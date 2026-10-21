@@ -4,6 +4,7 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/data/local/app_database.dart' hide Tag;
+import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -36,6 +37,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../../support/app_root_pages.dart';
+import '../../../support/graph_seed.dart';
 import '../../../support/in_memory_diagnostics_sink.dart';
 import '../../../support/ordinary_page_test_app.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
@@ -303,28 +305,30 @@ void main() {
         );
         await database.open();
         addTearDown(database.close);
-        for (final number in [100, 101]) {
+        seedRawGraph(raw, () {
+          for (final number in [100, 101]) {
+            raw.execute(
+              'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+              [_id(number), 'Намерение $number', 0, 0, number, number],
+            );
+          }
           raw.execute(
-            'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-            [_id(number), 'Намерение $number', 0, 0, number, number],
+            'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
+            [_id(200), _id(100), _id(101), 'need', 2, 0],
           );
-        }
-        raw.execute(
-          'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
-          [_id(200), _id(100), _id(101), 'need', 2, 0],
-        );
-        for (var number = 1; number <= 52; number++) {
-          raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-            _id(number),
-            number == 52 ? 'Дом' : 'Тег $number',
-          ]);
-        }
-        if (assigned) {
-          raw.execute(
-            'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-            [_id(52), _id(100)],
-          );
-        }
+          for (var number = 1; number <= 52; number++) {
+            raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+              _id(number),
+              number == 52 ? 'Дом' : 'Тег $number',
+            ]);
+          }
+          if (assigned) {
+            raw.execute(
+              'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+              [_id(52), _id(100)],
+            );
+          }
+        });
         final repository = DriftPersonalGraphRepository(
           database,
           UuidV7IntentionIdGenerator(),
@@ -340,6 +344,7 @@ void main() {
               personalGraphRepositoryProvider.overrideWithValue(repository),
             ],
             child: MaterialApp.router(
+              theme: doableTheme(Brightness.light),
               locale: const Locale('ru'),
               localizationsDelegates: AppLocalizations.localizationsDelegates,
               supportedLocales: AppLocalizations.supportedLocales,
@@ -417,28 +422,30 @@ void main() {
       );
       await database.open();
       addTearDown(database.close);
-      raw.execute(
-        'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-        [_id(100), 'Архивное намерение', 0, 1, 100, 100],
-      );
-      raw.execute(
-        'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-        [_id(101), 'Другое намерение', 0, 0, 101, 101],
-      );
-      raw.execute(
-        'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
-        [_id(200), _id(100), _id(101), 'need', 2, 1],
-      );
-      for (var number = 1; number <= 52; number++) {
-        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-          _id(number),
-          'Тег $number',
-        ]);
-      }
-      raw.execute(
-        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-        [_id(1), _id(100)],
-      );
+      seedRawGraph(raw, () {
+        raw.execute(
+          'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+          [_id(100), 'Архивное намерение', 0, 1, 100, 100],
+        );
+        raw.execute(
+          'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+          [_id(101), 'Другое намерение', 0, 0, 101, 101],
+        );
+        raw.execute(
+          'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
+          [_id(200), _id(100), _id(101), 'need', 2, 1],
+        );
+        for (var number = 1; number <= 52; number++) {
+          raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+            _id(number),
+            'Тег $number',
+          ]);
+        }
+        raw.execute(
+          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+          [_id(1), _id(100)],
+        );
+      });
       final repository = DriftPersonalGraphRepository(
         database,
         UuidV7IntentionIdGenerator(),
@@ -454,6 +461,7 @@ void main() {
             personalGraphRepositoryProvider.overrideWithValue(repository),
           ],
           child: MaterialApp.router(
+            theme: doableTheme(Brightness.light),
             locale: const Locale('ru'),
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
@@ -665,13 +673,18 @@ void main() {
     );
     await database.open();
     addTearDown(database.close);
-    for (var number = 1; number <= 51; number++) {
+    seedRawGraph(raw, () {
+      for (var number = 1; number <= 51; number++) {
+        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+          _id(number),
+          'Тег $number',
+        ]);
+      }
       raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-        _id(number),
-        'Тег $number',
+        _id(52),
+        'Дом',
       ]);
-    }
-    raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [_id(52), 'Дом']);
+    });
     final repository = DriftPersonalGraphRepository(
       database,
       UuidV7IntentionIdGenerator(),
@@ -687,6 +700,7 @@ void main() {
           personalGraphRepositoryProvider.overrideWithValue(repository),
         ],
         child: MaterialApp.router(
+          theme: doableTheme(Brightness.light),
           locale: const Locale('ru'),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
@@ -766,7 +780,9 @@ void main() {
     );
     await database.open();
     addTearDown(database.close);
-    raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [_id(1), 'Дом']);
+    seedRawGraph(raw, () {
+      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [_id(1), 'Дом']);
+    });
     final repository = DriftPersonalGraphRepository(
       database,
       UuidV7IntentionIdGenerator(),
@@ -782,6 +798,7 @@ void main() {
           personalGraphRepositoryProvider.overrideWithValue(repository),
         ],
         child: MaterialApp.router(
+          theme: doableTheme(Brightness.light),
           locale: const Locale('en'),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
@@ -839,18 +856,20 @@ void main() {
       );
       await database.open();
       addTearDown(database.close);
-      raw.execute(
-        'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-        [_id(100), 'Первое', 0, 0, 100, 100],
-      );
-      raw.execute(
-        'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-        [_id(101), 'Второе', 0, 0, 101, 101],
-      );
-      raw.execute(
-        'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
-        [_id(200), _id(100), _id(101), 'need', 2, 1],
-      );
+      seedRawGraph(raw, () {
+        raw.execute(
+          'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+          [_id(100), 'Первое', 0, 0, 100, 100],
+        );
+        raw.execute(
+          'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+          [_id(101), 'Второе', 0, 0, 101, 101],
+        );
+        raw.execute(
+          'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
+          [_id(200), _id(100), _id(101), 'need', 2, 1],
+        );
+      });
       final repository = DriftPersonalGraphRepository(
         database,
         UuidV7IntentionIdGenerator(),
@@ -866,6 +885,7 @@ void main() {
             personalGraphRepositoryProvider.overrideWithValue(repository),
           ],
           child: MaterialApp.router(
+            theme: doableTheme(Brightness.light),
             locale: const Locale('ru'),
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
@@ -945,11 +965,16 @@ void main() {
       );
       await database.open();
       addTearDown(database.close);
-      raw.execute(
-        'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-        [_id(100), 'Одинаковое имя', 0, 0, 100, 100],
-      );
-      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [_id(1), 'Дом']);
+      seedRawGraph(raw, () {
+        raw.execute(
+          'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+          [_id(100), 'Одинаковое имя', 0, 0, 100, 100],
+        );
+        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+          _id(1),
+          'Дом',
+        ]);
+      });
       final repository = DriftPersonalGraphRepository(
         database,
         UuidV7IntentionIdGenerator(),
@@ -965,6 +990,7 @@ void main() {
             personalGraphRepositoryProvider.overrideWithValue(repository),
           ],
           child: MaterialApp.router(
+            theme: doableTheme(Brightness.light),
             locale: const Locale('ru'),
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
@@ -1020,11 +1046,13 @@ void main() {
       expect(find.byKey(const ValueKey('tag-catalog-assign')), findsOneWidget);
       expect(raw.select('SELECT * FROM tag_assignments'), isEmpty);
 
-      raw.execute('DELETE FROM intentions WHERE id = ?', [_id(100)]);
-      raw.execute(
-        'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-        [_id(101), 'Одинаковое имя', 0, 0, 101, 101],
-      );
+      seedRawGraph(raw, () {
+        raw.execute('DELETE FROM intentions WHERE id = ?', [_id(100)]);
+        raw.execute(
+          'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+          [_id(101), 'Одинаковое имя', 0, 0, 101, 101],
+        );
+      });
       await tester.tap(find.byKey(const ValueKey('tag-catalog-assign')));
       await tester.pumpAndSettle();
       expect(raw.select('SELECT * FROM tag_assignments'), isEmpty);
@@ -1060,6 +1088,7 @@ void main() {
           personalGraphRepositoryProvider.overrideWithValue(repository),
         ],
         child: MaterialApp.router(
+          theme: doableTheme(Brightness.light),
           locale: const Locale('ru'),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
@@ -1139,20 +1168,22 @@ void main() {
     );
     final router = AppRouter();
     addTearDown(router.dispose);
-    raw.execute(
-      'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-      [_id(100), 'Архивное намерение', 0, 1, 100, 100],
-    );
-    for (var number = 1; number <= 150; number++) {
-      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-        _id(number),
-        'Тег $number',
-      ]);
-    }
-    raw.execute(
-      'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-      [_id(52), _id(100)],
-    );
+    seedRawGraph(raw, () {
+      raw.execute(
+        'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+        [_id(100), 'Архивное намерение', 0, 1, 100, 100],
+      );
+      for (var number = 1; number <= 150; number++) {
+        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+          _id(number),
+          'Тег $number',
+        ]);
+      }
+      raw.execute(
+        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+        [_id(52), _id(100)],
+      );
+    });
 
     await tester.pumpWidget(
       ProviderScope(
@@ -1161,6 +1192,7 @@ void main() {
           personalGraphRepositoryProvider.overrideWithValue(repository),
         ],
         child: MaterialApp.router(
+          theme: doableTheme(Brightness.light),
           locale: const Locale('ru'),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
@@ -1842,12 +1874,14 @@ void main() {
       );
       await database.open();
       addTearDown(database.close);
-      for (final (number, name) in [(1, 'Дом'), (2, 'Работа')]) {
-        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-          _id(number),
-          name,
-        ]);
-      }
+      seedRawGraph(raw, () {
+        for (final (number, name) in [(1, 'Дом'), (2, 'Работа')]) {
+          raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+            _id(number),
+            name,
+          ]);
+        }
+      });
       final repository = DriftPersonalGraphRepository(
         database,
         UuidV7IntentionIdGenerator(),
@@ -1889,6 +1923,7 @@ void main() {
         UncontrolledProviderScope(
           container: container,
           child: MaterialApp.router(
+            theme: doableTheme(Brightness.light),
             locale: const Locale('ru'),
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,

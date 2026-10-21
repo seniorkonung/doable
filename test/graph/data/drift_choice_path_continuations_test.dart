@@ -16,6 +16,7 @@ import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 
 String _uuid(int number) =>
@@ -53,12 +54,14 @@ final class _Fixture {
   Future<void> close() => database.close();
 
   void intention(int id, {bool ready = false, bool archived = false}) {
-    raw.execute(
-      '''INSERT INTO intentions
+    seedRawGraph(raw, () {
+      raw.execute(
+        '''INSERT INTO intentions
          (id, title, is_action_ready, is_archived, created_at, updated_at)
          VALUES (?, ?, ?, ?, 1, 1)''',
-      [_uuid(id), 'Намерение $id', ready ? 1 : 0, archived ? 1 : 0],
-    );
+        [_uuid(id), 'Намерение $id', ready ? 1 : 0, archived ? 1 : 0],
+      );
+    });
   }
 
   void relation(
@@ -69,19 +72,21 @@ final class _Fixture {
     int priority = 2,
     bool archived = false,
   }) {
-    raw.execute(
-      '''INSERT INTO long_term_relations
+    seedRawGraph(raw, () {
+      raw.execute(
+        '''INSERT INTO long_term_relations
          (id, source_intention_id, related_intention_id, type, priority,
           is_archived) VALUES (?, ?, ?, ?, ?, ?)''',
-      [
-        _uuid(id),
-        _uuid(source),
-        _uuid(related),
-        type,
-        priority,
-        archived ? 1 : 0,
-      ],
-    );
+        [
+          _uuid(id),
+          _uuid(source),
+          _uuid(related),
+          type,
+          priority,
+          archived ? 1 : 0,
+        ],
+      );
+    });
   }
 
   ChoicePathDraftProgress progress(int source, List<(int, int, int)> steps) =>
@@ -278,7 +283,7 @@ void main() {
           <Object>[1, _uuid(3)],
         ),
       ]) {
-        fixture.raw.execute(sql, args);
+        seedRawGraph(fixture.raw, () => fixture.raw.execute(sql, args));
         final result = await fixture.repository.getChoicePathContinuations(
           ChoicePathContinuationQuery(draft: draft),
         );
@@ -287,17 +292,19 @@ void main() {
           isA<ChoicePathContinuationSnapshotExpired>(),
           reason: sql,
         );
-        fixture.raw.execute(sql, restore);
+        seedRawGraph(fixture.raw, () => fixture.raw.execute(sql, restore));
       }
 
-      fixture.raw.execute(
-        'UPDATE long_term_relations SET is_archived = 1 WHERE id = ?',
-        [_uuid(101)],
-      );
-      fixture.raw.execute(
-        'UPDATE intentions SET is_archived = 1 WHERE id = ?',
-        [_uuid(1)],
-      );
+      seedRawGraph(fixture.raw, () {
+        fixture.raw.execute(
+          'UPDATE long_term_relations SET is_archived = 1 WHERE id = ?',
+          [_uuid(101)],
+        );
+        fixture.raw.execute(
+          'UPDATE intentions SET is_archived = 1 WHERE id = ?',
+          [_uuid(1)],
+        );
+      });
       final archived = await fixture.repository.getChoicePathContinuations(
         ChoicePathContinuationQuery(draft: draft),
       );
@@ -470,10 +477,12 @@ void main() {
       fixture.relation(101, 1, 2);
       // Название с пробелами по краям приложение не сохраняет, а схема
       // допускает.
-      fixture.raw.execute('UPDATE intentions SET title = ? WHERE id = ?', [
-        ' Название ',
-        _uuid(1),
-      ]);
+      seedRawGraph(fixture.raw, () {
+        fixture.raw.execute('UPDATE intentions SET title = ? WHERE id = ?', [
+          ' Название ',
+          _uuid(1),
+        ]);
+      });
       final corrupted = await fixture.repository.getChoicePathContinuations(
         ChoicePathContinuationQuery(
           draft: ChoicePathDraftBottomStart(_intention(2)),
@@ -548,14 +557,16 @@ void main() {
         (await fixture.page(fixture.progress(1, [(101, 1, 2)]))).items,
         isEmpty,
       );
-      fixture.raw.execute(
-        'UPDATE long_term_relations SET is_archived = 0 WHERE id = ?',
-        [_uuid(102)],
-      );
-      fixture.raw.execute(
-        'UPDATE long_term_relations SET type = ? WHERE id = ?',
-        ['can', _uuid(101)],
-      );
+      seedRawGraph(fixture.raw, () {
+        fixture.raw.execute(
+          'UPDATE long_term_relations SET is_archived = 0 WHERE id = ?',
+          [_uuid(102)],
+        );
+        fixture.raw.execute(
+          'UPDATE long_term_relations SET type = ? WHERE id = ?',
+          ['can', _uuid(101)],
+        );
+      });
       final result = await fixture.repository.getChoicePathContinuations(
         ChoicePathContinuationQuery(draft: fixture.progress(1, [(101, 1, 2)])),
       );
@@ -825,7 +836,8 @@ void main() {
       );
       try {
         await database.open();
-        await database.customStatement('''
+        await seedGraph(database, () async {
+          await database.customStatement('''
         WITH RECURSIVE ids(n) AS (
           VALUES(1) UNION ALL SELECT n + 1 FROM ids WHERE n < 4000
         )
@@ -834,8 +846,12 @@ void main() {
         SELECT printf('018f0b5d-6b2e-7c80-8000-%012x', n),
                'Намерение', n = 4000, 0, 1, 1 FROM ids
       ''');
-        for (final (offset, idBase) in [(1, 10000), (7, 20000), (37, 30000)]) {
-          await database.customStatement('''
+          for (final (offset, idBase) in [
+            (1, 10000),
+            (7, 20000),
+            (37, 30000),
+          ]) {
+            await database.customStatement('''
           WITH RECURSIVE ids(n) AS (
             VALUES(1) UNION ALL SELECT n + 1 FROM ids WHERE n < ${4000 - offset}
           )
@@ -847,7 +863,8 @@ void main() {
                  printf('018f0b5d-6b2e-7c80-8000-%012x', n + $offset),
                  'need', 2, 0 FROM ids
         ''');
-        }
+          }
+        });
         final repository = DriftPersonalGraphRepository(
           database,
           UuidV7IntentionIdGenerator(),
@@ -936,13 +953,16 @@ void main() {
     );
     fixture.intention(2);
     fixture.relation(101, 1, 2);
-    fixture.raw.execute(
-      'UPDATE long_term_relations SET is_archived = 1 WHERE id = ?',
-      [_uuid(101)],
-    );
-    fixture.raw.execute('UPDATE intentions SET is_archived = 1 WHERE id = ?', [
-      _uuid(1),
-    ]);
+    seedRawGraph(fixture.raw, () {
+      fixture.raw.execute(
+        'UPDATE long_term_relations SET is_archived = 1 WHERE id = ?',
+        [_uuid(101)],
+      );
+      fixture.raw.execute(
+        'UPDATE intentions SET is_archived = 1 WHERE id = ?',
+        [_uuid(1)],
+      );
+    });
     final stale = await fixture.repository.getChoicePathContinuations(
       ChoicePathContinuationQuery(draft: fixture.progress(1, [(101, 1, 2)])),
     );

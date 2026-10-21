@@ -19,6 +19,7 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import 'graph_seed.dart';
 import 'in_memory_diagnostics_sink.dart';
 
 String durabilityUuid(int number) =>
@@ -69,39 +70,40 @@ DriftPersonalGraphRepository durabilityRepository(
   choicePathStepIdGenerator: SequentialStepIds(firstStepNumber),
 );
 
-Future<void> seedDurabilityGraph(AppDatabase database) async {
-  for (var number = 1; number <= 5; number++) {
-    await database.customStatement(
-      '''INSERT INTO intentions
+Future<void> seedDurabilityGraph(AppDatabase database) =>
+    seedGraph(database, () async {
+      for (var number = 1; number <= 5; number++) {
+        await database.customStatement(
+          '''INSERT INTO intentions
          (id, title, is_action_ready, is_archived, created_at, updated_at)
          VALUES (?, ?, ?, 0, 1, 1)''',
-      [
-        durabilityUuid(number),
-        'Намерение $number',
-        number == 3 || number == 4 ? 1 : 0,
-      ],
-    );
-  }
-  for (final (number, source, related, type) in [
-    (101, 1, 2, 'need'),
-    (102, 2, 3, 'can'),
-    (103, 1, 4, 'need'),
-    (104, 1, 5, 'can'),
-  ]) {
-    await database.customStatement(
-      '''INSERT INTO long_term_relations
+          [
+            durabilityUuid(number),
+            'Намерение $number',
+            number == 3 || number == 4 ? 1 : 0,
+          ],
+        );
+      }
+      for (final (number, source, related, type) in [
+        (101, 1, 2, 'need'),
+        (102, 2, 3, 'can'),
+        (103, 1, 4, 'need'),
+        (104, 1, 5, 'can'),
+      ]) {
+        await database.customStatement(
+          '''INSERT INTO long_term_relations
          (id, source_intention_id, related_intention_id,
           type, priority, is_archived)
          VALUES (?, ?, ?, ?, 2, 0)''',
-      [
-        durabilityUuid(number),
-        durabilityUuid(source),
-        durabilityUuid(related),
-        type,
-      ],
-    );
-  }
-}
+          [
+            durabilityUuid(number),
+            durabilityUuid(source),
+            durabilityUuid(related),
+            type,
+          ],
+        );
+      }
+    });
 
 /// Дата дневного выбора, создаваемого [durabilityCreate] по умолчанию.
 final durabilityChoiceDate = CalendarDate.fromParts(2026, 9, 23);

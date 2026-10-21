@@ -1267,6 +1267,383 @@ class AppLocalizationsRu extends AppLocalizations {
   String get graphOperationTagAssignment => 'назначение тега';
 
   @override
+  String get dataExportSaved => 'Данные сохранены в файл';
+
+  @override
+  String get dataExportFailed => 'Не удалось сохранить файл';
+
+  @override
+  String get dataExportExistingFile =>
+      'Такой файл уже есть. Сохраните копию под новым именем';
+
+  @override
+  String get dataBackupRestored => 'Копия восстановлена';
+
+  @override
+  String get dataBackupRestoreFailed =>
+      'Не удалось восстановить копию. Ничего не изменено';
+
+  @override
+  String get dataReplacementStorageFull =>
+      'Недостаточно места на устройстве. Освободите место и повторите. Ничего не изменено';
+
+  @override
+  String get dataImported => 'Данные импортированы';
+
+  @override
+  String get dataImportInvalidFile =>
+      'Не удалось импортировать файл. Это не экспорт Doable, или он повреждён. Ничего не изменено';
+
+  @override
+  String get dataImportNewerVersion =>
+      'Файл создан более новой версией Doable. Обновите приложение, чтобы импортировать его. Ничего не изменено';
+
+  @override
+  String get dataImportUnreadable =>
+      'Не удалось прочитать файл. Проверьте доступ к нему и повторите. Ничего не изменено';
+
+  @override
+  String get dataImportFailed =>
+      'Не удалось импортировать данные. Ничего не изменено';
+
+  @override
+  String get dataManualBackupFailed => 'Не удалось сделать копию';
+
+  @override
+  String get settingsTitle => 'Настройки';
+
+  @override
+  String get dataSectionTitle => 'Данные';
+
+  @override
+  String get dataSectionLocalOnly =>
+      'Всё, что вы пишете, хранится только на этом устройстве.';
+
+  @override
+  String get dataExportTitle => 'Экспорт данных';
+
+  @override
+  String get dataExportHint => 'Сохранить копию всего в файл';
+
+  @override
+  String get dataExportNothing => 'Пока нечего экспортировать';
+
+  @override
+  String get dataExportRunning => 'Сохраняется в файл…';
+
+  @override
+  String dataExportProgress(double share) {
+    final intl.NumberFormat shareNumberFormat =
+        intl.NumberFormat.percentPattern(localeName);
+    final String shareString = shareNumberFormat.format(share);
+
+    return '$shareString';
+  }
+
+  @override
+  String dataExportComposition(
+    int intentions,
+    int relations,
+    int dailyChoices,
+    int tags,
+  ) {
+    final intl.NumberFormat intentionsNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String intentionsString = intentionsNumberFormat.format(intentions);
+    final intl.NumberFormat relationsNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String relationsString = relationsNumberFormat.format(relations);
+    final intl.NumberFormat dailyChoicesNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String dailyChoicesString = dailyChoicesNumberFormat.format(
+      dailyChoices,
+    );
+    final intl.NumberFormat tagsNumberFormat = intl.NumberFormat.decimalPattern(
+      localeName,
+    );
+    final String tagsString = tagsNumberFormat.format(tags);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      intentions,
+      locale: localeName,
+      other: '$intentionsString намерения',
+      many: '$intentionsString намерений',
+      few: '$intentionsString намерения',
+      one: '$intentionsString намерение',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      relations,
+      locale: localeName,
+      other: '$relationsString связи',
+      many: '$relationsString связей',
+      few: '$relationsString связи',
+      one: '$relationsString связь',
+    );
+    String _temp2 = intl.Intl.pluralLogic(
+      dailyChoices,
+      locale: localeName,
+      other: '$dailyChoicesString дневного выбора',
+      many: '$dailyChoicesString дневных выборов',
+      few: '$dailyChoicesString дневных выбора',
+      one: '$dailyChoicesString дневной выбор',
+    );
+    String _temp3 = intl.Intl.pluralLogic(
+      tags,
+      locale: localeName,
+      other: '$tagsString тега',
+      many: '$tagsString тегов',
+      few: '$tagsString тега',
+      one: '$tagsString тег',
+    );
+    return '$_temp0, $_temp1, $_temp2 и $_temp3 в одном файле';
+  }
+
+  @override
+  String get dataExportUnprotected =>
+      'Файл не защищён. Любой, у кого он есть, сможет прочитать написанное.';
+
+  @override
+  String get dataExportSave => 'Сохранить в файл';
+
+  @override
+  String get dataImportTitle => 'Импорт данных';
+
+  @override
+  String get dataImportHint => 'Заменить всё копией из файла';
+
+  @override
+  String get dataImportHintEmptyGraph => 'Вернуть копию из файла';
+
+  @override
+  String get dataImportChooseAnotherFile => 'Выбрать другой файл';
+
+  @override
+  String get dataBackupsTitle => 'Резервные копии';
+
+  @override
+  String get dataBackupsExplanation =>
+      'Копия делается каждый день, если данные менялись, и хранится на этом устройстве. Остаются 7 последних ежедневных копий. Выберите копию, чтобы восстановить её.';
+
+  @override
+  String get dataBackupsMakeNow => 'Сделать копию сейчас';
+
+  @override
+  String get dataBackupsReadFailed => 'Не удалось загрузить копии';
+
+  @override
+  String get dataBackupsLastJustNow => 'Последняя копия только что';
+
+  @override
+  String dataBackupsLastToday(String time) {
+    return 'Последняя копия сегодня в $time';
+  }
+
+  @override
+  String dataBackupsLastYesterday(String time) {
+    return 'Последняя копия вчера в $time';
+  }
+
+  @override
+  String dataBackupsLastOn(String date, String time) {
+    return 'Последняя копия $date в $time';
+  }
+
+  @override
+  String get dataBackupsNone => 'Пока нет копий';
+
+  @override
+  String get dataBackupsNothing => 'Пока нечего копировать';
+
+  @override
+  String dataBackupMadeToday(String time) {
+    return 'Сегодня, $time';
+  }
+
+  @override
+  String dataBackupMadeYesterday(String time) {
+    return 'Вчера, $time';
+  }
+
+  @override
+  String dataBackupMadeOn(String date, String time) {
+    return '$date, $time';
+  }
+
+  @override
+  String dataBackupRestoreMadeToday(String time) {
+    return 'Восстановить копию от сегодня, $time';
+  }
+
+  @override
+  String dataBackupRestoreMadeYesterday(String time) {
+    return 'Восстановить копию от вчера, $time';
+  }
+
+  @override
+  String dataBackupRestoreMadeOn(String date, String time) {
+    return 'Восстановить копию от $date, $time';
+  }
+
+  @override
+  String dataBackupAdded(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    return '$countString добавлено';
+  }
+
+  @override
+  String dataBackupChanged(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    return '$countString изменено';
+  }
+
+  @override
+  String dataBackupDeleted(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    return '$countString удалено';
+  }
+
+  @override
+  String get dataBackupNoChanges => 'Нет изменений';
+
+  @override
+  String get dataBackupDataReplaced => 'Данные заменены';
+
+  @override
+  String get dataRestoreRunning => 'Восстановление копии…';
+
+  @override
+  String get dataImportRunning => 'Импорт данных…';
+
+  @override
+  String dataReplacementProgress(double share) {
+    final intl.NumberFormat shareNumberFormat =
+        intl.NumberFormat.percentPattern(localeName);
+    final String shareString = shareNumberFormat.format(share);
+
+    return '$shareString';
+  }
+
+  @override
+  String get dataReplacementCancel => 'Отменить';
+
+  @override
+  String get dataReplacementCancelling => 'Отмена…';
+
+  @override
+  String get dataRestoreConfirmationTitle => 'Восстановить эту копию?';
+
+  @override
+  String dataRestoreMadeToday(String time) {
+    return 'Она сделана сегодня в $time.';
+  }
+
+  @override
+  String dataRestoreMadeYesterday(String time) {
+    return 'Она сделана вчера в $time.';
+  }
+
+  @override
+  String dataRestoreMadeOn(String date, String time) {
+    return 'Она сделана $date в $time.';
+  }
+
+  @override
+  String dataRestoreChangesSince(String changes) {
+    return 'С тех пор: $changes. Восстановление отменит всё это.';
+  }
+
+  @override
+  String get dataRestoreNoChangesSince => 'С тех пор ничего не изменилось.';
+
+  @override
+  String get dataRestoreReplacedSince =>
+      'С тех пор данные заменялись. Восстановление отменит все изменения.';
+
+  @override
+  String get dataReplacementReplacesEverything =>
+      'Она заменит всё, что сейчас есть в Doable. Сначала текущее состояние сохраняется как резервная копия.';
+
+  @override
+  String get dataReplacementConfirmationCancel => 'Отмена';
+
+  @override
+  String get dataRestoreConfirm => 'Восстановить копию';
+
+  @override
+  String get dataImportConfirmationTitle => 'Импортировать эту копию?';
+
+  @override
+  String dataImportConfirmationFacts(
+    String date,
+    int intentions,
+    int relations,
+    int dailyChoices,
+    int tags,
+  ) {
+    final intl.NumberFormat intentionsNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String intentionsString = intentionsNumberFormat.format(intentions);
+    final intl.NumberFormat relationsNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String relationsString = relationsNumberFormat.format(relations);
+    final intl.NumberFormat dailyChoicesNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String dailyChoicesString = dailyChoicesNumberFormat.format(
+      dailyChoices,
+    );
+    final intl.NumberFormat tagsNumberFormat = intl.NumberFormat.decimalPattern(
+      localeName,
+    );
+    final String tagsString = tagsNumberFormat.format(tags);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      intentions,
+      locale: localeName,
+      other: '$intentionsString намерения',
+      many: '$intentionsString намерений',
+      few: '$intentionsString намерения',
+      one: '$intentionsString намерение',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      relations,
+      locale: localeName,
+      other: '$relationsString связи',
+      many: '$relationsString связей',
+      few: '$relationsString связи',
+      one: '$relationsString связь',
+    );
+    String _temp2 = intl.Intl.pluralLogic(
+      dailyChoices,
+      locale: localeName,
+      other: '$dailyChoicesString дневного выбора',
+      many: '$dailyChoicesString дневных выборов',
+      few: '$dailyChoicesString дневных выбора',
+      one: '$dailyChoicesString дневной выбор',
+    );
+    String _temp3 = intl.Intl.pluralLogic(
+      tags,
+      locale: localeName,
+      other: '$tagsString тега',
+      many: '$tagsString тегов',
+      few: '$tagsString тега',
+      one: '$tagsString тег',
+    );
+    return 'Она сохранена $date года и содержит $_temp0, $_temp1, $_temp2 и $_temp3.';
+  }
+
+  @override
+  String get dataImportConfirm => 'Импортировать и заменить';
+
+  @override
   String get tagNavigationTitle => 'Намерения с тегом';
 
   @override

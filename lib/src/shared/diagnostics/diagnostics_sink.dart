@@ -46,6 +46,26 @@ enum DiagnosticsFailureCode {
   conflict,
   unavailable,
   corruption,
+
+  /// Файл снимка графа не прошёл проверку при чтении: размер или SHA-256 не
+  /// совпали с реестром снимков, файла нет или его записи не читаются.
+  snapshotCorruption,
+
+  /// На устройстве не хватило места: база сообщила `SQLITE_FULL` или запись
+  /// файла отказала с `ENOSPC`.
+  storageFull,
+
+  /// Файл, выбранный для импорта, не является экспортом Doable или повреждён,
+  /// в том числе нарушает правила данных графа.
+  invalidGraphFile,
+
+  /// Файл, выбранный для импорта, создан более новой версией формата данных
+  /// графа, чем поддерживает приложение.
+  newerGraphFormatVersion,
+
+  /// Документ, выбранный в системном диалоге, не прочитан: поставщик не
+  /// открыл его, или чтение прервалось.
+  documentUnreadable,
   incompatibleSchema,
   unexpected,
 }
@@ -441,4 +461,313 @@ final class BlockingRelationsDeleteDiagnosticsEvent extends DiagnosticsEvent {
   const BlockingRelationsDeleteDiagnosticsEvent({
     required DiagnosticsStatus status,
   }) : super(status);
+}
+
+/// Этап записи снимка графа.
+enum GraphSnapshotWriteDiagnosticsStage {
+  /// Сборка состояния из прежнего снимка и пакетов фактов после него.
+  stateAssembly,
+
+  /// Надёжная запись файла снимка под окончательным именем.
+  fileWrite,
+
+  /// Регистрация снимка в реестре снимков.
+  registration,
+}
+
+/// Запись снимка графа: исход, длительность, а у отказа — этап и безопасная
+/// категория, в том числе повреждение прежнего снимка.
+///
+/// Позиции лога, имена и пути файлов, содержимое снимка и исходное
+/// исключение не входят в контракт события. Конструкторы допускают этап
+/// только у отказа. Передача получателю — через [recordDiagnosticsSafely].
+final class GraphSnapshotWriteDiagnosticsEvent extends DiagnosticsEvent {
+  GraphSnapshotWriteDiagnosticsEvent.succeeded({required Duration duration})
+    : stage = null,
+      super(DiagnosticsSucceeded(duration));
+
+  GraphSnapshotWriteDiagnosticsEvent.failed({
+    required GraphSnapshotWriteDiagnosticsStage this.stage,
+    required Duration duration,
+    required DiagnosticsFailureCode code,
+  }) : super(DiagnosticsFailed(duration: duration, code: code));
+
+  final GraphSnapshotWriteDiagnosticsStage? stage;
+}
+
+/// Этап пересборки снимка графа из базы.
+enum GraphSnapshotRebuildDiagnosticsStage {
+  /// Чтение записей графа из базы порциями во временный файл.
+  databaseRead,
+
+  /// Сборка состояния из временного файла и пакетов фактов после первой
+  /// порции.
+  stateAssembly,
+
+  /// Надёжная запись файла снимка под окончательным именем.
+  fileWrite,
+
+  /// Регистрация снимка в реестре снимков.
+  registration,
+}
+
+/// Пересборка снимка графа из базы после того, как последний снимок не
+/// прошёл проверку: исход, длительность, а у отказа — этап и безопасная
+/// категория.
+///
+/// Позиции лога, имена и пути файлов, записи графа и исходное исключение не
+/// входят в контракт события. Конструкторы допускают этап только у отказа.
+/// Передача получателю — через [recordDiagnosticsSafely].
+final class GraphSnapshotRebuildDiagnosticsEvent extends DiagnosticsEvent {
+  GraphSnapshotRebuildDiagnosticsEvent.succeeded({required Duration duration})
+    : stage = null,
+      super(DiagnosticsSucceeded(duration));
+
+  GraphSnapshotRebuildDiagnosticsEvent.failed({
+    required GraphSnapshotRebuildDiagnosticsStage this.stage,
+    required Duration duration,
+    required DiagnosticsFailureCode code,
+  }) : super(DiagnosticsFailed(duration: duration, code: code));
+
+  final GraphSnapshotRebuildDiagnosticsStage? stage;
+}
+
+/// Этап фонового сжатия лога фактов.
+enum GraphLogCompactionDiagnosticsStage {
+  /// Сверка числа пакетов после последнего снимка с порогом сжатия.
+  check,
+
+  /// Запись снимка в отдельном изоляте, в том числе его пересборка из базы.
+  snapshotWrite,
+
+  /// Удаление истории до нового снимка.
+  historyRemoval,
+}
+
+/// Сжатие лога фактов в снимок: исход, длительность, а у отказа — этап и
+/// безопасная категория. Сверка, после которой сжатие не понадобилось,
+/// события не даёт.
+///
+/// Позиции лога, пороги, имена и пути файлов и исходное исключение не входят
+/// в контракт события. Конструкторы допускают этап только у отказа.
+/// Передача получателю — через [recordDiagnosticsSafely].
+final class GraphLogCompactionDiagnosticsEvent extends DiagnosticsEvent {
+  GraphLogCompactionDiagnosticsEvent.succeeded({required Duration duration})
+    : stage = null,
+      super(DiagnosticsSucceeded(duration));
+
+  GraphLogCompactionDiagnosticsEvent.failed({
+    required GraphLogCompactionDiagnosticsStage this.stage,
+    required Duration duration,
+    required DiagnosticsFailureCode code,
+  }) : super(DiagnosticsFailed(duration: duration, code: code));
+
+  final GraphLogCompactionDiagnosticsStage? stage;
+}
+
+/// Этап очистки каталога снимков.
+enum GraphSnapshotCleanupDiagnosticsStage {
+  /// Чтение имён файлов зарегистрированных снимков.
+  registryRead,
+
+  /// Удаление незарегистрированных и временных файлов каталога.
+  fileRemoval,
+}
+
+/// Очистка каталога снимков от незарегистрированных и временных файлов:
+/// исход, длительность, а у отказа — этап и безопасная категория.
+///
+/// Имена и пути файлов, их число и исходное исключение не входят в контракт
+/// события. Конструкторы допускают этап только у отказа. Передача
+/// получателю — через [recordDiagnosticsSafely].
+final class GraphSnapshotCleanupDiagnosticsEvent extends DiagnosticsEvent {
+  GraphSnapshotCleanupDiagnosticsEvent.succeeded({required Duration duration})
+    : stage = null,
+      super(DiagnosticsSucceeded(duration));
+
+  GraphSnapshotCleanupDiagnosticsEvent.failed({
+    required GraphSnapshotCleanupDiagnosticsStage this.stage,
+    required Duration duration,
+    required DiagnosticsFailureCode code,
+  }) : super(DiagnosticsFailed(duration: duration, code: code));
+
+  final GraphSnapshotCleanupDiagnosticsStage? stage;
+}
+
+/// Чтение состава графа: исход, длительность, а у отказа — безопасная
+/// категория, в том числе повреждение хранилища.
+///
+/// Числа сущностей и исходное исключение не входят в контракт события.
+/// Конструкторы допускают только завершённое чтение. Передача получателю —
+/// через [recordDiagnosticsSafely].
+final class GraphCompositionReadDiagnosticsEvent extends DiagnosticsEvent {
+  GraphCompositionReadDiagnosticsEvent.succeeded({required Duration duration})
+    : super(DiagnosticsSucceeded(duration));
+
+  GraphCompositionReadDiagnosticsEvent.failed({
+    required Duration duration,
+    required DiagnosticsFailureCode code,
+  }) : super(DiagnosticsFailed(duration: duration, code: code));
+}
+
+/// Этап экспорта графа в документ.
+enum GraphExportDiagnosticsStage {
+  /// Создание документа системным диалогом сохранения.
+  documentCreation,
+
+  /// Запись состояния графа в файл во временном каталоге приложения.
+  temporaryFileWrite,
+
+  /// Копирование временного файла в документ.
+  documentWrite,
+}
+
+/// Экспорт графа в документ: исход, длительность записи после выбора
+/// документа, а у отказа — этап и безопасная категория, в том числе
+/// повреждение снимка. Отмена системного диалога отказом не считается и
+/// события не даёт.
+///
+/// Записи графа, имена, пути и адреса файлов и документов и исходное
+/// исключение не входят в контракт события. Конструкторы допускают этап
+/// только у отказа. Передача получателю — через [recordDiagnosticsSafely].
+final class GraphExportDiagnosticsEvent extends DiagnosticsEvent {
+  GraphExportDiagnosticsEvent.succeeded({required Duration duration})
+    : stage = null,
+      super(DiagnosticsSucceeded(duration));
+
+  GraphExportDiagnosticsEvent.failed({
+    required GraphExportDiagnosticsStage this.stage,
+    required Duration duration,
+    required DiagnosticsFailureCode code,
+  }) : super(DiagnosticsFailed(duration: duration, code: code));
+
+  final GraphExportDiagnosticsStage? stage;
+}
+
+/// Вид создаваемой резервной копии графа.
+enum GraphBackupCreationDiagnosticsKind { daily, manual, beforeReplacement }
+
+/// Этап создания резервной копии графа.
+enum GraphBackupCreationDiagnosticsStage {
+  /// Чтение списка копий и подсчёт сводки изменений по пакетам лога после
+  /// позиции предыдущей копии.
+  changeSummary,
+
+  /// Запись копии в реестр копий, у ежедневной копии — вместе с удалением
+  /// копий окном хранения.
+  registration,
+}
+
+/// Создание резервной копии графа: вид копии, исход, длительность, а у
+/// отказа — этап и безопасная категория, в том числе нехватка места.
+/// Ежедневная копия, которая не понадобилась, события не даёт.
+///
+/// Позиции лога, моменты копий, сводки, записи графа и исходное исключение
+/// не входят в контракт события. Конструкторы допускают этап только у
+/// отказа. Передача получателю — через [recordDiagnosticsSafely].
+final class GraphBackupCreationDiagnosticsEvent extends DiagnosticsEvent {
+  GraphBackupCreationDiagnosticsEvent.succeeded({
+    required this.kind,
+    required Duration duration,
+  }) : stage = null,
+       super(DiagnosticsSucceeded(duration));
+
+  GraphBackupCreationDiagnosticsEvent.failed({
+    required this.kind,
+    required GraphBackupCreationDiagnosticsStage this.stage,
+    required Duration duration,
+    required DiagnosticsFailureCode code,
+  }) : super(DiagnosticsFailed(duration: duration, code: code));
+
+  final GraphBackupCreationDiagnosticsKind kind;
+  final GraphBackupCreationDiagnosticsStage? stage;
+}
+
+/// Автоматическое удаление резервных копий окном хранения при записи
+/// ежедневной копии: исход, длительность, а у отказа — безопасная категория.
+/// Ежедневная копия, которая не вытеснила ни одной копии, события удаления
+/// не даёт.
+///
+/// Число, виды, позиции и моменты удалённых копий и исходное исключение не
+/// входят в контракт события. Передача получателю — через
+/// [recordDiagnosticsSafely].
+final class GraphBackupRemovalDiagnosticsEvent extends DiagnosticsEvent {
+  GraphBackupRemovalDiagnosticsEvent.succeeded({required Duration duration})
+    : super(DiagnosticsSucceeded(duration));
+
+  GraphBackupRemovalDiagnosticsEvent.failed({
+    required Duration duration,
+    required DiagnosticsFailureCode code,
+  }) : super(DiagnosticsFailed(duration: duration, code: code));
+}
+
+/// Этап восстановления резервной копии графа.
+enum GraphBackupRestoreDiagnosticsStage {
+  /// Проверка, что копия хранится, и запись её состояния в снимок замены.
+  snapshotWrite,
+
+  /// Замена графа снимком замены в монопольном режиме координатора.
+  replacement,
+}
+
+/// Восстановление резервной копии графа: исход, длительность, а у отказа —
+/// этап и безопасная категория, в том числе повреждение снимка и нехватка
+/// места. Отмена восстановления отказом не считается и события не даёт.
+///
+/// Позиция и момент копии, записи графа, имена и пути файлов и исходное
+/// исключение не входят в контракт события. Конструкторы допускают этап
+/// только у отказа. Передача получателю — через [recordDiagnosticsSafely].
+final class GraphBackupRestoreDiagnosticsEvent extends DiagnosticsEvent {
+  GraphBackupRestoreDiagnosticsEvent.succeeded({required Duration duration})
+    : stage = null,
+      super(DiagnosticsSucceeded(duration));
+
+  GraphBackupRestoreDiagnosticsEvent.failed({
+    required GraphBackupRestoreDiagnosticsStage this.stage,
+    required Duration duration,
+    required DiagnosticsFailureCode code,
+  }) : super(DiagnosticsFailed(duration: duration, code: code));
+
+  final GraphBackupRestoreDiagnosticsStage? stage;
+}
+
+/// Этап импорта графа из файла экспорта.
+enum GraphImportDiagnosticsStage {
+  /// Открытие документа системным диалогом выбора, его копирование во
+  /// временный файл приложения и чтение заголовка копии.
+  documentRead,
+
+  /// Проверка данных файла: формата, версии формата, полей и количеств
+  /// записей и правил данных графа, в том числе тех, нарушение которых
+  /// обнаружили схема хранилища или общая проверка пути в транзакции замены.
+  dataValidation,
+
+  /// Запись проверенных записей файла в снимок замены.
+  snapshotWrite,
+
+  /// Замена графа снимком замены в монопольном режиме координатора.
+  replacement,
+}
+
+/// Импорт графа из файла экспорта: исход, длительность работы после выбора
+/// документа без ожидания подтверждения, а у отказа — этап и безопасная
+/// категория. Отмена диалога, отказ от подтверждения и отмена импорта
+/// отказом не считаются и события не дают.
+///
+/// Записи графа, названия, описания, даты дневных выборов, идентификаторы,
+/// имя, путь и адрес файла и документа и исходное исключение не входят в
+/// контракт события. Конструкторы допускают этап только у отказа. Передача
+/// получателю — через [recordDiagnosticsSafely].
+final class GraphImportDiagnosticsEvent extends DiagnosticsEvent {
+  GraphImportDiagnosticsEvent.succeeded({required Duration duration})
+    : stage = null,
+      super(DiagnosticsSucceeded(duration));
+
+  GraphImportDiagnosticsEvent.failed({
+    required GraphImportDiagnosticsStage this.stage,
+    required Duration duration,
+    required DiagnosticsFailureCode code,
+  }) : super(DiagnosticsFailed(duration: duration, code: code));
+
+  final GraphImportDiagnosticsStage? stage;
 }

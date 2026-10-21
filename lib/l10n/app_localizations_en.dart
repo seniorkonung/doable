@@ -1261,6 +1261,367 @@ class AppLocalizationsEn extends AppLocalizations {
   String get graphOperationTagAssignment => 'tag assignment';
 
   @override
+  String get dataExportSaved => 'Data saved to a file';
+
+  @override
+  String get dataExportFailed => 'Couldn’t save the file';
+
+  @override
+  String get dataExportExistingFile =>
+      'That file already exists. Save the copy under a new name';
+
+  @override
+  String get dataBackupRestored => 'Copy restored';
+
+  @override
+  String get dataBackupRestoreFailed =>
+      'Couldn’t restore the copy. Nothing was changed';
+
+  @override
+  String get dataReplacementStorageFull =>
+      'Not enough space on the device. Free up space and try again. Nothing was changed';
+
+  @override
+  String get dataImported => 'Data imported';
+
+  @override
+  String get dataImportInvalidFile =>
+      'Couldn’t import the file. It isn’t a Doable export, or it’s damaged. Nothing was changed';
+
+  @override
+  String get dataImportNewerVersion =>
+      'The file was created by a newer version of Doable. Update the app to import it. Nothing was changed';
+
+  @override
+  String get dataImportUnreadable =>
+      'Couldn’t read the file. Check that you can access it and try again. Nothing was changed';
+
+  @override
+  String get dataImportFailed =>
+      'Couldn’t import the data. Nothing was changed';
+
+  @override
+  String get dataManualBackupFailed => 'Couldn’t back up';
+
+  @override
+  String get settingsTitle => 'Settings';
+
+  @override
+  String get dataSectionTitle => 'Data';
+
+  @override
+  String get dataSectionLocalOnly =>
+      'Everything you write is stored only on this device.';
+
+  @override
+  String get dataExportTitle => 'Export data';
+
+  @override
+  String get dataExportHint => 'Save a copy of everything to a file';
+
+  @override
+  String get dataExportNothing => 'Nothing to export yet';
+
+  @override
+  String get dataExportRunning => 'Saving to a file…';
+
+  @override
+  String dataExportProgress(double share) {
+    final intl.NumberFormat shareNumberFormat =
+        intl.NumberFormat.percentPattern(localeName);
+    final String shareString = shareNumberFormat.format(share);
+
+    return '$shareString';
+  }
+
+  @override
+  String dataExportComposition(
+    int intentions,
+    int relations,
+    int dailyChoices,
+    int tags,
+  ) {
+    final intl.NumberFormat intentionsNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String intentionsString = intentionsNumberFormat.format(intentions);
+    final intl.NumberFormat relationsNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String relationsString = relationsNumberFormat.format(relations);
+    final intl.NumberFormat dailyChoicesNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String dailyChoicesString = dailyChoicesNumberFormat.format(
+      dailyChoices,
+    );
+    final intl.NumberFormat tagsNumberFormat = intl.NumberFormat.decimalPattern(
+      localeName,
+    );
+    final String tagsString = tagsNumberFormat.format(tags);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      intentions,
+      locale: localeName,
+      other: '$intentionsString intentions',
+      one: '$intentionsString intention',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      relations,
+      locale: localeName,
+      other: '$relationsString relations',
+      one: '$relationsString relation',
+    );
+    String _temp2 = intl.Intl.pluralLogic(
+      dailyChoices,
+      locale: localeName,
+      other: '$dailyChoicesString daily choices',
+      one: '$dailyChoicesString daily choice',
+    );
+    String _temp3 = intl.Intl.pluralLogic(
+      tags,
+      locale: localeName,
+      other: '$tagsString tags',
+      one: '$tagsString tag',
+    );
+    return '$_temp0, $_temp1, $_temp2 and $_temp3 in one file';
+  }
+
+  @override
+  String get dataExportUnprotected =>
+      'The file is not protected. Anyone who has it can read what you wrote.';
+
+  @override
+  String get dataExportSave => 'Save to a file';
+
+  @override
+  String get dataImportTitle => 'Import data';
+
+  @override
+  String get dataImportHint => 'Replace everything with a copy from a file';
+
+  @override
+  String get dataImportHintEmptyGraph => 'Bring back a copy from a file';
+
+  @override
+  String get dataImportChooseAnotherFile => 'Choose another file';
+
+  @override
+  String get dataBackupsTitle => 'Backups';
+
+  @override
+  String get dataBackupsExplanation =>
+      'A copy is made each day your data changes and stays on this device. The 7 most recent daily copies are kept. Choose a copy to restore it.';
+
+  @override
+  String get dataBackupsMakeNow => 'Back up now';
+
+  @override
+  String get dataBackupsReadFailed => 'Couldn’t load backups';
+
+  @override
+  String get dataBackupsLastJustNow => 'Last copy just now';
+
+  @override
+  String dataBackupsLastToday(String time) {
+    return 'Last copy today at $time';
+  }
+
+  @override
+  String dataBackupsLastYesterday(String time) {
+    return 'Last copy yesterday at $time';
+  }
+
+  @override
+  String dataBackupsLastOn(String date, String time) {
+    return 'Last copy on $date at $time';
+  }
+
+  @override
+  String get dataBackupsNone => 'No backups yet';
+
+  @override
+  String get dataBackupsNothing => 'Nothing to back up yet';
+
+  @override
+  String dataBackupMadeToday(String time) {
+    return 'Today, $time';
+  }
+
+  @override
+  String dataBackupMadeYesterday(String time) {
+    return 'Yesterday, $time';
+  }
+
+  @override
+  String dataBackupMadeOn(String date, String time) {
+    return '$date, $time';
+  }
+
+  @override
+  String dataBackupRestoreMadeToday(String time) {
+    return 'Restore the copy from today, $time';
+  }
+
+  @override
+  String dataBackupRestoreMadeYesterday(String time) {
+    return 'Restore the copy from yesterday, $time';
+  }
+
+  @override
+  String dataBackupRestoreMadeOn(String date, String time) {
+    return 'Restore the copy from $date, $time';
+  }
+
+  @override
+  String dataBackupAdded(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    return '$countString added';
+  }
+
+  @override
+  String dataBackupChanged(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    return '$countString changed';
+  }
+
+  @override
+  String dataBackupDeleted(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    return '$countString removed';
+  }
+
+  @override
+  String get dataBackupNoChanges => 'No changes';
+
+  @override
+  String get dataBackupDataReplaced => 'Data replaced';
+
+  @override
+  String get dataRestoreRunning => 'Restoring the copy…';
+
+  @override
+  String get dataImportRunning => 'Importing data…';
+
+  @override
+  String dataReplacementProgress(double share) {
+    final intl.NumberFormat shareNumberFormat =
+        intl.NumberFormat.percentPattern(localeName);
+    final String shareString = shareNumberFormat.format(share);
+
+    return '$shareString';
+  }
+
+  @override
+  String get dataReplacementCancel => 'Cancel';
+
+  @override
+  String get dataReplacementCancelling => 'Cancelling…';
+
+  @override
+  String get dataRestoreConfirmationTitle => 'Restore this copy?';
+
+  @override
+  String dataRestoreMadeToday(String time) {
+    return 'It was made today at $time.';
+  }
+
+  @override
+  String dataRestoreMadeYesterday(String time) {
+    return 'It was made yesterday at $time.';
+  }
+
+  @override
+  String dataRestoreMadeOn(String date, String time) {
+    return 'It was made on $date at $time.';
+  }
+
+  @override
+  String dataRestoreChangesSince(String changes) {
+    return 'Since then: $changes. Restoring undoes all of it.';
+  }
+
+  @override
+  String get dataRestoreNoChangesSince => 'Nothing has changed since then.';
+
+  @override
+  String get dataRestoreReplacedSince =>
+      'The data has been replaced since then. Restoring undoes every change.';
+
+  @override
+  String get dataReplacementReplacesEverything =>
+      'It will replace everything now in Doable. A backup of the current state is made first.';
+
+  @override
+  String get dataReplacementConfirmationCancel => 'Cancel';
+
+  @override
+  String get dataRestoreConfirm => 'Restore copy';
+
+  @override
+  String get dataImportConfirmationTitle => 'Import this copy?';
+
+  @override
+  String dataImportConfirmationFacts(
+    String date,
+    int intentions,
+    int relations,
+    int dailyChoices,
+    int tags,
+  ) {
+    final intl.NumberFormat intentionsNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String intentionsString = intentionsNumberFormat.format(intentions);
+    final intl.NumberFormat relationsNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String relationsString = relationsNumberFormat.format(relations);
+    final intl.NumberFormat dailyChoicesNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String dailyChoicesString = dailyChoicesNumberFormat.format(
+      dailyChoices,
+    );
+    final intl.NumberFormat tagsNumberFormat = intl.NumberFormat.decimalPattern(
+      localeName,
+    );
+    final String tagsString = tagsNumberFormat.format(tags);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      intentions,
+      locale: localeName,
+      other: '$intentionsString intentions',
+      one: '$intentionsString intention',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      relations,
+      locale: localeName,
+      other: '$relationsString relations',
+      one: '$relationsString relation',
+    );
+    String _temp2 = intl.Intl.pluralLogic(
+      dailyChoices,
+      locale: localeName,
+      other: '$dailyChoicesString daily choices',
+      one: '$dailyChoicesString daily choice',
+    );
+    String _temp3 = intl.Intl.pluralLogic(
+      tags,
+      locale: localeName,
+      other: '$tagsString tags',
+      one: '$tagsString tag',
+    );
+    return 'It was saved on $date and holds $_temp0, $_temp1, $_temp2 and $_temp3.';
+  }
+
+  @override
+  String get dataImportConfirm => 'Import and replace';
+
+  @override
   String get tagNavigationTitle => 'Tagged intentions';
 
   @override

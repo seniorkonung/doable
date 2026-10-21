@@ -21,6 +21,7 @@ import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 
 void main() {
@@ -329,16 +330,19 @@ Future<void> _insertIntention(
   AppDatabase database,
   IntentionId id, {
   required String title,
-}) => database
-    .into(database.intentions)
-    .insert(
-      IntentionsCompanion.insert(
-        id: id.toCanonicalString(),
-        title: title,
-        createdAt: DateTime.utc(2026, 9, 22).microsecondsSinceEpoch,
-        updatedAt: DateTime.utc(2026, 9, 22).microsecondsSinceEpoch,
+}) => seedGraph(
+  database,
+  () => database
+      .into(database.intentions)
+      .insert(
+        IntentionsCompanion.insert(
+          id: id.toCanonicalString(),
+          title: title,
+          createdAt: DateTime.utc(2026, 9, 22).microsecondsSinceEpoch,
+          updatedAt: DateTime.utc(2026, 9, 22).microsecondsSinceEpoch,
+        ),
       ),
-    );
+);
 
 Future<Map<String, Object?>?> _storedRelationOrNull(
   AppDatabase database,

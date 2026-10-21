@@ -46,5 +46,6 @@ final class AppRouter extends RootStackRouter {
     AutoRoute(page: RelationDetailsRoute.page),
     AutoRoute(page: RelationEditorRoute.page),
     AutoRoute(page: RelationParticipantPickerRoute.page),
+    AutoRoute(page: SettingsRoute.page),
   ];
 }

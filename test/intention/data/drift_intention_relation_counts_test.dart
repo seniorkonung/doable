@@ -13,6 +13,7 @@ import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 
 void main() {
@@ -625,12 +626,15 @@ Future<void> _insertIntention(
   AppDatabase database,
   IntentionId id, {
   String title = 'Намерение',
-}) => database.customStatement(
-  '''
+}) => seedGraph(
+  database,
+  () => database.customStatement(
+    '''
     INSERT INTO intentions (id, title, created_at, updated_at)
     VALUES (?, ?, 1, 1)
   ''',
-  [id.toCanonicalString(), title],
+    [id.toCanonicalString(), title],
+  ),
 );
 
 Future<void> _insertRelation(
@@ -640,8 +644,10 @@ Future<void> _insertRelation(
   required IntentionId relatedId,
   required String type,
   required bool isArchived,
-}) => database.customStatement(
-  '''
+}) => seedGraph(
+  database,
+  () => database.customStatement(
+    '''
     INSERT INTO long_term_relations (
       id,
       source_intention_id,
@@ -651,13 +657,14 @@ Future<void> _insertRelation(
       is_archived
     ) VALUES (?, ?, ?, ?, 1, ?)
   ''',
-  [
-    id,
-    sourceId.toCanonicalString(),
-    relatedId.toCanonicalString(),
-    type,
-    isArchived ? 1 : 0,
-  ],
+    [
+      id,
+      sourceId.toCanonicalString(),
+      relatedId.toCanonicalString(),
+      type,
+      isArchived ? 1 : 0,
+    ],
+  ),
 );
 
 IntentionId _id(String value) => switch (IntentionId.decode(value)) {

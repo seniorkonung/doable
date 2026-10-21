@@ -19,6 +19,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:drift/drift.dart' show Value;
 
 import '../support/app_root_pages.dart';
+import '../support/graph_seed.dart';
 import '../support/quick_creation.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
@@ -589,60 +590,63 @@ const _blockingOwnerTitle = 'Освободить намерение';
 Future<void> _seedBlockingFlow(LocalDatabaseHarness harness) async {
   final database = await harness.openReadyDatabase();
   final owner = _blockingIntentionId(1).toCanonicalString();
-  await database.batch((batch) {
-    batch.insert(
-      database.intentions,
-      IntentionsCompanion.insert(
-        id: owner,
-        title: _blockingOwnerTitle,
-        createdAt: 3000000,
-        updatedAt: 3000000,
-        isArchived: const Value(true),
-      ),
-    );
-    final neighbor = _blockingIntentionId(100).toCanonicalString();
-    batch.insert(
-      database.intentions,
-      IntentionsCompanion.insert(
-        id: neighbor,
-        title: 'Сосед 100',
-        createdAt: 1000100,
-        updatedAt: 1000100,
-      ),
-    );
-    batch.insert(
-      database.longTermRelations,
-      LongTermRelationsCompanion.insert(
-        id: _blockingRelationId(100).toCanonicalString(),
-        sourceIntentionId: owner,
-        relatedIntentionId: neighbor,
-        type: 'need',
-        priority: 2,
-        isArchived: const Value(true),
-      ),
-    );
-    final incoming = _blockingIntentionId(200).toCanonicalString();
-    batch.insert(
-      database.intentions,
-      IntentionsCompanion.insert(
-        id: incoming,
-        title: 'Встречный сосед',
-        createdAt: 1000200,
-        updatedAt: 1000200,
-      ),
-    );
-    batch.insert(
-      database.longTermRelations,
-      LongTermRelationsCompanion.insert(
-        id: _blockingRelationId(200).toCanonicalString(),
-        sourceIntentionId: incoming,
-        relatedIntentionId: owner,
-        type: 'can',
-        priority: 2,
-        isArchived: const Value(true),
-      ),
-    );
-  });
+  await seedGraph(
+    database,
+    () => database.batch((batch) {
+      batch.insert(
+        database.intentions,
+        IntentionsCompanion.insert(
+          id: owner,
+          title: _blockingOwnerTitle,
+          createdAt: 3000000,
+          updatedAt: 3000000,
+          isArchived: const Value(true),
+        ),
+      );
+      final neighbor = _blockingIntentionId(100).toCanonicalString();
+      batch.insert(
+        database.intentions,
+        IntentionsCompanion.insert(
+          id: neighbor,
+          title: 'Сосед 100',
+          createdAt: 1000100,
+          updatedAt: 1000100,
+        ),
+      );
+      batch.insert(
+        database.longTermRelations,
+        LongTermRelationsCompanion.insert(
+          id: _blockingRelationId(100).toCanonicalString(),
+          sourceIntentionId: owner,
+          relatedIntentionId: neighbor,
+          type: 'need',
+          priority: 2,
+          isArchived: const Value(true),
+        ),
+      );
+      final incoming = _blockingIntentionId(200).toCanonicalString();
+      batch.insert(
+        database.intentions,
+        IntentionsCompanion.insert(
+          id: incoming,
+          title: 'Встречный сосед',
+          createdAt: 1000200,
+          updatedAt: 1000200,
+        ),
+      );
+      batch.insert(
+        database.longTermRelations,
+        LongTermRelationsCompanion.insert(
+          id: _blockingRelationId(200).toCanonicalString(),
+          sourceIntentionId: incoming,
+          relatedIntentionId: owner,
+          type: 'can',
+          priority: 2,
+          isArchived: const Value(true),
+        ),
+      );
+    }),
+  );
   await harness.closePersistenceObjectGraph();
 }
 

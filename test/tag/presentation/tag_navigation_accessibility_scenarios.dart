@@ -33,10 +33,12 @@ void _registerNavigationEntryScenarios() {
             (await tester.runAsync(runtime.bootstrap)) as AppRuntimeReady;
         seedTagNavigationFixture(raw, extraPairsPerScope: 0);
         final longTag = 'Straße 🏷️ é ${'Длинное название ' * 7}'.trimRight();
-        raw.execute('UPDATE tags SET name = ? WHERE id = ?', [
-          longTag,
-          tagFixtureId(firstTagNumber),
-        ]);
+        seedRawGraph(raw, () {
+          raw.execute('UPDATE tags SET name = ? WHERE id = ?', [
+            longTag,
+            tagFixtureId(firstTagNumber),
+          ]);
+        });
         final before = retainedTagFixtureGraph(raw);
         final assignments = raw
             .select('SELECT * FROM tag_assignments')

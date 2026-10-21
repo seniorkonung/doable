@@ -3,7 +3,11 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 
 /// Сообщает о фактическом предъявлении [subject] после первого завершённого
-/// кадра, в котором [child] виден в приложении с фокусом ввода.
+/// кадра, в котором [child] виден на верхнем маршруте в приложении с фокусом
+/// ввода.
+///
+/// Маршрут, перекрытый листом или диалогом, предъявлением не считается: его
+/// содержимое остаётся под барьером, скрывающим его от экранного диктора.
 ///
 /// Построение виджета, запись состояния или вызов API показа предъявлением не
 /// считаются: проверка выполняется после кадра по фактической раскладке и
@@ -14,16 +18,12 @@ final class PresentationFrameEvidence<T extends Object> extends StatefulWidget {
     required this.subject,
     required this.onPresented,
     required this.child,
-    this.requiresCurrentRoute = true,
     super.key,
   });
 
   /// Предъявляемый результат; `null` означает отсутствие права подтверждать.
   final T? subject;
   final ValueChanged<T> onPresented;
-
-  /// Требует, чтобы маршрут сообщения был верхним и не перекрывался диалогом.
-  final bool requiresCurrentRoute;
   final Widget child;
 
   @override
@@ -100,7 +100,7 @@ final class _PresentationFrameEvidenceState<T extends Object>
       return false;
     }
     final route = _route;
-    if (widget.requiresCurrentRoute && route != null && !route.isCurrent) {
+    if (route != null && !route.isCurrent) {
       return false;
     }
     final renderObject = context.findRenderObject();

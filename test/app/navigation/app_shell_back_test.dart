@@ -24,6 +24,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/app_root_pages.dart';
 import '../../support/daily_choice_local_date.dart';
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
@@ -367,48 +368,50 @@ Future<_App> _start(WidgetTester tester) async {
 /// Намерения, связь и два дневных выбора по ней на
 /// разные даты: каждая корневая страница получает содержимое и параметры.
 void _seed(sqlite.Database database) {
-  for (var number = 1; number <= _intentionCount + 1; number++) {
-    final title = number == _other
-        ? 'Прочее'
-        : 'Намерение ${number.toString().padLeft(2, '0')}';
+  seedRawGraph(database, () {
+    for (var number = 1; number <= _intentionCount + 1; number++) {
+      final title = number == _other
+          ? 'Прочее'
+          : 'Намерение ${number.toString().padLeft(2, '0')}';
+      database.execute(
+        'INSERT INTO intentions (id, title, is_action_ready, is_archived, '
+        'created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+        [tagFixtureId(number), title, 1, 0, number, number],
+      );
+    }
     database.execute(
-      'INSERT INTO intentions (id, title, is_action_ready, is_archived, '
-      'created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-      [tagFixtureId(number), title, 1, 0, number, number],
+      'INSERT INTO long_term_relations (id, source_intention_id, '
+      'related_intention_id, type, priority, is_archived) '
+      'VALUES (?, ?, ?, ?, ?, ?)',
+      [tagFixtureId(_relation), tagFixtureId(1), tagFixtureId(2), 'need', 2, 0],
     );
-  }
-  database.execute(
-    'INSERT INTO long_term_relations (id, source_intention_id, '
-    'related_intention_id, type, priority, is_archived) '
-    'VALUES (?, ?, ?, ?, ?, ?)',
-    [tagFixtureId(_relation), tagFixtureId(1), tagFixtureId(2), 'need', 2, 0],
-  );
-  for (final (choice, date) in [
-    (_earlierChoice, _earlierDate),
-    (_laterChoice, _laterDate),
-  ]) {
-    database.execute(
-      'INSERT INTO daily_choices (id, source_intention_id, '
-      'selected_intention_id, choice_date, is_completed) '
-      'VALUES (?, ?, ?, ?, ?)',
-      [
-        tagFixtureId(choice),
-        tagFixtureId(1),
-        tagFixtureId(2),
-        date.toCanonicalString(),
-        0,
-      ],
-    );
-    database.execute(
-      'INSERT INTO daily_choice_path_steps (id, daily_choice_id, '
-      'long_term_relation_id) VALUES (?, ?, ?)',
-      [
-        tagFixtureId(choice + 10),
-        tagFixtureId(choice),
-        tagFixtureId(_relation),
-      ],
-    );
-  }
+    for (final (choice, date) in [
+      (_earlierChoice, _earlierDate),
+      (_laterChoice, _laterDate),
+    ]) {
+      database.execute(
+        'INSERT INTO daily_choices (id, source_intention_id, '
+        'selected_intention_id, choice_date, is_completed) '
+        'VALUES (?, ?, ?, ?, ?)',
+        [
+          tagFixtureId(choice),
+          tagFixtureId(1),
+          tagFixtureId(2),
+          date.toCanonicalString(),
+          0,
+        ],
+      );
+      database.execute(
+        'INSERT INTO daily_choice_path_steps (id, daily_choice_id, '
+        'long_term_relation_id) VALUES (?, ?, ?)',
+        [
+          tagFixtureId(choice + 10),
+          tagFixtureId(choice),
+          tagFixtureId(_relation),
+        ],
+      );
+    }
+  });
 }
 
 /// Корневая страница пункта [destination] показана без страниц поверх, а

@@ -14,6 +14,7 @@ import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 
@@ -46,23 +47,27 @@ void main() {
   tearDown(() => database.close());
 
   void addIntention(int number, {bool archived = false}) {
-    raw.execute(
-      'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, 0, ?, 100, 200)',
-      [tagFixtureId(number), 'Намерение $number', archived ? 1 : 0],
-    );
+    seedRawGraph(raw, () {
+      raw.execute(
+        'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, 0, ?, 100, 200)',
+        [tagFixtureId(number), 'Намерение $number', archived ? 1 : 0],
+      );
+    });
   }
 
   void addRelation(int number, int source, int related) {
-    raw.execute(
-      'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority) VALUES (?, ?, ?, ?, ?)',
-      [
-        tagFixtureId(number),
-        tagFixtureId(source),
-        tagFixtureId(related),
-        'can',
-        2,
-      ],
-    );
+    seedRawGraph(raw, () {
+      raw.execute(
+        'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority) VALUES (?, ?, ?, ?, ?)',
+        [
+          tagFixtureId(number),
+          tagFixtureId(source),
+          tagFixtureId(related),
+          'can',
+          2,
+        ],
+      );
+    });
   }
 
   Future<void> assign(int tag, IntentionId intentionId) async {
@@ -113,10 +118,12 @@ void main() {
   test('удаление активного и архивного намерения снимает все назначения, сохраняя теги', () async {
     addIntention(4);
     addIntention(5, archived: true);
-    raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-      tagFixtureId(303),
-      'Единственный',
-    ]);
+    seedRawGraph(raw, () {
+      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        tagFixtureId(303),
+        'Единственный',
+      ]);
+    });
     await assign(firstTagNumber, _intention(4));
     await assign(lastTagNumber, _intention(4));
     await assign(303, _intention(5));

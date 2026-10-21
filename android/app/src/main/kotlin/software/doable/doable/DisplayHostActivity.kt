@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.FlutterEngineCache
 
 abstract class DisplayHostActivity internal constructor(
@@ -59,6 +60,13 @@ abstract class DisplayHostActivity internal constructor(
     override fun onDisplayChanged(displayId: Int) {
         displayPolicy.invalidateDisplay()
         updateDisplayPolicy()
+    }
+
+    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+        super.configureFlutterEngine(flutterEngine)
+        // После переноса движка реестр пропускает плагин уже добавленного класса,
+        // а прежний экземпляр сам привязывается к новой Activity.
+        flutterEngine.plugins.add(DocumentAccessPlugin())
     }
 
     override fun shouldDestroyEngineWithHost(): Boolean =

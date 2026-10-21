@@ -137,6 +137,262 @@ void main() {
       expect(attempts, 1);
     });
 
+    for (final (description, event, expected)
+        in <(String, DiagnosticsEvent, Map<String, Object>)>[
+          (
+            'успех записи снимка',
+            GraphSnapshotWriteDiagnosticsEvent.succeeded(
+              duration: const Duration(microseconds: 11),
+            ),
+            {
+              'operation': 'graphSnapshotWrite',
+              'outcome': 'succeeded',
+              'durationMicros': 11,
+            },
+          ),
+          (
+            'отказ записи снимка из-за повреждённого прежнего снимка',
+            GraphSnapshotWriteDiagnosticsEvent.failed(
+              stage: GraphSnapshotWriteDiagnosticsStage.stateAssembly,
+              duration: const Duration(microseconds: 12),
+              code: DiagnosticsFailureCode.snapshotCorruption,
+            ),
+            {
+              'operation': 'graphSnapshotWrite',
+              'stage': 'stateAssembly',
+              'outcome': 'failed',
+              'durationMicros': 12,
+              'failureCode': 'snapshotCorruption',
+            },
+          ),
+          (
+            'успех пересборки снимка',
+            GraphSnapshotRebuildDiagnosticsEvent.succeeded(
+              duration: const Duration(microseconds: 21),
+            ),
+            {
+              'operation': 'graphSnapshotRebuild',
+              'outcome': 'succeeded',
+              'durationMicros': 21,
+            },
+          ),
+          (
+            'отказ пересборки снимка',
+            GraphSnapshotRebuildDiagnosticsEvent.failed(
+              stage: GraphSnapshotRebuildDiagnosticsStage.databaseRead,
+              duration: const Duration(microseconds: 22),
+              code: DiagnosticsFailureCode.unavailable,
+            ),
+            {
+              'operation': 'graphSnapshotRebuild',
+              'stage': 'databaseRead',
+              'outcome': 'failed',
+              'durationMicros': 22,
+              'failureCode': 'unavailable',
+            },
+          ),
+          (
+            'успех сжатия лога',
+            GraphLogCompactionDiagnosticsEvent.succeeded(
+              duration: const Duration(microseconds: 31),
+            ),
+            {
+              'operation': 'graphLogCompaction',
+              'outcome': 'succeeded',
+              'durationMicros': 31,
+            },
+          ),
+          (
+            'отказ сжатия лога',
+            GraphLogCompactionDiagnosticsEvent.failed(
+              stage: GraphLogCompactionDiagnosticsStage.historyRemoval,
+              duration: const Duration(microseconds: 32),
+              code: DiagnosticsFailureCode.unexpected,
+            ),
+            {
+              'operation': 'graphLogCompaction',
+              'stage': 'historyRemoval',
+              'outcome': 'failed',
+              'durationMicros': 32,
+              'failureCode': 'unexpected',
+            },
+          ),
+          (
+            'успех очистки каталога снимков',
+            GraphSnapshotCleanupDiagnosticsEvent.succeeded(
+              duration: const Duration(microseconds: 41),
+            ),
+            {
+              'operation': 'graphSnapshotCleanup',
+              'outcome': 'succeeded',
+              'durationMicros': 41,
+            },
+          ),
+          (
+            'отказ очистки каталога снимков',
+            GraphSnapshotCleanupDiagnosticsEvent.failed(
+              stage: GraphSnapshotCleanupDiagnosticsStage.fileRemoval,
+              duration: const Duration(microseconds: 42),
+              code: DiagnosticsFailureCode.unavailable,
+            ),
+            {
+              'operation': 'graphSnapshotCleanup',
+              'stage': 'fileRemoval',
+              'outcome': 'failed',
+              'durationMicros': 42,
+              'failureCode': 'unavailable',
+            },
+          ),
+          (
+            'отказ чтения состава графа из-за повреждения хранилища',
+            GraphCompositionReadDiagnosticsEvent.failed(
+              duration: const Duration(microseconds: 61),
+              code: DiagnosticsFailureCode.corruption,
+            ),
+            {
+              'operation': 'graphCompositionRead',
+              'outcome': 'failed',
+              'durationMicros': 61,
+              'failureCode': 'corruption',
+            },
+          ),
+          (
+            'успех экспорта графа',
+            GraphExportDiagnosticsEvent.succeeded(
+              duration: const Duration(microseconds: 51),
+            ),
+            {
+              'operation': 'graphExport',
+              'outcome': 'succeeded',
+              'durationMicros': 51,
+            },
+          ),
+          (
+            'отказ экспорта графа из-за повреждённого снимка',
+            GraphExportDiagnosticsEvent.failed(
+              stage: GraphExportDiagnosticsStage.temporaryFileWrite,
+              duration: const Duration(microseconds: 52),
+              code: DiagnosticsFailureCode.snapshotCorruption,
+            ),
+            {
+              'operation': 'graphExport',
+              'stage': 'temporaryFileWrite',
+              'outcome': 'failed',
+              'durationMicros': 52,
+              'failureCode': 'snapshotCorruption',
+            },
+          ),
+          (
+            'отказ удаления копий окном хранения',
+            GraphBackupRemovalDiagnosticsEvent.failed(
+              duration: const Duration(microseconds: 81),
+              code: DiagnosticsFailureCode.corruption,
+            ),
+            {
+              'operation': 'graphBackupRemoval',
+              'outcome': 'failed',
+              'durationMicros': 81,
+              'failureCode': 'corruption',
+            },
+          ),
+          (
+            'успех восстановления копии',
+            GraphBackupRestoreDiagnosticsEvent.succeeded(
+              duration: const Duration(microseconds: 91),
+            ),
+            {
+              'operation': 'graphBackupRestore',
+              'outcome': 'succeeded',
+              'durationMicros': 91,
+            },
+          ),
+          (
+            'отказ восстановления копии из-за повреждённого снимка',
+            GraphBackupRestoreDiagnosticsEvent.failed(
+              stage: GraphBackupRestoreDiagnosticsStage.snapshotWrite,
+              duration: const Duration(microseconds: 92),
+              code: DiagnosticsFailureCode.snapshotCorruption,
+            ),
+            {
+              'operation': 'graphBackupRestore',
+              'stage': 'snapshotWrite',
+              'outcome': 'failed',
+              'durationMicros': 92,
+              'failureCode': 'snapshotCorruption',
+            },
+          ),
+          (
+            'отказ импорта графа из-за файла, который не является экспортом '
+                'Doable или повреждён',
+            GraphImportDiagnosticsEvent.failed(
+              stage: GraphImportDiagnosticsStage.dataValidation,
+              duration: const Duration(microseconds: 101),
+              code: DiagnosticsFailureCode.invalidGraphFile,
+            ),
+            {
+              'operation': 'graphImport',
+              'stage': 'dataValidation',
+              'outcome': 'failed',
+              'durationMicros': 101,
+              'failureCode': 'invalidGraphFile',
+            },
+          ),
+        ]) {
+      test('$description кодируется только операцией, этапом отказа, исходом, '
+          'длительностью и категорией отказа', () {
+        final messages = <String>[];
+        final sink = DeveloperDiagnosticsSink(messages.add);
+
+        sink.record(event);
+
+        expect(jsonDecode(messages.single), expected);
+      });
+    }
+
+    for (final (description, event, expected)
+        in <(String, DiagnosticsEvent, Map<String, Object>)>[
+          (
+            'успех ежедневной копии',
+            GraphBackupCreationDiagnosticsEvent.succeeded(
+              kind: GraphBackupCreationDiagnosticsKind.daily,
+              duration: const Duration(microseconds: 71),
+            ),
+            {
+              'operation': 'graphBackupCreation',
+              'backupKind': 'daily',
+              'outcome': 'succeeded',
+              'durationMicros': 71,
+            },
+          ),
+          (
+            'отказ копии перед заменой из-за нехватки места',
+            GraphBackupCreationDiagnosticsEvent.failed(
+              kind: GraphBackupCreationDiagnosticsKind.beforeReplacement,
+              stage: GraphBackupCreationDiagnosticsStage.registration,
+              duration: const Duration(microseconds: 72),
+              code: DiagnosticsFailureCode.storageFull,
+            ),
+            {
+              'operation': 'graphBackupCreation',
+              'backupKind': 'beforeReplacement',
+              'stage': 'registration',
+              'outcome': 'failed',
+              'durationMicros': 72,
+              'failureCode': 'storageFull',
+            },
+          ),
+        ]) {
+      test('$description кодируется только операцией, видом копии, этапом '
+          'отказа, исходом, длительностью и категорией отказа', () {
+        final messages = <String>[];
+        final sink = DeveloperDiagnosticsSink(messages.add);
+
+        sink.record(event);
+
+        expect(jsonDecode(messages.single), expected);
+      });
+    }
+
     test(
       'защитная запись подавляет ошибку произвольного получателя без повтора',
       () {

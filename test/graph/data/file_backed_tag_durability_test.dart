@@ -19,6 +19,7 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 import '../../support/tag_storage_fixture.dart';
@@ -115,14 +116,16 @@ void main() {
     await harness.openReadyDatabase(setup: (db) => raw = db);
     seedTagRecipientGraphFixture(raw);
     // Архивированное действие участвует в выполненном дневном выборе.
-    raw.execute(
-      'INSERT INTO daily_choices (id, source_intention_id, selected_intention_id, choice_date, is_completed) VALUES (?, ?, ?, ?, 1)',
-      [tagFixtureId(203), tagFixtureId(1), tagFixtureId(2), '2026-09-24'],
-    );
-    raw.execute(
-      'INSERT INTO daily_choice_path_steps (id, daily_choice_id, long_term_relation_id) VALUES (?, ?, ?)',
-      [tagFixtureId(204), tagFixtureId(203), tagFixtureId(102)],
-    );
+    seedRawGraph(raw, () {
+      raw.execute(
+        'INSERT INTO daily_choices (id, source_intention_id, selected_intention_id, choice_date, is_completed) VALUES (?, ?, ?, ?, 1)',
+        [tagFixtureId(203), tagFixtureId(1), tagFixtureId(2), '2026-09-24'],
+      );
+      raw.execute(
+        'INSERT INTO daily_choice_path_steps (id, daily_choice_id, long_term_relation_id) VALUES (?, ?, ?)',
+        [tagFixtureId(204), tagFixtureId(203), tagFixtureId(102)],
+      );
+    });
     final graphBefore = retainedTagFixtureGraph(raw);
     await harness.closePersistenceObjectGraph();
 
@@ -255,14 +258,16 @@ void main() {
 
 void _seedAssignmentRecipients(sqlite.Database raw) {
   seedTagRecipientGraphFixture(raw);
-  raw.execute(
-    'INSERT INTO intentions (id, title, is_action_ready, created_at, updated_at) VALUES (?, ?, 1, 104, 204)',
-    [tagFixtureId(4), 'Удаляемое намерение'],
-  );
-  raw.execute(
-    'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority) VALUES (?, ?, ?, ?, 2)',
-    [tagFixtureId(103), tagFixtureId(3), tagFixtureId(4), 'can'],
-  );
+  seedRawGraph(raw, () {
+    raw.execute(
+      'INSERT INTO intentions (id, title, is_action_ready, created_at, updated_at) VALUES (?, ?, 1, 104, 204)',
+      [tagFixtureId(4), 'Удаляемое намерение'],
+    );
+    raw.execute(
+      'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority) VALUES (?, ?, ?, ?, 2)',
+      [tagFixtureId(103), tagFixtureId(3), tagFixtureId(4), 'can'],
+    );
+  });
 }
 
 List<List<Object?>> _tagRows(sqlite.Database db) => db

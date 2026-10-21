@@ -19,6 +19,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../support/app_root_pages.dart';
+import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/tag_storage_fixture.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
@@ -323,16 +324,18 @@ final class _App {
       await runtime.shutdown();
     });
     final ready = (await tester.runAsync(runtime.bootstrap)) as AppRuntimeReady;
-    for (final (number, name) in [
-      (_homeTag, 'Дом'),
-      (_workTag, 'Работа'),
-      (_gardenTag, 'Сад'),
-    ]) {
-      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-        tagFixtureId(number),
-        name,
-      ]);
-    }
+    seedRawGraph(raw, () {
+      for (final (number, name) in [
+        (_homeTag, 'Дом'),
+        (_workTag, 'Работа'),
+        (_gardenTag, 'Сад'),
+      ]) {
+        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+          tagFixtureId(number),
+          name,
+        ]);
+      }
+    });
     final l10n = lookupAppLocalizations(locale);
     await tester.pumpWidget(MainApp(runtime: runtime));
     await openIntentionGraph(tester, waitFor: _until);

@@ -1,9 +1,9 @@
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/data/local/bootstrap/local_data_bootstrap.dart';
 import 'package:doable/src/data/local/bootstrap/local_data_bootstrap_result.dart';
-import 'package:drift/drift.dart' hide isNull;
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 
@@ -54,7 +54,7 @@ void main() {
 }
 
 Future<void> _insertIntention(
-  GeneratedDatabase database, {
+  AppDatabase database, {
   required String id,
   required String title,
   String? description,
@@ -63,8 +63,10 @@ Future<void> _insertIntention(
   required int createdAt,
   required int updatedAt,
 }) {
-  return database.customStatement(
-    '''
+  return seedGraph(
+    database,
+    () => database.customStatement(
+      '''
       INSERT INTO intentions (
         id,
         title,
@@ -75,15 +77,16 @@ Future<void> _insertIntention(
         updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?)
     ''',
-    [
-      id,
-      title,
-      description,
-      isActionReady ? 1 : 0,
-      isArchived ? 1 : 0,
-      createdAt,
-      updatedAt,
-    ],
+      [
+        id,
+        title,
+        description,
+        isActionReady ? 1 : 0,
+        isArchived ? 1 : 0,
+        createdAt,
+        updatedAt,
+      ],
+    ),
   );
 }
 

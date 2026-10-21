@@ -67,21 +67,18 @@ extension _StatisticsReading on DriftPersonalGraphRepository {
           if (cursor == null) {
             totalItems = rows.isEmpty
                 ? 0
-                : _requiredStoredInteger(rows.first.data, 'total_items');
+                : requiredStoredInteger(rows.first.data, 'total_items');
             if (totalItems < 0) throw const StatisticsDataValidationException();
           }
           final counts = [
             for (final row in rows)
               (
-                intentionId: _decodeStoredRelationIntentionId(
-                  _requiredStoredString(row.data, 'intention_id'),
+                intentionId: decodeStoredIntentionId(
+                  requiredStoredString(row.data, 'intention_id'),
                 ),
                 counts: ContributionCounts(
-                  planned: _requiredStoredInteger(row.data, 'planned'),
-                  contribution: _requiredStoredInteger(
-                    row.data,
-                    'contribution',
-                  ),
+                  planned: requiredStoredInteger(row.data, 'planned'),
+                  contribution: requiredStoredInteger(row.data, 'contribution'),
                 ),
               ),
           ];
@@ -198,25 +195,19 @@ extension _StatisticsReading on DriftPersonalGraphRepository {
           .get();
       final byId = {
         for (final row in titles)
-          _decodeStoredRelationIntentionId(
-            _requiredStoredString(row.data, 'id'),
-          ): row,
+          decodeStoredIntentionId(requiredStoredString(row.data, 'id')): row,
       };
       for (final counted in selected) {
         final row = byId[counted.intentionId];
-        if (row == null) throw const _StoredIntentionCorruption();
+        if (row == null) throw const StoredGraphCorruption();
         items.add(
           StatisticsItem(
             id: counted.intentionId,
-            title: _requiredStoredString(row.data, 'title'),
-            archiveState: switch (_requiredStoredInteger(
+            title: requiredStoredString(row.data, 'title'),
+            archiveState: decodeStoredIntentionArchiveState(
               row.data,
               'is_archived',
-            )) {
-              0 => domain.IntentionArchiveState.active,
-              1 => domain.IntentionArchiveState.archived,
-              _ => throw const _StoredIntentionCorruption(),
-            },
+            ),
             counts: counted.counts,
           ),
         );
@@ -252,26 +243,17 @@ extension _StatisticsReading on DriftPersonalGraphRepository {
     var missed = 0;
     var upcoming = 0;
     for (final row in rows) {
-      CalendarDate.parseCanonical(
-        _requiredStoredString(row.data, 'choice_date'),
-      );
-      final completed = switch (_requiredStoredInteger(
-        row.data,
-        'is_completed',
-      )) {
-        0 => false,
-        1 => true,
-        _ => throw const _StoredIntentionCorruption(),
-      };
-      final count = _requiredStoredInteger(row.data, 'planned');
+      decodeStoredChoiceDate(row.data);
+      final completed = decodeStoredChoiceCompletion(row.data);
+      final count = requiredStoredInteger(row.data, 'planned');
       final group = StatisticsPeriodSummary(
         counts: ContributionCounts(
           planned: count,
           contribution: completed ? count : 0,
         ),
         uncompleted: UncompletedSplit(
-          missed: _requiredStoredInteger(row.data, 'missed'),
-          upcoming: _requiredStoredInteger(row.data, 'upcoming'),
+          missed: requiredStoredInteger(row.data, 'missed'),
+          upcoming: requiredStoredInteger(row.data, 'upcoming'),
         ),
       );
       planned += group.counts.planned;
@@ -349,7 +331,7 @@ final class _DriftStatisticsCursor implements StatisticsCursor {
 
 StatisticsReadFailure _classifyStatisticsReadFailure(Object error) {
   if (error is StatisticsReadFailure) return error;
-  if (error is _StoredIntentionCorruption ||
+  if (error is StoredGraphCorruption ||
       error is StatisticsDataValidationException ||
       error is CalendarDateValidationException ||
       error is IntentionTextValidationException) {
@@ -359,6 +341,7 @@ StatisticsReadFailure _classifyStatisticsReadFailure(Object error) {
     SqliteCorruptionFailure() => const StatisticsReadCorruptionFailure(),
     SqliteUnavailableFailure() => const StatisticsReadUnavailableFailure(),
     SqliteConstraintFailure() ||
+    SqliteStorageFullFailure() ||
     SqliteUnexpectedFailure() => const StatisticsReadUnexpectedFailure(),
   };
 }

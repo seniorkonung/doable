@@ -15,6 +15,7 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 
@@ -91,18 +92,22 @@ void main() {
   test(
     'полное чтение назначений сохраняет порядок всех 104 тегов намерения',
     () async {
-      for (var number = 303; number <= 405; number++) {
-        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-          tagFixtureId(number),
-          'Тег $number',
-        ]);
-        for (final (column, recipient) in [('intention_id', tagFixtureId(1))]) {
-          raw.execute(
-            'INSERT INTO tag_assignments (tag_id, $column) VALUES (?, ?)',
-            [tagFixtureId(number), recipient],
-          );
+      seedRawGraph(raw, () {
+        for (var number = 303; number <= 405; number++) {
+          raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+            tagFixtureId(number),
+            'Тег $number',
+          ]);
+          for (final (column, recipient) in [
+            ('intention_id', tagFixtureId(1)),
+          ]) {
+            raw.execute(
+              'INSERT INTO tag_assignments (tag_id, $column) VALUES (?, ?)',
+              [tagFixtureId(number), recipient],
+            );
+          }
         }
-      }
+      });
       for (final target in [_intention(1)]) {
         final loaded = assignments(await graph.getTagAssignments(target));
         expect(loaded.intentionId, target);
@@ -119,16 +124,18 @@ void main() {
   );
 
   test('назначения другим намерениям и идентичность связи не становятся назначениями намерения', () async {
-    raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-      tagFixtureId(303),
-      'Только другим намерениям',
-    ]);
-    for (final number in [1, 3]) {
-      raw.execute(
-        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-        [tagFixtureId(303), tagFixtureId(number)],
-      );
-    }
+    seedRawGraph(raw, () {
+      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        tagFixtureId(303),
+        'Только другим намерениям',
+      ]);
+      for (final number in [1, 3]) {
+        raw.execute(
+          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+          [tagFixtureId(303), tagFixtureId(number)],
+        );
+      }
+    });
     final oldAssignments = raw.select('SELECT * FROM tag_assignments');
     final loaded = selection(
       await graph.getTagCatalog(TagCatalogSelectionMode(_intention(2))),
@@ -159,10 +166,12 @@ void main() {
       ),
     );
 
-    raw.execute(
-      'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)',
-      [tagFixtureId(101), 'Отдельное намерение', 1, 1],
-    );
+    seedRawGraph(raw, () {
+      raw.execute(
+        'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)',
+        [tagFixtureId(101), 'Отдельное намерение', 1, 1],
+      );
+    });
     final empty = assignments(await graph.getTagAssignments(_intention(101)));
     expect(empty.items, isEmpty);
     final unassigned = selection(
@@ -240,16 +249,22 @@ void main() {
       expect(assignment['tag_creation_sequence'], expected);
 
       expect(
-        () => raw.execute(
-          'UPDATE tag_assignments SET tag_creation_sequence = ? WHERE creation_sequence = ?',
-          [(expected as int) + 1, assignment['creation_sequence']],
+        () => seedRawGraph(
+          raw,
+          () => raw.execute(
+            'UPDATE tag_assignments SET tag_creation_sequence = ? WHERE creation_sequence = ?',
+            [(expected as int) + 1, assignment['creation_sequence']],
+          ),
         ),
         throwsA(isA<sqlite.SqliteException>()),
       );
       expect(
-        () => raw.execute(
-          'INSERT INTO tag_assignments (tag_id, intention_id, tag_creation_sequence) VALUES (?, ?, ?)',
-          [tagFixtureId(lastTagNumber), tagFixtureId(1), expected],
+        () => seedRawGraph(
+          raw,
+          () => raw.execute(
+            'INSERT INTO tag_assignments (tag_id, intention_id, tag_creation_sequence) VALUES (?, ?, ?)',
+            [tagFixtureId(lastTagNumber), tagFixtureId(1), expected],
+          ),
         ),
         throwsA(isA<sqlite.SqliteException>()),
       );
@@ -269,18 +284,20 @@ void main() {
       for (final (target, column, recipientId) in [
         (_intention(1), 'intention_id', tagFixtureId(1)),
       ]) {
-        raw.execute(
-          'INSERT INTO tag_assignments (tag_id, $column) VALUES (?, ?)',
-          [tagFixtureId(lastTagNumber), recipientId],
-        );
-        raw.execute(
-          'DELETE FROM tag_assignments WHERE tag_id = ? AND $column = ?',
-          [tagFixtureId(firstTagNumber), recipientId],
-        );
-        raw.execute(
-          'INSERT INTO tag_assignments (tag_id, $column) VALUES (?, ?)',
-          [tagFixtureId(firstTagNumber), recipientId],
-        );
+        seedRawGraph(raw, () {
+          raw.execute(
+            'INSERT INTO tag_assignments (tag_id, $column) VALUES (?, ?)',
+            [tagFixtureId(lastTagNumber), recipientId],
+          );
+          raw.execute(
+            'DELETE FROM tag_assignments WHERE tag_id = ? AND $column = ?',
+            [tagFixtureId(firstTagNumber), recipientId],
+          );
+          raw.execute(
+            'INSERT INTO tag_assignments (tag_id, $column) VALUES (?, ?)',
+            [tagFixtureId(firstTagNumber), recipientId],
+          );
+        });
         final loaded = assignments(await graph.getTagAssignments(target));
         expect(loaded.items.map((tag) => tag.name.value), ['Дом', 'Работа']);
       }
@@ -324,7 +341,11 @@ void main() {
     for (final (target, column, recipient) in [
       (_intention(3), 'intention_id', tagFixtureId(3)),
     ]) {
-      raw.execute('DELETE FROM tag_assignments WHERE $column = ?', [recipient]);
+      seedRawGraph(raw, () {
+        raw.execute('DELETE FROM tag_assignments WHERE $column = ?', [
+          recipient,
+        ]);
+      });
       final loaded = assignments(await graph.getTagAssignments(target));
       expect(loaded.intentionId, target);
       expect(loaded.items, isEmpty);
@@ -332,12 +353,14 @@ void main() {
   });
 
   test('каталог выбора возвращает все 105 тегов без пропусков', () async {
-    for (var number = 303; number <= 405; number++) {
-      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-        tagFixtureId(number),
-        'Тег $number',
-      ]);
-    }
+    seedRawGraph(raw, () {
+      for (var number = 303; number <= 405; number++) {
+        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+          tagFixtureId(number),
+          'Тег $number',
+        ]);
+      }
+    });
     for (final target in [_intention(2)]) {
       final loaded = selection(
         await graph.getTagCatalog(TagCatalogSelectionMode(target)),
@@ -361,10 +384,12 @@ void main() {
 
   test('полные снимки разных намерений и ревизий не смешиваются', () async {
     final target = _intention(1);
-    raw.execute(
-      'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-      [tagFixtureId(lastTagNumber), tagFixtureId(1)],
-    );
+    seedRawGraph(raw, () {
+      raw.execute(
+        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+        [tagFixtureId(lastTagNumber), tagFixtureId(1)],
+      );
+    });
     final first = assignments(await graph.getTagAssignments(target));
     final other = DriftPersonalGraphRepository(
       database,
@@ -405,25 +430,27 @@ void main() {
 
   test('повреждение строки после сотой отклоняет снимок', () async {
     final target = _intention(1);
-    for (var number = 303; number <= 439; number++) {
+    seedRawGraph(raw, () {
+      for (var number = 303; number <= 439; number++) {
+        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+          tagFixtureId(number),
+          'Тег $number',
+        ]);
+        raw.execute(
+          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+          [tagFixtureId(number), tagFixtureId(1)],
+        );
+      }
+      // Формат идентификатора тега схема не проверяет.
       raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-        tagFixtureId(number),
-        'Тег $number',
+        'некорректный-id',
+        'Повреждённый',
       ]);
       raw.execute(
         'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-        [tagFixtureId(number), tagFixtureId(1)],
+        ['некорректный-id', tagFixtureId(1)],
       );
-    }
-    // Формат идентификатора тега схема не проверяет.
-    raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-      'некорректный-id',
-      'Повреждённый',
-    ]);
-    raw.execute(
-      'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-      ['некорректный-id', tagFixtureId(1)],
-    );
+    });
     expect(
       await graph.getTagAssignments(target),
       isA<TagAssignmentsError>().having(
@@ -443,7 +470,9 @@ void main() {
   });
 
   test('пустой каталог проверяет существование намерения', () async {
-    raw.execute('DELETE FROM tags');
+    seedRawGraph(raw, () {
+      raw.execute('DELETE FROM tags');
+    });
     for (final (target, missing) in [(_intention(1), _intention(999))]) {
       expect(assignments(await graph.getTagAssignments(target)).items, isEmpty);
       expect(

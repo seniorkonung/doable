@@ -30,6 +30,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../support/daily_choice_catalog_provider.dart';
 import '../support/daily_choice_durability_fixture.dart';
 import '../support/daily_choice_local_date.dart';
+import '../support/graph_seed.dart';
 import '../support/intention_creation_origin.dart';
 import '../support/local_database_harness.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';

@@ -14,6 +14,7 @@ import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/intention_catalog_large_fixture.dart';
 import '../../support/local_database_harness.dart';
@@ -326,15 +327,17 @@ void _populateMassExcludedTag(sqlite.Database database) {
   );
   database.execute('BEGIN');
   try {
-    database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-      _fixtureId(_massTag),
-      'Тег $_massTag',
-    ]);
-    for (var index = 0; index < _fixtureSize; index++) {
-      if (_hasMassTag(index)) {
-        insertAssignment.execute([_fixtureId(_massTag), _fixtureId(index)]);
+    seedRawGraph(database, () {
+      database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        _fixtureId(_massTag),
+        'Тег $_massTag',
+      ]);
+      for (var index = 0; index < _fixtureSize; index++) {
+        if (_hasMassTag(index)) {
+          insertAssignment.execute([_fixtureId(_massTag), _fixtureId(index)]);
+        }
       }
-    }
+    });
     database.execute('COMMIT');
   } on Object {
     database.execute('ROLLBACK');
@@ -583,62 +586,67 @@ void _populateJointTagFixture(sqlite.Database database) {
   );
   database.execute('BEGIN');
   try {
-    // Все намерения готовы: редкость совпадений задают теги, а не готовность.
-    database.execute('UPDATE intentions SET is_action_ready = 1');
-    for (final (base, count) in [
-      (_requiredTagBase, _conditionCount),
-      (_excludedTagBase, _conditionCount),
-      (_extraTagBase, _extraTagCount),
-      (_backgroundTagBase, _backgroundTagCount),
-      (_popularTag, 1),
-    ]) {
-      for (var index = 0; index < count; index++) {
-        insertTag.execute([_fixtureId(base + index), 'Тег ${base + index}']);
+    seedRawGraph(database, () {
+      // Все намерения готовы: редкость совпадений задают теги, а не готовность.
+      database.execute('UPDATE intentions SET is_action_ready = 1');
+      for (final (base, count) in [
+        (_requiredTagBase, _conditionCount),
+        (_excludedTagBase, _conditionCount),
+        (_extraTagBase, _extraTagCount),
+        (_backgroundTagBase, _backgroundTagCount),
+        (_popularTag, 1),
+      ]) {
+        for (var index = 0; index < count; index++) {
+          insertTag.execute([_fixtureId(base + index), 'Тег ${base + index}']);
+        }
       }
-    }
-    for (var index = 0; index < _jointCandidateCount; index++) {
-      final id = _fixtureId(_jointIntentionIndex(index));
-      database.execute(
-        'UPDATE intentions SET title = ?, is_action_ready = ?, '
-        'is_archived = ? WHERE id = ?',
-        [
-          index == _otherTitleCandidate
-              ? 'Другое название'
-              : 'Редкое %_ совпадение',
-          index == _notReadyCandidate ? 0 : 1,
-          index == _archivedCandidate ? 1 : 0,
-          id,
-        ],
-      );
-      for (var tag = 0; tag < _jointRequiredTagCount(index); tag++) {
-        insertAssignment.execute([_fixtureId(_requiredTagBase + tag), id]);
+      for (var index = 0; index < _jointCandidateCount; index++) {
+        final id = _fixtureId(_jointIntentionIndex(index));
+        database.execute(
+          'UPDATE intentions SET title = ?, is_action_ready = ?, '
+          'is_archived = ? WHERE id = ?',
+          [
+            index == _otherTitleCandidate
+                ? 'Другое название'
+                : 'Редкое %_ совпадение',
+            index == _notReadyCandidate ? 0 : 1,
+            index == _archivedCandidate ? 1 : 0,
+            id,
+          ],
+        );
+        for (var tag = 0; tag < _jointRequiredTagCount(index); tag++) {
+          insertAssignment.execute([_fixtureId(_requiredTagBase + tag), id]);
+        }
+        if (_jointExcludedTag(index) case final tag?) {
+          insertAssignment.execute([_fixtureId(_excludedTagBase + tag), id]);
+        }
       }
-      if (_jointExcludedTag(index) case final tag?) {
-        insertAssignment.execute([_fixtureId(_excludedTagBase + tag), id]);
+      // Дополнительные собственные теги не входят в условия. Плотная строка
+      // вне результата проверяет, что чтение назначений не захватывает соседей.
+      for (final id in [_fixtureId(_jointIntentionIndex(0)), _fixtureId(0)]) {
+        for (var tag = 0; tag < _extraTagCount; tag++) {
+          insertAssignment.execute([_fixtureId(_extraTagBase + tag), id]);
+        }
       }
-    }
-    // Дополнительные собственные теги не входят в условия. Плотная строка
-    // вне результата проверяет, что чтение назначений не захватывает соседей.
-    for (final id in [_fixtureId(_jointIntentionIndex(0)), _fixtureId(0)]) {
-      for (var tag = 0; tag < _extraTagCount; tag++) {
-        insertAssignment.execute([_fixtureId(_extraTagBase + tag), id]);
+      // У каждого намерения несколько собственных тегов вне условий: проверка
+      // кандидата не может отсечь его по одному отсутствию назначений.
+      // Популярный обязательный тег назначен большинству намерений каждого
+      // охвата и всем совместным кандидатам.
+      for (var index = 0; index < _fixtureSize; index++) {
+        for (final tag in _backgroundTags(index)) {
+          insertAssignment.execute([
+            _fixtureId(_backgroundTagBase + tag),
+            _fixtureId(index),
+          ]);
+        }
+        if (_hasPopularTag(index)) {
+          insertAssignment.execute([
+            _fixtureId(_popularTag),
+            _fixtureId(index),
+          ]);
+        }
       }
-    }
-    // У каждого намерения несколько собственных тегов вне условий: проверка
-    // кандидата не может отсечь его по одному отсутствию назначений.
-    // Популярный обязательный тег назначен большинству намерений каждого
-    // охвата и всем совместным кандидатам.
-    for (var index = 0; index < _fixtureSize; index++) {
-      for (final tag in _backgroundTags(index)) {
-        insertAssignment.execute([
-          _fixtureId(_backgroundTagBase + tag),
-          _fixtureId(index),
-        ]);
-      }
-      if (_hasPopularTag(index)) {
-        insertAssignment.execute([_fixtureId(_popularTag), _fixtureId(index)]);
-      }
-    }
+    });
     database.execute('COMMIT');
   } on Object {
     database.execute('ROLLBACK');

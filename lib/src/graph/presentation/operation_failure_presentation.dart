@@ -14,12 +14,18 @@ final class OperationFailurePresentation extends ConsumerStatefulWidget {
     required this.claim,
     required this.message,
     this.messageKey,
+    this.inheritsColor = false,
     super.key,
   });
 
   final GraphInitiatorPresentationClaim? claim;
   final String message;
   final Key? messageKey;
+
+  /// Сообщение рисуется цветом окружающего стиля текста, а не цветом ошибки:
+  /// так его показывает сообщение дизайн-системы, которое само обозначает
+  /// отказ значком.
+  final bool inheritsColor;
 
   @override
   ConsumerState<OperationFailurePresentation> createState() =>
@@ -80,8 +86,10 @@ final class _OperationFailurePresentationState
         child: ExcludeSemantics(
           child: Text(
             widget.message,
-            style: DefaultTextStyle.of(context).style
-                .copyWith(color: Theme.of(context).colorScheme.error),
+            style: widget.inheritsColor
+                ? null
+                : DefaultTextStyle.of(context).style
+                      .copyWith(color: Theme.of(context).colorScheme.error),
           ),
         ),
       ),

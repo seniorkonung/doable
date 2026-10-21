@@ -356,10 +356,12 @@ Future<void> _showAccessibleSearch(
   addTearDown(database.close);
   seedTagStorageFixture(raw);
   if (tagName != null) {
-    raw.execute('UPDATE tags SET name = ? WHERE id = ?', [
-      tagName,
-      tagFixtureId(lastTagNumber),
-    ]);
+    seedRawGraph(raw, () {
+      raw.execute('UPDATE tags SET name = ? WHERE id = ?', [
+        tagName,
+        tagFixtureId(lastTagNumber),
+      ]);
+    });
   }
   final repository = DriftPersonalGraphRepository(
     database,
@@ -378,6 +380,7 @@ Future<void> _showAccessibleSearch(
       child: ValueListenableBuilder<Locale>(
         valueListenable: language,
         builder: (context, locale, child) => MaterialApp.router(
+          theme: doableTheme(Brightness.light),
           locale: locale,
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,

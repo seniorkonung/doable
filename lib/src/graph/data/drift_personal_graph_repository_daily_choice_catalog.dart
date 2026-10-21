@@ -80,8 +80,8 @@ extension _DailyChoiceCatalogReading on DriftPersonalGraphRepository {
                   .getSingle())
               .data;
       summary = (
-        totalCount: _requiredStoredInteger(data, 'total_count'),
-        hasTimedChoices: _requiredStoredInteger(data, 'has_timed_choices') == 1,
+        totalCount: requiredStoredInteger(data, 'total_count'),
+        hasTimedChoices: requiredStoredInteger(data, 'has_timed_choices') == 1,
       );
     } else {
       summary = cursor.summary;
@@ -117,21 +117,14 @@ extension _DailyChoiceCatalogReading on DriftPersonalGraphRepository {
     final hasNext = rawRows.length > query.pageSize;
     final selectedRows = rawRows.take(query.pageSize).toList();
     final choices = [
-      for (final row in selectedRows)
-        _decodeStoredDailyChoice(row, switch (DailyChoiceId.decode(
-          _requiredStoredString(row.data, 'id'),
-        )) {
-          DailyChoiceIdDecodingSuccess(:final id) => id,
-          InvalidDailyChoiceIdDecoding() =>
-            throw const _StoredIntentionCorruption(),
-        }),
+      for (final row in selectedRows) decodeStoredDailyChoice(row.data),
     ];
     final items = await _verifyDailyChoiceCatalogItems(choices);
     final returnedCount = (cursor?.returnedCount ?? 0) + items.length;
     if (hasNext
         ? returnedCount >= summary.totalCount
         : returnedCount != summary.totalCount) {
-      throw const _StoredIntentionCorruption();
+      throw const StoredGraphCorruption();
     }
     final revision = _currentRevision;
     final nextCursor = hasNext
@@ -146,7 +139,7 @@ extension _DailyChoiceCatalogReading on DriftPersonalGraphRepository {
                 DailyChoiceTime(:final minuteOfDay) => minuteOfDay,
               },
               priority: choices.last.priority.level,
-              sequence: _requiredStoredInteger(
+              sequence: requiredStoredInteger(
                 selectedRows.last.data,
                 'creation_sequence',
               ),
@@ -190,9 +183,9 @@ extension _DailyChoiceCatalogReading on DriftPersonalGraphRepository {
     final stepsByChoice = <DailyChoiceId, List<ChoicePathStep>>{};
     final relationIds = <LongTermRelationId>{};
     for (final row in stepRows) {
-      final step = _decodeStoredChoiceStep(row);
+      final step = decodeStoredChoicePathStep(row.data);
       if (!selectedChoiceIds.contains(step.dailyChoiceId)) {
-        throw const _StoredIntentionCorruption();
+        throw const StoredGraphCorruption();
       }
       stepsByChoice.putIfAbsent(step.dailyChoiceId, () => []).add(step);
       relationIds.add(step.relationId);
@@ -214,23 +207,15 @@ extension _DailyChoiceCatalogReading on DriftPersonalGraphRepository {
           )
           .get();
       for (final row in rows) {
-        final data = row.data;
-        final id = _decodeStoredRelationId(_requiredStoredString(data, 'id'));
+        final id = decodeStoredRelationId(requiredStoredString(row.data, 'id'));
         if (!relationIds.contains(id) || relations.containsKey(id)) {
-          throw const _StoredIntentionCorruption();
+          throw const StoredGraphCorruption();
         }
-        relations[id] = (
-          source: _decodeStoredRelationIntentionId(
-            _requiredStoredString(data, 'source_intention_id'),
-          ),
-          related: _decodeStoredRelationIntentionId(
-            _requiredStoredString(data, 'related_intention_id'),
-          ),
-        );
+        relations[id] = decodeStoredRelationEnds(row.data);
       }
     }
     if (relations.length != relationIds.length) {
-      throw const _StoredIntentionCorruption();
+      throw const StoredGraphCorruption();
     }
 
     final participantIds = <IntentionId>{
@@ -264,43 +249,16 @@ extension _DailyChoiceCatalogReading on DriftPersonalGraphRepository {
           .get();
       for (final row in rows) {
         final data = row.data;
-        final id = _decodeStoredRelationIntentionId(
-          _requiredStoredString(data, 'id'),
-        );
+        final id = decodeStoredIntentionId(requiredStoredString(data, 'id'));
         if (!participantIds.contains(id) || !foundIds.add(id)) {
-          throw const _StoredIntentionCorruption();
+          throw const StoredGraphCorruption();
         }
-        final title = _requiredStoredString(data, 'title');
-        final readiness = switch (_requiredStoredInteger(
-          data,
-          'is_action_ready',
-        )) {
-          0 => domain.IntentionReadiness.notReady,
-          1 => domain.IntentionReadiness.ready,
-          _ => throw const _StoredIntentionCorruption(),
-        };
-        final archiveState = switch (_requiredStoredInteger(
-          data,
-          'is_archived',
-        )) {
-          0 => domain.IntentionArchiveState.active,
-          1 => domain.IntentionArchiveState.archived,
-          _ => throw const _StoredIntentionCorruption(),
-        };
-        try {
-          final participant = DailyChoiceCatalogParticipant(
-            id: id,
-            title: title,
-            readiness: readiness,
-            archiveState: archiveState,
-          );
-          if (participant.title != title) {
-            throw const _StoredIntentionCorruption();
-          }
-          participants[id] = participant;
-        } on IntentionTextValidationException {
-          throw const _StoredIntentionCorruption();
-        }
+        participants[id] = DailyChoiceCatalogParticipant(
+          id: id,
+          title: decodeStoredIntentionTitle(data, 'title'),
+          readiness: decodeStoredIntentionReadiness(data, 'is_action_ready'),
+          archiveState: decodeStoredIntentionArchiveState(data, 'is_archived'),
+        );
       }
     }
     final intermediateIds = allIntentionIds.difference(participantIds);
@@ -318,16 +276,16 @@ extension _DailyChoiceCatalogReading on DriftPersonalGraphRepository {
           )
           .get();
       for (final row in rows) {
-        final id = _decodeStoredRelationIntentionId(
-          _requiredStoredString(row.data, 'id'),
+        final id = decodeStoredIntentionId(
+          requiredStoredString(row.data, 'id'),
         );
         if (!intermediateIds.contains(id) || !foundIds.add(id)) {
-          throw const _StoredIntentionCorruption();
+          throw const StoredGraphCorruption();
         }
       }
     }
     if (foundIds.length != allIntentionIds.length) {
-      throw const _StoredIntentionCorruption();
+      throw const StoredGraphCorruption();
     }
     return List.unmodifiable([
       for (final choice in choices)
@@ -335,7 +293,6 @@ extension _DailyChoiceCatalogReading on DriftPersonalGraphRepository {
           choice,
           stepsByChoice[choice.id] ?? const [],
           relations,
-          foundIds,
           participants,
         ),
     ]);
@@ -347,23 +304,17 @@ DailyChoiceCatalogItem _catalogItemFor(
   List<ChoicePathStep> steps,
   Map<LongTermRelationId, ({IntentionId source, IntentionId related})>
   relations,
-  Set<IntentionId> intentionIds,
   Map<IntentionId, DailyChoiceCatalogParticipant> participants,
 ) {
-  _validateStoredChoicePathLinks(
-    choice: choice,
-    steps: steps,
-    relations: relations,
-    intentionIds: intentionIds,
-  );
+  verifyStoredChoicePath(choice: choice, steps: steps, relations: relations);
   return DailyChoiceCatalogItem(
     id: choice.id,
     source:
         participants[choice.sourceIntentionId] ??
-        (throw const _StoredIntentionCorruption()),
+        (throw const StoredGraphCorruption()),
     selected:
         participants[choice.selectedIntentionId] ??
-        (throw const _StoredIntentionCorruption()),
+        (throw const StoredGraphCorruption()),
     date: choice.date,
     isCompleted: choice.isCompleted,
     schedule: choice.schedule,
@@ -401,7 +352,7 @@ DailyChoiceCatalogReadFailure _classifyDailyChoiceCatalogFailure(Object error) {
   if (error is _DailyChoiceCatalogSnapshotHasExpired) {
     return const DailyChoiceCatalogSnapshotExpired();
   }
-  if (error is _StoredIntentionCorruption ||
+  if (error is StoredGraphCorruption ||
       error is DailyChoiceCatalogPageValidationException) {
     return const DailyChoiceCatalogCorruptionFailure();
   }
@@ -409,6 +360,7 @@ DailyChoiceCatalogReadFailure _classifyDailyChoiceCatalogFailure(Object error) {
     SqliteCorruptionFailure() => const DailyChoiceCatalogCorruptionFailure(),
     SqliteUnavailableFailure() => const DailyChoiceCatalogUnavailableFailure(),
     SqliteConstraintFailure() ||
+    SqliteStorageFullFailure() ||
     SqliteUnexpectedFailure() => const DailyChoiceCatalogUnexpectedFailure(),
   };
 }

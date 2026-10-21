@@ -7,6 +7,7 @@ import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/data/local/app_database.dart'
     hide Tag, TagAssignment;
+import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -37,6 +38,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../../support/ordinary_page_test_app.dart';
+import '../../../support/graph_seed.dart';
 import '../../../support/in_memory_diagnostics_sink.dart';
 import '../../../support/tag_catalog_test_repository.dart';
 import '../../../support/tag_storage_fixture.dart';
@@ -1161,12 +1163,14 @@ Future<AppRouter> _pumpStoredCatalog(
   );
   await database.open();
   seedTagNavigationFixture(raw, extraPairsPerScope: 0);
-  for (final (number, name) in [
-    (303, 'Дом без назначений'),
-    (304, 'Дом в архиве'),
-  ]) {
-    raw.execute('UPDATE tags SET name = ? WHERE id = ?', [name, _id(number)]);
-  }
+  seedRawGraph(raw, () {
+    for (final (number, name) in [
+      (303, 'Дом без назначений'),
+      (304, 'Дом в архиве'),
+    ]) {
+      raw.execute('UPDATE tags SET name = ? WHERE id = ?', [name, _id(number)]);
+    }
+  });
   final repository = DriftPersonalGraphRepository(
     database,
     UuidV7IntentionIdGenerator(),
@@ -1186,6 +1190,7 @@ Future<AppRouter> _pumpStoredCatalog(
         personalGraphRepositoryProvider.overrideWithValue(repository),
       ],
       child: MaterialApp.router(
+        theme: doableTheme(Brightness.light),
         locale: const Locale('ru'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
@@ -1237,6 +1242,7 @@ Future<TagCatalogTestRepository> _pumpCatalog(
                     ),
             )
           : MaterialApp.router(
+              theme: doableTheme(Brightness.light),
               locale: Locale(language),
               localizationsDelegates: AppLocalizations.localizationsDelegates,
               supportedLocales: AppLocalizations.supportedLocales,

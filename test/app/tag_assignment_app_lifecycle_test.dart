@@ -7,6 +7,7 @@ import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
+import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -34,6 +35,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/tag_storage_fixture.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
@@ -69,9 +71,12 @@ void main() {
       });
       final ready = await tester.runAsync(runtime.bootstrap) as AppRuntimeReady;
       seedTagStorageFixture(raw);
-      raw.execute(
-        'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
-        [tagFixtureId(103), tagFixtureId(3), tagFixtureId(1), 'can', 3, 0],
+      seedRawGraph(
+        raw,
+        () => raw.execute(
+          'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
+          [tagFixtureId(103), tagFixtureId(3), tagFixtureId(1), 'can', 3, 0],
+        ),
       );
       final provider = tagCatalogViewModelProvider(
         mode: TagCatalogSelectionMode(target),
@@ -88,6 +93,7 @@ void main() {
         UncontrolledProviderScope(
           container: ready.container,
           child: MaterialApp.router(
+            theme: doableTheme(Brightness.light),
             locale: const Locale('ru'),
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
@@ -401,12 +407,14 @@ void main() {
       addTearDown(runtime.shutdown);
       final ready = await runtime.bootstrap() as AppRuntimeReady;
       seedTagStorageFixture(raw);
-      for (var number = 303; number <= 352; number++) {
-        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-          tagFixtureId(number),
-          'Дополнительный тег $number',
-        ]);
-      }
+      seedRawGraph(raw, () {
+        for (var number = 303; number <= 352; number++) {
+          raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+            tagFixtureId(number),
+            'Дополнительный тег $number',
+          ]);
+        }
+      });
       final provider = tagCatalogViewModelProvider(
         mode: TagCatalogSelectionMode(_intentionId(1)),
       );

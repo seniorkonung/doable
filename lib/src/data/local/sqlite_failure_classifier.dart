@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:drift/drift.dart' show CouldNotRollBackException;
 import 'package:drift/isolate.dart';
 import 'package:sqlite3/sqlite3.dart';
 
@@ -19,15 +22,23 @@ final class SqliteConstraintFailure extends SqliteFailure {
   final int extendedResultCode;
 }
 
+/// Нехватка места на устройстве: SQLite сообщил `SQLITE_FULL`, в том числе
+/// при достижении `PRAGMA max_page_count`, или запись файла отказала с
+/// `ENOSPC`.
+final class SqliteStorageFullFailure extends SqliteFailure {
+  const SqliteStorageFullFailure();
+}
+
 final class SqliteUnexpectedFailure extends SqliteFailure {
   const SqliteUnexpectedFailure();
 }
 
 SqliteFailure classifySqliteFailure(Object error) {
-  final cause = unwrapDriftRemoteException(error);
+  final cause = _originalCause(error);
   return switch (cause) {
     SqliteException(:final extendedResultCode) => switch (extendedResultCode) {
       SqlExtendedError.SQLITE_IOERR_DATA => const SqliteCorruptionFailure(),
+      SqlError.SQLITE_FULL => const SqliteStorageFullFailure(),
       _ when _isCorruptionFamily(extendedResultCode) =>
         const SqliteCorruptionFailure(),
       _ when _unavailableExtendedResultCodes.contains(extendedResultCode) =>
@@ -36,9 +47,14 @@ SqliteFailure classifySqliteFailure(Object error) {
         SqliteConstraintFailure(extendedResultCode),
       _ => const SqliteUnexpectedFailure(),
     },
+    FileSystemException(osError: OSError(errorCode: _enospc)) =>
+      const SqliteStorageFullFailure(),
     _ => const SqliteUnexpectedFailure(),
   };
 }
+
+/// Код `ENOSPC` в Linux и Android.
+const _enospc = 28;
 
 const _unavailableExtendedResultCodes = <int>{
   SqlError.SQLITE_BUSY,
@@ -72,6 +88,16 @@ bool _isCorruptionFamily(int extendedResultCode) {
 }
 
 int _primaryResultCode(int extendedResultCode) => extendedResultCode & 0xff;
+
+/// Ошибка SQLite или файловой системы без обёрток Drift: ошибки фонового
+/// соединения и отказа отката транзакции. Откат отказывает, когда SQLite
+/// после ошибки, например `SQLITE_FULL`, уже сам откатил всю транзакцию,
+/// поэтому категорию задаёт ошибка, из-за которой транзакция откатывалась.
+Object _originalCause(Object error) => switch (error) {
+  DriftRemoteException(:final remoteCause) => _originalCause(remoteCause),
+  CouldNotRollBackException(:final cause) => _originalCause(cause),
+  _ => error,
+};
 
 Object unwrapDriftRemoteException(Object error) {
   var cause = error;

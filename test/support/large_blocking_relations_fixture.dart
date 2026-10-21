@@ -3,6 +3,8 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:drift/drift.dart' show Value;
 
+import 'graph_seed.dart';
+
 /// Набор пересекает внутреннюю границу удаления в 400 SQL-параметров.
 abstract final class LargeBlockingRelationsFixture {
   static const selectedCount = 401;
@@ -17,43 +19,46 @@ abstract final class LargeBlockingRelationsFixture {
   ];
 
   static Future<void> seed(AppDatabase database, IntentionId owner) =>
-      database.batch((batch) {
-        const timestamp = 1789862400000000;
-        for (var index = 0; index <= selectedCount; index++) {
-          final neighbor = participant(index);
-          batch.insert(
-            database.intentions,
-            IntentionsCompanion.insert(
-              id: neighbor.toCanonicalString(),
-              title: 'Участник $index',
-              createdAt: timestamp + index,
-              updatedAt: timestamp + index,
-            ),
-          );
+      seedGraph(
+        database,
+        () => database.batch((batch) {
+          const timestamp = 1789862400000000;
+          for (var index = 0; index <= selectedCount; index++) {
+            final neighbor = participant(index);
+            batch.insert(
+              database.intentions,
+              IntentionsCompanion.insert(
+                id: neighbor.toCanonicalString(),
+                title: 'Участник $index',
+                createdAt: timestamp + index,
+                updatedAt: timestamp + index,
+              ),
+            );
+            batch.insert(
+              database.longTermRelations,
+              LongTermRelationsCompanion.insert(
+                id: (index < selectedCount ? selected(index) : unselected)
+                    .toCanonicalString(),
+                sourceIntentionId: owner.toCanonicalString(),
+                relatedIntentionId: neighbor.toCanonicalString(),
+                type: 'need',
+                priority: index % 4 + 1,
+                description: Value('Описание $index'),
+              ),
+            );
+          }
           batch.insert(
             database.longTermRelations,
             LongTermRelationsCompanion.insert(
-              id: (index < selectedCount ? selected(index) : unselected)
-                  .toCanonicalString(),
-              sourceIntentionId: owner.toCanonicalString(),
-              relatedIntentionId: neighbor.toCanonicalString(),
-              type: 'need',
-              priority: index % 4 + 1,
-              description: Value('Описание $index'),
+              id: unrelated.toCanonicalString(),
+              sourceIntentionId: participant(0).toCanonicalString(),
+              relatedIntentionId: participant(1).toCanonicalString(),
+              type: 'can',
+              priority: 2,
             ),
           );
-        }
-        batch.insert(
-          database.longTermRelations,
-          LongTermRelationsCompanion.insert(
-            id: unrelated.toCanonicalString(),
-            sourceIntentionId: participant(0).toCanonicalString(),
-            relatedIntentionId: participant(1).toCanonicalString(),
-            type: 'can',
-            priority: 2,
-          ),
-        );
-      });
+        }),
+      );
 }
 
 String _uuid(int value) =>

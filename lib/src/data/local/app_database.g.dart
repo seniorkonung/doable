@@ -3,6 +3,2819 @@
 part of 'app_database.dart';
 
 // ignore_for_file: type=lint
+class GraphLogControl extends Table
+    with TableInfo<GraphLogControl, GraphLogControlData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  GraphLogControl(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'NOT NULL PRIMARY KEY CHECK (id = 1)',
+  );
+  static const VerificationMeta _captureMeta = const VerificationMeta(
+    'capture',
+  );
+  late final GeneratedColumn<bool> capture = GeneratedColumn<bool>(
+    'capture',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: true,
+    $customConstraints:
+        'NOT NULL CHECK (typeof(capture) = \'integer\' AND capture IN (0, 1))',
+  );
+  static const VerificationMeta _writingMeta = const VerificationMeta(
+    'writing',
+  );
+  late final GeneratedColumn<bool> writing = GeneratedColumn<bool>(
+    'writing',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: true,
+    $customConstraints:
+        'NOT NULL CHECK (typeof(writing) = \'integer\' AND writing IN (0, 1))',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, capture, writing];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'graph_log_control';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<GraphLogControlData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('capture')) {
+      context.handle(
+        _captureMeta,
+        capture.isAcceptableOrUnknown(data['capture']!, _captureMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_captureMeta);
+    }
+    if (data.containsKey('writing')) {
+      context.handle(
+        _writingMeta,
+        writing.isAcceptableOrUnknown(data['writing']!, _writingMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_writingMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  GraphLogControlData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return GraphLogControlData(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      capture: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}capture'],
+      )!,
+      writing: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}writing'],
+      )!,
+    );
+  }
+
+  @override
+  GraphLogControl createAlias(String alias) {
+    return GraphLogControl(attachedDatabase, alias);
+  }
+
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class GraphLogControlData extends DataClass
+    implements Insertable<GraphLogControlData> {
+  final int id;
+  final bool capture;
+  final bool writing;
+  const GraphLogControlData({
+    required this.id,
+    required this.capture,
+    required this.writing,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['capture'] = Variable<bool>(capture);
+    map['writing'] = Variable<bool>(writing);
+    return map;
+  }
+
+  GraphLogControlCompanion toCompanion(bool nullToAbsent) {
+    return GraphLogControlCompanion(
+      id: Value(id),
+      capture: Value(capture),
+      writing: Value(writing),
+    );
+  }
+
+  factory GraphLogControlData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return GraphLogControlData(
+      id: serializer.fromJson<int>(json['id']),
+      capture: serializer.fromJson<bool>(json['capture']),
+      writing: serializer.fromJson<bool>(json['writing']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'capture': serializer.toJson<bool>(capture),
+      'writing': serializer.toJson<bool>(writing),
+    };
+  }
+
+  GraphLogControlData copyWith({int? id, bool? capture, bool? writing}) =>
+      GraphLogControlData(
+        id: id ?? this.id,
+        capture: capture ?? this.capture,
+        writing: writing ?? this.writing,
+      );
+  GraphLogControlData copyWithCompanion(GraphLogControlCompanion data) {
+    return GraphLogControlData(
+      id: data.id.present ? data.id.value : this.id,
+      capture: data.capture.present ? data.capture.value : this.capture,
+      writing: data.writing.present ? data.writing.value : this.writing,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GraphLogControlData(')
+          ..write('id: $id, ')
+          ..write('capture: $capture, ')
+          ..write('writing: $writing')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, capture, writing);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is GraphLogControlData &&
+          other.id == this.id &&
+          other.capture == this.capture &&
+          other.writing == this.writing);
+}
+
+class GraphLogControlCompanion extends UpdateCompanion<GraphLogControlData> {
+  final Value<int> id;
+  final Value<bool> capture;
+  final Value<bool> writing;
+  const GraphLogControlCompanion({
+    this.id = const Value.absent(),
+    this.capture = const Value.absent(),
+    this.writing = const Value.absent(),
+  });
+  GraphLogControlCompanion.insert({
+    this.id = const Value.absent(),
+    required bool capture,
+    required bool writing,
+  }) : capture = Value(capture),
+       writing = Value(writing);
+  static Insertable<GraphLogControlData> custom({
+    Expression<int>? id,
+    Expression<bool>? capture,
+    Expression<bool>? writing,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (capture != null) 'capture': capture,
+      if (writing != null) 'writing': writing,
+    });
+  }
+
+  GraphLogControlCompanion copyWith({
+    Value<int>? id,
+    Value<bool>? capture,
+    Value<bool>? writing,
+  }) {
+    return GraphLogControlCompanion(
+      id: id ?? this.id,
+      capture: capture ?? this.capture,
+      writing: writing ?? this.writing,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (capture.present) {
+      map['capture'] = Variable<bool>(capture.value);
+    }
+    if (writing.present) {
+      map['writing'] = Variable<bool>(writing.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GraphLogControlCompanion(')
+          ..write('id: $id, ')
+          ..write('capture: $capture, ')
+          ..write('writing: $writing')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class GraphLogTagMarks extends Table
+    with TableInfo<GraphLogTagMarks, GraphLogTagMark> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  GraphLogTagMarks(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _tagIdMeta = const VerificationMeta('tagId');
+  late final GeneratedColumn<String> tagId = GeneratedColumn<String>(
+    'tag_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL PRIMARY KEY',
+  );
+  static const VerificationMeta _firstOperationMeta = const VerificationMeta(
+    'firstOperation',
+  );
+  late final GeneratedColumn<String> firstOperation = GeneratedColumn<String>(
+    'first_operation',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL CHECK (first_operation IN (\'insert\', \'update\', \'delete\'))',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [tagId, firstOperation];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'graph_log_tag_marks';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<GraphLogTagMark> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('tag_id')) {
+      context.handle(
+        _tagIdMeta,
+        tagId.isAcceptableOrUnknown(data['tag_id']!, _tagIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_tagIdMeta);
+    }
+    if (data.containsKey('first_operation')) {
+      context.handle(
+        _firstOperationMeta,
+        firstOperation.isAcceptableOrUnknown(
+          data['first_operation']!,
+          _firstOperationMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_firstOperationMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {tagId};
+  @override
+  GraphLogTagMark map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return GraphLogTagMark(
+      tagId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}tag_id'],
+      )!,
+      firstOperation: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}first_operation'],
+      )!,
+    );
+  }
+
+  @override
+  GraphLogTagMarks createAlias(String alias) {
+    return GraphLogTagMarks(attachedDatabase, alias);
+  }
+
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class GraphLogTagMark extends DataClass implements Insertable<GraphLogTagMark> {
+  final String tagId;
+  final String firstOperation;
+  const GraphLogTagMark({required this.tagId, required this.firstOperation});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['tag_id'] = Variable<String>(tagId);
+    map['first_operation'] = Variable<String>(firstOperation);
+    return map;
+  }
+
+  GraphLogTagMarksCompanion toCompanion(bool nullToAbsent) {
+    return GraphLogTagMarksCompanion(
+      tagId: Value(tagId),
+      firstOperation: Value(firstOperation),
+    );
+  }
+
+  factory GraphLogTagMark.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return GraphLogTagMark(
+      tagId: serializer.fromJson<String>(json['tag_id']),
+      firstOperation: serializer.fromJson<String>(json['first_operation']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'tag_id': serializer.toJson<String>(tagId),
+      'first_operation': serializer.toJson<String>(firstOperation),
+    };
+  }
+
+  GraphLogTagMark copyWith({String? tagId, String? firstOperation}) =>
+      GraphLogTagMark(
+        tagId: tagId ?? this.tagId,
+        firstOperation: firstOperation ?? this.firstOperation,
+      );
+  GraphLogTagMark copyWithCompanion(GraphLogTagMarksCompanion data) {
+    return GraphLogTagMark(
+      tagId: data.tagId.present ? data.tagId.value : this.tagId,
+      firstOperation: data.firstOperation.present
+          ? data.firstOperation.value
+          : this.firstOperation,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GraphLogTagMark(')
+          ..write('tagId: $tagId, ')
+          ..write('firstOperation: $firstOperation')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(tagId, firstOperation);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is GraphLogTagMark &&
+          other.tagId == this.tagId &&
+          other.firstOperation == this.firstOperation);
+}
+
+class GraphLogTagMarksCompanion extends UpdateCompanion<GraphLogTagMark> {
+  final Value<String> tagId;
+  final Value<String> firstOperation;
+  final Value<int> rowid;
+  const GraphLogTagMarksCompanion({
+    this.tagId = const Value.absent(),
+    this.firstOperation = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  GraphLogTagMarksCompanion.insert({
+    required String tagId,
+    required String firstOperation,
+    this.rowid = const Value.absent(),
+  }) : tagId = Value(tagId),
+       firstOperation = Value(firstOperation);
+  static Insertable<GraphLogTagMark> custom({
+    Expression<String>? tagId,
+    Expression<String>? firstOperation,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (tagId != null) 'tag_id': tagId,
+      if (firstOperation != null) 'first_operation': firstOperation,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  GraphLogTagMarksCompanion copyWith({
+    Value<String>? tagId,
+    Value<String>? firstOperation,
+    Value<int>? rowid,
+  }) {
+    return GraphLogTagMarksCompanion(
+      tagId: tagId ?? this.tagId,
+      firstOperation: firstOperation ?? this.firstOperation,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (tagId.present) {
+      map['tag_id'] = Variable<String>(tagId.value);
+    }
+    if (firstOperation.present) {
+      map['first_operation'] = Variable<String>(firstOperation.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GraphLogTagMarksCompanion(')
+          ..write('tagId: $tagId, ')
+          ..write('firstOperation: $firstOperation, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class GraphLogIntentionMarks extends Table
+    with TableInfo<GraphLogIntentionMarks, GraphLogIntentionMark> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  GraphLogIntentionMarks(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _intentionIdMeta = const VerificationMeta(
+    'intentionId',
+  );
+  late final GeneratedColumn<String> intentionId = GeneratedColumn<String>(
+    'intention_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL PRIMARY KEY',
+  );
+  static const VerificationMeta _firstOperationMeta = const VerificationMeta(
+    'firstOperation',
+  );
+  late final GeneratedColumn<String> firstOperation = GeneratedColumn<String>(
+    'first_operation',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL CHECK (first_operation IN (\'insert\', \'update\', \'delete\'))',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [intentionId, firstOperation];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'graph_log_intention_marks';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<GraphLogIntentionMark> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('intention_id')) {
+      context.handle(
+        _intentionIdMeta,
+        intentionId.isAcceptableOrUnknown(
+          data['intention_id']!,
+          _intentionIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_intentionIdMeta);
+    }
+    if (data.containsKey('first_operation')) {
+      context.handle(
+        _firstOperationMeta,
+        firstOperation.isAcceptableOrUnknown(
+          data['first_operation']!,
+          _firstOperationMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_firstOperationMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {intentionId};
+  @override
+  GraphLogIntentionMark map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return GraphLogIntentionMark(
+      intentionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}intention_id'],
+      )!,
+      firstOperation: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}first_operation'],
+      )!,
+    );
+  }
+
+  @override
+  GraphLogIntentionMarks createAlias(String alias) {
+    return GraphLogIntentionMarks(attachedDatabase, alias);
+  }
+
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class GraphLogIntentionMark extends DataClass
+    implements Insertable<GraphLogIntentionMark> {
+  final String intentionId;
+  final String firstOperation;
+  const GraphLogIntentionMark({
+    required this.intentionId,
+    required this.firstOperation,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['intention_id'] = Variable<String>(intentionId);
+    map['first_operation'] = Variable<String>(firstOperation);
+    return map;
+  }
+
+  GraphLogIntentionMarksCompanion toCompanion(bool nullToAbsent) {
+    return GraphLogIntentionMarksCompanion(
+      intentionId: Value(intentionId),
+      firstOperation: Value(firstOperation),
+    );
+  }
+
+  factory GraphLogIntentionMark.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return GraphLogIntentionMark(
+      intentionId: serializer.fromJson<String>(json['intention_id']),
+      firstOperation: serializer.fromJson<String>(json['first_operation']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'intention_id': serializer.toJson<String>(intentionId),
+      'first_operation': serializer.toJson<String>(firstOperation),
+    };
+  }
+
+  GraphLogIntentionMark copyWith({
+    String? intentionId,
+    String? firstOperation,
+  }) => GraphLogIntentionMark(
+    intentionId: intentionId ?? this.intentionId,
+    firstOperation: firstOperation ?? this.firstOperation,
+  );
+  GraphLogIntentionMark copyWithCompanion(
+    GraphLogIntentionMarksCompanion data,
+  ) {
+    return GraphLogIntentionMark(
+      intentionId: data.intentionId.present
+          ? data.intentionId.value
+          : this.intentionId,
+      firstOperation: data.firstOperation.present
+          ? data.firstOperation.value
+          : this.firstOperation,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GraphLogIntentionMark(')
+          ..write('intentionId: $intentionId, ')
+          ..write('firstOperation: $firstOperation')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(intentionId, firstOperation);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is GraphLogIntentionMark &&
+          other.intentionId == this.intentionId &&
+          other.firstOperation == this.firstOperation);
+}
+
+class GraphLogIntentionMarksCompanion
+    extends UpdateCompanion<GraphLogIntentionMark> {
+  final Value<String> intentionId;
+  final Value<String> firstOperation;
+  final Value<int> rowid;
+  const GraphLogIntentionMarksCompanion({
+    this.intentionId = const Value.absent(),
+    this.firstOperation = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  GraphLogIntentionMarksCompanion.insert({
+    required String intentionId,
+    required String firstOperation,
+    this.rowid = const Value.absent(),
+  }) : intentionId = Value(intentionId),
+       firstOperation = Value(firstOperation);
+  static Insertable<GraphLogIntentionMark> custom({
+    Expression<String>? intentionId,
+    Expression<String>? firstOperation,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (intentionId != null) 'intention_id': intentionId,
+      if (firstOperation != null) 'first_operation': firstOperation,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  GraphLogIntentionMarksCompanion copyWith({
+    Value<String>? intentionId,
+    Value<String>? firstOperation,
+    Value<int>? rowid,
+  }) {
+    return GraphLogIntentionMarksCompanion(
+      intentionId: intentionId ?? this.intentionId,
+      firstOperation: firstOperation ?? this.firstOperation,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (intentionId.present) {
+      map['intention_id'] = Variable<String>(intentionId.value);
+    }
+    if (firstOperation.present) {
+      map['first_operation'] = Variable<String>(firstOperation.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GraphLogIntentionMarksCompanion(')
+          ..write('intentionId: $intentionId, ')
+          ..write('firstOperation: $firstOperation, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class GraphLogTagAssignmentMarks extends Table
+    with TableInfo<GraphLogTagAssignmentMarks, GraphLogTagAssignmentMark> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  GraphLogTagAssignmentMarks(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _tagIdMeta = const VerificationMeta('tagId');
+  late final GeneratedColumn<String> tagId = GeneratedColumn<String>(
+    'tag_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _intentionIdMeta = const VerificationMeta(
+    'intentionId',
+  );
+  late final GeneratedColumn<String> intentionId = GeneratedColumn<String>(
+    'intention_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _firstOperationMeta = const VerificationMeta(
+    'firstOperation',
+  );
+  late final GeneratedColumn<String> firstOperation = GeneratedColumn<String>(
+    'first_operation',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL CHECK (first_operation IN (\'insert\', \'update\', \'delete\'))',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [tagId, intentionId, firstOperation];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'graph_log_tag_assignment_marks';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<GraphLogTagAssignmentMark> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('tag_id')) {
+      context.handle(
+        _tagIdMeta,
+        tagId.isAcceptableOrUnknown(data['tag_id']!, _tagIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_tagIdMeta);
+    }
+    if (data.containsKey('intention_id')) {
+      context.handle(
+        _intentionIdMeta,
+        intentionId.isAcceptableOrUnknown(
+          data['intention_id']!,
+          _intentionIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_intentionIdMeta);
+    }
+    if (data.containsKey('first_operation')) {
+      context.handle(
+        _firstOperationMeta,
+        firstOperation.isAcceptableOrUnknown(
+          data['first_operation']!,
+          _firstOperationMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_firstOperationMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {tagId, intentionId};
+  @override
+  GraphLogTagAssignmentMark map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return GraphLogTagAssignmentMark(
+      tagId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}tag_id'],
+      )!,
+      intentionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}intention_id'],
+      )!,
+      firstOperation: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}first_operation'],
+      )!,
+    );
+  }
+
+  @override
+  GraphLogTagAssignmentMarks createAlias(String alias) {
+    return GraphLogTagAssignmentMarks(attachedDatabase, alias);
+  }
+
+  @override
+  List<String> get customConstraints => const [
+    'PRIMARY KEY(tag_id, intention_id)',
+  ];
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class GraphLogTagAssignmentMark extends DataClass
+    implements Insertable<GraphLogTagAssignmentMark> {
+  final String tagId;
+  final String intentionId;
+  final String firstOperation;
+  const GraphLogTagAssignmentMark({
+    required this.tagId,
+    required this.intentionId,
+    required this.firstOperation,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['tag_id'] = Variable<String>(tagId);
+    map['intention_id'] = Variable<String>(intentionId);
+    map['first_operation'] = Variable<String>(firstOperation);
+    return map;
+  }
+
+  GraphLogTagAssignmentMarksCompanion toCompanion(bool nullToAbsent) {
+    return GraphLogTagAssignmentMarksCompanion(
+      tagId: Value(tagId),
+      intentionId: Value(intentionId),
+      firstOperation: Value(firstOperation),
+    );
+  }
+
+  factory GraphLogTagAssignmentMark.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return GraphLogTagAssignmentMark(
+      tagId: serializer.fromJson<String>(json['tag_id']),
+      intentionId: serializer.fromJson<String>(json['intention_id']),
+      firstOperation: serializer.fromJson<String>(json['first_operation']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'tag_id': serializer.toJson<String>(tagId),
+      'intention_id': serializer.toJson<String>(intentionId),
+      'first_operation': serializer.toJson<String>(firstOperation),
+    };
+  }
+
+  GraphLogTagAssignmentMark copyWith({
+    String? tagId,
+    String? intentionId,
+    String? firstOperation,
+  }) => GraphLogTagAssignmentMark(
+    tagId: tagId ?? this.tagId,
+    intentionId: intentionId ?? this.intentionId,
+    firstOperation: firstOperation ?? this.firstOperation,
+  );
+  GraphLogTagAssignmentMark copyWithCompanion(
+    GraphLogTagAssignmentMarksCompanion data,
+  ) {
+    return GraphLogTagAssignmentMark(
+      tagId: data.tagId.present ? data.tagId.value : this.tagId,
+      intentionId: data.intentionId.present
+          ? data.intentionId.value
+          : this.intentionId,
+      firstOperation: data.firstOperation.present
+          ? data.firstOperation.value
+          : this.firstOperation,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GraphLogTagAssignmentMark(')
+          ..write('tagId: $tagId, ')
+          ..write('intentionId: $intentionId, ')
+          ..write('firstOperation: $firstOperation')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(tagId, intentionId, firstOperation);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is GraphLogTagAssignmentMark &&
+          other.tagId == this.tagId &&
+          other.intentionId == this.intentionId &&
+          other.firstOperation == this.firstOperation);
+}
+
+class GraphLogTagAssignmentMarksCompanion
+    extends UpdateCompanion<GraphLogTagAssignmentMark> {
+  final Value<String> tagId;
+  final Value<String> intentionId;
+  final Value<String> firstOperation;
+  final Value<int> rowid;
+  const GraphLogTagAssignmentMarksCompanion({
+    this.tagId = const Value.absent(),
+    this.intentionId = const Value.absent(),
+    this.firstOperation = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  GraphLogTagAssignmentMarksCompanion.insert({
+    required String tagId,
+    required String intentionId,
+    required String firstOperation,
+    this.rowid = const Value.absent(),
+  }) : tagId = Value(tagId),
+       intentionId = Value(intentionId),
+       firstOperation = Value(firstOperation);
+  static Insertable<GraphLogTagAssignmentMark> custom({
+    Expression<String>? tagId,
+    Expression<String>? intentionId,
+    Expression<String>? firstOperation,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (tagId != null) 'tag_id': tagId,
+      if (intentionId != null) 'intention_id': intentionId,
+      if (firstOperation != null) 'first_operation': firstOperation,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  GraphLogTagAssignmentMarksCompanion copyWith({
+    Value<String>? tagId,
+    Value<String>? intentionId,
+    Value<String>? firstOperation,
+    Value<int>? rowid,
+  }) {
+    return GraphLogTagAssignmentMarksCompanion(
+      tagId: tagId ?? this.tagId,
+      intentionId: intentionId ?? this.intentionId,
+      firstOperation: firstOperation ?? this.firstOperation,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (tagId.present) {
+      map['tag_id'] = Variable<String>(tagId.value);
+    }
+    if (intentionId.present) {
+      map['intention_id'] = Variable<String>(intentionId.value);
+    }
+    if (firstOperation.present) {
+      map['first_operation'] = Variable<String>(firstOperation.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GraphLogTagAssignmentMarksCompanion(')
+          ..write('tagId: $tagId, ')
+          ..write('intentionId: $intentionId, ')
+          ..write('firstOperation: $firstOperation, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class GraphLogLongTermRelationMarks extends Table
+    with
+        TableInfo<GraphLogLongTermRelationMarks, GraphLogLongTermRelationMark> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  GraphLogLongTermRelationMarks(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _longTermRelationIdMeta =
+      const VerificationMeta('longTermRelationId');
+  late final GeneratedColumn<String> longTermRelationId =
+      GeneratedColumn<String>(
+        'long_term_relation_id',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+        $customConstraints: 'NOT NULL PRIMARY KEY',
+      );
+  static const VerificationMeta _firstOperationMeta = const VerificationMeta(
+    'firstOperation',
+  );
+  late final GeneratedColumn<String> firstOperation = GeneratedColumn<String>(
+    'first_operation',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL CHECK (first_operation IN (\'insert\', \'update\', \'delete\'))',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [longTermRelationId, firstOperation];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'graph_log_long_term_relation_marks';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<GraphLogLongTermRelationMark> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('long_term_relation_id')) {
+      context.handle(
+        _longTermRelationIdMeta,
+        longTermRelationId.isAcceptableOrUnknown(
+          data['long_term_relation_id']!,
+          _longTermRelationIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_longTermRelationIdMeta);
+    }
+    if (data.containsKey('first_operation')) {
+      context.handle(
+        _firstOperationMeta,
+        firstOperation.isAcceptableOrUnknown(
+          data['first_operation']!,
+          _firstOperationMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_firstOperationMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {longTermRelationId};
+  @override
+  GraphLogLongTermRelationMark map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return GraphLogLongTermRelationMark(
+      longTermRelationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}long_term_relation_id'],
+      )!,
+      firstOperation: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}first_operation'],
+      )!,
+    );
+  }
+
+  @override
+  GraphLogLongTermRelationMarks createAlias(String alias) {
+    return GraphLogLongTermRelationMarks(attachedDatabase, alias);
+  }
+
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class GraphLogLongTermRelationMark extends DataClass
+    implements Insertable<GraphLogLongTermRelationMark> {
+  final String longTermRelationId;
+  final String firstOperation;
+  const GraphLogLongTermRelationMark({
+    required this.longTermRelationId,
+    required this.firstOperation,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['long_term_relation_id'] = Variable<String>(longTermRelationId);
+    map['first_operation'] = Variable<String>(firstOperation);
+    return map;
+  }
+
+  GraphLogLongTermRelationMarksCompanion toCompanion(bool nullToAbsent) {
+    return GraphLogLongTermRelationMarksCompanion(
+      longTermRelationId: Value(longTermRelationId),
+      firstOperation: Value(firstOperation),
+    );
+  }
+
+  factory GraphLogLongTermRelationMark.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return GraphLogLongTermRelationMark(
+      longTermRelationId: serializer.fromJson<String>(
+        json['long_term_relation_id'],
+      ),
+      firstOperation: serializer.fromJson<String>(json['first_operation']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'long_term_relation_id': serializer.toJson<String>(longTermRelationId),
+      'first_operation': serializer.toJson<String>(firstOperation),
+    };
+  }
+
+  GraphLogLongTermRelationMark copyWith({
+    String? longTermRelationId,
+    String? firstOperation,
+  }) => GraphLogLongTermRelationMark(
+    longTermRelationId: longTermRelationId ?? this.longTermRelationId,
+    firstOperation: firstOperation ?? this.firstOperation,
+  );
+  GraphLogLongTermRelationMark copyWithCompanion(
+    GraphLogLongTermRelationMarksCompanion data,
+  ) {
+    return GraphLogLongTermRelationMark(
+      longTermRelationId: data.longTermRelationId.present
+          ? data.longTermRelationId.value
+          : this.longTermRelationId,
+      firstOperation: data.firstOperation.present
+          ? data.firstOperation.value
+          : this.firstOperation,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GraphLogLongTermRelationMark(')
+          ..write('longTermRelationId: $longTermRelationId, ')
+          ..write('firstOperation: $firstOperation')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(longTermRelationId, firstOperation);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is GraphLogLongTermRelationMark &&
+          other.longTermRelationId == this.longTermRelationId &&
+          other.firstOperation == this.firstOperation);
+}
+
+class GraphLogLongTermRelationMarksCompanion
+    extends UpdateCompanion<GraphLogLongTermRelationMark> {
+  final Value<String> longTermRelationId;
+  final Value<String> firstOperation;
+  final Value<int> rowid;
+  const GraphLogLongTermRelationMarksCompanion({
+    this.longTermRelationId = const Value.absent(),
+    this.firstOperation = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  GraphLogLongTermRelationMarksCompanion.insert({
+    required String longTermRelationId,
+    required String firstOperation,
+    this.rowid = const Value.absent(),
+  }) : longTermRelationId = Value(longTermRelationId),
+       firstOperation = Value(firstOperation);
+  static Insertable<GraphLogLongTermRelationMark> custom({
+    Expression<String>? longTermRelationId,
+    Expression<String>? firstOperation,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (longTermRelationId != null)
+        'long_term_relation_id': longTermRelationId,
+      if (firstOperation != null) 'first_operation': firstOperation,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  GraphLogLongTermRelationMarksCompanion copyWith({
+    Value<String>? longTermRelationId,
+    Value<String>? firstOperation,
+    Value<int>? rowid,
+  }) {
+    return GraphLogLongTermRelationMarksCompanion(
+      longTermRelationId: longTermRelationId ?? this.longTermRelationId,
+      firstOperation: firstOperation ?? this.firstOperation,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (longTermRelationId.present) {
+      map['long_term_relation_id'] = Variable<String>(longTermRelationId.value);
+    }
+    if (firstOperation.present) {
+      map['first_operation'] = Variable<String>(firstOperation.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GraphLogLongTermRelationMarksCompanion(')
+          ..write('longTermRelationId: $longTermRelationId, ')
+          ..write('firstOperation: $firstOperation, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class GraphLogDailyChoiceMarks extends Table
+    with TableInfo<GraphLogDailyChoiceMarks, GraphLogDailyChoiceMark> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  GraphLogDailyChoiceMarks(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _dailyChoiceIdMeta = const VerificationMeta(
+    'dailyChoiceId',
+  );
+  late final GeneratedColumn<String> dailyChoiceId = GeneratedColumn<String>(
+    'daily_choice_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL PRIMARY KEY',
+  );
+  static const VerificationMeta _firstOperationMeta = const VerificationMeta(
+    'firstOperation',
+  );
+  late final GeneratedColumn<String> firstOperation = GeneratedColumn<String>(
+    'first_operation',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL CHECK (first_operation IN (\'insert\', \'update\', \'delete\'))',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [dailyChoiceId, firstOperation];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'graph_log_daily_choice_marks';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<GraphLogDailyChoiceMark> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('daily_choice_id')) {
+      context.handle(
+        _dailyChoiceIdMeta,
+        dailyChoiceId.isAcceptableOrUnknown(
+          data['daily_choice_id']!,
+          _dailyChoiceIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_dailyChoiceIdMeta);
+    }
+    if (data.containsKey('first_operation')) {
+      context.handle(
+        _firstOperationMeta,
+        firstOperation.isAcceptableOrUnknown(
+          data['first_operation']!,
+          _firstOperationMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_firstOperationMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {dailyChoiceId};
+  @override
+  GraphLogDailyChoiceMark map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return GraphLogDailyChoiceMark(
+      dailyChoiceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}daily_choice_id'],
+      )!,
+      firstOperation: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}first_operation'],
+      )!,
+    );
+  }
+
+  @override
+  GraphLogDailyChoiceMarks createAlias(String alias) {
+    return GraphLogDailyChoiceMarks(attachedDatabase, alias);
+  }
+
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class GraphLogDailyChoiceMark extends DataClass
+    implements Insertable<GraphLogDailyChoiceMark> {
+  final String dailyChoiceId;
+  final String firstOperation;
+  const GraphLogDailyChoiceMark({
+    required this.dailyChoiceId,
+    required this.firstOperation,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['daily_choice_id'] = Variable<String>(dailyChoiceId);
+    map['first_operation'] = Variable<String>(firstOperation);
+    return map;
+  }
+
+  GraphLogDailyChoiceMarksCompanion toCompanion(bool nullToAbsent) {
+    return GraphLogDailyChoiceMarksCompanion(
+      dailyChoiceId: Value(dailyChoiceId),
+      firstOperation: Value(firstOperation),
+    );
+  }
+
+  factory GraphLogDailyChoiceMark.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return GraphLogDailyChoiceMark(
+      dailyChoiceId: serializer.fromJson<String>(json['daily_choice_id']),
+      firstOperation: serializer.fromJson<String>(json['first_operation']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'daily_choice_id': serializer.toJson<String>(dailyChoiceId),
+      'first_operation': serializer.toJson<String>(firstOperation),
+    };
+  }
+
+  GraphLogDailyChoiceMark copyWith({
+    String? dailyChoiceId,
+    String? firstOperation,
+  }) => GraphLogDailyChoiceMark(
+    dailyChoiceId: dailyChoiceId ?? this.dailyChoiceId,
+    firstOperation: firstOperation ?? this.firstOperation,
+  );
+  GraphLogDailyChoiceMark copyWithCompanion(
+    GraphLogDailyChoiceMarksCompanion data,
+  ) {
+    return GraphLogDailyChoiceMark(
+      dailyChoiceId: data.dailyChoiceId.present
+          ? data.dailyChoiceId.value
+          : this.dailyChoiceId,
+      firstOperation: data.firstOperation.present
+          ? data.firstOperation.value
+          : this.firstOperation,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GraphLogDailyChoiceMark(')
+          ..write('dailyChoiceId: $dailyChoiceId, ')
+          ..write('firstOperation: $firstOperation')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(dailyChoiceId, firstOperation);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is GraphLogDailyChoiceMark &&
+          other.dailyChoiceId == this.dailyChoiceId &&
+          other.firstOperation == this.firstOperation);
+}
+
+class GraphLogDailyChoiceMarksCompanion
+    extends UpdateCompanion<GraphLogDailyChoiceMark> {
+  final Value<String> dailyChoiceId;
+  final Value<String> firstOperation;
+  final Value<int> rowid;
+  const GraphLogDailyChoiceMarksCompanion({
+    this.dailyChoiceId = const Value.absent(),
+    this.firstOperation = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  GraphLogDailyChoiceMarksCompanion.insert({
+    required String dailyChoiceId,
+    required String firstOperation,
+    this.rowid = const Value.absent(),
+  }) : dailyChoiceId = Value(dailyChoiceId),
+       firstOperation = Value(firstOperation);
+  static Insertable<GraphLogDailyChoiceMark> custom({
+    Expression<String>? dailyChoiceId,
+    Expression<String>? firstOperation,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (dailyChoiceId != null) 'daily_choice_id': dailyChoiceId,
+      if (firstOperation != null) 'first_operation': firstOperation,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  GraphLogDailyChoiceMarksCompanion copyWith({
+    Value<String>? dailyChoiceId,
+    Value<String>? firstOperation,
+    Value<int>? rowid,
+  }) {
+    return GraphLogDailyChoiceMarksCompanion(
+      dailyChoiceId: dailyChoiceId ?? this.dailyChoiceId,
+      firstOperation: firstOperation ?? this.firstOperation,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (dailyChoiceId.present) {
+      map['daily_choice_id'] = Variable<String>(dailyChoiceId.value);
+    }
+    if (firstOperation.present) {
+      map['first_operation'] = Variable<String>(firstOperation.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GraphLogDailyChoiceMarksCompanion(')
+          ..write('dailyChoiceId: $dailyChoiceId, ')
+          ..write('firstOperation: $firstOperation, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class GraphSnapshots extends Table
+    with TableInfo<GraphSnapshots, RegisteredGraphSnapshot> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  GraphSnapshots(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'NOT NULL PRIMARY KEY AUTOINCREMENT CHECK (id > 0)',
+  );
+  static const VerificationMeta _positionMeta = const VerificationMeta(
+    'position',
+  );
+  late final GeneratedColumn<int> position = GeneratedColumn<int>(
+    'position',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints:
+        'NOT NULL CHECK (typeof(position) = \'integer\' AND position >= 0)',
+  );
+  static const VerificationMeta _fileNameMeta = const VerificationMeta(
+    'fileName',
+  );
+  late final GeneratedColumn<String> fileName = GeneratedColumn<String>(
+    'file_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL UNIQUE CHECK (typeof(file_name) = \'text\' AND file_name <> \'\')',
+  );
+  static const VerificationMeta _byteSizeMeta = const VerificationMeta(
+    'byteSize',
+  );
+  late final GeneratedColumn<int> byteSize = GeneratedColumn<int>(
+    'byte_size',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints:
+        'NOT NULL CHECK (typeof(byte_size) = \'integer\' AND byte_size > 0)',
+  );
+  static const VerificationMeta _checksumMeta = const VerificationMeta(
+    'checksum',
+  );
+  late final GeneratedColumn<Uint8List> checksum = GeneratedColumn<Uint8List>(
+    'checksum',
+    aliasedName,
+    false,
+    type: DriftSqlType.blob,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL CHECK (typeof(checksum) = \'blob\' AND length(checksum) = 32)',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    position,
+    fileName,
+    byteSize,
+    checksum,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'graph_snapshots';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<RegisteredGraphSnapshot> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('position')) {
+      context.handle(
+        _positionMeta,
+        position.isAcceptableOrUnknown(data['position']!, _positionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_positionMeta);
+    }
+    if (data.containsKey('file_name')) {
+      context.handle(
+        _fileNameMeta,
+        fileName.isAcceptableOrUnknown(data['file_name']!, _fileNameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_fileNameMeta);
+    }
+    if (data.containsKey('byte_size')) {
+      context.handle(
+        _byteSizeMeta,
+        byteSize.isAcceptableOrUnknown(data['byte_size']!, _byteSizeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_byteSizeMeta);
+    }
+    if (data.containsKey('checksum')) {
+      context.handle(
+        _checksumMeta,
+        checksum.isAcceptableOrUnknown(data['checksum']!, _checksumMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_checksumMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  RegisteredGraphSnapshot map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return RegisteredGraphSnapshot(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      position: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}position'],
+      )!,
+      fileName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}file_name'],
+      )!,
+      byteSize: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}byte_size'],
+      )!,
+      checksum: attachedDatabase.typeMapping.read(
+        DriftSqlType.blob,
+        data['${effectivePrefix}checksum'],
+      )!,
+    );
+  }
+
+  @override
+  GraphSnapshots createAlias(String alias) {
+    return GraphSnapshots(attachedDatabase, alias);
+  }
+
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class RegisteredGraphSnapshot extends DataClass
+    implements Insertable<RegisteredGraphSnapshot> {
+  final int id;
+  final int position;
+  final String fileName;
+  final int byteSize;
+
+  /// SHA-256 файла снимка.
+  final Uint8List checksum;
+  const RegisteredGraphSnapshot({
+    required this.id,
+    required this.position,
+    required this.fileName,
+    required this.byteSize,
+    required this.checksum,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['position'] = Variable<int>(position);
+    map['file_name'] = Variable<String>(fileName);
+    map['byte_size'] = Variable<int>(byteSize);
+    map['checksum'] = Variable<Uint8List>(checksum);
+    return map;
+  }
+
+  GraphSnapshotsCompanion toCompanion(bool nullToAbsent) {
+    return GraphSnapshotsCompanion(
+      id: Value(id),
+      position: Value(position),
+      fileName: Value(fileName),
+      byteSize: Value(byteSize),
+      checksum: Value(checksum),
+    );
+  }
+
+  factory RegisteredGraphSnapshot.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return RegisteredGraphSnapshot(
+      id: serializer.fromJson<int>(json['id']),
+      position: serializer.fromJson<int>(json['position']),
+      fileName: serializer.fromJson<String>(json['file_name']),
+      byteSize: serializer.fromJson<int>(json['byte_size']),
+      checksum: serializer.fromJson<Uint8List>(json['checksum']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'position': serializer.toJson<int>(position),
+      'file_name': serializer.toJson<String>(fileName),
+      'byte_size': serializer.toJson<int>(byteSize),
+      'checksum': serializer.toJson<Uint8List>(checksum),
+    };
+  }
+
+  RegisteredGraphSnapshot copyWith({
+    int? id,
+    int? position,
+    String? fileName,
+    int? byteSize,
+    Uint8List? checksum,
+  }) => RegisteredGraphSnapshot(
+    id: id ?? this.id,
+    position: position ?? this.position,
+    fileName: fileName ?? this.fileName,
+    byteSize: byteSize ?? this.byteSize,
+    checksum: checksum ?? this.checksum,
+  );
+  RegisteredGraphSnapshot copyWithCompanion(GraphSnapshotsCompanion data) {
+    return RegisteredGraphSnapshot(
+      id: data.id.present ? data.id.value : this.id,
+      position: data.position.present ? data.position.value : this.position,
+      fileName: data.fileName.present ? data.fileName.value : this.fileName,
+      byteSize: data.byteSize.present ? data.byteSize.value : this.byteSize,
+      checksum: data.checksum.present ? data.checksum.value : this.checksum,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RegisteredGraphSnapshot(')
+          ..write('id: $id, ')
+          ..write('position: $position, ')
+          ..write('fileName: $fileName, ')
+          ..write('byteSize: $byteSize, ')
+          ..write('checksum: $checksum')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    position,
+    fileName,
+    byteSize,
+    $driftBlobEquality.hash(checksum),
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is RegisteredGraphSnapshot &&
+          other.id == this.id &&
+          other.position == this.position &&
+          other.fileName == this.fileName &&
+          other.byteSize == this.byteSize &&
+          $driftBlobEquality.equals(other.checksum, this.checksum));
+}
+
+class GraphSnapshotsCompanion extends UpdateCompanion<RegisteredGraphSnapshot> {
+  final Value<int> id;
+  final Value<int> position;
+  final Value<String> fileName;
+  final Value<int> byteSize;
+  final Value<Uint8List> checksum;
+  const GraphSnapshotsCompanion({
+    this.id = const Value.absent(),
+    this.position = const Value.absent(),
+    this.fileName = const Value.absent(),
+    this.byteSize = const Value.absent(),
+    this.checksum = const Value.absent(),
+  });
+  GraphSnapshotsCompanion.insert({
+    this.id = const Value.absent(),
+    required int position,
+    required String fileName,
+    required int byteSize,
+    required Uint8List checksum,
+  }) : position = Value(position),
+       fileName = Value(fileName),
+       byteSize = Value(byteSize),
+       checksum = Value(checksum);
+  static Insertable<RegisteredGraphSnapshot> custom({
+    Expression<int>? id,
+    Expression<int>? position,
+    Expression<String>? fileName,
+    Expression<int>? byteSize,
+    Expression<Uint8List>? checksum,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (position != null) 'position': position,
+      if (fileName != null) 'file_name': fileName,
+      if (byteSize != null) 'byte_size': byteSize,
+      if (checksum != null) 'checksum': checksum,
+    });
+  }
+
+  GraphSnapshotsCompanion copyWith({
+    Value<int>? id,
+    Value<int>? position,
+    Value<String>? fileName,
+    Value<int>? byteSize,
+    Value<Uint8List>? checksum,
+  }) {
+    return GraphSnapshotsCompanion(
+      id: id ?? this.id,
+      position: position ?? this.position,
+      fileName: fileName ?? this.fileName,
+      byteSize: byteSize ?? this.byteSize,
+      checksum: checksum ?? this.checksum,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (position.present) {
+      map['position'] = Variable<int>(position.value);
+    }
+    if (fileName.present) {
+      map['file_name'] = Variable<String>(fileName.value);
+    }
+    if (byteSize.present) {
+      map['byte_size'] = Variable<int>(byteSize.value);
+    }
+    if (checksum.present) {
+      map['checksum'] = Variable<Uint8List>(checksum.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GraphSnapshotsCompanion(')
+          ..write('id: $id, ')
+          ..write('position: $position, ')
+          ..write('fileName: $fileName, ')
+          ..write('byteSize: $byteSize, ')
+          ..write('checksum: $checksum')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class GraphLogPackages extends Table
+    with TableInfo<GraphLogPackages, GraphLogPackage> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  GraphLogPackages(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _positionMeta = const VerificationMeta(
+    'position',
+  );
+  late final GeneratedColumn<int> position = GeneratedColumn<int>(
+    'position',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints:
+        'NOT NULL PRIMARY KEY AUTOINCREMENT CHECK (position > 0)',
+  );
+  static const VerificationMeta _recordedAtMeta = const VerificationMeta(
+    'recordedAt',
+  );
+  late final GeneratedColumn<int> recordedAt = GeneratedColumn<int>(
+    'recorded_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL CHECK (typeof(recorded_at) = \'integer\')',
+  );
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+    'kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL CHECK (typeof(kind) = \'text\' AND kind IN (\'change\', \'reset\'))',
+  );
+  static const VerificationMeta _formatVersionMeta = const VerificationMeta(
+    'formatVersion',
+  );
+  late final GeneratedColumn<int> formatVersion = GeneratedColumn<int>(
+    'format_version',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'CHECK (format_version IS NULL OR(typeof(format_version) = \'integer\' AND format_version > 0))',
+  );
+  static const VerificationMeta _factsMeta = const VerificationMeta('facts');
+  late final GeneratedColumn<Uint8List> facts = GeneratedColumn<Uint8List>(
+    'facts',
+    aliasedName,
+    true,
+    type: DriftSqlType.blob,
+    requiredDuringInsert: false,
+    $customConstraints: 'CHECK (facts IS NULL OR typeof(facts) = \'blob\')',
+  );
+  static const VerificationMeta _snapshotIdMeta = const VerificationMeta(
+    'snapshotId',
+  );
+  late final GeneratedColumn<int> snapshotId = GeneratedColumn<int>(
+    'snapshot_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints:
+        'REFERENCES graph_snapshots(id)ON UPDATE RESTRICT ON DELETE RESTRICT',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    position,
+    recordedAt,
+    kind,
+    formatVersion,
+    facts,
+    snapshotId,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'graph_log_packages';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<GraphLogPackage> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('position')) {
+      context.handle(
+        _positionMeta,
+        position.isAcceptableOrUnknown(data['position']!, _positionMeta),
+      );
+    }
+    if (data.containsKey('recorded_at')) {
+      context.handle(
+        _recordedAtMeta,
+        recordedAt.isAcceptableOrUnknown(data['recorded_at']!, _recordedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_recordedAtMeta);
+    }
+    if (data.containsKey('kind')) {
+      context.handle(
+        _kindMeta,
+        kind.isAcceptableOrUnknown(data['kind']!, _kindMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_kindMeta);
+    }
+    if (data.containsKey('format_version')) {
+      context.handle(
+        _formatVersionMeta,
+        formatVersion.isAcceptableOrUnknown(
+          data['format_version']!,
+          _formatVersionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('facts')) {
+      context.handle(
+        _factsMeta,
+        facts.isAcceptableOrUnknown(data['facts']!, _factsMeta),
+      );
+    }
+    if (data.containsKey('snapshot_id')) {
+      context.handle(
+        _snapshotIdMeta,
+        snapshotId.isAcceptableOrUnknown(data['snapshot_id']!, _snapshotIdMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {position};
+  @override
+  GraphLogPackage map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return GraphLogPackage(
+      position: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}position'],
+      )!,
+      recordedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}recorded_at'],
+      )!,
+      kind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}kind'],
+      )!,
+      formatVersion: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}format_version'],
+      ),
+      facts: attachedDatabase.typeMapping.read(
+        DriftSqlType.blob,
+        data['${effectivePrefix}facts'],
+      ),
+      snapshotId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}snapshot_id'],
+      ),
+    );
+  }
+
+  @override
+  GraphLogPackages createAlias(String alias) {
+    return GraphLogPackages(attachedDatabase, alias);
+  }
+
+  @override
+  List<String> get customConstraints => const [
+    'CHECK((kind = \'change\' AND format_version IS NOT NULL AND facts IS NOT NULL AND snapshot_id IS NULL)OR(kind = \'reset\' AND format_version IS NULL AND facts IS NULL AND snapshot_id IS NOT NULL))',
+  ];
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class GraphLogPackage extends DataClass implements Insertable<GraphLogPackage> {
+  final int position;
+  final int recordedAt;
+  final String kind;
+  final int? formatVersion;
+  final Uint8List? facts;
+  final int? snapshotId;
+  const GraphLogPackage({
+    required this.position,
+    required this.recordedAt,
+    required this.kind,
+    this.formatVersion,
+    this.facts,
+    this.snapshotId,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['position'] = Variable<int>(position);
+    map['recorded_at'] = Variable<int>(recordedAt);
+    map['kind'] = Variable<String>(kind);
+    if (!nullToAbsent || formatVersion != null) {
+      map['format_version'] = Variable<int>(formatVersion);
+    }
+    if (!nullToAbsent || facts != null) {
+      map['facts'] = Variable<Uint8List>(facts);
+    }
+    if (!nullToAbsent || snapshotId != null) {
+      map['snapshot_id'] = Variable<int>(snapshotId);
+    }
+    return map;
+  }
+
+  GraphLogPackagesCompanion toCompanion(bool nullToAbsent) {
+    return GraphLogPackagesCompanion(
+      position: Value(position),
+      recordedAt: Value(recordedAt),
+      kind: Value(kind),
+      formatVersion: formatVersion == null && nullToAbsent
+          ? const Value.absent()
+          : Value(formatVersion),
+      facts: facts == null && nullToAbsent
+          ? const Value.absent()
+          : Value(facts),
+      snapshotId: snapshotId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(snapshotId),
+    );
+  }
+
+  factory GraphLogPackage.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return GraphLogPackage(
+      position: serializer.fromJson<int>(json['position']),
+      recordedAt: serializer.fromJson<int>(json['recorded_at']),
+      kind: serializer.fromJson<String>(json['kind']),
+      formatVersion: serializer.fromJson<int?>(json['format_version']),
+      facts: serializer.fromJson<Uint8List?>(json['facts']),
+      snapshotId: serializer.fromJson<int?>(json['snapshot_id']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'position': serializer.toJson<int>(position),
+      'recorded_at': serializer.toJson<int>(recordedAt),
+      'kind': serializer.toJson<String>(kind),
+      'format_version': serializer.toJson<int?>(formatVersion),
+      'facts': serializer.toJson<Uint8List?>(facts),
+      'snapshot_id': serializer.toJson<int?>(snapshotId),
+    };
+  }
+
+  GraphLogPackage copyWith({
+    int? position,
+    int? recordedAt,
+    String? kind,
+    Value<int?> formatVersion = const Value.absent(),
+    Value<Uint8List?> facts = const Value.absent(),
+    Value<int?> snapshotId = const Value.absent(),
+  }) => GraphLogPackage(
+    position: position ?? this.position,
+    recordedAt: recordedAt ?? this.recordedAt,
+    kind: kind ?? this.kind,
+    formatVersion: formatVersion.present
+        ? formatVersion.value
+        : this.formatVersion,
+    facts: facts.present ? facts.value : this.facts,
+    snapshotId: snapshotId.present ? snapshotId.value : this.snapshotId,
+  );
+  GraphLogPackage copyWithCompanion(GraphLogPackagesCompanion data) {
+    return GraphLogPackage(
+      position: data.position.present ? data.position.value : this.position,
+      recordedAt: data.recordedAt.present
+          ? data.recordedAt.value
+          : this.recordedAt,
+      kind: data.kind.present ? data.kind.value : this.kind,
+      formatVersion: data.formatVersion.present
+          ? data.formatVersion.value
+          : this.formatVersion,
+      facts: data.facts.present ? data.facts.value : this.facts,
+      snapshotId: data.snapshotId.present
+          ? data.snapshotId.value
+          : this.snapshotId,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GraphLogPackage(')
+          ..write('position: $position, ')
+          ..write('recordedAt: $recordedAt, ')
+          ..write('kind: $kind, ')
+          ..write('formatVersion: $formatVersion, ')
+          ..write('facts: $facts, ')
+          ..write('snapshotId: $snapshotId')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    position,
+    recordedAt,
+    kind,
+    formatVersion,
+    $driftBlobEquality.hash(facts),
+    snapshotId,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is GraphLogPackage &&
+          other.position == this.position &&
+          other.recordedAt == this.recordedAt &&
+          other.kind == this.kind &&
+          other.formatVersion == this.formatVersion &&
+          $driftBlobEquality.equals(other.facts, this.facts) &&
+          other.snapshotId == this.snapshotId);
+}
+
+class GraphLogPackagesCompanion extends UpdateCompanion<GraphLogPackage> {
+  final Value<int> position;
+  final Value<int> recordedAt;
+  final Value<String> kind;
+  final Value<int?> formatVersion;
+  final Value<Uint8List?> facts;
+  final Value<int?> snapshotId;
+  const GraphLogPackagesCompanion({
+    this.position = const Value.absent(),
+    this.recordedAt = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.formatVersion = const Value.absent(),
+    this.facts = const Value.absent(),
+    this.snapshotId = const Value.absent(),
+  });
+  GraphLogPackagesCompanion.insert({
+    this.position = const Value.absent(),
+    required int recordedAt,
+    required String kind,
+    this.formatVersion = const Value.absent(),
+    this.facts = const Value.absent(),
+    this.snapshotId = const Value.absent(),
+  }) : recordedAt = Value(recordedAt),
+       kind = Value(kind);
+  static Insertable<GraphLogPackage> custom({
+    Expression<int>? position,
+    Expression<int>? recordedAt,
+    Expression<String>? kind,
+    Expression<int>? formatVersion,
+    Expression<Uint8List>? facts,
+    Expression<int>? snapshotId,
+  }) {
+    return RawValuesInsertable({
+      if (position != null) 'position': position,
+      if (recordedAt != null) 'recorded_at': recordedAt,
+      if (kind != null) 'kind': kind,
+      if (formatVersion != null) 'format_version': formatVersion,
+      if (facts != null) 'facts': facts,
+      if (snapshotId != null) 'snapshot_id': snapshotId,
+    });
+  }
+
+  GraphLogPackagesCompanion copyWith({
+    Value<int>? position,
+    Value<int>? recordedAt,
+    Value<String>? kind,
+    Value<int?>? formatVersion,
+    Value<Uint8List?>? facts,
+    Value<int?>? snapshotId,
+  }) {
+    return GraphLogPackagesCompanion(
+      position: position ?? this.position,
+      recordedAt: recordedAt ?? this.recordedAt,
+      kind: kind ?? this.kind,
+      formatVersion: formatVersion ?? this.formatVersion,
+      facts: facts ?? this.facts,
+      snapshotId: snapshotId ?? this.snapshotId,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (position.present) {
+      map['position'] = Variable<int>(position.value);
+    }
+    if (recordedAt.present) {
+      map['recorded_at'] = Variable<int>(recordedAt.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (formatVersion.present) {
+      map['format_version'] = Variable<int>(formatVersion.value);
+    }
+    if (facts.present) {
+      map['facts'] = Variable<Uint8List>(facts.value);
+    }
+    if (snapshotId.present) {
+      map['snapshot_id'] = Variable<int>(snapshotId.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GraphLogPackagesCompanion(')
+          ..write('position: $position, ')
+          ..write('recordedAt: $recordedAt, ')
+          ..write('kind: $kind, ')
+          ..write('formatVersion: $formatVersion, ')
+          ..write('facts: $facts, ')
+          ..write('snapshotId: $snapshotId')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class GraphBackups extends Table with TableInfo<GraphBackups, GraphBackup> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  GraphBackups(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'NOT NULL PRIMARY KEY AUTOINCREMENT CHECK (id > 0)',
+  );
+  static const VerificationMeta _positionMeta = const VerificationMeta(
+    'position',
+  );
+  late final GeneratedColumn<int> position = GeneratedColumn<int>(
+    'position',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints:
+        'NOT NULL CHECK (typeof(position) = \'integer\' AND position >= 0)',
+  );
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+    'kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL CHECK (typeof(kind) = \'text\' AND kind IN (\'daily\', \'manual\', \'before_replacement\'))',
+  );
+  static const VerificationMeta _madeAtMeta = const VerificationMeta('madeAt');
+  late final GeneratedColumn<int> madeAt = GeneratedColumn<int>(
+    'made_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL CHECK (typeof(made_at) = \'integer\')',
+  );
+  static const VerificationMeta _graphReplacedMeta = const VerificationMeta(
+    'graphReplaced',
+  );
+  late final GeneratedColumn<bool> graphReplaced = GeneratedColumn<bool>(
+    'graph_replaced',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL CHECK (typeof(graph_replaced) = \'integer\' AND graph_replaced IN (0, 1))',
+  );
+  static const VerificationMeta _addedCountMeta = const VerificationMeta(
+    'addedCount',
+  );
+  late final GeneratedColumn<int> addedCount = GeneratedColumn<int>(
+    'added_count',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'CHECK (added_count IS NULL OR(typeof(added_count) = \'integer\' AND added_count >= 0))',
+  );
+  static const VerificationMeta _changedCountMeta = const VerificationMeta(
+    'changedCount',
+  );
+  late final GeneratedColumn<int> changedCount = GeneratedColumn<int>(
+    'changed_count',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'CHECK (changed_count IS NULL OR(typeof(changed_count) = \'integer\' AND changed_count >= 0))',
+  );
+  static const VerificationMeta _deletedCountMeta = const VerificationMeta(
+    'deletedCount',
+  );
+  late final GeneratedColumn<int> deletedCount = GeneratedColumn<int>(
+    'deleted_count',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'CHECK (deleted_count IS NULL OR(typeof(deleted_count) = \'integer\' AND deleted_count >= 0))',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    position,
+    kind,
+    madeAt,
+    graphReplaced,
+    addedCount,
+    changedCount,
+    deletedCount,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'graph_backups';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<GraphBackup> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('position')) {
+      context.handle(
+        _positionMeta,
+        position.isAcceptableOrUnknown(data['position']!, _positionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_positionMeta);
+    }
+    if (data.containsKey('kind')) {
+      context.handle(
+        _kindMeta,
+        kind.isAcceptableOrUnknown(data['kind']!, _kindMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_kindMeta);
+    }
+    if (data.containsKey('made_at')) {
+      context.handle(
+        _madeAtMeta,
+        madeAt.isAcceptableOrUnknown(data['made_at']!, _madeAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_madeAtMeta);
+    }
+    if (data.containsKey('graph_replaced')) {
+      context.handle(
+        _graphReplacedMeta,
+        graphReplaced.isAcceptableOrUnknown(
+          data['graph_replaced']!,
+          _graphReplacedMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_graphReplacedMeta);
+    }
+    if (data.containsKey('added_count')) {
+      context.handle(
+        _addedCountMeta,
+        addedCount.isAcceptableOrUnknown(data['added_count']!, _addedCountMeta),
+      );
+    }
+    if (data.containsKey('changed_count')) {
+      context.handle(
+        _changedCountMeta,
+        changedCount.isAcceptableOrUnknown(
+          data['changed_count']!,
+          _changedCountMeta,
+        ),
+      );
+    }
+    if (data.containsKey('deleted_count')) {
+      context.handle(
+        _deletedCountMeta,
+        deletedCount.isAcceptableOrUnknown(
+          data['deleted_count']!,
+          _deletedCountMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  GraphBackup map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return GraphBackup(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      position: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}position'],
+      )!,
+      kind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}kind'],
+      )!,
+      madeAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}made_at'],
+      )!,
+      graphReplaced: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}graph_replaced'],
+      )!,
+      addedCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}added_count'],
+      ),
+      changedCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}changed_count'],
+      ),
+      deletedCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}deleted_count'],
+      ),
+    );
+  }
+
+  @override
+  GraphBackups createAlias(String alias) {
+    return GraphBackups(attachedDatabase, alias);
+  }
+
+  @override
+  List<String> get customConstraints => const [
+    'CHECK((graph_replaced = 0 AND added_count IS NOT NULL AND changed_count IS NOT NULL AND deleted_count IS NOT NULL)OR(graph_replaced = 1 AND added_count IS NULL AND changed_count IS NULL AND deleted_count IS NULL))',
+  ];
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class GraphBackup extends DataClass implements Insertable<GraphBackup> {
+  final int id;
+  final int position;
+  final String kind;
+  final int madeAt;
+  final bool graphReplaced;
+  final int? addedCount;
+  final int? changedCount;
+  final int? deletedCount;
+  const GraphBackup({
+    required this.id,
+    required this.position,
+    required this.kind,
+    required this.madeAt,
+    required this.graphReplaced,
+    this.addedCount,
+    this.changedCount,
+    this.deletedCount,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['position'] = Variable<int>(position);
+    map['kind'] = Variable<String>(kind);
+    map['made_at'] = Variable<int>(madeAt);
+    map['graph_replaced'] = Variable<bool>(graphReplaced);
+    if (!nullToAbsent || addedCount != null) {
+      map['added_count'] = Variable<int>(addedCount);
+    }
+    if (!nullToAbsent || changedCount != null) {
+      map['changed_count'] = Variable<int>(changedCount);
+    }
+    if (!nullToAbsent || deletedCount != null) {
+      map['deleted_count'] = Variable<int>(deletedCount);
+    }
+    return map;
+  }
+
+  GraphBackupsCompanion toCompanion(bool nullToAbsent) {
+    return GraphBackupsCompanion(
+      id: Value(id),
+      position: Value(position),
+      kind: Value(kind),
+      madeAt: Value(madeAt),
+      graphReplaced: Value(graphReplaced),
+      addedCount: addedCount == null && nullToAbsent
+          ? const Value.absent()
+          : Value(addedCount),
+      changedCount: changedCount == null && nullToAbsent
+          ? const Value.absent()
+          : Value(changedCount),
+      deletedCount: deletedCount == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedCount),
+    );
+  }
+
+  factory GraphBackup.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return GraphBackup(
+      id: serializer.fromJson<int>(json['id']),
+      position: serializer.fromJson<int>(json['position']),
+      kind: serializer.fromJson<String>(json['kind']),
+      madeAt: serializer.fromJson<int>(json['made_at']),
+      graphReplaced: serializer.fromJson<bool>(json['graph_replaced']),
+      addedCount: serializer.fromJson<int?>(json['added_count']),
+      changedCount: serializer.fromJson<int?>(json['changed_count']),
+      deletedCount: serializer.fromJson<int?>(json['deleted_count']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'position': serializer.toJson<int>(position),
+      'kind': serializer.toJson<String>(kind),
+      'made_at': serializer.toJson<int>(madeAt),
+      'graph_replaced': serializer.toJson<bool>(graphReplaced),
+      'added_count': serializer.toJson<int?>(addedCount),
+      'changed_count': serializer.toJson<int?>(changedCount),
+      'deleted_count': serializer.toJson<int?>(deletedCount),
+    };
+  }
+
+  GraphBackup copyWith({
+    int? id,
+    int? position,
+    String? kind,
+    int? madeAt,
+    bool? graphReplaced,
+    Value<int?> addedCount = const Value.absent(),
+    Value<int?> changedCount = const Value.absent(),
+    Value<int?> deletedCount = const Value.absent(),
+  }) => GraphBackup(
+    id: id ?? this.id,
+    position: position ?? this.position,
+    kind: kind ?? this.kind,
+    madeAt: madeAt ?? this.madeAt,
+    graphReplaced: graphReplaced ?? this.graphReplaced,
+    addedCount: addedCount.present ? addedCount.value : this.addedCount,
+    changedCount: changedCount.present ? changedCount.value : this.changedCount,
+    deletedCount: deletedCount.present ? deletedCount.value : this.deletedCount,
+  );
+  GraphBackup copyWithCompanion(GraphBackupsCompanion data) {
+    return GraphBackup(
+      id: data.id.present ? data.id.value : this.id,
+      position: data.position.present ? data.position.value : this.position,
+      kind: data.kind.present ? data.kind.value : this.kind,
+      madeAt: data.madeAt.present ? data.madeAt.value : this.madeAt,
+      graphReplaced: data.graphReplaced.present
+          ? data.graphReplaced.value
+          : this.graphReplaced,
+      addedCount: data.addedCount.present
+          ? data.addedCount.value
+          : this.addedCount,
+      changedCount: data.changedCount.present
+          ? data.changedCount.value
+          : this.changedCount,
+      deletedCount: data.deletedCount.present
+          ? data.deletedCount.value
+          : this.deletedCount,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GraphBackup(')
+          ..write('id: $id, ')
+          ..write('position: $position, ')
+          ..write('kind: $kind, ')
+          ..write('madeAt: $madeAt, ')
+          ..write('graphReplaced: $graphReplaced, ')
+          ..write('addedCount: $addedCount, ')
+          ..write('changedCount: $changedCount, ')
+          ..write('deletedCount: $deletedCount')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    position,
+    kind,
+    madeAt,
+    graphReplaced,
+    addedCount,
+    changedCount,
+    deletedCount,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is GraphBackup &&
+          other.id == this.id &&
+          other.position == this.position &&
+          other.kind == this.kind &&
+          other.madeAt == this.madeAt &&
+          other.graphReplaced == this.graphReplaced &&
+          other.addedCount == this.addedCount &&
+          other.changedCount == this.changedCount &&
+          other.deletedCount == this.deletedCount);
+}
+
+class GraphBackupsCompanion extends UpdateCompanion<GraphBackup> {
+  final Value<int> id;
+  final Value<int> position;
+  final Value<String> kind;
+  final Value<int> madeAt;
+  final Value<bool> graphReplaced;
+  final Value<int?> addedCount;
+  final Value<int?> changedCount;
+  final Value<int?> deletedCount;
+  const GraphBackupsCompanion({
+    this.id = const Value.absent(),
+    this.position = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.madeAt = const Value.absent(),
+    this.graphReplaced = const Value.absent(),
+    this.addedCount = const Value.absent(),
+    this.changedCount = const Value.absent(),
+    this.deletedCount = const Value.absent(),
+  });
+  GraphBackupsCompanion.insert({
+    this.id = const Value.absent(),
+    required int position,
+    required String kind,
+    required int madeAt,
+    required bool graphReplaced,
+    this.addedCount = const Value.absent(),
+    this.changedCount = const Value.absent(),
+    this.deletedCount = const Value.absent(),
+  }) : position = Value(position),
+       kind = Value(kind),
+       madeAt = Value(madeAt),
+       graphReplaced = Value(graphReplaced);
+  static Insertable<GraphBackup> custom({
+    Expression<int>? id,
+    Expression<int>? position,
+    Expression<String>? kind,
+    Expression<int>? madeAt,
+    Expression<bool>? graphReplaced,
+    Expression<int>? addedCount,
+    Expression<int>? changedCount,
+    Expression<int>? deletedCount,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (position != null) 'position': position,
+      if (kind != null) 'kind': kind,
+      if (madeAt != null) 'made_at': madeAt,
+      if (graphReplaced != null) 'graph_replaced': graphReplaced,
+      if (addedCount != null) 'added_count': addedCount,
+      if (changedCount != null) 'changed_count': changedCount,
+      if (deletedCount != null) 'deleted_count': deletedCount,
+    });
+  }
+
+  GraphBackupsCompanion copyWith({
+    Value<int>? id,
+    Value<int>? position,
+    Value<String>? kind,
+    Value<int>? madeAt,
+    Value<bool>? graphReplaced,
+    Value<int?>? addedCount,
+    Value<int?>? changedCount,
+    Value<int?>? deletedCount,
+  }) {
+    return GraphBackupsCompanion(
+      id: id ?? this.id,
+      position: position ?? this.position,
+      kind: kind ?? this.kind,
+      madeAt: madeAt ?? this.madeAt,
+      graphReplaced: graphReplaced ?? this.graphReplaced,
+      addedCount: addedCount ?? this.addedCount,
+      changedCount: changedCount ?? this.changedCount,
+      deletedCount: deletedCount ?? this.deletedCount,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (position.present) {
+      map['position'] = Variable<int>(position.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (madeAt.present) {
+      map['made_at'] = Variable<int>(madeAt.value);
+    }
+    if (graphReplaced.present) {
+      map['graph_replaced'] = Variable<bool>(graphReplaced.value);
+    }
+    if (addedCount.present) {
+      map['added_count'] = Variable<int>(addedCount.value);
+    }
+    if (changedCount.present) {
+      map['changed_count'] = Variable<int>(changedCount.value);
+    }
+    if (deletedCount.present) {
+      map['deleted_count'] = Variable<int>(deletedCount.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GraphBackupsCompanion(')
+          ..write('id: $id, ')
+          ..write('position: $position, ')
+          ..write('kind: $kind, ')
+          ..write('madeAt: $madeAt, ')
+          ..write('graphReplaced: $graphReplaced, ')
+          ..write('addedCount: $addedCount, ')
+          ..write('changedCount: $changedCount, ')
+          ..write('deletedCount: $deletedCount')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class Tags extends Table with TableInfo<Tags, Tag> {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -1109,6 +3922,544 @@ class TagAssignmentsCompanion extends UpdateCompanion<TagAssignment> {
   }
 }
 
+class LongTermRelations extends Table
+    with TableInfo<LongTermRelations, LongTermRelation> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  LongTermRelations(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _creationSequenceMeta = const VerificationMeta(
+    'creationSequence',
+  );
+  late final GeneratedColumn<int> creationSequence = GeneratedColumn<int>(
+    'creation_sequence',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints:
+        'NOT NULL PRIMARY KEY AUTOINCREMENT CHECK (creation_sequence > 0)',
+  );
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL UNIQUE',
+  );
+  static const VerificationMeta _sourceIntentionIdMeta = const VerificationMeta(
+    'sourceIntentionId',
+  );
+  late final GeneratedColumn<String> sourceIntentionId =
+      GeneratedColumn<String>(
+        'source_intention_id',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+        $customConstraints: 'NOT NULL REFERENCES intentions(id)ON UPDATE RESTRICT ON DELETE RESTRICT',
+      );
+  static const VerificationMeta _relatedIntentionIdMeta =
+      const VerificationMeta('relatedIntentionId');
+  late final GeneratedColumn<String> relatedIntentionId =
+      GeneratedColumn<String>(
+        'related_intention_id',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+        $customConstraints: 'NOT NULL REFERENCES intentions(id)ON UPDATE RESTRICT ON DELETE RESTRICT',
+      );
+  static const VerificationMeta _typeMeta = const VerificationMeta('type');
+  late final GeneratedColumn<String> type = GeneratedColumn<String>(
+    'type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL CHECK (typeof(type) = \'text\' AND type IN (\'need\', \'can\'))',
+  );
+  static const VerificationMeta _priorityMeta = const VerificationMeta(
+    'priority',
+  );
+  late final GeneratedColumn<int> priority = GeneratedColumn<int>(
+    'priority',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL CHECK (typeof(priority) = \'integer\' AND priority BETWEEN 1 AND 4)',
+  );
+  static const VerificationMeta _descriptionMeta = const VerificationMeta(
+    'description',
+  );
+  late final GeneratedColumn<String> description = GeneratedColumn<String>(
+    'description',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: 'CHECK (description IS NULL OR(typeof(description) = \'text\' AND instr(CAST(description AS BLOB), X\'00\') = 0))',
+  );
+  static const VerificationMeta _isArchivedMeta = const VerificationMeta(
+    'isArchived',
+  );
+  late final GeneratedColumn<bool> isArchived = GeneratedColumn<bool>(
+    'is_archived',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    $customConstraints: 'NOT NULL DEFAULT FALSE CHECK (typeof(is_archived) = \'integer\' AND is_archived IN (0, 1))',
+    defaultValue: const CustomExpression('FALSE'),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    creationSequence,
+    id,
+    sourceIntentionId,
+    relatedIntentionId,
+    type,
+    priority,
+    description,
+    isArchived,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'long_term_relations';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<LongTermRelation> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('creation_sequence')) {
+      context.handle(
+        _creationSequenceMeta,
+        creationSequence.isAcceptableOrUnknown(
+          data['creation_sequence']!,
+          _creationSequenceMeta,
+        ),
+      );
+    }
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('source_intention_id')) {
+      context.handle(
+        _sourceIntentionIdMeta,
+        sourceIntentionId.isAcceptableOrUnknown(
+          data['source_intention_id']!,
+          _sourceIntentionIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_sourceIntentionIdMeta);
+    }
+    if (data.containsKey('related_intention_id')) {
+      context.handle(
+        _relatedIntentionIdMeta,
+        relatedIntentionId.isAcceptableOrUnknown(
+          data['related_intention_id']!,
+          _relatedIntentionIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_relatedIntentionIdMeta);
+    }
+    if (data.containsKey('type')) {
+      context.handle(
+        _typeMeta,
+        type.isAcceptableOrUnknown(data['type']!, _typeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_typeMeta);
+    }
+    if (data.containsKey('priority')) {
+      context.handle(
+        _priorityMeta,
+        priority.isAcceptableOrUnknown(data['priority']!, _priorityMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_priorityMeta);
+    }
+    if (data.containsKey('description')) {
+      context.handle(
+        _descriptionMeta,
+        description.isAcceptableOrUnknown(
+          data['description']!,
+          _descriptionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('is_archived')) {
+      context.handle(
+        _isArchivedMeta,
+        isArchived.isAcceptableOrUnknown(data['is_archived']!, _isArchivedMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {creationSequence};
+  @override
+  List<Set<GeneratedColumn>> get uniqueKeys => [
+    {sourceIntentionId, relatedIntentionId},
+  ];
+  @override
+  LongTermRelation map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LongTermRelation(
+      creationSequence: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}creation_sequence'],
+      )!,
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      sourceIntentionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_intention_id'],
+      )!,
+      relatedIntentionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}related_intention_id'],
+      )!,
+      type: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}type'],
+      )!,
+      priority: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}priority'],
+      )!,
+      description: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}description'],
+      ),
+      isArchived: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_archived'],
+      )!,
+    );
+  }
+
+  @override
+  LongTermRelations createAlias(String alias) {
+    return LongTermRelations(attachedDatabase, alias);
+  }
+
+  @override
+  List<String> get customConstraints => const [
+    'UNIQUE(source_intention_id, related_intention_id)',
+    'CHECK(source_intention_id <> related_intention_id)',
+  ];
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class LongTermRelation extends DataClass
+    implements Insertable<LongTermRelation> {
+  final int creationSequence;
+  final String id;
+  final String sourceIntentionId;
+  final String relatedIntentionId;
+  final String type;
+  final int priority;
+  final String? description;
+  final bool isArchived;
+  const LongTermRelation({
+    required this.creationSequence,
+    required this.id,
+    required this.sourceIntentionId,
+    required this.relatedIntentionId,
+    required this.type,
+    required this.priority,
+    this.description,
+    required this.isArchived,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['creation_sequence'] = Variable<int>(creationSequence);
+    map['id'] = Variable<String>(id);
+    map['source_intention_id'] = Variable<String>(sourceIntentionId);
+    map['related_intention_id'] = Variable<String>(relatedIntentionId);
+    map['type'] = Variable<String>(type);
+    map['priority'] = Variable<int>(priority);
+    if (!nullToAbsent || description != null) {
+      map['description'] = Variable<String>(description);
+    }
+    map['is_archived'] = Variable<bool>(isArchived);
+    return map;
+  }
+
+  LongTermRelationsCompanion toCompanion(bool nullToAbsent) {
+    return LongTermRelationsCompanion(
+      creationSequence: Value(creationSequence),
+      id: Value(id),
+      sourceIntentionId: Value(sourceIntentionId),
+      relatedIntentionId: Value(relatedIntentionId),
+      type: Value(type),
+      priority: Value(priority),
+      description: description == null && nullToAbsent
+          ? const Value.absent()
+          : Value(description),
+      isArchived: Value(isArchived),
+    );
+  }
+
+  factory LongTermRelation.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LongTermRelation(
+      creationSequence: serializer.fromJson<int>(json['creation_sequence']),
+      id: serializer.fromJson<String>(json['id']),
+      sourceIntentionId: serializer.fromJson<String>(
+        json['source_intention_id'],
+      ),
+      relatedIntentionId: serializer.fromJson<String>(
+        json['related_intention_id'],
+      ),
+      type: serializer.fromJson<String>(json['type']),
+      priority: serializer.fromJson<int>(json['priority']),
+      description: serializer.fromJson<String?>(json['description']),
+      isArchived: serializer.fromJson<bool>(json['is_archived']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'creation_sequence': serializer.toJson<int>(creationSequence),
+      'id': serializer.toJson<String>(id),
+      'source_intention_id': serializer.toJson<String>(sourceIntentionId),
+      'related_intention_id': serializer.toJson<String>(relatedIntentionId),
+      'type': serializer.toJson<String>(type),
+      'priority': serializer.toJson<int>(priority),
+      'description': serializer.toJson<String?>(description),
+      'is_archived': serializer.toJson<bool>(isArchived),
+    };
+  }
+
+  LongTermRelation copyWith({
+    int? creationSequence,
+    String? id,
+    String? sourceIntentionId,
+    String? relatedIntentionId,
+    String? type,
+    int? priority,
+    Value<String?> description = const Value.absent(),
+    bool? isArchived,
+  }) => LongTermRelation(
+    creationSequence: creationSequence ?? this.creationSequence,
+    id: id ?? this.id,
+    sourceIntentionId: sourceIntentionId ?? this.sourceIntentionId,
+    relatedIntentionId: relatedIntentionId ?? this.relatedIntentionId,
+    type: type ?? this.type,
+    priority: priority ?? this.priority,
+    description: description.present ? description.value : this.description,
+    isArchived: isArchived ?? this.isArchived,
+  );
+  LongTermRelation copyWithCompanion(LongTermRelationsCompanion data) {
+    return LongTermRelation(
+      creationSequence: data.creationSequence.present
+          ? data.creationSequence.value
+          : this.creationSequence,
+      id: data.id.present ? data.id.value : this.id,
+      sourceIntentionId: data.sourceIntentionId.present
+          ? data.sourceIntentionId.value
+          : this.sourceIntentionId,
+      relatedIntentionId: data.relatedIntentionId.present
+          ? data.relatedIntentionId.value
+          : this.relatedIntentionId,
+      type: data.type.present ? data.type.value : this.type,
+      priority: data.priority.present ? data.priority.value : this.priority,
+      description: data.description.present
+          ? data.description.value
+          : this.description,
+      isArchived: data.isArchived.present
+          ? data.isArchived.value
+          : this.isArchived,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LongTermRelation(')
+          ..write('creationSequence: $creationSequence, ')
+          ..write('id: $id, ')
+          ..write('sourceIntentionId: $sourceIntentionId, ')
+          ..write('relatedIntentionId: $relatedIntentionId, ')
+          ..write('type: $type, ')
+          ..write('priority: $priority, ')
+          ..write('description: $description, ')
+          ..write('isArchived: $isArchived')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    creationSequence,
+    id,
+    sourceIntentionId,
+    relatedIntentionId,
+    type,
+    priority,
+    description,
+    isArchived,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LongTermRelation &&
+          other.creationSequence == this.creationSequence &&
+          other.id == this.id &&
+          other.sourceIntentionId == this.sourceIntentionId &&
+          other.relatedIntentionId == this.relatedIntentionId &&
+          other.type == this.type &&
+          other.priority == this.priority &&
+          other.description == this.description &&
+          other.isArchived == this.isArchived);
+}
+
+class LongTermRelationsCompanion extends UpdateCompanion<LongTermRelation> {
+  final Value<int> creationSequence;
+  final Value<String> id;
+  final Value<String> sourceIntentionId;
+  final Value<String> relatedIntentionId;
+  final Value<String> type;
+  final Value<int> priority;
+  final Value<String?> description;
+  final Value<bool> isArchived;
+  const LongTermRelationsCompanion({
+    this.creationSequence = const Value.absent(),
+    this.id = const Value.absent(),
+    this.sourceIntentionId = const Value.absent(),
+    this.relatedIntentionId = const Value.absent(),
+    this.type = const Value.absent(),
+    this.priority = const Value.absent(),
+    this.description = const Value.absent(),
+    this.isArchived = const Value.absent(),
+  });
+  LongTermRelationsCompanion.insert({
+    this.creationSequence = const Value.absent(),
+    required String id,
+    required String sourceIntentionId,
+    required String relatedIntentionId,
+    required String type,
+    required int priority,
+    this.description = const Value.absent(),
+    this.isArchived = const Value.absent(),
+  }) : id = Value(id),
+       sourceIntentionId = Value(sourceIntentionId),
+       relatedIntentionId = Value(relatedIntentionId),
+       type = Value(type),
+       priority = Value(priority);
+  static Insertable<LongTermRelation> custom({
+    Expression<int>? creationSequence,
+    Expression<String>? id,
+    Expression<String>? sourceIntentionId,
+    Expression<String>? relatedIntentionId,
+    Expression<String>? type,
+    Expression<int>? priority,
+    Expression<String>? description,
+    Expression<bool>? isArchived,
+  }) {
+    return RawValuesInsertable({
+      if (creationSequence != null) 'creation_sequence': creationSequence,
+      if (id != null) 'id': id,
+      if (sourceIntentionId != null) 'source_intention_id': sourceIntentionId,
+      if (relatedIntentionId != null)
+        'related_intention_id': relatedIntentionId,
+      if (type != null) 'type': type,
+      if (priority != null) 'priority': priority,
+      if (description != null) 'description': description,
+      if (isArchived != null) 'is_archived': isArchived,
+    });
+  }
+
+  LongTermRelationsCompanion copyWith({
+    Value<int>? creationSequence,
+    Value<String>? id,
+    Value<String>? sourceIntentionId,
+    Value<String>? relatedIntentionId,
+    Value<String>? type,
+    Value<int>? priority,
+    Value<String?>? description,
+    Value<bool>? isArchived,
+  }) {
+    return LongTermRelationsCompanion(
+      creationSequence: creationSequence ?? this.creationSequence,
+      id: id ?? this.id,
+      sourceIntentionId: sourceIntentionId ?? this.sourceIntentionId,
+      relatedIntentionId: relatedIntentionId ?? this.relatedIntentionId,
+      type: type ?? this.type,
+      priority: priority ?? this.priority,
+      description: description ?? this.description,
+      isArchived: isArchived ?? this.isArchived,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (creationSequence.present) {
+      map['creation_sequence'] = Variable<int>(creationSequence.value);
+    }
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (sourceIntentionId.present) {
+      map['source_intention_id'] = Variable<String>(sourceIntentionId.value);
+    }
+    if (relatedIntentionId.present) {
+      map['related_intention_id'] = Variable<String>(relatedIntentionId.value);
+    }
+    if (type.present) {
+      map['type'] = Variable<String>(type.value);
+    }
+    if (priority.present) {
+      map['priority'] = Variable<int>(priority.value);
+    }
+    if (description.present) {
+      map['description'] = Variable<String>(description.value);
+    }
+    if (isArchived.present) {
+      map['is_archived'] = Variable<bool>(isArchived.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LongTermRelationsCompanion(')
+          ..write('creationSequence: $creationSequence, ')
+          ..write('id: $id, ')
+          ..write('sourceIntentionId: $sourceIntentionId, ')
+          ..write('relatedIntentionId: $relatedIntentionId, ')
+          ..write('type: $type, ')
+          ..write('priority: $priority, ')
+          ..write('description: $description, ')
+          ..write('isArchived: $isArchived')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class DailyChoices extends Table with TableInfo<DailyChoices, DailyChoice> {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -1705,544 +5056,6 @@ class DailyChoicesCompanion extends UpdateCompanion<DailyChoice> {
   }
 }
 
-class LongTermRelations extends Table
-    with TableInfo<LongTermRelations, LongTermRelation> {
-  @override
-  final GeneratedDatabase attachedDatabase;
-  final String? _alias;
-  LongTermRelations(this.attachedDatabase, [this._alias]);
-  static const VerificationMeta _creationSequenceMeta = const VerificationMeta(
-    'creationSequence',
-  );
-  late final GeneratedColumn<int> creationSequence = GeneratedColumn<int>(
-    'creation_sequence',
-    aliasedName,
-    false,
-    hasAutoIncrement: true,
-    type: DriftSqlType.int,
-    requiredDuringInsert: false,
-    $customConstraints:
-        'NOT NULL PRIMARY KEY AUTOINCREMENT CHECK (creation_sequence > 0)',
-  );
-  static const VerificationMeta _idMeta = const VerificationMeta('id');
-  late final GeneratedColumn<String> id = GeneratedColumn<String>(
-    'id',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL UNIQUE',
-  );
-  static const VerificationMeta _sourceIntentionIdMeta = const VerificationMeta(
-    'sourceIntentionId',
-  );
-  late final GeneratedColumn<String> sourceIntentionId =
-      GeneratedColumn<String>(
-        'source_intention_id',
-        aliasedName,
-        false,
-        type: DriftSqlType.string,
-        requiredDuringInsert: true,
-        $customConstraints: 'NOT NULL REFERENCES intentions(id)ON UPDATE RESTRICT ON DELETE RESTRICT',
-      );
-  static const VerificationMeta _relatedIntentionIdMeta =
-      const VerificationMeta('relatedIntentionId');
-  late final GeneratedColumn<String> relatedIntentionId =
-      GeneratedColumn<String>(
-        'related_intention_id',
-        aliasedName,
-        false,
-        type: DriftSqlType.string,
-        requiredDuringInsert: true,
-        $customConstraints: 'NOT NULL REFERENCES intentions(id)ON UPDATE RESTRICT ON DELETE RESTRICT',
-      );
-  static const VerificationMeta _typeMeta = const VerificationMeta('type');
-  late final GeneratedColumn<String> type = GeneratedColumn<String>(
-    'type',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL CHECK (typeof(type) = \'text\' AND type IN (\'need\', \'can\'))',
-  );
-  static const VerificationMeta _priorityMeta = const VerificationMeta(
-    'priority',
-  );
-  late final GeneratedColumn<int> priority = GeneratedColumn<int>(
-    'priority',
-    aliasedName,
-    false,
-    type: DriftSqlType.int,
-    requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL CHECK (typeof(priority) = \'integer\' AND priority BETWEEN 1 AND 4)',
-  );
-  static const VerificationMeta _descriptionMeta = const VerificationMeta(
-    'description',
-  );
-  late final GeneratedColumn<String> description = GeneratedColumn<String>(
-    'description',
-    aliasedName,
-    true,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-    $customConstraints: 'CHECK (description IS NULL OR(typeof(description) = \'text\' AND instr(CAST(description AS BLOB), X\'00\') = 0))',
-  );
-  static const VerificationMeta _isArchivedMeta = const VerificationMeta(
-    'isArchived',
-  );
-  late final GeneratedColumn<bool> isArchived = GeneratedColumn<bool>(
-    'is_archived',
-    aliasedName,
-    false,
-    type: DriftSqlType.bool,
-    requiredDuringInsert: false,
-    $customConstraints: 'NOT NULL DEFAULT FALSE CHECK (typeof(is_archived) = \'integer\' AND is_archived IN (0, 1))',
-    defaultValue: const CustomExpression('FALSE'),
-  );
-  @override
-  List<GeneratedColumn> get $columns => [
-    creationSequence,
-    id,
-    sourceIntentionId,
-    relatedIntentionId,
-    type,
-    priority,
-    description,
-    isArchived,
-  ];
-  @override
-  String get aliasedName => _alias ?? actualTableName;
-  @override
-  String get actualTableName => $name;
-  static const String $name = 'long_term_relations';
-  @override
-  VerificationContext validateIntegrity(
-    Insertable<LongTermRelation> instance, {
-    bool isInserting = false,
-  }) {
-    final context = VerificationContext();
-    final data = instance.toColumns(true);
-    if (data.containsKey('creation_sequence')) {
-      context.handle(
-        _creationSequenceMeta,
-        creationSequence.isAcceptableOrUnknown(
-          data['creation_sequence']!,
-          _creationSequenceMeta,
-        ),
-      );
-    }
-    if (data.containsKey('id')) {
-      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
-    } else if (isInserting) {
-      context.missing(_idMeta);
-    }
-    if (data.containsKey('source_intention_id')) {
-      context.handle(
-        _sourceIntentionIdMeta,
-        sourceIntentionId.isAcceptableOrUnknown(
-          data['source_intention_id']!,
-          _sourceIntentionIdMeta,
-        ),
-      );
-    } else if (isInserting) {
-      context.missing(_sourceIntentionIdMeta);
-    }
-    if (data.containsKey('related_intention_id')) {
-      context.handle(
-        _relatedIntentionIdMeta,
-        relatedIntentionId.isAcceptableOrUnknown(
-          data['related_intention_id']!,
-          _relatedIntentionIdMeta,
-        ),
-      );
-    } else if (isInserting) {
-      context.missing(_relatedIntentionIdMeta);
-    }
-    if (data.containsKey('type')) {
-      context.handle(
-        _typeMeta,
-        type.isAcceptableOrUnknown(data['type']!, _typeMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_typeMeta);
-    }
-    if (data.containsKey('priority')) {
-      context.handle(
-        _priorityMeta,
-        priority.isAcceptableOrUnknown(data['priority']!, _priorityMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_priorityMeta);
-    }
-    if (data.containsKey('description')) {
-      context.handle(
-        _descriptionMeta,
-        description.isAcceptableOrUnknown(
-          data['description']!,
-          _descriptionMeta,
-        ),
-      );
-    }
-    if (data.containsKey('is_archived')) {
-      context.handle(
-        _isArchivedMeta,
-        isArchived.isAcceptableOrUnknown(data['is_archived']!, _isArchivedMeta),
-      );
-    }
-    return context;
-  }
-
-  @override
-  Set<GeneratedColumn> get $primaryKey => {creationSequence};
-  @override
-  List<Set<GeneratedColumn>> get uniqueKeys => [
-    {sourceIntentionId, relatedIntentionId},
-  ];
-  @override
-  LongTermRelation map(Map<String, dynamic> data, {String? tablePrefix}) {
-    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return LongTermRelation(
-      creationSequence: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}creation_sequence'],
-      )!,
-      id: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}id'],
-      )!,
-      sourceIntentionId: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}source_intention_id'],
-      )!,
-      relatedIntentionId: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}related_intention_id'],
-      )!,
-      type: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}type'],
-      )!,
-      priority: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}priority'],
-      )!,
-      description: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}description'],
-      ),
-      isArchived: attachedDatabase.typeMapping.read(
-        DriftSqlType.bool,
-        data['${effectivePrefix}is_archived'],
-      )!,
-    );
-  }
-
-  @override
-  LongTermRelations createAlias(String alias) {
-    return LongTermRelations(attachedDatabase, alias);
-  }
-
-  @override
-  List<String> get customConstraints => const [
-    'UNIQUE(source_intention_id, related_intention_id)',
-    'CHECK(source_intention_id <> related_intention_id)',
-  ];
-  @override
-  bool get dontWriteConstraints => true;
-}
-
-class LongTermRelation extends DataClass
-    implements Insertable<LongTermRelation> {
-  final int creationSequence;
-  final String id;
-  final String sourceIntentionId;
-  final String relatedIntentionId;
-  final String type;
-  final int priority;
-  final String? description;
-  final bool isArchived;
-  const LongTermRelation({
-    required this.creationSequence,
-    required this.id,
-    required this.sourceIntentionId,
-    required this.relatedIntentionId,
-    required this.type,
-    required this.priority,
-    this.description,
-    required this.isArchived,
-  });
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    map['creation_sequence'] = Variable<int>(creationSequence);
-    map['id'] = Variable<String>(id);
-    map['source_intention_id'] = Variable<String>(sourceIntentionId);
-    map['related_intention_id'] = Variable<String>(relatedIntentionId);
-    map['type'] = Variable<String>(type);
-    map['priority'] = Variable<int>(priority);
-    if (!nullToAbsent || description != null) {
-      map['description'] = Variable<String>(description);
-    }
-    map['is_archived'] = Variable<bool>(isArchived);
-    return map;
-  }
-
-  LongTermRelationsCompanion toCompanion(bool nullToAbsent) {
-    return LongTermRelationsCompanion(
-      creationSequence: Value(creationSequence),
-      id: Value(id),
-      sourceIntentionId: Value(sourceIntentionId),
-      relatedIntentionId: Value(relatedIntentionId),
-      type: Value(type),
-      priority: Value(priority),
-      description: description == null && nullToAbsent
-          ? const Value.absent()
-          : Value(description),
-      isArchived: Value(isArchived),
-    );
-  }
-
-  factory LongTermRelation.fromJson(
-    Map<String, dynamic> json, {
-    ValueSerializer? serializer,
-  }) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return LongTermRelation(
-      creationSequence: serializer.fromJson<int>(json['creation_sequence']),
-      id: serializer.fromJson<String>(json['id']),
-      sourceIntentionId: serializer.fromJson<String>(
-        json['source_intention_id'],
-      ),
-      relatedIntentionId: serializer.fromJson<String>(
-        json['related_intention_id'],
-      ),
-      type: serializer.fromJson<String>(json['type']),
-      priority: serializer.fromJson<int>(json['priority']),
-      description: serializer.fromJson<String?>(json['description']),
-      isArchived: serializer.fromJson<bool>(json['is_archived']),
-    );
-  }
-  @override
-  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return <String, dynamic>{
-      'creation_sequence': serializer.toJson<int>(creationSequence),
-      'id': serializer.toJson<String>(id),
-      'source_intention_id': serializer.toJson<String>(sourceIntentionId),
-      'related_intention_id': serializer.toJson<String>(relatedIntentionId),
-      'type': serializer.toJson<String>(type),
-      'priority': serializer.toJson<int>(priority),
-      'description': serializer.toJson<String?>(description),
-      'is_archived': serializer.toJson<bool>(isArchived),
-    };
-  }
-
-  LongTermRelation copyWith({
-    int? creationSequence,
-    String? id,
-    String? sourceIntentionId,
-    String? relatedIntentionId,
-    String? type,
-    int? priority,
-    Value<String?> description = const Value.absent(),
-    bool? isArchived,
-  }) => LongTermRelation(
-    creationSequence: creationSequence ?? this.creationSequence,
-    id: id ?? this.id,
-    sourceIntentionId: sourceIntentionId ?? this.sourceIntentionId,
-    relatedIntentionId: relatedIntentionId ?? this.relatedIntentionId,
-    type: type ?? this.type,
-    priority: priority ?? this.priority,
-    description: description.present ? description.value : this.description,
-    isArchived: isArchived ?? this.isArchived,
-  );
-  LongTermRelation copyWithCompanion(LongTermRelationsCompanion data) {
-    return LongTermRelation(
-      creationSequence: data.creationSequence.present
-          ? data.creationSequence.value
-          : this.creationSequence,
-      id: data.id.present ? data.id.value : this.id,
-      sourceIntentionId: data.sourceIntentionId.present
-          ? data.sourceIntentionId.value
-          : this.sourceIntentionId,
-      relatedIntentionId: data.relatedIntentionId.present
-          ? data.relatedIntentionId.value
-          : this.relatedIntentionId,
-      type: data.type.present ? data.type.value : this.type,
-      priority: data.priority.present ? data.priority.value : this.priority,
-      description: data.description.present
-          ? data.description.value
-          : this.description,
-      isArchived: data.isArchived.present
-          ? data.isArchived.value
-          : this.isArchived,
-    );
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('LongTermRelation(')
-          ..write('creationSequence: $creationSequence, ')
-          ..write('id: $id, ')
-          ..write('sourceIntentionId: $sourceIntentionId, ')
-          ..write('relatedIntentionId: $relatedIntentionId, ')
-          ..write('type: $type, ')
-          ..write('priority: $priority, ')
-          ..write('description: $description, ')
-          ..write('isArchived: $isArchived')
-          ..write(')'))
-        .toString();
-  }
-
-  @override
-  int get hashCode => Object.hash(
-    creationSequence,
-    id,
-    sourceIntentionId,
-    relatedIntentionId,
-    type,
-    priority,
-    description,
-    isArchived,
-  );
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      (other is LongTermRelation &&
-          other.creationSequence == this.creationSequence &&
-          other.id == this.id &&
-          other.sourceIntentionId == this.sourceIntentionId &&
-          other.relatedIntentionId == this.relatedIntentionId &&
-          other.type == this.type &&
-          other.priority == this.priority &&
-          other.description == this.description &&
-          other.isArchived == this.isArchived);
-}
-
-class LongTermRelationsCompanion extends UpdateCompanion<LongTermRelation> {
-  final Value<int> creationSequence;
-  final Value<String> id;
-  final Value<String> sourceIntentionId;
-  final Value<String> relatedIntentionId;
-  final Value<String> type;
-  final Value<int> priority;
-  final Value<String?> description;
-  final Value<bool> isArchived;
-  const LongTermRelationsCompanion({
-    this.creationSequence = const Value.absent(),
-    this.id = const Value.absent(),
-    this.sourceIntentionId = const Value.absent(),
-    this.relatedIntentionId = const Value.absent(),
-    this.type = const Value.absent(),
-    this.priority = const Value.absent(),
-    this.description = const Value.absent(),
-    this.isArchived = const Value.absent(),
-  });
-  LongTermRelationsCompanion.insert({
-    this.creationSequence = const Value.absent(),
-    required String id,
-    required String sourceIntentionId,
-    required String relatedIntentionId,
-    required String type,
-    required int priority,
-    this.description = const Value.absent(),
-    this.isArchived = const Value.absent(),
-  }) : id = Value(id),
-       sourceIntentionId = Value(sourceIntentionId),
-       relatedIntentionId = Value(relatedIntentionId),
-       type = Value(type),
-       priority = Value(priority);
-  static Insertable<LongTermRelation> custom({
-    Expression<int>? creationSequence,
-    Expression<String>? id,
-    Expression<String>? sourceIntentionId,
-    Expression<String>? relatedIntentionId,
-    Expression<String>? type,
-    Expression<int>? priority,
-    Expression<String>? description,
-    Expression<bool>? isArchived,
-  }) {
-    return RawValuesInsertable({
-      if (creationSequence != null) 'creation_sequence': creationSequence,
-      if (id != null) 'id': id,
-      if (sourceIntentionId != null) 'source_intention_id': sourceIntentionId,
-      if (relatedIntentionId != null)
-        'related_intention_id': relatedIntentionId,
-      if (type != null) 'type': type,
-      if (priority != null) 'priority': priority,
-      if (description != null) 'description': description,
-      if (isArchived != null) 'is_archived': isArchived,
-    });
-  }
-
-  LongTermRelationsCompanion copyWith({
-    Value<int>? creationSequence,
-    Value<String>? id,
-    Value<String>? sourceIntentionId,
-    Value<String>? relatedIntentionId,
-    Value<String>? type,
-    Value<int>? priority,
-    Value<String?>? description,
-    Value<bool>? isArchived,
-  }) {
-    return LongTermRelationsCompanion(
-      creationSequence: creationSequence ?? this.creationSequence,
-      id: id ?? this.id,
-      sourceIntentionId: sourceIntentionId ?? this.sourceIntentionId,
-      relatedIntentionId: relatedIntentionId ?? this.relatedIntentionId,
-      type: type ?? this.type,
-      priority: priority ?? this.priority,
-      description: description ?? this.description,
-      isArchived: isArchived ?? this.isArchived,
-    );
-  }
-
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    if (creationSequence.present) {
-      map['creation_sequence'] = Variable<int>(creationSequence.value);
-    }
-    if (id.present) {
-      map['id'] = Variable<String>(id.value);
-    }
-    if (sourceIntentionId.present) {
-      map['source_intention_id'] = Variable<String>(sourceIntentionId.value);
-    }
-    if (relatedIntentionId.present) {
-      map['related_intention_id'] = Variable<String>(relatedIntentionId.value);
-    }
-    if (type.present) {
-      map['type'] = Variable<String>(type.value);
-    }
-    if (priority.present) {
-      map['priority'] = Variable<int>(priority.value);
-    }
-    if (description.present) {
-      map['description'] = Variable<String>(description.value);
-    }
-    if (isArchived.present) {
-      map['is_archived'] = Variable<bool>(isArchived.value);
-    }
-    return map;
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('LongTermRelationsCompanion(')
-          ..write('creationSequence: $creationSequence, ')
-          ..write('id: $id, ')
-          ..write('sourceIntentionId: $sourceIntentionId, ')
-          ..write('relatedIntentionId: $relatedIntentionId, ')
-          ..write('type: $type, ')
-          ..write('priority: $priority, ')
-          ..write('description: $description, ')
-          ..write('isArchived: $isArchived')
-          ..write(')'))
-        .toString();
-  }
-}
-
 class DailyChoicePathSteps extends Table
     with TableInfo<DailyChoicePathSteps, DailyChoicePathStep> {
   @override
@@ -2782,13 +5595,103 @@ class IntentionTitlesFtsCompanion extends UpdateCompanion<IntentionTitlesFt> {
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
+  late final GraphLogControl graphLogControl = GraphLogControl(this);
+  late final GraphLogTagMarks graphLogTagMarks = GraphLogTagMarks(this);
+  late final GraphLogIntentionMarks graphLogIntentionMarks =
+      GraphLogIntentionMarks(this);
+  late final GraphLogTagAssignmentMarks graphLogTagAssignmentMarks =
+      GraphLogTagAssignmentMarks(this);
+  late final GraphLogLongTermRelationMarks graphLogLongTermRelationMarks =
+      GraphLogLongTermRelationMarks(this);
+  late final GraphLogDailyChoiceMarks graphLogDailyChoiceMarks =
+      GraphLogDailyChoiceMarks(this);
+  late final GraphSnapshots graphSnapshots = GraphSnapshots(this);
+  late final GraphLogPackages graphLogPackages = GraphLogPackages(this);
+  late final GraphBackups graphBackups = GraphBackups(this);
   late final Tags tags = Tags(this);
+  late final Trigger graphLogMarkTagInsert = Trigger(
+    'CREATE TRIGGER graph_log_mark_tag_insert AFTER INSERT ON tags WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_tag_marks (tag_id, first_operation) VALUES (new.id, \'insert\');END',
+    'graph_log_mark_tag_insert',
+  );
+  late final Trigger graphLogMarkTagUpdate = Trigger(
+    'CREATE TRIGGER graph_log_mark_tag_update AFTER UPDATE ON tags WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_tag_marks (tag_id, first_operation) VALUES (new.id, \'update\');END',
+    'graph_log_mark_tag_update',
+  );
+  late final Trigger graphLogMarkTagDelete = Trigger(
+    'CREATE TRIGGER graph_log_mark_tag_delete AFTER DELETE ON tags WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_tag_marks (tag_id, first_operation) VALUES (old.id, \'delete\');END',
+    'graph_log_mark_tag_delete',
+  );
+  late final Intentions intentions = Intentions(this);
+  late final Trigger graphLogMarkIntentionInsert = Trigger(
+    'CREATE TRIGGER graph_log_mark_intention_insert AFTER INSERT ON intentions WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_intention_marks (intention_id, first_operation) VALUES (new.id, \'insert\');END',
+    'graph_log_mark_intention_insert',
+  );
+  late final Trigger graphLogMarkIntentionUpdate = Trigger(
+    'CREATE TRIGGER graph_log_mark_intention_update AFTER UPDATE ON intentions WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_intention_marks (intention_id, first_operation) VALUES (new.id, \'update\');END',
+    'graph_log_mark_intention_update',
+  );
+  late final Trigger graphLogMarkIntentionDelete = Trigger(
+    'CREATE TRIGGER graph_log_mark_intention_delete AFTER DELETE ON intentions WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_intention_marks (intention_id, first_operation) VALUES (old.id, \'delete\');END',
+    'graph_log_mark_intention_delete',
+  );
+  late final TagAssignments tagAssignments = TagAssignments(this);
+  late final Trigger graphLogMarkTagAssignmentInsert = Trigger(
+    'CREATE TRIGGER graph_log_mark_tag_assignment_insert AFTER INSERT ON tag_assignments WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_tag_assignment_marks (tag_id, intention_id, first_operation) VALUES (new.tag_id, new.intention_id, \'insert\');END',
+    'graph_log_mark_tag_assignment_insert',
+  );
+  late final Trigger graphLogMarkTagAssignmentUpdate = Trigger(
+    'CREATE TRIGGER graph_log_mark_tag_assignment_update AFTER UPDATE ON tag_assignments WHEN old.tag_creation_sequence <> 0 AND (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_tag_assignment_marks (tag_id, intention_id, first_operation) VALUES (new.tag_id, new.intention_id, \'update\');END',
+    'graph_log_mark_tag_assignment_update',
+  );
+  late final Trigger graphLogMarkTagAssignmentDelete = Trigger(
+    'CREATE TRIGGER graph_log_mark_tag_assignment_delete AFTER DELETE ON tag_assignments WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_tag_assignment_marks (tag_id, intention_id, first_operation) VALUES (old.tag_id, old.intention_id, \'delete\');END',
+    'graph_log_mark_tag_assignment_delete',
+  );
+  late final LongTermRelations longTermRelations = LongTermRelations(this);
+  late final Trigger graphLogMarkLongTermRelationInsert = Trigger(
+    'CREATE TRIGGER graph_log_mark_long_term_relation_insert AFTER INSERT ON long_term_relations WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_long_term_relation_marks (long_term_relation_id, first_operation) VALUES (new.id, \'insert\');END',
+    'graph_log_mark_long_term_relation_insert',
+  );
+  late final Trigger graphLogMarkLongTermRelationUpdate = Trigger(
+    'CREATE TRIGGER graph_log_mark_long_term_relation_update AFTER UPDATE ON long_term_relations WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_long_term_relation_marks (long_term_relation_id, first_operation) VALUES (new.id, \'update\');END',
+    'graph_log_mark_long_term_relation_update',
+  );
+  late final Trigger graphLogMarkLongTermRelationDelete = Trigger(
+    'CREATE TRIGGER graph_log_mark_long_term_relation_delete AFTER DELETE ON long_term_relations WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_long_term_relation_marks (long_term_relation_id, first_operation) VALUES (old.id, \'delete\');END',
+    'graph_log_mark_long_term_relation_delete',
+  );
+  late final DailyChoices dailyChoices = DailyChoices(this);
+  late final Trigger graphLogMarkDailyChoiceInsert = Trigger(
+    'CREATE TRIGGER graph_log_mark_daily_choice_insert AFTER INSERT ON daily_choices WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_daily_choice_marks (daily_choice_id, first_operation) VALUES (new.id, \'insert\');END',
+    'graph_log_mark_daily_choice_insert',
+  );
+  late final Trigger graphLogMarkDailyChoiceUpdate = Trigger(
+    'CREATE TRIGGER graph_log_mark_daily_choice_update AFTER UPDATE ON daily_choices WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_daily_choice_marks (daily_choice_id, first_operation) VALUES (new.id, \'update\');END',
+    'graph_log_mark_daily_choice_update',
+  );
+  late final Trigger graphLogMarkDailyChoiceDelete = Trigger(
+    'CREATE TRIGGER graph_log_mark_daily_choice_delete AFTER DELETE ON daily_choices WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_daily_choice_marks (daily_choice_id, first_operation) VALUES (old.id, \'delete\');END',
+    'graph_log_mark_daily_choice_delete',
+  );
+  late final DailyChoicePathSteps dailyChoicePathSteps = DailyChoicePathSteps(
+    this,
+  );
+  late final Trigger graphLogMarkDailyChoicePathStepInsert = Trigger(
+    'CREATE TRIGGER graph_log_mark_daily_choice_path_step_insert AFTER INSERT ON daily_choice_path_steps WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_daily_choice_marks (daily_choice_id, first_operation) VALUES (new.daily_choice_id, \'update\');END',
+    'graph_log_mark_daily_choice_path_step_insert',
+  );
+  late final Trigger graphLogMarkDailyChoicePathStepUpdate = Trigger(
+    'CREATE TRIGGER graph_log_mark_daily_choice_path_step_update AFTER UPDATE ON daily_choice_path_steps WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_daily_choice_marks (daily_choice_id, first_operation) VALUES (old.daily_choice_id, \'update\'), (new.daily_choice_id, \'update\');END',
+    'graph_log_mark_daily_choice_path_step_update',
+  );
+  late final Trigger graphLogMarkDailyChoicePathStepDelete = Trigger(
+    'CREATE TRIGGER graph_log_mark_daily_choice_path_step_delete AFTER DELETE ON daily_choice_path_steps WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_daily_choice_marks (daily_choice_id, first_operation) VALUES (old.daily_choice_id, \'update\');END',
+    'graph_log_mark_daily_choice_path_step_delete',
+  );
   late final Trigger tagsImmutableIdentity = Trigger(
     'CREATE TRIGGER tags_immutable_identity AFTER UPDATE OF creation_sequence, id ON tags WHEN new.creation_sequence <> old.creation_sequence OR new.id <> old.id BEGIN SELECT RAISE (ABORT, \'tag identity is immutable\');END',
     'tags_immutable_identity',
   );
-  late final Intentions intentions = Intentions(this);
-  late final TagAssignments tagAssignments = TagAssignments(this);
   late final Index tagAssignmentsTagOrder = Index(
     'tag_assignments_tag_order',
     'CREATE INDEX tag_assignments_tag_order ON tag_assignments (tag_id, creation_sequence)',
@@ -2817,7 +5720,6 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'CREATE TRIGGER tag_assignments_immutable_identity AFTER UPDATE OF creation_sequence, tag_id, intention_id ON tag_assignments WHEN new.creation_sequence <> old.creation_sequence OR new.tag_id <> old.tag_id OR new.intention_id <> old.intention_id BEGIN SELECT RAISE (ABORT, \'tag assignment identity is immutable\');END',
     'tag_assignments_immutable_identity',
   );
-  late final DailyChoices dailyChoices = DailyChoices(this);
   late final Index dailyChoicesDateCompletionScheduleOrder = Index(
     'daily_choices_date_completion_schedule_order',
     'CREATE INDEX daily_choices_date_completion_schedule_order ON daily_choices (choice_date, is_completed, COALESCE(scheduled_minute, -1), priority, creation_sequence)',
@@ -2837,10 +5739,6 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final Trigger dailyChoicesImmutableIdentity = Trigger(
     'CREATE TRIGGER daily_choices_immutable_identity AFTER UPDATE OF creation_sequence, id ON daily_choices WHEN new.creation_sequence <> old.creation_sequence OR new.id <> old.id BEGIN SELECT RAISE (ABORT, \'daily choice identity is immutable\');END',
     'daily_choices_immutable_identity',
-  );
-  late final LongTermRelations longTermRelations = LongTermRelations(this);
-  late final DailyChoicePathSteps dailyChoicePathSteps = DailyChoicePathSteps(
-    this,
   );
   late final Index dailyChoicePathStepsOneRoot = Index(
     'daily_choice_path_steps_one_root',
@@ -2948,10 +5846,43 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities => [
+    graphLogControl,
+    OnCreateQuery(
+      'INSERT INTO graph_log_control (id, capture, writing) VALUES (1, 1, 0)',
+    ),
+    graphLogTagMarks,
+    graphLogIntentionMarks,
+    graphLogTagAssignmentMarks,
+    graphLogLongTermRelationMarks,
+    graphLogDailyChoiceMarks,
+    graphSnapshots,
+    graphLogPackages,
+    graphBackups,
     tags,
-    tagsImmutableIdentity,
+    graphLogMarkTagInsert,
+    graphLogMarkTagUpdate,
+    graphLogMarkTagDelete,
     intentions,
+    graphLogMarkIntentionInsert,
+    graphLogMarkIntentionUpdate,
+    graphLogMarkIntentionDelete,
     tagAssignments,
+    graphLogMarkTagAssignmentInsert,
+    graphLogMarkTagAssignmentUpdate,
+    graphLogMarkTagAssignmentDelete,
+    longTermRelations,
+    graphLogMarkLongTermRelationInsert,
+    graphLogMarkLongTermRelationUpdate,
+    graphLogMarkLongTermRelationDelete,
+    dailyChoices,
+    graphLogMarkDailyChoiceInsert,
+    graphLogMarkDailyChoiceUpdate,
+    graphLogMarkDailyChoiceDelete,
+    dailyChoicePathSteps,
+    graphLogMarkDailyChoicePathStepInsert,
+    graphLogMarkDailyChoicePathStepUpdate,
+    graphLogMarkDailyChoicePathStepDelete,
+    tagsImmutableIdentity,
     tagAssignmentsTagOrder,
     tagAssignmentsIntention,
     tagAssignmentsIntentionOrder,
@@ -2959,14 +5890,11 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     tagAssignmentsFillTagOrder,
     tagAssignmentsValidTagOrderUpdate,
     tagAssignmentsImmutableIdentity,
-    dailyChoices,
     dailyChoicesDateCompletionScheduleOrder,
     dailyChoicesDateCreationOrder,
     dailyChoicesSourceDateCreationOrder,
     dailyChoicesSelectedDateCreationOrder,
     dailyChoicesImmutableIdentity,
-    longTermRelations,
-    dailyChoicePathSteps,
     dailyChoicePathStepsOneRoot,
     dailyChoicePathStepsOneSuccessor,
     dailyChoicePathStepsRelation,
@@ -2999,9 +5927,50 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     WritePropagation(
       on: TableUpdateQuery.onTableName(
         'tags',
+        limitUpdateKind: UpdateKind.insert,
+      ),
+      result: [TableUpdate('graph_log_tag_marks', kind: UpdateKind.insert)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'tags',
         limitUpdateKind: UpdateKind.update,
       ),
-      result: [],
+      result: [TableUpdate('graph_log_tag_marks', kind: UpdateKind.insert)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'tags',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('graph_log_tag_marks', kind: UpdateKind.insert)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'intentions',
+        limitUpdateKind: UpdateKind.insert,
+      ),
+      result: [
+        TableUpdate('graph_log_intention_marks', kind: UpdateKind.insert),
+      ],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'intentions',
+        limitUpdateKind: UpdateKind.update,
+      ),
+      result: [
+        TableUpdate('graph_log_intention_marks', kind: UpdateKind.insert),
+      ],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'intentions',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [
+        TableUpdate('graph_log_intention_marks', kind: UpdateKind.insert),
+      ],
     ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
@@ -3016,6 +5985,137 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('tag_assignments', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'tag_assignments',
+        limitUpdateKind: UpdateKind.insert,
+      ),
+      result: [
+        TableUpdate('graph_log_tag_assignment_marks', kind: UpdateKind.insert),
+      ],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'tag_assignments',
+        limitUpdateKind: UpdateKind.update,
+      ),
+      result: [
+        TableUpdate('graph_log_tag_assignment_marks', kind: UpdateKind.insert),
+      ],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'tag_assignments',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [
+        TableUpdate('graph_log_tag_assignment_marks', kind: UpdateKind.insert),
+      ],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'long_term_relations',
+        limitUpdateKind: UpdateKind.insert,
+      ),
+      result: [
+        TableUpdate(
+          'graph_log_long_term_relation_marks',
+          kind: UpdateKind.insert,
+        ),
+      ],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'long_term_relations',
+        limitUpdateKind: UpdateKind.update,
+      ),
+      result: [
+        TableUpdate(
+          'graph_log_long_term_relation_marks',
+          kind: UpdateKind.insert,
+        ),
+      ],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'long_term_relations',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [
+        TableUpdate(
+          'graph_log_long_term_relation_marks',
+          kind: UpdateKind.insert,
+        ),
+      ],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'daily_choices',
+        limitUpdateKind: UpdateKind.insert,
+      ),
+      result: [
+        TableUpdate('graph_log_daily_choice_marks', kind: UpdateKind.insert),
+      ],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'daily_choices',
+        limitUpdateKind: UpdateKind.update,
+      ),
+      result: [
+        TableUpdate('graph_log_daily_choice_marks', kind: UpdateKind.insert),
+      ],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'daily_choices',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [
+        TableUpdate('graph_log_daily_choice_marks', kind: UpdateKind.insert),
+      ],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'daily_choices',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('daily_choice_path_steps', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'daily_choice_path_steps',
+        limitUpdateKind: UpdateKind.insert,
+      ),
+      result: [
+        TableUpdate('graph_log_daily_choice_marks', kind: UpdateKind.insert),
+      ],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'daily_choice_path_steps',
+        limitUpdateKind: UpdateKind.update,
+      ),
+      result: [
+        TableUpdate('graph_log_daily_choice_marks', kind: UpdateKind.insert),
+      ],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'daily_choice_path_steps',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [
+        TableUpdate('graph_log_daily_choice_marks', kind: UpdateKind.insert),
+      ],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'tags',
+        limitUpdateKind: UpdateKind.update,
+      ),
+      result: [],
     ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
@@ -3051,13 +6151,6 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.update,
       ),
       result: [],
-    ),
-    WritePropagation(
-      on: TableUpdateQuery.onTableName(
-        'daily_choices',
-        limitUpdateKind: UpdateKind.delete,
-      ),
-      result: [TableUpdate('daily_choice_path_steps', kind: UpdateKind.delete)],
     ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
@@ -3118,6 +6211,1857 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   ]);
 }
 
+typedef $GraphLogControlCreateCompanionBuilder =
+    GraphLogControlCompanion Function({
+      Value<int> id,
+      required bool capture,
+      required bool writing,
+    });
+typedef $GraphLogControlUpdateCompanionBuilder =
+    GraphLogControlCompanion Function({
+      Value<int> id,
+      Value<bool> capture,
+      Value<bool> writing,
+    });
+
+class $GraphLogControlFilterComposer
+    extends Composer<_$AppDatabase, GraphLogControl> {
+  $GraphLogControlFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get capture => $composableBuilder(
+    column: $table.capture,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get writing => $composableBuilder(
+    column: $table.writing,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $GraphLogControlOrderingComposer
+    extends Composer<_$AppDatabase, GraphLogControl> {
+  $GraphLogControlOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get capture => $composableBuilder(
+    column: $table.capture,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get writing => $composableBuilder(
+    column: $table.writing,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $GraphLogControlAnnotationComposer
+    extends Composer<_$AppDatabase, GraphLogControl> {
+  $GraphLogControlAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<bool> get capture =>
+      $composableBuilder(column: $table.capture, builder: (column) => column);
+
+  GeneratedColumn<bool> get writing =>
+      $composableBuilder(column: $table.writing, builder: (column) => column);
+}
+
+class $GraphLogControlTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          GraphLogControl,
+          GraphLogControlData,
+          $GraphLogControlFilterComposer,
+          $GraphLogControlOrderingComposer,
+          $GraphLogControlAnnotationComposer,
+          $GraphLogControlCreateCompanionBuilder,
+          $GraphLogControlUpdateCompanionBuilder,
+          (
+            GraphLogControlData,
+            BaseReferences<_$AppDatabase, GraphLogControl, GraphLogControlData>,
+          ),
+          GraphLogControlData,
+          PrefetchHooks Function()
+        > {
+  $GraphLogControlTableManager(_$AppDatabase db, GraphLogControl table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $GraphLogControlFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $GraphLogControlOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $GraphLogControlAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<bool> capture = const Value.absent(),
+                Value<bool> writing = const Value.absent(),
+              }) => GraphLogControlCompanion(
+                id: id,
+                capture: capture,
+                writing: writing,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required bool capture,
+                required bool writing,
+              }) => GraphLogControlCompanion.insert(
+                id: id,
+                capture: capture,
+                writing: writing,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $GraphLogControlProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      GraphLogControl,
+      GraphLogControlData,
+      $GraphLogControlFilterComposer,
+      $GraphLogControlOrderingComposer,
+      $GraphLogControlAnnotationComposer,
+      $GraphLogControlCreateCompanionBuilder,
+      $GraphLogControlUpdateCompanionBuilder,
+      (
+        GraphLogControlData,
+        BaseReferences<_$AppDatabase, GraphLogControl, GraphLogControlData>,
+      ),
+      GraphLogControlData,
+      PrefetchHooks Function()
+    >;
+typedef $GraphLogTagMarksCreateCompanionBuilder =
+    GraphLogTagMarksCompanion Function({
+      required String tagId,
+      required String firstOperation,
+      Value<int> rowid,
+    });
+typedef $GraphLogTagMarksUpdateCompanionBuilder =
+    GraphLogTagMarksCompanion Function({
+      Value<String> tagId,
+      Value<String> firstOperation,
+      Value<int> rowid,
+    });
+
+class $GraphLogTagMarksFilterComposer
+    extends Composer<_$AppDatabase, GraphLogTagMarks> {
+  $GraphLogTagMarksFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get tagId => $composableBuilder(
+    column: $table.tagId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get firstOperation => $composableBuilder(
+    column: $table.firstOperation,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $GraphLogTagMarksOrderingComposer
+    extends Composer<_$AppDatabase, GraphLogTagMarks> {
+  $GraphLogTagMarksOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get tagId => $composableBuilder(
+    column: $table.tagId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get firstOperation => $composableBuilder(
+    column: $table.firstOperation,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $GraphLogTagMarksAnnotationComposer
+    extends Composer<_$AppDatabase, GraphLogTagMarks> {
+  $GraphLogTagMarksAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get tagId =>
+      $composableBuilder(column: $table.tagId, builder: (column) => column);
+
+  GeneratedColumn<String> get firstOperation => $composableBuilder(
+    column: $table.firstOperation,
+    builder: (column) => column,
+  );
+}
+
+class $GraphLogTagMarksTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          GraphLogTagMarks,
+          GraphLogTagMark,
+          $GraphLogTagMarksFilterComposer,
+          $GraphLogTagMarksOrderingComposer,
+          $GraphLogTagMarksAnnotationComposer,
+          $GraphLogTagMarksCreateCompanionBuilder,
+          $GraphLogTagMarksUpdateCompanionBuilder,
+          (
+            GraphLogTagMark,
+            BaseReferences<_$AppDatabase, GraphLogTagMarks, GraphLogTagMark>,
+          ),
+          GraphLogTagMark,
+          PrefetchHooks Function()
+        > {
+  $GraphLogTagMarksTableManager(_$AppDatabase db, GraphLogTagMarks table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $GraphLogTagMarksFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $GraphLogTagMarksOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $GraphLogTagMarksAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> tagId = const Value.absent(),
+                Value<String> firstOperation = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => GraphLogTagMarksCompanion(
+                tagId: tagId,
+                firstOperation: firstOperation,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String tagId,
+                required String firstOperation,
+                Value<int> rowid = const Value.absent(),
+              }) => GraphLogTagMarksCompanion.insert(
+                tagId: tagId,
+                firstOperation: firstOperation,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $GraphLogTagMarksProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      GraphLogTagMarks,
+      GraphLogTagMark,
+      $GraphLogTagMarksFilterComposer,
+      $GraphLogTagMarksOrderingComposer,
+      $GraphLogTagMarksAnnotationComposer,
+      $GraphLogTagMarksCreateCompanionBuilder,
+      $GraphLogTagMarksUpdateCompanionBuilder,
+      (
+        GraphLogTagMark,
+        BaseReferences<_$AppDatabase, GraphLogTagMarks, GraphLogTagMark>,
+      ),
+      GraphLogTagMark,
+      PrefetchHooks Function()
+    >;
+typedef $GraphLogIntentionMarksCreateCompanionBuilder =
+    GraphLogIntentionMarksCompanion Function({
+      required String intentionId,
+      required String firstOperation,
+      Value<int> rowid,
+    });
+typedef $GraphLogIntentionMarksUpdateCompanionBuilder =
+    GraphLogIntentionMarksCompanion Function({
+      Value<String> intentionId,
+      Value<String> firstOperation,
+      Value<int> rowid,
+    });
+
+class $GraphLogIntentionMarksFilterComposer
+    extends Composer<_$AppDatabase, GraphLogIntentionMarks> {
+  $GraphLogIntentionMarksFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get intentionId => $composableBuilder(
+    column: $table.intentionId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get firstOperation => $composableBuilder(
+    column: $table.firstOperation,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $GraphLogIntentionMarksOrderingComposer
+    extends Composer<_$AppDatabase, GraphLogIntentionMarks> {
+  $GraphLogIntentionMarksOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get intentionId => $composableBuilder(
+    column: $table.intentionId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get firstOperation => $composableBuilder(
+    column: $table.firstOperation,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $GraphLogIntentionMarksAnnotationComposer
+    extends Composer<_$AppDatabase, GraphLogIntentionMarks> {
+  $GraphLogIntentionMarksAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get intentionId => $composableBuilder(
+    column: $table.intentionId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get firstOperation => $composableBuilder(
+    column: $table.firstOperation,
+    builder: (column) => column,
+  );
+}
+
+class $GraphLogIntentionMarksTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          GraphLogIntentionMarks,
+          GraphLogIntentionMark,
+          $GraphLogIntentionMarksFilterComposer,
+          $GraphLogIntentionMarksOrderingComposer,
+          $GraphLogIntentionMarksAnnotationComposer,
+          $GraphLogIntentionMarksCreateCompanionBuilder,
+          $GraphLogIntentionMarksUpdateCompanionBuilder,
+          (
+            GraphLogIntentionMark,
+            BaseReferences<
+              _$AppDatabase,
+              GraphLogIntentionMarks,
+              GraphLogIntentionMark
+            >,
+          ),
+          GraphLogIntentionMark,
+          PrefetchHooks Function()
+        > {
+  $GraphLogIntentionMarksTableManager(
+    _$AppDatabase db,
+    GraphLogIntentionMarks table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $GraphLogIntentionMarksFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $GraphLogIntentionMarksOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $GraphLogIntentionMarksAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> intentionId = const Value.absent(),
+                Value<String> firstOperation = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => GraphLogIntentionMarksCompanion(
+                intentionId: intentionId,
+                firstOperation: firstOperation,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String intentionId,
+                required String firstOperation,
+                Value<int> rowid = const Value.absent(),
+              }) => GraphLogIntentionMarksCompanion.insert(
+                intentionId: intentionId,
+                firstOperation: firstOperation,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $GraphLogIntentionMarksProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      GraphLogIntentionMarks,
+      GraphLogIntentionMark,
+      $GraphLogIntentionMarksFilterComposer,
+      $GraphLogIntentionMarksOrderingComposer,
+      $GraphLogIntentionMarksAnnotationComposer,
+      $GraphLogIntentionMarksCreateCompanionBuilder,
+      $GraphLogIntentionMarksUpdateCompanionBuilder,
+      (
+        GraphLogIntentionMark,
+        BaseReferences<
+          _$AppDatabase,
+          GraphLogIntentionMarks,
+          GraphLogIntentionMark
+        >,
+      ),
+      GraphLogIntentionMark,
+      PrefetchHooks Function()
+    >;
+typedef $GraphLogTagAssignmentMarksCreateCompanionBuilder =
+    GraphLogTagAssignmentMarksCompanion Function({
+      required String tagId,
+      required String intentionId,
+      required String firstOperation,
+      Value<int> rowid,
+    });
+typedef $GraphLogTagAssignmentMarksUpdateCompanionBuilder =
+    GraphLogTagAssignmentMarksCompanion Function({
+      Value<String> tagId,
+      Value<String> intentionId,
+      Value<String> firstOperation,
+      Value<int> rowid,
+    });
+
+class $GraphLogTagAssignmentMarksFilterComposer
+    extends Composer<_$AppDatabase, GraphLogTagAssignmentMarks> {
+  $GraphLogTagAssignmentMarksFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get tagId => $composableBuilder(
+    column: $table.tagId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get intentionId => $composableBuilder(
+    column: $table.intentionId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get firstOperation => $composableBuilder(
+    column: $table.firstOperation,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $GraphLogTagAssignmentMarksOrderingComposer
+    extends Composer<_$AppDatabase, GraphLogTagAssignmentMarks> {
+  $GraphLogTagAssignmentMarksOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get tagId => $composableBuilder(
+    column: $table.tagId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get intentionId => $composableBuilder(
+    column: $table.intentionId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get firstOperation => $composableBuilder(
+    column: $table.firstOperation,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $GraphLogTagAssignmentMarksAnnotationComposer
+    extends Composer<_$AppDatabase, GraphLogTagAssignmentMarks> {
+  $GraphLogTagAssignmentMarksAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get tagId =>
+      $composableBuilder(column: $table.tagId, builder: (column) => column);
+
+  GeneratedColumn<String> get intentionId => $composableBuilder(
+    column: $table.intentionId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get firstOperation => $composableBuilder(
+    column: $table.firstOperation,
+    builder: (column) => column,
+  );
+}
+
+class $GraphLogTagAssignmentMarksTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          GraphLogTagAssignmentMarks,
+          GraphLogTagAssignmentMark,
+          $GraphLogTagAssignmentMarksFilterComposer,
+          $GraphLogTagAssignmentMarksOrderingComposer,
+          $GraphLogTagAssignmentMarksAnnotationComposer,
+          $GraphLogTagAssignmentMarksCreateCompanionBuilder,
+          $GraphLogTagAssignmentMarksUpdateCompanionBuilder,
+          (
+            GraphLogTagAssignmentMark,
+            BaseReferences<
+              _$AppDatabase,
+              GraphLogTagAssignmentMarks,
+              GraphLogTagAssignmentMark
+            >,
+          ),
+          GraphLogTagAssignmentMark,
+          PrefetchHooks Function()
+        > {
+  $GraphLogTagAssignmentMarksTableManager(
+    _$AppDatabase db,
+    GraphLogTagAssignmentMarks table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $GraphLogTagAssignmentMarksFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $GraphLogTagAssignmentMarksOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $GraphLogTagAssignmentMarksAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> tagId = const Value.absent(),
+                Value<String> intentionId = const Value.absent(),
+                Value<String> firstOperation = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => GraphLogTagAssignmentMarksCompanion(
+                tagId: tagId,
+                intentionId: intentionId,
+                firstOperation: firstOperation,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String tagId,
+                required String intentionId,
+                required String firstOperation,
+                Value<int> rowid = const Value.absent(),
+              }) => GraphLogTagAssignmentMarksCompanion.insert(
+                tagId: tagId,
+                intentionId: intentionId,
+                firstOperation: firstOperation,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $GraphLogTagAssignmentMarksProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      GraphLogTagAssignmentMarks,
+      GraphLogTagAssignmentMark,
+      $GraphLogTagAssignmentMarksFilterComposer,
+      $GraphLogTagAssignmentMarksOrderingComposer,
+      $GraphLogTagAssignmentMarksAnnotationComposer,
+      $GraphLogTagAssignmentMarksCreateCompanionBuilder,
+      $GraphLogTagAssignmentMarksUpdateCompanionBuilder,
+      (
+        GraphLogTagAssignmentMark,
+        BaseReferences<
+          _$AppDatabase,
+          GraphLogTagAssignmentMarks,
+          GraphLogTagAssignmentMark
+        >,
+      ),
+      GraphLogTagAssignmentMark,
+      PrefetchHooks Function()
+    >;
+typedef $GraphLogLongTermRelationMarksCreateCompanionBuilder =
+    GraphLogLongTermRelationMarksCompanion Function({
+      required String longTermRelationId,
+      required String firstOperation,
+      Value<int> rowid,
+    });
+typedef $GraphLogLongTermRelationMarksUpdateCompanionBuilder =
+    GraphLogLongTermRelationMarksCompanion Function({
+      Value<String> longTermRelationId,
+      Value<String> firstOperation,
+      Value<int> rowid,
+    });
+
+class $GraphLogLongTermRelationMarksFilterComposer
+    extends Composer<_$AppDatabase, GraphLogLongTermRelationMarks> {
+  $GraphLogLongTermRelationMarksFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get longTermRelationId => $composableBuilder(
+    column: $table.longTermRelationId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get firstOperation => $composableBuilder(
+    column: $table.firstOperation,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $GraphLogLongTermRelationMarksOrderingComposer
+    extends Composer<_$AppDatabase, GraphLogLongTermRelationMarks> {
+  $GraphLogLongTermRelationMarksOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get longTermRelationId => $composableBuilder(
+    column: $table.longTermRelationId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get firstOperation => $composableBuilder(
+    column: $table.firstOperation,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $GraphLogLongTermRelationMarksAnnotationComposer
+    extends Composer<_$AppDatabase, GraphLogLongTermRelationMarks> {
+  $GraphLogLongTermRelationMarksAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get longTermRelationId => $composableBuilder(
+    column: $table.longTermRelationId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get firstOperation => $composableBuilder(
+    column: $table.firstOperation,
+    builder: (column) => column,
+  );
+}
+
+class $GraphLogLongTermRelationMarksTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          GraphLogLongTermRelationMarks,
+          GraphLogLongTermRelationMark,
+          $GraphLogLongTermRelationMarksFilterComposer,
+          $GraphLogLongTermRelationMarksOrderingComposer,
+          $GraphLogLongTermRelationMarksAnnotationComposer,
+          $GraphLogLongTermRelationMarksCreateCompanionBuilder,
+          $GraphLogLongTermRelationMarksUpdateCompanionBuilder,
+          (
+            GraphLogLongTermRelationMark,
+            BaseReferences<
+              _$AppDatabase,
+              GraphLogLongTermRelationMarks,
+              GraphLogLongTermRelationMark
+            >,
+          ),
+          GraphLogLongTermRelationMark,
+          PrefetchHooks Function()
+        > {
+  $GraphLogLongTermRelationMarksTableManager(
+    _$AppDatabase db,
+    GraphLogLongTermRelationMarks table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $GraphLogLongTermRelationMarksFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $GraphLogLongTermRelationMarksOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $GraphLogLongTermRelationMarksAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> longTermRelationId = const Value.absent(),
+                Value<String> firstOperation = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => GraphLogLongTermRelationMarksCompanion(
+                longTermRelationId: longTermRelationId,
+                firstOperation: firstOperation,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String longTermRelationId,
+                required String firstOperation,
+                Value<int> rowid = const Value.absent(),
+              }) => GraphLogLongTermRelationMarksCompanion.insert(
+                longTermRelationId: longTermRelationId,
+                firstOperation: firstOperation,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $GraphLogLongTermRelationMarksProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      GraphLogLongTermRelationMarks,
+      GraphLogLongTermRelationMark,
+      $GraphLogLongTermRelationMarksFilterComposer,
+      $GraphLogLongTermRelationMarksOrderingComposer,
+      $GraphLogLongTermRelationMarksAnnotationComposer,
+      $GraphLogLongTermRelationMarksCreateCompanionBuilder,
+      $GraphLogLongTermRelationMarksUpdateCompanionBuilder,
+      (
+        GraphLogLongTermRelationMark,
+        BaseReferences<
+          _$AppDatabase,
+          GraphLogLongTermRelationMarks,
+          GraphLogLongTermRelationMark
+        >,
+      ),
+      GraphLogLongTermRelationMark,
+      PrefetchHooks Function()
+    >;
+typedef $GraphLogDailyChoiceMarksCreateCompanionBuilder =
+    GraphLogDailyChoiceMarksCompanion Function({
+      required String dailyChoiceId,
+      required String firstOperation,
+      Value<int> rowid,
+    });
+typedef $GraphLogDailyChoiceMarksUpdateCompanionBuilder =
+    GraphLogDailyChoiceMarksCompanion Function({
+      Value<String> dailyChoiceId,
+      Value<String> firstOperation,
+      Value<int> rowid,
+    });
+
+class $GraphLogDailyChoiceMarksFilterComposer
+    extends Composer<_$AppDatabase, GraphLogDailyChoiceMarks> {
+  $GraphLogDailyChoiceMarksFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get dailyChoiceId => $composableBuilder(
+    column: $table.dailyChoiceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get firstOperation => $composableBuilder(
+    column: $table.firstOperation,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $GraphLogDailyChoiceMarksOrderingComposer
+    extends Composer<_$AppDatabase, GraphLogDailyChoiceMarks> {
+  $GraphLogDailyChoiceMarksOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get dailyChoiceId => $composableBuilder(
+    column: $table.dailyChoiceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get firstOperation => $composableBuilder(
+    column: $table.firstOperation,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $GraphLogDailyChoiceMarksAnnotationComposer
+    extends Composer<_$AppDatabase, GraphLogDailyChoiceMarks> {
+  $GraphLogDailyChoiceMarksAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get dailyChoiceId => $composableBuilder(
+    column: $table.dailyChoiceId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get firstOperation => $composableBuilder(
+    column: $table.firstOperation,
+    builder: (column) => column,
+  );
+}
+
+class $GraphLogDailyChoiceMarksTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          GraphLogDailyChoiceMarks,
+          GraphLogDailyChoiceMark,
+          $GraphLogDailyChoiceMarksFilterComposer,
+          $GraphLogDailyChoiceMarksOrderingComposer,
+          $GraphLogDailyChoiceMarksAnnotationComposer,
+          $GraphLogDailyChoiceMarksCreateCompanionBuilder,
+          $GraphLogDailyChoiceMarksUpdateCompanionBuilder,
+          (
+            GraphLogDailyChoiceMark,
+            BaseReferences<
+              _$AppDatabase,
+              GraphLogDailyChoiceMarks,
+              GraphLogDailyChoiceMark
+            >,
+          ),
+          GraphLogDailyChoiceMark,
+          PrefetchHooks Function()
+        > {
+  $GraphLogDailyChoiceMarksTableManager(
+    _$AppDatabase db,
+    GraphLogDailyChoiceMarks table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $GraphLogDailyChoiceMarksFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $GraphLogDailyChoiceMarksOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $GraphLogDailyChoiceMarksAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> dailyChoiceId = const Value.absent(),
+                Value<String> firstOperation = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => GraphLogDailyChoiceMarksCompanion(
+                dailyChoiceId: dailyChoiceId,
+                firstOperation: firstOperation,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String dailyChoiceId,
+                required String firstOperation,
+                Value<int> rowid = const Value.absent(),
+              }) => GraphLogDailyChoiceMarksCompanion.insert(
+                dailyChoiceId: dailyChoiceId,
+                firstOperation: firstOperation,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $GraphLogDailyChoiceMarksProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      GraphLogDailyChoiceMarks,
+      GraphLogDailyChoiceMark,
+      $GraphLogDailyChoiceMarksFilterComposer,
+      $GraphLogDailyChoiceMarksOrderingComposer,
+      $GraphLogDailyChoiceMarksAnnotationComposer,
+      $GraphLogDailyChoiceMarksCreateCompanionBuilder,
+      $GraphLogDailyChoiceMarksUpdateCompanionBuilder,
+      (
+        GraphLogDailyChoiceMark,
+        BaseReferences<
+          _$AppDatabase,
+          GraphLogDailyChoiceMarks,
+          GraphLogDailyChoiceMark
+        >,
+      ),
+      GraphLogDailyChoiceMark,
+      PrefetchHooks Function()
+    >;
+typedef $GraphSnapshotsCreateCompanionBuilder =
+    GraphSnapshotsCompanion Function({
+      Value<int> id,
+      required int position,
+      required String fileName,
+      required int byteSize,
+      required Uint8List checksum,
+    });
+typedef $GraphSnapshotsUpdateCompanionBuilder =
+    GraphSnapshotsCompanion Function({
+      Value<int> id,
+      Value<int> position,
+      Value<String> fileName,
+      Value<int> byteSize,
+      Value<Uint8List> checksum,
+    });
+
+final class $GraphSnapshotsReferences
+    extends
+        BaseReferences<_$AppDatabase, GraphSnapshots, RegisteredGraphSnapshot> {
+  $GraphSnapshotsReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static MultiTypedResultKey<GraphLogPackages, List<GraphLogPackage>>
+  _graphLogPackagesRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.graphLogPackages,
+    aliasName: 'graph_snapshots__id__graph_log_packages__snapshot_id',
+  );
+
+  $GraphLogPackagesProcessedTableManager get graphLogPackagesRefs {
+    final manager = $GraphLogPackagesTableManager(
+      $_db,
+      $_db.graphLogPackages,
+    ).filter((f) => f.snapshotId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _graphLogPackagesRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $GraphSnapshotsFilterComposer
+    extends Composer<_$AppDatabase, GraphSnapshots> {
+  $GraphSnapshotsFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get position => $composableBuilder(
+    column: $table.position,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get fileName => $composableBuilder(
+    column: $table.fileName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get byteSize => $composableBuilder(
+    column: $table.byteSize,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<Uint8List> get checksum => $composableBuilder(
+    column: $table.checksum,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  Expression<bool> graphLogPackagesRefs(
+    Expression<bool> Function($GraphLogPackagesFilterComposer f) f,
+  ) {
+    final $GraphLogPackagesFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.graphLogPackages,
+      getReferencedColumn: (t) => t.snapshotId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $GraphLogPackagesFilterComposer(
+            $db: $db,
+            $table: $db.graphLogPackages,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $GraphSnapshotsOrderingComposer
+    extends Composer<_$AppDatabase, GraphSnapshots> {
+  $GraphSnapshotsOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get position => $composableBuilder(
+    column: $table.position,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get fileName => $composableBuilder(
+    column: $table.fileName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get byteSize => $composableBuilder(
+    column: $table.byteSize,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<Uint8List> get checksum => $composableBuilder(
+    column: $table.checksum,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $GraphSnapshotsAnnotationComposer
+    extends Composer<_$AppDatabase, GraphSnapshots> {
+  $GraphSnapshotsAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get position =>
+      $composableBuilder(column: $table.position, builder: (column) => column);
+
+  GeneratedColumn<String> get fileName =>
+      $composableBuilder(column: $table.fileName, builder: (column) => column);
+
+  GeneratedColumn<int> get byteSize =>
+      $composableBuilder(column: $table.byteSize, builder: (column) => column);
+
+  GeneratedColumn<Uint8List> get checksum =>
+      $composableBuilder(column: $table.checksum, builder: (column) => column);
+
+  Expression<T> graphLogPackagesRefs<T extends Object>(
+    Expression<T> Function($GraphLogPackagesAnnotationComposer a) f,
+  ) {
+    final $GraphLogPackagesAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.graphLogPackages,
+      getReferencedColumn: (t) => t.snapshotId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $GraphLogPackagesAnnotationComposer(
+            $db: $db,
+            $table: $db.graphLogPackages,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $GraphSnapshotsTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          GraphSnapshots,
+          RegisteredGraphSnapshot,
+          $GraphSnapshotsFilterComposer,
+          $GraphSnapshotsOrderingComposer,
+          $GraphSnapshotsAnnotationComposer,
+          $GraphSnapshotsCreateCompanionBuilder,
+          $GraphSnapshotsUpdateCompanionBuilder,
+          (RegisteredGraphSnapshot, $GraphSnapshotsReferences),
+          RegisteredGraphSnapshot,
+          PrefetchHooks Function({bool graphLogPackagesRefs})
+        > {
+  $GraphSnapshotsTableManager(_$AppDatabase db, GraphSnapshots table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $GraphSnapshotsFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $GraphSnapshotsOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $GraphSnapshotsAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int> position = const Value.absent(),
+                Value<String> fileName = const Value.absent(),
+                Value<int> byteSize = const Value.absent(),
+                Value<Uint8List> checksum = const Value.absent(),
+              }) => GraphSnapshotsCompanion(
+                id: id,
+                position: position,
+                fileName: fileName,
+                byteSize: byteSize,
+                checksum: checksum,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required int position,
+                required String fileName,
+                required int byteSize,
+                required Uint8List checksum,
+              }) => GraphSnapshotsCompanion.insert(
+                id: id,
+                position: position,
+                fileName: fileName,
+                byteSize: byteSize,
+                checksum: checksum,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $GraphSnapshotsReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({graphLogPackagesRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [
+                if (graphLogPackagesRefs) db.graphLogPackages,
+              ],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (graphLogPackagesRefs)
+                    await $_getPrefetchedData<
+                      RegisteredGraphSnapshot,
+                      GraphSnapshots,
+                      GraphLogPackage
+                    >(
+                      currentTable: table,
+                      referencedTable: $GraphSnapshotsReferences
+                          ._graphLogPackagesRefsTable(db),
+                      managerFromTypedResult: (p0) => $GraphSnapshotsReferences(
+                        db,
+                        table,
+                        p0,
+                      ).graphLogPackagesRefs,
+                      referencedItemsForCurrentItem: (item, referencedItems) =>
+                          referencedItems.where((e) => e.snapshotId == item.id),
+                      typedResults: items,
+                    ),
+                ];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $GraphSnapshotsProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      GraphSnapshots,
+      RegisteredGraphSnapshot,
+      $GraphSnapshotsFilterComposer,
+      $GraphSnapshotsOrderingComposer,
+      $GraphSnapshotsAnnotationComposer,
+      $GraphSnapshotsCreateCompanionBuilder,
+      $GraphSnapshotsUpdateCompanionBuilder,
+      (RegisteredGraphSnapshot, $GraphSnapshotsReferences),
+      RegisteredGraphSnapshot,
+      PrefetchHooks Function({bool graphLogPackagesRefs})
+    >;
+typedef $GraphLogPackagesCreateCompanionBuilder =
+    GraphLogPackagesCompanion Function({
+      Value<int> position,
+      required int recordedAt,
+      required String kind,
+      Value<int?> formatVersion,
+      Value<Uint8List?> facts,
+      Value<int?> snapshotId,
+    });
+typedef $GraphLogPackagesUpdateCompanionBuilder =
+    GraphLogPackagesCompanion Function({
+      Value<int> position,
+      Value<int> recordedAt,
+      Value<String> kind,
+      Value<int?> formatVersion,
+      Value<Uint8List?> facts,
+      Value<int?> snapshotId,
+    });
+
+final class $GraphLogPackagesReferences
+    extends BaseReferences<_$AppDatabase, GraphLogPackages, GraphLogPackage> {
+  $GraphLogPackagesReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static GraphSnapshots _snapshotIdTable(_$AppDatabase db) => db.graphSnapshots
+      .createAlias('graph_log_packages__snapshot_id__graph_snapshots__id');
+
+  $GraphSnapshotsProcessedTableManager? get snapshotId {
+    final $_column = $_itemColumn<int>('snapshot_id');
+    if ($_column == null) return null;
+    final manager = $GraphSnapshotsTableManager(
+      $_db,
+      $_db.graphSnapshots,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_snapshotIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $GraphLogPackagesFilterComposer
+    extends Composer<_$AppDatabase, GraphLogPackages> {
+  $GraphLogPackagesFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get position => $composableBuilder(
+    column: $table.position,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get recordedAt => $composableBuilder(
+    column: $table.recordedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get formatVersion => $composableBuilder(
+    column: $table.formatVersion,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<Uint8List> get facts => $composableBuilder(
+    column: $table.facts,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $GraphSnapshotsFilterComposer get snapshotId {
+    final $GraphSnapshotsFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.snapshotId,
+      referencedTable: $db.graphSnapshots,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $GraphSnapshotsFilterComposer(
+            $db: $db,
+            $table: $db.graphSnapshots,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $GraphLogPackagesOrderingComposer
+    extends Composer<_$AppDatabase, GraphLogPackages> {
+  $GraphLogPackagesOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get position => $composableBuilder(
+    column: $table.position,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get recordedAt => $composableBuilder(
+    column: $table.recordedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get formatVersion => $composableBuilder(
+    column: $table.formatVersion,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<Uint8List> get facts => $composableBuilder(
+    column: $table.facts,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $GraphSnapshotsOrderingComposer get snapshotId {
+    final $GraphSnapshotsOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.snapshotId,
+      referencedTable: $db.graphSnapshots,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $GraphSnapshotsOrderingComposer(
+            $db: $db,
+            $table: $db.graphSnapshots,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $GraphLogPackagesAnnotationComposer
+    extends Composer<_$AppDatabase, GraphLogPackages> {
+  $GraphLogPackagesAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get position =>
+      $composableBuilder(column: $table.position, builder: (column) => column);
+
+  GeneratedColumn<int> get recordedAt => $composableBuilder(
+    column: $table.recordedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<int> get formatVersion => $composableBuilder(
+    column: $table.formatVersion,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<Uint8List> get facts =>
+      $composableBuilder(column: $table.facts, builder: (column) => column);
+
+  $GraphSnapshotsAnnotationComposer get snapshotId {
+    final $GraphSnapshotsAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.snapshotId,
+      referencedTable: $db.graphSnapshots,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $GraphSnapshotsAnnotationComposer(
+            $db: $db,
+            $table: $db.graphSnapshots,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $GraphLogPackagesTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          GraphLogPackages,
+          GraphLogPackage,
+          $GraphLogPackagesFilterComposer,
+          $GraphLogPackagesOrderingComposer,
+          $GraphLogPackagesAnnotationComposer,
+          $GraphLogPackagesCreateCompanionBuilder,
+          $GraphLogPackagesUpdateCompanionBuilder,
+          (GraphLogPackage, $GraphLogPackagesReferences),
+          GraphLogPackage,
+          PrefetchHooks Function({bool snapshotId})
+        > {
+  $GraphLogPackagesTableManager(_$AppDatabase db, GraphLogPackages table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $GraphLogPackagesFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $GraphLogPackagesOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $GraphLogPackagesAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> position = const Value.absent(),
+                Value<int> recordedAt = const Value.absent(),
+                Value<String> kind = const Value.absent(),
+                Value<int?> formatVersion = const Value.absent(),
+                Value<Uint8List?> facts = const Value.absent(),
+                Value<int?> snapshotId = const Value.absent(),
+              }) => GraphLogPackagesCompanion(
+                position: position,
+                recordedAt: recordedAt,
+                kind: kind,
+                formatVersion: formatVersion,
+                facts: facts,
+                snapshotId: snapshotId,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> position = const Value.absent(),
+                required int recordedAt,
+                required String kind,
+                Value<int?> formatVersion = const Value.absent(),
+                Value<Uint8List?> facts = const Value.absent(),
+                Value<int?> snapshotId = const Value.absent(),
+              }) => GraphLogPackagesCompanion.insert(
+                position: position,
+                recordedAt: recordedAt,
+                kind: kind,
+                formatVersion: formatVersion,
+                facts: facts,
+                snapshotId: snapshotId,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $GraphLogPackagesReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({snapshotId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (snapshotId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.snapshotId,
+                        referencedTable: $GraphLogPackagesReferences
+                            ._snapshotIdTable(db),
+                        referencedColumn: $GraphLogPackagesReferences
+                            ._snapshotIdTable(db)
+                            .id,
+                      ) as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $GraphLogPackagesProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      GraphLogPackages,
+      GraphLogPackage,
+      $GraphLogPackagesFilterComposer,
+      $GraphLogPackagesOrderingComposer,
+      $GraphLogPackagesAnnotationComposer,
+      $GraphLogPackagesCreateCompanionBuilder,
+      $GraphLogPackagesUpdateCompanionBuilder,
+      (GraphLogPackage, $GraphLogPackagesReferences),
+      GraphLogPackage,
+      PrefetchHooks Function({bool snapshotId})
+    >;
+typedef $GraphBackupsCreateCompanionBuilder = GraphBackupsCompanion Function({
+  Value<int> id,
+  required int position,
+  required String kind,
+  required int madeAt,
+  required bool graphReplaced,
+  Value<int?> addedCount,
+  Value<int?> changedCount,
+  Value<int?> deletedCount,
+});
+typedef $GraphBackupsUpdateCompanionBuilder = GraphBackupsCompanion Function({
+  Value<int> id,
+  Value<int> position,
+  Value<String> kind,
+  Value<int> madeAt,
+  Value<bool> graphReplaced,
+  Value<int?> addedCount,
+  Value<int?> changedCount,
+  Value<int?> deletedCount,
+});
+
+class $GraphBackupsFilterComposer
+    extends Composer<_$AppDatabase, GraphBackups> {
+  $GraphBackupsFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get position => $composableBuilder(
+    column: $table.position,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get madeAt => $composableBuilder(
+    column: $table.madeAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get graphReplaced => $composableBuilder(
+    column: $table.graphReplaced,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get addedCount => $composableBuilder(
+    column: $table.addedCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get changedCount => $composableBuilder(
+    column: $table.changedCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get deletedCount => $composableBuilder(
+    column: $table.deletedCount,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $GraphBackupsOrderingComposer
+    extends Composer<_$AppDatabase, GraphBackups> {
+  $GraphBackupsOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get position => $composableBuilder(
+    column: $table.position,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get madeAt => $composableBuilder(
+    column: $table.madeAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get graphReplaced => $composableBuilder(
+    column: $table.graphReplaced,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get addedCount => $composableBuilder(
+    column: $table.addedCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get changedCount => $composableBuilder(
+    column: $table.changedCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get deletedCount => $composableBuilder(
+    column: $table.deletedCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $GraphBackupsAnnotationComposer
+    extends Composer<_$AppDatabase, GraphBackups> {
+  $GraphBackupsAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get position =>
+      $composableBuilder(column: $table.position, builder: (column) => column);
+
+  GeneratedColumn<String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<int> get madeAt =>
+      $composableBuilder(column: $table.madeAt, builder: (column) => column);
+
+  GeneratedColumn<bool> get graphReplaced => $composableBuilder(
+    column: $table.graphReplaced,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get addedCount => $composableBuilder(
+    column: $table.addedCount,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get changedCount => $composableBuilder(
+    column: $table.changedCount,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get deletedCount => $composableBuilder(
+    column: $table.deletedCount,
+    builder: (column) => column,
+  );
+}
+
+class $GraphBackupsTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          GraphBackups,
+          GraphBackup,
+          $GraphBackupsFilterComposer,
+          $GraphBackupsOrderingComposer,
+          $GraphBackupsAnnotationComposer,
+          $GraphBackupsCreateCompanionBuilder,
+          $GraphBackupsUpdateCompanionBuilder,
+          (
+            GraphBackup,
+            BaseReferences<_$AppDatabase, GraphBackups, GraphBackup>,
+          ),
+          GraphBackup,
+          PrefetchHooks Function()
+        > {
+  $GraphBackupsTableManager(_$AppDatabase db, GraphBackups table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $GraphBackupsFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $GraphBackupsOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $GraphBackupsAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int> position = const Value.absent(),
+                Value<String> kind = const Value.absent(),
+                Value<int> madeAt = const Value.absent(),
+                Value<bool> graphReplaced = const Value.absent(),
+                Value<int?> addedCount = const Value.absent(),
+                Value<int?> changedCount = const Value.absent(),
+                Value<int?> deletedCount = const Value.absent(),
+              }) => GraphBackupsCompanion(
+                id: id,
+                position: position,
+                kind: kind,
+                madeAt: madeAt,
+                graphReplaced: graphReplaced,
+                addedCount: addedCount,
+                changedCount: changedCount,
+                deletedCount: deletedCount,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required int position,
+                required String kind,
+                required int madeAt,
+                required bool graphReplaced,
+                Value<int?> addedCount = const Value.absent(),
+                Value<int?> changedCount = const Value.absent(),
+                Value<int?> deletedCount = const Value.absent(),
+              }) => GraphBackupsCompanion.insert(
+                id: id,
+                position: position,
+                kind: kind,
+                madeAt: madeAt,
+                graphReplaced: graphReplaced,
+                addedCount: addedCount,
+                changedCount: changedCount,
+                deletedCount: deletedCount,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $GraphBackupsProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      GraphBackups,
+      GraphBackup,
+      $GraphBackupsFilterComposer,
+      $GraphBackupsOrderingComposer,
+      $GraphBackupsAnnotationComposer,
+      $GraphBackupsCreateCompanionBuilder,
+      $GraphBackupsUpdateCompanionBuilder,
+      (GraphBackup, BaseReferences<_$AppDatabase, GraphBackups, GraphBackup>),
+      GraphBackup,
+      PrefetchHooks Function()
+    >;
 typedef $TagsCreateCompanionBuilder = TagsCompanion Function({
   Value<int> creationSequence,
   required String id,
@@ -4110,6 +9054,573 @@ typedef $TagAssignmentsProcessedTableManager =
       TagAssignment,
       PrefetchHooks Function({bool tagId, bool intentionId})
     >;
+typedef $LongTermRelationsCreateCompanionBuilder =
+    LongTermRelationsCompanion Function({
+      Value<int> creationSequence,
+      required String id,
+      required String sourceIntentionId,
+      required String relatedIntentionId,
+      required String type,
+      required int priority,
+      Value<String?> description,
+      Value<bool> isArchived,
+    });
+typedef $LongTermRelationsUpdateCompanionBuilder =
+    LongTermRelationsCompanion Function({
+      Value<int> creationSequence,
+      Value<String> id,
+      Value<String> sourceIntentionId,
+      Value<String> relatedIntentionId,
+      Value<String> type,
+      Value<int> priority,
+      Value<String?> description,
+      Value<bool> isArchived,
+    });
+
+final class $LongTermRelationsReferences
+    extends BaseReferences<_$AppDatabase, LongTermRelations, LongTermRelation> {
+  $LongTermRelationsReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static Intentions _sourceIntentionIdTable(_$AppDatabase db) => db.intentions
+      .createAlias('long_term_relations__source_intention_id__intentions__id');
+
+  $IntentionsProcessedTableManager get sourceIntentionId {
+    final $_column = $_itemColumn<String>('source_intention_id')!;
+
+    final manager = $IntentionsTableManager(
+      $_db,
+      $_db.intentions,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_sourceIntentionIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static Intentions _relatedIntentionIdTable(_$AppDatabase db) => db.intentions
+      .createAlias('long_term_relations__related_intention_id__intentions__id');
+
+  $IntentionsProcessedTableManager get relatedIntentionId {
+    final $_column = $_itemColumn<String>('related_intention_id')!;
+
+    final manager = $IntentionsTableManager(
+      $_db,
+      $_db.intentions,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_relatedIntentionIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static MultiTypedResultKey<DailyChoicePathSteps, List<DailyChoicePathStep>>
+  _dailyChoicePathStepsRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.dailyChoicePathSteps,
+        aliasName: 'long_term_relations__id__daily_choice_path_steps__long_term_relation_id',
+      );
+
+  $DailyChoicePathStepsProcessedTableManager get dailyChoicePathStepsRefs {
+    final manager =
+        $DailyChoicePathStepsTableManager(
+          $_db,
+          $_db.dailyChoicePathSteps,
+        ).filter(
+          (f) => f.longTermRelationId.id.sqlEquals($_itemColumn<String>('id')!),
+        );
+
+    final cache = $_typedResult.readTableOrNull(
+      _dailyChoicePathStepsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $LongTermRelationsFilterComposer
+    extends Composer<_$AppDatabase, LongTermRelations> {
+  $LongTermRelationsFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get creationSequence => $composableBuilder(
+    column: $table.creationSequence,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get priority => $composableBuilder(
+    column: $table.priority,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isArchived => $composableBuilder(
+    column: $table.isArchived,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $IntentionsFilterComposer get sourceIntentionId {
+    final $IntentionsFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.sourceIntentionId,
+      referencedTable: $db.intentions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $IntentionsFilterComposer(
+            $db: $db,
+            $table: $db.intentions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $IntentionsFilterComposer get relatedIntentionId {
+    final $IntentionsFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.relatedIntentionId,
+      referencedTable: $db.intentions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $IntentionsFilterComposer(
+            $db: $db,
+            $table: $db.intentions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  Expression<bool> dailyChoicePathStepsRefs(
+    Expression<bool> Function($DailyChoicePathStepsFilterComposer f) f,
+  ) {
+    final $DailyChoicePathStepsFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.dailyChoicePathSteps,
+      getReferencedColumn: (t) => t.longTermRelationId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $DailyChoicePathStepsFilterComposer(
+            $db: $db,
+            $table: $db.dailyChoicePathSteps,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $LongTermRelationsOrderingComposer
+    extends Composer<_$AppDatabase, LongTermRelations> {
+  $LongTermRelationsOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get creationSequence => $composableBuilder(
+    column: $table.creationSequence,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get priority => $composableBuilder(
+    column: $table.priority,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isArchived => $composableBuilder(
+    column: $table.isArchived,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $IntentionsOrderingComposer get sourceIntentionId {
+    final $IntentionsOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.sourceIntentionId,
+      referencedTable: $db.intentions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $IntentionsOrderingComposer(
+            $db: $db,
+            $table: $db.intentions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $IntentionsOrderingComposer get relatedIntentionId {
+    final $IntentionsOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.relatedIntentionId,
+      referencedTable: $db.intentions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $IntentionsOrderingComposer(
+            $db: $db,
+            $table: $db.intentions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $LongTermRelationsAnnotationComposer
+    extends Composer<_$AppDatabase, LongTermRelations> {
+  $LongTermRelationsAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get creationSequence => $composableBuilder(
+    column: $table.creationSequence,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get type =>
+      $composableBuilder(column: $table.type, builder: (column) => column);
+
+  GeneratedColumn<int> get priority =>
+      $composableBuilder(column: $table.priority, builder: (column) => column);
+
+  GeneratedColumn<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isArchived => $composableBuilder(
+    column: $table.isArchived,
+    builder: (column) => column,
+  );
+
+  $IntentionsAnnotationComposer get sourceIntentionId {
+    final $IntentionsAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.sourceIntentionId,
+      referencedTable: $db.intentions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $IntentionsAnnotationComposer(
+            $db: $db,
+            $table: $db.intentions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $IntentionsAnnotationComposer get relatedIntentionId {
+    final $IntentionsAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.relatedIntentionId,
+      referencedTable: $db.intentions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $IntentionsAnnotationComposer(
+            $db: $db,
+            $table: $db.intentions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  Expression<T> dailyChoicePathStepsRefs<T extends Object>(
+    Expression<T> Function($DailyChoicePathStepsAnnotationComposer a) f,
+  ) {
+    final $DailyChoicePathStepsAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.dailyChoicePathSteps,
+      getReferencedColumn: (t) => t.longTermRelationId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $DailyChoicePathStepsAnnotationComposer(
+            $db: $db,
+            $table: $db.dailyChoicePathSteps,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $LongTermRelationsTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          LongTermRelations,
+          LongTermRelation,
+          $LongTermRelationsFilterComposer,
+          $LongTermRelationsOrderingComposer,
+          $LongTermRelationsAnnotationComposer,
+          $LongTermRelationsCreateCompanionBuilder,
+          $LongTermRelationsUpdateCompanionBuilder,
+          (LongTermRelation, $LongTermRelationsReferences),
+          LongTermRelation,
+          PrefetchHooks Function({
+            bool sourceIntentionId,
+            bool relatedIntentionId,
+            bool dailyChoicePathStepsRefs,
+          })
+        > {
+  $LongTermRelationsTableManager(_$AppDatabase db, LongTermRelations table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $LongTermRelationsFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $LongTermRelationsOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $LongTermRelationsAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> creationSequence = const Value.absent(),
+                Value<String> id = const Value.absent(),
+                Value<String> sourceIntentionId = const Value.absent(),
+                Value<String> relatedIntentionId = const Value.absent(),
+                Value<String> type = const Value.absent(),
+                Value<int> priority = const Value.absent(),
+                Value<String?> description = const Value.absent(),
+                Value<bool> isArchived = const Value.absent(),
+              }) => LongTermRelationsCompanion(
+                creationSequence: creationSequence,
+                id: id,
+                sourceIntentionId: sourceIntentionId,
+                relatedIntentionId: relatedIntentionId,
+                type: type,
+                priority: priority,
+                description: description,
+                isArchived: isArchived,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> creationSequence = const Value.absent(),
+                required String id,
+                required String sourceIntentionId,
+                required String relatedIntentionId,
+                required String type,
+                required int priority,
+                Value<String?> description = const Value.absent(),
+                Value<bool> isArchived = const Value.absent(),
+              }) => LongTermRelationsCompanion.insert(
+                creationSequence: creationSequence,
+                id: id,
+                sourceIntentionId: sourceIntentionId,
+                relatedIntentionId: relatedIntentionId,
+                type: type,
+                priority: priority,
+                description: description,
+                isArchived: isArchived,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $LongTermRelationsReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback:
+              ({
+                sourceIntentionId = false,
+                relatedIntentionId = false,
+                dailyChoicePathStepsRefs = false,
+              }) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (dailyChoicePathStepsRefs) db.dailyChoicePathSteps,
+                  ],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (sourceIntentionId) {
+                          state = state.withJoin(
+                            currentTable: table,
+                            currentColumn: table.sourceIntentionId,
+                            referencedTable: $LongTermRelationsReferences
+                                ._sourceIntentionIdTable(db),
+                            referencedColumn: $LongTermRelationsReferences
+                                ._sourceIntentionIdTable(db)
+                                .id,
+                          ) as T;
+                        }
+                        if (relatedIntentionId) {
+                          state = state.withJoin(
+                            currentTable: table,
+                            currentColumn: table.relatedIntentionId,
+                            referencedTable: $LongTermRelationsReferences
+                                ._relatedIntentionIdTable(db),
+                            referencedColumn: $LongTermRelationsReferences
+                                ._relatedIntentionIdTable(db)
+                                .id,
+                          ) as T;
+                        }
+
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (dailyChoicePathStepsRefs)
+                        await $_getPrefetchedData<
+                          LongTermRelation,
+                          LongTermRelations,
+                          DailyChoicePathStep
+                        >(
+                          currentTable: table,
+                          referencedTable: $LongTermRelationsReferences
+                              ._dailyChoicePathStepsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $LongTermRelationsReferences(
+                                db,
+                                table,
+                                p0,
+                              ).dailyChoicePathStepsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.longTermRelationId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
+                  },
+                );
+              },
+        ),
+      );
+}
+
+typedef $LongTermRelationsProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      LongTermRelations,
+      LongTermRelation,
+      $LongTermRelationsFilterComposer,
+      $LongTermRelationsOrderingComposer,
+      $LongTermRelationsAnnotationComposer,
+      $LongTermRelationsCreateCompanionBuilder,
+      $LongTermRelationsUpdateCompanionBuilder,
+      (LongTermRelation, $LongTermRelationsReferences),
+      LongTermRelation,
+      PrefetchHooks Function({
+        bool sourceIntentionId,
+        bool relatedIntentionId,
+        bool dailyChoicePathStepsRefs,
+      })
+    >;
 typedef $DailyChoicesCreateCompanionBuilder = DailyChoicesCompanion Function({
   Value<int> creationSequence,
   required String id,
@@ -4694,573 +10205,6 @@ typedef $DailyChoicesProcessedTableManager =
         bool dailyChoicePathStepsRefs,
       })
     >;
-typedef $LongTermRelationsCreateCompanionBuilder =
-    LongTermRelationsCompanion Function({
-      Value<int> creationSequence,
-      required String id,
-      required String sourceIntentionId,
-      required String relatedIntentionId,
-      required String type,
-      required int priority,
-      Value<String?> description,
-      Value<bool> isArchived,
-    });
-typedef $LongTermRelationsUpdateCompanionBuilder =
-    LongTermRelationsCompanion Function({
-      Value<int> creationSequence,
-      Value<String> id,
-      Value<String> sourceIntentionId,
-      Value<String> relatedIntentionId,
-      Value<String> type,
-      Value<int> priority,
-      Value<String?> description,
-      Value<bool> isArchived,
-    });
-
-final class $LongTermRelationsReferences
-    extends BaseReferences<_$AppDatabase, LongTermRelations, LongTermRelation> {
-  $LongTermRelationsReferences(super.$_db, super.$_table, super.$_typedResult);
-
-  static Intentions _sourceIntentionIdTable(_$AppDatabase db) => db.intentions
-      .createAlias('long_term_relations__source_intention_id__intentions__id');
-
-  $IntentionsProcessedTableManager get sourceIntentionId {
-    final $_column = $_itemColumn<String>('source_intention_id')!;
-
-    final manager = $IntentionsTableManager(
-      $_db,
-      $_db.intentions,
-    ).filter((f) => f.id.sqlEquals($_column));
-    final item = $_typedResult.readTableOrNull(_sourceIntentionIdTable($_db));
-    if (item == null) return manager;
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: [item]),
-    );
-  }
-
-  static Intentions _relatedIntentionIdTable(_$AppDatabase db) => db.intentions
-      .createAlias('long_term_relations__related_intention_id__intentions__id');
-
-  $IntentionsProcessedTableManager get relatedIntentionId {
-    final $_column = $_itemColumn<String>('related_intention_id')!;
-
-    final manager = $IntentionsTableManager(
-      $_db,
-      $_db.intentions,
-    ).filter((f) => f.id.sqlEquals($_column));
-    final item = $_typedResult.readTableOrNull(_relatedIntentionIdTable($_db));
-    if (item == null) return manager;
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: [item]),
-    );
-  }
-
-  static MultiTypedResultKey<DailyChoicePathSteps, List<DailyChoicePathStep>>
-  _dailyChoicePathStepsRefsTable(_$AppDatabase db) =>
-      MultiTypedResultKey.fromTable(
-        db.dailyChoicePathSteps,
-        aliasName: 'long_term_relations__id__daily_choice_path_steps__long_term_relation_id',
-      );
-
-  $DailyChoicePathStepsProcessedTableManager get dailyChoicePathStepsRefs {
-    final manager =
-        $DailyChoicePathStepsTableManager(
-          $_db,
-          $_db.dailyChoicePathSteps,
-        ).filter(
-          (f) => f.longTermRelationId.id.sqlEquals($_itemColumn<String>('id')!),
-        );
-
-    final cache = $_typedResult.readTableOrNull(
-      _dailyChoicePathStepsRefsTable($_db),
-    );
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: cache),
-    );
-  }
-}
-
-class $LongTermRelationsFilterComposer
-    extends Composer<_$AppDatabase, LongTermRelations> {
-  $LongTermRelationsFilterComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnFilters<int> get creationSequence => $composableBuilder(
-    column: $table.creationSequence,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get id => $composableBuilder(
-    column: $table.id,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get type => $composableBuilder(
-    column: $table.type,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<int> get priority => $composableBuilder(
-    column: $table.priority,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get description => $composableBuilder(
-    column: $table.description,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<bool> get isArchived => $composableBuilder(
-    column: $table.isArchived,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  $IntentionsFilterComposer get sourceIntentionId {
-    final $IntentionsFilterComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.sourceIntentionId,
-      referencedTable: $db.intentions,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $IntentionsFilterComposer(
-            $db: $db,
-            $table: $db.intentions,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-
-  $IntentionsFilterComposer get relatedIntentionId {
-    final $IntentionsFilterComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.relatedIntentionId,
-      referencedTable: $db.intentions,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $IntentionsFilterComposer(
-            $db: $db,
-            $table: $db.intentions,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-
-  Expression<bool> dailyChoicePathStepsRefs(
-    Expression<bool> Function($DailyChoicePathStepsFilterComposer f) f,
-  ) {
-    final $DailyChoicePathStepsFilterComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.id,
-      referencedTable: $db.dailyChoicePathSteps,
-      getReferencedColumn: (t) => t.longTermRelationId,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $DailyChoicePathStepsFilterComposer(
-            $db: $db,
-            $table: $db.dailyChoicePathSteps,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return f(composer);
-  }
-}
-
-class $LongTermRelationsOrderingComposer
-    extends Composer<_$AppDatabase, LongTermRelations> {
-  $LongTermRelationsOrderingComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnOrderings<int> get creationSequence => $composableBuilder(
-    column: $table.creationSequence,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get id => $composableBuilder(
-    column: $table.id,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get type => $composableBuilder(
-    column: $table.type,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<int> get priority => $composableBuilder(
-    column: $table.priority,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get description => $composableBuilder(
-    column: $table.description,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<bool> get isArchived => $composableBuilder(
-    column: $table.isArchived,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  $IntentionsOrderingComposer get sourceIntentionId {
-    final $IntentionsOrderingComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.sourceIntentionId,
-      referencedTable: $db.intentions,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $IntentionsOrderingComposer(
-            $db: $db,
-            $table: $db.intentions,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-
-  $IntentionsOrderingComposer get relatedIntentionId {
-    final $IntentionsOrderingComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.relatedIntentionId,
-      referencedTable: $db.intentions,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $IntentionsOrderingComposer(
-            $db: $db,
-            $table: $db.intentions,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-}
-
-class $LongTermRelationsAnnotationComposer
-    extends Composer<_$AppDatabase, LongTermRelations> {
-  $LongTermRelationsAnnotationComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  GeneratedColumn<int> get creationSequence => $composableBuilder(
-    column: $table.creationSequence,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<String> get id =>
-      $composableBuilder(column: $table.id, builder: (column) => column);
-
-  GeneratedColumn<String> get type =>
-      $composableBuilder(column: $table.type, builder: (column) => column);
-
-  GeneratedColumn<int> get priority =>
-      $composableBuilder(column: $table.priority, builder: (column) => column);
-
-  GeneratedColumn<String> get description => $composableBuilder(
-    column: $table.description,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<bool> get isArchived => $composableBuilder(
-    column: $table.isArchived,
-    builder: (column) => column,
-  );
-
-  $IntentionsAnnotationComposer get sourceIntentionId {
-    final $IntentionsAnnotationComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.sourceIntentionId,
-      referencedTable: $db.intentions,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $IntentionsAnnotationComposer(
-            $db: $db,
-            $table: $db.intentions,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-
-  $IntentionsAnnotationComposer get relatedIntentionId {
-    final $IntentionsAnnotationComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.relatedIntentionId,
-      referencedTable: $db.intentions,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $IntentionsAnnotationComposer(
-            $db: $db,
-            $table: $db.intentions,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-
-  Expression<T> dailyChoicePathStepsRefs<T extends Object>(
-    Expression<T> Function($DailyChoicePathStepsAnnotationComposer a) f,
-  ) {
-    final $DailyChoicePathStepsAnnotationComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.id,
-      referencedTable: $db.dailyChoicePathSteps,
-      getReferencedColumn: (t) => t.longTermRelationId,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $DailyChoicePathStepsAnnotationComposer(
-            $db: $db,
-            $table: $db.dailyChoicePathSteps,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return f(composer);
-  }
-}
-
-class $LongTermRelationsTableManager
-    extends
-        RootTableManager<
-          _$AppDatabase,
-          LongTermRelations,
-          LongTermRelation,
-          $LongTermRelationsFilterComposer,
-          $LongTermRelationsOrderingComposer,
-          $LongTermRelationsAnnotationComposer,
-          $LongTermRelationsCreateCompanionBuilder,
-          $LongTermRelationsUpdateCompanionBuilder,
-          (LongTermRelation, $LongTermRelationsReferences),
-          LongTermRelation,
-          PrefetchHooks Function({
-            bool sourceIntentionId,
-            bool relatedIntentionId,
-            bool dailyChoicePathStepsRefs,
-          })
-        > {
-  $LongTermRelationsTableManager(_$AppDatabase db, LongTermRelations table)
-    : super(
-        TableManagerState(
-          db: db,
-          table: table,
-          createFilteringComposer: () =>
-              $LongTermRelationsFilterComposer($db: db, $table: table),
-          createOrderingComposer: () =>
-              $LongTermRelationsOrderingComposer($db: db, $table: table),
-          createComputedFieldComposer: () =>
-              $LongTermRelationsAnnotationComposer($db: db, $table: table),
-          updateCompanionCallback:
-              ({
-                Value<int> creationSequence = const Value.absent(),
-                Value<String> id = const Value.absent(),
-                Value<String> sourceIntentionId = const Value.absent(),
-                Value<String> relatedIntentionId = const Value.absent(),
-                Value<String> type = const Value.absent(),
-                Value<int> priority = const Value.absent(),
-                Value<String?> description = const Value.absent(),
-                Value<bool> isArchived = const Value.absent(),
-              }) => LongTermRelationsCompanion(
-                creationSequence: creationSequence,
-                id: id,
-                sourceIntentionId: sourceIntentionId,
-                relatedIntentionId: relatedIntentionId,
-                type: type,
-                priority: priority,
-                description: description,
-                isArchived: isArchived,
-              ),
-          createCompanionCallback:
-              ({
-                Value<int> creationSequence = const Value.absent(),
-                required String id,
-                required String sourceIntentionId,
-                required String relatedIntentionId,
-                required String type,
-                required int priority,
-                Value<String?> description = const Value.absent(),
-                Value<bool> isArchived = const Value.absent(),
-              }) => LongTermRelationsCompanion.insert(
-                creationSequence: creationSequence,
-                id: id,
-                sourceIntentionId: sourceIntentionId,
-                relatedIntentionId: relatedIntentionId,
-                type: type,
-                priority: priority,
-                description: description,
-                isArchived: isArchived,
-              ),
-          withReferenceMapper: (p0) => p0
-              .map(
-                (e) => (
-                  e.readTable(table),
-                  $LongTermRelationsReferences(db, table, e),
-                ),
-              )
-              .toList(),
-          prefetchHooksCallback:
-              ({
-                sourceIntentionId = false,
-                relatedIntentionId = false,
-                dailyChoicePathStepsRefs = false,
-              }) {
-                return PrefetchHooks(
-                  db: db,
-                  explicitlyWatchedTables: [
-                    if (dailyChoicePathStepsRefs) db.dailyChoicePathSteps,
-                  ],
-                  addJoins:
-                      <
-                        T extends TableManagerState<
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic
-                        >
-                      >(state) {
-                        if (sourceIntentionId) {
-                          state = state.withJoin(
-                            currentTable: table,
-                            currentColumn: table.sourceIntentionId,
-                            referencedTable: $LongTermRelationsReferences
-                                ._sourceIntentionIdTable(db),
-                            referencedColumn: $LongTermRelationsReferences
-                                ._sourceIntentionIdTable(db)
-                                .id,
-                          ) as T;
-                        }
-                        if (relatedIntentionId) {
-                          state = state.withJoin(
-                            currentTable: table,
-                            currentColumn: table.relatedIntentionId,
-                            referencedTable: $LongTermRelationsReferences
-                                ._relatedIntentionIdTable(db),
-                            referencedColumn: $LongTermRelationsReferences
-                                ._relatedIntentionIdTable(db)
-                                .id,
-                          ) as T;
-                        }
-
-                        return state;
-                      },
-                  getPrefetchedDataCallback: (items) async {
-                    return [
-                      if (dailyChoicePathStepsRefs)
-                        await $_getPrefetchedData<
-                          LongTermRelation,
-                          LongTermRelations,
-                          DailyChoicePathStep
-                        >(
-                          currentTable: table,
-                          referencedTable: $LongTermRelationsReferences
-                              ._dailyChoicePathStepsRefsTable(db),
-                          managerFromTypedResult: (p0) =>
-                              $LongTermRelationsReferences(
-                                db,
-                                table,
-                                p0,
-                              ).dailyChoicePathStepsRefs,
-                          referencedItemsForCurrentItem:
-                              (item, referencedItems) => referencedItems.where(
-                                (e) => e.longTermRelationId == item.id,
-                              ),
-                          typedResults: items,
-                        ),
-                    ];
-                  },
-                );
-              },
-        ),
-      );
-}
-
-typedef $LongTermRelationsProcessedTableManager =
-    ProcessedTableManager<
-      _$AppDatabase,
-      LongTermRelations,
-      LongTermRelation,
-      $LongTermRelationsFilterComposer,
-      $LongTermRelationsOrderingComposer,
-      $LongTermRelationsAnnotationComposer,
-      $LongTermRelationsCreateCompanionBuilder,
-      $LongTermRelationsUpdateCompanionBuilder,
-      (LongTermRelation, $LongTermRelationsReferences),
-      LongTermRelation,
-      PrefetchHooks Function({
-        bool sourceIntentionId,
-        bool relatedIntentionId,
-        bool dailyChoicePathStepsRefs,
-      })
-    >;
 typedef $DailyChoicePathStepsCreateCompanionBuilder =
     DailyChoicePathStepsCompanion Function({
       required String id,
@@ -5794,15 +10738,40 @@ typedef $IntentionTitlesFtsProcessedTableManager =
 class $AppDatabaseManager {
   final _$AppDatabase _db;
   $AppDatabaseManager(this._db);
+  $GraphLogControlTableManager get graphLogControl =>
+      $GraphLogControlTableManager(_db, _db.graphLogControl);
+  $GraphLogTagMarksTableManager get graphLogTagMarks =>
+      $GraphLogTagMarksTableManager(_db, _db.graphLogTagMarks);
+  $GraphLogIntentionMarksTableManager get graphLogIntentionMarks =>
+      $GraphLogIntentionMarksTableManager(_db, _db.graphLogIntentionMarks);
+  $GraphLogTagAssignmentMarksTableManager get graphLogTagAssignmentMarks =>
+      $GraphLogTagAssignmentMarksTableManager(
+        _db,
+        _db.graphLogTagAssignmentMarks,
+      );
+  $GraphLogLongTermRelationMarksTableManager
+  get graphLogLongTermRelationMarks =>
+      $GraphLogLongTermRelationMarksTableManager(
+        _db,
+        _db.graphLogLongTermRelationMarks,
+      );
+  $GraphLogDailyChoiceMarksTableManager get graphLogDailyChoiceMarks =>
+      $GraphLogDailyChoiceMarksTableManager(_db, _db.graphLogDailyChoiceMarks);
+  $GraphSnapshotsTableManager get graphSnapshots =>
+      $GraphSnapshotsTableManager(_db, _db.graphSnapshots);
+  $GraphLogPackagesTableManager get graphLogPackages =>
+      $GraphLogPackagesTableManager(_db, _db.graphLogPackages);
+  $GraphBackupsTableManager get graphBackups =>
+      $GraphBackupsTableManager(_db, _db.graphBackups);
   $TagsTableManager get tags => $TagsTableManager(_db, _db.tags);
   $IntentionsTableManager get intentions =>
       $IntentionsTableManager(_db, _db.intentions);
   $TagAssignmentsTableManager get tagAssignments =>
       $TagAssignmentsTableManager(_db, _db.tagAssignments);
-  $DailyChoicesTableManager get dailyChoices =>
-      $DailyChoicesTableManager(_db, _db.dailyChoices);
   $LongTermRelationsTableManager get longTermRelations =>
       $LongTermRelationsTableManager(_db, _db.longTermRelations);
+  $DailyChoicesTableManager get dailyChoices =>
+      $DailyChoicesTableManager(_db, _db.dailyChoices);
   $DailyChoicePathStepsTableManager get dailyChoicePathSteps =>
       $DailyChoicePathStepsTableManager(_db, _db.dailyChoicePathSteps);
   $IntentionTitlesFtsTableManager get intentionTitlesFts =>

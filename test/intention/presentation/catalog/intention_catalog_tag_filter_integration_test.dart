@@ -26,6 +26,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
+import '../../../support/graph_seed.dart';
 import '../../../support/in_memory_diagnostics_sink.dart';
 import '../../../support/tag_storage_fixture.dart';
 import 'catalog_reconciliation_test_support.dart';
@@ -1183,7 +1184,7 @@ Future<void> _completeTag(
 }
 
 Future<void> _seedCatalog(AppDatabase database) =>
-    database.transaction(() async {
+    seedGraph(database, () async {
       for (final (number, title, ready, archived, tags) in [
         (1, 'Ходить в парк', 1, 0, [301, 303]),
         (2, 'Ходить в парк', 0, 0, [301, 303]),
@@ -1217,7 +1218,7 @@ Future<void> _seedCatalog(AppDatabase database) =>
 
 /// Намерения новее каталога, отсечённые только исключённым «Спорт».
 Future<void> _seedExcludedMatches(AppDatabase database) =>
-    database.transaction(() async {
+    seedGraph(database, () async {
       for (final number in [11, 12, 13]) {
         await database.customStatement(
           '''INSERT INTO intentions
@@ -1236,7 +1237,7 @@ Future<void> _seedExcludedMatches(AppDatabase database) =>
 
 /// Намерения 20–39 со «Здоровьем»; нечётные отсечены исключённым «Спортом».
 Future<void> _seedWindowedArea(AppDatabase database) =>
-    database.transaction(() async {
+    seedGraph(database, () async {
       for (var number = 20; number <= 39; number++) {
         await database.customStatement(
           '''INSERT INTO intentions

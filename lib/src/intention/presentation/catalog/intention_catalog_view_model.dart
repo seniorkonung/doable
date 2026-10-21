@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../app/navigation/graph_generation.dart';
 import '../../../graph/application/graph_change.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_revision.dart';
@@ -28,10 +29,13 @@ part 'intention_catalog_view_model.g.dart';
 @riverpod
 final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   late IntentionCatalogPurpose _purpose;
-  IntentionScope _scope = IntentionCatalogSelection.initial.scope;
-  String _titleFilterText = IntentionCatalogSelection.initial.titleFilterText;
-  IntentionTagFilter _tagFilter = IntentionCatalogSelection.initial.tagFilter;
-  IntentionCatalogOrder _order = IntentionCatalogSelection.initial.order;
+
+  /// Поколение графа, для которого заданы параметры просмотра.
+  GraphGeneration? _graphGeneration;
+  late IntentionScope _scope;
+  late String _titleFilterText;
+  late IntentionTagFilter _tagFilter;
+  late IntentionCatalogOrder _order;
   IntentionCatalogFilterValidationFailure? _filterValidationFailure;
   CatalogPagingPolicy _policy = CatalogPagingPolicy.production;
   Timer? _filterTimer;
@@ -60,6 +64,14 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   @override
   Future<IntentionCatalogState> build(IntentionCatalogPurpose purpose) {
     _purpose = purpose;
+    // Новое поколение графа открывает каталог с начальными параметрами, как
+    // при запуске приложения, а другое перестроение, в том числе по смене
+    // параметров, их сохраняет.
+    final graphGeneration = ref.watch(currentGraphGenerationProvider);
+    if (graphGeneration != _graphGeneration) {
+      _graphGeneration = graphGeneration;
+      _resetParameters();
+    }
     _invalidatePageRequest();
     _isLoadingFirstPage = false;
     _packagesBeforeFirstPage.clear();
@@ -554,6 +566,17 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     _queryGeneration += 1;
     _activePageRequest = null;
     _areaReconciliation = null;
+  }
+
+  void _resetParameters() {
+    const initial = IntentionCatalogSelection.initial;
+    _scope = initial.scope;
+    _titleFilterText = initial.titleFilterText;
+    _tagFilter = initial.tagFilter;
+    _order = initial.order;
+    _filterValidationFailure = initial.filterValidationFailure;
+    _filterTimer?.cancel();
+    _isDebouncingFilter = false;
   }
 
   void _applyParametersImmediately() {

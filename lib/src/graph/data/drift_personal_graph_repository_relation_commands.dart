@@ -33,35 +33,23 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
     final commandType = _longTermRelationCommandDiagnosticsType(command);
 
     try {
-      final success = await _sequencer.run(() async {
-        final committed = await _database.transaction(
-          () => switch (command) {
-            CreateLongTermRelation() => _createLongTermRelation(command),
-            UpdateLongTermRelation() => _updateLongTermRelation(command),
-            ArchiveLongTermRelation() => _setLongTermRelationScope(
-              relationId: command.relationId,
-              scope: relation_domain.RelationScope.archived,
-            ),
-            RestoreLongTermRelation() => _setLongTermRelationScope(
-              relationId: command.relationId,
-              scope: relation_domain.RelationScope.active,
-            ),
-            DeleteLongTermRelation() => _deleteLongTermRelation(
-              command.relationId,
-            ),
-          },
-        );
-        if (committed.didMutate) {
-          _mutationSequence++;
-        }
-        final revision = _currentRevision;
-        final value = committed.toSuccess(revision);
-        final result = ConfirmedGraphResult(revision: revision, value: value);
-        if (committed.didMutate) {
-          _notifyGraphWatchersFor(value.changes);
-        }
-        return result;
-      });
+      final success = await _writeGraph<LongTermRelationCommandSuccess>(
+        (_) => switch (command) {
+          CreateLongTermRelation() => _createLongTermRelation(command),
+          UpdateLongTermRelation() => _updateLongTermRelation(command),
+          ArchiveLongTermRelation() => _setLongTermRelationScope(
+            relationId: command.relationId,
+            scope: relation_domain.RelationScope.archived,
+          ),
+          RestoreLongTermRelation() => _setLongTermRelationScope(
+            relationId: command.relationId,
+            scope: relation_domain.RelationScope.active,
+          ),
+          DeleteLongTermRelation() => _deleteLongTermRelation(
+            command.relationId,
+          ),
+        },
+      );
       _recordDiagnostics(
         LongTermRelationCommandDiagnosticsEvent(
           commandType: commandType,
@@ -278,7 +266,7 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
       throw _LongTermRelationNotFound(command.relationId);
     }
     final storedAfter = await _readStoredRelation(command.relationId);
-    if (storedAfter == null) throw const _StoredIntentionCorruption();
+    if (storedAfter == null) throw const StoredGraphCorruption();
     final verifiedAfter = storedAfter.toDomain();
     if (!_sameStoredRelation(
       before: after,
@@ -286,7 +274,7 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
       after: verifiedAfter,
       afterDescription: storedAfter.description,
     )) {
-      throw const _StoredIntentionCorruption();
+      throw const StoredGraphCorruption();
     }
     final affectedCounts = await _readVerifiedRelationCountsFor({
       before.sourceIntentionId,
@@ -360,7 +348,7 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
     }
 
     final storedAfter = await _readStoredRelation(relationId);
-    if (storedAfter == null) throw const _StoredIntentionCorruption();
+    if (storedAfter == null) throw const StoredGraphCorruption();
     final verifiedAfter = storedAfter.toDomain();
     if (!_sameStoredRelation(
       before: after,
@@ -368,7 +356,7 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
       after: verifiedAfter,
       afterDescription: storedAfter.description,
     )) {
-      throw const _StoredIntentionCorruption();
+      throw const StoredGraphCorruption();
     }
     final affectedCounts = await _readVerifiedRelationCountsFor({
       before.sourceIntentionId,
@@ -413,7 +401,7 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
     );
   }
 
-  Future<_StoredRelationGroupRow?> _readStoredRelation(
+  Future<StoredLongTermRelation?> _readStoredRelation(
     LongTermRelationId id,
   ) async {
     final row = await _database
@@ -435,7 +423,7 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
           readsFrom: {_database.longTermRelations},
         )
         .getSingleOrNull();
-    return row == null ? null : _StoredRelationGroupRow.fromRawRow(row);
+    return row == null ? null : StoredLongTermRelation.decode(row.data);
   }
 
   Future<void> _requireRelationParticipant(
@@ -451,11 +439,11 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
         )
         .getSingleOrNull();
     if (row == null) throw _LongTermRelationParticipantNotFound(role, id);
-    final archivedValue = row.data['is_archived'];
-    if (archivedValue is! int || (archivedValue != 0 && archivedValue != 1)) {
-      throw const _StoredIntentionCorruption();
-    }
-    if (mustBeActive && archivedValue == 1) {
+    final archiveState = decodeStoredIntentionArchiveState(
+      row.data,
+      'is_archived',
+    );
+    if (mustBeActive && archiveState == domain.IntentionArchiveState.archived) {
       throw _LongTermRelationParticipantArchived(role, id);
     }
   }
@@ -484,22 +472,13 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
         )
         .getSingleOrNull();
     if (row == null) return null;
-    final serializedId = row.data['id'];
-    if (serializedId is! String) throw const _StoredIntentionCorruption();
-    return switch (LongTermRelationId.decode(serializedId)) {
-      LongTermRelationIdDecodingSuccess(:final id) => id,
-      InvalidLongTermRelationIdDecoding() =>
-        throw const _StoredIntentionCorruption(),
-    };
+    return decodeStoredRelationId(requiredStoredString(row.data, 'id'));
   }
 }
 
-sealed class _CommittedLongTermRelationCommand {
+sealed class _CommittedLongTermRelationCommand
+    implements _GraphWrite<LongTermRelationCommandSuccess> {
   const _CommittedLongTermRelationCommand();
-
-  bool get didMutate;
-
-  LongTermRelationCommandSuccess toSuccess(GraphRevision revision);
 }
 
 final class _CommittedLongTermRelationCreation
@@ -651,7 +630,7 @@ LongTermRelationCommandFailure _classifyLongTermRelationCommandFailure(
       intentionId: id,
     );
   }
-  if (error is _StoredIntentionCorruption) {
+  if (error is StoredGraphCorruption) {
     return const LongTermRelationCorruptionFailure();
   }
 
@@ -659,6 +638,7 @@ LongTermRelationCommandFailure _classifyLongTermRelationCommandFailure(
     SqliteCorruptionFailure() => const LongTermRelationCorruptionFailure(),
     SqliteUnavailableFailure() => const LongTermRelationUnavailableFailure(),
     SqliteConstraintFailure() ||
+    SqliteStorageFullFailure() ||
     SqliteUnexpectedFailure() => const LongTermRelationUnexpectedFailure(),
   };
 }

@@ -19,6 +19,7 @@ import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 
@@ -54,10 +55,9 @@ void main() {
       requiredTagIds: [_tagId(firstTagNumber)],
       excludedTagIds: [_tagId(lastTagNumber)],
     );
-    test(
-      'продолжает выдачу при другом порядке и повторах тех же условий',
-      () async {
-        seedTagStorageFixture(raw);
+    test('продолжает выдачу при другом порядке и повторах тех же условий', () async {
+      seedTagStorageFixture(raw);
+      seedRawGraph(raw, () {
         raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
           _uuid(303),
           'Отдых',
@@ -68,45 +68,41 @@ void main() {
             [_uuid(303), _uuid(number)],
           );
         }
-        final first = _firstPage(
-          await repository.getCatalogPage(
-            _tagQuery(
-              tagFilter: IntentionTagFilter(
-                requiredTagIds: [_tagId(firstTagNumber), _tagId(303)],
-                excludedTagIds: [_tagId(lastTagNumber), _tagId(304)],
-              ),
-              excludedIntentionId: _id(_uuid(3)),
+      });
+      final first = _firstPage(
+        await repository.getCatalogPage(
+          _tagQuery(
+            tagFilter: IntentionTagFilter(
+              requiredTagIds: [_tagId(firstTagNumber), _tagId(303)],
+              excludedTagIds: [_tagId(lastTagNumber), _tagId(304)],
             ),
+            excludedIntentionId: _id(_uuid(3)),
           ),
-        );
-        expect(first.totalCount, 2);
-        expect(first.items.single.id, _id(_uuid(1)));
-        expect(first.nextCursor, isNotNull);
+        ),
+      );
+      expect(first.totalCount, 2);
+      expect(first.items.single.id, _id(_uuid(1)));
+      expect(first.nextCursor, isNotNull);
 
-        final next = _continuationPage(
-          await repository.getCatalogPage(
-            _tagQuery(
-              tagFilter: IntentionTagFilter(
-                requiredTagIds: [
-                  _tagId(303),
-                  _tagId(firstTagNumber),
-                  _tagId(303),
-                ],
-                excludedTagIds: [
-                  _tagId(304),
-                  _tagId(lastTagNumber),
-                  _tagId(304),
-                ],
-              ),
-              excludedIntentionId: _id(_uuid(3)),
-              cursor: first.nextCursor,
+      final next = _continuationPage(
+        await repository.getCatalogPage(
+          _tagQuery(
+            tagFilter: IntentionTagFilter(
+              requiredTagIds: [
+                _tagId(303),
+                _tagId(firstTagNumber),
+                _tagId(303),
+              ],
+              excludedTagIds: [_tagId(304), _tagId(lastTagNumber), _tagId(304)],
             ),
+            excludedIntentionId: _id(_uuid(3)),
+            cursor: first.nextCursor,
           ),
-        );
-        expect(next.items.single.id, _id(_uuid(2)));
-        expect(next.nextCursor, isNull);
-      },
-    );
+        ),
+      );
+      expect(next.items.single.id, _id(_uuid(2)));
+      expect(next.nextCursor, isNull);
+    });
 
     test(
       'переименование выбранного тега сохраняет совместимость курсора',
@@ -220,20 +216,22 @@ void main() {
 
     test('находит совпадение за пределами прежних ста строк', () async {
       raw.execute('BEGIN');
-      for (var number = 1; number <= 120; number++) {
+      seedRawGraph(raw, () {
+        for (var number = 1; number <= 120; number++) {
+          raw.execute(
+            'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)',
+            [_uuid(number), 'Гулять $number', number, number],
+          );
+        }
+        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+          _uuid(1000),
+          'Здоровье',
+        ]);
         raw.execute(
-          'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)',
-          [_uuid(number), 'Гулять $number', number, number],
+          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+          [_uuid(1000), _uuid(110)],
         );
-      }
-      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-        _uuid(1000),
-        'Здоровье',
-      ]);
-      raw.execute(
-        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-        [_uuid(1000), _uuid(110)],
-      );
+      });
       raw.execute('COMMIT');
       final oldPage = _firstPage(
         await repository.getCatalogPage(
@@ -337,22 +335,24 @@ void main() {
           createdAt: DateTime.utc(2026, 9, 2, number),
         );
       }
-      for (final (number, name) in [(101, 'Здоровье'), (102, 'Спорт')]) {
-        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-          _uuid(number),
-          name,
-        ]);
-      }
-      for (var number = 1; number <= 6; number++) {
+      seedRawGraph(raw, () {
+        for (final (number, name) in [(101, 'Здоровье'), (102, 'Спорт')]) {
+          raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+            _uuid(number),
+            name,
+          ]);
+        }
+        for (var number = 1; number <= 6; number++) {
+          raw.execute(
+            'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+            [_uuid(101), _uuid(number)],
+          );
+        }
         raw.execute(
           'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-          [_uuid(101), _uuid(number)],
+          [_uuid(102), _uuid(6)],
         );
-      }
-      raw.execute(
-        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-        [_uuid(102), _uuid(6)],
-      );
+      });
       final filter = IntentionTagFilter(
         requiredTagIds: [_tagId(101)],
         excludedTagIds: [_tagId(102)],
@@ -468,17 +468,16 @@ void main() {
       }
     });
 
-    test(
-      'чистые исключения допускают отсутствие тегов, пересечение даёт ноль',
-      () async {
-        for (var number = 1; number <= 4; number++) {
-          await _insertIntention(
-            database,
-            id: _uuid(number),
-            title: 'Намерение $number',
-            createdAt: DateTime.utc(2026, 9, 2, number),
-          );
-        }
+    test('чистые исключения допускают отсутствие тегов, пересечение даёт ноль', () async {
+      for (var number = 1; number <= 4; number++) {
+        await _insertIntention(
+          database,
+          id: _uuid(number),
+          title: 'Намерение $number',
+          createdAt: DateTime.utc(2026, 9, 2, number),
+        );
+      }
+      seedRawGraph(raw, () {
         for (final (number, name, intention) in [
           (101, 'Здоровье', 2),
           (102, 'Спорт', 3),
@@ -493,38 +492,38 @@ void main() {
             [_uuid(number), _uuid(intention)],
           );
         }
+      });
 
-        final exclusions = _firstPage(
-          await repository.getCatalogPage(
-            _tagQuery(
-              tagFilter: IntentionTagFilter(
-                excludedTagIds: [_tagId(102), _tagId(103)],
-              ),
-              pageSize: 100,
+      final exclusions = _firstPage(
+        await repository.getCatalogPage(
+          _tagQuery(
+            tagFilter: IntentionTagFilter(
+              excludedTagIds: [_tagId(102), _tagId(103)],
+            ),
+            pageSize: 100,
+          ),
+        ),
+      );
+      expect(exclusions.totalCount, 2);
+      expect(exclusions.items.map((item) => item.id), [
+        _id(_uuid(1)),
+        _id(_uuid(2)),
+      ]);
+      expect(exclusions.items.first.tags, isEmpty);
+      final impossible = _firstPage(
+        await repository.getCatalogPage(
+          _tagQuery(
+            tagFilter: IntentionTagFilter(
+              requiredTagIds: [_tagId(101)],
+              excludedTagIds: [_tagId(101)],
             ),
           ),
-        );
-        expect(exclusions.totalCount, 2);
-        expect(exclusions.items.map((item) => item.id), [
-          _id(_uuid(1)),
-          _id(_uuid(2)),
-        ]);
-        expect(exclusions.items.first.tags, isEmpty);
-        final impossible = _firstPage(
-          await repository.getCatalogPage(
-            _tagQuery(
-              tagFilter: IntentionTagFilter(
-                requiredTagIds: [_tagId(101)],
-                excludedTagIds: [_tagId(101)],
-              ),
-            ),
-          ),
-        );
-        expect(impossible.totalCount, 0);
-        expect(impossible.items, isEmpty);
-        expect(impossible.nextCursor, isNull);
-      },
-    );
+        ),
+      );
+      expect(impossible.totalCount, 0);
+      expect(impossible.items, isEmpty);
+      expect(impossible.nextCursor, isNull);
+    });
 
     test('удалённые идентификаторы сохраняют смысл после создания одноимённого тега', () async {
       seedTagStorageFixture(raw);
@@ -547,14 +546,16 @@ void main() {
         await repository.execute(DeleteTag(_tagId(firstTagNumber))),
         isA<GraphCommandSucceeded>(),
       );
-      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-        _uuid(9000),
-        'Дом',
-      ]);
-      raw.execute(
-        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-        [_uuid(9000), _uuid(1)],
-      );
+      seedRawGraph(raw, () {
+        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+          _uuid(9000),
+          'Дом',
+        ]);
+        raw.execute(
+          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+          [_uuid(9000), _uuid(1)],
+        );
+      });
 
       final missingRequired = _firstPage(
         await repository.getCatalogPage(required),
@@ -578,123 +579,128 @@ void main() {
       expect(excluded.tagFilter.excludedTagIds, {_tagId(firstTagNumber)});
     });
 
-    test('применяет название и все собственные теги до количества и порции', () async {
-      for (final (number, title) in [
-        (1, 'Ходить в парк'),
-        (2, 'Ходить до магазина'),
-        (3, 'Ходить в зал'),
-        (4, 'Читать в тишине'),
-        (5, 'Ходить с семьёй'),
-        (6, 'Ходить на работу'),
-      ]) {
-        await _insertIntention(
-          database,
-          id: _uuid(number),
-          title: title,
-          createdAt: DateTime.utc(2026, 9, 2, number),
-        );
-      }
-      for (final (number, name) in [
-        (101, 'Здоровье'),
-        (102, 'Отдых'),
-        (103, 'Спорт'),
-        (104, 'Работа'),
-      ]) {
-        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-          _uuid(number),
-          name,
-        ]);
-      }
-      for (final (intention, tags) in [
-        (1, [101, 102]),
-        (2, [101]),
-        (3, [101, 102, 103]),
-        (4, [101, 102]),
-        (6, [101, 102, 104]),
-      ]) {
-        for (final tag in tags) {
-          raw.execute(
-            'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-            [_uuid(tag), _uuid(intention)],
+    test(
+      'применяет название и все собственные теги до количества и порции',
+      () async {
+        for (final (number, title) in [
+          (1, 'Ходить в парк'),
+          (2, 'Ходить до магазина'),
+          (3, 'Ходить в зал'),
+          (4, 'Читать в тишине'),
+          (5, 'Ходить с семьёй'),
+          (6, 'Ходить на работу'),
+        ]) {
+          await _insertIntention(
+            database,
+            id: _uuid(number),
+            title: title,
+            createdAt: DateTime.utc(2026, 9, 2, number),
           );
         }
-      }
-      raw.execute(
-        'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority) VALUES (?, ?, ?, ?, ?)',
-        [_uuid(500), _uuid(1), _uuid(5), 'need', 2],
-      );
-      final filter = IntentionTagFilter(
-        requiredTagIds: [_tagId(101), _tagId(102)],
-        excludedTagIds: [_tagId(103), _tagId(104)],
-      );
-      final before = raw
-          .select('SELECT * FROM intentions ORDER BY id')
-          .map((row) => Map.of(row))
-          .toList();
-      final revision = _firstPage(
-        await repository.getCatalogPage(
-          IntentionCatalogQuery(
-            scope: IntentionScope.all,
-            titleFilter: null,
-            order: IntentionCatalogOrder.createdAtAscending,
-            pageSize: 1,
-          ),
-        ),
-      ).revision;
-
-      final page = _firstPage(
-        await repository.getCatalogPage(
-          IntentionCatalogQuery(
-            scope: IntentionScope.all,
-            titleFilter: '  ХОДИТЬ  ',
-            tagFilter: filter,
-            order: IntentionCatalogOrder.createdAtAscending,
-            pageSize: 1,
-          ),
-        ),
-      );
-
-      expect(page.totalCount, 1);
-      expect(page.items.map((item) => item.id), [_id(_uuid(1))]);
-      expect(page.items.single.tags.map((tag) => tag.id), [
-        _tagId(101),
-        _tagId(102),
-      ]);
-      expect(page.nextCursor, isNull);
-      final tagsOnlyQuery = IntentionCatalogQuery(
-        scope: IntentionScope.all,
-        titleFilter: null,
-        tagFilter: filter,
-        order: IntentionCatalogOrder.createdAtAscending,
-        pageSize: 1,
-      );
-      final tagsOnly = _firstPage(
-        await repository.getCatalogPage(tagsOnlyQuery),
-      );
-      expect(tagsOnly.totalCount, 2);
-      expect(tagsOnly.items.map((item) => item.id), [_id(_uuid(1))]);
-      final continuation = _continuationPage(
-        await repository.getCatalogPage(
-          IntentionCatalogQuery(
-            scope: tagsOnlyQuery.scope,
-            titleFilter: null,
-            tagFilter: filter,
-            order: tagsOnlyQuery.order,
-            pageSize: 1,
-            cursor: tagsOnly.nextCursor,
-          ),
-        ),
-      );
-      expect(continuation.items.map((item) => item.id), [_id(_uuid(4))]);
-      expect(continuation.nextCursor, isNull);
-      expect(page.revision.compareTo(revision), GraphRevisionOrder.same);
-      expect(
-        raw
+        seedRawGraph(raw, () {
+          for (final (number, name) in [
+            (101, 'Здоровье'),
+            (102, 'Отдых'),
+            (103, 'Спорт'),
+            (104, 'Работа'),
+          ]) {
+            raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+              _uuid(number),
+              name,
+            ]);
+          }
+          for (final (intention, tags) in [
+            (1, [101, 102]),
+            (2, [101]),
+            (3, [101, 102, 103]),
+            (4, [101, 102]),
+            (6, [101, 102, 104]),
+          ]) {
+            for (final tag in tags) {
+              raw.execute(
+                'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+                [_uuid(tag), _uuid(intention)],
+              );
+            }
+          }
+          raw.execute(
+            'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority) VALUES (?, ?, ?, ?, ?)',
+            [_uuid(500), _uuid(1), _uuid(5), 'need', 2],
+          );
+        });
+        final filter = IntentionTagFilter(
+          requiredTagIds: [_tagId(101), _tagId(102)],
+          excludedTagIds: [_tagId(103), _tagId(104)],
+        );
+        final before = raw
             .select('SELECT * FROM intentions ORDER BY id')
-            .map((row) => Map.of(row)),
-        before,
-      );
-    });
+            .map((row) => Map.of(row))
+            .toList();
+        final revision = _firstPage(
+          await repository.getCatalogPage(
+            IntentionCatalogQuery(
+              scope: IntentionScope.all,
+              titleFilter: null,
+              order: IntentionCatalogOrder.createdAtAscending,
+              pageSize: 1,
+            ),
+          ),
+        ).revision;
+
+        final page = _firstPage(
+          await repository.getCatalogPage(
+            IntentionCatalogQuery(
+              scope: IntentionScope.all,
+              titleFilter: '  ХОДИТЬ  ',
+              tagFilter: filter,
+              order: IntentionCatalogOrder.createdAtAscending,
+              pageSize: 1,
+            ),
+          ),
+        );
+
+        expect(page.totalCount, 1);
+        expect(page.items.map((item) => item.id), [_id(_uuid(1))]);
+        expect(page.items.single.tags.map((tag) => tag.id), [
+          _tagId(101),
+          _tagId(102),
+        ]);
+        expect(page.nextCursor, isNull);
+        final tagsOnlyQuery = IntentionCatalogQuery(
+          scope: IntentionScope.all,
+          titleFilter: null,
+          tagFilter: filter,
+          order: IntentionCatalogOrder.createdAtAscending,
+          pageSize: 1,
+        );
+        final tagsOnly = _firstPage(
+          await repository.getCatalogPage(tagsOnlyQuery),
+        );
+        expect(tagsOnly.totalCount, 2);
+        expect(tagsOnly.items.map((item) => item.id), [_id(_uuid(1))]);
+        final continuation = _continuationPage(
+          await repository.getCatalogPage(
+            IntentionCatalogQuery(
+              scope: tagsOnlyQuery.scope,
+              titleFilter: null,
+              tagFilter: filter,
+              order: tagsOnlyQuery.order,
+              pageSize: 1,
+              cursor: tagsOnly.nextCursor,
+            ),
+          ),
+        );
+        expect(continuation.items.map((item) => item.id), [_id(_uuid(4))]);
+        expect(continuation.nextCursor, isNull);
+        expect(page.revision.compareTo(revision), GraphRevisionOrder.same);
+        expect(
+          raw
+              .select('SELECT * FROM intentions ORDER BY id')
+              .map((row) => Map.of(row)),
+          before,
+        );
+      },
+    );
 
     test('отбирает по собственным назначениям без влияния тегов связанных намерений', () async {
       // Номер намерения → (название, в архиве, собственные теги).
@@ -718,36 +724,45 @@ void main() {
           createdAt: DateTime.utc(2026, 9, 2, number),
         );
       }
-      for (final (number, name) in [
-        (101, 'Здоровье'),
-        (102, 'Отдых'),
-        (103, 'Работа'),
-      ]) {
-        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-          _uuid(number),
-          name,
-        ]);
-      }
-      for (final MapEntry(key: number, value: (_, _, tags))
-          in intentions.entries) {
-        for (final tag in tags) {
+      seedRawGraph(raw, () {
+        for (final (number, name) in [
+          (101, 'Здоровье'),
+          (102, 'Отдых'),
+          (103, 'Работа'),
+        ]) {
+          raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+            _uuid(number),
+            name,
+          ]);
+        }
+        for (final MapEntry(key: number, value: (_, _, tags))
+            in intentions.entries) {
+          for (final tag in tags) {
+            raw.execute(
+              'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+              [_uuid(tag), _uuid(number)],
+            );
+          }
+        }
+        // Связи с помеченными соседями не дают намерению собственных назначений.
+        for (final (relation, source, related, archived) in [
+          (500, 4, 1, 0),
+          (501, 2, 3, 0),
+          (502, 8, 7, 1),
+        ]) {
           raw.execute(
-            'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-            [_uuid(tag), _uuid(number)],
+            'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
+            [
+              _uuid(relation),
+              _uuid(source),
+              _uuid(related),
+              'need',
+              2,
+              archived,
+            ],
           );
         }
-      }
-      // Связи с помеченными соседями не дают намерению собственных назначений.
-      for (final (relation, source, related, archived) in [
-        (500, 4, 1, 0),
-        (501, 2, 3, 0),
-        (502, 8, 7, 1),
-      ]) {
-        raw.execute(
-          'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
-          [_uuid(relation), _uuid(source), _uuid(related), 'need', 2, archived],
-        );
-      }
+      });
       // Тег 900 никогда не существовал либо физически удалён вместе с
       // назначениями: хранилище не содержит ни его, ни ссылок на него.
       final filters = [
@@ -822,13 +837,14 @@ void main() {
       const requiredTag = 1001;
       const excludedTag = 1002;
       const pageSize = 100;
-      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?), (?, ?)', [
-        _uuid(requiredTag),
-        'Обязательный',
-        _uuid(excludedTag),
-        'Исключённый',
-      ]);
-      raw.execute('''
+      seedRawGraph(raw, () {
+        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?), (?, ?)', [
+          _uuid(requiredTag),
+          'Обязательный',
+          _uuid(excludedTag),
+          'Исключённый',
+        ]);
+        raw.execute('''
         WITH RECURSIVE ids(n) AS (
           VALUES(1) UNION ALL SELECT n + 1 FROM ids WHERE n < 50000
         )
@@ -837,16 +853,17 @@ void main() {
         SELECT printf('018f0b5d-6b2e-7c80-8000-%012x', n),
                'Запись ' || n, 0, n % 2, n, n FROM ids
       ''');
-      raw.execute(
-        'INSERT INTO tag_assignments (tag_id, intention_id) '
-        'SELECT ?, id FROM intentions',
-        [_uuid(requiredTag)],
-      );
-      raw.execute(
-        'INSERT INTO tag_assignments (tag_id, intention_id) '
-        'SELECT ?, id FROM intentions WHERE created_at % 10 = 0',
-        [_uuid(excludedTag)],
-      );
+        raw.execute(
+          'INSERT INTO tag_assignments (tag_id, intention_id) '
+          'SELECT ?, id FROM intentions',
+          [_uuid(requiredTag)],
+        );
+        raw.execute(
+          'INSERT INTO tag_assignments (tag_id, intention_id) '
+          'SELECT ?, id FROM intentions WHERE created_at % 10 = 0',
+          [_uuid(excludedTag)],
+        );
+      });
 
       // Вид условий по тегам, охват и режим фильтра названия независимы:
       // три случая проходят каждое значение каждого измерения. Двухсимвольный
@@ -918,17 +935,16 @@ void main() {
   });
 
   group('Порция каталога — собственные теги', () {
-    test(
-      'показывает собственные теги возвращаемых одноимённых намерений',
-      () async {
-        for (var number = 1; number <= 4; number++) {
-          await _insertIntention(
-            database,
-            id: _uuid(number),
-            title: 'Гулять',
-            createdAt: DateTime.utc(2026, 9, 2, number),
-          );
-        }
+    test('показывает собственные теги возвращаемых одноимённых намерений', () async {
+      for (var number = 1; number <= 4; number++) {
+        await _insertIntention(
+          database,
+          id: _uuid(number),
+          title: 'Гулять',
+          createdAt: DateTime.utc(2026, 9, 2, number),
+        );
+      }
+      seedRawGraph(raw, () {
         for (final (number, name) in [
           (110, 'Здоровье'),
           (109, 'Отдых'),
@@ -953,47 +969,44 @@ void main() {
           'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
           [_uuid(109), _uuid(4)],
         );
+      });
 
-        final page = _firstPage(
-          await repository.getCatalogPage(
-            IntentionCatalogQuery(
-              scope: IntentionScope.all,
-              titleFilter: null,
-              order: IntentionCatalogOrder.createdAtAscending,
-              pageSize: 3,
-            ),
+      final page = _firstPage(
+        await repository.getCatalogPage(
+          IntentionCatalogQuery(
+            scope: IntentionScope.all,
+            titleFilter: null,
+            order: IntentionCatalogOrder.createdAtAscending,
+            pageSize: 3,
           ),
-        );
+        ),
+      );
 
-        expect(page.totalCount, 4);
-        expect(page.nextCursor, isNotNull);
-        expect(page.items.map((item) => item.id), [
-          _id(_uuid(1)),
-          _id(_uuid(2)),
-          _id(_uuid(3)),
-        ]);
-        expect(
-          page.items.map((item) => item.tags.map((tag) => tag.name.value)),
-          [
-            ['Здоровье', 'Отдых'],
-            ['Семья'],
-            <String>[],
-          ],
-        );
-        expect(page.items.first.activeRelationCount, 1);
-        final assignments = (await repository.getTagAssignments(
-          page.items.first.id,
-        ) as TagAssignmentsSuccess).value;
-        expect(
-          page.items.first.tags.map((tag) => tag.id),
-          assignments.items.map((tag) => tag.id),
-        );
-        expect(
-          page.revision.compareTo(assignments.revision),
-          GraphRevisionOrder.same,
-        );
-      },
-    );
+      expect(page.totalCount, 4);
+      expect(page.nextCursor, isNotNull);
+      expect(page.items.map((item) => item.id), [
+        _id(_uuid(1)),
+        _id(_uuid(2)),
+        _id(_uuid(3)),
+      ]);
+      expect(page.items.map((item) => item.tags.map((tag) => tag.name.value)), [
+        ['Здоровье', 'Отдых'],
+        ['Семья'],
+        <String>[],
+      ]);
+      expect(page.items.first.activeRelationCount, 1);
+      final assignments = (await repository.getTagAssignments(
+        page.items.first.id,
+      ) as TagAssignmentsSuccess).value;
+      expect(
+        page.items.first.tags.map((tag) => tag.id),
+        assignments.items.map((tag) => tag.id),
+      );
+      expect(
+        page.revision.compareTo(assignments.revision),
+        GraphRevisionOrder.same,
+      );
+    });
 
     test(
       'продолжение получает все 1203 назначения независимо от размера порции',
@@ -1055,76 +1068,55 @@ void main() {
       },
     );
 
-    // По одному случаю на проверку чтения: начальный BOM и разбор
-    // идентификатора. Прочие варианты проходят те же проверки.
-    for (final (label, corrupt) in <(String, void Function(Database))>[
-      (
-        'начальный BOM в идентификаторе тега',
-        (connection) {
-          final tagId = '\ufeff${_uuid(440)}';
-          connection.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-            tagId,
-            'Тег с повреждённым идентификатором',
+    // Один случай на разбор идентификатора: прочие варианты проходят ту же
+    // проверку.
+    test('отклоняет всю порцию: неверный идентификатор тега после сотого назначения', () async {
+      seedTagStorageFixture(raw);
+      seedRawGraph(raw, () {
+        for (var number = 303; number <= 439; number++) {
+          raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+            _uuid(number),
+            'Тег $number',
           ]);
-          connection.execute(
+          raw.execute(
             'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-            [tagId, _uuid(1)],
+            [_uuid(number), _uuid(1)],
           );
-        },
-      ),
-      (
-        'неверный идентификатор тега после сотого назначения',
-        (connection) {
-          for (var number = 303; number <= 439; number++) {
-            connection.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-              _uuid(number),
-              'Тег $number',
-            ]);
-            connection.execute(
-              'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-              [_uuid(number), _uuid(1)],
-            );
-          }
-          connection.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-            'некорректный идентификатор',
-            'Последний тег',
-          ]);
-          connection.execute(
-            'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-            ['некорректный идентификатор', _uuid(1)],
-          );
-        },
-      ),
-    ]) {
-      test('отклоняет всю порцию: $label', () async {
-        seedTagStorageFixture(raw);
-        corrupt(raw);
-
-        expect(
-          await repository.getCatalogPage(
-            IntentionCatalogQuery(
-              scope: IntentionScope.all,
-              titleFilter: null,
-              order: IntentionCatalogOrder.createdAtAscending,
-              pageSize: 3,
-            ),
-          ),
-          isA<ResultFailure<IntentionCatalogPage>>().having(
-            (result) => result.failure,
-            'причина',
-            isA<IntentionCorruptionFailure>(),
-          ),
-        );
-        expect(
-          await repository.getTagAssignments(_id(_uuid(1))),
-          isA<TagAssignmentsError>().having(
-            (result) => result.failure,
-            'причина',
-            isA<TagAssignmentsCorruptionFailure>(),
-          ),
+        }
+        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+          'некорректный идентификатор',
+          'Последний тег',
+        ]);
+        raw.execute(
+          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+          ['некорректный идентификатор', _uuid(1)],
         );
       });
-    }
+
+      expect(
+        await repository.getCatalogPage(
+          IntentionCatalogQuery(
+            scope: IntentionScope.all,
+            titleFilter: null,
+            order: IntentionCatalogOrder.createdAtAscending,
+            pageSize: 3,
+          ),
+        ),
+        isA<ResultFailure<IntentionCatalogPage>>().having(
+          (result) => result.failure,
+          'причина',
+          isA<IntentionCorruptionFailure>(),
+        ),
+      );
+      expect(
+        await repository.getTagAssignments(_id(_uuid(1))),
+        isA<TagAssignmentsError>().having(
+          (result) => result.failure,
+          'причина',
+          isA<TagAssignmentsCorruptionFailure>(),
+        ),
+      );
+    });
   });
 
   test('отбирает действия до порции и считает только совпадения', () async {
@@ -1204,7 +1196,9 @@ void main() {
   });
 
   test('читает только порцию и количество при редкой готовности в большом каталоге', () async {
-    await database.customStatement('''
+    await seedGraph(
+      database,
+      () => database.customStatement('''
       WITH RECURSIVE ids(n) AS (
         VALUES(1) UNION ALL SELECT n + 1 FROM ids WHERE n < 3000
       )
@@ -1212,7 +1206,8 @@ void main() {
         (id, title, is_action_ready, is_archived, created_at, updated_at)
       SELECT printf('018f0b5d-6b2e-7c80-8000-%012x', n),
              'Действие %_ ' || n, n % 1000 = 0, 0, n, n FROM ids
-    ''');
+    '''),
+    );
     final query = IntentionCatalogQuery(
       scope: IntentionScope.active,
       readinessFilter: IntentionReadinessFilter.readyOnly,
@@ -1585,9 +1580,12 @@ void main() {
 
       for (final description in const ['', ' \t\r\n ']) {
         await expectLater(
-          database.customStatement(
-            'UPDATE intentions SET description = ? WHERE id = ?',
-            [description, id],
+          seedGraph(
+            database,
+            () => database.customStatement(
+              'UPDATE intentions SET description = ? WHERE id = ?',
+              [description, id],
+            ),
           ),
           throwsA(isA<SqliteException>()),
         );
@@ -1682,9 +1680,12 @@ void main() {
         isNot(contains(description)),
         reason: 'описание $index',
       );
-      await database.customStatement('DELETE FROM intentions WHERE id = ?', [
-        id,
-      ]);
+      await seedGraph(
+        database,
+        () => database.customStatement('DELETE FROM intentions WHERE id = ?', [
+          id,
+        ]),
+      );
     }
   });
 
@@ -1970,10 +1971,15 @@ void main() {
       );
       final cursor = _firstPage(await repository.getCatalogPage(query))
           .nextCursor!;
-      await (database.delete(database.intentions)..where(
-            (row) => row.id.equals('018f0b5d-6b2e-7c80-8000-000000000062'),
-          ))
-          .go();
+      await seedGraph(
+        database,
+        () =>
+            (database.delete(database.intentions)..where(
+                  (row) =>
+                      row.id.equals('018f0b5d-6b2e-7c80-8000-000000000062'),
+                ))
+                .go(),
+      );
       await _insertIntention(
         database,
         id: '018f0b5d-6b2e-7c80-8000-000000000060',
@@ -2609,42 +2615,44 @@ void _expectReadsBoundedByPage(
 
 void _seedJointCatalogPagingFixture(Database database) {
   database.execute('BEGIN');
-  for (final (number, name) in [
-    (1001, 'Здоровье'),
-    (1002, 'Отдых'),
-    (1003, 'Спорт'),
-    (1004, 'Работа'),
-  ]) {
-    database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-      _uuid(number),
-      name,
-    ]);
-  }
-  for (var number = 1; number <= 285; number++) {
-    database.execute(
-      'INSERT INTO intentions '
-      '(id, title, is_action_ready, is_archived, created_at, updated_at) '
-      'VALUES (?, ?, ?, ?, ?, ?)',
-      [
-        _uuid(number),
-        number >= 256 && number <= 265 ? 'Читать' : 'Гулять',
-        number < 276 ? 1 : 0,
-        number >= 266 && number <= 275 ? 1 : 0,
-        100 + (number - 1) ~/ 120,
-        300 - (number - 1) ~/ 80,
-      ],
-    );
-    for (final tag in [
-      1001,
-      if (number < 246 || number > 255) 1002,
-      if (number >= 237 && number <= 245) number.isOdd ? 1003 : 1004,
+  seedRawGraph(database, () {
+    for (final (number, name) in [
+      (1001, 'Здоровье'),
+      (1002, 'Отдых'),
+      (1003, 'Спорт'),
+      (1004, 'Работа'),
     ]) {
-      database.execute(
-        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-        [_uuid(tag), _uuid(number)],
-      );
+      database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        _uuid(number),
+        name,
+      ]);
     }
-  }
+    for (var number = 1; number <= 285; number++) {
+      database.execute(
+        'INSERT INTO intentions '
+        '(id, title, is_action_ready, is_archived, created_at, updated_at) '
+        'VALUES (?, ?, ?, ?, ?, ?)',
+        [
+          _uuid(number),
+          number >= 256 && number <= 265 ? 'Читать' : 'Гулять',
+          number < 276 ? 1 : 0,
+          number >= 266 && number <= 275 ? 1 : 0,
+          100 + (number - 1) ~/ 120,
+          300 - (number - 1) ~/ 80,
+        ],
+      );
+      for (final tag in [
+        1001,
+        if (number < 246 || number > 255) 1002,
+        if (number >= 237 && number <= 245) number.isOdd ? 1003 : 1004,
+      ]) {
+        database.execute(
+          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+          [_uuid(tag), _uuid(number)],
+        );
+      }
+    }
+  });
   database.execute('COMMIT');
 }
 
@@ -2657,19 +2665,22 @@ Future<void> _insertIntention(
   bool isArchived = false,
   required DateTime createdAt,
   DateTime? updatedAt,
-}) => database
-    .into(database.intentions)
-    .insert(
-      IntentionsCompanion.insert(
-        id: id,
-        title: title,
-        description: Value(description),
-        isActionReady: Value(isActionReady),
-        isArchived: Value(isArchived),
-        createdAt: createdAt.microsecondsSinceEpoch,
-        updatedAt: (updatedAt ?? createdAt).microsecondsSinceEpoch,
+}) => seedGraph(
+  database,
+  () => database
+      .into(database.intentions)
+      .insert(
+        IntentionsCompanion.insert(
+          id: id,
+          title: title,
+          description: Value(description),
+          isActionReady: Value(isActionReady),
+          isArchived: Value(isArchived),
+          createdAt: createdAt.microsecondsSinceEpoch,
+          updatedAt: (updatedAt ?? createdAt).microsecondsSinceEpoch,
+        ),
       ),
-    );
+);
 
 Future<void> _insertRawIntention(
   AppDatabase database, {
@@ -2677,18 +2688,21 @@ Future<void> _insertRawIntention(
   required String title,
   required Object description,
   required DateTime createdAt,
-}) => database.customStatement(
-  '''
+}) => seedGraph(
+  database,
+  () => database.customStatement(
+    '''
     INSERT INTO intentions (id, title, description, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?)
   ''',
-  [
-    id,
-    title,
-    description,
-    createdAt.microsecondsSinceEpoch,
-    createdAt.microsecondsSinceEpoch,
-  ],
+    [
+      id,
+      title,
+      description,
+      createdAt.microsecondsSinceEpoch,
+      createdAt.microsecondsSinceEpoch,
+    ],
+  ),
 );
 
 IntentionId _id(String value) => switch (IntentionId.decode(value)) {
@@ -2744,33 +2758,35 @@ IntentionCatalogContinuationPage _continuationPage(
 /// шестому и восьмому, у которых есть и исключаемый тег.
 void _seedReconciliationFixture(Database database) {
   database.execute('BEGIN');
-  for (final (number, name) in [
-    (1101, 'Спорт'),
-    (1102, 'Здоровье'),
-    (1103, 'Отдых'),
-  ]) {
-    database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-      _uuid(number),
-      name,
-    ]);
-  }
-  for (var number = 1; number <= 10; number++) {
-    database.execute(
-      'INSERT INTO intentions (id, title, created_at, updated_at) '
-      'VALUES (?, ?, ?, ?)',
-      [_uuid(number), 'Намерение $number', 100 + number, 200 + number],
-    );
-    for (final tag in [
-      if (number.isEven) 1101,
-      if (number == 2 || number == 3) 1102,
-      if (number == 4 || number == 6 || number == 8) 1103,
+  seedRawGraph(database, () {
+    for (final (number, name) in [
+      (1101, 'Спорт'),
+      (1102, 'Здоровье'),
+      (1103, 'Отдых'),
     ]) {
-      database.execute(
-        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-        [_uuid(tag), _uuid(number)],
-      );
+      database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        _uuid(number),
+        name,
+      ]);
     }
-  }
+    for (var number = 1; number <= 10; number++) {
+      database.execute(
+        'INSERT INTO intentions (id, title, created_at, updated_at) '
+        'VALUES (?, ?, ?, ?)',
+        [_uuid(number), 'Намерение $number', 100 + number, 200 + number],
+      );
+      for (final tag in [
+        if (number.isEven) 1101,
+        if (number == 2 || number == 3) 1102,
+        if (number == 4 || number == 6 || number == 8) 1103,
+      ]) {
+        database.execute(
+          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+          [_uuid(tag), _uuid(number)],
+        );
+      }
+    }
+  });
   database.execute('COMMIT');
 }
 

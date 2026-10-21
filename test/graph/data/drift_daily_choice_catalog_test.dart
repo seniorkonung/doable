@@ -13,6 +13,7 @@ import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 
 String _uuid(int number) =>
@@ -34,39 +35,41 @@ void main() {
       () => DateTime.utc(2026, 9, 23),
       diagnostics,
     );
-    for (final number in [1, 2, 3]) {
-      raw.execute(
-        '''INSERT INTO intentions
+    seedRawGraph(raw, () {
+      for (final number in [1, 2, 3]) {
+        raw.execute(
+          '''INSERT INTO intentions
            (id, title, description, is_action_ready, is_archived,
             created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, 1, 1)''',
-        [
-          _uuid(number),
-          'Намерение $number',
-          'Описание $number',
-          number == 3 ? 0 : 1,
-          number == 2 ? 1 : 0,
-        ],
-      );
-    }
-    for (final (number, source, target, archived) in [
-      (101, 1, 2, 1),
-      (102, 2, 3, 1),
-    ]) {
-      raw.execute(
-        '''INSERT INTO long_term_relations
+          [
+            _uuid(number),
+            'Намерение $number',
+            'Описание $number',
+            number == 3 ? 0 : 1,
+            number == 2 ? 1 : 0,
+          ],
+        );
+      }
+      for (final (number, source, target, archived) in [
+        (101, 1, 2, 1),
+        (102, 2, 3, 1),
+      ]) {
+        raw.execute(
+          '''INSERT INTO long_term_relations
            (id, source_intention_id, related_intention_id, type, priority,
             description, is_archived)
            VALUES (?, ?, ?, 'need', 2, ?, ?)''',
-        [
-          _uuid(number),
-          _uuid(source),
-          _uuid(target),
-          'Описание связи $number',
-          archived,
-        ],
-      );
-    }
+          [
+            _uuid(number),
+            _uuid(source),
+            _uuid(target),
+            'Описание связи $number',
+            archived,
+          ],
+        );
+      }
+    });
   });
   tearDown(() => database.close());
 
@@ -79,36 +82,43 @@ void main() {
     int? scheduledMinute,
     int priority = 4,
   }) {
-    raw.execute(
-      '''INSERT INTO daily_choices
+    seedRawGraph(raw, () {
+      raw.execute(
+        '''INSERT INTO daily_choices
          (id, source_intention_id, selected_intention_id, choice_date,
           description, is_completed, scheduled_minute, priority)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
-      [
-        _uuid(number),
-        _uuid(1),
-        _uuid(longPath ? 3 : 2),
-        date,
-        description,
-        completed,
-        scheduledMinute,
-        priority,
-      ],
-    );
-    raw.execute(
-      '''INSERT INTO daily_choice_path_steps
-         (id, daily_choice_id, long_term_relation_id, previous_step_id)
-         VALUES (?, ?, ?, NULL)''',
-      [_uuid(number + 1000), _uuid(number), _uuid(101)],
-    );
-    if (longPath) {
+        [
+          _uuid(number),
+          _uuid(1),
+          _uuid(longPath ? 3 : 2),
+          date,
+          description,
+          completed,
+          scheduledMinute,
+          priority,
+        ],
+      );
       raw.execute(
         '''INSERT INTO daily_choice_path_steps
+         (id, daily_choice_id, long_term_relation_id, previous_step_id)
+         VALUES (?, ?, ?, NULL)''',
+        [_uuid(number + 1000), _uuid(number), _uuid(101)],
+      );
+      if (longPath) {
+        raw.execute(
+          '''INSERT INTO daily_choice_path_steps
            (id, daily_choice_id, long_term_relation_id, previous_step_id)
            VALUES (?, ?, ?, ?)''',
-        [_uuid(number + 2000), _uuid(number), _uuid(102), _uuid(number + 1000)],
-      );
-    }
+          [
+            _uuid(number + 2000),
+            _uuid(number),
+            _uuid(102),
+            _uuid(number + 1000),
+          ],
+        );
+      }
+    });
   }
 
   DailyChoiceCatalogPage page(DailyChoiceCatalogPageResult result) =>
@@ -125,28 +135,30 @@ void main() {
         scheduledMinute: 18 * 60,
         priority: 2,
       );
-      raw.execute(
-        '''INSERT INTO intentions
+      seedRawGraph(raw, () {
+        raw.execute(
+          '''INSERT INTO intentions
       (id, title, is_action_ready, is_archived, created_at, updated_at)
       VALUES (?, 'Конечное действие', 1, 0, 1, 1)''',
-        [_uuid(4)],
-      );
-      raw.execute(
-        '''INSERT INTO long_term_relations
+          [_uuid(4)],
+        );
+        raw.execute(
+          '''INSERT INTO long_term_relations
       (id, source_intention_id, related_intention_id, type, priority, is_archived)
       VALUES (?, ?, ?, 'can', 1, 0)''',
-        [_uuid(103), _uuid(3), _uuid(4)],
-      );
-      raw.execute(
-        '''INSERT INTO daily_choice_path_steps
+          [_uuid(103), _uuid(3), _uuid(4)],
+        );
+        raw.execute(
+          '''INSERT INTO daily_choice_path_steps
       (id, daily_choice_id, long_term_relation_id, previous_step_id)
       VALUES (?, ?, ?, ?)''',
-        [_uuid(3201), _uuid(201), _uuid(103), _uuid(2201)],
-      );
-      raw.execute(
-        'UPDATE daily_choices SET selected_intention_id = ? WHERE id = ?',
-        [_uuid(4), _uuid(201)],
-      );
+          [_uuid(3201), _uuid(201), _uuid(103), _uuid(2201)],
+        );
+        raw.execute(
+          'UPDATE daily_choices SET selected_intention_id = ? WHERE id = ?',
+          [_uuid(4), _uuid(201)],
+        );
+      });
       addChoice(202, description: null, scheduledMinute: 0, priority: 1);
       addChoice(203);
 
@@ -234,10 +246,12 @@ void main() {
     final day = CalendarDate.fromParts(2026, 9, 23);
     addChoice(201, longPath: true);
     addChoice(202);
-    raw.execute(
-      'DELETE FROM daily_choice_path_steps WHERE daily_choice_id = ?',
-      [_uuid(202)],
-    );
+    seedRawGraph(raw, () {
+      raw.execute(
+        'DELETE FROM daily_choice_path_steps WHERE daily_choice_id = ?',
+        [_uuid(202)],
+      );
+    });
     final first = page(
       await repository.getDailyChoiceCatalogPage(
         DailyChoiceCatalogQuery(date: day, isCompleted: false, pageSize: 1),
@@ -522,10 +536,12 @@ void main() {
   test('повреждение одного выбранного пути отклоняет целую порцию', () async {
     addChoice(201);
     addChoice(202);
-    raw.execute(
-      'DELETE FROM daily_choice_path_steps WHERE daily_choice_id = ?',
-      [_uuid(201)],
-    );
+    seedRawGraph(raw, () {
+      raw.execute(
+        'DELETE FROM daily_choice_path_steps WHERE daily_choice_id = ?',
+        [_uuid(201)],
+      );
+    });
     final result = await repository.getDailyChoiceCatalogPage(
       DailyChoiceCatalogQuery(
         date: CalendarDate.fromParts(2026, 9, 23),
@@ -554,41 +570,43 @@ void main() {
 
   test('принимает путь длиннее одной SQL-порции ссылок', () async {
     const length = 405;
-    for (var number = 4; number <= length + 1; number++) {
-      raw.execute(
-        '''INSERT INTO intentions
+    seedRawGraph(raw, () {
+      for (var number = 4; number <= length + 1; number++) {
+        raw.execute(
+          '''INSERT INTO intentions
            (id, title, is_action_ready, is_archived, created_at, updated_at)
            VALUES (?, ?, 0, 0, 1, 1)''',
-        [_uuid(number), 'Намерение $number'],
-      );
-    }
-    for (var number = 3; number <= length; number++) {
-      raw.execute(
-        '''INSERT INTO long_term_relations
+          [_uuid(number), 'Намерение $number'],
+        );
+      }
+      for (var number = 3; number <= length; number++) {
+        raw.execute(
+          '''INSERT INTO long_term_relations
            (id, source_intention_id, related_intention_id, type, priority,
             is_archived) VALUES (?, ?, ?, 'need', 2, 0)''',
-        [_uuid(100 + number), _uuid(number), _uuid(number + 1)],
-      );
-    }
-    raw.execute(
-      '''INSERT INTO daily_choices
+          [_uuid(100 + number), _uuid(number), _uuid(number + 1)],
+        );
+      }
+      raw.execute(
+        '''INSERT INTO daily_choices
          (id, source_intention_id, selected_intention_id, choice_date,
           is_completed) VALUES (?, ?, ?, '2026-09-23', 0)''',
-      [_uuid(201), _uuid(1), _uuid(length + 1)],
-    );
-    for (var number = 1; number <= length; number++) {
-      raw.execute(
-        '''INSERT INTO daily_choice_path_steps
+        [_uuid(201), _uuid(1), _uuid(length + 1)],
+      );
+      for (var number = 1; number <= length; number++) {
+        raw.execute(
+          '''INSERT INTO daily_choice_path_steps
            (id, daily_choice_id, long_term_relation_id, previous_step_id)
            VALUES (?, ?, ?, ?)''',
-        [
-          _uuid(1000 + number),
-          _uuid(201),
-          _uuid(100 + number),
-          number == 1 ? null : _uuid(999 + number),
-        ],
-      );
-    }
+          [
+            _uuid(1000 + number),
+            _uuid(201),
+            _uuid(100 + number),
+            number == 1 ? null : _uuid(999 + number),
+          ],
+        );
+      }
+    });
 
     final catalog = page(
       await repository.getDailyChoiceCatalogPage(

@@ -12,6 +12,7 @@ import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 
 String _uuid(int number) =>
@@ -53,18 +54,20 @@ void main() {
     int archived = 0,
     int ready = 0,
   }) {
-    raw.execute(
-      '''INSERT INTO intentions
+    seedRawGraph(raw, () {
+      raw.execute(
+        '''INSERT INTO intentions
          (id, title, description, is_action_ready, is_archived, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, 1, 1)''',
-      [
-        _uuid(number),
-        title ?? 'Намерение $number',
-        'Описание $number',
-        ready,
-        archived,
-      ],
-    );
+        [
+          _uuid(number),
+          title ?? 'Намерение $number',
+          'Описание $number',
+          ready,
+          archived,
+        ],
+      );
+    });
   }
 
   void addRelation(
@@ -74,19 +77,21 @@ void main() {
     String type = 'need',
     int archived = 0,
   }) {
-    raw.execute(
-      '''INSERT INTO long_term_relations
+    seedRawGraph(raw, () {
+      raw.execute(
+        '''INSERT INTO long_term_relations
          (id, source_intention_id, related_intention_id, type, priority, description, is_archived)
          VALUES (?, ?, ?, ?, 2, ?, ?)''',
-      [
-        _uuid(number),
-        _uuid(source),
-        _uuid(related),
-        type,
-        'Связь $number',
-        archived,
-      ],
-    );
+        [
+          _uuid(number),
+          _uuid(source),
+          _uuid(related),
+          type,
+          'Связь $number',
+          archived,
+        ],
+      );
+    });
   }
 
   void addChoice(
@@ -95,26 +100,30 @@ void main() {
     int selected, {
     String? description = ' Выбор ',
   }) {
-    raw.execute(
-      '''INSERT INTO daily_choices
+    seedRawGraph(raw, () {
+      raw.execute(
+        '''INSERT INTO daily_choices
          (id, source_intention_id, selected_intention_id, choice_date, description, is_completed)
          VALUES (?, ?, ?, '2026-09-23', ?, 1)''',
-      [_uuid(number), _uuid(source), _uuid(selected), description],
-    );
+        [_uuid(number), _uuid(source), _uuid(selected), description],
+      );
+    });
   }
 
   void addStep(int number, int choice, int relation, [int? previous]) {
-    raw.execute(
-      '''INSERT INTO daily_choice_path_steps
+    seedRawGraph(raw, () {
+      raw.execute(
+        '''INSERT INTO daily_choice_path_steps
          (id, daily_choice_id, long_term_relation_id, previous_step_id)
          VALUES (?, ?, ?, ?)''',
-      [
-        _uuid(number),
-        _uuid(choice),
-        _uuid(relation),
-        previous == null ? null : _uuid(previous),
-      ],
-    );
+        [
+          _uuid(number),
+          _uuid(choice),
+          _uuid(relation),
+          previous == null ? null : _uuid(previous),
+        ],
+      );
+    });
   }
 
   test(
@@ -156,14 +165,16 @@ void main() {
       expect(details.path.last.related.id, details.selected.id);
       expect(() => details.path.clear(), throwsUnsupportedError);
 
-      raw.execute('UPDATE intentions SET title = ? WHERE id = ?', [
-        'Новое название',
-        _uuid(2),
-      ]);
-      raw.execute(
-        'UPDATE long_term_relations SET description = ? WHERE id = ?',
-        ['Новое описание перехода', _uuid(101)],
-      );
+      seedRawGraph(raw, () {
+        raw.execute('UPDATE intentions SET title = ? WHERE id = ?', [
+          'Новое название',
+          _uuid(2),
+        ]);
+        raw.execute(
+          'UPDATE long_term_relations SET description = ? WHERE id = ?',
+          ['Новое описание перехода', _uuid(101)],
+        );
+      });
       final refreshed = await repository.getDailyChoice(_choiceId(201));
       final refreshedPath =
           (refreshed as DailyChoiceReadSuccess).value.value!.path;
@@ -214,9 +225,12 @@ void main() {
         (1097, DailyChoicePriority.p2, DailyChoiceTime(hour: 18, minute: 17)),
         (1439, DailyChoicePriority.p3, DailyChoiceTime(hour: 23, minute: 59)),
       ]) {
-        raw.execute(
-          'UPDATE daily_choices SET scheduled_minute = ?, priority = ? WHERE id = ?',
-          [minute, priority.level, _uuid(201)],
+        seedRawGraph(
+          raw,
+          () => raw.execute(
+            'UPDATE daily_choices SET scheduled_minute = ?, priority = ? WHERE id = ?',
+            [minute, priority.level, _uuid(201)],
+          ),
         );
 
         final result = await repository.getDailyChoice(_choiceId(201));
@@ -247,9 +261,12 @@ void main() {
       // Имитируем повреждение хранения, недоступное через обычную запись.
       raw.execute('PRAGMA ignore_check_constraints = ON');
       try {
-        raw.execute(
-          'UPDATE daily_choices SET scheduled_minute = ?, priority = ? WHERE id = ?',
-          [minute, priority, _uuid(201)],
+        seedRawGraph(
+          raw,
+          () => raw.execute(
+            'UPDATE daily_choices SET scheduled_minute = ?, priority = ? WHERE id = ?',
+            [minute, priority, _uuid(201)],
+          ),
         );
       } finally {
         raw.execute('PRAGMA ignore_check_constraints = OFF');
@@ -330,14 +347,20 @@ void main() {
 
       // Схема пропускает обе записи: дату проверяет только шаблон, а описание
       // только на NUL.
-      raw.execute(
-        "UPDATE daily_choices SET choice_date = '2026-02-30' WHERE id = ?",
-        [_uuid(201)],
+      seedRawGraph(
+        raw,
+        () => raw.execute(
+          "UPDATE daily_choices SET choice_date = '2026-02-30' WHERE id = ?",
+          [_uuid(201)],
+        ),
       );
       await expectCorruption();
-      raw.execute(
-        "UPDATE daily_choices SET choice_date = '2026-09-23', description = ' ' WHERE id = ?",
-        [_uuid(201)],
+      seedRawGraph(
+        raw,
+        () => raw.execute(
+          "UPDATE daily_choices SET choice_date = '2026-09-23', description = ' ' WHERE id = ?",
+          [_uuid(201)],
+        ),
       );
       await expectCorruption();
     },
@@ -416,15 +439,21 @@ void main() {
       }
 
       await expectCorruption();
-      raw.execute(
-        'UPDATE daily_choice_path_steps SET long_term_relation_id = ? WHERE id = ?',
-        [_uuid(102), _uuid(302)],
+      seedRawGraph(
+        raw,
+        () => raw.execute(
+          'UPDATE daily_choice_path_steps SET long_term_relation_id = ? WHERE id = ?',
+          [_uuid(102), _uuid(302)],
+        ),
       );
       addStep(303, 201, 103, 302);
       await expectCorruption();
-      raw.execute('DELETE FROM daily_choice_path_steps WHERE id = ?', [
-        _uuid(303),
-      ]);
+      seedRawGraph(
+        raw,
+        () => raw.execute('DELETE FROM daily_choice_path_steps WHERE id = ?', [
+          _uuid(303),
+        ]),
+      );
       addStep(303, 201, 104, 302);
       final valid = await repository.getDailyChoice(_choiceId(201));
       expect(valid, isA<DailyChoiceReadSuccess>());

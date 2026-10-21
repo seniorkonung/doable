@@ -26,6 +26,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/daily_choice_durability_fixture.dart';
+import '../../support/graph_seed.dart';
 import '../../support/local_database_harness.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 
@@ -63,19 +64,23 @@ void main() {
     database = await harness.openReadyDatabase(observer: probe);
     diagnostics = InMemoryDiagnosticsSink();
     await seedDurabilityGraph(database);
-    await database.customStatement('UPDATE intentions SET is_action_ready = 1');
-    for (final (number, source, target) in _relations.skip(4)) {
+    await seedGraph(database, () async {
       await database.customStatement(
-        '''INSERT INTO long_term_relations
+        'UPDATE intentions SET is_action_ready = 1',
+      );
+      for (final (number, source, target) in _relations.skip(4)) {
+        await database.customStatement(
+          '''INSERT INTO long_term_relations
            (id, source_intention_id, related_intention_id, type, priority)
            VALUES (?, ?, ?, 'need', 2)''',
-        [
-          durabilityUuid(number),
-          durabilityUuid(source),
-          durabilityUuid(target),
-        ],
-      );
-    }
+          [
+            durabilityUuid(number),
+            durabilityUuid(source),
+            durabilityUuid(target),
+          ],
+        );
+      }
+    });
     repository = createRepository();
   });
   tearDown(() => harness.dispose());
@@ -99,7 +104,7 @@ void main() {
     List<int> path, {
     String date = '2026-10-12',
     bool completed = true,
-  }) async {
+  }) => seedGraph(database, () async {
     await database.customStatement(
       '''INSERT INTO daily_choices
          (id, source_intention_id, selected_intention_id, choice_date, is_completed)
@@ -125,7 +130,7 @@ void main() {
         ],
       );
     }
-  }
+  });
 
   test('раздел собирает четыре карточки и календарь выбранного вида', () async {
     await addChoice(201, [102], date: '2026-10-01');

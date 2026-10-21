@@ -9,8 +9,8 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../intention/presentation/details/details_test_support.dart';
 
 void main() {
-  late List<GraphCommandCompletion> successes;
-  late List<GraphCommandCompletion> failures;
+  late List<GraphPresentableCompletion> successes;
+  late List<GraphPresentableCompletion> failures;
 
   setUpAll(() async {
     final repository = ControlledDetailsRepository();
@@ -61,10 +61,10 @@ void main() {
       failures[0],
       successes[1],
       failures[1],
-    ], (completion) => messages[completion]!);
+    ], (completion) => GraphOperationMessage(messages[completion]!));
 
     expect(plan.coveredTokens, [failures[0].token]);
-    expect(plan.message, 'Первый отказ');
+    expect(plan.message.text, 'Первый отказ');
     expect(plan.otherCount, 0);
   });
 
@@ -83,10 +83,10 @@ void main() {
         failures[1],
         successes[0],
         failures[2],
-      ], (completion) => messages[completion]!);
+      ], (completion) => GraphOperationMessage(messages[completion]!));
 
       expect(plan.coveredTokens, [failures[0].token, failures[2].token]);
-      expect(plan.message, 'Не удалось архивировать «Купить хлеб»');
+      expect(plan.message.text, 'Не удалось архивировать «Купить хлеб»');
       expect(plan.otherCount, 1);
     },
   );
@@ -100,11 +100,11 @@ void main() {
 
     final plan = planGraphOperationMessage(
       successes,
-      (completion) => messages[completion]!,
+      (completion) => GraphOperationMessage(messages[completion]!),
     );
 
     expect(plan.coveredTokens, successes.map((completion) => completion.token));
-    expect(plan.message, 'Архивировано');
+    expect(plan.message.text, 'Архивировано');
     expect(plan.otherCount, 2);
   });
 
@@ -116,10 +116,10 @@ void main() {
 
         final plan = planGraphOperationMessage([
           completion,
-        ], (_) => 'Результат');
+        ], (_) => const GraphOperationMessage('Результат'));
 
         expect(plan.coveredTokens, [completion.token]);
-        expect(plan.message, 'Результат');
+        expect(plan.message.text, 'Результат');
         expect(plan.otherCount, 0);
       },
     );
@@ -131,14 +131,17 @@ void main() {
       final completions = [successes[0], successes[1]];
       var message = 'Показанный результат';
 
-      final plan = planGraphOperationMessage(completions, (_) => message);
+      final plan = planGraphOperationMessage(
+        completions,
+        (_) => GraphOperationMessage(message),
+      );
       completions
         ..clear()
         ..add(failures[0]);
       message = 'Новый результат';
 
       expect(plan.coveredTokens, [successes[0].token, successes[1].token]);
-      expect(plan.message, 'Показанный результат');
+      expect(plan.message.text, 'Показанный результат');
       expect(plan.otherCount, 1);
       expect(() => plan.coveredTokens.clear(), throwsUnsupportedError);
     },

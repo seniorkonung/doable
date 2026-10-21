@@ -424,42 +424,46 @@ Future<void> _expectLoadingFooter(
 }
 
 void _seedLayoutTagCatalog(sqlite.Database database) {
-  for (var number = 1; number <= 25; number++) {
-    database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-      tagFixtureId(9000 + number),
-      'Тег ${number.toString().padLeft(3, '0')}',
-    ]);
-  }
+  seedRawGraph(database, () {
+    for (var number = 1; number <= 25; number++) {
+      database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        tagFixtureId(9000 + number),
+        'Тег ${number.toString().padLeft(3, '0')}',
+      ]);
+    }
+  });
 }
 
 const _lastLayoutRelation = 53;
 
 /// Три порции помеченных намерений и две порции связей одной исходящей группы.
 void _seedOrdinaryLayout(sqlite.Database database) {
-  database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-    tagFixtureId(8000),
-    'Дом',
-  ]);
-  for (var number = 1; number <= 105; number++) {
-    database.execute(
-      'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-      [tagFixtureId(8000), tagFixtureId(number)],
-    );
-  }
-  // Вместе со связью из основного засева у первого намерения 52 связи.
-  for (var number = 3; number <= _lastLayoutRelation; number++) {
-    database.execute(
-      'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
-      [
-        tagFixtureId(5000 + number),
-        tagFixtureId(1),
-        tagFixtureId(number),
-        'need',
-        2,
-        0,
-      ],
-    );
-  }
+  seedRawGraph(database, () {
+    database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+      tagFixtureId(8000),
+      'Дом',
+    ]);
+    for (var number = 1; number <= 105; number++) {
+      database.execute(
+        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+        [tagFixtureId(8000), tagFixtureId(number)],
+      );
+    }
+    // Вместе со связью из основного засева у первого намерения 52 связи.
+    for (var number = 3; number <= _lastLayoutRelation; number++) {
+      database.execute(
+        'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
+        [
+          tagFixtureId(5000 + number),
+          tagFixtureId(1),
+          tagFixtureId(number),
+          'need',
+          2,
+          0,
+        ],
+      );
+    }
+  });
 }
 
 IntentionId _layoutIntentionId(int number) =>

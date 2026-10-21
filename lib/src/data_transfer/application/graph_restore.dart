@@ -1,0 +1,193 @@
+import '../../data/local/sqlite_failure_classifier.dart';
+import '../../graph/application/graph_command_coordinator.dart';
+import '../../graph_backups/graph_backup_registry.dart';
+import '../../graph_backups/graph_change_summary.dart';
+import '../../graph_snapshots/graph_log_compaction.dart';
+import '../../graph_snapshots/graph_snapshot_store.dart';
+import '../../shared/diagnostics/diagnostics_sink.dart';
+import 'graph_replacement.dart';
+
+/// Что изменилось в графе с резервной копии до текущего состояния.
+sealed class GraphChangesSinceBackup {
+  const GraphChangesSinceBackup();
+}
+
+/// Изменения посчитаны по фактам лога между позицией копии и текущей: числа
+/// добавленных, изменённых и удалённых сущностей, нулевые без изменений, или
+/// признак замены графа.
+final class GraphChangesSinceBackupCounted extends GraphChangesSinceBackup {
+  const GraphChangesSinceBackupCounted(this.summary);
+
+  final GraphChangeSummary summary;
+}
+
+/// Изменения не посчитаны: копии уже нет или подсчёт отказал. Это не
+/// отсутствие изменений.
+final class GraphChangesSinceBackupUncounted extends GraphChangesSinceBackup {
+  const GraphChangesSinceBackupUncounted();
+}
+
+/// Восстановление резервной копии атомарной заменой всего графа её
+/// состоянием (ADR-0036).
+///
+/// Фаза 1 под отметкой чтения истории проверяет, что копия ещё хранится, и
+/// пишет её состояние в снимок замены в отдельном изоляте; команды графа в это
+/// время подтверждаются как обычно. Фаза 2 заменяет граф этим снимком в
+/// монопольном режиме координатора, а прежнее состояние транзакция замены
+/// сохраняет копией перед заменой.
+///
+/// Исход восстановления сообщается в [DiagnosticsSink]; отмена события не
+/// даёт, а отказ диагностики исход восстановления не меняет.
+final class GraphRestore {
+  GraphRestore({
+    required this._backups,
+    required this._compaction,
+    required this._replacement,
+    required this._snapshotFiles,
+    required this._diagnosticsSink,
+  });
+
+  final GraphBackupRegistry _backups;
+
+  /// Сжатие лога фактов, которое ведёт отметки чтения истории и пишет снимок
+  /// замены.
+  final GraphLogCompaction _compaction;
+  final GraphReplacement _replacement;
+
+  /// Завершается, когда из каталога снимков удалены незарегистрированные
+  /// файлы прежних запусков. Снимок замены пишется только после этого, иначе
+  /// очистка удалила бы его до регистрации.
+  final Future<void> _snapshotFiles;
+  final DiagnosticsSink _diagnosticsSink;
+
+  /// Считает изменения графа с копии [backup] до текущего состояния по тем же
+  /// правилам, что и сводки копий, — только по фактам пакетов лога.
+  ///
+  /// Копия ищется в реестре под отметкой чтения истории, поэтому найденная
+  /// копия сохраняет пакеты после своей позиции до конца подсчёта. Копия,
+  /// которой уже нет, и отказ подсчёта дают
+  /// [GraphChangesSinceBackupUncounted].
+  Future<GraphChangesSinceBackup> countChangesSince(
+    GraphBackupEntry backup,
+  ) async {
+    try {
+      return await _compaction.readHistory((history) async {
+        if (!await _isStored(backup)) {
+          return const GraphChangesSinceBackupUncounted();
+        }
+        final tally = await GraphChangeTally.ofRange(
+          history,
+          after: backup.position,
+          upTo: await history.readCurrentPosition(),
+        );
+        return GraphChangesSinceBackupCounted(tally.summary);
+      });
+    } on Object {
+      return const GraphChangesSinceBackupUncounted();
+    }
+  }
+
+  /// Заменяет граф состоянием копии [backup]; саму замену выполняет
+  /// [exclusive] принятого координатором восстановления.
+  ///
+  /// [onProgress] получает ход обеих фаз. Отмена, принятая [cancellation],
+  /// прекращает запись снимка замены между записями, а замену — между
+  /// пакетами операторов, откатывая её транзакцию, и даёт
+  /// [GraphBackupRestoreCancelled]. После точки невозврата замены
+  /// [cancellation] отмену не принимает, и восстановление завершается так же,
+  /// как без неё. Копия, которую к началу восстановления уже удалило окно
+  /// хранения, даёт отказ. Нехватка места на устройстве в любой фазе даёт
+  /// [GraphBackupRestoreStorageFull]. После отказа и отмены граф, копии и
+  /// реестр снимков остаются прежними, а файл снимка замены удаляется.
+  Future<GraphBackupRestoreOutcome> restore(
+    GraphBackupEntry backup,
+    GraphExclusiveReplacement<GraphBackupRestored> exclusive, {
+    required void Function(GraphReplacementProgress progress) onProgress,
+    required GraphReplacementCancellation cancellation,
+  }) async {
+    final stopwatch = Stopwatch()..start();
+    UnregisteredGraphSnapshot? snapshot;
+    try {
+      await _snapshotFiles;
+      final written = await _writeSnapshot(
+        backup,
+        onProgress: (share) => onProgress(
+          GraphReplacementProgress(GraphReplacementPhase.snapshotWrite, share),
+        ),
+        cancelled: cancellation.requested,
+      );
+      snapshot = written;
+      final restored = await exclusive.replace(() {
+        onProgress(
+          const GraphReplacementProgress(GraphReplacementPhase.replacement, 0),
+        );
+        return _replacement.replaceGraph(
+          written,
+          onProgress: (share) => onProgress(
+            GraphReplacementProgress(GraphReplacementPhase.replacement, share),
+          ),
+          cancellation: cancellation,
+        );
+      });
+      recordDiagnosticsSafely(
+        _diagnosticsSink,
+        GraphBackupRestoreDiagnosticsEvent.succeeded(
+          duration: stopwatch.elapsed,
+        ),
+      );
+      return restored;
+    } on GraphReplacementSnapshotCancelled {
+      // Запись снимка замены при отмене удаляет свой файл.
+      return const GraphBackupRestoreCancelled();
+    } on GraphReplacementCancelled {
+      await snapshot?.delete();
+      return const GraphBackupRestoreCancelled();
+    } on Object catch (error) {
+      await snapshot?.delete();
+      recordDiagnosticsSafely(
+        _diagnosticsSink,
+        GraphBackupRestoreDiagnosticsEvent.failed(
+          // Снимок замены есть, только когда его запись завершилась.
+          stage: snapshot == null
+              ? GraphBackupRestoreDiagnosticsStage.snapshotWrite
+              : GraphBackupRestoreDiagnosticsStage.replacement,
+          duration: stopwatch.elapsed,
+          code: switch (error) {
+            _GraphBackupNotStored() => DiagnosticsFailureCode.notFound,
+            _ => graphSnapshotFailureCode(error),
+          },
+        ),
+      );
+      return switch (classifySqliteFailure(error)) {
+        SqliteStorageFullFailure() => const GraphBackupRestoreStorageFull(),
+        _ => const GraphBackupRestoreFailed(),
+      };
+    }
+  }
+
+  /// Пишет состояние на позиции копии [backup] в снимок замены, если копия
+  /// хранится: найденная под отметкой чтения истории, она сохраняет базовый
+  /// снимок своего состояния и пакеты после него до конца записи.
+  Future<UnregisteredGraphSnapshot> _writeSnapshot(
+    GraphBackupEntry backup, {
+    required void Function(double share) onProgress,
+    required Future<void> cancelled,
+  }) => _compaction.readHistory((history) async {
+    if (!await _isStored(backup)) throw const _GraphBackupNotStored();
+    return _compaction.writeReplacementSnapshot(
+      await history.selectStateAt(backup.position),
+      onProgress: onProgress,
+      cancelled: cancelled,
+    );
+  });
+
+  /// Хранится ли копия [backup] в реестре. Отказ чтения реестра передаётся
+  /// исключением.
+  Future<bool> _isStored(GraphBackupEntry backup) async =>
+      (await _backups.readBackups()).any((stored) => stored.id == backup.id);
+}
+
+/// Копию уже удалило окно хранения.
+final class _GraphBackupNotStored implements Exception {
+  const _GraphBackupNotStored();
+}

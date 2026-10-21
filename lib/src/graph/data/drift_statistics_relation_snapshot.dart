@@ -39,16 +39,16 @@ extension DriftStatisticsRelationSnapshotReading
       _requireRelationSnapshotSequence(sequence);
       for (final row in rows) {
         builder.add(
-          _decodeStoredRelationIntentionId(
-            _requiredStoredString(row.data, 'source_intention_id'),
+          decodeStoredIntentionId(
+            requiredStoredString(row.data, 'source_intention_id'),
           ),
-          _decodeStoredRelationIntentionId(
-            _requiredStoredString(row.data, 'related_intention_id'),
+          decodeStoredIntentionId(
+            requiredStoredString(row.data, 'related_intention_id'),
           ),
         );
       }
       if (rows.length < pageSize) break;
-      after = _requiredStoredInteger(rows.last.data, 'creation_sequence');
+      after = requiredStoredInteger(rows.last.data, 'creation_sequence');
     }
     return _statisticsRelationSnapshot = builder.build();
   }

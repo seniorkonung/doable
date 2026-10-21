@@ -17,6 +17,7 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/graph_seed.dart';
 import '../../support/tag_storage_fixture.dart';
 
 final class _RecordingSink implements DiagnosticsSink {
@@ -129,14 +130,16 @@ void main() {
 
     readFault.failure = null;
     // Формат идентификатора намерения схема не проверяет.
-    raw.execute(
-      'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, 1, 1)',
-      [damagedIntentionId, 'Повреждённое'],
-    );
-    raw.execute(
-      'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-      [tagFixtureId(firstTagNumber), damagedIntentionId],
-    );
+    seedRawGraph(raw, () {
+      raw.execute(
+        'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, 1, 1)',
+        [damagedIntentionId, 'Повреждённое'],
+      );
+      raw.execute(
+        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+        [tagFixtureId(firstTagNumber), damagedIntentionId],
+      );
+    });
     expect(
       await graph.getTaggedIntentionsPage(query(pageSize: 10)),
       isA<TaggedIntentionsPageError>().having(
@@ -230,10 +233,12 @@ void main() {
     );
 
     // Схема не проверяет формат идентификатора тега.
-    raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-      damagedId,
-      privateAssignment,
-    ]);
+    seedRawGraph(raw, () {
+      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        damagedId,
+        privateAssignment,
+      ]);
+    });
     expect(
       await graph.getTagCatalog(const TagCatalogBrowseMode()),
       isA<TagCatalogError>().having(

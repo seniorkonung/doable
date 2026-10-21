@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/graph_seed.dart';
 import '../../support/local_database_harness.dart';
 
 const _firstIntention = '018f0b5d-6b2e-7c80-8000-000000000001';
@@ -17,16 +18,19 @@ void main() {
   setUp(() async {
     harness = LocalDatabaseHarness.inMemory();
     await harness.openReadyDatabase(setup: (connection) => raw = connection);
-    raw.execute(
-      'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, 1, 1), (?, ?, 1, 1)',
-      [_firstIntention, 'Первое', _secondIntention, 'Второе'],
-    );
-    raw.execute(
-      '''INSERT INTO long_term_relations
+    seedRawGraph(raw, () {
+      raw
+        ..execute(
+          'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, 1, 1), (?, ?, 1, 1)',
+          [_firstIntention, 'Первое', _secondIntention, 'Второе'],
+        )
+        ..execute(
+          '''INSERT INTO long_term_relations
          (id, source_intention_id, related_intention_id, type, priority)
          VALUES (?, ?, ?, 'need', 1)''',
-      [_relation, _firstIntention, _secondIntention],
-    );
+          [_relation, _firstIntention, _secondIntention],
+        );
+    });
   });
 
   tearDown(() => harness.dispose());
@@ -42,9 +46,12 @@ void main() {
       );
     }
     expect(
-      () => raw.execute('INSERT INTO tags (id, name) VALUES (?, x\'80\')', [
-        _firstTag,
-      ]),
+      () => seedRawGraph(
+        raw,
+        () => raw.execute('INSERT INTO tags (id, name) VALUES (?, x\'80\')', [
+          _firstTag,
+        ]),
+      ),
       throwsA(isA<sqlite.SqliteException>()),
     );
     _addTag(raw, _firstTag, 'Straße');
@@ -57,24 +64,36 @@ void main() {
       throwsA(isA<sqlite.SqliteException>()),
     );
     expect(
-      () => raw.execute(
-        'INSERT INTO tags (id, name, name_key) VALUES (?, ?, ?)',
-        [_secondTag, 'Другое', 'чужой ключ'],
+      () => seedRawGraph(
+        raw,
+        () => raw.execute(
+          'INSERT INTO tags (id, name, name_key) VALUES (?, ?, ?)',
+          [_secondTag, 'Другое', 'чужой ключ'],
+        ),
       ),
       throwsA(isA<sqlite.SqliteException>()),
     );
     expect(
-      () => raw.execute('UPDATE tags SET name_key = ? WHERE id = ?', [
-        'чужой ключ',
-        _firstTag,
-      ]),
+      () => seedRawGraph(
+        raw,
+        () => raw.execute('UPDATE tags SET name_key = ? WHERE id = ?', [
+          'чужой ключ',
+          _firstTag,
+        ]),
+      ),
       throwsA(isA<sqlite.SqliteException>()),
     );
     expect(
       () => _addTag(raw, _firstTag, 'Другое'),
       throwsA(isA<sqlite.SqliteException>()),
     );
-    raw.execute('UPDATE tags SET name = ? WHERE id = ?', ['Все', _firstTag]);
+    seedRawGraph(
+      raw,
+      () => raw.execute('UPDATE tags SET name = ? WHERE id = ?', [
+        'Все',
+        _firstTag,
+      ]),
+    );
     _addTag(raw, _secondTag, 'Всё');
     expect(
       raw.select('SELECT name_key FROM tags WHERE id = ?', [
@@ -125,13 +144,16 @@ void main() {
     for (final table in ['tags', 'tag_assignments']) {
       for (final sequence in [0, -1]) {
         expect(
-          () => raw.execute(
-            table == 'tags'
-                ? 'INSERT INTO tags (creation_sequence, id, name) VALUES (?, ?, ?)'
-                : 'INSERT INTO tag_assignments (creation_sequence, tag_id, intention_id) VALUES (?, ?, ?)',
-            table == 'tags'
-                ? [sequence, _thirdTag, 'Третий']
-                : [sequence, _firstTag, _secondIntention],
+          () => seedRawGraph(
+            raw,
+            () => raw.execute(
+              table == 'tags'
+                  ? 'INSERT INTO tags (creation_sequence, id, name) VALUES (?, ?, ?)'
+                  : 'INSERT INTO tag_assignments (creation_sequence, tag_id, intention_id) VALUES (?, ?, ?)',
+              table == 'tags'
+                  ? [sequence, _thirdTag, 'Третий']
+                  : [sequence, _firstTag, _secondIntention],
+            ),
           ),
           throwsA(isA<sqlite.SqliteException>()),
         );
@@ -184,16 +206,22 @@ void main() {
       ),
     ]) {
       expect(
-        () => raw.execute(
-          'UPDATE ${update.$1} SET ${update.$2} = ? WHERE ${update.$4} = ?',
-          [update.$3, update.$5],
+        () => seedRawGraph(
+          raw,
+          () => raw.execute(
+            'UPDATE ${update.$1} SET ${update.$2} = ? WHERE ${update.$4} = ?',
+            [update.$3, update.$5],
+          ),
         ),
         throwsA(isA<sqlite.SqliteException>()),
       );
     }
-    raw.execute('DELETE FROM tag_assignments WHERE intention_id = ?', [
-      _secondIntention,
-    ]);
+    seedRawGraph(
+      raw,
+      () => raw.execute('DELETE FROM tag_assignments WHERE intention_id = ?', [
+        _secondIntention,
+      ]),
+    );
     _addAssignment(raw, _firstTag, _secondIntention);
     expect(
       raw.select(
@@ -202,7 +230,10 @@ void main() {
       ).single['creation_sequence'],
       greaterThan(assignmentSequence),
     );
-    raw.execute('DELETE FROM tags WHERE id = ?', [_secondTag]);
+    seedRawGraph(
+      raw,
+      () => raw.execute('DELETE FROM tags WHERE id = ?', [_secondTag]),
+    );
     _addTag(raw, _thirdTag, 'Третий');
     expect(
       raw.select('SELECT creation_sequence FROM tags WHERE id = ?', [
@@ -214,12 +245,18 @@ void main() {
 }
 
 void _addTag(sqlite.Database db, String id, String name) {
-  db.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [id, name]);
+  seedRawGraph(
+    db,
+    () => db.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [id, name]),
+  );
 }
 
 void _addAssignment(sqlite.Database db, String tagId, String? intentionId) {
-  db.execute(
-    'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-    [tagId, intentionId],
+  seedRawGraph(
+    db,
+    () => db.execute(
+      'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+      [tagId, intentionId],
+    ),
   );
 }

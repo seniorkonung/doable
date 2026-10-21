@@ -7,6 +7,7 @@ import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 
@@ -35,8 +36,7 @@ Future<void> expectFullTagCatalogSnapshot() async {
     seedTagStorageFixture(raw);
 
     void seedTo(int count, int current) {
-      raw.execute('BEGIN');
-      try {
+      seedRawGraph(raw, () {
         for (var index = current; index < count; index++) {
           final number = 10000 + index;
           raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
@@ -50,11 +50,7 @@ Future<void> expectFullTagCatalogSnapshot() async {
             );
           }
         }
-        raw.execute('COMMIT');
-      } on Object {
-        raw.execute('ROLLBACK');
-        rethrow;
-      }
+      });
     }
 
     Future<void> expectFullSnapshot(int count) async {

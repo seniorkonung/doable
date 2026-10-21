@@ -13,6 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/app_root_pages.dart';
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 import '../../support/tag_storage_fixture.dart';
@@ -218,10 +219,12 @@ void _storeIntention(
   String title, {
   required bool archived,
 }) {
-  database.execute(
-    'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-    [tagFixtureId(number), title, 1, archived ? 1 : 0, number, number],
-  );
+  seedRawGraph(database, () {
+    database.execute(
+      'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+      [tagFixtureId(number), title, 1, archived ? 1 : 0, number, number],
+    );
+  });
 }
 
 int _intentionCount(sqlite.Database database) =>

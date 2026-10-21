@@ -2030,6 +2030,413 @@ abstract class AppLocalizations {
   /// **'tag assignment'**
   String get graphOperationTagAssignment;
 
+  /// Сообщение общей поверхности об успешном экспорте графа в файл
+  ///
+  /// In en, this message translates to:
+  /// **'Data saved to a file'**
+  String get dataExportSaved;
+
+  /// Сообщение общей поверхности об отказе экспорта графа с действием commonRetry
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t save the file'**
+  String get dataExportFailed;
+
+  /// Сообщение общей поверхности с действием commonRetry, когда в диалоге сохранения выбран файл с данными и экспорт не начат
+  ///
+  /// In en, this message translates to:
+  /// **'That file already exists. Save the copy under a new name'**
+  String get dataExportExistingFile;
+
+  /// Сообщение общей поверхности об успешном восстановлении резервной копии
+  ///
+  /// In en, this message translates to:
+  /// **'Copy restored'**
+  String get dataBackupRestored;
+
+  /// Сообщение об отказе восстановления резервной копии: под строкой «Резервные копии» или на общей поверхности
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t restore the copy. Nothing was changed'**
+  String get dataBackupRestoreFailed;
+
+  /// Сообщение об отказе замены графа из-за нехватки места на устройстве
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough space on the device. Free up space and try again. Nothing was changed'**
+  String get dataReplacementStorageFull;
+
+  /// Сообщение общей поверхности об успешном импорте файла экспорта
+  ///
+  /// In en, this message translates to:
+  /// **'Data imported'**
+  String get dataImported;
+
+  /// Сообщение об отказе импорта: файл не является экспортом Doable или повреждён; под строкой «Импорт данных» или на общей поверхности
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t import the file. It isn’t a Doable export, or it’s damaged. Nothing was changed'**
+  String get dataImportInvalidFile;
+
+  /// Сообщение об отказе импорта файла более новой версии формата; под строкой «Импорт данных» или на общей поверхности
+  ///
+  /// In en, this message translates to:
+  /// **'The file was created by a newer version of Doable. Update the app to import it. Nothing was changed'**
+  String get dataImportNewerVersion;
+
+  /// Сообщение об отказе импорта: выбранный файл не удалось прочитать; под строкой «Импорт данных» или на общей поверхности
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t read the file. Check that you can access it and try again. Nothing was changed'**
+  String get dataImportUnreadable;
+
+  /// Сообщение об отказе импорта по неизвестной причине; под строкой «Импорт данных» или на общей поверхности
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t import the data. Nothing was changed'**
+  String get dataImportFailed;
+
+  /// Сообщение общей поверхности без действия об отказе ручной резервной копии
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t back up'**
+  String get dataManualBackupFailed;
+
+  /// Заголовок страницы «Настройки» и доступное название перехода к ней с Главной
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get settingsTitle;
+
+  /// Заголовок раздела «Данные» страницы настроек
+  ///
+  /// In en, this message translates to:
+  /// **'Data'**
+  String get dataSectionTitle;
+
+  /// Пояснение раздела «Данные» о том, что граф хранится только на устройстве
+  ///
+  /// In en, this message translates to:
+  /// **'Everything you write is stored only on this device.'**
+  String get dataSectionLocalOnly;
+
+  /// Название строки экспорта в разделе «Данные» и заголовок панели экспорта графа в файл
+  ///
+  /// In en, this message translates to:
+  /// **'Export data'**
+  String get dataExportTitle;
+
+  /// Подпись строки экспорта, когда экспорт можно начать или состав графа неизвестен
+  ///
+  /// In en, this message translates to:
+  /// **'Save a copy of everything to a file'**
+  String get dataExportHint;
+
+  /// Подпись недоступной строки экспорта при пустом графе
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to export yet'**
+  String get dataExportNothing;
+
+  /// Подпись строки экспорта, пока идёт экспорт
+  ///
+  /// In en, this message translates to:
+  /// **'Saving to a file…'**
+  String get dataExportRunning;
+
+  /// Ход идущего экспорта для экранного диктора: доля записанных записей в процентах
+  ///
+  /// In en, this message translates to:
+  /// **'{share}'**
+  String dataExportProgress(double share);
+
+  /// Состав будущего файла экспорта: числа всех намерений, долговременных связей, дневных выборов и тегов вместе с архивированными
+  ///
+  /// In en, this message translates to:
+  /// **'{intentions, plural, one{{intentions} intention} other{{intentions} intentions}}, {relations, plural, one{{relations} relation} other{{relations} relations}}, {dailyChoices, plural, one{{dailyChoices} daily choice} other{{dailyChoices} daily choices}} and {tags, plural, one{{tags} tag} other{{tags} tags}} in one file'**
+  String dataExportComposition(
+    int intentions,
+    int relations,
+    int dailyChoices,
+    int tags,
+  );
+
+  /// Предупреждение панели экспорта о том, что файл не зашифрован
+  ///
+  /// In en, this message translates to:
+  /// **'The file is not protected. Anyone who has it can read what you wrote.'**
+  String get dataExportUnprotected;
+
+  /// Кнопка панели экспорта, открывающая системный диалог сохранения
+  ///
+  /// In en, this message translates to:
+  /// **'Save to a file'**
+  String get dataExportSave;
+
+  /// Название строки импорта в разделе «Данные»
+  ///
+  /// In en, this message translates to:
+  /// **'Import data'**
+  String get dataImportTitle;
+
+  /// Подпись строки импорта, когда граф не пуст или его состав неизвестен
+  ///
+  /// In en, this message translates to:
+  /// **'Replace everything with a copy from a file'**
+  String get dataImportHint;
+
+  /// Подпись строки импорта при пустом графе
+  ///
+  /// In en, this message translates to:
+  /// **'Bring back a copy from a file'**
+  String get dataImportHintEmptyGraph;
+
+  /// Действие под строкой «Импорт данных» после отказа импорта файла, который не является экспортом Doable или повреждён; снова открывает системный диалог выбора файла
+  ///
+  /// In en, this message translates to:
+  /// **'Choose another file'**
+  String get dataImportChooseAnotherFile;
+
+  /// Заголовок панели «Резервные копии»
+  ///
+  /// In en, this message translates to:
+  /// **'Backups'**
+  String get dataBackupsTitle;
+
+  /// Пояснение панели «Резервные копии»: когда делаются и сколько хранятся копии; число совпадает с окном хранения ежедневных копий
+  ///
+  /// In en, this message translates to:
+  /// **'A copy is made each day your data changes and stays on this device. The 7 most recent daily copies are kept. Choose a copy to restore it.'**
+  String get dataBackupsExplanation;
+
+  /// Кнопка панели «Резервные копии», делающая ручную копию
+  ///
+  /// In en, this message translates to:
+  /// **'Back up now'**
+  String get dataBackupsMakeNow;
+
+  /// Сообщение панели «Резервные копии» вместо списка, когда копии прочитать не удалось
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t load backups'**
+  String get dataBackupsReadFailed;
+
+  /// Подпись строки «Резервные копии», когда последняя копия сделана меньше минуты назад
+  ///
+  /// In en, this message translates to:
+  /// **'Last copy just now'**
+  String get dataBackupsLastJustNow;
+
+  /// Подпись строки «Резервные копии», когда последняя копия сделана сегодня
+  ///
+  /// In en, this message translates to:
+  /// **'Last copy today at {time}'**
+  String dataBackupsLastToday(String time);
+
+  /// Подпись строки «Резервные копии», когда последняя копия сделана вчера
+  ///
+  /// In en, this message translates to:
+  /// **'Last copy yesterday at {time}'**
+  String dataBackupsLastYesterday(String time);
+
+  /// Подпись строки «Резервные копии», когда последняя копия сделана раньше вчерашнего дня
+  ///
+  /// In en, this message translates to:
+  /// **'Last copy on {date} at {time}'**
+  String dataBackupsLastOn(String date, String time);
+
+  /// Подпись доступной строки «Резервные копии», когда копий нет, а граф не пуст
+  ///
+  /// In en, this message translates to:
+  /// **'No backups yet'**
+  String get dataBackupsNone;
+
+  /// Подпись недоступной строки «Резервные копии», когда копий нет и граф пуст
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to back up yet'**
+  String get dataBackupsNothing;
+
+  /// Момент копии, сделанной сегодня, в списке копий
+  ///
+  /// In en, this message translates to:
+  /// **'Today, {time}'**
+  String dataBackupMadeToday(String time);
+
+  /// Момент копии, сделанной вчера, в списке копий
+  ///
+  /// In en, this message translates to:
+  /// **'Yesterday, {time}'**
+  String dataBackupMadeYesterday(String time);
+
+  /// Момент копии, сделанной раньше вчерашнего дня, в списке копий
+  ///
+  /// In en, this message translates to:
+  /// **'{date}, {time}'**
+  String dataBackupMadeOn(String date, String time);
+
+  /// Доступное название копии, сделанной сегодня, в списке копий
+  ///
+  /// In en, this message translates to:
+  /// **'Restore the copy from today, {time}'**
+  String dataBackupRestoreMadeToday(String time);
+
+  /// Доступное название копии, сделанной вчера, в списке копий
+  ///
+  /// In en, this message translates to:
+  /// **'Restore the copy from yesterday, {time}'**
+  String dataBackupRestoreMadeYesterday(String time);
+
+  /// Доступное название копии, сделанной раньше вчерашнего дня, в списке копий
+  ///
+  /// In en, this message translates to:
+  /// **'Restore the copy from {date}, {time}'**
+  String dataBackupRestoreMadeOn(String date, String time);
+
+  /// Часть сводки изменений: число добавленных намерений, тегов, долговременных связей и дневных выборов
+  ///
+  /// In en, this message translates to:
+  /// **'{count} added'**
+  String dataBackupAdded(int count);
+
+  /// Часть сводки изменений: число изменённых намерений, тегов, долговременных связей и дневных выборов
+  ///
+  /// In en, this message translates to:
+  /// **'{count} changed'**
+  String dataBackupChanged(int count);
+
+  /// Часть сводки изменений: число удалённых намерений, тегов, долговременных связей и дневных выборов
+  ///
+  /// In en, this message translates to:
+  /// **'{count} removed'**
+  String dataBackupDeleted(int count);
+
+  /// Сводка копии, с предыдущей копии которой граф не изменился
+  ///
+  /// In en, this message translates to:
+  /// **'No changes'**
+  String get dataBackupNoChanges;
+
+  /// Сводка копии, между которой и предыдущей копией граф заменялся импортом или восстановлением
+  ///
+  /// In en, this message translates to:
+  /// **'Data replaced'**
+  String get dataBackupDataReplaced;
+
+  /// Заголовок модального прогресса, пока идёт восстановление резервной копии
+  ///
+  /// In en, this message translates to:
+  /// **'Restoring the copy…'**
+  String get dataRestoreRunning;
+
+  /// Заголовок модального прогресса импорта с выбора файла до исхода замены графа
+  ///
+  /// In en, this message translates to:
+  /// **'Importing data…'**
+  String get dataImportRunning;
+
+  /// Ход замены графа для экранного диктора: выполненная доля в процентах
+  ///
+  /// In en, this message translates to:
+  /// **'{share}'**
+  String dataReplacementProgress(double share);
+
+  /// Кнопка модального прогресса замены графа, откатывающая замену
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get dataReplacementCancel;
+
+  /// Состояние модального прогресса замены графа после «Отменить», пока замена откатывается
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelling…'**
+  String get dataReplacementCancelling;
+
+  /// Заголовок подтверждения восстановления резервной копии
+  ///
+  /// In en, this message translates to:
+  /// **'Restore this copy?'**
+  String get dataRestoreConfirmationTitle;
+
+  /// Момент копии, сделанной сегодня, в подтверждении её восстановления
+  ///
+  /// In en, this message translates to:
+  /// **'It was made today at {time}.'**
+  String dataRestoreMadeToday(String time);
+
+  /// Момент копии, сделанной вчера, в подтверждении её восстановления
+  ///
+  /// In en, this message translates to:
+  /// **'It was made yesterday at {time}.'**
+  String dataRestoreMadeYesterday(String time);
+
+  /// Момент копии, сделанной раньше вчерашнего дня, в подтверждении её восстановления
+  ///
+  /// In en, this message translates to:
+  /// **'It was made on {date} at {time}.'**
+  String dataRestoreMadeOn(String date, String time);
+
+  /// Изменения графа после копии, которые отменит её восстановление
+  ///
+  /// In en, this message translates to:
+  /// **'Since then: {changes}. Restoring undoes all of it.'**
+  String dataRestoreChangesSince(String changes);
+
+  /// Подтверждение восстановления копии, после которой граф не изменялся
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing has changed since then.'**
+  String get dataRestoreNoChangesSince;
+
+  /// Подтверждение восстановления копии, после которой граф заменялся импортом или восстановлением
+  ///
+  /// In en, this message translates to:
+  /// **'The data has been replaced since then. Restoring undoes every change.'**
+  String get dataRestoreReplacedSince;
+
+  /// Предупреждение подтверждений восстановления копии и импорта: копия заменит весь граф, а текущее состояние сначала сохраняется копией
+  ///
+  /// In en, this message translates to:
+  /// **'It will replace everything now in Doable. A backup of the current state is made first.'**
+  String get dataReplacementReplacesEverything;
+
+  /// Действие подтверждений восстановления копии и импорта, закрывающее подтверждение без изменений
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get dataReplacementConfirmationCancel;
+
+  /// Действие подтверждения восстановления копии, начинающее восстановление
+  ///
+  /// In en, this message translates to:
+  /// **'Restore copy'**
+  String get dataRestoreConfirm;
+
+  /// Заголовок подтверждения импорта файла экспорта в непустой граф
+  ///
+  /// In en, this message translates to:
+  /// **'Import this copy?'**
+  String get dataImportConfirmationTitle;
+
+  /// Дата сохранения файла импорта по местному времени и числа его намерений, долговременных связей, дневных выборов и тегов из заголовка файла
+  ///
+  /// In en, this message translates to:
+  /// **'It was saved on {date} and holds {intentions, plural, one{{intentions} intention} other{{intentions} intentions}}, {relations, plural, one{{relations} relation} other{{relations} relations}}, {dailyChoices, plural, one{{dailyChoices} daily choice} other{{dailyChoices} daily choices}} and {tags, plural, one{{tags} tag} other{{tags} tags}}.'**
+  String dataImportConfirmationFacts(
+    String date,
+    int intentions,
+    int relations,
+    int dailyChoices,
+    int tags,
+  );
+
+  /// Действие подтверждения импорта, начинающее замену графа содержимым файла
+  ///
+  /// In en, this message translates to:
+  /// **'Import and replace'**
+  String get dataImportConfirm;
+
   /// Заголовок навигации по тегу
   ///
   /// In en, this message translates to:

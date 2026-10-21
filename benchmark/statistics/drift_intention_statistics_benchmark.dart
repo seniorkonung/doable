@@ -29,6 +29,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../support/contribution_statistics_fixture.dart';
 import '../support/benchmark.dart';
 import '../support/intention_statistics_fixture.dart';
+import '../../test/support/graph_seed.dart';
 import '../../test/support/local_database_harness.dart';
 
 const _readZone = #intentionStatisticsCostRead;
@@ -137,13 +138,15 @@ void main() {
             for (final view in StatisticsView.values)
               view: reference.section(view),
           };
-          raw.execute(
-            'UPDATE long_term_relations SET is_archived = ? WHERE id = ?',
-            [
-              originalRelationArchived ? 0 : 1,
-              changedRelationId.toCanonicalString(),
-            ],
-          );
+          seedRawGraph(raw, () {
+            raw.execute(
+              'UPDATE long_term_relations SET is_archived = ? WHERE id = ?',
+              [
+                originalRelationArchived ? 0 : 1,
+                changedRelationId.toCanonicalString(),
+              ],
+            );
+          });
           final changedReference = fixture.reference(raw, period);
           final changedExpected = {
             for (final view in StatisticsView.values)
@@ -162,13 +165,15 @@ void main() {
               reason: 'команда меняет разбивку, а не только ревизию',
             );
           }
-          raw.execute(
-            'UPDATE long_term_relations SET is_archived = ? WHERE id = ?',
-            [
-              originalRelationArchived ? 1 : 0,
-              changedRelationId.toCanonicalString(),
-            ],
-          );
+          seedRawGraph(raw, () {
+            raw.execute(
+              'UPDATE long_term_relations SET is_archived = ? WHERE id = ?',
+              [
+                originalRelationArchived ? 1 : 0,
+                changedRelationId.toCanonicalString(),
+              ],
+            );
+          });
           referenceWatch.stop();
           final choices = _periodCount(raw, 'daily_choices', period);
           final steps = _periodCount(raw, 'daily_choice_path_steps', period);

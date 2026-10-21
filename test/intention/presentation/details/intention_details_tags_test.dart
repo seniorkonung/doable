@@ -4,6 +4,7 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
@@ -19,6 +20,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../../support/app_root_pages.dart';
+import '../../../support/graph_seed.dart';
 import '../../../support/in_memory_diagnostics_sink.dart';
 import '../../../support/tag_storage_fixture.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
@@ -38,11 +40,13 @@ void main() {
         await database.open();
         addTearDown(database.close);
         seedTagStorageFixture(raw);
-        raw.execute('UPDATE intentions SET title = ? WHERE id IN (?, ?)', [
-          'Общее название',
-          tagFixtureId(1),
-          tagFixtureId(2),
-        ]);
+        seedRawGraph(raw, () {
+          raw.execute('UPDATE intentions SET title = ? WHERE id IN (?, ?)', [
+            'Общее название',
+            tagFixtureId(1),
+            tagFixtureId(2),
+          ]);
+        });
         final graphBefore = retainedTagFixtureGraph(raw);
         final assignmentsBefore = raw
             .select('SELECT * FROM tag_assignments ORDER BY creation_sequence')
@@ -63,6 +67,7 @@ void main() {
               personalGraphRepositoryProvider.overrideWithValue(repository),
             ],
             child: MaterialApp.router(
+              theme: doableTheme(Brightness.light),
               locale: const Locale('ru'),
               localizationsDelegates: AppLocalizations.localizationsDelegates,
               supportedLocales: AppLocalizations.supportedLocales,

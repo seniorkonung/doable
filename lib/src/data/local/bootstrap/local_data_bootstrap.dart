@@ -116,6 +116,7 @@ final class LocalDataBootstrap {
         SqliteCorruptionFailure() => const LocalDataCorruption(),
         SqliteUnavailableFailure() => const LocalDataRetryableFailure(),
         SqliteConstraintFailure() ||
+        SqliteStorageFullFailure() ||
         SqliteUnexpectedFailure() => const LocalDataUnexpectedFailure(),
       },
     };

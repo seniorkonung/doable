@@ -252,6 +252,34 @@ void main() {
       },
     );
 
+    // Предварительные сборки создавали схемы 1 и 2; перехода с них нет.
+    for (final preReleaseSchemaVersion in [1, 2]) {
+      test(
+        'классифицирует хранилище предварительной сборки версии '
+        '$preReleaseSchemaVersion как corruption без его изменения',
+        () async {
+          final databaseFile = await _temporaryDatabaseFile();
+          late List<int> preservedBytes;
+          final bootstrap = _bootstrapFor(
+            databaseFile,
+            setup: (database) {
+              database
+                ..execute('CREATE TABLE intentions (title TEXT NOT NULL)')
+                ..execute(
+                  "INSERT INTO intentions(title) VALUES ('сохранённое')",
+                )
+                ..execute('PRAGMA user_version = $preReleaseSchemaVersion');
+              preservedBytes = databaseFile.readAsBytesSync();
+            },
+          );
+          addTearDown(bootstrap.close);
+
+          expect(await bootstrap.open(), isA<LocalDataCorruption>());
+          expect(await databaseFile.readAsBytes(), preservedBytes);
+        },
+      );
+    }
+
     test(
       'сохраняет типизированную причину отказа bounded verification',
       () async {

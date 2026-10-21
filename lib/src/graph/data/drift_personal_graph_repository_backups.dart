@@ -1,0 +1,278 @@
+part of 'drift_personal_graph_repository.dart';
+
+extension _GraphBackupRegistryAccess on DriftPersonalGraphRepository {
+  /// Список меняют только записи копий в исполнителе репозитория, и каждая
+  /// подтверждённая запись сообщает об этом. Поэтому подписка на сигнал
+  /// появляется до первого чтения, а записи во время чтения дают одно
+  /// следующее чтение.
+  Stream<GraphBackupsRead> _watchBackups() {
+    late final StreamController<GraphBackupsRead> controller;
+    StreamSubscription<void>? changes;
+    var isObserving = true;
+    var isChanged = true;
+    var isReading = false;
+
+    Future<void> readWhileChanged() async {
+      isReading = true;
+      try {
+        while (isChanged && isObserving) {
+          isChanged = false;
+          final read = await _readBackups();
+          if (!isObserving) return;
+          controller.add(read);
+          if (read is GraphBackupsReadFailed) {
+            isObserving = false;
+            unawaited(changes?.cancel());
+            unawaited(controller.close());
+          }
+        }
+      } finally {
+        isReading = false;
+      }
+    }
+
+    controller = StreamController(
+      onListen: () {
+        changes = _backupsChanged.stream.listen((_) {
+          isChanged = true;
+          if (!isReading) unawaited(readWhileChanged());
+        });
+        unawaited(readWhileChanged());
+      },
+      onCancel: () {
+        isObserving = false;
+        return changes?.cancel();
+      },
+    );
+    return controller.stream;
+  }
+
+  Future<GraphBackupsRead> _readBackups() async {
+    try {
+      return GraphBackupsReadSucceeded(await _selectBackups());
+    } on Object {
+      return const GraphBackupsReadFailed();
+    }
+  }
+
+  /// Копии от новых к старым по созданию; отказ хранилища передаётся
+  /// исключением.
+  Future<List<GraphBackupEntry>> _selectBackups() async {
+    final rows = await _sequencer.run(
+      () => (_database.select(
+        _database.graphBackups,
+      )..orderBy([(backup) => OrderingTerm.desc(backup.id)])).get(),
+    );
+    return [for (final row in rows) _backupEntry(row)];
+  }
+
+  /// Удаление копий окном хранения диагностируется после подтверждения
+  /// транзакции, если оно удалило хотя бы одну копию, а его отказ — сразу.
+  Future<bool> _insertDailyBackup(
+    DateTime dayStart,
+    GraphChangeTally? since,
+  ) async {
+    final removal = Stopwatch();
+    var removed = 0;
+    final written = await _writeBackup((madeAt, position) async {
+      if (!await _isDailyBackupDue(dayStart, madeAt, position)) return false;
+      await _insertBackupRow(
+        GraphBackupKind.daily,
+        madeAt,
+        position,
+        await _summaryUpTo(position, since),
+      );
+      removed = await _removeBackupsBeforeWindow(removal);
+      return true;
+    });
+    if (removed > 0) {
+      _recordDiagnostics(
+        GraphBackupRemovalDiagnosticsEvent.succeeded(duration: removal.elapsed),
+      );
+    }
+    return written;
+  }
+
+  Future<void> _insertManualBackup(GraphChangeTally? since) =>
+      _writeBackup((madeAt, position) async {
+        await _insertBackupRow(
+          GraphBackupKind.manual,
+          madeAt,
+          position,
+          await _summaryUpTo(position, since),
+        );
+        return true;
+      });
+
+  /// Выполняет [write] одной транзакцией в исполнителе репозитория: момент
+  /// копии — показание часов в этой транзакции, а позиция — текущая в ней.
+  /// Наблюдатели списка узнают о записи после подтверждения.
+  Future<bool> _writeBackup(
+    Future<bool> Function(DateTime madeAt, int position) write,
+  ) => _sequencer.run(() async {
+    final written = await _database.transaction(
+      () async => write(_now(), await _selectCurrentLogPosition()),
+    );
+    if (written) _backupsChanged.add(null);
+    return written;
+  });
+
+  /// Условие записи ежедневной копии [GraphBackupRegistry.insertDailyBackup].
+  Future<bool> _isDailyBackupDue(
+    DateTime dayStart,
+    DateTime madeAt,
+    int position,
+  ) async {
+    final last =
+        await (_database.select(_database.graphBackups)
+              ..where((backup) => backup.kind.equals(_dailyBackupKind))
+              ..orderBy([(backup) => OrderingTerm.desc(backup.id)])
+              ..limit(1))
+            .getSingleOrNull();
+    if (last == null) return !(await _selectComposition()).isEmpty;
+    final isToday = isGraphBackupMadeInCurrentDay(
+      _backupMoment(last.madeAt),
+      dayStart: dayStart,
+      now: madeAt,
+    );
+    return !isToday && position > last.position;
+  }
+
+  /// Вставляет строку копии с позицией [position] и сводкой [summary].
+  Future<void> _insertBackupRow(
+    GraphBackupKind kind,
+    DateTime madeAt,
+    int position,
+    GraphChangeSummary summary,
+  ) async {
+    final counts = switch (summary) {
+      final GraphChangeCounts counts => counts,
+      GraphDataReplaced() => null,
+    };
+    await _database
+        .into(_database.graphBackups)
+        .insert(
+          local.GraphBackupsCompanion.insert(
+            position: position,
+            kind: _storedBackupKind(kind),
+            madeAt: madeAt.microsecondsSinceEpoch,
+            graphReplaced: counts == null,
+            addedCount: Value.absentIfNull(counts?.added),
+            changedCount: Value.absentIfNull(counts?.changed),
+            deletedCount: Value.absentIfNull(counts?.deleted),
+          ),
+        );
+  }
+
+  /// Сводка с последней копии до [position]. Пакеты после конца [since], а
+  /// без неё — после позиции последней копии, хранятся: граница хранения
+  /// истории не позже самой старой копии.
+  ///
+  /// Копия без предыдущей сравнивается с пустым графом, а пакеты «сброс» не
+  /// ищутся: ранняя история может быть уже сжата.
+  Future<GraphChangeSummary> _summaryUpTo(
+    int position,
+    GraphChangeTally? since,
+  ) async {
+    final last =
+        await (_database.select(_database.graphBackups)
+              ..orderBy([(backup) => OrderingTerm.desc(backup.id)])
+              ..limit(1))
+            .getSingleOrNull();
+    if (last == null) {
+      final composition = await _selectComposition();
+      return GraphChangeCounts(
+        added:
+            composition.intentionCount +
+            composition.relationCount +
+            composition.dailyChoiceCount +
+            composition.tagCount,
+        changed: 0,
+        deleted: 0,
+      );
+    }
+    final tally = since ?? GraphChangeTally(after: last.position);
+    while (true) {
+      final portion = await _selectStoredLogPackages(
+        after: tally.position,
+        upTo: position,
+      );
+      if (portion.isEmpty) return tally.summary;
+      portion.map(GraphHistoryPackage.decode).forEach(tally.add);
+    }
+  }
+
+  /// Удаляет копии любого вида, созданные раньше самой старой из
+  /// [retainedDailyGraphBackups] последних ежедневных копий, и возвращает
+  /// число удалённых копий.
+  ///
+  /// Длительность удаления отсчитывает [duration]; отказ диагностируется и
+  /// передаётся вызывающему.
+  Future<int> _removeBackupsBeforeWindow(Stopwatch duration) async {
+    final backups = _database.graphBackups;
+    duration.start();
+    try {
+      final oldestRetained =
+          await (_database.selectOnly(backups)
+                ..addColumns([backups.id])
+                ..where(backups.kind.equals(_dailyBackupKind))
+                ..orderBy([OrderingTerm.desc(backups.id)])
+                ..limit(1, offset: retainedDailyGraphBackups - 1))
+              .map((row) => row.read(backups.id)!)
+              .getSingleOrNull();
+      if (oldestRetained == null) return 0;
+      return await (_database.delete(
+        backups,
+      )..where((backup) => backup.id.isSmallerThanValue(oldestRetained))).go();
+    } on Object catch (error) {
+      _recordDiagnostics(
+        GraphBackupRemovalDiagnosticsEvent.failed(
+          duration: duration.elapsed,
+          code: graphSnapshotFailureCode(error),
+        ),
+      );
+      rethrow;
+    } finally {
+      duration.stop();
+    }
+  }
+}
+
+const _dailyBackupKind = 'daily';
+
+String _storedBackupKind(GraphBackupKind kind) => switch (kind) {
+  GraphBackupKind.daily => _dailyBackupKind,
+  GraphBackupKind.manual => 'manual',
+  GraphBackupKind.beforeReplacement => 'before_replacement',
+};
+
+DateTime _backupMoment(int madeAt) =>
+    DateTime.fromMicrosecondsSinceEpoch(madeAt, isUtc: true);
+
+/// Схема гарантирует копии известный вид и либо полную сводку, либо признак
+/// замены.
+GraphBackupEntry _backupEntry(local.GraphBackup row) => GraphBackupEntry(
+  id: GraphBackupId(row.id),
+  kind: switch (row.kind) {
+    _dailyBackupKind => GraphBackupKind.daily,
+    'manual' => GraphBackupKind.manual,
+    'before_replacement' => GraphBackupKind.beforeReplacement,
+    _ => throw StateError('Копия вне схемы.'),
+  },
+  position: row.position,
+  madeAt: _backupMoment(row.madeAt),
+  summary: switch (row) {
+    local.GraphBackup(graphReplaced: true) => const GraphDataReplaced(),
+    local.GraphBackup(
+      :final addedCount?,
+      :final changedCount?,
+      :final deletedCount?,
+    ) =>
+      GraphChangeCounts(
+        added: addedCount,
+        changed: changedCount,
+        deleted: deletedCount,
+      ),
+    _ => throw StateError('Копия вне схемы.'),
+  },
+);

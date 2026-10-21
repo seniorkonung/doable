@@ -76,6 +76,22 @@ void main() {
     },
   );
 
+  test('production connection сохраняет журнал отката и полную синхронизацию, '
+      'на которые опирается атомарность замены графа', () async {
+    final database = AppDatabase(openAndroidProductionDatabaseConnection());
+    addTearDown(database.close);
+
+    final journalMode = await database
+        .customSelect('PRAGMA journal_mode')
+        .getSingle();
+    final synchronous = await database
+        .customSelect('PRAGMA synchronous')
+        .getSingle();
+
+    expect(journalMode.read<String>('journal_mode'), 'delete');
+    expect(synchronous.read<int>('synchronous'), 2);
+  });
+
   test('регистрирует обязательные функции на production, in-memory и file-backed соединениях', () async {
     final connections = <ConfiguredLocalDatabaseConnection Function()>[
       openAndroidProductionDatabaseConnection,

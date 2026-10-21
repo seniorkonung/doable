@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/data/local/app_database.dart' hide Tag;
+import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -23,6 +24,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../../support/app_root_pages.dart';
+import '../../../support/graph_seed.dart';
 import '../../../support/in_memory_diagnostics_sink.dart';
 import '../../../support/ordinary_page_test_app.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
@@ -49,56 +51,58 @@ void main() {
       );
       await database.open();
       addTearDown(database.close);
-      for (var i = 1; i <= 107; i++) {
+      seedRawGraph(raw, () {
+        for (var i = 1; i <= 107; i++) {
+          raw.execute(
+            'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+            [_id(i), 'Намерение $i', 0, i.isEven ? 1 : 0, i, i],
+          );
+        }
+        for (final (id, archived) in [(201, 0), (202, 1)]) {
+          raw.execute(
+            'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
+            [
+              _id(id),
+              _id(1),
+              _id(id == 201 ? 3 : 4),
+              id == 201 ? 'need' : 'can',
+              2,
+              archived,
+            ],
+          );
+        }
         raw.execute(
-          'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-          [_id(i), 'Намерение $i', 0, i.isEven ? 1 : 0, i, i],
+          'INSERT INTO daily_choices (id, source_intention_id, selected_intention_id, choice_date, is_completed) VALUES (?, ?, ?, ?, ?)',
+          [_id(203), _id(1), _id(3), '2026-09-25', 0],
         );
-      }
-      for (final (id, archived) in [(201, 0), (202, 1)]) {
         raw.execute(
-          'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
-          [
-            _id(id),
-            _id(1),
-            _id(id == 201 ? 3 : 4),
-            id == 201 ? 'need' : 'can',
-            2,
-            archived,
-          ],
+          'INSERT INTO daily_choice_path_steps (id, daily_choice_id, long_term_relation_id) VALUES (?, ?, ?)',
+          [_id(204), _id(203), _id(201)],
         );
-      }
-      raw.execute(
-        'INSERT INTO daily_choices (id, source_intention_id, selected_intention_id, choice_date, is_completed) VALUES (?, ?, ?, ?, ?)',
-        [_id(203), _id(1), _id(3), '2026-09-25', 0],
-      );
-      raw.execute(
-        'INSERT INTO daily_choice_path_steps (id, daily_choice_id, long_term_relation_id) VALUES (?, ?, ?)',
-        [_id(204), _id(203), _id(201)],
-      );
-      for (var i = 1; i <= 52; i++) {
-        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-          _id(300 + i),
-          'Тег $i',
-        ]);
-      }
-      for (var i = 1; i <= 104; i++) {
+        for (var i = 1; i <= 52; i++) {
+          raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+            _id(300 + i),
+            'Тег $i',
+          ]);
+        }
+        for (var i = 1; i <= 104; i++) {
+          raw.execute(
+            'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+            [_id(301), _id(i)],
+          );
+        }
+        // Назначения за пределами первой сотни относятся к обоим охватам.
+        for (final id in [106, 107]) {
+          raw.execute(
+            'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+            [_id(301), _id(id)],
+          );
+        }
         raw.execute(
           'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-          [_id(301), _id(i)],
+          [_id(302), _id(105)],
         );
-      }
-      // Назначения за пределами первой сотни относятся к обоим охватам.
-      for (final id in [106, 107]) {
-        raw.execute(
-          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-          [_id(301), _id(id)],
-        );
-      }
-      raw.execute(
-        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-        [_id(302), _id(105)],
-      );
+      });
       final retained = {
         for (final table in [
           'intentions',
@@ -122,10 +126,12 @@ void main() {
 
       await tester.tap(find.byKey(ValueKey('tag-catalog-delete-${_id(301)}')));
       await tester.pumpAndSettle();
-      raw.execute(
-        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-        [_id(301), _id(105)],
-      );
+      seedRawGraph(raw, () {
+        raw.execute(
+          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+          [_id(301), _id(105)],
+        );
+      });
       await tester.tap(find.byKey(const ValueKey('tag-delete-confirm')));
       await _pumpUntil(
         tester,
@@ -173,15 +179,20 @@ void main() {
     );
     await database.open();
     addTearDown(database.close);
-    raw.execute(
-      'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-      [_id(1), 'Дом', 0, 1, 1, 1],
-    );
-    raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [_id(301), 'Дом']);
-    raw.execute(
-      'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-      [_id(301), _id(1)],
-    );
+    seedRawGraph(raw, () {
+      raw.execute(
+        'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+        [_id(1), 'Дом', 0, 1, 1, 1],
+      );
+      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        _id(301),
+        'Дом',
+      ]);
+      raw.execute(
+        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+        [_id(301), _id(1)],
+      );
+    });
     raw.execute('''
       CREATE TEMP TRIGGER fail_tag_cascade AFTER DELETE ON tag_assignments
       WHEN OLD.tag_id = '${_id(301)}'
@@ -215,7 +226,12 @@ void main() {
     );
     await database.open();
     addTearDown(database.close);
-    raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [_id(301), 'Дом']);
+    seedRawGraph(raw, () {
+      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        _id(301),
+        'Дом',
+      ]);
+    });
     final repository = DriftPersonalGraphRepository(
       database,
       UuidV7IntentionIdGenerator(),
@@ -225,8 +241,13 @@ void main() {
     await _openRealCatalog(tester, repository);
     await tester.tap(find.byKey(ValueKey('tag-catalog-delete-${_id(301)}')));
     await tester.pumpAndSettle();
-    raw.execute('DELETE FROM tags WHERE id = ?', [_id(301)]);
-    raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [_id(302), 'Дом']);
+    seedRawGraph(raw, () {
+      raw.execute('DELETE FROM tags WHERE id = ?', [_id(301)]);
+      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        _id(302),
+        'Дом',
+      ]);
+    });
     await tester.tap(find.byKey(const ValueKey('tag-delete-confirm')));
     await _pumpUntil(
       tester,
@@ -320,6 +341,7 @@ Future<void> _openRealCatalog(
         personalGraphRepositoryProvider.overrideWithValue(repository),
       ],
       child: MaterialApp.router(
+        theme: doableTheme(Brightness.light),
         locale: const Locale('ru'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,

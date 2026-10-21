@@ -50,6 +50,10 @@ abstract base class LocalDatabaseConnectionObserver {
   /// Границы транзакции позволяют отделять удержание очереди от ожидания.
   void onTransactionStarted() {}
 
+  /// Подтверждение транзакции ждёт этого hook, поэтому проверка может
+  /// удержать транзакцию после её последнего оператора.
+  FutureOr<void> beforeTransactionCommit() {}
+
   void onTransactionFinished() {}
 
   FutureOr<List<Map<String, Object?>>> afterSelect(
@@ -152,6 +156,7 @@ final class _LocalDatabaseObserverInterceptor extends QueryInterceptor {
   @override
   Future<void> commitTransaction(TransactionExecutor inner) async {
     try {
+      await _observer.beforeTransactionCommit();
       await inner.send();
     } finally {
       _observer.onTransactionFinished();

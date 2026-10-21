@@ -1,0 +1,667 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:isolate';
+import 'dart:math';
+
+import '../shared/diagnostics/diagnostics_sink.dart';
+import 'graph_fact_log.dart';
+import 'graph_snapshot_store.dart';
+
+/// Наибольшее число пакетов после последнего снимка, при котором лог ещё не
+/// сжимается.
+///
+/// Больший порог реже переписывает весь граф в снимок, но сборка состояния
+/// держит в памяти итог фактов всех пакетов после снимка. Значение выбрано
+/// бенчмарком лога фактов: итог тысячи правок занимает около 4,5 МиБ, а
+/// правок описаний на пределе графем — около 12 МиБ, что сопоставимо с
+/// остальной памятью сборки. Сжатие графа из миллиона сущностей длится
+/// около 34 с и при этом пороге случается раз на тысячу команд.
+const int graphLogCompactionThreshold = 1000;
+
+/// Выполняет запись снимка [write] в отдельном изоляте. Подмена позволяет
+/// проверкам наблюдать попытки сжатия и внедрять отказы файловой системы в
+/// изоляте записи.
+typedef GraphSnapshotWriteRunner = Future<GraphSnapshotEntry> Function(
+  GraphSnapshotWrite write,
+);
+
+/// Отдельная функция не захватывает лог и базу замыканием изолята:
+/// https://api.dart.dev/dart-isolate/Isolate/run.html
+Future<GraphSnapshotEntry> runGraphSnapshotWriteInIsolate(
+  GraphSnapshotWrite write,
+) => Isolate.run(write.run);
+
+/// Выполняет запись состояния графа [write] в отдельном изоляте. Подмена
+/// позволяет проверкам внедрять отказы файловой системы в изоляте записи.
+typedef GraphStateWriteRunner = Future<void> Function(GraphStateWrite write);
+
+/// Отдельная функция не захватывает лог и базу замыканием изолята, как
+/// [runGraphSnapshotWriteInIsolate].
+Future<void> runGraphStateWriteInIsolate(GraphStateWrite write) =>
+    Isolate.run(write.run);
+
+/// Выполняет запись снимка замены графа [write] в отдельном изоляте.
+/// Подмена позволяет проверкам внедрять отказы файловой системы в изоляте
+/// записи.
+typedef GraphReplacementSnapshotWriteRunner =
+    Future<UnregisteredGraphSnapshot> Function(
+      GraphReplacementSnapshotWrite write,
+    );
+
+/// Отдельная функция не захватывает лог и базу замыканием изолята, как
+/// [runGraphSnapshotWriteInIsolate].
+Future<UnregisteredGraphSnapshot> runGraphReplacementSnapshotWriteInIsolate(
+  GraphReplacementSnapshotWrite write,
+) => Isolate.run(write.run);
+
+/// Фоновое сжатие лога фактов в снимки.
+///
+/// Когда пакетов после последнего снимка становится больше порога, снимок
+/// текущей позиции собирается, пишется и регистрируется в отдельном изоляте,
+/// а затем удаляется история до него, кроме нужной хранимым копиям и идущим
+/// чтениям истории [readHistory] и снимков сохраняемых пакетов «сброс»:
+/// историю, отложенную ради чтений, удаляет следующее сжатие. Если последний
+/// снимок не проходит проверку, снимок текущего состояния пересобирается из
+/// базы, а повреждённый снимок удаляет та же граница хранения. База получает
+/// только короткие операции лога и порции графа, поэтому команды графа
+/// подтверждаются и во время сжатия. Одновременно идёт не больше одного
+/// сжатия.
+///
+/// Неудачное сжатие не повторяется на каждом новом пакете: следующая
+/// попытка — когда после неё записано ещё не меньше порога пакетов. Отказ
+/// записи или регистрации снимка оставляет базу, лог и прежний снимок без
+/// изменений, поэтому [start] в следующем запуске приложения пробует снова.
+/// Отказ удаления истории наступает, когда новый снимок уже зарегистрирован:
+/// прежние снимки и пакеты остаются в реестре и каталоге снимков, по новому
+/// снимку сжатие не нужно, а прежнюю историю удаляет граница хранения
+/// следующего успешного сжатия.
+///
+/// Исход сжатия и записи или пересборки снимка в изоляте записи сообщается в
+/// [DiagnosticsSink]; отказ диагностики исход сжатия не меняет.
+///
+/// Состояние графа на текущей позиции для экспорта пишет [writeCurrentState]
+/// тем же способом: в отдельном изоляте, который обращается к логу через
+/// это сжатие, под отметкой чтения истории. Если запись обнаружила, что
+/// последний снимок не проходит проверку, снимок пересобирается из базы вне
+/// порога, а запись дожидается пересборки и выполняется заново из нового
+/// снимка. Снимок замены графа на позиции, выбранной чтением истории, пишет
+/// [writeReplacementSnapshot] так же, но без пересборки, а снимок замены из
+/// недоверенного файла формата — [writeReplacementSnapshotOfFile] в
+/// отдельном изоляте без обращений к логу.
+final class GraphLogCompaction {
+  GraphLogCompaction({
+    required this._log,
+    required this._directory,
+    required this._clock,
+    required this._diagnosticsSink,
+    this._threshold = graphLogCompactionThreshold,
+    this._runner = runGraphSnapshotWriteInIsolate,
+    this._stateWriteRunner = runGraphStateWriteInIsolate,
+    this._replacementSnapshotRunner = runGraphReplacementSnapshotWriteInIsolate,
+  });
+
+  final ObservableGraphFactLog _log;
+  final Directory _directory;
+  final DateTime Function() _clock;
+  final DiagnosticsSink _diagnosticsSink;
+  final int _threshold;
+  final GraphSnapshotWriteRunner _runner;
+  final GraphStateWriteRunner _stateWriteRunner;
+  final GraphReplacementSnapshotWriteRunner _replacementSnapshotRunner;
+  late final _store = GraphSnapshotStore(
+    log: _log,
+    directory: _directory,
+    clock: _clock,
+    diagnosticsSink: _diagnosticsSink,
+  );
+
+  /// Подписка на новые пакеты; есть, только пока сжатие ведётся — между
+  /// [start] и [shutdown].
+  StreamSubscription<int>? _signals;
+  Future<void>? _running;
+
+  /// Позиция последнего снимка, известная по последней проверке; `null` —
+  /// ещё не прочитана.
+  int? _snapshotPosition;
+
+  /// Наибольшая известная позиция лога.
+  var _latestPosition = 0;
+
+  /// Позиция лога при последней неудачной попытке, пока за ней не последовала
+  /// успешная.
+  int? _failedAt;
+
+  /// Удаляет из каталога снимков незарегистрированные и временные файлы по
+  /// правилу [GraphSnapshotStore.removeUnregisteredFiles]. Выполняется не
+  /// одновременно со сжатием.
+  Future<void> removeUnregisteredFiles() => _store.removeUnregisteredFiles();
+
+  /// Чтение истории по правилу [GraphSnapshotStore.readHistory]: сжатие не
+  /// удаляет выбранную им историю, пока [read] не завершилось.
+  Future<T> readHistory<T>(Future<T> Function(GraphHistoryRead history) read) =>
+      _store.readHistory(read);
+
+  /// Пишет состояние графа на текущей позиции в новый файл формата [file]
+  /// существующего каталога с моментом [writtenAt] в заголовке по правилу
+  /// [GraphSnapshotStore.writeStateFile] в отдельном изоляте; [onProgress]
+  /// получает ход записи.
+  ///
+  /// Чтение истории [readHistory] фиксирует текущую позицию и сохраняет её
+  /// базовый снимок и пакеты после него до конца записи. Поэтому файл
+  /// отражает состояние на этой позиции, даже если во время записи
+  /// подтверждаются команды и завершается сжатие, а команды записи не ждут:
+  /// база получает от изолята записи только короткие операции лога.
+  ///
+  /// Если базовый снимок не прошёл проверку, а сжатие ведётся, запись
+  /// дожидается идущего сжатия, а затем пересборки снимка из базы вне
+  /// порога, если этот снимок остаётся последним. Когда последним
+  /// зарегистрирован другой снимок, запись один раз выполняется заново по
+  /// новому чтению истории, и ход отсчитывается с нуля. Иначе — сжатие не
+  /// ведётся или пересборка не удалась — запись отказывает
+  /// [GraphSnapshotCorruption]; повреждение, обнаруженное новой записью,
+  /// тоже сразу даёт этот отказ.
+  Future<void> writeCurrentState(
+    File file, {
+    required DateTime writtenAt,
+    required void Function(double share) onProgress,
+  }) async {
+    GraphSnapshotEntry? base;
+    try {
+      await _writeState(
+        file,
+        writtenAt: writtenAt,
+        onProgress: onProgress,
+        onBase: (selected) => base = selected,
+      );
+    } on GraphSnapshotCorruption {
+      // Отметка чтения уже снята, поэтому граница хранения не сохраняет
+      // повреждённый снимок ради этой записи.
+      if (base case final corrupted? when _signals != null) {
+        await _rebuildIfLatest(corrupted);
+        onProgress(0);
+        await _writeState(
+          file,
+          writtenAt: writtenAt,
+          onProgress: onProgress,
+          onBase: (selected) {
+            if (selected?.fileName == corrupted.fileName) {
+              throw const GraphSnapshotCorruption();
+            }
+          },
+        );
+        return;
+      }
+      rethrow;
+    }
+  }
+
+  /// Пишет состояние графа на текущей позиции в [file] под отметкой чтения
+  /// истории; [onBase] получает базовый снимок чтения до записи.
+  Future<void> _writeState(
+    File file, {
+    required DateTime writtenAt,
+    required void Function(double share) onProgress,
+    required void Function(GraphSnapshotEntry? base) onBase,
+  }) => readHistory((history) async {
+    final state = await history.selectStateAt(
+      await history.readCurrentPosition(),
+    );
+    onBase(state.base);
+    return _inWriter(
+      (compaction) => _stateWriteRunner(
+        GraphStateWrite._(state, file.path, _directory, writtenAt, compaction),
+      ),
+      onProgress: onProgress,
+    );
+  });
+
+  /// Пишет состояние графа на позиции источника [state] в новый снимок
+  /// каталога снимков по правилу
+  /// [GraphSnapshotStore.writeReplacementSnapshot] в отдельном изоляте и не
+  /// регистрирует его: снимок замены графа регистрирует транзакция замены.
+  /// [onProgress] получает ход записи, а завершение [cancelled] прекращает
+  /// её между записями отказом [GraphReplacementSnapshotCancelled].
+  ///
+  /// Вызывается внутри чтения истории [readHistory], которое выбрало
+  /// [state]: до конца записи оно сохраняет базовый снимок источника и
+  /// пакеты после него. Поэтому сжатие, завершившееся во время записи, ей не
+  /// мешает, а команды записи не ждут: база получает от изолята записи
+  /// только короткие операции лога. Базовый снимок, не прошедший проверку,
+  /// даёт [GraphSnapshotCorruption]: пересборка из базы восстанавливает
+  /// только текущее состояние, а не состояние на прошлой позиции.
+  Future<UnregisteredGraphSnapshot> writeReplacementSnapshot(
+    GraphStateSource state, {
+    required void Function(double share) onProgress,
+    required Future<void> cancelled,
+  }) => _writeReplacementSnapshot(
+    _StateReplacementSource(state),
+    onProgress: onProgress,
+    cancelled: cancelled,
+  );
+
+  /// Пишет записи недоверенного файла формата [file] в новый снимок каталога
+  /// снимков по правилу [GraphSnapshotStore.writeReplacementSnapshotOfFile] в
+  /// отдельном изоляте и не регистрирует его: снимок замены графа
+  /// регистрирует транзакция замены. [onProgress] получает ход записи, а
+  /// завершение [cancelled] прекращает её между записями отказом
+  /// [GraphReplacementSnapshotCancelled].
+  ///
+  /// Запись не читает лог, поэтому команды графа её не ждут. Она не
+  /// выполняется одновременно с [removeUnregisteredFiles].
+  Future<UnregisteredGraphSnapshot> writeReplacementSnapshotOfFile(
+    File file, {
+    required void Function(double share) onProgress,
+    required Future<void> cancelled,
+  }) => _writeReplacementSnapshot(
+    _FileReplacementSource(file.path),
+    onProgress: onProgress,
+    cancelled: cancelled,
+  );
+
+  Future<UnregisteredGraphSnapshot> _writeReplacementSnapshot(
+    _ReplacementSnapshotSource source, {
+    required void Function(double share) onProgress,
+    required Future<void> cancelled,
+  }) => _inWriter(
+    (compaction) => _replacementSnapshotRunner(
+      GraphReplacementSnapshotWrite._(source, _directory, _clock(), compaction),
+    ),
+    onProgress: onProgress,
+    cancelled: cancelled,
+  );
+
+  /// Дожидается идущего сжатия, а затем, если сжатие ещё ведётся, запускает
+  /// и дожидается сжатия, которое пересобирает снимок вне порога, если
+  /// последним остаётся [corrupted].
+  Future<void> _rebuildIfLatest(GraphSnapshotEntry corrupted) async {
+    while (_running != null) {
+      await _running;
+    }
+    if (_signals != null) await _launch(corrupted: corrupted);
+  }
+
+  /// Сверяет лог с порогом и следит за новыми пакетами. Вызывается один раз,
+  /// не одновременно с [removeUnregisteredFiles].
+  void start() {
+    _signals = _log.confirmedPositions.listen(_onConfirmed);
+    _launch();
+  }
+
+  /// Перестаёт следить за новыми пакетами и дожидается идущего сжатия.
+  Future<void> shutdown() async {
+    final signals = _signals;
+    _signals = null;
+    await signals?.cancel();
+    await _running;
+  }
+
+  void _onConfirmed(int position) {
+    _latestPosition = max(_latestPosition, position);
+    if (_running != null || !_mayBeDue(position)) return;
+    _launch();
+  }
+
+  /// Решение без обращения к базе: окончательно порог сверяется с
+  /// прочитанными позициями перед сжатием.
+  bool _mayBeDue(int position) {
+    if (_snapshotPosition case final snapshot?
+        when position - snapshot <= _threshold) {
+      return false;
+    }
+    if (_failedAt case final failed? when position - failed < _threshold) {
+      return false;
+    }
+    return true;
+  }
+
+  /// Запускает сжатие, которое не дожидается порога, если последний снимок —
+  /// [corrupted], не прошедший проверку при чтении истории.
+  Future<void> _launch({GraphSnapshotEntry? corrupted}) =>
+      _running = _compactIfDue(corrupted: corrupted)
+          .whenComplete(() => _running = null);
+
+  Future<void> _compactIfDue({GraphSnapshotEntry? corrupted}) async {
+    final stopwatch = Stopwatch()..start();
+    var stage = GraphLogCompactionDiagnosticsStage.check;
+    try {
+      final position = await _log.readCurrentPosition();
+      _latestPosition = max(_latestPosition, position);
+      final latest = await _log.readSnapshotAtOrBefore(position);
+      final snapshotPosition = _snapshotPosition = latest?.position ?? 0;
+      final rebuildDue =
+          corrupted != null && latest?.fileName == corrupted.fileName;
+      if (!rebuildDue && position - snapshotPosition <= _threshold) return;
+      stage = GraphLogCompactionDiagnosticsStage.snapshotWrite;
+      final snapshot = await _writeSnapshot(position);
+      _snapshotPosition = snapshot.position;
+      _failedAt = null;
+      stage = GraphLogCompactionDiagnosticsStage.historyRemoval;
+      await _store.removeHistoryBefore(snapshot.position);
+      _recordDiagnostics(
+        GraphLogCompactionDiagnosticsEvent.succeeded(
+          duration: stopwatch.elapsed,
+        ),
+      );
+    } on Object catch (error) {
+      // Запись снимка при отказе удаляет свой файл и не регистрирует его.
+      // Удаление истории откатывается своей транзакцией, а новый снимок
+      // остаётся зарегистрированным: прежнюю историю удалит граница хранения
+      // следующего успешного сжатия.
+      _failedAt = _latestPosition;
+      _recordDiagnostics(
+        GraphLogCompactionDiagnosticsEvent.failed(
+          stage: stage,
+          duration: stopwatch.elapsed,
+          code: graphSnapshotFailureCode(error),
+        ),
+      );
+    }
+  }
+
+  Future<GraphSnapshotEntry> _writeSnapshot(int position) => _inWriter(
+    (compaction) => _runner(
+      GraphSnapshotWrite._(position, _directory, _clock(), compaction),
+    ),
+  );
+
+  /// Выполняет [write] изолята записи, который обращается к логу и
+  /// диагностике через порт: операции выполняет [_log] этого изолята,
+  /// поэтому база и её исполнитель остаются здесь, события записывает
+  /// [_diagnosticsSink], ход записи получает [onProgress], а о завершении
+  /// [cancelled] узнаёт изолят записи.
+  ///
+  /// Сообщения изолята записи обрабатываются в порядке отправки, а его
+  /// результат приходит последним, поэтому к завершению записи все её
+  /// события и ход уже переданы.
+  Future<T> _inWriter<T>(
+    Future<T> Function(SendPort compaction) write, {
+    void Function(double share)? onProgress,
+    Future<void>? cancelled,
+  }) async {
+    final messages = ReceivePort();
+    messages.listen((message) {
+      switch (message as _WriterMessage) {
+        case final _GraphFactLogCall<Object?> call:
+          call.answer(_log);
+        case _WriterDiagnostics(:final event):
+          _recordDiagnostics(event);
+        case _WriterProgress(:final share):
+          onProgress?.call(share);
+        case _WriterCancellation(:final cancel):
+          // Отмена после окончания записи уходит в закрытый порт и ничего
+          // не меняет.
+          unawaited(cancelled?.then((_) => cancel.send(null)));
+      }
+    });
+    try {
+      return await write(messages.sendPort);
+    } finally {
+      messages.close();
+    }
+  }
+
+  void _recordDiagnostics(DiagnosticsEvent event) =>
+      recordDiagnosticsSafely(_diagnosticsSink, event);
+}
+
+/// Запись снимка для отдельного изолята: позиция, каталог снимков, момент
+/// записи и порт, через который изолят обращается к логу фактов и
+/// передаёт события диагностики.
+final class GraphSnapshotWrite {
+  const GraphSnapshotWrite._(
+    this._position,
+    this._directory,
+    this._writtenAt,
+    this._compaction,
+  );
+
+  final int _position;
+  final Directory _directory;
+  final DateTime _writtenAt;
+  final SendPort _compaction;
+
+  /// Пишет и регистрирует снимок, а если последний снимок не проходит
+  /// проверку, пересобирает снимок из базы; выполняется в изоляте записи.
+  Future<GraphSnapshotEntry> run() async {
+    final store = GraphSnapshotStore(
+      log: _PortGraphFactLog(_compaction),
+      directory: _directory,
+      clock: () => _writtenAt,
+      diagnosticsSink: _PortDiagnosticsSink(_compaction),
+    );
+    try {
+      return await store.writeSnapshot(_position);
+    } on GraphSnapshotCorruption {
+      return store.rebuildSnapshot();
+    }
+  }
+}
+
+/// Запись состояния графа для отдельного изолята: источник состояния,
+/// выбранный чтением истории, путь файла, каталог снимков, момент записи и
+/// порт, через который изолят обращается к логу фактов и передаёт ход
+/// записи.
+final class GraphStateWrite {
+  const GraphStateWrite._(
+    this._state,
+    this._path,
+    this._directory,
+    this._writtenAt,
+    this._compaction,
+  );
+
+  final GraphStateSource _state;
+  final String _path;
+  final Directory _directory;
+  final DateTime _writtenAt;
+  final SendPort _compaction;
+
+  /// Пишет состояние на позиции источника в файл; выполняется в изоляте
+  /// записи.
+  Future<void> run() =>
+      GraphSnapshotStore(
+        log: _PortGraphFactLog(_compaction),
+        directory: _directory,
+        clock: () => _writtenAt,
+        diagnosticsSink: _PortDiagnosticsSink(_compaction),
+      ).writeStateFile(
+        _state,
+        File(_path),
+        onProgress: (share) => _compaction.send(_WriterProgress(share)),
+      );
+}
+
+/// Запись снимка замены графа для отдельного изолята: источник записей —
+/// состояние на позиции, выбранной чтением истории, или файл формата, —
+/// каталог снимков, момент записи и порт, через который изолят обращается к
+/// логу фактов, передаёт ход записи и получает отмену.
+final class GraphReplacementSnapshotWrite {
+  const GraphReplacementSnapshotWrite._(
+    this._source,
+    this._directory,
+    this._writtenAt,
+    this._compaction,
+  );
+
+  final _ReplacementSnapshotSource _source;
+  final Directory _directory;
+  final DateTime _writtenAt;
+  final SendPort _compaction;
+
+  /// Пишет снимок замены, пока изолят сжатия не сообщил об отмене;
+  /// выполняется в изоляте записи.
+  Future<UnregisteredGraphSnapshot> run() async {
+    var cancelled = false;
+    // Порт создаётся в изоляте, который получает по нему сообщения, поэтому
+    // изолят сжатия узнаёт его из первого сообщения записи.
+    final cancellation = ReceivePort()..listen((_) => cancelled = true);
+    _compaction.send(_WriterCancellation(cancellation.sendPort));
+    final store = GraphSnapshotStore(
+      log: _PortGraphFactLog(_compaction),
+      directory: _directory,
+      clock: () => _writtenAt,
+      diagnosticsSink: _PortDiagnosticsSink(_compaction),
+    );
+    void onProgress(double share) => _compaction.send(_WriterProgress(share));
+    bool isCancelled() => cancelled;
+    try {
+      return await switch (_source) {
+        _StateReplacementSource(:final state) => store.writeReplacementSnapshot(
+          state,
+          onProgress: onProgress,
+          isCancelled: isCancelled,
+        ),
+        _FileReplacementSource(:final path) =>
+          store.writeReplacementSnapshotOfFile(
+            File(path),
+            onProgress: onProgress,
+            isCancelled: isCancelled,
+          ),
+      };
+    } finally {
+      cancellation.close();
+    }
+  }
+}
+
+/// Источник записей снимка замены графа.
+sealed class _ReplacementSnapshotSource {
+  const _ReplacementSnapshotSource();
+}
+
+/// Состояние графа на позиции, выбранной чтением истории.
+final class _StateReplacementSource extends _ReplacementSnapshotSource {
+  const _StateReplacementSource(this.state);
+
+  final GraphStateSource state;
+}
+
+/// Недоверенный файл формата по пути [path].
+final class _FileReplacementSource extends _ReplacementSnapshotSource {
+  const _FileReplacementSource(this.path);
+
+  final String path;
+}
+
+/// Лог фактов изолята записи: каждую операцию выполняет лог изолята сжатия,
+/// а её отказ передаётся обратно.
+final class _PortGraphFactLog implements GraphFactLog {
+  const _PortGraphFactLog(this._calls);
+
+  final SendPort _calls;
+
+  @override
+  Future<int> readCurrentPosition() =>
+      _call((log) => log.readCurrentPosition());
+
+  @override
+  Future<List<StoredGraphLogPackage>> readPackages({
+    required int after,
+    required int upTo,
+  }) => _call((log) => log.readPackages(after: after, upTo: upTo));
+
+  @override
+  Future<GraphRecordPortion> readGraphRecords({GraphRecordOrderKey? after}) =>
+      _call((log) => log.readGraphRecords(after: after));
+
+  @override
+  Future<GraphSnapshotEntry?> readSnapshotAtOrBefore(int position) =>
+      _call((log) => log.readSnapshotAtOrBefore(position));
+
+  @override
+  Future<Set<String>> readSnapshotFileNames() =>
+      _call((log) => log.readSnapshotFileNames());
+
+  @override
+  Future<void> registerSnapshot(GraphSnapshotEntry snapshot) =>
+      _call((log) => log.registerSnapshot(snapshot));
+
+  @override
+  Future<List<String>> removeHistoryBefore(
+    int boundary, {
+    required Iterable<GraphSnapshotEntry> retained,
+  }) => _call((log) => log.removeHistoryBefore(boundary, retained: retained));
+
+  /// Изоляты одной группы передают замыкания:
+  /// https://api.dart.dev/dart-isolate/SendPort/send.html
+  Future<T> _call<T>(Future<T> Function(GraphFactLog log) operation) async {
+    final reply = ReceivePort();
+    _calls.send(_GraphFactLogCall<T>(operation, reply.sendPort));
+    return switch (await reply.first as _GraphFactLogReply<T>) {
+      _GraphFactLogSuccess<T>(:final value) => value,
+      _GraphFactLogFailure<T>(:final error, :final stackTrace) =>
+        Error.throwWithStackTrace(error, stackTrace),
+    };
+  }
+}
+
+/// Получатель диагностики изолята записи: события записывает получатель
+/// изолята сжатия.
+final class _PortDiagnosticsSink implements DiagnosticsSink {
+  const _PortDiagnosticsSink(this._compaction);
+
+  final SendPort _compaction;
+
+  @override
+  void record(DiagnosticsEvent event) =>
+      _compaction.send(_WriterDiagnostics(event));
+}
+
+/// Сообщение изолята записи изоляту сжатия.
+sealed class _WriterMessage {
+  const _WriterMessage();
+}
+
+final class _WriterDiagnostics extends _WriterMessage {
+  const _WriterDiagnostics(this.event);
+
+  final DiagnosticsEvent event;
+}
+
+/// Доля записанных записей состояния графа.
+final class _WriterProgress extends _WriterMessage {
+  const _WriterProgress(this.share);
+
+  final double share;
+}
+
+/// Порт изолята записи, в который изолят сжатия сообщает об отмене записи.
+final class _WriterCancellation extends _WriterMessage {
+  const _WriterCancellation(this.cancel);
+
+  final SendPort cancel;
+}
+
+final class _GraphFactLogCall<T> extends _WriterMessage {
+  const _GraphFactLogCall(this._operation, this._reply);
+
+  final Future<T> Function(GraphFactLog log) _operation;
+  final SendPort _reply;
+
+  /// Отказы лога пересекают границу изолятов уже сейчас — база работает в
+  /// своём изоляте, — поэтому передаются как есть.
+  Future<void> answer(GraphFactLog log) async {
+    try {
+      _reply.send(_GraphFactLogSuccess<T>(await _operation(log)));
+    } on Object catch (error, stackTrace) {
+      _reply.send(_GraphFactLogFailure<T>(error, stackTrace));
+    }
+  }
+}
+
+sealed class _GraphFactLogReply<T> {
+  const _GraphFactLogReply();
+}
+
+final class _GraphFactLogSuccess<T> extends _GraphFactLogReply<T> {
+  const _GraphFactLogSuccess(this.value);
+
+  final T value;
+}
+
+final class _GraphFactLogFailure<T> extends _GraphFactLogReply<T> {
+  const _GraphFactLogFailure(this.error, this.stackTrace);
+
+  final Object error;
+  final StackTrace stackTrace;
+}

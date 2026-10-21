@@ -24,6 +24,7 @@ import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 
@@ -67,20 +68,22 @@ void main() {
         seedTagStorageFixture(raw);
         id = _id(tagFixtureId(1));
         expectedTagNames = ['Дом'];
-        for (var index = 0; index < 105; index++) {
-          final name = 'Собственный тег $index';
-          expectedTagNames.add(name);
-          raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-            tagFixtureId(2000 - index),
-            name,
-          ]);
-        }
-        for (var index = 104; index >= 0; index--) {
-          raw.execute(
-            'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-            [tagFixtureId(2000 - index), id.toCanonicalString()],
-          );
-        }
+        seedRawGraph(raw, () {
+          for (var index = 0; index < 105; index++) {
+            final name = 'Собственный тег $index';
+            expectedTagNames.add(name);
+            raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+              tagFixtureId(2000 - index),
+              name,
+            ]);
+          }
+          for (var index = 104; index >= 0; index--) {
+            raw.execute(
+              'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+              [tagFixtureId(2000 - index), id.toCanonicalString()],
+            );
+          }
+        });
       });
 
       test(
@@ -138,13 +141,15 @@ void main() {
             ('восстановления из архива', RestoreIntention.new, 1, 1),
           ]) {
         test('снимки $name сохраняют полные собственные теги', () async {
-          if (isArchived == 1) {
-            raw.execute('UPDATE long_term_relations SET is_archived = 1');
-          }
-          raw.execute(
-            'UPDATE intentions SET is_action_ready = ?, is_archived = ? WHERE id = ?',
-            [isReady, isArchived, id.toCanonicalString()],
-          );
+          seedRawGraph(raw, () {
+            if (isArchived == 1) {
+              raw.execute('UPDATE long_term_relations SET is_archived = 1');
+            }
+            raw.execute(
+              'UPDATE intentions SET is_action_ready = ?, is_archived = ? WHERE id = ?',
+              [isReady, isArchived, id.toCanonicalString()],
+            );
+          });
           final saved = _commandSuccess(
             await repository.execute(command(id)),
           ) as IntentionSaved;
@@ -219,13 +224,15 @@ void main() {
             ('восстановления из архива', RestoreIntention.new, 1, 0),
           ]) {
         test('повтор $name сохраняет проверенные теги без записи', () async {
-          if (isArchived == 1) {
-            raw.execute('UPDATE long_term_relations SET is_archived = 1');
-          }
-          raw.execute(
-            'UPDATE intentions SET is_action_ready = ?, is_archived = ? WHERE id = ?',
-            [isReady, isArchived, id.toCanonicalString()],
-          );
+          seedRawGraph(raw, () {
+            if (isArchived == 1) {
+              raw.execute('UPDATE long_term_relations SET is_archived = 1');
+            }
+            raw.execute(
+              'UPDATE intentions SET is_action_ready = ?, is_archived = ? WHERE id = ?',
+              [isReady, isArchived, id.toCanonicalString()],
+            );
+          });
 
           final saved = _commandSuccess(
             await repository.execute(command(id)),
@@ -248,8 +255,10 @@ void main() {
       test(
         'снимок удаления сохраняет теги до каскадного удаления назначений',
         () async {
-          raw.execute('DELETE FROM daily_choices');
-          raw.execute('DELETE FROM long_term_relations');
+          seedRawGraph(raw, () {
+            raw.execute('DELETE FROM daily_choices');
+            raw.execute('DELETE FROM long_term_relations');
+          });
 
           final deleted = _commandSuccess(
             await repository.execute(DeleteIntention(id)),
@@ -579,6 +588,8 @@ void main() {
       clock = _DeterministicClock([
         DateTime.utc(2026, 9, 3, 12),
         DateTime.utc(2026, 9, 3, 13),
+        // Время записи пакета удаления.
+        DateTime.utc(2026, 9, 3, 14),
       ]);
       repository = DriftPersonalGraphRepository(
         database,
@@ -1024,6 +1035,17 @@ void main() {
     test(
       'физически удаляет active и archived намерения из всех публичных чтений',
       () async {
+        // Каждое удаление читает часы для времени записи своего пакета фактов.
+        clock = _DeterministicClock([
+          DateTime.utc(2026, 9, 3, 12),
+          DateTime.utc(2026, 9, 3, 13),
+        ]);
+        repository = DriftPersonalGraphRepository(
+          database,
+          idGenerator,
+          clock.call,
+          diagnostics,
+        );
         final fixtures = [
           (id: _id(_firstUuid), isArchived: false),
           (id: _id(_secondUuid), isArchived: true),
@@ -1551,14 +1573,16 @@ void main() {
       );
 
       setUp(() async {
-        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-          weekendTagId.toCanonicalString(),
-          'Выходные',
-        ]);
-        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-          homeTagId.toCanonicalString(),
-          'Дом',
-        ]);
+        seedRawGraph(raw, () {
+          raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+            weekendTagId.toCanonicalString(),
+            'Выходные',
+          ]);
+          raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+            homeTagId.toCanonicalString(),
+            'Дом',
+          ]);
+        });
         await _insertIntention(
           database,
           id: existingActiveId.toCanonicalString(),
@@ -1770,6 +1794,14 @@ void main() {
 
       test('переименованный выбранный тег назначается по идентичности с '
           'актуальным названием без создания нового тега', () async {
+        // Переименование читает часы для времени записи своего пакета фактов.
+        clock = _DeterministicClock([createdAt, createdAt]);
+        repository = DriftPersonalGraphRepository(
+          database,
+          idGenerator,
+          clock.call,
+          diagnostics,
+        );
         final renamed = await repository.execute(
           RenameTag(tagId: homeTagId, name: TagName.fromInput('Быт')),
         );
@@ -1805,6 +1837,14 @@ void main() {
       test('удалённый и заново созданный одноимённый выбранный тег отклоняет '
           'всё создание точным отсутствующим идентификатором без подмены '
           'новым тегом', () async {
+        // Команды тегов читают часы для времени записи своих пакетов фактов.
+        clock = _DeterministicClock([createdAt, createdAt, createdAt]);
+        repository = DriftPersonalGraphRepository(
+          database,
+          idGenerator,
+          clock.call,
+          diagnostics,
+        );
         _tagCommandSuccess(await repository.execute(DeleteTag(homeTagId)));
         final recreated = _tagCommandSuccess(
           await repository.execute(CreateTag(TagName.fromInput('Дом'))),
@@ -2081,6 +2121,8 @@ List<IntentionSummary> _catalogItems(Result<IntentionCatalogPage> result) {
   return (result as ResultSuccess<IntentionCatalogPage>).value.items;
 }
 
+/// Сохранённое намерение фикстуры не оставляет отметок лога фактов:
+/// иначе следующая команда, даже без изменений, записала бы его пакет.
 Future<void> _insertIntention(
   AppDatabase database, {
   required String id,
@@ -2090,19 +2132,23 @@ Future<void> _insertIntention(
   bool isArchived = false,
   required DateTime createdAt,
   DateTime? updatedAt,
-}) => database
-    .into(database.intentions)
-    .insert(
-      IntentionsCompanion.insert(
-        id: id,
-        title: title,
-        description: Value(description),
-        isActionReady: Value(isActionReady),
-        isArchived: Value(isArchived),
-        createdAt: createdAt.microsecondsSinceEpoch,
-        updatedAt: (updatedAt ?? createdAt).microsecondsSinceEpoch,
-      ),
-    );
+}) async {
+  await seedGraph(database, () async {
+    await database
+        .into(database.intentions)
+        .insert(
+          IntentionsCompanion.insert(
+            id: id,
+            title: title,
+            description: Value(description),
+            isActionReady: Value(isActionReady),
+            isArchived: Value(isArchived),
+            createdAt: createdAt.microsecondsSinceEpoch,
+            updatedAt: (updatedAt ?? createdAt).microsecondsSinceEpoch,
+          ),
+        );
+  });
+}
 
 final class _DeterministicIntentionIdGenerator implements IntentionIdGenerator {
   _DeterministicIntentionIdGenerator(Iterable<IntentionId> ids)

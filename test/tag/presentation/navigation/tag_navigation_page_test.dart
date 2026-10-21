@@ -7,6 +7,7 @@ import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/data/local/app_database.dart' hide Tag;
+import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
@@ -30,6 +31,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../../support/app_root_pages.dart';
+import '../../../support/graph_seed.dart';
 import '../../../support/in_memory_diagnostics_sink.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
 import '../../../support/ordinary_page_test_app.dart';
@@ -523,19 +525,21 @@ _pumpStoredPage(WidgetTester tester, {_Reads? reads}) async {
   );
   await database.open();
   seedTagStorageFixture(raw);
-  raw.execute('UPDATE intentions SET title = ?', ['Общее название']);
-  raw.execute(
-    'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, 0, 0, 1, 1)',
-    [tagFixtureId(4), 'Общее название'],
-  );
-  raw.execute(
-    'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, 2, 0)',
-    [tagFixtureId(104), tagFixtureId(3), tagFixtureId(1), 'can'],
-  );
-  raw.execute(
-    'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-    [tagFixtureId(firstTagNumber), tagFixtureId(4)],
-  );
+  seedRawGraph(raw, () {
+    raw.execute('UPDATE intentions SET title = ?', ['Общее название']);
+    raw.execute(
+      'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, 0, 0, 1, 1)',
+      [tagFixtureId(4), 'Общее название'],
+    );
+    raw.execute(
+      'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, 2, 0)',
+      [tagFixtureId(104), tagFixtureId(3), tagFixtureId(1), 'can'],
+    );
+    raw.execute(
+      'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+      [tagFixtureId(firstTagNumber), tagFixtureId(4)],
+    );
+  });
   final repository = DriftPersonalGraphRepository(
     database,
     UuidV7IntentionIdGenerator(),
@@ -559,6 +563,7 @@ _pumpStoredPage(WidgetTester tester, {_Reads? reads}) async {
         ],
       ],
       child: MaterialApp.router(
+        theme: doableTheme(Brightness.light),
         locale: const Locale('ru'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,

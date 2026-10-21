@@ -8,6 +8,7 @@ import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
@@ -31,6 +32,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/app_root_pages.dart';
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
@@ -125,6 +127,7 @@ void main() {
           personalGraphRepositoryProvider.overrideWithValue(repository),
         ],
         child: MaterialApp.router(
+          theme: doableTheme(Brightness.light),
           locale: locale,
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
@@ -223,17 +226,19 @@ void _registerAssignmentScenarios() {
         final ready =
             (await tester.runAsync(runtime.bootstrap)) as AppRuntimeReady;
         seedTagStorageFixture(raw);
-        for (var index = 0; index < 50; index++) {
-          final id = tagFixtureId(10000 + index);
-          raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-            id,
-            'Дополнение ${index.toString().padLeft(3, '0')}',
-          ]);
-          raw.execute(
-            'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-            [id, tagFixtureId(number)],
-          );
-        }
+        seedRawGraph(raw, () {
+          for (var index = 0; index < 50; index++) {
+            final id = tagFixtureId(10000 + index);
+            raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+              id,
+              'Дополнение ${index.toString().padLeft(3, '0')}',
+            ]);
+            raw.execute(
+              'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+              [id, tagFixtureId(number)],
+            );
+          }
+        });
         final l10n = await AppLocalizations.delegate.load(locale);
         final router = ready.container.read(appRouterProvider);
         await tester.pumpWidget(MainApp(runtime: runtime));
@@ -544,15 +549,17 @@ void _registerDraftSelectionScenarios() {
       () => DateTime.utc(2026, 9, 25),
       diagnostics,
     );
-    for (final (number, name) in [
-      (firstTagNumber, 'Дом'),
-      (lastTagNumber, 'Работа'),
-    ]) {
-      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-        tagFixtureId(number),
-        name,
-      ]);
-    }
+    seedRawGraph(raw, () {
+      for (final (number, name) in [
+        (firstTagNumber, 'Дом'),
+        (lastTagNumber, 'Работа'),
+      ]) {
+        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+          tagFixtureId(number),
+          name,
+        ]);
+      }
+    });
     final container = ProviderContainer(
       overrides: [
         personalGraphRepositoryProvider.overrideWithValue(repository),

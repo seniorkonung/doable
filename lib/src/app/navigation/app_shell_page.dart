@@ -1,10 +1,12 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app_destination.dart';
 import 'app_navigation.dart';
 import 'app_navigation_bar.dart';
 import 'app_shell_tab_insets.dart';
+import 'graph_generation.dart';
 
 /// Оболочка корневых страниц: область вкладок и панель основной навигации.
 ///
@@ -52,9 +54,11 @@ final class AppShellPage extends StatelessWidget {
 /// Область вкладок оболочки.
 ///
 /// Вкладка строится при первом выборе пункта и дальше остаётся в дереве:
-/// состояние страницы живёт весь запуск, а страница продолжает согласовываться
-/// с подтверждёнными изменениями. Переключение идёт без анимации перехода.
-final class _AppShellTabs extends StatefulWidget {
+/// состояние страницы живёт до конца запуска или до замены графа, а страница
+/// продолжает согласовываться с подтверждёнными изменениями. Новое поколение
+/// графа создаёт состояние построенных вкладок заново, как при запуске
+/// приложения (ADR-0036). Переключение идёт без анимации перехода.
+final class _AppShellTabs extends ConsumerStatefulWidget {
   const _AppShellTabs({required this.selected, required this.children});
 
   final AppDestination selected;
@@ -63,10 +67,10 @@ final class _AppShellTabs extends StatefulWidget {
   final List<Widget> children;
 
   @override
-  State<_AppShellTabs> createState() => _AppShellTabsState();
+  ConsumerState<_AppShellTabs> createState() => _AppShellTabsState();
 }
 
-final class _AppShellTabsState extends State<_AppShellTabs> {
+final class _AppShellTabsState extends ConsumerState<_AppShellTabs> {
   /// Пункты, вкладки которых уже построены в этом запуске.
   late final Set<AppDestination> _built = {widget.selected};
 
@@ -78,16 +82,20 @@ final class _AppShellTabsState extends State<_AppShellTabs> {
 
   @override
   Widget build(BuildContext context) {
-    return IndexedStack(
-      index: widget.selected.index,
-      sizing: StackFit.expand,
-      children: [
-        for (final destination in AppDestination.values)
-          if (_built.contains(destination))
-            _tab(destination)
-          else
-            const SizedBox.shrink(),
-      ],
+    final generation = ref.watch(currentGraphGenerationProvider);
+    return KeyedSubtree(
+      key: ObjectKey(generation),
+      child: IndexedStack(
+        index: widget.selected.index,
+        sizing: StackFit.expand,
+        children: [
+          for (final destination in AppDestination.values)
+            if (_built.contains(destination))
+              _tab(destination)
+            else
+              const SizedBox.shrink(),
+        ],
+      ),
     );
   }
 

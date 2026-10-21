@@ -532,7 +532,7 @@ Future<void> _expectVisibleCatalogMarks(
 }
 
 Future<void> _seedCatalogChoices(AppDatabase database) =>
-    database.transaction(() async {
+    seedGraph(database, () async {
       for (var number = 1; number <= 243; number++) {
         final id = 1000 + number;
         final foreign = number == 122;

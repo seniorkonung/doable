@@ -11,6 +11,7 @@ import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
+import 'package:doable/src/app/settings/settings_page.dart';
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
@@ -50,10 +51,12 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/app_root_pages.dart';
 import '../../support/daily_choice_local_date.dart';
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 import '../../support/quick_creation.dart';
+import '../../support/temporary_graph_files.dart';
 
 part 'app_shell_page_matrix.dart';
 part 'app_shell_unnamed_page_scenarios.dart';
@@ -400,8 +403,12 @@ void _expectCreationSheetAboveCatalog(WidgetTester tester) {
   );
 }
 
-/// Запускает приложение на засеянном хранилище и ждёт Главную.
-Future<AppRouter> _start(WidgetTester tester) async {
+/// Запускает приложение на засеянном хранилище и ждёт Главную. Страницам
+/// операций с данными нужны файлы графа [graphFiles].
+Future<AppRouter> _start(
+  WidgetTester tester, {
+  TemporaryGraphFiles? graphFiles,
+}) async {
   tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
   tester.binding.platformDispatcher.localesTestValue = const [Locale('en')];
   addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
@@ -418,6 +425,7 @@ Future<AppRouter> _start(WidgetTester tester) async {
     diagnosticsSink: InMemoryDiagnosticsSink(),
     dailyChoiceLocalDateSource: ControlledDailyChoiceLocalDate(_choiceDate)
         .read,
+    graphFilesFactory: graphFiles?.create,
   );
   addTearDown(() async {
     await tester.pumpWidget(const SizedBox.shrink());
@@ -438,50 +446,52 @@ Future<AppRouter> _start(WidgetTester tester) async {
 /// Два намерения, связь между ними, дневной выбор по этой связи и тег:
 /// каждая страница приложения получает свои данные.
 void _seed(sqlite.Database database) {
-  for (final (number, title) in [(_read, 'Читать'), (_run, 'Бегать')]) {
+  seedRawGraph(database, () {
+    for (final (number, title) in [(_read, 'Читать'), (_run, 'Бегать')]) {
+      database.execute(
+        'INSERT INTO intentions (id, title, is_action_ready, is_archived, '
+        'created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+        [tagFixtureId(number), title, 1, 0, number, number],
+      );
+    }
     database.execute(
-      'INSERT INTO intentions (id, title, is_action_ready, is_archived, '
-      'created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-      [tagFixtureId(number), title, 1, 0, number, number],
+      'INSERT INTO long_term_relations (id, source_intention_id, '
+      'related_intention_id, type, priority, is_archived) '
+      'VALUES (?, ?, ?, ?, ?, ?)',
+      [
+        tagFixtureId(_relation),
+        tagFixtureId(_read),
+        tagFixtureId(_run),
+        'need',
+        2,
+        0,
+      ],
     );
-  }
-  database.execute(
-    'INSERT INTO long_term_relations (id, source_intention_id, '
-    'related_intention_id, type, priority, is_archived) '
-    'VALUES (?, ?, ?, ?, ?, ?)',
-    [
-      tagFixtureId(_relation),
-      tagFixtureId(_read),
-      tagFixtureId(_run),
-      'need',
-      2,
-      0,
-    ],
-  );
-  database.execute(
-    'INSERT INTO daily_choices (id, source_intention_id, '
-    'selected_intention_id, choice_date, is_completed) VALUES (?, ?, ?, ?, ?)',
-    [
-      tagFixtureId(_choice),
-      tagFixtureId(_read),
-      tagFixtureId(_run),
-      _choiceDate.toCanonicalString(),
-      0,
-    ],
-  );
-  database.execute(
-    'INSERT INTO daily_choice_path_steps (id, daily_choice_id, '
-    'long_term_relation_id) VALUES (?, ?, ?)',
-    [tagFixtureId(211), tagFixtureId(_choice), tagFixtureId(_relation)],
-  );
-  database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-    tagFixtureId(_tag),
-    'Дом',
-  ]);
-  database.execute(
-    'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-    [tagFixtureId(_tag), tagFixtureId(_read)],
-  );
+    database.execute(
+      'INSERT INTO daily_choices (id, source_intention_id, '
+      'selected_intention_id, choice_date, is_completed) VALUES (?, ?, ?, ?, ?)',
+      [
+        tagFixtureId(_choice),
+        tagFixtureId(_read),
+        tagFixtureId(_run),
+        _choiceDate.toCanonicalString(),
+        0,
+      ],
+    );
+    database.execute(
+      'INSERT INTO daily_choice_path_steps (id, daily_choice_id, '
+      'long_term_relation_id) VALUES (?, ?, ?)',
+      [tagFixtureId(211), tagFixtureId(_choice), tagFixtureId(_relation)],
+    );
+    database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+      tagFixtureId(_tag),
+      'Дом',
+    ]);
+    database.execute(
+      'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+      [tagFixtureId(_tag), tagFixtureId(_read)],
+    );
+  });
 }
 
 /// Выбирает пункт панели и ждёт его корневую страницу.

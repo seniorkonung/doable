@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
     hide IntentionCatalogPage;
@@ -367,6 +368,7 @@ void main() {
       scrollable: find.descendant(of: list, matching: find.byType(Scrollable)),
       maxScrolls: 100,
     );
+    await tester.pumpAndSettle();
     expect(find.text('Действие 1'), findsOneWidget);
     await tester.tap(find.text('Действие 1'));
     await tester.pumpAndSettle();
@@ -554,6 +556,7 @@ Future<AppRouter> _pumpApp(
       ],
       retry: (retryCount, error) => null,
       child: MaterialApp.router(
+        theme: doableTheme(Brightness.light),
         locale: locale,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,

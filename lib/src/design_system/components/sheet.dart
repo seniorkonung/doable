@@ -48,21 +48,30 @@ Future<T?> showDoableSheet<T>({
   );
 }
 
-/// Лист высотой по содержимому с ручкой, заголовком, пояснением и телом.
+/// Лист высотой по содержимому с ручкой, заголовком, пояснением, телом и
+/// нижней частью.
 ///
-/// При нехватке высоты тело прокручивается; шапка остаётся доступной для свайпа.
-/// Компонент только оформляет содержимое, показом управляет [showDoableSheet].
+/// При нехватке высоты прокручивается только тело: шапка остаётся доступной
+/// для свайпа, а нижняя часть — видна под телом. Компонент только оформляет
+/// содержимое, показом управляет [showDoableSheet].
 final class Sheet extends StatelessWidget {
   const Sheet({
     required this.title,
-    required this.text,
     required this.child,
+    this.text,
+    this.footer,
     super.key,
   });
 
   final String title;
-  final String text;
+
+  /// Пояснение под заголовком; без него тело следует сразу за заголовком.
+  final String? text;
   final Widget child;
+
+  /// Основная кнопка листа на всю ширину, закреплённая под телом вне его
+  /// прокрутки; без неё лист заканчивается телом.
+  final Widget? footer;
 
   @override
   Widget build(BuildContext context) {
@@ -130,19 +139,31 @@ final class Sheet extends StatelessWidget {
                     style: DoableType.title.copyWith(color: colors.ink),
                   ),
                 ),
-                const SizedBox(height: 2),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: DoableMetrics.space4,
+                if (text case final text?) ...[
+                  const SizedBox(height: 2),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: DoableMetrics.space4,
+                    ),
+                    child: Text(
+                      text,
+                      textAlign: TextAlign.center,
+                      style: DoableType.hint.copyWith(color: colors.muted),
+                    ),
                   ),
-                  child: Text(
-                    text,
-                    textAlign: TextAlign.center,
-                    style: DoableType.hint.copyWith(color: colors.muted),
-                  ),
-                ),
+                ],
                 const SizedBox(height: DoableMetrics.space3),
                 Flexible(child: SingleChildScrollView(child: child)),
+                if (footer case final footer?)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      DoableMetrics.space2,
+                      DoableMetrics.space3,
+                      DoableMetrics.space2,
+                      0,
+                    ),
+                    child: footer,
+                  ),
               ],
             ),
           ),

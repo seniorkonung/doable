@@ -22,6 +22,7 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 
 String _uuid(int number) =>
@@ -77,34 +78,36 @@ void main() {
       InMemoryDiagnosticsSink(),
       dailyChoiceIdGenerator: _FixedChoiceIdGenerator(),
     );
-    for (var number = 1; number <= 4; number++) {
-      await database.customStatement(
-        '''INSERT INTO intentions
+    await seedGraph(database, () async {
+      for (var number = 1; number <= 4; number++) {
+        await database.customStatement(
+          '''INSERT INTO intentions
            (id, title, is_action_ready, is_archived, created_at, updated_at)
            VALUES (?, ?, ?, 0, 1, 1)''',
-        [_uuid(number), 'Намерение $number', number >= 3 ? 1 : 0],
-      );
-    }
-    await database.customStatement(
-      '''INSERT INTO intentions
+          [_uuid(number), 'Намерение $number', number >= 3 ? 1 : 0],
+        );
+      }
+      await database.customStatement(
+        '''INSERT INTO intentions
          (id, title, is_action_ready, is_archived, created_at, updated_at)
          VALUES (?, 'Новое основание', 0, 0, 1, 1)''',
-      [_uuid(5)],
-    );
-    for (final (number, source, target) in [
-      (101, 1, 2),
-      (102, 2, 3),
-      (103, 1, 4),
-      (104, 5, 4),
-    ]) {
-      await database.customStatement(
-        '''INSERT INTO long_term_relations
+        [_uuid(5)],
+      );
+      for (final (number, source, target) in [
+        (101, 1, 2),
+        (102, 2, 3),
+        (103, 1, 4),
+        (104, 5, 4),
+      ]) {
+        await database.customStatement(
+          '''INSERT INTO long_term_relations
            (id, source_intention_id, related_intention_id,
             type, priority, is_archived)
            VALUES (?, ?, ?, 'need', 2, 0)''',
-        [_uuid(number), _uuid(source), _uuid(target)],
-      );
-    }
+          [_uuid(number), _uuid(source), _uuid(target)],
+        );
+      }
+    });
   });
   tearDown(() => database.close());
 
