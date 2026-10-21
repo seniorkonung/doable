@@ -1,3 +1,4 @@
+import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
@@ -106,6 +107,29 @@ void main() {
         _secondTag,
       ]).single['name_key'],
       'всё',
+    );
+  });
+
+  test('хранит цвет только как отсутствие или код палитры тегов', () {
+    final codes = [for (final color in TagColor.values) color.code];
+    _addTag(raw, _firstTag, 'Без цвета');
+    for (final (index, code) in codes.indexed) {
+      _addColoredTag(raw, _coloredTag(index), 'Тег $code', code);
+    }
+    // Коды сравниваются точно: другой регистр — чужое значение.
+    for (final invalid in ['red', 'Blue']) {
+      expect(
+        () => _addColoredTag(raw, _secondTag, 'Недопустимый', invalid),
+        throwsA(isA<sqlite.SqliteException>()),
+        reason: 'Цвет вне палитры должен быть отклонён.',
+      );
+    }
+
+    expect(
+      raw
+          .select('SELECT color FROM tags ORDER BY creation_sequence')
+          .map((row) => row['color']),
+      [null, ...codes],
     );
   });
 
@@ -250,6 +274,20 @@ void _addTag(sqlite.Database db, String id, String name) {
     () => db.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [id, name]),
   );
 }
+
+void _addColoredTag(sqlite.Database db, String id, String name, String color) {
+  seedRawGraph(
+    db,
+    () => db.execute('INSERT INTO tags (id, name, color) VALUES (?, ?, ?)', [
+      id,
+      name,
+      color,
+    ]),
+  );
+}
+
+String _coloredTag(int index) =>
+    '018f0b5d-6b2e-7c80-8000-${(100 + index).toString().padLeft(12, '0')}';
 
 void _addAssignment(sqlite.Database db, String tagId, String? intentionId) {
   seedRawGraph(

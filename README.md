@@ -12,26 +12,23 @@ The product model is maintained in
 
 ## Local data before launch and rollback
 
-The SQLite schema is version 3 (`user_version = 3`), a new baseline that a fresh
+The SQLite schema is version 4 (`user_version = 4`), a new baseline that a fresh
 installation creates in one step. Pre-release builds created schema versions 1
-and 2. No data migration from them is provided: the app reports such a database
-as damaged local data and does not change, delete, or recreate it.
+to 3; version 4 adds tag colors. No data migration from them is provided: the
+app reports such a database as damaged local data and does not change, delete,
+or recreate it.
 
-Before first launching this build over a pre-release installation, stop Doable
-and manually clear its local app data. On Android, clear Doable's storage
+Before first launching this build over an installation with schema version 1,
+2, or 3, stop Doable and manually clear its local app data. The database, the
+graph fact log, the graph snapshot files, and the backups belong to one schema,
+so the cleanup removes all of them together. On Android, clear Doable's storage
 through the system app settings. This permanently deletes the installation's
-local data; the next launch creates a fresh database with schema version 3.
+local data; the next launch creates a fresh database with schema version 4.
 
-Earlier pre-release builds with schema version 3, which introduced the graph
-fact log and graph export, recorded graph changes without their kind: created,
-changed, or deleted. No migration from them is provided either: this build reads
-their recorded changes as damaged local data. Before first launching this build
-over such an installation, clear Doable's local app data the same way.
-
-Before rolling back to a build without schema version 3, stop Doable and
-manually clear local app data again if this build has created a database: the
-earlier builds do not open schema version 3. Rolling back the build cannot
-restore data already deleted during either cleanup.
+Before rolling back to any build without schema version 4, stop Doable and
+manually clear local app data the same way if this build has created a
+database: earlier builds do not open schema version 4. Rolling back the build
+cannot restore data already deleted during either cleanup.
 
 ## Reproducible generation
 
