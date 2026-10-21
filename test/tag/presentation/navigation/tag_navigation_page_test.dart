@@ -7,6 +7,7 @@ import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/data/local/app_database.dart' hide Tag;
+import 'package:doable/src/design_system/components/tag_dot.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -19,11 +20,13 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/application/tagged_intentions_page.dart';
 import 'package:doable/src/tag/domain/tag.dart';
+import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_page.dart';
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_view_model.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -34,6 +37,7 @@ import '../../../support/app_root_pages.dart';
 import '../../../support/graph_seed.dart';
 import '../../../support/in_memory_diagnostics_sink.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
+import '../../../support/inline_text.dart';
 import '../../../support/ordinary_page_test_app.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/tag_storage_fixture.dart';
@@ -48,6 +52,78 @@ void main() {
   _registerTerminalNavigationScenarios();
   _registerLatePageWidgetScenarios();
   _registerPrimaryNavigationScenarios();
+  for (final (locale, name, color, visualColor) in [
+    ('ru', 'Дом', TagColor.blue, DoableTagColor.blue),
+    ('en', 'Home', null, null),
+  ]) {
+    testWidgets(
+      'точка перед названием и прежний доступный заголовок на $locale',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        try {
+          final reads = _Reads();
+          addTearDown(reads.dispose);
+          await _pumpPage(tester, reads, locale: locale);
+          final tag = Tag(
+            id: _tag.id,
+            name: TagName.fromInput(name),
+            color: color,
+          );
+          reads.page(0, [], tag: tag);
+          await tester.pumpAndSettle();
+          final l10n = AppLocalizations.of(
+            tester.element(find.byType(TagNavigationPage)),
+          );
+          final title = l10n.tagNavigationTag(name);
+          final header = findTextIgnoringInlineWidgets(title);
+          expect(header, findsOneWidget);
+          final dot = find.descendant(
+            of: header,
+            matching: find.byType(TagDot),
+          );
+          expect(dot, findsOneWidget);
+          expect(tester.getSize(dot), const Size.square(10));
+          expect(tester.widget<TagDot>(dot).color, visualColor);
+
+          final paragraph = tester.renderObject<RenderParagraph>(
+            find.descendant(of: header, matching: find.byType(RichText)),
+          );
+          final nameStart = paragraph.text.toPlainText().indexOf(name);
+          final nameBox = paragraph
+              .getBoxesForSelection(
+                TextSelection(
+                  baseOffset: nameStart,
+                  extentOffset: nameStart + name.length,
+                ),
+              )
+              .single
+              .toRect()
+              .shift(paragraph.localToGlobal(Offset.zero));
+          final prefixBox = paragraph
+              .getBoxesForSelection(
+                TextSelection(
+                  baseOffset: 0,
+                  extentOffset: l10n.tagNavigationTag('').length,
+                ),
+              )
+              .single
+              .toRect()
+              .shift(paragraph.localToGlobal(Offset.zero));
+          expect(
+            tester.getRect(dot).left,
+            greaterThanOrEqualTo(prefixBox.right),
+          );
+          expect(tester.getRect(dot).right, lessThan(nameBox.left));
+          final node = tester.getSemantics(header);
+          expect(node.label, title);
+          expect(node.flagsCollection.isHeader, isTrue);
+        } finally {
+          semantics.dispose();
+        }
+      },
+    );
+  }
+
   for (final (archived, number) in [(false, 1), (false, 4), (true, 2)]) {
     testWidgets('точный переход к намерению $number и возврат к охвату', (
       tester,
@@ -197,7 +273,10 @@ void main() {
       );
       reads.page(0, [], tag: tag);
       await tester.pumpAndSettle();
-      expect(find.text('Тег: ${tag.name.value}'), findsOneWidget);
+      expect(
+        findTextIgnoringInlineWidgets('Тег: ${tag.name.value}'),
+        findsOneWidget,
+      );
       await _scrollTo(tester, _scope(TaggedIntentionsScope.archived));
       await tester.tap(_scope(TaggedIntentionsScope.archived));
       await tester.pump();
@@ -294,7 +373,10 @@ void main() {
         reads.page(0, [intention, need, can]);
         await tester.pumpAndSettle();
 
-        expect(find.text(russian ? 'Тег: Дом' : 'Tag: Дом'), findsOneWidget);
+        expect(
+          findTextIgnoringInlineWidgets(russian ? 'Тег: Дом' : 'Tag: Дом'),
+          findsOneWidget,
+        );
         expect(find.text('Намерение 1'), findsOneWidget);
         expect(find.text('Намерение 101'), findsOneWidget);
         expect(find.text('Намерение 102'), findsOneWidget);
@@ -368,7 +450,7 @@ void main() {
     await _pumpPage(tester, reads, locale: 'en');
     await tester.pumpAndSettle();
     expect(reads.queries, hasLength(2));
-    expect(find.text('Tag: Дом'), findsOneWidget);
+    expect(findTextIgnoringInlineWidgets('Tag: Дом'), findsOneWidget);
     expect(find.text('Намерение 102'), findsOneWidget);
     expect(
       tester

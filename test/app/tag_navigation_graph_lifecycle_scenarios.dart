@@ -584,7 +584,10 @@ void _testTaggedGraphLifecycle() {
       await _expectTargets(tester, app.router, [
         _intentionId(2),
       ], scope: TaggedIntentionsScope.archived);
-      expect(find.text(_l10n(tester).tagNavigationTag(name)), findsOneWidget);
+      expect(
+        findTextIgnoringInlineWidgets(_l10n(tester).tagNavigationTag(name)),
+        findsOneWidget,
+      );
       expect(_snapshot(app.raw)['tag_assignments'], before['tag_assignments']);
       final deleted = await _completed(
         tester,

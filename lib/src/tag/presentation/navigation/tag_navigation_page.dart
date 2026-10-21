@@ -7,9 +7,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../app/navigation/ordinary_page_scaffold.dart';
 import '../../../app/routing/app_router.gr.dart';
+import '../../../design_system/components/tag_dot.dart';
 import '../../../intention/domain/intention.dart';
 import '../../application/tagged_intentions_page.dart';
 import '../../domain/tag_id.dart';
+import '../tag_phrase_text.dart';
 import 'tag_navigation_state.dart';
 import 'tag_navigation_view_model.dart';
 
@@ -48,9 +50,13 @@ final class TagNavigationPage extends ConsumerWidget
                   padding: const EdgeInsets.all(16),
                   child: Semantics(
                     header: true,
-                    child: Text(
-                      l10n.tagNavigationTag(tag.name.value),
+                    child: DefaultTextStyle.merge(
                       style: Theme.of(context).textTheme.titleLarge,
+                      child: tagPhraseText(
+                        phrase: l10n.tagNavigationTag,
+                        tags: [(name: tag.name.value, color: tag.color)],
+                        dotSize: TagDotSize.large,
+                      ),
                     ),
                   ),
                 ),

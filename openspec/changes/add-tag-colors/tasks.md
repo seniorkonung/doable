@@ -220,7 +220,7 @@
   - **Предполагаемые файлы:** `lib/src/tag/presentation/assignments/tag_assignments_section.dart`, `test/tag/presentation/assignments/tag_assignments_section_test.dart`.
   - **Размер:** S.
 
-- [ ] 2.8 Показывать точку перед названием в заголовке навигации по тегу
+- [x] 2.8 Показывать точку перед названием в заголовке навигации по тегу
   - **Критерии приёмки:**
     - Через помощник задачи 2.6 заголовок показывает точку размера 10 непосредственно перед названием: «Тег: ● Дом», «Tag: ● Home». Экранный диктор по-прежнему получает заголовок «Тег: Дом».
   - **Проверка:** `mise exec --no-deps -- flutter test test/tag/presentation/navigation/ test/tag/presentation/tag_accessibility_test.dart test/tag/presentation/catalog/tag_catalog_navigation_test.dart test/app/tag_navigation_app_flow_test.dart test/app/tag_navigation_app_lifecycle_test.dart`. Проверить заголовок с цветным и бесцветным тегами: точка стоит перед названием, а доступный заголовок совпадает с прежним «Тег: Дом». Проверки, искавшие заголовок по точному тексту, переведены на поиск, не зависящий от точек. Отрицательные проверки в `tag_navigation_semantics_scenarios.dart` (заголовок исчезает после подтверждённого отсутствия тега) и в `tag_navigation_app_lifecycle_test.dart` (прежнее название не остаётся в заголовке после переименования) по-прежнему падают, если фраза показана. Остальные утверждения сценариев семантики и доступности навигации не меняются.

@@ -113,7 +113,10 @@ void _registerTerminalAppScenarios() {
             .position
             .jumpTo(0);
         await tester.pumpAndSettle();
-        expect(find.text(l10n.tagNavigationTag('Быт')), findsOneWidget);
+        expect(
+          findTextIgnoringInlineWidgets(l10n.tagNavigationTag('Быт')),
+          findsOneWidget,
+        );
         command.release.complete();
         expect((await _completed(tester, accepted.future)).isFailure, isFalse);
         expect(app.repository.commands.whereType<UpdateTag>(), hasLength(1));

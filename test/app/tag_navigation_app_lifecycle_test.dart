@@ -43,6 +43,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../support/app_root_pages.dart';
 import '../support/in_memory_diagnostics_sink.dart';
+import '../support/inline_text.dart';
 import '../support/tag_storage_fixture.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
 
@@ -235,7 +236,7 @@ void main() {
             case _Mutation.renameTag:
               expect(current.tag.name.value, 'Быт');
               expect(
-                find.text(
+                findTextIgnoringInlineWidgets(
                   app.l10n(tester).tagNavigationTag(before.tag.name.value),
                 ),
                 findsNothing,

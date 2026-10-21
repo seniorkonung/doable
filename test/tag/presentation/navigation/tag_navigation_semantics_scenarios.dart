@@ -105,7 +105,10 @@ void _registerNavigationSemanticsScenarios() {
       );
       await tester.pumpAndSettle();
       await _expectNavigationStatusSemantics(tester, l10n.tagNotFound);
-      expect(find.text(l10n.tagNavigationTag(tag.name.value)), findsNothing);
+      expect(
+        findTextIgnoringInlineWidgets(l10n.tagNavigationTag(tag.name.value)),
+        findsNothing,
+      );
       for (final scope in TaggedIntentionsScope.values) {
         await tester.scrollUntilVisible(_scope(scope), -300, maxScrolls: 100);
         await tester.pumpAndSettle();

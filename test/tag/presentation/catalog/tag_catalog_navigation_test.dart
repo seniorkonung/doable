@@ -25,6 +25,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../../support/graph_seed.dart';
 import '../../../support/in_memory_diagnostics_sink.dart';
+import '../../../support/inline_text.dart';
 import '../../../support/tag_storage_fixture.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
 
@@ -123,7 +124,10 @@ void main() {
         h.router.current.argsAs<TagNavigationRouteArgs>().tagId,
         _tagId(303),
       );
-      expect(find.text(l10n.tagNavigationTag(name)), findsOneWidget);
+      expect(
+        findTextIgnoringInlineWidgets(l10n.tagNavigationTag(name)),
+        findsOneWidget,
+      );
       expect(tester.takeException(), isNull);
     } finally {
       semantics.dispose();
@@ -188,7 +192,7 @@ void main() {
         h.router.current.argsAs<TagNavigationRouteArgs>().tagId,
         _tagId(352),
       );
-      expect(find.text('Тег: Новое имя'), findsOneWidget);
+      expect(findTextIgnoringInlineWidgets('Тег: Новое имя'), findsOneWidget);
       h.router.pop();
       await tester.pumpAndSettle();
 
