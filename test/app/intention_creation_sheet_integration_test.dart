@@ -53,6 +53,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../support/app_root_pages.dart';
+import '../support/inline_text.dart';
 import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/intention_creation_origin.dart';
@@ -313,7 +314,9 @@ void main() {
         expect(
           find.descendant(
             of: createdRows,
-            matching: find.text(l10n.intentionSummaryTags('Дом, $_sport')),
+            matching: findTextIgnoringInlineWidgets(
+              l10n.intentionSummaryTags('Дом, $_sport'),
+            ),
           ),
           findsOneWidget,
         );
