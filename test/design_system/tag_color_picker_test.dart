@@ -1,3 +1,5 @@
+import 'dart:ui' show Tristate;
+
 import 'package:doable/src/design_system/components/tag_color_picker.dart';
 import 'package:doable/src/design_system/components/tag_dot.dart';
 import 'package:doable/src/design_system/doable_colors.dart';
@@ -39,9 +41,11 @@ void main() {
     for (final color in [null, ...DoableTagColor.values]) {
       final node = tester.getSemantics(_button(_colorLabel(color)));
       expect(node.label, _colorLabel(color));
-      expect(node.hasFlag(SemanticsFlag.isButton), isTrue);
-      expect(node.hasFlag(SemanticsFlag.hasSelectedState), isTrue);
-      expect(node.hasFlag(SemanticsFlag.isSelected), color == null);
+      expect(node.flagsCollection.isButton, isTrue);
+      expect(
+        node.flagsCollection.isSelected,
+        color == null ? Tristate.isTrue : Tristate.isFalse,
+      );
       expect(node.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
     }
 
@@ -59,7 +63,7 @@ void main() {
     expect(_selectedLabels(tester), ['Синий']);
 
     final none = tester.getSemantics(_button('Без цвета'));
-    tester.binding.pipelineOwner.semanticsOwner!.performAction(
+    tester.binding.renderViews.first.owner!.semanticsOwner!.performAction(
       none.id,
       SemanticsAction.tap,
     );
@@ -185,8 +189,10 @@ Finder _button(String label) => find.byWidgetPredicate(
 List<String> _selectedLabels(WidgetTester tester) => [
   for (final color in [null, ...DoableTagColor.values])
     if (tester
-        .getSemantics(_button(_colorLabel(color)))
-        .hasFlag(SemanticsFlag.isSelected))
+            .getSemantics(_button(_colorLabel(color)))
+            .flagsCollection
+            .isSelected ==
+        Tristate.isTrue)
       _colorLabel(color),
 ];
 

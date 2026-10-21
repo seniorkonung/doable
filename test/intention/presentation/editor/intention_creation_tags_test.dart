@@ -23,7 +23,6 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_test/src/mock_canvas.dart';
 
 import '../../../support/app_root_pages.dart';
 import '../../../support/quick_creation.dart';
