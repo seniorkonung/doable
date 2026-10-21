@@ -8,10 +8,10 @@
   - **Критерии приёмки:**
     - `TagColor` задаёт девять вариантов с устойчивыми кодами по решению 1 дизайна; `Tag.color` — обязательный параметр типа `TagColor?`. Все места сборки явно передают отсутствие цвета либо сохраняют цвет исходного тега при копировании.
     - Общий кодек файла, снимка и пакета фактов записывает обязательное поле `color` после `name`; `null` означает «Без цвета». Отсутствующее поле, неверный тип и неизвестный код дают существующий отказ повреждения формата.
-    - Эталоны файла и пакета версии 1 содержат цветной и бесцветный теги. Номер неопубликованного формата и пустая цепочка повышения сохраняются; совместимость со старым представлением не добавляется.
-  - **Проверка:** `mise exec --no-deps -- flutter test test/tag/domain test/graph_format`; `mise exec --no-deps -- flutter analyze` для проверки обязательной адаптации вызовов.
+    - Эталон пакета версии 1 и встроенные примеры проверок кодека содержат цветной и бесцветный теги. В общем эталоне файла версии 1 и во всех рукописных записях формата, включая снимок замены в `test/app/navigation/app_shell_graph_generation_test.dart`, у тегов поле `color` равно `null`: база ещё не хранит и не вставляет цвет, поэтому цветной тег в эталон файла добавляет задача 1.8. Номер неопубликованного формата и пустая цепочка повышения сохраняются; совместимость со старым представлением не добавляется.
+  - **Проверка:** `mise exec --no-deps -- flutter test test/tag/domain test/graph_format test/graph_snapshots/graph_import_snapshot_test.dart test/graph/data/drift_graph_replacement_test.dart test/data_transfer/graph_import_test.dart test/app/graph_import_failures_app_flow_test.dart test/app/navigation/app_shell_graph_generation_test.dart` — проверки кодека, а также потребители эталона файла и рукописного снимка, сравнивающие записи или выгрузку базы с файлом; `mise exec --no-deps -- flutter analyze` для проверки обязательной адаптации вызовов.
   - **Зависимости:** нет.
-  - **Предполагаемые файлы:** `lib/src/tag/domain/tag_color.dart` (новый), `lib/src/tag/domain/tag.dart`, `lib/src/graph_format/graph_format_codec.dart`, `test/graph_format/graph_format_codec_test.dart`, `test/graph_format/graph_format_file_test.dart`, оба эталона в `test/graph_format/golden/`; механические изменения существующих конструкторов в коде, тестах и бенчмарках.
+  - **Предполагаемые файлы:** `lib/src/tag/domain/tag_color.dart` (новый), `lib/src/tag/domain/tag.dart`, `lib/src/graph_format/graph_format_codec.dart`, `test/graph_format/graph_format_codec_test.dart`, `test/graph_format/graph_format_file_test.dart`, оба эталона в `test/graph_format/golden/`, `test/app/navigation/app_shell_graph_generation_test.dart`; механические изменения существующих конструкторов в коде, тестах и бенчмарках.
   - **Размер:** M — один переход общего контракта с механической адаптацией вызовов.
 
 - [ ] 1.2 Разрешить хранение цвета в текущей базовой схеме БД
@@ -74,9 +74,10 @@
   - **Критерии приёмки:**
     - Вставка тега при замене переносит цвет из полного `TagRecord`, включая явное отсутствие цвета; назначения и порядок воспроизводятся по действующему контракту замены.
     - Существующие проверки успешной замены, отката и снимка замены учитывают цвета в исходном и новом графе; ошибки сохраняют прежнее полное состояние.
-  - **Проверка:** `mise exec --no-deps -- flutter test test/graph/data/drift_graph_replacement_test.dart test/graph_snapshots/graph_replacement_snapshot_test.dart`.
-  - **Зависимости:** 1.6 — новый формат и схема.
-  - **Предполагаемые файлы:** `lib/src/graph/data/drift_personal_graph_repository_replacement.dart`, `test/graph/data/drift_graph_replacement_test.dart`, `test/graph_snapshots/graph_replacement_snapshot_test.dart`.
+    - Один тег общего эталона файла версии 1 получает цвет, другой остаётся без цвета. Проверки, сравнивающие с эталоном прочитанные записи или выгрузку базы после замены и импорта, проходят с обоими тегами.
+  - **Проверка:** `mise exec --no-deps -- flutter test test/graph/data/drift_graph_replacement_test.dart test/graph_snapshots/graph_replacement_snapshot_test.dart test/graph_format/graph_format_file_test.dart test/graph_snapshots/graph_import_snapshot_test.dart test/data_transfer/graph_import_test.dart test/app/graph_import_failures_app_flow_test.dart`.
+  - **Зависимости:** 1.6 — новый формат, схема и чтение записей графа с цветом.
+  - **Предполагаемые файлы:** `lib/src/graph/data/drift_personal_graph_repository_replacement.dart`, `test/graph/data/drift_graph_replacement_test.dart`, `test/graph_snapshots/graph_replacement_snapshot_test.dart`, `test/graph_format/golden/graph_format_v1.jsonl`, `test/graph_format/graph_format_file_test.dart`.
   - **Размер:** M.
 
 - [ ] 1.9 Подтвердить восстановление цветов резервной копии и учёт правки цвета в сводке
