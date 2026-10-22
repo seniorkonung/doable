@@ -569,6 +569,18 @@
             "dsl_features": []
           },
           {
+            "name": "position",
+            "getter_name": "position",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL COLLATE BINARY UNIQUE CHECK (typeof(position) = 'text' AND length(position) > 0 AND instr(CAST(position AS BLOB), X'00') = 0 AND NOT position GLOB '*[^0-9A-Za-z]*')",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              "unique"
+            ]
+          },
+          {
             "name": "name_key",
             "getter_name": "nameKey",
             "moor_type": "string",
@@ -2196,7 +2208,7 @@
       "sql": [
         {
           "dialect": "sqlite",
-          "sql": "CREATE TABLE IF NOT EXISTS \"tags\" (\"creation_sequence\" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT CHECK (creation_sequence > 0), \"id\" TEXT NOT NULL UNIQUE, \"name\" TEXT NOT NULL CHECK (typeof(name) = 'text' AND instr(CAST(name AS BLOB), X'00') = 0 AND substr(name, 1, 1) <> char(65279) AND doable_tag_name_valid_v1(name) = 1), \"color\" TEXT CHECK (color IS NULL OR color IN ('brown', 'orange', 'olive', 'green', 'teal', 'blue', 'violet', 'purple', 'pink')), \"name_key\" TEXT NOT NULL COLLATE BINARY UNIQUE GENERATED ALWAYS AS (doable_tag_name_key_v1(name)) STORED);"
+          "sql": "CREATE TABLE IF NOT EXISTS \"tags\" (\"creation_sequence\" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT CHECK (creation_sequence > 0), \"id\" TEXT NOT NULL UNIQUE, \"name\" TEXT NOT NULL CHECK (typeof(name) = 'text' AND instr(CAST(name AS BLOB), X'00') = 0 AND substr(name, 1, 1) <> char(65279) AND doable_tag_name_valid_v1(name) = 1), \"color\" TEXT CHECK (color IS NULL OR color IN ('brown', 'orange', 'olive', 'green', 'teal', 'blue', 'violet', 'purple', 'pink')), \"position\" TEXT NOT NULL COLLATE BINARY UNIQUE CHECK (typeof(position) = 'text' AND length(position) > 0 AND instr(CAST(position AS BLOB), X'00') = 0 AND NOT position GLOB '*[^0-9A-Za-z]*'), \"name_key\" TEXT NOT NULL COLLATE BINARY UNIQUE GENERATED ALWAYS AS (doable_tag_name_key_v1(name)) STORED);"
         }
       ]
     },

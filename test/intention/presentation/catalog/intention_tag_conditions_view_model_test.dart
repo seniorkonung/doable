@@ -17,6 +17,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'catalog_test_support.dart';
+import '../../../support/tag_positions.dart';
 
 final _actionSearchPurpose = SelectDailyChoiceAction(
   session: IntentionSearchSession(),
@@ -410,7 +411,12 @@ final class _Harness {
   void rename(int revision, Tag before, String name) => update(
     revision,
     before,
-    Tag(id: before.id, name: TagName.fromInput(name), color: before.color),
+    Tag(
+      id: before.id,
+      name: TagName.fromInput(name),
+      color: before.color,
+      position: before.position,
+    ),
   );
 
   void delete(int revision, TagId tagId) => package(revision, [
@@ -474,5 +480,9 @@ TagId _id(int number) => (TagId.decode(
   '00000000-0000-4000-8000-${number.toString().padLeft(12, '0')}',
 ) as TagIdDecodingSuccess).id;
 
-Tag _tag(int number, String name, {TagColor? color}) =>
-    Tag(id: _id(number), name: TagName.fromInput(name), color: color);
+Tag _tag(int number, String name, {TagColor? color}) => Tag(
+  id: _id(number),
+  name: TagName.fromInput(name),
+  color: color,
+  position: tagPositionAt(number),
+);

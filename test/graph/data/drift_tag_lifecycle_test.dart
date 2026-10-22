@@ -16,6 +16,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
+import '../../support/tag_positions.dart';
 
 String _uuid(int number) =>
     '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}';
@@ -84,9 +85,10 @@ void main() {
         'INSERT INTO daily_choice_path_steps (id, daily_choice_id, long_term_relation_id) VALUES (?, ?, ?)',
         [_uuid(5), _uuid(4), _uuid(3)],
       );
-      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+      raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
         _uuid(6),
         'Дом',
+        tagPositionKey(6),
       ]);
       for (final intention in [1, 2]) {
         raw.execute(
@@ -184,6 +186,46 @@ void main() {
     );
     expect(graphState(), before);
     expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
+  });
+
+  test('новый тег встаёт перед первым по месту, а не по созданию', () async {
+    Future<String> createdPosition(String name) async {
+      final result = await repository.execute(
+        CreateTag(name: _name(name), color: null),
+      );
+      final tag =
+          ((result as TagCommandSucceeded).value.value as TagCreated).tag;
+      expect(
+        raw.select('SELECT position FROM tags WHERE id = ?', [
+          tag.id.toCanonicalString(),
+        ]).single['position'],
+        tag.position.value,
+      );
+      return tag.position.value;
+    }
+
+    expect(await createdPosition('Дом'), 'a0');
+    // Первый по месту тег — не первый и не последний по созданию.
+    seedRawGraph(raw, () {
+      for (final (number, name, position) in [
+        (7, 'Работа', 'Zz0V'),
+        (8, 'Отдых', 'a1'),
+      ]) {
+        raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
+          _uuid(number),
+          name,
+          position,
+        ]);
+      }
+    });
+
+    expect(await createdPosition('Спорт'), 'Zz');
+    expect(
+      raw
+          .select('SELECT name FROM tags ORDER BY position')
+          .map((row) => row['name']),
+      ['Спорт', 'Работа', 'Дом', 'Отдых'],
+    );
   });
 
   test('повтор названия и цвета не меняет ревизию, смена регистра разрешена, чужое имя занято', () async {

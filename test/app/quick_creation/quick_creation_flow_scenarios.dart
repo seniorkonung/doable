@@ -431,8 +431,8 @@ Future<void> _seedSearchGraph(AppDatabase database) async {
       (901, 'Вторая группа'),
     ]) {
       await database.customStatement(
-        'INSERT INTO tags (id, name) VALUES (?, ?)',
-        [durabilityUuid(number), name],
+        'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+        [durabilityUuid(number), name, tagPositionKey(number)],
       );
     }
     for (var i = 0; i < 160; i++) {

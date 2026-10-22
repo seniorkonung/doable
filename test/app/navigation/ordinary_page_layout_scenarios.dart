@@ -426,10 +426,14 @@ Future<void> _expectLoadingFooter(
 void _seedLayoutTagCatalog(sqlite.Database database) {
   seedRawGraph(database, () {
     for (var number = 1; number <= 25; number++) {
-      database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-        tagFixtureId(9000 + number),
-        'Тег ${number.toString().padLeft(3, '0')}',
-      ]);
+      database.execute(
+        'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+        [
+          tagFixtureId(9000 + number),
+          'Тег ${number.toString().padLeft(3, '0')}',
+          tagPositionKey(9000 + number),
+        ],
+      );
     }
   });
 }
@@ -439,9 +443,10 @@ const _lastLayoutRelation = 53;
 /// Три порции помеченных намерений и две порции связей одной исходящей группы.
 void _seedOrdinaryLayout(sqlite.Database database) {
   seedRawGraph(database, () {
-    database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+    database.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
       tagFixtureId(8000),
       'Дом',
+      tagPositionKey(8000),
     ]);
     for (var number = 1; number <= 105; number++) {
       database.execute(

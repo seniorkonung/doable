@@ -17,6 +17,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'catalog_reconciliation_test_support.dart';
 import 'catalog_test_support.dart';
+import '../../../support/tag_positions.dart';
 
 void main() {
   test('поздняя первая порция не меняет границу новой выдачи', () async {
@@ -687,6 +688,7 @@ Tag _tag(int number) => Tag(
   },
   name: TagName.fromInput('Тег $number'),
   color: null,
+  position: tagPositionAt(number),
 );
 
 const _browse = BrowseIntentionCatalog();

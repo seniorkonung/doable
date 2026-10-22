@@ -18,6 +18,14 @@ CREATE TABLE tags (
       'blue', 'violet', 'purple', 'pink'
     )
   ),
+  -- Место в ручном порядке: дробный ключ `TagPosition`. Схема проверяет
+  -- только алфавит, полную каноническую форму — декодер при чтении.
+  position TEXT NOT NULL COLLATE BINARY UNIQUE CHECK (
+    typeof(position) = 'text' AND
+    length(position) > 0 AND
+    instr(CAST(position AS BLOB), x'00') = 0 AND
+    NOT position GLOB '*[^0-9A-Za-z]*'
+  ),
   name_key TEXT NOT NULL COLLATE BINARY UNIQUE
     GENERATED ALWAYS AS (doable_tag_name_key_v1(name)) STORED
 );

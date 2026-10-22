@@ -41,6 +41,7 @@ import '../../../support/inline_text.dart';
 import '../../../support/ordinary_page_test_app.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/tag_storage_fixture.dart';
+import '../../../support/tag_positions.dart';
 
 part 'tag_navigation_semantics_scenarios.dart';
 part 'tag_navigation_terminal_page_scenarios.dart';
@@ -68,6 +69,7 @@ void main() {
             id: _tag.id,
             name: TagName.fromInput(name),
             color: color,
+            position: _tag.position,
           );
           reads.page(0, [], tag: tag);
           await tester.pumpAndSettle();
@@ -270,6 +272,7 @@ void main() {
         id: _tag.id,
         name: TagName.fromInput('Длинный тег ' * 20),
         color: _tag.color,
+        position: _tag.position,
       );
       reads.page(0, [], tag: tag);
       await tester.pumpAndSettle();
@@ -553,6 +556,7 @@ final _tag = Tag(
   id: (TagId.decode(tagFixtureId(301)) as TagIdDecodingSuccess).id,
   name: TagName.fromInput('Дом'),
   color: null,
+  position: tagPositionAt(1000),
 );
 
 TaggedIntention _intention(

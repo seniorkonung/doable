@@ -24,6 +24,7 @@ import '../support/in_memory_diagnostics_sink.dart';
 import '../support/tag_storage_fixture.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
 import '../support/quick_creation.dart';
+import '../support/tag_positions.dart';
 
 const _homeTag = 301;
 const _workTag = 302;
@@ -330,9 +331,10 @@ final class _App {
         (_workTag, 'Работа'),
         (_gardenTag, 'Сад'),
       ]) {
-        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
           tagFixtureId(number),
           name,
+          tagPositionKey(number),
         ]);
       }
     });

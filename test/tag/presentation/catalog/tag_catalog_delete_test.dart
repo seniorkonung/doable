@@ -28,6 +28,7 @@ import '../../../support/graph_seed.dart';
 import '../../../support/in_memory_diagnostics_sink.dart';
 import '../../../support/ordinary_page_test_app.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
+import '../../../support/tag_positions.dart';
 
 String _id(int number) =>
     '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}';
@@ -80,10 +81,10 @@ void main() {
           [_id(204), _id(203), _id(201)],
         );
         for (var i = 1; i <= 52; i++) {
-          raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-            _id(300 + i),
-            'Тег $i',
-          ]);
+          raw.execute(
+            'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+            [_id(300 + i), 'Тег $i', tagPositionKey(300 + i)],
+          );
         }
         for (var i = 1; i <= 104; i++) {
           raw.execute(
@@ -184,9 +185,10 @@ void main() {
         'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
         [_id(1), 'Дом', 0, 1, 1, 1],
       );
-      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+      raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
         _id(301),
         'Дом',
+        tagPositionKey(301),
       ]);
       raw.execute(
         'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
@@ -227,9 +229,10 @@ void main() {
     await database.open();
     addTearDown(database.close);
     seedRawGraph(raw, () {
-      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+      raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
         _id(301),
         'Дом',
+        tagPositionKey(301),
       ]);
     });
     final repository = DriftPersonalGraphRepository(
@@ -243,9 +246,10 @@ void main() {
     await tester.pumpAndSettle();
     seedRawGraph(raw, () {
       raw.execute('DELETE FROM tags WHERE id = ?', [_id(301)]);
-      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+      raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
         _id(302),
         'Дом',
+        tagPositionKey(302),
       ]);
     });
     await tester.tap(find.byKey(const ValueKey('tag-delete-confirm')));
@@ -373,17 +377,23 @@ final class _PendingRepository extends Fake implements PersonalGraphRepository {
   bool deleted = false;
 
   @override
-  Future<TagCatalogResult> getTagCatalog(
-    TagCatalogMode mode,
-  ) async => TagCatalogSuccess(
-    TagCatalogSnapshot(
-      items: deleted
-          ? []
-          : [Tag(id: _tagId(301), name: TagName.fromInput('Дом'), color: null)],
+  Future<TagCatalogResult> getTagCatalog(TagCatalogMode mode) async =>
+      TagCatalogSuccess(
+        TagCatalogSnapshot(
+          items: deleted
+              ? []
+              : [
+                  Tag(
+                    id: _tagId(301),
+                    name: TagName.fromInput('Дом'),
+                    color: null,
+                    position: tagPositionAt(1000),
+                  ),
+                ],
 
-      revision: const _Revision(),
-    ),
-  );
+          revision: const _Revision(),
+        ),
+      );
 
   @override
   Future<GraphCommandResult<TSuccess, TFailure>> execute<

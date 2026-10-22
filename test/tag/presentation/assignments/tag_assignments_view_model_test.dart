@@ -17,6 +17,8 @@ import 'package:doable/src/tag/presentation/assignments/tag_assignments_view_mod
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/tag_positions.dart';
+
 void main() {
   test('пустой снимок отличается от отсутствия намерения', () async {
     final h = _Harness();
@@ -644,5 +646,9 @@ IntentionId _intentionId(int number) => (IntentionId.decode(
 TagId _id(int number) => (TagId.decode(
   '00000000-0000-4000-8000-${number.toString().padLeft(12, '0')}',
 ) as TagIdDecodingSuccess).id;
-Tag _tag(int number, String name, {TagColor? color}) =>
-    Tag(id: _id(number), name: TagName.fromInput(name), color: color);
+Tag _tag(int number, String name, {TagColor? color}) => Tag(
+  id: _id(number),
+  name: TagName.fromInput(name),
+  color: color,
+  position: tagPositionAt(number),
+);

@@ -27,6 +27,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/tag_assignment_changed.dart';
+import '../../../support/tag_positions.dart';
 
 void main() {
   test('отсутствие намерения не отменяется поздним полным снимком', () async {
@@ -1682,5 +1683,9 @@ TagId _id(int number) => (TagId.decode(
 IntentionId _intentionId(int number) => (IntentionId.decode(
   '00000000-0000-4000-8000-${number.toString().padLeft(12, '0')}',
 ) as IntentionIdDecodingSuccess).id;
-Tag _tag(int number, String name, {TagColor? color}) =>
-    Tag(id: _id(number), name: TagName.fromInput(name), color: color);
+Tag _tag(int number, String name, {TagColor? color}) => Tag(
+  id: _id(number),
+  name: TagName.fromInput(name),
+  color: color,
+  position: tagPositionAt(number),
+);

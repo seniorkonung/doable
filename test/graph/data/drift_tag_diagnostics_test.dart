@@ -20,6 +20,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/graph_seed.dart';
 import '../../support/tag_storage_fixture.dart';
+import '../../support/tag_positions.dart';
 
 final class _RecordingSink implements DiagnosticsSink {
   final events = <DiagnosticsEvent>[];
@@ -301,9 +302,10 @@ void main() {
 
     // Схема не проверяет формат идентификатора тега.
     seedRawGraph(raw, () {
-      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+      raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
         damagedId,
         privateAssignment,
+        tagPositionKey(200000),
       ]);
     });
     expect(

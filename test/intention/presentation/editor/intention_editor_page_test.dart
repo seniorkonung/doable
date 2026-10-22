@@ -39,6 +39,7 @@ import '../../../support/app_root_pages.dart';
 import '../../../support/quick_creation.dart';
 import '../catalog/catalog_test_support.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
+import '../../../support/tag_positions.dart';
 
 void main() {
   setUp(() {
@@ -2341,8 +2342,12 @@ void _completeCatalogRefresh(ControlledCatalogRepository repository) {
   }
 }
 
-Tag _tag(int number, String name) =>
-    Tag(id: _tagId(number), name: TagName.fromInput(name), color: null);
+Tag _tag(int number, String name) => Tag(
+  id: _tagId(number),
+  name: TagName.fromInput(name),
+  color: null,
+  position: tagPositionAt(number),
+);
 
 /// Наблюдение подтверждает тег из [tags] или его отсутствие и не
 /// завершается, пока наблюдатель не освободит подписку.

@@ -28,6 +28,7 @@ import 'package:sqlite3/sqlite3.dart';
 
 import '../../../support/graph_seed.dart';
 import '../../../support/in_memory_diagnostics_sink.dart';
+import '../../../support/tag_positions.dart';
 import '../../../support/tag_storage_fixture.dart';
 import 'catalog_reconciliation_test_support.dart';
 import 'catalog_test_support.dart';
@@ -1210,8 +1211,8 @@ Future<void> _seedCatalog(AppDatabase database) =>
         );
         for (final tag in tags) {
           await database.customStatement(
-            'INSERT OR IGNORE INTO tags (id, name) VALUES (?, ?)',
-            [tagFixtureId(tag), _tagNames[tag]],
+            'INSERT OR IGNORE INTO tags (id, name, position) VALUES (?, ?, ?)',
+            [tagFixtureId(tag), _tagNames[tag], tagPositionKey(tag)],
           );
           await database.customStatement(
             'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',

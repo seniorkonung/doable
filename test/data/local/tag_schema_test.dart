@@ -1,9 +1,12 @@
+import 'dart:typed_data';
+
 import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/graph_seed.dart';
 import '../../support/local_database_harness.dart';
+import '../../support/tag_positions.dart';
 
 const _firstIntention = '018f0b5d-6b2e-7c80-8000-000000000001';
 const _secondIntention = '018f0b5d-6b2e-7c80-8000-000000000002';
@@ -49,9 +52,10 @@ void main() {
     expect(
       () => seedRawGraph(
         raw,
-        () => raw.execute('INSERT INTO tags (id, name) VALUES (?, x\'80\')', [
-          _firstTag,
-        ]),
+        () => raw.execute(
+          'INSERT INTO tags (id, name, position) VALUES (?, x\'80\', ?)',
+          [_firstTag, 'a0'],
+        ),
       ),
       throwsA(isA<sqlite.SqliteException>()),
     );
@@ -68,8 +72,8 @@ void main() {
       () => seedRawGraph(
         raw,
         () => raw.execute(
-          'INSERT INTO tags (id, name, name_key) VALUES (?, ?, ?)',
-          [_secondTag, 'Другое', 'чужой ключ'],
+          'INSERT INTO tags (id, name, position, name_key) VALUES (?, ?, ?, ?)',
+          [_secondTag, 'Другое', 'a0', 'чужой ключ'],
         ),
       ),
       throwsA(isA<sqlite.SqliteException>()),
@@ -85,7 +89,7 @@ void main() {
       throwsA(isA<sqlite.SqliteException>()),
     );
     expect(
-      () => _addTag(raw, _firstTag, 'Другое'),
+      () => _addTag(raw, _firstTag, 'Другое', position: 'a0'),
       throwsA(isA<sqlite.SqliteException>()),
     );
     seedRawGraph(
@@ -133,6 +137,63 @@ void main() {
     );
   });
 
+  test('хранит место непустой уникальной строкой из цифр и латинских букв', () {
+    _addTag(raw, _firstTag, 'Первый', position: 'a0');
+    _addTag(raw, _secondTag, 'Второй', position: 'Zz0V');
+    for (final invalid in <Object?>[
+      null,
+      '',
+      ' a0',
+      'a-0',
+      'а0',
+      'a0\u0000',
+      Uint8List.fromList('a1'.codeUnits),
+      'a0',
+    ]) {
+      expect(
+        () => seedRawGraph(
+          raw,
+          () => raw.execute(
+            'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+            [_thirdTag, 'Третий', invalid],
+          ),
+        ),
+        throwsA(isA<sqlite.SqliteException>()),
+        reason: 'Место $invalid должно быть отклонено.',
+      );
+    }
+    expect(
+      raw
+          .select('SELECT position FROM tags ORDER BY creation_sequence')
+          .map((row) => row['position']),
+      ['a0', 'Zz0V'],
+    );
+  });
+
+  test('сортирует места как сравнение их кодовых единиц', () {
+    // Ключи разных регистров и длин, перемешанные относительно порядка.
+    final keys = [
+      'a1',
+      'Zz',
+      'b00',
+      'a0V',
+      'A${'0' * 26}1',
+      'a0',
+      'Zzzz',
+      'z1',
+    ];
+    for (final (index, key) in keys.indexed) {
+      _addTag(raw, _coloredTag(index), 'Тег $index', position: key);
+    }
+
+    expect(
+      raw
+          .select('SELECT position FROM tags ORDER BY position')
+          .map((row) => row['position']),
+      [...keys]..sort(),
+    );
+  });
+
   test('разрешает только существующее намерение и одну пару', () {
     _addTag(raw, _firstTag, 'Дом');
     for (final intentionId in [null, 'нет-намерения']) {
@@ -172,7 +233,7 @@ void main() {
             raw,
             () => raw.execute(
               table == 'tags'
-                  ? 'INSERT INTO tags (creation_sequence, id, name) VALUES (?, ?, ?)'
+                  ? 'INSERT INTO tags (creation_sequence, id, name, position) VALUES (?, ?, ?, \'a0\')'
                   : 'INSERT INTO tag_assignments (creation_sequence, tag_id, intention_id) VALUES (?, ?, ?)',
               table == 'tags'
                   ? [sequence, _thirdTag, 'Третий']
@@ -268,23 +329,31 @@ void main() {
   });
 }
 
-void _addTag(sqlite.Database db, String id, String name) {
+/// Без явного [position] место выводится из номера в [id], поэтому у
+/// различных тегов оно различно.
+void _addTag(sqlite.Database db, String id, String name, {String? position}) {
   seedRawGraph(
     db,
-    () => db.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [id, name]),
+    () => db.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
+      id,
+      name,
+      position ?? _positionOf(id),
+    ]),
   );
 }
 
 void _addColoredTag(sqlite.Database db, String id, String name, String color) {
   seedRawGraph(
     db,
-    () => db.execute('INSERT INTO tags (id, name, color) VALUES (?, ?, ?)', [
-      id,
-      name,
-      color,
-    ]),
+    () => db.execute(
+      'INSERT INTO tags (id, name, color, position) VALUES (?, ?, ?, ?)',
+      [id, name, color, _positionOf(id)],
+    ),
   );
 }
+
+String _positionOf(String id) =>
+    tagPositionKey(int.parse(id.substring(24), radix: 16));
 
 String _coloredTag(int index) =>
     '018f0b5d-6b2e-7c80-8000-${(100 + index).toString().padLeft(12, '0')}';

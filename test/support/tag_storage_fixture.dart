@@ -1,6 +1,7 @@
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import 'graph_seed.dart';
+import 'tag_positions.dart';
 
 String tagFixtureId(int number) =>
     '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}';
@@ -15,13 +16,15 @@ const restTagNumber = 306;
 void seedTagStorageFixture(sqlite.Database database) {
   seedRawGraph(database, () {
     _writeTagRecipientGraph(database);
-    database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+    database.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
       tagFixtureId(firstTagNumber),
       'Дом',
+      tagPositionKey(firstTagNumber),
     ]);
-    database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+    database.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
       tagFixtureId(lastTagNumber),
       'Работа',
+      tagPositionKey(lastTagNumber),
     ]);
     for (final number in [1, 2]) {
       database.execute(
@@ -117,9 +120,10 @@ void _writeTagNavigation(
     (304, 'Только в архиве'),
     (lastTagNumber, 'Работа'),
   ]) {
-    database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+    database.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
       tagFixtureId(number),
       name,
+      tagPositionKey(number),
     ]);
   }
   for (final (tagNumber, intentionNumber) in [
@@ -208,9 +212,10 @@ void seedTagNavigationLifecycleFixture(sqlite.Database database) {
         ],
       );
     }
-    database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+    database.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
       tagFixtureId(restTagNumber),
       'Отдых',
+      tagPositionKey(restTagNumber),
     ]);
     for (final (tagNumber, intentionNumber) in [
       (restTagNumber, 3),
@@ -251,10 +256,14 @@ void seedLargeTagReadFixture(
     }
     for (var index = 0; index < tagCount; index++) {
       final id = tagFixtureId(10000 + index);
-      database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-        id,
-        'Тег ${index.toString().padLeft(5, '0')}',
-      ]);
+      database.execute(
+        'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+        [
+          id,
+          'Тег ${index.toString().padLeft(5, '0')}',
+          tagPositionKey(10000 + index),
+        ],
+      );
       for (final (number, assigned) in [
         (1, index.isEven),
         (3, index % 3 == 0),
@@ -295,10 +304,10 @@ void seedWidelyAssignedTagFixture(
       (9000, 'Общий тег'),
       (9001, 'Сохранённый тег'),
     ]) {
-      database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-        tagFixtureId(number),
-        name,
-      ]);
+      database.execute(
+        'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+        [tagFixtureId(number), name, tagPositionKey(number)],
+      );
     }
     database.execute(
       'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
@@ -344,10 +353,10 @@ void seedLargeTaggedEntitiesFixture(
       (9000, 'Выбранный тег'),
       (9001, 'Другой тег'),
     ]) {
-      database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-        tagFixtureId(number),
-        name,
-      ]);
+      database.execute(
+        'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+        [tagFixtureId(number), name, tagPositionKey(number)],
+      );
     }
     for (var index = 0; index < recipientPairs; index++) {
       final primary = _largeTaggedPrimary(index, archivePeriod);

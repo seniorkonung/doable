@@ -74,6 +74,7 @@ import '../../support/tag_read_contract_test_fallback.dart';
 import '../../support/statistics_read_contract_test_fallback.dart';
 import '../../support/catalog_reconciliation_test_fallback.dart';
 import '../../support/tag_storage_fixture.dart';
+import '../../support/tag_positions.dart';
 
 /// Контрольная точка согласования: каталог, подробные данные и соседство
 /// обслуживаются одним графом, одним coordinator и одним потоком завершений.
@@ -1500,6 +1501,7 @@ void main() {
         },
         name: TagName.fromInput('Дом'),
         color: null,
+        position: tagPositionAt(1000),
       );
       repository.completeTagCommand(
         0,
@@ -1681,6 +1683,7 @@ void main() {
             id: tagId,
             name: TagName.fromInput('Здоровье'),
             color: null,
+            position: tagPositionAt(1001),
           ),
         ],
       );

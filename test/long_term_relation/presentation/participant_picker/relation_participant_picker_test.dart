@@ -35,6 +35,7 @@ import '../../../support/inline_text.dart';
 import 'participant_picker_test_support.dart';
 
 import '../../../support/in_memory_quick_creation_mode_store.dart';
+import '../../../support/tag_positions.dart';
 
 void main() {
   _defineTagSearchTests();
@@ -894,6 +895,7 @@ Tag _tag(int index, String name) => Tag(
   },
   name: TagName.fromInput(name),
   color: null,
+  position: tagPositionAt(index),
 );
 
 Future<void> _pumpUntilReconciliationQueries(

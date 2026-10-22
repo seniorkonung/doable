@@ -32,6 +32,7 @@ import '../../../support/app_root_pages.dart';
 import '../../../support/quick_creation.dart';
 import '../catalog/catalog_test_support.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
+import '../../../support/tag_positions.dart';
 
 /// Доступность полного сценария нижней панели создания намерения: экранный
 /// диктор, клавиатура и guidelines Android.
@@ -1175,8 +1176,12 @@ Result<IntentionCommandSuccess> _savedResult() {
   );
 }
 
-Tag _tag(int number, String name) =>
-    Tag(id: _tagId(number), name: TagName.fromInput(name), color: null);
+Tag _tag(int number, String name) => Tag(
+  id: _tagId(number),
+  name: TagName.fromInput(name),
+  color: null,
+  position: tagPositionAt(number),
+);
 
 TagId _tagId(int number) => switch (TagId.decode(
   '018f47c2-6b7d-7abc-8def-${number.toString().padLeft(12, '0')}',

@@ -50,7 +50,7 @@ final class GraphFactCapture {
         .customSelect(
           '''SELECT mark.tag_id AS mark_id, mark.first_operation,
                 tag.id IS NOT NULL AS present, tag.id, tag.name,
-                tag.color
+                tag.color, tag.position
          FROM graph_log_tag_marks AS mark
          LEFT JOIN tags AS tag ON tag.id = mark.tag_id
          ORDER BY tag.creation_sequence IS NULL, tag.creation_sequence,

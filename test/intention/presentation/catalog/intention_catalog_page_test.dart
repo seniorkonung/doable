@@ -40,6 +40,7 @@ import '../../../support/inline_text.dart';
 import '../../../support/quick_creation.dart';
 import 'catalog_test_support.dart';
 import 'catalog_reconciliation_test_support.dart';
+import '../../../support/tag_positions.dart';
 
 void main() {
   testWidgets('показывает загрузку до подтверждённой первой страницы', (
@@ -2133,6 +2134,7 @@ Tag _tag(int index, String name) => Tag(
   },
   name: TagName.fromInput(name),
   color: null,
+  position: tagPositionAt(index),
 );
 
 IntentionCatalogLoaded _loadedCatalog(ProviderContainer container) =>

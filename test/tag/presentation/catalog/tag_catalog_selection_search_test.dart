@@ -18,6 +18,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/tag_catalog_test_repository.dart';
+import '../../../support/tag_positions.dart';
 
 void main() {
   testWidgets('отказ назначения сохраняет скрытый выбор для явного повтора', (
@@ -356,6 +357,7 @@ Tag _tag(int number, String name) => Tag(
   id: (TagId.decode(_id(number)) as TagIdDecodingSuccess).id,
   name: TagName.fromInput(name),
   color: null,
+  position: tagPositionAt(number),
 );
 
 /// Общий выбор в контексте живой сессии черновика, открытый поверх исходной

@@ -77,6 +77,7 @@ void _registerNavigationSemanticsScenarios() {
         id: _tag.id,
         name: TagName.fromInput('Длинное название 🏷️ ' * 10),
         color: _tag.color,
+        position: _tag.position,
       );
       reads.page(0, [], tag: tag);
       await tester.pumpAndSettle();

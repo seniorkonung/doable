@@ -11,6 +11,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/inline_text.dart';
+import '../../support/tag_positions.dart';
 
 void main() {
   testWidgets('показывает подтверждённое количество активных связей на двух '
@@ -466,6 +467,7 @@ Tag _tag(int number, String name, {TagColor? color}) => Tag(
   ) as TagIdDecodingSuccess).id,
   name: TagName.fromInput(name),
   color: color,
+  position: tagPositionAt(number),
 );
 
 Widget _testApp({

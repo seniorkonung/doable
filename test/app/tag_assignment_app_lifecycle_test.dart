@@ -39,6 +39,7 @@ import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/tag_storage_fixture.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
+import '../support/tag_positions.dart';
 
 void main() {
   final target = _intentionId(1);
@@ -415,10 +416,14 @@ void main() {
       seedTagStorageFixture(raw);
       seedRawGraph(raw, () {
         for (var number = 303; number <= 352; number++) {
-          raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-            tagFixtureId(number),
-            'Дополнительный тег $number',
-          ]);
+          raw.execute(
+            'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+            [
+              tagFixtureId(number),
+              'Дополнительный тег $number',
+              tagPositionKey(number),
+            ],
+          );
         }
       });
       final provider = tagCatalogViewModelProvider(

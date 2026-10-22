@@ -21,6 +21,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'catalog_reconciliation_test_support.dart';
 import 'catalog_test_support.dart';
+import '../../../support/tag_positions.dart';
 
 final _actionSearchPurpose = SelectDailyChoiceAction(
   session: IntentionSearchSession(),
@@ -34,11 +35,13 @@ void main() {
     id: _tagId(1),
     name: TagName.fromInput('Здоровье'),
     color: null,
+    position: tagPositionAt(1000),
   );
   final rest = Tag(
     id: _tagId(2),
     name: TagName.fromInput('Отдых'),
     color: null,
+    position: tagPositionAt(1001),
   );
   const browse = BrowseIntentionCatalog();
 
@@ -493,6 +496,7 @@ void main() {
       id: health.id,
       name: health.name,
       color: TagColor.blue,
+      position: health.position,
     );
     await _completeTagUpdate(
       container,
@@ -557,6 +561,7 @@ void main() {
       id: health.id,
       name: TagName.fromInput('Самочувствие'),
       color: TagColor.blue,
+      position: health.position,
     );
     await _completeTagUpdate(
       container,
@@ -599,6 +604,7 @@ void main() {
       id: health.id,
       name: TagName.fromInput('Самочувствие'),
       color: health.color,
+      position: health.position,
     );
     final fourth = testSummary(index: 4, tags: [wellBeing]);
     final third = testSummary(index: 3, tags: [wellBeing, rest]);
@@ -617,7 +623,12 @@ void main() {
     );
     final before = _loaded(container, browse);
 
-    final newHealth = Tag(id: _tagId(3), name: health.name, color: null);
+    final newHealth = Tag(
+      id: _tagId(3),
+      name: health.name,
+      color: null,
+      position: tagPositionAt(1002),
+    );
     const revision = TestCatalogRevision(2);
     await completeTagCommand(
       container,
@@ -915,7 +926,12 @@ void main() {
     );
     confirmedStates.clear();
 
-    final newHealth = Tag(id: _tagId(3), name: health.name, color: null);
+    final newHealth = Tag(
+      id: _tagId(3),
+      name: health.name,
+      color: null,
+      position: tagPositionAt(1003),
+    );
     const created = TestCatalogRevision(3);
     await completeTagCommand(
       container,
@@ -1306,6 +1322,7 @@ void main() {
       id: _tagId(3),
       name: TagName.fromInput('Спорт'),
       color: null,
+      position: tagPositionAt(1004),
     );
     final tenth = testSummary(index: 10, tags: [health]);
     final eighth = testSummary(index: 8, tags: [health]);
@@ -1590,6 +1607,7 @@ void main() {
         id: health.id,
         name: TagName.fromInput('Самочувствие'),
         color: health.color,
+        position: health.position,
       );
       await _completeTagUpdate(
         container,

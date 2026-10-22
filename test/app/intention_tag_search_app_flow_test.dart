@@ -15,6 +15,7 @@ import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/tag_storage_fixture.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
+import '../support/tag_positions.dart';
 
 const _health = 301;
 const _sport = 302;
@@ -216,10 +217,10 @@ void _seed(sqlite.Database database) {
       (_sport, 'Спорт'),
       (_rest, 'Отдых'),
     ]) {
-      database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-        tagFixtureId(number),
-        name,
-      ]);
+      database.execute(
+        'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+        [tagFixtureId(number), name, tagPositionKey(number)],
+      );
     }
     for (final (number, title, ready, archived, tags) in [
       (1, 'Ходить в парк', 1, 0, [_health, _rest]),

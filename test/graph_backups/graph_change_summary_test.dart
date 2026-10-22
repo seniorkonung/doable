@@ -27,6 +27,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
+import '../support/tag_positions.dart';
 
 void main() {
   group('сводка изменений по фактам пакетов', () {
@@ -335,7 +336,12 @@ Object _shown(GraphChangeSummary summary) => switch (summary) {
 final _createdAt = DateTime.utc(2026, 10, 1, 7);
 
 TagRecord _tag(int number, String name) => TagRecord(
-  Tag(id: _tagId(number), name: TagName.fromStored(name), color: null),
+  Tag(
+    id: _tagId(number),
+    name: TagName.fromStored(name),
+    color: null,
+    position: tagPositionAt(number),
+  ),
 );
 
 IntentionRecord _intention(int number, String title, {bool archived = false}) =>

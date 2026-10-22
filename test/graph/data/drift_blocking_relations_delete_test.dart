@@ -26,6 +26,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/large_blocking_relations_fixture.dart';
+import '../../support/tag_positions.dart';
 
 void main() {
   late AppDatabase database;
@@ -1059,8 +1060,8 @@ Future<void> _insertTag(AppDatabase database, int number, String name) =>
     seedGraph(
       database,
       () => database.customStatement(
-        'INSERT INTO tags (id, name) VALUES (?, ?)',
-        [_uuid(number), name],
+        'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+        [_uuid(number), name, tagPositionKey(number)],
       ),
     );
 

@@ -34,6 +34,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/statistics_read_contract_test_fallback.dart';
 import '../../../support/catalog_reconciliation_test_fallback.dart';
+import '../../../support/tag_positions.dart';
 
 void main() {
   group('GraphCommandCoordinator', () {
@@ -992,11 +993,17 @@ _confirmedFullCreatedResult(GraphRevision revision) {
   final id = _id(_firstUuid);
   final timestamp = IntentionTimestamp(DateTime.utc(2026, 10, 4));
   final tags = [
-    Tag(id: _tagId(_firstTagUuid), name: TagName.fromInput('Дом'), color: null),
+    Tag(
+      id: _tagId(_firstTagUuid),
+      name: TagName.fromInput('Дом'),
+      color: null,
+      position: tagPositionAt(1000),
+    ),
     Tag(
       id: _tagId(_secondTagUuid),
       name: TagName.fromInput('Выходные'),
       color: null,
+      position: tagPositionAt(1001),
     ),
   ];
   return ResultSuccess(

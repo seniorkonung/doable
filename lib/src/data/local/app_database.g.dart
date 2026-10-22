@@ -2861,6 +2861,17 @@ class Tags extends Table with TableInfo<Tags, Tag> {
     requiredDuringInsert: false,
     $customConstraints: 'CHECK (color IS NULL OR color IN (\'brown\', \'orange\', \'olive\', \'green\', \'teal\', \'blue\', \'violet\', \'purple\', \'pink\'))',
   );
+  static const VerificationMeta _positionMeta = const VerificationMeta(
+    'position',
+  );
+  late final GeneratedColumn<String> position = GeneratedColumn<String>(
+    'position',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL COLLATE BINARY UNIQUE CHECK (typeof(position) = \'text\' AND length(position) > 0 AND instr(CAST(position AS BLOB), X\'00\') = 0 AND NOT position GLOB \'*[^0-9A-Za-z]*\')',
+  );
   static const VerificationMeta _nameKeyMeta = const VerificationMeta(
     'nameKey',
   );
@@ -2882,6 +2893,7 @@ class Tags extends Table with TableInfo<Tags, Tag> {
     id,
     name,
     color,
+    position,
     nameKey,
   ];
   @override
@@ -2924,6 +2936,14 @@ class Tags extends Table with TableInfo<Tags, Tag> {
         color.isAcceptableOrUnknown(data['color']!, _colorMeta),
       );
     }
+    if (data.containsKey('position')) {
+      context.handle(
+        _positionMeta,
+        position.isAcceptableOrUnknown(data['position']!, _positionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_positionMeta);
+    }
     if (data.containsKey('name_key')) {
       context.handle(
         _nameKeyMeta,
@@ -2955,6 +2975,10 @@ class Tags extends Table with TableInfo<Tags, Tag> {
         DriftSqlType.string,
         data['${effectivePrefix}color'],
       ),
+      position: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}position'],
+      )!,
       nameKey: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}name_key'],
@@ -2978,12 +3002,17 @@ class Tag extends DataClass implements Insertable<Tag> {
 
   /// NULL — тег без цвета; иначе устойчивый код `TagColor`.
   final String? color;
+
+  /// Место в ручном порядке: дробный ключ `TagPosition`. Схема проверяет
+  /// только алфавит, полную каноническую форму — декодер при чтении.
+  final String position;
   final String nameKey;
   const Tag({
     required this.creationSequence,
     required this.id,
     required this.name,
     this.color,
+    required this.position,
     required this.nameKey,
   });
   @override
@@ -2995,6 +3024,7 @@ class Tag extends DataClass implements Insertable<Tag> {
     if (!nullToAbsent || color != null) {
       map['color'] = Variable<String>(color);
     }
+    map['position'] = Variable<String>(position);
     return map;
   }
 
@@ -3006,6 +3036,7 @@ class Tag extends DataClass implements Insertable<Tag> {
       color: color == null && nullToAbsent
           ? const Value.absent()
           : Value(color),
+      position: Value(position),
     );
   }
 
@@ -3019,6 +3050,7 @@ class Tag extends DataClass implements Insertable<Tag> {
       id: serializer.fromJson<String>(json['id']),
       name: serializer.fromJson<String>(json['name']),
       color: serializer.fromJson<String?>(json['color']),
+      position: serializer.fromJson<String>(json['position']),
       nameKey: serializer.fromJson<String>(json['name_key']),
     );
   }
@@ -3030,6 +3062,7 @@ class Tag extends DataClass implements Insertable<Tag> {
       'id': serializer.toJson<String>(id),
       'name': serializer.toJson<String>(name),
       'color': serializer.toJson<String?>(color),
+      'position': serializer.toJson<String>(position),
       'name_key': serializer.toJson<String>(nameKey),
     };
   }
@@ -3039,12 +3072,14 @@ class Tag extends DataClass implements Insertable<Tag> {
     String? id,
     String? name,
     Value<String?> color = const Value.absent(),
+    String? position,
     String? nameKey,
   }) => Tag(
     creationSequence: creationSequence ?? this.creationSequence,
     id: id ?? this.id,
     name: name ?? this.name,
     color: color.present ? color.value : this.color,
+    position: position ?? this.position,
     nameKey: nameKey ?? this.nameKey,
   );
   @override
@@ -3054,13 +3089,15 @@ class Tag extends DataClass implements Insertable<Tag> {
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('color: $color, ')
+          ..write('position: $position, ')
           ..write('nameKey: $nameKey')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(creationSequence, id, name, color, nameKey);
+  int get hashCode =>
+      Object.hash(creationSequence, id, name, color, position, nameKey);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -3069,6 +3106,7 @@ class Tag extends DataClass implements Insertable<Tag> {
           other.id == this.id &&
           other.name == this.name &&
           other.color == this.color &&
+          other.position == this.position &&
           other.nameKey == this.nameKey);
 }
 
@@ -3077,30 +3115,36 @@ class TagsCompanion extends UpdateCompanion<Tag> {
   final Value<String> id;
   final Value<String> name;
   final Value<String?> color;
+  final Value<String> position;
   const TagsCompanion({
     this.creationSequence = const Value.absent(),
     this.id = const Value.absent(),
     this.name = const Value.absent(),
     this.color = const Value.absent(),
+    this.position = const Value.absent(),
   });
   TagsCompanion.insert({
     this.creationSequence = const Value.absent(),
     required String id,
     required String name,
     this.color = const Value.absent(),
+    required String position,
   }) : id = Value(id),
-       name = Value(name);
+       name = Value(name),
+       position = Value(position);
   static Insertable<Tag> custom({
     Expression<int>? creationSequence,
     Expression<String>? id,
     Expression<String>? name,
     Expression<String>? color,
+    Expression<String>? position,
   }) {
     return RawValuesInsertable({
       if (creationSequence != null) 'creation_sequence': creationSequence,
       if (id != null) 'id': id,
       if (name != null) 'name': name,
       if (color != null) 'color': color,
+      if (position != null) 'position': position,
     });
   }
 
@@ -3109,12 +3153,14 @@ class TagsCompanion extends UpdateCompanion<Tag> {
     Value<String>? id,
     Value<String>? name,
     Value<String?>? color,
+    Value<String>? position,
   }) {
     return TagsCompanion(
       creationSequence: creationSequence ?? this.creationSequence,
       id: id ?? this.id,
       name: name ?? this.name,
       color: color ?? this.color,
+      position: position ?? this.position,
     );
   }
 
@@ -3133,6 +3179,9 @@ class TagsCompanion extends UpdateCompanion<Tag> {
     if (color.present) {
       map['color'] = Variable<String>(color.value);
     }
+    if (position.present) {
+      map['position'] = Variable<String>(position.value);
+    }
     return map;
   }
 
@@ -3142,7 +3191,8 @@ class TagsCompanion extends UpdateCompanion<Tag> {
           ..write('creationSequence: $creationSequence, ')
           ..write('id: $id, ')
           ..write('name: $name, ')
-          ..write('color: $color')
+          ..write('color: $color, ')
+          ..write('position: $position')
           ..write(')'))
         .toString();
   }
@@ -8119,12 +8169,14 @@ typedef $TagsCreateCompanionBuilder = TagsCompanion Function({
   required String id,
   required String name,
   Value<String?> color,
+  required String position,
 });
 typedef $TagsUpdateCompanionBuilder = TagsCompanion Function({
   Value<int> creationSequence,
   Value<String> id,
   Value<String> name,
   Value<String?> color,
+  Value<String> position,
 });
 
 final class $TagsReferences extends BaseReferences<_$AppDatabase, Tags, Tag> {
@@ -8174,6 +8226,11 @@ class $TagsFilterComposer extends Composer<_$AppDatabase, Tags> {
 
   ColumnFilters<String> get color => $composableBuilder(
     column: $table.color,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get position => $composableBuilder(
+    column: $table.position,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -8236,6 +8293,11 @@ class $TagsOrderingComposer extends Composer<_$AppDatabase, Tags> {
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get position => $composableBuilder(
+    column: $table.position,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get nameKey => $composableBuilder(
     column: $table.nameKey,
     builder: (column) => ColumnOrderings(column),
@@ -8263,6 +8325,9 @@ class $TagsAnnotationComposer extends Composer<_$AppDatabase, Tags> {
 
   GeneratedColumn<String> get color =>
       $composableBuilder(column: $table.color, builder: (column) => column);
+
+  GeneratedColumn<String> get position =>
+      $composableBuilder(column: $table.position, builder: (column) => column);
 
   GeneratedColumn<String> get nameKey =>
       $composableBuilder(column: $table.nameKey, builder: (column) => column);
@@ -8325,11 +8390,13 @@ class $TagsTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<String?> color = const Value.absent(),
+                Value<String> position = const Value.absent(),
               }) => TagsCompanion(
                 creationSequence: creationSequence,
                 id: id,
                 name: name,
                 color: color,
+                position: position,
               ),
           createCompanionCallback:
               ({
@@ -8337,11 +8404,13 @@ class $TagsTableManager
                 required String id,
                 required String name,
                 Value<String?> color = const Value.absent(),
+                required String position,
               }) => TagsCompanion.insert(
                 creationSequence: creationSequence,
                 id: id,
                 name: name,
                 color: color,
+                position: position,
               ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), $TagsReferences(db, table, e)))

@@ -24,6 +24,7 @@ import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 import '../../support/tag_storage_fixture.dart';
+import '../../support/tag_positions.dart';
 
 TagId _tag(int number) =>
     (TagId.decode(tagFixtureId(number)) as TagIdDecodingSuccess).id;
@@ -137,10 +138,10 @@ void main() {
     test('два потребителя $label согласуют полные снимки и изменения графа', () async {
       seedRawGraph(raw, () {
         for (var number = 303; number <= 439; number++) {
-          raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-            tagFixtureId(number),
-            'Тег $number',
-          ]);
+          raw.execute(
+            'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+            [tagFixtureId(number), 'Тег $number', tagPositionKey(number)],
+          );
           raw.execute(
             'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
             [tagFixtureId(number), target.toCanonicalString()],

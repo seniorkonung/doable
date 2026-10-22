@@ -350,15 +350,17 @@ void _registerDraftSearchScenarios() {
             _visibleNames(tester).contains('Домашнее'),
       );
       await tester.pumpAndSettle();
-      final createdRows = raw.select('SELECT id FROM tags WHERE name = ?', [
-        'Домашнее',
-      ]);
+      final createdRows = raw.select(
+        'SELECT id, position FROM tags WHERE name = ?',
+        ['Домашнее'],
+      );
       final created = Tag(
         id: (TagId.decode(
           createdRows.single['id'] as String,
         ) as TagIdDecodingSuccess).id,
         name: TagName.fromInput('Домашнее'),
         color: null,
+        position: tagPosition(createdRows.single['position'] as String),
       );
       expect(tester.widget<TextField>(_search).controller!.value, editingValue);
       expect(find.text(l10n.tagCatalogInvalidSearch), findsOneWidget);

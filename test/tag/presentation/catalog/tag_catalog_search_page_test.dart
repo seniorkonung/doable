@@ -44,6 +44,7 @@ import '../../../support/tag_catalog_test_repository.dart';
 import '../../../support/tag_storage_fixture.dart';
 import '../../../support/tag_assignment_changed.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
+import '../../../support/tag_positions.dart';
 
 part 'tag_catalog_draft_search_scenarios.dart';
 part 'tag_catalog_search_recovery_scenarios.dart';
@@ -450,6 +451,7 @@ void main() {
             id: selected.id,
             name: TagName.fromInput('Актуальный дом'),
             color: selected.color,
+            position: selected.position,
           );
           repository.observe(renamed, revision: 2);
           await tester.pumpAndSettle();
@@ -1330,6 +1332,7 @@ Tag _tag(int number, String name) => Tag(
   id: (TagId.decode(_id(number)) as TagIdDecodingSuccess).id,
   name: TagName.fromInput(name),
   color: null,
+  position: tagPositionAt(number),
 );
 
 /// Прежний смысл необязательного получателя: без намерения — просмотр

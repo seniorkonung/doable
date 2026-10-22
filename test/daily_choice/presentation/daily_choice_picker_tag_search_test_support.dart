@@ -24,6 +24,7 @@ import '../../intention/presentation/catalog/catalog_test_support.dart';
 import '../../support/app_root_pages.dart';
 import '../../support/inline_text.dart';
 import '../../intention/presentation/catalog/intention_picker_session_test_support.dart';
+import '../../support/tag_positions.dart';
 
 /// Страница выбора намерения для дневного выбора и её ограничения поиска.
 ///
@@ -417,6 +418,7 @@ Tag _tag(int index, String name) => Tag(
   },
   name: TagName.fromInput(name),
   color: null,
+  position: tagPositionAt(index),
 );
 
 Future<void> _pumpUntilReconciliationQueries(

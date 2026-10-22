@@ -18,6 +18,8 @@ import 'package:doable/src/tag/presentation/editor/tag_editor_view_model.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/tag_positions.dart';
+
 void main() {
   test(
     'создание проверяет название, отклоняет повтор и сохраняет ввод при отказе',
@@ -359,5 +361,9 @@ final class _Revision implements GraphRevision {
 TagId _id(int number) => (TagId.decode(
   '00000000-0000-4000-8000-${number.toString().padLeft(12, '0')}',
 ) as TagIdDecodingSuccess).id;
-Tag _tag(int number, String name, {TagColor? color}) =>
-    Tag(id: _id(number), name: TagName.fromInput(name), color: color);
+Tag _tag(int number, String name, {TagColor? color}) => Tag(
+  id: _id(number),
+  name: TagName.fromInput(name),
+  color: color,
+  position: tagPositionAt(number),
+);

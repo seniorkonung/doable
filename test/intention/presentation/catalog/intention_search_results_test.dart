@@ -18,6 +18,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'catalog_reconciliation_test_support.dart';
 import 'catalog_test_support.dart';
+import '../../../support/tag_positions.dart';
 
 const _purpose = BrowseIntentionCatalog();
 const _listKey = PageStorageKey<String>('search-results-test-list');
@@ -310,6 +311,7 @@ Tag _tag(int index, String name) => Tag(
   },
   name: TagName.fromInput(name),
   color: null,
+  position: tagPositionAt(index),
 );
 
 /// Сводки с обязательным тегом в порядке убывания номера.
@@ -438,6 +440,7 @@ final class _Harness {
       id: _other.id,
       name: TagName.fromInput('Покой'),
       color: _other.color,
+      position: _other.position,
     );
     await complete(
       UpdateTag(tagId: _other.id, name: renamed.name, color: _other.color),

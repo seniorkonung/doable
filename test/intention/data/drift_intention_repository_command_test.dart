@@ -27,6 +27,7 @@ import 'package:sqlite3/sqlite3.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
+import '../../support/tag_positions.dart';
 
 void main() {
   late AppDatabase database;
@@ -72,10 +73,10 @@ void main() {
           for (var index = 0; index < 105; index++) {
             final name = 'Собственный тег $index';
             expectedTagNames.add(name);
-            raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-              tagFixtureId(2000 - index),
-              name,
-            ]);
+            raw.execute(
+              'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+              [tagFixtureId(2000 - index), name, tagPositionKey(2000 - index)],
+            );
           }
           for (var index = 104; index >= 0; index--) {
             raw.execute(
@@ -1574,14 +1575,18 @@ void main() {
 
       setUp(() async {
         seedRawGraph(raw, () {
-          raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-            weekendTagId.toCanonicalString(),
-            'Выходные',
-          ]);
-          raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-            homeTagId.toCanonicalString(),
-            'Дом',
-          ]);
+          raw.execute(
+            'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+            [
+              weekendTagId.toCanonicalString(),
+              'Выходные',
+              tagPositionKey(200000),
+            ],
+          );
+          raw.execute(
+            'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+            [homeTagId.toCanonicalString(), 'Дом', tagPositionKey(200001)],
+          );
         });
         await _insertIntention(
           database,

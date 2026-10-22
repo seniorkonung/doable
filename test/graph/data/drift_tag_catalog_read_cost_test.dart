@@ -10,6 +10,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
+import '../../support/tag_positions.dart';
 
 void main() {
   test(
@@ -39,10 +40,14 @@ Future<void> expectFullTagCatalogSnapshot() async {
       seedRawGraph(raw, () {
         for (var index = current; index < count; index++) {
           final number = 10000 + index;
-          raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-            tagFixtureId(number),
-            'Тег ${index.toString().padLeft(6, '0')}',
-          ]);
+          raw.execute(
+            'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+            [
+              tagFixtureId(number),
+              'Тег ${index.toString().padLeft(6, '0')}',
+              tagPositionKey(number),
+            ],
+          );
           if (index % 10 == 0) {
             raw.execute(
               'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',

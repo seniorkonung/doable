@@ -37,6 +37,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../intention/presentation/details/details_test_support.dart';
 import '../../support/tag_assignment_changed.dart';
+import '../../support/tag_positions.dart';
 
 void main() {
   setUp(() {
@@ -2083,11 +2084,13 @@ final class _PresenterHarness {
       id: _tagId,
       name: TagName.fromInput('Планы'),
       color: null,
+      position: tagPositionAt(1000),
     );
     final after = Tag(
       id: _tagId,
       name: TagName.fromInput('Новое имя'),
       color: before.color,
+      position: before.position,
     );
     final success = switch (kind) {
       TagCommandKind.create => TagCreated(

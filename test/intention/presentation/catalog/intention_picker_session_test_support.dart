@@ -24,6 +24,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'catalog_reconciliation_test_support.dart';
 import 'catalog_test_support.dart';
 import '../../../support/app_root_pages.dart';
+import '../../../support/tag_positions.dart';
 
 /// Проверяет жизнь поисков одного назначения в настоящем стеке маршрутов.
 void defineIntentionPickerSessionTests({
@@ -238,6 +239,7 @@ Tag _tag(int index, String name) => Tag(
   },
   name: TagName.fromInput(name),
   color: null,
+  position: tagPositionAt(index),
 );
 
 Future<void> _settleRoute(WidgetTester tester) async {

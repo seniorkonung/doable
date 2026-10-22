@@ -15,6 +15,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
+import '../../support/tag_positions.dart';
 
 TagId _tagId(int number) =>
     (TagId.decode(tagFixtureId(number)) as TagIdDecodingSuccess).id;
@@ -280,9 +281,10 @@ void main() {
       raw.execute('DELETE FROM tags WHERE id = ?', [
         tagFixtureId(firstTagNumber),
       ]);
-      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+      raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
         tagFixtureId(999),
         'Дом',
+        tagPositionKey(999),
       ]);
     });
     final before = graph();

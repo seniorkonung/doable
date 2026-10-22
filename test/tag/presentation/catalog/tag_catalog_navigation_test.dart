@@ -28,6 +28,7 @@ import '../../../support/in_memory_diagnostics_sink.dart';
 import '../../../support/inline_text.dart';
 import '../../../support/tag_storage_fixture.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
+import '../../../support/tag_positions.dart';
 
 void main() {
   for (final (number, archivedOnly) in [(303, false), (304, true)]) {
@@ -142,10 +143,10 @@ void main() {
         seed: (raw) {
           seedRawGraph(raw, () {
             for (var number = 305; number <= 352; number++) {
-              raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-                tagFixtureId(number),
-                'Тег $number',
-              ]);
+              raw.execute(
+                'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+                [tagFixtureId(number), 'Тег $number', tagPositionKey(number)],
+              );
             }
           });
         },
@@ -296,9 +297,10 @@ _pumpCatalog(
       (303, 'Свободный'),
       (304, 'Только в архиве'),
     ]) {
-      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+      raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
         tagFixtureId(number),
         name,
+        tagPositionKey(number),
       ]);
     }
     raw.execute(

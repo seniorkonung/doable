@@ -26,6 +26,7 @@ import '../support/app_root_pages.dart';
 import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
+import '../support/tag_positions.dart';
 
 Future<void> _until(WidgetTester tester, bool Function() done) async {
   for (var attempt = 0; attempt < 100 && !done(); attempt++) {
@@ -90,13 +91,15 @@ void main() {
     );
     const tagIdText = '018f0b5d-6b2e-7c80-8000-000000000001';
     seedRawGraph(raw, () {
-      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+      raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
         tagIdText,
         'Дом',
+        tagPositionKey(200000),
       ]);
-      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+      raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
         '018f0b5d-6b2e-7c80-8000-000000000002',
         'Для дома',
+        tagPositionKey(200001),
       ]);
     });
     await _tap(tester, 'catalog-open-tags');

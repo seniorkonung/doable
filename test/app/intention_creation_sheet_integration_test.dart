@@ -61,6 +61,7 @@ import '../support/local_database_harness.dart';
 import '../support/tag_storage_fixture.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
 import '../support/quick_creation.dart';
+import '../support/tag_positions.dart';
 
 // Названия намерений и тегов — данные человека: они одинаковы в обеих
 // локалях.
@@ -448,10 +449,10 @@ Iterable<int> get _activeSketches =>
 void _seedGraph(sqlite.Database database) {
   seedRawGraph(database, () {
     for (final MapEntry(key: number, value: name) in _tagNames.entries) {
-      database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-        tagFixtureId(number),
-        name,
-      ]);
+      database.execute(
+        'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+        [tagFixtureId(number), name, tagPositionKey(number)],
+      );
     }
     void intention(
       int number,

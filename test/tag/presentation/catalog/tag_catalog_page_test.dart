@@ -45,6 +45,7 @@ import '../../../support/graph_seed.dart';
 import '../../../support/in_memory_diagnostics_sink.dart';
 import '../../../support/ordinary_page_test_app.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
+import '../../../support/tag_positions.dart';
 
 String _id(int number) =>
     '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}';
@@ -364,10 +365,14 @@ void main() {
             [_id(200), _id(100), _id(101), 'need', 2, 0],
           );
           for (var number = 1; number <= 52; number++) {
-            raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-              _id(number),
-              number == 52 ? 'Дом' : 'Тег $number',
-            ]);
+            raw.execute(
+              'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+              [
+                _id(number),
+                number == 52 ? 'Дом' : 'Тег $number',
+                tagPositionKey(number),
+              ],
+            );
           }
           if (assigned) {
             raw.execute(
@@ -483,10 +488,10 @@ void main() {
           [_id(200), _id(100), _id(101), 'need', 2, 1],
         );
         for (var number = 1; number <= 52; number++) {
-          raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-            _id(number),
-            'Тег $number',
-          ]);
+          raw.execute(
+            'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+            [_id(number), 'Тег $number', tagPositionKey(number)],
+          );
         }
         raw.execute(
           'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
@@ -722,14 +727,16 @@ void main() {
     addTearDown(database.close);
     seedRawGraph(raw, () {
       for (var number = 1; number <= 51; number++) {
-        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
           _id(number),
           'Тег $number',
+          tagPositionKey(number),
         ]);
       }
-      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+      raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
         _id(52),
         'Дом',
+        tagPositionKey(52),
       ]);
     });
     final repository = DriftPersonalGraphRepository(
@@ -828,7 +835,11 @@ void main() {
     await database.open();
     addTearDown(database.close);
     seedRawGraph(raw, () {
-      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [_id(1), 'Дом']);
+      raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
+        _id(1),
+        'Дом',
+        tagPositionKey(1),
+      ]);
     });
     final repository = DriftPersonalGraphRepository(
       database,
@@ -1017,9 +1028,10 @@ void main() {
           'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
           [_id(100), 'Одинаковое имя', 0, 0, 100, 100],
         );
-        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
           _id(1),
           'Дом',
+          tagPositionKey(1),
         ]);
       });
       final repository = DriftPersonalGraphRepository(
@@ -1221,9 +1233,10 @@ void main() {
         [_id(100), 'Архивное намерение', 0, 1, 100, 100],
       );
       for (var number = 1; number <= 150; number++) {
-        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
           _id(number),
           'Тег $number',
+          tagPositionKey(number),
         ]);
       }
       raw.execute(
@@ -1964,10 +1977,10 @@ void main() {
       addTearDown(database.close);
       seedRawGraph(raw, () {
         for (final (number, name) in [(1, 'Дом'), (2, 'Работа')]) {
-          raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-            _id(number),
-            name,
-          ]);
+          raw.execute(
+            'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+            [_id(number), name, tagPositionKey(number)],
+          );
         }
       });
       final repository = DriftPersonalGraphRepository(
@@ -2273,6 +2286,7 @@ Tag _tag(int number, String name, {TagColor? color}) => Tag(
   id: (TagId.decode(_id(number)) as TagIdDecodingSuccess).id,
   name: TagName.fromInput(name),
   color: color,
+  position: tagPositionAt(number),
 );
 
 void _expectTagDot(

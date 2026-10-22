@@ -19,6 +19,8 @@ import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:drift/drift.dart';
 
+import 'tag_positions.dart';
+
 /// Эталонная выгрузка базы для проверки полноты лога фактов: записи формата
 /// графа, прочитанные из таблиц графа собственными запросами, без механизма
 /// фактов.
@@ -64,6 +66,7 @@ Future<List<GraphEntityRecord>> referenceGraphRecords(
             final code? => _tagColor(code),
             null => null,
           },
+          position: tagPosition(row.position),
         ),
       ),
     for (final row in intentions) IntentionRecord(_intention(row)),

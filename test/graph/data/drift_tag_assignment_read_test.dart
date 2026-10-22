@@ -19,6 +19,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
+import '../../support/tag_positions.dart';
 
 IntentionId _intention(int number) =>
     (IntentionId.decode(tagFixtureId(number)) as IntentionIdDecodingSuccess).id;
@@ -95,10 +96,10 @@ void main() {
     () async {
       seedRawGraph(raw, () {
         for (var number = 303; number <= 405; number++) {
-          raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-            tagFixtureId(number),
-            'Тег $number',
-          ]);
+          raw.execute(
+            'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+            [tagFixtureId(number), 'Тег $number', tagPositionKey(number)],
+          );
           for (final (column, recipient) in [
             ('intention_id', tagFixtureId(1)),
           ]) {
@@ -126,9 +127,10 @@ void main() {
 
   test('назначения другим намерениям и идентичность связи не становятся назначениями намерения', () async {
     seedRawGraph(raw, () {
-      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+      raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
         tagFixtureId(303),
         'Только другим намерениям',
+        tagPositionKey(303),
       ]);
       for (final number in [1, 3]) {
         raw.execute(
@@ -375,9 +377,10 @@ void main() {
   test('каталог выбора возвращает все 105 тегов без пропусков', () async {
     seedRawGraph(raw, () {
       for (var number = 303; number <= 405; number++) {
-        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
           tagFixtureId(number),
           'Тег $number',
+          tagPositionKey(number),
         ]);
       }
     });
@@ -452,9 +455,10 @@ void main() {
     final target = _intention(1);
     seedRawGraph(raw, () {
       for (var number = 303; number <= 439; number++) {
-        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
           tagFixtureId(number),
           'Тег $number',
+          tagPositionKey(number),
         ]);
         raw.execute(
           'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
@@ -462,9 +466,10 @@ void main() {
         );
       }
       // Формат идентификатора тега схема не проверяет.
-      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+      raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
         'некорректный-id',
         'Повреждённый',
+        tagPositionKey(200000),
       ]);
       raw.execute(
         'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',

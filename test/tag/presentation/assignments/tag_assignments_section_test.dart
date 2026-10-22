@@ -33,6 +33,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../../../support/in_memory_diagnostics_sink.dart';
 import '../../../support/tag_storage_fixture.dart';
 import '../../../support/tag_assignment_changed.dart';
+import '../../../support/tag_positions.dart';
 
 TagId _tagId(int number) =>
     (TagId.decode(tagFixtureId(number)) as TagIdDecodingSuccess).id;
@@ -797,8 +798,12 @@ final class _PendingRepository extends Fake implements PersonalGraphRepository {
   }
 }
 
-Tag _tag(int number, String name, {TagColor? color}) =>
-    Tag(id: _tagId(number), name: TagName.fromInput(name), color: color);
+Tag _tag(int number, String name, {TagColor? color}) => Tag(
+  id: _tagId(number),
+  name: TagName.fromInput(name),
+  color: color,
+  position: tagPositionAt(number),
+);
 
 Future<void> _pumpUntil(WidgetTester tester, bool Function() done) async {
   for (var attempt = 0; attempt < 30 && !done(); attempt++) {

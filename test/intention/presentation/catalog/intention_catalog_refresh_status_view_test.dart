@@ -16,6 +16,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'catalog_reconciliation_test_support.dart';
 import 'catalog_test_support.dart';
+import '../../../support/tag_positions.dart';
 
 const _purpose = BrowseIntentionCatalog();
 
@@ -160,6 +161,7 @@ final _excluded = Tag(
   id: _tagId(1),
   name: TagName.fromInput('Спорт'),
   color: null,
+  position: tagPositionAt(1000),
 );
 
 TagId _tagId(int index) => switch (TagId.decode(

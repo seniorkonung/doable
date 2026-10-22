@@ -22,6 +22,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../catalog/catalog_test_support.dart';
+import '../../../support/tag_positions.dart';
 
 void main() {
   test(
@@ -2115,8 +2116,12 @@ TagId _tagId(int number) => switch (TagId.decode(
   InvalidTagIdDecoding() => throw StateError('Некорректный UUID тега.'),
 };
 
-Tag _tag(int number, String name, {TagColor? color}) =>
-    Tag(id: _tagId(number), name: TagName.fromInput(name), color: color);
+Tag _tag(int number, String name, {TagColor? color}) => Tag(
+  id: _tagId(number),
+  name: TagName.fromInput(name),
+  color: color,
+  position: tagPositionAt(number),
+);
 
 Map<TagId, String> _tagNames(IntentionEditorState state) =>
     state.selectedTags.map((id, tag) => MapEntry(id, tag.name.value));

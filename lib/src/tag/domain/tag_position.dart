@@ -54,6 +54,13 @@ final class TagPosition {
     return TagPosition._(decremented);
   }
 
+  @override
+  bool operator ==(Object other) =>
+      other is TagPosition && other.value == value;
+
+  @override
+  int get hashCode => value.hashCode;
+
   static const _digits =
       '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
   static const _zero = '0';

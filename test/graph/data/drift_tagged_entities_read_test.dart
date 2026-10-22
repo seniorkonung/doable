@@ -18,6 +18,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
+import '../../support/tag_positions.dart';
 
 TagId _tag(int number) =>
     (TagId.decode(tagFixtureId(number)) as TagIdDecodingSuccess).id;
@@ -480,9 +481,10 @@ void main() {
 
   test('тег без назначений пуст в обоих охватах при помеченных связанных намерениях', () async {
     seedRawGraph(raw, () {
-      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+      raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
         tagFixtureId(305),
         'Без назначений',
+        tagPositionKey(305),
       ]);
     });
     for (final scope in TaggedIntentionsScope.values) {
@@ -510,9 +512,10 @@ void main() {
     expect(empty.nextCursor, isNull);
     expect(empty.tag.id, _tag(lastTagNumber));
     seedRawGraph(raw, () {
-      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+      raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
         tagFixtureId(303),
         'Только архив',
+        tagPositionKey(303),
       ]);
       raw.execute(
         'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',

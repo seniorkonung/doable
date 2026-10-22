@@ -11,6 +11,8 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:doable/src/tag/domain/tag_assignment.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/tag_positions.dart';
+
 void main() {
   test('редактирование сохраняет идентичность и допускает изменение только '
       'цвета, но не полное совпадение', () {
@@ -21,11 +23,13 @@ void main() {
       id: before.id,
       name: TagName.fromInput('Дом'),
       color: null,
+      position: before.position,
     );
     final recolored = Tag(
       id: before.id,
       name: before.name,
       color: TagColor.blue,
+      position: before.position,
     );
 
     expect(
@@ -201,7 +205,12 @@ IntentionId _intentionId(int suffix) => (IntentionId.decode(
 Tag _tag(int suffix, String name) {
   final text = '00000000-0000-4000-8000-${suffix.toString().padLeft(12, '0')}';
   final decoded = TagId.decode(text) as TagIdDecodingSuccess;
-  return Tag(id: decoded.id, name: TagName.fromInput(name), color: null);
+  return Tag(
+    id: decoded.id,
+    name: TagName.fromInput(name),
+    color: null,
+    position: tagPositionAt(suffix),
+  );
 }
 
 IntentionCatalogEntrySnapshot _entry(IntentionId id, List<Tag> tags) => _Entry(

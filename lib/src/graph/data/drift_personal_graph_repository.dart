@@ -81,6 +81,7 @@ import '../../tag/application/tag_result.dart';
 import '../../tag/domain/tag.dart' as tag_domain;
 import '../../tag/domain/tag_assignment.dart';
 import '../../tag/domain/tag_id.dart';
+import '../../tag/domain/tag_position.dart';
 import '../application/blocking_relation_reference.dart';
 import '../application/delete_blocking_relations.dart';
 import '../application/graph_change.dart';

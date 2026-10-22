@@ -21,6 +21,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/tag_positions.dart';
+
 void main() {
   _registerDraftScenarios();
   const intentionNumber = 100;
@@ -251,6 +253,7 @@ void main() {
             id: first.id,
             name: TagName.fromInput('Поздний ответ'),
             color: first.color,
+            position: first.position,
           ),
           revision: const _Revision(2),
         ),
@@ -577,6 +580,7 @@ final class _ControlledRepository extends Fake
           id: (TagId.decode(_id(index)) as TagIdDecodingSuccess).id,
           name: TagName.fromInput('Тег $index'),
           color: null,
+          position: tagPositionAt(index),
         ),
         isAssigned: index.isEven,
       ),

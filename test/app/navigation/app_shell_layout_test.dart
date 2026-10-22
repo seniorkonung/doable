@@ -45,6 +45,7 @@ import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 import '../../support/quick_creation.dart';
+import '../../support/tag_positions.dart';
 
 part 'ordinary_page_layout_scenarios.dart';
 

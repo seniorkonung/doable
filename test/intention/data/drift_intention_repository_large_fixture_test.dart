@@ -18,6 +18,7 @@ import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/intention_catalog_large_fixture.dart';
 import '../../support/local_database_harness.dart';
+import '../../support/tag_positions.dart';
 
 const _fixtureSize = 5000;
 const _pageSize = 10;
@@ -328,10 +329,10 @@ void _populateMassExcludedTag(sqlite.Database database) {
   database.execute('BEGIN');
   try {
     seedRawGraph(database, () {
-      database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-        _fixtureId(_massTag),
-        'Тег $_massTag',
-      ]);
+      database.execute(
+        'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+        [_fixtureId(_massTag), 'Тег $_massTag', tagPositionKey(_massTag)],
+      );
       for (var index = 0; index < _fixtureSize; index++) {
         if (_hasMassTag(index)) {
           insertAssignment.execute([_fixtureId(_massTag), _fixtureId(index)]);
@@ -579,7 +580,7 @@ Future<void> _expectJointTraversal(
 /// Каждое намерение дополнительно имеет три фоновых тега вне условий.
 void _populateJointTagFixture(sqlite.Database database) {
   final insertTag = database.prepare(
-    'INSERT INTO tags (id, name) VALUES (?, ?)',
+    'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
   );
   final insertAssignment = database.prepare(
     'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
@@ -597,7 +598,11 @@ void _populateJointTagFixture(sqlite.Database database) {
         (_popularTag, 1),
       ]) {
         for (var index = 0; index < count; index++) {
-          insertTag.execute([_fixtureId(base + index), 'Тег ${base + index}']);
+          insertTag.execute([
+            _fixtureId(base + index),
+            'Тег ${base + index}',
+            tagPositionKey(base + index),
+          ]);
         }
       }
       for (var index = 0; index < _jointCandidateCount; index++) {

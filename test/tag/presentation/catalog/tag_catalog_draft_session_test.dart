@@ -29,6 +29,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../../support/tag_assignment_changed.dart';
 import '../../../support/tag_catalog_test_repository.dart'
     show TagCatalogTestRevision;
+import '../../../support/tag_positions.dart';
 
 /// Совместные проверки общего выбора тегов и проекции сессии черновика:
 /// локальное включение отличается от постоянного назначения, выбранные
@@ -131,6 +132,7 @@ void main() {
         id: home.id,
         name: renamed.name,
         color: TagColor.blue,
+        position: home.position,
       );
       draft.coordinator.acceptTagUpdate(
         UpdateTag(tagId: home.id, name: recolored.name, color: recolored.color),
@@ -367,6 +369,7 @@ Tag _tag(int number, String name) => Tag(
   id: (TagId.decode(_id(number)) as TagIdDecodingSuccess).id,
   name: TagName.fromInput(name),
   color: null,
+  position: tagPositionAt(number),
 );
 
 /// Живая сессия черновика и координатор в одном контейнере с общим выбором.

@@ -70,6 +70,7 @@ import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 import '../../support/inline_text.dart';
+import '../../support/tag_positions.dart';
 
 /// Активные намерения «Намерение 01» … «Намерение 40»: выдача каталога
 /// длиннее экрана.
@@ -981,9 +982,10 @@ void _seed(sqlite.Database database) {
       [tagFixtureId(_healthTag), tagFixtureId(number)],
     );
 
-    database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+    database.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
       tagFixtureId(_healthTag),
       'Здоровье',
+      tagPositionKey(_healthTag),
     ]);
     for (var number = 1; number <= _activeCount; number++) {
       insertIntention(number, _activeTitle(number));

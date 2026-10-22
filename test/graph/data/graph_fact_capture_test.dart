@@ -24,6 +24,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/graph_seed.dart';
 import '../../support/local_database_harness.dart';
+import '../../support/tag_positions.dart';
 
 const _source = '018f0b5d-6b2e-7c80-8000-000000000001';
 const _selected = '018f0b5d-6b2e-7c80-8000-000000000002';
@@ -100,8 +101,10 @@ void main() {
     [id, source, related],
   );
 
-  Future<void> addTag(String id, String name) =>
-      write('INSERT INTO tags (id, name) VALUES (?, ?)', [id, name]);
+  Future<void> addTag(String id, String name, String position) => write(
+    'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+    [id, name, position],
+  );
 
   Future<void> assign(String tagId, String intentionId) => write(
     'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
@@ -130,8 +133,8 @@ void main() {
     await addIntention(_other, 'Другое действие');
     await addRelation(_relation, _source, _selected);
     await addRelation(_secondRelation, _selected, _other);
-    await addTag(_tagA, 'Дом');
-    await addTag(_tagB, 'Работа');
+    await addTag(_tagA, 'Дом', 'a1');
+    await addTag(_tagB, 'Работа', 'a0');
   });
 
   Future<int> remainingMarks() async {
@@ -291,6 +294,7 @@ void main() {
               id: _tagId(_tagA),
               name: TagName.fromStored('Дача'),
               color: null,
+              position: tagPosition('a1'),
             ),
           ),
         ),
@@ -315,6 +319,7 @@ void main() {
               id: _tagId(_tagA),
               name: TagName.fromStored('Дом'),
               color: TagColor.blue,
+              position: tagPosition('a1'),
             ),
           ),
         ),
@@ -421,7 +426,11 @@ void main() {
 
     final facts = await capture(() async {
       await addIntention(_created, 'Временное намерение');
-      await addTag('018f0b5d-6b2e-7c80-8000-000000000023', 'Временный тег');
+      await addTag(
+        '018f0b5d-6b2e-7c80-8000-000000000023',
+        'Временный тег',
+        'Zz',
+      );
       await assign(_tagA, _created);
       await write('DELETE FROM intentions WHERE id = ?', [_created]);
       await write('DELETE FROM tags WHERE id = ?', [

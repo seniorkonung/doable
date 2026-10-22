@@ -28,6 +28,7 @@ import 'package:sqlite3/sqlite3.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
+import '../../support/tag_positions.dart';
 
 part 'catalog_tag_filter_failure_scenarios.dart';
 
@@ -119,8 +120,8 @@ void main() {
         );
         await seedGraph(database, () async {
           await database.customStatement(
-            'INSERT INTO tags (id, name) VALUES (?, ?)',
-            [_relationUuid, 'CANARY-тег'],
+            'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+            [_relationUuid, 'CANARY-тег', tagPositionKey(200000)],
           );
           await database.customStatement(
             'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
@@ -338,13 +339,15 @@ void main() {
         createdAt: DateTime.utc(2026, 9, 2),
       );
       seedRawGraph(raw, () {
-        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
           homeTagId.toCanonicalString(),
           'Дом',
+          tagPositionKey(200001),
         ]);
-        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
           weekendTagId.toCanonicalString(),
           'Выходные',
+          tagPositionKey(200002),
         ]);
       });
       final created = await repository.execute(

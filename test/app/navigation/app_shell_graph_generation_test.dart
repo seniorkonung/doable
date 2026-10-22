@@ -43,6 +43,7 @@ import '../../support/in_memory_quick_creation_mode_store.dart';
 import '../../support/inline_text.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/temporary_graph_files.dart';
+import '../../support/tag_positions.dart';
 
 /// Намерений в графе до замены и после неё: выдача каталога длиннее экрана.
 const _intentionCount = 40;
@@ -193,9 +194,10 @@ Future<_App> _start(WidgetTester tester) async {
 void _seed(sqlite.Database database) {
   database.execute('BEGIN');
   seedRawGraph(database, () {
-    database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+    database.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
       tagFixtureId(_previousTag),
       'Здоровье',
+      tagPositionKey(_previousTag),
     ]);
     for (var number = 1; number <= _intentionCount; number++) {
       final id = tagFixtureId(_firstPrevious + number - 1);
@@ -359,7 +361,13 @@ Future<UnregisteredGraphSnapshot> _writeReplacementSnapshot(
         'dailyChoices': counts.dailyChoices,
       },
     },
-    {'kind': 'tag', 'id': tagId, 'name': 'Здоровье', 'color': null},
+    {
+      'kind': 'tag',
+      'id': tagId,
+      'name': 'Здоровье',
+      'color': null,
+      'position': tagPositionKey(_replacedTag),
+    },
     for (var number = 1; number <= _intentionCount; number++)
       {
         'kind': 'intention',

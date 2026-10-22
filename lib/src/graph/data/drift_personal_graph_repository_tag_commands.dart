@@ -75,6 +75,9 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
     CreateTag command, {
     required void Function(TagCommandDiagnosticsStage) onStage,
   }) async {
+    // Новый тег встаёт первым. Текущий первый читается в транзакции записи,
+    // поэтому другая запись не может занять вычисленный ключ.
+    final position = TagPosition.first(await _findFirstTagPosition());
     onStage(TagCommandDiagnosticsStage.write);
     final id = _tagIdGenerator.generate();
     await _database
@@ -84,14 +87,30 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
             id: id.toCanonicalString(),
             name: command.name.value,
             color: Value(command.color?.code),
+            position: position.value,
           ),
         );
     onStage(TagCommandDiagnosticsStage.resultRead);
     final tag = await _findTagById(id);
-    if (tag == null || tag.name != command.name || tag.color != command.color) {
+    if (tag == null ||
+        tag.name != command.name ||
+        tag.color != command.color ||
+        tag.position != position) {
       throw const StoredGraphCorruption();
     }
     return _CommittedTagCreated(tag);
+  }
+
+  /// Место первого тега в ручном порядке; `null` — каталог пуст.
+  Future<TagPosition?> _findFirstTagPosition() async {
+    final row = await _database
+        .customSelect(
+          'SELECT position FROM tags ORDER BY position LIMIT 1',
+          readsFrom: {_database.tags},
+        )
+        .getSingleOrNull();
+    if (row == null) return null;
+    return decodeStoredTagPosition(requiredStoredString(row.data, 'position'));
   }
 
   Future<_CommittedTagCommand> _updateTag(
@@ -275,7 +294,7 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
   Future<tag_domain.Tag?> _findTagById(TagId id) async {
     final row = await _database
         .customSelect(
-          'SELECT id, name, color FROM tags WHERE id = ?',
+          'SELECT id, name, color, position FROM tags WHERE id = ?',
           variables: [Variable<String>(id.toCanonicalString())],
           readsFrom: {_database.tags},
         )
@@ -293,7 +312,7 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
     if (ids.isEmpty) return const {};
     final rows = await _database
         .customSelect(
-          'SELECT id, name, color FROM tags '
+          'SELECT id, name, color, position FROM tags '
           'WHERE id IN (SELECT value FROM json_each(?))',
           variables: [
             Variable<String>(
@@ -317,7 +336,7 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
   Future<tag_domain.Tag?> _findTagByNameKey(String key) async {
     final row = await _database
         .customSelect(
-          'SELECT id, name, color FROM tags WHERE name_key = ?',
+          'SELECT id, name, color, position FROM tags WHERE name_key = ?',
           variables: [Variable<String>(key)],
           readsFrom: {_database.tags},
         )

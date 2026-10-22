@@ -37,6 +37,7 @@ import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/inline_text.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
+import '../../support/tag_positions.dart';
 
 part 'tag_navigation_accessibility_scenarios.dart';
 part 'tag_catalog_search_accessibility_scenarios.dart';
@@ -230,10 +231,14 @@ void _registerAssignmentScenarios() {
         seedRawGraph(raw, () {
           for (var index = 0; index < 50; index++) {
             final id = tagFixtureId(10000 + index);
-            raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-              id,
-              'Дополнение ${index.toString().padLeft(3, '0')}',
-            ]);
+            raw.execute(
+              'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+              [
+                id,
+                'Дополнение ${index.toString().padLeft(3, '0')}',
+                tagPositionKey(10000 + index),
+              ],
+            );
             raw.execute(
               'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
               [id, tagFixtureId(number)],
@@ -555,9 +560,10 @@ void _registerDraftSelectionScenarios() {
         (firstTagNumber, 'Дом'),
         (lastTagNumber, 'Работа'),
       ]) {
-        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
           tagFixtureId(number),
           name,
+          tagPositionKey(number),
         ]);
       }
     });

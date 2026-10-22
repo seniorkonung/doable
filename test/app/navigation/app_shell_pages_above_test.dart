@@ -57,6 +57,7 @@ import '../../support/tag_storage_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 import '../../support/quick_creation.dart';
 import '../../support/temporary_graph_files.dart';
+import '../../support/tag_positions.dart';
 
 part 'app_shell_page_matrix.dart';
 part 'app_shell_unnamed_page_scenarios.dart';
@@ -483,9 +484,10 @@ void _seed(sqlite.Database database) {
       'long_term_relation_id) VALUES (?, ?, ?)',
       [tagFixtureId(211), tagFixtureId(_choice), tagFixtureId(_relation)],
     );
-    database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+    database.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
       tagFixtureId(_tag),
       'Дом',
+      tagPositionKey(_tag),
     ]);
     database.execute(
       'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',

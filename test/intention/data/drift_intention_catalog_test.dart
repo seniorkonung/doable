@@ -22,6 +22,7 @@ import 'package:sqlite3/sqlite3.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
+import '../../support/tag_positions.dart';
 
 void main() {
   late AppDatabase database;
@@ -58,9 +59,10 @@ void main() {
     test('продолжает выдачу при другом порядке и повторах тех же условий', () async {
       seedTagStorageFixture(raw);
       seedRawGraph(raw, () {
-        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
           _uuid(303),
           'Отдых',
+          tagPositionKey(303),
         ]);
         for (final number in [1, 2]) {
           raw.execute(
@@ -224,9 +226,10 @@ void main() {
             [_uuid(number), 'Гулять $number', number, number],
           );
         }
-        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
           _uuid(1000),
           'Здоровье',
+          tagPositionKey(1000),
         ]);
         raw.execute(
           'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
@@ -338,10 +341,10 @@ void main() {
       }
       seedRawGraph(raw, () {
         for (final (number, name) in [(101, 'Здоровье'), (102, 'Спорт')]) {
-          raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-            _uuid(number),
-            name,
-          ]);
+          raw.execute(
+            'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+            [_uuid(number), name, tagPositionKey(number)],
+          );
         }
         for (var number = 1; number <= 6; number++) {
           raw.execute(
@@ -484,10 +487,10 @@ void main() {
           (102, 'Спорт', 3),
           (103, 'Работа', 4),
         ]) {
-          raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-            _uuid(number),
-            name,
-          ]);
+          raw.execute(
+            'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+            [_uuid(number), name, tagPositionKey(number)],
+          );
           raw.execute(
             'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
             [_uuid(number), _uuid(intention)],
@@ -548,9 +551,10 @@ void main() {
         isA<GraphCommandSucceeded>(),
       );
       seedRawGraph(raw, () {
-        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
           _uuid(9000),
           'Дом',
+          tagPositionKey(9000),
         ]);
         raw.execute(
           'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
@@ -605,10 +609,10 @@ void main() {
             (103, 'Спорт'),
             (104, 'Работа'),
           ]) {
-            raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-              _uuid(number),
-              name,
-            ]);
+            raw.execute(
+              'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+              [_uuid(number), name, tagPositionKey(number)],
+            );
           }
           for (final (intention, tags) in [
             (1, [101, 102]),
@@ -731,10 +735,10 @@ void main() {
           (102, 'Отдых'),
           (103, 'Работа'),
         ]) {
-          raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-            _uuid(number),
-            name,
-          ]);
+          raw.execute(
+            'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+            [_uuid(number), name, tagPositionKey(number)],
+          );
         }
         for (final MapEntry(key: number, value: (_, _, tags))
             in intentions.entries) {
@@ -839,12 +843,17 @@ void main() {
       const excludedTag = 1002;
       const pageSize = 100;
       seedRawGraph(raw, () {
-        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?), (?, ?)', [
-          _uuid(requiredTag),
-          'Обязательный',
-          _uuid(excludedTag),
-          'Исключённый',
-        ]);
+        raw.execute(
+          'INSERT INTO tags (id, name, position) VALUES (?, ?, ?), (?, ?, ?)',
+          [
+            _uuid(requiredTag),
+            'Обязательный',
+            tagPositionKey(requiredTag),
+            _uuid(excludedTag),
+            'Исключённый',
+            tagPositionKey(excludedTag),
+          ],
+        );
         raw.execute('''
         WITH RECURSIVE ids(n) AS (
           VALUES(1) UNION ALL SELECT n + 1 FROM ids WHERE n < 50000
@@ -951,10 +960,10 @@ void main() {
           (109, 'Отдых'),
           (108, 'Семья'),
         ]) {
-          raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-            _uuid(number),
-            name,
-          ]);
+          raw.execute(
+            'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+            [_uuid(number), name, tagPositionKey(number)],
+          );
         }
         for (final (tag, intention) in [(109, 1), (110, 1), (108, 2)]) {
           raw.execute(
@@ -1075,18 +1084,19 @@ void main() {
       seedTagStorageFixture(raw);
       seedRawGraph(raw, () {
         for (var number = 303; number <= 439; number++) {
-          raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-            _uuid(number),
-            'Тег $number',
-          ]);
+          raw.execute(
+            'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+            [_uuid(number), 'Тег $number', tagPositionKey(number)],
+          );
           raw.execute(
             'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
             [_uuid(number), _uuid(1)],
           );
         }
-        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
           'некорректный идентификатор',
           'Последний тег',
+          tagPositionKey(200000),
         ]);
         raw.execute(
           'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
@@ -2623,10 +2633,10 @@ void _seedJointCatalogPagingFixture(Database database) {
       (1003, 'Спорт'),
       (1004, 'Работа'),
     ]) {
-      database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-        _uuid(number),
-        name,
-      ]);
+      database.execute(
+        'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+        [_uuid(number), name, tagPositionKey(number)],
+      );
     }
     for (var number = 1; number <= 285; number++) {
       database.execute(
@@ -2765,10 +2775,10 @@ void _seedReconciliationFixture(Database database) {
       (1102, 'Здоровье'),
       (1103, 'Отдых'),
     ]) {
-      database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-        _uuid(number),
-        name,
-      ]);
+      database.execute(
+        'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+        [_uuid(number), name, tagPositionKey(number)],
+      );
     }
     for (var number = 1; number <= 10; number++) {
       database.execute(

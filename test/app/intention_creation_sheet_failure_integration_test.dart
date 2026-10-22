@@ -28,6 +28,7 @@ import '../support/intention_creation_storage_observer.dart';
 import '../support/intention_creation_origin.dart';
 import '../support/tag_storage_fixture.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
+import '../support/tag_positions.dart';
 
 const _rawTitle = '  Рисовать акварель  ';
 const _title = 'Рисовать акварель';
@@ -192,9 +193,10 @@ Future<_App> _launch(
         [tagFixtureId(id), title, archived],
       );
     }
-    raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+    raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
       tagFixtureId(301),
       'Дом',
+      tagPositionKey(301),
     ]);
     raw.execute(
       'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',

@@ -6,6 +6,8 @@ import 'package:doable/src/tag/presentation/catalog/tag_delete_confirmation.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/tag_positions.dart';
+
 void main() {
   for (final locale in [const Locale('ru'), const Locale('en')]) {
     testWidgets(
@@ -23,6 +25,7 @@ void main() {
           ) as TagIdDecodingSuccess).id,
           name: TagName.fromInput(name),
           color: null,
+          position: tagPositionAt(1000),
         );
         bool? result;
         await tester.pumpWidget(

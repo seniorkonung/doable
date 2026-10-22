@@ -13,7 +13,7 @@ extension _TagReading on DriftPersonalGraphRepository {
     final rows = await _database
         .customSelect(
           '''SELECT a.intention_id, a.tag_id AS assigned_tag_id,
-         t.id, t.name, t.color
+         t.id, t.name, t.color, t.position
        FROM tag_assignments a JOIN tags t ON t.id = a.tag_id
        WHERE a.intention_id IN (${List.filled(requested.length, '?').join(', ')})
        ORDER BY a.intention_id ASC, a.tag_creation_sequence ASC''',
@@ -119,9 +119,9 @@ extension _TagReading on DriftPersonalGraphRepository {
           final rows = await _database
               .customSelect(
                 intentionId == null
-                    ? '''SELECT id, name, color FROM tags
+                    ? '''SELECT id, name, color, position FROM tags
                    ORDER BY creation_sequence ASC'''
-                    : '''SELECT t.id, t.name, t.color,
+                    : '''SELECT t.id, t.name, t.color, t.position,
                    EXISTS(SELECT 1 FROM tag_assignments a WHERE a.tag_id = t.id AND a.intention_id = ?) AS is_assigned
                    FROM tags t
                    ORDER BY t.creation_sequence ASC''',
@@ -191,7 +191,8 @@ extension _TagReading on DriftPersonalGraphRepository {
           await _validateTagReadIntention(intentionId);
           final rows = await _database
               .customSelect(
-                '''SELECT a.tag_id AS assigned_tag_id, t.id, t.name, t.color
+                '''SELECT a.tag_id AS assigned_tag_id, t.id, t.name, t.color,
+                 t.position
                FROM tag_assignments a JOIN tags t ON t.id = a.tag_id
                WHERE a.intention_id = ?
                ORDER BY a.tag_creation_sequence ASC''',
@@ -257,7 +258,7 @@ extension _TagReading on DriftPersonalGraphRepository {
           () => _database.transaction(() async {
             final row = await _database
                 .customSelect(
-                  'SELECT id, name, color FROM tags WHERE id = ?',
+                  'SELECT id, name, color, position FROM tags WHERE id = ?',
                   variables: [Variable<String>(id.toCanonicalString())],
                   readsFrom: {_database.tags},
                 )

@@ -28,6 +28,7 @@ import '../../support/app_root_pages.dart';
 import '../../support/inline_text.dart';
 import 'catalog/catalog_reconciliation_test_support.dart';
 import 'catalog/catalog_test_support.dart';
+import '../../support/tag_positions.dart';
 
 /// Нижняя граница области над открытой клавиатурой: окно 900, inset 300.
 const _keyboardTop = 600.0;
@@ -749,6 +750,7 @@ Tag _tag(int index, String name) => Tag(
   },
   name: TagName.fromInput(name),
   color: null,
+  position: tagPositionAt(index),
 );
 
 /// Прокачивает кадры и переходы маршрутов без ожидания бесконечных

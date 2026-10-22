@@ -36,6 +36,7 @@ import '../../../intention/presentation/catalog/catalog_test_support.dart'
         TestCatalogRevision,
         testIntention,
         testSummary;
+import '../../../support/tag_positions.dart';
 
 /// Контрольная точка независимых жизненных циклов фазы 2.
 ///
@@ -382,8 +383,12 @@ TagId _tagId(int number) => switch (TagId.decode(
   InvalidTagIdDecoding() => throw StateError('Некорректный UUID тега.'),
 };
 
-Tag _tag(int number, String name) =>
-    Tag(id: _tagId(number), name: TagName.fromInput(name), color: null);
+Tag _tag(int number, String name) => Tag(
+  id: _tagId(number),
+  name: TagName.fromInput(name),
+  color: null,
+  position: tagPositionAt(number),
+);
 
 /// Сессии черновика, общий выбор через существующую страницу и настоящий
 /// редактор тега в одном маршрутном стеке и одном контейнере.
@@ -578,10 +583,12 @@ final class _Repository extends Fake implements PersonalGraphRepository {
 
   TagCommandResult _createTag(CreateTag command) {
     tagCommands.add(command);
+    final number = _nextTagNumber++;
     final tag = Tag(
-      id: _tagId(_nextTagNumber++),
+      id: _tagId(number),
       name: command.name,
       color: null,
+      position: tagPositionAt(number),
     );
     _tags.add(tag);
     final revision = TestCatalogRevision(++_revision);

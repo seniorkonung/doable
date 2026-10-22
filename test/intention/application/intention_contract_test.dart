@@ -13,6 +13,8 @@ import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/tag_positions.dart';
+
 void main() {
   group('поисковый ключ названия намерения', () {
     test('сопоставляет фильтр с названием через единый поисковый ключ', () {
@@ -150,16 +152,19 @@ void main() {
           id: health,
           name: TagName.fromInput('Здоровье'),
           color: null,
+          position: tagPositionAt(1000),
         );
         final renamed = Tag(
           id: health,
           name: TagName.fromInput('Самочувствие'),
           color: original.color,
+          position: original.position,
         );
         final sameName = Tag(
           id: rest,
           name: TagName.fromInput('Здоровье'),
           color: null,
+          position: tagPositionAt(1001),
         );
         final required = IntentionTagFilter(requiredTagIds: [original.id]);
         final excluded = IntentionTagFilter(excludedTagIds: [original.id]);
@@ -194,16 +199,19 @@ void main() {
         id: _tagId('00000000-0000-4000-8000-000000000101'),
         name: TagName.fromStored('Здоровье'),
         color: null,
+        position: tagPositionAt(1002),
       );
       final rest = Tag(
         id: _tagId('00000000-0000-4000-8000-000000000102'),
         name: TagName.fromStored('Отдых'),
         color: null,
+        position: tagPositionAt(1003),
       );
       final sport = Tag(
         id: _tagId('00000000-0000-4000-8000-000000000103'),
         name: TagName.fromStored('Спорт'),
         color: null,
+        position: tagPositionAt(1004),
       );
       const candidateId = '00000000-0000-4000-8000-000000000001';
       final otherParticipant = _intentionId(
@@ -306,11 +314,13 @@ void main() {
           id: _tagId('00000000-0000-4000-8000-000000000002'),
           name: TagName.fromStored('Первый тег'),
           color: null,
+          position: tagPositionAt(1005),
         ),
         Tag(
           id: _tagId('00000000-0000-4000-8000-000000000001'),
           name: TagName.fromStored('Второй тег'),
           color: null,
+          position: tagPositionAt(1006),
         ),
       ];
       final summary = IntentionSummary(
@@ -358,11 +368,17 @@ void main() {
         createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 2)),
         tags: [
-          Tag(id: firstId, name: TagName.fromStored('Первый тег'), color: null),
+          Tag(
+            id: firstId,
+            name: TagName.fromStored('Первый тег'),
+            color: null,
+            position: tagPositionAt(1007),
+          ),
           Tag(
             id: secondId,
             name: TagName.fromStored('Второй тег'),
             color: null,
+            position: tagPositionAt(1008),
           ),
         ],
       );
@@ -372,6 +388,7 @@ void main() {
           id: secondId,
           name: TagName.fromStored('Второй тег'),
           color: TagColor.blue,
+          position: tagPositionAt(1009),
         ),
       );
 
@@ -407,6 +424,7 @@ void main() {
             id: _tagId('00000000-0000-4000-8000-000000000001'),
             name: TagName.fromStored('Здоровье'),
             color: null,
+            position: tagPositionAt(1010),
           ),
         ],
       );
@@ -416,6 +434,7 @@ void main() {
           id: _tagId('00000000-0000-4000-8000-000000000002'),
           name: TagName.fromStored('Здоровье'),
           color: TagColor.blue,
+          position: tagPositionAt(1011),
         ),
       );
 
@@ -438,11 +457,17 @@ void main() {
         createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 2)),
         tags: [
-          Tag(id: firstId, name: TagName.fromStored('Первый тег'), color: null),
+          Tag(
+            id: firstId,
+            name: TagName.fromStored('Первый тег'),
+            color: null,
+            position: tagPositionAt(1012),
+          ),
           Tag(
             id: secondId,
             name: TagName.fromStored('Второй тег'),
             color: null,
+            position: tagPositionAt(1013),
           ),
         ],
       );
@@ -477,6 +502,7 @@ void main() {
             id: _tagId('00000000-0000-4000-8000-000000000001'),
             name: TagName.fromStored('Здоровье'),
             color: null,
+            position: tagPositionAt(1014),
           ),
         ],
       );

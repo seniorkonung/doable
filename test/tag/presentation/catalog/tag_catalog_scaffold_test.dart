@@ -14,6 +14,7 @@ import '../../../support/app_root_pages.dart';
 import '../../../support/ordinary_page_test_app.dart';
 import '../../../support/tag_catalog_test_repository.dart';
 import '../../../support/tag_storage_fixture.dart';
+import '../../../support/tag_positions.dart';
 
 void main() {
   final intentionId =
@@ -67,6 +68,7 @@ void main() {
             id: (TagId.decode(tagFixtureId(301)) as TagIdDecodingSuccess).id,
             name: TagName.fromInput('Дом'),
             color: null,
+            position: tagPositionAt(1000),
           ),
         ]);
         await tester.pumpAndSettle();

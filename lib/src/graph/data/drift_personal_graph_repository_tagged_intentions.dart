@@ -28,7 +28,7 @@ extension _TaggedIntentionsReading on DriftPersonalGraphRepository {
           stage = TagReadDiagnosticsStage.read;
           final tagRow = await _database
               .customSelect(
-                'SELECT id, name, color FROM tags WHERE id = ?',
+                'SELECT id, name, color, position FROM tags WHERE id = ?',
                 variables: [Variable<String>(query.tagId.toCanonicalString())],
                 readsFrom: {_database.tags},
               )

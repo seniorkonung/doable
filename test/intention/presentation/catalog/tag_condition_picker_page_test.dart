@@ -32,6 +32,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/tag_catalog_test_repository.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
+import '../../../support/tag_positions.dart';
 
 const _present = IntentionTagRequirement.mustBePresent;
 const _absent = IntentionTagRequirement.mustBeAbsent;
@@ -728,5 +729,9 @@ TagId _id(int number) => (TagId.decode(
   '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}',
 ) as TagIdDecodingSuccess).id;
 
-Tag _tag(int number, String name, {TagColor? color}) =>
-    Tag(id: _id(number), name: TagName.fromInput(name), color: color);
+Tag _tag(int number, String name, {TagColor? color}) => Tag(
+  id: _id(number),
+  name: TagName.fromInput(name),
+  color: color,
+  position: tagPositionAt(number),
+);

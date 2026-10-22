@@ -39,6 +39,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../../../support/in_memory_diagnostics_sink.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/tag_storage_fixture.dart';
+import '../../../support/tag_positions.dart';
 
 part 'tag_navigation_terminal_watch_scenarios.dart';
 part 'tag_navigation_late_page_scenarios.dart';
@@ -1183,7 +1184,12 @@ final class _Reads with TagReadContractTestFallback implements TagReadContract {
         TaggedIntentionsPage(
           tag:
               tag ??
-              Tag(id: query.tagId, name: TagName.fromInput('Дом'), color: null),
+              Tag(
+                id: query.tagId,
+                name: TagName.fromInput('Дом'),
+                color: null,
+                position: tagPositionAt(1000),
+              ),
           scope: query.scope,
           items: items,
           pageSize: query.pageSize,
@@ -1217,8 +1223,12 @@ final class _Revision implements GraphRevision {
   }
 }
 
-Tag _tag(String name, {int id = 1, TagColor? color}) =>
-    Tag(id: _tagId(id), name: TagName.fromInput(name), color: color);
+Tag _tag(String name, {int id = 1, TagColor? color}) => Tag(
+  id: _tagId(id),
+  name: TagName.fromInput(name),
+  color: color,
+  position: tagPositionAt(id),
+);
 
 TagId _tagId(int n) => (TagId.decode(
   '10000000-0000-4000-8000-${n.toString().padLeft(12, '0')}',

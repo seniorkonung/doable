@@ -8,6 +8,8 @@ import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/tag_positions.dart';
+
 void main() {
   test('запрос помеченных намерений проверяет допустимый размер страницы', () {
     final tagId = _tag(1, 'Дом').id;
@@ -234,6 +236,7 @@ Tag _tag(int value, String name) => Tag(
   ) as TagIdDecodingSuccess).id,
   name: TagName.fromInput(name),
   color: null,
+  position: tagPositionAt(value),
 );
 
 IntentionId _intentionId(int value) => (IntentionId.decode(
