@@ -301,7 +301,7 @@
   - **Предполагаемые файлы:** `lib/src/intention/presentation/details/intention_details_page.dart`, `test/intention/presentation/details/intention_details_tags_test.dart`, `test/app/tag_assignment_app_flow_test.dart`, `test/app/tag_assignment_app_lifecycle_test.dart`, `test/app/tag_app_flow_test.dart`, `test/app/navigation/app_shell_page_matrix.dart`, `test/app/navigation/app_shell_pages_above_test.dart`, `test/tag/presentation/tag_accessibility_test.dart`.
   - **Размер:** M.
 
-- [ ] 2.16 Подтвердить готовность второй фазы: выбор и создание тегов существующего намерения полностью идут через панель
+- [x] 2.16 Подтвердить готовность второй фазы: выбор и создание тегов существующего намерения полностью идут через панель
   - **Критерии приёмки:**
     - Выполнено условие «Ready to advance» второй фазы: выбор и создание тегов для существующего намерения полностью идут через панель по спецификациям, включая отказы, доступность и локализацию, а прежний выбор тегов со страницы намерения больше не открывается.
     - Пакет не содержит меню тега, изменения, дублирования, удаления и перестановки в панели, контекстов черновика и фильтра. Результаты проверок и путь к APK сообщены в сессии; ручная проверка на устройстве остаётся за пользователем и не блокирует готовность фазы.
