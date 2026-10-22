@@ -48,7 +48,7 @@ void main() {
     await pumpEventQueue();
     expect(_names(panel.loaded), ['Дом', 'Работа']);
     expect(panel.loaded.rowsAreCurrent, isFalse);
-    expect(panel.loaded.refreshFailure, isA<TagCatalogUnavailableFailure>());
+    expect(panel.loaded.refreshFailure, TagsPanelReadFailure.unavailable);
 
     panel.model.retryRefresh();
     await pumpEventQueue();
@@ -101,11 +101,11 @@ void main() {
     final h = _Harness();
     addTearDown(h.dispose);
     final panel = h.open();
-    h.repository.reads.last.completeError(StateError('сбой драйвера'));
+    h.repository.fail(const TagCatalogUnexpectedFailure());
     await pumpEventQueue();
 
     final failure = panel.state.catalog as TagsPanelLoadFailure;
-    expect(failure.failure, isA<TagCatalogUnexpectedFailure>());
+    expect(failure.failure, TagsPanelReadFailure.unexpected);
     expect(failure.canRetry, isFalse);
     panel.model.retryLoad();
     await pumpEventQueue();
@@ -551,7 +551,7 @@ void main() {
     h.repository.fail(const TagCatalogUnavailableFailure());
     await pumpEventQueue();
 
-    expect(panel.loaded.refreshFailure, isA<TagCatalogUnavailableFailure>());
+    expect(panel.loaded.refreshFailure, TagsPanelReadFailure.unavailable);
     expect(_names(panel.loaded), ['парк', 'Дом']);
     panel.model.search('парк');
     expect(_proposedName(panel), isNull);

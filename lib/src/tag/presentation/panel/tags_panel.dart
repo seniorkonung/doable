@@ -12,7 +12,6 @@ import '../../../design_system/components/tag_create_row.dart';
 import '../../../design_system/components/tag_row.dart';
 import '../../../design_system/doable_metrics.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
-import '../../application/tag_catalog.dart';
 import '../catalog/tag_catalog_filter.dart';
 import '../catalog/tag_catalog_search_controller.dart';
 import '../editor/tag_editor_state.dart';
@@ -270,21 +269,18 @@ const _bodyPadding = EdgeInsets.symmetric(horizontal: DoableMetrics.space2);
 
 String _loadFailureMessage(
   AppLocalizations l10n,
-  TagCatalogReadFailure failure,
+  TagsPanelReadFailure failure,
 ) => switch (failure) {
-  TagCatalogUnavailableFailure() => l10n.tagsPanelLoadUnavailable,
-  TagCatalogCorruptionFailure() => l10n.tagsPanelLoadCorruption,
-  // Отсутствие намерения модель показывает отдельным состоянием.
-  TagCatalogIntentionNotFound() ||
-  TagCatalogUnexpectedFailure() => l10n.tagsPanelLoadUnexpected,
+  TagsPanelReadFailure.unavailable => l10n.tagsPanelLoadUnavailable,
+  TagsPanelReadFailure.corruption => l10n.tagsPanelLoadCorruption,
+  TagsPanelReadFailure.unexpected => l10n.tagsPanelLoadUnexpected,
 };
 
 String _refreshFailureMessage(
   AppLocalizations l10n,
-  TagCatalogReadFailure failure,
+  TagsPanelReadFailure failure,
 ) => switch (failure) {
-  TagCatalogUnavailableFailure() => l10n.tagsPanelRefreshUnavailable,
-  TagCatalogCorruptionFailure() => l10n.tagsPanelRefreshCorruption,
-  TagCatalogIntentionNotFound() ||
-  TagCatalogUnexpectedFailure() => l10n.tagsPanelRefreshUnexpected,
+  TagsPanelReadFailure.unavailable => l10n.tagsPanelRefreshUnavailable,
+  TagsPanelReadFailure.corruption => l10n.tagsPanelRefreshCorruption,
+  TagsPanelReadFailure.unexpected => l10n.tagsPanelRefreshUnexpected,
 };

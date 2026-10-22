@@ -163,7 +163,11 @@ final class TagsPanelViewModel extends _$TagsPanelViewModel {
   }
 
   Future<void> _load(int generation) async {
-    final result = await _readCatalog();
+    final result = await _repository.getTagCatalog(switch (_context) {
+      TagsPanelAssignmentContext(:final intentionId) => TagCatalogSelectionMode(
+        intentionId,
+      ),
+    });
     if (!ref.mounted || generation != _generation) return;
     // Отказ чтения, за которым уже запрошено следующее, ничего не решает.
     if (result is GraphResultFailure && _refreshNeeded) return;
@@ -171,10 +175,10 @@ final class TagsPanelViewModel extends _$TagsPanelViewModel {
       case GraphResultSuccess(
         value: TagSelectionSnapshot(:final rows, :final revision),
       ):
-        if (_precedesRequired(revision) || _precedesShown(revision)) {
+        if (_precedesRequired(revision)) {
           if (++_staleReadAttempts >= _maxStaleReads) {
             _refreshNeeded = false;
-            _readFailed(const TagCatalogUnavailableFailure());
+            _readFailed(TagsPanelReadFailure.unavailable);
           } else {
             _refreshNeeded = true;
           }
@@ -190,30 +194,21 @@ final class TagsPanelViewModel extends _$TagsPanelViewModel {
           ]),
         );
       case GraphResultSuccess(value: TagBrowseSnapshot()):
-        _readFailed(const TagCatalogUnexpectedFailure());
+        _readFailed(TagsPanelReadFailure.unexpected);
       case GraphResultFailure(failure: TagCatalogIntentionNotFound()):
         _generation++;
         _refreshNeeded = false;
         state = state.withCatalog(const TagsPanelIntentionMissing());
-      case GraphResultFailure(:final failure):
-        _readFailed(failure);
+      case GraphResultFailure(failure: TagCatalogUnavailableFailure()):
+        _readFailed(TagsPanelReadFailure.unavailable);
+      case GraphResultFailure(failure: TagCatalogCorruptionFailure()):
+        _readFailed(TagsPanelReadFailure.corruption);
+      case GraphResultFailure(failure: TagCatalogUnexpectedFailure()):
+        _readFailed(TagsPanelReadFailure.unexpected);
     }
   }
 
-  Future<TagCatalogResult> _readCatalog() async {
-    final mode = switch (_context) {
-      TagsPanelAssignmentContext(:final intentionId) => TagCatalogSelectionMode(
-        intentionId,
-      ),
-    };
-    try {
-      return await _repository.getTagCatalog(mode);
-    } on Object {
-      return const TagCatalogError(TagCatalogUnexpectedFailure());
-    }
-  }
-
-  void _readFailed(TagCatalogReadFailure failure) {
+  void _readFailed(TagsPanelReadFailure failure) {
     state = state.withCatalog(switch (state.catalog) {
       final TagsPanelLoaded loaded => loaded.withRefreshFailure(failure),
       _ => TagsPanelLoadFailure(failure),
@@ -324,7 +319,4 @@ final class TagsPanelViewModel extends _$TagsPanelViewModel {
     return order == GraphRevisionOrder.older ||
         order == GraphRevisionOrder.differentEpoch;
   }
-
-  bool _precedesShown(GraphRevision revision) =>
-      _shownRevision?.compareTo(revision) == GraphRevisionOrder.newer;
 }

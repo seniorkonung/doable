@@ -1,4 +1,3 @@
-import '../../application/tag_catalog.dart';
 import '../../domain/tag.dart';
 import '../catalog/tag_catalog_filter.dart';
 
@@ -36,6 +35,10 @@ final class TagsPanelSearch {
   final bool inputIsInvalid;
 }
 
+/// Отказ чтения каталога панели. Отсутствие намерения отказом панели не
+/// является: его представляет [TagsPanelIntentionMissing].
+enum TagsPanelReadFailure { unavailable, corruption, unexpected }
+
 sealed class TagsPanelCatalog {
   const TagsPanelCatalog();
 }
@@ -49,8 +52,8 @@ final class TagsPanelLoading extends TagsPanelCatalog {
 final class TagsPanelLoadFailure extends TagsPanelCatalog {
   const TagsPanelLoadFailure(this.failure);
 
-  final TagCatalogReadFailure failure;
-  bool get canRetry => failure is TagCatalogUnavailableFailure;
+  final TagsPanelReadFailure failure;
+  bool get canRetry => failure == TagsPanelReadFailure.unavailable;
 }
 
 /// Намерения, для которого открыта панель, больше нет.
@@ -67,11 +70,12 @@ final class TagsPanelLoaded extends TagsPanelCatalog {
     : rows = List.unmodifiable(rows);
 
   final List<TagsPanelRow> rows;
-  final TagCatalogReadFailure? refreshFailure;
+  final TagsPanelReadFailure? refreshFailure;
 
   bool get isEmpty => rows.isEmpty;
   bool get rowsAreCurrent => refreshFailure == null;
-  bool get canRetryRefresh => refreshFailure is TagCatalogUnavailableFailure;
+  bool get canRetryRefresh =>
+      refreshFailure == TagsPanelReadFailure.unavailable;
 
   /// Совпавшие с [filter] строки в ручном порядке.
   List<TagsPanelRow> rowsMatching(TagCatalogFilter filter) => [
@@ -89,7 +93,7 @@ final class TagsPanelLoaded extends TagsPanelCatalog {
   TagsPanelLoaded withRows(List<TagsPanelRow> rows) =>
       TagsPanelLoaded(rows, refreshFailure: refreshFailure);
 
-  TagsPanelLoaded withRefreshFailure(TagCatalogReadFailure failure) =>
+  TagsPanelLoaded withRefreshFailure(TagsPanelReadFailure failure) =>
       TagsPanelLoaded(rows, refreshFailure: failure);
 }
 
