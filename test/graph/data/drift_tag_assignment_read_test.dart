@@ -92,13 +92,18 @@ void main() {
   });
 
   test(
-    'полное чтение назначений сохраняет порядок всех 104 тегов намерения',
+    'полное чтение назначений даёт все 104 тега намерения в ручном порядке',
     () async {
       seedRawGraph(raw, () {
+        // Места новых тегов обратны порядку их создания и назначения.
         for (var number = 303; number <= 405; number++) {
           raw.execute(
             'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
-            [tagFixtureId(number), 'Тег $number', tagPositionKey(number)],
+            [
+              tagFixtureId(number),
+              'Тег $number',
+              tagPositionKey(1000 - number),
+            ],
           );
           for (final (column, recipient) in [
             ('intention_id', tagFixtureId(1)),
@@ -115,11 +120,11 @@ void main() {
         expect(loaded.intentionId, target);
         expect(loaded.items.map((tag) => tag.name.value), [
           'Дом',
-          for (var number = 303; number <= 405; number++) 'Тег $number',
+          for (var number = 405; number >= 303; number--) 'Тег $number',
         ]);
         expect(loaded.items.map((tag) => tag.id.toCanonicalString()), [
           tagFixtureId(firstTagNumber),
-          for (var number = 303; number <= 405; number++) tagFixtureId(number),
+          for (var number = 405; number >= 303; number--) tagFixtureId(number),
         ]);
       }
     },
@@ -301,28 +306,39 @@ void main() {
   );
 
   test(
-    'повторное назначение не переносит тег в конец списка получателя',
+    'порядок тегов намерения не зависит от очерёдности назначения и создания',
     () async {
-      for (final (target, column, recipientId) in [
-        (_intention(1), 'intention_id', tagFixtureId(1)),
-      ]) {
-        seedRawGraph(raw, () {
-          raw.execute(
-            'INSERT INTO tag_assignments (tag_id, $column) VALUES (?, ?)',
-            [tagFixtureId(lastTagNumber), recipientId],
-          );
-          raw.execute(
-            'DELETE FROM tag_assignments WHERE tag_id = ? AND $column = ?',
-            [tagFixtureId(firstTagNumber), recipientId],
-          );
-          raw.execute(
-            'INSERT INTO tag_assignments (tag_id, $column) VALUES (?, ?)',
-            [tagFixtureId(firstTagNumber), recipientId],
-          );
-        });
-        final loaded = assignments(await graph.getTagAssignments(target));
-        expect(loaded.items.map((tag) => tag.name.value), ['Дом', 'Работа']);
-      }
+      final recipientId = tagFixtureId(1);
+      seedRawGraph(raw, () {
+        // «Спорт» создан последним, но стоит в ручном порядке первым.
+        raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
+          tagFixtureId(303),
+          'Спорт',
+          tagPositionKey(1),
+        ]);
+        raw.execute(
+          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+          [tagFixtureId(lastTagNumber), recipientId],
+        );
+        raw.execute(
+          'DELETE FROM tag_assignments WHERE tag_id = ? AND intention_id = ?',
+          [tagFixtureId(firstTagNumber), recipientId],
+        );
+        raw.execute(
+          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+          [tagFixtureId(firstTagNumber), recipientId],
+        );
+        raw.execute(
+          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+          [tagFixtureId(303), recipientId],
+        );
+      });
+      final loaded = assignments(await graph.getTagAssignments(_intention(1)));
+      expect(loaded.items.map((tag) => tag.name.value), [
+        'Спорт',
+        'Дом',
+        'Работа',
+      ]);
     },
   );
 
@@ -377,10 +393,11 @@ void main() {
   test('каталог выбора возвращает все 105 тегов без пропусков', () async {
     seedRawGraph(raw, () {
       for (var number = 303; number <= 405; number++) {
+        // Места новых тегов обратны порядку их создания.
         raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
           tagFixtureId(number),
           'Тег $number',
-          tagPositionKey(number),
+          tagPositionKey(1000 - number),
         ]);
       }
     });
@@ -391,12 +408,12 @@ void main() {
       expect(loaded.rows.map((row) => row.tag.name.value), [
         'Дом',
         'Работа',
-        for (var number = 303; number <= 405; number++) 'Тег $number',
+        for (var number = 405; number >= 303; number--) 'Тег $number',
       ]);
       expect(loaded.rows.map((row) => row.tag.id.toCanonicalString()), [
         tagFixtureId(firstTagNumber),
         tagFixtureId(lastTagNumber),
-        for (var number = 303; number <= 405; number++) tagFixtureId(number),
+        for (var number = 405; number >= 303; number--) tagFixtureId(number),
       ]);
       expect(loaded.rows.map((row) => row.isAssigned), [
         true,

@@ -381,7 +381,8 @@ void main() {
         GraphRevisionOrder.same,
         reason: reason,
       );
-      expect(after.tagNames, ['Дом', 'Выходные', 'Спорт'], reason: reason);
+      // Созданный командой «Спорт» встаёт в ручном порядке первым.
+      expect(after.tagNames, ['Спорт', 'Дом', 'Выходные'], reason: reason);
       expect(
         _watched(await repository.watchIntention(newId).first),
         isNull,
@@ -486,9 +487,9 @@ void main() {
         final summary = confirmed.value.catalogMutation.after!.summary;
         expect(summary.id, newId, reason: reason);
         expect(summary.tags.map((tag) => tag.id), [
+          sportTagId,
           homeTagId,
           weekendTagId,
-          sportTagId,
         ], reason: reason);
       }
     });

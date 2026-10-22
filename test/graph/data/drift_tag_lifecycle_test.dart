@@ -220,10 +220,11 @@ void main() {
     });
 
     expect(await createdPosition('Спорт'), 'Zz');
+    final catalog = await repository.getTagCatalog(
+      const TagCatalogBrowseMode(),
+    );
     expect(
-      raw
-          .select('SELECT name FROM tags ORDER BY position')
-          .map((row) => row['name']),
+      (catalog as TagCatalogSuccess).value.items.map((tag) => tag.name.value),
       ['Спорт', 'Работа', 'Дом', 'Отдых'],
     );
   });

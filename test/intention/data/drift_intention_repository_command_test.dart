@@ -68,14 +68,27 @@ void main() {
       setUp(() {
         seedTagStorageFixture(raw);
         id = _id(tagFixtureId(1));
-        expectedTagNames = ['Дом'];
+        // Место 1000 + (37 · index) mod 105 перемешивает теги: ручной порядок
+        // не совпадает ни с порядком создания, ни с обратным порядком
+        // назначения. «Дом» из фикстуры стоит перед ними.
+        int place(int index) => 1000 + index * 37 % 105;
+        expectedTagNames = [
+          'Дом',
+          for (final index in List.generate(
+            105,
+            (index) => index,
+          )..sort((a, b) => place(a).compareTo(place(b))))
+            'Собственный тег $index',
+        ];
         seedRawGraph(raw, () {
           for (var index = 0; index < 105; index++) {
-            final name = 'Собственный тег $index';
-            expectedTagNames.add(name);
             raw.execute(
               'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
-              [tagFixtureId(2000 - index), name, tagPositionKey(2000 - index)],
+              [
+                tagFixtureId(2000 - index),
+                'Собственный тег $index',
+                tagPositionKey(place(index)),
+              ],
             );
           }
           for (var index = 104; index >= 0; index--) {
@@ -1910,7 +1923,8 @@ void main() {
           GraphRevisionOrder.same,
         );
 
-        // Явное исправление набора назначает новый «Дом» по его идентичности.
+        // Явное исправление набора назначает новый «Дом» по его идентичности;
+        // созданный позже, он стоит в ручном порядке первым.
         final saved = _commandSuccess(
           await repository.execute(
             CreateIntention.withInitialState(
@@ -1925,7 +1939,7 @@ void main() {
           saved.catalogMutation.after!.summary.tags.map(
             (tag) => (tag.id, tag.name.value),
           ),
-          [(weekendTagId, 'Выходные'), (recreatedTagId, 'Дом')],
+          [(recreatedTagId, 'Дом'), (weekendTagId, 'Выходные')],
         );
         expect(
           _catalogItems(await repository.getCatalogPage(recreatedTagQuery))

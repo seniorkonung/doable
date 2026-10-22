@@ -281,7 +281,7 @@ final class IntentionSummary {
   final IntentionTimestamp createdAt;
   final IntentionTimestamp updatedAt;
 
-  /// Полный подтверждённый состав собственных тегов в порядке создания тегов.
+  /// Полный подтверждённый состав собственных тегов в ручном порядке тегов.
   /// Пустой список означает проверенное отсутствие назначений.
   final List<Tag> tags;
 

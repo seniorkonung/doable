@@ -252,11 +252,11 @@ void _realTagNavigationCatalogScenarios() {
           state.revision.compareTo(completion.revision!) ==
               GraphRevisionOrder.same,
     ) as TagAssignmentsLoaded;
-    // Весь набор сразу в порядке создания тегов, без частичных публикаций.
+    // Весь набор сразу в ручном порядке тегов, без частичных публикаций.
     expect(_tagContents(loaded.items), [
       (h.tagId, 'Дом 🏷️'),
-      (fixtureTag(303), 'Без назначений'),
       (fixtureTag(lastTagNumber), 'Работа'),
+      (fixtureTag(303), 'Без назначений'),
     ]);
     expect(states, [
       isA<TagAssignmentsInitialLoading>(),
@@ -277,8 +277,8 @@ void _realTagNavigationCatalogScenarios() {
     ) as TagAssignmentsLoaded;
     final expected = [
       (h.tagId, 'Быт'),
-      (fixtureTag(303), 'Без назначений'),
       (fixtureTag(lastTagNumber), 'Работа'),
+      (fixtureTag(303), 'Без назначений'),
     ];
     expect(_tagContents(current.items), expected);
     expect(

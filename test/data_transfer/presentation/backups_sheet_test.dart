@@ -446,7 +446,7 @@ void main() {
       'Сделать копию сейчас',
     ]);
     expect(await app.backupKinds(), [GraphBackupKind.daily]);
-    expect(await app.tagNames(), ['Дом', 'Сад']);
+    expect(await app.tagNames(), ['Сад', 'Дом']);
   });
 
   testWidgets('«Восстановить копию», нажатое дважды, закрывает подтверждение '

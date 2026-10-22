@@ -1178,7 +1178,8 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('tag-editor-submit')));
     await _waitForEditorToClose(tester);
 
-    await tester.tap(find.byTooltip('Изменить тег').first);
+    // Созданный позже «Работа» стоит первым, поэтому «Дом» — последний.
+    await tester.tap(find.byTooltip('Изменить тег').last);
     await tester.pumpAndSettle();
     expect(find.text('Дом'), findsWidgets);
     await tester.enterText(
@@ -1190,7 +1191,7 @@ void main() {
     expect(find.text('Быт'), findsOneWidget);
     expect(find.text('Работа'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Изменить тег').first);
+    await tester.tap(find.byTooltip('Изменить тег').last);
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const ValueKey('tag-editor-name')),

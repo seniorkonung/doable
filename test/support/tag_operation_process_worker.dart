@@ -205,9 +205,11 @@ Future<void> _verifyAssignments(
   final catalog = (await repository.getTagCatalog(
     const TagCatalogBrowseMode(),
   ) as TagCatalogSuccess).value;
+  // Каждый новый тег встаёт первым, поэтому созданный позже «Работа» стоит
+  // перед «Быт».
   expect(catalog.items.map((tag) => (tag.id, tag.name.value)).toList(), [
-    (_tag(301), 'Быт'),
     (_tag(303), 'Работа'),
+    (_tag(301), 'Быт'),
   ]);
   for (final target in <IntentionId>[_intention(1)]) {
     final snapshot = (await repository.getTagAssignments(
@@ -215,8 +217,8 @@ Future<void> _verifyAssignments(
     ) as TagAssignmentsSuccess).value;
     expect(snapshot.intentionId, target);
     expect(snapshot.items.map((tag) => (tag.id, tag.name.value)), [
-      (_tag(301), 'Быт'),
       (_tag(303), 'Работа'),
+      (_tag(301), 'Быт'),
     ]);
   }
   final secondPage = (await repository.getTagAssignments(

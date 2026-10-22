@@ -212,13 +212,15 @@ void main() {
         chooseTags();
         final creation = await _creation(tester, app);
         await _waitFor(tester, () => _sheet.evaluate().isEmpty);
+        // Черновик показывал теги в порядке выбора, а созданное намерение —
+        // в ручном порядке: созданный позже «Спорт» стоит перед «Дом».
         await _expectCreatedPage(
           tester,
           app,
           creation,
           title: _title,
           description: _description,
-          tags: ['Дом', _sport],
+          tags: [_sport, 'Дом'],
           readiness: IntentionReadiness.ready,
         );
         final created = _createdId(creation);
@@ -246,7 +248,7 @@ void main() {
         expect(app.completions, hasLength(2));
         _expectConfirmedPackage(
           creation,
-          tags: ['Дом', _sport],
+          tags: [_sport, 'Дом'],
           readiness: IntentionReadiness.ready,
         );
         expect(_storedIntentionIds(app.raw), [...intentionsBefore, created]);
@@ -295,7 +297,7 @@ void main() {
         expect(summary.createdAt.value, summary.updatedAt.value);
         expect(
           [for (final tag in summary.tags) tag.name.value],
-          ['Дом', _sport],
+          [_sport, 'Дом'],
         );
         // Новая строка встала над видимыми: список сдвинулся на неё, а
         // видимые строки остались на своих местах экрана.
@@ -316,7 +318,7 @@ void main() {
           find.descendant(
             of: createdRows,
             matching: findTextIgnoringInlineWidgets(
-              l10n.intentionSummaryTags('Дом, $_sport'),
+              l10n.intentionSummaryTags('$_sport, Дом'),
             ),
           ),
           findsOneWidget,
@@ -407,7 +409,7 @@ void main() {
           title: _title,
           description: _description,
           readiness: IntentionReadiness.ready,
-          tags: ['Дом', _sport],
+          tags: [_sport, 'Дом'],
         );
         await _expectDurableIntention(
           tester,
@@ -1121,7 +1123,7 @@ void _expectStoredIntention(
 
 /// Полный результат после повторного открытия хранилища, прочитанный
 /// публичными чтениями модуля графа: подробности намерения и назначения
-/// в порядке создания тегов.
+/// в ручном порядке тегов.
 Future<void> _expectDurableIntention(
   WidgetTester tester,
   _Launch app,

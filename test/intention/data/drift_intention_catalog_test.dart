@@ -945,7 +945,7 @@ void main() {
   });
 
   group('Порция каталога — собственные теги', () {
-    test('показывает собственные теги возвращаемых одноимённых намерений', () async {
+    test('показывает собственные теги возвращаемых одноимённых намерений в ручном порядке', () async {
       for (var number = 1; number <= 4; number++) {
         await _insertIntention(
           database,
@@ -955,17 +955,24 @@ void main() {
         );
       }
       seedRawGraph(raw, () {
-        for (final (number, name) in [
-          (110, 'Здоровье'),
-          (109, 'Отдых'),
-          (108, 'Семья'),
+        // Ручной порядок «Семья», «Здоровье», «Отдых» не совпадает ни с
+        // порядком создания тегов, ни с очерёдностью их назначения.
+        for (final (number, name, position) in [
+          (110, 'Здоровье', 2),
+          (109, 'Отдых', 3),
+          (108, 'Семья', 1),
         ]) {
           raw.execute(
             'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
-            [_uuid(number), name, tagPositionKey(number)],
+            [_uuid(number), name, tagPositionKey(position)],
           );
         }
-        for (final (tag, intention) in [(109, 1), (110, 1), (108, 2)]) {
+        for (final (tag, intention) in [
+          (109, 1),
+          (108, 1),
+          (110, 1),
+          (108, 2),
+        ]) {
           raw.execute(
             'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
             [_uuid(tag), _uuid(intention)],
@@ -1000,7 +1007,7 @@ void main() {
         _id(_uuid(3)),
       ]);
       expect(page.items.map((item) => item.tags.map((tag) => tag.name.value)), [
-        ['Здоровье', 'Отдых'],
+        ['Семья', 'Здоровье', 'Отдых'],
         ['Семья'],
         <String>[],
       ]);

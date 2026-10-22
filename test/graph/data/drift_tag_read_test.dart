@@ -62,11 +62,11 @@ void main() {
   });
   tearDown(() => database.close());
 
-  void addTag(int number, String name, {String? color}) {
+  void addTag(int number, String name, {String? color, int? position}) {
     seedRawGraph(raw, () {
       raw.execute(
         'INSERT INTO tags (id, name, color, position) VALUES (?, ?, ?, ?)',
-        [_uuid(number), name, color, tagPositionKey(number)],
+        [_uuid(number), name, color, tagPositionKey(position ?? number)],
       );
     });
   }
@@ -90,24 +90,33 @@ void main() {
     expect(() => loaded.items.clear(), throwsUnsupportedError);
   });
 
-  test('пустой каталог и полный снимок сохраняют порядок создания', () async {
+  test('пустой каталог и полный снимок идут в ручном порядке', () async {
     final empty = snapshot(
       await repository.getTagCatalog(const TagCatalogBrowseMode()),
     );
     expect(empty.items, isEmpty);
 
+    // Места обратны порядку создания и не следуют названиям.
     for (var number = 1; number <= 7; number++) {
-      addTag(number, 'Тег $number', color: number.isOdd ? 'blue' : null);
+      addTag(
+        number,
+        'Тег $number',
+        color: number.isOdd ? 'blue' : null,
+        position: 8 - number,
+      );
     }
     final loaded = snapshot(
       await repository.getTagCatalog(const TagCatalogBrowseMode()),
     );
     expect(loaded.items.map((tag) => tag.name.value), [
-      for (var number = 1; number <= 7; number++) 'Тег $number',
+      for (var number = 7; number >= 1; number--) 'Тег $number',
     ]);
     expect(loaded.items.map((tag) => tag.color), [
-      for (var number = 1; number <= 7; number++)
+      for (var number = 7; number >= 1; number--)
         number.isOdd ? TagColor.blue : null,
+    ]);
+    expect(loaded.items.map((tag) => tag.position.value), [
+      for (var index = 1; index <= 7; index++) tagPositionKey(index),
     ]);
   });
 

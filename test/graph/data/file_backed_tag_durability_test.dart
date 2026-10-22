@@ -110,7 +110,7 @@ void main() {
     expect(await harness.databaseFile.readAsBytes(), corrupted);
   });
 
-  test('чтение, правка цвета, назначение архивированному действию, навигация и снятие сохраняются после перезапусков', () async {
+  test('чтение, ручной порядок, правка цвета, назначение архивированному действию, навигация и снятие сохраняются после перезапусков', () async {
     final harness = await LocalDatabaseHarness.fileBacked();
     addTearDown(harness.dispose);
     late sqlite.Database raw;
@@ -145,6 +145,8 @@ void main() {
         (IntentionId.decode(tagFixtureId(2)) as IntentionIdDecodingSuccess).id;
     final activeAction =
         (IntentionId.decode(tagFixtureId(1)) as IntentionIdDecodingSuccess).id;
+    // Тег, созданный позже, стоит в ручном порядке первым.
+    late final TagId laterTagId;
 
     Future<void> expectState(
       DriftPersonalGraphRepository repository,
@@ -157,6 +159,7 @@ void main() {
         const TagCatalogBrowseMode(),
       ) as TagCatalogSuccess).value;
       expect(catalog.items.map((tag) => (tag.id, tag.name.value, tag.color)), [
+        (laterTagId, 'Работа', null),
         (tagId, 'Дом', color),
       ]);
       for (final intentionId in [activeAction, archivedAction]) {
@@ -196,6 +199,11 @@ void main() {
     );
     final tagId =
         ((created as TagCommandSucceeded).value.value as TagCreated).tag.id;
+    final later = await repository.execute(
+      CreateTag(name: TagName.fromInput('Работа'), color: null),
+    );
+    laterTagId =
+        ((later as TagCommandSucceeded).value.value as TagCreated).tag.id;
     await expectState(repository, tagId, color: null, active: [], archived: []);
 
     for (final intentionId in [archivedAction, activeAction, archivedAction]) {

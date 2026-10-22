@@ -16,7 +16,7 @@ extension _TagReading on DriftPersonalGraphRepository {
          t.id, t.name, t.color, t.position
        FROM tag_assignments a JOIN tags t ON t.id = a.tag_id
        WHERE a.intention_id IN (${List.filled(requested.length, '?').join(', ')})
-       ORDER BY a.intention_id ASC, a.tag_creation_sequence ASC''',
+       ORDER BY a.intention_id ASC, t.position ASC''',
           variables: [for (final id in requested.keys) Variable<String>(id)],
           readsFrom: {_database.tags, _database.tagAssignments},
         )
@@ -120,11 +120,11 @@ extension _TagReading on DriftPersonalGraphRepository {
               .customSelect(
                 intentionId == null
                     ? '''SELECT id, name, color, position FROM tags
-                   ORDER BY creation_sequence ASC'''
+                   ORDER BY position ASC'''
                     : '''SELECT t.id, t.name, t.color, t.position,
                    EXISTS(SELECT 1 FROM tag_assignments a WHERE a.tag_id = t.id AND a.intention_id = ?) AS is_assigned
                    FROM tags t
-                   ORDER BY t.creation_sequence ASC''',
+                   ORDER BY t.position ASC''',
                 variables: [
                   if (intentionId != null)
                     Variable<String>(intentionId.toCanonicalString()),
@@ -195,7 +195,7 @@ extension _TagReading on DriftPersonalGraphRepository {
                  t.position
                FROM tag_assignments a JOIN tags t ON t.id = a.tag_id
                WHERE a.intention_id = ?
-               ORDER BY a.tag_creation_sequence ASC''',
+               ORDER BY t.position ASC''',
                 variables: [Variable<String>(intentionId.toCanonicalString())],
                 readsFrom: {_database.tags, _database.tagAssignments},
               )
@@ -296,9 +296,8 @@ extension _TagReading on DriftPersonalGraphRepository {
   }
 }
 
-/// Порядок назначений и существование тега гарантируют схема: ключ порядка
-/// назначения совпадает с порядком создания тега (триггеры), а внешний ключ не
-/// допускает назначения без тега.
+/// Существование тега гарантирует схема: внешний ключ не допускает назначения
+/// без тега.
 tag_domain.Tag _decodeAssignedTag(Map<String, Object?> data) {
   final tag = decodeStoredTag(data);
   if (requiredStoredString(data, 'assigned_tag_id') !=

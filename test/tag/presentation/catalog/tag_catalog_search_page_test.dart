@@ -776,11 +776,12 @@ void main() {
           editingValue,
         );
         expect(find.text(l10n.tagCatalogInvalidSearch), findsOneWidget);
+        // Созданный тег встаёт в ручном порядке первым.
         expect(_visibleNames(tester), [
+          'Новый дом',
           'Дом 🏷️',
           'Дом без назначений',
           'Дом в архиве',
-          'Новый дом',
         ]);
         final container = ProviderScope.containerOf(
           tester.element(find.byType(TagCatalogPage)),
@@ -800,7 +801,9 @@ void main() {
           tester,
           () =>
               _loaded(tester, intentionId).canUseCurrentItems &&
-              _loaded(tester, intentionId).items.first.name.value == 'Спорт',
+              _loaded(tester, intentionId).items.any(
+                (tag) => tag.id == home.id && tag.name.value == 'Спорт',
+              ),
         );
         await tester.pumpAndSettle();
         expect(router.current.name, TagCatalogRoute.name);
@@ -810,9 +813,9 @@ void main() {
         );
         expect(find.text(l10n.tagCatalogInvalidSearch), findsOneWidget);
         expect(_visibleNames(tester), [
+          'Новый дом',
           'Дом без назначений',
           'Дом в архиве',
-          'Новый дом',
         ]);
         expect(find.text(l10n.tagCatalogNoMatches), findsNothing);
 
@@ -831,9 +834,9 @@ void main() {
           await tester.pumpAndSettle();
           expect(_assignment(tester, unused), l10n.tagCatalogAssigned);
           expect(_visibleNames(tester), [
+            'Новый дом',
             'Дом без назначений',
             'Дом в архиве',
-            'Новый дом',
           ]);
           expect(
             tester.widget<TextField>(_search).controller!.value,
@@ -854,11 +857,11 @@ void main() {
         await tester.tap(find.byTooltip(l10n.tagCatalogClearSearch));
         await tester.pump();
         expect(_visibleNames(tester), [
+          'Новый дом',
           'Спорт',
+          'Работа',
           'Дом без назначений',
           'Дом в архиве',
-          'Работа',
-          'Новый дом',
         ]);
         expect(tester.widget<TextField>(_search).controller!.text, isEmpty);
         expect(find.text(l10n.tagCatalogInvalidSearch), findsNothing);

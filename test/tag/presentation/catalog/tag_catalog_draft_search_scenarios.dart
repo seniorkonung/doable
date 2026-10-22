@@ -364,7 +364,8 @@ void _registerDraftSearchScenarios() {
       );
       expect(tester.widget<TextField>(_search).controller!.value, editingValue);
       expect(find.text(l10n.tagCatalogInvalidSearch), findsOneWidget);
-      expect(_visibleNames(tester), [...matches, 'Домашнее']);
+      // Созданный тег встаёт в ручном порядке первым.
+      expect(_visibleNames(tester), ['Домашнее', ...matches]);
       expect(_draftSelected(tester, created), isTrue);
       expect(
         _draftStatus(created, l10n.tagCatalogAvailableForDraft),
