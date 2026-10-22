@@ -1839,16 +1839,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Type a name in search to create the first one';
 
   @override
-  String tagsPanelRowMarked(String tagName) {
-    return '$tagName, selected';
-  }
-
-  @override
-  String tagsPanelRowUnmarked(String tagName) {
-    return '$tagName, not selected';
-  }
-
-  @override
   String tagsPanelCreateTag(String query) {
     return 'Create tag “$query”';
   }

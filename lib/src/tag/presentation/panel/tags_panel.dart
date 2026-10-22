@@ -236,7 +236,6 @@ final class _LoadedCatalog extends StatelessWidget {
                       SliverList.builder(
                         itemCount: rows.length,
                         itemBuilder: (context, index) => _row(
-                          l10n,
                           rows[index],
                           isCurrent: catalog.rowsAreCurrent,
                         ),
@@ -251,11 +250,7 @@ final class _LoadedCatalog extends StatelessWidget {
     );
   }
 
-  Widget _row(
-    AppLocalizations l10n,
-    TagsPanelRow row, {
-    required bool isCurrent,
-  }) {
+  Widget _row(TagsPanelRow row, {required bool isCurrent}) {
     final tag = row.tag;
     final name = tag.name.value;
     return TagRow(
@@ -263,9 +258,7 @@ final class _LoadedCatalog extends StatelessWidget {
       name: name,
       color: tagColorPresentation(tag.color),
       mark: row.isMarked ? TagRowMark.checked : TagRowMark.none,
-      label: row.isMarked
-          ? l10n.tagsPanelRowMarked(name)
-          : l10n.tagsPanelRowUnmarked(name),
+      label: name,
       // Отказ принадлежит общей поверхности, а нажатие во время изменения
       // назначений намерения координатор отклоняет без сообщения.
       onPressed: isCurrent ? () => model.toggle(tag.id) : null,

@@ -45,8 +45,6 @@ void main() {
         done: 'Готово',
         expand: 'Раскрыть панель тегов',
         collapse: 'Свернуть панель тегов',
-        marked: 'Дом, отмечен',
-        unmarked: 'Работа, не отмечен',
       ),
     ),
     (
@@ -58,8 +56,6 @@ void main() {
         done: 'Done',
         expand: 'Expand tags panel',
         collapse: 'Collapse tags panel',
-        marked: 'Дом, selected',
-        unmarked: 'Работа, not selected',
       ),
     ),
   ]) {
@@ -90,10 +86,12 @@ void main() {
         TagRowMark.none,
         TagRowMark.none,
       ]);
+      // Отметка объявляется один раз: в названии строки только название
+      // тега, а отметку передаёт состояние отметки.
       expect(
         tester.getSemantics(_row(1)),
         isSemantics(
-          label: texts.marked,
+          label: 'Дом',
           hasCheckedState: true,
           isChecked: true,
           isEnabled: true,
@@ -103,7 +101,7 @@ void main() {
       expect(
         tester.getSemantics(_row(2)),
         isSemantics(
-          label: texts.unmarked,
+          label: 'Работа',
           hasCheckedState: true,
           isChecked: false,
           isEnabled: true,

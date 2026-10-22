@@ -1860,16 +1860,6 @@ class AppLocalizationsRu extends AppLocalizations {
       'Введите название в поиске, чтобы создать первый';
 
   @override
-  String tagsPanelRowMarked(String tagName) {
-    return '$tagName, отмечен';
-  }
-
-  @override
-  String tagsPanelRowUnmarked(String tagName) {
-    return '$tagName, не отмечен';
-  }
-
-  @override
   String tagsPanelCreateTag(String query) {
     return 'Создать тег «$query»';
   }

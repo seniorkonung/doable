@@ -320,7 +320,7 @@ void _registerAssignmentScenarios() {
         expect(
           tester.getSemantics(assignedRow),
           isSemantics(
-            label: l10n.tagsPanelRowMarked('Дом'),
+            label: 'Дом',
             hasCheckedState: true,
             isChecked: true,
             hasTapAction: true,
@@ -329,7 +329,7 @@ void _registerAssignmentScenarios() {
         expect(
           tester.getSemantics(availableRow),
           isSemantics(
-            label: l10n.tagsPanelRowUnmarked('Работа'),
+            label: 'Работа',
             hasCheckedState: true,
             isChecked: false,
             hasTapAction: true,
@@ -380,16 +380,13 @@ void _registerAssignmentScenarios() {
               raw.select('SELECT * FROM tag_assignments WHERE tag_id = ?', [
                 newId,
               ]).isNotEmpty &&
-              find
-                  .bySemanticsLabel(l10n.tagsPanelRowMarked(newName))
-                  .evaluate()
-                  .isNotEmpty,
+              find.bySemanticsLabel(newName).evaluate().isNotEmpty,
         );
         await tester.pumpAndSettle();
         expect(
           tester.getSemantics(newRow),
           isSemantics(
-            label: l10n.tagsPanelRowMarked(newName),
+            label: newName,
             hasCheckedState: true,
             isChecked: true,
             hasTapAction: true,

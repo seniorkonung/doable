@@ -2791,18 +2791,6 @@ abstract class AppLocalizations {
   /// **'Type a name in search to create the first one'**
   String get tagsPanelEmptyText;
 
-  /// Доступное название отмеченной строки панели тегов
-  ///
-  /// In en, this message translates to:
-  /// **'{tagName}, selected'**
-  String tagsPanelRowMarked(String tagName);
-
-  /// Доступное название неотмеченной строки панели тегов
-  ///
-  /// In en, this message translates to:
-  /// **'{tagName}, not selected'**
-  String tagsPanelRowUnmarked(String tagName);
-
   /// Строка панели тегов, создающая тег с названием из поиска
   ///
   /// In en, this message translates to:

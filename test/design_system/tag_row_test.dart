@@ -27,7 +27,7 @@ void main() {
             name: 'Работа',
             color: DoableTagColor.blue,
             mark: TagRowMark.checked,
-            label: 'Работа, отмечен',
+            label: 'Работа',
             onPressed: () {},
           ),
         ),
@@ -122,7 +122,7 @@ void main() {
           name: 'Работа',
           color: DoableTagColor.blue,
           mark: TagRowMark.none,
-          label: 'Работа, не отмечен',
+          label: 'Работа',
           onPressed: () => taps++,
         ),
       ),
@@ -131,7 +131,7 @@ void main() {
     expect(
       tester.getSemantics(find.byType(TagRow)),
       matchesSemantics(
-        label: 'Работа, не отмечен',
+        label: 'Работа',
         hasCheckedState: true,
         hasEnabledState: true,
         isEnabled: true,
@@ -150,7 +150,7 @@ void main() {
           name: 'Работа',
           color: DoableTagColor.blue,
           mark: TagRowMark.checked,
-          label: 'Работа, отмечен',
+          label: 'Работа',
           onPressed: () => taps++,
         ),
       ),
@@ -159,7 +159,7 @@ void main() {
     expect(
       tester.getSemantics(find.byType(TagRow)),
       matchesSemantics(
-        label: 'Работа, отмечен',
+        label: 'Работа',
         hasCheckedState: true,
         isChecked: true,
         hasEnabledState: true,
@@ -182,7 +182,7 @@ void main() {
           name: 'Работа',
           color: DoableTagColor.blue,
           mark: TagRowMark.checked,
-          label: 'Работа, отмечен',
+          label: 'Работа',
           onPressed: null,
         ),
       ),
@@ -192,7 +192,7 @@ void main() {
     expect(
       tester.getSemantics(find.byType(TagRow)),
       matchesSemantics(
-        label: 'Работа, отмечен',
+        label: 'Работа',
         hasCheckedState: true,
         isChecked: true,
         hasEnabledState: true,
@@ -211,7 +211,7 @@ void main() {
           name: 'Работа',
           color: DoableTagColor.blue,
           mark: TagRowMark.none,
-          label: 'Работа, не отмечен',
+          label: 'Работа',
           onPressed: () {},
         ),
       ),
