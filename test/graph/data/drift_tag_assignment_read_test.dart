@@ -262,50 +262,6 @@ void main() {
   });
 
   test(
-    'ключ порядка назначения повторяет создание тега и остаётся неизменным',
-    () {
-      final tagId = tagFixtureId(firstTagNumber);
-      final expected = raw.select(
-        'SELECT creation_sequence FROM tags WHERE id = ?',
-        [tagId],
-      ).single['creation_sequence'];
-      final assignment = raw.select(
-        'SELECT creation_sequence, tag_creation_sequence FROM tag_assignments WHERE tag_id = ? AND intention_id = ?',
-        [tagId, tagFixtureId(1)],
-      ).single;
-      expect(assignment['tag_creation_sequence'], expected);
-
-      expect(
-        () => seedRawGraph(
-          raw,
-          () => raw.execute(
-            'UPDATE tag_assignments SET tag_creation_sequence = ? WHERE creation_sequence = ?',
-            [(expected as int) + 1, assignment['creation_sequence']],
-          ),
-        ),
-        throwsA(isA<sqlite.SqliteException>()),
-      );
-      expect(
-        () => seedRawGraph(
-          raw,
-          () => raw.execute(
-            'INSERT INTO tag_assignments (tag_id, intention_id, tag_creation_sequence) VALUES (?, ?, ?)',
-            [tagFixtureId(lastTagNumber), tagFixtureId(1), expected],
-          ),
-        ),
-        throwsA(isA<sqlite.SqliteException>()),
-      );
-      expect(
-        raw.select(
-          'SELECT tag_creation_sequence FROM tag_assignments WHERE creation_sequence = ?',
-          [assignment['creation_sequence']],
-        ).single['tag_creation_sequence'],
-        expected,
-      );
-    },
-  );
-
-  test(
     'порядок тегов намерения не зависит от очерёдности назначения и создания',
     () async {
       final recipientId = tagFixtureId(1);

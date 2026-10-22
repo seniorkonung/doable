@@ -3721,17 +3721,6 @@ class TagAssignments extends Table
     $customConstraints:
         'NOT NULL REFERENCES tags(id)ON UPDATE RESTRICT ON DELETE CASCADE',
   );
-  static const VerificationMeta _tagCreationSequenceMeta =
-      const VerificationMeta('tagCreationSequence');
-  late final GeneratedColumn<int> tagCreationSequence = GeneratedColumn<int>(
-    'tag_creation_sequence',
-    aliasedName,
-    false,
-    type: DriftSqlType.int,
-    requiredDuringInsert: false,
-    $customConstraints: 'NOT NULL DEFAULT 0 CHECK (tag_creation_sequence >= 0)',
-    defaultValue: const CustomExpression('0'),
-  );
   static const VerificationMeta _intentionIdMeta = const VerificationMeta(
     'intentionId',
   );
@@ -3744,12 +3733,7 @@ class TagAssignments extends Table
     $customConstraints: 'NOT NULL REFERENCES intentions(id)ON UPDATE RESTRICT ON DELETE CASCADE',
   );
   @override
-  List<GeneratedColumn> get $columns => [
-    creationSequence,
-    tagId,
-    tagCreationSequence,
-    intentionId,
-  ];
+  List<GeneratedColumn> get $columns => [creationSequence, tagId, intentionId];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -3778,15 +3762,6 @@ class TagAssignments extends Table
       );
     } else if (isInserting) {
       context.missing(_tagIdMeta);
-    }
-    if (data.containsKey('tag_creation_sequence')) {
-      context.handle(
-        _tagCreationSequenceMeta,
-        tagCreationSequence.isAcceptableOrUnknown(
-          data['tag_creation_sequence']!,
-          _tagCreationSequenceMeta,
-        ),
-      );
     }
     if (data.containsKey('intention_id')) {
       context.handle(
@@ -3820,10 +3795,6 @@ class TagAssignments extends Table
         DriftSqlType.string,
         data['${effectivePrefix}tag_id'],
       )!,
-      tagCreationSequence: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}tag_creation_sequence'],
-      )!,
       intentionId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}intention_id'],
@@ -3845,12 +3816,10 @@ class TagAssignments extends Table
 class TagAssignment extends DataClass implements Insertable<TagAssignment> {
   final int creationSequence;
   final String tagId;
-  final int tagCreationSequence;
   final String intentionId;
   const TagAssignment({
     required this.creationSequence,
     required this.tagId,
-    required this.tagCreationSequence,
     required this.intentionId,
   });
   @override
@@ -3858,7 +3827,6 @@ class TagAssignment extends DataClass implements Insertable<TagAssignment> {
     final map = <String, Expression>{};
     map['creation_sequence'] = Variable<int>(creationSequence);
     map['tag_id'] = Variable<String>(tagId);
-    map['tag_creation_sequence'] = Variable<int>(tagCreationSequence);
     map['intention_id'] = Variable<String>(intentionId);
     return map;
   }
@@ -3867,7 +3835,6 @@ class TagAssignment extends DataClass implements Insertable<TagAssignment> {
     return TagAssignmentsCompanion(
       creationSequence: Value(creationSequence),
       tagId: Value(tagId),
-      tagCreationSequence: Value(tagCreationSequence),
       intentionId: Value(intentionId),
     );
   }
@@ -3880,9 +3847,6 @@ class TagAssignment extends DataClass implements Insertable<TagAssignment> {
     return TagAssignment(
       creationSequence: serializer.fromJson<int>(json['creation_sequence']),
       tagId: serializer.fromJson<String>(json['tag_id']),
-      tagCreationSequence: serializer.fromJson<int>(
-        json['tag_creation_sequence'],
-      ),
       intentionId: serializer.fromJson<String>(json['intention_id']),
     );
   }
@@ -3892,7 +3856,6 @@ class TagAssignment extends DataClass implements Insertable<TagAssignment> {
     return <String, dynamic>{
       'creation_sequence': serializer.toJson<int>(creationSequence),
       'tag_id': serializer.toJson<String>(tagId),
-      'tag_creation_sequence': serializer.toJson<int>(tagCreationSequence),
       'intention_id': serializer.toJson<String>(intentionId),
     };
   }
@@ -3900,12 +3863,10 @@ class TagAssignment extends DataClass implements Insertable<TagAssignment> {
   TagAssignment copyWith({
     int? creationSequence,
     String? tagId,
-    int? tagCreationSequence,
     String? intentionId,
   }) => TagAssignment(
     creationSequence: creationSequence ?? this.creationSequence,
     tagId: tagId ?? this.tagId,
-    tagCreationSequence: tagCreationSequence ?? this.tagCreationSequence,
     intentionId: intentionId ?? this.intentionId,
   );
   TagAssignment copyWithCompanion(TagAssignmentsCompanion data) {
@@ -3914,9 +3875,6 @@ class TagAssignment extends DataClass implements Insertable<TagAssignment> {
           ? data.creationSequence.value
           : this.creationSequence,
       tagId: data.tagId.present ? data.tagId.value : this.tagId,
-      tagCreationSequence: data.tagCreationSequence.present
-          ? data.tagCreationSequence.value
-          : this.tagCreationSequence,
       intentionId: data.intentionId.present
           ? data.intentionId.value
           : this.intentionId,
@@ -3928,54 +3886,45 @@ class TagAssignment extends DataClass implements Insertable<TagAssignment> {
     return (StringBuffer('TagAssignment(')
           ..write('creationSequence: $creationSequence, ')
           ..write('tagId: $tagId, ')
-          ..write('tagCreationSequence: $tagCreationSequence, ')
           ..write('intentionId: $intentionId')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(creationSequence, tagId, tagCreationSequence, intentionId);
+  int get hashCode => Object.hash(creationSequence, tagId, intentionId);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is TagAssignment &&
           other.creationSequence == this.creationSequence &&
           other.tagId == this.tagId &&
-          other.tagCreationSequence == this.tagCreationSequence &&
           other.intentionId == this.intentionId);
 }
 
 class TagAssignmentsCompanion extends UpdateCompanion<TagAssignment> {
   final Value<int> creationSequence;
   final Value<String> tagId;
-  final Value<int> tagCreationSequence;
   final Value<String> intentionId;
   const TagAssignmentsCompanion({
     this.creationSequence = const Value.absent(),
     this.tagId = const Value.absent(),
-    this.tagCreationSequence = const Value.absent(),
     this.intentionId = const Value.absent(),
   });
   TagAssignmentsCompanion.insert({
     this.creationSequence = const Value.absent(),
     required String tagId,
-    this.tagCreationSequence = const Value.absent(),
     required String intentionId,
   }) : tagId = Value(tagId),
        intentionId = Value(intentionId);
   static Insertable<TagAssignment> custom({
     Expression<int>? creationSequence,
     Expression<String>? tagId,
-    Expression<int>? tagCreationSequence,
     Expression<String>? intentionId,
   }) {
     return RawValuesInsertable({
       if (creationSequence != null) 'creation_sequence': creationSequence,
       if (tagId != null) 'tag_id': tagId,
-      if (tagCreationSequence != null)
-        'tag_creation_sequence': tagCreationSequence,
       if (intentionId != null) 'intention_id': intentionId,
     });
   }
@@ -3983,13 +3932,11 @@ class TagAssignmentsCompanion extends UpdateCompanion<TagAssignment> {
   TagAssignmentsCompanion copyWith({
     Value<int>? creationSequence,
     Value<String>? tagId,
-    Value<int>? tagCreationSequence,
     Value<String>? intentionId,
   }) {
     return TagAssignmentsCompanion(
       creationSequence: creationSequence ?? this.creationSequence,
       tagId: tagId ?? this.tagId,
-      tagCreationSequence: tagCreationSequence ?? this.tagCreationSequence,
       intentionId: intentionId ?? this.intentionId,
     );
   }
@@ -4003,9 +3950,6 @@ class TagAssignmentsCompanion extends UpdateCompanion<TagAssignment> {
     if (tagId.present) {
       map['tag_id'] = Variable<String>(tagId.value);
     }
-    if (tagCreationSequence.present) {
-      map['tag_creation_sequence'] = Variable<int>(tagCreationSequence.value);
-    }
     if (intentionId.present) {
       map['intention_id'] = Variable<String>(intentionId.value);
     }
@@ -4017,7 +3961,6 @@ class TagAssignmentsCompanion extends UpdateCompanion<TagAssignment> {
     return (StringBuffer('TagAssignmentsCompanion(')
           ..write('creationSequence: $creationSequence, ')
           ..write('tagId: $tagId, ')
-          ..write('tagCreationSequence: $tagCreationSequence, ')
           ..write('intentionId: $intentionId')
           ..write(')'))
         .toString();
@@ -5742,7 +5685,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'graph_log_mark_tag_assignment_insert',
   );
   late final Trigger graphLogMarkTagAssignmentUpdate = Trigger(
-    'CREATE TRIGGER graph_log_mark_tag_assignment_update AFTER UPDATE ON tag_assignments WHEN old.tag_creation_sequence <> 0 AND (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_tag_assignment_marks (tag_id, intention_id, first_operation) VALUES (new.tag_id, new.intention_id, \'update\');END',
+    'CREATE TRIGGER graph_log_mark_tag_assignment_update AFTER UPDATE ON tag_assignments WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_tag_assignment_marks (tag_id, intention_id, first_operation) VALUES (new.tag_id, new.intention_id, \'update\');END',
     'graph_log_mark_tag_assignment_update',
   );
   late final Trigger graphLogMarkTagAssignmentDelete = Trigger(
@@ -5801,22 +5744,6 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final Index tagAssignmentsIntention = Index(
     'tag_assignments_intention',
     'CREATE INDEX tag_assignments_intention ON tag_assignments (intention_id, tag_id)',
-  );
-  late final Index tagAssignmentsIntentionOrder = Index(
-    'tag_assignments_intention_order',
-    'CREATE INDEX tag_assignments_intention_order ON tag_assignments (intention_id, tag_creation_sequence)',
-  );
-  late final Trigger tagAssignmentsValidTagOrderInsert = Trigger(
-    'CREATE TRIGGER tag_assignments_valid_tag_order_insert BEFORE INSERT ON tag_assignments WHEN (SELECT creation_sequence FROM tags WHERE id = new.tag_id) IS NULL OR(new.tag_creation_sequence <> 0 AND new.tag_creation_sequence <> (SELECT creation_sequence FROM tags WHERE id = new.tag_id))BEGIN SELECT RAISE (ABORT, \'tag assignment order does not match tag\');END',
-    'tag_assignments_valid_tag_order_insert',
-  );
-  late final Trigger tagAssignmentsFillTagOrder = Trigger(
-    'CREATE TRIGGER tag_assignments_fill_tag_order AFTER INSERT ON tag_assignments WHEN new.tag_creation_sequence = 0 BEGIN UPDATE tag_assignments SET tag_creation_sequence = (SELECT creation_sequence FROM tags WHERE id = new.tag_id) WHERE creation_sequence = new.creation_sequence;END',
-    'tag_assignments_fill_tag_order',
-  );
-  late final Trigger tagAssignmentsValidTagOrderUpdate = Trigger(
-    'CREATE TRIGGER tag_assignments_valid_tag_order_update BEFORE UPDATE ON tag_assignments WHEN new.tag_creation_sequence IS NOT (SELECT creation_sequence FROM tags WHERE id = new.tag_id) OR(old.tag_creation_sequence <> 0 AND new.tag_creation_sequence <> old.tag_creation_sequence)BEGIN SELECT RAISE (ABORT, \'tag assignment order is immutable\');END',
-    'tag_assignments_valid_tag_order_update',
   );
   late final Trigger tagAssignmentsImmutableIdentity = Trigger(
     'CREATE TRIGGER tag_assignments_immutable_identity AFTER UPDATE OF creation_sequence, tag_id, intention_id ON tag_assignments WHEN new.creation_sequence <> old.creation_sequence OR new.tag_id <> old.tag_id OR new.intention_id <> old.intention_id BEGIN SELECT RAISE (ABORT, \'tag assignment identity is immutable\');END',
@@ -5987,10 +5914,6 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     tagsImmutableIdentity,
     tagAssignmentsTagOrder,
     tagAssignmentsIntention,
-    tagAssignmentsIntentionOrder,
-    tagAssignmentsValidTagOrderInsert,
-    tagAssignmentsFillTagOrder,
-    tagAssignmentsValidTagOrderUpdate,
     tagAssignmentsImmutableIdentity,
     dailyChoicesDateCompletionScheduleOrder,
     dailyChoicesDateCreationOrder,
@@ -6215,27 +6138,6 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     WritePropagation(
       on: TableUpdateQuery.onTableName(
         'tags',
-        limitUpdateKind: UpdateKind.update,
-      ),
-      result: [],
-    ),
-    WritePropagation(
-      on: TableUpdateQuery.onTableName(
-        'tag_assignments',
-        limitUpdateKind: UpdateKind.insert,
-      ),
-      result: [],
-    ),
-    WritePropagation(
-      on: TableUpdateQuery.onTableName(
-        'tag_assignments',
-        limitUpdateKind: UpdateKind.insert,
-      ),
-      result: [TableUpdate('tag_assignments', kind: UpdateKind.update)],
-    ),
-    WritePropagation(
-      on: TableUpdateQuery.onTableName(
-        'tag_assignments',
         limitUpdateKind: UpdateKind.update,
       ),
       result: [],
@@ -8819,14 +8721,12 @@ typedef $TagAssignmentsCreateCompanionBuilder =
     TagAssignmentsCompanion Function({
       Value<int> creationSequence,
       required String tagId,
-      Value<int> tagCreationSequence,
       required String intentionId,
     });
 typedef $TagAssignmentsUpdateCompanionBuilder =
     TagAssignmentsCompanion Function({
       Value<int> creationSequence,
       Value<String> tagId,
-      Value<int> tagCreationSequence,
       Value<String> intentionId,
     });
 
@@ -8880,11 +8780,6 @@ class $TagAssignmentsFilterComposer
   });
   ColumnFilters<int> get creationSequence => $composableBuilder(
     column: $table.creationSequence,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<int> get tagCreationSequence => $composableBuilder(
-    column: $table.tagCreationSequence,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -8949,11 +8844,6 @@ class $TagAssignmentsOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<int> get tagCreationSequence => $composableBuilder(
-    column: $table.tagCreationSequence,
-    builder: (column) => ColumnOrderings(column),
-  );
-
   $TagsOrderingComposer get tagId {
     final $TagsOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -9012,11 +8902,6 @@ class $TagAssignmentsAnnotationComposer
   });
   GeneratedColumn<int> get creationSequence => $composableBuilder(
     column: $table.creationSequence,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<int> get tagCreationSequence => $composableBuilder(
-    column: $table.tagCreationSequence,
     builder: (column) => column,
   );
 
@@ -9097,24 +8982,20 @@ class $TagAssignmentsTableManager
               ({
                 Value<int> creationSequence = const Value.absent(),
                 Value<String> tagId = const Value.absent(),
-                Value<int> tagCreationSequence = const Value.absent(),
                 Value<String> intentionId = const Value.absent(),
               }) => TagAssignmentsCompanion(
                 creationSequence: creationSequence,
                 tagId: tagId,
-                tagCreationSequence: tagCreationSequence,
                 intentionId: intentionId,
               ),
           createCompanionCallback:
               ({
                 Value<int> creationSequence = const Value.absent(),
                 required String tagId,
-                Value<int> tagCreationSequence = const Value.absent(),
                 required String intentionId,
               }) => TagAssignmentsCompanion.insert(
                 creationSequence: creationSequence,
                 tagId: tagId,
-                tagCreationSequence: tagCreationSequence,
                 intentionId: intentionId,
               ),
           withReferenceMapper: (p0) => p0

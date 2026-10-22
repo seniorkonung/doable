@@ -63,7 +63,7 @@
   - **Предполагаемые файлы:** `lib/src/graph/data/drift_personal_graph_repository_tag_reads.dart`, `lib/src/tag/application/tag_catalog.dart`, `lib/src/tag/application/tag_assignments.dart`, `lib/src/tag/application/tag_read_result.dart`, `lib/src/intention/application/intention_catalog.dart`, `lib/src/intention/presentation/catalog/tag_condition_picker_page.dart` (описание экрана), `test/graph/data/drift_tag_read_test.dart`, `test/graph/data/drift_tag_lifecycle_test.dart`, `test/graph/data/drift_tag_assignment_read_test.dart`, `test/intention/data/drift_intention_catalog_test.dart`, `test/intention/data/drift_intention_repository_command_test.dart`, `test/graph/data/file_backed_tag_durability_test.dart`; ожидания проверок экранов и сквозных сценариев, которые полагались на порядок создания.
   - **Размер:** M.
 
-- [ ] 1.6 Убрать из базовой схемы 5 копию порядка создания тега в назначениях вместе с поддерживающими её объектами
+- [x] 1.6 Убрать из базовой схемы 5 копию порядка создания тега в назначениях вместе с поддерживающими её объектами
   - **Критерии приёмки:**
     - Схема не содержит `tag_assignments.tag_creation_sequence`, трёх поддерживающих её триггеров, индекса `tag_assignments_intention_order` и условия по этому столбцу в триггере `graph_log_mark_tag_assignment_update` по решению 3 дизайна. Вставка назначения по-прежнему даёт одну отметку «вставка», а изменение строки — отметку «изменение». Проверка удалённой копии удаляется вместе с ней.
     - `tags.creation_sequence` остаётся неизменным ключом порций записей графа и порядка записей в файлах. Индекс `tag_assignments_tag_order` остаётся: он обслуживает порции навигации по тегу и удаляется вместе с ними в фазе 4 по решению 11 дизайна.

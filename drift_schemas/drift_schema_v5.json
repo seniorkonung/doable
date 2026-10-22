@@ -885,16 +885,6 @@
             ]
           },
           {
-            "name": "tag_creation_sequence",
-            "getter_name": "tagCreationSequence",
-            "moor_type": "int",
-            "nullable": false,
-            "customConstraints": "NOT NULL DEFAULT 0 CHECK (tag_creation_sequence >= 0)",
-            "default_dart": "const CustomExpression('0')",
-            "default_client_dart": null,
-            "dsl_features": []
-          },
-          {
             "name": "intention_id",
             "getter_name": "intentionId",
             "moor_type": "string",
@@ -965,7 +955,7 @@
           4
         ],
         "name": "graph_log_mark_tag_assignment_update",
-        "sql": "CREATE TRIGGER graph_log_mark_tag_assignment_update\nAFTER UPDATE ON tag_assignments\nWHEN\n  old.tag_creation_sequence <> 0 AND\n  (SELECT capture FROM graph_log_control) = 1\nBEGIN\n  SELECT RAISE(ABORT, 'graph write outside the graph write path')\n  FROM graph_log_control\n  WHERE writing = 0;\n  INSERT OR IGNORE INTO graph_log_tag_assignment_marks (\n    tag_id, intention_id, first_operation\n  ) VALUES (new.tag_id, new.intention_id, 'update');\nEND;"
+        "sql": "CREATE TRIGGER graph_log_mark_tag_assignment_update\nAFTER UPDATE ON tag_assignments\nWHEN (SELECT capture FROM graph_log_control) = 1\nBEGIN\n  SELECT RAISE(ABORT, 'graph write outside the graph write path')\n  FROM graph_log_control\n  WHERE writing = 0;\n  INSERT OR IGNORE INTO graph_log_tag_assignment_marks (\n    tag_id, intention_id, first_operation\n  ) VALUES (new.tag_id, new.intention_id, 'update');\nEND;"
       }
     },
     {
@@ -1568,71 +1558,6 @@
       "references": [
         18
       ],
-      "type": "index",
-      "data": {
-        "on": 18,
-        "name": "tag_assignments_intention_order",
-        "sql": "CREATE INDEX tag_assignments_intention_order\n  ON tag_assignments (intention_id, tag_creation_sequence);",
-        "unique": false,
-        "columns": []
-      }
-    },
-    {
-      "id": 38,
-      "references": [
-        18,
-        10
-      ],
-      "type": "trigger",
-      "data": {
-        "on": 18,
-        "references_in_body": [
-          18,
-          10
-        ],
-        "name": "tag_assignments_valid_tag_order_insert",
-        "sql": "CREATE TRIGGER tag_assignments_valid_tag_order_insert\nBEFORE INSERT ON tag_assignments\nWHEN\n  (SELECT creation_sequence FROM tags WHERE id = new.tag_id) IS NULL OR\n  (new.tag_creation_sequence <> 0 AND\n   new.tag_creation_sequence <> (SELECT creation_sequence FROM tags WHERE id = new.tag_id))\nBEGIN\n  SELECT RAISE(ABORT, 'tag assignment order does not match tag');\nEND;"
-      }
-    },
-    {
-      "id": 39,
-      "references": [
-        18,
-        10
-      ],
-      "type": "trigger",
-      "data": {
-        "on": 18,
-        "references_in_body": [
-          18,
-          10
-        ],
-        "name": "tag_assignments_fill_tag_order",
-        "sql": "CREATE TRIGGER tag_assignments_fill_tag_order\nAFTER INSERT ON tag_assignments\nWHEN new.tag_creation_sequence = 0\nBEGIN\n  UPDATE tag_assignments\n  SET tag_creation_sequence = (SELECT creation_sequence FROM tags WHERE id = new.tag_id)\n  WHERE creation_sequence = new.creation_sequence;\nEND;"
-      }
-    },
-    {
-      "id": 40,
-      "references": [
-        18,
-        10
-      ],
-      "type": "trigger",
-      "data": {
-        "on": 18,
-        "references_in_body": [
-          18,
-          10
-        ],
-        "name": "tag_assignments_valid_tag_order_update",
-        "sql": "CREATE TRIGGER tag_assignments_valid_tag_order_update\nBEFORE UPDATE ON tag_assignments\nWHEN\n  new.tag_creation_sequence IS NOT (SELECT creation_sequence FROM tags WHERE id = new.tag_id) OR\n  (old.tag_creation_sequence <> 0 AND\n   new.tag_creation_sequence <> old.tag_creation_sequence)\nBEGIN\n  SELECT RAISE(ABORT, 'tag assignment order is immutable');\nEND;"
-      }
-    },
-    {
-      "id": 41,
-      "references": [
-        18
-      ],
       "type": "trigger",
       "data": {
         "on": 18,
@@ -1644,7 +1569,7 @@
       }
     },
     {
-      "id": 42,
+      "id": 38,
       "references": [
         26
       ],
@@ -1658,7 +1583,7 @@
       }
     },
     {
-      "id": 43,
+      "id": 39,
       "references": [
         26
       ],
@@ -1672,7 +1597,7 @@
       }
     },
     {
-      "id": 44,
+      "id": 40,
       "references": [
         26
       ],
@@ -1686,7 +1611,7 @@
       }
     },
     {
-      "id": 45,
+      "id": 41,
       "references": [
         26
       ],
@@ -1700,7 +1625,7 @@
       }
     },
     {
-      "id": 46,
+      "id": 42,
       "references": [
         26
       ],
@@ -1715,7 +1640,7 @@
       }
     },
     {
-      "id": 47,
+      "id": 43,
       "references": [
         30
       ],
@@ -1729,7 +1654,7 @@
       }
     },
     {
-      "id": 48,
+      "id": 44,
       "references": [
         30
       ],
@@ -1743,7 +1668,7 @@
       }
     },
     {
-      "id": 49,
+      "id": 45,
       "references": [
         30
       ],
@@ -1757,7 +1682,7 @@
       }
     },
     {
-      "id": 50,
+      "id": 46,
       "references": [
         22,
         30
@@ -1774,7 +1699,7 @@
       }
     },
     {
-      "id": 51,
+      "id": 47,
       "references": [
         22
       ],
@@ -1788,7 +1713,7 @@
       }
     },
     {
-      "id": 52,
+      "id": 48,
       "references": [
         22
       ],
@@ -1802,7 +1727,7 @@
       }
     },
     {
-      "id": 53,
+      "id": 49,
       "references": [
         22
       ],
@@ -1817,7 +1742,7 @@
       }
     },
     {
-      "id": 54,
+      "id": 50,
       "references": [
         22,
         14
@@ -1834,7 +1759,7 @@
       }
     },
     {
-      "id": 55,
+      "id": 51,
       "references": [
         22,
         14
@@ -1851,7 +1776,7 @@
       }
     },
     {
-      "id": 56,
+      "id": 52,
       "references": [
         14,
         22
@@ -1868,7 +1793,7 @@
       }
     },
     {
-      "id": 57,
+      "id": 53,
       "references": [],
       "type": "table",
       "data": {
@@ -1893,58 +1818,58 @@
       }
     },
     {
-      "id": 58,
+      "id": 54,
       "references": [
         14,
-        57
+        53
       ],
       "type": "trigger",
       "data": {
         "on": 14,
         "references_in_body": [
           14,
-          57
+          53
         ],
         "name": "intentions_fts_after_insert",
         "sql": "CREATE TRIGGER intentions_fts_after_insert\nAFTER INSERT ON intentions\nBEGIN\n  INSERT INTO intention_titles_fts(rowid, title_search_key)\n  VALUES (new.rowid, new.title_search_key);\nEND;"
       }
     },
     {
-      "id": 59,
+      "id": 55,
       "references": [
         14,
-        57
+        53
       ],
       "type": "trigger",
       "data": {
         "on": 14,
         "references_in_body": [
           14,
-          57
+          53
         ],
         "name": "intentions_fts_after_update_search_content",
         "sql": "CREATE TRIGGER intentions_fts_after_update_search_content\nAFTER UPDATE ON intentions\nBEGIN\n  INSERT INTO intention_titles_fts(\n    intention_titles_fts, rowid, title_search_key\n  ) VALUES ('delete', old.rowid, old.title_search_key);\n  INSERT INTO intention_titles_fts(rowid, title_search_key)\n  VALUES (new.rowid, new.title_search_key);\nEND;"
       }
     },
     {
-      "id": 60,
+      "id": 56,
       "references": [
         14,
-        57
+        53
       ],
       "type": "trigger",
       "data": {
         "on": 14,
         "references_in_body": [
           14,
-          57
+          53
         ],
         "name": "intentions_fts_after_delete",
         "sql": "CREATE TRIGGER intentions_fts_after_delete\nAFTER DELETE ON intentions\nBEGIN\n  INSERT INTO intention_titles_fts(\n    intention_titles_fts, rowid, title_search_key\n  ) VALUES ('delete', old.rowid, old.title_search_key);\nEND;"
       }
     },
     {
-      "id": 61,
+      "id": 57,
       "references": [
         14
       ],
@@ -1958,7 +1883,7 @@
       }
     },
     {
-      "id": 62,
+      "id": 58,
       "references": [
         14
       ],
@@ -1972,7 +1897,7 @@
       }
     },
     {
-      "id": 63,
+      "id": 59,
       "references": [
         14
       ],
@@ -1986,7 +1911,7 @@
       }
     },
     {
-      "id": 64,
+      "id": 60,
       "references": [
         14
       ],
@@ -2000,7 +1925,7 @@
       }
     },
     {
-      "id": 65,
+      "id": 61,
       "references": [
         14
       ],
@@ -2014,7 +1939,7 @@
       }
     },
     {
-      "id": 66,
+      "id": 62,
       "references": [
         14
       ],
@@ -2028,7 +1953,7 @@
       }
     },
     {
-      "id": 67,
+      "id": 63,
       "references": [
         14
       ],
@@ -2042,7 +1967,7 @@
       }
     },
     {
-      "id": 68,
+      "id": 64,
       "references": [
         14
       ],
@@ -2056,7 +1981,7 @@
       }
     },
     {
-      "id": 69,
+      "id": 65,
       "references": [
         14
       ],
@@ -2070,7 +1995,7 @@
       }
     },
     {
-      "id": 70,
+      "id": 66,
       "references": [
         14
       ],
@@ -2084,7 +2009,7 @@
       }
     },
     {
-      "id": 71,
+      "id": 67,
       "references": [
         14
       ],
@@ -2098,7 +2023,7 @@
       }
     },
     {
-      "id": 72,
+      "id": 68,
       "references": [
         14
       ],
@@ -2280,7 +2205,7 @@
       "sql": [
         {
           "dialect": "sqlite",
-          "sql": "CREATE TABLE IF NOT EXISTS \"tag_assignments\" (\"creation_sequence\" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT CHECK (creation_sequence > 0), \"tag_id\" TEXT NOT NULL REFERENCES tags(id)ON UPDATE RESTRICT ON DELETE CASCADE, \"tag_creation_sequence\" INTEGER NOT NULL DEFAULT 0 CHECK (tag_creation_sequence >= 0), \"intention_id\" TEXT NOT NULL REFERENCES intentions(id)ON UPDATE RESTRICT ON DELETE CASCADE, UNIQUE(tag_id, intention_id));"
+          "sql": "CREATE TABLE IF NOT EXISTS \"tag_assignments\" (\"creation_sequence\" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT CHECK (creation_sequence > 0), \"tag_id\" TEXT NOT NULL REFERENCES tags(id)ON UPDATE RESTRICT ON DELETE CASCADE, \"intention_id\" TEXT NOT NULL REFERENCES intentions(id)ON UPDATE RESTRICT ON DELETE CASCADE, UNIQUE(tag_id, intention_id));"
         }
       ]
     },
@@ -2298,7 +2223,7 @@
       "sql": [
         {
           "dialect": "sqlite",
-          "sql": "CREATE TRIGGER graph_log_mark_tag_assignment_update AFTER UPDATE ON tag_assignments WHEN old.tag_creation_sequence <> 0 AND (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, 'graph write outside the graph write path') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_tag_assignment_marks (tag_id, intention_id, first_operation) VALUES (new.tag_id, new.intention_id, 'update');END"
+          "sql": "CREATE TRIGGER graph_log_mark_tag_assignment_update AFTER UPDATE ON tag_assignments WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, 'graph write outside the graph write path') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_tag_assignment_marks (tag_id, intention_id, first_operation) VALUES (new.tag_id, new.intention_id, 'update');END"
         }
       ]
     },
@@ -2443,42 +2368,6 @@
         {
           "dialect": "sqlite",
           "sql": "CREATE INDEX tag_assignments_intention ON tag_assignments (intention_id, tag_id)"
-        }
-      ]
-    },
-    {
-      "name": "tag_assignments_intention_order",
-      "sql": [
-        {
-          "dialect": "sqlite",
-          "sql": "CREATE INDEX tag_assignments_intention_order ON tag_assignments (intention_id, tag_creation_sequence)"
-        }
-      ]
-    },
-    {
-      "name": "tag_assignments_valid_tag_order_insert",
-      "sql": [
-        {
-          "dialect": "sqlite",
-          "sql": "CREATE TRIGGER tag_assignments_valid_tag_order_insert BEFORE INSERT ON tag_assignments WHEN (SELECT creation_sequence FROM tags WHERE id = new.tag_id) IS NULL OR(new.tag_creation_sequence <> 0 AND new.tag_creation_sequence <> (SELECT creation_sequence FROM tags WHERE id = new.tag_id))BEGIN SELECT RAISE (ABORT, 'tag assignment order does not match tag');END"
-        }
-      ]
-    },
-    {
-      "name": "tag_assignments_fill_tag_order",
-      "sql": [
-        {
-          "dialect": "sqlite",
-          "sql": "CREATE TRIGGER tag_assignments_fill_tag_order AFTER INSERT ON tag_assignments WHEN new.tag_creation_sequence = 0 BEGIN UPDATE tag_assignments SET tag_creation_sequence = (SELECT creation_sequence FROM tags WHERE id = new.tag_id) WHERE creation_sequence = new.creation_sequence;END"
-        }
-      ]
-    },
-    {
-      "name": "tag_assignments_valid_tag_order_update",
-      "sql": [
-        {
-          "dialect": "sqlite",
-          "sql": "CREATE TRIGGER tag_assignments_valid_tag_order_update BEFORE UPDATE ON tag_assignments WHEN new.tag_creation_sequence IS NOT (SELECT creation_sequence FROM tags WHERE id = new.tag_id) OR(old.tag_creation_sequence <> 0 AND new.tag_creation_sequence <> old.tag_creation_sequence)BEGIN SELECT RAISE (ABORT, 'tag assignment order is immutable');END"
         }
       ]
     },
