@@ -117,6 +117,29 @@ void main() {
     expect(find.byType(SnackBar), findsNothing);
   });
 
+  testWidgets('слишком длинное название показывает причину, делает «Создать '
+      'тег» недоступной и остаётся для исправления', (tester) async {
+    final h = await _pumpApp(tester);
+    await h.open(initialName: 'Дом');
+    final longName = '🙂' * 256;
+
+    await tester.enterText(_nameField, longName);
+    await tester.pump();
+
+    expect(
+      find.descendant(
+        of: find.byType(Sheet),
+        matching: find.text(
+          lookupAppLocalizations(const Locale('ru')).tagNameTooLong,
+        ),
+      ),
+      findsOne,
+    );
+    expect(tester.widget<FilledButton>(_create).onPressed, isNull);
+    expect(_nameText(tester), longName);
+    expect(h.repository.commands, isEmpty);
+  });
+
   testWidgets('выбор цвета сразу меняет точку в поле и пишется только '
       'созданием', (tester) async {
     final h = await _pumpApp(tester);
