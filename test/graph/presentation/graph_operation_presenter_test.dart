@@ -248,9 +248,9 @@ void main() {
     },
   );
 
-  // Обычное время показа — 4 с. Лист и диалог перекрывают страницу без
-  // собственного Scaffold; лист закрывается и после этого времени, и до его
-  // конца.
+  // Обычное время показа — 4 с. Лист без сообщений поверх и диалог
+  // перекрывают страницу без собственного Scaffold; лист закрывается и после
+  // этого времени, и до его конца.
   for (final scenario
       in <
         ({
@@ -311,6 +311,55 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
       await tester.pumpAndSettle();
       expect(find.byType(SnackBar), findsNothing);
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+    });
+  }
+
+  for (final size in DoableSheetSize.values) {
+    testWidgets('ожидающий результат показан над нижней частью открытого '
+        'листа ${size.name} с сообщениями поверх и предъявлен, пока лист '
+        'открыт', (tester) async {
+      final harness = await _pumpPresenterApp(tester);
+      final first = harness.startDelete(index: 1, title: 'Первое');
+      final second = harness.startDelete(index: 2, title: 'Второе');
+      unawaited(
+        _openMessagesSheet(tester.element(find.byType(Scaffold)), size: size),
+      );
+      await tester.pumpAndSettle();
+
+      harness.completeDeleted(first);
+      harness.completeDeleted(second);
+      await tester.pumpAndSettle();
+      final message = find.descendant(
+        of: find.byType(Sheet),
+        matching: find.text(_deleted('Первое')),
+      );
+      expect(message, findsOneWidget);
+      expect(
+        tester
+            .getRect(
+              find.descendant(
+                of: find.byType(Sheet),
+                matching: find.byType(SnackBar),
+              ),
+            )
+            .bottom,
+        lessThanOrEqualTo(tester.getRect(find.text('Готово')).top),
+      );
+
+      // Неподтверждённое сообщение не закрывается по времени, а следующее
+      // показывается только после предъявленного.
+      await _closeMessage(tester);
+      expect(find.byType(Sheet), findsOneWidget);
+      expect(find.text(_deleted('Первое')), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byType(Sheet),
+          matching: find.text(_deleted('Второе')),
+        ),
+        findsOneWidget,
+      );
       await _closeMessage(tester);
       expect(find.byType(SnackBar), findsNothing);
     });
@@ -1999,6 +2048,31 @@ final class _PresentationOnlyChange implements GraphChange {
 Future<void> _openSheet(BuildContext context) => showDoableSheet<void>(
   context: context,
   builder: (_) => const Sheet(title: 'Лист', child: SizedBox(height: 120)),
+);
+
+Future<void> _openMessagesSheet(
+  BuildContext context, {
+  required DoableSheetSize size,
+}) => showDoableSheet<void>(
+  context: context,
+  size: size,
+  hostsMessages: true,
+  builder: (_) => switch (size) {
+    DoableSheetSize.content => const Sheet(
+      title: 'Лист',
+      footer: SizedBox(height: 44, child: Text('Готово')),
+      child: SizedBox(height: 120),
+    ),
+    DoableSheetSize.expandable => Sheet.expandable(
+      title: 'Лист',
+      text: 'Пояснение',
+      pinned: const SizedBox(height: 44),
+      body: ListView(children: const [SizedBox(height: 120)]),
+      footer: const SizedBox(height: 44, child: Text('Готово')),
+      expandLabel: 'Раскрыть',
+      collapseLabel: 'Свернуть',
+    ),
+  },
 );
 
 Future<void> _closeMessage(WidgetTester tester) async {

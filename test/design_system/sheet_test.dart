@@ -10,6 +10,7 @@ const _half = 534.0;
 const _full = 844.0 - _statusBar;
 const _expandLabel = 'Раскрыть на весь экран';
 const _collapseLabel = 'Свернуть';
+const _homeIndicator = 34.0;
 
 void main() {
   testWidgets('перетаскивание шапки на 48 вверх раскрывает лист, вниз '
@@ -134,6 +135,73 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('лист по содержимому с сообщениями поверх той же высоты, что и '
+      'без них, а его нижняя часть над системным отступом', (tester) async {
+    await _openContentSheet(tester);
+    final height = _sheetHeight(tester);
+    final footer = tester.getRect(find.text('Создать'));
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    await _openContentSheet(tester, hostsMessages: true);
+
+    expect(height, lessThan(_screen.height / 2));
+    expect(_sheetHeight(tester), height);
+    expect(tester.getRect(find.text('Создать')), footer);
+    expect(footer.bottom, _screen.height - _homeIndicator - 16);
+  });
+
+  for (final scenario
+      in <
+        ({
+          String name,
+          Future<void> Function(WidgetTester) open,
+          String head,
+          String footer,
+        })
+      >[
+        (
+          name: 'раскрываемый',
+          open: (tester) => _openExpandableSheet(tester, hostsMessages: true),
+          head: 'Поиск',
+          footer: 'Готово',
+        ),
+        (
+          name: 'по содержимому',
+          open: (tester) => _openContentSheet(tester, hostsMessages: true),
+          head: 'Новый тег',
+          footer: 'Создать',
+        ),
+      ]) {
+    testWidgets('${scenario.name} лист с сообщениями поверх при открытой '
+        'клавиатуре не выше места над ней, учитывает её один раз, а его шапка '
+        'и нижняя часть видны', (tester) async {
+      await scenario.open(tester);
+      const keyboard = 400.0;
+      // Клавиатура закрывает системный отступ: он остаётся только в
+      // viewPadding.
+      tester.view
+        ..viewInsets = const FakeViewPadding(bottom: keyboard)
+        ..padding = const FakeViewPadding(top: _statusBar);
+      await tester.pumpAndSettle();
+
+      const aboveKeyboard = 844.0 - keyboard;
+      final sheet = tester.getRect(find.byType(Sheet));
+      expect(sheet.bottom, aboveKeyboard);
+      expect(sheet.top, greaterThanOrEqualTo(_statusBar));
+      expect(
+        tester.getRect(find.text(scenario.head)).top,
+        greaterThan(sheet.top),
+      );
+      // Системный отступ под клавиатурой не поднимает нижнюю часть.
+      expect(
+        tester.getRect(find.text(scenario.footer)).bottom,
+        aboveKeyboard - 16,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('прокрутка тела в обе стороны не меняет размер листа', (
     tester,
   ) async {
@@ -184,11 +252,56 @@ final class _OpenedSheet {
   bool isClosed = false;
 }
 
-Future<_OpenedSheet> _openExpandableSheet(WidgetTester tester) async {
+Future<_OpenedSheet> _openExpandableSheet(
+  WidgetTester tester, {
+  bool hostsMessages = false,
+}) => _openSheet(
+  tester,
+  size: DoableSheetSize.expandable,
+  hostsMessages: hostsMessages,
+  builder: (context) => Sheet.expandable(
+    title: 'Теги',
+    text: 'Выберите сколько нужно',
+    expandLabel: _expandLabel,
+    collapseLabel: _collapseLabel,
+    pinned: const SizedBox(height: 44, child: Text('Поиск')),
+    body: ListView.builder(
+      itemCount: 40,
+      itemBuilder: (context, index) =>
+          SizedBox(height: 48, child: Text('Тег $index')),
+    ),
+    footer: const SizedBox(height: 44, child: Text('Готово')),
+  ),
+);
+
+Future<_OpenedSheet> _openContentSheet(
+  WidgetTester tester, {
+  bool hostsMessages = false,
+}) => _openSheet(
+  tester,
+  size: DoableSheetSize.content,
+  hostsMessages: hostsMessages,
+  builder: (context) => const Sheet(
+    title: 'Новый тег',
+    footer: SizedBox(height: 44, child: Text('Создать')),
+    child: SizedBox(height: 120, child: Text('Название')),
+  ),
+);
+
+Future<_OpenedSheet> _openSheet(
+  WidgetTester tester, {
+  required DoableSheetSize size,
+  required bool hostsMessages,
+  required WidgetBuilder builder,
+}) async {
   tester.view
     ..devicePixelRatio = 1
     ..physicalSize = _screen
-    ..padding = const FakeViewPadding(top: _statusBar);
+    ..padding = const FakeViewPadding(top: _statusBar, bottom: _homeIndicator)
+    ..viewPadding = const FakeViewPadding(
+      top: _statusBar,
+      bottom: _homeIndicator,
+    );
   addTearDown(tester.view.reset);
   final opened = _OpenedSheet();
 
@@ -201,20 +314,9 @@ Future<_OpenedSheet> _openExpandableSheet(WidgetTester tester) async {
             child: TextButton(
               onPressed: () => showDoableSheet<void>(
                 context: context,
-                size: DoableSheetSize.expandable,
-                builder: (context) => Sheet.expandable(
-                  title: 'Теги',
-                  text: 'Выберите сколько нужно',
-                  expandLabel: _expandLabel,
-                  collapseLabel: _collapseLabel,
-                  pinned: const SizedBox(height: 44, child: Text('Поиск')),
-                  body: ListView.builder(
-                    itemCount: 40,
-                    itemBuilder: (context, index) =>
-                        SizedBox(height: 48, child: Text('Тег $index')),
-                  ),
-                  footer: const SizedBox(height: 44, child: Text('Готово')),
-                ),
+                size: size,
+                hostsMessages: hostsMessages,
+                builder: builder,
               ).whenComplete(() => opened.isClosed = true),
               child: const Text('Открыть'),
             ),

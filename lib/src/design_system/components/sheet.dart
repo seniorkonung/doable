@@ -3,6 +3,7 @@ import 'dart:ui' show lerpDouble;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 
 import '../doable_colors.dart';
 import '../doable_icon.dart';
@@ -29,10 +30,16 @@ enum DoableSheetSize {
 /// принадлежат Material, а жест закрытия — Material только у листа по
 /// содержимому:
 /// https://api.flutter.dev/flutter/material/showModalBottomSheet.html
+///
+/// С [hostsMessages] лист содержит собственный прозрачный [Scaffold], и
+/// сообщения общего [ScaffoldMessenger] появляются над его нижней частью, а не
+/// на странице под листом. Признак нужен листу, который остаётся открытым до
+/// результата начатой в нём операции.
 Future<T?> showDoableSheet<T>({
   required BuildContext context,
   required WidgetBuilder builder,
   DoableSheetSize size = DoableSheetSize.content,
+  bool hostsMessages = false,
 }) {
   final colors = _colorsOf(Theme.of(context));
 
@@ -60,9 +67,22 @@ Future<T?> showDoableSheet<T>({
       // SafeArea учитывает системные панели, но не открытую клавиатуру.
       // https://api.flutter.dev/flutter/widgets/MediaQueryData/viewInsets.html
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-      child: builder(context),
+      child: hostsMessages
+          ? _MessagesHost(child: builder(context))
+          : builder(context),
     ),
   );
+}
+
+/// Отмечает лист, показанный с `hostsMessages`.
+final class _MessagesHost extends InheritedWidget {
+  const _MessagesHost({required super.child});
+
+  static bool of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<_MessagesHost>() != null;
+
+  @override
+  bool updateShouldNotify(_MessagesHost oldWidget) => false;
 }
 
 /// Лист с ручкой, заголовком, пояснением, телом и нижней частью.
@@ -143,34 +163,242 @@ final class Sheet extends StatelessWidget {
         color: colors.raised,
         borderRadius: borderRadius,
         clipBehavior: Clip.antiAlias,
-        child: SafeArea(
-          top: false,
+        child: _SheetLayout(
           minimum: const EdgeInsets.fromLTRB(
             DoableMetrics.space3,
             DoableMetrics.space2,
             DoableMetrics.space3,
             0,
           ),
-          // Нижний minimum не прибавлялся бы к системному отступу:
-          // https://api.flutter.dev/flutter/widgets/SafeArea/minimum.html
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: DoableMetrics.space4),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Center(child: _Grip(color: colors.grip)),
-                const SizedBox(height: 14),
-                _TitleBlock(title: title, text: text),
-                const SizedBox(height: DoableMetrics.space3),
-                Flexible(child: SingleChildScrollView(child: child)),
-                if (footer case final footer?) _Footer(child: footer),
-              ],
-            ),
+          head: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(child: _Grip(color: colors.grip)),
+              const SizedBox(height: 14),
+              _TitleBlock(title: title, text: text),
+              const SizedBox(height: DoableMetrics.space3),
+              Flexible(child: SingleChildScrollView(child: child)),
+            ],
           ),
+          footer: switch (footer) {
+            final footer? => _Footer(child: footer),
+            null => null,
+          },
         ),
       ),
     );
+  }
+}
+
+/// Раскладка частей листа над закреплённой нижней частью [footer] с учётом
+/// безопасной области.
+final class _SheetLayout extends StatelessWidget {
+  const _SheetLayout({
+    required this.minimum,
+    required this.head,
+    required this.footer,
+  });
+
+  /// Наименьшие отступы содержимого; нижний не прибавляется к системному.
+  final EdgeInsets minimum;
+
+  /// Содержимое над нижней частью; занимает не больше доступной высоты.
+  final Widget head;
+  final Widget? footer;
+
+  @override
+  Widget build(BuildContext context) {
+    if (_MessagesHost.of(context)) {
+      return _MessagesScaffold(minimum: minimum, head: head, footer: footer);
+    }
+    return SafeArea(
+      top: false,
+      minimum: minimum,
+      // Нижний minimum не прибавлялся бы к системному отступу:
+      // https://api.flutter.dev/flutter/widgets/SafeArea/minimum.html
+      child: Padding(
+        padding: _bottomPadding,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Flexible(child: head),
+            ?footer,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+const _bottomPadding = EdgeInsets.only(bottom: DoableMetrics.space4);
+
+/// Раскладка листа с `hostsMessages`: [footer] стоит в `bottomNavigationBar`
+/// собственного [Scaffold], и сообщение появляется над ним.
+///
+/// Отступы и высота те же, что у листа без [Scaffold]: лист по содержимому
+/// следует за [head] и [footer], а клавиатуру учитывает только
+/// [showDoableSheet].
+final class _MessagesScaffold extends StatefulWidget {
+  const _MessagesScaffold({
+    required this.minimum,
+    required this.head,
+    required this.footer,
+  });
+
+  final EdgeInsets minimum;
+  final Widget head;
+  final Widget? footer;
+
+  @override
+  State<_MessagesScaffold> createState() => _MessagesScaffoldState();
+}
+
+final class _MessagesScaffoldState extends State<_MessagesScaffold> {
+  final _extents = _ScaffoldExtents();
+
+  @override
+  Widget build(BuildContext context) {
+    final minimum = widget.minimum;
+    // Scaffold снимает с тела нижний системный отступ при нижней части, а ей
+    // самой без resizeToAvoidBottomInset оставляет его и над клавиатурой:
+    // https://api.flutter.dev/flutter/material/Scaffold/resizeToAvoidBottomInset.html
+    final systemBottom = MediaQuery.paddingOf(context).bottom;
+    final footer = widget.footer;
+    return _ScaffoldFrame(
+      extents: _extents,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        resizeToAvoidBottomInset: false,
+        body: _ExtentProbe(
+          onLayout: (height) => _extents.body = height,
+          child: SafeArea(
+            top: false,
+            minimum: minimum,
+            child: footer == null
+                ? Padding(padding: _bottomPadding, child: widget.head)
+                : widget.head,
+          ),
+        ),
+        bottomNavigationBar: footer == null
+            ? null
+            : _ExtentProbe(
+                onLayout: (height) => _extents.footer = height,
+                child: SafeArea(
+                  top: false,
+                  bottom: false,
+                  minimum: minimum.copyWith(top: 0, bottom: 0),
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      bottom: systemBottom + DoableMetrics.space4,
+                    ),
+                    child: footer,
+                  ),
+                ),
+              ),
+      ),
+    );
+  }
+}
+
+/// Высоты тела и нижней части [Scaffold] листа при последней раскладке.
+final class _ScaffoldExtents {
+  var body = 0.0;
+  var footer = 0.0;
+}
+
+/// Сообщает высоту, которую занял [child].
+final class _ExtentProbe extends SingleChildRenderObjectWidget {
+  const _ExtentProbe({required this.onLayout, required super.child});
+
+  final ValueChanged<double> onLayout;
+
+  @override
+  _RenderExtentProbe createRenderObject(BuildContext context) =>
+      _RenderExtentProbe(onLayout);
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    _RenderExtentProbe renderObject,
+  ) => renderObject.onLayout = onLayout;
+}
+
+final class _RenderExtentProbe extends RenderProxyBox {
+  _RenderExtentProbe(this.onLayout);
+
+  ValueChanged<double> onLayout;
+
+  @override
+  void performLayout() {
+    super.performLayout();
+    onLayout(size.height);
+  }
+}
+
+/// Ограничивает [Scaffold] листа высотой его тела и нижней части, когда
+/// высота задана только сверху.
+///
+/// [Scaffold] занимает всю данную ему высоту, поэтому сначала раскладывается
+/// в неё, и тело получает содержимое по его высоте; затем — повторно в высоту
+/// тела и нижней части. Оба ограничения нестрогие, поэтому изменение
+/// содержимого снова доходит до раскладки листа.
+final class _ScaffoldFrame extends SingleChildRenderObjectWidget {
+  const _ScaffoldFrame({required this.extents, required super.child});
+
+  final _ScaffoldExtents extents;
+
+  @override
+  _RenderScaffoldFrame createRenderObject(BuildContext context) =>
+      _RenderScaffoldFrame(extents);
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    _RenderScaffoldFrame renderObject,
+  ) => renderObject.extents = extents;
+}
+
+final class _RenderScaffoldFrame extends RenderProxyBox {
+  _RenderScaffoldFrame(this._extents);
+
+  _ScaffoldExtents _extents;
+
+  set extents(_ScaffoldExtents value) {
+    if (identical(value, _extents)) {
+      return;
+    }
+    _extents = value;
+    markNeedsLayout();
+  }
+
+  @override
+  Size computeDryLayout(BoxConstraints constraints) {
+    assert(
+      debugCannotComputeDryLayout(
+        reason: 'Высота листа зависит от раскладки его Scaffold.',
+      ),
+    );
+    return Size.zero;
+  }
+
+  @override
+  void performLayout() {
+    final scaffold = child!;
+    scaffold.layout(constraints, parentUsesSize: true);
+    if (!constraints.hasTightHeight) {
+      final height = constraints.constrainHeight(
+        _extents.body + _extents.footer,
+      );
+      if (height < scaffold.size.height) {
+        scaffold.layout(
+          constraints.copyWith(maxHeight: height),
+          parentUsesSize: true,
+        );
+      }
+    }
+    size = scaffold.size;
   }
 }
 
@@ -314,45 +542,41 @@ final class _ExpandableSheetState extends State<_ExpandableSheet>
             ],
           );
 
-    final content = SafeArea(
-      top: false,
+    final content = _SheetLayout(
       minimum: const EdgeInsets.symmetric(horizontal: DoableMetrics.space3),
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: DoableMetrics.space4),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Listener(
-              onPointerDown: (_) => _isPointerCanceled = false,
-              onPointerCancel: (_) => _isPointerCanceled = true,
-              child: GestureDetector(
-                // Вся шапка — область свайпа, включая пустые места у краёв.
-                behavior: HitTestBehavior.opaque,
-                // Сдвиг считается от касания, а не от преодоления допуска:
-                // https://api.flutter.dev/flutter/gestures/DragStartBehavior.html
-                dragStartBehavior: DragStartBehavior.down,
-                onVerticalDragStart: _startDrag,
-                onVerticalDragUpdate: _updateDrag,
-                onVerticalDragEnd: _endDrag,
-                onVerticalDragCancel: () => _dragStartY = null,
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: DoableMetrics.space3),
-                  child: header,
-                ),
+      head: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Listener(
+            onPointerDown: (_) => _isPointerCanceled = false,
+            onPointerCancel: (_) => _isPointerCanceled = true,
+            child: GestureDetector(
+              // Вся шапка — область свайпа, включая пустые места у краёв.
+              behavior: HitTestBehavior.opaque,
+              // Сдвиг считается от касания, а не от преодоления допуска:
+              // https://api.flutter.dev/flutter/gestures/DragStartBehavior.html
+              dragStartBehavior: DragStartBehavior.down,
+              onVerticalDragStart: _startDrag,
+              onVerticalDragUpdate: _updateDrag,
+              onVerticalDragEnd: _endDrag,
+              onVerticalDragCancel: () => _dragStartY = null,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: DoableMetrics.space3),
+                child: header,
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: DoableMetrics.space2,
-              ),
-              child: expansion.pinned,
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: DoableMetrics.space2,
             ),
-            const SizedBox(height: DoableMetrics.space2),
-            Expanded(child: widget.body),
-            _Footer(child: expansion.footer),
-          ],
-        ),
+            child: expansion.pinned,
+          ),
+          const SizedBox(height: DoableMetrics.space2),
+          Expanded(child: widget.body),
+        ],
       ),
+      footer: _Footer(child: expansion.footer),
     );
 
     return LayoutBuilder(
