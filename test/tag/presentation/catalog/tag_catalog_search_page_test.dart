@@ -111,6 +111,24 @@ void main() {
     );
 
     testWidgets(
+      '$description: запрос из одних пробелов сохраняется в поле и не сужает список',
+      (tester) async {
+        final repository = await _pumpCatalog(tester, intentionId: intentionId);
+        repository.complete([_tag(1, 'Работа'), _tag(2, 'Дом')]);
+        await tester.pumpAndSettle();
+
+        await tester.enterText(_search, 'дом');
+        await tester.pump();
+        expect(_visibleNames(tester), ['Дом']);
+        await tester.enterText(_search, '   ');
+        await tester.pump();
+
+        expect(tester.widget<TextField>(_search).controller!.text, '   ');
+        expect(_visibleNames(tester), ['Работа', 'Дом']);
+      },
+    );
+
+    testWidgets(
       '$description: изменение запроса возвращает начало списка, выбор и обновление сохраняют прокрутку и ввод',
       (tester) async {
         final repository = await _pumpCatalog(tester, intentionId: intentionId);

@@ -13,8 +13,9 @@ final class TagCatalogFilter extends TagCatalogFilterResult {
 
   static const empty = TagCatalogFilter._('');
 
-  /// Проверяет исходный ввод до преобразования регистра, не исправляя его.
-  /// Пустая строка допустима; пробелы и длина запроса сохраняют свой смысл.
+  /// Проверяет исходный ввод до преобразования регистра, не исправляя его,
+  /// и отбрасывает окружающие пробелы по правилу названия тега. Пустой после
+  /// этого запрос не сужает список; внутренние пробелы и длина сохраняются.
   static TagCatalogFilterResult fromInput(String input) {
     try {
       UnicodeText.ensureValidScalarValuesWithoutNul(input);
@@ -22,7 +23,11 @@ final class TagCatalogFilter extends TagCatalogFilterResult {
       return const TagCatalogFilterInvalidUnicode();
     }
 
-    return TagCatalogFilter._(UnicodeDefaultCaseFolding17.fold(input));
+    return TagCatalogFilter._(
+      UnicodeDefaultCaseFolding17.fold(
+        TagName.trimSurroundingWhitespace(input),
+      ),
+    );
   }
 
   final String _matchingKey;

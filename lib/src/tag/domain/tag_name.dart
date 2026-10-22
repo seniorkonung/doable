@@ -23,20 +23,23 @@ final class TagName {
 
   static TagName fromInput(String input) {
     _ensureValidUnicode(input);
-    final value = input.trim();
+    final value = trimSurroundingWhitespace(input);
     _ensureValidLength(value);
     return TagName._(value);
   }
 
   static TagName fromStored(String stored) {
     _ensureValidUnicode(stored);
-    final canonical = stored.trim();
+    final canonical = trimSurroundingWhitespace(stored);
     _ensureValidLength(canonical);
     if (canonical != stored) {
       throw const TagNameValidationException(TagNameFailureReason.nonCanonical);
     }
     return TagName._(stored);
   }
+
+  /// Единое правило окружающих пробелов для названия и поиска по названиям.
+  static String trimSurroundingWhitespace(String input) => input.trim();
 
   static void _ensureValidUnicode(String value) {
     try {

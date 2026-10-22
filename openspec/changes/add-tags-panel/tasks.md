@@ -168,7 +168,7 @@
   - **Предполагаемые файлы:** `lib/src/graph/application/graph_command_coordinator.dart`, `lib/src/graph/presentation/graph_operation_presenter.dart`, `lib/src/tag/presentation/editor/tag_editor_view_model.dart`, `lib/src/tag/presentation/editor/tag_editor_state.dart`, `lib/src/tag/presentation/editor/tag_editor_page.dart`, `lib/src/tag/presentation/catalog/tag_catalog_view.dart`, `lib/src/tag/presentation/assignments/tag_assignments_section.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` и генерируемые файлы локализации; проверки из раздела «Проверка».
   - **Размер:** M — один переход политики предъявления: по частям его не ввести без двойного предъявления отказа.
 
-- [ ] 2.4 Искать теги без учёта окружающих пробелов запроса по одному правилу для панели и прежних страниц
+- [x] 2.4 Искать теги без учёта окружающих пробелов запроса по одному правилу для панели и прежних страниц
   - **Критерии приёмки:**
     - `TagCatalogFilter.fromInput` после проверки Unicode удаляет окружающие пробелы по правилу `TagName` и только затем строит ключ сопоставления по решению 5 дизайна: запрос из одних пробелов даёт пустой фильтр, а внутренние пробелы остаются частью искомой подстроки. Поле поиска сохраняет исходный ввод.
     - По этому правилу до своего удаления в фазе 4 ищут прежние каталог тегов и выбор условия по тегу. Проверки, закреплявшие значимость окружающих пробелов, заменяются проверками требования «Поиск тегов в панели», включая сценарий «Запрос из одних пробелов не сужает список».
