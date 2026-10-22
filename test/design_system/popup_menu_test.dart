@@ -149,6 +149,28 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('системный жирный шрифт переносит название, которое без '
+      'жирности помещается в строку, и меню встаёт над строкой', (
+    tester,
+  ) async {
+    final menu = _Menu();
+    // При кегле 1,5 «Дублировать» без жирности помещается в строку пункта,
+    // а жирным переносится.
+    _useScreen(tester, textScale: 1.5, boldText: true);
+    // Под строкой помещается меню с названиями в одну строку, но не меню
+    // с перенесённым названием.
+    await tester.pumpWidget(menu.app(rowTop: _screen.height - 48 - 210));
+
+    await menu.open(tester);
+
+    expect(
+      tester.getSize(find.text('Дублировать')).height,
+      greaterThan(tester.getSize(find.text('Изменить')).height),
+      reason: 'жирное название переносится',
+    );
+    expect(tester.getRect(_panel).bottom, tester.getRect(_row).top - 4);
+  });
+
   testWidgets('меню следует за строкой, которую опускает скрытая после '
       'открытия меню клавиатура', (tester) async {
     final menu = _Menu();
@@ -334,19 +356,26 @@ Finder _itemOf(String name) =>
 Finder _iconOf(String name) =>
     find.descendant(of: _itemOf(name), matching: find.byType(DoableIcon));
 
-/// Экран телефона из макета; [bottomPadding] — нижний системный отступ.
+/// Экран телефона из макета; [bottomPadding] — нижний системный отступ,
+/// [textScale] и [boldText] — системные масштаб и жирность текста.
 void _useScreen(
   WidgetTester tester, {
   double bottomPadding = 0,
   double textScale = 1,
+  bool boldText = false,
 }) {
   tester.view
     ..devicePixelRatio = 1
     ..physicalSize = _screen
     ..padding = FakeViewPadding(bottom: bottomPadding);
-  tester.platformDispatcher.textScaleFactorTestValue = textScale;
+  tester.platformDispatcher
+    ..textScaleFactorTestValue = textScale
+    ..accessibilityFeaturesTestValue = FakeAccessibilityFeatures(
+      boldText: boldText,
+    );
   addTearDown(tester.view.reset);
   addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+  addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
 }
 
 DoableColors _colorsOf(Brightness brightness) => switch (brightness) {

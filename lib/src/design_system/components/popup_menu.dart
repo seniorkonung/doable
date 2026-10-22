@@ -9,6 +9,7 @@ import '../doable_icon.dart';
 import '../doable_metrics.dart';
 import '../doable_shadows.dart';
 import '../doable_type.dart';
+import '../text_metrics.dart';
 
 /// Пункт всплывающего меню: значение, которое возвращает его выбор, иконка и
 /// название. Название служит доступным названием пункта без подсказки,
@@ -78,9 +79,8 @@ Future<T?> showPopupMenu<T>({
       // а сам удерживает меню в их пределах.
       final screenPadding = MediaQuery.paddingOf(navigator.context);
       final height = _PopupMenuPanel.heightOf(
+        context,
         items.map((item) => item.action.name),
-        textScaler: MediaQuery.textScalerOf(context),
-        textDirection: Directionality.of(context),
       );
       final below = placed.bottom + _PopupMenuPanel.gap;
       final bottomLimit =
@@ -137,6 +137,8 @@ final class _PopupMenuPanel<T> extends PopupMenuEntry<T> {
   static const double _radius = 20;
   static const double _itemMinHeight = 48;
   static const double _iconSize = 22;
+
+  /// Ширина названия пункта: по ней название и рисуется, и измеряется.
   static const double _nameWidth =
       width -
       2 * _padding -
@@ -144,27 +146,28 @@ final class _PopupMenuPanel<T> extends PopupMenuEntry<T> {
       _iconSize -
       DoableMetrics.space3;
 
+  /// Стиль названия пункта без цвета. Название не наследует стиль по
+  /// умолчанию: у построителя положения он не тот, что у плоскости внутри
+  /// Material, и иначе измерение разошлось бы с отрисовкой.
+  static final TextStyle _nameStyle = DoableType.action.copyWith(
+    inherit: false,
+  );
+
   final List<_PopupMenuItem<T>> items;
 
-  /// Высота меню до его раскладки: положение над строкой зависит от неё,
-  /// а длинные названия при крупном шрифте переносятся и растят пункты.
-  static double heightOf(
-    Iterable<String> names, {
-    required TextScaler textScaler,
-    required TextDirection textDirection,
-  }) {
+  /// Высота меню с названиями [names] в [context] до его раскладки:
+  /// положение над строкой зависит от неё, а длинные названия при крупном
+  /// или жирном системном шрифте переносятся и растят пункты.
+  static double heightOf(BuildContext context, Iterable<String> names) {
     var height = 2 * _padding;
     for (final name in names) {
-      final painter = TextPainter(
-        text: TextSpan(text: name, style: DoableType.action),
-        textScaler: textScaler,
-        textDirection: textDirection,
-      )..layout(maxWidth: _nameWidth);
-      height += math.max(
-        _itemMinHeight,
-        painter.height + 2 * DoableMetrics.space3,
+      final nameHeight = tallestTextHeight(
+        context,
+        texts: [name],
+        style: _nameStyle,
+        maxWidth: _nameWidth,
       );
-      painter.dispose();
+      height += math.max(_itemMinHeight, nameHeight + 2 * DoableMetrics.space3);
     }
     return height;
   }
@@ -241,10 +244,11 @@ final class _PopupMenuPanelState<T> extends State<_PopupMenuPanel<T>> {
                   color: color,
                 ),
                 const SizedBox(width: DoableMetrics.space3),
-                Expanded(
+                SizedBox(
+                  width: _PopupMenuPanel._nameWidth,
                   child: Text(
                     action.name,
-                    style: DoableType.action.copyWith(color: color),
+                    style: _PopupMenuPanel._nameStyle.copyWith(color: color),
                   ),
                 ),
               ],
