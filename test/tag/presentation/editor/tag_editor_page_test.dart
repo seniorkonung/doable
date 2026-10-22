@@ -152,6 +152,7 @@ void main() {
         find.byKey(const ValueKey('tag-editor-name')),
         'Дом',
       );
+      await tester.pump();
       await tester.ensureVisible(
         find.byKey(const ValueKey('tag-editor-submit')),
       );
@@ -243,6 +244,7 @@ void main() {
         find.byKey(const ValueKey('tag-editor-name')),
         'работа',
       );
+      await tester.pump();
       await tester.tap(_swatch('Green'));
       await tester.pumpAndSettle();
       await tester.ensureVisible(
@@ -391,6 +393,7 @@ void main() {
           find.byKey(const ValueKey('tag-editor-name')),
           'Первое имя',
         );
+        await tester.pump();
         await tester.tap(find.byKey(const ValueKey('tag-editor-submit')));
         await tester.pump();
         expect(repository.commands, hasLength(1));
@@ -402,6 +405,7 @@ void main() {
           find.byKey(const ValueKey('tag-editor-name')),
           'Второе имя',
         );
+        await tester.pump();
         await tester.tap(find.byKey(const ValueKey('tag-editor-submit')));
         await tester.pump();
 
@@ -443,7 +447,7 @@ void main() {
     );
   }
 
-  testWidgets('ошибка длины читаема и сохраняет ввод', (tester) async {
+  testWidgets('ошибка длины видна при вводе и сохраняет ввод', (tester) async {
     tester.view.physicalSize = const Size(420, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -454,11 +458,15 @@ void main() {
       find.byKey(const ValueKey('tag-editor-name')),
       longName,
     );
-    await tester.ensureVisible(find.byKey(const ValueKey('tag-editor-submit')));
-    await tester.tap(find.byKey(const ValueKey('tag-editor-submit')));
     await tester.pump();
 
     expect(find.textContaining('255 visible characters'), findsWidgets);
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const ValueKey('tag-editor-submit')))
+          .onPressed,
+      isNull,
+    );
     expect(
       tester
           .widget<TextField>(find.byKey(const ValueKey('tag-editor-name')))
@@ -489,6 +497,7 @@ void main() {
       find.byKey(const ValueKey('tag-editor-name')),
       'Дом',
     );
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('tag-editor-submit')));
     repository.fail(TagNameOccupiedFailure(_id(1)));
     await tester.pumpAndSettle();
@@ -501,22 +510,45 @@ void main() {
         isA<TagNameOccupiedFailure>(),
       ),
     );
-    expect(
-      find.text(
-        'A tag with this name already exists. Choose another name or use '
-        'the existing tag.',
-      ),
-      findsNothing,
-    );
+    expect(find.text('A tag with this name already exists.'), findsNothing);
     expect(
       find.byKey(const ValueKey('tag-editor-field-failure')),
       findsNothing,
     );
-    expect(
-      find.byKey(const ValueKey('tag-editor-use-existing')),
-      findsOneWidget,
-    );
   });
+
+  testWidgets(
+    'название из снимка, введённое в другом регистре и с пробелами, сразу '
+    'объявлено занятым, а «Создать тег» недоступна',
+    (tester) async {
+      final repository = _Repository();
+      await _pumpEditor(
+        tester,
+        repository,
+        locale: const Locale('ru'),
+        editorContext: TagEditorCreating(
+          TagCreationFormKey(),
+          existingNames: [TagName.fromInput('Дом')],
+        ),
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('tag-editor-name')),
+        '  дом  ',
+      );
+      await tester.pump();
+
+      expect(find.text('Тег с таким названием уже есть.'), findsOneWidget);
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.byKey(const ValueKey('tag-editor-submit')),
+            )
+            .onPressed,
+        isNull,
+      );
+      expect(repository.commands, isEmpty);
+    },
+  );
 }
 
 Future<void> _pumpEditor(

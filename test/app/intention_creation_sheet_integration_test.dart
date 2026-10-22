@@ -759,6 +759,7 @@ Future<TagId> _prepareFullDraft(
   expect(find.byType(AppNavigationBar), findsNothing);
   staleSubmit();
   await tester.enterText(_tagEditorName, _sport);
+  await tester.pump();
   await _tap(tester, _tagEditorSubmit);
   await _waitFor(tester, () => _tagEditorName.evaluate().isEmpty);
   // Созданный тег виден в общем выборе, поэтому успех не объявляется.

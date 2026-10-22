@@ -59,7 +59,7 @@ final class TagEditorViewModelProvider
 }
 
 String _$tagEditorViewModelHash() =>
-    r'8b004994d30021a2819bc0a51a858e7f634a5c7e';
+    r'26f8dba7a3115adb2240a16d4d3dee08ee048a47';
 
 final class TagEditorViewModelFamily extends $Family
     with

@@ -530,7 +530,7 @@ void main() {
     ),
     (
       failure: TagNameOccupiedFailure(_tagId),
-      ru: 'Тег с таким названием уже есть. Выберите другое название или используйте существующий тег.',
+      ru: 'Тег с таким названием уже есть.',
     ),
     (
       failure: TagNotFoundFailure(_tagId),

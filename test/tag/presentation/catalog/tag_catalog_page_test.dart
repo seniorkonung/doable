@@ -343,128 +343,6 @@ void main() {
     );
   }
 
-  for (final assigned in [false, true]) {
-    testWidgets(
-      'редактор подтверждает уже загруженный ${assigned ? 'назначенный' : 'свободный'} тег',
-      (tester) async {
-        late sqlite.Database raw;
-        final database = AppDatabase(
-          openInMemoryLocalDatabase(setup: (db) => raw = db),
-        );
-        await database.open();
-        addTearDown(database.close);
-        seedRawGraph(raw, () {
-          for (final number in [100, 101]) {
-            raw.execute(
-              'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-              [_id(number), 'Намерение $number', 0, 0, number, number],
-            );
-          }
-          raw.execute(
-            'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
-            [_id(200), _id(100), _id(101), 'need', 2, 0],
-          );
-          for (var number = 1; number <= 52; number++) {
-            raw.execute(
-              'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
-              [
-                _id(number),
-                number == 52 ? 'Дом' : 'Тег $number',
-                tagPositionKey(number),
-              ],
-            );
-          }
-          if (assigned) {
-            raw.execute(
-              'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-              [_id(52), _id(100)],
-            );
-          }
-        });
-        final repository = DriftPersonalGraphRepository(
-          database,
-          UuidV7IntentionIdGenerator(),
-          () => DateTime.utc(2026, 9, 27),
-          InMemoryDiagnosticsSink(),
-        );
-        final router = AppRouter();
-        addTearDown(router.dispose);
-        await tester.pumpWidget(
-          ProviderScope(
-            overrides: [
-              inMemoryQuickCreationModeOverride,
-              personalGraphRepositoryProvider.overrideWithValue(repository),
-            ],
-            child: MaterialApp.router(
-              theme: doableTheme(Brightness.light),
-              locale: const Locale('ru'),
-              localizationsDelegates: AppLocalizations.localizationsDelegates,
-              supportedLocales: AppLocalizations.supportedLocales,
-              routerConfig: router.config(),
-            ),
-          ),
-        );
-        await tester.pumpAndSettle();
-        await openIntentionGraph(tester);
-        final intentionId =
-            (IntentionId.decode(_id(100)) as IntentionIdDecodingSuccess).id;
-        router.push<Object?>(
-          TagCatalogRoute(selectionContext: TagAssignmentContext(intentionId)),
-        );
-        await tester.pumpAndSettle();
-        expect(
-          find.byKey(const ValueKey('tag-catalog-load-more')),
-          findsNothing,
-        );
-        await tester.tap(find.byKey(const ValueKey('tag-catalog-create')));
-        await tester.pumpAndSettle();
-        await tester.enterText(
-          find.byKey(const ValueKey('tag-editor-name')),
-          'дом',
-        );
-        await tester.tap(find.byKey(const ValueKey('tag-editor-submit')));
-        for (
-          var attempt = 0;
-          attempt < 30 &&
-              find
-                  .byKey(const ValueKey('tag-editor-use-existing'))
-                  .evaluate()
-                  .isEmpty;
-          attempt++
-        ) {
-          await tester.runAsync(
-            () => Future<void>.delayed(const Duration(milliseconds: 20)),
-          );
-          await tester.pumpAndSettle();
-        }
-        await tester.tap(find.byKey(const ValueKey('tag-editor-use-existing')));
-        await _waitForEditorToClose(tester);
-        expect(
-          find.byKey(const ValueKey('tag-catalog-load-more')),
-          findsNothing,
-        );
-        final assign = find.byKey(const ValueKey('tag-catalog-assign'));
-        if (assigned) {
-          expect(tester.widget<FilledButton>(assign).onPressed, isNull);
-        } else {
-          expect(assign, findsOneWidget);
-          expect(tester.widget<FilledButton>(assign).onPressed, isNotNull);
-          await tester.tap(assign);
-          await tester.pumpAndSettle();
-          expect(
-            raw
-                .select(
-                  'SELECT tag_id FROM tag_assignments WHERE intention_id = ?',
-                  [_id(100)],
-                )
-                .map((row) => row['tag_id']),
-            [_id(52)],
-          );
-        }
-      },
-    );
-  }
-
   testWidgets(
     'выбор назначает свободный тег архивному получателю только по нажатию',
     (tester) async {
@@ -716,9 +594,7 @@ void main() {
     },
   );
 
-  testWidgets('выбор из полного каталога следует внешним изменениям тега', (
-    tester,
-  ) async {
+  testWidgets('полный каталог следует внешним изменениям тега', (tester) async {
     late sqlite.Database raw;
     final database = AppDatabase(
       openInMemoryLocalDatabase(setup: (db) => raw = db),
@@ -767,29 +643,6 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('catalog-open-tags')));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('tag-catalog-load-more')), findsNothing);
-    await tester.tap(find.byKey(const ValueKey('tag-catalog-create')));
-    await tester.pumpAndSettle();
-    await tester.enterText(
-      find.byKey(const ValueKey('tag-editor-name')),
-      'дом',
-    );
-    await tester.tap(find.byKey(const ValueKey('tag-editor-submit')));
-    for (
-      var attempt = 0;
-      attempt < 30 &&
-          find
-              .byKey(const ValueKey('tag-editor-use-existing'))
-              .evaluate()
-              .isEmpty;
-      attempt++
-    ) {
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 20)),
-      );
-      await tester.pumpAndSettle();
-    }
-    await tester.tap(find.byKey(const ValueKey('tag-editor-use-existing')));
-    await _waitForEditorToClose(tester);
     await tester.scrollUntilVisible(
       find.byKey(ValueKey('tag-catalog-row-${_id(52)}')),
       300,
@@ -825,7 +678,7 @@ void main() {
     expect(raw.select('SELECT id FROM tags WHERE id = ?', [_id(52)]), isEmpty);
   });
 
-  testWidgets('конфликт сохраняет ввод и выбирает существующий тег по id', (
+  testWidgets('конфликт при записи сохраняет ввод и не создаёт второй тег', (
     tester,
   ) async {
     late sqlite.Database raw;
@@ -874,21 +727,20 @@ void main() {
       find.byKey(const ValueKey('tag-editor-name')),
       'дом',
     );
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('tag-editor-submit')));
-    for (
-      var attempt = 0;
-      attempt < 30 &&
-          find
-              .byKey(const ValueKey('tag-editor-use-existing'))
-              .evaluate()
-              .isEmpty;
-      attempt++
-    ) {
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 20)),
-      );
-      await tester.pumpAndSettle();
-    }
+    // Отказ записи предъявляет общая поверхность; форма сохраняет ввод и
+    // ждёт исправления названия.
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 50)),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const ValueKey('tag-editor-submit')))
+          .onPressed,
+      isNull,
+    );
     expect(
       tester
           .widget<TextField>(find.byKey(const ValueKey('tag-editor-name')))
@@ -896,10 +748,6 @@ void main() {
           .text,
       'дом',
     );
-    await tester.tap(find.byKey(const ValueKey('tag-editor-use-existing')));
-    await _waitForEditorToClose(tester);
-    expect(find.text('Дом'), findsOneWidget);
-    expect(find.byTooltip('Edit tag'), findsOneWidget);
     expect(raw.select('SELECT id FROM tags'), hasLength(1));
     expect(raw.select('SELECT * FROM tag_assignments'), isEmpty);
   });
@@ -966,6 +814,7 @@ void main() {
         find.byKey(const ValueKey('tag-editor-name')),
         'Отмена',
       );
+      await tester.pump();
       await tester.tap(find.byKey(const ValueKey('tag-editor-cancel')));
       await tester.pumpAndSettle();
       expect(
@@ -980,6 +829,7 @@ void main() {
         find.byKey(const ValueKey('tag-editor-name')),
         'Дом',
       );
+      await tester.pump();
       await tester.tap(find.byKey(const ValueKey('tag-editor-submit')));
       await _waitForEditorToClose(tester);
       final tagId = raw.select('SELECT id FROM tags').single['id'] as String;
@@ -1014,7 +864,7 @@ void main() {
   );
 
   testWidgets(
-    'конфликт выбирает исходный тег, а исчезнувшего получателя не заменяет',
+    'выбранный тег не назначается одноимённому намерению вместо исчезнувшего',
     (tester) async {
       late sqlite.Database raw;
       final database = AppDatabase(
@@ -1064,36 +914,8 @@ void main() {
         TagCatalogRoute(selectionContext: TagAssignmentContext(intentionId)),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('tag-catalog-create')));
+      await tester.tap(find.byKey(ValueKey('tag-catalog-row-${_id(1)}')));
       await tester.pumpAndSettle();
-      await tester.enterText(
-        find.byKey(const ValueKey('tag-editor-name')),
-        'дом',
-      );
-      await tester.tap(find.byKey(const ValueKey('tag-editor-submit')));
-      for (
-        var attempt = 0;
-        attempt < 30 &&
-            find
-                .byKey(const ValueKey('tag-editor-use-existing'))
-                .evaluate()
-                .isEmpty;
-        attempt++
-      ) {
-        await tester.runAsync(
-          () => Future<void>.delayed(const Duration(milliseconds: 20)),
-        );
-        await tester.pumpAndSettle();
-      }
-      expect(
-        tester
-            .widget<TextField>(find.byKey(const ValueKey('tag-editor-name')))
-            .controller!
-            .text,
-        'дом',
-      );
-      await tester.tap(find.byKey(const ValueKey('tag-editor-use-existing')));
-      await _waitForEditorToClose(tester);
       final container = ProviderScope.containerOf(
         tester.element(find.byType(TagCatalogPage)),
       );
@@ -1164,6 +986,7 @@ void main() {
       find.byKey(const ValueKey('tag-editor-name')),
       '  Дом  ',
     );
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('tag-editor-submit')));
     await _waitForEditorToClose(tester);
     expect(find.text('Дом'), findsOneWidget);
@@ -1174,6 +997,7 @@ void main() {
       find.byKey(const ValueKey('tag-editor-name')),
       'Работа',
     );
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('tag-editor-submit')));
     await _waitForEditorToClose(tester);
 
@@ -1185,6 +1009,7 @@ void main() {
       find.byKey(const ValueKey('tag-editor-name')),
       'Быт',
     );
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('tag-editor-submit')));
     await _waitForEditorToClose(tester);
     expect(find.text('Быт'), findsOneWidget);
@@ -1196,6 +1021,7 @@ void main() {
       find.byKey(const ValueKey('tag-editor-name')),
       'Отменённое имя',
     );
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('tag-editor-cancel')));
     await tester.pumpAndSettle();
     expect(find.text('Быт'), findsOneWidget);
@@ -2071,6 +1897,7 @@ void main() {
         find.byKey(const ValueKey('tag-editor-name')),
         'Домашнее',
       );
+      await tester.pump();
       await tester.tap(find.byKey(const ValueKey('tag-editor-submit')));
       await _waitForEditorToClose(tester);
       final created =
@@ -2090,6 +1917,7 @@ void main() {
         find.byKey(const ValueKey('tag-editor-name')),
         'Домовой',
       );
+      await tester.pump();
       await tester.tap(find.byKey(const ValueKey('tag-editor-cancel')));
       await tester.pumpAndSettle();
 

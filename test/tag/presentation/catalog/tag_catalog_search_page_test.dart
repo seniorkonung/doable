@@ -781,6 +781,7 @@ void main() {
           find.byKey(const ValueKey('tag-editor-name')),
           'Новый дом',
         );
+        await tester.pump();
         await tester.tap(find.byKey(const ValueKey('tag-editor-submit')));
         await _pumpUntil(
           tester,

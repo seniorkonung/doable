@@ -261,6 +261,7 @@ Future<TagId> _newTag(WidgetTester tester, _App app) async {
   await _until(tester, _key('tag-editor-name'));
   await tester.pumpAndSettle();
   await tester.enterText(_key('tag-editor-name'), _sport);
+  await tester.pump();
   await _tap(tester, _key('tag-editor-submit'));
   await _wait(tester, () => _key('tag-editor-name').evaluate().isEmpty);
   // Созданный тег виден в общем выборе, поэтому успех не объявляется.

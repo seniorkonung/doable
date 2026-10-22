@@ -341,6 +341,7 @@ void _registerDraftSearchScenarios() {
         find.byKey(const ValueKey('tag-editor-name')),
         'Домашнее',
       );
+      await tester.pump();
       await tester.tap(find.byKey(const ValueKey('tag-editor-submit')));
       await _pumpUntil(
         tester,

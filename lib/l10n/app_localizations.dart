@@ -3139,42 +3139,6 @@ abstract class AppLocalizations {
   /// **'Cancel'**
   String get tagEditorCancel;
 
-  /// Выбрать тег при конфликте названия
-  ///
-  /// In en, this message translates to:
-  /// **'Use existing tag'**
-  String get tagEditorUseExisting;
-
-  /// Чтение после подтверждённой записи
-  ///
-  /// In en, this message translates to:
-  /// **'Tag saved. Refreshing its details…'**
-  String get tagEditorReadingCommitted;
-
-  /// Ошибка чтения после подтверждённой записи
-  ///
-  /// In en, this message translates to:
-  /// **'Tag saved, but its details couldn’t be refreshed.'**
-  String get tagEditorCommittedReadFailed;
-
-  /// Тег исчез после подтверждённой записи
-  ///
-  /// In en, this message translates to:
-  /// **'Tag saved, but is no longer found. Refresh the catalog.'**
-  String get tagEditorCommittedMissing;
-
-  /// Повторная проверка существующего тега по id
-  ///
-  /// In en, this message translates to:
-  /// **'Checking existing tag…'**
-  String get tagEditorReadingExisting;
-
-  /// Конфликтный тег исчез до выбора
-  ///
-  /// In en, this message translates to:
-  /// **'The existing tag is gone. Correct the name or refresh the catalog.'**
-  String get tagEditorExistingMissing;
-
   /// Временный отказ чтения одного тега
   ///
   /// In en, this message translates to:
@@ -3346,7 +3310,7 @@ abstract class AppLocalizations {
   /// Название тега уже занято
   ///
   /// In en, this message translates to:
-  /// **'A tag with this name already exists. Choose another name or use the existing tag.'**
+  /// **'A tag with this name already exists.'**
   String get tagNameOccupied;
 
   /// Тег отсутствует при изменении

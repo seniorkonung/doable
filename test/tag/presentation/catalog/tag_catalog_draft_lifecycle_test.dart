@@ -84,6 +84,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(host.router.current.name, TagEditorRoute.name);
         await tester.enterText(_editorName, 'Домашнее');
+        await tester.pump();
         await tester.tap(_editorSubmit);
         await tester.pumpAndSettle();
         // Созданный тег виден в выборе, поэтому успех права предъявления не

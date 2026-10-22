@@ -89,13 +89,7 @@ void main() {
       () =>
           find.byKey(const ValueKey('catalog-open-tags')).evaluate().isNotEmpty,
     );
-    const tagIdText = '018f0b5d-6b2e-7c80-8000-000000000001';
     seedRawGraph(raw, () {
-      raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
-        tagIdText,
-        'Дом',
-        tagPositionKey(200000),
-      ]);
       raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
         '018f0b5d-6b2e-7c80-8000-000000000002',
         'Для дома',
@@ -114,15 +108,18 @@ void main() {
     );
     await tester.enterText(
       find.byKey(const ValueKey('tag-editor-name')),
-      'дом',
+      'Дом',
     );
+    await tester.pump();
     await _tap(tester, 'tag-editor-submit');
-    await _tap(tester, 'tag-editor-use-existing');
     await _until(
       tester,
       () => find.byKey(const ValueKey('tag-editor-name')).evaluate().isEmpty,
     );
-    final row = find.byKey(const ValueKey('tag-catalog-row-$tagIdText'));
+    final tagIdText = raw
+        .select("SELECT id FROM tags WHERE name = 'Дом'")
+        .single['id'];
+    final row = find.byKey(ValueKey('tag-catalog-row-$tagIdText'));
     await _until(
       tester,
       () => tester.widget<Semantics>(row).properties.selected == true,
@@ -137,6 +134,7 @@ void main() {
       find.byKey(const ValueKey('tag-editor-name')),
       'Спорт',
     );
+    await tester.pump();
     repository.holdNextRename();
     await _tap(tester, 'tag-editor-submit');
     await _until(tester, () => repository.renameAttempts == 1);
@@ -158,101 +156,78 @@ void main() {
     expect(repository.renameAttempts, 1);
   });
 
-  testWidgets(
-    'после commit ошибка чтения сохраняет ввод и не повторяет создание',
-    (tester) async {
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-      tester.binding.platformDispatcher.localesTestValue = const [Locale('en')];
-      addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
-      tester.view.physicalSize = const Size(1200, 2400);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.reset);
-      late sqlite.Database raw;
-      late _ControlledRepository repository;
-      final diagnostics = InMemoryDiagnosticsSink();
-      final runtime = AppRuntime(
-        quickCreationModeStore: InMemoryQuickCreationModeStore(),
-        connectionFactory: () =>
-            openInMemoryLocalDatabase(setup: (database) => raw = database),
-        diagnosticsSink: diagnostics,
-        repositoryFactory: (database) => repository = _ControlledRepository(
-          DriftPersonalGraphRepository(
-            database,
-            UuidV7IntentionIdGenerator(),
-            () => DateTime.utc(2026, 9, 25),
-            diagnostics,
-          ),
+  testWidgets('после commit ошибка обновления каталога не повторяет создание', (
+    tester,
+  ) async {
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    tester.binding.platformDispatcher.localesTestValue = const [Locale('en')];
+    addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
+    tester.view.physicalSize = const Size(1200, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    late sqlite.Database raw;
+    late _ControlledRepository repository;
+    final diagnostics = InMemoryDiagnosticsSink();
+    final runtime = AppRuntime(
+      quickCreationModeStore: InMemoryQuickCreationModeStore(),
+      connectionFactory: () =>
+          openInMemoryLocalDatabase(setup: (database) => raw = database),
+      diagnosticsSink: diagnostics,
+      repositoryFactory: (database) => repository = _ControlledRepository(
+        DriftPersonalGraphRepository(
+          database,
+          UuidV7IntentionIdGenerator(),
+          () => DateTime.utc(2026, 9, 25),
+          diagnostics,
         ),
-      );
-      addTearDown(() async {
-        await tester.pumpWidget(const SizedBox.shrink());
-        await runtime.shutdown();
-      });
-      await tester.pumpWidget(MainApp(runtime: runtime));
-      await openIntentionGraph(
-        tester,
-        waitFor: (tester, finder) =>
-            _until(tester, () => finder.evaluate().isNotEmpty),
-      );
-      await _tap(tester, 'catalog-open-tags');
-      final search = find.byKey(const ValueKey('tag-catalog-search'));
-      await _until(tester, () => search.evaluate().isNotEmpty);
-      await tester.enterText(search, 'STRASS');
-      await tester.pump();
-      await _tap(tester, 'tag-catalog-create');
-      await _until(
-        tester,
-        () =>
-            find.byKey(const ValueKey('tag-editor-name')).evaluate().isNotEmpty,
-      );
-      await tester.enterText(
-        find.byKey(const ValueKey('tag-editor-name')),
-        'Straße',
-      );
-      repository.failNextTagRead = true;
-      repository.failNextCatalogRead = true;
-      await _tap(tester, 'tag-editor-submit');
-      await _until(
-        tester,
-        () => find
-            .byKey(const ValueKey('tag-editor-retry-committed'))
-            .evaluate()
-            .isNotEmpty,
-      );
-      expect(raw.select('SELECT name FROM tags').single['name'], 'Straße');
-      expect(repository.createAttempts, 1);
-      expect(
-        tester
-            .widget<TextField>(find.byKey(const ValueKey('tag-editor-name')))
-            .controller!
-            .text,
-        'Straße',
-      );
-      expect(
-        tester
-            .widget<FilledButton>(
-              find.byKey(const ValueKey('tag-editor-submit')),
-            )
-            .onPressed,
-        isNull,
-      );
-      await _tap(tester, 'tag-editor-retry-committed');
-      await _until(
-        tester,
-        () => find.byKey(const ValueKey('tag-editor-name')).evaluate().isEmpty,
-      );
-      await _until(
-        tester,
-        () => find.textContaining('couldn’t be loaded').evaluate().isNotEmpty,
-      );
-      await tester.tap(find.text('Try again'));
-      await _until(tester, () => find.text('Straße').evaluate().isNotEmpty);
-      expect(tester.widget<TextField>(search).controller!.text, 'STRASS');
-      expect(repository.createAttempts, 1);
-      expect(raw.select('SELECT id FROM tags'), hasLength(1));
-      expect(tester.takeException(), isNull);
-    },
-  );
+      ),
+    );
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await runtime.shutdown();
+    });
+    await tester.pumpWidget(MainApp(runtime: runtime));
+    await openIntentionGraph(
+      tester,
+      waitFor: (tester, finder) =>
+          _until(tester, () => finder.evaluate().isNotEmpty),
+    );
+    await _tap(tester, 'catalog-open-tags');
+    final search = find.byKey(const ValueKey('tag-catalog-search'));
+    await _until(tester, () => search.evaluate().isNotEmpty);
+    await tester.enterText(search, 'STRASS');
+    await tester.pump();
+    await _tap(tester, 'tag-catalog-create');
+    await _until(
+      tester,
+      () => find.byKey(const ValueKey('tag-editor-name')).evaluate().isNotEmpty,
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('tag-editor-name')),
+      'Straße',
+    );
+    await tester.pump();
+    repository.failNextCatalogRead = true;
+    await _tap(tester, 'tag-editor-submit');
+    // Успех закрывает форму тегом из результата команды без чтения после
+    // записи.
+    await _until(
+      tester,
+      () => find.byKey(const ValueKey('tag-editor-name')).evaluate().isEmpty,
+    );
+    expect(raw.select('SELECT name FROM tags').single['name'], 'Straße');
+    expect(repository.createAttempts, 1);
+    await _until(
+      tester,
+      () => find.textContaining('couldn’t be loaded').evaluate().isNotEmpty,
+    );
+    await tester.tap(find.text('Try again'));
+    await _until(tester, () => find.text('Straße').evaluate().isNotEmpty);
+    expect(tester.widget<TextField>(search).controller!.text, 'STRASS');
+    expect(repository.createAttempts, 1);
+    expect(raw.select('SELECT id FROM tags'), hasLength(1));
+    expect(tester.takeException(), isNull);
+  });
 }
 
 final class _ControlledRepository extends Fake
@@ -261,7 +236,6 @@ final class _ControlledRepository extends Fake
 
   final PersonalGraphRepository delegate;
   Completer<void>? _heldRename;
-  bool failNextTagRead = false;
   bool failNextCatalogRead = false;
   int createAttempts = 0;
   int renameAttempts = 0;
@@ -303,13 +277,7 @@ final class _ControlledRepository extends Fake
   }
 
   @override
-  Stream<TagReadResult> watchTag(TagId id) {
-    if (failNextTagRead) {
-      failNextTagRead = false;
-      return Stream.value(const TagReadError(TagReadUnavailableFailure()));
-    }
-    return delegate.watchTag(id);
-  }
+  Stream<TagReadResult> watchTag(TagId id) => delegate.watchTag(id);
 
   @override
   Future<GraphCommandResult<TSuccess, TFailure>> execute<

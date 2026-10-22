@@ -2053,27 +2053,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get tagEditorCancel => 'Отмена';
 
   @override
-  String get tagEditorUseExisting => 'Использовать существующий тег';
-
-  @override
-  String get tagEditorReadingCommitted => 'Тег сохранён. Обновляем его данные…';
-
-  @override
-  String get tagEditorCommittedReadFailed =>
-      'Тег сохранён, но данные не удалось обновить.';
-
-  @override
-  String get tagEditorCommittedMissing =>
-      'Тег сохранён, но больше не найден. Обновите каталог.';
-
-  @override
-  String get tagEditorReadingExisting => 'Проверяем существующий тег…';
-
-  @override
-  String get tagEditorExistingMissing =>
-      'Существующего тега больше нет. Исправьте название или обновите каталог.';
-
-  @override
   String get tagEditorReadUnavailable =>
       'Не удалось прочитать тег. Повторите попытку.';
 
@@ -2176,8 +2155,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get tagNameNonCanonical => 'Удалите пробелы по краям названия тега.';
 
   @override
-  String get tagNameOccupied =>
-      'Тег с таким названием уже есть. Выберите другое название или используйте существующий тег.';
+  String get tagNameOccupied => 'Тег с таким названием уже есть.';
 
   @override
   String get tagNotFound => 'Этого тега больше нет. Обновите каталог.';

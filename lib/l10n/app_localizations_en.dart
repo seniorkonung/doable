@@ -2031,27 +2031,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tagEditorCancel => 'Cancel';
 
   @override
-  String get tagEditorUseExisting => 'Use existing tag';
-
-  @override
-  String get tagEditorReadingCommitted => 'Tag saved. Refreshing its details…';
-
-  @override
-  String get tagEditorCommittedReadFailed =>
-      'Tag saved, but its details couldn’t be refreshed.';
-
-  @override
-  String get tagEditorCommittedMissing =>
-      'Tag saved, but is no longer found. Refresh the catalog.';
-
-  @override
-  String get tagEditorReadingExisting => 'Checking existing tag…';
-
-  @override
-  String get tagEditorExistingMissing =>
-      'The existing tag is gone. Correct the name or refresh the catalog.';
-
-  @override
   String get tagEditorReadUnavailable => 'Tag couldn’t be read. Try again.';
 
   @override
@@ -2152,8 +2131,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tagNameNonCanonical => 'Remove whitespace around the tag name.';
 
   @override
-  String get tagNameOccupied =>
-      'A tag with this name already exists. Choose another name or use the existing tag.';
+  String get tagNameOccupied => 'A tag with this name already exists.';
 
   @override
   String get tagNotFound => 'This tag no longer exists. Refresh the catalog.';

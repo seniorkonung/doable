@@ -154,6 +154,7 @@ void main() {
 
     final invalid = '🙂' * 256;
     await tester.enterText(nameField, invalid);
+    await tester.pump();
     await _tap(tester, find.byKey(const ValueKey('tag-editor-submit')));
     final failure = find.byKey(const ValueKey('tag-editor-field-failure'));
     await _until(tester, failure);
@@ -164,6 +165,7 @@ void main() {
 
     final corrected = 'Straße 🏠é ${('Длинное название ' * 8).trimRight()}';
     await tester.enterText(nameField, corrected);
+    await tester.pump();
     await _tap(tester, find.byKey(const ValueKey('tag-editor-submit')));
     await _until(tester, find.text(corrected));
     final id = raw.select('SELECT id FROM tags').single['id'] as String;
@@ -332,6 +334,7 @@ void _registerAssignmentScenarios() {
         final name = find.byKey(const ValueKey('tag-editor-name'));
         await _until(tester, name);
         await tester.enterText(name, 'Дом');
+        await tester.pump();
         await _tap(tester, find.byKey(const ValueKey('tag-editor-submit')));
         // Отказ создания предъявляет общая поверхность поверх редактора.
         final failure = find.byKey(const ValueKey('graph-operation-message'));
@@ -365,6 +368,7 @@ void _registerAssignmentScenarios() {
 
         final newName = 'Straße 🏠é ${'Длинное название ' * 7}'.trimRight();
         await tester.enterText(name, newName);
+        await tester.pump();
         await _tap(tester, find.byKey(const ValueKey('tag-editor-submit')));
         await _until(
           tester,

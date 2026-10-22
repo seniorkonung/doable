@@ -37,6 +37,7 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
 Future<void> _saveName(WidgetTester tester, String name) async {
   await _until(tester, find.byKey(const ValueKey('tag-editor-name')));
   await tester.enterText(find.byKey(const ValueKey('tag-editor-name')), name);
+  await tester.pump();
   await _tap(tester, find.byKey(const ValueKey('tag-editor-submit')));
   for (var attempt = 0; attempt < 100; attempt++) {
     if (find.byKey(const ValueKey('tag-editor-name')).evaluate().isEmpty) {
@@ -253,10 +254,12 @@ void main() {
         find.byKey(const ValueKey('tag-editor-name')),
         'STRASSE',
       );
+      await tester.pump();
       await _tap(tester, find.byKey(const ValueKey('tag-editor-submit')));
+      // Занятость определяет запись, а её отказ предъявляет общая поверхность.
       await _until(
         tester,
-        find.byKey(const ValueKey('tag-editor-use-existing')),
+        find.textContaining('Тег с таким названием уже есть.'),
       );
       expect(raw.select('SELECT id FROM tags'), hasLength(1));
       expect(

@@ -151,6 +151,7 @@ void main() {
       find.byKey(const ValueKey('tag-editor-name')),
       newName,
     );
+    await tester.pump();
     await _tap(tester, find.byKey(const ValueKey('tag-editor-submit')));
     await _waitFor(
       tester,

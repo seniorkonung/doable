@@ -9,7 +9,6 @@ import '../../../design_system/components/tag_color_picker.dart';
 import '../../../design_system/components/tag_dot.dart';
 import '../../../design_system/doable_metrics.dart';
 import '../../../graph/presentation/operation_failure_presentation.dart';
-import '../../application/tag_read_result.dart';
 import '../../application/tag_result.dart';
 import '../../domain/tag.dart';
 import '../tag_color_presentation.dart';
@@ -38,10 +37,7 @@ final class _TagEditorPageState extends ConsumerState<TagEditorPage> {
   void initState() {
     super.initState();
     _nameController = TextEditingController(
-      text: switch (widget.editorContext) {
-        TagEditorCreating() => '',
-        TagEditorRenaming(:final tag) => tag.name.value,
-      },
+      text: TagEditorState.initialInput(widget.editorContext),
     );
   }
 
@@ -58,9 +54,7 @@ final class _TagEditorPageState extends ConsumerState<TagEditorPage> {
     final state = ref.watch(provider);
     final model = ref.read(provider.notifier);
     ref.listen(provider, (previous, next) {
-      if (next.event
-          case TagEditorSaved(:final tag) ||
-              TagEditorExistingSelected(:final tag)) {
+      if (next.event case TagEditorSaved(:final tag)) {
         model.consumeEvent();
         unawaited(context.router.maybePop<Tag>(tag));
       }
@@ -68,12 +62,13 @@ final class _TagEditorPageState extends ConsumerState<TagEditorPage> {
 
     // Отказ принятой отправки предъявляет общая поверхность, поэтому форма
     // рисует только собственную проверку названия и прерванную отправку.
-    final fieldFailure = switch (state.status) {
+    final fieldFailure = switch (state.nameCheck) {
       TagEditorNameInvalid(:final reason) => tagFailureMessage(
         l10n,
         TagNameInputFailure(reason),
       ),
-      _ => null,
+      TagEditorNameOccupied() => l10n.tagNameOccupied,
+      TagEditorNameAccepted() || TagEditorNameEmpty() => null,
     };
     final generalFailure = switch (state.status) {
       TagEditorSubmissionInterrupted() => tagFailureMessage(
@@ -82,7 +77,6 @@ final class _TagEditorPageState extends ConsumerState<TagEditorPage> {
       ),
       _ => null,
     };
-    final readStatus = _readStatus(l10n, state.status);
     final creating = state.context is TagEditorCreating;
     final selectedColor = tagColorPresentation(state.color);
 
@@ -144,39 +138,15 @@ final class _TagEditorPageState extends ConsumerState<TagEditorPage> {
                 messageKey: const ValueKey('tag-editor-general-failure'),
               ),
             ],
-            if (readStatus != null) ...[
+            if (state.status is TagEditorAlreadyRunning) ...[
               const SizedBox(height: 16),
               Semantics(
-                key: state.status is TagEditorAlreadyRunning
-                    ? const ValueKey('tag-editor-already-running')
-                    : null,
+                key: const ValueKey('tag-editor-already-running'),
                 container: true,
                 liveRegion: true,
-                child: Text(readStatus),
+                child: Text(l10n.tagEditorAlreadyRunning),
               ),
             ],
-            if (state.status case TagEditorSubmissionFailed(
-              failure: TagNameOccupiedFailure(),
-            )) ...[
-              const SizedBox(height: 16),
-              OutlinedButton(
-                key: const ValueKey('tag-editor-use-existing'),
-                onPressed: model.useExisting,
-                child: Text(l10n.tagEditorUseExisting),
-              ),
-            ],
-            if (state.status case TagEditorExistingReadFailed(canRetry: true))
-              OutlinedButton(
-                key: const ValueKey('tag-editor-retry-existing'),
-                onPressed: model.useExisting,
-                child: Text(l10n.commonRetry),
-              ),
-            if (state.status case TagEditorCommittedReadFailed(canRetry: true))
-              OutlinedButton(
-                key: const ValueKey('tag-editor-retry-committed'),
-                onPressed: model.retryCommittedRead,
-                child: Text(l10n.commonRetry),
-              ),
             const SizedBox(height: 24),
             FilledButton(
               key: const ValueKey('tag-editor-submit'),
@@ -201,26 +171,3 @@ final class _TagEditorPageState extends ConsumerState<TagEditorPage> {
     );
   }
 }
-
-String? _readStatus(AppLocalizations l10n, TagEditorStatus status) =>
-    switch (status) {
-      TagEditorAlreadyRunning() => l10n.tagEditorAlreadyRunning,
-      TagEditorReadingCommitted() => l10n.tagEditorReadingCommitted,
-      TagEditorCommittedReadFailed(:final failure) =>
-        '${l10n.tagEditorCommittedReadFailed} ${_readFailure(l10n, failure)}',
-      TagEditorCommittedMissing() => l10n.tagEditorCommittedMissing,
-      TagEditorReadingExisting() => l10n.tagEditorReadingExisting,
-      TagEditorExistingReadFailed(:final failure) => _readFailure(
-        l10n,
-        failure,
-      ),
-      TagEditorExistingMissing() => l10n.tagEditorExistingMissing,
-      _ => null,
-    };
-
-String _readFailure(AppLocalizations l10n, TagReadFailure failure) =>
-    switch (failure) {
-      TagReadUnavailableFailure() => l10n.tagEditorReadUnavailable,
-      TagReadCorruptionFailure() => l10n.tagEditorReadCorruption,
-      TagReadUnexpectedFailure() => l10n.tagEditorReadUnexpected,
-    };

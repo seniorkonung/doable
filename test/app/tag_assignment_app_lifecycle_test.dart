@@ -119,6 +119,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('tag-catalog-create')));
       await tester.pumpAndSettle();
       await tester.enterText(editor, 'Для дома');
+      await tester.pump();
       await tester.tap(find.byKey(const ValueKey('tag-editor-submit')));
       await _pumpUntil(
         tester,

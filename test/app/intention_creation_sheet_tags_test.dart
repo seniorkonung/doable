@@ -104,6 +104,7 @@ void main() {
       await _until(tester, _tagEditorName);
       await tester.pumpAndSettle();
       await tester.enterText(_tagEditorName, 'Сарай');
+      await tester.pump();
       await _tap(tester, _tagEditorSubmit);
       await _waitForStorage(tester, () => _tagEditorName.evaluate().isEmpty);
       final shed = app.storedTagId('Сарай');
