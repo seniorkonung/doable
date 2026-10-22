@@ -1708,7 +1708,7 @@ void main() {
     },
   );
   testWidgets(
-    'выбор для черновика не добавляет неподтверждённого или удалённого кандидата и сохраняет уже включённый тег',
+    'выбор для черновика не добавляет неподтверждённого или удалённого кандидата, а удалённый тег уходит из черновика',
     (tester) async {
       final repository = _CatalogRepository();
       addTearDown(repository.dispose);
@@ -1744,8 +1744,8 @@ void main() {
       expect(tester.widget<FilledButton>(add).onPressed, isNull);
       await tester.tap(add, warnIfMissed: false);
       await tester.pump();
-      expect(draft.tagSet.current.tagIds, [_tag(1, 'Дом').id]);
-      expect(draft.state.selectedTags[_tag(1, 'Дом').id], isNotNull);
+      expect(draft.tagSet.current.tagIds, isEmpty);
+      expect(draft.state.selectedTags, isEmpty);
       expect(repository._commands, isEmpty);
       expect(tester.takeException(), isNull);
     },

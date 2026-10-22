@@ -53,9 +53,6 @@ final _tagEditorName = find.byKey(const ValueKey('tag-editor-name'));
 final _tagEditorSubmit = find.byKey(const ValueKey('tag-editor-submit'));
 final _submit = find.byKey(const ValueKey('intention-editor-submit'));
 final _failure = find.byKey(const ValueKey('intention-editor-failure'));
-final _removeMissing = find.byKey(
-  const ValueKey('intention-editor-remove-missing-tags'),
-);
 final _message = find.byKey(const ValueKey('graph-operation-message'));
 
 /// Теги панели создания и общий выбор тегов на настоящих маршрутах
@@ -129,7 +126,8 @@ void main() {
       expect(_fieldsScroll(tester).pixels, fieldsOffset);
       expect(_text(tester, 'intention-editor-title'), _rawTitle);
       expect(_text(tester, 'intention-editor-description'), _longDescription);
-      expect(_chipNames(tester), ['Дом', 'Сарай']);
+      // Созданный тег встаёт первым в ручном порядке.
+      expect(_chipNames(tester), ['Сарай', 'Дом']);
       // Созданный тег виден в выборе, поэтому успех не объявляется.
       expect(_message, findsNothing);
 
@@ -200,12 +198,11 @@ void main() {
   );
 
   testWidgets(
-    'панель показывает переименование и удаление выбранного тега другим '
-    'экраном, отказ сохранения сохраняет набор с объяснением, а явное '
-    'исправление снимает только удалённый тег и не отправляет сохранение',
+    'панель показывает переименование выбранного тега другим экраном, '
+    'удаление убирает его из черновика без подмены одноимённым новым тегом, '
+    'а сохранение создаёт намерение только с оставшимся тегом',
     (tester) async {
       final app = await _App.start(tester);
-      final l10n = app.l10n;
       final home = _tagId(_homeTag);
       final work = _tagId(_workTag);
 
@@ -231,8 +228,8 @@ void main() {
       await _waitForStorage(tester, () => _chipNames(tester).first == 'Быт');
       expect(_chipStatus(home), findsNothing);
 
-      // Удалённый тег остаётся в черновике с последним названием, а
-      // одноимённый новый тег его не заменяет.
+      // Удалённый тег уходит из черновика, а одноимённый новый тег его не
+      // заменяет.
       await app.runTagCommand(
         tester,
         app.coordinator.acceptTagDelete(DeleteTag(home)),
@@ -248,36 +245,14 @@ void main() {
           ),
         ),
       );
-      await _until(tester, _chipStatus(home));
-      await tester.pumpAndSettle();
-      expect(_chipNames(tester), ['Быт', 'Работа']);
-      expect(
-        tester.widget<Text>(_chipStatus(home)).data,
-        l10n.editorDraftTagMissing,
-      );
-      final graphBefore = app.storedGraph();
-
-      // Сохранение отклоняется целиком и объясняет исправление набора.
-      await _tap(tester, _submit);
-      await _until(tester, _failure);
-      await tester.pumpAndSettle();
-      expect(
-        tester.getSemantics(_failure),
-        isSemantics(label: l10n.editorCreateTagsMissing(1)),
-      );
-      expect(_chipNames(tester), ['Быт', 'Работа']);
-      expect(tester.widget<FilledButton>(_submit).onPressed, isNull);
-      expect(app.storedGraph(), graphBefore);
-
-      // Исправление снимает только удалённый тег и само не сохраняет.
-      await _tap(tester, _removeMissing);
+      await _waitForStorage(tester, () => _chipNames(tester).length == 1);
+      await _letStorageRun(tester);
       await tester.pumpAndSettle();
       expect(_chipNames(tester), ['Работа']);
       expect(_failure, findsNothing);
-      await _letStorageRun(tester);
-      expect(app.storedGraph(), graphBefore);
+      expect(app.storedTable('intentions'), isEmpty);
 
-      // Явное сохранение создаёт намерение только с оставшимся тегом.
+      // Сохранение создаёт намерение только с оставшимся тегом.
       await _tap(tester, _submit);
       await _waitForStorage(tester, () => _sheet.evaluate().isEmpty);
       await returnToIntentionGraphAfterCreation(

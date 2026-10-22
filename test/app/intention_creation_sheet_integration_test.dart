@@ -195,7 +195,8 @@ void main() {
         expect(_text(tester, 'intention-editor-title'), _rawTitle);
         expect(_text(tester, 'intention-editor-description'), _description);
         expect(_iconOf(tester, _readiness), Icons.check_circle);
-        expect(_chipNames(tester), ['Дом', _sport]);
+        // Созданный позже «Спорт» стоит первым в ручном порядке.
+        expect(_chipNames(tester), [_sport, 'Дом']);
 
         // До отправки граф получил только самостоятельный тег: ни намерения,
         // ни назначений.
@@ -212,8 +213,7 @@ void main() {
         chooseTags();
         final creation = await _creation(tester, app);
         await _waitFor(tester, () => _sheet.evaluate().isEmpty);
-        // Черновик показывал теги в порядке выбора, а созданное намерение —
-        // в ручном порядке: созданный позже «Спорт» стоит перед «Дом».
+        // Созданное намерение показывает теги в том же ручном порядке.
         await _expectCreatedPage(
           tester,
           app,

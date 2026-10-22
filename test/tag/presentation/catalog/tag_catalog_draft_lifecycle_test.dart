@@ -200,7 +200,6 @@ void main() {
         expect(afterOutcome.operation, isA<OperationIdle<Intention>>());
         expect(afterOutcome.event, isNull);
         expect(afterOutcome.failurePresentation, isNull);
-        expect(afterOutcome.missingTagIds, isEmpty);
         expect(
           afterOutcome.selectedTags[_home.id]?.status,
           isA<IntentionDraftTagAvailable>(),

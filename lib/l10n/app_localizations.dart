@@ -1838,12 +1838,6 @@ abstract class AppLocalizations {
   /// **'Checking tag'**
   String get editorDraftTagChecking;
 
-  /// Состояние выбранного тега черновика, отсутствие которого подтверждено; тег остаётся в черновике до явного снятия
-  ///
-  /// In en, this message translates to:
-  /// **'Tag deleted'**
-  String get editorDraftTagMissing;
-
   /// Устранимый отказ чтения выбранного тега черновика; не означает удаление тега
   ///
   /// In en, this message translates to:
@@ -1868,17 +1862,11 @@ abstract class AppLocalizations {
   /// **'Check tag {tagName} again'**
   String editorRetryDraftTag(String tagName);
 
-  /// Отказ создания намерения: выбранные теги черновика отсутствуют при сохранении; объясняет исправление набора
+  /// Отказ создания намерения: выбранные теги черновика отсутствуют при сохранении; они уже убраны из черновика, и сохранение снова доступно
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{A selected tag was deleted from the catalog. Remove it from the draft to save the intention.} other{{count} selected tags were deleted from the catalog. Remove them from the draft to save the intention.}}'**
+  /// **'{count, plural, =1{A selected tag was deleted from the catalog and removed from the draft. Save the intention again.} other{{count} selected tags were deleted from the catalog and removed from the draft. Save the intention again.}}'**
   String editorCreateTagsMissing(int count);
-
-  /// Явное исправление отказа создания: снимает из черновика только выбранные теги, отсутствие которых подтвердило сохранение; сохранение не отправляет
-  ///
-  /// In en, this message translates to:
-  /// **'{count, plural, =1{Remove deleted tag} other{Remove deleted tags}}'**
-  String editorRemoveMissingTags(int count);
 
   /// Вид операции создания намерения в сообщении оболочки
   ///

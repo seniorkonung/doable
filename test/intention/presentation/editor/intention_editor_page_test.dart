@@ -298,57 +298,47 @@ void main() {
     },
   );
 
-  testWidgets(
-    'правка текста не снимает конфликт и отказ отсутствующих тегов и не открывает повтор',
-    (tester) async {
-      final cases = <(IntentionFailure, String)>[
-        (
-          const IntentionConflictFailure(),
-          'The intention couldn’t be created because of a conflict.',
-        ),
-        (
-          IntentionCreationTagsMissingFailure([_tagId(1)]),
-          'A selected tag was deleted from the catalog. Remove it from the '
-              'draft to save the intention.',
-        ),
-      ];
+  testWidgets('правка текста не снимает конфликт и не открывает повтор', (
+    tester,
+  ) async {
+    final repository = ControlledCatalogRepository();
+    await _openEditor(tester, repository);
+    await tester.enterText(
+      find.byKey(const ValueKey('intention-editor-title')),
+      'Намерение',
+    );
+    await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
+    repository.completeCommand(
+      0,
+      const ResultFailure(IntentionConflictFailure()),
+    );
+    await tester.pumpAndSettle();
 
-      for (final (failure, message) in cases) {
-        final repository = ControlledCatalogRepository();
-        await _openEditor(tester, repository);
-        await tester.enterText(
-          find.byKey(const ValueKey('intention-editor-title')),
-          'Намерение',
-        );
-        await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
-        repository.completeCommand(0, ResultFailure(failure));
-        await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('intention-editor-title')),
+      'Исправленное намерение',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('intention-editor-description')),
+      'Описание',
+    );
+    await tester.pump();
 
-        await tester.enterText(
-          find.byKey(const ValueKey('intention-editor-title')),
-          'Исправленное намерение',
-        );
-        await tester.enterText(
-          find.byKey(const ValueKey('intention-editor-description')),
-          'Описание',
-        );
-        await tester.pump();
-
-        expect(find.text(message), findsOneWidget);
-        expect(find.widgetWithText(FilledButton, 'Try again'), findsNothing);
-        expect(
-          tester
-              .widget<FilledButton>(
-                find.byKey(const ValueKey('intention-editor-submit')),
-              )
-              .onPressed,
-          isNull,
-        );
-        expect(repository.commands, hasLength(1));
-        await tester.pumpWidget(const SizedBox.shrink());
-      }
-    },
-  );
+    expect(
+      find.text('The intention couldn’t be created because of a conflict.'),
+      findsOneWidget,
+    );
+    expect(find.widgetWithText(FilledButton, 'Try again'), findsNothing);
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.byKey(const ValueKey('intention-editor-submit')),
+          )
+          .onPressed,
+      isNull,
+    );
+    expect(repository.commands, hasLength(1));
+  });
 
   testWidgets('показывает безопасные failures и retry только для unavailable', (
     tester,

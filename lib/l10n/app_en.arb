@@ -1025,10 +1025,6 @@
   "@editorDraftTagChecking": {
     "description": "Доступное состояние выбранного тега черновика, пока наблюдение ещё не подтвердило тег"
   },
-  "editorDraftTagMissing": "Tag deleted",
-  "@editorDraftTagMissing": {
-    "description": "Состояние выбранного тега черновика, отсутствие которого подтверждено; тег остаётся в черновике до явного снятия"
-  },
   "editorDraftTagReadUnavailable": "Couldn't check tag",
   "@editorDraftTagReadUnavailable": {
     "description": "Устранимый отказ чтения выбранного тега черновика; не означает удаление тега"
@@ -1050,18 +1046,9 @@
       }
     }
   },
-  "editorCreateTagsMissing": "{count, plural, =1{A selected tag was deleted from the catalog. Remove it from the draft to save the intention.} other{{count} selected tags were deleted from the catalog. Remove them from the draft to save the intention.}}",
+  "editorCreateTagsMissing": "{count, plural, =1{A selected tag was deleted from the catalog and removed from the draft. Save the intention again.} other{{count} selected tags were deleted from the catalog and removed from the draft. Save the intention again.}}",
   "@editorCreateTagsMissing": {
-    "description": "Отказ создания намерения: выбранные теги черновика отсутствуют при сохранении; объясняет исправление набора",
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "editorRemoveMissingTags": "{count, plural, =1{Remove deleted tag} other{Remove deleted tags}}",
-  "@editorRemoveMissingTags": {
-    "description": "Явное исправление отказа создания: снимает из черновика только выбранные теги, отсутствие которых подтвердило сохранение; сохранение не отправляет",
+    "description": "Отказ создания намерения: выбранные теги черновика отсутствуют при сохранении; они уже убраны из черновика, и сохранение снова доступно",
     "placeholders": {
       "count": {
         "type": "int"

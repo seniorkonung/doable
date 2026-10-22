@@ -131,7 +131,6 @@ final class _IntentionEditorPageState
     final titleFailure = failureAt(_FailurePlace.title);
     final descriptionFailure = failureAt(_FailurePlace.description);
     final pinnedFailure = failureAt(_FailurePlace.pinned);
-    final missingTagIds = editor.missingTagIds;
     return PopScope<Object?>(
       // Маршрут не закрывается сам: решение принимает сессия.
       canPop: false,
@@ -220,7 +219,6 @@ final class _IntentionEditorPageState
                 const SizedBox(height: 12),
                 IntentionCreationTags(
                   tags: editor.selectedTags,
-                  missingTagIds: missingTagIds,
                   enabled: !isDraftFixed,
                   onRemove: notifier.removeTag,
                   onRetryObservation: notifier.retryTagObservation,
@@ -247,41 +245,15 @@ final class _IntentionEditorPageState
                   messageKey: const ValueKey('intention-editor-failure'),
                 ),
               ),
-        // Исправление набора и повтор стоят вместе с сохранением и при
-        // нехватке ширины переносятся друг под друга.
         footer: Padding(
           padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
-          child: OverflowBar(
-            alignment: MainAxisAlignment.end,
-            overflowAlignment: OverflowBarAlignment.end,
-            spacing: 8,
-            overflowSpacing: 8,
-            children: [
-              if (missingTagIds.isNotEmpty)
-                // Исправление снимает только теги, отсутствие которых
-                // подтвердил отказ, и не отправляет сохранение. Как и снятие
-                // отдельного тега, оно не уводит фокус из поля ввода.
-                TextFieldTapRegion(
-                  child: OutlinedButton(
-                    key: const ValueKey('intention-editor-remove-missing-tags'),
-                    onPressed: isDraftFixed
-                        ? null
-                        : () => missingTagIds.forEach(notifier.removeTag),
-                    child: Text(
-                      localizations.editorRemoveMissingTags(
-                        missingTagIds.length,
-                      ),
-                    ),
-                  ),
-                ),
-              FilledButton(
-                key: const ValueKey('intention-editor-submit'),
-                onPressed: editor.canSubmit && !_isChoosingTags
-                    ? _submit
-                    : null,
-                child: Text(_submitLabel(localizations, editor)),
-              ),
-            ],
+          child: Align(
+            alignment: AlignmentDirectional.centerEnd,
+            child: FilledButton(
+              key: const ValueKey('intention-editor-submit'),
+              onPressed: editor.canSubmit && !_isChoosingTags ? _submit : null,
+              child: Text(_submitLabel(localizations, editor)),
+            ),
           ),
         ),
       ),
@@ -538,8 +510,8 @@ String _failureMessage(
     (IntentionTextField.description, IntentionTextValidationReason.empty) ||
     (IntentionTextField.titleFilter, _) => localizations.editorInvalidInput,
   },
-  // Объяснение описывает проверку при сохранении; исправление снимает
-  // оставшиеся в черновике отсутствующие теги.
+  // Объяснение описывает проверку при сохранении; отсутствующие теги уже
+  // ушли из черновика.
   IntentionCreationTagsMissingFailure(:final missingTagIds) =>
     localizations.editorCreateTagsMissing(missingTagIds.length),
   IntentionGenericValidationFailure() => localizations.editorInvalidInput,

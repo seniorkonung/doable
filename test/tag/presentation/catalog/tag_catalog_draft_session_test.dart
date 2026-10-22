@@ -40,7 +40,7 @@ void main() {
   final work = _tag(2, 'Работа');
 
   testWidgets(
-    'одно явное добавление даёт одно включение и одно наблюдение проекции, а переименование, изменение только цвета, удаление и одноимённый тег не меняют идентичность в наборе',
+    'одно явное добавление даёт одно включение и одно наблюдение проекции, переименование и изменение только цвета не меняют идентичность в наборе, удаление убирает тег из набора, а одноимённый тег его не заменяет',
     (tester) async {
       final repository = _Repository();
       final draft = _DraftSession(repository);
@@ -162,7 +162,7 @@ void main() {
         isA<IntentionDraftTagAvailable>(),
       );
 
-      // Удаление убирает строку выбора, но не снимает тег из черновика.
+      // Подтверждённое удаление убирает строку выбора и тег из черновика.
       draft.coordinator.acceptTagDelete(DeleteTag(home.id));
       repository.completeCommand(
         TagDeleted(
@@ -182,13 +182,8 @@ void main() {
       expect(_row(home), findsNothing);
       expect(find.text(l10n.tagCatalogNoMatches), findsOneWidget);
       expect(tester.widget<FilledButton>(add).onPressed, isNull);
-      expect(draft.tagSet.current.tagIds, [home.id]);
-      expect(draft.state.selectedTags[home.id]?.name, renamed.name);
-      expect(draft.state.selectedTags[home.id]?.color, TagColor.blue);
-      expect(
-        draft.state.selectedTags[home.id]?.status,
-        isA<IntentionDraftTagMissing>(),
-      );
+      expect(draft.tagSet.current.tagIds, isEmpty);
+      expect(draft.state.selectedTags, isEmpty);
 
       // Новый тег с последним известным названием удалённого — другая
       // идентичность: он доступен для добавления, а не включён.
@@ -220,21 +215,16 @@ void main() {
         findsOneWidget,
       );
       expect(find.text(l10n.tagCatalogInDraft), findsNothing);
-      expect(draft.tagSet.current.tagIds, [home.id]);
-      expect(draft.state.selectedTags.keys, [home.id]);
+      expect(draft.tagSet.current.tagIds, isEmpty);
 
       await tester.tap(_row(namesake));
       await tester.pump();
-      expect(draft.tagSet.current.tagIds, [home.id]);
+      expect(draft.tagSet.current.tagIds, isEmpty);
       await tester.tap(add);
       await tester.pump();
 
-      expect(draft.tagSet.current.tagIds, [home.id, namesake.id]);
-      expect(draft.state.selectedTags.keys, [home.id, namesake.id]);
-      expect(
-        draft.state.selectedTags[home.id]?.status,
-        isA<IntentionDraftTagMissing>(),
-      );
+      expect(draft.tagSet.current.tagIds, [namesake.id]);
+      expect(draft.state.selectedTags.keys, [namesake.id]);
       expect(draft.state.selectedTags[namesake.id]?.name, namesake.name);
       expect(_status(namesake, l10n.tagCatalogInDraft), findsOneWidget);
 

@@ -431,8 +431,8 @@ void main() {
         await tester.pumpAndSettle();
         expect(_traversal(tester), _panel(l10n, tags: tags));
 
-        // Удалённый тег назван в своём элементе, а исправление объявлено
-        // рядом с сообщением и сохранением.
+        // Удалённый тег уходит из черновика, объяснение объявлено рядом с
+        // сохранением, а сохранение снова доступно.
         tester.semantics.tap(find.semantics.byLabel(l10n.editorSaveAction));
         await tester.pump();
         repository.completeCommand(
@@ -441,22 +441,21 @@ void main() {
         );
         await tester.pumpAndSettle();
         final missingMessage = l10n.editorCreateTagsMissing(1);
-        final removeMissing = l10n.editorRemoveMissingTags(1);
-        final withMissingTag = _panel(l10n, tags: tags);
-        withMissingTag[withMissingTag.indexOf('Дом')] =
-            'Дом\n${l10n.editorDraftTagMissing}';
-        withMissingTag.insertAll(withMissingTag.length - 1, [
-          missingMessage,
-          removeMissing,
-        ]);
-        expect(_traversal(tester), withMissingTag);
+        final withoutMissingTag = _panel(l10n, tags: ['Работа']);
+        withoutMissingTag.insert(withoutMissingTag.length - 1, missingMessage);
+        expect(_traversal(tester), withoutMissingTag);
         expect(
           tester.getSemantics(find.byKey(_failure)),
           isSemantics(label: missingMessage, isLiveRegion: true),
         );
-        tester.semantics.tap(find.semantics.byLabel(removeMissing));
-        await tester.pumpAndSettle();
-        expect(_traversal(tester), _panel(l10n, tags: ['Работа']));
+        expect(
+          tester.getSemantics(find.byKey(_submit)),
+          isSemantics(
+            label: l10n.editorSaveAction,
+            isEnabled: true,
+            hasTapAction: true,
+          ),
+        );
         expect(repository.commands, hasLength(2));
 
         // Устранимый отказ предлагает повтор тем же действием.
@@ -736,10 +735,8 @@ void main() {
           ResultFailure(IntentionCreationTagsMissingFailure([_home.id])),
         );
         await tester.pumpAndSettle();
-        await _expectGuidelines(tester, 'удалённый тег и исправление');
+        await _expectGuidelines(tester, 'отказ из-за удалённого тега');
 
-        await tester.tap(find.byKey(_removeMissing));
-        await tester.pumpAndSettle();
         await tester.tap(find.byKey(_submit));
         await tester.pump();
         repository.completeCommand(
@@ -762,7 +759,6 @@ const _chooseTags = ValueKey('intention-editor-choose-tags');
 const _readiness = ValueKey('intention-editor-readiness');
 const _submit = ValueKey('intention-editor-submit');
 const _failure = ValueKey('intention-editor-failure');
-const _removeMissing = ValueKey('intention-editor-remove-missing-tags');
 const _closeButton = ValueKey('intention-editor-close');
 const _readinessConfirmation = ValueKey(
   'intention-editor-readiness-confirmation',

@@ -18,6 +18,7 @@ import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
+import 'package:doable/src/tag/domain/tag_position.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -691,61 +692,58 @@ void main() {
   });
 
   group('восстановление после отказа', () {
-    test(
-      'любой отказ сохраняет весь сырой черновик без нормализации и сброса',
-      () async {
-        for (final (name, failure) in _failureCases()) {
-          final session = await _failedFullDraftSession(failure);
-          final failed = session.state;
+    test('любой отказ сохраняет весь сырой черновик без нормализации и сброса, '
+        'кроме отсутствующих тегов', () async {
+      for (final (name, failure) in _failureCases()) {
+        final session = await _failedFullDraftSession(failure);
+        final failed = session.state;
+        // Отсутствующие теги уходят из набора вместе с отказом.
+        final missing = switch (failure) {
+          IntentionCreationTagsMissingFailure(:final missingTagIds) =>
+            missingTagIds,
+          _ => const <TagId>{},
+        };
+        final tagIds = [
+          for (final id in [_tagId(1), _tagId(2)])
+            if (!missing.contains(id)) id,
+        ];
 
-          expect(failed.event, isNull, reason: name);
-          expect(failed.draft.title, _rawTitle, reason: name);
-          expect(failed.draft.description, _rawDescription, reason: name);
-          expect(failed.draft.tagIds, [_tagId(1), _tagId(2)], reason: name);
-          expect(
-            failed.draft.readiness,
-            IntentionReadiness.ready,
-            reason: name,
-          );
-          expect(_tagNames(failed), {
-            _tagId(1): 'Дом',
-            _tagId(2): 'Выходные',
-          }, reason: name);
-          expect(
-            failed.operation,
-            isA<OperationFailed<Intention>>().having(
-              (operation) => operation.failure.runtimeType,
-              'вид отказа',
-              failure.runtimeType,
-            ),
-            reason: name,
-          );
-          expect(
-            failed.draftAvailability,
-            IntentionDraftAvailability.editable,
-            reason: name,
-          );
-          expect(session.editor.draftTagSet.current.tagIds, [
-            _tagId(1),
-            _tagId(2),
-          ], reason: name);
-          expect(failed.failurePresentation, isNotNull, reason: name);
-          expect(session.repository.commands, hasLength(1), reason: name);
-          expect(session.repository.tagCommands, isEmpty, reason: name);
-        }
-      },
-    );
+        expect(failed.event, isNull, reason: name);
+        expect(failed.draft.title, _rawTitle, reason: name);
+        expect(failed.draft.description, _rawDescription, reason: name);
+        expect(failed.draft.tagIds, tagIds, reason: name);
+        expect(failed.draft.readiness, IntentionReadiness.ready, reason: name);
+        expect(failed.selectedTags.keys, tagIds, reason: name);
+        expect(
+          failed.operation,
+          isA<OperationFailed<Intention>>().having(
+            (operation) => operation.failure.runtimeType,
+            'вид отказа',
+            failure.runtimeType,
+          ),
+          reason: name,
+        );
+        expect(
+          failed.draftAvailability,
+          IntentionDraftAvailability.editable,
+          reason: name,
+        );
+        expect(session.editor.draftTagSet.current.tagIds, tagIds, reason: name);
+        expect(failed.failurePresentation, isNotNull, reason: name);
+        expect(session.repository.commands, hasLength(1), reason: name);
+        expect(session.repository.tagCommands, isEmpty, reason: name);
+      }
+    });
 
     test('правка снимает отказ только по его типизированной причине и не отправляет черновик сама', () async {
       final edits = <String, void Function(IntentionEditorViewModel)>{
         'название': (editor) => editor.changeTitle('Исправленное название'),
         'описание': (editor) => editor.changeDescription('Исправленное'),
-        // Снятие доступного тега меняет набор так же, как добавление.
         'добавление нового тега': (editor) =>
             editor.draftTagSet.add(_tag(3, 'Спорт')),
         'повторное добавление включённого тега с новым названием': (editor) =>
-            editor.draftTagSet.add(_tag(1, 'Быт')),
-        'снятие отсутствующего тега': (editor) => editor.removeTag(_tagId(1)),
+            editor.draftTagSet.add(_tag(2, 'Отдых')),
+        'снятие тега': (editor) => editor.removeTag(_tagId(2)),
         'готовность': (editor) => editor.disableReadiness(),
       };
       _Recovery expected(IntentionFailure failure, String edit) =>
@@ -766,9 +764,9 @@ void main() {
                   ? _Recovery.correctable
                   : _Recovery.blocked,
             IntentionCreationTagsMissingFailure() =>
-              edit == 'снятие отсутствующего тега'
+              edit == 'добавление нового тега' || edit == 'снятие тега'
                   ? _Recovery.correctable
-                  : _Recovery.blocked,
+                  : _Recovery.resubmittable,
             IntentionUnavailableFailure() => _Recovery.retryable,
             IntentionNotFoundFailure() ||
             IntentionConflictFailure() ||
@@ -804,6 +802,11 @@ void main() {
               expect(edited.canRetry, isTrue, reason: reason);
               expect(edited.canSubmit, isTrue, reason: reason);
               _expectFailureKeptByForm(session, surface, reason: reason);
+            case _Recovery.resubmittable:
+              expect(edited.operation, isA<OperationFailed<Intention>>());
+              expect(edited.canRetry, isFalse, reason: reason);
+              expect(edited.canSubmit, isTrue, reason: reason);
+              _expectFailureKeptByForm(session, surface, reason: reason);
             case _Recovery.blocked:
               expect(edited.operation, isA<OperationFailed<Intention>>());
               expect(edited.canRetry, isFalse, reason: reason);
@@ -816,64 +819,31 @@ void main() {
       }
     });
 
-    test('отказ отсутствующих тегов сохраняет точные идентификаторы и разрешает новую проверку только после явного снятия каждого из них', () async {
-      final missing = IntentionCreationTagsMissingFailure([
-        _tagId(1),
-        _tagId(3),
-      ]);
+    test('отказ отсутствующих тегов сам убирает их из набора, сохраняет остальные данные черновика и разрешает только явную новую отправку', () async {
       final session = await _failedFullDraftSession(
-        missing,
+        IntentionCreationTagsMissingFailure([_tagId(1), _tagId(3)]),
         tags: [_tag(1, 'Дом'), _tag(2, 'Выходные'), _tag(3, 'Спорт')],
       );
       final editor = session.editor;
-      expect(session.state.missingTagIds, {_tagId(1), _tagId(3)});
 
-      // Одноимённый новый тег не заменяет отсутствующий.
+      final failed = session.state;
+      expect(failed.draft.tagIds, [_tagId(2)]);
+      expect(_tagNames(failed), {_tagId(2): 'Выходные'});
+      expect(failed.draft.title, _rawTitle);
+      expect(failed.draft.description, _rawDescription);
+      expect(failed.draft.readiness, IntentionReadiness.ready);
       expect(
-        editor.draftTagSet.add(_tag(4, 'Дом')),
-        IntentionDraftTagAddition.added,
-      );
-      expect(
-        editor.draftTagSet.add(_tag(1, 'Быт')),
-        IntentionDraftTagAddition.alreadyIncluded,
-      );
-      editor
-        ..removeTag(_tagId(2))
-        ..changeTitle('Другое название');
-      await _deliverEvents(session.container);
-
-      expect(session.state.draft.tagIds, [_tagId(1), _tagId(3), _tagId(4)]);
-      expect(session.state.canSubmit, isFalse);
-      expect(session.state.missingTagIds, {_tagId(1), _tagId(3)});
-      expect(session.state.failurePresentation, isNotNull);
-
-      editor.removeTag(_tagId(1));
-      await _deliverEvents(session.container);
-
-      expect(session.state.canSubmit, isFalse);
-      expect(session.state.missingTagIds, {_tagId(3)});
-      expect(
-        session.state.operation,
+        failed.operation,
         isA<OperationFailed<Intention>>().having(
           (operation) => operation.failure,
           'отказ',
-          isA<IntentionCreationTagsMissingFailure>().having(
-            (failure) => failure.missingTagIds,
-            'точные отсутствующие теги',
-            {_tagId(1), _tagId(3)},
-          ),
+          isA<IntentionCreationTagsMissingFailure>(),
         ),
       );
-      editor.submit();
-      expect(session.repository.commands, hasLength(1));
-
-      editor.removeTag(_tagId(3));
-      await _deliverEvents(session.container);
-
-      expect(session.state.operation, isA<OperationIdle<Intention>>());
-      expect(session.state.canSubmit, isTrue);
-      expect(session.state.missingTagIds, isEmpty);
-      expect(session.state.failurePresentation, isNull);
+      expect(failed.failurePresentation, isNotNull);
+      expect(failed.canSubmit, isTrue);
+      expect(editor.draftTagSet.current.tagIds, [_tagId(2)]);
+      // Отказ не повторяет отправку сам.
       expect(session.repository.commands, hasLength(1));
 
       editor.submit();
@@ -882,13 +852,13 @@ void main() {
       expect(
         session.repository.commands.last,
         isA<CreateIntention>()
-            .having((command) => command.title, 'название', 'Другое название')
+            .having((command) => command.title, 'название', _rawTitle)
             .having(
               (command) => command.description,
               'описание',
               _rawDescription,
             )
-            .having((command) => command.tagIds, 'теги', {_tagId(4)})
+            .having((command) => command.tagIds, 'теги', {_tagId(2)})
             .having(
               (command) => command.readiness,
               'готовность',
@@ -1052,17 +1022,16 @@ void main() {
       await _deliverEvents(container);
 
       final firstFailed = container.read(firstProvider);
-      expect(firstFailed.missingTagIds, {_tagId(1)});
       expect(firstFailed.failurePresentation, isNotNull);
       expect(firstFailed.draft.title, 'Первое');
       expect(firstFailed.draft.description, 'Описание первого');
-      expect(firstFailed.draft.tagIds, [_tagId(1)]);
+      expect(firstFailed.draft.tagIds, isEmpty);
       expect(firstFailed.draft.readiness, IntentionReadiness.ready);
-      // Отказ первой сессии не помечает тот же тег отсутствующим во второй
-      // и не снимает фиксацию её принятой отправки.
+      // Отказ первой сессии не убирает тот же тег из набора второй и не
+      // снимает фиксацию её принятой отправки.
       final secondRunning = container.read(secondProvider);
       expect(secondRunning.operation, isA<OperationRunning<Intention>>());
-      expect(secondRunning.missingTagIds, isEmpty);
+      expect(secondRunning.draft.tagIds, [_tagId(2), _tagId(1)]);
       expect(secondRunning.failurePresentation, isNull);
       expect(
         second.draftTagSet.current.availability,
@@ -1079,14 +1048,14 @@ void main() {
         second.draftTagSet.current.availability,
         IntentionDraftAvailability.closed,
       );
-      expect(container.read(firstProvider).missingTagIds, {_tagId(1)});
+      expect(container.read(firstProvider).draft.tagIds, isEmpty);
       expect(
         first.draftTagSet.current.availability,
         IntentionDraftAvailability.editable,
       );
       expect(firstPublished.map((snapshot) => snapshot.tagIds), [
         [_tagId(1)],
-        [_tagId(1)],
+        isEmpty,
       ]);
       expect(firstPublished.map((snapshot) => snapshot.availability), [
         IntentionDraftAvailability.submitting,
@@ -1114,7 +1083,52 @@ void main() {
   });
 
   group('проекция выбранных тегов', () {
-    test('подтверждённое отсутствие сохраняет идентификатор, последние название и цвет до явного снятия и не подменяется одноимённым тегом', () async {
+    test('подтверждённое удаление выбранного тега убирает из набора только его и освобождает его наблюдение', () async {
+      final watches = _TagWatches();
+      final repository = ControlledCatalogRepository()
+        ..tagObservations = watches.watch;
+      final container = _container(repository);
+      final provider = intentionEditorViewModelProvider(
+        IntentionCreationFormKey(),
+      );
+      final subscription = container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      final editor = container.read(provider.notifier)
+        ..changeTitle('Намерение')
+        ..confirmReadiness();
+      editor.draftTagSet
+        ..add(_tag(1, 'Дом'))
+        ..add(_tag(2, 'Работа'));
+      await _deliverEvents(container);
+
+      final deletedWatch = watches.single(_tagId(1))
+        ..observe(_tag(1, 'Быт'), revision: 2)
+        ..observe(null, revision: 3);
+      await _deliverEvents(container);
+
+      final kept = container.read(provider);
+      expect(kept.draft.tagIds, [_tagId(2)]);
+      expect(_tagNames(kept), {_tagId(2): 'Работа'});
+      expect(kept.draft.title, 'Намерение');
+      expect(kept.draft.readiness, IntentionReadiness.ready);
+      expect(kept.operation, isA<OperationIdle<Intention>>());
+      expect(editor.draftTagSet.current.tagIds, [_tagId(2)]);
+      expect(deletedWatch.isReleased, isTrue);
+      expect(watches.single(_tagId(2)).isReleased, isFalse);
+
+      editor.submit();
+
+      expect(
+        repository.commands.single,
+        isA<CreateIntention>().having((command) => command.tagIds, 'теги', {
+          _tagId(2),
+        }),
+      );
+      repository.completeCommand(0, _savedResult());
+      await _settle(container);
+    });
+
+    test('удаление, подтверждённое во время отправки, убирает тег из набора после её отказа', () async {
       final watches = _TagWatches();
       final repository = ControlledCatalogRepository()
         ..tagObservations = watches.watch;
@@ -1126,45 +1140,67 @@ void main() {
       addTearDown(subscription.close);
       final editor = container.read(provider.notifier)
         ..changeTitle('Намерение');
-      editor.draftTagSet.add(_tag(1, 'Дом'));
-      await _deliverEvents(container);
-      final deletedWatch = watches.single(_tagId(1))
-        ..observe(_tag(1, 'Быт', color: TagColor.blue), revision: 2)
-        ..observe(null, revision: 3);
+      editor.draftTagSet
+        ..add(_tag(1, 'Дом'))
+        ..add(_tag(2, 'Работа'));
       await _deliverEvents(container);
 
-      final missing = container.read(provider);
-      expect(missing.draft.tagIds, [_tagId(1)]);
-      expect(_tagNames(missing), {_tagId(1): 'Быт'});
-      expect(_tagColors(missing), {_tagId(1): TagColor.blue});
-      expect(_tagStatus(missing, 1), isA<IntentionDraftTagMissing>());
-      // Отсутствие в проекции не заменяет транзакционную проверку при
-      // сохранении и само не блокирует отправку.
-      expect(missing.operation, isA<OperationIdle<Intention>>());
-      expect(missing.canSubmit, isTrue);
+      editor.submit();
+      watches.single(_tagId(1)).observe(null, revision: 2);
+      await _deliverEvents(container);
 
-      expect(
-        editor.draftTagSet.add(_tag(4, 'Быт')),
-        IntentionDraftTagAddition.added,
+      // До результата черновик зафиксирован.
+      expect(container.read(provider).draft.tagIds, [_tagId(1), _tagId(2)]);
+
+      repository.completeCommand(
+        0,
+        const ResultFailure(IntentionUnavailableFailure()),
       );
-      watches.single(_tagId(4)).observe(_tag(4, 'Быт'), revision: 4);
-      // Окончание наблюдения после подтверждённого отсутствия сохраняет его.
-      deletedWatch.end();
       await _deliverEvents(container);
 
-      final withReplacement = container.read(provider);
-      expect(withReplacement.draft.tagIds, [_tagId(1), _tagId(4)]);
-      expect(_tagNames(withReplacement), {_tagId(1): 'Быт', _tagId(4): 'Быт'});
-      expect(_tagStatus(withReplacement, 1), isA<IntentionDraftTagMissing>());
-      expect(_tagStatus(withReplacement, 4), isA<IntentionDraftTagAvailable>());
+      final failed = container.read(provider);
+      expect(failed.draft.tagIds, [_tagId(2)]);
+      expect(_tagNames(failed), {_tagId(2): 'Работа'});
+      expect(failed.operation, isA<OperationFailed<Intention>>());
+      expect(failed.canRetry, isTrue);
+      expect(watches.single(_tagId(1)).isReleased, isTrue);
+    });
 
-      editor.removeTag(_tagId(1));
+    test('выбранные теги показываются в ручном порядке, а перестановка меняет только показ', () async {
+      final watches = _TagWatches();
+      final repository = ControlledCatalogRepository()
+        ..tagObservations = watches.watch;
+      final container = _container(repository);
+      final provider = intentionEditorViewModelProvider(
+        IntentionCreationFormKey(),
+      );
+      final subscription = container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      final tagSet = container.read(provider.notifier).draftTagSet
+        ..add(_tag(3, 'Спорт'))
+        ..add(_tag(1, 'Дом'))
+        ..add(_tag(2, 'Работа'));
+      await _deliverEvents(container);
 
-      final corrected = container.read(provider);
-      expect(corrected.draft.tagIds, [_tagId(4)]);
-      expect(_tagNames(corrected), {_tagId(4): 'Быт'});
+      final added = container.read(provider);
+      expect(added.selectedTags.keys, [_tagId(1), _tagId(2), _tagId(3)]);
+      expect(added.draft.tagIds, [_tagId(3), _tagId(1), _tagId(2)]);
+      final published = <IntentionDraftTagSetSnapshot>[];
+      final changesSubscription = tagSet.changes.listen(published.add);
+      addTearDown(changesSubscription.cancel);
+
+      // «Спорт» переставлен в начало ручного порядка.
+      watches
+          .single(_tagId(3))
+          .observe(_tag(3, 'Спорт', position: tagPositionAt(0)), revision: 2);
+      await _deliverEvents(container);
+
+      final moved = container.read(provider);
+      expect(moved.selectedTags.keys, [_tagId(3), _tagId(1), _tagId(2)]);
+      expect(moved.draft.tagIds, same(added.draft.tagIds));
+      expect(moved.draft.isChanged, isTrue);
+      expect(published, isEmpty);
       expect(repository.commands, isEmpty);
-      expect(repository.tagCommands, isEmpty);
     });
 
     test('загрузка и типизированный отказ чтения отличаются от удаления, а повтор наблюдения доступен только после устранимого отказа', () async {
@@ -1788,7 +1824,7 @@ void main() {
               (
                 'отсутствующий тег',
                 IntentionCreationTagsMissingFailure([_tagId(1)]),
-                (editor) => editor.removeTag(_tagId(1)),
+                (editor) => editor.removeTag(_tagId(2)),
               ),
             ];
         for (final (name, failure, correct) in corrections) {
@@ -1939,6 +1975,10 @@ enum _Recovery {
 
   /// Причина устранима повтором: явная отправка остаётся доступной.
   retryable,
+
+  /// Отказ сам устранил причину: объяснение остаётся, а новая явная
+  /// отправка доступна.
+  resubmittable,
 
   /// Причина не устранена: отправка недоступна.
   blocked,
@@ -2116,12 +2156,13 @@ TagId _tagId(int number) => switch (TagId.decode(
   InvalidTagIdDecoding() => throw StateError('Некорректный UUID тега.'),
 };
 
-Tag _tag(int number, String name, {TagColor? color}) => Tag(
-  id: _tagId(number),
-  name: TagName.fromInput(name),
-  color: color,
-  position: tagPositionAt(number),
-);
+Tag _tag(int number, String name, {TagColor? color, TagPosition? position}) =>
+    Tag(
+      id: _tagId(number),
+      name: TagName.fromInput(name),
+      color: color,
+      position: position ?? tagPositionAt(number),
+    );
 
 Map<TagId, String> _tagNames(IntentionEditorState state) =>
     state.selectedTags.map((id, tag) => MapEntry(id, tag.name.value));

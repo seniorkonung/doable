@@ -48,8 +48,10 @@ part 'intention_editor_view_model.g.dart';
 ///
 /// Проекцию выбранных тегов сессия поддерживает собственным наблюдением
 /// `watchTag` каждого выбранного идентификатора. Наблюдение меняет только
-/// проекцию, не отправляет команд графа и освобождается при снятии тега и
-/// завершении сессии.
+/// проекцию, не отправляет команд графа и освобождается, когда тег уходит из
+/// набора, и при завершении сессии. Тег, отсутствие которого подтвердило
+/// наблюдение, уходит из набора; во время отправки — после её результата,
+/// потому что до него черновик зафиксирован.
 @riverpod
 final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
   late GraphCommandCoordinator _coordinator;
@@ -61,6 +63,10 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
   /// Право ошибки, которое публикует текущее состояние сессии.
   GraphInitiatorPresentationClaim? _publishedFailureClaim;
   final _tagObservations = <TagId, _DraftTagObservation>{};
+
+  /// Выбранные теги, отсутствие которых наблюдение подтвердило во время
+  /// отправки; они уходят из набора после её результата.
+  final _tagsDeletedDuringSubmission = <TagId>{};
   var _tagObservationGeneration = 0;
 
   @override
@@ -85,6 +91,7 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
               previous.draftAvailability != next.draftAvailability) {
             draftTagSet._publish(next.draftTagSet);
           }
+          _releaseTagObservationsOutside(next.draft.tagIds);
         case IntentionDraftAvailability.closed:
           draftTagSet._close();
           _releaseTagObservations();
@@ -120,7 +127,6 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
   void removeTag(TagId id) {
     if (_acceptsDraftChanges && state.draft.tagIds.contains(id)) {
       state = state.withoutTag(id);
-      _releaseTagObservation(id);
     }
   }
 
@@ -281,6 +287,7 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
           failurePresentation: _claimFailure(completion.token),
         ),
       };
+      _removeTagsDeletedDuringSubmission();
     } on Object {
       // Закрытая по запросу сессия уже передала результат общей поверхности.
       if (!ref.mounted || state.closing is IntentionCreationClosedOnRequest) {
@@ -294,7 +301,15 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
       state = state.withOperation(
         const OperationFailed<Intention>(IntentionUnexpectedFailure()),
       );
+      _removeTagsDeletedDuringSubmission();
     }
+  }
+
+  void _removeTagsDeletedDuringSubmission() {
+    if (_acceptsDraftChanges) {
+      state = state.withoutDeletedTags(_tagsDeletedDuringSubmission);
+    }
+    _tagsDeletedDuringSubmission.clear();
   }
 
   /// Завершает сессию по запросу закрытия, не отменяя принятую отправку.
@@ -419,28 +434,40 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
         observation.revision = value.revision;
         // Новая ревизия без изменения тега не публикует проекцию заново.
         switch ((observed, tag.status)) {
-          case (null, IntentionDraftTagMissing()):
-            return;
-          case (final Tag current, IntentionDraftTagAvailable())
-              when current.name == tag.name && current.color == tag.color:
-            return;
           case (null, _):
-            state = state.withSelectedTag(
-              id,
-              tag.withStatus(const IntentionDraftTagMissing()),
-            );
+            _tagDeleted(id);
+          case (final Tag current, IntentionDraftTagAvailable())
+              when current.name == tag.name &&
+                  current.color == tag.color &&
+                  current.position == tag.position:
+            return;
           case (final Tag current, _):
             state = state.withSelectedTag(
               id,
               IntentionDraftTag(
                 name: current.name,
                 color: current.color,
+                position: current.position,
                 status: const IntentionDraftTagAvailable(),
               ),
             );
         }
       case TagReadError(:final failure):
         _tagObservationFailed(id, generation, failure);
+    }
+  }
+
+  /// Удалённый тег не возвращается с прежним идентификатором, поэтому
+  /// наблюдение больше не нужно, а тег уходит из набора.
+  void _tagDeleted(TagId id) {
+    switch (state.draftAvailability) {
+      case IntentionDraftAvailability.editable:
+        state = state.withoutDeletedTags({id});
+      case IntentionDraftAvailability.submitting:
+        _releaseTagObservation(id);
+        _tagsDeletedDuringSubmission.add(id);
+      case IntentionDraftAvailability.closed:
+        return;
     }
   }
 
@@ -459,8 +486,7 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
     );
   }
 
-  /// Подтверждённое отсутствие окончательно и переживает окончание потока;
-  /// иное окончание без установленной причины — неизвестный отказ.
+  /// Окончание без установленной причины — неизвестный отказ.
   void _tagObservationEnded(TagId id, int generation) {
     final observation = _activeTagObservation(id, generation);
     final tag = state.selectedTags[id];
@@ -468,7 +494,7 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
       return;
     }
     switch (tag.status) {
-      case IntentionDraftTagMissing() || IntentionDraftTagReadFailed():
+      case IntentionDraftTagReadFailed():
         observation.release();
       case IntentionDraftTagLoading() || IntentionDraftTagAvailable():
         _tagObservationFailed(id, generation, const TagReadUnexpectedFailure());
@@ -490,6 +516,14 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
 
   void _releaseTagObservation(TagId id) =>
       _tagObservations.remove(id)?.release();
+
+  void _releaseTagObservationsOutside(Set<TagId> tagIds) {
+    for (final id in [..._tagObservations.keys]) {
+      if (!tagIds.contains(id)) {
+        _releaseTagObservation(id);
+      }
+    }
+  }
 
   void _releaseTagObservations() {
     for (final observation in _tagObservations.values) {

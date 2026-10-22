@@ -1131,9 +1131,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get editorDraftTagChecking => 'Checking tag';
 
   @override
-  String get editorDraftTagMissing => 'Tag deleted';
-
-  @override
   String get editorDraftTagReadUnavailable => 'Couldn\'t check tag';
 
   @override
@@ -1154,19 +1151,8 @@ class AppLocalizationsEn extends AppLocalizations {
       count,
       locale: localeName,
       other:
-          '$count selected tags were deleted from the catalog. Remove them from the draft to save the intention.',
-      one: 'A selected tag was deleted from the catalog. Remove it from the draft to save the intention.',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String editorRemoveMissingTags(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'Remove deleted tags',
-      one: 'Remove deleted tag',
+          '$count selected tags were deleted from the catalog and removed from the draft. Save the intention again.',
+      one: 'A selected tag was deleted from the catalog and removed from the draft. Save the intention again.',
     );
     return '$_temp0';
   }

@@ -1137,9 +1137,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get editorDraftTagChecking => 'Проверяем тег';
 
   @override
-  String get editorDraftTagMissing => 'Тег удалён';
-
-  @override
   String get editorDraftTagReadUnavailable => 'Не удалось проверить тег';
 
   @override
@@ -1160,19 +1157,8 @@ class AppLocalizationsRu extends AppLocalizations {
       count,
       locale: localeName,
       other:
-          'Удалено из каталога выбранных тегов: $count. Уберите их из черновика, чтобы сохранить намерение.',
-      one: 'Выбранный тег удалён из каталога. Уберите его из черновика, чтобы сохранить намерение.',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String editorRemoveMissingTags(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'Убрать удалённые теги',
-      one: 'Убрать удалённый тег',
+          'Удалено из каталога выбранных тегов: $count. Они убраны из черновика. Сохраните намерение ещё раз.',
+      one: 'Выбранный тег удалён из каталога и убран из черновика. Сохраните намерение ещё раз.',
     );
     return '$_temp0';
   }
