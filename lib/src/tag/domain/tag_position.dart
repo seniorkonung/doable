@@ -33,25 +33,17 @@ final class TagPosition {
     return TagPositionDecodingSuccess(TagPosition._(serialized));
   }
 
-  /// Место тега, который становится первым: начальное в пустом каталоге,
-  /// иначе строго перед [currentFirst].
-  static TagPosition first(TagPosition? currentFirst) {
-    if (currentFirst == null) return const TagPosition._(_initial);
-
-    final key = currentFirst.value;
-    final integer = key.substring(0, _integerLength(key.codeUnitAt(0))!);
-    final fraction = key.substring(integer.length);
-    // Каноническая форма исключает наименьшую целую часть без дробной.
-    if (integer == _smallestInteger) {
-      return TagPosition._(integer + _fractionBelow(fraction));
+  /// Место строго между [before] и [after], где [before] меньше [after].
+  ///
+  /// Без [before] место встаёт перед [after], без [after] — после [before],
+  /// без обеих сторон это начальное место пустого каталога.
+  static TagPosition between(TagPosition? before, TagPosition? after) {
+    if (before != null &&
+        after != null &&
+        before.value.compareTo(after.value) >= 0) {
+      throw ArgumentError('Место ${before.value} не меньше ${after.value}');
     }
-    if (fraction.isNotEmpty) return TagPosition._(integer);
-
-    final decremented = _decrementInteger(integer);
-    if (decremented == _smallestInteger) {
-      return TagPosition._(decremented + _midDigit);
-    }
-    return TagPosition._(decremented);
+    return TagPosition._(_keyBetween(before?.value, after?.value));
   }
 
   @override
@@ -77,17 +69,97 @@ final class TagPosition {
     return null;
   }
 
-  /// Дробная часть строго меньше непустой [fraction] без завершающего нуля.
-  static String _fractionBelow(String fraction) {
-    var zeros = 0;
-    while (fraction[zeros] == _zero) {
-      zeros++;
+  static String _keyBetween(String? before, String? after) {
+    if (before == null) {
+      if (after == null) return _initial;
+      final (integer, fraction) = _split(after);
+      // Каноническая форма исключает наименьшую целую часть без дробной.
+      if (integer == _smallestInteger) {
+        return integer + _midpoint('', fraction);
+      }
+      if (fraction.isNotEmpty) return integer;
+      final decremented = _decrementInteger(integer);
+      if (decremented == _smallestInteger) return decremented + _midDigit;
+      return decremented;
     }
-    final prefix = fraction.substring(0, zeros);
-    final digit = _digits.indexOf(fraction[zeros]);
-    if (digit > 1) return prefix + _digits[(digit + 1) ~/ 2];
-    if (fraction.length > zeros + 1) return prefix + fraction[zeros];
-    return '$prefix$_zero$_midDigit';
+
+    final (integer, fraction) = _split(before);
+    if (after != null) {
+      final (afterInteger, afterFraction) = _split(after);
+      if (integer == afterInteger) {
+        return integer + _midpoint(fraction, afterFraction);
+      }
+    }
+    // Следующая целая часть подходит, если она меньше [after]; после
+    // наибольшей целой части место есть только в дробной.
+    final incremented = _incrementInteger(integer);
+    if (incremented != null &&
+        (after == null || incremented.compareTo(after) < 0)) {
+      return incremented;
+    }
+    return integer + _midpoint(fraction, null);
+  }
+
+  /// Целая часть с префиксом и дробная часть канонического [key].
+  static (String, String) _split(String key) {
+    final integerLength = _integerLength(key.codeUnitAt(0))!;
+    return (key.substring(0, integerLength), key.substring(integerLength));
+  }
+
+  /// Дробная часть строго между [lower] и [upper] без завершающего нуля;
+  /// `null` в [upper] — без верхней границы. Обе части без завершающего нуля,
+  /// [lower] меньше [upper].
+  static String _midpoint(String lower, String? upper) {
+    if (upper != null) {
+      // [lower] дополняется нулями: завершающие нули не меняют дробь.
+      var common = 0;
+      while ((common < lower.length ? lower[common] : _zero) == upper[common]) {
+        common++;
+      }
+      if (common > 0) {
+        return upper.substring(0, common) +
+            _midpoint(
+              common < lower.length ? lower.substring(common) : '',
+              upper.substring(common),
+            );
+      }
+    }
+
+    final lowerDigit = lower.isEmpty ? 0 : _digits.indexOf(lower[0]);
+    final upperDigit = upper == null
+        ? _digits.length
+        : _digits.indexOf(upper[0]);
+    if (upperDigit - lowerDigit > 1) {
+      return _digits[(lowerDigit + upperDigit + 1) ~/ 2];
+    }
+    if (upper != null && upper.length > 1) return upper[0];
+    return _digits[lowerDigit] +
+        _midpoint(lower.isEmpty ? '' : lower.substring(1), null);
+  }
+
+  /// Следующая целая часть; `null` — [integer] наибольшая.
+  static String? _incrementInteger(String integer) {
+    final head = integer.codeUnitAt(0);
+    final digits = integer.substring(1).split('');
+    for (var index = digits.length - 1; index >= 0; index--) {
+      final digit = _digits.indexOf(digits[index]);
+      if (digit < _digits.length - 1) {
+        digits[index] = _digits[digit + 1];
+        return String.fromCharCode(head) + digits.join();
+      }
+      digits[index] = _zero;
+    }
+
+    // Все цифры были наибольшими: переход к следующему префиксу длины.
+    if (head == _upperZ) return 'a$_zero';
+    if (head == _lowerZ) return null;
+    final nextHead = head + 1;
+    if (nextHead > _lowerA) {
+      digits.add(_zero);
+    } else {
+      digits.removeLast();
+    }
+    return String.fromCharCode(nextHead) + digits.join();
   }
 
   /// Предыдущая целая часть; [integer] не равна наименьшей.

@@ -77,7 +77,7 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
   }) async {
     // Новый тег встаёт первым. Текущий первый читается в транзакции записи,
     // поэтому другая запись не может занять вычисленный ключ.
-    final position = TagPosition.first(await _findFirstTagPosition());
+    final position = TagPosition.between(null, await _findFirstTagPosition());
     onStage(TagCommandDiagnosticsStage.write);
     final id = _tagIdGenerator.generate();
     await _database
