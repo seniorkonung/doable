@@ -41,7 +41,7 @@
   - **Предполагаемые файлы:** `lib/src/data/local/app_database.dart`, `lib/src/data/local/migrations/migration_strategy.dart`, `drift_schemas/drift_schema_v5.json` (новый), `drift_schemas/drift_schema_v4.json` (удаляется), `test/data/local/bootstrap/local_data_bootstrap_test.dart`, `README.md`.
   - **Размер:** S.
 
-- [ ] 1.4 Отклонять при чтении файл или снимок, в секции тегов которого повторяется место, как повреждение формата
+- [x] 1.4 Отклонять при чтении файл или снимок, в секции тегов которого повторяется место, как повреждение формата
   - **Критерии приёмки:**
     - Чтение записей файла или снимка с повторяющимся местом в секции тегов завершается `GraphFormatCorruption` до замены графа по решению 4 дизайна; ограничение `UNIQUE` при замене остаётся последней защитой.
   - **Проверка:**

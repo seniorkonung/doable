@@ -219,6 +219,11 @@ void main() {
           lines[1],
         ]),
         'удаление сущности': file([...lines.take(lines.length - 1), deletion]),
+        'повторённое место тега': file([
+          ...lines.take(2),
+          lines[2].replaceFirst('"position":"a0V"', '"position":"a1"'),
+          ...lines.skip(3),
+        ]),
         'намерения не по возрастанию времени создания': file([
           ...lines.take(3),
           lines[4],
