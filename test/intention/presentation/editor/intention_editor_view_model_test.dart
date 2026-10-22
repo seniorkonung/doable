@@ -13,6 +13,7 @@ import 'package:doable/src/intention/presentation/editor/intention_editor_view_m
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
 import 'package:doable/src/intention/presentation/operation/operation_state.dart';
+import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_color.dart';
@@ -22,6 +23,8 @@ import 'package:doable/src/tag/domain/tag_position.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../catalog/catalog_reconciliation_test_support.dart'
+    show tagDeletionSuccess;
 import '../catalog/catalog_test_support.dart';
 import '../../../support/tag_positions.dart';
 
@@ -1166,6 +1169,111 @@ void main() {
       expect(watches.single(_tagId(1)).isReleased, isTrue);
     });
 
+    test('пакет с удалением выбранного тега убирает из набора только его и после отказа повреждения или неизвестного отказа наблюдения', () async {
+      final watches = _TagWatches();
+      final repository = ControlledCatalogRepository()
+        ..tagObservations = watches.watch;
+      final container = _container(repository);
+      final provider = intentionEditorViewModelProvider(
+        IntentionCreationFormKey(),
+      );
+      final subscription = container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      final editor = container.read(provider.notifier)
+        ..changeTitle('Намерение')
+        ..confirmReadiness();
+      editor.draftTagSet
+        ..add(_tag(1, 'Дом'))
+        ..add(_tag(2, 'Выходные'))
+        ..add(_tag(3, 'Работа'));
+      await _deliverEvents(container);
+      watches.single(_tagId(1)).fail(const TagReadCorruptionFailure());
+      watches.single(_tagId(2)).throwError();
+      await _deliverEvents(container);
+      expect(
+        _tagStatus(container.read(provider), 1),
+        _readFailed<TagReadCorruptionFailure>(canRetry: false),
+      );
+      expect(
+        _tagStatus(container.read(provider), 2),
+        _readFailed<TagReadUnexpectedFailure>(canRetry: false),
+      );
+
+      await _deleteTag(container, repository, 1, revision: 2);
+
+      final withoutCorrupted = container.read(provider);
+      expect(withoutCorrupted.draft.tagIds, [_tagId(2), _tagId(3)]);
+      expect(_tagNames(withoutCorrupted), {
+        _tagId(2): 'Выходные',
+        _tagId(3): 'Работа',
+      });
+
+      await _deleteTag(container, repository, 2, revision: 3);
+
+      final kept = container.read(provider);
+      expect(kept.draft.tagIds, [_tagId(3)]);
+      expect(_tagNames(kept), {_tagId(3): 'Работа'});
+      expect(kept.draft.title, 'Намерение');
+      expect(kept.draft.readiness, IntentionReadiness.ready);
+      expect(kept.operation, isA<OperationIdle<Intention>>());
+      expect(editor.draftTagSet.current.tagIds, [_tagId(3)]);
+      expect(watches.single(_tagId(3)).isReleased, isFalse);
+
+      // Удаление, уже полученное наблюдением, пакет повторно не применяет.
+      editor.draftTagSet.add(_tag(4, 'Спорт'));
+      await _deliverEvents(container);
+      watches.single(_tagId(4)).observe(null, revision: 4);
+      await _deliverEvents(container);
+      final observed = container.read(provider);
+      await _deleteTag(container, repository, 4, revision: 4);
+
+      expect(container.read(provider), same(observed));
+      expect(observed.draft.tagIds, [_tagId(3)]);
+      expect(repository.commands, isEmpty);
+    });
+
+    test('пакет с удалением выбранного тега во время отправки убирает его после её результата', () async {
+      final watches = _TagWatches();
+      final repository = ControlledCatalogRepository()
+        ..tagObservations = watches.watch;
+      final container = _container(repository);
+      final provider = intentionEditorViewModelProvider(
+        IntentionCreationFormKey(),
+      );
+      final subscription = container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      final editor = container.read(provider.notifier)
+        ..changeTitle('Намерение');
+      editor.draftTagSet
+        ..add(_tag(1, 'Дом'))
+        ..add(_tag(2, 'Работа'));
+      await _deliverEvents(container);
+      watches.single(_tagId(1)).throwError();
+      await _deliverEvents(container);
+
+      // Пакеты публикуются в порядке принятия, поэтому во время отправки
+      // приходит удаление, принятое до неё.
+      final confirmDeletion = _startTagDeletion(container, repository, 1);
+      editor.submit();
+      await confirmDeletion(revision: 2);
+
+      // До результата черновик зафиксирован.
+      expect(container.read(provider).draft.tagIds, [_tagId(1), _tagId(2)]);
+
+      repository.completeCommand(
+        0,
+        const ResultFailure(IntentionUnavailableFailure()),
+      );
+      await _deliverEvents(container);
+
+      final failed = container.read(provider);
+      expect(failed.draft.tagIds, [_tagId(2)]);
+      expect(_tagNames(failed), {_tagId(2): 'Работа'});
+      expect(failed.draft.title, 'Намерение');
+      expect(failed.operation, isA<OperationFailed<Intention>>());
+      expect(failed.canRetry, isTrue);
+    });
+
     test('выбранные теги показываются в ручном порядке, а перестановка меняет только показ', () async {
       final watches = _TagWatches();
       final repository = ControlledCatalogRepository()
@@ -2112,6 +2220,41 @@ ProviderContainer _container(ControlledCatalogRepository repository) {
   );
   addTearDown(container.dispose);
   return container;
+}
+
+/// Удаляет тег через координатор графа, как панель тегов, и доставляет
+/// подтверждённый пакет.
+Future<void> _deleteTag(
+  ProviderContainer container,
+  ControlledCatalogRepository repository,
+  int number, {
+  required int revision,
+}) => _startTagDeletion(container, repository, number)(revision: revision);
+
+/// Передаёт координатору удаление тега; возвращённая функция подтверждает
+/// его на ревизии и ждёт публикации пакета.
+Future<void> Function({required int revision}) _startTagDeletion(
+  ProviderContainer container,
+  ControlledCatalogRepository repository,
+  int number,
+) {
+  expect(
+    container
+        .read(graphCommandCoordinatorProvider.notifier)
+        .acceptTagDelete(DeleteTag(_tagId(number))),
+    isA<TagCommandAccepted>(),
+  );
+  final index = repository.tagCommands.length - 1;
+  return ({required int revision}) async {
+    repository.completeTagCommand(
+      index,
+      tagDeletionSuccess(
+        tagId: _tagId(number),
+        revision: TestCatalogRevision(revision),
+      ),
+    );
+    await _deliverEvents(container);
+  };
 }
 
 Future<void> _settle(ProviderContainer container) async {

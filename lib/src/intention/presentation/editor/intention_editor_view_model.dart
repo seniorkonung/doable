@@ -5,6 +5,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_revision.dart';
 import '../../../graph/application/personal_graph_repository_provider.dart';
+import '../../../tag/application/tag_change.dart';
 import '../../../tag/application/tag_read_result.dart';
 import '../../../tag/domain/tag.dart';
 import '../../../tag/domain/tag_id.dart';
@@ -49,15 +50,17 @@ part 'intention_editor_view_model.g.dart';
 /// Проекцию выбранных тегов сессия поддерживает собственным наблюдением
 /// `watchTag` каждого выбранного идентификатора. Наблюдение меняет только
 /// проекцию, не отправляет команд графа и освобождается, когда тег уходит из
-/// набора, и при завершении сессии. Тег, отсутствие которого подтвердило
-/// наблюдение, уходит из набора; во время отправки — после её результата,
-/// потому что до него черновик зафиксирован.
+/// набора, и при завершении сессии. Тег, удаление которого подтвердил пакет
+/// координатора или наблюдение, уходит из набора при любом состоянии его
+/// наблюдения; во время отправки — после её результата, потому что до него
+/// черновик зафиксирован.
 @riverpod
 final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
   late GraphCommandCoordinator _coordinator;
   late IntentionCreationFormKey _formKey;
   late TagReadContract _tagReads;
   late _SessionDraftTagSet _draftTagSet;
+  StreamSubscription<GraphCommandCompletion>? _completions;
   IntentionOperationToken? _activeToken;
 
   /// Право ошибки, которое публикует текущее состояние сессии.
@@ -79,6 +82,7 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
       this,
       initial.draftTagSet,
     );
+    _completions = _coordinator.completions.listen(_onCompletion);
     listenSelf((previous, next) {
       _publishFailureClaim(next.failurePresentation);
       if (previous == null) {
@@ -95,9 +99,11 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
         case IntentionDraftAvailability.closed:
           draftTagSet._close();
           _releaseTagObservations();
+          _releaseCompletions();
       }
     });
     ref.onDispose(() {
+      _releaseCompletions();
       draftTagSet._close();
       _releaseTagObservations();
       final activeToken = _activeToken;
@@ -455,6 +461,26 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
       case TagReadError(:final failure):
         _tagObservationFailed(id, generation, failure);
     }
+  }
+
+  /// Подтверждённое удаление выбранного тега действует независимо от
+  /// наблюдения, которое могло уже завершиться отказом. Удаление, которое
+  /// наблюдение уже применило, набор не меняет.
+  void _onCompletion(GraphCommandCompletion completion) {
+    if (!ref.mounted) {
+      return;
+    }
+    for (final change in completion.confirmedChange?.changes ?? const []) {
+      if (change case TagDeletedChange(:final tagId)
+          when state.draft.tagIds.contains(tagId)) {
+        _tagDeleted(tagId);
+      }
+    }
+  }
+
+  void _releaseCompletions() {
+    unawaited(_completions?.cancel());
+    _completions = null;
   }
 
   /// Удалённый тег не возвращается с прежним идентификатором, поэтому
