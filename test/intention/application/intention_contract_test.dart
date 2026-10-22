@@ -388,7 +388,7 @@ void main() {
           id: secondId,
           name: TagName.fromStored('Второй тег'),
           color: TagColor.blue,
-          position: tagPositionAt(1009),
+          position: tagPositionAt(1008),
         ),
       );
 

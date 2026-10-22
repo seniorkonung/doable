@@ -118,7 +118,7 @@
   - **Предполагаемые файлы:** `test/intention/data/drift_intention_repository_command_test.dart`, `test/data_transfer/presentation/backups_sheet_test.dart`, `test/intention/data/drift_intention_repository_large_fixture_test.dart`.
   - **Размер:** XS.
 
-- [ ] 1.11 Сохранять место тега во входных данных проверки изменения только цвета
+- [x] 1.11 Сохранять место тега во входных данных проверки изменения только цвета
   - **Критерии приёмки:**
     - В проверке «изменение только цвета тега заменяет его состояние в сводке» из `test/intention/application/intention_contract_test.dart` тег, переданный в `withUpdatedTag`, сохраняет исходное место второго тега `tagPositionAt(1008)`: по решению 2 дизайна `UpdateTag` меняет только название и цвет, а место не трогает.
     - Ожидания проверки не меняются: порядок `[firstId, secondId]`, названия и цвета сводки остаются прежними.
