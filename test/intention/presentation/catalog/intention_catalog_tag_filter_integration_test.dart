@@ -369,9 +369,9 @@ void main() {
     },
   );
 
-  test('удаление исключённого тега начинает новую выдачу с первой порции, '
-      'и она показывает прежде отсечённые намерения через настоящий '
-      'репозиторий', () async {
+  test('удаление исключённого тега снимает его условие и начинает новую '
+      'выдачу с первой порции, и она показывает прежде отсечённые намерения '
+      'через настоящий репозиторий', () async {
     await _seedExcludedMatches(database);
     final provider = intentionCatalogViewModelProvider(
       const BrowseIntentionCatalog(),
@@ -405,7 +405,10 @@ void main() {
     ]);
     expect(restarted.totalCount, 9);
     expect(restarted.nextCursor, isNotNull);
-    expect(restarted.selection.tagFilter, filter);
+    expect(
+      restarted.selection.tagFilter,
+      IntentionTagFilter(requiredTagIds: [_tagId(301)]),
+    );
     expect(_catalogPageReads(diagnostics), pageReadsBefore + 1);
   });
 
@@ -686,8 +689,9 @@ void main() {
         await container.read((provider ?? catalog).future)
             as IntentionCatalogConfirmedState;
 
-    test('переименование и удаление выбранных тегов сохраняют условия, а '
-        'одноимённый новый тег их не подменяет', () async {
+    test('переименование сохраняет условия, удаление обязательного тега '
+        'снимает его условие и расширяет выдачу, а одноимённый новый тег '
+        'условие не восстанавливает', () async {
       open(browse);
       await confirmed();
       final snapshot = await _tagSnapshot(repository);
@@ -714,16 +718,15 @@ void main() {
 
       await _deleteTag(container, _tagId(301));
       expect(_shown(container, conditions), [
-        (_tagId(301), _present, 'Самочувствие', true),
         (_tagId(302), _absent, 'Спорт', false),
       ]);
-      // Удалённый обязательный тег даёт успешную пустую выдачу.
+      final remaining = IntentionTagFilter(excludedTagIds: [_tagId(302)]);
       var state = await _awaitCatalog(
         container,
         catalog,
-        (state) => state.totalCount == 0,
+        (state) => state.query.tagFilter == remaining,
       );
-      expect(state.query.tagFilter.requiredTagIds, {_tagId(301)});
+      expect(state.totalCount, 7);
 
       await _completeTag(
         container,
@@ -742,19 +745,78 @@ void main() {
       await _assignTag(container, recreated.id, _intentionId(7));
       await pumpEventQueue();
       expect(_shown(container, conditions), [
-        (_tagId(301), _present, 'Самочувствие', true),
         (_tagId(302), _absent, 'Спорт', false),
       ]);
       state = await confirmed();
-      expect(state.totalCount, 0);
-
-      // Явное снятие условия удалённого тега возобновляет поиск.
-      model.remove(_tagId(301));
-      state = await confirmed();
+      expect(state.query.tagFilter, remaining);
       expect(state.totalCount, 7);
-      expect(_shown(container, conditions), [
-        (_tagId(302), _absent, 'Спорт', false),
-      ]);
+    });
+
+    test('удаление снимает условие и в другом открытом поиске: каждый '
+        'начинает новую выдачу одним чтением без промежуточной пустой '
+        'выдачи', () async {
+      final action = intentionCatalogViewModelProvider(_actionSearchPurpose);
+      open(browse);
+      open(_actionSearchPurpose);
+      await confirmed();
+      await confirmed(action);
+      final snapshot = await _tagSnapshot(repository);
+      container
+          .read(conditions.notifier)
+          .applySelection(snapshot.select(302, _present));
+      container.read(
+          intentionTagConditionsViewModelProvider(_actionSearchPurpose)
+              .notifier,
+        )
+        ..applySelection(snapshot.select(301, _present))
+        ..applySelection(snapshot.select(302, _absent));
+      final browseBefore = await confirmed();
+      final actionBefore = await confirmed(action);
+      expect(browseBefore.totalCount, 1);
+      expect(actionBefore.totalCount, 4);
+      final published = <IntentionCatalogConfirmedState>[];
+      for (final provider in [catalog, action]) {
+        addTearDown(
+          container.listen(provider, (_, next) {
+            // Перечитывание сохраняет прежнее значение до новой выдачи.
+            if (next.isLoading) return;
+            if (next.value case final IntentionCatalogConfirmedState state) {
+              published.add(state);
+            }
+          }).close,
+        );
+      }
+      final pageReadsBefore = _catalogPageReads(diagnostics);
+
+      await _deleteTag(container, _tagId(302));
+      final browseAfter = await _awaitRevisionAfter(
+        container,
+        catalog,
+        browseBefore,
+      );
+      final actionAfter = await _awaitRevisionAfter(
+        container,
+        action,
+        actionBefore,
+      );
+
+      expect(_shown(container, conditions), isEmpty);
+      expect(
+        _shown(
+          container,
+          intentionTagConditionsViewModelProvider(_actionSearchPurpose),
+        ),
+        [(_tagId(301), _present, 'Здоровье', false)],
+      );
+      expect(browseAfter.query.tagFilter, IntentionTagFilter.empty);
+      expect(browseAfter.totalCount, 8);
+      expect(
+        actionAfter.query.tagFilter,
+        IntentionTagFilter(requiredTagIds: [_tagId(301)]),
+      );
+      expect(actionAfter.totalCount, 5);
+      expect(published, [browseAfter, actionAfter]);
+      expect(_catalogPageReads(diagnostics), pageReadsBefore + 2);
     });
 
     test('выбор из устаревшего снимка предъявляется с актуальным названием '

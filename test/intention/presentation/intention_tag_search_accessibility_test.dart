@@ -391,7 +391,7 @@ void main() {
       _expectTappable(tester, field);
       expect(tester.widget<TextField>(field).controller!.text, 'ход');
 
-      // Удаление исключённого тега помечает его условие удалённым.
+      // Удаление исключённого тега снимает его условие без сбоя раскладки.
       final deleted = _tags[1];
       final accepted = acceptTagCommand(
         container,
@@ -404,38 +404,7 @@ void main() {
       );
       await accepted.future;
       await _pumpFrames(tester);
-      expect(tester.takeException(), isNull);
-
-      // Условие удалённого тега сохраняет надобность, объявляет пометку
-      // удаления и остаётся доступным для снятия.
-      final deletedToggle = _conditionToggle(deleted.id);
-      await _reach(tester, deletedToggle);
-      _expectTappable(tester, deletedToggle);
-      expect(
-        tester.getSemantics(deletedToggle).label,
-        l10n.intentionTagConditionDeletedSemantics(
-          l10n.intentionTagConditionAbsentSemantics(deleted.name.value),
-        ),
-      );
-      expect(
-        find.descendant(
-          of: deletedToggle,
-          matching: findTextIgnoringInlineWidgets(
-            l10n.intentionTagConditionDeleted(
-              l10n.intentionTagConditionAbsent(deleted.name.value),
-            ),
-          ),
-        ),
-        findsOneWidget,
-      );
-      final deletedRemove = _conditionRemove(deleted.id);
-      await _reach(tester, deletedRemove);
-      _expectTappable(tester, deletedRemove);
-      await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
-      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
-      await expectLater(tester, meetsGuideline(textContrastGuideline));
-      await tester.tap(deletedRemove);
-      await tester.pump();
+      expect(_conditionToggle(deleted.id), findsNothing);
       expect(
         container.read(conditionsProvider).conditions,
         hasLength(_initialConditions - 1),

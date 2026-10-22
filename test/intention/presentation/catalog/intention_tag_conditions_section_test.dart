@@ -16,7 +16,6 @@ import 'package:doable/src/intention/presentation/catalog/intention_tag_conditio
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import 'package:doable/src/intention/presentation/catalog/tag_condition_picker_page.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
-import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_color.dart';
@@ -40,7 +39,7 @@ final _add = find.byKey(const ValueKey('intention-tag-conditions-add'));
 
 void main() {
   testWidgets(
-    'точки цветного и бесцветного тегов стоят перед названием при смене надобности и удалении',
+    'точки цветного и бесцветного тегов стоят перед названием при смене надобности',
     (tester) async {
       final h = await _open(tester);
       final home = _tag(1, 'Дом', color: TagColor.blue);
@@ -73,10 +72,6 @@ void main() {
       await tester.tap(_toggle(work));
       await tester.pump();
       expectLabels(['не \uFFFCДом', '\uFFFCРабота']);
-
-      await h.delete(home, revision: 2);
-      await h.delete(work, revision: 3);
-      expectLabels(['не \uFFFCДом (тег удалён)', '\uFFFCРабота (тег удалён)']);
     },
   );
 
@@ -111,24 +106,6 @@ void main() {
       expect(_chipIcon(health, Icons.block), findsNothing);
       expect(_chipIcon(sport, Icons.block), findsOneWidget);
       expect(_chipIcon(sport, Icons.check), findsNothing);
-    },
-  );
-
-  testWidgets(
-    'удалённый тег показан последним известным названием с пометкой и прежней надобностью',
-    (tester) async {
-      final h = await _open(tester);
-      final health = _tag(1, 'Здоровье');
-      final sport = _tag(2, 'Спорт');
-      await h.select(health, _present);
-      await h.select(sport, _absent);
-
-      await h.delete(health, revision: 2);
-      await h.delete(sport, revision: 3);
-
-      expect(h.shown, ['Здоровье (тег удалён)', 'не Спорт (тег удалён)']);
-      expect(_chipIcon(health, Icons.check), findsOneWidget);
-      expect(_chipIcon(sport, Icons.block), findsOneWidget);
     },
   );
 
@@ -190,19 +167,16 @@ void main() {
     },
   );
 
-  testWidgets('крестик снимает условие, в том числе удалённого тега', (
-    tester,
-  ) async {
+  testWidgets('крестик снимает условие', (tester) async {
     final h = await _open(tester);
     final health = _tag(1, 'Здоровье');
     final sport = _tag(2, 'Спорт');
     await h.select(health, _present);
     await h.select(sport, _absent);
-    await h.delete(health, revision: 2);
 
     await tester.tap(_remove(sport));
     await tester.pump();
-    expect(h.shown, ['Здоровье (тег удалён)']);
+    expect(h.shown, ['Здоровье']);
     expect(h.appliedFilter, IntentionTagFilter(requiredTagIds: [health.id]));
 
     await tester.tap(_remove(health));
@@ -301,7 +275,6 @@ void main() {
         language,
         presentLabel,
         absentLabel,
-        deletedLabel,
         toggleHint,
         removeLabel,
         addLabel,
@@ -312,37 +285,32 @@ void main() {
           'ru',
           'Здоровье, должен быть',
           'Спорт, должен отсутствовать',
-          'Отдых, должен отсутствовать, тег удалён',
           'Переключить надобность: должен быть или должен отсутствовать',
           'Снять условие: Спорт',
           'Добавить условие по тегу',
-          ['Здоровье', 'не Спорт', 'не Отдых (тег удалён)'],
+          ['Здоровье', 'не Спорт'],
         ),
         (
           'en',
           'Здоровье, must be present',
           'Спорт, must be absent',
-          'Отдых, must be absent, tag deleted',
           'Toggle requirement: must be present or must be absent',
           'Remove condition: Спорт',
           'Add tag condition',
-          ['Здоровье', 'not Спорт', 'not Отдых (tag deleted)'],
+          ['Здоровье', 'not Спорт'],
         ),
       ]) {
     testWidgets(
-      '$language: диктор читает надобность, пометку удаления и назначение действий, ориентиры доступности выполнены',
+      '$language: диктор читает надобность и назначение действий, ориентиры доступности выполнены',
       (tester) async {
         final handle = tester.ensureSemantics();
         final h = await _open(tester, language: language);
-        final rest = _tag(3, 'Отдых');
         await h.select(_tag(1, 'Здоровье'), _present);
         await h.select(_tag(2, 'Спорт'), _absent);
-        await h.select(rest, _absent);
-        await h.delete(rest, revision: 2);
 
         // Названия тегов выводятся без перевода и преобразования.
         expect(h.shown, visible);
-        for (final label in [presentLabel, absentLabel, deletedLabel]) {
+        for (final label in [presentLabel, absentLabel]) {
           expect(
             tester.getSemantics(find.bySemanticsLabel(label)),
             isSemantics(
@@ -452,11 +420,10 @@ final class _Router extends RootStackRouter {
 }
 
 final class _Harness {
-  _Harness(this.tester, this.repository, this.changes);
+  _Harness(this.tester, this.repository);
 
   final WidgetTester tester;
   final _Repository repository;
-  final StreamController<ConfirmedGraphChangePackage> changes;
 
   ProviderContainer get _container =>
       ProviderScope.containerOf(tester.element(_section));
@@ -493,17 +460,6 @@ final class _Harness {
             snapshotRevision: const TagCatalogTestRevision(),
           ),
         );
-    await tester.pump();
-  }
-
-  /// Подтверждает физическое удаление тега другим экраном приложения.
-  Future<void> delete(Tag tag, {required int revision}) async {
-    final confirmed = TagCatalogTestRevision(revision);
-    changes.add(
-      _Package(confirmed, [
-        TagDeletedChange(revision: confirmed, tagId: tag.id),
-      ]),
-    );
     await tester.pump();
   }
 
@@ -544,15 +500,7 @@ Future<_Harness> _open(WidgetTester tester, {String language = 'ru'}) async {
     ),
   );
   await tester.pump();
-  return _Harness(tester, repository, changes);
-}
-
-final class _Package implements ConfirmedGraphChangePackage {
-  const _Package(this.revision, this.changes);
-  @override
-  final GraphRevision revision;
-  @override
-  final List<GraphChange> changes;
+  return _Harness(tester, repository);
 }
 
 Finder _chip(Tag tag) => find.byKey(

@@ -44,34 +44,31 @@ void main() {
     expect(h.repository.queries, hasLength(queries));
   });
 
-  test('подтверждённое удаление сохраняет условие с последним названием '
-      'до явного снятия', () {
+  test('подтверждённое удаление снимает обязательное и исключающее условия, '
+      'а остальные сохраняют места и надобности без повторной публикации '
+      'фильтра', () {
     final h = _Harness();
     addTearDown(h.dispose);
     h.select(_tag(1, 'Здоровье'), _present);
     h.select(_tag(2, 'Спорт'), _absent);
-    h.rename(2, _tag(1, 'Здоровье'), 'Самочувствие');
+    h.select(_tag(3, 'Отдых'), _present);
+    h.select(_tag(4, 'Работа'), _absent);
+    h.appliedFilter;
+    final queries = h.repository.queries.length;
 
-    h.delete(3, _id(1));
+    h.delete(2, _id(1));
+    h.delete(3, _id(4));
 
     expect(h.shown, [
-      (_id(1), _present, 'Самочувствие', true),
       (_id(2), _absent, 'Спорт', false),
+      (_id(3), _present, 'Отдых', false),
     ]);
-    expect(
-      h.appliedFilter,
-      IntentionTagFilter(requiredTagIds: [_id(1)], excludedTagIds: [_id(2)]),
-    );
-
-    // Удалённое условие по-прежнему переключается и снимается.
-    h.model.toggleRequirement(_id(1));
-    expect(h.shown.first, (_id(1), _absent, 'Самочувствие', true));
-    h.model.remove(_id(1));
-    expect(h.shown, [(_id(2), _absent, 'Спорт', false)]);
-    expect(h.appliedFilter, IntentionTagFilter(excludedTagIds: [_id(2)]));
+    // Фильтр без снятых тегов применяет модель каталога по тому же пакету.
+    h.appliedFilter;
+    expect(h.repository.queries, hasLength(queries));
   });
 
-  test('новый тег с прежним названием не снимает признак удаления', () {
+  test('новый тег с прежним названием не восстанавливает снятое условие', () {
     final h = _Harness();
     addTearDown(h.dispose);
     h.select(_tag(1, 'Здоровье'), _present);
@@ -84,15 +81,7 @@ void main() {
       ),
     ]);
 
-    expect(h.shown, [(_id(1), _present, 'Здоровье', true)]);
-    expect(h.appliedFilter, IntentionTagFilter(requiredTagIds: [_id(1)]));
-
-    // Одноимённый тег — отдельное условие по собственному идентификатору.
-    h.select(_tag(7, 'Здоровье'), _present, revision: 3);
-    expect(h.shown, [
-      (_id(1), _present, 'Здоровье', true),
-      (_id(7), _present, 'Здоровье', false),
-    ]);
+    expect(h.conditions, isEmpty);
   });
 
   test('устаревший выбор предъявляется с актуальными названием и '

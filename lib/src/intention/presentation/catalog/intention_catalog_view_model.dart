@@ -541,14 +541,35 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   /// Отказ не согласует данные: подтверждённого пакета у него нет.
   void _handleCompletion(GraphCommandCompletion completion) {
     final confirmedChange = completion.confirmedChange;
-    if (confirmedChange != null) {
-      _reconcilePackage(
-        _CatalogChangePackage(
-          confirmedChange.revision,
-          confirmedChange.changes,
-        ),
-      );
+    if (confirmedChange == null || !ref.mounted) {
+      return;
     }
+    final package = _CatalogChangePackage(
+      confirmedChange.revision,
+      confirmedChange.changes,
+    );
+    if (!_dropDeletedTagConditions(package)) {
+      _reconcilePackage(package);
+    }
+  }
+
+  /// Снимает условия по тегам, удалённым пакетом, и начинает новую выдачу с
+  /// первой порции; `false` — пакет не удаляет ни одного тега из условий.
+  ///
+  /// Модель условий того же назначения снимает их в этой же публикации
+  /// пакета без повторной публикации фильтра, поэтому снятие даёт одно
+  /// чтение. Новая выдача уже отражает пакет и не согласуется с ним.
+  bool _dropDeletedTagConditions(_CatalogChangePackage package) {
+    final deletedTagIds = package.deletedTagIds.toSet();
+    final remaining = IntentionTagFilter(
+      requiredTagIds: _tagFilter.requiredTagIds.difference(deletedTagIds),
+      excludedTagIds: _tagFilter.excludedTagIds.difference(deletedTagIds),
+    );
+    if (remaining == _tagFilter) {
+      return false;
+    }
+    changeTagFilter(remaining);
+    return true;
   }
 
   void _reconcilePackage(_CatalogChangePackage package) {
@@ -638,16 +659,6 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
         break;
     }
 
-    // Удаление исключённого тега открывает совпадения в том числе внутри
-    // загруженной части. Обязательный удалённый тег оставляет выдачу пустой
-    // при любых исключениях, поэтому читать её заново не нужно.
-    final tagFilter = confirmed.query.tagFilter;
-    final deletedTagIds = package.deletedTagIds.toSet();
-    if (deletedTagIds.any(tagFilter.excludedTagIds.contains) &&
-        !deletedTagIds.any(tagFilter.requiredTagIds.contains)) {
-      return null;
-    }
-
     var reconciled = confirmed;
     final mutatedIds = <IntentionId>{};
     for (final mutation in package.mutations) {
@@ -689,7 +700,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     for (final updated in package.updatedTags) {
       reconciled = _applyUpdatedTagContent(reconciled, updated);
     }
-    for (final deletedTagId in deletedTagIds) {
+    for (final deletedTagId in package.deletedTagIds) {
       reconciled = _applyDeletedTagContent(reconciled, deletedTagId);
     }
     return _withRevision(reconciled, package.revision);
@@ -755,27 +766,15 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     );
   }
 
-  /// Согласует физическое удаление тега с сохранёнными условиями поиска.
+  /// Убирает из загруженных строк тег, физически удалённый вне условий
+  /// поиска.
   ///
-  /// Условие по удалённому идентификатору не снимается. Обязательный тег
-  /// больше не назначен ни одному намерению, поэтому выдача становится
-  /// успешно пустой без продолжения. Иначе тег исчезает из загруженных
-  /// строк.
+  /// Тег вне условий не влияет на принадлежность, поэтому состав совпадений,
+  /// порядок, число совпадений и курсор сохраняются.
   IntentionCatalogConfirmedState _applyDeletedTagContent(
     IntentionCatalogConfirmedState confirmed,
     TagId deletedTagId,
   ) {
-    final tagFilter = confirmed.query.tagFilter;
-    if (tagFilter.requiredTagIds.contains(deletedTagId)) {
-      return switch (confirmed) {
-        IntentionCatalogEmpty() => confirmed,
-        IntentionCatalogLoaded() => IntentionCatalogEmpty(
-          selection: confirmed.selection,
-          query: confirmed.query,
-          revision: confirmed.revision,
-        ),
-      };
-    }
     if (confirmed is! IntentionCatalogLoaded) {
       return confirmed;
     }
@@ -903,7 +902,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
 /// Модель каталога полагается на эти контракты и сама пакет с фактом без
 /// такой мутации не отклоняет.
 /// Редактирование тега заменяет его полное состояние в загруженных строках,
-/// а физическое удаление тега согласуется по сохранённым условиям поиска.
+/// а физическое удаление тега вне условий поиска убирает его из них.
 final class _CatalogChangePackage {
   _CatalogChangePackage(this.revision, Iterable<GraphChange> changes)
     : mutations = List.unmodifiable(

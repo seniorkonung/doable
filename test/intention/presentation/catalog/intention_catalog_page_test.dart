@@ -1414,7 +1414,8 @@ void main() {
       ),
     );
     await _pumpUntilQueries(tester, repository, restarted + 1);
-    expect(repository.queryAt(restarted).tagFilter, filter);
+    final remaining = IntentionTagFilter(requiredTagIds: [health.id]);
+    expect(repository.queryAt(restarted).tagFilter, remaining);
     expect(repository.queryAt(restarted).cursor, isNull);
     repository.complete(
       restarted,
@@ -1428,7 +1429,7 @@ void main() {
 
     await tester.tap(find.widgetWithText(FilledButton, 'Try again'));
     await _pumpUntilQueries(tester, repository, restarted + 2);
-    expect(repository.queryAt(restarted + 1).tagFilter, filter);
+    expect(repository.queryAt(restarted + 1).tagFilter, remaining);
     repository.complete(
       restarted + 1,
       _firstPage(_taggedSummaries([health], first: 4, last: 1), revision: 2),
@@ -1440,8 +1441,9 @@ void main() {
     expect(find.byType(IntentionSummaryView), findsNWidgets(4));
   });
 
-  testWidgets('после подтверждённых переименования и удаления тега строки '
-      'и чипы показывают согласованные данные', (tester) async {
+  testWidgets('после подтверждённого переименования тега строки и чипы '
+      'показывают новое название, а удаление снимает условие и показывает '
+      'выдачу по оставшимся условиям', (tester) async {
     final repository = ControlledCatalogRepository();
     final container = reconciliationCatalogContainer(repository);
     addTearDown(container.dispose);
@@ -1471,6 +1473,7 @@ void main() {
     );
     expect(find.text('Total intentions: 3'), findsOneWidget);
 
+    final restarted = repository.queries.length;
     await _completeCatalogWidgetTagCommand(
       tester,
       container,
@@ -1481,18 +1484,18 @@ void main() {
         revision: const TestCatalogRevision(3),
       ),
     );
+    await _pumpUntilQueries(tester, repository, restarted + 1);
+    expect(repository.queryAt(restarted).tagFilter, IntentionTagFilter.empty);
+    repository.complete(
+      restarted,
+      _firstPage(_taggedSummaries(const [], first: 5, last: 1), revision: 3),
+    );
     await tester.pumpAndSettle();
 
-    expect(_shownConditions(tester), ['Самочувствие (tag deleted)']);
-    expect(find.byType(IntentionSummaryView), findsNothing);
-    expect(
-      find.text('No intentions match the tag conditions.'),
-      findsOneWidget,
-    );
-    expect(
-      repository.queries.last.tagFilter,
-      IntentionTagFilter(requiredTagIds: [health.id]),
-    );
+    expect(_shownConditions(tester), isEmpty);
+    expect(find.text('Total intentions: 5'), findsOneWidget);
+    expect(find.byType(IntentionSummaryView), findsNWidgets(5));
+    expect(repository.queries, hasLength(restarted + 1));
   });
 }
 

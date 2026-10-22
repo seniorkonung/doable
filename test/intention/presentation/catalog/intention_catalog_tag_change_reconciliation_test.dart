@@ -725,30 +725,34 @@ void main() {
     expect(repository.queries, hasLength(2));
   });
 
-  test('удаление обязательного тега сохраняет условие и даёт успешный пустой '
-      'результат без продолжения', () async {
+  test('удаление обязательного тега снимает его условие и одним чтением '
+      'первой порции без промежуточной пустой выдачи расширяет выдачу по '
+      'оставшимся условиям', () async {
     final repository = ControlledCatalogRepository();
     final container = reconciliationCatalogContainer(
       repository,
       pageSize: 2,
       prefetchRemaining: 0,
     );
-    _observeConfirmedStates(container, browse);
+    final confirmedStates = _observeConfirmedStates(container, browse);
+    final provider = intentionCatalogViewModelProvider(browse);
     final fourth = testSummary(index: 4, tags: [health]);
-    final third = testSummary(index: 3, tags: [health, rest]);
-    final filter = IntentionTagFilter(requiredTagIds: [health.id]);
     await _loadFiltered(
       container,
       repository,
       browse,
-      filter,
+      IntentionTagFilter(
+        requiredTagIds: [health.id],
+        excludedTagIds: [rest.id],
+      ),
       IntentionCatalogFirstPage(
-        items: [fourth, third],
-        totalCount: 3,
-        nextCursor: const TestCatalogCursor(),
+        items: [fourth],
+        totalCount: 1,
+        nextCursor: null,
         revision: const TestCatalogRevision(1),
       ),
     );
+    confirmedStates.clear();
 
     await _completeTagDelete(
       container,
@@ -756,17 +760,37 @@ void main() {
       tagId: health.id,
       revision: const TestCatalogRevision(2),
     );
+    await waitForCatalogQueries(repository, 3);
 
-    final current = _confirmed(container, browse);
-    expect(current, isA<IntentionCatalogEmpty>());
-    expect(current.totalCount, 0);
-    expect(current.nextCursor, isNull);
-    expect(current.selection.tagFilter, filter);
-    expect(current.query.tagFilter.requiredTagIds, [health.id]);
+    final remaining = IntentionTagFilter(excludedTagIds: [rest.id]);
+    expect(repository.queryAt(2).tagFilter, remaining);
+    expect(repository.queryAt(2).cursor, isNull);
+    final fifth = testSummary(index: 5);
+    repository.complete(
+      2,
+      ResultSuccess(
+        IntentionCatalogFirstPage(
+          items: [fifth, fourth],
+          totalCount: 3,
+          nextCursor: const TestCatalogCursor(),
+          revision: const TestCatalogRevision(2),
+        ),
+      ),
+    );
+    final current =
+        await container.read(provider.future) as IntentionCatalogLoaded;
+
+    expect(current.items.map((item) => item.id), [fifth.id, fourth.id]);
+    expect(current.totalCount, 3);
+    expect(current.selection.tagFilter, remaining);
+    // До новой выдачи публикуется только прежняя, а не пустая.
+    expect(confirmedStates.whereType<IntentionCatalogEmpty>(), isEmpty);
+    await Future<void>.delayed(Duration.zero);
+    expect(repository.queries, hasLength(3));
   });
 
-  test('удаление обязательного тега во время продолжения не возвращает '
-      'прежние совпадения из запоздалой порции', () async {
+  test('удаление обязательного тега во время продолжения не смешивает '
+      'запоздалую порцию с новой выдачей', () async {
     final repository = ControlledCatalogRepository();
     final container = reconciliationCatalogContainer(
       repository,
@@ -774,14 +798,14 @@ void main() {
       prefetchRemaining: 0,
     );
     _observeConfirmedStates(container, browse);
+    final provider = intentionCatalogViewModelProvider(browse);
     final fourth = testSummary(index: 4, tags: [health]);
     final third = testSummary(index: 3, tags: [health]);
-    final filter = IntentionTagFilter(requiredTagIds: [health.id]);
     await _loadFiltered(
       container,
       repository,
       browse,
-      filter,
+      IntentionTagFilter(requiredTagIds: [health.id]),
       IntentionCatalogFirstPage(
         items: [fourth, third],
         totalCount: 3,
@@ -790,7 +814,7 @@ void main() {
       ),
     );
     final loading = container
-        .read(intentionCatalogViewModelProvider(browse).notifier)
+        .read(provider.notifier)
         .loadNextPageIfNeeded(visibleIndex: 1);
     await waitForCatalogQueries(repository, 3);
 
@@ -800,9 +824,7 @@ void main() {
       tagId: health.id,
       revision: const TestCatalogRevision(2),
     );
-    final emptied = _confirmed(container, browse);
-    expect(emptied, isA<IntentionCatalogEmpty>());
-
+    await waitForCatalogQueries(repository, 4);
     repository.complete(
       2,
       ResultSuccess(
@@ -816,12 +838,25 @@ void main() {
       ),
     );
     await loading;
-    await Future<void>.delayed(Duration.zero);
+    final fifth = testSummary(index: 5);
+    repository.complete(
+      3,
+      ResultSuccess(
+        IntentionCatalogFirstPage(
+          items: [fifth],
+          totalCount: 1,
+          nextCursor: null,
+          revision: const TestCatalogRevision(2),
+        ),
+      ),
+    );
+    final current =
+        await container.read(provider.future) as IntentionCatalogLoaded;
 
-    final current = _confirmed(container, browse);
-    expect(current, isA<IntentionCatalogEmpty>());
-    expect(current.totalCount, 0);
-    expect(current.selection.tagFilter, filter);
+    expect(repository.queryAt(3).tagFilter, IntentionTagFilter.empty);
+    expect(current.items.map((item) => item.id), [fifth.id]);
+    expect(current.totalCount, 1);
+    expect(current.selection.tagFilter, IntentionTagFilter.empty);
   });
 
   test('удаление тега вне условий убирает его из загруженных строк и '
@@ -900,146 +935,9 @@ void main() {
     expect(completed.nextCursor, isNull);
   });
 
-  test('новый одноимённый тег, назначенный после удаления обязательного, '
-      'не восстанавливает соответствие условию', () async {
-    final repository = ControlledCatalogRepository();
-    final container = reconciliationCatalogContainer(repository);
-    final confirmedStates = _observeConfirmedStates(container, browse);
-    final only = testSummary(index: 1, tags: [health]);
-    final filter = IntentionTagFilter(requiredTagIds: [health.id]);
-    await _loadFiltered(
-      container,
-      repository,
-      browse,
-      filter,
-      IntentionCatalogFirstPage(
-        items: [only],
-        totalCount: 1,
-        nextCursor: null,
-        revision: const TestCatalogRevision(1),
-      ),
-    );
-    await _completeTagDelete(
-      container,
-      repository,
-      tagId: health.id,
-      revision: const TestCatalogRevision(2),
-    );
-    confirmedStates.clear();
-
-    final newHealth = Tag(
-      id: _tagId(3),
-      name: health.name,
-      color: null,
-      position: tagPositionAt(1003),
-    );
-    const created = TestCatalogRevision(3);
-    await completeTagCommand(
-      container,
-      repository,
-      CreateTag(
-        name: newHealth.name,
-        color: null,
-        placement: TagPlacement.first,
-      ),
-      TagCommandSucceeded(
-        ConfirmedGraphResult(
-          revision: created,
-          value: TagCreated(
-            TagCreatedChange(revision: created, after: newHealth),
-          ),
-        ),
-      ),
-    );
-    await completeIntentionTagAssignment(
-      container,
-      repository,
-      state: TagAssignmentState.assigned,
-      tagId: newHealth.id,
-      before: testSummary(index: 1),
-      after: testSummary(index: 1, tags: [newHealth]),
-      revision: const TestCatalogRevision(4),
-    );
-
-    final current = _confirmed(container, browse);
-    expect(current, isA<IntentionCatalogEmpty>());
-    expect(current.totalCount, 0);
-    expect(current.selection.tagFilter, filter);
-    expect(
-      current.selection.tagFilter.requiredTagIds,
-      isNot(contains(newHealth.id)),
-    );
-    expect(
-      confirmedStates.every((state) => state is IntentionCatalogEmpty),
-      isTrue,
-    );
-  });
-
-  test('явное снятие условия по удалённому тегу сразу применяет оставшиеся '
-      'условия', () async {
-    final repository = ControlledCatalogRepository();
-    final container = reconciliationCatalogContainer(
-      repository,
-      filterDebounce: const Duration(hours: 1),
-    );
-    final confirmedStates = _observeConfirmedStates(container, browse);
-    final provider = intentionCatalogViewModelProvider(browse);
-    final withBoth = testSummary(index: 2, tags: [health, rest]);
-    final filter = IntentionTagFilter(requiredTagIds: [health.id, rest.id]);
-    await _loadFiltered(
-      container,
-      repository,
-      browse,
-      filter,
-      IntentionCatalogFirstPage(
-        items: [withBoth],
-        totalCount: 1,
-        nextCursor: null,
-        revision: const TestCatalogRevision(1),
-      ),
-    );
-    await _completeTagDelete(
-      container,
-      repository,
-      tagId: health.id,
-      revision: const TestCatalogRevision(2),
-    );
-    final emptied = _confirmed(container, browse);
-    expect(emptied, isA<IntentionCatalogEmpty>());
-    confirmedStates.clear();
-
-    final remaining = IntentionTagFilter(requiredTagIds: [rest.id]);
-    container.read(provider.notifier).changeTagFilter(remaining);
-    await waitForCatalogQueries(repository, 3);
-    final query = repository.queryAt(2);
-    expect(query.tagFilter, remaining);
-    expect(query.cursor, isNull);
-    final withRest = testSummary(index: 2, tags: [rest]);
-    repository.complete(
-      2,
-      ResultSuccess(
-        IntentionCatalogFirstPage(
-          items: [withRest],
-          totalCount: 1,
-          nextCursor: null,
-          revision: const TestCatalogRevision(2),
-        ),
-      ),
-    );
-    await container.read(provider.future);
-
-    final current = _loaded(container, browse);
-    expect(current.items.map((item) => item.id), [withRest.id]);
-    expect(current.totalCount, 1);
-    expect(current.selection.tagFilter, remaining);
-    expect(
-      confirmedStates.take(confirmedStates.length - 1),
-      everyElement(isA<IntentionCatalogEmpty>()),
-    );
-  });
-
-  test('удаление исключённого тега начинает новую выдачу одним чтением '
-      'первой порции, и она показывает прежде отсечённые намерения', () async {
+  test('удаление исключённого тега снимает его условие и начинает новую '
+      'выдачу одним чтением первой порции, и она показывает прежде '
+      'отсечённые намерения', () async {
     final repository = ControlledCatalogRepository();
     final container = reconciliationCatalogContainer(
       repository,
@@ -1075,8 +973,9 @@ void main() {
     );
     await waitForCatalogQueries(repository, 3);
 
+    final remaining = IntentionTagFilter(requiredTagIds: [health.id]);
     final query = repository.queryAt(2);
-    expect(query.tagFilter, filter);
+    expect(query.tagFilter, remaining);
     expect(query.cursor, isNull);
     final eleventh = testSummary(index: 11, tags: [health]);
     repository.complete(
@@ -1095,7 +994,7 @@ void main() {
 
     expect(current.items.map((item) => item.id), [eleventh.id, tenth.id]);
     expect(current.totalCount, 5);
-    expect(current.selection.tagFilter, filter);
+    expect(current.selection.tagFilter, remaining);
     await Future<void>.delayed(Duration.zero);
     expect(repository.queries, hasLength(3));
   });

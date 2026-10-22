@@ -607,15 +607,12 @@ void _defineTagSearchTests() {
   });
 
   testWidgets('отказ новой выдачи после удаления исключённого тега показан '
-      'отказом первой порции, а повтор показывает выдачу с прежними охватом '
-      'и исключением', (tester) async {
+      'отказом первой порции, а повтор показывает выдачу без его условия с '
+      'прежними охватом и исключением', (tester) async {
     final repository = ControlledCatalogRepository();
     final health = _tag(1, 'Здоровье');
     final rest = _tag(2, 'Отдых');
-    final filter = IntentionTagFilter(
-      requiredTagIds: [health.id],
-      excludedTagIds: [rest.id],
-    );
+    final remaining = IntentionTagFilter(requiredTagIds: [health.id]);
     final opened = await _openTagSearchPicker(
       tester,
       repository,
@@ -648,7 +645,7 @@ void _defineTagSearchTests() {
     _expectParticipantQuery(
       repository.queryAt(restarted),
       _archivedRelation,
-      filter,
+      remaining,
     );
     repository.complete(
       restarted,
@@ -665,7 +662,7 @@ void _defineTagSearchTests() {
     _expectParticipantQuery(
       repository.queryAt(restarted + 1),
       _archivedRelation,
-      filter,
+      remaining,
     );
     repository.complete(
       restarted + 1,

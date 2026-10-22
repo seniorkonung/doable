@@ -72,9 +72,12 @@ void main() {
         await h.load(_summaries(first: 40));
         h.position.jumpTo(300);
         await _settle(tester);
-        // Удаление обязательного тега снимает список с экрана без смены
-        // параметров поиска.
+        // Удаление обязательного тега начинает новую выдачу, и её пустая
+        // первая порция снимает список с экрана.
+        final restarted = h.repository.queries.length;
         await h.deleteTag(_health);
+        h.repository.complete(restarted, h._page(const []));
+        await tester.pumpAndSettle();
         expect(_list, findsNothing);
         expect(find.text(_emptyRu), findsOneWidget);
 
@@ -279,8 +282,8 @@ final class _Harness {
       )
       .position;
 
-  /// Загружает выдачу с обязательным и исключённым тегами: удаление первого
-  /// опустошает её без чтения, удаление второго начинает новую выдачу.
+  /// Загружает выдачу с обязательным и исключённым тегами: удаление любого
+  /// из них снимает его условие и начинает новую выдачу.
   Future<void> load(List<IntentionSummary> items) async {
     repository.complete(0, _page(const []));
     await _settle(_tester);

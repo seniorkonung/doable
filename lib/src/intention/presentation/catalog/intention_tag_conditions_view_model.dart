@@ -227,20 +227,12 @@ final class IntentionTagConditionsViewModel
             ..revision = package.revision
             ..needsVerification = false;
           changed = true;
+        // Модель каталога сама исключает тег из применённого фильтра в
+        // этой же публикации пакета, поэтому фильтр не публикуется повторно.
         case TagDeletedChange(:final tagId):
-          final entry = _entries[tagId];
-          if (entry == null ||
-              entry.isDeleted ||
-              !_supersedes(package.revision, entry.revision)) {
-            continue;
-          }
-          entry
-            ..isDeleted = true
-            ..revision = package.revision
-            ..needsVerification = false;
-          changed = true;
+          changed = _entries.remove(tagId) != null || changed;
         // Новый тег с прежним названием имеет другой идентификатор и
-        // условие не затрагивает: признак удаления не снимается.
+        // снятое условие не восстанавливает.
         case GraphChange():
           break;
       }

@@ -144,15 +144,12 @@ void defineDailyChoicePickerTagSearchTests(
   });
 
   testWidgets('отказ новой выдачи после удаления исключённого тега показан '
-      'отказом первой порции, а повтор показывает выдачу с прежними '
-      'ограничениями', (tester) async {
+      'отказом первой порции, а повтор показывает выдачу без его условия с '
+      'прежними ограничениями', (tester) async {
     final repository = ControlledCatalogRepository();
     final health = _tag(1, 'Здоровье');
     final rest = _tag(2, 'Отдых');
-    final filter = IntentionTagFilter(
-      requiredTagIds: [health.id],
-      excludedTagIds: [rest.id],
-    );
+    final remaining = IntentionTagFilter(requiredTagIds: [health.id]);
     final opened = await _openPicker(tester, repository, page);
     await _applyConditions(tester, opened.container, repository, page, [
       (health, IntentionTagRequirement.mustBePresent),
@@ -171,7 +168,7 @@ void defineDailyChoicePickerTagSearchTests(
     );
     await accepted.future;
     await _pumpUntilQueries(tester, repository, restarted + 1);
-    _expectPickerQuery(page, repository.queryAt(restarted), filter);
+    _expectPickerQuery(page, repository.queryAt(restarted), remaining);
     repository.complete(
       restarted,
       const ResultFailure(IntentionUnavailableFailure()),
@@ -183,7 +180,7 @@ void defineDailyChoicePickerTagSearchTests(
 
     await tester.tap(find.widgetWithText(FilledButton, 'Try again'));
     await _pumpUntilQueries(tester, repository, restarted + 2);
-    _expectPickerQuery(page, repository.queryAt(restarted + 1), filter);
+    _expectPickerQuery(page, repository.queryAt(restarted + 1), remaining);
     repository.complete(
       restarted + 1,
       _firstPage(_summaries(page, [health], count: 4), revision: 2),
