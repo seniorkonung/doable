@@ -203,7 +203,11 @@ void main() {
           expect(find.byKey(ValueKey(_intention(1))), findsNothing);
           final created = app.runtime.commandCoordinator.acceptTagCreation(
             TagCreationFormKey(),
-            CreateTag(name: before.tag.name, color: null),
+            CreateTag(
+              name: before.tag.name,
+              color: null,
+              placement: TagPlacement.first,
+            ),
           ) as TagCommandAccepted;
           final replacement = await _completed(tester, created.future);
           switch (replacement.result) {

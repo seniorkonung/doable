@@ -373,7 +373,11 @@ void main() {
       await h.confirm(
         (coordinator) => coordinator.acceptTagCreation(
           TagCreationFormKey(),
-          CreateTag(name: rest.name, color: null),
+          CreateTag(
+            name: rest.name,
+            color: null,
+            placement: TagPlacement.first,
+          ),
         ),
         (revision) =>
             TagCreated(TagCreatedChange(revision: revision, after: rest)),

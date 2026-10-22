@@ -195,7 +195,11 @@ void main() {
       final namesake = _tag(3, 'Дом и сад');
       draft.coordinator.acceptTagCreation(
         TagCreationFormKey(),
-        CreateTag(name: namesake.name, color: null),
+        CreateTag(
+          name: namesake.name,
+          color: null,
+          placement: TagPlacement.first,
+        ),
       );
       repository.completeCommand(
         TagCreated(

@@ -138,7 +138,11 @@ Future<void> _mutateAssignments(GraphCommandCoordinator coordinator) async {
     final created = await _expectSuccess(
       coordinator.acceptTagCreation(
         TagCreationFormKey(),
-        CreateTag(name: TagName.fromInput(name), color: null),
+        CreateTag(
+          name: TagName.fromInput(name),
+          color: null,
+          placement: TagPlacement.first,
+        ),
       ),
     );
     expect((created as TagCreated).tag.id, _tag(number));

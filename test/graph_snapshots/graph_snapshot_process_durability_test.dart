@@ -173,7 +173,11 @@ Future<T> _confirm<T extends GraphCommandOutcome>(
 Future<void> _seedGraph(DriftPersonalGraphRepository repository) async {
   final home = (await _confirm<TagCreated>(
     repository,
-    CreateTag(name: TagName.fromInput('Дом'), color: null),
+    CreateTag(
+      name: TagName.fromInput('Дом'),
+      color: null,
+      placement: TagPlacement.first,
+    ),
   )).tag;
   final health = (await _confirm<IntentionSaved>(
     repository,
@@ -217,7 +221,11 @@ Future<void> _exceedThreshold(
   for (var number = 1; number <= graphSnapshotWorkerThreshold + 1; number++) {
     await _confirm<TagCreated>(
       repository,
-      CreateTag(name: TagName.fromInput('$label $number'), color: null),
+      CreateTag(
+        name: TagName.fromInput('$label $number'),
+        color: null,
+        placement: TagPlacement.first,
+      ),
     );
   }
 }

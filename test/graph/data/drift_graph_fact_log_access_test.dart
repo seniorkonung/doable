@@ -79,7 +79,11 @@ void main() {
   }
 
   Future<Tag> createTag(String name) async => (await confirm<TagCreated>(
-    CreateTag(name: TagName.fromInput(name), color: null),
+    CreateTag(
+      name: TagName.fromInput(name),
+      color: null,
+      placement: TagPlacement.first,
+    ),
   )).tag;
 
   /// Все порции записей графа от начала до конца.
@@ -119,7 +123,11 @@ void main() {
       expect(await repository.readCurrentPosition(), 0);
 
       final result = await repository.execute(
-        CreateTag(name: TagName.fromInput('Дом'), color: null),
+        CreateTag(
+          name: TagName.fromInput('Дом'),
+          color: null,
+          placement: TagPlacement.first,
+        ),
       );
 
       expect(result, isA<GraphResultSuccess<Object?, GraphCommandFailure>>());
@@ -239,7 +247,13 @@ void main() {
 
       final first = await repository.readPackages(after: 0, upTo: upTo);
       final command = repository
-          .execute(CreateTag(name: TagName.fromInput('Дом'), color: null))
+          .execute(
+            CreateTag(
+              name: TagName.fromInput('Дом'),
+              color: null,
+              placement: TagPlacement.first,
+            ),
+          )
           .whenComplete(() => completions.add('команда'));
       final second = repository
           .readPackages(after: first.last.position, upTo: upTo)
@@ -371,7 +385,13 @@ void main() {
 
     final first = await repository.readGraphRecords();
     final command = repository
-        .execute(CreateTag(name: TagName.fromInput('Новый'), color: null))
+        .execute(
+          CreateTag(
+            name: TagName.fromInput('Новый'),
+            color: null,
+            placement: TagPlacement.first,
+          ),
+        )
         .whenComplete(() => completions.add('команда'));
     final second = repository
         .readGraphRecords(after: first.next)

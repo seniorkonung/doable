@@ -19,11 +19,36 @@ sealed class TagLifecycleCommand extends TagCommand {
   const TagLifecycleCommand();
 }
 
+/// Место нового тега в ручном порядке задаётся соседом, а не ключом:
+/// ключ вычисляет запись по соседям, прочитанным в той же транзакции.
+sealed class TagPlacement {
+  const TagPlacement();
+
+  static const first = FirstTagPlacement();
+}
+
+/// Перед текущим первым тегом каталога.
+final class FirstTagPlacement extends TagPlacement {
+  const FirstTagPlacement();
+}
+
+/// Сразу после тега [tagId] и перед следующим за ним.
+final class AfterTagPlacement extends TagPlacement {
+  const AfterTagPlacement(this.tagId);
+
+  final TagId tagId;
+}
+
 final class CreateTag extends TagLifecycleCommand {
-  const CreateTag({required this.name, required this.color});
+  const CreateTag({
+    required this.name,
+    required this.color,
+    required this.placement,
+  });
 
   final TagName name;
   final TagColor? color;
+  final TagPlacement placement;
 }
 
 /// Задаёт полное новое редактируемое состояние тега: название и цвет

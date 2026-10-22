@@ -204,7 +204,11 @@ void main() {
       await tester.pumpAndSettle();
       final created = coordinator.acceptTagCreation(
         TagCreationFormKey(),
-        CreateTag(name: TagName.fromInput('Новое имя'), color: null),
+        CreateTag(
+          name: TagName.fromInput('Новое имя'),
+          color: null,
+          placement: TagPlacement.first,
+        ),
       ) as TagCommandAccepted;
       expect((await created.future).result, isA<GraphResultSuccess>());
       await tester.pumpAndSettle();

@@ -1871,7 +1871,11 @@ void main() {
         _tagCommandSuccess(await repository.execute(DeleteTag(homeTagId)));
         final recreated = _tagCommandSuccess(
           await repository.execute(
-            CreateTag(name: TagName.fromInput('Дом'), color: null),
+            CreateTag(
+              name: TagName.fromInput('Дом'),
+              color: null,
+              placement: TagPlacement.first,
+            ),
           ),
         );
         final recreatedTagId = (recreated.value as TagCreated).tag.id;

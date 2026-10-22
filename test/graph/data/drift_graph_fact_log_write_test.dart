@@ -94,14 +94,33 @@ void main() {
 
     final tag = (await expectOnePackage<TagCreated>(
       repository.execute(
-        CreateTag(name: TagName.fromInput('Дом'), color: null),
+        CreateTag(
+          name: TagName.fromInput('Дом'),
+          color: null,
+          placement: TagPlacement.first,
+        ),
       ),
       ['создание тега'],
     )).tag;
     // Тег, вставший перед первым, не переписывает место прежнего тега.
+    final first = (await expectOnePackage<TagCreated>(
+      repository.execute(
+        CreateTag(
+          name: TagName.fromInput('Работа'),
+          color: null,
+          placement: TagPlacement.first,
+        ),
+      ),
+      ['создание тега'],
+    )).tag;
+    // Тег между соседями не переписывает места ни одного из них.
     await expectOnePackage<TagCreated>(
       repository.execute(
-        CreateTag(name: TagName.fromInput('Работа'), color: null),
+        CreateTag(
+          name: TagName.fromInput('Сад'),
+          color: null,
+          placement: AfterTagPlacement(first.id),
+        ),
       ),
       ['создание тега'],
     );
@@ -266,7 +285,11 @@ void main() {
       'отклоняется повреждением без изменения базы и лога фактов', () async {
     final tag = _confirmed<TagCreated>(
       await repository.execute(
-        CreateTag(name: TagName.fromInput('Дом'), color: null),
+        CreateTag(
+          name: TagName.fromInput('Дом'),
+          color: null,
+          placement: TagPlacement.first,
+        ),
       ),
     ).tag;
     await seedGraph(database, () async {

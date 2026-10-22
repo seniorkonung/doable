@@ -269,7 +269,11 @@ void main() {
         const CreateIntention(title: 'Бегать', description: 'По утрам'),
       )).intention;
       final home = (await confirm<TagCreated>(
-        CreateTag(name: TagName.fromInput('Дом'), color: null),
+        CreateTag(
+          name: TagName.fromInput('Дом'),
+          color: null,
+          placement: TagPlacement.first,
+        ),
       )).tag;
       final previous = await repository.readCurrentPosition();
 
@@ -282,7 +286,11 @@ void main() {
       );
       await confirm<TagDeleted>(DeleteTag(home.id));
       await confirm<TagCreated>(
-        CreateTag(name: TagName.fromInput('Работа'), color: null),
+        CreateTag(
+          name: TagName.fromInput('Работа'),
+          color: null,
+          placement: TagPlacement.first,
+        ),
       );
 
       expect(_shown(await summaryAfter(previous)), (
@@ -296,7 +304,11 @@ void main() {
       'изменённый байт снимка на начале диапазона сводку не меняет',
       () async {
         await confirm<TagCreated>(
-          CreateTag(name: TagName.fromInput('Дом'), color: null),
+          CreateTag(
+            name: TagName.fromInput('Дом'),
+            color: null,
+            placement: TagPlacement.first,
+          ),
         );
         final snapshot = await store.writeSnapshot(1);
         final file = File.fromUri(snapshots.uri.resolve(snapshot.fileName));
@@ -304,7 +316,11 @@ void main() {
         bytes[bytes.length ~/ 2] ^= 0xff;
         await file.writeAsBytes(bytes);
         await confirm<TagCreated>(
-          CreateTag(name: TagName.fromInput('Дача'), color: null),
+          CreateTag(
+            name: TagName.fromInput('Дача'),
+            color: null,
+            placement: TagPlacement.first,
+          ),
         );
         await expectLater(
           () async => (await store.readStateAt(2)).records.drain<void>(),

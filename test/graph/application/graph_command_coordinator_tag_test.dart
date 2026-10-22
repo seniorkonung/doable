@@ -237,7 +237,7 @@ TagCommandAccepted _startTag(
 ) => switch (kind) {
   TagCommandKind.create => coordinator.acceptTagCreation(
     TagCreationFormKey(),
-    CreateTag(name: _name, color: null),
+    CreateTag(name: _name, color: null, placement: TagPlacement.first),
   ),
   TagCommandKind.update => coordinator.acceptTagUpdate(
     UpdateTag(tagId: _tagId, name: _name, color: null),

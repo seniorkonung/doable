@@ -75,9 +75,15 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
     CreateTag command, {
     required void Function(TagCommandDiagnosticsStage) onStage,
   }) async {
-    // Новый тег встаёт первым. Текущий первый читается в транзакции записи,
-    // поэтому другая запись не может занять вычисленный ключ.
-    final position = TagPosition.between(null, await _findFirstTagPosition());
+    // Соседи читаются в транзакции записи, поэтому другая запись не может
+    // занять вычисленный ключ.
+    final position = switch (command.placement) {
+      FirstTagPlacement() => TagPosition.between(
+        null,
+        await _findFirstTagPosition(),
+      ),
+      AfterTagPlacement(:final tagId) => await _positionAfterTag(tagId),
+    };
     onStage(TagCommandDiagnosticsStage.write);
     final id = _tagIdGenerator.generate();
     await _database
@@ -111,6 +117,28 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
         .getSingleOrNull();
     if (row == null) return null;
     return decodeStoredTagPosition(requiredStoredString(row.data, 'position'));
+  }
+
+  /// Место сразу после тега [tagId] и перед следующим за ним по месту.
+  Future<TagPosition> _positionAfterTag(TagId tagId) async {
+    final source = await _findTagById(tagId);
+    if (source == null) throw _TagMissing(tagId);
+    final next = await _database
+        .customSelect(
+          'SELECT position FROM tags WHERE position > ? '
+          'ORDER BY position LIMIT 1',
+          variables: [Variable<String>(source.position.value)],
+          readsFrom: {_database.tags},
+        )
+        .getSingleOrNull();
+    return TagPosition.between(
+      source.position,
+      next == null
+          ? null
+          : decodeStoredTagPosition(
+              requiredStoredString(next.data, 'position'),
+            ),
+    );
   }
 
   Future<_CommittedTagCommand> _updateTag(

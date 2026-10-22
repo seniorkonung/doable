@@ -241,7 +241,11 @@ void main() {
         tester,
         app.coordinator.acceptTagCreation(
           TagCreationFormKey(),
-          CreateTag(name: TagName.fromInput('Быт'), color: null),
+          CreateTag(
+            name: TagName.fromInput('Быт'),
+            color: null,
+            placement: TagPlacement.first,
+          ),
         ),
       );
       await _until(tester, _chipStatus(home));

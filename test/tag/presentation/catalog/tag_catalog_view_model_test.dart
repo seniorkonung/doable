@@ -1503,7 +1503,7 @@ final class _Harness {
   Future<void> created(Tag tag, {required int revision}) async {
     final accepted = coordinator.acceptTagCreation(
       TagCreationFormKey(),
-      CreateTag(name: tag.name, color: null),
+      CreateTag(name: tag.name, color: null, placement: TagPlacement.first),
     ) as TagCommandAccepted;
     final r = _Revision(revision);
     repository.completeCommand(

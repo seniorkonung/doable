@@ -615,7 +615,11 @@ final class _BackupsApp {
   Future<void> createTag(String name) async {
     expect(
       await _repository.execute(
-        CreateTag(name: TagName.fromInput(name), color: null),
+        CreateTag(
+          name: TagName.fromInput(name),
+          color: null,
+          placement: TagPlacement.first,
+        ),
       ),
       isA<GraphCommandSucceeded>(),
     );
@@ -683,7 +687,11 @@ final class _RestoreFromSheetApp {
       final repository = container.read(personalGraphRepositoryProvider);
       expect(
         await repository.execute(
-          CreateTag(name: TagName.fromInput('Дом'), color: null),
+          CreateTag(
+            name: TagName.fromInput('Дом'),
+            color: null,
+            placement: TagPlacement.first,
+          ),
         ),
         isA<GraphCommandSucceeded>(),
       );
@@ -692,7 +700,11 @@ final class _RestoreFromSheetApp {
       await container.read(graphBackupsProvider).makeDailyBackupIfDue();
       expect(
         await repository.execute(
-          CreateTag(name: TagName.fromInput('Сад'), color: null),
+          CreateTag(
+            name: TagName.fromInput('Сад'),
+            color: null,
+            placement: TagPlacement.first,
+          ),
         ),
         isA<GraphCommandSucceeded>(),
       );

@@ -103,7 +103,13 @@ void main() {
     expect(
       await ready.container
           .read(personalGraphRepositoryProvider)
-          .execute(CreateTag(name: TagName.fromInput(name), color: null)),
+          .execute(
+            CreateTag(
+              name: TagName.fromInput(name),
+              color: null,
+              placement: TagPlacement.first,
+            ),
+          ),
       isA<GraphCommandSucceeded>(),
     );
   }
@@ -192,7 +198,11 @@ void main() {
         (await confirm<IntentionSaved>(command)).intention;
 
     final home = (await confirm<TagCreated>(
-      CreateTag(name: TagName.fromInput('Дом'), color: null),
+      CreateTag(
+        name: TagName.fromInput('Дом'),
+        color: null,
+        placement: TagPlacement.first,
+      ),
     )).tag;
     final health = await createIntention(
       CreateIntention.withInitialState(

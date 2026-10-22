@@ -549,7 +549,11 @@ final class _RestoreApp {
       final repository = container.read(personalGraphRepositoryProvider);
       expect(
         await repository.execute(
-          CreateTag(name: TagName.fromInput('Дом'), color: null),
+          CreateTag(
+            name: TagName.fromInput('Дом'),
+            color: null,
+            placement: TagPlacement.first,
+          ),
         ),
         isA<GraphCommandSucceeded>(),
       );
@@ -623,7 +627,13 @@ final class _ImportApp {
         expect(
           await container
               .read(personalGraphRepositoryProvider)
-              .execute(CreateTag(name: TagName.fromInput('Дом'), color: null)),
+              .execute(
+                CreateTag(
+                  name: TagName.fromInput('Дом'),
+                  color: null,
+                  placement: TagPlacement.first,
+                ),
+              ),
           isA<GraphCommandSucceeded>(),
         );
       });

@@ -70,7 +70,11 @@ final class TagEditorViewModel extends _$TagEditorViewModel {
     final start = switch (state.context) {
       TagEditorCreating(:final formKey) => _coordinator.acceptTagCreation(
         formKey,
-        CreateTag(name: name, color: state.color),
+        CreateTag(
+          name: name,
+          color: state.color,
+          placement: TagPlacement.first,
+        ),
       ),
       TagEditorRenaming(:final tag) => _coordinator.acceptTagUpdate(
         UpdateTag(tagId: tag.id, name: name, color: state.color),

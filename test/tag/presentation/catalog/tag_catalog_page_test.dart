@@ -217,6 +217,7 @@ void main() {
                       CreateTag(
                         name: TagName.fromInput('Из редактора'),
                         color: null,
+                        placement: TagPlacement.first,
                       ),
                     )
                 as TagCommandAccepted;
@@ -1505,7 +1506,11 @@ void main() {
                 .read(graphCommandCoordinatorProvider.notifier)
                 .acceptTagCreation(
                   TagCreationFormKey(),
-                  CreateTag(name: TagName.fromInput('Другой'), color: null),
+                  CreateTag(
+                    name: TagName.fromInput('Другой'),
+                    color: null,
+                    placement: TagPlacement.first,
+                  ),
                 )
             as TagCommandAccepted;
     repository.completeCommand(

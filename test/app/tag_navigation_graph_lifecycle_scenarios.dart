@@ -615,7 +615,11 @@ void _testTaggedGraphLifecycle() {
         tester,
         (coordinator.acceptTagCreation(
           TagCreationFormKey(),
-          CreateTag(name: TagName.fromInput(name), color: null),
+          CreateTag(
+            name: TagName.fromInput(name),
+            color: null,
+            placement: TagPlacement.first,
+          ),
         ) as TagCommandAccepted).future,
       );
       expect(created.isFailure, isFalse);

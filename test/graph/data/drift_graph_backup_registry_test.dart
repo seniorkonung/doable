@@ -80,7 +80,11 @@ void main() {
   }
 
   Future<Tag> createTag(String name) async => (await confirm<TagCreated>(
-    CreateTag(name: TagName.fromInput(name), color: null),
+    CreateTag(
+      name: TagName.fromInput(name),
+      color: null,
+      placement: TagPlacement.first,
+    ),
   )).tag;
 
   Future<Intention> createIntention(String title) async =>

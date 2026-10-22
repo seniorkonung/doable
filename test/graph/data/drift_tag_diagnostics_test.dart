@@ -184,7 +184,11 @@ void main() {
     const damagedId = 'CANARY-повреждённый-идентификатор';
 
     final created = await graph.execute(
-      CreateTag(name: TagName.fromInput(privateName), color: null),
+      CreateTag(
+        name: TagName.fromInput(privateName),
+        color: null,
+        placement: TagPlacement.first,
+      ),
     );
     expect(created, isA<TagCommandSucceeded>());
     final id =
@@ -212,7 +216,11 @@ void main() {
     expect((unchanged as TagCommandSucceeded).value.value, isA<TagUnchanged>());
 
     final conflict = await graph.execute(
-      CreateTag(name: TagName.fromInput('CANARY-ПЕРЕИМЕНОВАННОЕ'), color: null),
+      CreateTag(
+        name: TagName.fromInput('CANARY-ПЕРЕИМЕНОВАННОЕ'),
+        color: null,
+        placement: TagPlacement.first,
+      ),
     );
     expect(
       (conflict as TagCommandFailed).failure,
@@ -227,7 +235,11 @@ void main() {
     );
 
     final other = await graph.execute(
-      CreateTag(name: TagName.fromInput(otherName), color: null),
+      CreateTag(
+        name: TagName.fromInput(otherName),
+        color: null,
+        placement: TagPlacement.first,
+      ),
     );
     final otherId =
         ((other as TagCommandSucceeded).value.value as TagCreated).tag.id;

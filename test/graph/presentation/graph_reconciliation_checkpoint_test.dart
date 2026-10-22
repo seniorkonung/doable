@@ -340,7 +340,11 @@ void main() {
 
         final recreated = await (coordinator.acceptTagCreation(
           TagCreationFormKey(),
-          CreateTag(name: TagName.fromInput('Общий тег'), color: null),
+          CreateTag(
+            name: TagName.fromInput('Общий тег'),
+            color: null,
+            placement: TagPlacement.first,
+          ),
         ) as TagCommandAccepted).future;
         final newTag =
             ((recreated.confirmedResult as TagCommandSucceeded).value.value
@@ -1491,7 +1495,11 @@ void main() {
       final beforeGroup = harness.neighborhood;
       final accepted = harness.coordinator.acceptTagCreation(
         TagCreationFormKey(),
-        CreateTag(name: TagName.fromInput('Дом'), color: null),
+        CreateTag(
+          name: TagName.fromInput('Дом'),
+          color: null,
+          placement: TagPlacement.first,
+        ),
       ) as TagCommandAccepted;
       const revision = TestGraphRevision(5);
       final tag = tag_domain.Tag(

@@ -1043,7 +1043,11 @@ void main() {
         container,
         (coordinator) => coordinator.acceptTagCreation(
           TagCreationFormKey(),
-          CreateTag(name: TagName.fromInput('Самочувствие'), color: null),
+          CreateTag(
+            name: TagName.fromInput('Самочувствие'),
+            color: null,
+            placement: TagPlacement.first,
+          ),
         ),
       );
       final recreated = (await _tagSnapshot(repository)).tags

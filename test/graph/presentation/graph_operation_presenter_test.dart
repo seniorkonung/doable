@@ -2051,7 +2051,11 @@ final class _PresenterHarness {
     final accepted = switch (kind) {
       TagCommandKind.create => _coordinator.acceptTagCreation(
         TagCreationFormKey(),
-        CreateTag(name: TagName.fromInput('Планы'), color: null),
+        CreateTag(
+          name: TagName.fromInput('Планы'),
+          color: null,
+          placement: TagPlacement.first,
+        ),
       ),
       TagCommandKind.update => _coordinator.acceptTagUpdate(
         UpdateTag(

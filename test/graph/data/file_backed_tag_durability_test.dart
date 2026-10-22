@@ -195,12 +195,20 @@ void main() {
       isEmpty,
     );
     final created = await repository.execute(
-      CreateTag(name: TagName.fromInput('Дом'), color: null),
+      CreateTag(
+        name: TagName.fromInput('Дом'),
+        color: null,
+        placement: TagPlacement.first,
+      ),
     );
     final tagId =
         ((created as TagCommandSucceeded).value.value as TagCreated).tag.id;
     final later = await repository.execute(
-      CreateTag(name: TagName.fromInput('Работа'), color: null),
+      CreateTag(
+        name: TagName.fromInput('Работа'),
+        color: null,
+        placement: TagPlacement.first,
+      ),
     );
     laterTagId =
         ((later as TagCommandSucceeded).value.value as TagCreated).tag.id;

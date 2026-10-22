@@ -146,7 +146,13 @@ void main() {
       expect(
         await ready.container
             .read(personalGraphRepositoryProvider)
-            .execute(CreateTag(name: TagName.fromInput('Дом'), color: null)),
+            .execute(
+              CreateTag(
+                name: TagName.fromInput('Дом'),
+                color: null,
+                placement: TagPlacement.first,
+              ),
+            ),
         isA<GraphCommandSucceeded>(),
       );
 

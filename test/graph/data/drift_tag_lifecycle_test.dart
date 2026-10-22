@@ -101,7 +101,11 @@ void main() {
     final initialRevision = await currentRevision();
 
     final created = await repository.execute(
-      CreateTag(name: _name('Работа'), color: TagColor.green),
+      CreateTag(
+        name: _name('Работа'),
+        color: TagColor.green,
+        placement: TagPlacement.first,
+      ),
     );
     expect(created, isA<TagCommandSucceeded>());
     final newTag = (created as TagCommandSucceeded).value.value as TagCreated;
@@ -191,7 +195,11 @@ void main() {
   test('новый тег встаёт перед первым по месту, а не по созданию', () async {
     Future<String> createdPosition(String name) async {
       final result = await repository.execute(
-        CreateTag(name: _name(name), color: null),
+        CreateTag(
+          name: _name(name),
+          color: null,
+          placement: TagPlacement.first,
+        ),
       );
       final tag =
           ((result as TagCommandSucceeded).value.value as TagCreated).tag;
@@ -229,9 +237,94 @@ void main() {
     );
   });
 
+  test('тег с размещением после исходного встаёт сразу за ним и не меняет '
+      'места остальных тегов', () async {
+    seedRawGraph(raw, () {
+      for (final (number, name, position) in [
+        (6, 'Дом', 'a0'),
+        (7, 'Работа', 'a1'),
+        (8, 'Отдых', 'a2'),
+      ]) {
+        raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
+          _uuid(number),
+          name,
+          position,
+        ]);
+      }
+    });
+    TagId id(int number) =>
+        (TagId.decode(_uuid(number)) as TagIdDecodingSuccess).id;
+    Future<void> createAfter(String name, int source) async {
+      final result = await repository.execute(
+        CreateTag(
+          name: _name(name),
+          color: null,
+          placement: AfterTagPlacement(id(source)),
+        ),
+      );
+      expect(result, isA<TagCommandSucceeded>());
+    }
+
+    Future<List<String>> catalogNames() async =>
+        ((await repository.getTagCatalog(const TagCatalogBrowseMode()))
+                as TagCatalogSuccess)
+            .value
+            .items
+            .map((tag) => tag.name.value)
+            .toList();
+    List<List<Object?>> seededPositions() => raw
+        .select(
+          'SELECT id, position FROM tags WHERE id IN (?, ?, ?) ORDER BY id',
+          [_uuid(6), _uuid(7), _uuid(8)],
+        )
+        .map((row) => row.values)
+        .toList();
+    final positionsBefore = seededPositions();
+
+    await createAfter('Спорт', 6);
+    expect(await catalogNames(), ['Дом', 'Спорт', 'Работа', 'Отдых']);
+    await createAfter('Сад', 8);
+    expect(await catalogNames(), ['Дом', 'Спорт', 'Работа', 'Отдых', 'Сад']);
+    expect(seededPositions(), positionsBefore);
+  });
+
+  test('отсутствующий исходный тег отклоняет создание без записи', () async {
+    await repository.execute(
+      CreateTag(name: _name('Дом'), color: null, placement: TagPlacement.first),
+    );
+    final missing = (TagId.decode(_uuid(8)) as TagIdDecodingSuccess).id;
+    final before = await currentRevision();
+
+    final result = await repository.execute(
+      CreateTag(
+        name: _name('Работа'),
+        color: null,
+        placement: AfterTagPlacement(missing),
+      ),
+    );
+
+    expect(
+      (result as TagCommandFailed).failure,
+      isA<TagNotFoundFailure>().having(
+        (failure) => failure.tagId,
+        'исходный тег',
+        missing,
+      ),
+    );
+    expect(
+      (await currentRevision()).compareTo(before),
+      GraphRevisionOrder.same,
+    );
+    expect(raw.select('SELECT name FROM tags').single['name'], 'Дом');
+  });
+
   test('повтор названия и цвета не меняет ревизию, смена регистра разрешена, чужое имя занято', () async {
     final first = await repository.execute(
-      CreateTag(name: _name('Straße'), color: TagColor.blue),
+      CreateTag(
+        name: _name('Straße'),
+        color: TagColor.blue,
+        placement: TagPlacement.first,
+      ),
     );
     final id =
         ((first as TagCommandSucceeded).value.value as TagCreated).tag.id;
@@ -259,7 +352,11 @@ void main() {
 
     final revisionBeforeConflict = await currentRevision();
     final duplicate = await repository.execute(
-      CreateTag(name: _name('straße'), color: null),
+      CreateTag(
+        name: _name('straße'),
+        color: null,
+        placement: TagPlacement.first,
+      ),
     );
     expect(duplicate, isA<TagCommandFailed>());
     expect(
@@ -281,8 +378,20 @@ void main() {
     'конкурирующие команды сохраняют единственность и исходную идентичность',
     () async {
       final results = await Future.wait([
-        repository.execute(CreateTag(name: _name('Дом'), color: null)),
-        repository.execute(CreateTag(name: _name('ДОМ'), color: null)),
+        repository.execute(
+          CreateTag(
+            name: _name('Дом'),
+            color: null,
+            placement: TagPlacement.first,
+          ),
+        ),
+        repository.execute(
+          CreateTag(
+            name: _name('ДОМ'),
+            color: null,
+            placement: TagPlacement.first,
+          ),
+        ),
       ]);
       expect(results.whereType<TagCommandSucceeded>().length, 1);
       expect(results.whereType<TagCommandFailed>().length, 1);
@@ -298,7 +407,11 @@ void main() {
       );
 
       final other = await repository.execute(
-        CreateTag(name: _name('Работа'), color: TagColor.blue),
+        CreateTag(
+          name: _name('Работа'),
+          color: TagColor.blue,
+          placement: TagPlacement.first,
+        ),
       );
       final otherId =
           ((other as TagCommandSucceeded).value.value as TagCreated).tag.id;
@@ -329,7 +442,7 @@ void main() {
 
   test('наблюдатель получает переименование подтверждённого тега', () async {
     final created = await repository.execute(
-      CreateTag(name: _name('Дом'), color: null),
+      CreateTag(name: _name('Дом'), color: null, placement: TagPlacement.first),
     );
     final id =
         ((created as TagCommandSucceeded).value.value as TagCreated).tag.id;
@@ -354,7 +467,9 @@ void main() {
 
   test('отсутствующий тег не заменяется новым одноимённым', () async {
     final missing = (TagId.decode(_uuid(8)) as TagIdDecodingSuccess).id;
-    await repository.execute(CreateTag(name: _name('Дом'), color: null));
+    await repository.execute(
+      CreateTag(name: _name('Дом'), color: null, placement: TagPlacement.first),
+    );
     final before = await currentRevision();
     final result = await repository.execute(
       UpdateTag(tagId: missing, name: _name('Дом'), color: null),

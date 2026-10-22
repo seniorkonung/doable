@@ -633,7 +633,11 @@ void main() {
     await completeTagCommand(
       container,
       repository,
-      CreateTag(name: newHealth.name, color: null),
+      CreateTag(
+        name: newHealth.name,
+        color: null,
+        placement: TagPlacement.first,
+      ),
       TagCommandSucceeded(
         ConfirmedGraphResult(
           revision: revision,
@@ -936,7 +940,11 @@ void main() {
     await completeTagCommand(
       container,
       repository,
-      CreateTag(name: newHealth.name, color: null),
+      CreateTag(
+        name: newHealth.name,
+        color: null,
+        placement: TagPlacement.first,
+      ),
       TagCommandSucceeded(
         ConfirmedGraphResult(
           revision: created,

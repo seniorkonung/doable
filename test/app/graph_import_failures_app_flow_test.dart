@@ -133,7 +133,11 @@ Future<ImportAppHarness> _startApp(WidgetTester tester) async {
     seed: (graph) async {
       expect(
         await graph.execute(
-          CreateTag(name: TagName.fromInput('Дом'), color: null),
+          CreateTag(
+            name: TagName.fromInput('Дом'),
+            color: null,
+            placement: TagPlacement.first,
+          ),
         ),
         isA<GraphCommandSucceeded>(),
       );
