@@ -5,15 +5,15 @@
 **Format version:** 1
 **Result:** No unresolved findings
 **Coverage status:** Complete
-**Summary:** Задачи 2.17–2.23 выполнены по существу. Отметка созданного тега теперь принадлежит открытию панели. Диктор объявляет отметку строки один раз — состоянием отметки. Недостижимые отказы чтения убраны из модели панели. Вариант листа связан с функцией показа типом. Новые проверки листа «Новый тег», прежнего каталога и модуля основ ловят заявленные регрессии. Полная проверка фазы на проверяемой голове не проходит. Задача 2.19 убрала слова отметки из доступного названия строки, а сквозная проверка `test/app/tag_app_flow_test.dart` по-прежнему ищет строку по названию «Работа, отмечен». Исправление этой проверки отслеживает невыполненная задача 2.24 фазы 2, поэтому фаза 2 будет готова к завершению только после неё. Принятых остаточных рисков нет.
+**Summary:** Задача 2.24 выполнена по существу. Сквозная проверка «серия назначений и снятий сохраняется без сообщений об успехе» теперь ждёт строку тега «Работа», у которой доступное название — только название тега, а отметку передаёт отмеченное состояние. Неотмеченная строка ожидание не завершает. Остальные шаги и утверждения проверки не изменились. Полная проверка фазы `mise run check` на проверяемой голове проходит, так что фаза 2 готова к завершению. Принятых остаточных рисков нет.
 
 ## Review target
 
-- **Baseline ref:** a23257b331cb017014f20cbe132e6504f0fd9ae1
-- **Base commit:** a23257b331cb017014f20cbe132e6504f0fd9ae1
-- **Reviewed head:** d3e9f32eb2bf61df4e6296518202ae4025965dd8
-- **Target commits:** ["bf30523e3fa4584b7c3bc2bf042d3e85c3093646","ef372b90be6ad1e3040733f8e9fdf7885452739f","fef5be7eddd89ce7e57b4b3a3e094662dfcf9563","bc2bb1b2c61c57a56994adadeae11bdf22866c44","2d28d322c21f1ca04b75c44e6be8796c2cd71663","b1b8ec78e4b0bbbe2629e957cd7ab01611fb3ad3","d3e9f32eb2bf61df4e6296518202ae4025965dd8"]
-- **Reviewable paths:** ["lib/l10n/app_en.arb","lib/l10n/app_localizations.dart","lib/l10n/app_localizations_en.dart","lib/l10n/app_localizations_ru.dart","lib/l10n/app_ru.arb","lib/src/app/quick_creation/quick_creation_daily_choice_start_sheet.dart","lib/src/app/quick_creation/quick_creation_mode_menu.dart","lib/src/data_transfer/presentation/backups_sheet.dart","lib/src/data_transfer/presentation/export_data_sheet.dart","lib/src/design_system/components/action_sheet.dart","lib/src/design_system/components/sheet.dart","lib/src/design_system/components/tag_row.dart","lib/src/graph/presentation/graph_operation_presenter.dart","lib/src/tag/presentation/editor/tag_sheet.dart","lib/src/tag/presentation/panel/tags_panel.dart","lib/src/tag/presentation/panel/tags_panel_context.dart","lib/src/tag/presentation/panel/tags_panel_state.dart","lib/src/tag/presentation/panel/tags_panel_view_model.dart","lib/src/tag/presentation/panel/tags_panel_view_model.g.dart","openspec/changes/add-tags-panel/tasks.md","test/design_system/sheet_test.dart","test/design_system/tag_row_test.dart","test/graph/presentation/graph_operation_presenter_test.dart","test/tag/presentation/catalog/tag_catalog_page_test.dart","test/tag/presentation/editor/tag_sheet_test.dart","test/tag/presentation/panel/tags_panel_test.dart","test/tag/presentation/panel/tags_panel_view_model_test.dart","test/tag/presentation/tag_accessibility_test.dart"]
+- **Baseline ref:** a9cd702a91c8f50542c98f0b1ef3f83d3a8a7c84
+- **Base commit:** a9cd702a91c8f50542c98f0b1ef3f83d3a8a7c84
+- **Reviewed head:** bf7624bb30f60feb8612fd8965ad83d0f504a64c
+- **Target commits:** ["bf7624bb30f60feb8612fd8965ad83d0f504a64c"]
+- **Reviewable paths:** ["openspec/changes/add-tags-panel/tasks.md","test/app/tag_app_flow_test.dart"]
 - **OpenSpec change:** add-tags-panel
 - **OpenSpec schema:** intent-driven
 - **Target scope:** User-requested bounded range
@@ -22,54 +22,21 @@
 
 ## Reviewed increment
 
-### U1 · Отметка созданного тега принадлежит открытию панели
+### U1 · Сквозная проверка назначения ждёт отмеченную строку по семантике строки
 
-- **Work items:** ["2.18"]
-- **Requirements and scenarios:** ["tag-management: Создание тега из панели", "tag-management: Закрытие панели до подтверждения создания", "tag-management: Закрытие листа до подтверждения создания", "tag-management: Выбор тегов намерения в панели", "design: решение 5", "ADR-0040"]
-- **Affected boundary:** Человек, создающий тег в листе поверх панели со страницы намерения; координатор команд графа и хранилище
-- **Implementation target:** ["lib/src/tag/presentation/panel/tags_panel_context.dart","lib/src/tag/presentation/panel/tags_panel_view_model.dart","lib/src/tag/presentation/panel/tags_panel.dart","test/tag/presentation/panel/tags_panel_test.dart"]
-- **Applicable constraints and non-goals:** Принятое создание завершается независимо от закрытия листа и панели. Изменения назначений одного намерения идут последовательно, без очереди. Контексты черновика и фильтра — фаза 4.
-
-### U2 · Отметка строки тега объявляется диктору один раз
-
-- **Work items:** ["2.19"]
-- **Requirements and scenarios:** ["tag-management: Локализация и доступность управления тегами", "tag-management: Отметка тега объявляется один раз", "design: решение 10", "ADR-0030"]
-- **Affected boundary:** Пользователи экранного диктора в панели тегов; строка тега модуля основ
-- **Implementation target:** ["lib/src/design_system/components/tag_row.dart","lib/src/tag/presentation/panel/tags_panel.dart","lib/l10n/app_en.arb","lib/l10n/app_localizations.dart","lib/l10n/app_localizations_en.dart","lib/l10n/app_localizations_ru.dart","lib/l10n/app_ru.arb","lib/src/tag/presentation/panel/tags_panel_view_model.g.dart","test/design_system/tag_row_test.dart","test/tag/presentation/panel/tags_panel_test.dart","test/tag/presentation/tag_accessibility_test.dart"]
-- **Applicable constraints and non-goals:** Компоненты модуля основ получают готовые тексты и подписи. Нажатие, его недоступность, вид строки и отсутствие отдельного элемента навигации у точки не меняются. В коммите задачи у `tags_panel_view_model.g.dart` изменился только хеш генерации.
-- **Excluded change scope:** Подпись удержания и отметки режима фильтра появятся в фазах 3 и 4.
-
-### U3 · Модель панели обрабатывает только достижимые отказы чтения
-
-- **Work items:** ["2.20"]
-- **Requirements and scenarios:** ["tag-management: Получение каталога тегов и безопасные ошибки", "tag-management: Неизвестный отказ получения каталога", "tag-management: Согласование панели тегов с подтверждёнными изменениями", "tag-management: Запоздалое чтение после изменения тега", "tag-management: Фоновое обновление сохраняет список"]
-- **Affected boundary:** Панель тегов и контракт чтения каталога `TagReadContract.getTagCatalog`
-- **Implementation target:** ["lib/src/tag/presentation/panel/tags_panel_state.dart","lib/src/tag/presentation/panel/tags_panel_view_model.dart","lib/src/tag/presentation/panel/tags_panel_view_model.g.dart","lib/src/tag/presentation/panel/tags_panel.dart","test/tag/presentation/panel/tags_panel_view_model_test.dart"]
-- **Applicable constraints and non-goals:** Видимое поведение панели не меняется: те же сообщения, повтор только для доказанно устранимой недоступности, отсутствие намерения — отдельное состояние. Прежний каталог со своим перехватом исключений остаётся до фазы 4.
-
-### U4 · Проверки конфликта при записи и причины недопустимого названия
-
-- **Work items:** ["2.17", "2.21"]
-- **Requirements and scenarios:** ["tag-management: Уникальность названия тега", "tag-management: Допустимое название тега", "tag-management: Согласование панели тегов с подтверждёнными изменениями"]
-- **Affected boundary:** Форма прежней страницы каталога и общая поверхность; лист «Новый тег» и репозиторий тегов
-- **Implementation target:** ["test/tag/presentation/catalog/tag_catalog_page_test.dart","test/tag/presentation/editor/tag_sheet_test.dart"]
-- **Applicable constraints and non-goals:** Только проверки, поведение приложения не меняется. Обычные тесты обходятся без замеров времени и расширенных тайм-аутов.
-
-### U5 · Вариант листа связан с функцией показа; отменённое касание и рост содержимого проверены
-
-- **Work items:** ["2.22", "2.23"]
-- **Requirements and scenarios:** ["tag-management: Панель тегов", "tag-management: Согласование панели тегов с подтверждёнными изменениями", "design: решения 7 и 9", "ADR-0041", "ADR-0042", "ADR-0032"]
-- **Affected boundary:** Модуль основ и все места показа листов: панель тегов, лист «Новый тег», экспорт, резервные копии, меню режима быстрого создания и лист начала дневного выбора; общая поверхность результатов операций
-- **Implementation target:** ["lib/src/design_system/components/sheet.dart","lib/src/design_system/components/action_sheet.dart","lib/src/app/quick_creation/quick_creation_daily_choice_start_sheet.dart","lib/src/app/quick_creation/quick_creation_mode_menu.dart","lib/src/data_transfer/presentation/backups_sheet.dart","lib/src/data_transfer/presentation/export_data_sheet.dart","lib/src/tag/presentation/editor/tag_sheet.dart","lib/src/tag/presentation/panel/tags_panel.dart","lib/src/graph/presentation/graph_operation_presenter.dart","test/design_system/sheet_test.dart","test/graph/presentation/graph_operation_presenter_test.dart"]
-- **Applicable constraints and non-goals:** Лист показывается над корневым навигатором, учитывает клавиатуру, возвращает результат типа `T` и может размещать сообщения общей поверхности. Затемнение, «назад» и семантика маршрута остаются за Material. Вид, жесты, закрытие и размещение сообщений у мест показа не меняются.
+- **Work items:** ["2.24"]
+- **Requirements and scenarios:** ["tag-management: Выбор тегов намерения в панели", "tag-management: Отметка тега объявляется один раз", "tag-management: Локализация и доступность управления тегами"]
+- **Affected boundary:** Сквозная проверка панели тегов в запущенном приложении: страница намерения, панель тегов и хранилище назначений
+- **Implementation target:** ["test/app/tag_app_flow_test.dart"]
+- **Applicable constraints and non-goals:** Меняется только проверка. Поведение приложения и семантика строки тега остаются прежними. Остальные шаги и утверждения проверки не меняются. Обычные тесты обходятся без замеров времени и расширенных тайм-аутов.
 
 ## Pass coverage
 
 | Pass | Status | Evidence or limitation |
 |---|---|---|
-| Independent decision review | Complete | Два свежих изолированных ревьюера по `implementation-decision-review` получили нейтральные брифы без артефактов планирования, истории коммитов и прежнего отчёта. Первый получил общий бриф U1, U2, U3 и U5 и все 25 их путей: эти единицы делят `tags_panel.dart`. Второй проверил 2 пути U4. Наборы путей не пересекаются. Оба сообщили о полном покрытии своих путей. Первый ревьюер один раз вывел каталогом `test/tag` diff двух путей U4, но не опирался на них. Второй не читал изменённые `tag_sheet.dart` и презентер. Оба файла входят в цель первого ревьюера, а допущение об активном приложении оркестратор подтвердил по `graph_operation_presenter.dart:118-131`. |
-| OpenSpec conformance | Complete | Проверки шли в этой рабочей копии: она чистая, HEAD = d3e9f32eb2bf61df4e6296518202ae4025965dd8. `mise run check`: код 1. `dart format` и `flutter analyze` прошли без замечаний. Из обычных тестов 3479 прошли, 1 упал — `test/app/tag_app_flow_test.dart`, «серия назначений и снятий сохраняется без сообщений об успехе»: проверка ищет строку по прежнему названию «Работа, отмечен», исправление отслеживает задача 2.24. Отдельный прогон этой проверки снова падает. `mise run check:process-tests` отдельно: код 0, 18 прошли. `mise run codegen-check`: код 0. `mise exec --no-deps -- openspec validate add-tags-panel --strict --no-interactive --json`: valid. Критерии задач 2.17–2.23 сопоставлены с кодом и тестами диапазона. В `tasks.md` диапазон только отметил задачи выполненными. Сборка APK и проверки на устройстве не выполнялись. |
-| Code quality | Complete | Оркестратор применил линзы `code-review-and-quality` ко всем путям поставки на проверяемой голове. Проверены закрытие открытия через `PopScope` для «Готово», свайпа шапки, затемнения и «назад», а также путь удаления маршрута, где отметку не даёт `ref.mounted`. Сверены контракт `getTagCatalog` с перехватом всех исключений, сериализация чтений и ревизий без `_precedesShown`, исчерпывающий разбор `TagsPanelReadFailure` и семантика `TagRow`. Просмотрены также закрытые возможности листа, все шесть мест показа, отсутствие ссылок на `DoableSheetSize` и удалённые строки локализации. Наконец, проверены потребители в `test/` и необходимость новых проверок. |
+| Independent decision review | Complete | Свежий изолированный ревьюер работал по `implementation-decision-review`. Он получил нейтральный бриф без артефактов планирования, истории коммитов и прежнего отчёта. Его цель — единственный путь поставки `test/app/tag_app_flow_test.dart` на голове bf7624bb30f60feb8612fd8965ad83d0f504a64c. Ревьюер сообщил о полном покрытии и замечаний не нашёл. Он прогнал `mise exec --no-deps -- flutter test test/app/tag_app_flow_test.dart`: прошли все 3 проверки. Ограничение, которое ревьюер раскрыл сам: отрицательный прогон с неотмеченной строкой не выполнялся. То, что ожидание падает на неотмеченной строке, установлено разбором кода `TagRow` и данных фикстуры. |
+| OpenSpec conformance | Complete | Проверки шли в этой рабочей копии: она чистая, HEAD = bf7624bb30f60feb8612fd8965ad83d0f504a64c. `mise run check`: код 0. Внутри него `dart format` и `flutter analyze` прошли без замечаний, все 3480 обычных тестов прошли, а `check:process-tests` прошёл 18 из 18. `mise exec --no-deps -- openspec validate add-tags-panel --strict --no-interactive --json`: valid. Все критерии 2.24 сопоставлены с диффом. В `tasks.md` диапазон только отметил 2.24 выполненной, и это подтверждено. Сборка APK и проверки на устройстве не выполнялись. |
+| Code quality | Complete | Оркестратор применил линзы `code-review-and-quality` к `test/app/tag_app_flow_test.dart` на проверяемой голове. Сверено несколько вещей. Во-первых, искатель `_checkedRow` против `MergeSemantics`/`Semantics(label, checked)` в `lib/src/design_system/components/tag_row.dart:43-47`. Во-вторых, название «Работа» тега `lastTagNumber` в `test/support/tag_storage_fixture.dart`. В-третьих, использование существующего опроса `_until` без новых тайм-аутов. Наконец, сверена идиома проверок отмеченного состояния `flagsCollection.isChecked` / `CheckedState` с другими сквозными проверками, например `test/app/long_term_relation_app_flow_test.dart:128`. |
 
 ## Findings
 
@@ -77,12 +44,8 @@ No unresolved findings remain in the implementation review.
 
 ## Review coverage
 
-Просмотрены все 7 целевых коммитов. Задача 2.18 сопоставлена с U1, 2.19 — с U2, 2.20 — с U3, 2.17 и 2.21 — с U4, 2.22 и 2.23 — с U5. `tasks.md` служит свидетельством планирования с отметками выполнения. Несопоставленных путей нет. Кода фаз 3–4 в диапазоне нет.
+Просмотрен единственный целевой коммит bf7624bb30f60feb8612fd8965ad83d0f504a64c. Задача 2.24 сопоставлена с U1, а `tasks.md` служит свидетельством планирования с отметкой выполнения. Несопоставленных путей нет. Кода приложения в диапазоне нет.
 
-Подтверждено следующее. В U1 `PopScope.onPopInvokedWithResult` закрывает открытие при любом `Navigator.pop` маршрута панели ещё до закрывающей анимации. Закрытие листа «Новый тег» закрывает другой маршрут и открытие не трогает. Новая проверка падала бы на прежнем коде: модель во время анимации жива, а строка создания видна. В U2 строка отдаёт название, а отметку передаёт одно состояние `checked`. Ни `lib`, ни `test` больше не ссылаются на удалённые ключи, но строковый литерал в сквозной проверке остался; его замену отслеживает задача 2.24. В U3 `_readTagCatalog` перехватывает любое исключение и возвращает `TagCatalogError`. Показанная ревизия не опережает требуемую, потому что применённый пакет поднимает обе. Чтения сериализованы, поэтому без `_precedesShown` запоздалое чтение по-прежнему отсекается. В U4 конфликт действительно обнаруживается при записи, ожидание идёт по появлению сообщения, а не по времени, а 256 графемных кластеров — минимальный выход за предел. В U5 закрытые конструкторы возможностей не дают построить вариант листа без своей функции показа, а обе функции различаются только `enableDrag`. Проверки отменённого касания и роста содержимого падали бы при нарушении.
+Подтверждено следующее. `_checkedRow` ищет внутри нажатой строки узел семантики, у которого название ровно «Работа» и `isChecked == CheckedState.isTrue`. Строка объединяет семантику: название приходит из `Semantics.label` (в панели это название тега), видимый текст исключён, а `checked` выставлен только при отметке. Поэтому прежнее название «Работа, отмечен» больше не ищется, а неотмеченная строка ожидание не завершает: через 100 попыток `_until` проверка падает. Раньше времени ожидание тоже не завершится. По фикстуре «Работа» не назначен намерению 1, а единственное назначение «Дом» снимается ещё до шага с панелью. Если бы семантика была выключена, `debugSemantics` вернул бы null, и проверка упала бы, а не прошла. Утверждения об отсутствии `SnackBar`, о строках `tag_assignments`, о трёх завершениях операций и о согласованности после повторного открытия не изменились.
 
-Часть кандидатов отклонена. Замечание «отдельный `label` у `TagRow` позволяет вызывающему снова продублировать отметку» не принято. Отдельное доступное название требуется самим изменением: по требованию «Локализация и доступность управления тегами» оно сообщает о действиях по удержанию (фаза 3) и о надобностях режима фильтра (фаза 4). Двойное объявление в текущем коде недостижимо, а `tags_panel_test` и `tag_accessibility_test` закрепляют название без слов отметки. Возможность листа из объемлющего построителя можно передать во вложенную функцию показа, и несогласованная пара скомпилируется. Это тоже не принято замечанием: в текущем коде такого пути нет, а Dart не умеет ограничить значение областью замыкания без несоразмерной сложности. Критерий 2.23 — нельзя получить возможность вне функции показа — выполнен закрытыми конструкторами.
-
-Nit, не замечание: в описании `GraphOperationPresenter` (`graph_operation_presenter.dart:31`) после правки 2.23 осталась одна не перенесённая строка комментария длиннее соседних.
-
-Сборка APK и проверки на устройстве не выполнялись. Ручные проверки остаются за пользователем: объявление отметки строки TalkBack один раз, закрытие панели свайпом шапки во время создания тега, отменённое системой касание шапки и вид всех листов после перехода на новые функции показа.
+Сборка APK и проверки на устройстве не выполнялись. Ручные проверки предыдущих задач фазы 2 остаются за пользователем: объявление отметки строки TalkBack один раз, закрытие панели свайпом шапки во время создания тега, отменённое системой касание шапки и вид всех листов после перехода на новые функции показа.
