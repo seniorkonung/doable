@@ -1738,11 +1738,6 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String intentionTagConditionDeleted(String condition) {
-    return '$condition (тег удалён)';
-  }
-
-  @override
   String intentionTagConditionPresentSemantics(String tagName) {
     return '$tagName, должен быть';
   }
@@ -1750,11 +1745,6 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String intentionTagConditionAbsentSemantics(String tagName) {
     return '$tagName, должен отсутствовать';
-  }
-
-  @override
-  String intentionTagConditionDeletedSemantics(String condition) {
-    return '$condition, тег удалён';
   }
 
   @override

@@ -2605,12 +2605,6 @@ abstract class AppLocalizations {
   /// **'not {tagName}'**
   String intentionTagConditionAbsent(String tagName);
 
-  /// Текст чипа условия по удалённому тегу с последним известным названием
-  ///
-  /// In en, this message translates to:
-  /// **'{condition} (tag deleted)'**
-  String intentionTagConditionDeleted(String condition);
-
   /// Семантика условия с надобностью «должен быть»
   ///
   /// In en, this message translates to:
@@ -2622,12 +2616,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{tagName}, must be absent'**
   String intentionTagConditionAbsentSemantics(String tagName);
-
-  /// Семантика условия по удалённому тегу
-  ///
-  /// In en, this message translates to:
-  /// **'{condition}, tag deleted'**
-  String intentionTagConditionDeletedSemantics(String condition);
 
   /// Назначение нажатия на чип условия
   ///

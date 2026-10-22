@@ -726,7 +726,6 @@ IntentionTagCondition _condition(
   requirement: requirement,
   name: tag.name,
   color: tag.color,
-  isDeleted: false,
 );
 
 TagId _id(int number) => (TagId.decode(

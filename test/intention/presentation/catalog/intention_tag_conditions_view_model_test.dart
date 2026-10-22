@@ -8,7 +8,6 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_purp
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
-import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
@@ -37,7 +36,7 @@ void main() {
 
     h.update(2, _tag(1, 'Здоровье'), _tag(1, 'Здоровье', color: TagColor.blue));
 
-    expect(h.shown, [(_id(1), _present, 'Здоровье', false)]);
+    expect(h.shown, [(_id(1), _present, 'Здоровье')]);
     expect(h.colors, {_id(1): TagColor.blue});
     // Идентичность и надобность условия прежние: новая выдача не начинается.
     expect(h.appliedFilter, IntentionTagFilter(requiredTagIds: [_id(1)]));
@@ -59,10 +58,7 @@ void main() {
     h.delete(2, _id(1));
     h.delete(3, _id(4));
 
-    expect(h.shown, [
-      (_id(2), _absent, 'Спорт', false),
-      (_id(3), _present, 'Отдых', false),
-    ]);
+    expect(h.shown, [(_id(2), _absent, 'Спорт'), (_id(3), _present, 'Отдых')]);
     // Фильтр без снятых тегов применяет модель каталога по тому же пакету.
     h.appliedFilter;
     expect(h.repository.queries, hasLength(queries));
@@ -84,159 +80,20 @@ void main() {
     expect(h.conditions, isEmpty);
   });
 
-  test('устаревший выбор предъявляется с актуальными названием и '
-      'цветом', () async {
+  test('выбор уже удалённого тега из устаревшего снимка не меняет условий и '
+      'выдачи', () {
     final h = _Harness();
     addTearDown(h.dispose);
-    // Редактирование подтверждено до выбора: тег ещё не был условием.
-    h.update(
-      2,
-      _tag(1, 'Здоровье'),
-      _tag(1, 'Самочувствие', color: TagColor.blue),
-    );
-
-    h.select(_tag(1, 'Здоровье'), _present, revision: 1);
-
-    // Поиск применяется сразу, не дожидаясь уточнения предъявления.
-    expect(h.appliedFilter, IntentionTagFilter(requiredTagIds: [_id(1)]));
-    expect(h.shown, [(_id(1), _present, 'Здоровье', false)]);
-    expect(h.colors, {_id(1): null});
-    expect(h.reads.queries, [_id(1)]);
-
-    h.reads.tag(0, _tag(1, 'Самочувствие', color: TagColor.blue), revision: 2);
-    await pumpEventQueue();
-    expect(h.shown, [(_id(1), _present, 'Самочувствие', false)]);
-    expect(h.colors, {_id(1): TagColor.blue});
-
-    // Следующий выбор из снимка актуальной ревизии чтения не требует.
-    h.select(_tag(2, 'Спорт'), _absent, revision: 2);
-    expect(h.reads.queries, hasLength(1));
-  });
-
-  test('устаревший выбор удалённого тега получает признак удаления', () async {
-    final h = _Harness();
-    addTearDown(h.dispose);
+    h.select(_tag(2, 'Спорт'), _present);
     h.delete(2, _id(1));
+    h.appliedFilter;
+    final queries = h.repository.queries.length;
 
     h.select(_tag(1, 'Здоровье'), _absent, revision: 1);
-    h.reads.tag(0, null, revision: 2);
-    await pumpEventQueue();
 
-    expect(h.shown, [(_id(1), _absent, 'Здоровье', true)]);
-    expect(h.appliedFilter, IntentionTagFilter(excludedTagIds: [_id(1)]));
-  });
-
-  test('выбор без известной ревизии графа уточняется чтением', () async {
-    final h = _Harness(knownRevision: null);
-    addTearDown(h.dispose);
-
-    h.select(_tag(1, 'Здоровье'), _present, revision: 1);
-    expect(h.reads.queries, [_id(1)]);
-    h.reads.tag(0, _tag(1, 'Самочувствие'), revision: 4);
-    await pumpEventQueue();
-
-    expect(h.shown, [(_id(1), _present, 'Самочувствие', false)]);
-  });
-
-  test('ошибка чтения тегов не ставит признак удаления, а следующий '
-      'подтверждённый пакет повторяет уточнение', () async {
-    final h = _Harness();
-    addTearDown(h.dispose);
-    h.delete(2, _id(1));
-    h.select(_tag(1, 'Здоровье'), _present, revision: 1);
-
-    h.reads.fail(0, const TagReadUnavailableFailure());
-    await pumpEventQueue();
-    expect(h.shown, [(_id(1), _present, 'Здоровье', false)]);
-    expect(h.reads.queries, hasLength(1));
-
-    h.package(3, [
-      TagCreatedChange(revision: const _Revision(3), after: _tag(7, 'Дом')),
-    ]);
-    expect(h.reads.queries, [_id(1), _id(1)]);
-    h.reads.throwError(1);
-    await pumpEventQueue();
-    expect(h.shown, [(_id(1), _present, 'Здоровье', false)]);
-
-    h.package(4, [
-      TagCreatedChange(revision: const _Revision(4), after: _tag(8, 'Быт')),
-    ]);
-    h.reads.tag(2, null, revision: 4);
-    await pumpEventQueue();
-    expect(h.shown, [(_id(1), _present, 'Здоровье', true)]);
-
-    // Подтверждённое предъявление больше не перечитывается.
-    h.package(5, [
-      TagCreatedChange(revision: const _Revision(5), after: _tag(9, 'Сад')),
-    ]);
-    expect(h.reads.queries, hasLength(3));
-  });
-
-  test(
-    'позднее чтение не возвращает название и цвет до более нового пакета',
-    () async {
-      final h = _Harness();
-      addTearDown(h.dispose);
-      h.rename(2, _tag(1, 'Здоровье'), 'Самочувствие');
-      h.select(_tag(1, 'Здоровье'), _present, revision: 1);
-
-      h.update(
-        3,
-        _tag(1, 'Самочувствие'),
-        _tag(1, 'Тонус', color: TagColor.green),
-      );
-      expect(h.shown, [(_id(1), _present, 'Тонус', false)]);
-      expect(h.colors, {_id(1): TagColor.green});
-      h.reads.tag(0, _tag(1, 'Самочувствие'), revision: 2);
-      await pumpEventQueue();
-
-      expect(h.shown, [(_id(1), _present, 'Тонус', false)]);
-      expect(h.colors, {_id(1): TagColor.green});
-      // Пакет о самом теге подтвердил предъявление: повтор чтения не нужен.
-      h.package(4, [
-        TagCreatedChange(revision: const _Revision(4), after: _tag(8, 'Быт')),
-      ]);
-      expect(h.reads.queries, hasLength(1));
-    },
-  );
-
-  test(
-    'пакет не новее подтверждённого чтения не откатывает название',
-    () async {
-      final h = _Harness();
-      addTearDown(h.dispose);
-      h.rename(2, _tag(1, 'Здоровье'), 'Самочувствие');
-      h.select(_tag(1, 'Здоровье'), _present, revision: 1);
-      h.reads.tag(0, _tag(1, 'Тонус'), revision: 4);
-      await pumpEventQueue();
-
-      h.rename(3, _tag(1, 'Самочувствие'), 'Бодрость');
-
-      expect(h.shown, [(_id(1), _present, 'Тонус', false)]);
-    },
-  );
-
-  test('ответ чтения снятого условия не восстанавливает его', () async {
-    final h = _Harness();
-    addTearDown(h.dispose);
-    h.rename(2, _tag(1, 'Здоровье'), 'Самочувствие');
-    h.select(_tag(1, 'Здоровье'), _present, revision: 1);
-    h.model.remove(_id(1));
-
-    h.reads.tag(0, _tag(1, 'Самочувствие'), revision: 2);
-    await pumpEventQueue();
-    expect(h.conditions, isEmpty);
-    expect(h.appliedFilter, IntentionTagFilter.empty);
-
-    // Условие, выбранное заново, не получает ответ прежнего чтения.
-    h.rename(3, _tag(1, 'Самочувствие'), 'Тонус');
-    h.select(_tag(1, 'Самочувствие'), _absent, revision: 2);
-    h.model.remove(_id(1));
-    h.select(_tag(1, 'Тонус'), _absent, revision: 3);
-    h.reads.tag(1, _tag(1, 'Самочувствие'), revision: 3);
-    await pumpEventQueue();
-    expect(h.shown, [(_id(1), _absent, 'Тонус', false)]);
-    expect(h.reads.queries, hasLength(2));
+    expect(h.shown, [(_id(2), _present, 'Спорт')]);
+    expect(h.appliedFilter, IntentionTagFilter(requiredTagIds: [_id(2)]));
+    expect(h.repository.queries, hasLength(queries));
   });
 
   test('повторный выбор из более нового снимка обновляет название и '
@@ -253,14 +110,13 @@ void main() {
       _absent,
       revision: 2,
     );
-    expect(h.shown, [(_id(1), _absent, 'Самочувствие', false)]);
+    expect(h.shown, [(_id(1), _absent, 'Самочувствие')]);
     expect(h.colors, {_id(1): TagColor.blue});
 
     // Прежний снимок не возвращает уже подтверждённые название и цвет.
     h.select(_tag(1, 'Здоровье'), _present, revision: 1);
-    expect(h.shown, [(_id(1), _present, 'Самочувствие', false)]);
+    expect(h.shown, [(_id(1), _present, 'Самочувствие')]);
     expect(h.colors, {_id(1): TagColor.blue});
-    expect(h.reads.queries, isEmpty);
   });
 
   test('условия разных назначений поиска независимы', () {
@@ -290,7 +146,7 @@ void main() {
             snapshotRevision: const _Revision(1),
           ),
         );
-    expect(h.shown, [(_id(1), _present, 'Здоровье', false)]);
+    expect(h.shown, [(_id(1), _present, 'Здоровье')]);
     expect(h.appliedFilter, IntentionTagFilter(requiredTagIds: [_id(1)]));
     expect(
       h.container
@@ -303,7 +159,7 @@ void main() {
 }
 
 final class _Harness {
-  _Harness({int? knownRevision = 1}) {
+  _Harness() {
     container = ProviderContainer(
       overrides: [
         personalGraphRepositoryProvider.overrideWithValue(repository),
@@ -314,28 +170,17 @@ final class _Harness {
             filterDebounce: const Duration(minutes: 1),
           ),
         ),
-        intentionTagConditionsReaderProvider.overrideWithValue(reads),
         intentionTagConditionsChangesProvider.overrideWithValue(changes.stream),
       ],
       retry: (retryCount, error) => null,
     );
     subscription = container.listen(provider, (_, _) {});
-    if (knownRevision != null) {
-      // Модель знает подтверждённую ревизию графа из постороннего пакета.
-      package(knownRevision, [
-        TagCreatedChange(
-          revision: _Revision(knownRevision),
-          after: _tag(99, 'Посторонний'),
-        ),
-      ]);
-    }
   }
 
   static const purpose = BrowseIntentionCatalog();
 
   final provider = intentionTagConditionsViewModelProvider(purpose);
   final repository = ControlledCatalogRepository();
-  final reads = _TagReads();
   final changes = StreamController<ConfirmedGraphChangePackage>.broadcast(
     sync: true,
   );
@@ -346,14 +191,9 @@ final class _Harness {
       container.read(provider.notifier);
   IntentionTagConditionsState get state => container.read(provider);
   List<IntentionTagCondition> get conditions => state.conditions;
-  List<(TagId, IntentionTagRequirement, String, bool)> get shown => [
+  List<(TagId, IntentionTagRequirement, String)> get shown => [
     for (final condition in conditions)
-      (
-        condition.tagId,
-        condition.requirement,
-        condition.name.value,
-        condition.isDeleted,
-      ),
+      (condition.tagId, condition.requirement, condition.name.value),
   ];
 
   /// Предъявляемые цвета условий; `null` — «Без цвета».
@@ -397,17 +237,6 @@ final class _Harness {
     ),
   ]);
 
-  void rename(int revision, Tag before, String name) => update(
-    revision,
-    before,
-    Tag(
-      id: before.id,
-      name: TagName.fromInput(name),
-      color: before.color,
-      position: before.position,
-    ),
-  );
-
   void delete(int revision, TagId tagId) => package(revision, [
     TagDeletedChange(revision: _Revision(revision), tagId: tagId),
   ]);
@@ -416,32 +245,6 @@ final class _Harness {
     container.dispose();
     unawaited(changes.close());
   }
-}
-
-final class _TagReads extends Fake implements TagReadContract {
-  final queries = <TagId>[];
-  final _results = <Completer<TagReadResult>>[];
-
-  @override
-  Stream<TagReadResult> watchTag(TagId id) {
-    queries.add(id);
-    final result = Completer<TagReadResult>();
-    _results.add(result);
-    return Stream.fromFuture(result.future);
-  }
-
-  void tag(int index, Tag? tag, {required int revision}) =>
-      _results[index].complete(
-        TagReadSuccess(
-          GraphSnapshot(value: tag, revision: _Revision(revision)),
-        ),
-      );
-
-  void fail(int index, TagReadFailure failure) =>
-      _results[index].complete(TagReadError(failure));
-
-  void throwError(int index) =>
-      _results[index].completeError(StateError('Контролируемый сбой чтения.'));
 }
 
 final class _Package implements ConfirmedGraphChangePackage {

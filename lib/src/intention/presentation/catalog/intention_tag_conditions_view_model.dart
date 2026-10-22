@@ -5,11 +5,8 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../app/navigation/graph_generation.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
-import '../../../graph/application/graph_command_result.dart';
 import '../../../graph/application/graph_revision.dart';
-import '../../../graph/application/personal_graph_repository_provider.dart';
 import '../../../tag/application/tag_change.dart';
-import '../../../tag/application/tag_read_result.dart';
 import '../../../tag/domain/tag.dart';
 import '../../../tag/domain/tag_color.dart';
 import '../../../tag/domain/tag_id.dart';
@@ -20,11 +17,7 @@ import 'intention_catalog_view_model.dart';
 
 part 'intention_tag_conditions_view_model.g.dart';
 
-/// Узкие зависимости позволяют проверять предъявление условий без команд.
-final intentionTagConditionsReaderProvider = Provider<TagReadContract>(
-  (ref) => ref.watch(personalGraphRepositoryProvider),
-);
-
+/// Узкая зависимость позволяет проверять предъявление условий без команд.
 final intentionTagConditionsChangesProvider =
     Provider<Stream<ConfirmedGraphChangePackage>>(
       (ref) => ref
@@ -51,16 +44,13 @@ enum IntentionTagRequirement {
 
 /// Выбранное условие для предъявления: идентичность задаёт только [tagId].
 ///
-/// [name] и [color] — актуальные название и цвет либо последние известные,
-/// если удаление тега подтверждено. Название, цвет и признак удаления в
-/// предикат поиска не входят.
+/// Название и цвет в предикат поиска не входят.
 final class IntentionTagCondition {
   const IntentionTagCondition({
     required this.tagId,
     required this.requirement,
     required this.name,
     required this.color,
-    required this.isDeleted,
   });
 
   final TagId tagId;
@@ -69,7 +59,6 @@ final class IntentionTagCondition {
 
   /// `null` — «Без цвета».
   final TagColor? color;
-  final bool isDeleted;
 
   @override
   bool operator ==(Object other) =>
@@ -77,11 +66,10 @@ final class IntentionTagCondition {
       other.tagId == tagId &&
       other.requirement == requirement &&
       other.name == name &&
-      other.color == color &&
-      other.isDeleted == isDeleted;
+      other.color == color;
 
   @override
-  int get hashCode => Object.hash(tagId, requirement, name, color, isDeleted);
+  int get hashCode => Object.hash(tagId, requirement, name, color);
 }
 
 /// Выбор тега с надобностью из снимка каталога тегов на [snapshotRevision].
@@ -119,19 +107,18 @@ final class IntentionTagConditionsState {
 /// Выбранные условия по тегам одного назначения поиска.
 ///
 /// Изменение условий сразу передаётся модели каталога того же назначения.
-/// Модель не выполняет команд тегов и не читает выдачу: читается только
-/// текущее состояние тега, выбранного из возможно устаревшего снимка.
+/// Модель не выполняет команд тегов и ничего не читает: предъявление
+/// условий следует за подтверждёнными пакетами изменений.
 /// Условия живут, пока открыт их поиск, и между открытиями не сохраняются.
 @riverpod
 final class IntentionTagConditionsViewModel
     extends _$IntentionTagConditionsViewModel {
   late IntentionCatalogPurpose _purpose;
-  late TagReadContract _reads;
   StreamSubscription<ConfirmedGraphChangePackage>? _changes;
   final _entries = <TagId, _ConditionEntry>{};
 
-  /// Новейшая ревизия графа, о подтверждении которой знает модель.
-  GraphRevision? _knownRevision;
+  /// Теги, удаление которых подтверждено в текущем поколении графа.
+  final _deletedTagIds = <TagId>{};
 
   /// Поколение графа, для которого выбраны условия.
   GraphGeneration? _graphGeneration;
@@ -144,11 +131,10 @@ final class IntentionTagConditionsViewModel
     if (graphGeneration != _graphGeneration) {
       _graphGeneration = graphGeneration;
       _entries.clear();
-      _knownRevision = null;
+      _deletedTagIds.clear();
     }
     unawaited(_changes?.cancel());
     _purpose = purpose;
-    _reads = ref.watch(intentionTagConditionsReaderProvider);
     _changes = ref
         .watch(intentionTagConditionsChangesProvider)
         .listen(_onPackage);
@@ -160,14 +146,16 @@ final class IntentionTagConditionsViewModel
 
   /// Добавляет условие по выбранному тегу либо меняет надобность уже
   /// существующего условия, сохраняя его место.
+  ///
+  /// Выбор тега из снимка, устаревшего к подтверждённому удалению этого тега,
+  /// не меняет ни условий, ни выдачи.
   void applySelection(IntentionTagConditionSelection selection) {
     final IntentionTagConditionSelection(
       :tag,
       :requirement,
       :snapshotRevision,
     ) = selection;
-    final isCurrent = _isCurrent(snapshotRevision);
-    _noteRevision(snapshotRevision);
+    if (_deletedTagIds.contains(tag.id)) return;
     final existing = _entries[tag.id];
     if (existing == null) {
       _entries[tag.id] = _ConditionEntry(
@@ -175,23 +163,19 @@ final class IntentionTagConditionsViewModel
         name: tag.name,
         color: tag.color,
         revision: snapshotRevision,
-        needsVerification: !isCurrent,
       );
     } else {
       existing.requirement = requirement;
       // Более ранний снимок не возвращает уже подтверждённое предъявление.
-      if (!existing.isDeleted &&
-          snapshotRevision.compareTo(existing.revision) ==
-              GraphRevisionOrder.newer) {
+      if (snapshotRevision.compareTo(existing.revision) ==
+          GraphRevisionOrder.newer) {
         existing
           ..name = tag.name
           ..color = tag.color
-          ..revision = snapshotRevision
-          ..needsVerification = !isCurrent;
+          ..revision = snapshotRevision;
       }
     }
     _publish();
-    _verifyPending();
   }
 
   /// Переключает «должен быть ↔ должен отсутствовать» на прежнем месте.
@@ -202,7 +186,7 @@ final class IntentionTagConditionsViewModel
     _publish();
   }
 
-  /// Снимает условие, в том числе по удалённому тегу.
+  /// Снимает условие.
   void remove(TagId tagId) {
     if (_entries.remove(tagId) == null) return;
     _publish();
@@ -210,26 +194,23 @@ final class IntentionTagConditionsViewModel
 
   void _onPackage(ConfirmedGraphChangePackage package) {
     if (!ref.mounted) return;
-    _noteRevision(package.revision);
     var changed = false;
     for (final change in package.changes) {
       switch (change) {
         case TagUpdatedChange(:final after):
           final entry = _entries[after.id];
-          if (entry == null ||
-              entry.isDeleted ||
-              !_supersedes(package.revision, entry.revision)) {
+          if (entry == null || !_supersedes(package.revision, entry.revision)) {
             continue;
           }
           entry
             ..name = after.name
             ..color = after.color
-            ..revision = package.revision
-            ..needsVerification = false;
+            ..revision = package.revision;
           changed = true;
         // Модель каталога сама исключает тег из применённого фильтра в
         // этой же публикации пакета, поэтому фильтр не публикуется повторно.
         case TagDeletedChange(:final tagId):
+          _deletedTagIds.add(tagId);
           changed = _entries.remove(tagId) != null || changed;
         // Новый тег с прежним названием имеет другой идентификатор и
         // снятое условие не восстанавливает.
@@ -238,58 +219,6 @@ final class IntentionTagConditionsViewModel
       }
     }
     if (changed) state = _snapshot();
-    // Неудавшееся уточнение повторяется событием пакета, без таймеров.
-    _verifyPending();
-  }
-
-  void _verifyPending() {
-    for (final MapEntry(key: tagId, value: entry) in _entries.entries) {
-      if (entry.needsVerification && !entry.isVerifying) {
-        unawaited(_verify(tagId, entry));
-      }
-    }
-  }
-
-  /// Уточняет предъявление условия, выбранного из снимка, после которого
-  /// тег мог быть отредактирован или удалён.
-  Future<void> _verify(TagId tagId, _ConditionEntry entry) async {
-    entry.isVerifying = true;
-    final result = await _readTag(tagId);
-    entry.isVerifying = false;
-    if (!ref.mounted ||
-        !identical(_entries[tagId], entry) ||
-        !entry.needsVerification) {
-      return;
-    }
-    // Отказ чтения не подтверждает удаление: условие остаётся прежним.
-    if (result case GraphResultSuccess(:final value)) {
-      _noteRevision(value.revision);
-      final tag = value.value;
-      if (value.revision.compareTo(entry.revision) ==
-              GraphRevisionOrder.older ||
-          (tag != null && tag.id != tagId)) {
-        return;
-      }
-      entry
-        ..revision = value.revision
-        ..needsVerification = false;
-      if (tag == null) {
-        entry.isDeleted = true;
-      } else {
-        entry
-          ..name = tag.name
-          ..color = tag.color;
-      }
-      state = _snapshot();
-    }
-  }
-
-  Future<TagReadResult> _readTag(TagId tagId) async {
-    try {
-      return await _reads.watchTag(tagId).first;
-    } on Object {
-      return const TagReadError(TagReadUnexpectedFailure());
-    }
   }
 
   void _publish() {
@@ -307,27 +236,8 @@ final class IntentionTagConditionsViewModel
         requirement: entry.requirement,
         name: entry.name,
         color: entry.color,
-        isDeleted: entry.isDeleted,
       ),
   ]);
-
-  /// Снимок не старше известной ревизии уже отражает все подтверждённые
-  /// изменения; более новые пакеты модель получит сама.
-  bool _isCurrent(GraphRevision snapshotRevision) {
-    final known = _knownRevision;
-    if (known == null) return false;
-    return switch (snapshotRevision.compareTo(known)) {
-      GraphRevisionOrder.same || GraphRevisionOrder.newer => true,
-      GraphRevisionOrder.older || GraphRevisionOrder.differentEpoch => false,
-    };
-  }
-
-  void _noteRevision(GraphRevision revision) {
-    final known = _knownRevision;
-    if (known == null || _supersedes(revision, known)) {
-      _knownRevision = revision;
-    }
-  }
 
   bool _supersedes(GraphRevision revision, GraphRevision confirmed) =>
       switch (revision.compareTo(confirmed)) {
@@ -343,19 +253,12 @@ final class _ConditionEntry {
     required this.name,
     required this.color,
     required this.revision,
-    required this.needsVerification,
   });
 
   IntentionTagRequirement requirement;
   TagName name;
   TagColor? color;
-  bool isDeleted = false;
 
-  /// Ревизия, на которой подтверждены предъявляемые название и цвет или
-  /// удаление.
+  /// Ревизия, на которой подтверждены предъявляемые название и цвет.
   GraphRevision revision;
-
-  /// Предъявление взято из снимка, который мог устареть к моменту выбора.
-  bool needsVerification;
-  bool isVerifying = false;
 }

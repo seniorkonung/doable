@@ -509,7 +509,7 @@
   - **Предполагаемые файлы:** `lib/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart`, `lib/src/intention/presentation/catalog/intention_catalog_view_model.dart`, `test/intention/presentation/catalog/intention_tag_conditions_view_model_test.dart`, `test/intention/presentation/catalog/intention_catalog_tag_change_reconciliation_test.dart`, `test/intention/presentation/catalog/intention_catalog_tag_filter_integration_test.dart`; проверки, которые ожидали пометку удалённого условия или пустую выдачу по удалённому обязательному тегу: `test/intention/presentation/catalog/intention_catalog_page_test.dart`, `test/intention/presentation/catalog/intention_tag_conditions_section_test.dart`, `test/intention/presentation/intention_tag_search_accessibility_test.dart`, `test/daily_choice/presentation/daily_choice_picker_tag_search_test_support.dart`, `test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart`.
   - **Размер:** M.
 
-- [ ] 3.10 Убрать признак удалённого условия поиска и уточнение выбранного тега чтением
+- [x] 3.10 Убрать признак удалённого условия поиска и уточнение выбранного тега чтением
   - **Критерии приёмки:**
     - По решению 8 дизайна условие поиска по тегу больше не бывает удалённым: `isDeleted`, `needsVerification`, уточнение выбранного тега через `watchTag` и зависимость модели условий от чтения тегов удаляются. Выбор тега, удаление которого модель условий уже получила, игнорируется без изменения условий и выдачи.
     - Чипы условий не показывают «тег удалён»: строки `intentionTagConditionDeleted` и `intentionTagConditionDeletedSemantics` удалены из русской и английской локализации и генерируемых файлов.

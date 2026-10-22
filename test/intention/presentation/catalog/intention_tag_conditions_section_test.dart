@@ -16,7 +16,6 @@ import 'package:doable/src/intention/presentation/catalog/intention_tag_conditio
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import 'package:doable/src/intention/presentation/catalog/tag_condition_picker_page.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
-import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
@@ -373,10 +372,6 @@ final class _Repository extends Fake implements PersonalGraphRepository {
     tagCatalogReads.add(read);
     return read.future;
   }
-
-  /// Уточнение выбора из снимка остаётся без ответа: условие не меняется.
-  @override
-  Stream<TagReadResult> watchTag(TagId id) => const Stream.empty();
 
   @override
   Future<GraphCommandResult<TSuccess, TFailure>> execute<

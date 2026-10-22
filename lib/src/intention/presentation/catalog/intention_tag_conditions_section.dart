@@ -84,7 +84,7 @@ final class _ConditionChip extends StatelessWidget {
     final theme = Theme.of(context);
     final id = condition.tagId.toCanonicalString();
     final name = condition.name.value;
-    final (icon, requirementSemantics) = switch (condition.requirement) {
+    final (icon, semanticsLabel) = switch (condition.requirement) {
       IntentionTagRequirement.mustBePresent => (
         Icons.check,
         localizations.intentionTagConditionPresentSemantics(name),
@@ -94,11 +94,6 @@ final class _ConditionChip extends StatelessWidget {
         localizations.intentionTagConditionAbsentSemantics(name),
       ),
     };
-    final semanticsLabel = condition.isDeleted
-        ? localizations.intentionTagConditionDeletedSemantics(
-            requirementSemantics,
-          )
-        : requirementSemantics;
     return Material(
       key: ValueKey('intention-tag-condition-$id'),
       color: theme.colorScheme.surface,
@@ -136,19 +131,10 @@ final class _ConditionChip extends StatelessWidget {
                         // Длинное название переносится, а не обрезается.
                         Flexible(
                           child: tagPhraseText(
-                            phrase: (name) {
-                              final label = switch (condition.requirement) {
-                                IntentionTagRequirement.mustBePresent => name,
-                                IntentionTagRequirement.mustBeAbsent =>
-                                  localizations.intentionTagConditionAbsent(
-                                    name,
-                                  ),
-                              };
-                              return condition.isDeleted
-                                  ? localizations.intentionTagConditionDeleted(
-                                      label,
-                                    )
-                                  : label;
+                            phrase: (name) => switch (condition.requirement) {
+                              IntentionTagRequirement.mustBePresent => name,
+                              IntentionTagRequirement.mustBeAbsent =>
+                                localizations.intentionTagConditionAbsent(name),
                             },
                             tags: [(name: name, color: condition.color)],
                             dotSize: TagDotSize.medium,

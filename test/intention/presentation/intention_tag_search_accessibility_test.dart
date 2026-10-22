@@ -640,7 +640,6 @@ IntentionTagCondition _condition(
   requirement: requirement,
   name: tag.name,
   color: tag.color,
-  isDeleted: false,
 );
 
 Finder _conditionToggle(TagId id) => find.byKey(

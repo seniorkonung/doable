@@ -711,15 +711,13 @@ void main() {
         ),
       );
       expect(_shown(container, conditions), [
-        (_tagId(301), _present, 'Самочувствие', false),
-        (_tagId(302), _absent, 'Спорт', false),
+        (_tagId(301), _present, 'Самочувствие'),
+        (_tagId(302), _absent, 'Спорт'),
       ]);
       expect((await confirmed()).totalCount, 5);
 
       await _deleteTag(container, _tagId(301));
-      expect(_shown(container, conditions), [
-        (_tagId(302), _absent, 'Спорт', false),
-      ]);
+      expect(_shown(container, conditions), [(_tagId(302), _absent, 'Спорт')]);
       final remaining = IntentionTagFilter(excludedTagIds: [_tagId(302)]);
       var state = await _awaitCatalog(
         container,
@@ -744,9 +742,7 @@ void main() {
       expect(recreated.id, isNot(_tagId(301)));
       await _assignTag(container, recreated.id, _intentionId(7));
       await pumpEventQueue();
-      expect(_shown(container, conditions), [
-        (_tagId(302), _absent, 'Спорт', false),
-      ]);
+      expect(_shown(container, conditions), [(_tagId(302), _absent, 'Спорт')]);
       state = await confirmed();
       expect(state.query.tagFilter, remaining);
       expect(state.totalCount, 7);
@@ -806,7 +802,7 @@ void main() {
           container,
           intentionTagConditionsViewModelProvider(_actionSearchPurpose),
         ),
-        [(_tagId(301), _present, 'Здоровье', false)],
+        [(_tagId(301), _present, 'Здоровье')],
       );
       expect(browseAfter.query.tagFilter, IntentionTagFilter.empty);
       expect(browseAfter.totalCount, 8);
@@ -817,42 +813,6 @@ void main() {
       expect(actionAfter.totalCount, 5);
       expect(published, [browseAfter, actionAfter]);
       expect(_catalogPageReads(diagnostics), pageReadsBefore + 2);
-    });
-
-    test('выбор из устаревшего снимка предъявляется с актуальным названием '
-        'и признаком удаления', () async {
-      open(browse);
-      await confirmed();
-      final stale = await _tagSnapshot(repository);
-      await _completeTag(
-        container,
-        (coordinator) => coordinator.acceptTagUpdate(
-          UpdateTag(
-            tagId: _tagId(302),
-            name: TagName.fromInput('Бег'),
-            color: null,
-          ),
-        ),
-      );
-      await _deleteTag(container, _tagId(304));
-      final model = container.read(conditions.notifier);
-
-      model.applySelection(stale.select(302, _absent));
-      model.applySelection(stale.select(304, _present));
-
-      // Поиск применён сразу, до уточнения предъявления.
-      expect(
-        container.read(catalog.notifier).selection.tagFilter,
-        IntentionTagFilter(
-          requiredTagIds: [_tagId(304)],
-          excludedTagIds: [_tagId(302)],
-        ),
-      );
-      await _awaitConditions(container, conditions, [
-        (_tagId(302), _absent, 'Бег', false),
-        (_tagId(304), _present, 'Работа', true),
-      ]);
-      expect(await confirmed(), isA<IntentionCatalogEmpty>());
     });
   });
 }
@@ -887,31 +847,13 @@ Future<_TagSnapshot> _tagSnapshot(
   return _TagSnapshot(snapshot.items, snapshot.revision);
 }
 
-List<(TagId, IntentionTagRequirement, String, bool)> _shown(
+List<(TagId, IntentionTagRequirement, String)> _shown(
   ProviderContainer container,
   IntentionTagConditionsViewModelProvider provider,
 ) => [
   for (final condition in container.read(provider).conditions)
-    (
-      condition.tagId,
-      condition.requirement,
-      condition.name.value,
-      condition.isDeleted,
-    ),
+    (condition.tagId, condition.requirement, condition.name.value),
 ];
-
-/// Ждёт уточнения предъявления условий чтением настоящего адаптера.
-Future<void> _awaitConditions(
-  ProviderContainer container,
-  IntentionTagConditionsViewModelProvider provider,
-  List<(TagId, IntentionTagRequirement, String, bool)> expected,
-) async {
-  for (var attempt = 0; attempt < 1000; attempt++) {
-    if (equals(expected).matches(_shown(container, provider), {})) return;
-    await Future<void>.delayed(const Duration(milliseconds: 1));
-  }
-  expect(_shown(container, provider), expected);
-}
 
 /// Ждёт подтверждённой выдачи, согласованной с изменением тегов.
 Future<IntentionCatalogConfirmedState> _awaitCatalog(
