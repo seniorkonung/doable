@@ -65,11 +65,11 @@
 
 - [ ] 1.6 Убрать из базовой схемы 5 копию порядка создания тега в назначениях вместе с поддерживающими её объектами
   - **Критерии приёмки:**
-    - Схема не содержит `tag_assignments.tag_creation_sequence`, трёх поддерживающих её триггеров, индексов `tag_assignments_intention_order` и `tag_assignments_tag_order` и условия по этому столбцу в триггере `graph_log_mark_tag_assignment_update` по решению 3 дизайна. Вставка назначения по-прежнему даёт одну отметку «вставка», а изменение строки — отметку «изменение». Проверка удалённой копии удаляется вместе с ней.
-    - `tags.creation_sequence` остаётся неизменным ключом порций записей графа и порядка записей в файлах. Навигация по тегу до своего удаления в фазе 4 читает порции без отдельного индекса.
+    - Схема не содержит `tag_assignments.tag_creation_sequence`, трёх поддерживающих её триггеров, индекса `tag_assignments_intention_order` и условия по этому столбцу в триггере `graph_log_mark_tag_assignment_update` по решению 3 дизайна. Вставка назначения по-прежнему даёт одну отметку «вставка», а изменение строки — отметку «изменение». Проверка удалённой копии удаляется вместе с ней.
+    - `tags.creation_sequence` остаётся неизменным ключом порций записей графа и порядка записей в файлах. Индекс `tag_assignments_tag_order` остаётся: он обслуживает порции навигации по тегу и удаляется вместе с ними в фазе 4 по решению 11 дизайна.
   - **Проверка:**
-    - `mise run codegen`; сгенерированный `drift_schemas/drift_schema_v5.json` не содержит удалённых столбца, триггеров и индексов.
-    - `mise exec --no-deps -- flutter test test/data/local/tag_schema_test.dart test/data/local/graph_log_schema_test.dart test/data/local/app_database_schema_test.dart test/data/local/schema_verifier_test.dart test/graph/data/drift_tag_assignment_read_test.dart test/graph/data/drift_tagged_entities_read_test.dart test/graph/data/drift_tagged_entities_read_cost_test.dart`.
+    - `mise run codegen`; сгенерированный `drift_schemas/drift_schema_v5.json` не содержит удалённых столбца, триггеров и индекса, а `tag_assignments_tag_order` в нём сохраняется.
+    - `mise exec --no-deps -- flutter test test/data/local/tag_schema_test.dart test/data/local/graph_log_schema_test.dart test/data/local/app_database_schema_test.dart test/data/local/schema_verifier_test.dart test/graph/data/drift_tag_assignment_read_test.dart`.
   - **Зависимости:** 1.3 — базовая схема 5; 1.5 — чтения больше не используют копию.
   - **Предполагаемые файлы:** `lib/src/data/local/schema/tag_schema.drift`, `lib/src/data/local/schema/graph_log_schema.drift`, генерируемые `lib/src/data/local/app_database.g.dart` и `drift_schemas/drift_schema_v5.json`, `test/graph/data/drift_tag_assignment_read_test.dart`.
   - **Размер:** S.
