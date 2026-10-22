@@ -12,6 +12,7 @@ import '../../../intention/application/intention_catalog.dart';
 import '../../application/tag_catalog.dart';
 import '../../application/tag_change.dart';
 import '../../application/tag_command.dart';
+import '../../application/tag_result.dart';
 import '../../domain/tag_id.dart';
 import '../catalog/tag_catalog_filter.dart';
 import 'tags_panel_context.dart';
@@ -96,6 +97,31 @@ final class TagsPanelViewModel extends _$TagsPanelViewModel {
           AssignTag(tagId: tagId, intentionId: intentionId),
         ),
     };
+  }
+
+  /// Принятое из листа создание принадлежит этому открытию панели, а не
+  /// экранной сессии листа, поэтому закрытие листа его не прерывает. После
+  /// подтверждения модель один раз очищает поиск и отмечает тег отдельной
+  /// командой назначения; её отклонение или отказ оставляют тег
+  /// неотмеченным. Закрытая до подтверждения панель тег не отмечает.
+  void acceptCreation(TagCommandAccepted creation) =>
+      unawaited(_markCreated(creation.future));
+
+  Future<void> _markCreated(Future<TagCommandCompletion> creation) async {
+    final completion = await creation;
+    if (!ref.mounted) return;
+    if (completion.result case GraphResultSuccess(
+      value: TagCreated(:final tag),
+    )) {
+      state = state.withSearch(TagsPanelSearch.initial);
+      final coordinator = ref.read(graphCommandCoordinatorProvider.notifier);
+      switch (_context) {
+        case TagsPanelAssignmentContext(:final intentionId):
+          coordinator.acceptTagAssign(
+            AssignTag(tagId: tag.id, intentionId: intentionId),
+          );
+      }
+    }
   }
 
   void retryLoad() {

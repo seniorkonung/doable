@@ -14,6 +14,8 @@ import 'package:doable/src/tag/domain/tag_assignment.dart';
 import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
+import 'package:doable/src/tag/presentation/editor/tag_editor_state.dart';
+import 'package:doable/src/tag/presentation/editor/tag_editor_view_model.dart';
 import 'package:doable/src/tag/presentation/panel/tags_panel_context.dart';
 import 'package:doable/src/tag/presentation/panel/tags_panel_state.dart';
 import 'package:doable/src/tag/presentation/panel/tags_panel_view_model.dart';
@@ -431,6 +433,195 @@ void main() {
     expect(await accepted.future, isA<TagCommandSucceededCompletion>());
     expect(h.coordinator.isRunning(_intentionId), isFalse);
   });
+
+  test('Строка создания предлагает название из поиска', () async {
+    final h = _Harness();
+    addTearDown(h.dispose);
+    final panel = h.open();
+    h.repository.complete([_tag(1, 'Дом')], assignedIds: {});
+    await pumpEventQueue();
+    expect(_proposedName(panel), isNull);
+
+    panel.model.search('  Парк ');
+    expect(_proposedName(panel), 'Парк');
+    expect(_visibleNames(panel), isEmpty);
+
+    panel.model.search('Па\u0000рк');
+    expect(_proposedName(panel), 'Парк');
+  });
+
+  test('Совпадающее название не предлагает создание', () async {
+    final h = _Harness();
+    addTearDown(h.dispose);
+    final panel = h.open();
+    h.repository.complete([_tag(1, 'Дом'), _tag(2, 'Домик')], assignedIds: {});
+    await pumpEventQueue();
+
+    panel.model.search('  дом  ');
+
+    expect(_visibleNames(panel), ['Дом', 'Домик']);
+    expect(_proposedName(panel), isNull);
+  });
+
+  test(
+    'Новый тег встаёт первым и очищает поиск; Созданный тег сразу назначен',
+    () async {
+      final h = _Harness.confirmedByCoordinator();
+      addTearDown(h.dispose);
+      final panel = h.open();
+      h.repository.complete([
+        _tag(5, 'Дом'),
+        _tag(7, 'Работа'),
+      ], assignedIds: {});
+      await pumpEventQueue();
+      panel.model.search('парк');
+
+      panel.model.acceptCreation(h.acceptCreation('парк'));
+      await pumpEventQueue();
+      h.repository.command.complete(
+        TagCommandSucceeded(_created(2, 1, 'парк')),
+      );
+      await pumpEventQueue();
+
+      expect(panel.state.search.filter.isEmpty, isTrue);
+      expect(_visibleNames(panel), ['парк', 'Дом', 'Работа']);
+      final assign = h.repository.commands.last as AssignTag;
+      expect((assign.tagId, assign.intentionId), (_id(1), _intentionId));
+      expect(_marks(panel), [false, false, false]);
+
+      h.repository.command.complete(
+        TagCommandSucceeded(_assignment(3, _id(1), _intentionId)),
+      );
+      await pumpEventQueue();
+      expect(_marks(panel), [true, false, false]);
+      expect(h.repository.reads, hasLength(1));
+    },
+  );
+
+  test('Закрытие листа до подтверждения создания', () async {
+    final h = _Harness.confirmedByCoordinator();
+    addTearDown(h.dispose);
+    final panel = h.open();
+    h.repository.complete([_tag(5, 'Дом')], assignedIds: {});
+    await pumpEventQueue();
+    panel.model.search('Спорт');
+    final sheet = tagEditorViewModelProvider(
+      TagEditorCreating(
+        TagCreationFormKey(),
+        initialName: 'Спорт',
+        onCreationAccepted: panel.model.acceptCreation,
+      ),
+    );
+    final sheetSubscription = h.container.listen(sheet, (_, _) {});
+    unawaited(h.container.read(sheet.notifier).submit());
+    await pumpEventQueue();
+
+    h.container.read(sheet.notifier).closeSession();
+    sheetSubscription.close();
+    await pumpEventQueue();
+    h.repository.command.complete(TagCommandSucceeded(_created(2, 1, 'Спорт')));
+    await pumpEventQueue();
+    h.repository.command.complete(
+      TagCommandSucceeded(_assignment(3, _id(1), _intentionId)),
+    );
+    await pumpEventQueue();
+
+    expect(h.repository.commands.whereType<AssignTag>(), hasLength(1));
+    expect(_names(panel.loaded), ['Спорт', 'Дом']);
+    expect(_marks(panel), [true, false]);
+    expect(panel.state.search.filter.isEmpty, isTrue);
+  });
+
+  test('Подтверждённая запись и ошибка обновления', () async {
+    final h = _Harness();
+    addTearDown(h.dispose);
+    final panel = h.open();
+    h.repository.complete([_tag(5, 'Дом')], assignedIds: {});
+    await pumpEventQueue();
+    panel.model.search('парк');
+    panel.model.acceptCreation(h.acceptCreation('парк'));
+    await pumpEventQueue();
+    final created = _created(2, 1, 'парк');
+    h.repository.command.complete(TagCommandSucceeded(created));
+    h.changes.add(created);
+    await pumpEventQueue();
+
+    h.changes.add(ConfirmedGraphReplacement(const TagCatalogTestRevision(3)));
+    await pumpEventQueue();
+    h.repository.fail(const TagCatalogUnavailableFailure());
+    await pumpEventQueue();
+
+    expect(panel.loaded.refreshFailure, isA<TagCatalogUnavailableFailure>());
+    expect(_names(panel.loaded), ['парк', 'Дом']);
+    panel.model.search('парк');
+    expect(_proposedName(panel), isNull);
+    expect(h.repository.commands.whereType<CreateTag>(), hasLength(1));
+  });
+
+  test(
+    'закрытие панели до подтверждения создания оставляет тег неотмеченным',
+    () async {
+      final h = _Harness.confirmedByCoordinator();
+      addTearDown(h.dispose);
+      final first = h.open();
+      h.repository.complete([_tag(5, 'Дом')], assignedIds: {});
+      await pumpEventQueue();
+      first.model.search('парк');
+      first.model.acceptCreation(h.acceptCreation('парк'));
+      await pumpEventQueue();
+
+      first.close();
+      await pumpEventQueue();
+      h.repository.command.complete(
+        TagCommandSucceeded(_created(2, 1, 'парк')),
+      );
+      await pumpEventQueue();
+      expect(h.repository.commands.single, isA<CreateTag>());
+
+      final second = h.open();
+      h.repository.complete(
+        [_tag(1, 'парк'), _tag(5, 'Дом')],
+        revision: 2,
+        assignedIds: {},
+      );
+      await pumpEventQueue();
+      expect(second.state.search.filter.isEmpty, isTrue);
+      expect(_marks(second), [false, false]);
+      expect(h.repository.commands, hasLength(1));
+    },
+  );
+
+  test('отказ или отклонение назначения созданного тега', () async {
+    final h = _Harness.confirmedByCoordinator();
+    addTearDown(h.dispose);
+    final panel = h.open();
+    h.repository.complete([_tag(5, 'Дом')], assignedIds: {});
+    await pumpEventQueue();
+
+    panel.model.acceptCreation(h.acceptCreation('парк'));
+    await pumpEventQueue();
+    h.repository.command.complete(TagCommandSucceeded(_created(2, 1, 'парк')));
+    await pumpEventQueue();
+    h.repository.command.complete(
+      const TagCommandFailed(TagUnavailableFailure()),
+    );
+    await pumpEventQueue();
+    expect(_marks(panel), [false, false]);
+
+    // Назначение намерения, принятое до подтверждения создания, занимает
+    // ключ намерения, и координатор отклоняет назначение созданного тега.
+    panel.model.acceptCreation(h.acceptCreation('сад'));
+    await pumpEventQueue();
+    final creation = h.repository.commandResults.last;
+    expect(panel.model.toggle(_id(5)), isA<TagCommandAccepted>());
+    await pumpEventQueue();
+    creation.complete(TagCommandSucceeded(_created(3, 2, 'сад')));
+    await pumpEventQueue();
+
+    expect(h.repository.commands.whereType<AssignTag>(), hasLength(2));
+    expect(_names(panel.loaded), ['парк', 'сад', 'Дом']);
+    expect(_marks(panel), [false, false, false]);
+  });
 }
 
 final _intentionId = _intention(1);
@@ -462,6 +653,12 @@ final class _Harness {
 
   GraphCommandCoordinator get coordinator =>
       container.read(graphCommandCoordinatorProvider.notifier);
+
+  TagCommandAccepted acceptCreation(String name) =>
+      coordinator.acceptTagCreation(
+        TagCreationFormKey(),
+        CreateTag(name: TagName.fromInput(name), color: null),
+      ) as TagCommandAccepted;
 
   _Panel open() => _Panel(
     container,
@@ -520,6 +717,23 @@ ConfirmedGraphResult<TagCommandSuccess> _assignment(
       revision: TagCatalogTestRevision(revision),
       assignment: TagAssignment(tagId: tagId, intentionId: intentionId),
       state: state,
+    ),
+  ),
+);
+
+String? _proposedName(_Panel panel) =>
+    panel.loaded.proposedTagName(panel.state.search.filter);
+
+ConfirmedGraphResult<TagCommandSuccess> _created(
+  int revision,
+  int number,
+  String name,
+) => _package(
+  revision,
+  TagCreated(
+    TagCreatedChange(
+      revision: TagCatalogTestRevision(revision),
+      after: _tag(number, name),
     ),
   ),
 );

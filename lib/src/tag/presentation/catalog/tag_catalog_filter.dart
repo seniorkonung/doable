@@ -9,9 +9,9 @@ sealed class TagCatalogFilterResult {
 
 /// Буквальный поиск по названию тега без учёта регистра Unicode 17.0.0.
 final class TagCatalogFilter extends TagCatalogFilterResult {
-  const TagCatalogFilter._(this._matchingKey);
+  const TagCatalogFilter._(this.query, this._matchingKey);
 
-  static const empty = TagCatalogFilter._('');
+  static const empty = TagCatalogFilter._('', '');
 
   /// Проверяет исходный ввод до преобразования регистра, не исправляя его,
   /// и отбрасывает окружающие пробелы по правилу названия тега. Пустой после
@@ -23,19 +23,21 @@ final class TagCatalogFilter extends TagCatalogFilterResult {
       return const TagCatalogFilterInvalidUnicode();
     }
 
-    return TagCatalogFilter._(
-      UnicodeDefaultCaseFolding17.fold(
-        TagName.trimSurroundingWhitespace(input),
-      ),
-    );
+    final query = TagName.trimSurroundingWhitespace(input);
+    return TagCatalogFilter._(query, UnicodeDefaultCaseFolding17.fold(query));
   }
 
+  /// Применённый запрос в исходном регистре без окружающих пробелов.
+  final String query;
   final String _matchingKey;
 
   bool get isEmpty => _matchingKey.isEmpty;
 
   bool matches(TagName name) =>
       isEmpty || name.matchingKey.contains(_matchingKey);
+
+  /// Название совпадает с запросом по правилу уникальности названий тегов.
+  bool matchesWhole(TagName name) => name.matchingKey == _matchingKey;
 }
 
 /// Ввод содержит NUL или непарный UTF-16 surrogate и не может быть фильтром.

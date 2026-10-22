@@ -79,6 +79,13 @@ final class TagsPanelLoaded extends TagsPanelCatalog {
       if (filter.matches(row.tag.name)) row,
   ];
 
+  /// Название, создание тега с которым предлагается первой строкой: непустой
+  /// [filter], которому не совпадает целиком ни одно название. Иначе `null`.
+  String? proposedTagName(TagCatalogFilter filter) =>
+      filter.isEmpty || rows.any((row) => filter.matchesWhole(row.tag.name))
+      ? null
+      : filter.query;
+
   TagsPanelLoaded withRows(List<TagsPanelRow> rows) =>
       TagsPanelLoaded(rows, refreshFailure: refreshFailure);
 
