@@ -95,3 +95,12 @@
   - **Зависимости:** 1.6 — схема 5 без копии порядка в назначениях.
   - **Предполагаемые файлы:** `test/app/intention_creation_sheet_failure_integration_test.dart`.
   - **Размер:** XS.
+
+- [ ] 1.9 Сверять назначения последнего тега в сценарии навигации по тегу в определённом порядке строк
+  - **Критерии приёмки:**
+    - В проверке «открытая навигация обновляет поля и порядок назначений» из `test/app/tag_navigation_graph_lifecycle_scenarios.dart` запрос назначений последнего тега упорядочен по `creation_sequence`, как строки помощника `_snapshot` (`ORDER BY rowid`), с которыми его сравнивают. После задачи 1.6 строки без `ORDER BY` приходят в порядке намерений, поэтому сравнение не должно зависеть от плана запроса SQLite. Оно по-прежнему строгое по составу и порядку строк.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test --no-pub test/app/tag_navigation_app_flow_test.dart` проходит.
+  - **Зависимости:** 1.6 — схема 5 без индекса `tag_assignments_intention_order`.
+  - **Предполагаемые файлы:** `test/app/tag_navigation_graph_lifecycle_scenarios.dart`.
+  - **Размер:** XS.
