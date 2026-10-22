@@ -8,6 +8,7 @@ import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
@@ -309,99 +310,96 @@ void _registerAssignmentScenarios() {
 
         await _tap(tester, choose);
         final assignedRow = find.byKey(
-          ValueKey('tag-catalog-row-${tagFixtureId(firstTagNumber)}'),
+          ValueKey('tags-panel-row-${tagFixtureId(firstTagNumber)}'),
+        );
+        final availableRow = find.byKey(
+          ValueKey('tags-panel-row-${tagFixtureId(lastTagNumber)}'),
         );
         await _until(tester, assignedRow);
         await tester.pumpAndSettle();
-        final assignedStatus = find.descendant(
-          of: assignedRow,
-          matching: find.text(l10n.tagCatalogAssigned),
-        );
-        expect(assignedStatus, findsOneWidget);
         expect(
-          tester.getSemantics(assignedStatus).label,
-          contains(l10n.tagCatalogAssigned),
-        );
-        expect(
-          tester
-              .getSemantics(assignedStatus)
-              .getSemanticsData()
-              .hasAction(SemanticsAction.tap),
-          isTrue,
-        );
-        expect(find.text(l10n.tagCatalogAvailable), findsWidgets);
-        await _tap(tester, find.byKey(const ValueKey('tag-catalog-create')));
-        final name = find.byKey(const ValueKey('tag-editor-name'));
-        await _until(tester, name);
-        await tester.enterText(name, 'Дом');
-        await tester.pump();
-        await _tap(tester, find.byKey(const ValueKey('tag-editor-submit')));
-        // Отказ создания предъявляет общая поверхность поверх редактора.
-        final failure = find.byKey(const ValueKey('graph-operation-message'));
-        await _until(tester, failure);
-        await tester.pumpAndSettle();
-        expect(
-          tester.getSemantics(failure.last),
+          tester.getSemantics(assignedRow),
           isSemantics(
-            label: l10n.graphOperationMessage(
-              l10n.graphOperationCreate,
-              l10n.graphOperationTag,
-              l10n.tagNameOccupied,
-            ),
-            isLiveRegion: true,
+            label: l10n.tagsPanelRowMarked('Дом'),
+            hasCheckedState: true,
+            isChecked: true,
+            hasTapAction: true,
           ),
         );
-        ScaffoldMessenger.of(tester.element(name)).removeCurrentSnackBar();
-        await tester.pumpAndSettle();
-        expect(tester.widget<TextField>(name).controller!.text, 'Дом');
-        _expectAction(
-          tester.getSemantics(find.byKey(const ValueKey('tag-editor-cancel'))),
+        expect(
+          tester.getSemantics(availableRow),
+          isSemantics(
+            label: l10n.tagsPanelRowUnmarked('Работа'),
+            hasCheckedState: true,
+            isChecked: false,
+            hasTapAction: true,
+          ),
         );
+
+        final newName = 'Straße 🏠é ${'Длинное название ' * 7}'.trimRight();
+        await tester.enterText(
+          find.descendant(
+            of: find.byType(Sheet),
+            matching: find.byType(TextField),
+          ),
+          newName,
+        );
+        await tester.pump();
+        final createRow = find.bySemanticsLabel(
+          l10n.tagsPanelCreateTag(newName),
+        );
+        _expectAction(tester.getSemantics(createRow));
+        await _tap(tester, createRow);
+        final name = find.bySemanticsLabel(RegExp(l10n.tagEditorNameLabel));
+        await _until(tester, name);
+        await tester.pumpAndSettle();
         expect(
           _traversalIndex(tester, l10n.tagEditorNameLabel),
           lessThan(_traversalIndex(tester, l10n.tagEditorCreateAction)),
         );
-        expect(
-          _traversalIndex(tester, l10n.tagEditorCreateAction),
-          lessThan(_traversalIndex(tester, l10n.tagEditorCancel)),
-        );
-
-        final newName = 'Straße 🏠é ${'Длинное название ' * 7}'.trimRight();
-        await tester.enterText(name, newName);
-        await tester.pump();
-        await _tap(tester, find.byKey(const ValueKey('tag-editor-submit')));
-        await _until(
+        await _tap(
           tester,
-          find.bySemanticsLabel(l10n.tagCatalogAssignNamed(newName)),
+          find.widgetWithText(FilledButton, l10n.tagEditorCreateAction),
+        );
+        await _untilCondition(
+          tester,
+          () => raw.select('SELECT id FROM tags WHERE name = ?', [
+            newName,
+          ]).isNotEmpty,
         );
         final newId =
             raw.select('SELECT id FROM tags WHERE name = ?', [
                   newName,
                 ]).single['id']
                 as String;
-        expect(
-          raw.select('SELECT * FROM tag_assignments WHERE tag_id = ?', [newId]),
-          isEmpty,
-        );
-        final assign = find.byKey(const ValueKey('tag-catalog-assign'));
-        await tester.pumpAndSettle();
-        expect(
-          find.bySemanticsLabel(l10n.tagCatalogAssignNamed(newName)),
-          findsOneWidget,
-        );
-        _expectAction(tester.getSemantics(assign));
-        await _tap(tester, assign);
+        // Созданный в панели тег сразу назначен и объявлен отмеченным.
+        final newRow = find.byKey(ValueKey('tags-panel-row-$newId'));
         await _untilCondition(
           tester,
-          () => raw.select('SELECT * FROM tag_assignments WHERE tag_id = ?', [
-            newId,
-          ]).isNotEmpty,
+          () =>
+              raw.select('SELECT * FROM tag_assignments WHERE tag_id = ?', [
+                newId,
+              ]).isNotEmpty &&
+              find
+                  .bySemanticsLabel(l10n.tagsPanelRowMarked(newName))
+                  .evaluate()
+                  .isNotEmpty,
+        );
+        await tester.pumpAndSettle();
+        expect(
+          tester.getSemantics(newRow),
+          isSemantics(
+            label: l10n.tagsPanelRowMarked(newName),
+            hasCheckedState: true,
+            isChecked: true,
+            hasTapAction: true,
+          ),
         );
         expect(
           raw.select('SELECT * FROM tag_assignments WHERE tag_id = ?', [newId]),
           hasLength(1),
         );
-        router.pop();
+        await _tap(tester, find.text(l10n.tagsPanelDone));
         await _until(tester, find.byType(IntentionDetailsPage));
         await tester.pumpAndSettle();
         expect(

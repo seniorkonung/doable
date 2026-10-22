@@ -152,6 +152,48 @@ void _registerPageMatrixTests() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('матрица: панель тегов перекрывает страницу намерения и панель '
+      'навигации, а «назад» закрывает только её', (tester) async {
+    final router = await _start(tester);
+    await _select(tester, AppDestination.intentionGraph);
+    await _open(
+      tester,
+      _summary(IntentionCatalogPage, 'Читать'),
+      IntentionDetailsPage,
+    );
+    await _tap(tester, _MatrixEntry.assignTags.finder);
+    await _until(
+      tester,
+      find.byKey(ValueKey('tags-panel-row-${tagFixtureId(_tag)}')),
+    );
+    await tester.pumpAndSettle();
+
+    final panel = find.byType(Sheet);
+    expect(panel, findsOneWidget);
+    expect(tester.getRect(panel).bottom, _screen(tester).height);
+    expect(find.byType(IntentionDetailsPage), findsOneWidget);
+    expect(_MatrixEntry.assignTags.finder.hitTestable(), findsNothing);
+    final bar = find.byType(AppNavigationBar);
+    expect(bar, findsOneWidget);
+    expect(
+      tester.widget<AppNavigationBar>(bar).selected,
+      AppDestination.intentionGraph,
+    );
+    expect(_destinations.hitTestable(), findsNothing);
+    expect(_announcedDestinations, findsNothing);
+
+    await tester.binding.handlePopRoute();
+    await _gone(tester, Sheet);
+    _expectAboveShell(
+      tester,
+      IntentionDetailsPage,
+      AppDestination.intentionGraph,
+    );
+    await _close(tester, IntentionDetailsPage);
+    _expectRootPage(tester, router, AppDestination.intentionGraph);
+    expect(tester.takeException(), isNull);
+  });
+
   const read = _MatrixEntry.intention;
   const daily = _MatrixEntry.dailyChoice;
   const tags = _MatrixEntry.tags;
@@ -185,12 +227,6 @@ void _registerPageMatrixTests() {
       page: TagCatalogPage,
       panel: true,
       entries: [tags],
-    ),
-    (
-      name: 'назначение тегов',
-      page: TagCatalogPage,
-      panel: false,
-      entries: [read, _MatrixEntry.assignTags],
     ),
     (
       name: 'теги черновика',

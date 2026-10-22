@@ -4,6 +4,7 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
@@ -13,7 +14,6 @@ import 'package:doable/src/intention/presentation/details/intention_details_stat
 import 'package:doable/src/intention/presentation/details/intention_details_view_model.dart';
 import 'package:doable/src/tag/application/tagged_intentions_page.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
-import 'package:doable/src/tag/presentation/catalog/tag_selection_context.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -146,39 +146,47 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(choose);
         await tester.pumpAndSettle();
-        expect(router.current.name, TagCatalogRoute.name);
-        expect(
-          router.current.argsAs<TagCatalogRouteArgs>().selectionContext,
-          TagAssignmentContext(_intentionId(number)),
-        );
+        // Панель открыта над страницей намерения, а не отдельной страницей.
+        expect(router.current.name, IntentionDetailsRoute.name);
+        expect(find.byType(Sheet), findsOneWidget);
+        expect(find.text('Теги'), findsOneWidget);
 
-        await tester.tap(find.byKey(const ValueKey('tag-catalog-create')));
-        await tester.pumpAndSettle();
+        // Нажатие на существующий тег сразу назначает его этому намерению
+        // без восстановления архивного и без изменения остальных данных.
+        final workId = tagFixtureId(lastTagNumber);
+        await tester.tap(find.byKey(ValueKey('tags-panel-row-$workId')));
+        await _waitUntil(
+          tester,
+          () => raw.select(
+            'SELECT * FROM tag_assignments WHERE tag_id = ? AND intention_id = ?',
+            [workId, tagFixtureId(number)],
+          ).isNotEmpty,
+        );
+        expect(retainedTagFixtureGraph(raw), graphBefore);
+
         await tester.enterText(
-          find.byKey(const ValueKey('tag-editor-name')),
+          find.descendant(
+            of: find.byType(Sheet),
+            matching: find.byType(TextField),
+          ),
           'Новый тег $number',
         );
         await tester.pump();
-        await tester.tap(find.byKey(const ValueKey('tag-editor-submit')));
+        await tester.tap(find.text('Создать тег «Новый тег $number»'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(FilledButton, 'Создать тег'));
         await _waitUntil(
           tester,
-          () =>
-              find.byKey(const ValueKey('tag-editor-name')).evaluate().isEmpty,
+          () => raw.select('SELECT id FROM tags WHERE name = ?', [
+            'Новый тег $number',
+          ]).isNotEmpty,
         );
-        expect(router.current.name, TagCatalogRoute.name);
         final newTagId =
             raw.select('SELECT id FROM tags WHERE name = ?', [
                   'Новый тег $number',
                 ]).single['id']
                 as String;
-        expect(
-          raw.select('SELECT * FROM tag_assignments WHERE tag_id = ?', [
-            newTagId,
-          ]),
-          isEmpty,
-        );
-
-        await tester.tap(find.byKey(const ValueKey('tag-catalog-assign')));
+        // Созданный в панели тег сразу назначен именно этому намерению.
         await _waitUntil(
           tester,
           () => raw.select(
@@ -187,14 +195,14 @@ void main() {
           ).isNotEmpty,
         );
         expect(
-          raw.select(
-            'SELECT * FROM tag_assignments WHERE tag_id = ? AND intention_id = ?',
-            [newTagId, tagFixtureId(number)],
-          ),
+          raw.select('SELECT * FROM tag_assignments WHERE tag_id = ?', [
+            newTagId,
+          ]),
           hasLength(1),
         );
-        router.pop();
+        await tester.tap(find.text('Готово'));
         await tester.pumpAndSettle();
+        expect(find.byType(Sheet), findsNothing);
         final remove = find.byKey(ValueKey('tag-assignment-remove-$newTagId'));
         await Scrollable.ensureVisible(tester.element(remove), alignment: 0.3);
         await tester.pumpAndSettle();

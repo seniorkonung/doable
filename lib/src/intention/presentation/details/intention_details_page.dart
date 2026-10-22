@@ -22,7 +22,8 @@ import '../../../long_term_relation/presentation/neighborhood/relation_neighborh
 import '../../../tag/presentation/assignments/tag_assignments_section.dart';
 import '../../../tag/presentation/assignments/tag_assignments_state.dart';
 import '../../../tag/presentation/assignments/tag_assignments_view_model.dart';
-import '../../../tag/presentation/catalog/tag_selection_context.dart';
+import '../../../tag/presentation/panel/tags_panel.dart';
+import '../../../tag/presentation/panel/tags_panel_context.dart';
 import '../../../statistics/application/intention_statistics_target.dart';
 import '../../../statistics/presentation/intention_statistics_section.dart';
 import '../../../statistics/presentation/intention_statistics_view_model.dart';
@@ -462,11 +463,7 @@ final class _LoadedDetails extends StatelessWidget {
               isArchived:
                   intention.archiveState == IntentionArchiveState.archived,
               onChooseTag: (intentionId) => unawaited(
-                context.router.push(
-                  TagCatalogRoute(
-                    selectionContext: TagAssignmentContext(intentionId),
-                  ),
-                ),
+                showTagsPanel(context, TagsPanelAssignmentContext(intentionId)),
               ),
               onOpenTag: (tagId) => unawaited(
                 context.router.push<void>(TagNavigationRoute(tagId: tagId)),

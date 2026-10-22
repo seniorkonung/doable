@@ -7,6 +7,8 @@ import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/design_system/components/sheet.dart';
+import 'package:doable/src/design_system/components/tag_row.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_page.dart';
 import 'package:flutter/material.dart';
@@ -58,16 +60,19 @@ void main() {
     );
     await _until(tester, choose);
     await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('tag-catalog-search')), findsNothing);
+    expect(find.byType(Sheet), findsNothing);
     await _tap(tester, choose);
 
     final homeTagId = tagFixtureId(firstTagNumber);
     final existingTagId = tagFixtureId(lastTagNumber);
-    final homeRow = find.byKey(ValueKey('tag-catalog-row-$homeTagId'));
-    final workRow = find.byKey(ValueKey('tag-catalog-row-$existingTagId'));
+    final homeRow = find.byKey(ValueKey('tags-panel-row-$homeTagId'));
+    final workRow = find.byKey(ValueKey('tags-panel-row-$existingTagId'));
     await _until(tester, homeRow);
     await tester.pumpAndSettle();
-    final search = find.byKey(const ValueKey('tag-catalog-search'));
+    final search = find.descendant(
+      of: find.byType(Sheet),
+      matching: find.byType(TextField),
+    );
     final localizations = AppLocalizations.of(tester.element(search));
     final storedBeforeSearch = _storedGraph(raw);
     final diagnosticsBeforeSearch = diagnostics.events;
@@ -84,42 +89,34 @@ void main() {
       await tester.pumpAndSettle();
       expect(homeRow, hasHome ? findsOneWidget : findsNothing);
       expect(workRow, hasWork ? findsOneWidget : findsNothing);
-      if (hasHome) {
-        expect(
-          _assignmentLabel(tester, homeRow),
-          localizations.tagCatalogAssigned,
-        );
-      }
-      if (hasWork) {
-        expect(
-          _assignmentLabel(tester, workRow),
-          localizations.tagCatalogAvailable,
-        );
-      }
+      if (hasHome) expect(_mark(tester, homeRow), TagRowMark.checked);
+      if (hasWork) expect(_mark(tester, workRow), TagRowMark.none);
       if (!hasHome && !hasWork) {
-        expect(find.text(localizations.tagCatalogNoMatches), findsOneWidget);
+        expect(
+          find.text(localizations.tagsPanelCreateTag(query)),
+          findsOneWidget,
+        );
       }
       expect(_storedGraph(raw), storedBeforeSearch);
       expect(diagnostics.events, diagnosticsBeforeSearch);
     }
-    await tester.tap(find.byTooltip(localizations.tagCatalogClearSearch));
+    await tester.tap(find.bySemanticsLabel(localizations.tagsPanelClearSearch));
     await tester.pumpAndSettle();
     expect(homeRow, findsOneWidget);
     expect(workRow, findsOneWidget);
-    expect(_assignmentLabel(tester, homeRow), localizations.tagCatalogAssigned);
+    expect(_mark(tester, homeRow), TagRowMark.checked);
     expect(_storedGraph(raw), storedBeforeSearch);
     expect(diagnostics.events, diagnosticsBeforeSearch);
 
+    // Нажатие на строку само назначает тег, отдельного действия нет.
     await tester.enterText(search, 'работ');
     await tester.pumpAndSettle();
     expect(homeRow, findsNothing);
     expect(_storedGraph(raw), storedBeforeSearch);
     expect(diagnostics.events, diagnosticsBeforeSearch);
     await _tap(tester, workRow);
-    expect(_storedGraph(raw), storedBeforeSearch);
-    await _tap(tester, find.byKey(const ValueKey('tag-catalog-assign')));
-    await _until(tester, find.text('Работа'));
     await _waitFor(tester, () => _assigned(raw, existingTagId, number));
+    await _waitFor(tester, () => _mark(tester, workRow) == TagRowMark.checked);
     final storedAfterAssign = _storedGraph(raw);
     final assignmentsBefore = storedBeforeSearch['tag_assignments']!;
     expect(storedAfterAssign['tags'], storedBeforeSearch['tags']);
@@ -132,7 +129,7 @@ void main() {
       hasLength(assignmentsBefore.length + 1),
     );
     expect(retainedTagFixtureGraph(raw), graphBefore);
-    router.pop();
+    await _tap(tester, find.text(localizations.tagsPanelDone));
     await _until(
       tester,
       find.byKey(
@@ -141,45 +138,49 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('tag-catalog-search')), findsNothing);
+    expect(find.byType(Sheet), findsNothing);
+    expect(find.byType(SnackBar), findsNothing);
 
+    // Созданный из строки создания тег сразу назначен этому намерению.
     await _tap(tester, choose);
-    await _tap(tester, find.byKey(const ValueKey('tag-catalog-create')));
+    await _until(tester, homeRow);
     const newName = 'Общий тег 🏷️';
-    await _until(tester, find.byKey(const ValueKey('tag-editor-name')));
-    await tester.enterText(
-      find.byKey(const ValueKey('tag-editor-name')),
-      newName,
+    await tester.enterText(search, newName);
+    await _tap(tester, find.text(localizations.tagsPanelCreateTag(newName)));
+    await _tap(
+      tester,
+      find.widgetWithText(FilledButton, localizations.tagEditorCreateAction),
     );
-    await tester.pump();
-    await _tap(tester, find.byKey(const ValueKey('tag-editor-submit')));
     await _waitFor(
       tester,
-      () => find.byKey(const ValueKey('tag-editor-name')).evaluate().isEmpty,
+      () => raw.select('SELECT id FROM tags WHERE name = ?', [
+        newName,
+      ]).isNotEmpty,
     );
     final newTagId =
         raw.select('SELECT id FROM tags WHERE name = ?', [newName]).single['id']
             as String;
-    expect(_assignments(raw, newTagId), isEmpty);
-    final assign = find.byKey(const ValueKey('tag-catalog-assign'));
-    expect(assign, findsOneWidget);
-    await tester.pumpAndSettle();
-    expect(
-      assign.hitTestable(),
-      findsOneWidget,
-      reason: 'Сообщение об успешном создании не перекрывает назначение тега.',
-    );
-
-    await _tap(tester, assign);
     await _waitFor(tester, () => _assigned(raw, newTagId, number));
-    router.pop();
+    final newRow = find.byKey(ValueKey('tags-panel-row-$newTagId'));
+    await _waitFor(
+      tester,
+      () =>
+          newRow.evaluate().isNotEmpty &&
+          _mark(tester, newRow) == TagRowMark.checked,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text(localizations.tagEditorCreateTitle), findsNothing);
+    expect(tester.widgetList<TagRow>(find.byType(TagRow)).first.name, newName);
+    expect(find.byType(SnackBar), findsNothing);
+    await _tap(tester, find.text(localizations.tagsPanelDone));
     final remove = find.byKey(
       ValueKey('tag-assignment-remove-$newTagId'),
       skipOffstage: false,
     );
     await _until(tester, remove);
     await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('tag-catalog-search')), findsNothing);
+    expect(find.byType(Sheet), findsNothing);
+    expect(find.byType(SnackBar), findsNothing);
     await _tap(
       tester,
       find.byKey(
@@ -216,8 +217,9 @@ void main() {
     expect(find.text(newName), findsOneWidget);
     await tester.pumpAndSettle();
     final storedBeforeBrowseSearch = _storedGraph(raw);
+    final catalogSearch = find.byKey(const ValueKey('tag-catalog-search'));
     for (final query in ['общ', 'спорт', 'общий']) {
-      await tester.enterText(search, query);
+      await tester.enterText(catalogSearch, query);
       await tester.pumpAndSettle();
       expect(
         find.text(newName),
@@ -249,14 +251,8 @@ Map<String, List<List<Object?>>> _storedGraph(sqlite.Database raw) => {
         .toList(),
 };
 
-String _assignmentLabel(WidgetTester tester, Finder row) =>
-    (tester
-                .widget<ListTile>(
-                  find.descendant(of: row, matching: find.byType(ListTile)),
-                )
-                .subtitle!
-            as Text)
-        .data!;
+TagRowMark _mark(WidgetTester tester, Finder row) =>
+    tester.widget<TagRow>(row).mark;
 
 List<sqlite.Row> _assignments(sqlite.Database raw, String tagId) =>
     raw.select('SELECT * FROM tag_assignments WHERE tag_id = ?', [tagId]);

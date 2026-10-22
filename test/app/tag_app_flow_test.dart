@@ -180,10 +180,12 @@ void main() {
             skipOffstage: false,
           ),
         );
-        await _tap(tester, find.byKey(ValueKey('tag-catalog-row-$tagId')));
-        await _tap(tester, find.byKey(const ValueKey('tag-catalog-assign')));
-        await _until(tester, find.text('Назначен'));
-        await _tap(tester, find.byType(BackButton));
+        final row = find.byKey(ValueKey('tags-panel-row-$tagId'));
+        await _tap(tester, row);
+        await _until(tester, find.bySemanticsLabel('Работа, отмечен'));
+        await tester.pumpAndSettle();
+        expect(find.byType(SnackBar, skipOffstage: false), findsNothing);
+        await _tap(tester, find.text('Готово'));
         await _until(tester, remove);
       } else {
         await _tap(tester, remove);
