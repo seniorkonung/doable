@@ -1796,6 +1796,80 @@ class AppLocalizationsRu extends AppLocalizations {
   String get intentionTagConditionsAddSemantics => 'Добавить условие по тегу';
 
   @override
+  String get tagsPanelTitle => 'Теги';
+
+  @override
+  String get tagsPanelAssignmentHint => 'Выберите сколько нужно';
+
+  @override
+  String get tagsPanelSearchPlaceholder => 'Найти или создать тег';
+
+  @override
+  String get tagsPanelSearchLabel => 'Поиск тегов';
+
+  @override
+  String get tagsPanelClearSearch => 'Очистить поиск тегов';
+
+  @override
+  String get tagsPanelInvalidSearch =>
+      'Недопустимые символы показаны как �. Ввод сохранён, но не применён; показаны результаты последнего корректного запроса.';
+
+  @override
+  String get tagsPanelDone => 'Готово';
+
+  @override
+  String get tagsPanelExpand => 'Раскрыть панель тегов';
+
+  @override
+  String get tagsPanelCollapse => 'Свернуть панель тегов';
+
+  @override
+  String get tagsPanelLoading => 'Загружаем теги…';
+
+  @override
+  String get tagsPanelLoadUnavailable => 'Не удалось загрузить теги.';
+
+  @override
+  String get tagsPanelLoadCorruption =>
+      'Сохранённые данные тегов повреждены и не могут быть показаны.';
+
+  @override
+  String get tagsPanelLoadUnexpected =>
+      'Не удалось загрузить теги из-за непредвиденной ошибки.';
+
+  @override
+  String get tagsPanelRefreshUnavailable =>
+      'Не удалось обновить теги. Список может быть устаревшим.';
+
+  @override
+  String get tagsPanelRefreshCorruption =>
+      'Не удалось обновить теги: сохранённые данные повреждены. Список может быть устаревшим.';
+
+  @override
+  String get tagsPanelRefreshUnexpected =>
+      'Не удалось обновить теги из-за непредвиденной ошибки. Список может быть устаревшим.';
+
+  @override
+  String get tagsPanelIntentionMissing => 'Этого намерения больше нет.';
+
+  @override
+  String get tagsPanelEmptyTitle => 'Тегов пока нет';
+
+  @override
+  String get tagsPanelEmptyText =>
+      'Введите название в поиске, чтобы создать первый';
+
+  @override
+  String tagsPanelRowMarked(String tagName) {
+    return '$tagName, отмечен';
+  }
+
+  @override
+  String tagsPanelRowUnmarked(String tagName) {
+    return '$tagName, не отмечен';
+  }
+
+  @override
   String get tagCatalogTitle => 'Теги';
 
   @override

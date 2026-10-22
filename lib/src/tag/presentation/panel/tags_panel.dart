@@ -1,0 +1,238 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../../l10n/app_localizations.dart';
+import '../../../design_system/components/button.dart';
+import '../../../design_system/components/empty_state.dart';
+import '../../../design_system/components/list_state.dart';
+import '../../../design_system/components/notice.dart';
+import '../../../design_system/components/search_field.dart';
+import '../../../design_system/components/sheet.dart';
+import '../../../design_system/components/tag_row.dart';
+import '../../../design_system/doable_metrics.dart';
+import '../../application/tag_catalog.dart';
+import '../catalog/tag_catalog_filter.dart';
+import '../catalog/tag_catalog_search_controller.dart';
+import '../tag_color_presentation.dart';
+import 'tags_panel_context.dart';
+import 'tags_panel_state.dart';
+import 'tags_panel_view_model.dart';
+
+/// Показывает панель тегов над страницей или листом инициатора.
+///
+/// Нажатия применяются сразу, поэтому «Готово», свайп вниз, касание
+/// затемнения и «назад» только закрывают панель. Каждый вызов — новое
+/// открытие с пустым поиском. Отказы операций панели общая поверхность
+/// показывает поверх неё, над «Готово».
+Future<void> showTagsPanel(
+  BuildContext context,
+  TagsPanelContext panelContext,
+) {
+  // Открытие создаётся один раз: маршрут может перестраивать содержимое.
+  final opening = TagsPanelOpening(panelContext);
+  return showDoableSheet<void>(
+    context: context,
+    size: DoableSheetSize.expandable,
+    hostsMessages: true,
+    builder: (_) => _TagsPanel(opening),
+  );
+}
+
+final class _TagsPanel extends ConsumerStatefulWidget {
+  const _TagsPanel(this.opening);
+
+  final TagsPanelOpening opening;
+
+  @override
+  ConsumerState<_TagsPanel> createState() => _TagsPanelState();
+}
+
+final class _TagsPanelState extends ConsumerState<_TagsPanel> {
+  final _searchController = TagCatalogSearchController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final provider = tagsPanelViewModelProvider(widget.opening);
+    final state = ref.watch(provider);
+    final model = ref.read(provider.notifier);
+    final (title, text) = switch (widget.opening.context) {
+      TagsPanelAssignmentContext() => (
+        l10n.tagsPanelTitle,
+        l10n.tagsPanelAssignmentHint,
+      ),
+    };
+
+    return Sheet.expandable(
+      title: title,
+      text: text,
+      expandLabel: l10n.tagsPanelExpand,
+      collapseLabel: l10n.tagsPanelCollapse,
+      pinned: SearchField(
+        controller: _searchController,
+        placeholder: l10n.tagsPanelSearchPlaceholder,
+        label: l10n.tagsPanelSearchLabel,
+        clearLabel: l10n.tagsPanelClearSearch,
+        onChanged: model.search,
+        error: state.search.inputIsInvalid ? l10n.tagsPanelInvalidSearch : null,
+      ),
+      body: switch (state.catalog) {
+        TagsPanelLoading() => _StatusBody(
+          ListState.loading(text: l10n.tagsPanelLoading),
+        ),
+        TagsPanelLoadFailure(:final failure, :final canRetry) => _StatusBody(
+          ListState.error(
+            message: _loadFailureMessage(l10n, failure),
+            retry: canRetry
+                ? (label: l10n.commonRetry, onPressed: model.retryLoad)
+                : null,
+          ),
+        ),
+        TagsPanelIntentionMissing() => _StatusBody(
+          ListState.error(message: l10n.tagsPanelIntentionMissing),
+        ),
+        final TagsPanelLoaded loaded => _LoadedCatalog(
+          catalog: loaded,
+          filter: state.search.filter,
+          model: model,
+        ),
+      },
+      footer: Button.primary(
+        label: l10n.tagsPanelDone,
+        onPressed: () => Navigator.pop(context),
+      ),
+    );
+  }
+}
+
+/// Состояние всего каталога на месте его строк.
+final class _StatusBody extends StatelessWidget {
+  const _StatusBody(this.state);
+
+  final ListState state;
+
+  @override
+  Widget build(BuildContext context) =>
+      ListView(padding: _bodyPadding, children: [state]);
+}
+
+final class _LoadedCatalog extends StatelessWidget {
+  const _LoadedCatalog({
+    required this.catalog,
+    required this.filter,
+    required this.model,
+  });
+
+  final TagsPanelLoaded catalog;
+  final TagCatalogFilter filter;
+  final TagsPanelViewModel model;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final rows = catalog.rowsMatching(filter);
+    final refreshFailure = catalog.refreshFailure;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Сообщение стоит вне прокрутки: оно видно при любом положении
+        // списка и не сдвигает прокрутку показанных строк.
+        if (refreshFailure != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              DoableMetrics.space2,
+              0,
+              DoableMetrics.space2,
+              DoableMetrics.space2,
+            ),
+            child: Notice.content(
+              message: Semantics(
+                container: true,
+                liveRegion: true,
+                child: Text(_refreshFailureMessage(l10n, refreshFailure)),
+              ),
+              action: catalog.canRetryRefresh
+                  ? (label: l10n.commonRetry, onPressed: model.retryRefresh)
+                  : null,
+            ),
+          ),
+        Expanded(
+          child: CustomScrollView(
+            slivers: [
+              if (catalog.isEmpty && filter.isEmpty)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: EmptyState(
+                    title: l10n.tagsPanelEmptyTitle,
+                    text: l10n.tagsPanelEmptyText,
+                  ),
+                )
+              else
+                SliverPadding(
+                  padding: _bodyPadding,
+                  sliver: SliverList.builder(
+                    itemCount: rows.length,
+                    itemBuilder: (context, index) => _row(
+                      l10n,
+                      rows[index],
+                      isCurrent: catalog.rowsAreCurrent,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _row(
+    AppLocalizations l10n,
+    TagsPanelRow row, {
+    required bool isCurrent,
+  }) {
+    final tag = row.tag;
+    final name = tag.name.value;
+    return TagRow(
+      key: ValueKey('tags-panel-row-${tag.id.toCanonicalString()}'),
+      name: name,
+      color: tagColorPresentation(tag.color),
+      mark: row.isMarked ? TagRowMark.checked : TagRowMark.none,
+      label: row.isMarked
+          ? l10n.tagsPanelRowMarked(name)
+          : l10n.tagsPanelRowUnmarked(name),
+      // Отказ принадлежит общей поверхности, а нажатие во время изменения
+      // назначений намерения координатор отклоняет без сообщения.
+      onPressed: isCurrent ? () => model.toggle(tag.id) : null,
+    );
+  }
+}
+
+const _bodyPadding = EdgeInsets.symmetric(horizontal: DoableMetrics.space2);
+
+String _loadFailureMessage(
+  AppLocalizations l10n,
+  TagCatalogReadFailure failure,
+) => switch (failure) {
+  TagCatalogUnavailableFailure() => l10n.tagsPanelLoadUnavailable,
+  TagCatalogCorruptionFailure() => l10n.tagsPanelLoadCorruption,
+  // Отсутствие намерения модель показывает отдельным состоянием.
+  TagCatalogIntentionNotFound() ||
+  TagCatalogUnexpectedFailure() => l10n.tagsPanelLoadUnexpected,
+};
+
+String _refreshFailureMessage(
+  AppLocalizations l10n,
+  TagCatalogReadFailure failure,
+) => switch (failure) {
+  TagCatalogUnavailableFailure() => l10n.tagsPanelRefreshUnavailable,
+  TagCatalogCorruptionFailure() => l10n.tagsPanelRefreshCorruption,
+  TagCatalogIntentionNotFound() ||
+  TagCatalogUnexpectedFailure() => l10n.tagsPanelRefreshUnexpected,
+};

@@ -1775,6 +1775,80 @@ class AppLocalizationsEn extends AppLocalizations {
   String get intentionTagConditionsAddSemantics => 'Add tag condition';
 
   @override
+  String get tagsPanelTitle => 'Tags';
+
+  @override
+  String get tagsPanelAssignmentHint => 'Choose as many as you need';
+
+  @override
+  String get tagsPanelSearchPlaceholder => 'Find or create a tag';
+
+  @override
+  String get tagsPanelSearchLabel => 'Search tags';
+
+  @override
+  String get tagsPanelClearSearch => 'Clear tag search';
+
+  @override
+  String get tagsPanelInvalidSearch =>
+      'Invalid characters are shown as �. Your input is retained but wasn’t applied; results use the last valid query.';
+
+  @override
+  String get tagsPanelDone => 'Done';
+
+  @override
+  String get tagsPanelExpand => 'Expand tags panel';
+
+  @override
+  String get tagsPanelCollapse => 'Collapse tags panel';
+
+  @override
+  String get tagsPanelLoading => 'Loading tags…';
+
+  @override
+  String get tagsPanelLoadUnavailable => 'Couldn’t load tags.';
+
+  @override
+  String get tagsPanelLoadCorruption =>
+      'Saved tag data is corrupted and can’t be shown.';
+
+  @override
+  String get tagsPanelLoadUnexpected =>
+      'Couldn’t load tags because of an unexpected error.';
+
+  @override
+  String get tagsPanelRefreshUnavailable =>
+      'Couldn’t update tags. The list may be out of date.';
+
+  @override
+  String get tagsPanelRefreshCorruption =>
+      'Couldn’t update tags: saved data is corrupted. The list may be out of date.';
+
+  @override
+  String get tagsPanelRefreshUnexpected =>
+      'Couldn’t update tags because of an unexpected error. The list may be out of date.';
+
+  @override
+  String get tagsPanelIntentionMissing => 'This intention no longer exists.';
+
+  @override
+  String get tagsPanelEmptyTitle => 'No tags yet';
+
+  @override
+  String get tagsPanelEmptyText =>
+      'Type a name in search to create the first one';
+
+  @override
+  String tagsPanelRowMarked(String tagName) {
+    return '$tagName, selected';
+  }
+
+  @override
+  String tagsPanelRowUnmarked(String tagName) {
+    return '$tagName, not selected';
+  }
+
+  @override
   String get tagCatalogTitle => 'Tags';
 
   @override

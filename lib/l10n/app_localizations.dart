@@ -2677,6 +2677,132 @@ abstract class AppLocalizations {
   /// **'Add tag condition'**
   String get intentionTagConditionsAddSemantics;
 
+  /// Заголовок панели тегов при выборе тегов намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Tags'**
+  String get tagsPanelTitle;
+
+  /// Строка под заголовком панели тегов при выборе тегов намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Choose as many as you need'**
+  String get tagsPanelAssignmentHint;
+
+  /// Заполнитель поля поиска панели тегов
+  ///
+  /// In en, this message translates to:
+  /// **'Find or create a tag'**
+  String get tagsPanelSearchPlaceholder;
+
+  /// Доступное название поля поиска панели тегов
+  ///
+  /// In en, this message translates to:
+  /// **'Search tags'**
+  String get tagsPanelSearchLabel;
+
+  /// Доступное название очистки поиска панели тегов
+  ///
+  /// In en, this message translates to:
+  /// **'Clear tag search'**
+  String get tagsPanelClearSearch;
+
+  /// Ошибка некорректного Unicode в поиске панели с объяснением сохранения последнего корректного фильтра
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid characters are shown as �. Your input is retained but wasn’t applied; results use the last valid query.'**
+  String get tagsPanelInvalidSearch;
+
+  /// Кнопка, которая только закрывает панель тегов
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get tagsPanelDone;
+
+  /// Доступное название ручки панели тегов в половинном размере
+  ///
+  /// In en, this message translates to:
+  /// **'Expand tags panel'**
+  String get tagsPanelExpand;
+
+  /// Доступное название ручки панели тегов в полном размере
+  ///
+  /// In en, this message translates to:
+  /// **'Collapse tags panel'**
+  String get tagsPanelCollapse;
+
+  /// Первоначальная загрузка каталога панели тегов
+  ///
+  /// In en, this message translates to:
+  /// **'Loading tags…'**
+  String get tagsPanelLoading;
+
+  /// Устранимый отказ первоначального чтения каталога панели; рядом действие повтора
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t load tags.'**
+  String get tagsPanelLoadUnavailable;
+
+  /// Повреждение данных при первоначальном чтении каталога панели; без повтора
+  ///
+  /// In en, this message translates to:
+  /// **'Saved tag data is corrupted and can’t be shown.'**
+  String get tagsPanelLoadCorruption;
+
+  /// Неизвестный отказ первоначального чтения каталога панели; без повтора
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t load tags because of an unexpected error.'**
+  String get tagsPanelLoadUnexpected;
+
+  /// Устранимый отказ фонового обновления над неактуальным списком; рядом действие повтора
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t update tags. The list may be out of date.'**
+  String get tagsPanelRefreshUnavailable;
+
+  /// Повреждение данных при фоновом обновлении над неактуальным списком; без повтора
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t update tags: saved data is corrupted. The list may be out of date.'**
+  String get tagsPanelRefreshCorruption;
+
+  /// Неизвестный отказ фонового обновления над неактуальным списком; без повтора
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t update tags because of an unexpected error. The list may be out of date.'**
+  String get tagsPanelRefreshUnexpected;
+
+  /// Намерения, для которого открыта панель тегов, больше нет
+  ///
+  /// In en, this message translates to:
+  /// **'This intention no longer exists.'**
+  String get tagsPanelIntentionMissing;
+
+  /// Заголовок пустого каталога в панели тегов
+  ///
+  /// In en, this message translates to:
+  /// **'No tags yet'**
+  String get tagsPanelEmptyTitle;
+
+  /// Подсказка пустого каталога в панели тегов
+  ///
+  /// In en, this message translates to:
+  /// **'Type a name in search to create the first one'**
+  String get tagsPanelEmptyText;
+
+  /// Доступное название отмеченной строки панели тегов
+  ///
+  /// In en, this message translates to:
+  /// **'{tagName}, selected'**
+  String tagsPanelRowMarked(String tagName);
+
+  /// Доступное название неотмеченной строки панели тегов
+  ///
+  /// In en, this message translates to:
+  /// **'{tagName}, not selected'**
+  String tagsPanelRowUnmarked(String tagName);
+
   /// Заголовок каталога тегов и переход к нему
   ///
   /// In en, this message translates to:
