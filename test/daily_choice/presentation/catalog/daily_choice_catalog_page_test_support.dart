@@ -40,7 +40,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/app_root_pages.dart';
-import '../../../support/catalog_reconciliation_test_fallback.dart';
 import '../../../support/daily_choice_local_date.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
@@ -105,7 +104,7 @@ Future<AppRouter> pumpCatalogPage(
 /// Записывает запросы выдачи в [queries], а отметок — в [dayStatusQueries].
 /// Ответы остаются незавершёнными до решения сценария по номеру запроса.
 final class CatalogPageRepository
-    with TagReadContractTestFallback, CatalogReconciliationTestFallback
+    with TagReadContractTestFallback
     implements PersonalGraphRepository {
   // Управляемые чтения невыполненных; completeFirst задаёт обе секции дня.
   final queries = <DailyChoiceCatalogQuery>[];

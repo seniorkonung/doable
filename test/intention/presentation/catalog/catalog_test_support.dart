@@ -76,9 +76,6 @@ final class ControlledCatalogRepository
 
   final queries = <IntentionCatalogQuery>[];
   final _requests = <Completer<Result<IntentionCatalogPage>>>[];
-  final reconciliationQueries = <IntentionCatalogReconciliationQuery>[];
-  final _reconciliationRequests =
-      <Completer<Result<IntentionCatalogReconciliationOutcome>>>[];
   final commands = <IntentionCommand>[];
   final _commandRequests =
       <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
@@ -122,16 +119,6 @@ final class ControlledCatalogRepository
     _requests[index].complete(result);
   }
 
-  IntentionCatalogReconciliationQuery reconciliationQueryAt(int index) =>
-      reconciliationQueries[index];
-
-  void completeReconciliation(
-    int index,
-    Result<IntentionCatalogReconciliationOutcome> result,
-  ) {
-    _reconciliationRequests[index].complete(result);
-  }
-
   void completeCommand(int index, Result<IntentionCommandSuccess> result) {
     _commandRequests[index].complete(switch (result) {
       ResultSuccess(:final value) => ResultSuccess(
@@ -166,15 +153,6 @@ final class ControlledCatalogRepository
     queries.add(query);
     final request = Completer<Result<IntentionCatalogPage>>();
     _requests.add(request);
-    return request.future;
-  }
-
-  @override
-  Future<Result<IntentionCatalogReconciliationOutcome>>
-  getCatalogReconciliationPortion(IntentionCatalogReconciliationQuery query) {
-    reconciliationQueries.add(query);
-    final request = Completer<Result<IntentionCatalogReconciliationOutcome>>();
-    _reconciliationRequests.add(request);
     return request.future;
   }
 
@@ -264,11 +242,6 @@ final class ControlledCatalogRepository
 
 final class TestCatalogCursor implements IntentionCatalogCursor {
   const TestCatalogCursor();
-}
-
-final class TestReconciliationCursor
-    implements IntentionCatalogReconciliationCursor {
-  const TestReconciliationCursor();
 }
 
 final class TestCatalogRevision implements GraphRevision {

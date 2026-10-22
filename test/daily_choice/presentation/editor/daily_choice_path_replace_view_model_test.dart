@@ -24,7 +24,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/tag_read_contract_test_fallback.dart';
-import '../../../support/catalog_reconciliation_test_fallback.dart';
 
 void main() {
   test('актуализация конфликта не возвращает старые поля и игнорирует два поздних чтения', () async {
@@ -208,7 +207,7 @@ final class _Harness {
 }
 
 final class _Repository
-    with TagReadContractTestFallback, CatalogReconciliationTestFallback
+    with TagReadContractTestFallback
     implements PersonalGraphRepository {
   final choice = DailyChoice(
     id: _choiceId(),

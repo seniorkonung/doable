@@ -28,17 +28,13 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
 
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/statistics_read_contract_test_fallback.dart';
-import '../../../support/catalog_reconciliation_test_fallback.dart';
 
 /// Граф, в котором тест сам решает исход каждой команды сохранения связи.
 ///
 /// Чтения здесь недоступны намеренно: черновик формы не должен заводить
 /// собственного источника данных графа.
 final class ControlledRelationEditorRepository
-    with
-        StatisticsReadContractTestFallback,
-        TagReadContractTestFallback,
-        CatalogReconciliationTestFallback
+    with StatisticsReadContractTestFallback, TagReadContractTestFallback
     implements PersonalGraphRepository {
   @override
   Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(

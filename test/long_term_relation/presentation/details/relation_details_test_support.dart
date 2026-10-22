@@ -29,7 +29,6 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
 import '../neighborhood/neighborhood_test_support.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/statistics_read_contract_test_fallback.dart';
-import '../../../support/catalog_reconciliation_test_fallback.dart';
 
 /// Одно наблюдение подробных данных связи, которым управляет тест.
 final class ControlledRelationWatch {
@@ -66,10 +65,7 @@ final class ControlledRelationWatch {
 
 /// Управляемый граф для подробного просмотра связи и переходов к участникам.
 final class ControlledRelationDetailsRepository
-    with
-        StatisticsReadContractTestFallback,
-        TagReadContractTestFallback,
-        CatalogReconciliationTestFallback
+    with StatisticsReadContractTestFallback, TagReadContractTestFallback
     implements PersonalGraphRepository {
   @override
   Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(

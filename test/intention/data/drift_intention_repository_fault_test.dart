@@ -62,22 +62,6 @@ void main() {
     );
   });
 
-  _catalogReconciliationFailureScenarios((observer, setup) async {
-    final replacement = await _replaceDatabase(
-      observer,
-      database,
-      diagnostics,
-      setup: setup,
-    );
-    database = replacement.database;
-    repository = replacement.repository;
-    return (
-      database: database,
-      repository: repository,
-      diagnostics: diagnostics,
-    );
-  });
-
   group('Порция каталога — отказы получения собственных тегов', () {
     test('ошибка после получения назначений не публикует частичный успех', () async {
       for (final (error, expected, code)

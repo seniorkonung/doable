@@ -29,7 +29,6 @@ import '../../../intention/presentation/catalog/catalog_test_support.dart';
 import '../details/relation_details_test_support.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/statistics_read_contract_test_fallback.dart';
-import '../../../support/catalog_reconciliation_test_fallback.dart';
 
 /// Граф для страницы создания связи: команды, каталог выбора участника и
 /// подробный просмотр связи конфликтующей пары.
@@ -37,10 +36,7 @@ import '../../../support/catalog_reconciliation_test_fallback.dart';
 /// Соседство и отдельная сводка здесь недоступны: форма получает выбор из
 /// каталога и наблюдает выбранные на замену намерения до сохранения связи.
 final class ControlledRelationFormRepository
-    with
-        StatisticsReadContractTestFallback,
-        TagReadContractTestFallback,
-        CatalogReconciliationTestFallback
+    with StatisticsReadContractTestFallback, TagReadContractTestFallback
     implements PersonalGraphRepository {
   @override
   Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(

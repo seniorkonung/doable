@@ -30,7 +30,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/tag_read_contract_test_fallback.dart';
 import '../../support/statistics_read_contract_test_fallback.dart';
-import '../../support/catalog_reconciliation_test_fallback.dart';
 
 void main() {
   group('GraphCommandCoordinator — изменение долговременной связи', () {
@@ -171,10 +170,7 @@ LongTermRelation _relation(
 );
 
 final class _ControlledPersonalGraphRepository
-    with
-        StatisticsReadContractTestFallback,
-        TagReadContractTestFallback,
-        CatalogReconciliationTestFallback
+    with StatisticsReadContractTestFallback, TagReadContractTestFallback
     implements PersonalGraphRepository {
   @override
   Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(

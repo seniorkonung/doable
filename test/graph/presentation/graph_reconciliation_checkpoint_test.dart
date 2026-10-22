@@ -72,7 +72,6 @@ import '../../support/in_memory_diagnostics_sink.dart';
 import '../../long_term_relation/presentation/neighborhood/neighborhood_test_support.dart';
 import '../../support/tag_read_contract_test_fallback.dart';
 import '../../support/statistics_read_contract_test_fallback.dart';
-import '../../support/catalog_reconciliation_test_fallback.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/tag_positions.dart';
 
@@ -2039,10 +2038,7 @@ final class _CheckpointHarness {
 
 /// Управляемый граф, обслуживающий все чтения и команды контрольной точки.
 final class _CheckpointGraphRepository
-    with
-        StatisticsReadContractTestFallback,
-        TagReadContractTestFallback,
-        CatalogReconciliationTestFallback
+    with StatisticsReadContractTestFallback, TagReadContractTestFallback
     implements PersonalGraphRepository {
   @override
   Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(

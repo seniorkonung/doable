@@ -817,55 +817,6 @@ void main() {
     });
   });
 
-  group('контракт чтения согласования каталога', () {
-    test('окно сохранённых строк не зависит от изменения исходного списка', () {
-      final second = _summary(id: '00000000-0000-4000-8000-000000000002');
-      final first = _summary(id: '00000000-0000-4000-8000-000000000001');
-      final stored = [second, first];
-
-      final window = IntentionCatalogInnerReconciliationWindow(stored);
-      stored.clear();
-
-      expect(window.storedIntentionIds, [second.id, first.id]);
-      expect(window.upperEdgeRow.id, first.id);
-    });
-
-    test('внутреннее окно без сохранённых строк не создаётся', () {
-      expect(
-        () => IntentionCatalogInnerReconciliationWindow(const []),
-        throwsArgumentError,
-      );
-    });
-
-    test('ранее завершённая выдача, включая пустую, — отдельная граница, '
-        'а окно с последней строкой области может быть пустым', () {
-      final reconciliation = IntentionCatalogReconciliationQuery(
-        catalogQuery: _query(),
-        boundary: const IntentionCatalogCompletedBoundary(),
-        window: IntentionCatalogFinalReconciliationWindow(const []),
-      );
-
-      expect(_boundaryDescription(reconciliation.boundary), 'completed');
-      expect(_windowDescription(reconciliation.window), 'final');
-      expect(reconciliation.window.storedIntentionIds, isEmpty);
-      expect(reconciliation.cursor, isNull);
-    });
-
-    test('первая порция отклоняет количество меньше своих строк', () {
-      final summary = _summary(id: '00000000-0000-4000-8000-000000000001');
-
-      expect(
-        () => IntentionCatalogReconciliationFirstPortion(
-          items: [summary],
-          totalCount: 0,
-          nextCursor: null,
-          revision: const _TestGraphRevision(epoch: 'первая', sequence: 0),
-        ),
-        throwsA(isA<IntentionCatalogPageValidationException>()),
-      );
-    });
-  });
-
   group('полное начальное состояние создания намерения', () {
     final home = _tagId('00000000-0000-4000-8000-000000000001');
     final weekend = _tagId('00000000-0000-4000-8000-000000000002');
@@ -1028,18 +979,6 @@ Intention _intention() {
     updatedAt: timestamp,
   );
 }
-
-String _boundaryDescription(IntentionCatalogReconciliationBoundary boundary) =>
-    switch (boundary) {
-      IntentionCatalogPartialPrefixBoundary() => 'partial',
-      IntentionCatalogCompletedBoundary() => 'completed',
-    };
-
-String _windowDescription(IntentionCatalogReconciliationWindow window) =>
-    switch (window) {
-      IntentionCatalogInnerReconciliationWindow() => 'inner',
-      IntentionCatalogFinalReconciliationWindow() => 'final',
-    };
 
 Matcher _throwsQueryFailure(IntentionCatalogQueryValidationFailure failure) =>
     throwsA(

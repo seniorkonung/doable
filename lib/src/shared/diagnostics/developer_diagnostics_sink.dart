@@ -130,16 +130,6 @@ Map<String, Object> _encode(DiagnosticsEvent event) => switch (event) {
     ..._encodeStatus(event.status),
     'pageSize': pageSize,
   },
-  CatalogReconciliationReadDiagnosticsEvent(
-    :final pageSize,
-    :final completion,
-  ) =>
-    {
-      'operation': 'catalogReconciliationRead',
-      ..._encodeStatus(event.status),
-      'pageSize': pageSize,
-      'completion': ?completion?.name,
-    },
   IntentionDetailReadDiagnosticsEvent() => {
     'operation': 'intentionDetailRead',
     ..._encodeStatus(event.status),

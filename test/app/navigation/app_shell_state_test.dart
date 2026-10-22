@@ -1486,7 +1486,7 @@ final class _ObservedRepository implements PersonalGraphRepository {
   /// Команда намерения принята координатором и ждёт [releaseCommand].
   var isHolding = false;
 
-  /// Обращения к выдаче каталога намерений: порции и чтения согласования.
+  /// Обращения к выдаче каталога намерений: первая порция и продолжения.
   var catalogReads = 0;
 
   /// Получения первой порции выдачи каталога намерений.
@@ -1546,13 +1546,6 @@ final class _ObservedRepository implements PersonalGraphRepository {
     catalogReads++;
     if (query.cursor == null) firstCatalogPortions++;
     return _delegate.getCatalogPage(query);
-  }
-
-  @override
-  Future<Result<IntentionCatalogReconciliationOutcome>>
-  getCatalogReconciliationPortion(IntentionCatalogReconciliationQuery query) {
-    catalogReads++;
-    return _delegate.getCatalogReconciliationPortion(query);
   }
 
   @override

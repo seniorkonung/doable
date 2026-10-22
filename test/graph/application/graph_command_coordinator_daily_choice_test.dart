@@ -20,7 +20,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/tag_read_contract_test_fallback.dart';
-import '../../support/catalog_reconciliation_test_fallback.dart';
 
 void main() {
   test(
@@ -177,7 +176,7 @@ final _choiceB =
     (DailyChoiceId.decode(_uuid(5)) as DailyChoiceIdDecodingSuccess).id;
 
 final class _ControlledRepository
-    with TagReadContractTestFallback, CatalogReconciliationTestFallback
+    with TagReadContractTestFallback
     implements PersonalGraphRepository {
   @override
   Future<ChoicePathContinuationResult> getChoicePathContinuations(

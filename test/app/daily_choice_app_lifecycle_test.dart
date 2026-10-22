@@ -1049,11 +1049,6 @@ final class _ObservedRepository implements PersonalGraphRepository {
   ) => _delegate.getCatalogPage(query);
 
   @override
-  Future<Result<IntentionCatalogReconciliationOutcome>>
-  getCatalogReconciliationPortion(IntentionCatalogReconciliationQuery query) =>
-      _delegate.getCatalogReconciliationPortion(query);
-
-  @override
   Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(
     IntentionId id,
   ) => _delegate.watchIntention(id);
