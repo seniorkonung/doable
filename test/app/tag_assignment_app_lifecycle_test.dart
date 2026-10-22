@@ -74,7 +74,11 @@ void main() {
       await tester.pumpAndSettle();
 
       // Нажатие и закрытие в одном событии: запись ещё не подтверждена.
-      tester.widget<TagRow>(workRow).onPressed!();
+      tester
+          .widget<TagRow>(
+            find.descendant(of: workRow, matching: find.byType(TagRow)),
+          )
+          .onPressed!();
       Navigator.of(tester.element(workRow)).pop();
       expect(_assignments(raw, workId, 1), isEmpty);
 

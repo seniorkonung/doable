@@ -251,8 +251,9 @@ Map<String, List<List<Object?>>> _storedGraph(sqlite.Database raw) => {
         .toList(),
 };
 
-TagRowMark _mark(WidgetTester tester, Finder row) =>
-    tester.widget<TagRow>(row).mark;
+TagRowMark _mark(WidgetTester tester, Finder row) => tester
+    .widget<TagRow>(find.descendant(of: row, matching: find.byType(TagRow)))
+    .mark;
 
 List<sqlite.Row> _assignments(sqlite.Database raw, String tagId) =>
     raw.select('SELECT * FROM tag_assignments WHERE tag_id = ?', [tagId]);
