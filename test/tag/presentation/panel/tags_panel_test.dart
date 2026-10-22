@@ -14,6 +14,7 @@ import 'package:doable/src/graph/application/personal_graph_repository_provider.
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
+import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
@@ -454,13 +455,133 @@ void main() {
     expectVisible();
     expect(tester.takeException(), isNull);
   });
+
+  for (final (locale, texts) in [
+    (const Locale('ru'), (create: 'Создать тег «спорт»', title: 'Новый тег')),
+    (const Locale('en'), (create: 'Create tag “спорт”', title: 'New tag')),
+  ]) {
+    testWidgets('${locale.languageCode}: Совпадений нет, создание доступно', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      final h = await _pumpApp(tester, locale: locale);
+      await h.open();
+      h.repository.complete([_tag(1, 'Дом')], assignedIds: {});
+      await tester.pump();
+
+      await tester.enterText(_search, 'спорт');
+      await tester.pump();
+
+      expect(find.byType(TagRow), findsNothing);
+      expect(
+        tester.getSemantics(find.bySemanticsLabel(texts.create)),
+        isSemantics(label: texts.create, isButton: true, hasTapAction: true),
+      );
+      expect(_searchText(tester), 'спорт');
+
+      await tester.tap(find.text(texts.create));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(Sheet), findsExactly(2));
+      expect(find.text(texts.title), findsOne);
+      expect(_tagSheetNameText(tester), 'спорт');
+      semantics.dispose();
+    });
+  }
+
+  for (final (name, close) in <(String, Future<void> Function(WidgetTester))>[
+    (
+      'свайп вниз',
+      (tester) => tester.drag(find.text('Новый тег'), const Offset(0, 300)),
+    ),
+    ('касание затемнения', (tester) => tester.tapAt(const Offset(195, 120))),
+    ('«назад»', (tester) => tester.binding.handlePopRoute()),
+  ]) {
+    testWidgets('$name в листе «Новый тег» возвращает ту же панель с прежними '
+        'каталогом, отметками и поиском', (tester) async {
+      final h = await _pumpApp(tester);
+      await h.open();
+      h.repository.complete(
+        [_tag(1, 'Работа'), _tag(2, 'Рассада')],
+        assignedIds: {_id(2)},
+      );
+      await tester.pump();
+      await tester.enterText(_search, 'ра');
+      await tester.pump();
+      await tester.tap(find.text('Создать тег «ра»'));
+      await tester.pumpAndSettle();
+      await tester.enterText(_tagSheetName, 'Рамки');
+
+      await close(tester);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(Sheet), findsOne);
+      expect(find.text('Новый тег'), findsNothing);
+      expect(h.isClosed, isFalse);
+      expect(_searchText(tester), 'ра');
+      expect(find.text('Создать тег «ра»'), findsOne);
+      expect(_rowNames(tester), ['Работа', 'Рассада']);
+      expect(_marks(tester), [TagRowMark.none, TagRowMark.checked]);
+      expect(h.repository.commands, isEmpty);
+      expect(h.repository.reads, hasLength(1));
+    });
+  }
+
+  testWidgets('подтверждённое создание из листа закрывает лист, очищает поле '
+      'поиска и ставит новый тег первым', (tester) async {
+    final h = await _pumpApp(tester);
+    await h.open();
+    h.repository.complete([_tag(5, 'Дом')], assignedIds: {});
+    await tester.pump();
+    await tester.enterText(_search, 'парк');
+    await tester.pump();
+    await tester.tap(find.text('Создать тег «парк»'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Создать тег'));
+    await tester.pump();
+    final create = h.repository.commands.single as CreateTag;
+    expect((create.name.value, create.color), ('парк', null));
+    final created = ConfirmedGraphResult<TagCommandSuccess>(
+      revision: const TagCatalogTestRevision(2),
+      value: TagCreated(
+        TagCreatedChange(
+          revision: const TagCatalogTestRevision(2),
+          after: _tag(1, 'парк'),
+        ),
+      ),
+    );
+    h.repository.command.complete(TagCommandSucceeded(created));
+    h.changes.add(created);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(Sheet), findsOne);
+    expect(find.text('Новый тег'), findsNothing);
+    expect(_searchText(tester), isEmpty);
+    expect(_rowNames(tester), ['парк', 'Дом']);
+    final assign = h.repository.commands.last as AssignTag;
+    expect((assign.tagId, assign.intentionId), (_id(1), _intentionId));
+    expect(find.byType(SnackBar), findsNothing);
+  });
 }
 
 final _intentionId = (IntentionId.decode(
   '00000000-0000-4000-9000-000000000001',
 ) as IntentionIdDecodingSuccess).id;
 
-final _search = find.byType(TextField);
+final _search = find.byType(TextField).first;
+
+/// Поле названия листа «Новый тег», открытого поверх панели.
+final _tagSheetName = find.descendant(
+  of: find.byType(Sheet).last,
+  matching: find.byType(TextField),
+);
+
+String _searchText(WidgetTester tester) =>
+    tester.widget<TextField>(_search).controller!.text;
+
+String _tagSheetNameText(WidgetTester tester) =>
+    tester.widget<TextField>(_tagSheetName).controller!.text;
 
 final _listState = find.byWidgetPredicate((widget) => widget is ListState);
 

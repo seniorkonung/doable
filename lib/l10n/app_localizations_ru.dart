@@ -1870,6 +1870,14 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
+  String tagsPanelCreateTag(String query) {
+    return 'Создать тег «$query»';
+  }
+
+  @override
+  String get tagSheetNamePlaceholder => 'Название';
+
+  @override
   String get tagCatalogTitle => 'Теги';
 
   @override

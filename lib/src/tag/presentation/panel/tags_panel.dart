@@ -8,11 +8,15 @@ import '../../../design_system/components/list_state.dart';
 import '../../../design_system/components/notice.dart';
 import '../../../design_system/components/search_field.dart';
 import '../../../design_system/components/sheet.dart';
+import '../../../design_system/components/tag_create_row.dart';
 import '../../../design_system/components/tag_row.dart';
 import '../../../design_system/doable_metrics.dart';
+import '../../../graph/application/graph_command_coordinator.dart';
 import '../../application/tag_catalog.dart';
 import '../catalog/tag_catalog_filter.dart';
 import '../catalog/tag_catalog_search_controller.dart';
+import '../editor/tag_editor_state.dart';
+import '../editor/tag_sheet.dart';
 import '../tag_color_presentation.dart';
 import 'tags_panel_context.dart';
 import 'tags_panel_state.dart';
@@ -50,11 +54,31 @@ final class _TagsPanel extends ConsumerStatefulWidget {
 final class _TagsPanelState extends ConsumerState<_TagsPanel> {
   final _searchController = TagCatalogSearchController();
 
+  /// Один ключ на открытие: повторный лист создания не обходит ещё
+  /// выполняющееся создание этой панели.
+  final _creationKey = TagCreationFormKey();
+
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
   }
+
+  /// Лист «Новый тег» поверх панели; принятое в нём создание продолжает
+  /// модель панели, поэтому возвращаемое листом значение не нужно.
+  void _openCreation(
+    String name,
+    TagsPanelLoaded catalog,
+    TagsPanelViewModel model,
+  ) => showTagSheet(
+    context,
+    TagEditorCreating(
+      _creationKey,
+      initialName: name,
+      existingNames: [for (final row in catalog.rows) row.tag.name],
+      onCreationAccepted: model.acceptCreation,
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -62,6 +86,14 @@ final class _TagsPanelState extends ConsumerState<_TagsPanel> {
     final provider = tagsPanelViewModelProvider(widget.opening);
     final state = ref.watch(provider);
     final model = ref.read(provider.notifier);
+    ref.listen(provider, (previous, next) {
+      // Ввод в поле всегда даёт новый поиск, поэтому начальный после другого
+      // означает сброс моделью после подтверждённого создания.
+      if (identical(next.search, TagsPanelSearch.initial) &&
+          !identical(previous?.search, next.search)) {
+        _searchController.clear();
+      }
+    });
     final (title, text) = switch (widget.opening.context) {
       TagsPanelAssignmentContext() => (
         l10n.tagsPanelTitle,
@@ -101,6 +133,7 @@ final class _TagsPanelState extends ConsumerState<_TagsPanel> {
           catalog: loaded,
           filter: state.search.filter,
           model: model,
+          onCreate: (name) => _openCreation(name, loaded, model),
         ),
       },
       footer: Button.primary(
@@ -127,16 +160,21 @@ final class _LoadedCatalog extends StatelessWidget {
     required this.catalog,
     required this.filter,
     required this.model,
+    required this.onCreate,
   });
 
   final TagsPanelLoaded catalog;
   final TagCatalogFilter filter;
   final TagsPanelViewModel model;
 
+  /// Открывает создание тега с предложенным названием.
+  final ValueChanged<String> onCreate;
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final rows = catalog.rowsMatching(filter);
+    final proposedName = catalog.proposedTagName(filter);
     final refreshFailure = catalog.refreshFailure;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -176,13 +214,25 @@ final class _LoadedCatalog extends StatelessWidget {
               else
                 SliverPadding(
                   padding: _bodyPadding,
-                  sliver: SliverList.builder(
-                    itemCount: rows.length,
-                    itemBuilder: (context, index) => _row(
-                      l10n,
-                      rows[index],
-                      isCurrent: catalog.rowsAreCurrent,
-                    ),
+                  sliver: SliverMainAxisGroup(
+                    slivers: [
+                      if (proposedName != null)
+                        SliverToBoxAdapter(
+                          child: TagCreateRow(
+                            text: l10n.tagsPanelCreateTag(proposedName),
+                            label: l10n.tagsPanelCreateTag(proposedName),
+                            onPressed: () => onCreate(proposedName),
+                          ),
+                        ),
+                      SliverList.builder(
+                        itemCount: rows.length,
+                        itemBuilder: (context, index) => _row(
+                          l10n,
+                          rows[index],
+                          isCurrent: catalog.rowsAreCurrent,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
             ],

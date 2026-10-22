@@ -59,7 +59,7 @@ final class TagsPanelViewModelProvider
 }
 
 String _$tagsPanelViewModelHash() =>
-    r'b9c10146cf4bce7a5ba573929038748bd3a2a140';
+    r'9ba5e4da1098f2ab12368054d1bb936aa9a16b70';
 
 final class TagsPanelViewModelFamily extends $Family
     with

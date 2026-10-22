@@ -2803,6 +2803,18 @@ abstract class AppLocalizations {
   /// **'{tagName}, not selected'**
   String tagsPanelRowUnmarked(String tagName);
 
+  /// Строка панели тегов, создающая тег с названием из поиска
+  ///
+  /// In en, this message translates to:
+  /// **'Create tag “{query}”'**
+  String tagsPanelCreateTag(String query);
+
+  /// Заполнитель поля названия в листе тега
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get tagSheetNamePlaceholder;
+
   /// Заголовок каталога тегов и переход к нему
   ///
   /// In en, this message translates to:

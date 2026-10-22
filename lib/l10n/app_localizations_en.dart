@@ -1849,6 +1849,14 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String tagsPanelCreateTag(String query) {
+    return 'Create tag “$query”';
+  }
+
+  @override
+  String get tagSheetNamePlaceholder => 'Name';
+
+  @override
   String get tagCatalogTitle => 'Tags';
 
   @override
