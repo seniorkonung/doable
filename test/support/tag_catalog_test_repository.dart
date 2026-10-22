@@ -84,6 +84,9 @@ final class TagCatalogTestRepository extends Fake
     return read.future;
   }
 
+  void fail(TagCatalogReadFailure failure) =>
+      reads.last.complete(TagCatalogError(failure));
+
   void complete(List<Tag> tags, {int revision = 1, Set<TagId>? assignedIds}) =>
       reads.last.complete(
         TagCatalogSuccess(switch (readModes.last) {
