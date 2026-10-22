@@ -7,6 +7,7 @@ import 'package:doable/src/design_system/components/notice.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/design_system/components/tag_dot.dart';
 import 'package:doable/src/design_system/components/tag_row.dart';
+import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -964,7 +965,237 @@ void main() {
     );
     semantics.dispose();
   });
+
+  testWidgets('перетаскивание за ручку сразу ставит тег на новое место, а '
+      'перетаскивание за название порядок не меняет', (tester) async {
+    final h = await _pumpApp(tester);
+    await h.open();
+    final sport = _tag(3, 'Спорт');
+    h.repository.complete(
+      [_tag(1, 'Работа'), _tag(2, 'Дом'), sport],
+      assignedIds: {_id(3)},
+    );
+    await tester.pump();
+
+    await tester.drag(find.text('Спорт'), const Offset(0, -150));
+    await tester.pumpAndSettle();
+    expect(_rowNames(tester), ['Работа', 'Дом', 'Спорт']);
+    expect(h.repository.commands, isEmpty);
+
+    final drag = await tester.startGesture(tester.getCenter(_gripOf(_row(3))));
+    for (var step = 0; step < 8; step++) {
+      await drag.moveBy(const Offset(0, -20));
+      await tester.pump();
+    }
+    expect(
+      tester
+          .widgetList<TagRow>(find.byType(TagRow))
+          .where((row) => row.ground == TagRowGround.lifted)
+          .map((row) => row.name),
+      ['Спорт'],
+      reason: 'поднятая строка выделена',
+    );
+    await drag.up();
+    await tester.pumpAndSettle();
+
+    expect(_rowNames(tester), ['Спорт', 'Работа', 'Дом']);
+    expect(_marks(tester), [
+      TagRowMark.checked,
+      TagRowMark.none,
+      TagRowMark.none,
+    ]);
+    final move = h.repository.commands.single as MoveTag;
+    expect((move.tagId, move.placement), (_id(3), TagPlacement.first));
+
+    // Пока перестановка выполняется, следующая не начинается.
+    await _dragByGrip(tester, _row(3), -100);
+    expect(h.repository.commands, hasLength(1));
+    expect(_rowNames(tester), ['Спорт', 'Работа', 'Дом']);
+
+    final moved = ConfirmedGraphResult<TagCommandSuccess>(
+      revision: const TagCatalogTestRevision(2),
+      value: TagUpdated(
+        TagUpdatedChange(
+          revision: const TagCatalogTestRevision(2),
+          before: sport,
+          after: _tag(3, 'Спорт', at: 0),
+        ),
+      ),
+    );
+    h.repository.command.complete(TagCommandSucceeded(moved));
+    h.changes.add(moved);
+    await tester.pumpAndSettle();
+
+    expect(_rowNames(tester), ['Спорт', 'Работа', 'Дом']);
+    expect(find.byType(SnackBar), findsNothing);
+    await _dragByGrip(tester, _row(2), -100);
+    expect(h.repository.commands, hasLength(2));
+  });
+
+  for (final (locale, moveActions) in [
+    (
+      const Locale('ru'),
+      [
+        'Переместить в начало',
+        'Переместить вверх',
+        'Переместить вниз',
+        'Переместить в конец',
+      ],
+    ),
+    (
+      const Locale('en'),
+      ['Move to the start', 'Move up', 'Move down', 'Move to the end'],
+    ),
+  ]) {
+    testWidgets('${locale.languageCode}: Поиск отключает перестановку '
+        'перетаскиванием и командами экранного диктора, а ручки сохраняют '
+        'место', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final h = await _pumpApp(tester, locale: locale);
+      await h.open();
+      h.repository.complete([
+        _tag(1, 'Работа'),
+        _tag(2, 'Дом'),
+        _tag(3, 'Спорт'),
+      ], assignedIds: {});
+      await tester.pump();
+      expect(_moveActionsOf(tester, _row(2)), unorderedEquals(moveActions));
+      final dotInset = tester
+          .getTopLeft(
+            find.descendant(of: _row(2), matching: find.byType(TagDot)),
+          )
+          .dx;
+
+      await tester.enterText(_search, 'дом');
+      await tester.pump();
+      final row = tester.getRect(_row(2));
+      await tester.dragFrom(
+        row.centerLeft + const Offset(20, 0),
+        const Offset(0, -100),
+      );
+      await tester.pumpAndSettle();
+
+      expect(_rowNames(tester), ['Дом']);
+      expect(tester.getRect(_row(2)), row);
+      expect(_gripOf(_row(2)), findsNothing);
+      expect(
+        tester
+            .getTopLeft(
+              find.descendant(of: _row(2), matching: find.byType(TagDot)),
+            )
+            .dx,
+        dotInset,
+      );
+      expect(_moveActionsOf(tester, _row(2)), isEmpty);
+      expect(h.repository.commands, isEmpty);
+      semantics.dispose();
+    });
+  }
+
+  for (final (locale, message, done) in [
+    (
+      const Locale('ru'),
+      'Перестановка — «тег»: Не удалось выполнить действие с тегом. '
+          'Повторите попытку.',
+      'Готово',
+    ),
+    (
+      const Locale('en'),
+      'Move — “tag”: Could not complete the tag operation. Try again.',
+      'Done',
+    ),
+  ]) {
+    testWidgets('${locale.languageCode}: Отказ записи перестановки '
+        'возвращает прежний порядок и виден поверх панели над «Готово»', (
+      tester,
+    ) async {
+      final h = await _pumpApp(tester, locale: locale);
+      await h.open();
+      h.repository.complete([
+        _tag(1, 'Работа'),
+        _tag(2, 'Дом'),
+        _tag(3, 'Спорт'),
+      ], assignedIds: {});
+      await tester.pump();
+
+      await _dragByGrip(tester, _row(3), -150);
+      expect(_rowNames(tester), ['Спорт', 'Работа', 'Дом']);
+      h.repository.command.complete(
+        const TagCommandFailed(TagUnavailableFailure()),
+      );
+      await tester.pumpAndSettle();
+
+      expect(_rowNames(tester), ['Работа', 'Дом', 'Спорт']);
+      expect(
+        find.descendant(of: find.byType(Sheet), matching: find.text(message)),
+        findsOne,
+      );
+      expect(
+        tester
+            .getRect(
+              find.descendant(
+                of: find.byType(Sheet),
+                matching: find.byType(SnackBar),
+              ),
+            )
+            .bottom,
+        lessThanOrEqualTo(tester.getRect(find.text(done)).top),
+      );
+    });
+  }
+
+  testWidgets('на неактуальных строках тег нельзя переставить ни '
+      'перетаскиванием, ни командами экранного диктора', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final h = await _pumpApp(tester);
+    await h.open();
+    h.repository.complete([_tag(1, 'Работа'), _tag(2, 'Дом')], assignedIds: {});
+    await tester.pump();
+    h.changes.add(ConfirmedGraphReplacement(const TagCatalogTestRevision(2)));
+    await tester.pump();
+    h.repository.fail(const TagCatalogUnavailableFailure());
+    await tester.pumpAndSettle();
+
+    await _dragByGrip(tester, _row(2), -100);
+
+    expect(_rowNames(tester), ['Работа', 'Дом']);
+    expect(_moveActionsOf(tester, _row(2)), isEmpty);
+    expect(h.repository.commands, isEmpty);
+    semantics.dispose();
+  });
 }
+
+/// Ручка перестановки строки [row].
+Finder _gripOf(Finder row) => find.descendant(
+  of: row,
+  matching: find.byWidgetPredicate(
+    (widget) => widget is DoableIcon && widget.icon == DoableIconData.grip,
+  ),
+);
+
+/// Перетаскивает строку [row] за ручку на [dy] по вертикали и отпускает её.
+Future<void> _dragByGrip(WidgetTester tester, Finder row, double dy) async {
+  final drag = await tester.startGesture(tester.getCenter(_gripOf(row)));
+  for (var step = 0; step < 10; step++) {
+    await drag.moveBy(Offset(0, dy / 10));
+    await tester.pump();
+  }
+  await drag.up();
+  await tester.pumpAndSettle();
+}
+
+/// Команды перемещения, которые экранный диктор предлагает для строки [row]:
+/// переставляемый список вешает их на узел вокруг строки.
+List<String?> _moveActionsOf(WidgetTester tester, Finder row) => [
+  for (final id
+      in tester
+              .getSemantics(row)
+              .parent!
+              .getSemanticsData()
+              .customSemanticsActionIds ??
+          const <int>[])
+    CustomSemanticsAction.getAction(id)!.label,
+];
 
 /// Удерживает строку и выбирает пункт меню тега.
 Future<void> _chooseFromMenu(
@@ -1122,10 +1353,11 @@ TagId _id(int number) => (TagId.decode(
   '00000000-0000-4000-8000-${number.toString().padLeft(12, '0')}',
 ) as TagIdDecodingSuccess).id;
 
-/// Номер задаёт и идентичность, и место тега в ручном порядке.
-Tag _tag(int number, String name, {TagColor? color}) => Tag(
+/// Номер задаёт идентичность и, если не задано [at], место тега в ручном
+/// порядке.
+Tag _tag(int number, String name, {TagColor? color, int? at}) => Tag(
   id: _id(number),
   name: TagName.fromInput(name),
   color: color,
-  position: tagPositionAt(number),
+  position: tagPositionAt(at ?? number),
 );

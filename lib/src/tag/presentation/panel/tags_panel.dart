@@ -231,6 +231,7 @@ final class _TagsPanelState extends ConsumerState<_TagsPanel> {
           final TagsPanelLoaded loaded => _LoadedCatalog(
             catalog: loaded,
             filter: state.search.filter,
+            canReorder: state.canReorder,
             model: model,
             heldTagId: _heldTagId,
             onCreate: (proposal) => _openCreation(proposal, loaded, model),
@@ -272,6 +273,7 @@ final class _LoadedCatalog extends StatelessWidget {
   const _LoadedCatalog({
     required this.catalog,
     required this.filter,
+    required this.canReorder,
     required this.model,
     required this.heldTagId,
     required this.onCreate,
@@ -280,6 +282,11 @@ final class _LoadedCatalog extends StatelessWidget {
 
   final TagsPanelLoaded catalog;
   final TagCatalogFilter filter;
+
+  /// Новая перестановка доступна: строки актуальны, и предыдущая не
+  /// выполняется.
+  final bool canReorder;
+
   final TagsPanelViewModel model;
 
   /// Тег, меню которого открыто.
@@ -351,13 +358,45 @@ final class _LoadedCatalog extends StatelessWidget {
                             ),
                           ),
                         ),
-                      SliverList.builder(
-                        itemCount: rows.length,
-                        itemBuilder: (context, index) => _row(
-                          rows[index],
-                          isCurrent: catalog.rowsAreCurrent,
+                      // Переставляется только полный список на актуальных
+                      // строках; список сам предлагает экранному диктору
+                      // команды перемещения каждой строки.
+                      if (filter.isEmpty && catalog.rowsAreCurrent)
+                        SliverReorderableList(
+                          itemCount: rows.length,
+                          onReorderItem: (from, to) =>
+                              model.move(rows[from].tag.id, to),
+                          proxyDecorator: (_, index, _) => _row(
+                            rows[index],
+                            handle: TagRowDragHandle(
+                              index: index,
+                              enabled: false,
+                            ),
+                            ground: TagRowGround.lifted,
+                            isCurrent: false,
+                          ),
+                          itemBuilder: (context, index) => _row(
+                            rows[index],
+                            handle: TagRowDragHandle(
+                              index: index,
+                              enabled: canReorder,
+                            ),
+                            isCurrent: true,
+                          ),
+                        )
+                      else
+                        SliverList.builder(
+                          itemCount: rows.length,
+                          itemBuilder: (context, index) => _row(
+                            rows[index],
+                            // Поиск скрывает ручки, а неактуальные строки
+                            // показывают их недоступными.
+                            handle: filter.isEmpty
+                                ? TagRowDragHandle(index: index, enabled: false)
+                                : const TagRowHiddenHandle(),
+                            isCurrent: catalog.rowsAreCurrent,
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 ),
@@ -368,7 +407,12 @@ final class _LoadedCatalog extends StatelessWidget {
     );
   }
 
-  Widget _row(TagsPanelRow row, {required bool isCurrent}) {
+  Widget _row(
+    TagsPanelRow row, {
+    required TagRowHandle handle,
+    required bool isCurrent,
+    TagRowGround? ground,
+  }) {
     final tag = row.tag;
     final name = tag.name.value;
     // Меню стоит у строки, поэтому ему нужен её собственный контекст.
@@ -379,8 +423,10 @@ final class _LoadedCatalog extends StatelessWidget {
         color: tagColorPresentation(tag.color),
         mark: row.isMarked ? TagRowMark.checked : TagRowMark.none,
         label: name,
-        handle: const TagRowHiddenHandle(),
-        ground: tag.id == heldTagId ? TagRowGround.held : TagRowGround.none,
+        handle: handle,
+        ground:
+            ground ??
+            (tag.id == heldTagId ? TagRowGround.held : TagRowGround.none),
         // Отказ принадлежит общей поверхности, а нажатие во время изменения
         // назначений намерения координатор отклоняет без сообщения.
         onPressed: isCurrent ? () => model.toggle(tag.id) : null,
