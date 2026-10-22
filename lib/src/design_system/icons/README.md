@@ -28,6 +28,7 @@
 | [from_action.svg](assets/from_action.svg) | `Main.dc.html` | `choiceSheet` → ссылка `ActionPicker.dc.html`, ведущий SVG |
 | [check.svg](assets/check.svg) | `Main.dc.html` | `pinSheet` → `pick.intention.on`; та же галочка у `pick.relation.on` и `pick.choice.on` |
 | [chevron_right.svg](assets/chevron_right.svg) | `Main.dc.html` | `choiceSheet` → ссылка `IntentionPicker.dc.html`, завершающий SVG; тот же шеврон у `ActionPicker.dc.html` |
+| [chevron_down.svg](assets/chevron_down.svg) | `TagsPanel.dc.html` | Кнопка `toggleSize` в полном размере, SVG |
 | [settings.svg](assets/settings.svg) | `Home.dc.html` | Ссылка `Settings.dc.html` |
 | [export.svg](assets/export.svg) | `Settings.dc.html` | Кнопка `openExport`, ведущий SVG |
 | [lock_open.svg](assets/lock_open.svg) | `Settings.dc.html` | `exportOpen` → предупреждение панели, SVG |

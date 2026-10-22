@@ -47,14 +47,14 @@ void main() {
     },
   );
 
-  testWidgets('все 23 ресурса сохраняют исходную графику в обеих темах', (
+  testWidgets('все 24 ресурса сохраняют исходную графику в обеих темах', (
     tester,
   ) async {
     await (FontLoader('Inter')..addFont(
           rootBundle.load('lib/src/design_system/fonts/InterVariable.ttf'),
         ))
         .load();
-    await tester.binding.setSurfaceSize(const Size(560, 736));
+    await tester.binding.setSurfaceSize(const Size(560, 768));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
     await tester.pumpWidget(
@@ -113,6 +113,7 @@ Widget _sampleRow(DoableIconData icon, DoableColors colors) {
     DoableIconData.calendarMini => (14.0, colors.muted, colors.bg),
     DoableIconData.check => (20.0, colors.accent, colors.fill),
     DoableIconData.chevronRight => (20.0, colors.muted, colors.bg),
+    DoableIconData.chevronDown => (28.0, colors.grip, colors.raised),
     DoableIconData.settings => (22.0, colors.ink, colors.bg),
     DoableIconData.lockOpen => (20.0, colors.muted, colors.fill),
     DoableIconData.warning => (20.0, colors.accent, colors.fill),

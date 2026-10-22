@@ -20,6 +20,7 @@ enum DoableIconData {
   fromAction('from_action'),
   check('check'),
   chevronRight('chevron_right'),
+  chevronDown('chevron_down'),
   settings('settings'),
   export('export'),
   lockOpen('lock_open'),
