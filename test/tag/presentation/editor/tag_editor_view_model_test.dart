@@ -38,7 +38,6 @@ void main() {
       await first;
       expect(h.state.input, '  Дом  ');
       expect(h.state.status, isA<TagEditorSubmissionFailed>());
-      expect(h.state.failurePresentation, isNotNull);
       expect(h.state.canSubmit, isTrue);
     },
   );
@@ -126,12 +125,8 @@ void main() {
       expect(h.repository.commands, isEmpty);
       expect(h.state.input, 'Имя\u0000');
       expect(
-        (h.state.status as TagEditorSubmissionFailed).failure,
-        isA<TagNameInputFailure>().having(
-          (failure) => failure.reason,
-          'причина',
-          TagNameFailureReason.invalidUnicodeRepertoire,
-        ),
+        (h.state.status as TagEditorNameInvalid).reason,
+        TagNameFailureReason.invalidUnicodeRepertoire,
       );
     },
   );

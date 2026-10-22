@@ -3067,54 +3067,6 @@ abstract class AppLocalizations {
   /// **'Tag couldn’t be read because of an unexpected error.'**
   String get tagEditorReadUnexpected;
 
-  /// Подтверждение создания тега
-  ///
-  /// In en, this message translates to:
-  /// **'Tag created.'**
-  String get tagCreated;
-
-  /// Подтверждение изменения тега
-  ///
-  /// In en, this message translates to:
-  /// **'Tag updated.'**
-  String get tagUpdated;
-
-  /// Подтверждение неизменного названия тега
-  ///
-  /// In en, this message translates to:
-  /// **'Tag name unchanged.'**
-  String get tagUnchanged;
-
-  /// Подтверждение удаления тега и назначений
-  ///
-  /// In en, this message translates to:
-  /// **'Tag deleted with all its assignments.'**
-  String get tagDeleted;
-
-  /// Подтверждение нового назначения тега
-  ///
-  /// In en, this message translates to:
-  /// **'Tag assigned.'**
-  String get tagAssigned;
-
-  /// Подтверждение повторного назначения
-  ///
-  /// In en, this message translates to:
-  /// **'Tag already assigned.'**
-  String get tagAlreadyAssigned;
-
-  /// Подтверждение снятия назначения
-  ///
-  /// In en, this message translates to:
-  /// **'Tag assignment removed.'**
-  String get tagAssignmentRemoved;
-
-  /// Подтверждение повторного снятия
-  ///
-  /// In en, this message translates to:
-  /// **'Tag assignment already absent.'**
-  String get tagAssignmentAlreadyAbsent;
-
   /// Занятость ключей назначения при повторном действии
   ///
   /// In en, this message translates to:

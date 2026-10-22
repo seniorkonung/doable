@@ -27,7 +27,6 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
 import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
-import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_assignment.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
@@ -36,8 +35,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../intention/presentation/details/details_test_support.dart';
-import '../../support/tag_assignment_changed.dart';
-import '../../support/tag_positions.dart';
 
 void main() {
   setUp(() {
@@ -465,43 +462,36 @@ void main() {
     },
   );
 
-  for (final scenario in <({TagCommandKind kind, bool unchanged, String ru})>[
-    (kind: TagCommandKind.create, unchanged: false, ru: 'Тег создан.'),
-    (kind: TagCommandKind.update, unchanged: false, ru: 'Тег изменён.'),
-    (
-      kind: TagCommandKind.update,
-      unchanged: true,
-      ru: 'Название тега не изменилось.',
-    ),
-    (
-      kind: TagCommandKind.delete,
-      unchanged: false,
-      ru: 'Тег удалён вместе со всеми назначениями.',
-    ),
-  ]) {
+  for (final kind in TagCommandKind.values) {
     testWidgets(
-      'успех тега ${scenario.kind.name}, без изменения: ${scenario.unchanged}',
+      'отказ операции тега ${kind.name} показывается общей поверхностью без '
+      'ухода инициатора',
       (tester) async {
         final harness = await _pumpPresenterApp(
           tester,
           locale: const Locale('ru'),
         );
-        final accepted = harness.startTag(scenario.kind);
-        harness.completeTagSuccess(
-          accepted,
-          scenario.kind,
-          unchanged: scenario.unchanged,
-        );
+        final accepted = harness.startTag(kind);
+        harness.completeTagFailure(accepted, const TagUnavailableFailure());
         await tester.pumpAndSettle();
 
-        final operation = switch (scenario.kind) {
-          TagCommandKind.create => 'Создание',
-          TagCommandKind.update => 'Изменение',
-          TagCommandKind.delete => 'Удаление',
-          TagCommandKind.assign || TagCommandKind.removeAssignment =>
-            throw StateError('Сценарий проверяет жизненный цикл тега.'),
+        final message = switch (kind) {
+          TagCommandKind.create =>
+            'Создание — «тег»: Не удалось выполнить действие с тегом. '
+                'Повторите попытку.',
+          TagCommandKind.update =>
+            'Изменение — «тег»: Не удалось выполнить действие с тегом. '
+                'Повторите попытку.',
+          TagCommandKind.delete =>
+            'Удаление — «тег»: Не удалось выполнить действие с тегом. '
+                'Повторите попытку.',
+          TagCommandKind.assign =>
+            'Назначение — «назначение тега»: Не удалось изменить назначение '
+                'тега. Повторите попытку.',
+          TagCommandKind.removeAssignment =>
+            'Снятие — «назначение тега»: Не удалось изменить назначение '
+                'тега. Повторите попытку.',
         };
-        final message = '$operation — «тег»: ${scenario.ru}';
         expect(find.text(message), findsOneWidget);
         expect(
           tester.getSemantics(
@@ -518,24 +508,6 @@ void main() {
       },
     );
   }
-
-  testWidgets('несогласованный результат тега не объявляется успехом', (
-    tester,
-  ) async {
-    final harness = await _pumpPresenterApp(tester);
-    final accepted = harness.startTag(TagCommandKind.create);
-    harness.completeTagSuccess(accepted, TagCommandKind.update);
-    await tester.pumpAndSettle();
-
-    expect(
-      find.text(
-        'Create — “tag”: The tag operation failed because of an unexpected error.',
-      ),
-      findsOneWidget,
-    );
-    expect(find.text('Create — “tag”: Tag updated.'), findsNothing);
-    await _closeMessage(tester);
-  });
 
   for (final scenario in <({TagCommandFailure failure, String ru})>[
     (
@@ -659,71 +631,27 @@ void main() {
     },
   );
 
-  testWidgets(
-    'тег ждёт сообщения графа и передаёт отказ оболочке после закрытия формы',
-    (tester) async {
-      final harness = await _pumpPresenterApp(tester);
-      final intention = harness.startDelete(index: 1, title: 'Граф');
-      final tag = harness.startTag(
-        TagCommandKind.create,
-        releaseInitiator: false,
-      );
-      harness.completeDeleted(intention);
-      harness.completeTagFailure(tag, const TagUnavailableFailure());
-      await tester.pumpAndSettle();
+  testWidgets('отказ тега ждёт текущего сообщения графа и не вытесняет его', (
+    tester,
+  ) async {
+    final harness = await _pumpPresenterApp(tester);
+    final intention = harness.startDelete(index: 1, title: 'Граф');
+    final tag = harness.startTag(TagCommandKind.create);
+    harness.completeDeleted(intention);
+    harness.completeTagFailure(tag, const TagUnavailableFailure());
+    await tester.pumpAndSettle();
 
-      expect(find.text(_deleted('Граф')), findsOneWidget);
-      await _closeMessage(tester);
-      expect(find.byType(SnackBar), findsNothing);
-
-      harness.releaseInitiatorPresentation(tag.token);
-      await tester.pumpAndSettle();
-      expect(
-        find.text(
-          'Create — “tag”: Could not complete the tag operation. Try again.',
-        ),
-        findsOneWidget,
-      );
-      await _closeMessage(tester);
-      expect(find.byType(SnackBar), findsNothing);
-    },
-  );
-
-  for (final scenario in <({TagCommandKind kind, bool unchanged, String ru})>[
-    (kind: TagCommandKind.assign, unchanged: false, ru: 'Тег назначен.'),
-    (kind: TagCommandKind.assign, unchanged: true, ru: 'Тег уже назначен.'),
-    (
-      kind: TagCommandKind.removeAssignment,
-      unchanged: false,
-      ru: 'Назначение тега снято.',
-    ),
-    (
-      kind: TagCommandKind.removeAssignment,
-      unchanged: true,
-      ru: 'Назначение тега уже отсутствует.',
-    ),
-  ]) {
-    testWidgets('исход назначения ${scenario.kind.name}, ${scenario.unchanged}', (
-      tester,
-    ) async {
-      final harness = await _pumpPresenterApp(
-        tester,
-        locale: const Locale('ru'),
-      );
-      final accepted = harness.startTag(scenario.kind);
-      harness.completeTagSuccess(
-        accepted,
-        scenario.kind,
-        unchanged: scenario.unchanged,
-      );
-      await tester.pumpAndSettle();
-
-      final message =
-          '${scenario.kind == TagCommandKind.assign ? 'Назначение' : 'Снятие'} — «назначение тега»: ${scenario.ru}';
-      expect(find.text(message), findsOneWidget);
-      await _closeMessage(tester);
-    });
-  }
+    expect(find.text(_deleted('Граф')), findsOneWidget);
+    await _closeMessage(tester);
+    expect(
+      find.text(
+        'Create — “tag”: Could not complete the tag operation. Try again.',
+      ),
+      findsOneWidget,
+    );
+    await _closeMessage(tester);
+    expect(find.byType(SnackBar), findsNothing);
+  });
 
   for (final scenario in <({TagCommandFailure failure, String ru})>[
     (
@@ -2113,10 +2041,7 @@ final class _PresenterHarness {
   GraphCommandCoordinator get _coordinator =>
       container.read(graphCommandCoordinatorProvider.notifier);
 
-  TagCommandAccepted startTag(
-    TagCommandKind kind, {
-    bool releaseInitiator = true,
-  }) {
+  TagCommandAccepted startTag(TagCommandKind kind) {
     final commandIndex = repository.tagCommands.length;
     final accepted = switch (kind) {
       TagCommandKind.create => _coordinator.acceptTagCreation(
@@ -2141,77 +2066,8 @@ final class _PresenterHarness {
         ),
       ),
     } as TagCommandAccepted;
-    if (releaseInitiator) {
-      _coordinator.releaseInitiatorPresentation(accepted.token);
-    }
     _tagIndexes[accepted] = commandIndex;
     return accepted;
-  }
-
-  void completeTagSuccess(
-    TagCommandAccepted accepted,
-    TagCommandKind kind, {
-    bool unchanged = false,
-  }) {
-    const revision = TestDetailsRevision(8);
-    final before = Tag(
-      id: _tagId,
-      name: TagName.fromInput('Планы'),
-      color: null,
-      position: tagPositionAt(1000),
-    );
-    final after = Tag(
-      id: _tagId,
-      name: TagName.fromInput('Новое имя'),
-      color: before.color,
-      position: before.position,
-    );
-    final success = switch (kind) {
-      TagCommandKind.create => TagCreated(
-        TagCreatedChange(revision: revision, after: before),
-      ),
-      TagCommandKind.update when unchanged => TagUnchanged(
-        TagUnchangedChange(revision: revision, tag: before),
-      ),
-      TagCommandKind.update => TagUpdated(
-        TagUpdatedChange(revision: revision, before: before, after: after),
-      ),
-      TagCommandKind.delete => TagDeleted(
-        TagDeletedChange(revision: revision, tagId: _tagId),
-      ),
-      TagCommandKind.assign || TagCommandKind.removeAssignment =>
-        unchanged
-            ? TagAssignmentUnchanged(
-                TagAssignmentUnchangedChange(
-                  revision: revision,
-                  assignment: TagAssignment(
-                    tagId: _tagId,
-                    intentionId: testDetailsIntentionId(1),
-                  ),
-                  state: kind == TagCommandKind.assign
-                      ? TagAssignmentState.assigned
-                      : TagAssignmentState.absent,
-                ),
-              )
-            : testTagAssignmentChanged(
-                TagAssignmentChangedChange(
-                  revision: revision,
-                  assignment: TagAssignment(
-                    tagId: _tagId,
-                    intentionId: testDetailsIntentionId(1),
-                  ),
-                  state: kind == TagCommandKind.assign
-                      ? TagAssignmentState.assigned
-                      : TagAssignmentState.absent,
-                ),
-              ),
-    };
-    repository.completeTagCommand(
-      _tagIndexes[accepted]!,
-      GraphCommandSucceeded(
-        ConfirmedGraphResult(revision: revision, value: success),
-      ),
-    );
   }
 
   void completeTagFailure(

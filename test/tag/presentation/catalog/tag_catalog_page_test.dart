@@ -889,7 +889,6 @@ void main() {
       );
       await tester.pumpAndSettle();
     }
-    expect(find.textContaining('already exists'), findsOneWidget);
     expect(
       tester
           .widget<TextField>(find.byKey(const ValueKey('tag-editor-name')))
@@ -1309,9 +1308,8 @@ void main() {
     expect(repository.calls, 2);
   });
 
-  testWidgets('выбор показывает занятость и отказ на английском', (
-    tester,
-  ) async {
+  testWidgets('выбор показывает занятость на английском, а отказ назначения '
+      'оставляет общей поверхности', (tester) async {
     tester.view.physicalSize = const Size(420, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -1365,8 +1363,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(
       find.text('Could not complete the tag assignment operation. Try again.'),
-      findsOneWidget,
+      findsNothing,
     );
+    expect(tester.widget<FilledButton>(assign).onPressed, isNotNull);
     await tester.enterText(
       find.byKey(const ValueKey('tag-catalog-search')),
       'нет совпадений',

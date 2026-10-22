@@ -57,12 +57,16 @@ final class _TagCatalogViewState extends ConsumerState<TagCatalogView> {
   TagCatalogOpening _draftOpening = TagCatalogOpening();
   late final GraphCommandCoordinator _coordinator;
   TagOperationToken? _activeDeleteToken;
-  TagOperationToken? _failureToken;
-  GraphInitiatorPresentationClaim? _failureClaim;
+
+  /// Отказ удаления, который не является результатом операции: старт не
+  /// принят или исход не соответствует удалению. Отказы операции
+  /// предъявляет общая поверхность.
   TagCommandFailure? _deleteFailure;
   bool _confirmationOpen = false;
   bool _deleteBusy = false;
   TagOperationToken? _activeAssignToken;
+
+  /// Отказ назначения, который не является результатом операции.
   TagCommandFailure? _assignFailure;
   StreamSubscription<GraphCommandCompletion>? _busyDeleteSubscription;
   StreamSubscription<IntentionDraftTagSetSnapshot>? _draftSetChanges;
@@ -80,7 +84,6 @@ final class _TagCatalogViewState extends ConsumerState<TagCatalogView> {
     if (oldWidget.selectionContext == widget.selectionContext) return;
     _modeGeneration++;
     _draftOpening = TagCatalogOpening();
-    _releasePresentation();
     _activeAssignToken = null;
     _assignFailure = null;
     _activeDeleteToken = null;
@@ -102,22 +105,7 @@ final class _TagCatalogViewState extends ConsumerState<TagCatalogView> {
     _searchController.dispose();
     unawaited(_busyDeleteSubscription?.cancel());
     unawaited(_draftSetChanges?.cancel());
-    _releasePresentation();
     super.dispose();
-  }
-
-  void _releasePresentation() {
-    if (_activeDeleteToken case final token?) {
-      _coordinator.releaseInitiatorPresentation(token);
-    }
-    if (_failureToken case final token?) {
-      _coordinator.releaseInitiatorPresentation(token);
-    }
-    if (_activeAssignToken case final token?) {
-      _coordinator.releaseInitiatorPresentation(token);
-    }
-    _failureToken = null;
-    _failureClaim = null;
   }
 
   /// Просмотр и назначение разделяют состояние по режиму чтения; выбор для
@@ -182,7 +170,6 @@ final class _TagCatalogViewState extends ConsumerState<TagCatalogView> {
 
   void _assignSelected(TagAssignmentAction action) {
     if (_activeAssignToken != null) return;
-    _releasePresentation();
     final start = action.perform();
     switch (start) {
       case TagCommandAccepted(:final token, :final future):
@@ -209,7 +196,6 @@ final class _TagCatalogViewState extends ConsumerState<TagCatalogView> {
 
   void _selectTag(TagId id) {
     if (_activeAssignToken != null) return;
-    _releasePresentation();
     setState(() => _assignFailure = null);
     ref.read(_provider.notifier).selectTag(id);
   }
@@ -219,28 +205,11 @@ final class _TagCatalogViewState extends ConsumerState<TagCatalogView> {
     Future<TagCommandCompletion> future,
   ) async {
     try {
-      final completion = await future;
+      await future;
       if (!mounted || !identical(_activeAssignToken, token)) return;
-      switch (completion.result) {
-        case GraphResultSuccess():
-          setState(() => _activeAssignToken = null);
-        case GraphResultFailure(:final failure):
-          final canPresentHere = ModalRoute.of(context)?.isCurrent ?? false;
-          if (!canPresentHere) {
-            _coordinator.releaseInitiatorPresentation(token);
-          }
-          setState(() {
-            _activeAssignToken = null;
-            _assignFailure = canPresentHere ? failure : null;
-            _failureToken = canPresentHere ? token : null;
-            _failureClaim = canPresentHere
-                ? _coordinator.claimInitiatorFailure(token)
-                : null;
-          });
-      }
+      setState(() => _activeAssignToken = null);
     } on Object {
       if (!mounted || !identical(_activeAssignToken, token)) return;
-      _coordinator.releaseInitiatorPresentation(token);
       setState(() {
         _activeAssignToken = null;
         _assignFailure = const TagUnexpectedFailure();
@@ -263,7 +232,6 @@ final class _TagCatalogViewState extends ConsumerState<TagCatalogView> {
     if (!ref.read(_provider.notifier).canActOn(tag.id)) {
       return;
     }
-    _releasePresentation();
     unawaited(_busyDeleteSubscription?.cancel());
     _busyDeleteSubscription = null;
     final start = _coordinator.acceptTagDelete(DeleteTag(tag.id));
@@ -310,21 +278,9 @@ final class _TagCatalogViewState extends ConsumerState<TagCatalogView> {
           setState(() {
             _activeDeleteToken = null;
           });
-        case GraphResultFailure(:final failure):
-          final canPresentHere = ModalRoute.of(context)?.isCurrent ?? false;
-          if (!canPresentHere) {
-            _coordinator.releaseInitiatorPresentation(token);
-          }
-          setState(() {
-            _activeDeleteToken = null;
-            _deleteFailure = canPresentHere ? failure : null;
-            _failureToken = canPresentHere ? token : null;
-            _failureClaim = canPresentHere
-                ? _coordinator.claimInitiatorFailure(token)
-                : null;
-          });
+        case GraphResultFailure():
+          setState(() => _activeDeleteToken = null);
         case GraphResultSuccess():
-          _coordinator.releaseInitiatorPresentation(token);
           setState(() {
             _activeDeleteToken = null;
             _deleteFailure = const TagUnexpectedFailure();
@@ -332,7 +288,6 @@ final class _TagCatalogViewState extends ConsumerState<TagCatalogView> {
       }
     } on Object {
       if (!mounted || !identical(_activeDeleteToken, token)) return;
-      _coordinator.releaseInitiatorPresentation(token);
       setState(() {
         _activeDeleteToken = null;
         _deleteFailure = const TagUnexpectedFailure();
@@ -465,7 +420,7 @@ final class _TagCatalogViewState extends ConsumerState<TagCatalogView> {
                     Padding(
                       padding: const EdgeInsets.all(16),
                       child: OperationFailurePresentation(
-                        claim: _failureClaim,
+                        claim: null,
                         message: tagFailureMessage(localizations, failure),
                         messageKey: const ValueKey('tag-delete-failure'),
                       ),
@@ -485,7 +440,7 @@ final class _TagCatalogViewState extends ConsumerState<TagCatalogView> {
                     Padding(
                       padding: const EdgeInsets.all(16),
                       child: OperationFailurePresentation(
-                        claim: _failureClaim,
+                        claim: null,
                         message: tagAssignmentFailureMessage(
                           localizations,
                           failure,

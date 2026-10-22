@@ -761,14 +761,9 @@ Future<TagId> _prepareFullDraft(
   await tester.enterText(_tagEditorName, _sport);
   await _tap(tester, _tagEditorSubmit);
   await _waitFor(tester, () => _tagEditorName.evaluate().isEmpty);
-  await _acceptMessage(
-    tester,
-    l10n.graphOperationMessage(
-      l10n.graphOperationCreate,
-      l10n.graphOperationTag,
-      l10n.tagCreated,
-    ),
-  );
+  // Созданный тег виден в общем выборе, поэтому успех не объявляется.
+  await tester.pumpAndSettle();
+  expect(find.byType(SnackBar), findsNothing);
   final sport = _storedTagId(app.raw, _sport);
   await _addToDraft(tester, sport);
 

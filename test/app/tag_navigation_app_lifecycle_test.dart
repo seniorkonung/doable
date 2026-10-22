@@ -132,10 +132,8 @@ void main() {
       );
       expect(app.model(tester).canActOn(_intention(2)), isFalse);
       expect(find.text(l10n.tagNavigationRefreshUnavailable), findsOneWidget);
-      await _waitFor(
-        tester,
-        () => find.textContaining(l10n.tagUpdated).evaluate().isNotEmpty,
-      );
+      // Успех записи не объявляется сообщением и не выдаётся за отказ.
+      expect(find.byType(SnackBar), findsNothing);
       expect(
         app.raw.select('SELECT name FROM tags WHERE id = ?', [
           tagFixtureId(firstTagNumber),
@@ -150,8 +148,7 @@ void main() {
       expect(app.repository.commands.whereType<UpdateTag>(), hasLength(1));
       expect(find.text(l10n.tagNavigationRefreshUnavailable), findsNothing);
       expect(app.model(tester).canActOn(_intention(2)), isTrue);
-      await _dismissMessage(tester);
-      expect(find.textContaining(l10n.tagUpdated), findsNothing);
+      expect(find.byType(SnackBar), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );
@@ -347,13 +344,6 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
 
 Future<void> _changeScope(WidgetTester tester, TaggedIntentionsScope scope) =>
     _tap(tester, find.byKey(ValueKey(scope)));
-
-Future<void> _dismissMessage(WidgetTester tester) async {
-  final message = find.byKey(const ValueKey('graph-operation-message'));
-  ScaffoldMessenger.of(tester.element(message.first)).removeCurrentSnackBar();
-  await _waitFor(tester, () => message.evaluate().isEmpty);
-  await tester.pumpAndSettle();
-}
 
 final class _App {
   _App(

@@ -51,9 +51,7 @@ final class TagEditorViewModel extends _$TagEditorViewModel {
     try {
       name = TagName.fromInput(state.input);
     } on TagNameValidationException catch (error) {
-      state = state.withStatus(
-        TagEditorSubmissionFailed(TagNameInputFailure(error.reason)),
-      );
+      state = state.withStatus(TagEditorNameInvalid(error.reason));
       return;
     }
 
@@ -68,10 +66,6 @@ final class TagEditorViewModel extends _$TagEditorViewModel {
     };
     switch (start) {
       case TagCommandAccepted(:final token, :final future):
-        final previousToken = _token;
-        if (previousToken != null) {
-          _coordinator.releaseInitiatorPresentation(previousToken);
-        }
         _token = token;
         state = state.withStatus(const TagEditorSubmitting());
         await _finish(future);
@@ -92,9 +86,7 @@ final class TagEditorViewModel extends _$TagEditorViewModel {
           }
         });
       case GraphCommandCoordinatorDraining():
-        state = state.withStatus(
-          const TagEditorSubmissionFailed(TagUnexpectedFailure()),
-        );
+        state = state.withStatus(const TagEditorSubmissionInterrupted());
     }
   }
 
@@ -106,12 +98,7 @@ final class TagEditorViewModel extends _$TagEditorViewModel {
       }
       switch (completion.result) {
         case GraphResultFailure(:final failure):
-          state = state.withStatus(
-            TagEditorSubmissionFailed(failure),
-            failurePresentation: _coordinator.claimInitiatorFailure(
-              completion.token,
-            ),
-          );
+          state = state.withStatus(TagEditorSubmissionFailed(failure));
         case GraphResultSuccess(:final value):
           final TagId tagId = switch (value) {
             TagCreated(:final tag) => tag.id,
@@ -125,9 +112,7 @@ final class TagEditorViewModel extends _$TagEditorViewModel {
       }
     } on Object {
       if (_closed || !ref.mounted) return;
-      state = state.withStatus(
-        const TagEditorSubmissionFailed(TagUnexpectedFailure()),
-      );
+      state = state.withStatus(const TagEditorSubmissionInterrupted());
     }
   }
 
@@ -145,8 +130,6 @@ final class TagEditorViewModel extends _$TagEditorViewModel {
       default:
         return;
     }
-    final token = _token;
-    if (token != null) _coordinator.releaseInitiatorPresentation(token);
     state = state.withStatus(TagEditorReadingExisting(id));
     final result = await _readTag(id);
     if (_closed || !ref.mounted) return;
@@ -234,13 +217,11 @@ final class TagEditorViewModel extends _$TagEditorViewModel {
     if (!_closed && state.event != null) state = state.withoutEvent();
   }
 
-  /// Явный уход заканчивает владение инлайн-ошибкой, но не отменяет команду.
+  /// Явный уход заканчивает экранную сессию, но не отменяет команду.
   void closeSession() {
     if (_closed) return;
     _closed = true;
     unawaited(_busySubscription?.cancel());
     _busySubscription = null;
-    final token = _token;
-    if (token != null) _coordinator.releaseInitiatorPresentation(token);
   }
 }

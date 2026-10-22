@@ -1988,30 +1988,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Tag couldn’t be read because of an unexpected error.';
 
   @override
-  String get tagCreated => 'Tag created.';
-
-  @override
-  String get tagUpdated => 'Tag updated.';
-
-  @override
-  String get tagUnchanged => 'Tag name unchanged.';
-
-  @override
-  String get tagDeleted => 'Tag deleted with all its assignments.';
-
-  @override
-  String get tagAssigned => 'Tag assigned.';
-
-  @override
-  String get tagAlreadyAssigned => 'Tag already assigned.';
-
-  @override
-  String get tagAssignmentRemoved => 'Tag assignment removed.';
-
-  @override
-  String get tagAssignmentAlreadyAbsent => 'Tag assignment already absent.';
-
-  @override
   String get tagAssignmentAlreadyRunning =>
       'A tag assignment change is already in progress. Wait for its result.';
 

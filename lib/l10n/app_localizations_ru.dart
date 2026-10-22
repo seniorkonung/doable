@@ -2011,30 +2011,6 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось прочитать тег из-за непредвиденной ошибки.';
 
   @override
-  String get tagCreated => 'Тег создан.';
-
-  @override
-  String get tagUpdated => 'Тег изменён.';
-
-  @override
-  String get tagUnchanged => 'Название тега не изменилось.';
-
-  @override
-  String get tagDeleted => 'Тег удалён вместе со всеми назначениями.';
-
-  @override
-  String get tagAssigned => 'Тег назначен.';
-
-  @override
-  String get tagAlreadyAssigned => 'Тег уже назначен.';
-
-  @override
-  String get tagAssignmentRemoved => 'Назначение тега снято.';
-
-  @override
-  String get tagAssignmentAlreadyAbsent => 'Назначение тега уже отсутствует.';
-
-  @override
   String get tagAssignmentAlreadyRunning =>
       'Изменение назначения тега уже выполняется. Дождитесь результата.';
 

@@ -122,8 +122,9 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('серия назначений и снятий при занятой поверхности сохраняется '
-      'с одним объединённым подтверждением', (tester) async {
+  testWidgets('серия назначений и снятий сохраняется без сообщений об успехе', (
+    tester,
+  ) async {
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     tester.binding.platformDispatcher.localesTestValue = [const Locale('ru')];
     addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
@@ -158,9 +159,8 @@ void main() {
     final empty = find.text('Назначений тегов пока нет.', skipOffstage: false);
     await _tap(tester, homeRemove);
     await _until(tester, empty);
-    const first = 'Снятие — «назначение тега»: Назначение тега снято.';
-    await _until(tester, find.text(first));
     await tester.pumpAndSettle();
+    expect(find.byType(SnackBar, skipOffstage: false), findsNothing);
 
     for (final (number, assign) in [
       (lastTagNumber, true),
@@ -196,20 +196,12 @@ void main() {
         ),
         hasLength(assign ? 1 : 0),
       );
-      expect(find.text(first).hitTestable(), findsOneWidget);
-      expect(find.textContaining(' · ещё '), findsNothing);
+      expect(find.byType(SnackBar, skipOffstage: false), findsNothing);
     }
 
-    const combined = '$first · ещё 1';
-    await tester.drag(find.text(first), const Offset(600, 0));
-    await tester.pumpAndSettle();
-    expect(find.text(combined).hitTestable(), findsOneWidget);
-    expect(find.text(first), findsNothing);
     expect(empty, findsOneWidget);
     expect(completions, hasLength(3));
     final stored = raw.select('SELECT * FROM tag_assignments ORDER BY rowid');
-    await tester.drag(find.text(combined), const Offset(600, 0));
-    await tester.pumpAndSettle();
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     await _tap(tester, find.text('Намерение 1'));

@@ -86,8 +86,8 @@ void main() {
         await tester.enterText(_editorName, 'Домашнее');
         await tester.tap(_editorSubmit);
         await tester.pumpAndSettle();
-        final tagClaim = await presenter.nextClaim();
-        expect(tagClaim!.completions.single, isA<TagCommandCompletion>());
+        // Созданный тег виден в выборе, поэтому успех права предъявления не
+        // образует.
         final created = repository.tagNamed('Домашнее');
 
         expect(host.router.current.name, TagCatalogRoute.name);
@@ -98,10 +98,6 @@ void main() {
           findsOneWidget,
         );
         _expectFirstDraft(first.state, tagIds: [_home.id]);
-        host.coordinator.confirmAppPresentation(
-          tagClaim,
-          tagClaim.completions.map((completion) => completion.token),
-        );
         await tester.tap(_addToDraft);
         await tester.pump();
         expect(first.tagSet.current.tagIds, [_home.id, created.id]);

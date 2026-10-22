@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../design_system/components/tag_dot.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
-import '../../../graph/application/graph_command_result.dart';
 import '../../../graph/presentation/operation_failure_presentation.dart';
 import '../../../intention/domain/intention_id.dart';
 import '../../application/tag_assignments.dart';
@@ -44,8 +43,9 @@ final class _TagAssignmentsSectionState
   late final GraphCommandCoordinator _coordinator;
   StreamSubscription<GraphCommandCompletion>? _completions;
   TagOperationToken? _activeRemoveToken;
-  TagOperationToken? _failureToken;
-  GraphInitiatorPresentationClaim? _failureClaim;
+
+  /// Отказ снятия, который не является результатом операции: старт не принят
+  /// или ожидание прервалось. Отказы операции предъявляет общая поверхность.
   TagCommandFailure? _removeFailure;
   bool _commandBusy = false;
 
@@ -63,7 +63,6 @@ final class _TagAssignmentsSectionState
   void didUpdateWidget(TagAssignmentsSection oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.intentionId != widget.intentionId) {
-      _releasePresentation();
       _activeRemoveToken = null;
       _removeFailure = null;
       _commandBusy = false;
@@ -73,19 +72,7 @@ final class _TagAssignmentsSectionState
   @override
   void dispose() {
     unawaited(_completions?.cancel());
-    _releasePresentation();
     super.dispose();
-  }
-
-  void _releasePresentation() {
-    if (_activeRemoveToken case final token?) {
-      _coordinator.releaseInitiatorPresentation(token);
-    }
-    if (_failureToken case final token?) {
-      _coordinator.releaseInitiatorPresentation(token);
-    }
-    _failureToken = null;
-    _failureClaim = null;
   }
 
   bool get _intentionBusy =>
@@ -113,7 +100,6 @@ final class _TagAssignmentsSectionState
       tagAssignmentsViewModelProvider(intentionId).notifier,
     );
     if (_activeRemoveToken != null || !model.canActOn(tag.id)) return;
-    _releasePresentation();
     final start = _coordinator.acceptTagRemoveAssignment(
       RemoveTagAssignment(tagId: tag.id, intentionId: intentionId),
     );
@@ -144,36 +130,19 @@ final class _TagAssignmentsSectionState
     Future<TagCommandCompletion> future,
   ) async {
     try {
-      final completion = await future;
+      await future;
       if (!mounted ||
           widget.intentionId != intentionId ||
           !identical(_activeRemoveToken, token)) {
         return;
       }
-      switch (completion.result) {
-        case GraphResultSuccess():
-          setState(() => _activeRemoveToken = null);
-        case GraphResultFailure(:final failure):
-          final canPresentHere = ModalRoute.of(context)?.isCurrent ?? false;
-          if (!canPresentHere) {
-            _coordinator.releaseInitiatorPresentation(token);
-          }
-          setState(() {
-            _activeRemoveToken = null;
-            _removeFailure = canPresentHere ? failure : null;
-            _failureToken = canPresentHere ? token : null;
-            _failureClaim = canPresentHere
-                ? _coordinator.claimInitiatorFailure(token)
-                : null;
-          });
-      }
+      setState(() => _activeRemoveToken = null);
     } on Object {
       if (!mounted ||
           widget.intentionId != intentionId ||
           !identical(_activeRemoveToken, token)) {
         return;
       }
-      _coordinator.releaseInitiatorPresentation(token);
       setState(() {
         _activeRemoveToken = null;
         _removeFailure = const TagUnexpectedFailure();
@@ -232,7 +201,7 @@ final class _TagAssignmentsSectionState
             Padding(
               padding: const EdgeInsets.all(16),
               child: OperationFailurePresentation(
-                claim: _failureClaim,
+                claim: null,
                 message: tagAssignmentFailureMessage(l10n, failure),
                 messageKey: const ValueKey('tag-assignments-remove-failure'),
               ),

@@ -5,6 +5,7 @@ import '../../application/tag_result.dart';
 import '../../domain/tag.dart';
 import '../../domain/tag_color.dart';
 import '../../domain/tag_id.dart';
+import '../../domain/tag_name.dart';
 
 sealed class TagEditorContext {
   const TagEditorContext();
@@ -39,10 +40,25 @@ final class TagEditorAlreadyRunning extends TagEditorStatus {
   const TagEditorAlreadyRunning();
 }
 
+/// Название не прошло проверку до отправки; ошибку рисует поле.
+final class TagEditorNameInvalid extends TagEditorStatus {
+  const TagEditorNameInvalid(this.reason);
+
+  final TagNameFailureReason reason;
+}
+
+/// Отказ принятой отправки. Его предъявляет общая поверхность, а форма
+/// только сохраняет ввод для исправления или допустимого повтора.
 final class TagEditorSubmissionFailed extends TagEditorStatus {
   const TagEditorSubmissionFailed(this.failure);
 
   final TagCommandFailure failure;
+}
+
+/// Отправка не дала результата операции: координатор её не принял или
+/// исход не соответствует отправке. Сообщение рисует сама форма.
+final class TagEditorSubmissionInterrupted extends TagEditorStatus {
+  const TagEditorSubmissionInterrupted();
 }
 
 final class TagEditorReadingCommitted extends TagEditorStatus {
@@ -127,7 +143,6 @@ final class TagEditorState {
     required this.color,
     required this.status,
     this.event,
-    this.failurePresentation,
   });
 
   TagEditorState.initial(this.context)
@@ -140,8 +155,7 @@ final class TagEditorState {
         TagEditorRenaming(:final tag) => tag.color,
       },
       status = const TagEditorIdle(),
-      event = null,
-      failurePresentation = null;
+      event = null;
 
   final TagEditorContext context;
   final String input;
@@ -150,9 +164,6 @@ final class TagEditorState {
   final TagColor? color;
   final TagEditorStatus status;
   final TagEditorEvent? event;
-
-  /// Инлайн-предъявление принадлежит существующему модулю представления.
-  final GraphInitiatorPresentationClaim? failurePresentation;
 
   bool get canSubmit => switch (status) {
     TagEditorIdle() => true,
@@ -165,28 +176,24 @@ final class TagEditorState {
     input: value,
     color: color,
     status: switch (status) {
+      TagEditorNameInvalid() ||
       TagEditorSubmissionFailed(
         failure: TagNameInputFailure() || TagNameOccupiedFailure(),
-      ) =>
-        const TagEditorIdle(),
+      ) => const TagEditorIdle(),
       TagEditorExistingMissing() ||
       TagEditorExistingReadFailed() => const TagEditorIdle(),
       _ => status,
     },
   );
 
-  TagEditorState withStatus(
-    TagEditorStatus value, {
-    TagEditorEvent? event,
-    GraphInitiatorPresentationClaim? failurePresentation,
-  }) => TagEditorState(
-    context: context,
-    input: input,
-    color: color,
-    status: value,
-    event: event,
-    failurePresentation: failurePresentation,
-  );
+  TagEditorState withStatus(TagEditorStatus value, {TagEditorEvent? event}) =>
+      TagEditorState(
+        context: context,
+        input: input,
+        color: color,
+        status: value,
+        event: event,
+      );
 
   TagEditorState withColor(TagColor? value) => TagEditorState(
     context: context,
@@ -194,7 +201,6 @@ final class TagEditorState {
     color: value,
     status: status,
     event: event,
-    failurePresentation: failurePresentation,
   );
 
   TagEditorState withoutEvent() => TagEditorState(
@@ -202,6 +208,5 @@ final class TagEditorState {
     input: input,
     color: color,
     status: status,
-    failurePresentation: failurePresentation,
   );
 }

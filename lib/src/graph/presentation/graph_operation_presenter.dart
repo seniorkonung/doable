@@ -13,8 +13,6 @@ import '../../intention/application/intention_result.dart';
 import '../../long_term_relation/application/long_term_relation_command.dart';
 import '../../long_term_relation/presentation/relation_command_failure_message.dart';
 import '../../shared/presentation/presentation_frame_evidence.dart';
-import '../../tag/application/tag_change.dart';
-import '../../tag/application/tag_result.dart';
 import '../../tag/presentation/tag_failure_message.dart';
 import '../application/graph_command_coordinator.dart';
 import '../application/graph_command_result.dart';
@@ -34,8 +32,8 @@ import 'graph_operation_message_plan.dart';
 /// перекрывшего маршрута результат ждёт, а обычное время показа отсчитывается
 /// с первого кадра, в котором сообщение видно.
 ///
-/// Что предъявлять, решает coordinator: ручная копия приходит сюда только
-/// отказом (ADR-0016).
+/// Что предъявлять, решает coordinator: ручная копия и операции тегов
+/// приходят сюда только отказом (ADR-0016).
 final class GraphOperationPresenter extends ConsumerStatefulWidget {
   const GraphOperationPresenter({required this.child, super.key});
 
@@ -322,8 +320,8 @@ GraphOperationMessage _messageFor(
   DailyChoiceCommandCompletion() => GraphOperationMessage(
     _dailyChoiceMessage(localizations, completion),
   ),
-  TagCommandCompletion() => GraphOperationMessage(
-    _tagMessage(localizations, completion),
+  TagCommandFailedCompletion() => GraphOperationMessage(
+    _tagFailureMessage(localizations, completion),
   ),
   GraphExportCompletion() => _exportMessage(localizations, completion),
   GraphBackupRestoreCompletion() => GraphOperationMessage(
@@ -381,9 +379,9 @@ GraphOperationMessage _exportMessage(
   };
 }
 
-String _tagMessage(
+String _tagFailureMessage(
   AppLocalizations localizations,
-  TagCommandCompletion completion,
+  TagCommandFailedCompletion completion,
 ) => localizations.graphOperationMessage(
   switch (completion.kind) {
     TagCommandKind.create => localizations.graphOperationCreate,
@@ -398,35 +396,10 @@ String _tagMessage(
       localizations.graphOperationTagAssignment,
     _ => localizations.graphOperationTag,
   },
-  switch (completion.result) {
-    GraphResultSuccess(:final value) => switch ((completion.kind, value)) {
-      (TagCommandKind.create, TagCreated()) => localizations.tagCreated,
-      (TagCommandKind.update, TagUpdated()) => localizations.tagUpdated,
-      (TagCommandKind.update, TagUnchanged()) => localizations.tagUnchanged,
-      (TagCommandKind.delete, TagDeleted()) => localizations.tagDeleted,
-      (TagCommandKind.assign, TagAssignmentChanged(:final state))
-          when state == TagAssignmentState.assigned =>
-        localizations.tagAssigned,
-      (TagCommandKind.assign, TagAssignmentUnchanged(:final state))
-          when state == TagAssignmentState.assigned =>
-        localizations.tagAlreadyAssigned,
-      (TagCommandKind.removeAssignment, TagAssignmentChanged(:final state))
-          when state == TagAssignmentState.absent =>
-        localizations.tagAssignmentRemoved,
-      (TagCommandKind.removeAssignment, TagAssignmentUnchanged(:final state))
-          when state == TagAssignmentState.absent =>
-        localizations.tagAssignmentAlreadyAbsent,
-      _ => switch (completion.kind) {
-        TagCommandKind.assign || TagCommandKind.removeAssignment =>
-          localizations.tagAssignmentUnexpected,
-        _ => localizations.tagUnexpected,
-      },
-    },
-    GraphResultFailure(:final failure) => switch (completion.kind) {
-      TagCommandKind.assign || TagCommandKind.removeAssignment =>
-        tagAssignmentFailureMessage(localizations, failure),
-      _ => tagFailureMessage(localizations, failure),
-    },
+  switch (completion.kind) {
+    TagCommandKind.assign || TagCommandKind.removeAssignment =>
+      tagAssignmentFailureMessage(localizations, completion.failure),
+    _ => tagFailureMessage(localizations, completion.failure),
   },
 );
 

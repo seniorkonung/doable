@@ -164,10 +164,9 @@ void main() {
         find.byKey(ValueKey('tag-catalog-delete-${_id(301)}')),
         findsNothing,
       );
-      expect(
-        find.textContaining('Тег удалён вместе со всеми назначениями.'),
-        findsOneWidget,
-      );
+      // Исчезновение тега из каталога и есть результат: успех не
+      // объявляется сообщением.
+      expect(find.byType(SnackBar), findsNothing);
     },
   );
 
@@ -264,7 +263,7 @@ void main() {
   const locale = Locale('ru');
   const busyMessage =
       'Изменение этого тега уже выполняется. Дождитесь результата.';
-  const resultMessage = 'Тег удалён вместе со всеми назначениями.';
+  const failureMessage = 'Не удалось выполнить действие с тегом.';
 
   for (final succeeds in [true, false]) {
     testWidgets(
@@ -319,12 +318,13 @@ void main() {
         repository.finish(succeeds: succeeds);
         await tester.pumpAndSettle();
         expect(notice, findsNothing);
-        final expectedResult = succeeds
-            ? resultMessage
-            : 'Не удалось выполнить действие с тегом.';
-        final result = find.textContaining(expectedResult);
-        expect(result, findsOneWidget);
-        expect(tester.getSemantics(result).label, contains(expectedResult));
+        if (succeeds) {
+          expect(find.byType(SnackBar), findsNothing);
+        } else {
+          final result = find.textContaining(failureMessage);
+          expect(result, findsOneWidget);
+          expect(tester.getSemantics(result).label, contains(failureMessage));
+        }
         expect(repository.commands, 1);
         semantics.dispose();
       },

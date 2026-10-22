@@ -256,10 +256,6 @@ void main() {
       repository.fail(TagNameOccupiedFailure(_id(2)));
       await tester.pumpAndSettle();
       expect(
-        find.byKey(const ValueKey('tag-editor-field-failure')),
-        findsOneWidget,
-      );
-      expect(
         tester
             .widget<TextField>(find.byKey(const ValueKey('tag-editor-name')))
             .controller!
@@ -474,9 +470,8 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('закрытие формы до кадра возвращает ошибку оболочке', (
-    tester,
-  ) async {
+  testWidgets('отказ отправки сразу принадлежит общей поверхности, а форма '
+      'его не рисует', (tester) async {
     final repository = _Repository();
     await _pumpEditor(tester, repository);
     final container = ProviderScope.containerOf(
@@ -487,36 +482,40 @@ void main() {
     );
     final registration = coordinator.registerAppPresentation();
     addTearDown(registration.release);
-    GraphAppPresentationClaim? fallback;
-    unawaited(registration.nextClaim().then((claim) => fallback = claim));
+    GraphAppPresentationClaim? app;
+    unawaited(registration.nextClaim().then((claim) => app = claim));
 
     await tester.enterText(
       find.byKey(const ValueKey('tag-editor-name')),
       'Дом',
     );
     await tester.tap(find.byKey(const ValueKey('tag-editor-submit')));
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
     repository.fail(TagNameOccupiedFailure(_id(1)));
-    await tester.pump();
-    await tester.pump();
-    expect(fallback, isNull);
+    await tester.pumpAndSettle();
 
-    await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pump();
-    expect(fallback, isNotNull);
     expect(
-      fallback!.completions.single,
-      isA<TagCommandCompletion>().having(
-        (completion) => completion.confirmedResult,
-        'результат',
-        isA<TagCommandFailed>().having(
-          (result) => result.failure,
-          'ошибка',
-          isA<TagNameOccupiedFailure>(),
-        ),
+      app?.completions.single,
+      isA<TagCommandFailedCompletion>().having(
+        (completion) => completion.failure,
+        'ошибка',
+        isA<TagNameOccupiedFailure>(),
       ),
     );
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    expect(
+      find.text(
+        'A tag with this name already exists. Choose another name or use '
+        'the existing tag.',
+      ),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('tag-editor-field-failure')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('tag-editor-use-existing')),
+      findsOneWidget,
+    );
   });
 }
 

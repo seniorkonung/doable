@@ -467,9 +467,8 @@ void main() {
     },
   );
 
-  testWidgets('отказ снятия показан общим инлайн-предъявлением', (
-    tester,
-  ) async {
+  testWidgets('отказ снятия принадлежит общей поверхности, а секция его не '
+      'рисует', (tester) async {
     final reads = _PendingReads();
     await tester.pumpWidget(
       _host(
@@ -482,15 +481,25 @@ void main() {
     );
     reads.page(0, [_tag(301, 'Дом')]);
     await tester.pumpAndSettle();
+    final coordinator = ProviderScope.containerOf(
+      tester.element(find.byType(TagAssignmentsSection)),
+    ).read(graphCommandCoordinatorProvider.notifier);
+    final registration = coordinator.registerAppPresentation();
+    addTearDown(registration.release);
+    GraphAppPresentationClaim? app;
+    unawaited(registration.nextClaim().then((claim) => app = claim));
+
     await tester.tap(
       find.byKey(ValueKey('tag-assignment-remove-${tagFixtureId(301)}')),
     );
     await tester.pumpAndSettle();
+
+    expect(app?.completions.single.isFailure, isTrue);
     expect(
       find.byKey(const ValueKey('tag-assignments-remove-failure')),
-      findsOneWidget,
+      findsNothing,
     );
-    expect(find.textContaining('Повторите попытку'), findsOneWidget);
+    expect(find.textContaining('Повторите попытку'), findsNothing);
     expect(find.text('Дом'), findsOneWidget);
   });
 
@@ -569,7 +578,7 @@ void main() {
 
   for (final succeeds in [false, true]) {
     testWidgets(
-      'снятие после ухода завершается и предъявляется один раз: ${succeeds ? 'успех' : 'отказ'}',
+      'снятие после ухода завершается, а предъявляется только отказ: ${succeeds ? 'успех' : 'отказ'}',
       (tester) async {
         final pending = _PendingRepository();
         final reads = _PendingReads();
@@ -591,7 +600,8 @@ void main() {
           graphCommandCoordinatorProvider.notifier,
         );
         final registration = coordinator.registerAppPresentation();
-        final claimFuture = registration.nextClaim();
+        final claims = <GraphAppPresentationClaim?>[];
+        unawaited(registration.nextClaim().then(claims.add));
         await tester.tap(
           find.byKey(ValueKey('tag-assignment-remove-${tagFixtureId(301)}')),
         );
@@ -634,9 +644,10 @@ void main() {
           );
         }
         await tester.pumpAndSettle();
-        final claim = await claimFuture;
-        expect(claim, isNotNull);
-        expect(claim!.completions.single.isFailure, !succeeds);
+        expect(
+          claims.map((claim) => claim?.completions.single.isFailure),
+          succeeds ? isEmpty : [isTrue],
+        );
         expect(coordinator.isRunning(_intentionId(1)), isFalse);
 
         await tester.pumpWidget(host());
@@ -651,19 +662,23 @@ void main() {
           findsNothing,
         );
         expect(find.text('Дом'), succeeds ? findsNothing : findsOneWidget);
-        coordinator.confirmAppPresentation(
-          claim,
-          claim.completions.map((completion) => completion.token),
-        );
-        var repeated = false;
-        final nextClaim = registration.nextClaim().then((value) {
-          repeated = value != null;
-        });
-        await tester.pump();
+        if (claims.singleOrNull case final claim?) {
+          coordinator.confirmAppPresentation(
+            claim,
+            claim.completions.map((completion) => completion.token),
+          );
+          var repeated = false;
+          final nextClaim = registration.nextClaim().then((value) {
+            repeated = value != null;
+          });
+          await tester.pump();
+          expect(repeated, isFalse);
+          registration.release();
+          await nextClaim;
+        } else {
+          registration.release();
+        }
         expect(pending.commands, hasLength(1));
-        expect(repeated, isFalse);
-        registration.release();
-        await nextClaim;
       },
     );
   }

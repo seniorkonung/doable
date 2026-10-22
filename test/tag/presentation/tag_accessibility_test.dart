@@ -333,15 +333,23 @@ void _registerAssignmentScenarios() {
         await _until(tester, name);
         await tester.enterText(name, 'Дом');
         await _tap(tester, find.byKey(const ValueKey('tag-editor-submit')));
-        final fieldFailure = find.byKey(
-          const ValueKey('tag-editor-field-failure'),
-        );
-        await _until(tester, fieldFailure);
+        // Отказ создания предъявляет общая поверхность поверх редактора.
+        final failure = find.byKey(const ValueKey('graph-operation-message'));
+        await _until(tester, failure);
         await tester.pumpAndSettle();
         expect(
-          tester.getSemantics(fieldFailure).label,
-          contains(l10n.tagNameOccupied),
+          tester.getSemantics(failure.last),
+          isSemantics(
+            label: l10n.graphOperationMessage(
+              l10n.graphOperationCreate,
+              l10n.graphOperationTag,
+              l10n.tagNameOccupied,
+            ),
+            isLiveRegion: true,
+          ),
         );
+        ScaffoldMessenger.of(tester.element(name)).removeCurrentSnackBar();
+        await tester.pumpAndSettle();
         expect(tester.widget<TextField>(name).controller!.text, 'Дом');
         _expectAction(
           tester.getSemantics(find.byKey(const ValueKey('tag-editor-cancel'))),

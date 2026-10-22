@@ -66,18 +66,21 @@ final class _TagEditorPageState extends ConsumerState<TagEditorPage> {
       }
     });
 
-    final failure = switch (state.status) {
-      TagEditorSubmissionFailed(:final failure) => failure,
+    // Отказ принятой отправки предъявляет общая поверхность, поэтому форма
+    // рисует только собственную проверку названия и прерванную отправку.
+    final fieldFailure = switch (state.status) {
+      TagEditorNameInvalid(:final reason) => tagFailureMessage(
+        l10n,
+        TagNameInputFailure(reason),
+      ),
       _ => null,
     };
-    final fieldFailure = switch (failure) {
-      TagNameInputFailure() ||
-      TagNameOccupiedFailure() => tagFailureMessage(l10n, failure!),
+    final generalFailure = switch (state.status) {
+      TagEditorSubmissionInterrupted() => tagFailureMessage(
+        l10n,
+        const TagUnexpectedFailure(),
+      ),
       _ => null,
-    };
-    final generalFailure = switch (failure) {
-      null || TagNameInputFailure() || TagNameOccupiedFailure() => null,
-      _ => tagFailureMessage(l10n, failure),
     };
     final readStatus = _readStatus(l10n, state.status);
     final creating = state.context is TagEditorCreating;
@@ -113,7 +116,7 @@ final class _TagEditorPageState extends ConsumerState<TagEditorPage> {
                 error: fieldFailure == null
                     ? null
                     : OperationFailurePresentation(
-                        claim: state.failurePresentation,
+                        claim: null,
                         message: fieldFailure,
                         messageKey: const ValueKey('tag-editor-field-failure'),
                       ),
@@ -136,7 +139,7 @@ final class _TagEditorPageState extends ConsumerState<TagEditorPage> {
             if (generalFailure != null) ...[
               const SizedBox(height: 16),
               OperationFailurePresentation(
-                claim: state.failurePresentation,
+                claim: null,
                 message: generalFailure,
                 messageKey: const ValueKey('tag-editor-general-failure'),
               ),

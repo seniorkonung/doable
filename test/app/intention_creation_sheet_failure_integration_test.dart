@@ -263,14 +263,9 @@ Future<TagId> _newTag(WidgetTester tester, _App app) async {
   await tester.enterText(_key('tag-editor-name'), _sport);
   await _tap(tester, _key('tag-editor-submit'));
   await _wait(tester, () => _key('tag-editor-name').evaluate().isEmpty);
-  await _acceptMessage(
-    tester,
-    app.l10n.graphOperationMessage(
-      app.l10n.graphOperationCreate,
-      app.l10n.graphOperationTag,
-      app.l10n.tagCreated,
-    ),
-  );
+  // Созданный тег виден в общем выборе, поэтому успех не объявляется.
+  await tester.pumpAndSettle();
+  expect(find.byType(SnackBar), findsNothing);
   final sport = _tagIdFrom(
     app.raw.select('SELECT id FROM tags WHERE name = ?', [_sport]).single['id']
         as String,

@@ -129,8 +129,8 @@ void main() {
       expect(_text(tester, 'intention-editor-title'), _rawTitle);
       expect(_text(tester, 'intention-editor-description'), _longDescription);
       expect(_chipNames(tester), ['Дом', 'Сарай']);
-      // Сообщение о созданном теге видно и над вернувшейся панелью.
-      await app.closeMessage(tester);
+      // Созданный тег виден в выборе, поэтому успех не объявляется.
+      expect(_message, findsNothing);
 
       // Сброс черновика не создаёт намерение и назначения, а созданный
       // выбором тег остаётся самостоятельной меткой.
@@ -370,8 +370,8 @@ final class _App {
     expect(router.current.name, TagCatalogRoute.name);
   }
 
-  /// Дожидается успеха команды тега другого экрана и закрывает её сообщение
-  /// общей поверхности, чтобы оно не перекрывало панель.
+  /// Дожидается успеха команды тега другого экрана; успех виден в данных и
+  /// не объявляется сообщением общей поверхности.
   Future<void> runTagCommand(WidgetTester tester, TagCommandStart start) async {
     final accepted = start as TagCommandAccepted;
     TagCommandCompletion? completion;
@@ -381,17 +381,8 @@ final class _App {
       completion!.result,
       isA<GraphResultSuccess<TagCommandSuccess, TagCommandFailure>>(),
     );
-    await closeMessage(tester);
-  }
-
-  /// Закрывает текущее сообщение общей поверхности. Над панелью оно лежит
-  /// поверх нижнего края её полей и перехватывает нажатия на них.
-  Future<void> closeMessage(WidgetTester tester) async {
-    await _until(tester, _message);
     await tester.pumpAndSettle();
-    // Все копии сообщения принадлежат одной общей поверхности.
-    ScaffoldMessenger.of(tester.element(_message.first)).hideCurrentSnackBar();
-    await tester.pumpAndSettle();
+    expect(_message, findsNothing);
   }
 
   List<List<Object?>> storedTable(String table) => raw

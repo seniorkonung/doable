@@ -222,61 +222,48 @@ void main() {
     },
   );
 
-  // Тексты по языкам проверяют тесты сообщений об отказе; здесь важна проводка
-  // инлайн-отображения, поэтому достаточно русского.
-  const scenario = (
-    locale: Locale('ru'),
-    failure: 'Этого намерения больше нет. Обновите подробности.',
-    busy: 'Изменение назначения тега уже выполняется. Дождитесь результата.',
-  );
   testWidgets(
-    'инлайн-отказ назначения и занятость доступны для ${scenario.locale.languageCode}',
+    'отказ назначения без права инициатора показывает общая поверхность, а '
+    'занятость остаётся инлайн',
     (tester) async {
       final harness = _FailureHarness();
       addTearDown(harness.dispose);
-      final claim = await harness.createAssignmentClaim();
+      harness.failAssignment();
 
       await tester.pumpWidget(
         harness.app(
           Builder(
-            builder: (context) => Column(
-              children: [
-                OperationFailurePresentation(
-                  claim: claim,
-                  message: tagAssignmentFailureMessage(
-                    AppLocalizations.of(context),
-                    TagIntentionNotFoundFailure(testDetailsIntentionId(1)),
-                  ),
-                  messageKey: const ValueKey('assignment-failure-message'),
-                ),
-                OperationFailurePresentation(
-                  claim: null,
-                  message: tagAssignmentStartMessage(
-                    AppLocalizations.of(context),
-                    const TagCommandAlreadyRunning(),
-                  )!,
-                  messageKey: const ValueKey('assignment-busy-message'),
-                ),
-              ],
+            builder: (context) => OperationFailurePresentation(
+              claim: null,
+              message: tagAssignmentStartMessage(
+                AppLocalizations.of(context),
+                const TagCommandAlreadyRunning(),
+              )!,
+              messageKey: const ValueKey('assignment-busy-message'),
             ),
           ),
-          locale: scenario.locale,
+          locale: const Locale('ru'),
         ),
       );
       await tester.pumpAndSettle();
 
-      expect(find.text(scenario.failure), findsOneWidget);
-      expect(find.text(scenario.busy), findsOneWidget);
       expect(
-        tester.getSemantics(
-          find.byKey(const ValueKey('assignment-failure-message')),
+        find.text(
+          'Изменение назначения тега уже выполняется. Дождитесь результата.',
         ),
-        matchesSemantics(
-          label: scenario.failure,
-          isLiveRegion: true,
-          textDirection: TextDirection.ltr,
-        ),
+        findsOneWidget,
       );
+      expect(
+        find.descendant(
+          of: find.byType(SnackBar),
+          matching: find.text(
+            'Назначение — «назначение тега»: Этого намерения больше нет. '
+            'Обновите подробности.',
+          ),
+        ),
+        findsOneWidget,
+      );
+      await _closeMessage(tester);
       expect(find.byType(SnackBar), findsNothing);
     },
   );
@@ -720,7 +707,7 @@ final class _FailureHarness {
     return coordinator.claimInitiatorFailure(accepted.token)!;
   }
 
-  Future<GraphInitiatorPresentationClaim> createAssignmentClaim() async {
+  void failAssignment() {
     final tagId = switch (TagId.decode(
       '018f1400-0000-7000-8000-000000000003',
     )) {
@@ -728,15 +715,13 @@ final class _FailureHarness {
       InvalidTagIdDecoding() => throw StateError('Некорректный ID тега.'),
     };
     final intentionId = testDetailsIntentionId(1);
-    final accepted = coordinator.acceptTagAssign(
+    coordinator.acceptTagAssign(
       AssignTag(tagId: tagId, intentionId: intentionId),
-    ) as TagCommandAccepted;
+    );
     repository.completeTagCommand(
       repository.tagCommands.length - 1,
       TagCommandFailed(TagIntentionNotFoundFailure(intentionId)),
     );
-    await accepted.future;
-    return coordinator.claimInitiatorFailure(accepted.token)!;
   }
 
   Widget app(Widget body, {Locale locale = const Locale('en')}) =>
