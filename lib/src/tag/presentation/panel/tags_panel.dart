@@ -259,6 +259,7 @@ final class _LoadedCatalog extends StatelessWidget {
       color: tagColorPresentation(tag.color),
       mark: row.isMarked ? TagRowMark.checked : TagRowMark.none,
       label: name,
+      handle: const TagRowHiddenHandle(),
       // Отказ принадлежит общей поверхности, а нажатие во время изменения
       // назначений намерения координатор отклоняет без сообщения.
       onPressed: isCurrent ? () => model.toggle(tag.id) : null,
