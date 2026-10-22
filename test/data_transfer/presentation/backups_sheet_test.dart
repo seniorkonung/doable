@@ -739,7 +739,8 @@ final class _RestoreFromSheetApp {
     return [for (final backup in backups!) backup.kind];
   }
 
-  /// Названия тегов графа в порядке создания.
+  /// Названия тегов графа в ручном порядке по месту: новый тег встаёт перед
+  /// текущим первым, поэтому «Сад», созданный позже «Дома», стоит первым.
   Future<List<String>> tagNames() async {
     final catalog = await _tester.runAsync(
       () => _container

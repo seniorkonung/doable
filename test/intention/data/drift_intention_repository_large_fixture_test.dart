@@ -777,14 +777,18 @@ bool _matchesTagOnlyQuery(int fixtureIndex, _Conditions conditions) {
   return excludedTag == null || excludedTag >= conditions.excluded;
 }
 
-/// Фоновые теги намерения фикстуры в порядке их создания.
+/// Фоновые теги намерения фикстуры в ручном порядке по месту. Фикстура даёт
+/// места по возрастанию номера тега, поэтому ручной порядок в ней совпадает
+/// с порядком создания.
 List<int> _backgroundTags(int fixtureIndex) => [
   for (final offset in _backgroundTagOffsets)
     (fixtureIndex + offset) % _backgroundTagCount,
 ]..sort();
 
-/// Полный состав собственных тегов намерения фикстуры в порядке создания
-/// тегов: обязательные, исключённый, дополнительные, фоновые, популярный.
+/// Полный состав собственных тегов намерения фикстуры в ручном порядке по
+/// месту: обязательные, исключённый, дополнительные, фоновые, популярный.
+/// Фикстура даёт места по возрастанию номера тега, поэтому ручной порядок
+/// в ней совпадает с порядком создания.
 List<TagId> _fixtureTagIds(int fixtureIndex) {
   final jointIndex = _jointIndexOf(fixtureIndex);
   return [
