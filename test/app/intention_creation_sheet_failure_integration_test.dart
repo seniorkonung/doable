@@ -385,8 +385,9 @@ void _expectFaultPoint(_App app, List<TagId> tags) {
   final point = app.storage.faultPoint!;
   expect(point.inTransaction, isTrue);
   final row = point.graph['intentions']!.last;
-  // Порядок столбцов соответствует схемам intentions и tag_assignments.
-  // Проверяются также сохраняемые поисковый ключ и порядок тегов.
+  // Порядок столбцов соответствует схемам intentions и tag_assignments:
+  // строка назначения — creation_sequence, tag_id, intention_id. В строке
+  // намерения проверяется также сохраняемый поисковый ключ.
   expect(row, [
     isA<String>(),
     _title,
@@ -399,7 +400,7 @@ void _expectFaultPoint(_App app, List<TagId> tags) {
   ]);
   expect(row[6], row[7]);
   final assignments = point.graph['tag_assignments']!
-      .where((assignment) => assignment[3] == row.first)
+      .where((assignment) => assignment[2] == row.first)
       .toList();
   expect(assignments, hasLength(1));
   expect(assignments.length, lessThan(tags.length));
@@ -407,7 +408,6 @@ void _expectFaultPoint(_App app, List<TagId> tags) {
   expect(assignment, [
     isA<int>(),
     isIn(tags.map((tag) => tag.toCanonicalString())),
-    point.graph['tags']!.singleWhere((stored) => stored[1] == assignment[1])[0],
     row.first,
   ]);
   expect(point.graph['intention_titles_fts']!.last, ['рисовать акварель']);
