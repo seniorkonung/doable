@@ -51,6 +51,25 @@ void main() {
     expect(sheet.isClosed, isTrue);
   });
 
+  testWidgets('отменённое системой касание шапки не раскрывает, не '
+      'сворачивает и не закрывает лист', (tester) async {
+    final sheet = await _openExpandableSheet(tester);
+
+    await _cancelHeaderDrag(tester, const Offset(0, -60));
+    expect(_sheetHeight(tester), _half);
+
+    await _cancelHeaderDrag(tester, const Offset(0, 60));
+    expect(_sheetHeight(tester), _half);
+    expect(sheet.isClosed, isFalse);
+
+    await tester.tap(find.bySemanticsLabel(_expandLabel));
+    await tester.pumpAndSettle();
+    await _cancelHeaderDrag(tester, const Offset(0, 60));
+    expect(_sheetHeight(tester), _full);
+    expect(find.byType(Sheet), findsOne);
+    expect(sheet.isClosed, isFalse);
+  });
+
   testWidgets('ручка — кнопка раскрытия, а в полном размере её заменяет '
       'шеврон сворачивания', (tester) async {
     final semantics = tester.ensureSemantics();
@@ -149,6 +168,48 @@ void main() {
     expect(_sheetHeight(tester), height);
     expect(tester.getRect(find.text('Создать')), footer);
     expect(footer.bottom, _screen.height - _homeIndicator - 16);
+  });
+
+  testWidgets('лист по содержимому с сообщениями поверх растёт и '
+      'уменьшается вместе с содержимым после открытия', (tester) async {
+    final showsError = ValueNotifier(false);
+    addTearDown(showsError.dispose);
+    await _openContentSheet(
+      tester,
+      hostsMessages: true,
+      body: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: 120, child: Text('Название')),
+          ValueListenableBuilder(
+            valueListenable: showsError,
+            builder: (context, showsError, _) => showsError
+                ? const SizedBox(height: 40, child: Text('Ошибка'))
+                : const SizedBox.shrink(),
+          ),
+        ],
+      ),
+    );
+    final height = _sheetHeight(tester);
+    const footerBottom = 844.0 - _homeIndicator - 16;
+
+    showsError.value = true;
+    await tester.pumpAndSettle();
+
+    expect(_sheetHeight(tester), height + 40);
+    expect(
+      tester.getRect(find.text('Ошибка')).bottom,
+      lessThanOrEqualTo(tester.getRect(find.text('Создать')).top),
+    );
+    expect(tester.getRect(find.text('Создать')).bottom, footerBottom);
+
+    showsError.value = false;
+    await tester.pumpAndSettle();
+
+    expect(_sheetHeight(tester), height);
+    expect(tester.getRect(find.text('Создать')).bottom, footerBottom);
+    expect(tester.takeException(), isNull);
   });
 
   for (final scenario
@@ -277,16 +338,29 @@ Future<_OpenedSheet> _openExpandableSheet(
 Future<_OpenedSheet> _openContentSheet(
   WidgetTester tester, {
   bool hostsMessages = false,
+  Widget body = const SizedBox(height: 120, child: Text('Название')),
 }) => _openSheet(
   tester,
   size: DoableSheetSize.content,
   hostsMessages: hostsMessages,
-  builder: (context) => const Sheet(
+  builder: (context) => Sheet(
     title: 'Новый тег',
-    footer: SizedBox(height: 44, child: Text('Создать')),
-    child: SizedBox(height: 120, child: Text('Название')),
+    footer: const SizedBox(height: 44, child: Text('Создать')),
+    child: body,
   ),
 );
+
+/// Сдвигает касание шапки на [offset] и отменяет его системой, а не
+/// отпусканием.
+Future<void> _cancelHeaderDrag(WidgetTester tester, Offset offset) async {
+  final gesture = await tester.startGesture(
+    tester.getCenter(find.text('Выберите сколько нужно')),
+  );
+  await gesture.moveBy(offset);
+  await tester.pump();
+  await gesture.cancel();
+  await tester.pumpAndSettle();
+}
 
 Future<_OpenedSheet> _openSheet(
   WidgetTester tester, {
