@@ -379,3 +379,17 @@
   - **Зависимости:** 2.1 — раскрываемый лист и жест шапки; 2.2 — размещение сообщений поверх листа, высота которого следует за содержимым.
   - **Предполагаемые файлы:** `test/design_system/sheet_test.dart`.
   - **Размер:** XS.
+
+- [ ] 2.23 Связать вариант листа модуля основ с функцией его показа типом, чтобы несогласованная пара не компилировалась
+  - **Критерии приёмки:**
+    - Перечисление `DoableSheetSize` и параметр `size` у `showDoableSheet` удалены. Лист по содержимому показывает `showDoableSheet`, а раскрываемый — отдельная функция модуля основ, например `showDoableExpandableSheet`, по решению 9 дизайна и [ADR-0041](../../../docs/adr/0041-expand-design-system-sheets-by-header-drag.md). Обе функции, как прежде, показывают лист над корневым навигатором, учитывают клавиатуру, возвращают результат типа `T` и принимают признак `hostsMessages`.
+    - Каждая функция передаёт построителю возможность построить только свой вариант `Sheet`, а вне функции эту возможность не получить. Публичного способа построить лист по содержимому или раскрываемый лист без неё нет. Лист по содержимому в построителе раскрываемой функции и раскрываемый лист в построителе `showDoableSheet` — ошибки компиляции.
+    - На новый вызов переведены все места показа: панель тегов (раскрываемая), лист «Новый тег», экспорт, резервные копии, меню режима быстрого создания с `ActionSheet` и лист начала дневного выбора. Их вид, жесты, закрытие и размещение сообщений не меняются.
+    - Описание `Sheet` верно называет владельца закрытия. Лист по содержимому закрывают перетаскивание и средства Material маршрута `showDoableSheet`. Раскрываемый лист сам закрывает половинный размер жестом шапки через `Navigator.pop`, а касание затемнения и «назад» остаются за Material. Описание `GraphOperationPresenter` о листах с `hostsMessages` относится к обеим функциям показа.
+    - Проверки модуля основ и презентера, которые выбирали размер параметром, открывают лист соответствующей функцией. Сценарии и утверждения остаются прежними, включая проверку из 2.22.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter analyze`: ни одна ссылка на `DoableSheetSize` и параметр `size` не осталась.
+    - `mise exec --no-deps -- flutter test test/design_system/sheet_test.dart test/graph/presentation/graph_operation_presenter_test.dart test/tag/presentation/panel/tags_panel_test.dart test/tag/presentation/editor/tag_sheet_test.dart test/data_transfer/presentation/export_data_sheet_test.dart test/data_transfer/presentation/backups_sheet_test.dart test/app/quick_creation/quick_creation_mode_menu_test.dart test/app/quick_creation/quick_creation_daily_choice_start_sheet_test.dart`.
+  - **Зависимости:** 2.1 — раскрываемый лист; 2.2 — признак размещения сообщений; 2.22 — проверки листа, которые переводятся на новые функции.
+  - **Предполагаемые файлы:** `lib/src/design_system/components/sheet.dart`, `lib/src/design_system/components/action_sheet.dart`, `lib/src/tag/presentation/panel/tags_panel.dart`, `lib/src/tag/presentation/editor/tag_sheet.dart`, `lib/src/data_transfer/presentation/export_data_sheet.dart`, `lib/src/data_transfer/presentation/backups_sheet.dart`, `lib/src/app/quick_creation/quick_creation_mode_menu.dart`, `lib/src/app/quick_creation/quick_creation_daily_choice_start_sheet.dart`, `lib/src/graph/presentation/graph_operation_presenter.dart`, `test/design_system/sheet_test.dart`, `test/graph/presentation/graph_operation_presenter_test.dart`.
+  - **Размер:** M.
