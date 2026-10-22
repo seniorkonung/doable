@@ -44,6 +44,87 @@ void main() {
     });
   }
 
+  for (final brightness in Brightness.values) {
+    final theme = brightness == Brightness.light ? 'светлой' : 'тёмной';
+    final colors = switch (brightness) {
+      Brightness.light => DoableColors.light,
+      Brightness.dark => DoableColors.dark,
+    };
+
+    for (final (kind, look, label, build, background, foreground) in [
+      (
+        'тихая',
+        'плашка fill с текстом ink',
+        'Отмена',
+        (VoidCallback? onPressed) =>
+            Button.quiet(label: 'Отмена', onPressed: onPressed),
+        colors.fill,
+        colors.ink,
+      ),
+      (
+        'разрушительная',
+        'плашка accent с текстом on-accent',
+        'Удалить',
+        (VoidCallback? onPressed) =>
+            Button.danger(label: 'Удалить', onPressed: onPressed),
+        colors.accent,
+        colors.onAccent,
+      ),
+    ]) {
+      testWidgets('в $theme теме $kind кнопка — $look шириной по подписи', (
+        tester,
+      ) async {
+        await tester.pumpWidget(
+          _app(brightness: brightness, button: build(() {}), block: false),
+        );
+
+        final plane = tester.getRect(_plane);
+        final text = tester.getRect(find.text(label));
+        expect(plane.height, DoableMetrics.controlHeight);
+        expect(plane.width, text.width + 2 * DoableMetrics.space4);
+        expect(_planeMaterial(tester).color, background);
+        expect(_planeMaterial(tester).shape, const StadiumBorder());
+        expect(
+          tester.getSize(find.byType(Button)).height,
+          greaterThanOrEqualTo(DoableMetrics.tapMin),
+          reason: 'область нажатия выше плашки',
+        );
+
+        final style = _labelStyle(tester, label);
+        expect(style.color, foreground);
+        expect(style.fontSize, DoableType.section.fontSize);
+        expect(style.fontWeight, DoableType.section.fontWeight);
+        expect(tester.getCenter(find.text(label)), plane.center);
+      });
+
+      testWidgets('в $theme теме выключенная $kind кнопка остаётся на месте '
+          'плашкой fill с текстом grip и объявляется недоступной', (
+        tester,
+      ) async {
+        final semantics = tester.ensureSemantics();
+        await tester.pumpWidget(
+          _app(brightness: brightness, button: build(() {}), block: false),
+        );
+        final enabledPlane = tester.getRect(_plane);
+
+        await tester.pumpWidget(
+          _app(brightness: brightness, button: build(null), block: false),
+        );
+        // Material меняет цвета кнопки с анимацией.
+        await tester.pumpAndSettle();
+
+        expect(tester.getRect(_plane), enabledPlane);
+        expect(_planeMaterial(tester).color, colors.fill);
+        expect(_labelStyle(tester, label).color, colors.grip);
+        expect(
+          tester.getSemantics(find.text(label)),
+          matchesSemantics(label: label, isButton: true, hasEnabledState: true),
+        );
+        semantics.dispose();
+      });
+    }
+  }
+
   testWidgets('нажатие по области выше плашки передаётся потребителю', (
     tester,
   ) async {
@@ -119,10 +200,12 @@ Material _planeMaterial(WidgetTester tester) => tester.widget<Material>(_plane);
 TextStyle _labelStyle(WidgetTester tester, String label) =>
     tester.renderObject<RenderParagraph>(find.text(label)).text.style!;
 
+/// С [block] кнопка стоит в контейнере шириной 360, без него — свободно.
 Widget _app({
   required Button button,
   Brightness brightness = Brightness.light,
   double textScale = 1,
+  bool block = true,
 }) => MaterialApp(
   theme: doableTheme(brightness),
   home: MediaQuery(
@@ -130,7 +213,7 @@ Widget _app({
     child: Scaffold(
       body: Align(
         alignment: Alignment.topCenter,
-        child: SizedBox(width: 360, child: button),
+        child: block ? SizedBox(width: 360, child: button) : button,
       ),
     ),
   ),

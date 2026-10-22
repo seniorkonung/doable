@@ -544,7 +544,7 @@
   - **Предполагаемые файлы:** `lib/src/design_system/components/popup_menu.dart` (новый), `lib/src/design_system/doable_icon.dart`, `lib/src/design_system/icons/assets/edit.svg`, `lib/src/design_system/icons/assets/copy.svg` и `lib/src/design_system/icons/assets/delete.svg` (новые), `lib/src/design_system/icons/README.md`, `test/design_system/popup_menu_test.dart` (новый), `test/design_system/doable_icon_test.dart`, `test/design_system/goldens/doable_icons.png`.
   - **Размер:** M.
 
-- [ ] 3.13 Добавить в модуль основ диалог подтверждения и кнопки видов quiet и danger
+- [x] 3.13 Добавить в модуль основ диалог подтверждения и кнопки видов quiet и danger
   - **Критерии приёмки:**
     - `Button` по правилам компонента дизайн-системы получает виды quiet — плоскость `fill` с текстом `ink` — и danger — плоскость `accent` с текстом `on-accent`, а также ширину по подписи для действий диалога размера md. Выключенное состояние и область нажатия не меньше `tap-min` — как у primary.
     - Функция модуля основ показывает `ConfirmDialog` вида «подтверждение» в корневом навигаторе по правилам компонента: плоскость `raised` с углами `radius-xl` и `shadow-float` по центру экрана в `space-8` от краёв и затемнение `scrim` поверх листов. Заголовок — в стиле `title`, первый абзац — в стиле `body` цвета `muted` с выделенным названием цвета `ink`, справа — quiet-кнопка отмены и danger-кнопка действия через `space-2`. Касание затемнения и «назад» отменяют, а диалог объявляет себя маршрутом с названием по заголовку; тексты задаёт потребитель по ADR-0030.
