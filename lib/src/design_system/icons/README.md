@@ -32,6 +32,7 @@
 | [chevron_down.svg](assets/chevron_down.svg) | `TagsPanel.dc.html` | Кнопка `toggleSize` в полном размере, SVG |
 | [search.svg](assets/search.svg) | `TagsPanel.dc.html` | Поле поиска `tags-search`, ведущий SVG |
 | [clear.svg](assets/clear.svg) | `TagsPanel.dc.html` | Кнопка `clearQ`, SVG |
+| [grip.svg](assets/grip.svg) | `TagsPanel.dc.html` | Строка `rows` → кнопка `row.grab`, SVG |
 | [settings.svg](assets/settings.svg) | `Home.dc.html` | Ссылка `Settings.dc.html` |
 | [export.svg](assets/export.svg) | `Settings.dc.html` | Кнопка `openExport`, ведущий SVG |
 | [lock_open.svg](assets/lock_open.svg) | `Settings.dc.html` | `exportOpen` → предупреждение панели, SVG |

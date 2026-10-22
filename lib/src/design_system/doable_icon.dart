@@ -24,6 +24,7 @@ enum DoableIconData {
   chevronDown('chevron_down'),
   search('search'),
   clear('clear'),
+  grip('grip'),
   settings('settings'),
   export('export'),
   lockOpen('lock_open'),
