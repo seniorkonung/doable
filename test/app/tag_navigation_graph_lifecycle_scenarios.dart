@@ -140,9 +140,11 @@ void _testTaggedGraphLifecycle() {
     await _expectTargets(tester, app.router, targets);
     expect(
       app.raw
-          .select('SELECT * FROM tag_assignments WHERE tag_id = ?', [
-            tagFixtureId(lastTagNumber),
-          ])
+          .select(
+            'SELECT * FROM tag_assignments WHERE tag_id = ? '
+            'ORDER BY creation_sequence',
+            [tagFixtureId(lastTagNumber)],
+          )
           .map((row) => row.values.toList()),
       before['tag_assignments']!.where(
         (row) => row.contains(tagFixtureId(lastTagNumber)),
