@@ -1216,8 +1216,7 @@ List<IntentionId> _ids(IntentionCatalogLoaded catalog) => [
 bool _catalogCurrentAt(_Launch app, GraphRevision revision) =>
     switch (_catalogState(app)) {
       final IntentionCatalogLoaded catalog =>
-        catalog.revision.compareTo(revision) == GraphRevisionOrder.same &&
-            catalog.refresh is IntentionCatalogRefreshIdle,
+        catalog.revision.compareTo(revision) == GraphRevisionOrder.same,
       _ => false,
     };
 

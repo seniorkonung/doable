@@ -777,82 +777,6 @@ void main() {
     );
   });
 
-  testWidgets('массовое согласование после удаления исключённого тега '
-      'сохраняет экранное положение видимого намерения', (tester) async {
-    final repository = ControlledCatalogRepository();
-    final container = reconciliationCatalogContainer(repository);
-    addTearDown(container.dispose);
-    final health = _tag(1, 'Здоровье');
-    final rest = _tag(2, 'Отдых');
-    final items = _taggedSummaries([health], first: 60, last: 2, step: 2);
-    await _loadTaggedCatalog(
-      tester,
-      container,
-      repository,
-      IntentionTagFilter(
-        requiredTagIds: [health.id],
-        excludedTagIds: [rest.id],
-      ),
-      IntentionCatalogFirstPage(
-        items: items,
-        totalCount: items.length,
-        nextCursor: null,
-        revision: const TestCatalogRevision(1),
-      ),
-    );
-    // Перед видимым намерением откроется больше строк, чем помещается в
-    // построенную область списка.
-    final anchor = await _scrollToMiddle(tester, items, distance: 1800);
-    final positionBefore = _catalogScrollPosition(tester).pixels;
-    final loadingStates = _observeCatalogLoading(container);
-
-    await _completeCatalogWidgetTagCommand(
-      tester,
-      container,
-      repository,
-      DeleteTag(rest.id),
-      tagDeletionSuccess(
-        tagId: rest.id,
-        revision: const TestCatalogRevision(2),
-      ),
-    );
-    await _pumpUntilReconciliationQueries(tester, repository, 1);
-
-    // Ожидание чтения согласования не заменяет загруженный список.
-    expect(
-      _catalogScrollPosition(tester).pixels,
-      moreOrLessEquals(positionBefore, epsilon: 0.01),
-    );
-    expect(
-      _catalogTileTop(tester, anchor.title),
-      moreOrLessEquals(anchor.top, epsilon: 0.01),
-    );
-
-    final missing = _taggedSummaries([health], first: 59, last: 1, step: 2);
-    repository.completeReconciliation(
-      0,
-      reconciliationFirstPortion(
-        missing,
-        totalCount: items.length + missing.length,
-        revision: 2,
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    final current = _loadedCatalog(container);
-    expect(current.items, hasLength(items.length + missing.length));
-    expect(
-      current.items.indexWhere((item) => item.title == anchor.title),
-      greaterThan(anchor.index),
-    );
-    expect(find.text('Total intentions: 60'), findsOneWidget);
-    expect(
-      _catalogTileTop(tester, anchor.title),
-      moreOrLessEquals(anchor.top, epsilon: 0.01),
-    );
-    expect(loadingStates, isEmpty);
-  });
-
   testWidgets('одиночное назначение и снятие тега сохраняют экранное '
       'положение видимого намерения либо переводят его к ближайшему '
       'соседу', (tester) async {
@@ -1453,57 +1377,67 @@ void main() {
     expect(find.text(byScope), findsNothing);
   });
 
-  testWidgets('отказ обновления из-за недоступности показан над сохранённым '
-      'списком, а повтор согласует выдачу', (tester) async {
+  testWidgets('отказ новой выдачи после удаления исключённого тега показан '
+      'отказом первой порции, а повтор показывает прежде отсечённые '
+      'намерения', (tester) async {
     final repository = ControlledCatalogRepository();
     final container = reconciliationCatalogContainer(repository);
     addTearDown(container.dispose);
     final health = _tag(1, 'Здоровье');
     final rest = _tag(2, 'Отдых');
-    final items = _taggedSummaries([health], last: 2, step: 2);
-    await _failCatalogRefresh(
+    final filter = IntentionTagFilter(
+      requiredTagIds: [health.id],
+      excludedTagIds: [rest.id],
+    );
+    await _loadTaggedCatalog(
       tester,
       container,
       repository,
-      required: health,
-      deletedExcluded: rest,
-      items: items,
-      failure: const IntentionUnavailableFailure(),
+      filter,
+      IntentionCatalogFirstPage(
+        items: _taggedSummaries([health], first: 4, last: 2, step: 2),
+        totalCount: 2,
+        nextCursor: null,
+        revision: const TestCatalogRevision(1),
+      ),
     );
+    final restarted = repository.queries.length;
 
-    final message = find.text(
-      'The intention list isn’t up to date: changes couldn’t be loaded.',
+    await _completeCatalogWidgetTagCommand(
+      tester,
+      container,
+      repository,
+      DeleteTag(rest.id),
+      tagDeletionSuccess(
+        tagId: rest.id,
+        revision: const TestCatalogRevision(2),
+      ),
     );
+    await _pumpUntilQueries(tester, repository, restarted + 1);
+    expect(repository.queryAt(restarted).tagFilter, filter);
+    expect(repository.queryAt(restarted).cursor, isNull);
+    repository.complete(
+      restarted,
+      const ResultFailure(IntentionUnavailableFailure()),
+    );
+    await tester.pumpAndSettle();
+
+    final message = find.text('Intentions couldn’t be loaded. Try again.');
     expect(message, findsOneWidget);
-    expect(find.text('Total intentions: 30'), findsOneWidget);
-    expect(_loadedCatalog(container).items, items);
-    // Отказ виден и не закрывает первую строку списка.
-    final list = tester.getRect(
-      find.byKey(const PageStorageKey<String>('intention-catalog-list')),
-    );
-    expect(message.hitTestable(), findsOneWidget);
-    expect(find.text('Намерение 60').hitTestable(), findsOneWidget);
+    expect(find.byType(IntentionSummaryView), findsNothing);
 
     await tester.tap(find.widgetWithText(FilledButton, 'Try again'));
-    await _pumpUntilReconciliationQueries(tester, repository, 2);
-    final missing = _taggedSummaries([health], first: 59, last: 1, step: 2);
-    repository.completeReconciliation(
-      1,
-      reconciliationFirstPortion(
-        missing,
-        totalCount: items.length + missing.length,
-        revision: 2,
-      ),
+    await _pumpUntilQueries(tester, repository, restarted + 2);
+    expect(repository.queryAt(restarted + 1).tagFilter, filter);
+    repository.complete(
+      restarted + 1,
+      _firstPage(_taggedSummaries([health], first: 4, last: 1), revision: 2),
     );
     await tester.pumpAndSettle();
 
     expect(message, findsNothing);
-    expect(find.text('Total intentions: 60'), findsOneWidget);
-    expect(_loadedCatalog(container).items, hasLength(60));
-    expect(
-      _catalogTileTop(tester, 'Намерение 60'),
-      moreOrLessEquals(list.top, epsilon: 0.01),
-    );
+    expect(find.text('Total intentions: 4'), findsOneWidget);
+    expect(find.byType(IntentionSummaryView), findsNWidgets(4));
   });
 
   testWidgets('после подтверждённых переименования и удаления тега строки '
@@ -2078,48 +2012,6 @@ Future<void> _openCatalogWithConditions(
   await tester.pumpAndSettle();
 }
 
-/// Доводит каталог до отказа обновления после удаления исключённого тега.
-Future<void> _failCatalogRefresh(
-  WidgetTester tester,
-  ProviderContainer container,
-  ControlledCatalogRepository repository, {
-  required Tag required,
-  required Tag deletedExcluded,
-  required List<IntentionSummary> items,
-  required IntentionFailure failure,
-}) async {
-  await _loadTaggedCatalog(
-    tester,
-    container,
-    repository,
-    IntentionTagFilter(
-      requiredTagIds: [required.id],
-      excludedTagIds: [deletedExcluded.id],
-    ),
-    IntentionCatalogFirstPage(
-      items: items,
-      totalCount: items.length,
-      nextCursor: null,
-      revision: const TestCatalogRevision(1),
-    ),
-  );
-  await _completeCatalogWidgetTagCommand(
-    tester,
-    container,
-    repository,
-    DeleteTag(deletedExcluded.id),
-    tagDeletionSuccess(
-      tagId: deletedExcluded.id,
-      revision: const TestCatalogRevision(2),
-    ),
-  );
-  await _pumpUntilReconciliationQueries(tester, repository, 1);
-  repository.completeReconciliation(0, ResultFailure(failure));
-  await tester.pump();
-  await tester.pump();
-  await tester.pump();
-}
-
 int _summaryIndex(IntentionSummary summary) =>
     int.parse(summary.title.split(' ').last);
 
@@ -2199,20 +2091,6 @@ Future<void> _completeCatalogWidgetTagAssignment(
     command,
     result,
   );
-}
-
-Future<void> _pumpUntilReconciliationQueries(
-  WidgetTester tester,
-  ControlledCatalogRepository repository,
-  int count,
-) async {
-  for (var attempt = 0; attempt < 1000; attempt++) {
-    if (repository.reconciliationQueries.length >= count) {
-      return;
-    }
-    await tester.pump(const Duration(milliseconds: 1));
-  }
-  fail('Не дождались $count чтений согласования каталога.');
 }
 
 Future<void> _pumpUntilQueries(

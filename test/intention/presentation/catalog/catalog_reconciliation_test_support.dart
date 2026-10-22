@@ -54,19 +54,6 @@ Future<void> waitForCatalogQueries(
   fail('Не дождались $count запросов каталога.');
 }
 
-Future<void> waitForReconciliationQueries(
-  ControlledCatalogRepository repository,
-  int count,
-) async {
-  for (var attempt = 0; attempt < 1000; attempt++) {
-    if (repository.reconciliationQueries.length >= count) {
-      return;
-    }
-    await Future<void>.delayed(const Duration(milliseconds: 1));
-  }
-  fail('Не дождались $count чтений согласования каталога.');
-}
-
 Future<IntentionCommandCompletion> completeCatalogCommand(
   ProviderContainer container,
   ControlledCatalogRepository repository,
@@ -312,33 +299,5 @@ TagCommandResult tagRenameSuccess({
     value: TagUpdated(
       TagUpdatedChange(revision: revision, before: before, after: after),
     ),
-  ),
-);
-
-/// Первая успешная порция чтения согласования с абсолютным количеством.
-Result<IntentionCatalogReconciliationOutcome> reconciliationFirstPortion(
-  List<IntentionSummary> items, {
-  required int totalCount,
-  IntentionCatalogReconciliationCursor? nextCursor,
-  required int revision,
-}) => ResultSuccess(
-  IntentionCatalogReconciliationFirstPortion(
-    items: items,
-    totalCount: totalCount,
-    nextCursor: nextCursor,
-    revision: TestCatalogRevision(revision),
-  ),
-);
-
-/// Последующая успешная порция чтения согласования той же ревизии.
-Result<IntentionCatalogReconciliationOutcome> reconciliationContinuationPortion(
-  List<IntentionSummary> items, {
-  IntentionCatalogReconciliationCursor? nextCursor,
-  required int revision,
-}) => ResultSuccess(
-  IntentionCatalogReconciliationContinuationPortion(
-    items: items,
-    nextCursor: nextCursor,
-    revision: TestCatalogRevision(revision),
   ),
 );

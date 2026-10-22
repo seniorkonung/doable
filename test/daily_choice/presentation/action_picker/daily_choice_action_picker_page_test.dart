@@ -46,6 +46,7 @@ void main() {
       rowReadiness: const [IntentionReadiness.ready],
       totalCountLabel: (count) => 'Total actions: $count',
       emptyScopeMessage: 'No active actions are available.',
+      unavailableMessage: 'Actions couldn’t be loaded. Try again.',
     ),
   );
 

@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -371,131 +369,8 @@ void main() {
     },
   );
 
-  for (final (name, loadAll, expectedBefore, expectedAfter, hasNext) in [
-    (
-      'частично загруженный префикс',
-      false,
-      [10, 6, 5, 2],
-      [13, 12, 11, 10, 6, 5, 4, 2],
-      true,
-    ),
-    (
-      'полностью загруженная выдача',
-      true,
-      [10, 6, 5, 2, 1],
-      [13, 12, 11, 10, 6, 5, 4, 2, 1],
-      false,
-    ),
-  ]) {
-    test('удаление исключённого тега достраивает загруженную область через '
-        'настоящий репозиторий: $name', () async {
-      await _seedExcludedMatches(database);
-      final provider = intentionCatalogViewModelProvider(
-        const BrowseIntentionCatalog(),
-      );
-      final subscription = container.listen(provider, (_, _) {});
-      addTearDown(subscription.close);
-      await container.read(provider.future);
-      final model = container.read(provider.notifier);
-      final filter = IntentionTagFilter(
-        requiredTagIds: [_tagId(301)],
-        excludedTagIds: [_tagId(302)],
-      );
-      model.changeTagFilter(filter);
-      var loaded =
-          await container.read(provider.future) as IntentionCatalogLoaded;
-      while (loaded.items.length < expectedBefore.length) {
-        await model.loadNextPageIfNeeded(visibleIndex: loaded.items.length - 1);
-        loaded =
-            container.read(provider).requireValue as IntentionCatalogLoaded;
-      }
-      expect(loaded.items.map((item) => item.id), [
-        for (final number in expectedBefore) _intentionId(number),
-      ]);
-      expect(loaded.totalCount, 5);
-      expect(loaded.nextCursor == null, loadAll);
-      final pageReadsBefore = _catalogPageReads(diagnostics);
-      final states = <AsyncValue<IntentionCatalogState>>[];
-      final observer = container.listen(
-        provider,
-        (_, next) => states.add(next),
-      );
-      addTearDown(observer.close);
-
-      await _deleteTag(container, _tagId(302));
-      final current = await _awaitRevisionAfter(container, provider, loaded);
-
-      expect(current, isA<IntentionCatalogLoaded>());
-      final reconciled = current as IntentionCatalogLoaded;
-      expect(reconciled.items.map((item) => item.id), [
-        for (final number in expectedAfter) _intentionId(number),
-      ]);
-      expect(reconciled.totalCount, 9);
-      expect(reconciled.nextCursor, same(loaded.nextCursor));
-      expect(reconciled.selection.tagFilter, filter);
-      for (final item in reconciled.items) {
-        expect(item.tags.map((tag) => tag.id), contains(_tagId(301)));
-        expect(item.tags.map((tag) => tag.id), isNot(contains(_tagId(302))));
-      }
-      expect(states.where((state) => state.isLoading), isEmpty);
-      expect(_catalogPageReads(diagnostics), pageReadsBefore);
-
-      if (hasNext) {
-        await model.loadNextPageIfNeeded(
-          visibleIndex: reconciled.items.length - 1,
-        );
-        final completed =
-            container.read(provider).requireValue as IntentionCatalogLoaded;
-        expect(completed.items.map((item) => item.id), [
-          for (final number in [...expectedAfter, 1]) _intentionId(number),
-        ]);
-        expect(completed.totalCount, 9);
-        expect(completed.nextCursor, isNull);
-      }
-    });
-  }
-
-  test('удаление исключённого тега открывает совпадение в пустой выдаче через '
-      'настоящий репозиторий', () async {
-    final provider = intentionCatalogViewModelProvider(
-      const BrowseIntentionCatalog(),
-    );
-    final subscription = container.listen(provider, (_, _) {});
-    addTearDown(subscription.close);
-    await container.read(provider.future);
-    final model = container.read(provider.notifier);
-    final filter = IntentionTagFilter(
-      requiredTagIds: [_tagId(301)],
-      excludedTagIds: [_tagId(302)],
-    );
-    model.changeTitleFilter('зал');
-    model.changeTagFilter(filter);
-    final empty =
-        await container.read(provider.future) as IntentionCatalogEmpty;
-    final pageReadsBefore = _catalogPageReads(diagnostics);
-    final states = <AsyncValue<IntentionCatalogState>>[];
-    final observer = container.listen(provider, (_, next) => states.add(next));
-    addTearDown(observer.close);
-
-    await _deleteTag(container, _tagId(302));
-    final current = await _awaitRevisionAfter(container, provider, empty);
-
-    expect(current, isA<IntentionCatalogLoaded>());
-    final reconciled = current as IntentionCatalogLoaded;
-    expect(reconciled.items.map((item) => item.id), [_intentionId(4)]);
-    expect(reconciled.items.single.tags.map((tag) => tag.id), [
-      _tagId(301),
-      _tagId(303),
-    ]);
-    expect(reconciled.totalCount, 1);
-    expect(reconciled.nextCursor, isNull);
-    expect(reconciled.selection.tagFilter, filter);
-    expect(states.where((state) => state.isLoading), isEmpty);
-    expect(_catalogPageReads(diagnostics), pageReadsBefore);
-  });
-
-  test('отказ SQLite при чтении согласования сохраняет выдачу с явным '
-      'отказом обновления, а повтор достраивает её через настоящий '
+  test('удаление исключённого тега начинает новую выдачу с первой порции, '
+      'и она показывает прежде отсечённые намерения через настоящий '
       'репозиторий', () async {
     await _seedExcludedMatches(database);
     final provider = intentionCatalogViewModelProvider(
@@ -518,209 +393,20 @@ void main() {
     ]);
     expect(loaded.totalCount, 5);
     final pageReadsBefore = _catalogPageReads(diagnostics);
-    final states = <AsyncValue<IntentionCatalogState>>[];
-    final observer = container.listen(provider, (_, next) => states.add(next));
-    addTearDown(observer.close);
-
-    fault.failNextFilteredSelect = true;
-    await _deleteTag(container, _tagId(302));
-    final failed = await _awaitRefreshFailure(container, provider);
-
-    expect(failed, isA<IntentionCatalogLoaded>());
-    expect((failed as IntentionCatalogLoaded).items, loaded.items);
-    expect(failed.totalCount, 5);
-    expect(failed.nextCursor, same(loaded.nextCursor));
-    expect(failed.selection.tagFilter, filter);
-    expect(failed.refresh, isA<IntentionCatalogRefreshUnavailable>());
-    expect(fault.failNextFilteredSelect, isFalse);
-    expect(states.where((state) => state.isLoading), isEmpty);
-    // Отказ не сбрасывает выдачу: каталог не перечитывается.
-    expect(_catalogPageReads(diagnostics), pageReadsBefore);
-
-    await model.retryRefresh();
-
-    final reconciled =
-        container.read(provider).requireValue as IntentionCatalogLoaded;
-    expect(reconciled.items.map((item) => item.id), [
-      for (final number in [13, 12, 11, 10, 6]) _intentionId(number),
-    ]);
-    expect(reconciled.totalCount, 9);
-    expect(reconciled.nextCursor, same(loaded.nextCursor));
-    expect(reconciled.refresh, isA<IntentionCatalogRefreshIdle>());
-    for (final item in reconciled.items) {
-      expect(item.tags.map((tag) => tag.id), isNot(contains(_tagId(302))));
-    }
-    expect(states.where((state) => state.isLoading), isEmpty);
-    expect(_catalogPageReads(diagnostics), pageReadsBefore);
-  });
-
-  test(
-    'после отказа SQLite при чтении согласования следующее подтверждённое '
-    'назначение тега само повторяет чтение через настоящий репозиторий',
-    () async {
-      await _seedExcludedMatches(database);
-      final provider = intentionCatalogViewModelProvider(
-        const BrowseIntentionCatalog(),
-      );
-      final subscription = container.listen(provider, (_, _) {});
-      addTearDown(subscription.close);
-      await container.read(provider.future);
-      final model = container.read(provider.notifier);
-      final filter = IntentionTagFilter(
-        requiredTagIds: [_tagId(301)],
-        excludedTagIds: [_tagId(302)],
-      );
-      model.changeTagFilter(filter);
-      final loaded =
-          await container.read(provider.future) as IntentionCatalogLoaded;
-      final pageReadsBefore = _catalogPageReads(diagnostics);
-      final states = <AsyncValue<IntentionCatalogState>>[];
-      final observer = container.listen(
-        provider,
-        (_, next) => states.add(next),
-      );
-      addTearDown(observer.close);
-
-      fault.failNextFilteredSelect = true;
-      await _deleteTag(container, _tagId(302));
-      final failed = await _awaitRefreshFailure(container, provider);
-      expect(failed.refresh, isA<IntentionCatalogRefreshUnavailable>());
-
-      // «Ходить без тегов» получает «Здоровье» и становится совпадением.
-      await _assignTag(container, _tagId(301), _intentionId(7));
-      final current = await _awaitRevisionAfter(container, provider, failed);
-
-      expect(current, isA<IntentionCatalogLoaded>());
-      final reconciled = current as IntentionCatalogLoaded;
-      expect(reconciled.items.map((item) => item.id), [
-        for (final number in [13, 12, 11, 10, 7, 6]) _intentionId(number),
-      ]);
-      expect(
-        reconciled.items
-            .singleWhere((item) => item.id == _intentionId(7))
-            .tags
-            .map((tag) => tag.id),
-        [_tagId(301)],
-      );
-      expect(reconciled.totalCount, 10);
-      expect(reconciled.nextCursor, same(loaded.nextCursor));
-      expect(reconciled.selection.tagFilter, filter);
-      expect(reconciled.refresh, isA<IntentionCatalogRefreshIdle>());
-      expect(states.where((state) => state.isLoading), isEmpty);
-      expect(_catalogPageReads(diagnostics), pageReadsBefore);
-    },
-  );
-  test('ранее полностью загруженная выдача в несколько окон согласуется '
-      'через настоящий репозиторий окнами не больше порции', () async {
-    await _seedWindowedArea(database);
-    final provider = intentionCatalogViewModelProvider(
-      const BrowseIntentionCatalog(),
-    );
-    final subscription = container.listen(provider, (_, _) {});
-    addTearDown(subscription.close);
-    await container.read(provider.future);
-    final model = container.read(provider.notifier);
-    final filter = IntentionTagFilter(
-      requiredTagIds: [_tagId(301)],
-      excludedTagIds: [_tagId(302)],
-    );
-    model.changeTagFilter(filter);
-    var loaded =
-        await container.read(provider.future) as IntentionCatalogLoaded;
-    while (loaded.nextCursor != null) {
-      await model.loadNextPageIfNeeded(visibleIndex: loaded.items.length - 1);
-      loaded = container.read(provider).requireValue as IntentionCatalogLoaded;
-    }
-    final storedBefore = [
-      for (var number = 38; number >= 20; number -= 2) number,
-      10,
-      6,
-      5,
-      2,
-      1,
-    ];
-    expect(loaded.items.map((item) => item.id), [
-      for (final number in storedBefore) _intentionId(number),
-    ]);
-    expect(loaded.totalCount, storedBefore.length);
-    final pageReadsBefore = _catalogPageReads(diagnostics);
-    final states = <AsyncValue<IntentionCatalogState>>[];
-    final observer = container.listen(provider, (_, next) => states.add(next));
-    addTearDown(observer.close);
-    fault.boundedReads.clear();
 
     await _deleteTag(container, _tagId(302));
     final current = await _awaitRevisionAfter(container, provider, loaded);
 
-    // Совпадения лежат перед первой сохранённой строкой, внутри окон и сразу
-    // после их краёв; итог равен сравнению со всей сохранённой областью.
-    const expectedAfter = [
-      39, 38, 37, 36, 35, 34, 33, 32, 31, 30, 29, 28, 27, 26, 25, 24, 23, //
-      22, 21, 20, 10, 6, 5, 4, 2, 1,
-    ];
     expect(current, isA<IntentionCatalogLoaded>());
-    final reconciled = current as IntentionCatalogLoaded;
-    expect(reconciled.items.map((item) => item.id), [
-      for (final number in expectedAfter) _intentionId(number),
+    final restarted = current as IntentionCatalogLoaded;
+    expect(restarted.items.map((item) => item.id), [
+      _intentionId(13),
+      _intentionId(12),
     ]);
-    expect(reconciled.totalCount, expectedAfter.length);
-    expect(reconciled.nextCursor, isNull);
-    for (final item in reconciled.items) {
-      expect(item.tags.map((tag) => tag.id), contains(_tagId(301)));
-      expect(item.tags.map((tag) => tag.id), isNot(contains(_tagId(302))));
-    }
-    expect(states.where((state) => state.isLoading), isEmpty);
-    expect(_catalogPageReads(diagnostics), pageReadsBefore);
-
-    // Каждое чтение согласования получает не больше порции сохранённых
-    // идентификаторов, а число чтений линейно по сохранённым и недостающим
-    // строкам.
-    const pageSize = 2;
-    final missingCount = expectedAfter.length - storedBefore.length;
-    final windows = fault.boundedReads;
-    expect(windows, isNotEmpty);
-    expect(windows, everyElement(lessThanOrEqualTo(pageSize)));
-    expect(
-      windows.length,
-      lessThanOrEqualTo(
-        (storedBefore.length + pageSize - 1) ~/ pageSize +
-            (missingCount + pageSize - 1) ~/ pageSize +
-            1,
-      ),
-    );
-
-    // Результат совпадает с новым чтением той же выдачи.
-    final fresh = ProviderContainer(
-      overrides: [
-        personalGraphRepositoryProvider.overrideWithValue(repository),
-        catalogPagingPolicyProvider.overrideWithValue(
-          CatalogPagingPolicy(
-            pageSize: pageSize,
-            prefetchRemaining: 0,
-            filterDebounce: const Duration(milliseconds: 250),
-          ),
-        ),
-      ],
-      retry: (retryCount, error) => null,
-    );
-    addTearDown(fresh.dispose);
-    final freshSubscription = fresh.listen(provider, (_, _) {});
-    addTearDown(freshSubscription.close);
-    await fresh.read(provider.future);
-    fresh.read(provider.notifier).changeTagFilter(filter);
-    var reread = await fresh.read(provider.future) as IntentionCatalogLoaded;
-    while (reread.nextCursor != null) {
-      await fresh
-          .read(provider.notifier)
-          .loadNextPageIfNeeded(visibleIndex: reread.items.length - 1);
-      reread = fresh.read(provider).requireValue as IntentionCatalogLoaded;
-    }
-    expect(reread.totalCount, reconciled.totalCount);
-    List<List<Object>> contents(IntentionCatalogLoaded state) => [
-      for (final item in state.items)
-        [item.id, ...item.tags.map((tag) => tag.id)],
-    ];
-    expect(contents(reread), contents(reconciled));
+    expect(restarted.totalCount, 9);
+    expect(restarted.nextCursor, isNotNull);
+    expect(restarted.selection.tagFilter, filter);
+    expect(_catalogPageReads(diagnostics), pageReadsBefore + 1);
   });
 
   group('полное создание через настоящий репозиторий и coordinator', () {
@@ -1245,25 +931,6 @@ Future<void> _seedExcludedMatches(AppDatabase database) =>
       }
     });
 
-/// Намерения 20–39 со «Здоровьем»; нечётные отсечены исключённым «Спортом».
-Future<void> _seedWindowedArea(AppDatabase database) =>
-    seedGraph(database, () async {
-      for (var number = 20; number <= 39; number++) {
-        await database.customStatement(
-          '''INSERT INTO intentions
-         (id, title, is_action_ready, is_archived, created_at, updated_at)
-         VALUES (?, ?, 1, 0, ?, ?)''',
-          [tagFixtureId(number), 'Плавать $number', number, number],
-        );
-        for (final tag in [301, if (number.isOdd) 302]) {
-          await database.customStatement(
-            'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-            [tagFixtureId(tag), tagFixtureId(number)],
-          );
-        }
-      }
-    });
-
 /// Проводит физическое удаление тега настоящим адаптером через coordinator.
 Future<void> _deleteTag(ProviderContainer container, TagId tagId) async {
   final start = container
@@ -1346,22 +1013,6 @@ Future<List<IntentionSummary>> _readWhole(
   return items;
 }
 
-/// Ждёт публикации явного отказа обновления.
-Future<IntentionCatalogConfirmedState> _awaitRefreshFailure(
-  ProviderContainer container,
-  IntentionCatalogViewModelProvider provider,
-) async {
-  for (var attempt = 0; attempt < 1000; attempt++) {
-    final current = container.read(provider).value;
-    if (current is IntentionCatalogConfirmedState &&
-        current.refresh is! IntentionCatalogRefreshIdle) {
-      return current;
-    }
-    await Future<void>.delayed(const Duration(milliseconds: 1));
-  }
-  fail('Отказ обновления не опубликован.');
-}
-
 /// Ждёт публикации подтверждённого состояния более новой ревизии.
 Future<IntentionCatalogConfirmedState> _awaitRevisionAfter(
   ProviderContainer container,
@@ -1401,40 +1052,12 @@ TagId _tagId(int number) => switch (TagId.decode(tagFixtureId(number))) {
 
 final class _CatalogReadFault extends LocalDatabaseConnectionObserver {
   bool failNextSelect = false;
-
-  /// Отказывает следующему чтению с условиями по тегам: команды тегов таких
-  /// чтений не выполняют.
-  bool failNextFilteredSelect = false;
   int selects = 0;
-
-  /// Число сохранённых идентификаторов, переданных каждой ограниченной
-  /// выборкой с условиями по тегам.
-  final boundedReads = <int>[];
 
   @override
   void beforeStatement(LocalDatabaseSqlStatement statement) {
     if (statement.operation != LocalDatabaseSqlOperation.select) return;
     selects++;
-    final sql = statement.statements.join('\n');
-    if (sql.contains('json_each') && sql.contains('LIMIT')) {
-      boundedReads.add(
-        sql.contains('stored_row')
-            ? (jsonDecode(
-                statement.arguments.whereType<String>().lastWhere(
-                  (argument) => argument.startsWith('['),
-                ),
-              ) as List).length
-            : 0,
-      );
-    }
-    if (failNextFilteredSelect &&
-        statement.statements.any((sql) => sql.contains('json_each'))) {
-      failNextFilteredSelect = false;
-      throw SqliteException(
-        extendedResultCode: SqlError.SQLITE_BUSY,
-        message: 'Контролируемая недоступность чтения согласования.',
-      );
-    }
     if (failNextSelect) {
       failNextSelect = false;
       throw SqliteException(

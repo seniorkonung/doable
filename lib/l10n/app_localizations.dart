@@ -770,24 +770,6 @@ abstract class AppLocalizations {
   /// **'More intentions couldn’t be loaded because of an unexpected error.'**
   String get catalogLoadMoreUnexpected;
 
-  /// Устранимый отказ обновления над сохранённой выдачей каталога
-  ///
-  /// In en, this message translates to:
-  /// **'The intention list isn’t up to date: changes couldn’t be loaded.'**
-  String get catalogRefreshUnavailable;
-
-  /// Отказ обновления сохранённой выдачи из-за повреждения данных
-  ///
-  /// In en, this message translates to:
-  /// **'The intention list isn’t up to date: stored data is damaged.'**
-  String get catalogRefreshCorruption;
-
-  /// Отказ обновления сохранённой выдачи из-за непредвиденной ошибки
-  ///
-  /// In en, this message translates to:
-  /// **'The intention list isn’t up to date because of an unexpected error.'**
-  String get catalogRefreshUnexpected;
-
   /// Признак готовности намерения к действию
   ///
   /// In en, this message translates to:

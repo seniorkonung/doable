@@ -3,7 +3,6 @@ import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_catalog_status_views.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_search_results.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
@@ -26,122 +25,17 @@ const _listKey = PageStorageKey<String>('search-results-test-list');
 const _loadingRu = 'Загружаем намерения…';
 const _unavailableRu = 'Не удалось загрузить намерения. Повторите попытку.';
 const _emptyRu = 'Активных намерений пока нет.';
-const _refreshUnavailableRu =
-    'Список намерений не обновлён: не удалось получить изменения.';
 
 /// Высота строки-образца выдачи.
 const _rowExtent = 48.0;
 
 final _list = find.byKey(_listKey);
-final _refreshStatus = find.byType(IntentionCatalogRefreshStatusView);
-final _refreshRetry = find.descendant(
-  of: _refreshStatus,
-  matching: find.byType(FilledButton),
-);
 
 final _health = _tag(1, 'Здоровье');
 final _sport = _tag(2, 'Спорт');
-final _other = _tag(3, 'Отдых');
 
 void main() {
-  group('отказ обновления над загруженным списком', () {
-    // Категория отказа меняет только текст и повтор общего представления
-    // отказа; место над списком у всех одно.
-    testWidgets('появление и снятие отказа из-за недоступности не меняют '
-        'смещение и экранное положение строки прокрученного списка', (
-      tester,
-    ) async {
-      final h = await _open(tester);
-      await h.load(_summaries(first: 40));
-      h.position.jumpTo(300);
-      await _settle(tester);
-      final rowTop = _rowTop(tester, 'Намерение 33');
-
-      await h.failRefresh(const IntentionUnavailableFailure());
-
-      expect(find.text(_refreshUnavailableRu), findsOneWidget);
-      expect(_refreshRetry, findsOneWidget);
-      expect(h.position.pixels, 300);
-      expect(_rowTop(tester, 'Намерение 33'), rowTop);
-
-      await h.recoverRefresh(totalCount: 40);
-
-      expect(find.text(_refreshUnavailableRu), findsNothing);
-      expect(h.position.pixels, 300);
-      expect(_rowTop(tester, 'Намерение 33'), rowTop);
-    });
-
-    for (final (name, count) in [
-      ('прокручиваемый', 40),
-      ('помещающийся на экране', 2),
-    ]) {
-      testWidgets('$name список, стоявший в начале, остаётся в начале: строки '
-          'уходят из-под отказа и возвращаются после снятия', (tester) async {
-        final h = await _open(tester);
-        await h.load(_summaries(first: count));
-        final first = 'Намерение $count';
-        final listTop = tester.getRect(_list).top;
-        expect(_rowTop(tester, first), moreOrLessEquals(listTop));
-
-        await h.failRefresh(const IntentionUnavailableFailure());
-
-        expect(tester.takeException(), isNull);
-        expect(find.text(_refreshUnavailableRu), findsOneWidget);
-        expect(find.text(first).hitTestable(), findsOneWidget);
-
-        await h.recoverRefresh(totalCount: count);
-
-        expect(tester.takeException(), isNull);
-        expect(find.text(_refreshUnavailableRu), findsNothing);
-        expect(_rowTop(tester, first), moreOrLessEquals(listTop));
-      });
-    }
-
-    testWidgets('первая строка прокрученного списка достижима прокруткой под '
-        'отказом', (tester) async {
-      final h = await _open(tester);
-      await h.load(_summaries(first: 40));
-      h.position.jumpTo(300);
-      await _settle(tester);
-      await h.failRefresh(const IntentionCorruptionFailure());
-
-      await tester.drag(_list, const Offset(0, 5000));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Намерение 40').hitTestable(), findsOneWidget);
-    });
-  });
-
-  group('пустая выдача', () {
-    testWidgets('без отказа обновления выводит только сообщение о пустоте', (
-      tester,
-    ) async {
-      final h = await _open(tester);
-      await h.load(const []);
-
-      expect(h.confirmed, isA<IntentionCatalogEmpty>());
-      expect(find.text(_emptyRu), findsOneWidget);
-      expect(
-        find.descendant(of: _refreshStatus, matching: find.byType(Text)),
-        findsNothing,
-      );
-    });
-
-    testWidgets('отказ обновления из-за недоступности стоит над сообщением '
-        'о пустоте', (tester) async {
-      final h = await _open(tester);
-      await h.load(const []);
-
-      await h.failRefresh(const IntentionUnavailableFailure());
-
-      expect(h.confirmed, isA<IntentionCatalogEmpty>());
-      expect(find.text(_refreshUnavailableRu), findsOneWidget);
-      expect(find.text(_emptyRu), findsOneWidget);
-      expect(_refreshRetry, findsOneWidget);
-    });
-  });
-
-  group('верхняя позиция при смене параметров', () {
+  group('верхняя позиция новой выдачи', () {
     for (final (name, change) in <(String, void Function(_Harness))>[
       ('условий по тегам', _clearTagConditions),
       ('текста названия', (h) => h.notifier.changeTitleFilter('намерение')),
@@ -209,29 +103,24 @@ void main() {
       );
     });
 
-    testWidgets('выдача, вернувшаяся после временной пустоты без смены '
-        'параметров, сохраняет позицию', (tester) async {
+    testWidgets('удаление исключённого тега при показанном прокрученном '
+        'списке открывает новую выдачу со смещением ноль', (tester) async {
       final h = await _open(tester);
       await h.load(_summaries(first: 40));
       h.position.jumpTo(300);
       await _settle(tester);
-      await h.deleteTag(_health);
-      expect(_list, findsNothing);
 
-      // Согласование после удаления исключённого тега возвращает совпадения
-      // без смены параметров.
+      final restarted = h.repository.queries.length;
       await h.deleteTag(_sport);
-      h.repository.completeReconciliation(
-        0,
-        reconciliationFirstPortion(
-          _summaries(first: 40, tags: const []),
-          totalCount: 40,
-          revision: h.revision,
-        ),
-      );
+      expect(h.repository.queries, hasLength(restarted + 1));
+      h.repository.complete(restarted, h._page(_summaries(first: 40)));
       await tester.pumpAndSettle();
 
-      expect(h.position.pixels, 300);
+      expect(h.position.pixels, 0);
+      expect(
+        _rowTop(tester, 'Намерение 40'),
+        moreOrLessEquals(tester.getRect(_list).top),
+      );
     });
   });
 
@@ -391,8 +280,7 @@ final class _Harness {
       .position;
 
   /// Загружает выдачу с обязательным и исключённым тегами: удаление первого
-  /// опустошает её без чтения, удаление второго требует чтения недостающей
-  /// части.
+  /// опустошает её без чтения, удаление второго начинает новую выдачу.
   Future<void> load(List<IntentionSummary> items) async {
     repository.complete(0, _page(const []));
     await _settle(_tester);
@@ -421,46 +309,6 @@ final class _Harness {
       revision: TestCatalogRevision(++revision),
     ),
   );
-
-  /// Подтверждает удаление исключённого тега и завершает чтение
-  /// согласования заданным отказом.
-  Future<void> failRefresh(IntentionFailure failure) async {
-    final read = repository.reconciliationQueries.length;
-    await deleteTag(_sport);
-    expect(repository.reconciliationQueries, hasLength(read + 1));
-    repository.completeReconciliation(read, ResultFailure(failure));
-    await _tester.pumpAndSettle();
-  }
-
-  /// Снимает отказ любой категории автоматическим повтором: следующий
-  /// подтверждённый пакет заново читает недостающую часть.
-  Future<void> recoverRefresh({required int totalCount}) async {
-    final read = repository.reconciliationQueries.length;
-    final renamed = Tag(
-      id: _other.id,
-      name: TagName.fromInput('Покой'),
-      color: _other.color,
-      position: _other.position,
-    );
-    await complete(
-      UpdateTag(tagId: _other.id, name: renamed.name, color: _other.color),
-      tagRenameSuccess(
-        before: _other,
-        after: renamed,
-        revision: TestCatalogRevision(++revision),
-      ),
-    );
-    expect(repository.reconciliationQueries, hasLength(read + 1));
-    repository.completeReconciliation(
-      read,
-      reconciliationFirstPortion(
-        const [],
-        totalCount: totalCount,
-        revision: revision,
-      ),
-    );
-    await _tester.pumpAndSettle();
-  }
 
   /// Меняет параметры поиска и отвечает на первую порцию новой выдачи.
   Future<void> changeParameters(

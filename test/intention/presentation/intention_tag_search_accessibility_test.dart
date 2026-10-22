@@ -391,7 +391,7 @@ void main() {
       _expectTappable(tester, field);
       expect(tester.widget<TextField>(field).controller!.text, 'ход');
 
-      // Отказ обновления после удаления исключённого тега и его повтор.
+      // Удаление исключённого тега помечает его условие удалённым.
       final deleted = _tags[1];
       final accepted = acceptTagCommand(
         container,
@@ -403,47 +403,8 @@ void main() {
         ),
       );
       await accepted.future;
-      await _pumpUntilReconciliationQueries(tester, repository, 1);
-      repository.completeReconciliation(
-        0,
-        const ResultFailure(IntentionUnavailableFailure()),
-      );
       await _pumpFrames(tester);
       expect(tester.takeException(), isNull);
-
-      final refresh = find.byType(IntentionCatalogRefreshStatusView);
-      final refreshRetry = find.descendant(
-        of: refresh,
-        matching: find.widgetWithText(FilledButton, l10n.commonRetry),
-      );
-      await _reach(tester, refreshRetry, within: list, delta: -150);
-      _expectTappable(tester, refreshRetry);
-      expect(
-        tester.getSemantics(refresh),
-        isSemantics(isLiveRegion: true, label: l10n.catalogRefreshUnavailable),
-      );
-      expect(find.text(l10n.catalogRefreshUnavailable), findsOneWidget);
-      await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
-      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
-      await expectLater(tester, meetsGuideline(textContrastGuideline));
-      await tester.tap(refreshRetry);
-      await _pumpUntilReconciliationQueries(tester, repository, 2);
-      repository.completeReconciliation(
-        1,
-        const ResultFailure(IntentionUnavailableFailure()),
-      );
-      await _pumpFrames(tester);
-      expect(find.text(l10n.catalogRefreshUnavailable), findsOneWidget);
-
-      // Строки сохранённой выдачи остаются достижимыми под отказом.
-      for (final summary in [...items, lastSummary]) {
-        final row = find.ancestor(
-          of: find.text(summary.title),
-          matching: find.byType(IntentionSummaryView),
-        );
-        await _reach(tester, row, within: list);
-        _expectTappable(tester, row);
-      }
 
       // Условие удалённого тега сохраняет надобность, объявляет пометку
       // удаления и остаётся доступным для снятия.
@@ -774,18 +735,4 @@ Future<void> _pumpUntilQueries(
     await tester.pump(const Duration(milliseconds: 1));
   }
   fail('Не дождались $count запросов каталога.');
-}
-
-Future<void> _pumpUntilReconciliationQueries(
-  WidgetTester tester,
-  ControlledCatalogRepository repository,
-  int count,
-) async {
-  for (var attempt = 0; attempt < 1000; attempt++) {
-    if (repository.reconciliationQueries.length >= count) {
-      return;
-    }
-    await tester.pump(const Duration(milliseconds: 1));
-  }
-  fail('Не дождались $count чтений согласования.');
 }

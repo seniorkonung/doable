@@ -489,18 +489,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'More intentions couldn’t be loaded because of an unexpected error.';
 
   @override
-  String get catalogRefreshUnavailable =>
-      'The intention list isn’t up to date: changes couldn’t be loaded.';
-
-  @override
-  String get catalogRefreshCorruption =>
-      'The intention list isn’t up to date: stored data is damaged.';
-
-  @override
-  String get catalogRefreshUnexpected =>
-      'The intention list isn’t up to date because of an unexpected error.';
-
-  @override
   String get catalogReady => 'Ready for action';
 
   @override

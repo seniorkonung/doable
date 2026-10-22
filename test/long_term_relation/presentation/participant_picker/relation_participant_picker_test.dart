@@ -606,10 +606,9 @@ void _defineTagSearchTests() {
     expect(find.text(byScope), findsNothing);
   });
 
-  testWidgets('отказ обновления из-за недоступности показан над сохранённым '
-      'списком, а повтор согласует выдачу с прежними охватом и исключением', (
-    tester,
-  ) async {
+  testWidgets('отказ новой выдачи после удаления исключённого тега показан '
+      'отказом первой порции, а повтор показывает выдачу с прежними охватом '
+      'и исключением', (tester) async {
     final repository = ControlledCatalogRepository();
     final health = _tag(1, 'Здоровье');
     final rest = _tag(2, 'Отдых');
@@ -622,56 +621,60 @@ void _defineTagSearchTests() {
       repository,
       _archivedRelation,
     );
-    await _failRefresh(
+    await _applyConditions(
       tester,
       opened.container,
       repository,
       _archivedRelation,
-      required: health,
-      deletedExcluded: rest,
-      items: _summaries([health], count: 3),
-      failure: const IntentionUnavailableFailure(),
+      [
+        (health, IntentionTagRequirement.mustBePresent),
+        (rest, IntentionTagRequirement.mustBeAbsent),
+      ],
+      _tagSearchPage(_summaries([health], count: 3), revision: 1),
     );
+    final restarted = repository.queries.length;
 
-    final message = find.text(
-      'The intention list isn’t up to date: changes couldn’t be loaded.',
+    final accepted = acceptTagCommand(
+      opened.container,
+      repository,
+      DeleteTag(rest.id),
+      tagDeletionSuccess(
+        tagId: rest.id,
+        revision: const TestCatalogRevision(2),
+      ),
     );
-    expect(message, findsOneWidget);
-    expect(find.byType(IntentionSummaryView), findsNWidgets(3));
-    expect(_shownConditions(tester), ['Здоровье', 'not Отдых (tag deleted)']);
-    // Отказ не закрывает первую строку: она остаётся достижимой.
-    expect(
-      find.byType(IntentionSummaryView).first.hitTestable(),
-      findsOneWidget,
-    );
+    await accepted.future;
+    await _pumpUntilQueries(tester, repository, restarted + 1);
     _expectParticipantQuery(
-      repository.reconciliationQueryAt(0).catalogQuery,
+      repository.queryAt(restarted),
       _archivedRelation,
       filter,
     );
+    repository.complete(
+      restarted,
+      const ResultFailure(IntentionUnavailableFailure()),
+    );
+    await tester.pumpAndSettle();
+
+    final message = find.text('Intentions couldn’t be loaded. Try again.');
+    expect(message, findsOneWidget);
+    expect(find.byType(IntentionSummaryView), findsNothing);
 
     await tester.tap(find.widgetWithText(FilledButton, 'Try again'));
-    await _pumpUntilReconciliationQueries(tester, repository, 2);
+    await _pumpUntilQueries(tester, repository, restarted + 2);
     _expectParticipantQuery(
-      repository.reconciliationQueryAt(1).catalogQuery,
+      repository.queryAt(restarted + 1),
       _archivedRelation,
       filter,
     );
-    repository.completeReconciliation(
-      1,
-      reconciliationFirstPortion(
-        [
-          testSummary(index: 4, title: 'Намерение 4', tags: [health]),
-        ],
-        totalCount: 4,
-        revision: 2,
-      ),
+    repository.complete(
+      restarted + 1,
+      _tagSearchPage(_summaries([health], count: 4), revision: 2),
     );
     await tester.pumpAndSettle();
 
     expect(message, findsNothing);
     expect(find.byType(IntentionSummaryView), findsNWidgets(4));
-    expect(_shownConditions(tester), ['Здоровье', 'not Отдых (tag deleted)']);
     _expectNoCommands(repository, tagCommands: 1);
   });
 }
@@ -775,41 +778,6 @@ Future<void> _applyConditions(
   await tester.pumpAndSettle();
 }
 
-/// Доводит выбор участника до отказа обновления после удаления исключённого
-/// тега.
-Future<void> _failRefresh(
-  WidgetTester tester,
-  ProviderContainer container,
-  ControlledCatalogRepository repository,
-  SelectRelationParticipant purpose, {
-  required Tag required,
-  required Tag deletedExcluded,
-  required List<IntentionSummary> items,
-  required IntentionFailure failure,
-}) async {
-  await _applyConditions(tester, container, repository, purpose, [
-    (required, IntentionTagRequirement.mustBePresent),
-    (deletedExcluded, IntentionTagRequirement.mustBeAbsent),
-  ], _tagSearchPage(items, revision: 1));
-  final accepted = acceptTagCommand(
-    container,
-    repository,
-    DeleteTag(deletedExcluded.id),
-    tagDeletionSuccess(
-      tagId: deletedExcluded.id,
-      revision: const TestCatalogRevision(2),
-    ),
-  );
-  await accepted.future;
-  await tester.pump();
-  await tester.pump();
-  await _pumpUntilReconciliationQueries(tester, repository, 1);
-  repository.completeReconciliation(0, ResultFailure(failure));
-  await tester.pump();
-  await tester.pump();
-  await tester.pump();
-}
-
 /// Запрос выбора участника сохраняет охват связи и исключение второго
 /// участника при любых условиях; готовность поиск не ограничивает.
 void _expectParticipantQuery(
@@ -897,20 +865,6 @@ Tag _tag(int index, String name) => Tag(
   color: null,
   position: tagPositionAt(index),
 );
-
-Future<void> _pumpUntilReconciliationQueries(
-  WidgetTester tester,
-  ControlledCatalogRepository repository,
-  int count,
-) async {
-  for (var attempt = 0; attempt < 1000; attempt++) {
-    if (repository.reconciliationQueries.length >= count) {
-      return;
-    }
-    await tester.pump(const Duration(milliseconds: 1));
-  }
-  fail('Не дождались $count чтений согласования.');
-}
 
 Future<void> _pumpUntilQueries(
   WidgetTester tester,

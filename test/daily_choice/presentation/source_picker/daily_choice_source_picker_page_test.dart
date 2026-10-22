@@ -47,6 +47,7 @@ void main() {
       ],
       totalCountLabel: (count) => 'Total intentions: $count',
       emptyScopeMessage: 'No active intentions are available.',
+      unavailableMessage: 'Intentions couldn’t be loaded. Try again.',
     ),
   );
 

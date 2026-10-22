@@ -50,17 +50,12 @@ sealed class IntentionCatalogConfirmedState extends IntentionCatalogState {
     required this.totalCount,
     required this.nextCursor,
     required this.revision,
-    this.refresh = const IntentionCatalogRefreshIdle(),
   });
 
   final IntentionCatalogQuery query;
   final int totalCount;
   final IntentionCatalogCursor? nextCursor;
   final GraphRevision revision;
-
-  /// Согласование содержимого с подтверждёнными изменениями, которые
-  /// требуют чтения недостающей части выдачи.
-  final IntentionCatalogRefreshState refresh;
 }
 
 final class IntentionCatalogLoaded extends IntentionCatalogConfirmedState {
@@ -71,7 +66,6 @@ final class IntentionCatalogLoaded extends IntentionCatalogConfirmedState {
     required super.totalCount,
     required super.nextCursor,
     required super.revision,
-    super.refresh,
     this.continuation = const IntentionCatalogContinuationIdle(),
   }) : items = List.unmodifiable(items);
 
@@ -108,38 +102,11 @@ final class IntentionCatalogContinuationUnexpected
   const IntentionCatalogContinuationUnexpected();
 }
 
-/// Отказ обновления сохраняет последнее целиком подтверждённое содержимое:
-/// до успешного повтора оно не отражает подтверждённые изменения, которые
-/// требуют чтения недостающей части выдачи.
-sealed class IntentionCatalogRefreshState {
-  const IntentionCatalogRefreshState();
-}
-
-final class IntentionCatalogRefreshIdle extends IntentionCatalogRefreshState {
-  const IntentionCatalogRefreshIdle();
-}
-
-final class IntentionCatalogRefreshUnavailable
-    extends IntentionCatalogRefreshState {
-  const IntentionCatalogRefreshUnavailable();
-}
-
-final class IntentionCatalogRefreshCorruption
-    extends IntentionCatalogRefreshState {
-  const IntentionCatalogRefreshCorruption();
-}
-
-final class IntentionCatalogRefreshUnexpected
-    extends IntentionCatalogRefreshState {
-  const IntentionCatalogRefreshUnexpected();
-}
-
 final class IntentionCatalogEmpty extends IntentionCatalogConfirmedState {
   const IntentionCatalogEmpty({
     required super.selection,
     required super.query,
     required super.revision,
-    super.refresh,
   }) : super(totalCount: 0, nextCursor: null);
 
   IntentionScope get scope => query.scope;
