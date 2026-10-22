@@ -1,11 +1,13 @@
 import 'dart:async';
 
 import 'package:doable/src/graph/application/graph_change.dart';
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
+import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_assignment.dart';
@@ -302,6 +304,133 @@ void main() {
     expect(second.state.search.inputIsInvalid, isFalse);
     expect(_visibleNames(second), ['Работа', 'Дом']);
   });
+
+  test('Нажатие сразу назначает и снимает тег', () async {
+    final h = _Harness.confirmedByCoordinator();
+    addTearDown(h.dispose);
+    final panel = h.open();
+    h.repository.complete(
+      [_tag(1, 'Дом'), _tag(2, 'Работа')],
+      assignedIds: {_id(1)},
+    );
+    await pumpEventQueue();
+
+    expect(panel.model.toggle(_id(2)), isA<TagCommandAccepted>());
+    await pumpEventQueue();
+    final assign = h.repository.commands.single as AssignTag;
+    expect((assign.tagId, assign.intentionId), (_id(2), _intentionId));
+    expect(_marks(panel), [true, false]);
+    h.repository.command.complete(
+      TagCommandSucceeded(_assignment(2, _id(2), _intentionId)),
+    );
+    await pumpEventQueue();
+    expect(_marks(panel), [true, true]);
+
+    expect(panel.model.toggle(_id(1)), isA<TagCommandAccepted>());
+    await pumpEventQueue();
+    final remove = h.repository.commands.last as RemoveTagAssignment;
+    expect((remove.tagId, remove.intentionId), (_id(1), _intentionId));
+    h.repository.command.complete(
+      TagCommandSucceeded(
+        _assignment(3, _id(1), _intentionId, state: TagAssignmentState.absent),
+      ),
+    );
+    await pumpEventQueue();
+
+    expect(_marks(panel), [false, true]);
+    expect(h.repository.reads, hasLength(1));
+  });
+
+  test('Отказ записи оставляет прежнюю отметку', () async {
+    final h = _Harness.confirmedByCoordinator();
+    addTearDown(h.dispose);
+    final panel = h.open();
+    h.repository.complete(
+      [_tag(1, 'Дом'), _tag(2, 'Работа')],
+      assignedIds: {_id(1)},
+    );
+    await pumpEventQueue();
+
+    final accepted = panel.model.toggle(_id(2)) as TagCommandAccepted;
+    await pumpEventQueue();
+    h.repository.command.complete(
+      const TagCommandFailed(TagUnavailableFailure()),
+    );
+    await accepted.future;
+    await pumpEventQueue();
+
+    expect(_marks(panel), [true, false]);
+    expect(panel.loaded.rowsAreCurrent, isTrue);
+    expect(h.repository.reads, hasLength(1));
+  });
+
+  test(
+    'нажатие во время изменения назначений намерения отклоняется без очереди',
+    () async {
+      final h = _Harness.confirmedByCoordinator();
+      addTearDown(h.dispose);
+      final panel = h.open();
+      h.repository.complete(
+        [_tag(1, 'Дом'), _tag(2, 'Работа')],
+        assignedIds: {_id(1)},
+      );
+      await pumpEventQueue();
+      expect(panel.model.toggle(_id(2)), isA<TagCommandAccepted>());
+      await pumpEventQueue();
+
+      expect(panel.model.toggle(_id(1)), isA<TagCommandAlreadyRunning>());
+      expect(_marks(panel), [true, false]);
+
+      h.repository.command.complete(
+        TagCommandSucceeded(_assignment(2, _id(2), _intentionId)),
+      );
+      await pumpEventQueue();
+      expect(_marks(panel), [true, true]);
+      expect(h.repository.commands, hasLength(1));
+    },
+  );
+
+  test('нажатие недоступно на неактуальных строках и без намерения', () async {
+    final h = _Harness();
+    addTearDown(h.dispose);
+    final panel = h.open();
+    h.repository.complete([_tag(1, 'Дом')], assignedIds: {});
+    await pumpEventQueue();
+    h.changes.add(ConfirmedGraphReplacement(const TagCatalogTestRevision(2)));
+    await pumpEventQueue();
+    h.repository.fail(const TagCatalogUnavailableFailure());
+    await pumpEventQueue();
+    expect(panel.loaded.rowsAreCurrent, isFalse);
+
+    expect(panel.model.toggle(_id(1)), isNull);
+
+    panel.model.retryRefresh();
+    h.repository.fail(const TagCatalogIntentionNotFound());
+    await pumpEventQueue();
+    expect(panel.state.catalog, isA<TagsPanelIntentionMissing>());
+    expect(panel.model.toggle(_id(1)), isNull);
+    await pumpEventQueue();
+    expect(h.repository.commands, isEmpty);
+  });
+
+  test('принятое назначение завершается после закрытия панели', () async {
+    final h = _Harness.confirmedByCoordinator();
+    addTearDown(h.dispose);
+    final panel = h.open();
+    h.repository.complete([_tag(1, 'Дом')], assignedIds: {});
+    await pumpEventQueue();
+    final accepted = panel.model.toggle(_id(1)) as TagCommandAccepted;
+    await pumpEventQueue();
+
+    panel.close();
+    await pumpEventQueue();
+    h.repository.command.complete(
+      TagCommandSucceeded(_assignment(2, _id(1), _intentionId)),
+    );
+
+    expect(await accepted.future, isA<TagCommandSucceededCompletion>());
+    expect(h.coordinator.isRunning(_intentionId), isFalse);
+  });
 }
 
 final _intentionId = _intention(1);
@@ -317,9 +446,22 @@ final class _Harness {
     );
   }
 
+  /// Подтверждённые пакеты приходят от координатора графа, исполнившего
+  /// команды панели.
+  _Harness.confirmedByCoordinator() {
+    container = ProviderContainer(
+      overrides: [
+        personalGraphRepositoryProvider.overrideWithValue(repository),
+      ],
+    );
+  }
+
   final repository = TagCatalogTestRepository();
   final changes = StreamController<ConfirmedGraphChangePackage>.broadcast();
   late final ProviderContainer container;
+
+  GraphCommandCoordinator get coordinator =>
+      container.read(graphCommandCoordinatorProvider.notifier);
 
   _Panel open() => _Panel(
     container,
@@ -369,17 +511,22 @@ ConfirmedGraphResult<TagCommandSuccess> _package(
 ConfirmedGraphResult<TagCommandSuccess> _assignment(
   int revision,
   TagId tagId,
-  IntentionId intentionId,
-) => _package(
+  IntentionId intentionId, {
+  TagAssignmentState state = TagAssignmentState.assigned,
+}) => _package(
   revision,
   testTagAssignmentChanged(
     TagAssignmentChangedChange(
       revision: TagCatalogTestRevision(revision),
       assignment: TagAssignment(tagId: tagId, intentionId: intentionId),
-      state: TagAssignmentState.assigned,
+      state: state,
     ),
   ),
 );
+
+List<bool> _marks(_Panel panel) => [
+  for (final row in panel.loaded.rows) row.isMarked,
+];
 
 TagId _id(int number) => (TagId.decode(
   '00000000-0000-4000-8000-${number.toString().padLeft(12, '0')}',

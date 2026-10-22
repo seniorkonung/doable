@@ -11,6 +11,8 @@ import '../../../graph/application/personal_graph_repository_provider.dart';
 import '../../../intention/application/intention_catalog.dart';
 import '../../application/tag_catalog.dart';
 import '../../application/tag_change.dart';
+import '../../application/tag_command.dart';
+import '../../domain/tag_id.dart';
 import '../catalog/tag_catalog_filter.dart';
 import 'tags_panel_context.dart';
 import 'tags_panel_state.dart';
@@ -70,6 +72,30 @@ final class TagsPanelViewModel extends _$TagsPanelViewModel {
         inputIsInvalid: true,
       ),
     });
+  }
+
+  /// Нажатие на строку назначает неотмеченный тег намерению или снимает
+  /// отмеченный. Отметка меняется только по подтверждённому пакету, поэтому
+  /// отказ записи оставляет её прежней, а сам отказ принадлежит общей
+  /// поверхности. Пока назначения этого намерения меняются, координатор
+  /// отклоняет нажатие по занятому ключу намерения без очереди. На
+  /// неактуальных строках и без намерения нажатие недоступно: `null`.
+  TagCommandStart? toggle(TagId tagId) {
+    final catalog = state.catalog;
+    if (catalog is! TagsPanelLoaded || !catalog.rowsAreCurrent) return null;
+    final row = catalog.rows.where((row) => row.tag.id == tagId).firstOrNull;
+    if (row == null) return null;
+    final coordinator = ref.read(graphCommandCoordinatorProvider.notifier);
+    return switch (_context) {
+      TagsPanelAssignmentContext(:final intentionId) when row.isMarked =>
+        coordinator.acceptTagRemoveAssignment(
+          RemoveTagAssignment(tagId: tagId, intentionId: intentionId),
+        ),
+      TagsPanelAssignmentContext(:final intentionId) =>
+        coordinator.acceptTagAssign(
+          AssignTag(tagId: tagId, intentionId: intentionId),
+        ),
+    };
   }
 
   void retryLoad() {

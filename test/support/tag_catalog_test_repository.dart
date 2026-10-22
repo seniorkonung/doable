@@ -32,8 +32,10 @@ final class TagCatalogTestRepository extends Fake
     implements PersonalGraphRepository {
   final reads = <Completer<TagCatalogResult>>[];
   final readModes = <TagCatalogMode>[];
-  final command = Completer<TagCommandResult>();
   final commands = <GraphCommand<GraphCommandOutcome, GraphCommandFailure>>[];
+
+  /// Результаты команд в порядке исполнения: каждая команда ждёт свой.
+  final commandResults = <Completer<TagCommandResult>>[];
   final statusReads = <Completer<TagAssignmentStatusResult>>[];
   final statusQueries = <(TagId, IntentionId)>[];
   final observations = <TagId, StreamController<TagReadResult>>{};
@@ -44,8 +46,13 @@ final class TagCatalogTestRepository extends Fake
     TFailure extends GraphCommandFailure
   >(GraphCommand<TSuccess, TFailure> command) async {
     commands.add(command);
-    return await this.command.future as GraphCommandResult<TSuccess, TFailure>;
+    final result = Completer<TagCommandResult>();
+    commandResults.add(result);
+    return await result.future as GraphCommandResult<TSuccess, TFailure>;
   }
+
+  /// Результат последней исполняемой команды.
+  Completer<TagCommandResult> get command => commandResults.last;
 
   @override
   Stream<TagReadResult> watchTag(TagId id) => observations
