@@ -1,3 +1,5 @@
+import 'dart:ui' show CheckedState;
+
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/data/local/app_database.dart';
@@ -24,6 +26,19 @@ Future<void> _until(WidgetTester tester, Finder finder) async {
   }
   fail('Не появился элемент: $finder');
 }
+
+// Строка отмечена по семантике: название — только название тега, а отметку
+// передаёт отмеченное состояние.
+Finder _checkedRow(Finder row, String name) => find.descendant(
+  of: row,
+  matching: find.byElementPredicate((element) {
+    final data = element.renderObject?.debugSemantics?.getSemanticsData();
+    return data != null &&
+        data.label == name &&
+        data.flagsCollection.isChecked == CheckedState.isTrue;
+  }, description: 'отмеченная строка тега «$name»'),
+  matchRoot: true,
+);
 
 Future<void> _tap(WidgetTester tester, Finder finder) async {
   await _until(tester, finder);
@@ -182,7 +197,7 @@ void main() {
         );
         final row = find.byKey(ValueKey('tags-panel-row-$tagId'));
         await _tap(tester, row);
-        await _until(tester, find.bySemanticsLabel('Работа, отмечен'));
+        await _until(tester, _checkedRow(row, 'Работа'));
         await tester.pumpAndSettle();
         expect(find.byType(SnackBar, skipOffstage: false), findsNothing);
         await _tap(tester, find.text('Готово'));
