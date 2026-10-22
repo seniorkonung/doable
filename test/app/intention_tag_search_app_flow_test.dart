@@ -1,10 +1,13 @@
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/main.dart';
+import 'package:doable/src/design_system/components/tag_row.dart';
+import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/catalog/tag_condition_picker_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
+import 'package:doable/src/tag/presentation/assignments/tag_assignments_section.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -170,6 +173,97 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('Удаление обязательного тега расширяет выдачу', (tester) async {
+    final app = await _App.pump(tester, const Locale('ru'));
+    final l10n = app.l10n;
+    const page = IntentionCatalogPage;
+    final healthRest = l10n.intentionSummaryTags('Здоровье, Отдых');
+    final rest = l10n.intentionSummaryTags('Отдых');
+    final health = tagFixtureId(_health);
+    await _addCondition(tester, _health, present: true);
+    await _addCondition(tester, _sport, present: false);
+    await _expectResults(tester, page, [
+      ('Ходить в парк', healthRest),
+      ('Читать в тишине', healthRest),
+      ('Ходить до магазина', l10n.intentionSummaryTags('Здоровье')),
+      ('Ходить в парк', healthRest),
+    ]);
+    await _tap(tester, find.text('Читать в тишине'));
+    await _openPanel(tester, l10n);
+
+    await _chooseFromMenu(tester, _panelRow(_health), l10n.tagsPanelDeleteTag);
+    await _tap(tester, find.text(l10n.tagsPanelDeleteConfirm));
+    await _waitFor(tester, () => _panelRow(_health).evaluate().isEmpty);
+    expect(_panelNames(tester), ['Спорт', 'Отдых']);
+    await _waitFor(tester, () => _assignmentRow(_health).evaluate().isEmpty);
+    expect(_assignmentRow(_rest), findsOneWidget);
+    expect(
+      app.raw.select('SELECT * FROM tags WHERE id = ?', [health]),
+      isEmpty,
+    );
+    expect(
+      app.raw.select('SELECT * FROM tag_assignments WHERE tag_id = ?', [
+        health,
+      ]),
+      isEmpty,
+    );
+
+    await _closePanelAndPage(tester, l10n);
+    expect(_conditions(tester, page), [
+      l10n.intentionTagConditionAbsent('Спорт'),
+    ]);
+    await _expectResults(tester, page, [
+      ('Ходить в парк', rest),
+      ('Гулять без тегов', l10n.intentionSummaryNoTags),
+      ('Читать в тишине', rest),
+      ('Ходить до магазина', l10n.intentionSummaryNoTags),
+      ('Ходить в парк', rest),
+    ]);
+    expect(find.byType(SnackBar, skipOffstage: false), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Перестановка меняет порядок во всех представлениях', (
+    tester,
+  ) async {
+    final app = await _App.pump(tester, const Locale('ru'));
+    final l10n = app.l10n;
+    const page = IntentionCatalogPage;
+    final positionsBefore = _positions(app.raw);
+    // У «Читать в тишине» назначены «Здоровье» и «Отдых», но не «Спорт».
+    await _tap(tester, find.text('Читать в тишине'));
+    await _openPanel(tester, l10n);
+
+    await _dragToFirst(tester, _panelRow(_rest));
+    await _waitFor(tester, () => _positions(app.raw) != positionsBefore);
+    await tester.pumpAndSettle();
+    expect(_panelNames(tester), ['Отдых', 'Здоровье', 'Спорт']);
+    // Перестановка меняет место только переставленного тега.
+    final positions = _positions(app.raw);
+    expect(
+      {...positions}..remove(tagFixtureId(_rest)),
+      {...positionsBefore}..remove(tagFixtureId(_rest)),
+    );
+    await _waitFor(
+      tester,
+      () =>
+          tester.getTopLeft(_assignmentRow(_rest)).dy <
+          tester.getTopLeft(_assignmentRow(_health)).dy,
+    );
+
+    await _closePanelAndPage(tester, l10n);
+    final restHealth = l10n.intentionSummaryTags('Отдых, Здоровье');
+    await _expectResults(tester, page, [
+      ('Ходить в парк', restHealth),
+      ('Гулять без тегов', l10n.intentionSummaryNoTags),
+      ('Читать в тишине', restHealth),
+      ('Ходить в зал', l10n.intentionSummaryTags('Отдых, Здоровье, Спорт')),
+      ('Ходить до магазина', l10n.intentionSummaryTags('Здоровье')),
+      ('Ходить в парк', restHealth),
+    ]);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 final class _App {
@@ -423,3 +517,75 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
   await tester.tap(finder);
   await tester.pump();
 }
+
+Future<void> _openPanel(WidgetTester tester, AppLocalizations l10n) async {
+  await _tap(
+    tester,
+    find.byKey(const ValueKey('tag-assignments-choose'), skipOffstage: false),
+  );
+  await _until(tester, find.text(l10n.tagsPanelDone));
+  await tester.pumpAndSettle();
+}
+
+/// Закрывает панель кнопкой «Готово», а страницу намерения — «назад».
+Future<void> _closePanelAndPage(
+  WidgetTester tester,
+  AppLocalizations l10n,
+) async {
+  await _tap(tester, find.text(l10n.tagsPanelDone));
+  await tester.pumpAndSettle();
+  await tester.binding.handlePopRoute();
+  await _waitFor(
+    tester,
+    () => find.byType(TagAssignmentsSection).evaluate().isEmpty,
+  );
+  await tester.pumpAndSettle();
+}
+
+/// Удерживает строку панели и выбирает пункт меню тега.
+Future<void> _chooseFromMenu(
+  WidgetTester tester,
+  Finder row,
+  String action,
+) async {
+  await _until(tester, row);
+  await tester.longPress(row);
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(action));
+  await tester.pumpAndSettle();
+}
+
+/// Перетаскивает строку панели за ручку выше первой строки и отпускает её.
+Future<void> _dragToFirst(WidgetTester tester, Finder row) async {
+  final grip = find.descendant(
+    of: row,
+    matching: find.byWidgetPredicate(
+      (widget) => widget is DoableIcon && widget.icon == DoableIconData.grip,
+    ),
+  );
+  final first = find.byType(TagRow).first;
+  final distance = tester.getTopLeft(first).dy - tester.getCenter(grip).dy - 20;
+  final drag = await tester.startGesture(tester.getCenter(grip));
+  for (var step = 0; step < 10; step++) {
+    await drag.moveBy(Offset(0, distance / 10));
+    await tester.pump();
+  }
+  await drag.up();
+  await tester.pumpAndSettle();
+}
+
+Finder _panelRow(int tag) =>
+    find.byKey(ValueKey('tags-panel-row-${tagFixtureId(tag)}'));
+
+Finder _assignmentRow(int tag) =>
+    find.byKey(ValueKey('tag-assignment-row-${tagFixtureId(tag)}'));
+
+List<String> _panelNames(WidgetTester tester) => [
+  for (final row in tester.widgetList<TagRow>(find.byType(TagRow))) row.name,
+];
+
+/// Места тегов хранилища по их идентификаторам.
+Map<String, String> _positions(sqlite.Database raw) => {
+  for (final row in raw.select('SELECT id, position FROM tags'))
+    row['id'] as String: row['position'] as String,
+};
