@@ -2012,6 +2012,12 @@ abstract class AppLocalizations {
   /// **'tag'**
   String get graphOperationTag;
 
+  /// Перестановка тега в ручном порядке в общем сообщении
+  ///
+  /// In en, this message translates to:
+  /// **'Move'**
+  String get graphOperationMoveTag;
+
   /// Назначение тега получателю в общем сообщении
   ///
   /// In en, this message translates to:

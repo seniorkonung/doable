@@ -60,7 +60,7 @@ void main() {
     CreateTag() => coordinator.acceptTagCreation(TagCreationFormKey(), command),
     UpdateTag() => coordinator.acceptTagUpdate(command),
     DeleteTag() => coordinator.acceptTagDelete(command),
-    MoveTag() => fail('Перестановку тега координатор примет в задаче 3.4'),
+    MoveTag() => coordinator.acceptTagMove(command),
     AssignTag() => coordinator.acceptTagAssign(command),
     RemoveTagAssignment() => coordinator.acceptTagRemoveAssignment(command),
   } as TagCommandAccepted).future;
@@ -274,6 +274,12 @@ void main() {
         (assignmentState() as TagAssignmentsLoaded).items.first.name.value,
         'Переименованный',
       );
+
+      final moved = await send(
+        MoveTag(tagId: _tag(lastTagNumber), placement: TagPlacement.first),
+      );
+      expect(success(moved), isA<TagUpdated>());
+      await settled(moved.revision!);
 
       final deleted = await send(DeleteTag(_tag(lastTagNumber)));
       expect(success(deleted), isA<TagDeleted>());

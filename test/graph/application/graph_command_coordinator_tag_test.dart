@@ -58,6 +58,43 @@ void main() {
   });
 
   test(
+    'перестановка тега разделяет ключ с его изменением и удалением',
+    () async {
+      final repository = _ControlledRepository();
+      final coordinator = _coordinator(repository);
+      final move = MoveTag(tagId: _tagId, placement: TagPlacement.first);
+      final accepted = coordinator.acceptTagMove(move) as TagCommandAccepted;
+
+      expect(coordinator.isTagRunning(_tagId), isTrue);
+      expect(coordinator.acceptTagMove(move), isA<TagCommandAlreadyRunning>());
+      expect(
+        coordinator.acceptTagUpdate(
+          UpdateTag(tagId: _tagId, name: _name, color: null),
+        ),
+        isA<TagCommandAlreadyRunning>(),
+      );
+      expect(
+        coordinator.acceptTagDelete(DeleteTag(_tagId)),
+        isA<TagCommandAlreadyRunning>(),
+      );
+      expect(repository.commands, [same(move)]);
+
+      repository.complete(0, const TagCommandFailed(TagUnavailableFailure()));
+      final completion = await accepted.future;
+      expect(completion.kind, TagCommandKind.move);
+      expect(coordinator.isTagRunning(_tagId), isFalse);
+
+      final update = coordinator.acceptTagUpdate(
+        UpdateTag(tagId: _tagId, name: _name, color: null),
+      ) as TagCommandAccepted;
+      expect(coordinator.acceptTagMove(move), isA<TagCommandAlreadyRunning>());
+      repository.complete(1, const TagCommandFailed(TagUnavailableFailure()));
+      await update.future;
+      await coordinator.shutdown();
+    },
+  );
+
+  test(
     'исключение становится типизированным отказом и освобождает ключ',
     () async {
       final repository = _ControlledRepository();
@@ -243,6 +280,9 @@ TagCommandAccepted _startTag(
     UpdateTag(tagId: _tagId, name: _name, color: null),
   ),
   TagCommandKind.delete => coordinator.acceptTagDelete(DeleteTag(_tagId)),
+  TagCommandKind.move => coordinator.acceptTagMove(
+    MoveTag(tagId: _tagId, placement: TagPlacement.first),
+  ),
   TagCommandKind.assign => coordinator.acceptTagAssign(
     AssignTag(tagId: _tagId, intentionId: _intentionId),
   ),

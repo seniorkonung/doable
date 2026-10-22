@@ -387,6 +387,7 @@ String _tagFailureMessage(
     TagCommandKind.create => localizations.graphOperationCreate,
     TagCommandKind.update => localizations.graphOperationUpdate,
     TagCommandKind.delete => localizations.graphOperationDelete,
+    TagCommandKind.move => localizations.graphOperationMoveTag,
     TagCommandKind.assign => localizations.graphOperationAssignTag,
     TagCommandKind.removeAssignment =>
       localizations.graphOperationRemoveTagAssignment,

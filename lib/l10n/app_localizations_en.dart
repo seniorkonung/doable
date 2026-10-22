@@ -1252,6 +1252,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get graphOperationTag => 'tag';
 
   @override
+  String get graphOperationMoveTag => 'Move';
+
+  @override
   String get graphOperationAssignTag => 'Assign';
 
   @override

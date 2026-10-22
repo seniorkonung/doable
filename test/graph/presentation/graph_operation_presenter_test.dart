@@ -486,6 +486,9 @@ void main() {
           TagCommandKind.delete =>
             'Удаление — «тег»: Не удалось выполнить действие с тегом. '
                 'Повторите попытку.',
+          TagCommandKind.move =>
+            'Перестановка — «тег»: Не удалось выполнить действие с тегом. '
+                'Повторите попытку.',
           TagCommandKind.assign =>
             'Назначение — «назначение тега»: Не удалось изменить назначение '
                 'тега. Повторите попытку.',
@@ -567,6 +570,24 @@ void main() {
       expect(find.byType(SnackBar), findsNothing);
     });
   }
+
+  testWidgets('отказ перестановки тега называет перестановку по-английски', (
+    tester,
+  ) async {
+    final harness = await _pumpPresenterApp(tester);
+    final accepted = harness.startTag(TagCommandKind.move);
+    harness.completeTagFailure(accepted, const TagUnavailableFailure());
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'Move — “tag”: Could not complete the tag operation. Try again.',
+      ),
+      findsOneWidget,
+    );
+    await _closeMessage(tester);
+    expect(find.byType(SnackBar), findsNothing);
+  });
 
   testWidgets('исключение хранилища тега не попадает в сообщение', (
     tester,
@@ -2065,6 +2086,9 @@ final class _PresenterHarness {
         ),
       ),
       TagCommandKind.delete => _coordinator.acceptTagDelete(DeleteTag(_tagId)),
+      TagCommandKind.move => _coordinator.acceptTagMove(
+        MoveTag(tagId: _tagId, placement: TagPlacement.first),
+      ),
       TagCommandKind.assign => _coordinator.acceptTagAssign(
         AssignTag(tagId: _tagId, intentionId: testDetailsIntentionId(1)),
       ),

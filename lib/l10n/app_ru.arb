@@ -345,6 +345,7 @@
   "graphOperationRelation": "связь",
   "graphOperationDailyChoice": "дневной выбор",
   "graphOperationTag": "тег",
+  "graphOperationMoveTag": "Перестановка",
   "graphOperationAssignTag": "Назначение",
   "graphOperationRemoveTagAssignment": "Снятие",
   "graphOperationTagAssignment": "назначение тега",

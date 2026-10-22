@@ -1258,6 +1258,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get graphOperationTag => 'тег';
 
   @override
+  String get graphOperationMoveTag => 'Перестановка';
+
+  @override
   String get graphOperationAssignTag => 'Назначение';
 
   @override

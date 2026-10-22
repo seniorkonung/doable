@@ -1172,6 +1172,8 @@
   "@graphOperationTag": {
     "description": "Обозначение тега в общем сообщении операции"
   },
+  "graphOperationMoveTag": "Move",
+  "@graphOperationMoveTag": { "description": "Перестановка тега в ручном порядке в общем сообщении" },
   "graphOperationAssignTag": "Assign",
   "@graphOperationAssignTag": { "description": "Назначение тега получателю в общем сообщении" },
   "graphOperationRemoveTagAssignment": "Remove",

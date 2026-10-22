@@ -333,14 +333,14 @@ final class DailyChoiceCommandCompletion extends GraphPresentableCompletion {
   bool get isFailure => confirmedResult is GraphResultFailure;
 }
 
-enum TagCommandKind { create, update, delete, assign, removeAssignment }
+enum TagCommandKind { create, update, delete, move, assign, removeAssignment }
 
 /// Завершение операции тега с политикой «только отказ» по ADR-0016.
 ///
-/// Подтверждённый результат создания, изменения, удаления, назначения и
-/// снятия назначения виден там, где операция выполнена, поэтому успех
-/// публикуется для согласования и права предъявления не образует, а отказ
-/// сразу принадлежит общей поверхности.
+/// Подтверждённый результат создания, изменения, удаления, перестановки,
+/// назначения и снятия назначения виден там, где операция выполнена, поэтому
+/// успех публикуется для согласования и права предъявления не образует, а
+/// отказ сразу принадлежит общей поверхности.
 sealed class TagCommandCompletion extends GraphCommandCompletion {
   const TagCommandCompletion._({required this.token, required this.kind});
 
@@ -1053,6 +1053,9 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     command,
     TagCommandKind.delete,
   );
+
+  TagCommandStart acceptTagMove(MoveTag command) =>
+      _acceptTag({ExistingTagKey(command.tagId)}, command, TagCommandKind.move);
 
   TagCommandStart acceptTagAssign(AssignTag command) => _acceptTag(
     _assignmentKeys(command.tagId, command.intentionId),
