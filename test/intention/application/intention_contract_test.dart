@@ -409,6 +409,58 @@ void main() {
       expect(copy.updatedAt, summary.updatedAt);
     });
 
+    test('изменение только места тега переставляет его в сводке', () {
+      final firstId = _tagId('00000000-0000-4000-8000-000000000002');
+      final secondId = _tagId('00000000-0000-4000-8000-000000000001');
+      final summary = IntentionSummary(
+        id: _intentionId('00000000-0000-4000-8000-000000000003'),
+        title: 'Гулять',
+        hasDescription: true,
+        readiness: IntentionReadiness.ready,
+        archiveState: IntentionArchiveState.archived,
+        activeRelationCount: 2,
+        createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
+        updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 2)),
+        tags: [
+          Tag(
+            id: firstId,
+            name: TagName.fromStored('Первый тег'),
+            color: null,
+            position: tagPositionAt(1015),
+          ),
+          Tag(
+            id: secondId,
+            name: TagName.fromStored('Второй тег'),
+            color: TagColor.blue,
+            position: tagPositionAt(1016),
+          ),
+        ],
+      );
+
+      final copy = summary.withUpdatedTag(
+        Tag(
+          id: secondId,
+          name: TagName.fromStored('Второй тег'),
+          color: TagColor.blue,
+          position: tagPositionAt(1014),
+        ),
+      );
+
+      expect(copy.tags.map((tag) => (tag.id, tag.position)), [
+        (secondId, tagPositionAt(1014)),
+        (firstId, tagPositionAt(1015)),
+      ]);
+      expect(summary.tags.map((tag) => tag.id), [firstId, secondId]);
+      expect(copy.id, summary.id);
+      expect(copy.title, summary.title);
+      expect(copy.hasDescription, summary.hasDescription);
+      expect(copy.readiness, summary.readiness);
+      expect(copy.archiveState, summary.archiveState);
+      expect(copy.activeRelationCount, summary.activeRelationCount);
+      expect(copy.createdAt, summary.createdAt);
+      expect(copy.updatedAt, summary.updatedAt);
+    });
+
     test('изменение неназначенного тега не меняет сводку', () {
       final summary = IntentionSummary(
         id: _intentionId('00000000-0000-4000-8000-000000000003'),

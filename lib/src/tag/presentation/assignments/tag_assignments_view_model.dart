@@ -176,7 +176,8 @@ final class TagAssignmentsViewModel extends _$TagAssignmentsViewModel {
     }
   }
 
-  /// Изменение и удаление тега и снятие назначения показываются сразу.
+  /// Изменение, перестановка и удаление тега и снятие назначения
+  /// показываются сразу.
   /// Факты назначения, в том числе начальные назначения созданного намерения,
   /// локально не применяются: весь набор с актуальными тегами даёт
   /// перечитанный снимок, поэтому частичный набор не публикуется. Снимок не
@@ -218,10 +219,11 @@ final class TagAssignmentsViewModel extends _$TagAssignmentsViewModel {
       for (final change in package.changes) {
         switch (change) {
           case TagUpdatedChange(:final after):
+            // Места уникальны, поэтому нестабильная сортировка однозначна.
             items = [
               for (final tag in items)
                 if (tag.id == after.id) after else tag,
-            ];
+            ]..sort((a, b) => a.position.compareTo(b.position));
           case TagDeletedChange(:final tagId):
             items = [
               for (final tag in items)

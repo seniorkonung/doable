@@ -309,8 +309,7 @@ final class TagsPanelViewModel extends _$TagsPanelViewModel {
 
   // Места уникальны, поэтому нестабильная сортировка однозначна.
   static List<TagsPanelRow> _inManualOrder(List<TagsPanelRow> rows) =>
-      rows
-        ..sort((a, b) => a.tag.position.value.compareTo(b.tag.position.value));
+      rows..sort((a, b) => a.tag.position.compareTo(b.tag.position));
 
   bool _precedesRequired(GraphRevision revision) {
     final required = _requiredRevision;

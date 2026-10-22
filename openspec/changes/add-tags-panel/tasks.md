@@ -452,7 +452,7 @@
   - **Предполагаемые файлы:** `lib/src/graph/application/graph_command_coordinator.dart`, `lib/src/graph/presentation/graph_operation_presenter.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` и генерируемые файлы локализации, `test/graph/application/graph_command_coordinator_tag_test.dart`, `test/graph/presentation/graph_operation_presenter_test.dart`, `test/intention/presentation/catalog/catalog_reconciliation_test_support.dart`, `test/graph/data/tag_assignment_integration_test.dart`.
   - **Размер:** S.
 
-- [ ] 3.5 Показывать подтверждённую перестановку в порядке тегов кратких результатов поиска и назначений страницы намерения
+- [x] 3.5 Показывать подтверждённую перестановку в порядке тегов кратких результатов поиска и назначений страницы намерения
   - **Критерии приёмки:**
     - По решению 2 дизайна потребители `TagUpdatedChange` заменяют тег по идентификатору и пересортировывают свои списки по месту. `IntentionSummary.withUpdatedTag` упорядочивает теги намерения по месту и сохраняет их состав, соответствие фильтру, порядок выдачи и временные метки. Назначения на странице намерения показывают новый порядок сразу, не дожидаясь перечитывания.
     - Сценарий «Перестановка меняет порядок во всех представлениях» выполняется для страницы намерения и результатов поиска без повторного открытия.

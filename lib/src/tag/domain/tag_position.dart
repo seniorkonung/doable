@@ -3,7 +3,7 @@
 /// Ключ состоит из целой части с префиксом длины и дробной части без
 /// завершающего нуля. Теги упорядочены сравнением ключей по кодовым единицам;
 /// для ASCII оно совпадает с сортировкой SQLite `BINARY`.
-final class TagPosition {
+final class TagPosition implements Comparable<TagPosition> {
   const TagPosition._(this.value);
 
   /// Каноническая строка ключа в сохранённых данных.
@@ -45,6 +45,10 @@ final class TagPosition {
     }
     return TagPosition._(_keyBetween(before?.value, after?.value));
   }
+
+  /// Ручной порядок тегов: сравнение ключей по кодовым единицам.
+  @override
+  int compareTo(TagPosition other) => value.compareTo(other.value);
 
   @override
   bool operator ==(Object other) =>

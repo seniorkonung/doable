@@ -303,11 +303,11 @@ final class IntentionSummary {
       );
 
   /// Заменяет полное состояние назначенного тега той же идентичности:
-  /// название и цвет.
+  /// название, цвет и место, и упорядочивает теги по месту.
   ///
-  /// Состав и порядок тегов переносятся без изменений, поэтому соответствие
-  /// фильтру, порядок выдачи и временные метки сохраняются. Если тег не
-  /// назначен намерению, возвращается та же сводка.
+  /// Состав тегов переносится без изменений, поэтому соответствие фильтру,
+  /// порядок выдачи и временные метки сохраняются. Если тег не назначен
+  /// намерению, возвращается та же сводка.
   IntentionSummary withUpdatedTag(Tag updated) {
     if (!tags.any((tag) => tag.id == updated.id)) {
       return this;
@@ -321,7 +321,9 @@ final class IntentionSummary {
       activeRelationCount: activeRelationCount,
       createdAt: createdAt,
       updatedAt: updatedAt,
-      tags: [for (final tag in tags) tag.id == updated.id ? updated : tag],
+      // Места уникальны, поэтому нестабильная сортировка однозначна.
+      tags: [for (final tag in tags) tag.id == updated.id ? updated : tag]
+        ..sort((a, b) => a.position.compareTo(b.position)),
     );
   }
 
