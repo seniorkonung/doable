@@ -149,6 +149,26 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('меню следует за строкой, которую опускает скрытая после '
+      'открытия меню клавиатура', (tester) async {
+    final menu = _Menu();
+    _useScreen(tester);
+    tester.view.viewInsets = const FakeViewPadding(bottom: 336);
+    await tester.pumpWidget(menu.appAboveKeyboard(rowBottom: 300));
+    await menu.open(tester);
+    final raised = tester.getRect(_row);
+    expect(tester.getRect(_panel).top, raised.bottom + 4);
+
+    tester.view.viewInsets = FakeViewPadding.zero;
+    await tester.pumpAndSettle();
+
+    final row = tester.getRect(_row);
+    expect(row.top, greaterThan(raised.top), reason: 'строка опустилась');
+    final panel = tester.getRect(_panel);
+    expect(panel.top, row.bottom + 4);
+    expect(panel.left, row.left + _contentInset);
+  });
+
   testWidgets('выбор пункта закрывает меню и возвращает его значение', (
     tester,
   ) async {
@@ -233,19 +253,33 @@ final class _Menu {
   late BuildContext _rowContext;
   late Future<_Action?> result;
 
+  /// Страница со строкой на [rowTop] от верха экрана.
   Widget app({
     required double rowTop,
     Brightness brightness = Brightness.light,
+  }) => _page(
+    brightness: brightness,
+    row: (row) => Positioned(top: rowTop, left: 12, right: 12, child: row),
+  );
+
+  /// Страница со строкой на [rowBottom] над клавиатурой: тело страницы
+  /// сжимается её отступом.
+  Widget appAboveKeyboard({required double rowBottom}) => _page(
+    brightness: Brightness.light,
+    row: (row) =>
+        Positioned(bottom: rowBottom, left: 12, right: 12, child: row),
+  );
+
+  Widget _page({
+    required Brightness brightness,
+    required Widget Function(Widget row) row,
   }) => MaterialApp(
     theme: doableTheme(brightness),
     home: Scaffold(
       body: Stack(
         children: [
-          Positioned(
-            top: rowTop,
-            left: 12,
-            right: 12,
-            child: Builder(
+          row(
+            Builder(
               builder: (context) {
                 _rowContext = context;
                 return const SizedBox(key: _rowKey, height: 48);

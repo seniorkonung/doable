@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/semantics.dart';
 
 import '../doable_colors.dart';
@@ -50,14 +51,9 @@ Future<T?> showPopupMenu<T>({
   );
   final navigator = Navigator.of(row, rootNavigator: true);
   final overlay = navigator.overlay!.context.findRenderObject()! as RenderBox;
-  final rowBox = row.findRenderObject()! as RenderBox;
-  final rowRect = MatrixUtils.transformRect(
-    rowBox.getTransformTo(overlay),
-    Offset.zero & rowBox.size,
-  );
-  // Маршрут меню убирает отступы из MediaQuery построителя положения,
-  // а сам удерживает меню в их пределах.
-  final screenPadding = MediaQuery.paddingOf(navigator.context);
+  // Строка, которую убрали из дерева, пока меню открыто, оставляет меню там,
+  // где оно стояло.
+  var rowRect = _rectIn(overlay, row)!;
   final items = [
     for (final action in actions) (action: action, destructive: false),
     if (destructive != null) (action: destructive, destructive: true),
@@ -68,18 +64,31 @@ Future<T?> showPopupMenu<T>({
     useRootNavigator: true,
     semanticLabel: label,
     positionBuilder: (context, constraints) {
+      final placed = rowRect = _rectIn(overlay, row) ?? rowRect;
+      // Когда в одном кадре меняются раскладки строки и меню, например при
+      // скрытии клавиатуры, маршрут меню может разложиться раньше строки.
+      // Поэтому после кадра меню перестраивается, если строка сместилась.
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        final current = _rectIn(overlay, row);
+        if (context.mounted && current != null && current != placed) {
+          (context as Element).markNeedsBuild();
+        }
+      });
+      // Маршрут меню убирает отступы из MediaQuery построителя положения,
+      // а сам удерживает меню в их пределах.
+      final screenPadding = MediaQuery.paddingOf(navigator.context);
       final height = _PopupMenuPanel.heightOf(
         items.map((item) => item.action.name),
         textScaler: MediaQuery.textScalerOf(context),
         textDirection: Directionality.of(context),
       );
-      final below = rowRect.bottom + _PopupMenuPanel.gap;
+      final below = placed.bottom + _PopupMenuPanel.gap;
       final bottomLimit =
           constraints.maxHeight - _menuScreenMargin - screenPadding.bottom;
       final top = below + height <= bottomLimit
           ? below
-          : rowRect.top - _PopupMenuPanel.gap - height;
-      final left = rowRect.left + contentInset;
+          : placed.top - _PopupMenuPanel.gap - height;
+      final left = placed.left + contentInset;
       return RelativeRect.fromLTRB(
         left,
         top,
@@ -97,6 +106,18 @@ Future<T?> showPopupMenu<T>({
     menuPadding: EdgeInsets.zero,
     constraints: const BoxConstraints.tightFor(width: _PopupMenuPanel.width),
     items: [_PopupMenuPanel<T>(items)],
+  );
+}
+
+/// Прямоугольник строки [row] в координатах [overlay] или null, если строки
+/// больше нет в дереве.
+Rect? _rectIn(RenderBox overlay, BuildContext row) {
+  if (!row.mounted) return null;
+  final rowBox = row.findRenderObject();
+  if (rowBox is! RenderBox || !rowBox.attached) return null;
+  return MatrixUtils.transformRect(
+    rowBox.getTransformTo(overlay),
+    Offset.zero & rowBox.size,
   );
 }
 
