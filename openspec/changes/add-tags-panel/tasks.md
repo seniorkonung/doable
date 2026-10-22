@@ -258,7 +258,7 @@
   - **Предполагаемые файлы:** `lib/src/tag/presentation/editor/tag_editor_state.dart`, `lib/src/tag/presentation/editor/tag_editor_view_model.dart` и генерируемый `tag_editor_view_model.g.dart`, `lib/src/tag/presentation/editor/tag_editor_page.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` и генерируемые файлы локализации, `test/tag/presentation/editor/tag_editor_view_model_test.dart`, `test/tag/presentation/editor/tag_editor_page_test.dart`, `test/tag/presentation/catalog/tag_catalog_page_test.dart`, `test/app/tag_app_flow_test.dart`, `test/app/tag_app_lifecycle_test.dart`.
   - **Размер:** M.
 
-- [ ] 2.12 Добавить в модуль основ однострочное текстовое поле с ведущей меткой и строку создания тега
+- [x] 2.12 Добавить в модуль основ однострочное текстовое поле с ведущей меткой и строку создания тега
   - **Критерии приёмки:**
     - Компонент `TextField` дизайн-системы в однострочном виде `name`: плоскость `fill` высотой 48 без рамки и кольца фокуса, ведущая метка перед текстом, заполнитель `muted` и строка ошибки под полем в стиле `hint` цвета `danger`, объявляемая как оповещение. Многострочный вид и сохранённый текст появляются с потребителями.
     - `TagCreateRow` — строка высотой не меньше 48 с плюсом 18 и текстом в стиле `action` цвета `accent`; длинный текст переносится без обрезки. Текст, доступное название и обработчик задаёт потребитель по ADR-0030.
