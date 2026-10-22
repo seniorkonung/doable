@@ -189,7 +189,7 @@
   - **Предполагаемые файлы:** `lib/src/design_system/components/search_field.dart` (новый), `lib/src/design_system/doable_icon.dart`, `lib/src/design_system/icons/assets/search.svg` (новый), `lib/src/design_system/icons/assets/clear.svg` (новый), `lib/src/design_system/icons/README.md`, `test/design_system/search_field_test.dart` (новый), `test/design_system/doable_icon_test.dart`, `test/design_system/goldens/doable_icons.png`.
   - **Размер:** S.
 
-- [ ] 2.6 Добавить в модуль основ строку тега с отметкой выбора
+- [x] 2.6 Добавить в модуль основ строку тега с отметкой выбора
   - **Критерии приёмки:**
     - `TagRow` по правилам компонента дизайн-системы: высота не меньше 48, `TagDot` 10, название в стиле `action` с переносом без обрезки и отметка «нет» или «отмечен» — галочка 20 цвета `accent` справа, различимая без опоры на цвет. Доступное название и отметку строки, обработчик нажатия и его недоступность задаёт потребитель по ADR-0030.
     - Ручка перестановки, удержание и отметки фильтра появляются вместе с потребителями в фазах 3 и 4.
