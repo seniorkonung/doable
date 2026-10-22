@@ -393,3 +393,14 @@
   - **Зависимости:** 2.1 — раскрываемый лист; 2.2 — признак размещения сообщений; 2.22 — проверки листа, которые переводятся на новые функции.
   - **Предполагаемые файлы:** `lib/src/design_system/components/sheet.dart`, `lib/src/design_system/components/action_sheet.dart`, `lib/src/tag/presentation/panel/tags_panel.dart`, `lib/src/tag/presentation/editor/tag_sheet.dart`, `lib/src/data_transfer/presentation/export_data_sheet.dart`, `lib/src/data_transfer/presentation/backups_sheet.dart`, `lib/src/app/quick_creation/quick_creation_mode_menu.dart`, `lib/src/app/quick_creation/quick_creation_daily_choice_start_sheet.dart`, `lib/src/graph/presentation/graph_operation_presenter.dart`, `test/design_system/sheet_test.dart`, `test/graph/presentation/graph_operation_presenter_test.dart`.
   - **Размер:** M.
+
+- [ ] 2.24 Дожидаться в сквозной проверке назначения отметки строки панели по названию тега и отмеченному состоянию
+  - **Критерии приёмки:**
+    - Проверка «серия назначений и снятий сохраняется без сообщений об успехе» в `test/app/tag_app_flow_test.dart` после нажатия на строку тега в панели дожидается подтверждённой отметки по семантике строки из 2.19: доступное название — только название тега («Работа»), отметку передаёт отмеченное состояние. Прежнее доступное название «Работа, отмечен» проверка больше не ищет.
+    - Ожидание завершается только на отмеченной строке: проверка падает, если назначение не подтверждено и строка осталась неотмеченной.
+    - Остальные шаги и утверждения проверки не меняются: отсутствие сообщений об успехе, назначения в `tag_assignments`, число завершений операций и согласованность после повторного открытия намерения. Поведение приложения не меняется.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app/tag_app_flow_test.dart`: проверка серии назначений и снятий проходит целиком.
+  - **Зависимости:** 2.15 — сквозные проверки через панель; 2.19 — отметка строки передаётся состоянием, а не словами в названии.
+  - **Предполагаемые файлы:** `test/app/tag_app_flow_test.dart`.
+  - **Размер:** XS.
