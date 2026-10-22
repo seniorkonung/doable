@@ -71,14 +71,11 @@ final class TagEditorViewModel extends _$TagEditorViewModel {
     if (_closed || !state.canSubmit || name == null) return;
 
     final start = switch (state.context) {
-      TagEditorCreating(:final formKey) => _coordinator.acceptTagCreation(
-        formKey,
-        CreateTag(
-          name: name,
-          color: state.color,
-          placement: TagPlacement.first,
+      TagEditorCreating(:final formKey, :final placement) =>
+        _coordinator.acceptTagCreation(
+          formKey,
+          CreateTag(name: name, color: state.color, placement: placement),
         ),
-      ),
       TagEditorRenaming(:final tag) => _coordinator.acceptTagUpdate(
         UpdateTag(tagId: tag.id, name: name, color: state.color),
       ),

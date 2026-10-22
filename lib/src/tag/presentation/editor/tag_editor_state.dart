@@ -1,4 +1,5 @@
 import '../../../graph/application/graph_command_coordinator.dart';
+import '../../application/tag_command.dart';
 import '../../application/tag_result.dart';
 import '../../domain/tag.dart';
 import '../../domain/tag_color.dart';
@@ -13,12 +14,20 @@ final class TagEditorCreating extends TagEditorContext {
   const TagEditorCreating(
     this.formKey, {
     this.initialName = '',
+    this.initialColor,
+    this.placement = TagPlacement.first,
     this.existingNames = const [],
     this.onCreationAccepted,
   });
 
   final TagCreationFormKey formKey;
   final String initialName;
+
+  /// Начальный выбор цвета; до создания его можно изменить.
+  final TagColor? initialColor;
+
+  /// Место нового тега в ручном порядке; формой не меняется.
+  final TagPlacement placement;
 
   /// Названия снимка вызывающего; совпадение с ними занимает название ещё
   /// при вводе. Без снимка занятость определяет запись.
@@ -126,7 +135,7 @@ final class TagEditorState {
   TagEditorState.initial(this.context, this.nameCheck)
     : input = initialInput(context),
       color = switch (context) {
-        TagEditorCreating() => null,
+        TagEditorCreating(:final initialColor) => initialColor,
         TagEditorRenaming(:final tag) => tag.color,
       },
       status = const TagEditorIdle(),

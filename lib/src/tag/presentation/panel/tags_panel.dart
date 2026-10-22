@@ -12,6 +12,7 @@ import '../../../design_system/components/tag_create_row.dart';
 import '../../../design_system/components/tag_row.dart';
 import '../../../design_system/doable_metrics.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
+import '../../application/tag_command.dart';
 import '../catalog/tag_catalog_filter.dart';
 import '../catalog/tag_catalog_search_controller.dart';
 import '../editor/tag_editor_state.dart';
@@ -66,14 +67,16 @@ final class _TagsPanelState extends ConsumerState<_TagsPanel> {
   /// Лист «Новый тег» поверх панели; принятое в нём создание продолжает
   /// модель панели, поэтому возвращаемое листом значение не нужно.
   void _openCreation(
-    String name,
+    TagCreationProposal proposal,
     TagsPanelLoaded catalog,
     TagsPanelViewModel model,
   ) => showTagSheet(
     context,
     TagEditorCreating(
       _creationKey,
-      initialName: name,
+      initialName: proposal.name,
+      initialColor: proposal.color,
+      placement: proposal.placement,
       existingNames: [for (final row in catalog.rows) row.tag.name],
       onCreationAccepted: model.acceptCreation,
     ),
@@ -141,7 +144,7 @@ final class _TagsPanelState extends ConsumerState<_TagsPanel> {
             catalog: loaded,
             filter: state.search.filter,
             model: model,
-            onCreate: (name) => _openCreation(name, loaded, model),
+            onCreate: (proposal) => _openCreation(proposal, loaded, model),
           ),
         },
         footer: Button.primary(
@@ -176,8 +179,8 @@ final class _LoadedCatalog extends StatelessWidget {
   final TagCatalogFilter filter;
   final TagsPanelViewModel model;
 
-  /// Открывает создание тега с предложенным названием.
-  final ValueChanged<String> onCreate;
+  /// Открывает создание тега с предложенными значениями.
+  final ValueChanged<TagCreationProposal> onCreate;
 
   @override
   Widget build(BuildContext context) {
@@ -230,7 +233,13 @@ final class _LoadedCatalog extends StatelessWidget {
                           child: TagCreateRow(
                             text: l10n.tagsPanelCreateTag(proposedName),
                             label: l10n.tagsPanelCreateTag(proposedName),
-                            onPressed: () => onCreate(proposedName),
+                            onPressed: () => onCreate(
+                              TagCreationProposal(
+                                name: proposedName,
+                                color: null,
+                                placement: TagPlacement.first,
+                              ),
+                            ),
                           ),
                         ),
                       SliverList.builder(

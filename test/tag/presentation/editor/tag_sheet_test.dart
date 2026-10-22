@@ -309,6 +309,29 @@ void main() {
     expect(find.byType(SnackBar), findsNothing);
   });
 
+  testWidgets('лист копии показывает предложенные название и цвет и '
+      'создаёт копию с размещением после исходного тега', (tester) async {
+    final h = await _pumpApp(tester);
+    final source = _tag('Дом', color: TagColor.blue);
+    await h.open(
+      initialName: 'Дом 2',
+      initialColor: TagColor.blue,
+      placement: AfterTagPlacement(source.id),
+      existingNames: ['Дом'],
+    );
+
+    expect(find.text('Новый тег'), findsOne);
+    expect(_nameText(tester), 'Дом 2');
+    expect(_nameDot(tester).color, DoableTagColor.blue);
+    expect(tester.widget<FilledButton>(_submit).onPressed, isNotNull);
+
+    await tester.tap(_submit);
+    await tester.pump();
+    final create = h.repository.commands.single as CreateTag;
+    expect((create.name.value, create.color), ('Дом 2', TagColor.blue));
+    expect((create.placement as AfterTagPlacement).tagId, source.id);
+  });
+
   testWidgets('слишком длинное название показывает причину, делает «Создать '
       'тег» недоступной и остаётся для исправления', (tester) async {
     final h = await _pumpApp(tester);
@@ -432,12 +455,16 @@ final class _Harness {
 
   Future<void> open({
     required String initialName,
+    TagColor? initialColor,
+    TagPlacement placement = TagPlacement.first,
     List<String> existingNames = const [],
   }) async {
     await _open(
       TagEditorCreating(
         TagCreationFormKey(),
         initialName: initialName,
+        initialColor: initialColor,
+        placement: placement,
         existingNames: [
           for (final name in existingNames) TagName.fromInput(name),
         ],

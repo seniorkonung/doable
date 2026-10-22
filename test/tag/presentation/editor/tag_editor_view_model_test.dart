@@ -160,6 +160,34 @@ void main() {
     );
   });
 
+  test(
+    'создание начинает с цвета контекста и отправляет его размещение',
+    () async {
+      final h = _Harness(
+        TagEditorCreating(
+          TagCreationFormKey(),
+          initialName: 'Дом 2',
+          initialColor: TagColor.blue,
+          placement: AfterTagPlacement(_id(1)),
+        ),
+      );
+      addTearDown(h.dispose);
+      expect((h.state.input, h.state.color), ('Дом 2', TagColor.blue));
+
+      h.model.changeName('Дом и сад');
+      h.model.changeColor(TagColor.green);
+      unawaited(h.model.submit());
+
+      final command = h.repository.commands.single.command as CreateTag;
+      expect(
+        (command.name.value, command.color),
+        ('Дом и сад', TagColor.green),
+      );
+      expect((command.placement as AfterTagPlacement).tagId, _id(1));
+      h.repository.failCommand(0, const TagUnavailableFailure());
+    },
+  );
+
   test('Изменение только регистра собственного названия', () async {
     final tag = _tag(1, 'дом');
     final h = _Harness(

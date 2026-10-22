@@ -1,4 +1,8 @@
+import '../../../shared/domain/unicode_default_case_folding_17.dart';
+import '../../application/tag_command.dart';
 import '../../domain/tag.dart';
+import '../../domain/tag_color.dart';
+import '../../domain/tag_id.dart';
 import '../catalog/tag_catalog_filter.dart';
 
 /// Состояние одного открытия панели: каталог и поиск меняются независимо,
@@ -90,6 +94,28 @@ final class TagsPanelLoaded extends TagsPanelCatalog {
       ? null
       : filter.query;
 
+  /// Создание копии тега [tagId]: первое свободное по правилу уникальности
+  /// названий «‹название› N» при N от 2, цвет исходного тега и место сразу
+  /// после него. Без такого тега в строках — `null`.
+  TagCreationProposal? duplicationOf(TagId tagId) {
+    final source = rows.where((row) => row.tag.id == tagId).firstOrNull?.tag;
+    if (source == null) return null;
+    final occupied = {for (final row in rows) row.tag.name.matchingKey};
+    // Предложенное название может оказаться длиннее допустимого, поэтому
+    // ключ строится без проверки названия по тому же свёртыванию регистра.
+    var number = 2;
+    while (occupied.contains(
+      UnicodeDefaultCaseFolding17.fold('${source.name.value} $number'),
+    )) {
+      number++;
+    }
+    return TagCreationProposal(
+      name: '${source.name.value} $number',
+      color: source.color,
+      placement: AfterTagPlacement(source.id),
+    );
+  }
+
   TagsPanelLoaded withRows(List<TagsPanelRow> rows) =>
       TagsPanelLoaded(rows, refreshFailure: refreshFailure);
 
@@ -104,4 +130,18 @@ final class TagsPanelRow {
 
   /// Отметка контекста: при назначении — тег назначен намерению.
   final bool isMarked;
+}
+
+/// Начальные значения листа «Новый тег»: название и цвет можно изменить до
+/// создания, а размещение лист отправляет без изменений.
+final class TagCreationProposal {
+  const TagCreationProposal({
+    required this.name,
+    required this.color,
+    required this.placement,
+  });
+
+  final String name;
+  final TagColor? color;
+  final TagPlacement placement;
 }

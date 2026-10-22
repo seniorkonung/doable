@@ -532,6 +532,73 @@ void main() {
     expect(panel.state.search.filter.isEmpty, isTrue);
   });
 
+  test('Занятое название пропускается', () async {
+    final h = _Harness();
+    addTearDown(h.dispose);
+    final panel = h.open();
+    h.repository.complete([
+      _tag(1, 'Работа'),
+      _tag(2, 'Дом', color: TagColor.blue),
+      _tag(3, 'Дом 2'),
+      _tag(4, 'дом 3'),
+    ], assignedIds: {});
+    await pumpEventQueue();
+
+    final copy = panel.loaded.duplicationOf(_id(2))!;
+    expect(copy.name, 'Дом 4');
+    expect(copy.color, TagColor.blue);
+    expect((copy.placement as AfterTagPlacement).tagId, _id(2));
+
+    final first = panel.loaded.duplicationOf(_id(1))!;
+    expect((first.name, first.color), ('Работа 2', null));
+  });
+
+  test('Копия встаёт после оригинала без его назначений', () async {
+    final h = _Harness.confirmedByCoordinator();
+    addTearDown(h.dispose);
+    final panel = h.open();
+    h.repository.complete([
+      _tag(5, 'Работа'),
+      _tag(7, 'Дом', color: TagColor.blue),
+      _tag(9, 'Спорт'),
+    ], assignedIds: {});
+    await pumpEventQueue();
+    panel.model.search('дом');
+    final copy = panel.loaded.duplicationOf(_id(7))!;
+    final sheet = tagEditorViewModelProvider(
+      TagEditorCreating(
+        TagCreationFormKey(),
+        initialName: copy.name,
+        initialColor: copy.color,
+        placement: copy.placement,
+        existingNames: [for (final row in panel.loaded.rows) row.tag.name],
+        onCreationAccepted: panel.model.acceptCreation,
+      ),
+    );
+    final sheetSubscription = h.container.listen(sheet, (_, _) {});
+    addTearDown(sheetSubscription.close);
+    unawaited(h.container.read(sheet.notifier).submit());
+    await pumpEventQueue();
+
+    final create = h.repository.commands.single as CreateTag;
+    expect((create.name.value, create.color), ('Дом 2', TagColor.blue));
+    expect((create.placement as AfterTagPlacement).tagId, _id(7));
+    h.repository.command.complete(
+      TagCommandSucceeded(_created(2, 1, 'Дом 2', color: TagColor.blue, at: 8)),
+    );
+    await pumpEventQueue();
+    h.repository.command.complete(
+      TagCommandSucceeded(_assignment(3, _id(1), _intentionId)),
+    );
+    await pumpEventQueue();
+
+    expect(panel.state.search.filter.isEmpty, isTrue);
+    expect(_names(panel.loaded), ['Работа', 'Дом', 'Дом 2', 'Спорт']);
+    expect(_marks(panel), [false, false, true, false]);
+    final assign = h.repository.commands.whereType<AssignTag>().single;
+    expect((assign.tagId, assign.intentionId), (_id(1), _intentionId));
+  });
+
   test('Подтверждённая запись и ошибка обновления', () async {
     final h = _Harness();
     addTearDown(h.dispose);
@@ -731,13 +798,15 @@ String? _proposedName(_Panel panel) =>
 ConfirmedGraphResult<TagCommandSuccess> _created(
   int revision,
   int number,
-  String name,
-) => _package(
+  String name, {
+  TagColor? color,
+  int? at,
+}) => _package(
   revision,
   TagCreated(
     TagCreatedChange(
       revision: TagCatalogTestRevision(revision),
-      after: _tag(number, name),
+      after: _tag(number, name, color: color, at: at),
     ),
   ),
 );
@@ -754,10 +823,11 @@ IntentionId _intention(int number) => (IntentionId.decode(
   '00000000-0000-4000-9000-${number.toString().padLeft(12, '0')}',
 ) as IntentionIdDecodingSuccess).id;
 
-/// Номер задаёт и идентичность, и место тега в ручном порядке.
-Tag _tag(int number, String name, {TagColor? color}) => Tag(
+/// Номер задаёт идентичность и, если не задано [at], место тега в ручном
+/// порядке.
+Tag _tag(int number, String name, {TagColor? color, int? at}) => Tag(
   id: _id(number),
   name: TagName.fromInput(name),
   color: color,
-  position: tagPositionAt(number),
+  position: tagPositionAt(at ?? number),
 );
