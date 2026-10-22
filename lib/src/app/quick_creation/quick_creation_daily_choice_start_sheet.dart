@@ -14,7 +14,8 @@ Future<ChoicePathDraftDirection?> showQuickCreationDailyChoiceStartSheet(
   BuildContext context,
 ) => showDoableSheet<ChoicePathDraftDirection>(
   context: context,
-  builder: (context) => QuickCreationDailyChoiceStartSheet(
+  builder: (context, sheet) => QuickCreationDailyChoiceStartSheet(
+    sheet,
     onSelected: (direction) =>
         Navigator.pop<ChoicePathDraftDirection>(context, direction),
   ),
@@ -22,10 +23,13 @@ Future<ChoicePathDraftDirection?> showQuickCreationDailyChoiceStartSheet(
 
 /// Выбор начала дневного выбора; продолжением управляет вызывающая сторона.
 final class QuickCreationDailyChoiceStartSheet extends StatelessWidget {
-  const QuickCreationDailyChoiceStartSheet({
+  const QuickCreationDailyChoiceStartSheet(
+    this.sheet, {
     required this.onSelected,
     super.key,
   });
+
+  final ContentSheetCapability sheet;
 
   final ValueChanged<ChoicePathDraftDirection> onSelected;
 
@@ -33,6 +37,7 @@ final class QuickCreationDailyChoiceStartSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
     return ActionSheet(
+      sheet,
       title: localizations.quickCreationModeDailyChoice,
       text: localizations.quickCreationDailyChoiceStartPrompt,
       options: [

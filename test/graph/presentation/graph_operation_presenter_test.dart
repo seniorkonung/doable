@@ -313,16 +313,17 @@ void main() {
     });
   }
 
-  for (final size in DoableSheetSize.values) {
+  for (final (name, openMessagesSheet) in [
+    ('content', _openContentMessagesSheet),
+    ('expandable', _openExpandableMessagesSheet),
+  ]) {
     testWidgets('ожидающий результат показан над нижней частью открытого '
-        'листа ${size.name} с сообщениями поверх и предъявлен, пока лист '
+        'листа $name с сообщениями поверх и предъявлен, пока лист '
         'открыт', (tester) async {
       final harness = await _pumpPresenterApp(tester);
       final first = harness.startDelete(index: 1, title: 'Первое');
       final second = harness.startDelete(index: 2, title: 'Второе');
-      unawaited(
-        _openMessagesSheet(tester.element(find.byType(Scaffold)), size: size),
-      );
+      unawaited(openMessagesSheet(tester.element(find.byType(Scaffold))));
       await tester.pumpAndSettle();
 
       harness.completeDeleted(first);
@@ -1975,33 +1976,37 @@ final class _PresentationOnlyChange implements GraphChange {
 
 Future<void> _openSheet(BuildContext context) => showDoableSheet<void>(
   context: context,
-  builder: (_) => const Sheet(title: 'Лист', child: SizedBox(height: 120)),
+  builder: (_, sheet) =>
+      Sheet(sheet, title: 'Лист', child: const SizedBox(height: 120)),
 );
 
-Future<void> _openMessagesSheet(
-  BuildContext context, {
-  required DoableSheetSize size,
-}) => showDoableSheet<void>(
-  context: context,
-  size: size,
-  hostsMessages: true,
-  builder: (_) => switch (size) {
-    DoableSheetSize.content => const Sheet(
-      title: 'Лист',
-      footer: SizedBox(height: 44, child: Text('Готово')),
-      child: SizedBox(height: 120),
-    ),
-    DoableSheetSize.expandable => Sheet.expandable(
-      title: 'Лист',
-      text: 'Пояснение',
-      pinned: const SizedBox(height: 44),
-      body: ListView(children: const [SizedBox(height: 120)]),
-      footer: const SizedBox(height: 44, child: Text('Готово')),
-      expandLabel: 'Раскрыть',
-      collapseLabel: 'Свернуть',
-    ),
-  },
-);
+Future<void> _openContentMessagesSheet(BuildContext context) =>
+    showDoableSheet<void>(
+      context: context,
+      hostsMessages: true,
+      builder: (_, sheet) => Sheet(
+        sheet,
+        title: 'Лист',
+        footer: const SizedBox(height: 44, child: Text('Готово')),
+        child: const SizedBox(height: 120),
+      ),
+    );
+
+Future<void> _openExpandableMessagesSheet(BuildContext context) =>
+    showDoableExpandableSheet<void>(
+      context: context,
+      hostsMessages: true,
+      builder: (_, sheet) => Sheet.expandable(
+        sheet,
+        title: 'Лист',
+        text: 'Пояснение',
+        pinned: const SizedBox(height: 44),
+        body: ListView(children: const [SizedBox(height: 120)]),
+        footer: const SizedBox(height: 44, child: Text('Готово')),
+        expandLabel: 'Раскрыть',
+        collapseLabel: 'Свернуть',
+      ),
+    );
 
 Future<void> _closeMessage(WidgetTester tester) async {
   await tester.pump(const Duration(seconds: 5));

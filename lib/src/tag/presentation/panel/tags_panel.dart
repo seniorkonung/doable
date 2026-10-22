@@ -33,17 +33,17 @@ Future<void> showTagsPanel(
 ) {
   // Открытие создаётся один раз: маршрут может перестраивать содержимое.
   final opening = TagsPanelOpening(panelContext);
-  return showDoableSheet<void>(
+  return showDoableExpandableSheet<void>(
     context: context,
-    size: DoableSheetSize.expandable,
     hostsMessages: true,
-    builder: (_) => _TagsPanel(opening),
+    builder: (_, sheet) => _TagsPanel(sheet, opening),
   );
 }
 
 final class _TagsPanel extends ConsumerStatefulWidget {
-  const _TagsPanel(this.opening);
+  const _TagsPanel(this.sheet, this.opening);
 
+  final ExpandableSheetCapability sheet;
   final TagsPanelOpening opening;
 
   @override
@@ -107,6 +107,7 @@ final class _TagsPanelState extends ConsumerState<_TagsPanel> {
         if (didPop) widget.opening.close();
       },
       child: Sheet.expandable(
+        widget.sheet,
         title: title,
         text: text,
         expandLabel: l10n.tagsPanelExpand,

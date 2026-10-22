@@ -20,11 +20,13 @@ import '../application/graph_export_provider.dart';
 /// ничего не меняет.
 Future<void> showExportDataSheet(BuildContext context) => showDoableSheet<void>(
   context: context,
-  builder: (_) => const _ExportDataSheet(),
+  builder: (_, sheet) => _ExportDataSheet(sheet),
 );
 
 final class _ExportDataSheet extends ConsumerWidget {
-  const _ExportDataSheet();
+  const _ExportDataSheet(this.sheet);
+
+  final ContentSheetCapability sheet;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -42,6 +44,7 @@ final class _ExportDataSheet extends ConsumerWidget {
       GraphCompositionReadFailed() || null => null,
     };
     return Sheet(
+      sheet,
       title: localizations.dataExportTitle,
       text: composition,
       child: Padding(

@@ -26,12 +26,13 @@ Future<void> showTagSheet(BuildContext context, TagEditorCreating creating) =>
     showDoableSheet<void>(
       context: context,
       hostsMessages: true,
-      builder: (_) => _TagSheet(creating),
+      builder: (_, sheet) => _TagSheet(sheet, creating),
     );
 
 final class _TagSheet extends ConsumerStatefulWidget {
-  const _TagSheet(this.creating);
+  const _TagSheet(this.sheet, this.creating);
 
+  final ContentSheetCapability sheet;
   final TagEditorCreating creating;
 
   @override
@@ -90,6 +91,7 @@ final class _TagSheetState extends ConsumerState<_TagSheet> {
     final selectedColor = tagColorPresentation(state.color);
 
     return Sheet(
+      widget.sheet,
       title: l10n.tagEditorCreateTitle,
       footer: Button.primary(
         label: state.status is TagEditorSubmitting

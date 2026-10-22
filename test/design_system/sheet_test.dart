@@ -318,20 +318,23 @@ Future<_OpenedSheet> _openExpandableSheet(
   bool hostsMessages = false,
 }) => _openSheet(
   tester,
-  size: DoableSheetSize.expandable,
-  hostsMessages: hostsMessages,
-  builder: (context) => Sheet.expandable(
-    title: 'Теги',
-    text: 'Выберите сколько нужно',
-    expandLabel: _expandLabel,
-    collapseLabel: _collapseLabel,
-    pinned: const SizedBox(height: 44, child: Text('Поиск')),
-    body: ListView.builder(
-      itemCount: 40,
-      itemBuilder: (context, index) =>
-          SizedBox(height: 48, child: Text('Тег $index')),
+  (context) => showDoableExpandableSheet<void>(
+    context: context,
+    hostsMessages: hostsMessages,
+    builder: (context, sheet) => Sheet.expandable(
+      sheet,
+      title: 'Теги',
+      text: 'Выберите сколько нужно',
+      expandLabel: _expandLabel,
+      collapseLabel: _collapseLabel,
+      pinned: const SizedBox(height: 44, child: Text('Поиск')),
+      body: ListView.builder(
+        itemCount: 40,
+        itemBuilder: (context, index) =>
+            SizedBox(height: 48, child: Text('Тег $index')),
+      ),
+      footer: const SizedBox(height: 44, child: Text('Готово')),
     ),
-    footer: const SizedBox(height: 44, child: Text('Готово')),
   ),
 );
 
@@ -341,12 +344,15 @@ Future<_OpenedSheet> _openContentSheet(
   Widget body = const SizedBox(height: 120, child: Text('Название')),
 }) => _openSheet(
   tester,
-  size: DoableSheetSize.content,
-  hostsMessages: hostsMessages,
-  builder: (context) => Sheet(
-    title: 'Новый тег',
-    footer: const SizedBox(height: 44, child: Text('Создать')),
-    child: body,
+  (context) => showDoableSheet<void>(
+    context: context,
+    hostsMessages: hostsMessages,
+    builder: (context, sheet) => Sheet(
+      sheet,
+      title: 'Новый тег',
+      footer: const SizedBox(height: 44, child: Text('Создать')),
+      child: body,
+    ),
   ),
 );
 
@@ -363,11 +369,9 @@ Future<void> _cancelHeaderDrag(WidgetTester tester, Offset offset) async {
 }
 
 Future<_OpenedSheet> _openSheet(
-  WidgetTester tester, {
-  required DoableSheetSize size,
-  required bool hostsMessages,
-  required WidgetBuilder builder,
-}) async {
+  WidgetTester tester,
+  Future<void> Function(BuildContext context) show,
+) async {
   tester.view
     ..devicePixelRatio = 1
     ..physicalSize = _screen
@@ -386,12 +390,8 @@ Future<_OpenedSheet> _openSheet(
         builder: (context) => Scaffold(
           body: Center(
             child: TextButton(
-              onPressed: () => showDoableSheet<void>(
-                context: context,
-                size: size,
-                hostsMessages: hostsMessages,
-                builder: builder,
-              ).whenComplete(() => opened.isClosed = true),
+              onPressed: () =>
+                  show(context).whenComplete(() => opened.isClosed = true),
               child: const Text('Открыть'),
             ),
           ),

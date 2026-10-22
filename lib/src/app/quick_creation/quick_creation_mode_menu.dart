@@ -16,18 +16,21 @@ import 'quick_creation_mode_presentation.dart';
 Future<void> showQuickCreationModeMenu(BuildContext context) {
   return showDoableSheet<void>(
     context: context,
-    builder: (_) => const _QuickCreationModeMenu(),
+    builder: (_, sheet) => _QuickCreationModeMenu(sheet),
   );
 }
 
 final class _QuickCreationModeMenu extends ConsumerWidget {
-  const _QuickCreationModeMenu();
+  const _QuickCreationModeMenu(this.sheet);
+
+  final ContentSheetCapability sheet;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final localizations = AppLocalizations.of(context);
     final selected = ref.watch(quickCreationModeControllerProvider);
     return ActionSheet(
+      sheet,
       title: localizations.quickCreationMenuTitle,
       text: localizations.quickCreationMenuPrompt,
       options: [

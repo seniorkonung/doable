@@ -32,11 +32,13 @@ import 'restore_backup_confirmation.dart';
 Future<GraphBackupEntry?> showBackupsSheet(BuildContext context) =>
     showDoableSheet<GraphBackupEntry>(
       context: context,
-      builder: (_) => const _BackupsSheet(),
+      builder: (_, sheet) => _BackupsSheet(sheet),
     );
 
 final class _BackupsSheet extends ConsumerStatefulWidget {
-  const _BackupsSheet();
+  const _BackupsSheet(this.sheet);
+
+  final ContentSheetCapability sheet;
 
   @override
   ConsumerState<_BackupsSheet> createState() => _BackupsSheetState();
@@ -67,6 +69,7 @@ final class _BackupsSheetState extends ConsumerState<_BackupsSheet> {
     final localizations = AppLocalizations.of(context);
     final now = ref.watch(graphBackupsClockProvider)();
     return Sheet(
+      widget.sheet,
       title: localizations.dataBackupsTitle,
       text: localizations.dataBackupsExplanation,
       footer: FilledButton(

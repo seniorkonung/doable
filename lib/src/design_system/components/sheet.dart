@@ -11,24 +11,29 @@ import '../doable_metrics.dart';
 import '../doable_shadows.dart';
 import '../doable_type.dart';
 
-/// Размер листа, с которым его показывает [showDoableSheet].
-enum DoableSheetSize {
-  /// Высота по содержимому; лист целиком перетаскивает Material.
-  content,
-
-  /// Половинная высота с раскрытием на весь экран жестом и нажатием шапки;
-  /// содержимое — [Sheet.expandable].
-  expandable,
+/// Возможность построить лист по содержимому [Sheet.new].
+///
+/// Её даёт построителю только [showDoableSheet]: маршрут этой функции
+/// перетаскивает лист целиком, что верно лишь для листа по содержимому.
+final class ContentSheetCapability {
+  const ContentSheetCapability._();
 }
 
-/// Показывает лист над корневым навигатором, перекрывая всю страницу и панель.
+/// Возможность построить раскрываемый лист [Sheet.expandable].
 ///
-/// [builder] строит [Sheet] или композицию на его основе; для
-/// [DoableSheetSize.expandable] — на основе [Sheet.expandable]. Потребитель
-/// закрывает лист через Navigator.pop с результатом типа [T]; закрытие без
-/// выбора даёт null. Барьер, системное «назад» и семантика маршрута
-/// принадлежат Material, а жест закрытия — Material только у листа по
-/// содержимому:
+/// Её даёт построителю только [showDoableExpandableSheet]: маршрут этой
+/// функции не перетаскивает лист, а жест шапки обрабатывает сам лист.
+final class ExpandableSheetCapability {
+  const ExpandableSheetCapability._();
+}
+
+/// Показывает лист высотой по содержимому над корневым навигатором,
+/// перекрывая всю страницу и панель.
+///
+/// [builder] строит [Sheet] или композицию на его основе с переданной
+/// возможностью. Потребитель закрывает лист через Navigator.pop с результатом
+/// типа [T]; закрытие без выбора даёт null. Перетаскивание листа, барьер,
+/// системное «назад» и семантика маршрута принадлежат Material:
 /// https://api.flutter.dev/flutter/material/showModalBottomSheet.html
 ///
 /// С [hostsMessages] лист содержит собственный прозрачный [Scaffold], и
@@ -37,9 +42,43 @@ enum DoableSheetSize {
 /// результата начатой в нём операции.
 Future<T?> showDoableSheet<T>({
   required BuildContext context,
-  required WidgetBuilder builder,
-  DoableSheetSize size = DoableSheetSize.content,
+  required Widget Function(BuildContext context, ContentSheetCapability sheet)
+  builder,
   bool hostsMessages = false,
+}) => _showSheet(
+  context: context,
+  enableDrag: true,
+  hostsMessages: hostsMessages,
+  builder: (context) => builder(context, const ContentSheetCapability._()),
+);
+
+/// Показывает раскрываемый лист [Sheet.expandable] над корневым навигатором,
+/// перекрывая всю страницу и панель.
+///
+/// Результат и [hostsMessages] — как у [showDoableSheet]. Перетаскивание
+/// листа Material здесь выключено: половинный лист жестом шапки закрывает сам
+/// [Sheet] через Navigator.pop, а барьер, системное «назад» и семантика
+/// маршрута по-прежнему принадлежат Material.
+Future<T?> showDoableExpandableSheet<T>({
+  required BuildContext context,
+  required Widget Function(
+    BuildContext context,
+    ExpandableSheetCapability sheet,
+  )
+  builder,
+  bool hostsMessages = false,
+}) => _showSheet(
+  context: context,
+  enableDrag: false,
+  hostsMessages: hostsMessages,
+  builder: (context) => builder(context, const ExpandableSheetCapability._()),
+);
+
+Future<T?> _showSheet<T>({
+  required BuildContext context,
+  required bool enableDrag,
+  required bool hostsMessages,
+  required WidgetBuilder builder,
 }) {
   final colors = _colorsOf(Theme.of(context));
 
@@ -58,11 +97,7 @@ Future<T?> showDoableSheet<T>({
     constraints: const BoxConstraints(maxWidth: double.infinity),
     showDragHandle: false,
     isDismissible: true,
-    // Раскрываемый лист сам обрабатывает перетаскивание шапки.
-    enableDrag: switch (size) {
-      DoableSheetSize.content => true,
-      DoableSheetSize.expandable => false,
-    },
+    enableDrag: enableDrag,
     builder: (context) => Padding(
       // SafeArea учитывает системные панели, но не открытую клавиатуру.
       // https://api.flutter.dev/flutter/widgets/MediaQueryData/viewInsets.html
@@ -87,13 +122,16 @@ final class _MessagesHost extends InheritedWidget {
 
 /// Лист с ручкой, заголовком, пояснением, телом и нижней частью.
 ///
-/// Компонент только оформляет содержимое, показом управляет [showDoableSheet].
+/// Вариант листа строится только с возможностью, которую даёт построителю
+/// его функция показа: [showDoableSheet] или [showDoableExpandableSheet].
 final class Sheet extends StatelessWidget {
   /// Лист высотой по содержимому.
   ///
-  /// При нехватке высоты прокручивается только тело: шапка остаётся доступной
-  /// для свайпа, а нижняя часть — видна под телом.
-  const Sheet({
+  /// Закрывают его перетаскивание и средства Material маршрута
+  /// [showDoableSheet]. При нехватке высоты прокручивается только тело: шапка
+  /// остаётся доступной для свайпа, а нижняя часть — видна под телом.
+  const Sheet(
+    ContentSheetCapability _, {
     required this.title,
     required this.child,
     this.text,
@@ -104,11 +142,14 @@ final class Sheet extends StatelessWidget {
   /// Лист половинной высоты, который раскрывается на весь экран.
   ///
   /// Перетаскивание шапки на 48 вверх раскрывает лист, вниз — сворачивает
-  /// полный или закрывает половинный; нажатие на ручку переключает размер.
+  /// полный или закрывает половинный через Navigator.pop; нажатие на ручку
+  /// переключает размер. Касание затемнения и «назад» закрывают лист
+  /// средствами Material маршрута [showDoableExpandableSheet].
   /// [body] — собственный прокручиваемый список тела, который занимает место
   /// между [pinned] и [footer]; его прокрутка не меняет размер листа.
   /// [expandLabel] и [collapseLabel] — доступные названия ручки.
-  const Sheet.expandable({
+  const Sheet.expandable(
+    ExpandableSheetCapability _, {
     required this.title,
     required String text,
     required Widget pinned,
@@ -238,8 +279,8 @@ const _bottomPadding = EdgeInsets.only(bottom: DoableMetrics.space4);
 /// собственного [Scaffold], и сообщение появляется над ним.
 ///
 /// Отступы и высота те же, что у листа без [Scaffold]: лист по содержимому
-/// следует за [head] и [footer], а клавиатуру учитывает только
-/// [showDoableSheet].
+/// следует за [head] и [footer], а клавиатуру учитывает только функция
+/// показа листа.
 final class _MessagesScaffold extends StatefulWidget {
   const _MessagesScaffold({
     required this.minimum,
@@ -582,7 +623,7 @@ final class _ExpandableSheetState extends State<_ExpandableSheet>
     return LayoutBuilder(
       builder: (context, constraints) {
         // Высота ограничена местом над клавиатурой: его отнимает
-        // showDoableSheet, а полный лист занимает всё оставшееся.
+        // showDoableExpandableSheet, а полный лист занимает всё оставшееся.
         final full = constraints.maxHeight;
         final half = math.min(_halfHeight, full);
         return AnimatedBuilder(
