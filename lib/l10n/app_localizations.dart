@@ -2767,6 +2767,12 @@ abstract class AppLocalizations {
   /// **'Name'**
   String get tagSheetNamePlaceholder;
 
+  /// Заголовок листа изменения тега
+  ///
+  /// In en, this message translates to:
+  /// **'Edit tag'**
+  String get tagSheetEditTitle;
+
   /// Заголовок каталога тегов и переход к нему
   ///
   /// In en, this message translates to:

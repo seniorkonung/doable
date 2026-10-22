@@ -1835,6 +1835,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get tagSheetNamePlaceholder => 'Название';
 
   @override
+  String get tagSheetEditTitle => 'Изменить тег';
+
+  @override
   String get tagCatalogTitle => 'Теги';
 
   @override

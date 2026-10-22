@@ -1814,6 +1814,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tagSheetNamePlaceholder => 'Name';
 
   @override
+  String get tagSheetEditTitle => 'Edit tag';
+
+  @override
   String get tagCatalogTitle => 'Tags';
 
   @override

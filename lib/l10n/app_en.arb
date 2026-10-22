@@ -1405,6 +1405,8 @@
   "@tagsPanelCreateTag": {"description": "Строка панели тегов, создающая тег с названием из поиска", "placeholders": {"query": {"type": "String"}}},
   "tagSheetNamePlaceholder": "Name",
   "@tagSheetNamePlaceholder": {"description": "Заполнитель поля названия в листе тега"},
+  "tagSheetEditTitle": "Edit tag",
+  "@tagSheetEditTitle": {"description": "Заголовок листа изменения тега"},
   "tagCatalogTitle": "Tags",
   "tagCatalogSelectionTitle": "Choose a tag",
   "@tagCatalogSelectionTitle": {"description": "Заголовок каталога выбора"},

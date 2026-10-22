@@ -30,9 +30,14 @@ final class TagEditorCreating extends TagEditorContext {
 }
 
 final class TagEditorRenaming extends TagEditorContext {
-  const TagEditorRenaming(this.tag);
+  const TagEditorRenaming(this.tag, {this.existingNames = const []});
 
   final Tag tag;
+
+  /// Названия снимка вызывающего, включая собственное: совпадение с другим
+  /// тегом занимает название ещё при вводе, а с собственным — нет. Без
+  /// снимка занятость определяет запись.
+  final List<TagName> existingNames;
 }
 
 sealed class TagEditorStatus {
@@ -142,12 +147,21 @@ final class TagEditorState {
   final TagEditorEvent? event;
 
   bool get canSubmit =>
-      nameCheck is TagEditorNameAccepted &&
+      switch (nameCheck) {
+        TagEditorNameAccepted(:final name) => _isNewValue(name),
+        _ => false,
+      } &&
       switch (status) {
         TagEditorIdle() => true,
         TagEditorSubmissionFailed(failure: TagUnavailableFailure()) => true,
         _ => false,
       };
+
+  /// Изменению без нового названия или цвета нечего сохранять.
+  bool _isNewValue(TagName name) => switch (context) {
+    TagEditorCreating() => true,
+    TagEditorRenaming(:final tag) => name != tag.name || color != tag.color,
+  };
 
   TagEditorState withInput(String value, TagEditorNameCheck check) =>
       TagEditorState(

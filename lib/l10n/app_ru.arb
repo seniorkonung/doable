@@ -499,6 +499,7 @@
   "tagsPanelCreateTag": "Создать тег «{query}»",
   "@tagsPanelCreateTag": {"placeholders": {"query": {"type": "String"}}},
   "tagSheetNamePlaceholder": "Название",
+  "tagSheetEditTitle": "Изменить тег",
   "tagCatalogTitle": "Теги",
   "tagCatalogSelectionTitle": "Выбор тега",
   "tagCatalogSearch": "Поиск тегов",

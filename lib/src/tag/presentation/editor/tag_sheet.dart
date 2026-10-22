@@ -15,25 +15,26 @@ import '../tag_failure_message.dart';
 import 'tag_editor_state.dart';
 import 'tag_editor_view_model.dart';
 
-/// Показывает лист «Новый тег» поверх панели тегов.
+/// Показывает поверх панели тегов лист «Новый тег» или «Изменить тег».
 ///
 /// Закрытие свайпом, касанием затемнения или «назад» завершает только
-/// экранную сессию листа: принятое создание продолжается у того, кому его
-/// отдал [TagEditorCreating.onCreationAccepted]. Подтверждённое создание
-/// закрывает лист, если он ещё открыт. Отказ записи общая поверхность
-/// показывает поверх листа, а лист сохраняет название и цвет.
-Future<void> showTagSheet(BuildContext context, TagEditorCreating creating) =>
+/// экранную сессию листа и не меняет тег: принятое создание продолжается у
+/// того, кому его отдал [TagEditorCreating.onCreationAccepted]. Подтверждённое
+/// создание или изменение закрывает лист, если он ещё открыт. Отказ записи
+/// общая поверхность показывает поверх листа, а лист сохраняет название и
+/// цвет.
+Future<void> showTagSheet(BuildContext context, TagEditorContext editing) =>
     showDoableSheet<void>(
       context: context,
       hostsMessages: true,
-      builder: (_, sheet) => _TagSheet(sheet, creating),
+      builder: (_, sheet) => _TagSheet(sheet, editing),
     );
 
 final class _TagSheet extends ConsumerStatefulWidget {
-  const _TagSheet(this.sheet, this.creating);
+  const _TagSheet(this.sheet, this.editing);
 
   final ContentSheetCapability sheet;
-  final TagEditorCreating creating;
+  final TagEditorContext editing;
 
   @override
   ConsumerState<_TagSheet> createState() => _TagSheetState();
@@ -41,7 +42,7 @@ final class _TagSheet extends ConsumerStatefulWidget {
 
 final class _TagSheetState extends ConsumerState<_TagSheet> {
   late final _nameController = TextEditingController(
-    text: TagEditorState.initialInput(widget.creating),
+    text: TagEditorState.initialInput(widget.editing),
   );
 
   /// Живая область включается первым выбором пользователя,
@@ -57,7 +58,7 @@ final class _TagSheetState extends ConsumerState<_TagSheet> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final provider = tagEditorViewModelProvider(widget.creating);
+    final provider = tagEditorViewModelProvider(widget.editing);
     final state = ref.watch(provider);
     final model = ref.read(provider.notifier);
     ref.listen(provider, (previous, next) {
@@ -89,14 +90,24 @@ final class _TagSheetState extends ConsumerState<_TagSheet> {
       TagEditorCompleted() => null,
     };
     final selectedColor = tagColorPresentation(state.color);
+    final (title, action) = switch (state.context) {
+      TagEditorCreating() => (
+        l10n.tagEditorCreateTitle,
+        l10n.tagEditorCreateAction,
+      ),
+      TagEditorRenaming() => (
+        l10n.tagSheetEditTitle,
+        l10n.tagEditorRenameAction,
+      ),
+    };
 
     return Sheet(
       widget.sheet,
-      title: l10n.tagEditorCreateTitle,
+      title: title,
       footer: Button.primary(
         label: state.status is TagEditorSubmitting
             ? l10n.tagEditorSaving
-            : l10n.tagEditorCreateAction,
+            : action,
         onPressed: state.canSubmit ? model.submit : null,
       ),
       child: Padding(

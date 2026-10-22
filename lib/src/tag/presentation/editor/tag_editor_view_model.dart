@@ -28,7 +28,10 @@ final class TagEditorViewModel extends _$TagEditorViewModel {
       TagEditorCreating(:final existingNames) => {
         for (final name in existingNames) name.matchingKey,
       },
-      TagEditorRenaming() => const {},
+      TagEditorRenaming(:final tag, :final existingNames) => {
+        for (final name in existingNames)
+          if (name.matchingKey != tag.name.matchingKey) name.matchingKey,
+      },
     };
     ref.onDispose(closeSession);
     final input = TagEditorState.initialInput(context);

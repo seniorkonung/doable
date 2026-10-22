@@ -160,6 +160,61 @@ void main() {
     );
   });
 
+  test('Изменение только регистра собственного названия', () async {
+    final tag = _tag(1, 'дом');
+    final h = _Harness(
+      TagEditorRenaming(tag, existingNames: [tag.name, _name('Работа')]),
+    );
+    addTearDown(h.dispose);
+    h.model.changeName('Дом');
+    expect(h.state.nameCheck, isA<TagEditorNameAccepted>());
+    expect(h.state.canSubmit, isTrue);
+
+    final submit = h.model.submit();
+    final command = h.repository.commands.single.command as UpdateTag;
+    expect((command.tagId, command.name.value), (tag.id, 'Дом'));
+    h.repository.failCommand(0, const TagUnavailableFailure());
+    await submit;
+  });
+
+  test('Переименование в занятое название', () async {
+    final tag = _tag(1, 'Дом');
+    final h = _Harness(
+      TagEditorRenaming(tag, existingNames: [tag.name, _name('Работа')]),
+    );
+    addTearDown(h.dispose);
+    h.model.changeName('работа');
+    expect(h.state.nameCheck, isA<TagEditorNameOccupied>());
+    expect(h.state.canSubmit, isFalse);
+    await h.model.submit();
+    expect(h.repository.commands, isEmpty);
+    expect(h.state.input, 'работа');
+  });
+
+  test('«Сохранить» недоступна при прежних названии и цвете и доступна после '
+      'смены только цвета', () async {
+    final tag = _tag(1, 'Дом', color: TagColor.blue);
+    final h = _Harness(TagEditorRenaming(tag, existingNames: [tag.name]));
+    addTearDown(h.dispose);
+    expect(h.state.canSubmit, isFalse);
+    h.model.changeName('  Дом  ');
+    expect(h.state.canSubmit, isFalse);
+    await h.model.submit();
+    expect(h.repository.commands, isEmpty);
+
+    h.model.changeColor(null);
+    expect(h.state.canSubmit, isTrue);
+    h.model.changeColor(TagColor.blue);
+    expect(h.state.canSubmit, isFalse);
+    h.model.changeColor(TagColor.green);
+
+    final submit = h.model.submit();
+    final command = h.repository.commands.single.command as UpdateTag;
+    expect((command.name.value, command.color), ('Дом', TagColor.green));
+    h.repository.failCommand(0, const TagUnavailableFailure());
+    await submit;
+  });
+
   test(
     'подтверждённое создание завершает сессию тегом из результата команды',
     () async {
@@ -258,9 +313,10 @@ final class _Revision implements GraphRevision {
 TagId _id(int number) => (TagId.decode(
   '00000000-0000-4000-8000-${number.toString().padLeft(12, '0')}',
 ) as TagIdDecodingSuccess).id;
+TagName _name(String value) => TagName.fromInput(value);
 Tag _tag(int number, String name, {TagColor? color}) => Tag(
   id: _id(number),
-  name: TagName.fromInput(name),
+  name: _name(name),
   color: color,
   position: tagPositionAt(number),
 );
