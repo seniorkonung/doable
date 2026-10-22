@@ -1832,6 +1832,39 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
+  String tagsPanelTagMenu(String tagName) {
+    return 'Тег: $tagName';
+  }
+
+  @override
+  String get tagsPanelTagHoldHint => 'Удерживайте, чтобы открыть действия тега';
+
+  @override
+  String get tagsPanelEditTag => 'Изменить тег';
+
+  @override
+  String get tagsPanelDuplicateTag => 'Дублировать тег';
+
+  @override
+  String get tagsPanelDeleteTag => 'Удалить тег';
+
+  @override
+  String get tagsPanelDeleteTitle => 'Удалить тег?';
+
+  @override
+  String get tagsPanelDeleteTextBefore => 'Будут необратимо удалены тег ';
+
+  @override
+  String get tagsPanelDeleteTextAfter =>
+      ' и все его назначения активным и архивированным намерениям. Сами намерения, связи, дневные выборы и их пути сохранятся.';
+
+  @override
+  String get tagsPanelDeleteCancel => 'Отмена';
+
+  @override
+  String get tagsPanelDeleteConfirm => 'Удалить';
+
+  @override
   String get tagSheetNamePlaceholder => 'Название';
 
   @override

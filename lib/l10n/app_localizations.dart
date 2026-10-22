@@ -2761,6 +2761,66 @@ abstract class AppLocalizations {
   /// **'Create tag “{query}”'**
   String tagsPanelCreateTag(String query);
 
+  /// Доступное название меню тега, открытого удержанием строки панели
+  ///
+  /// In en, this message translates to:
+  /// **'Tag: {tagName}'**
+  String tagsPanelTagMenu(String tagName);
+
+  /// Подсказка диктора на строке тега: удержание открывает действия тега
+  ///
+  /// In en, this message translates to:
+  /// **'Long press to open tag actions'**
+  String get tagsPanelTagHoldHint;
+
+  /// Действие меню тега, открывающее лист изменения тега
+  ///
+  /// In en, this message translates to:
+  /// **'Edit tag'**
+  String get tagsPanelEditTag;
+
+  /// Действие меню тега, открывающее лист создания копии тега
+  ///
+  /// In en, this message translates to:
+  /// **'Duplicate tag'**
+  String get tagsPanelDuplicateTag;
+
+  /// Разрушительное действие меню тега, открывающее подтверждение удаления самого тега
+  ///
+  /// In en, this message translates to:
+  /// **'Delete tag'**
+  String get tagsPanelDeleteTag;
+
+  /// Заголовок подтверждения удаления тега
+  ///
+  /// In en, this message translates to:
+  /// **'Delete tag?'**
+  String get tagsPanelDeleteTitle;
+
+  /// Текст подтверждения удаления до выделенного названия тега
+  ///
+  /// In en, this message translates to:
+  /// **'This permanently deletes the tag '**
+  String get tagsPanelDeleteTextBefore;
+
+  /// Текст подтверждения удаления после выделенного названия тега: полный охват удаления и что сохраняется
+  ///
+  /// In en, this message translates to:
+  /// **' and all its assignments to active and archived intentions. The intentions, relations, daily choices and their paths remain.'**
+  String get tagsPanelDeleteTextAfter;
+
+  /// Отмена удаления тега
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get tagsPanelDeleteCancel;
+
+  /// Подтверждение удаления тега и всех его назначений
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get tagsPanelDeleteConfirm;
+
   /// Заполнитель поля названия в листе тега
   ///
   /// In en, this message translates to:

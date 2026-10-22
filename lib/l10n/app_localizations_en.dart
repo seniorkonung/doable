@@ -1811,6 +1811,39 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String tagsPanelTagMenu(String tagName) {
+    return 'Tag: $tagName';
+  }
+
+  @override
+  String get tagsPanelTagHoldHint => 'Long press to open tag actions';
+
+  @override
+  String get tagsPanelEditTag => 'Edit tag';
+
+  @override
+  String get tagsPanelDuplicateTag => 'Duplicate tag';
+
+  @override
+  String get tagsPanelDeleteTag => 'Delete tag';
+
+  @override
+  String get tagsPanelDeleteTitle => 'Delete tag?';
+
+  @override
+  String get tagsPanelDeleteTextBefore => 'This permanently deletes the tag ';
+
+  @override
+  String get tagsPanelDeleteTextAfter =>
+      ' and all its assignments to active and archived intentions. The intentions, relations, daily choices and their paths remain.';
+
+  @override
+  String get tagsPanelDeleteCancel => 'Cancel';
+
+  @override
+  String get tagsPanelDeleteConfirm => 'Delete';
+
+  @override
   String get tagSheetNamePlaceholder => 'Name';
 
   @override

@@ -396,6 +396,55 @@ void _registerAssignmentScenarios() {
           raw.select('SELECT * FROM tag_assignments WHERE tag_id = ?', [newId]),
           hasLength(1),
         );
+        // Отметка назначает тег нажатием, а удаление самого тега — отдельное
+        // действие строки с доступным подтверждением.
+        final rowNode = tester.getSemantics(newRow);
+        expect(
+          rowNode,
+          isSemantics(
+            label: newName,
+            hint: l10n.tagsPanelTagHoldHint,
+            hasCheckedState: true,
+            isChecked: true,
+            hasTapAction: true,
+            hasLongPressAction: true,
+            customActions: [
+              CustomSemanticsAction(label: l10n.tagsPanelEditTag),
+              CustomSemanticsAction(label: l10n.tagsPanelDuplicateTag),
+              CustomSemanticsAction(label: l10n.tagsPanelDeleteTag),
+            ],
+          ),
+        );
+        tester.binding.renderViews.first.owner!.semanticsOwner!.performAction(
+          rowNode.id,
+          SemanticsAction.customAction,
+          CustomSemanticsAction.getIdentifier(
+            CustomSemanticsAction(label: l10n.tagsPanelDeleteTag),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.bySemanticsLabel(l10n.tagsPanelDeleteTitle), findsWidgets);
+        expect(
+          tester
+              .getSemantics(
+                find.textContaining(l10n.tagsPanelDeleteTextAfter.trim()),
+              )
+              .label,
+          allOf(
+            contains(newName),
+            contains(l10n.tagsPanelDeleteTextAfter.trim()),
+          ),
+        );
+        final cancelDeletion = find.text(l10n.tagsPanelDeleteCancel);
+        final confirmDeletion = find.text(l10n.tagsPanelDeleteConfirm);
+        _expectAction(tester.getSemantics(cancelDeletion));
+        _expectAction(tester.getSemantics(confirmDeletion));
+        await tester.tap(cancelDeletion);
+        await tester.pumpAndSettle();
+        expect(
+          raw.select('SELECT id FROM tags WHERE id = ?', [newId]),
+          hasLength(1),
+        );
         await _tap(tester, find.text(l10n.tagsPanelDone));
         await _until(tester, find.byType(IntentionDetailsPage));
         await tester.pumpAndSettle();

@@ -59,6 +59,10 @@ final class TagRow extends StatelessWidget {
   static const double _minHeight = 48;
   static const double _handleWidth = 40;
 
+  /// Отступ точки и названия от начала строки: по нему потребитель
+  /// выравнивает меню тега.
+  static const double contentInset = _handleWidth;
+
   // Действия кешируются по доступному названию согласно контракту Flutter:
   // https://api.flutter.dev/flutter/semantics/CustomSemanticsAction-class.html
   static final _menuActions = <String, CustomSemanticsAction>{};

@@ -1,18 +1,25 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../../../design_system/components/button.dart';
+import '../../../design_system/components/confirm_dialog.dart';
 import '../../../design_system/components/empty_state.dart';
 import '../../../design_system/components/list_state.dart';
 import '../../../design_system/components/notice.dart';
+import '../../../design_system/components/popup_menu.dart';
 import '../../../design_system/components/search_field.dart';
 import '../../../design_system/components/sheet.dart';
 import '../../../design_system/components/tag_create_row.dart';
 import '../../../design_system/components/tag_row.dart';
+import '../../../design_system/doable_icon.dart';
 import '../../../design_system/doable_metrics.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../application/tag_command.dart';
+import '../../domain/tag.dart';
+import '../../domain/tag_id.dart';
 import '../catalog/tag_catalog_filter.dart';
 import '../catalog/tag_catalog_search_controller.dart';
 import '../editor/tag_editor_state.dart';
@@ -58,6 +65,9 @@ final class _TagsPanelState extends ConsumerState<_TagsPanel> {
   /// выполняющееся создание этой панели.
   final _creationKey = TagCreationFormKey();
 
+  /// Тег, меню которого открыто: его строка показана удерживаемой.
+  TagId? _heldTagId;
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -81,6 +91,84 @@ final class _TagsPanelState extends ConsumerState<_TagsPanel> {
       onCreationAccepted: model.acceptCreation,
     ),
   );
+
+  /// Меню тега у строки [row]. Пока оно открыто, строка удерживаемая.
+  Future<void> _openMenu(BuildContext row, Tag tag) async {
+    final l10n = AppLocalizations.of(context);
+    setState(() => _heldTagId = tag.id);
+    final action = await showPopupMenu<_TagAction>(
+      row: row,
+      contentInset: TagRow.contentInset,
+      label: l10n.tagsPanelTagMenu(tag.name.value),
+      actions: [
+        PopupMenuAction(
+          value: _TagAction.edit,
+          icon: DoableIconData.edit,
+          name: l10n.tagsPanelEditTag,
+        ),
+        PopupMenuAction(
+          value: _TagAction.duplicate,
+          icon: DoableIconData.copy,
+          name: l10n.tagsPanelDuplicateTag,
+        ),
+      ],
+      destructive: PopupMenuAction(
+        value: _TagAction.delete,
+        icon: DoableIconData.delete,
+        name: l10n.tagsPanelDeleteTag,
+      ),
+    );
+    if (!mounted) return;
+    setState(() => _heldTagId = null);
+    if (action != null) _runAction(action, tag.id);
+  }
+
+  /// Действие над тегом [tagId] из меню или у экранного диктора. Каталог мог
+  /// измениться, пока меню было открыто, поэтому действие берёт актуальный
+  /// тег и недоступно, если строки неактуальны или тега больше нет.
+  void _runAction(_TagAction action, TagId tagId) {
+    final provider = tagsPanelViewModelProvider(widget.opening);
+    final catalog = ref.read(provider).catalog;
+    if (catalog is! TagsPanelLoaded || !catalog.rowsAreCurrent) return;
+    final tag = catalog.rows
+        .where((row) => row.tag.id == tagId)
+        .firstOrNull
+        ?.tag;
+    if (tag == null) return;
+    final model = ref.read(provider.notifier);
+    switch (action) {
+      case _TagAction.edit:
+        unawaited(
+          showTagSheet(
+            context,
+            TagEditorRenaming(
+              tag,
+              existingNames: [for (final row in catalog.rows) row.tag.name],
+            ),
+          ),
+        );
+      case _TagAction.duplicate:
+        _openCreation(catalog.duplicationOf(tagId)!, catalog, model);
+      case _TagAction.delete:
+        unawaited(_confirmDeletion(tag, model));
+    }
+  }
+
+  Future<void> _confirmDeletion(Tag tag, TagsPanelViewModel model) async {
+    final l10n = AppLocalizations.of(context);
+    final confirmed = await showConfirmDialog(
+      context: context,
+      title: l10n.tagsPanelDeleteTitle,
+      text: ConfirmDialogText(
+        before: l10n.tagsPanelDeleteTextBefore,
+        name: tag.name.value,
+        after: l10n.tagsPanelDeleteTextAfter,
+      ),
+      cancelLabel: l10n.tagsPanelDeleteCancel,
+      actionLabel: l10n.tagsPanelDeleteConfirm,
+    );
+    if (confirmed && mounted) model.delete(tag.id);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -144,7 +232,20 @@ final class _TagsPanelState extends ConsumerState<_TagsPanel> {
             catalog: loaded,
             filter: state.search.filter,
             model: model,
+            heldTagId: _heldTagId,
             onCreate: (proposal) => _openCreation(proposal, loaded, model),
+            menuOf: (row, tag) => TagRowMenu(
+              holdHint: l10n.tagsPanelTagHoldHint,
+              onOpen: () => unawaited(_openMenu(row, tag)),
+              actions: [
+                for (final (action, label) in [
+                  (_TagAction.edit, l10n.tagsPanelEditTag),
+                  (_TagAction.duplicate, l10n.tagsPanelDuplicateTag),
+                  (_TagAction.delete, l10n.tagsPanelDeleteTag),
+                ])
+                  (label: label, onInvoke: () => _runAction(action, tag.id)),
+              ],
+            ),
           ),
         },
         footer: Button.primary(
@@ -172,15 +273,23 @@ final class _LoadedCatalog extends StatelessWidget {
     required this.catalog,
     required this.filter,
     required this.model,
+    required this.heldTagId,
     required this.onCreate,
+    required this.menuOf,
   });
 
   final TagsPanelLoaded catalog;
   final TagCatalogFilter filter;
   final TagsPanelViewModel model;
 
+  /// Тег, меню которого открыто.
+  final TagId? heldTagId;
+
   /// Открывает создание тега с предложенными значениями.
   final ValueChanged<TagCreationProposal> onCreate;
+
+  /// Меню тега [tag], открываемое у строки [row].
+  final TagRowMenu Function(BuildContext row, Tag tag) menuOf;
 
   @override
   Widget build(BuildContext context) {
@@ -262,19 +371,26 @@ final class _LoadedCatalog extends StatelessWidget {
   Widget _row(TagsPanelRow row, {required bool isCurrent}) {
     final tag = row.tag;
     final name = tag.name.value;
-    return TagRow(
+    // Меню стоит у строки, поэтому ему нужен её собственный контекст.
+    return Builder(
       key: ValueKey('tags-panel-row-${tag.id.toCanonicalString()}'),
-      name: name,
-      color: tagColorPresentation(tag.color),
-      mark: row.isMarked ? TagRowMark.checked : TagRowMark.none,
-      label: name,
-      handle: const TagRowHiddenHandle(),
-      // Отказ принадлежит общей поверхности, а нажатие во время изменения
-      // назначений намерения координатор отклоняет без сообщения.
-      onPressed: isCurrent ? () => model.toggle(tag.id) : null,
+      builder: (context) => TagRow(
+        name: name,
+        color: tagColorPresentation(tag.color),
+        mark: row.isMarked ? TagRowMark.checked : TagRowMark.none,
+        label: name,
+        handle: const TagRowHiddenHandle(),
+        ground: tag.id == heldTagId ? TagRowGround.held : TagRowGround.none,
+        // Отказ принадлежит общей поверхности, а нажатие во время изменения
+        // назначений намерения координатор отклоняет без сообщения.
+        onPressed: isCurrent ? () => model.toggle(tag.id) : null,
+        menu: isCurrent ? menuOf(context, tag) : null,
+      ),
     );
   }
 }
+
+enum _TagAction { edit, duplicate, delete }
 
 const _bodyPadding = EdgeInsets.symmetric(horizontal: DoableMetrics.space2);
 

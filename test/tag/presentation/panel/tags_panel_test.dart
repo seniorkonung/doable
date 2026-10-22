@@ -25,6 +25,7 @@ import 'package:doable/src/tag/presentation/panel/tags_panel.dart';
 import 'package:doable/src/tag/presentation/panel/tags_panel_context.dart';
 import 'package:doable/src/tag/presentation/panel/tags_panel_view_model.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -603,7 +604,395 @@ void main() {
     expect(find.byType(Sheet), findsNothing);
     expect(h.repository.commands.single, isA<CreateTag>());
   });
+
+  for (final (locale, texts) in [
+    (
+      const Locale('ru'),
+      (
+        menu: 'Тег: Работа',
+        hold: 'Удерживайте, чтобы открыть действия тега',
+        edit: 'Изменить тег',
+        duplicate: 'Дублировать тег',
+        delete: 'Удалить тег',
+      ),
+    ),
+    (
+      const Locale('en'),
+      (
+        menu: 'Tag: Работа',
+        hold: 'Long press to open tag actions',
+        edit: 'Edit tag',
+        duplicate: 'Duplicate tag',
+        delete: 'Delete tag',
+      ),
+    ),
+  ]) {
+    testWidgets('${locale.languageCode}: Удержание тега открывает его '
+        'действия, а «назад» закрывает только меню', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final h = await _pumpApp(tester, locale: locale);
+      await h.open();
+      h.repository.complete(
+        [_tag(1, 'Дом'), _tag(2, 'Работа')],
+        assignedIds: {_id(1)},
+      );
+      await tester.pump();
+
+      await tester.longPress(_row(2));
+      await tester.pumpAndSettle();
+
+      expect(find.bySemanticsLabel(texts.menu), findsOne);
+      for (final action in [texts.edit, texts.duplicate, texts.delete]) {
+        expect(find.text(action), findsOne);
+      }
+      expect(_grounds(tester), [TagRowGround.none, TagRowGround.held]);
+      expect(_marks(tester), [TagRowMark.checked, TagRowMark.none]);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      expect(find.text(texts.edit), findsNothing);
+      expect(find.byType(Sheet), findsOne);
+      expect(h.isClosed, isFalse);
+      expect(_grounds(tester), [TagRowGround.none, TagRowGround.none]);
+      expect(_marks(tester), [TagRowMark.checked, TagRowMark.none]);
+      expect(h.repository.commands, isEmpty);
+      semantics.dispose();
+    });
+
+    testWidgets('${locale.languageCode}: Экранный диктор различает операции: '
+        'отметка и действия тега доступны на строке без удержания', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      final h = await _pumpApp(tester, locale: locale);
+      await h.open();
+      h.repository.complete([_tag(2, 'Работа')], assignedIds: {});
+      await tester.pump();
+
+      final node = tester.getSemantics(_row(2));
+      expect(
+        node,
+        isSemantics(
+          label: 'Работа',
+          hint: texts.hold,
+          hasCheckedState: true,
+          isChecked: false,
+          hasTapAction: true,
+          hasLongPressAction: true,
+          customActions: [
+            CustomSemanticsAction(label: texts.edit),
+            CustomSemanticsAction(label: texts.duplicate),
+            CustomSemanticsAction(label: texts.delete),
+          ],
+        ),
+      );
+
+      _performRowAction(tester, node, texts.delete);
+      await tester.pumpAndSettle();
+
+      // Удаление требует отдельного доступного подтверждения.
+      expect(find.byType(Dialog), findsOne);
+      expect(h.repository.commands, isEmpty);
+      semantics.dispose();
+    });
+  }
+
+  for (final (locale, texts) in [
+    (
+      const Locale('ru'),
+      (
+        title: 'Удалить тег?',
+        text:
+            'Будут необратимо удалены тег Дом и все его назначения активным '
+            'и архивированным намерениям. Сами намерения, связи, дневные '
+            'выборы и их пути сохранятся.',
+        menuDelete: 'Удалить тег',
+        cancel: 'Отмена',
+        delete: 'Удалить',
+      ),
+    ),
+    (
+      const Locale('en'),
+      (
+        title: 'Delete tag?',
+        text:
+            'This permanently deletes the tag Дом and all its assignments to '
+            'active and archived intentions. The intentions, relations, '
+            'daily choices and their paths remain.',
+        menuDelete: 'Delete tag',
+        cancel: 'Cancel',
+        delete: 'Delete',
+      ),
+    ),
+  ]) {
+    testWidgets('${locale.languageCode}: Подтверждение объясняет полный '
+        'охват, а «Удалить» удаляет тег по идентификатору и сохраняет поиск', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      final h = await _pumpApp(tester, locale: locale);
+      await h.open();
+      h.repository.complete(
+        [_tag(1, 'Дом'), _tag(2, 'Для дома'), _tag(3, 'Работа')],
+        assignedIds: {_id(2)},
+      );
+      await tester.pump();
+      await tester.enterText(_search, 'дом');
+      await tester.pump();
+
+      await _chooseFromMenu(tester, _row(1), texts.menuDelete);
+
+      expect(find.text(texts.title), findsOne);
+      expect(find.text(texts.text, findRichText: true), findsOne);
+      expect(find.text(texts.cancel), findsOne);
+      expect(h.repository.commands, isEmpty);
+
+      await tester.tap(find.text(texts.delete));
+      await tester.pumpAndSettle();
+
+      final delete = h.repository.commands.single as DeleteTag;
+      expect(delete.tagId, _id(1));
+      final deleted = ConfirmedGraphResult<TagCommandSuccess>(
+        revision: const TagCatalogTestRevision(2),
+        value: TagDeleted(
+          TagDeletedChange(
+            revision: const TagCatalogTestRevision(2),
+            tagId: _id(1),
+          ),
+        ),
+      );
+      h.repository.command.complete(TagCommandSucceeded(deleted));
+      h.changes.add(deleted);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(Dialog), findsNothing);
+      expect(_searchText(tester), 'дом');
+      expect(_rowNames(tester), ['Для дома']);
+      expect(_marks(tester), [TagRowMark.checked]);
+      expect(find.byType(SnackBar), findsNothing);
+      semantics.dispose();
+    });
+  }
+
+  for (final (name, cancel) in <(String, Future<void> Function(WidgetTester))>[
+    ('«Отмена»', (tester) => tester.tap(find.text('Отмена'))),
+    ('касание затемнения', (tester) => tester.tapAt(const Offset(10, 120))),
+    ('«назад»', (tester) => tester.binding.handlePopRoute()),
+  ]) {
+    testWidgets('$name в подтверждении удаления возвращает ту же панель без '
+        'удаления', (tester) async {
+      final h = await _pumpApp(tester);
+      await h.open();
+      h.repository.complete(
+        [_tag(1, 'Дом'), _tag(2, 'Для дома')],
+        assignedIds: {_id(2)},
+      );
+      await tester.pump();
+      await tester.enterText(_search, 'дом');
+      await tester.pump();
+      await _chooseFromMenu(tester, _row(1), 'Удалить тег');
+
+      await cancel(tester);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(Dialog), findsNothing);
+      expect(find.byType(Sheet), findsOne);
+      expect(h.isClosed, isFalse);
+      expect(_searchText(tester), 'дом');
+      expect(_rowNames(tester), ['Дом', 'Для дома']);
+      expect(_marks(tester), [TagRowMark.none, TagRowMark.checked]);
+      expect(_grounds(tester), everyElement(TagRowGround.none));
+      expect(h.repository.commands, isEmpty);
+    });
+  }
+
+  testWidgets('отказ удаления виден поверх панели, а тег остаётся', (
+    tester,
+  ) async {
+    final h = await _pumpApp(tester);
+    await h.open();
+    h.repository.complete([_tag(1, 'Дом')], assignedIds: {});
+    await tester.pump();
+    await _chooseFromMenu(tester, _row(1), 'Удалить тег');
+    await tester.tap(find.text('Удалить'));
+    await tester.pump();
+
+    h.repository.command.complete(
+      const TagCommandFailed(TagUnavailableFailure()),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(
+        of: find.byType(Sheet),
+        matching: find.textContaining(
+          'Не удалось выполнить действие с тегом. Повторите попытку.',
+        ),
+      ),
+      findsOne,
+    );
+    expect(_rowNames(tester), ['Дом']);
+  });
+
+  testWidgets('Изменение тега сохраняет запрос: подтверждённое изменение '
+      'цвета закрывает лист, а результаты показывают новый цвет', (
+    tester,
+  ) async {
+    final h = await _pumpApp(tester);
+    await h.open();
+    final before = _tag(2, 'Для дома');
+    h.repository.complete(
+      [_tag(1, 'Дом'), before, _tag(3, 'Работа')],
+      assignedIds: {_id(1)},
+    );
+    await tester.pump();
+    await tester.enterText(_search, 'дом');
+    await tester.pump();
+
+    await _chooseFromMenu(tester, _row(2), 'Изменить тег');
+
+    expect(find.byType(Sheet), findsExactly(2));
+    expect(find.text('Изменить тег'), findsOne);
+    expect(_tagSheetNameText(tester), 'Для дома');
+    // Занятость сверяется с названиями снимка панели ещё при вводе.
+    await tester.enterText(_tagSheetName, 'дом');
+    await tester.pump();
+    expect(tester.widget<FilledButton>(_tagSheetSubmit).onPressed, isNull);
+    await tester.enterText(_tagSheetName, 'Для дома');
+    await tester.tap(find.bySemanticsLabel('Синий').last);
+    await tester.pump();
+    await tester.tap(_tagSheetSubmit);
+    await tester.pump();
+
+    final update = h.repository.commands.single as UpdateTag;
+    expect(
+      (update.tagId, update.name.value, update.color),
+      (_id(2), 'Для дома', TagColor.blue),
+    );
+    final after = _tag(2, 'Для дома', color: TagColor.blue);
+    final updated = ConfirmedGraphResult<TagCommandSuccess>(
+      revision: const TagCatalogTestRevision(2),
+      value: TagUpdated(
+        TagUpdatedChange(
+          revision: const TagCatalogTestRevision(2),
+          before: before,
+          after: after,
+        ),
+      ),
+    );
+    h.repository.command.complete(TagCommandSucceeded(updated));
+    h.changes.add(updated);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(Sheet), findsOne);
+    expect(find.text('Изменить тег'), findsNothing);
+    expect(_searchText(tester), 'дом');
+    expect(_rowNames(tester), ['Дом', 'Для дома']);
+    expect(
+      tester.widgetList<TagDot>(find.byType(TagDot)).map((dot) => dot.color),
+      [null, DoableTagColor.blue],
+    );
+    expect(find.byType(SnackBar), findsNothing);
+  });
+
+  testWidgets('«назад» в листе «Изменить тег» закрывает только лист без '
+      'изменения тега', (tester) async {
+    final h = await _pumpApp(tester);
+    await h.open();
+    h.repository.complete([_tag(1, 'Дом')], assignedIds: {});
+    await tester.pump();
+    await _chooseFromMenu(tester, _row(1), 'Изменить тег');
+    await tester.enterText(_tagSheetName, 'Быт');
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(find.byType(Sheet), findsOne);
+    expect(find.text('Изменить тег'), findsNothing);
+    expect(h.isClosed, isFalse);
+    expect(_rowNames(tester), ['Дом']);
+    expect(h.repository.commands, isEmpty);
+  });
+
+  testWidgets('«Дублировать тег» открывает лист «Новый тег» с предложенной '
+      'копией', (tester) async {
+    final h = await _pumpApp(tester);
+    await h.open();
+    h.repository.complete([
+      _tag(1, 'Дом', color: TagColor.green),
+      _tag(2, 'Работа'),
+    ], assignedIds: {});
+    await tester.pump();
+
+    await _chooseFromMenu(tester, _row(1), 'Дублировать тег');
+
+    expect(find.byType(Sheet), findsExactly(2));
+    expect(find.text('Новый тег'), findsOne);
+    expect(_tagSheetNameText(tester), 'Дом 2');
+    await tester.tap(find.widgetWithText(FilledButton, 'Создать тег'));
+    await tester.pump();
+    final create = h.repository.commands.single as CreateTag;
+    expect((create.name.value, create.color), ('Дом 2', TagColor.green));
+    expect(
+      create.placement,
+      isA<AfterTagPlacement>().having((p) => p.tagId, 'tagId', _id(1)),
+    );
+  });
+
+  testWidgets('на неактуальных строках меню и действия тега недоступны', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    final h = await _pumpApp(tester);
+    await h.open();
+    h.repository.complete([_tag(1, 'Дом')], assignedIds: {});
+    await tester.pump();
+    h.changes.add(ConfirmedGraphReplacement(const TagCatalogTestRevision(2)));
+    await tester.pump();
+    h.repository.fail(const TagCatalogUnavailableFailure());
+    await tester.pumpAndSettle();
+
+    await tester.longPress(_row(1));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Изменить тег'), findsNothing);
+    expect(_grounds(tester), [TagRowGround.none]);
+    expect(
+      tester.getSemantics(_row(1)),
+      isSemantics(label: 'Дом', customActions: const []),
+    );
+    semantics.dispose();
+  });
 }
+
+/// Удерживает строку и выбирает пункт меню тега.
+Future<void> _chooseFromMenu(
+  WidgetTester tester,
+  Finder row,
+  String action,
+) async {
+  await tester.longPress(row);
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(action));
+  await tester.pumpAndSettle();
+}
+
+void _performRowAction(WidgetTester tester, SemanticsNode node, String label) =>
+    tester.binding.renderViews.first.owner!.semanticsOwner!.performAction(
+      node.id,
+      SemanticsAction.customAction,
+      CustomSemanticsAction.getIdentifier(CustomSemanticsAction(label: label)),
+    );
+
+final _tagSheetSubmit = find.descendant(
+  of: find.byType(Sheet).last,
+  matching: find.byType(FilledButton),
+);
+
+List<TagRowGround> _grounds(WidgetTester tester) => [
+  for (final row in tester.widgetList<TagRow>(find.byType(TagRow))) row.ground,
+];
 
 final _intentionId = (IntentionId.decode(
   '00000000-0000-4000-9000-000000000001',
