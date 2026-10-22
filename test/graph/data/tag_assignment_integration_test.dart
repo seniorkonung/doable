@@ -60,6 +60,7 @@ void main() {
     CreateTag() => coordinator.acceptTagCreation(TagCreationFormKey(), command),
     UpdateTag() => coordinator.acceptTagUpdate(command),
     DeleteTag() => coordinator.acceptTagDelete(command),
+    MoveTag() => fail('Перестановку тега координатор примет в задаче 3.4'),
     AssignTag() => coordinator.acceptTagAssign(command),
     RemoveTagAssignment() => coordinator.acceptTagRemoveAssignment(command),
   } as TagCommandAccepted).future;

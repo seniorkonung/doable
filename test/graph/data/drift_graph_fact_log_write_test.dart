@@ -124,6 +124,11 @@ void main() {
       ),
       ['создание тега'],
     );
+    // Перестановка переписывает только место переставленного тега.
+    await expectOnePackage<TagUpdated>(
+      repository.execute(MoveTag(tagId: tag.id, placement: TagPlacement.first)),
+      ['изменение тега'],
+    );
     final source = (await expectOnePackage<IntentionSaved>(
       repository.execute(
         CreateIntention.withInitialState(

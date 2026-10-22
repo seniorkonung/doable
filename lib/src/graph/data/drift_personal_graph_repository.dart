@@ -678,6 +678,7 @@ final class DriftPersonalGraphRepository
       ),
       final CreateTag createTag => await _executeTag(createTag),
       final UpdateTag updateTag => await _executeTag(updateTag),
+      final MoveTag moveTag => await _executeTag(moveTag),
       final DeleteTag deleteTag => await _executeTag(deleteTag),
       final AssignTag assignTag => await _executeTag(assignTag),
       final RemoveTagAssignment removeTagAssignment => await _executeTag(

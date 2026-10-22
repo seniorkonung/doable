@@ -318,6 +318,128 @@ void main() {
     expect(raw.select('SELECT name FROM tags').single['name'], 'Дом');
   });
 
+  group('перестановка тега', () {
+    TagId id(int number) =>
+        (TagId.decode(_uuid(number)) as TagIdDecodingSuccess).id;
+
+    void seedTags(List<(int, String, String)> tags) => seedRawGraph(raw, () {
+      for (final (number, name, position) in tags) {
+        raw.execute(
+          'INSERT INTO tags (id, name, color, position) VALUES (?, ?, ?, ?)',
+          [_uuid(number), name, TagColor.green.code, position],
+        );
+      }
+    });
+
+    Future<List<String>> catalogNames() async =>
+        ((await repository.getTagCatalog(const TagCatalogBrowseMode()))
+                as TagCatalogSuccess)
+            .value
+            .items
+            .map((tag) => tag.name.value)
+            .toList();
+
+    List<List<Object?>> tagRows() => raw
+        .select('SELECT * FROM tags ORDER BY id')
+        .map((row) => row.values.toList())
+        .toList();
+
+    int packageCount() =>
+        raw
+                .select('SELECT COUNT(*) AS count FROM graph_log_packages')
+                .single['count']
+            as int;
+
+    test('в начало, между соседями и в конец меняет порядок каталога и только '
+        'место переставленного тега', () async {
+      seedTags([
+        (6, 'Дом', 'a0'),
+        (7, 'Работа', 'a1'),
+        (8, 'Отдых', 'a2'),
+        (9, 'Спорт', 'a3'),
+      ]);
+
+      Future<void> move(int number, TagPlacement placement) async {
+        List<List<Object?>> others() => raw
+            .select('SELECT * FROM tags WHERE id <> ? ORDER BY id', [
+              _uuid(number),
+            ])
+            .map((row) => row.values.toList())
+            .toList();
+        final othersBefore = others();
+        final result = await repository.execute(
+          MoveTag(tagId: id(number), placement: placement),
+        );
+        final change =
+            ((result as TagCommandSucceeded).value.value as TagUpdated).change;
+        expect(change.after.name, change.before.name);
+        expect(change.after.color, change.before.color);
+        expect(others(), othersBefore);
+      }
+
+      await move(9, TagPlacement.first);
+      expect(await catalogNames(), ['Спорт', 'Дом', 'Работа', 'Отдых']);
+      await move(6, AfterTagPlacement(id(7)));
+      expect(await catalogNames(), ['Спорт', 'Работа', 'Дом', 'Отдых']);
+      await move(9, AfterTagPlacement(id(8)));
+      expect(await catalogNames(), ['Работа', 'Дом', 'Отдых', 'Спорт']);
+    });
+
+    test('на текущее место подтверждается без записи, новой ревизии и пакета '
+        'фактов', () async {
+      seedTags([(6, 'Дом', 'a0'), (7, 'Работа', 'a1')]);
+      final revision = await currentRevision();
+      final rows = tagRows();
+      final packages = packageCount();
+
+      for (final command in [
+        MoveTag(tagId: id(6), placement: TagPlacement.first),
+        MoveTag(tagId: id(7), placement: AfterTagPlacement(id(6))),
+      ]) {
+        final result = await repository.execute(command);
+        expect(
+          (result as TagCommandSucceeded).value.value,
+          isA<TagUnchanged>(),
+        );
+      }
+
+      expect(
+        (await currentRevision()).compareTo(revision),
+        GraphRevisionOrder.same,
+      );
+      expect(tagRows(), rows);
+      expect(packageCount(), packages);
+    });
+
+    test('отсутствующий переставляемый тег или сосед размещения отклоняет '
+        'перестановку без записи', () async {
+      seedTags([(6, 'Дом', 'a0'), (7, 'Работа', 'a1')]);
+      final revision = await currentRevision();
+      final rows = tagRows();
+
+      for (final (command, missing) in [
+        (MoveTag(tagId: id(8), placement: TagPlacement.first), id(8)),
+        (MoveTag(tagId: id(6), placement: AfterTagPlacement(id(9))), id(9)),
+      ]) {
+        final result = await repository.execute(command);
+        expect(
+          (result as TagCommandFailed).failure,
+          isA<TagNotFoundFailure>().having(
+            (failure) => failure.tagId,
+            'отсутствующий тег',
+            missing,
+          ),
+        );
+      }
+
+      expect(
+        (await currentRevision()).compareTo(revision),
+        GraphRevisionOrder.same,
+      );
+      expect(tagRows(), rows);
+    });
+  });
+
   test('повтор названия и цвета не меняет ревизию, смена регистра разрешена, чужое имя занято', () async {
     final first = await repository.execute(
       CreateTag(

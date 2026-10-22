@@ -19,7 +19,7 @@ sealed class TagLifecycleCommand extends TagCommand {
   const TagLifecycleCommand();
 }
 
-/// Место нового тега в ручном порядке задаётся соседом, а не ключом:
+/// Место тега в ручном порядке задаётся соседом, а не ключом:
 /// ключ вычисляет запись по соседям, прочитанным в той же транзакции.
 sealed class TagPlacement {
   const TagPlacement();
@@ -63,6 +63,15 @@ final class UpdateTag extends TagLifecycleCommand {
   final TagId tagId;
   final TagName name;
   final TagColor? color;
+}
+
+/// Меняет только место тега: новое место задаётся соседом, а не ключом.
+/// Размещение на текущем месте подтверждается без изменения.
+final class MoveTag extends TagLifecycleCommand {
+  const MoveTag({required this.tagId, required this.placement});
+
+  final TagId tagId;
+  final TagPlacement placement;
 }
 
 /// Подтверждение привязано к id. Исполнение удаляет тег и все его назначения

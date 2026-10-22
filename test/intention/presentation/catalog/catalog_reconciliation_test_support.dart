@@ -203,6 +203,7 @@ TagCommandAccepted acceptTagCommand(
     CreateTag() => coordinator.acceptTagCreation(TagCreationFormKey(), command),
     UpdateTag() => coordinator.acceptTagUpdate(command),
     DeleteTag() => coordinator.acceptTagDelete(command),
+    MoveTag() => fail('Перестановку тега координатор примет в задаче 3.4'),
   };
   expect(start, isA<TagCommandAccepted>());
   final accepted = start as TagCommandAccepted;

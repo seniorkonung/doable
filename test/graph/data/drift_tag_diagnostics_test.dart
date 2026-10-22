@@ -243,6 +243,24 @@ void main() {
     );
     final otherId =
         ((other as TagCommandSucceeded).value.value as TagCreated).tag.id;
+    final moved = await graph.execute(
+      MoveTag(tagId: id, placement: TagPlacement.first),
+    );
+    expect((moved as TagCommandSucceeded).value.value, isA<TagUpdated>());
+    expect(
+      sink.events.whereType<TagCommandDiagnosticsEvent>().last,
+      isA<TagCommandDiagnosticsEvent>()
+          .having(
+            (event) => event.commandType,
+            'вид',
+            TagCommandDiagnosticsType.move,
+          )
+          .having(
+            (event) => event.status,
+            'исход',
+            isA<DiagnosticsSucceeded>(),
+          ),
+    );
     final updateConflict = await graph.execute(
       UpdateTag(
         tagId: otherId,

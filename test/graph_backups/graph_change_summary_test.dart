@@ -300,6 +300,34 @@ void main() {
       ));
     });
 
+    test('перестановка тега даёт «1 изменено»', () async {
+      final home = (await confirm<TagCreated>(
+        CreateTag(
+          name: TagName.fromInput('Дом'),
+          color: null,
+          placement: TagPlacement.first,
+        ),
+      )).tag;
+      await confirm<TagCreated>(
+        CreateTag(
+          name: TagName.fromInput('Работа'),
+          color: null,
+          placement: TagPlacement.first,
+        ),
+      );
+      final previous = await repository.readCurrentPosition();
+
+      await confirm<TagUpdated>(
+        MoveTag(tagId: home.id, placement: TagPlacement.first),
+      );
+
+      expect(_shown(await summaryAfter(previous)), (
+        added: 0,
+        changed: 1,
+        deleted: 0,
+      ));
+    });
+
     test(
       'изменённый байт снимка на начале диапазона сводку не меняет',
       () async {
