@@ -110,7 +110,7 @@ void main() {
     expect(await harness.databaseFile.readAsBytes(), corrupted);
   });
 
-  test('чтение, ручной порядок, правка цвета, назначение архивированному действию, навигация и снятие сохраняются после перезапусков', () async {
+  test('Теги сохраняются после полного перезапуска: чтение, ручной порядок, правка цвета, перестановка, назначение архивированному действию, навигация и снятие', () async {
     final harness = await LocalDatabaseHarness.fileBacked();
     addTearDown(harness.dispose);
     late sqlite.Database raw;
@@ -145,23 +145,26 @@ void main() {
         (IntentionId.decode(tagFixtureId(2)) as IntentionIdDecodingSuccess).id;
     final activeAction =
         (IntentionId.decode(tagFixtureId(1)) as IntentionIdDecodingSuccess).id;
-    // Тег, созданный позже, стоит в ручном порядке первым.
+    // Тег, созданный позже, стоит в ручном порядке первым до перестановки.
     late final TagId laterTagId;
 
     Future<void> expectState(
       DriftPersonalGraphRepository repository,
       TagId tagId, {
       required TagColor? color,
+      required bool movedFirst,
       required List<IntentionId> active,
       required List<IntentionId> archived,
     }) async {
       final catalog = (await repository.getTagCatalog(
         const TagCatalogBrowseMode(),
       ) as TagCatalogSuccess).value;
-      expect(catalog.items.map((tag) => (tag.id, tag.name.value, tag.color)), [
-        (laterTagId, 'Работа', null),
-        (tagId, 'Дом', color),
-      ]);
+      final later = (laterTagId, 'Работа', null);
+      final moved = (tagId, 'Дом', color);
+      expect(
+        catalog.items.map((tag) => (tag.id, tag.name.value, tag.color)),
+        movedFirst ? [moved, later] : [later, moved],
+      );
       for (final intentionId in [activeAction, archivedAction]) {
         final snapshot = (await repository.getTagAssignments(
           intentionId,
@@ -212,7 +215,14 @@ void main() {
     );
     laterTagId =
         ((later as TagCommandSucceeded).value.value as TagCreated).tag.id;
-    await expectState(repository, tagId, color: null, active: [], archived: []);
+    await expectState(
+      repository,
+      tagId,
+      color: null,
+      movedFirst: false,
+      active: [],
+      archived: [],
+    );
 
     for (final intentionId in [archivedAction, activeAction, archivedAction]) {
       expect(
@@ -231,6 +241,7 @@ void main() {
       repository,
       tagId,
       color: null,
+      movedFirst: false,
       active: [activeAction],
       archived: [archivedAction],
     );
@@ -242,6 +253,13 @@ void main() {
           name: TagName.fromInput('Дом'),
           color: TagColor.blue,
         ),
+      ) as TagCommandSucceeded).value.value,
+      isA<TagUpdated>(),
+    );
+    // Стоящий вторым тег переставлен в начало.
+    expect(
+      (await repository.execute(
+        MoveTag(tagId: tagId, placement: TagPlacement.first),
       ) as TagCommandSucceeded).value.value,
       isA<TagUpdated>(),
     );
@@ -262,6 +280,7 @@ void main() {
       repository,
       tagId,
       color: TagColor.blue,
+      movedFirst: true,
       active: [],
       archived: [],
     );
@@ -287,6 +306,7 @@ void main() {
       repository,
       tagId,
       color: TagColor.blue,
+      movedFirst: true,
       active: [],
       archived: [archivedAction],
     );
