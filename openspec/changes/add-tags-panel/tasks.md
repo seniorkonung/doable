@@ -104,3 +104,16 @@
   - **Зависимости:** 1.6 — схема 5 без индекса `tag_assignments_intention_order`.
   - **Предполагаемые файлы:** `test/app/tag_navigation_graph_lifecycle_scenarios.dart`.
   - **Размер:** XS.
+
+- [ ] 1.10 Описывать в комментариях изменённых проверок ручной порядок тегов вместо порядка создания
+  - **Критерии приёмки:**
+    - Комментарии, которые называют порядок создания тегов, описывают ручной порядок по месту тега. Там, где фикстура даёт места по возрастанию номера тега, комментарий явно говорит, что ручной порядок в ней совпадает с порядком создания:
+      - комментарий группы «Создание с полным начальным состоянием» в `test/intention/data/drift_intention_repository_command_test.dart`;
+      - помощник `tagNames` в `test/data_transfer/presentation/backups_sheet_test.dart`: он читает каталог в ручном порядке, в котором «Сад», созданный позже «Дома», стоит первым;
+      - помощники `_backgroundTags` и `_fixtureTagIds` в `test/intention/data/drift_intention_repository_large_fixture_test.dart`.
+    - Ожидания, фикстуры и код проверок не меняются: задача правит только комментарии.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test --no-pub test/intention/data/drift_intention_repository_command_test.dart test/data_transfer/presentation/backups_sheet_test.dart test/intention/data/drift_intention_repository_large_fixture_test.dart` проходит.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `test/intention/data/drift_intention_repository_command_test.dart`, `test/data_transfer/presentation/backups_sheet_test.dart`, `test/intention/data/drift_intention_repository_large_fixture_test.dart`.
+  - **Размер:** XS.
