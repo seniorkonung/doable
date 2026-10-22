@@ -334,3 +334,15 @@
   - **Зависимости:** 2.13 — отметка созданного тега в модели панели; 2.14 — создание из листа поверх панели.
   - **Предполагаемые файлы:** `lib/src/tag/presentation/panel/tags_panel_view_model.dart`, `lib/src/tag/presentation/panel/tags_panel.dart`, `test/tag/presentation/panel/tags_panel_test.dart`, `test/tag/presentation/panel/tags_panel_view_model_test.dart`.
   - **Размер:** S.
+
+- [ ] 2.19 Объявлять отметку строки тега экранному диктору один раз — системным состоянием отметки
+  - **Критерии приёмки:**
+    - В режиме выбора тегов намерения доступное название строки панели — только название тега, а отметку передаёт одно системное состояние отметки, которое `TagRow` выводит из `mark`: «отмечен» — отмеченное состояние, «нет» — неотмеченное. Диктор объявляет отметку один раз, без опоры на цвет и форму галочки, по сценарию «Отметка тега объявляется один раз» требования «Локализация и доступность управления тегами».
+    - Строки `tagsPanelRowMarked` и `tagsPanelRowUnmarked` удалены из русской и английской локализации и генерируемых файлов. Документация `TagRow` больше не требует передавать отметку словами в доступном названии.
+    - Нажатие, его недоступность, вид строки и отсутствие отдельного элемента навигации у точки и названия не меняются.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/design_system/tag_row_test.dart test/tag/presentation/panel/tags_panel_test.dart test/tag/presentation/tag_accessibility_test.dart`: семантика отмеченной и неотмеченной строки — название тега без слов отметки и отмеченное или неотмеченное состояние; сценарий «Отметка тега объявляется один раз». Проверки падают, если доступное название снова содержит слова отметки.
+  - **Зависимости:** 2.6 — строка тега; 2.10 — строки панели.
+  - **Предполагаемые файлы:** `lib/src/design_system/components/tag_row.dart`, `lib/src/tag/presentation/panel/tags_panel.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` и генерируемые файлы локализации, `test/design_system/tag_row_test.dart`, `test/tag/presentation/panel/tags_panel_test.dart`, `test/tag/presentation/tag_accessibility_test.dart`.
+  - **Размер:** S.
