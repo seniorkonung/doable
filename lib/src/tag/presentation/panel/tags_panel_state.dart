@@ -21,6 +21,14 @@ final class TagsPanelState {
 
   TagsPanelState withSearch(TagsPanelSearch search) =>
       TagsPanelState(catalog: catalog, search: search);
+
+  /// Тег можно переставить: полный список без сужения поиском показан на
+  /// актуальных строках, и предыдущая перестановка не выполняется.
+  bool get canReorder => switch (catalog) {
+    TagsPanelLoaded(rowsAreCurrent: true, pendingMove: null) =>
+      search.filter.isEmpty,
+    _ => false,
+  };
 }
 
 /// Применённый поиск панели.
@@ -70,11 +78,24 @@ final class TagsPanelIntentionMissing extends TagsPanelCatalog {
 /// Во время фонового перечитывания строки остаются актуальными. Отказ
 /// обновления сохраняет их неактуальными до успешного чтения.
 final class TagsPanelLoaded extends TagsPanelCatalog {
-  TagsPanelLoaded(List<TagsPanelRow> rows, {this.refreshFailure})
-    : rows = List.unmodifiable(rows);
+  TagsPanelLoaded(
+    List<TagsPanelRow> confirmedRows, {
+    this.refreshFailure,
+    this.pendingMove,
+  }) : confirmedRows = List.unmodifiable(confirmedRows),
+       rows = List.unmodifiable(_moved(confirmedRows, pendingMove));
 
+  /// Строки в подтверждённом ручном порядке.
+  final List<TagsPanelRow> confirmedRows;
+
+  /// Показанные строки: подтверждённые с применённой [pendingMove].
   final List<TagsPanelRow> rows;
+
   final TagsPanelReadFailure? refreshFailure;
+
+  /// Выполняющаяся перестановка, новый порядок которой показан до
+  /// подтверждения.
+  final MoveTag? pendingMove;
 
   bool get isEmpty => rows.isEmpty;
   bool get rowsAreCurrent => refreshFailure == null;
@@ -116,11 +137,48 @@ final class TagsPanelLoaded extends TagsPanelCatalog {
     );
   }
 
-  TagsPanelLoaded withRows(List<TagsPanelRow> rows) =>
-      TagsPanelLoaded(rows, refreshFailure: refreshFailure);
+  TagsPanelLoaded withConfirmedRows(List<TagsPanelRow> rows) => TagsPanelLoaded(
+    rows,
+    refreshFailure: refreshFailure,
+    pendingMove: pendingMove,
+  );
 
   TagsPanelLoaded withRefreshFailure(TagsPanelReadFailure failure) =>
-      TagsPanelLoaded(rows, refreshFailure: failure);
+      TagsPanelLoaded(
+        confirmedRows,
+        refreshFailure: failure,
+        pendingMove: pendingMove,
+      );
+
+  TagsPanelLoaded withPendingMove(MoveTag? move) => TagsPanelLoaded(
+    confirmedRows,
+    refreshFailure: refreshFailure,
+    pendingMove: move,
+  );
+
+  /// Порядок после [move]. Если переставляемого тега или соседа размещения
+  /// среди строк уже нет, запись перестановку отклонит, поэтому показывается
+  /// подтверждённый порядок.
+  static List<TagsPanelRow> _moved(List<TagsPanelRow> rows, MoveTag? move) {
+    if (move == null) return rows;
+    final moved = rows.where((row) => row.tag.id == move.tagId).firstOrNull;
+    if (moved == null) return rows;
+    final others = [
+      for (final row in rows)
+        if (row.tag.id != move.tagId) row,
+    ];
+    final index = switch (move.placement) {
+      FirstTagPlacement() => 0,
+      AfterTagPlacement(:final tagId) => switch (others.indexWhere(
+        (row) => row.tag.id == tagId,
+      )) {
+        -1 => null,
+        final at => at + 1,
+      },
+    };
+    if (index == null) return rows;
+    return others..insert(index, moved);
+  }
 }
 
 final class TagsPanelRow {

@@ -689,6 +689,168 @@ void main() {
     expect(_names(panel.loaded), ['парк', 'сад', 'Дом']);
     expect(_marks(panel), [false, false, false]);
   });
+
+  test(
+    'перестановка в начало, в конец и между соседями сохраняет отметки',
+    () async {
+      final h = _Harness.confirmedByCoordinator();
+      addTearDown(h.dispose);
+      final panel = h.open();
+      h.repository.complete(
+        [_tag(2, 'Работа'), _tag(4, 'Дом'), _tag(6, 'Спорт')],
+        assignedIds: {_id(2)},
+      );
+      await pumpEventQueue();
+
+      expect(panel.model.move(_id(6), 0), isA<TagCommandAccepted>());
+      expect(_names(panel.loaded), ['Спорт', 'Работа', 'Дом']);
+      expect(_marks(panel), [false, true, false]);
+      await pumpEventQueue();
+      final first = h.repository.commands.last as MoveTag;
+      expect((first.tagId, first.placement), (_id(6), TagPlacement.first));
+      h.repository.command.complete(
+        TagCommandSucceeded(_moved(2, _tag(6, 'Спорт'), at: 0)),
+      );
+      await pumpEventQueue();
+      expect(_names(panel.loaded), ['Спорт', 'Работа', 'Дом']);
+
+      expect(panel.model.move(_id(6), 2), isA<TagCommandAccepted>());
+      expect(_names(panel.loaded), ['Работа', 'Дом', 'Спорт']);
+      await pumpEventQueue();
+      final last = h.repository.commands.last as MoveTag;
+      expect(last.tagId, _id(6));
+      expect((last.placement as AfterTagPlacement).tagId, _id(4));
+      h.repository.command.complete(
+        TagCommandSucceeded(_moved(3, _tag(6, 'Спорт', at: 0), at: 8)),
+      );
+      await pumpEventQueue();
+
+      expect(panel.model.move(_id(2), 1), isA<TagCommandAccepted>());
+      expect(_names(panel.loaded), ['Дом', 'Работа', 'Спорт']);
+      await pumpEventQueue();
+      final between = h.repository.commands.last as MoveTag;
+      expect(between.tagId, _id(2));
+      expect((between.placement as AfterTagPlacement).tagId, _id(4));
+      h.repository.command.complete(
+        TagCommandSucceeded(_moved(4, _tag(2, 'Работа'), at: 5)),
+      );
+      await pumpEventQueue();
+
+      expect(_names(panel.loaded), ['Дом', 'Работа', 'Спорт']);
+      expect(_marks(panel), [false, true, false]);
+      expect(panel.loaded.pendingMove, isNull);
+      expect(panel.state.canReorder, isTrue);
+      expect(h.repository.commands, hasLength(3));
+      expect(h.repository.reads, hasLength(1));
+    },
+  );
+
+  test('Отказ записи перестановки возвращает прежний порядок', () async {
+    final h = _Harness.confirmedByCoordinator();
+    addTearDown(h.dispose);
+    final panel = h.open();
+    h.repository.complete(
+      [_tag(1, 'Работа'), _tag(2, 'Дом'), _tag(3, 'Спорт')],
+      assignedIds: {_id(3)},
+    );
+    await pumpEventQueue();
+
+    final accepted = panel.model.move(_id(3), 0) as TagCommandAccepted;
+    expect(_names(panel.loaded), ['Спорт', 'Работа', 'Дом']);
+    await pumpEventQueue();
+    h.repository.command.complete(
+      const TagCommandFailed(TagUnavailableFailure()),
+    );
+    expect(await accepted.future, isA<TagCommandFailedCompletion>());
+    await pumpEventQueue();
+
+    expect(_names(panel.loaded), ['Работа', 'Дом', 'Спорт']);
+    expect(_marks(panel), [false, false, true]);
+    expect(panel.state.canReorder, isTrue);
+    expect(h.repository.reads, hasLength(1));
+  });
+
+  test('непринятая перестановка не меняет порядок', () async {
+    final h = _Harness.confirmedByCoordinator();
+    addTearDown(h.dispose);
+    final panel = h.open();
+    h.repository.complete([_tag(1, 'Работа'), _tag(2, 'Дом')], assignedIds: {});
+    await pumpEventQueue();
+    h.coordinator.acceptTagUpdate(
+      UpdateTag(tagId: _id(2), name: TagName.fromInput('Быт'), color: null),
+    );
+    await pumpEventQueue();
+
+    expect(panel.model.move(_id(2), 0), isA<TagCommandAlreadyRunning>());
+
+    expect(_names(panel.loaded), ['Работа', 'Дом']);
+    expect(panel.state.canReorder, isTrue);
+    expect(h.repository.commands.whereType<MoveTag>(), isEmpty);
+  });
+
+  test('Поиск отключает перестановку', () async {
+    final h = _Harness();
+    addTearDown(h.dispose);
+    final panel = h.open();
+    h.repository.complete([
+      _tag(1, 'Работа'),
+      _tag(2, 'Дом'),
+      _tag(3, 'Для дома'),
+    ], assignedIds: {});
+    await pumpEventQueue();
+    panel.model.search('дом');
+
+    expect(panel.state.canReorder, isFalse);
+    expect(panel.model.move(_id(3), 0), isNull);
+
+    expect(_names(panel.loaded), ['Работа', 'Дом', 'Для дома']);
+    expect(_visibleNames(panel), ['Дом', 'Для дома']);
+    await pumpEventQueue();
+    expect(h.repository.commands, isEmpty);
+  });
+
+  test('перестановка недоступна, пока выполняется предыдущая', () async {
+    final h = _Harness.confirmedByCoordinator();
+    addTearDown(h.dispose);
+    final panel = h.open();
+    h.repository.complete([
+      _tag(1, 'Работа'),
+      _tag(2, 'Дом'),
+      _tag(3, 'Спорт'),
+    ], assignedIds: {});
+    await pumpEventQueue();
+
+    expect(panel.model.move(_id(3), 0), isA<TagCommandAccepted>());
+    expect(panel.state.canReorder, isFalse);
+    expect(panel.model.move(_id(2), 0), isNull);
+    expect(_names(panel.loaded), ['Спорт', 'Работа', 'Дом']);
+    await pumpEventQueue();
+    expect(h.repository.commands, hasLength(1));
+
+    h.repository.command.complete(
+      TagCommandSucceeded(_moved(2, _tag(3, 'Спорт'), at: 0)),
+    );
+    await pumpEventQueue();
+    expect(panel.state.canReorder, isTrue);
+  });
+
+  test('перестановка недоступна на неактуальных строках', () async {
+    final h = _Harness();
+    addTearDown(h.dispose);
+    final panel = h.open();
+    h.repository.complete([_tag(1, 'Работа'), _tag(2, 'Дом')], assignedIds: {});
+    await pumpEventQueue();
+    h.changes.add(ConfirmedGraphReplacement(const TagCatalogTestRevision(2)));
+    await pumpEventQueue();
+    h.repository.fail(const TagCatalogUnavailableFailure());
+    await pumpEventQueue();
+
+    expect(panel.state.canReorder, isFalse);
+    expect(panel.model.move(_id(2), 0), isNull);
+    expect(_names(panel.loaded), ['Работа', 'Дом']);
+    await pumpEventQueue();
+    expect(h.repository.commands, isEmpty);
+  });
 }
 
 final _intentionId = _intention(1);
@@ -807,6 +969,27 @@ ConfirmedGraphResult<TagCommandSuccess> _created(
     TagCreatedChange(
       revision: TagCatalogTestRevision(revision),
       after: _tag(number, name, color: color, at: at),
+    ),
+  ),
+);
+
+/// Подтверждённая перестановка [before] на место [at].
+ConfirmedGraphResult<TagCommandSuccess> _moved(
+  int revision,
+  Tag before, {
+  required int at,
+}) => _package(
+  revision,
+  TagUpdated(
+    TagUpdatedChange(
+      revision: TagCatalogTestRevision(revision),
+      before: before,
+      after: Tag(
+        id: before.id,
+        name: before.name,
+        color: before.color,
+        position: tagPositionAt(at),
+      ),
     ),
   ),
 );

@@ -99,6 +99,59 @@ final class TagsPanelViewModel extends _$TagsPanelViewModel {
     };
   }
 
+  /// Ставит тег [tagId] на место [index] показанного списка и сразу
+  /// показывает новый порядок. Место отправляется соседом: после тега, который
+  /// окажется перед ним, либо первым. Подтверждённый пакет перестановки
+  /// применяется к строкам без чтения, а отказ записи возвращает
+  /// подтверждённый порядок и принадлежит общей поверхности. Непринятая
+  /// координатором команда порядок не меняет. Пока поиск сужает список,
+  /// строки неактуальны или выполняется предыдущая перестановка, а также при
+  /// перестановке на текущее место команда не отправляется: `null`.
+  TagCommandStart? move(TagId tagId, int index) {
+    final catalog = state.catalog;
+    if (!state.canReorder || catalog is! TagsPanelLoaded) return null;
+    final rows = catalog.rows;
+    final from = rows.indexWhere((row) => row.tag.id == tagId);
+    if (from == -1 || index < 0 || index >= rows.length || index == from) {
+      return null;
+    }
+    final others = [
+      for (final row in rows)
+        if (row.tag.id != tagId) row,
+    ];
+    final command = MoveTag(
+      tagId: tagId,
+      placement: index == 0
+          ? TagPlacement.first
+          : AfterTagPlacement(others[index - 1].tag.id),
+    );
+    final start = ref
+        .read(graphCommandCoordinatorProvider.notifier)
+        .acceptTagMove(command);
+    if (start case TagCommandAccepted(:final future)) {
+      state = state.withCatalog(catalog.withPendingMove(command));
+      unawaited(_settleMove(future, _generation));
+    }
+    return start;
+  }
+
+  /// Подтверждённый пакет применяется до снятия показанной перестановки, чтобы
+  /// подтверждённый порядок не мелькнул прежним, даже если пакет ещё не
+  /// пришёл из потока изменений.
+  Future<void> _settleMove(
+    Future<TagCommandCompletion> move,
+    int generation,
+  ) async {
+    final completion = await move;
+    if (!ref.mounted || generation != _generation) return;
+    if (completion case TagCommandSucceededCompletion(:final confirmedChange)) {
+      _onChange(confirmedChange);
+    }
+    if (state.catalog case final TagsPanelLoaded loaded) {
+      state = state.withCatalog(loaded.withPendingMove(null));
+    }
+  }
+
   /// Принятое из листа создание принадлежит этому открытию панели, а не
   /// экранной сессии листа, поэтому закрытие листа его не прерывает. После
   /// подтверждения модель один раз очищает поиск и отмечает тег отдельной
@@ -188,10 +241,16 @@ final class TagsPanelViewModel extends _$TagsPanelViewModel {
         _staleReadAttempts = 0;
         _shownRevision = revision;
         state = state.withCatalog(
-          TagsPanelLoaded([
-            for (final row in rows)
-              TagsPanelRow(tag: row.tag, isMarked: row.isAssigned),
-          ]),
+          TagsPanelLoaded(
+            [
+              for (final row in rows)
+                TagsPanelRow(tag: row.tag, isMarked: row.isAssigned),
+            ],
+            pendingMove: switch (state.catalog) {
+              TagsPanelLoaded(:final pendingMove) => pendingMove,
+              _ => null,
+            },
+          ),
         );
       case GraphResultSuccess(value: TagBrowseSnapshot()):
         _readFailed(TagsPanelReadFailure.unexpected);
@@ -238,7 +297,7 @@ final class TagsPanelViewModel extends _$TagsPanelViewModel {
       case GraphRevisionOrder.newer when _explains(package):
         _shownRevision = package.revision;
         state = state.withCatalog(
-          catalog.withRows(_applied(catalog.rows, package)),
+          catalog.withConfirmedRows(_applied(catalog.confirmedRows, package)),
         );
       case GraphRevisionOrder.newer || GraphRevisionOrder.differentEpoch:
         _requestRead();
