@@ -12,6 +12,7 @@ import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
+import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention.dart';
@@ -681,6 +682,8 @@ void main() {
   testWidgets('конфликт при записи сохраняет ввод и не создаёт второй тег', (
     tester,
   ) async {
+    // Общая поверхность показывает сообщение только активному приложению.
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     late sqlite.Database raw;
     final database = AppDatabase(
       openInMemoryLocalDatabase(setup: (db) => raw = db),
@@ -714,6 +717,8 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           routerConfig: router.config(),
+          builder: (_, child) =>
+              GraphOperationPresenter(child: child ?? const SizedBox.shrink()),
         ),
       ),
     );
@@ -731,15 +736,26 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('tag-editor-submit')));
     // Отказ записи предъявляет общая поверхность; форма сохраняет ввод и
     // ждёт исправления названия.
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 50)),
+    final l10n = lookupAppLocalizations(const Locale('en'));
+    final occupied = find.descendant(
+      of: find.byKey(const ValueKey('graph-operation-message')),
+      matching: find.textContaining(l10n.tagNameOccupied),
     );
+    await _pumpUntilFound(tester, occupied);
     await tester.pumpAndSettle();
+    expect(occupied, findsOneWidget);
+    final submit = find.byKey(const ValueKey('tag-editor-submit'));
+    expect(tester.widget<FilledButton>(submit).onPressed, isNull);
     expect(
-      tester
-          .widget<FilledButton>(find.byKey(const ValueKey('tag-editor-submit')))
-          .onPressed,
-      isNull,
+      find.descendant(of: submit, matching: find.text(l10n.tagEditorSaving)),
+      findsNothing,
+    );
+    expect(
+      find.descendant(
+        of: submit,
+        matching: find.text(l10n.tagEditorCreateAction),
+      ),
+      findsOneWidget,
     );
     expect(
       tester
@@ -2065,6 +2081,14 @@ final class _DraftChooser {
     _session.close();
     container.dispose();
   }
+}
+
+Future<void> _pumpUntilFound(WidgetTester tester, Finder finder) async {
+  for (var attempt = 0; attempt < 30 && finder.evaluate().isEmpty; attempt++) {
+    await tester.runAsync(() => pumpEventQueue());
+    await tester.pump();
+  }
+  expect(finder, findsOneWidget);
 }
 
 Future<void> _waitForEditorToClose(WidgetTester tester) async {
