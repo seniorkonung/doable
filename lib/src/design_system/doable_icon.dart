@@ -10,6 +10,7 @@ enum DoableIconData {
   graph('graph'),
   graphFilled('graph_filled'),
   plus('plus'),
+  plusSmall('plus_small'),
   intention('intention'),
   relation('relation'),
   calendar('calendar'),

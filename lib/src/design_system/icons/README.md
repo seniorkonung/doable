@@ -18,6 +18,7 @@
 | [graph.svg](assets/graph.svg) | `Main.dc.html` | `nav[aria-label="Sections"]` → `nav.graph.away` |
 | [graph_filled.svg](assets/graph_filled.svg) | `Main.dc.html` | `nav[aria-label="Sections"]` → `nav.graph.up` |
 | [plus.svg](assets/plus.svg) | `Main.dc.html` | Кнопка `addTap`, первый SVG |
+| [plus_small.svg](assets/plus_small.svg) | `TagsPanel.dc.html` | Кнопка `openNewTag`, SVG |
 | [intention.svg](assets/intention.svg) | `Main.dc.html` | `pinSheet` → кнопка `pick.intention.go`, ведущий SVG |
 | [relation.svg](assets/relation.svg) | `Main.dc.html` | `pinSheet` → кнопка `pick.relation.go`, ведущий SVG |
 | [calendar.svg](assets/calendar.svg) | `Main.dc.html` | `pinSheet` → кнопка `pick.choice.go`, ведущий SVG |
