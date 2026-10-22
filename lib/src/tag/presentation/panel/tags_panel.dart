@@ -101,44 +101,53 @@ final class _TagsPanelState extends ConsumerState<_TagsPanel> {
       ),
     };
 
-    return Sheet.expandable(
-      title: title,
-      text: text,
-      expandLabel: l10n.tagsPanelExpand,
-      collapseLabel: l10n.tagsPanelCollapse,
-      pinned: SearchField(
-        controller: _searchController,
-        placeholder: l10n.tagsPanelSearchPlaceholder,
-        label: l10n.tagsPanelSearchLabel,
-        clearLabel: l10n.tagsPanelClearSearch,
-        onChanged: model.search,
-        error: state.search.inputIsInvalid ? l10n.tagsPanelInvalidSearch : null,
-      ),
-      body: switch (state.catalog) {
-        TagsPanelLoading() => _StatusBody(
-          ListState.loading(text: l10n.tagsPanelLoading),
-        ),
-        TagsPanelLoadFailure(:final failure, :final canRetry) => _StatusBody(
-          ListState.error(
-            message: _loadFailureMessage(l10n, failure),
-            retry: canRetry
-                ? (label: l10n.commonRetry, onPressed: model.retryLoad)
-                : null,
-          ),
-        ),
-        TagsPanelIntentionMissing() => _StatusBody(
-          ListState.error(message: l10n.tagsPanelIntentionMissing),
-        ),
-        final TagsPanelLoaded loaded => _LoadedCatalog(
-          catalog: loaded,
-          filter: state.search.filter,
-          model: model,
-          onCreate: (name) => _openCreation(name, loaded, model),
-        ),
+    // Маршрут извещает о любом своём закрытии сразу, а содержимое
+    // освобождается только после закрывающей анимации.
+    return PopScope<void>(
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) widget.opening.close();
       },
-      footer: Button.primary(
-        label: l10n.tagsPanelDone,
-        onPressed: () => Navigator.pop(context),
+      child: Sheet.expandable(
+        title: title,
+        text: text,
+        expandLabel: l10n.tagsPanelExpand,
+        collapseLabel: l10n.tagsPanelCollapse,
+        pinned: SearchField(
+          controller: _searchController,
+          placeholder: l10n.tagsPanelSearchPlaceholder,
+          label: l10n.tagsPanelSearchLabel,
+          clearLabel: l10n.tagsPanelClearSearch,
+          onChanged: model.search,
+          error: state.search.inputIsInvalid
+              ? l10n.tagsPanelInvalidSearch
+              : null,
+        ),
+        body: switch (state.catalog) {
+          TagsPanelLoading() => _StatusBody(
+            ListState.loading(text: l10n.tagsPanelLoading),
+          ),
+          TagsPanelLoadFailure(:final failure, :final canRetry) => _StatusBody(
+            ListState.error(
+              message: _loadFailureMessage(l10n, failure),
+              retry: canRetry
+                  ? (label: l10n.commonRetry, onPressed: model.retryLoad)
+                  : null,
+            ),
+          ),
+          TagsPanelIntentionMissing() => _StatusBody(
+            ListState.error(message: l10n.tagsPanelIntentionMissing),
+          ),
+          final TagsPanelLoaded loaded => _LoadedCatalog(
+            catalog: loaded,
+            filter: state.search.filter,
+            model: model,
+            onCreate: (name) => _openCreation(name, loaded, model),
+          ),
+        },
+        footer: Button.primary(
+          label: l10n.tagsPanelDone,
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
     );
   }

@@ -24,4 +24,12 @@ final class TagsPanelOpening {
   TagsPanelOpening(this.context);
 
   final TagsPanelContext context;
+
+  bool _isClosed = false;
+
+  /// Открытие закрыто вместе с маршрутом панели, хотя её содержимое и модель
+  /// ещё живут до конца закрывающей анимации.
+  bool get isClosed => _isClosed;
+
+  void close() => _isClosed = true;
 }

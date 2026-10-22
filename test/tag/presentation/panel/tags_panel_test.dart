@@ -563,6 +563,48 @@ void main() {
     expect((assign.tagId, assign.intentionId), (_id(1), _intentionId));
     expect(find.byType(SnackBar), findsNothing);
   });
+
+  testWidgets('Закрытие панели до подтверждения создания: подтверждение во '
+      'время закрывающей анимации панели не отмечает тег', (tester) async {
+    final h = await _pumpApp(tester);
+    await h.open();
+    h.repository.complete([_tag(5, 'Дом')], assignedIds: {});
+    await tester.pump();
+    await tester.enterText(_search, 'парк');
+    await tester.pump();
+    await tester.tap(find.text('Создать тег «парк»'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Создать тег'));
+    await tester.pump();
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('Новый тег'), findsNothing);
+
+    await tester.tap(find.text('Готово'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    // Маршрут панели уже закрыт, но её содержимое и модель ещё живут.
+    expect(h.isClosed, isTrue);
+    expect(find.text('Создать тег «парк»'), findsOne);
+    final created = ConfirmedGraphResult<TagCommandSuccess>(
+      revision: const TagCatalogTestRevision(2),
+      value: TagCreated(
+        TagCreatedChange(
+          revision: const TagCatalogTestRevision(2),
+          after: _tag(1, 'парк'),
+        ),
+      ),
+    );
+    h.repository.command.complete(TagCommandSucceeded(created));
+    await tester.pump();
+
+    expect(h.repository.commands.single, isA<CreateTag>());
+    expect(find.text('Создать тег «парк»'), findsOne);
+    expect(_searchText(tester), 'парк');
+    await tester.pumpAndSettle();
+    expect(find.byType(Sheet), findsNothing);
+    expect(h.repository.commands.single, isA<CreateTag>());
+  });
 }
 
 final _intentionId = (IntentionId.decode(

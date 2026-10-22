@@ -103,13 +103,14 @@ final class TagsPanelViewModel extends _$TagsPanelViewModel {
   /// экранной сессии листа, поэтому закрытие листа его не прерывает. После
   /// подтверждения модель один раз очищает поиск и отмечает тег отдельной
   /// командой назначения; её отклонение или отказ оставляют тег
-  /// неотмеченным. Закрытая до подтверждения панель тег не отмечает.
+  /// неотмеченным. Открытие, закрытое до подтверждения, тег не отмечает,
+  /// даже если модель ещё жива.
   void acceptCreation(TagCommandAccepted creation) =>
       unawaited(_markCreated(creation.future));
 
   Future<void> _markCreated(Future<TagCommandCompletion> creation) async {
     final completion = await creation;
-    if (!ref.mounted) return;
+    if (!ref.mounted || opening.isClosed) return;
     if (completion.result case GraphResultSuccess(
       value: TagCreated(:final tag),
     )) {
