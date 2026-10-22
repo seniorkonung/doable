@@ -469,39 +469,50 @@
   - **Предполагаемые файлы:** `lib/src/intention/presentation/editor/intention_editor_state.dart`, `lib/src/intention/presentation/editor/intention_editor_view_model.dart`, `lib/src/intention/presentation/editor/intention_creation_tags.dart`, `test/intention/presentation/editor/intention_editor_view_model_test.dart`, `test/intention/presentation/editor/intention_creation_tags_test.dart`.
   - **Размер:** M.
 
-- [ ] 3.7 Снимать условия по удалённому тегу во всех открытых поисках намерений одним чтением новой выдачи
+- [ ] 3.7 Начинать новую выдачу с первой порции после удаления исключённого тега и убрать состояние «Список намерений не обновлён»
+  - **Критерии приёмки:**
+    - По решению 8 дизайна пакет, который удаляет тег из исключённых условий применённого фильтра, начинает новую выдачу с первой порции и верхней позиции вместо достраивания загруженной области. Исключение уже удалённого тега не отсекает ни одного намерения, поэтому новая выдача соответствует оставшимся условиям; модель условий и ветвь удалённого обязательного тега в этой задаче не меняются. Отказ новой выдачи предъявляется как отказ первой порции при смене параметров поиска — ошибкой получения с повтором.
+    - Достраивание загруженной области удаляется вместе со всем, что публиковало только оно: состоянием `IntentionCatalogRefreshState`, повтором `retryRefresh`, показом над результатами поиска и строками `catalogRefresh*` в русской и английской локализации и генерируемых файлах. Модель каталога больше не вызывает `getCatalogReconciliationPortion`. Отказы первой порции и продолжения выдачи и их повторы не меняются.
+  - **Проверка:**
+    - `mise run codegen` и `mise exec --no-deps -- flutter analyze`: ни один файл не ссылается на удалённые состояние, повтор и строки.
+    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog test/intention/presentation/intention_tag_search_accessibility_test.dart test/app/intention_creation_sheet_integration_test.dart test/daily_choice/presentation/action_picker/daily_choice_action_picker_page_test.dart test/daily_choice/presentation/source_picker/daily_choice_source_picker_page_test.dart test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart`: удаление исключённого тега даёт одно чтение первой порции, и выдача показывает прежде отсечённые намерения; отказ этого чтения показывает ошибку получения с повтором, а успешный повтор — новую выдачу; в пикерах действия, исходного намерения и участника связи отказ после удаления исключённого тега ожидается как отказ первой порции, а не «Список намерений не обновлён».
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `lib/src/intention/presentation/catalog/intention_catalog_view_model.dart`, `lib/src/intention/presentation/catalog/intention_catalog_state.dart`, `lib/src/intention/presentation/catalog/intention_search_results.dart`, `lib/src/intention/presentation/catalog/intention_catalog_status_views.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` и генерируемые файлы локализации; проверки, которые запускали достраивание или ожидали его отказ: `test/intention/presentation/catalog/intention_catalog_refresh_status_view_test.dart` (удаляется), `test/intention/presentation/catalog/intention_catalog_tag_change_reconciliation_test.dart`, `test/intention/presentation/catalog/intention_catalog_tag_filter_revision_protocol_test.dart`, `test/intention/presentation/catalog/intention_catalog_tag_filter_integration_test.dart`, `test/intention/presentation/catalog/intention_search_results_test.dart`, `test/intention/presentation/intention_tag_search_accessibility_test.dart`, `test/app/intention_creation_sheet_integration_test.dart`, `test/daily_choice/presentation/daily_choice_picker_tag_search_test_support.dart`, `test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart`.
+  - **Размер:** M.
+
+- [ ] 3.8 Убрать чтение согласования каталога `getCatalogReconciliationPortion`, у которого после 3.7 нет потребителей
+  - **Критерии приёмки:**
+    - По решению 8 дизайна удаляются метод `getCatalogReconciliationPortion` из `PersonalGraphRepository`, его адаптер Drift с событием диагностики `CatalogReconciliationReadDiagnosticsEvent` и типы `IntentionCatalogReconciliation*` из `intention_catalog.dart`. Части адаптера, общие с чтением порций каталога, сохраняются.
+    - Удаляются тестовые замены чтения — примесь `CatalogReconciliationTestFallback` со всеми подключениями и подмены в `catalog_test_support.dart`, `daily_choice_app_lifecycle_test.dart` и `app_shell_state_test.dart`, — а также проверки чтения в наборах слоя данных. Проверки первой порции и продолжения выдачи сохраняют прежние ожидания.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter analyze`: ни один файл не ссылается на удалённые метод, типы, событие диагностики и примесь.
+    - `mise exec --no-deps -- flutter test test/intention/data test/intention/application/intention_contract_test.dart test/intention/presentation/catalog test/app/daily_choice_app_lifecycle_test.dart test/app/navigation/app_shell_state_test.dart`: чтение первой порции и продолжения, их отказы и диагностика каталога без изменений.
+  - **Зависимости:** 3.7 — модель каталога больше не читает согласование.
+  - **Предполагаемые файлы:** `lib/src/graph/application/personal_graph_repository.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `lib/src/intention/application/intention_catalog.dart`, `lib/src/shared/diagnostics/diagnostics_sink.dart`, `lib/src/shared/diagnostics/developer_diagnostics_sink.dart`, `test/support/catalog_reconciliation_test_fallback.dart` (удаляется) и наборы, которые подключают примесь, `test/intention/presentation/catalog/catalog_test_support.dart`, `test/app/daily_choice_app_lifecycle_test.dart`, `test/app/navigation/app_shell_state_test.dart`, `test/intention/data/drift_intention_catalog_test.dart`, `test/intention/data/drift_intention_repository_large_fixture_test.dart`, `test/intention/data/catalog_tag_filter_failure_scenarios.dart`, `test/intention/application/intention_contract_test.dart`.
+  - **Размер:** M.
+
+- [ ] 3.9 Снимать условия по удалённому тегу во всех открытых поисках намерений одним чтением новой выдачи
   - **Критерии приёмки:**
     - По решению 8 дизайна и требованию «Снятие условий при удалении тега» модель условий на `TagDeletedChange` убирает условие по тегу, обязательное или исключающее, и не публикует фильтр повторно. Остальные условия сохраняют места и надобности. В той же публикации пакета модель каталога исключает тег из применённого фильтра и начинает новую выдачу с первой порции: снятие даёт одно чтение без промежуточной пустой выдачи. Так ведёт себя каждый открытый поиск всех четырёх контекстов. Новый тег с прежним названием условие не восстанавливает, а отказ получения тегов условий не снимает.
-    - Особые ветви каталога для удалённого тега из условий удаляются вместе с их проверками: успешно пустая выдача по удалённому обязательному тегу и достраивание загруженной области после удаления исключённого тега. Удалённый тег вне условий по-прежнему только исчезает из загруженных строк без нового чтения.
+    - Особые ветви каталога для удалённого тега из условий удаляются вместе с их проверками: успешно пустая выдача по удалённому обязательному тегу и отдельное перечитывание после удаления исключённого тега из 3.7 уступают место общему снятию условия. Удалённый тег вне условий по-прежнему только исчезает из загруженных строк без нового чтения.
   - **Проверка:**
     - `mise exec --no-deps -- flutter test test/intention/presentation/catalog/intention_tag_conditions_view_model_test.dart test/intention/presentation/catalog/intention_catalog_tag_change_reconciliation_test.dart test/intention/presentation/catalog/intention_catalog_tag_filter_integration_test.dart`: сценарий «Удаление обязательного тега расширяет выдачу»; сценарий «Удаление снимает условие и в другом открытом поиске» на моделях двух открытых поисков разных контекстов, каждый с одним чтением первой порции и без промежуточной пустой выдачи; удаление исключённого тега; новый одноимённый тег; удаление тега вне условий.
-  - **Зависимости:** нет.
+  - **Зависимости:** 3.7 — ветвь удалённого исключённого тега без достраивания загруженной области.
   - **Предполагаемые файлы:** `lib/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart`, `lib/src/intention/presentation/catalog/intention_catalog_view_model.dart`, `test/intention/presentation/catalog/intention_tag_conditions_view_model_test.dart`, `test/intention/presentation/catalog/intention_catalog_tag_change_reconciliation_test.dart`, `test/intention/presentation/catalog/intention_catalog_tag_filter_integration_test.dart`.
   - **Размер:** M.
 
-- [ ] 3.8 Убрать признак удалённого условия поиска и уточнение выбранного тега чтением
+- [ ] 3.10 Убрать признак удалённого условия поиска и уточнение выбранного тега чтением
   - **Критерии приёмки:**
     - По решению 8 дизайна условие поиска по тегу больше не бывает удалённым: `isDeleted`, `needsVerification`, уточнение выбранного тега через `watchTag` и зависимость модели условий от чтения тегов удаляются. Выбор тега, удаление которого модель условий уже получила, игнорируется без изменения условий и выдачи.
     - Чипы условий не показывают «тег удалён»: строки `intentionTagConditionDeleted` и `intentionTagConditionDeletedSemantics` удалены из русской и английской локализации и генерируемых файлов.
   - **Проверка:**
     - `mise run codegen` и `mise exec --no-deps -- flutter analyze`: ни одна проверка не ссылается на удалённые признаки, зависимость чтения и строки.
     - `mise exec --no-deps -- flutter test test/intention/presentation/catalog/intention_tag_conditions_view_model_test.dart test/intention/presentation/catalog/intention_tag_conditions_section_test.dart test/intention/presentation/catalog/tag_condition_picker_page_test.dart test/intention/presentation/catalog/intention_catalog_tag_filter_integration_test.dart test/intention/presentation/intention_tag_search_accessibility_test.dart`: выбор уже удалённого тега не добавляет условие.
-  - **Зависимости:** 3.7 — удаление тега снимает условие.
+  - **Зависимости:** 3.9 — удаление тега снимает условие.
   - **Предполагаемые файлы:** `lib/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart`, `lib/src/intention/presentation/catalog/intention_tag_conditions_section.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` и генерируемые файлы локализации; проверки из раздела «Проверка».
   - **Размер:** S.
 
-- [ ] 3.9 Убрать состояние «Список намерений не обновлён», которое после снятия условий при удалении тега ничто не публикует
-  - **Критерии приёмки:**
-    - Состояние отказа обновления выдачи `IntentionCatalogRefreshState`, его повтор `retryRefresh`, показ над результатами поиска и строки `catalogRefresh*` удаляются из кода, локализации и проверок. После 3.7 его публиковало бы только достраивание загруженной области, а назначение и снятие тега модель каталога согласует каталожной мутацией без чтения.
-    - Удаление решено при планировании фазы. Сценарии «Отказ обновления выдачи виден и устраняется повтором» и «Следующее изменение повторяет неудавшееся обновление» delta-спецификации `intention-management` описывают недостижимое состояние и требуют отдельной правки планирования. Отказы первой порции и продолжения выдачи и их повторы не меняются.
-  - **Проверка:**
-    - `mise run codegen` и `mise exec --no-deps -- flutter analyze`: ни одна проверка не ссылается на удалённые состояние, повтор и строки.
-    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog test/intention/presentation/intention_tag_search_accessibility_test.dart test/app/intention_creation_sheet_integration_test.dart`.
-  - **Зависимости:** 3.7 — особые ветви удалённого тега удалены.
-  - **Предполагаемые файлы:** `lib/src/intention/presentation/catalog/intention_catalog_state.dart`, `lib/src/intention/presentation/catalog/intention_catalog_view_model.dart`, `lib/src/intention/presentation/catalog/intention_search_results.dart`, `lib/src/intention/presentation/catalog/intention_catalog_status_views.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` и генерируемые файлы локализации; проверки, которые ожидали это состояние, в том числе `test/intention/presentation/catalog/intention_catalog_refresh_status_view_test.dart`.
-  - **Размер:** M.
-
-- [ ] 3.10 Добавить в строку тега модуля основ ручку перестановки, удержание и действия строки для экранного диктора
+- [ ] 3.11 Добавить в строку тега модуля основ ручку перестановки, удержание и действия строки для экранного диктора
   - **Критерии приёмки:**
     - `TagRow` по правилам компонента дизайн-системы получает ручку — шесть точек `grip` 16 в области шириной 40 слева, нажимаемой на всю высоту строки; начало перетаскивания за неё подключает потребитель. Скрытая потребителем ручка сохраняет своё место, поэтому точка и название не смещаются. Ручка не создаёт отдельного элемента навигации диктора.
     - Удержание строки и контекстный щелчок вызывают обработчик потребителя. Удерживаемая строка (`held`) имеет фон `fill`, а поднятая при перетаскивании — плоскость `raised` с `shadow-float`. Пользовательские действия семантики и подсказку удержания задаёт потребитель по ADR-0030; они объявляются на той же строке, которая вместе с названием и отметкой остаётся одним элементом навигации диктора.
@@ -513,7 +524,7 @@
   - **Предполагаемые файлы:** `lib/src/design_system/components/tag_row.dart`, `lib/src/design_system/doable_icon.dart`, `lib/src/design_system/icons/assets/grip.svg` (новый), `lib/src/design_system/icons/README.md`, `test/design_system/tag_row_test.dart`, `test/design_system/doable_icon_test.dart`, `test/design_system/goldens/doable_icons.png`.
   - **Размер:** M.
 
-- [ ] 3.11 Добавить в модуль основ всплывающее меню у удерживаемой строки
+- [ ] 3.12 Добавить в модуль основ всплывающее меню у удерживаемой строки
   - **Критерии приёмки:**
     - Функция модуля основ показывает `PopupMenu` по правилам компонента дизайн-системы через `showMenu` корневого навигатора у переданной строки: плоскость `raised` шириной 228 с углами 20, обводкой `hairline` и `shadow-float`, пункты высотой 48 с иконкой 22 и названием в стиле `action`. Разрушительный пункт стоит последним и окрашен `danger`. Меню стоит на 4 под строкой, а без места снизу — на 4 над ней.
     - Экран не затемняется, а касание вне меню и «назад» закрывают только меню. Функция возвращает выбранный пункт либо его отсутствие; тексты, доступные названия и иконки пунктов задаёт потребитель по ADR-0030.
@@ -525,7 +536,7 @@
   - **Предполагаемые файлы:** `lib/src/design_system/components/popup_menu.dart` (новый), `lib/src/design_system/doable_icon.dart`, `lib/src/design_system/icons/assets/edit.svg`, `lib/src/design_system/icons/assets/copy.svg` и `lib/src/design_system/icons/assets/delete.svg` (новые), `lib/src/design_system/icons/README.md`, `test/design_system/popup_menu_test.dart` (новый), `test/design_system/doable_icon_test.dart`, `test/design_system/goldens/doable_icons.png`.
   - **Размер:** M.
 
-- [ ] 3.12 Добавить в модуль основ диалог подтверждения и кнопки видов quiet и danger
+- [ ] 3.13 Добавить в модуль основ диалог подтверждения и кнопки видов quiet и danger
   - **Критерии приёмки:**
     - `Button` по правилам компонента дизайн-системы получает виды quiet — плоскость `fill` с текстом `ink` — и danger — плоскость `accent` с текстом `on-accent`, а также ширину по подписи для действий диалога размера md. Выключенное состояние и область нажатия не меньше `tap-min` — как у primary.
     - Функция модуля основ показывает `ConfirmDialog` вида «подтверждение» в корневом навигаторе по правилам компонента: плоскость `raised` с углами `radius-xl` и `shadow-float` по центру экрана в `space-8` от краёв и затемнение `scrim` поверх листов. Заголовок — в стиле `title`, первый абзац — в стиле `body` цвета `muted` с выделенным названием цвета `ink`, справа — quiet-кнопка отмены и danger-кнопка действия через `space-2`. Касание затемнения и «назад» отменяют, а диалог объявляет себя маршрутом с названием по заголовку; тексты задаёт потребитель по ADR-0030.
@@ -535,7 +546,7 @@
   - **Предполагаемые файлы:** `lib/src/design_system/components/button.dart`, `lib/src/design_system/components/confirm_dialog.dart` (новый), `test/design_system/button_test.dart`, `test/design_system/confirm_dialog_test.dart` (новый).
   - **Размер:** M.
 
-- [ ] 3.13 Изменять название и цвет тега в листе «Изменить тег»
+- [ ] 3.14 Изменять название и цвет тега в листе «Изменить тег»
   - **Критерии приёмки:**
     - По решению 6 дизайна контекст изменения `TagEditorViewModel` несёт тег и названия снимка вызывающего. Занятость при вводе сверяется с ними без собственного тега, поэтому совпадение с собственным названием, в том числе в другом регистре, конфликтом не считается. «Сохранить» доступна только для допустимого свободного значения, которое отличается от сохранённого названием или цветом, и отправляет `UpdateTag`. Прежняя страница редактора работает по тем же правилам без снимка: занятость для неё по-прежнему определяет запись.
     - `showTagSheet` для контекста изменения показывает лист по содержимому с признаком размещения сообщений: заголовок «Изменить тег», поле «Название» с точкой цвета и сохранённым названием, `TagColorPicker` с сохранённым цветом и «Сохранить» в подвале. Подтверждённое изменение закрывает лист, если он ещё открыт. Отказ записи виден поверх листа, который сохраняет название и цвет, а закрытие без сохранения свайпом, касанием затемнения или «назад» не меняет тег.
@@ -547,17 +558,17 @@
   - **Предполагаемые файлы:** `lib/src/tag/presentation/editor/tag_editor_state.dart`, `lib/src/tag/presentation/editor/tag_editor_view_model.dart` и генерируемый `tag_editor_view_model.g.dart`, `lib/src/tag/presentation/editor/tag_sheet.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` и генерируемые файлы локализации, `test/tag/presentation/editor/tag_editor_view_model_test.dart`, `test/tag/presentation/editor/tag_sheet_test.dart`.
   - **Размер:** M.
 
-- [ ] 3.14 Предлагать в модели панели копию тега с первым свободным названием, цветом исходного тега и местом сразу после него
+- [ ] 3.15 Предлагать в модели панели копию тега с первым свободным названием, цветом исходного тега и местом сразу после него
   - **Критерии приёмки:**
     - По требованию «Дублирование тега» модель панели предлагает для тега создание с названием «‹название› N» — первым свободным по ключам сопоставления названий снимка при N от 2 — с цветом исходного тега и размещением сразу после него. Контекст создания листа несёт начальные название, цвет и размещение, поэтому лист «Новый тег» открывается с ними, а до создания их можно изменить.
     - Принятое создание копии продолжается тем же путём, что и создание из строки создания: после подтверждения поиск очищается, а копия встаёт сразу после исходного тега и отмечается назначением в пределах открытия панели.
   - **Проверка:**
     - `mise exec --no-deps -- flutter test test/tag/presentation/panel/tags_panel_view_model_test.dart test/tag/presentation/editor`: сценарий «Занятое название пропускается», в том числе с занятым названием в другом регистре; предложение с цветом исходного тега и размещением после него; лист копии с предложенными названием и цветом; создание из листа отправляет размещение контекста; подтверждённая копия встаёт после исходного тега, отмечается одним назначением и очищает поиск.
-  - **Зависимости:** 3.2 — создание после исходного тега; 3.13 — контекст листа тега.
+  - **Зависимости:** 3.2 — создание после исходного тега; 3.14 — контекст листа тега.
   - **Предполагаемые файлы:** `lib/src/tag/presentation/panel/tags_panel_view_model.dart`, `lib/src/tag/presentation/editor/tag_editor_state.dart`, `lib/src/tag/presentation/editor/tag_editor_view_model.dart`, `test/tag/presentation/panel/tags_panel_view_model_test.dart`, `test/tag/presentation/editor/tag_editor_view_model_test.dart`, `test/tag/presentation/editor/tag_sheet_test.dart`.
   - **Размер:** M.
 
-- [ ] 3.15 Переставлять тег в модели панели с немедленным показом нового порядка и возвратом подтверждённого при отказе
+- [ ] 3.16 Переставлять тег в модели панели с немедленным показом нового порядка и возвратом подтверждённого при отказе
   - **Критерии приёмки:**
     - По решению 6 дизайна перестановка в полном списке без поиска сразу показывает новый порядок и отправляет через координатор `MoveTag` с размещением `after` предыдущего тега либо `first`. Отметки и остальные строки не меняются, а подтверждённый пакет перестановки применяется к строкам без перечитывания.
     - Отказ записи или непринятая команда возвращают подтверждённый порядок; отказ принадлежит общей поверхности. Пока перестановка выполняется, новая недоступна.
@@ -568,7 +579,7 @@
   - **Предполагаемые файлы:** `lib/src/tag/presentation/panel/tags_panel_view_model.dart`, `lib/src/tag/presentation/panel/tags_panel_state.dart`, `test/tag/presentation/panel/tags_panel_view_model_test.dart`.
   - **Размер:** S.
 
-- [ ] 3.16 Открывать по удержанию тега в панели меню изменения, дублирования и удаления с подтверждением
+- [ ] 3.17 Открывать по удержанию тега в панели меню изменения, дублирования и удаления с подтверждением
   - **Критерии приёмки:**
     - Удержание строки панели открывает у неё меню «Изменить тег», «Дублировать тег» и «Удалить тег» по требованию «Панель тегов». Пока меню открыто, строка имеет фон удерживаемой, а отметки и назначения не меняются. Те же действия доступны экранному диктору без удержания пользовательскими действиями строки, а её семантика сообщает, что удержание открывает действия тега. На неактуальных строках меню и действия недоступны.
     - «Изменить тег» открывает лист «Изменить тег» с названиями снимка, «Дублировать тег» — лист «Новый тег» с предложенной копией. «Удалить тег» открывает подтверждение «Удалить тег?» с названием тега и охватом удаления по требованию «Явно подтверждаемое удаление тега»: «Удалить» отправляет `DeleteTag` по идентификатору тега, а «Отмена», касание затемнения и «назад» ничего не меняют.
@@ -576,33 +587,33 @@
   - **Проверка:**
     - `mise run codegen`.
     - `mise exec --no-deps -- flutter test test/tag/presentation/panel/tags_panel_test.dart test/tag/presentation/tag_accessibility_test.dart` на обоих языках с проверкой семантики: сценарии «Удержание тега открывает его действия», «Изменение тега сохраняет запрос», «Подтверждение объясняет полный охват» и «Экранный диктор различает операции»; дублирование из меню; удаление после подтверждения и его отмена; действия диктора без удержания; «назад» в меню, листе и подтверждении; отказ удаления поверх панели; недоступность меню на неактуальных строках.
-  - **Зависимости:** 3.10–3.14 — строка, меню, диалог, лист изменения и копия.
+  - **Зависимости:** 3.11–3.15 — строка, меню, диалог, лист изменения и копия.
   - **Предполагаемые файлы:** `lib/src/tag/presentation/panel/tags_panel.dart`, `lib/src/tag/presentation/panel/tags_panel_view_model.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` и генерируемые файлы локализации, `test/tag/presentation/panel/tags_panel_test.dart`, `test/tag/presentation/tag_accessibility_test.dart`.
   - **Размер:** M.
 
-- [ ] 3.17 Переставлять теги в панели перетаскиванием за ручку и командами экранного диктора
+- [ ] 3.18 Переставлять теги в панели перетаскиванием за ручку и командами экранного диктора
   - **Критерии приёмки:**
     - По решению 6 дизайна список панели без поиска переставляется перетаскиванием только за ручку строки: поднятая строка выделена, а отпущенный тег сразу стоит на новом месте. Строки получают команды диктора «в начало», «выше», «ниже» и «в конец» с локализацией `WidgetsLocalizations`, и они дают тот же результат, что и перетаскивание.
     - Пока поиск сужает список, он показывается без перестановки, а ручки скрыты с сохранением места. На неактуальных строках и во время выполняющейся перестановки перетаскивание и команды диктора недоступны.
     - Отказ записи перестановки возвращает подтверждённый порядок и виден поверх панели над «Готово», а успех сообщением не объявляется.
   - **Проверка:**
     - `mise exec --no-deps -- flutter test test/tag/presentation/panel/tags_panel_test.dart test/tag/presentation/tag_accessibility_test.dart`: перетаскивание за ручку меняет порядок, а за название — нет; сценарии «Поиск отключает перестановку», «Отказ записи перестановки возвращает прежний порядок» и «Перестановка без перетаскивания» на обоих языках; недоступность на неактуальных строках.
-  - **Зависимости:** 3.10 — ручка строки; 3.15 — перестановка в модели; 3.16 — строки панели с действиями.
+  - **Зависимости:** 3.11 — ручка строки; 3.16 — перестановка в модели; 3.17 — строки панели с действиями.
   - **Предполагаемые файлы:** `lib/src/tag/presentation/panel/tags_panel.dart`, `test/tag/presentation/panel/tags_panel_test.dart`, `test/tag/presentation/tag_accessibility_test.dart`.
   - **Размер:** M.
 
-- [ ] 3.18 Проверить в запущенном приложении управление тегами из панели и сохранение перестановки после перезапуска
+- [ ] 3.19 Проверить в запущенном приложении управление тегами из панели и сохранение перестановки после перезапуска
   - **Критерии приёмки:**
     - Сквозные проверки открывают панель со страницы намерения в запущенном приложении и сверяют экраны с хранилищем. Изменение только цвета и переименование видны в назначениях страницы и в условии открытого поиска. Копия встаёт сразу после исходного тега и назначена только этому намерению, а исходный тег сохраняет назначения и место. Подтверждённое удаление убирает тег со страницы и снимает условие открытого поиска, выдача которого следует оставшимся условиям. Перестановка меняет порядок тегов на странице намерения и в результатах поиска. Сообщения об успехе не показываются.
     - Проверка перезапуска в `test/graph/data/file_backed_tag_durability_test.dart` по сценарию «Теги сохраняются после полного перезапуска» переставляет стоящий вторым тег в начало, и после повторного открытия файловой БД он стоит первым.
   - **Проверка:**
     - `mise exec --no-deps -- flutter test test/app/tag_app_flow_test.dart test/app/intention_tag_search_app_flow_test.dart`: через панель — сценарии «Изменение только цвета общего тега», «Общее переименование», «Копия встаёт после оригинала без его назначений», «Удаление обязательного тега расширяет выдачу», «Перестановка меняет порядок во всех представлениях» и «Успех операции в панели не объявляется сообщением».
     - `mise exec --no-deps -- flutter test --concurrency=1 test/graph/data/file_backed_tag_durability_test.dart`.
-  - **Зависимости:** 3.5 — порядок в представлениях; 3.7 — снятие условий; 3.16, 3.17 — управление и перестановка в панели.
+  - **Зависимости:** 3.5 — порядок в представлениях; 3.9 — снятие условий; 3.17, 3.18 — управление и перестановка в панели.
   - **Предполагаемые файлы:** `test/app/tag_app_flow_test.dart`, `test/app/intention_tag_search_app_flow_test.dart`, `test/graph/data/file_backed_tag_durability_test.dart`.
   - **Размер:** M.
 
-- [ ] 3.19 Подтвердить готовность третьей фазы: все операции над самими тегами выполняются в панели, а удаление тега согласовано с условиями поиска и черновиком
+- [ ] 3.20 Подтвердить готовность третьей фазы: все операции над самими тегами выполняются в панели, а удаление тега согласовано с условиями поиска и черновиком
   - **Критерии приёмки:**
     - Выполнено условие «Ready to advance» третьей фазы: все операции над самими тегами выполняются в панели по спецификациям, включая отказы, доступность и проверки данных, а удаление тега согласовано с условиями поиска и черновиком.
     - Пакет не открывает панель из панели создания намерения и из поиска намерений и не удаляет прежние страницы. Результаты проверок и путь к APK сообщены в сессии; ручная проверка на устройстве остаётся за пользователем и не блокирует готовность фазы.
@@ -610,6 +621,6 @@
     - `mise run check` и `mise exec --no-deps -- openspec validate add-tags-panel --strict --no-interactive`; после фиксации изменений — `mise run codegen-check` на чистой рабочей копии.
     - `mise exec --no-deps -- flutter build apk --release` с артефактом `build/app/outputs/flutter-apk/app-release.apk`. Если через DTD найдено запущенное приложение, выполнить hot restart и проверить `get_runtime_errors`; эмулятор и устройство не запускаются.
     - Сообщить оставшиеся ручные проверки на устройстве: меню открывается удержанием у строки, изменение, дублирование и удаление с подтверждением проходят в панели над страницей намерения, перетаскивание за ручку переставляет тег и не тянет лист, TalkBack объявляет действия строки и команды перемещения, отказ виден над «Готово» и над «Сохранить»; вид сверяется с макетами `IntentionTagMenu`, `IntentionTagEdit`, `IntentionTagDuplicate`, `IntentionTagDelete`, `IntentionTagDrag` и `TagsPanel`.
-  - **Зависимости:** 3.1–3.18.
+  - **Зависимости:** 3.1–3.19.
   - **Предполагаемые файлы:** нет, только проверка и сборка.
   - **Размер:** XS.
