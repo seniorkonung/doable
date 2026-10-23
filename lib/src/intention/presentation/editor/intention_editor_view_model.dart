@@ -567,7 +567,7 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
 
 /// Контракт набора тегов, связанный с одним построением сессии: публикует
 /// изменения набора и его доступности, а после закрытия сессии публикует
-/// закрытое состояние, завершает поток и отвергает добавление.
+/// закрытое состояние, завершает поток и отвергает изменения.
 final class _SessionDraftTagSet implements IntentionDraftTagSet {
   _SessionDraftTagSet(this._session, this._current);
 
@@ -586,6 +586,9 @@ final class _SessionDraftTagSet implements IntentionDraftTagSet {
   IntentionDraftTagAddition add(Tag tag) => _isClosed
       ? IntentionDraftTagAddition.sessionClosed
       : _session._addTag(tag);
+
+  @override
+  void remove(TagId tagId) => _session.removeTag(tagId);
 
   void _publish(IntentionDraftTagSetSnapshot snapshot) {
     if (_isClosed) {

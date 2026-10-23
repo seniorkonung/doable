@@ -185,7 +185,7 @@ final class _TagsPanelState extends ConsumerState<_TagsPanel> {
       }
     });
     final (title, text) = switch (widget.opening.context) {
-      TagsPanelAssignmentContext() => (
+      TagsPanelAssignmentContext() || TagsPanelDraftContext() => (
         l10n.tagsPanelTitle,
         l10n.tagsPanelAssignmentHint,
       ),

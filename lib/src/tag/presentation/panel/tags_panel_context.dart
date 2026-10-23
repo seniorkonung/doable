@@ -1,4 +1,5 @@
 import '../../../intention/domain/intention_id.dart';
+import '../../../intention/presentation/editor/intention_draft_tag_set.dart';
 
 /// Контекст панели тегов по ADR-0040: определяет отметку строки и смысл
 /// нажатия на неё. Контекст собирает вызывающий сценарий из явных
@@ -13,6 +14,15 @@ final class TagsPanelAssignmentContext extends TagsPanelContext {
   const TagsPanelAssignmentContext(this.intentionId);
 
   final IntentionId intentionId;
+}
+
+/// Выбор тегов черновика создания намерения: отметка показывает, входит ли
+/// тег в набор черновика его сессии. Нажатие меняет только этот набор и не
+/// отправляет команд графа.
+final class TagsPanelDraftContext extends TagsPanelContext {
+  const TagsPanelDraftContext(this.tagSet);
+
+  final IntentionDraftTagSet tagSet;
 }
 
 /// Одно открытие панели тегов.

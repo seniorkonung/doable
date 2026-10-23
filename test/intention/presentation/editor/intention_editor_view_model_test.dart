@@ -288,6 +288,41 @@ void main() {
       expect(repository.tagCommands, isEmpty);
     });
 
+    test('исключение через контракт набора меняет только набор и выбранные теги черновика', () async {
+      final repository = ControlledCatalogRepository();
+      final container = _container(repository);
+      final provider = intentionEditorViewModelProvider(
+        IntentionCreationFormKey(),
+      );
+      final subscription = container.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+      final tagSet =
+          (container.read(provider.notifier)
+                ..changeTitle('Намерение')
+                ..confirmReadiness())
+              .draftTagSet
+            ..add(_tag(1, 'Дом'))
+            ..add(_tag(2, 'Выходные'));
+      await _deliverEvents(container);
+      final published = <IntentionDraftTagSetSnapshot>[];
+      final changesSubscription = tagSet.changes.listen(published.add);
+      addTearDown(changesSubscription.cancel);
+
+      tagSet.remove(_tagId(1));
+      await _deliverEvents(container);
+
+      final state = container.read(provider);
+      expect(state.draft.tagIds, [_tagId(2)]);
+      expect(_tagNames(state), {_tagId(2): 'Выходные'});
+      expect(state.draft.title, 'Намерение');
+      expect(state.draft.readiness, IntentionReadiness.ready);
+      expect(published.map((snapshot) => snapshot.tagIds), [
+        [_tagId(2)],
+      ]);
+      expect(repository.commands, isEmpty);
+      expect(repository.tagCommands, isEmpty);
+    });
+
     test(
       'опубликованные наборы неизменяемы и не меняются последующими правками',
       () {

@@ -10,10 +10,13 @@ import 'package:doable/src/design_system/components/tag_row.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/intention/presentation/editor/intention_draft_tag_set.dart';
+import 'package:doable/src/intention/presentation/editor/intention_editor_view_model.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
@@ -125,6 +128,56 @@ void main() {
       semantics.dispose();
     });
   }
+
+  testWidgets('Панель для черновика отмечает его набор и следует за ним, а '
+      'нажатие включает и исключает тег без команд графа', (tester) async {
+    late IntentionDraftTagSet tagSet;
+    final h = await _pumpApp(
+      tester,
+      panelContext: (container) {
+        final session = intentionEditorViewModelProvider(
+          IntentionCreationFormKey(),
+        );
+        container.listen(session, (_, _) {});
+        tagSet = container.read(session.notifier).draftTagSet
+          ..add(_tag(1, 'Дом'));
+        return TagsPanelDraftContext(tagSet);
+      },
+    );
+    await h.open();
+
+    expect(find.text('Теги'), findsOne);
+    expect(find.text('Выберите сколько нужно'), findsOne);
+    expect(h.repository.readModes.single, isA<TagCatalogBrowseMode>());
+    h.repository.complete([_tag(1, 'Дом'), _tag(2, 'Работа'), _tag(3, 'Сад')]);
+    await tester.pump();
+    expect(_marks(tester), [
+      TagRowMark.checked,
+      TagRowMark.none,
+      TagRowMark.none,
+    ]);
+
+    await tester.tap(_row(2));
+    await tester.pump();
+    await tester.tap(_row(1));
+    await tester.pump();
+    expect(_marks(tester), [
+      TagRowMark.none,
+      TagRowMark.checked,
+      TagRowMark.none,
+    ]);
+    expect(tagSet.current.tagIds, [_id(2)]);
+
+    tagSet.add(_tag(3, 'Сад'));
+    await tester.pump();
+    expect(_marks(tester), [
+      TagRowMark.none,
+      TagRowMark.checked,
+      TagRowMark.checked,
+    ]);
+    expect(h.repository.commands, isEmpty);
+    expect(find.byType(SnackBar), findsNothing);
+  });
 
   testWidgets('Большой каталог получен целиком', (tester) async {
     final h = await _pumpApp(tester);
@@ -1298,6 +1351,7 @@ final class _Harness {
 Future<_Harness> _pumpApp(
   WidgetTester tester, {
   Locale locale = const Locale('ru'),
+  TagsPanelContext Function(ProviderContainer container)? panelContext,
 }) async {
   tester.view
     ..devicePixelRatio = 1
@@ -1319,6 +1373,8 @@ Future<_Harness> _pumpApp(
   );
   addTearDown(container.dispose);
   final harness = _Harness(tester, repository, changes);
+  final opened =
+      panelContext?.call(container) ?? TagsPanelAssignmentContext(_intentionId);
 
   await tester.pumpWidget(
     UncontrolledProviderScope(
@@ -1336,7 +1392,7 @@ Future<_Harness> _pumpApp(
               child: TextButton(
                 onPressed: () => showTagsPanel(
                   context,
-                  TagsPanelAssignmentContext(_intentionId),
+                  opened,
                 ).whenComplete(() => harness.isClosed = true),
                 child: const Text('Открыть'),
               ),

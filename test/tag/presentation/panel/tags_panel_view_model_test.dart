@@ -5,6 +5,8 @@ import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/intention/presentation/editor/intention_draft_tag_set.dart';
+import 'package:doable/src/intention/presentation/editor/intention_editor_view_model.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
@@ -851,6 +853,213 @@ void main() {
     await pumpEventQueue();
     expect(h.repository.commands, isEmpty);
   });
+
+  group('черновик создания намерения', () {
+    test(
+      'отметки показывают набор черновика и следуют за его изменениями',
+      () async {
+        final h = _Harness();
+        addTearDown(h.dispose);
+        final draft = h.openDraft()..tagSet.add(_tag(1, 'Дом'));
+        final panel = draft.open();
+        expect(h.repository.readModes.single, isA<TagCatalogBrowseMode>());
+        h.repository.complete([
+          _tag(1, 'Дом'),
+          _tag(2, 'Работа'),
+          _tag(3, 'Выходные'),
+        ]);
+        await pumpEventQueue();
+        expect(_marks(panel), [true, false, false]);
+
+        draft.tagSet
+          ..add(_tag(3, 'Выходные'))
+          ..remove(_id(1));
+        await pumpEventQueue();
+
+        expect(_marks(panel), [false, false, true]);
+        expect(h.repository.reads, hasLength(1));
+      },
+    );
+
+    test('нажатие включает и исключает тег без команд графа, а повторное '
+        'включение оставляет одно включение', () async {
+      final h = _Harness.confirmedByCoordinator();
+      addTearDown(h.dispose);
+      final draft = h.openDraft()..tagSet.add(_tag(1, 'Дом'));
+      final panel = draft.open();
+      h.repository.complete([_tag(1, 'Дом'), _tag(2, 'Работа')]);
+      await pumpEventQueue();
+
+      expect(panel.model.toggle(_id(2)), isNull);
+      await pumpEventQueue();
+      expect(draft.tagSet.current.tagIds, [_id(1), _id(2)]);
+      expect(_marks(panel), [true, true]);
+
+      panel.model.toggle(_id(1));
+      await pumpEventQueue();
+      expect(draft.tagSet.current.tagIds, [_id(2)]);
+      expect(_marks(panel), [false, true]);
+
+      // Второе нажатие раньше обновления отметки приходится на неотмеченную
+      // строку и снова включает тот же тег.
+      panel.model
+        ..toggle(_id(1))
+        ..toggle(_id(1));
+      await pumpEventQueue();
+      expect(draft.tagSet.current.tagIds, [_id(2), _id(1)]);
+      expect(_marks(panel), [true, true]);
+      expect(h.repository.commands, isEmpty);
+    });
+
+    test('Поиск скрывает включённый тег без снятия выбора', () async {
+      final h = _Harness();
+      addTearDown(h.dispose);
+      final draft = h.openDraft()..tagSet.add(_tag(1, 'Дом'));
+      final panel = draft.open();
+      h.repository.complete([_tag(1, 'Дом'), _tag(2, 'Работа')]);
+      await pumpEventQueue();
+
+      panel.model.search('работ');
+      expect(_visibleNames(panel), ['Работа']);
+      panel.model.search('парк');
+      expect(_visibleNames(panel), isEmpty);
+      panel.model.search('');
+      await pumpEventQueue();
+
+      expect(draft.tagSet.current.tagIds, [_id(1)]);
+      expect(_marks(panel), [true, false]);
+    });
+
+    test('Возврат из редактора сохраняет поиск черновика', () async {
+      final h = _Harness();
+      addTearDown(h.dispose);
+      final draft = h.openDraft()..tagSet.add(_tag(2, 'Для дома'));
+      final panel = draft.open();
+      h.repository.complete([_tag(1, 'Работа'), _tag(2, 'Для дома')]);
+      await pumpEventQueue();
+      panel.model.search('дом');
+
+      h.changes.add(
+        _package(
+          2,
+          TagUpdated(
+            TagUpdatedChange(
+              revision: const TagCatalogTestRevision(2),
+              before: _tag(2, 'Для дома'),
+              after: _tag(2, 'Для дома', color: TagColor.blue),
+            ),
+          ),
+        ),
+      );
+      await pumpEventQueue();
+
+      expect(panel.state.search.filter.query, 'дом');
+      final row = panel.loaded.rowsMatching(panel.state.search.filter).single;
+      expect((row.tag.name.value, row.tag.color), ('Для дома', TagColor.blue));
+      expect(row.isMarked, isTrue);
+      expect(draft.tagSet.current.tagIds, [_id(2)]);
+    });
+
+    test('созданный и продублированный тег включается в набор один раз, в том '
+        'числе после закрытия листа', () async {
+      final h = _Harness.confirmedByCoordinator();
+      addTearDown(h.dispose);
+      final draft = h.openDraft();
+      final panel = draft.open();
+      h.repository.complete([_tag(5, 'Дом')]);
+      await pumpEventQueue();
+      panel.model.search('парк');
+
+      panel.model.acceptCreation(h.acceptCreation('парк'));
+      await pumpEventQueue();
+      h.repository.command.complete(
+        TagCommandSucceeded(_created(2, 1, 'парк')),
+      );
+      await pumpEventQueue();
+      expect(panel.state.search.filter.isEmpty, isTrue);
+      expect(draft.tagSet.current.tagIds, [_id(1)]);
+      expect(_names(panel.loaded), ['парк', 'Дом']);
+      expect(_marks(panel), [true, false]);
+
+      final copy = panel.loaded.duplicationOf(_id(5))!;
+      final sheet = tagEditorViewModelProvider(
+        TagEditorCreating(
+          TagCreationFormKey(),
+          initialName: copy.name,
+          placement: copy.placement,
+          onCreationAccepted: panel.model.acceptCreation,
+        ),
+      );
+      final sheetSubscription = h.container.listen(sheet, (_, _) {});
+      unawaited(h.container.read(sheet.notifier).submit());
+      await pumpEventQueue();
+      h.container.read(sheet.notifier).closeSession();
+      sheetSubscription.close();
+      await pumpEventQueue();
+      h.repository.command.complete(
+        TagCommandSucceeded(_created(3, 2, 'Дом 2', at: 6)),
+      );
+      await pumpEventQueue();
+
+      expect(draft.tagSet.current.tagIds, [_id(1), _id(2)]);
+      expect(_names(panel.loaded), ['парк', 'Дом', 'Дом 2']);
+      expect(_marks(panel), [true, false, true]);
+      expect(h.repository.commands, everyElement(isA<CreateTag>()));
+    });
+
+    test('закрытие панели до подтверждения создания не включает тег', () async {
+      final h = _Harness.confirmedByCoordinator();
+      addTearDown(h.dispose);
+      final draft = h.openDraft();
+      final panel = draft.open();
+      h.repository.complete([_tag(5, 'Дом')]);
+      await pumpEventQueue();
+      panel.model.acceptCreation(h.acceptCreation('парк'));
+      await pumpEventQueue();
+
+      panel.close();
+      await pumpEventQueue();
+      h.repository.command.complete(
+        TagCommandSucceeded(_created(2, 1, 'парк')),
+      );
+      await pumpEventQueue();
+
+      expect(draft.tagSet.current.tagIds, isEmpty);
+    });
+
+    test('Удалённый тег уходит из черновика', () async {
+      final h = _Harness.confirmedByCoordinator();
+      addTearDown(h.dispose);
+      final draft = h.openDraft()
+        ..tagSet.add(_tag(1, 'Дом'))
+        ..tagSet.add(_tag(2, 'Работа'));
+      final panel = draft.open();
+      h.repository.complete([_tag(1, 'Дом'), _tag(2, 'Работа')]);
+      await pumpEventQueue();
+
+      panel.model.delete(_id(1));
+      await pumpEventQueue();
+      h.repository.command.complete(
+        TagCommandSucceeded(
+          _package(
+            2,
+            TagDeleted(
+              TagDeletedChange(
+                revision: const TagCatalogTestRevision(2),
+                tagId: _id(1),
+              ),
+            ),
+          ),
+        ),
+      );
+      await pumpEventQueue();
+
+      expect(_names(panel.loaded), ['Работа']);
+      expect(_marks(panel), [true]);
+      expect(draft.tagSet.current.tagIds, [_id(2)]);
+      expect(h.repository.reads, hasLength(1));
+    });
+  });
 }
 
 final _intentionId = _intention(1);
@@ -898,6 +1107,19 @@ final class _Harness {
     TagsPanelOpening(TagsPanelAssignmentContext(_intentionId)),
   );
 
+  /// Сессия создания намерения в том же контейнере, из которой открывается
+  /// панель в контексте её черновика.
+  _DraftSession openDraft() {
+    final session = intentionEditorViewModelProvider(
+      IntentionCreationFormKey(),
+    );
+    container.listen(session, (_, _) {});
+    return _DraftSession(
+      container,
+      container.read(session.notifier).draftTagSet,
+    );
+  }
+
   Future<void> dispose() async {
     container.dispose();
     await changes.close();
@@ -919,6 +1141,16 @@ final class _Panel {
   TagsPanelLoaded get loaded => state.catalog as TagsPanelLoaded;
 
   void close() => subscription.close();
+}
+
+final class _DraftSession {
+  _DraftSession(this.container, this.tagSet);
+
+  final ProviderContainer container;
+  final IntentionDraftTagSet tagSet;
+
+  _Panel open() =>
+      _Panel(container, TagsPanelOpening(TagsPanelDraftContext(tagSet)));
 }
 
 List<String> _names(TagsPanelLoaded loaded) => [

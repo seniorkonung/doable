@@ -9,10 +9,12 @@ import '../../../graph/application/graph_revision.dart';
 import '../../../graph/application/personal_graph_repository.dart';
 import '../../../graph/application/personal_graph_repository_provider.dart';
 import '../../../intention/application/intention_catalog.dart';
+import '../../../intention/presentation/editor/intention_draft_tag_set.dart';
 import '../../application/tag_catalog.dart';
 import '../../application/tag_change.dart';
 import '../../application/tag_command.dart';
 import '../../application/tag_result.dart';
+import '../../domain/tag.dart';
 import '../../domain/tag_id.dart';
 import '../catalog/tag_catalog_filter.dart';
 import 'tags_panel_context.dart';
@@ -37,6 +39,7 @@ final class TagsPanelViewModel extends _$TagsPanelViewModel {
   late TagsPanelContext _context;
   late PersonalGraphRepository _repository;
   StreamSubscription<ConfirmedGraphChangePackage>? _changes;
+  StreamSubscription<IntentionDraftTagSetSnapshot>? _draftChanges;
   GraphRevision? _shownRevision;
   GraphRevision? _requiredRevision;
   Future<void>? _activeRead;
@@ -55,7 +58,16 @@ final class TagsPanelViewModel extends _$TagsPanelViewModel {
     _generation++;
     _staleReadAttempts = 0;
     _changes = ref.watch(tagsPanelChangesProvider).listen(_onChange);
-    ref.onDispose(() => unawaited(_changes?.cancel()));
+    _draftChanges = switch (_context) {
+      TagsPanelAssignmentContext() => null,
+      TagsPanelDraftContext(:final tagSet) => tagSet.changes.listen(
+        (_) => _markDraft(tagSet),
+      ),
+    };
+    ref.onDispose(() {
+      unawaited(_changes?.cancel());
+      unawaited(_draftChanges?.cancel());
+    });
     _requestRead();
     return const TagsPanelState(catalog: TagsPanelLoading());
   }
@@ -75,28 +87,41 @@ final class TagsPanelViewModel extends _$TagsPanelViewModel {
     });
   }
 
-  /// Нажатие на строку назначает неотмеченный тег намерению или снимает
-  /// отмеченный. Отметка меняется только по подтверждённому пакету, поэтому
+  /// Нажатие на строку включает неотмеченный тег в набор контекста или
+  /// исключает отмеченный.
+  ///
+  /// Для намерения нажатие назначает или снимает тег командой графа, которую
+  /// и возвращает. Отметка меняется только по подтверждённому пакету, поэтому
   /// отказ записи оставляет её прежней, а сам отказ принадлежит общей
   /// поверхности. Пока назначения этого намерения меняются, координатор
-  /// отклоняет нажатие по занятому ключу намерения без очереди. На
-  /// неактуальных строках и без намерения нажатие недоступно: `null`.
+  /// отклоняет нажатие по занятому ключу намерения без очереди.
+  ///
+  /// Для черновика нажатие меняет только его набор, команды нет: `null`.
+  /// Отметка следует за изменением набора, а повторное включение тега
+  /// оставляет одно включение.
+  ///
+  /// На неактуальных строках и без намерения нажатие недоступно: `null`.
   TagCommandStart? toggle(TagId tagId) {
     final catalog = state.catalog;
     if (catalog is! TagsPanelLoaded || !catalog.rowsAreCurrent) return null;
     final row = catalog.rows.where((row) => row.tag.id == tagId).firstOrNull;
     if (row == null) return null;
     final coordinator = ref.read(graphCommandCoordinatorProvider.notifier);
-    return switch (_context) {
-      TagsPanelAssignmentContext(:final intentionId) when row.isMarked =>
-        coordinator.acceptTagRemoveAssignment(
+    switch (_context) {
+      case TagsPanelAssignmentContext(:final intentionId) when row.isMarked:
+        return coordinator.acceptTagRemoveAssignment(
           RemoveTagAssignment(tagId: tagId, intentionId: intentionId),
-        ),
-      TagsPanelAssignmentContext(:final intentionId) =>
-        coordinator.acceptTagAssign(
+        );
+      case TagsPanelAssignmentContext(:final intentionId):
+        return coordinator.acceptTagAssign(
           AssignTag(tagId: tagId, intentionId: intentionId),
-        ),
-    };
+        );
+      case TagsPanelDraftContext(:final tagSet) when row.isMarked:
+        tagSet.remove(tagId);
+      case TagsPanelDraftContext(:final tagSet):
+        tagSet.add(row.tag);
+    }
+    return null;
   }
 
   /// Удаляет тег [tagId] со всеми назначениями после подтверждения
@@ -162,10 +187,11 @@ final class TagsPanelViewModel extends _$TagsPanelViewModel {
 
   /// Принятое из листа создание принадлежит этому открытию панели, а не
   /// экранной сессии листа, поэтому закрытие листа его не прерывает. После
-  /// подтверждения модель один раз очищает поиск и отмечает тег отдельной
-  /// командой назначения; её отклонение или отказ оставляют тег
-  /// неотмеченным. Открытие, закрытое до подтверждения, тег не отмечает,
-  /// даже если модель ещё жива.
+  /// подтверждения модель один раз очищает поиск и отмечает тег по контексту:
+  /// для намерения — отдельной командой назначения, отклонение или отказ
+  /// которой оставляют тег неотмеченным, для черновика — включением в его
+  /// набор. Открытие, закрытое до подтверждения, тег не отмечает, даже если
+  /// модель ещё жива.
   void acceptCreation(TagCommandAccepted creation) =>
       unawaited(_markCreated(creation.future));
 
@@ -182,6 +208,8 @@ final class TagsPanelViewModel extends _$TagsPanelViewModel {
           coordinator.acceptTagAssign(
             AssignTag(tagId: tag.id, intentionId: intentionId),
           );
+        case TagsPanelDraftContext(:final tagSet):
+          tagSet.add(tag);
       }
     }
   }
@@ -228,14 +256,19 @@ final class TagsPanelViewModel extends _$TagsPanelViewModel {
       TagsPanelAssignmentContext(:final intentionId) => TagCatalogSelectionMode(
         intentionId,
       ),
+      TagsPanelDraftContext() => const TagCatalogBrowseMode(),
     });
     if (!ref.mounted || generation != _generation) return;
     // Отказ чтения, за которым уже запрошено следующее, ничего не решает.
     if (result is GraphResultFailure && _refreshNeeded) return;
     switch (result) {
-      case GraphResultSuccess(
-        value: TagSelectionSnapshot(:final rows, :final revision),
-      ):
+      case GraphResultSuccess(value: final snapshot):
+        final rows = _rowsOf(snapshot);
+        if (rows == null) {
+          _readFailed(TagsPanelReadFailure.unexpected);
+          return;
+        }
+        final revision = snapshot.revision;
         if (_precedesRequired(revision)) {
           if (++_staleReadAttempts >= _maxStaleReads) {
             _refreshNeeded = false;
@@ -250,18 +283,13 @@ final class TagsPanelViewModel extends _$TagsPanelViewModel {
         _shownRevision = revision;
         state = state.withCatalog(
           TagsPanelLoaded(
-            [
-              for (final row in rows)
-                TagsPanelRow(tag: row.tag, isMarked: row.isAssigned),
-            ],
+            rows,
             pendingMove: switch (state.catalog) {
               TagsPanelLoaded(:final pendingMove) => pendingMove,
               _ => null,
             },
           ),
         );
-      case GraphResultSuccess(value: TagBrowseSnapshot()):
-        _readFailed(TagsPanelReadFailure.unexpected);
       case GraphResultFailure(failure: TagCatalogIntentionNotFound()):
         _generation++;
         _refreshNeeded = false;
@@ -274,6 +302,43 @@ final class TagsPanelViewModel extends _$TagsPanelViewModel {
         _readFailed(TagsPanelReadFailure.unexpected);
     }
   }
+
+  /// Строки снимка с отметками контекста; снимок другого режима — `null`.
+  List<TagsPanelRow>? _rowsOf(TagCatalogSnapshot snapshot) => switch ((
+    _context,
+    snapshot,
+  )) {
+    (TagsPanelAssignmentContext(), TagSelectionSnapshot(:final rows)) => [
+      for (final row in rows)
+        TagsPanelRow(tag: row.tag, isMarked: row.isAssigned),
+    ],
+    (TagsPanelDraftContext(:final tagSet), TagBrowseSnapshot(:final items)) =>
+      _markedByDraft(items, tagSet),
+    _ => null,
+  };
+
+  /// Отметки черновика — его текущий набор. Строка созданного тега приходит
+  /// пакетом раньше, чем модель включает тег в набор, поэтому пакеты отметок
+  /// черновика не меняют.
+  void _markDraft(IntentionDraftTagSet tagSet) {
+    if (state.catalog case final TagsPanelLoaded loaded) {
+      state = state.withCatalog(
+        loaded.withConfirmedRows(
+          _markedByDraft([
+            for (final row in loaded.confirmedRows) row.tag,
+          ], tagSet),
+        ),
+      );
+    }
+  }
+
+  static List<TagsPanelRow> _markedByDraft(
+    List<Tag> tags,
+    IntentionDraftTagSet tagSet,
+  ) => [
+    for (final tag in tags)
+      TagsPanelRow(tag: tag, isMarked: tagSet.current.tagIds.contains(tag.id)),
+  ];
 
   void _readFailed(TagsPanelReadFailure failure) {
     state = state.withCatalog(switch (state.catalog) {
@@ -337,6 +402,7 @@ final class TagsPanelViewModel extends _$TagsPanelViewModel {
   ) {
     final intentionId = switch (_context) {
       TagsPanelAssignmentContext(:final intentionId) => intentionId,
+      TagsPanelDraftContext() => null,
     };
     var applied = rows;
     for (final change in package.changes) {
