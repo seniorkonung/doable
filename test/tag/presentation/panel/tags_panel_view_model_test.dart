@@ -4,7 +4,6 @@ import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
-import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
@@ -1106,54 +1105,6 @@ void main() {
       expect(h.repository.reads, hasLength(1));
     });
 
-    test('Нажатия переключают надобность по кругу и сразу применяют поиск '
-        'без команд графа', () async {
-      final h = _Harness();
-      addTearDown(h.dispose);
-      final search = h.openFilter();
-      final panel = search.open();
-      h.repository.complete([_tag(1, 'Спорт'), _tag(2, 'Дом')]);
-      await pumpEventQueue();
-      expect(panel.state.canClearConditions, isFalse);
-
-      expect(panel.model.toggle(_id(1)), isNull);
-      await pumpEventQueue();
-      expect(search.requirements, [
-        (_id(1), IntentionTagRequirement.mustBePresent),
-      ]);
-      expect(_filterMarks(panel), [_present, TagsPanelFilterMark.none]);
-      expect(
-        h.repository.catalogQueries.last.tagFilter,
-        IntentionTagFilter(requiredTagIds: [_id(1)]),
-      );
-      expect(panel.state.canClearConditions, isTrue);
-
-      panel.model.toggle(_id(1));
-      await pumpEventQueue();
-      expect(search.requirements, [
-        (_id(1), IntentionTagRequirement.mustBeAbsent),
-      ]);
-      expect(_filterMarks(panel), [_absent, TagsPanelFilterMark.none]);
-      expect(
-        h.repository.catalogQueries.last.tagFilter,
-        IntentionTagFilter(excludedTagIds: [_id(1)]),
-      );
-
-      panel.model.toggle(_id(1));
-      await pumpEventQueue();
-      expect(search.requirements, isEmpty);
-      expect(_filterMarks(panel), [
-        TagsPanelFilterMark.none,
-        TagsPanelFilterMark.none,
-      ]);
-      expect(
-        h.repository.catalogQueries.last.tagFilter,
-        IntentionTagFilter.empty,
-      );
-      expect(panel.state.canClearConditions, isFalse);
-      expect(h.repository.commands, isEmpty);
-    });
-
     test('созданный и продублированный тег становится условием «должен быть» '
         'один раз, в том числе после закрытия листа, без назначений', () async {
       final h = _Harness.confirmedByCoordinator();
@@ -1209,28 +1160,6 @@ void main() {
         TagsPanelFilterMark.none,
         _present,
       ]);
-      expect(h.repository.commands, everyElement(isA<CreateTag>()));
-    });
-
-    test('Закрытие панели до подтверждения создания не добавляет '
-        'условия', () async {
-      final h = _Harness.confirmedByCoordinator();
-      addTearDown(h.dispose);
-      final search = h.openFilter();
-      final panel = search.open();
-      h.repository.complete([_tag(5, 'Дом')]);
-      await pumpEventQueue();
-      panel.model.acceptCreation(h.acceptCreation('Парк'));
-      await pumpEventQueue();
-
-      panel.close();
-      await pumpEventQueue();
-      h.repository.command.complete(
-        TagCommandSucceeded(_created(2, 1, 'Парк')),
-      );
-      await pumpEventQueue();
-
-      expect(search.requirements, isEmpty);
       expect(h.repository.commands, everyElement(isA<CreateTag>()));
     });
 

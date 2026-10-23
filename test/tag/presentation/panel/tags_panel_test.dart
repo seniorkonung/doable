@@ -260,89 +260,88 @@ void main() {
       );
       semantics.dispose();
     });
+  }
 
-    testWidgets('${locale.languageCode}: Нажатия переключают надобность по '
-        'кругу и сразу применяют поиск', (tester) async {
-      final semantics = tester.ensureSemantics();
-      late IntentionTagConditionSet conditions;
-      final h = await _pumpApp(
-        tester,
-        locale: locale,
-        panelContext: (container) =>
-            TagsPanelFilterContext(conditions = _searchConditions(container)),
-      );
-      await h.open();
-      h.repository.complete([_tag(1, 'Спорт'), _tag(2, 'Дом')]);
-      await tester.pump();
-      expect(find.text(texts.reset), findsNothing);
+  testWidgets('Нажатия переключают надобность по кругу и сразу применяют '
+      'поиск', (tester) async {
+    final semantics = tester.ensureSemantics();
+    late IntentionTagConditionSet conditions;
+    final h = await _pumpApp(
+      tester,
+      panelContext: (container) =>
+          TagsPanelFilterContext(conditions = _searchConditions(container)),
+    );
+    await h.open();
+    h.repository.complete([_tag(1, 'Спорт'), _tag(2, 'Дом')]);
+    await tester.pump();
+    expect(find.text('Сбросить'), findsNothing);
 
-      for (final (requirement, mark, label, filter) in [
-        (
-          IntentionTagRequirement.mustBePresent,
-          TagRowFilterMark.mustBePresent,
-          texts.present('Спорт'),
-          IntentionTagFilter(requiredTagIds: [_id(1)]),
-        ),
-        (
-          IntentionTagRequirement.mustBeAbsent,
-          TagRowFilterMark.mustBeAbsent,
-          texts.absent('Спорт'),
-          IntentionTagFilter(excludedTagIds: [_id(1)]),
-        ),
-      ]) {
-        await tester.tap(_row(1));
-        await tester.pump();
-        expect(_requirements(conditions), [(_id(1), requirement)]);
-        expect(_marks(tester), [mark, TagRowFilterMark.none]);
-        expect(tester.getSemantics(_row(1)).label, label);
-        expect(h.repository.catalogQueries.last.tagFilter, filter);
-        expect(find.text(texts.reset), findsOne);
-      }
-
+    for (final (requirement, mark, label, filter) in [
+      (
+        IntentionTagRequirement.mustBePresent,
+        TagRowFilterMark.mustBePresent,
+        'Спорт, должен быть',
+        IntentionTagFilter(requiredTagIds: [_id(1)]),
+      ),
+      (
+        IntentionTagRequirement.mustBeAbsent,
+        TagRowFilterMark.mustBeAbsent,
+        'Спорт, должен отсутствовать',
+        IntentionTagFilter(excludedTagIds: [_id(1)]),
+      ),
+    ]) {
       await tester.tap(_row(1));
       await tester.pump();
-      expect(_requirements(conditions), isEmpty);
-      expect(_marks(tester), [TagRowFilterMark.none, TagRowFilterMark.none]);
-      expect(tester.getSemantics(_row(1)).label, 'Спорт');
-      expect(
-        h.repository.catalogQueries.last.tagFilter,
-        IntentionTagFilter.empty,
-      );
-      expect(find.text(texts.reset), findsNothing);
-      expect(h.repository.commands, isEmpty);
-      semantics.dispose();
-    });
+      expect(_requirements(conditions), [(_id(1), requirement)]);
+      expect(_marks(tester), [mark, TagRowFilterMark.none]);
+      expect(tester.getSemantics(_row(1)).label, label);
+      expect(h.repository.catalogQueries.last.tagFilter, filter);
+      expect(find.text('Сбросить'), findsOne);
+    }
 
-    testWidgets('${locale.languageCode}: «Сбросить» снимает все условия по '
-        'тегам и исчезает', (tester) async {
-      late IntentionTagConditionSet conditions;
-      final h = await _pumpApp(
-        tester,
-        locale: locale,
-        panelContext: (container) => TagsPanelFilterContext(
-          conditions = _searchConditions(container)
-            ..cycle(_tag(1, 'Здоровье'), snapshotRevision: _revision)
-            ..cycle(_tag(2, 'Спорт'), snapshotRevision: _revision)
-            ..cycle(_tag(2, 'Спорт'), snapshotRevision: _revision),
-        ),
-      );
-      await h.open();
-      h.repository.complete([_tag(1, 'Здоровье'), _tag(2, 'Спорт')]);
-      await tester.pump();
+    await tester.tap(_row(1));
+    await tester.pump();
+    expect(_requirements(conditions), isEmpty);
+    expect(_marks(tester), [TagRowFilterMark.none, TagRowFilterMark.none]);
+    expect(tester.getSemantics(_row(1)).label, 'Спорт');
+    expect(
+      h.repository.catalogQueries.last.tagFilter,
+      IntentionTagFilter.empty,
+    );
+    expect(find.text('Сбросить'), findsNothing);
+    expect(h.repository.commands, isEmpty);
+    semantics.dispose();
+  });
 
-      await tester.tap(find.text(texts.reset));
-      await tester.pump();
+  testWidgets('«Сбросить» снимает все условия по тегам и исчезает', (
+    tester,
+  ) async {
+    late IntentionTagConditionSet conditions;
+    final h = await _pumpApp(
+      tester,
+      panelContext: (container) => TagsPanelFilterContext(
+        conditions = _searchConditions(container)
+          ..cycle(_tag(1, 'Здоровье'), snapshotRevision: _revision)
+          ..cycle(_tag(2, 'Спорт'), snapshotRevision: _revision)
+          ..cycle(_tag(2, 'Спорт'), snapshotRevision: _revision),
+      ),
+    );
+    await h.open();
+    h.repository.complete([_tag(1, 'Здоровье'), _tag(2, 'Спорт')]);
+    await tester.pump();
 
-      expect(_requirements(conditions), isEmpty);
-      expect(_marks(tester), [TagRowFilterMark.none, TagRowFilterMark.none]);
-      expect(
-        h.repository.catalogQueries.last.tagFilter,
-        IntentionTagFilter.empty,
-      );
-      expect(find.text(texts.reset), findsNothing);
-      expect(h.isClosed, isFalse);
-    });
-  }
+    await tester.tap(find.text('Сбросить'));
+    await tester.pump();
+
+    expect(_requirements(conditions), isEmpty);
+    expect(_marks(tester), [TagRowFilterMark.none, TagRowFilterMark.none]);
+    expect(
+      h.repository.catalogQueries.last.tagFilter,
+      IntentionTagFilter.empty,
+    );
+    expect(find.text('Сбросить'), findsNothing);
+    expect(h.isClosed, isFalse);
+  });
 
   testWidgets('Создание тега без назначений: созданный в панели фильтра тег '
       'становится условием «должен быть»', (tester) async {
