@@ -128,3 +128,18 @@
   - **Зависимости:** 1.1.
   - **Предполагаемые файлы:** `lib/src/intention/application/intention_description_preview.dart`, `test/intention/application/intention_description_preview_test.dart`.
   - **Размер:** XS.
+
+- [ ] 1.9 Сверить набор свёртки начала описания со `String.trim` по всем кодовым единицам вместо ручного списка в тесте
+  - **Критерии приёмки:**
+    - Тест фабрики `IntentionDescriptionPreview.fromDescription` перебирает все кодовые единицы UTF-16 от `U+0000` до `U+FFFF`. `String.trim` определяет пробельные символы по кодовым единицам, и все они лежат в этом диапазоне, поэтому перебор полный.
+      - Если `String.trim` убирает единицу, фабрика сворачивает её внутренние серии в один пробел и обрезает её по краям.
+      - Иначе фабрика возвращает текст с этой единицей без изменений.
+    - Тест падает при любом расхождении набора свёртки с набором `String.trim` в обе стороны: и при потере символа, и при лишнем символе вроде `U+200B`. Сообщение об ошибке называет расходящиеся кодовые единицы.
+    - Ручной список из 26 пробельных символов в тесте удалён; второй копии набора в тестах нет.
+    - Реализация фабрики и её поведение не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/application/intention_description_preview_test.dart`.
+    - `mise exec --no-deps -- flutter analyze test/intention/application/intention_description_preview_test.dart`.
+  - **Зависимости:** 1.8 — набор записан видимыми экранированиями.
+  - **Предполагаемые файлы:** `test/intention/application/intention_description_preview_test.dart`.
+  - **Размер:** XS.
