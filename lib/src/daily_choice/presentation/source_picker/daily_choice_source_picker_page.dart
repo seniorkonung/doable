@@ -164,9 +164,6 @@ final class _DailyChoiceSourcePickerPageState
                           : l10n.catalogNoDescription,
                     ],
                     confirmedTags: summary.tags,
-                    activeRelationCount: ConfirmedActiveRelationCount(
-                      summary.activeRelationCount,
-                    ),
                     tapHint: l10n.sourcePickerSelectHint,
                     onTap: () => unawaited(_close(summary.id)),
                   ),

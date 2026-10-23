@@ -122,8 +122,6 @@ void main() {
             relatedId: testIntentionId(2),
             sourceTitle: 'быть здоровым',
             relatedTitle: 'много ходить',
-            sourceActiveRelationCount: 3,
-            relatedActiveRelationCount: 5,
             relatedArchiveState: IntentionArchiveState.archived,
             priority: RelationPriority.p3,
             scope: RelationScope.archived,
@@ -146,8 +144,6 @@ void main() {
     expect(find.text('Related intention'), findsOneWidget);
     expect(find.text('быть здоровым'), findsOneWidget);
     expect(find.text('много ходить'), findsOneWidget);
-    expect(find.text('Active relations: 3'), findsOneWidget);
-    expect(find.text('Active relations: 5'), findsOneWidget);
     expect(find.text('Active'), findsOneWidget);
     expect(find.text('Archived'), findsOneWidget);
     // Участники в подробностях связи — представление без поиска: тегов и условий в нём нет.
@@ -303,7 +299,6 @@ void main() {
         sourceId: testIntentionId(1),
         relatedId: testIntentionId(2),
         relatedTitle: 'прежнее название',
-        relatedActiveRelationCount: 2,
       ),
       revision: revision,
     );
@@ -317,7 +312,6 @@ void main() {
         relatedId: testIntentionId(2),
         relatedTitle: 'новое название',
         relatedArchiveState: IntentionArchiveState.archived,
-        relatedActiveRelationCount: 0,
         scope: RelationScope.archived,
       ),
       revision: const TestGraphRevision(2),
@@ -326,7 +320,6 @@ void main() {
 
     expect(find.text('прежнее название'), findsNothing);
     expect(find.text('новое название'), findsOneWidget);
-    expect(find.text('Active relations: 0'), findsOneWidget);
     expect(_textOf(tester, 'relation-details-scope'), 'Archived relation');
   });
 
@@ -391,7 +384,6 @@ void main() {
             sourceId: testIntentionId(1),
             relatedId: testIntentionId(2),
             sourceTitle: 'быть здоровым',
-            sourceActiveRelationCount: 2,
           ),
           revision: revision,
         );
@@ -401,7 +393,6 @@ void main() {
       find.byKey(const ValueKey('relation-details-source-participant')),
     );
     expect(node.label, contains('быть здоровым'));
-    expect(node.label, contains('Активных связей: 2'));
     expect(node.hint, contains('Открывает намерение и его собственные связи'));
     expect(node.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
 

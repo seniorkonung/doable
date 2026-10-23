@@ -159,9 +159,6 @@ final class _DailyChoiceActionPickerPageState
                           : l10n.catalogNoDescription,
                     ],
                     confirmedTags: summary.tags,
-                    activeRelationCount: ConfirmedActiveRelationCount(
-                      summary.activeRelationCount,
-                    ),
                     tapHint: l10n.actionPickerSelectHint,
                     onTap: () => unawaited(_close(summary.id)),
                   ),

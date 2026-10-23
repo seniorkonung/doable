@@ -628,8 +628,8 @@ final class _ParticipantTransition extends StatelessWidget {
       children: [
         Text(label, style: Theme.of(context).textTheme.labelLarge),
         const SizedBox(height: 4),
-        // Переход объявляется одним узлом: название, архивное состояние,
-        // активное количество и назначение перехода звучат вместе.
+        // Переход объявляется одним узлом: название, архивное состояние и
+        // назначение перехода звучат вместе.
         Card(
           margin: EdgeInsets.zero,
           clipBehavior: Clip.antiAlias,
@@ -637,9 +637,6 @@ final class _ParticipantTransition extends StatelessWidget {
             key: transitionKey,
             title: participant.title,
             archiveState: participant.archiveState,
-            activeRelationCount: ConfirmedActiveRelationCount(
-              participant.activeRelationCount,
-            ),
             showArchiveState: true,
             tapHint: localizations.relationDetailsOpenParticipant,
             onTap: () => unawaited(

@@ -211,9 +211,6 @@ final class _ParticipantOptionTile extends StatelessWidget {
             archiveState: summary.archiveState,
             showArchiveState: true,
             confirmedTags: summary.tags,
-            activeRelationCount: ConfirmedActiveRelationCount(
-              summary.activeRelationCount,
-            ),
             onTap: () => onSelected(
               GraphSnapshot(
                 revision: revision,

@@ -1219,50 +1219,6 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets(
-    'показывает количество активных связей в каждой строке каталога',
-    (tester) async {
-      final semantics = tester.ensureSemantics();
-      final repository = ControlledCatalogRepository();
-      await tester.pumpWidget(_testApp(repository, locale: const Locale('ru')));
-      repository.complete(
-        0,
-        ResultSuccess(
-          IntentionCatalogFirstPage(
-            items: [
-              testSummary(
-                index: 1,
-                title: 'Быть здоровым',
-                activeRelationCount: 3,
-              ),
-              testSummary(index: 2, title: 'Выбрать страховку'),
-            ],
-            totalCount: 2,
-            nextCursor: null,
-            revision: const TestCatalogRevision(1),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Быть здоровым'), findsOneWidget);
-      expect(find.text('Активных связей: 3'), findsOneWidget);
-      expect(find.text('Активных связей: 0'), findsOneWidget);
-
-      final row = tester.getSemantics(
-        find.ancestor(
-          of: find.text('Быть здоровым'),
-          matching: find.byType(IntentionSummaryView),
-        ),
-      );
-      expect(row.label, contains('Быть здоровым'));
-      expect(row.label, contains('Не готово к действию'));
-      expect(row.label, contains('Активных связей: 3'));
-
-      semantics.dispose();
-    },
-  );
-
   testWidgets('условие, добавленное в панели тегов, сразу начинает выдачу с '
       'верхней позиции', (tester) async {
     final repository = ControlledCatalogRepository();

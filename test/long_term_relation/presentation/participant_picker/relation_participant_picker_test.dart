@@ -114,28 +114,6 @@ void main() {
     expect(repository.queryAt(2).scope, IntentionScope.active);
   });
 
-  testWidgets(
-    'сохраняет одноимённые намерения отдельными строками с их количествами',
-    (tester) async {
-      final repository = ControlledParticipantPickerRepository();
-      addTearDown(repository.dispose);
-      final router = await _pumpAppWithCatalog(tester, repository);
-      addTearDown(router.dispose);
-
-      unawaited(_pushPicker(router, excludedIndex: 9));
-      await _settleRoute(tester);
-      _completePage(repository, 1, [
-        testSummary(index: 1, title: 'Позвонить', activeRelationCount: 2),
-        testSummary(index: 2, title: 'Позвонить', activeRelationCount: 5),
-      ]);
-      await tester.pumpAndSettle();
-
-      expect(find.text('Позвонить'), findsNWidgets(2));
-      expect(find.text('Active relations: 2'), findsOneWidget);
-      expect(find.text('Active relations: 5'), findsOneWidget);
-    },
-  );
-
   for (final (language, markLabel) in [('en', 'Favorite intention')]) {
     testWidgets('$language: одноимённые участники показаны без отметки '
         'избранного и выбираются по идентификатору', (tester) async {
@@ -424,7 +402,6 @@ void main() {
 
     final option = tester.getSemantics(find.byType(IntentionSummaryView));
     expect(option.label, contains('Ходить'));
-    expect(option.label, contains('Active relations: 0'));
     expect(option.hint, 'Selects this intention as a relation participant');
     final details = tester.getSemantics(
       find.byTooltip('Open intention details'),

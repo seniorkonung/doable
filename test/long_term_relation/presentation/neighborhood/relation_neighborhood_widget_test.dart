@@ -1290,7 +1290,6 @@ void main() {
               priority: RelationPriority.p1,
               ownerTitle: 'Build продукт',
               neighborTitle: 'Ship без перевода',
-              neighborActiveRelationCount: 4,
             ),
           ],
           counts: counts,
@@ -1308,7 +1307,6 @@ void main() {
         find.text('Чтобы Build продукт, нужно Ship без перевода'),
         findsOneWidget,
       );
-      expect(find.text('Активных связей: 4'), findsOneWidget);
       expect(tester.takeException(), isNull);
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
