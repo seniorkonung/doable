@@ -2353,6 +2353,30 @@ class AppLocalizationsEn extends AppLocalizations {
   String get intentionPickerEmptyScopeTitle => 'Nothing to choose from';
 
   @override
+  String get intentionPickerActionTitle => 'Choose an action';
+
+  @override
+  String get intentionPickerIntentionTitle => 'Choose an intention';
+
+  @override
+  String get intentionPickerSearchPlaceholder => 'Search by name';
+
+  @override
+  String get intentionPickerClearSearch => 'Clear the name';
+
+  @override
+  String intentionPickerFilterLabel(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Filter by tags, $count conditions',
+      one: 'Filter by tags, 1 condition',
+      zero: 'Filter by tags',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get participantPickerCancel => 'Cancel the selection';
 
   @override

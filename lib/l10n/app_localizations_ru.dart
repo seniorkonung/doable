@@ -2378,6 +2378,32 @@ class AppLocalizationsRu extends AppLocalizations {
   String get intentionPickerEmptyScopeTitle => 'Выбрать не из чего';
 
   @override
+  String get intentionPickerActionTitle => 'Выбор действия';
+
+  @override
+  String get intentionPickerIntentionTitle => 'Выбор намерения';
+
+  @override
+  String get intentionPickerSearchPlaceholder => 'Поиск по названию';
+
+  @override
+  String get intentionPickerClearSearch => 'Очистить название';
+
+  @override
+  String intentionPickerFilterLabel(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Фильтр по тегам, $count условия',
+      many: 'Фильтр по тегам, $count условий',
+      few: 'Фильтр по тегам, $count условия',
+      one: 'Фильтр по тегам, $count условие',
+      zero: 'Фильтр по тегам',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get participantPickerCancel => 'Отменить выбор';
 
   @override

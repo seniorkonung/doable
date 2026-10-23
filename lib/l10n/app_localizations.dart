@@ -3682,6 +3682,36 @@ abstract class AppLocalizations {
   /// **'Nothing to choose from'**
   String get intentionPickerEmptyScopeTitle;
 
+  /// Заголовок шапки экрана выбора действия
+  ///
+  /// In en, this message translates to:
+  /// **'Choose an action'**
+  String get intentionPickerActionTitle;
+
+  /// Заголовок шапки экрана выбора намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Choose an intention'**
+  String get intentionPickerIntentionTitle;
+
+  /// Заполнитель и доступное название поля поиска по названию на экране выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Search by name'**
+  String get intentionPickerSearchPlaceholder;
+
+  /// Доступное название крестика очистки поля поиска на экране выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Clear the name'**
+  String get intentionPickerClearSearch;
+
+  /// Доступное название кнопки фильтра по тегам на экране выбора с числом условий
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{Filter by tags} =1{Filter by tags, 1 condition} other{Filter by tags, {count} conditions}}'**
+  String intentionPickerFilterLabel(int count);
+
   /// Назначение отмены выбора участника
   ///
   /// In en, this message translates to:

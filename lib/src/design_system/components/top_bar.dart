@@ -19,6 +19,7 @@ final class TopBar extends StatelessWidget implements PreferredSizeWidget {
     required this.title,
     required this.closeLabel,
     required this.onClose,
+    this.closeKey,
     super.key,
   });
 
@@ -28,6 +29,9 @@ final class TopBar extends StatelessWidget implements PreferredSizeWidget {
   /// Доступное название крестика.
   final String closeLabel;
   final VoidCallback onClose;
+
+  /// Ключ крестика, по которому его находят сценарии экрана.
+  final Key? closeKey;
 
   @override
   Size get preferredSize => const Size.fromHeight(_height);
@@ -66,6 +70,7 @@ final class TopBar extends StatelessWidget implements PreferredSizeWidget {
                   button: true,
                   label: closeLabel,
                   child: InkResponse(
+                    key: closeKey,
                     onTap: onClose,
                     radius: DoableMetrics.tapMin / 2,
                     child: SizedBox.square(

@@ -1901,6 +1901,27 @@
   "@intentionPickerEmptyScopeTitle": {
     "description": "Заголовок пустой выдачи экрана выбора, когда допустимый охват пуст без фильтров"
   },
+  "intentionPickerActionTitle": "Choose an action",
+  "@intentionPickerActionTitle": {
+    "description": "Заголовок шапки экрана выбора действия"
+  },
+  "intentionPickerIntentionTitle": "Choose an intention",
+  "@intentionPickerIntentionTitle": {
+    "description": "Заголовок шапки экрана выбора намерения"
+  },
+  "intentionPickerSearchPlaceholder": "Search by name",
+  "@intentionPickerSearchPlaceholder": {
+    "description": "Заполнитель и доступное название поля поиска по названию на экране выбора"
+  },
+  "intentionPickerClearSearch": "Clear the name",
+  "@intentionPickerClearSearch": {
+    "description": "Доступное название крестика очистки поля поиска на экране выбора"
+  },
+  "intentionPickerFilterLabel": "{count, plural, =0{Filter by tags} =1{Filter by tags, 1 condition} other{Filter by tags, {count} conditions}}",
+  "@intentionPickerFilterLabel": {
+    "description": "Доступное название кнопки фильтра по тегам на экране выбора с числом условий",
+    "placeholders": {"count": {"type": "int"}}
+  },
   "@participantPickerTitle": {
     "description": "Заголовок выбора участника долговременной связи"
   },

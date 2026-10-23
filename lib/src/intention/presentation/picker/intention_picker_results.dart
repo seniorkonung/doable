@@ -14,6 +14,7 @@ import '../../domain/intention_id.dart';
 import '../catalog/intention_catalog_purpose.dart';
 import '../catalog/intention_catalog_state.dart';
 import '../catalog/intention_catalog_view_model.dart';
+import 'intention_picker_kind.dart';
 import 'intention_picker_row.dart';
 
 /// Выдача экрана выбора назначения [purpose]: заголовок с количеством,
@@ -81,7 +82,7 @@ final class _IntentionPickerResultsState
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final kind = _PickedKind.of(widget.purpose);
+    final kind = IntentionPickerKind.of(widget.purpose);
     ref.listen(
       intentionCatalogViewModelProvider(widget.purpose),
       (_, next) => _startNewResultsFromTop(next),
@@ -143,11 +144,13 @@ final class _IntentionPickerResultsState
       ListView(padding: _sidePadding, children: [state]);
 
   Widget _list(
-    _PickedKind kind,
+    IntentionPickerKind kind,
     IntentionCatalogConfirmedState results,
     List<Widget> slivers,
   ) => CustomScrollView(
-    key: PageStorageKey<String>('${_keyPrefix(widget.purpose)}-list'),
+    key: PageStorageKey<String>(
+      '${intentionPickerKeyPrefix(widget.purpose)}-list',
+    ),
     controller: _scrollController,
     slivers: [
       SliverPadding(
@@ -176,7 +179,7 @@ final class _IntentionPickerResultsState
     final summary = results.items[index];
     return IntentionPickerRow(
       key: ValueKey(
-        '${_keyPrefix(widget.purpose)}-${summary.id.toCanonicalString()}',
+        '${intentionPickerKeyPrefix(widget.purpose)}-${summary.id.toCanonicalString()}',
       ),
       purpose: widget.purpose,
       summary: summary,
@@ -190,7 +193,7 @@ final class _IntentionPickerResultsState
 
   Widget? _continuation(
     AppLocalizations l10n,
-    _PickedKind kind,
+    IntentionPickerKind kind,
     IntentionCatalogLoaded results,
   ) => switch (results.continuation) {
     IntentionCatalogContinuationIdle() when results.nextCursor == null => null,
@@ -249,52 +252,5 @@ final class _IntentionPickerResultsState
   ) => switch (catalog.value) {
     IntentionCatalogConfirmedState(:final query) => query,
     _ => null,
-  };
-
-  /// Начало ключей списка и строк, по которым их находят сценарии поисков.
-  static String _keyPrefix(IntentionPickerPurpose purpose) => switch (purpose) {
-    SelectDailyChoiceAction() => 'daily-choice-action',
-    SelectDailyChoiceSource() => 'daily-choice-source',
-  };
-}
-
-/// Что выбирает поиск: от этого зависят тексты выдачи.
-enum _PickedKind {
-  action,
-  intention;
-
-  static _PickedKind of(IntentionPickerPurpose purpose) => switch (purpose) {
-    SelectDailyChoiceAction() => action,
-    SelectDailyChoiceSource() => intention,
-  };
-
-  String header(AppLocalizations l10n) => switch (this) {
-    action => l10n.intentionPickerActionsHeader,
-    intention => l10n.intentionPickerIntentionsHeader,
-  };
-
-  String loading(AppLocalizations l10n) => switch (this) {
-    action => l10n.actionPickerLoading,
-    intention => l10n.catalogLoading,
-  };
-
-  String loadingMore(AppLocalizations l10n) => switch (this) {
-    action => l10n.intentionPickerLoadingMoreActions,
-    intention => l10n.intentionPickerLoadingMoreIntentions,
-  };
-
-  String unavailable(AppLocalizations l10n) => switch (this) {
-    action => l10n.actionPickerUnavailable,
-    intention => l10n.catalogUnavailable,
-  };
-
-  String corruption(AppLocalizations l10n) => switch (this) {
-    action => l10n.actionPickerCorruption,
-    intention => l10n.catalogCorruption,
-  };
-
-  String unexpected(AppLocalizations l10n) => switch (this) {
-    action => l10n.actionPickerUnexpected,
-    intention => l10n.catalogUnexpectedFailure,
   };
 }
