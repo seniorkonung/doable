@@ -717,7 +717,7 @@
   - **Предполагаемые файлы:** `lib/src/design_system/components/tag_row.dart`, `lib/src/design_system/doable_icon.dart`, `lib/src/design_system/icons/assets/exclude.svg` (новый), `lib/src/design_system/icons/README.md`, `lib/src/tag/presentation/panel/tags_panel.dart`, `test/design_system/tag_row_test.dart`, `test/design_system/doable_icon_test.dart`, `test/design_system/goldens/doable_icons.png`; помощники чтения отметки `test/tag/presentation/panel/tags_panel_test.dart` и `test/app/tag_assignment_app_flow_test.dart`.
   - **Размер:** S.
 
-- [ ] 4.5 Добавить в раскрываемый лист модуля основ действие шапки, а в кнопку — вид text
+- [x] 4.5 Добавить в раскрываемый лист модуля основ действие шапки, а в кнопку — вид text
   - **Критерии приёмки:**
     - `Button` по правилам компонента дизайн-системы получает вид text: текст `accent` без плашки, размер sm с боковыми отступами `space-2` и область нажатия не меньше `tap-min`. Выключенная кнопка остаётся на месте с текстом `grip`.
     - `Sheet.expandable` получает необязательное действие шапки по правилам компонента `Sheet`: кнопку вида text размера sm справа от заголовка, по центру строки заголовка в половинном и полном размерах. Подпись заканчивается в `space-5` от края экрана, а заголовок остаётся по центру; без действия шапка не меняется. Подпись, доступное название и обработчик задаёт потребитель по ADR-0030.

@@ -1,3 +1,4 @@
+import 'package:doable/src/design_system/components/button.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
@@ -11,6 +12,7 @@ const _full = 844.0 - _statusBar;
 const _expandLabel = 'Раскрыть на весь экран';
 const _collapseLabel = 'Свернуть';
 const _homeIndicator = 34.0;
+const _resetLabel = 'Сбросить условия по тегам';
 
 void main() {
   testWidgets('перетаскивание шапки на 48 вверх раскрывает лист, вниз '
@@ -279,6 +281,69 @@ void main() {
     expect(_sheetHeight(tester), _half);
   });
 
+  testWidgets('действие шапки стоит справа на строке заголовка в половинном '
+      'и полном размерах, заголовок остаётся по центру, а нажатие вызывает '
+      'обработчик без изменения размера листа', (tester) async {
+    final semantics = tester.ensureSemantics();
+    var presses = 0;
+    await _openExpandableSheet(tester, onReset: () => presses++);
+
+    for (final (size, height) in [('половинный', _half), ('полный', _full)]) {
+      final title = tester.getRect(find.text('Теги'));
+      final label = tester.getRect(find.text('Сбросить'));
+      expect(label.right, _screen.width - 20, reason: size);
+      expect(label.center.dy, closeTo(title.center.dy, 0.01), reason: size);
+      expect(title.center.dx, _screen.width / 2, reason: size);
+      expect(
+        tester.getSemantics(find.bySemanticsLabel(_resetLabel)),
+        isSemantics(
+          label: _resetLabel,
+          isButton: true,
+          hasEnabledState: true,
+          isEnabled: true,
+          isFocusable: true,
+          hasTapAction: true,
+          hasFocusAction: true,
+        ),
+        reason: size,
+      );
+
+      // Верх области нажатия выше строки заголовка.
+      final area = tester.getRect(find.byType(Button));
+      expect(area.height, greaterThanOrEqualTo(44), reason: size);
+      expect(area.top, lessThan(title.top), reason: size);
+      final before = presses;
+      await tester.tapAt(Offset(area.center.dx, area.top + 1));
+      await tester.pumpAndSettle();
+      expect(presses, before + 1, reason: size);
+      expect(_sheetHeight(tester), height, reason: size);
+
+      if (height == _half) {
+        await tester.tap(find.bySemanticsLabel(_expandLabel));
+        await tester.pumpAndSettle();
+      }
+    }
+    semantics.dispose();
+  });
+
+  testWidgets('без действия шапка листа та же, что и с ним, но без кнопки', (
+    tester,
+  ) async {
+    await _openExpandableSheet(tester, onReset: () {});
+    final title = tester.getCenter(find.text('Теги'));
+    final text = tester.getRect(find.text('Выберите сколько нужно'));
+    final pinned = tester.getRect(find.text('Поиск'));
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    await _openExpandableSheet(tester);
+
+    expect(find.byType(Button), findsNothing);
+    expect(tester.getCenter(find.text('Теги')), title);
+    expect(tester.getRect(find.text('Выберите сколько нужно')), text);
+    expect(tester.getRect(find.text('Поиск')), pinned);
+  });
+
   testWidgets('касание затемнения закрывает лист', (tester) async {
     final sheet = await _openExpandableSheet(tester);
 
@@ -313,9 +378,11 @@ final class _OpenedSheet {
   bool isClosed = false;
 }
 
+/// С [onReset] у листа есть действие шапки «Сбросить».
 Future<_OpenedSheet> _openExpandableSheet(
   WidgetTester tester, {
   bool hostsMessages = false,
+  VoidCallback? onReset,
 }) => _openSheet(
   tester,
   (context) => showDoableExpandableSheet<void>(
@@ -327,6 +394,14 @@ Future<_OpenedSheet> _openExpandableSheet(
       text: 'Выберите сколько нужно',
       expandLabel: _expandLabel,
       collapseLabel: _collapseLabel,
+      action: switch (onReset) {
+        final onReset? => (
+          label: 'Сбросить',
+          semanticLabel: _resetLabel,
+          onPressed: onReset,
+        ),
+        null => null,
+      },
       pinned: const SizedBox(height: 44, child: Text('Поиск')),
       body: ListView.builder(
         itemCount: 40,

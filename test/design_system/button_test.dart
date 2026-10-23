@@ -125,6 +125,93 @@ void main() {
     }
   }
 
+  for (final brightness in Brightness.values) {
+    final theme = brightness == Brightness.light ? 'светлой' : 'тёмной';
+    final colors = switch (brightness) {
+      Brightness.light => DoableColors.light,
+      Brightness.dark => DoableColors.dark,
+    };
+
+    testWidgets('в $theme теме текстовая кнопка — текст accent без плашки '
+        'размера sm с областью нажатия не меньше tap-min', (tester) async {
+      final semantics = tester.ensureSemantics();
+      await tester.pumpWidget(
+        _app(
+          brightness: brightness,
+          button: Button.text(
+            label: 'Сбросить',
+            semanticLabel: 'Сбросить условия',
+            onPressed: () {},
+          ),
+          block: false,
+        ),
+      );
+
+      final pill = tester.getRect(_plane);
+      final text = tester.getRect(find.text('Сбросить'));
+      expect(pill.height, DoableMetrics.controlHeightSm);
+      expect(pill.width, text.width + 2 * DoableMetrics.space2);
+      expect(_planeMaterial(tester).color, Colors.transparent);
+      expect(
+        tester.getSize(find.byType(Button)).height,
+        greaterThanOrEqualTo(DoableMetrics.tapMin),
+        reason: 'область нажатия выше подписи',
+      );
+
+      final style = _labelStyle(tester, 'Сбросить');
+      expect(style.color, colors.accent);
+      expect(style.fontSize, DoableType.section.fontSize);
+      expect(style.fontWeight, DoableType.section.fontWeight);
+      expect(tester.getCenter(find.text('Сбросить')), pill.center);
+      expect(
+        tester.getSemantics(find.byType(Button)),
+        matchesSemantics(
+          label: 'Сбросить условия',
+          isButton: true,
+          hasEnabledState: true,
+          isEnabled: true,
+          isFocusable: true,
+          hasTapAction: true,
+          hasFocusAction: true,
+        ),
+      );
+      semantics.dispose();
+    });
+
+    testWidgets('в $theme теме выключенная текстовая кнопка остаётся на месте '
+        'с текстом grip и объявляется недоступной', (tester) async {
+      final semantics = tester.ensureSemantics();
+      Button build(VoidCallback? onPressed) => Button.text(
+        label: 'Сбросить',
+        semanticLabel: 'Сбросить условия',
+        onPressed: onPressed,
+      );
+      await tester.pumpWidget(
+        _app(brightness: brightness, button: build(() {}), block: false),
+      );
+      final enabledPill = tester.getRect(_plane);
+
+      await tester.pumpWidget(
+        _app(brightness: brightness, button: build(null), block: false),
+      );
+      // Material меняет цвета кнопки с анимацией.
+      await tester.pumpAndSettle();
+
+      expect(tester.getRect(_plane), enabledPill);
+      expect(_planeMaterial(tester).color, Colors.transparent);
+      expect(_labelStyle(tester, 'Сбросить').color, colors.grip);
+      expect(
+        tester.getSemantics(find.byType(Button)),
+        matchesSemantics(
+          label: 'Сбросить условия',
+          isButton: true,
+          hasEnabledState: true,
+        ),
+      );
+      semantics.dispose();
+    });
+  }
+
   testWidgets('нажатие по области выше плашки передаётся потребителю', (
     tester,
   ) async {
@@ -197,8 +284,12 @@ final _plane = find.descendant(
 
 Material _planeMaterial(WidgetTester tester) => tester.widget<Material>(_plane);
 
-TextStyle _labelStyle(WidgetTester tester, String label) =>
-    tester.renderObject<RenderParagraph>(find.text(label)).text.style!;
+TextStyle _labelStyle(WidgetTester tester, String label) => tester
+    .renderObject<RenderParagraph>(
+      find.descendant(of: find.text(label), matching: find.byType(RichText)),
+    )
+    .text
+    .style!;
 
 /// С [block] кнопка стоит в контейнере шириной 360, без него — свободно.
 Widget _app({

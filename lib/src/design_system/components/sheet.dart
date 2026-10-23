@@ -10,6 +10,7 @@ import '../doable_icon.dart';
 import '../doable_metrics.dart';
 import '../doable_shadows.dart';
 import '../doable_type.dart';
+import 'button.dart';
 
 /// Возможность построить лист по содержимому [Sheet.new].
 ///
@@ -120,6 +121,14 @@ final class _MessagesHost extends InheritedWidget {
   bool updateShouldNotify(_MessagesHost oldWidget) => false;
 }
 
+/// Действие шапки раскрываемого листа: подпись, доступное название и
+/// обработчик нажатия.
+typedef SheetAction = ({
+  String label,
+  String semanticLabel,
+  VoidCallback onPressed,
+});
+
 /// Лист с ручкой, заголовком, пояснением, телом и нижней частью.
 ///
 /// Вариант листа строится только с возможностью, которую даёт построителю
@@ -148,6 +157,8 @@ final class Sheet extends StatelessWidget {
   /// [body] — собственный прокручиваемый список тела, который занимает место
   /// между [pinned] и [footer]; его прокрутка не меняет размер листа.
   /// [expandLabel] и [collapseLabel] — доступные названия ручки.
+  /// [action] — текстовая кнопка размера sm справа на строке заголовка,
+  /// например «Сбросить»; заголовок при ней остаётся по центру.
   const Sheet.expandable(
     ExpandableSheetCapability _, {
     required this.title,
@@ -157,6 +168,7 @@ final class Sheet extends StatelessWidget {
     required Widget footer,
     required String expandLabel,
     required String collapseLabel,
+    SheetAction? action,
     super.key,
   }) : text = text,
        child = body,
@@ -167,6 +179,7 @@ final class Sheet extends StatelessWidget {
          footer: footer,
          expandLabel: expandLabel,
          collapseLabel: collapseLabel,
+         action: action,
        );
 
   final String title;
@@ -217,7 +230,7 @@ final class Sheet extends StatelessWidget {
             children: [
               Center(child: _Grip(color: colors.grip)),
               const SizedBox(height: 14),
-              _TitleBlock(title: title, text: text),
+              _TitleBlock(title: title, text: text, action: null),
               const SizedBox(height: DoableMetrics.space3),
               Flexible(child: SingleChildScrollView(child: child)),
             ],
@@ -449,6 +462,7 @@ typedef _Expansion = ({
   Widget footer,
   String expandLabel,
   String collapseLabel,
+  SheetAction? action,
 });
 
 final class _ExpandableSheet extends StatefulWidget {
@@ -560,7 +574,18 @@ final class _ExpandableSheetState extends State<_ExpandableSheet>
         ),
       ),
     );
-    final titleBlock = _TitleBlock(title: widget.title, text: expansion.text);
+    final titleBlock = _TitleBlock(
+      title: widget.title,
+      text: expansion.text,
+      action: switch (expansion.action) {
+        final action? => Button.text(
+          label: action.label,
+          semanticLabel: action.semanticLabel,
+          onPressed: action.onPressed,
+        ),
+        null => null,
+      },
+    );
     // Ручка половинного листа стоит над началом заголовка, чтобы область
     // нажатия была не меньше 44 при прежнем положении ручки и заголовка.
     final header = _isFull
@@ -679,42 +704,155 @@ final class _Grip extends StatelessWidget {
 }
 
 final class _TitleBlock extends StatelessWidget {
-  const _TitleBlock({required this.title, required this.text});
+  const _TitleBlock({
+    required this.title,
+    required this.text,
+    required this.action,
+  });
 
   final String title;
   final String? text;
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
     final colors = _colorsOf(Theme.of(context));
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Semantics(
-          header: true,
-          namesRoute: true,
+    return _TitleLayout(
+      title: Semantics(
+        header: true,
+        namesRoute: true,
+        child: Text(
+          title,
+          textAlign: TextAlign.center,
+          style: DoableType.title.copyWith(color: colors.ink),
+        ),
+      ),
+      action: action,
+      text: switch (text) {
+        final text? => Padding(
+          padding: const EdgeInsets.symmetric(horizontal: DoableMetrics.space4),
           child: Text(
-            title,
+            text,
             textAlign: TextAlign.center,
-            style: DoableType.title.copyWith(color: colors.ink),
+            style: DoableType.hint.copyWith(color: colors.muted),
           ),
         ),
-        if (text case final text?) ...[
-          const SizedBox(height: 2),
-          Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: DoableMetrics.space4,
-            ),
-            child: Text(
-              text,
-              textAlign: TextAlign.center,
-              style: DoableType.hint.copyWith(color: colors.muted),
-            ),
-          ),
-        ],
-      ],
+        null => null,
+      },
     );
+  }
+}
+
+enum _TitleSlot { title, action, text }
+
+/// Заголовок по центру, действие справа на его строке и пояснение под ним.
+///
+/// Заголовок отступает от обоих краёв на ширину действия, поэтому остаётся
+/// по центру и не заходит под действие. Область нажатия действия выше строки
+/// заголовка и выходит за верх раскладки; там она тоже принимает касания.
+final class _TitleLayout
+    extends SlottedMultiChildRenderObjectWidget<_TitleSlot, RenderBox> {
+  const _TitleLayout({
+    required this.title,
+    required this.action,
+    required this.text,
+  });
+
+  final Widget title;
+  final Widget? action;
+  final Widget? text;
+
+  @override
+  Iterable<_TitleSlot> get slots => _TitleSlot.values;
+
+  @override
+  Widget? childForSlot(_TitleSlot slot) => switch (slot) {
+    _TitleSlot.title => title,
+    _TitleSlot.action => action,
+    _TitleSlot.text => text,
+  };
+
+  @override
+  _RenderTitleLayout createRenderObject(BuildContext context) =>
+      _RenderTitleLayout();
+}
+
+final class _RenderTitleLayout extends RenderBox
+    with SlottedContainerRenderObjectMixin<_TitleSlot, RenderBox> {
+  static const _textGap = 2.0;
+
+  @override
+  void performLayout() {
+    final width = constraints.maxWidth;
+    final title = childForSlot(_TitleSlot.title)!;
+    final action = childForSlot(_TitleSlot.action);
+    final text = childForSlot(_TitleSlot.text);
+
+    action?.layout(BoxConstraints(maxWidth: width), parentUsesSize: true);
+    final inset = action?.size.width ?? 0;
+    title.layout(
+      BoxConstraints.tightFor(width: math.max(0, width - 2 * inset)),
+      parentUsesSize: true,
+    );
+    _place(title, Offset(inset, 0));
+    if (action != null) {
+      _place(
+        action,
+        Offset(
+          width - action.size.width,
+          (title.size.height - action.size.height) / 2,
+        ),
+      );
+    }
+    var height = title.size.height;
+    if (text != null) {
+      text.layout(BoxConstraints.tightFor(width: width), parentUsesSize: true);
+      height += _textGap;
+      _place(text, Offset(0, height));
+      height += text.size.height;
+    }
+    size = constraints.constrain(Size(width, height));
+  }
+
+  static void _place(RenderBox child, Offset offset) =>
+      (child.parentData! as BoxParentData).offset = offset;
+
+  static Offset _offsetOf(RenderBox child) =>
+      (child.parentData! as BoxParentData).offset;
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    for (final child in children) {
+      context.paintChild(child, offset + _offsetOf(child));
+    }
+  }
+
+  @override
+  bool hitTest(BoxHitTestResult result, {required Offset position}) {
+    final action = childForSlot(_TitleSlot.action);
+    final isInside =
+        size.contains(position) ||
+        (action != null &&
+            (_offsetOf(action) & action.size).contains(position));
+    if (!isInside || !hitTestChildren(result, position: position)) {
+      return false;
+    }
+    result.add(BoxHitTestEntry(this, position));
+    return true;
+  }
+
+  @override
+  bool hitTestChildren(BoxHitTestResult result, {required Offset position}) {
+    for (final child in children) {
+      final isHit = result.addWithPaintOffset(
+        offset: _offsetOf(child),
+        position: position,
+        hitTest: (result, transformed) =>
+            child.hitTest(result, position: transformed),
+      );
+      if (isHit) return true;
+    }
+    return false;
   }
 }
 
