@@ -2377,6 +2377,37 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get intentionPickerNoActionsByTitle => 'No actions with this name';
+
+  @override
+  String get intentionPickerNoIntentionsByTitle =>
+      'No intentions with this name';
+
+  @override
+  String get intentionPickerTryShorterTitle => 'Try a shorter name.';
+
+  @override
+  String get intentionPickerNoActionsByTags => 'No actions match these tags';
+
+  @override
+  String get intentionPickerNoIntentionsByTags =>
+      'No intentions match these tags';
+
+  @override
+  String get intentionPickerChangeTags =>
+      'Change the tags in the filter or reset it.';
+
+  @override
+  String get intentionPickerNothingFound => 'Nothing found';
+
+  @override
+  String get intentionPickerChangeTitleOrTags =>
+      'Change the name or the tag conditions.';
+
+  @override
+  String get intentionPickerResetFilters => 'Reset filters';
+
+  @override
   String get participantPickerCancel => 'Cancel the selection';
 
   @override

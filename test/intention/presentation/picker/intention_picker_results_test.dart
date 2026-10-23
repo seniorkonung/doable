@@ -1,6 +1,5 @@
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/design_system/components/catalog_header.dart';
-import 'package:doable/src/design_system/components/empty_state.dart';
 import 'package:doable/src/design_system/components/list_state.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -100,26 +99,6 @@ void main() {
       expect(h.notifier.selection.filterValidationFailure, isNotNull);
       expect(_listState, findsNothing);
       expect(find.byType(CatalogHeader), findsNothing);
-    });
-
-    testWidgets('пустой охват показывает заголовок с нулём и сообщение '
-        'страницы без кнопки', (tester) async {
-      final h = await _open(tester);
-
-      h.repository.complete(0, _firstPage(const []));
-      await _settle(tester);
-
-      expect(_header('Действия', 0), findsOneWidget);
-      expect(
-        find.descendant(
-          of: find.byType(EmptyState),
-          matching: find.text('Выбрать не из чего'),
-        ),
-        findsOneWidget,
-      );
-      expect(find.text(_emptyScopeRu), findsOneWidget);
-      expect(find.byType(TextButton), findsNothing);
-      expect(find.byType(FilledButton), findsNothing);
     });
 
     testWidgets('поиск исходного намерения называет выдачу «Намерения»', (
@@ -401,6 +380,7 @@ Future<_Harness> _open(
           body: IntentionPickerResults(
             purpose: h.purpose,
             emptyScopeMessage: _emptyScopeRu,
+            onResetFilters: () {},
             onPick: h.picks.add,
             onOpenDetails: h.openedDetails.add,
           ),

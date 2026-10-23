@@ -3712,6 +3712,60 @@ abstract class AppLocalizations {
   /// **'{count, plural, =0{Filter by tags} =1{Filter by tags, 1 condition} other{Filter by tags, {count} conditions}}'**
   String intentionPickerFilterLabel(int count);
 
+  /// Заголовок пустой выдачи выбора действия из-за фильтра названия
+  ///
+  /// In en, this message translates to:
+  /// **'No actions with this name'**
+  String get intentionPickerNoActionsByTitle;
+
+  /// Заголовок пустой выдачи выбора намерения из-за фильтра названия
+  ///
+  /// In en, this message translates to:
+  /// **'No intentions with this name'**
+  String get intentionPickerNoIntentionsByTitle;
+
+  /// Совет пустой выдачи экрана выбора из-за фильтра названия
+  ///
+  /// In en, this message translates to:
+  /// **'Try a shorter name.'**
+  String get intentionPickerTryShorterTitle;
+
+  /// Заголовок пустой выдачи выбора действия из-за условий по тегам
+  ///
+  /// In en, this message translates to:
+  /// **'No actions match these tags'**
+  String get intentionPickerNoActionsByTags;
+
+  /// Заголовок пустой выдачи выбора намерения из-за условий по тегам
+  ///
+  /// In en, this message translates to:
+  /// **'No intentions match these tags'**
+  String get intentionPickerNoIntentionsByTags;
+
+  /// Совет пустой выдачи экрана выбора из-за условий по тегам
+  ///
+  /// In en, this message translates to:
+  /// **'Change the tags in the filter or reset it.'**
+  String get intentionPickerChangeTags;
+
+  /// Заголовок пустой выдачи экрана выбора из-за фильтра названия и условий по тегам
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing found'**
+  String get intentionPickerNothingFound;
+
+  /// Совет пустой выдачи экрана выбора из-за фильтра названия и условий по тегам
+  ///
+  /// In en, this message translates to:
+  /// **'Change the name or the tag conditions.'**
+  String get intentionPickerChangeTitleOrTags;
+
+  /// Действие пустой выдачи экрана выбора, которое снимает фильтр названия и все условия по тегам
+  ///
+  /// In en, this message translates to:
+  /// **'Reset filters'**
+  String get intentionPickerResetFilters;
+
   /// Назначение отмены выбора участника
   ///
   /// In en, this message translates to:

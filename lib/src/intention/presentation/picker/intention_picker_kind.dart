@@ -28,6 +28,16 @@ enum IntentionPickerKind {
     intention => l10n.catalogLoading,
   };
 
+  String noMatchesByTitle(AppLocalizations l10n) => switch (this) {
+    action => l10n.intentionPickerNoActionsByTitle,
+    intention => l10n.intentionPickerNoIntentionsByTitle,
+  };
+
+  String noMatchesByTags(AppLocalizations l10n) => switch (this) {
+    action => l10n.intentionPickerNoActionsByTags,
+    intention => l10n.intentionPickerNoIntentionsByTags,
+  };
+
   String loadingMore(AppLocalizations l10n) => switch (this) {
     action => l10n.intentionPickerLoadingMoreActions,
     intention => l10n.intentionPickerLoadingMoreIntentions,

@@ -2404,6 +2404,37 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
+  String get intentionPickerNoActionsByTitle =>
+      'Нет действий с таким названием';
+
+  @override
+  String get intentionPickerNoIntentionsByTitle =>
+      'Нет намерений с таким названием';
+
+  @override
+  String get intentionPickerTryShorterTitle => 'Попробуйте название короче.';
+
+  @override
+  String get intentionPickerNoActionsByTags => 'Нет действий под эти теги';
+
+  @override
+  String get intentionPickerNoIntentionsByTags => 'Нет намерений под эти теги';
+
+  @override
+  String get intentionPickerChangeTags =>
+      'Измените теги в фильтре или сбросьте его.';
+
+  @override
+  String get intentionPickerNothingFound => 'Ничего не найдено';
+
+  @override
+  String get intentionPickerChangeTitleOrTags =>
+      'Измените название или условия по тегам.';
+
+  @override
+  String get intentionPickerResetFilters => 'Сбросить фильтры';
+
+  @override
   String get participantPickerCancel => 'Отменить выбор';
 
   @override

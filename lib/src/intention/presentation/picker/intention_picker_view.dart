@@ -142,6 +142,11 @@ final class _IntentionPickerViewState
               child: IntentionPickerResults(
                 purpose: widget.purpose,
                 emptyScopeMessage: widget.emptyScopeMessage,
+                onResetFilters: () {
+                  _titleController.clear();
+                  notifier.clearTitleFilter();
+                  ref.read(conditionsProvider.notifier).clear();
+                },
                 onPick: widget.onPick,
                 onOpenDetails: widget.onOpenDetails,
               ),

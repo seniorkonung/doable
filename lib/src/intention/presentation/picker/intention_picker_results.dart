@@ -7,6 +7,7 @@ import '../../../../l10n/app_localizations.dart';
 import '../../../design_system/components/catalog_header.dart';
 import '../../../design_system/components/empty_state.dart';
 import '../../../design_system/components/list_state.dart';
+import '../../../design_system/doable_icon.dart';
 import '../../../design_system/doable_metrics.dart';
 import '../../../graph/application/graph_revision.dart';
 import '../../application/intention_catalog.dart';
@@ -20,12 +21,16 @@ import 'intention_picker_row.dart';
 /// Выдача экрана выбора назначения [purpose]: заголовок с количеством,
 /// строки, подгрузка следующей порции, пустая выдача и отказы.
 ///
+/// Пустая выдача из-за фильтра называет его причину и предлагает сбросить
+/// фильтры.
+///
 /// Элемент один владеет прокруткой списка и возвращает его к началу, когда
 /// модель подтверждает выдачу нового запроса.
 final class IntentionPickerResults extends ConsumerStatefulWidget {
   const IntentionPickerResults({
     required this.purpose,
     required this.emptyScopeMessage,
+    required this.onResetFilters,
     required this.onPick,
     required this.onOpenDetails,
     super.key,
@@ -35,6 +40,10 @@ final class IntentionPickerResults extends ConsumerStatefulWidget {
 
   /// Сообщение страницы о том, что допустимый охват пуст.
   final String emptyScopeMessage;
+
+  /// Снимает фильтр названия и все условия по тегам: полем названия владеет
+  /// экран.
+  final VoidCallback onResetFilters;
 
   /// Получает сводку строки с ревизией выдачи, из которой строка построена:
   /// к моменту нажатия модель может держать уже другую выдачу.
@@ -111,10 +120,7 @@ final class _IntentionPickerResultsState
         final IntentionCatalogEmpty empty => _list(kind, empty, [
           SliverFillRemaining(
             hasScrollBody: false,
-            child: EmptyState(
-              title: l10n.intentionPickerEmptyScopeTitle,
-              text: widget.emptyScopeMessage,
-            ),
+            child: _empty(l10n, kind, empty.query),
           ),
         ]),
         IntentionCatalogUnavailable() => _status(
@@ -137,6 +143,50 @@ final class _IntentionPickerResultsState
       loading: () => _status(ListState.loading(text: kind.loading(l10n))),
     );
   }
+
+  /// Причину пустой выдачи называет запрос, который её дал.
+  EmptyState _empty(
+    AppLocalizations l10n,
+    IntentionPickerKind kind,
+    IntentionCatalogQuery query,
+  ) => switch ((
+    byTitle: query.titleFilter != null,
+    byTags: query.tagFilter != IntentionTagFilter.empty,
+  )) {
+    (byTitle: false, byTags: false) => EmptyState(
+      title: l10n.intentionPickerEmptyScopeTitle,
+      text: widget.emptyScopeMessage,
+    ),
+    (byTitle: true, byTags: false) => _filteredEmpty(
+      l10n,
+      title: kind.noMatchesByTitle(l10n),
+      text: l10n.intentionPickerTryShorterTitle,
+    ),
+    (byTitle: false, byTags: true) => _filteredEmpty(
+      l10n,
+      title: kind.noMatchesByTags(l10n),
+      text: l10n.intentionPickerChangeTags,
+    ),
+    (byTitle: true, byTags: true) => _filteredEmpty(
+      l10n,
+      title: l10n.intentionPickerNothingFound,
+      text: l10n.intentionPickerChangeTitleOrTags,
+    ),
+  };
+
+  EmptyState _filteredEmpty(
+    AppLocalizations l10n, {
+    required String title,
+    required String text,
+  }) => EmptyState(
+    icon: DoableIconData.search,
+    title: title,
+    text: text,
+    action: (
+      label: l10n.intentionPickerResetFilters,
+      onPressed: widget.onResetFilters,
+    ),
+  );
 
   /// Состояние вместо выдачи прокручивается, когда крупный текст не
   /// помещается в оставшуюся высоту.

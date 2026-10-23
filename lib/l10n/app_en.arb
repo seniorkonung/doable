@@ -1922,6 +1922,42 @@
     "description": "Доступное название кнопки фильтра по тегам на экране выбора с числом условий",
     "placeholders": {"count": {"type": "int"}}
   },
+  "intentionPickerNoActionsByTitle": "No actions with this name",
+  "@intentionPickerNoActionsByTitle": {
+    "description": "Заголовок пустой выдачи выбора действия из-за фильтра названия"
+  },
+  "intentionPickerNoIntentionsByTitle": "No intentions with this name",
+  "@intentionPickerNoIntentionsByTitle": {
+    "description": "Заголовок пустой выдачи выбора намерения из-за фильтра названия"
+  },
+  "intentionPickerTryShorterTitle": "Try a shorter name.",
+  "@intentionPickerTryShorterTitle": {
+    "description": "Совет пустой выдачи экрана выбора из-за фильтра названия"
+  },
+  "intentionPickerNoActionsByTags": "No actions match these tags",
+  "@intentionPickerNoActionsByTags": {
+    "description": "Заголовок пустой выдачи выбора действия из-за условий по тегам"
+  },
+  "intentionPickerNoIntentionsByTags": "No intentions match these tags",
+  "@intentionPickerNoIntentionsByTags": {
+    "description": "Заголовок пустой выдачи выбора намерения из-за условий по тегам"
+  },
+  "intentionPickerChangeTags": "Change the tags in the filter or reset it.",
+  "@intentionPickerChangeTags": {
+    "description": "Совет пустой выдачи экрана выбора из-за условий по тегам"
+  },
+  "intentionPickerNothingFound": "Nothing found",
+  "@intentionPickerNothingFound": {
+    "description": "Заголовок пустой выдачи экрана выбора из-за фильтра названия и условий по тегам"
+  },
+  "intentionPickerChangeTitleOrTags": "Change the name or the tag conditions.",
+  "@intentionPickerChangeTitleOrTags": {
+    "description": "Совет пустой выдачи экрана выбора из-за фильтра названия и условий по тегам"
+  },
+  "intentionPickerResetFilters": "Reset filters",
+  "@intentionPickerResetFilters": {
+    "description": "Действие пустой выдачи экрана выбора, которое снимает фильтр названия и все условия по тегам"
+  },
   "@participantPickerTitle": {
     "description": "Заголовок выбора участника долговременной связи"
   },

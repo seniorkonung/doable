@@ -1,5 +1,6 @@
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/design_system/components/catalog_header.dart';
+import 'package:doable/src/design_system/components/empty_state.dart';
 import 'package:doable/src/design_system/components/filter_button.dart';
 import 'package:doable/src/design_system/components/list_state.dart';
 import 'package:doable/src/design_system/components/top_bar.dart';
@@ -8,6 +9,7 @@ import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import 'package:doable/src/intention/presentation/picker/intention_picker_view.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
@@ -22,6 +24,8 @@ import '../../../support/tag_positions.dart';
 
 const _screen = Size(390, 844);
 const _closeLabel = 'Закрыть поиск';
+const _emptyScopeMessage = 'Доступных активных действий нет.';
+const _revision = TestCatalogRevision(1);
 
 final _actionField = find.byKey(const ValueKey('daily-choice-action-filter'));
 final _filterButton = find.byType(FilterButton);
@@ -133,6 +137,167 @@ void main() {
     });
   }
 
+  for (final (locale, texts) in [
+    (
+      const Locale('ru'),
+      (
+        actions: 'Действия',
+        intentions: 'Намерения',
+        byTitle: (
+          'Нет действий с таким названием',
+          'Попробуйте название короче.',
+        ),
+        byTags: (
+          'Нет действий под эти теги',
+          'Измените теги в фильтре или сбросьте его.',
+        ),
+        byBoth: (
+          'Ничего не найдено',
+          'Измените название или условия по тегам.',
+        ),
+        scope: 'Выбрать не из чего',
+        reset: 'Сбросить фильтры',
+      ),
+    ),
+    (
+      const Locale('en'),
+      (
+        actions: 'Actions',
+        intentions: 'Intentions',
+        byTitle: ('No actions with this name', 'Try a shorter name.'),
+        byTags: (
+          'No actions match these tags',
+          'Change the tags in the filter or reset it.',
+        ),
+        byBoth: ('Nothing found', 'Change the name or the tag conditions.'),
+        scope: 'Nothing to choose from',
+        reset: 'Reset filters',
+      ),
+    ),
+  ]) {
+    final lang = locale.languageCode;
+    for (final (scenario, purpose, filter, required, header, message, reset)
+        in [
+          (
+            'пустая выдача по названию советует название короче',
+            SelectDailyChoiceAction(session: IntentionSearchSession()),
+            'бег',
+            false,
+            texts.actions,
+            texts.byTitle,
+            true,
+          ),
+          (
+            'пустая выдача по условиям отличается от пустого охвата',
+            SelectDailyChoiceAction(session: IntentionSearchSession()),
+            '',
+            true,
+            texts.actions,
+            texts.byTags,
+            true,
+          ),
+          (
+            'пустая выдача называет обе причины',
+            SelectDailyChoiceSource(session: IntentionSearchSession()),
+            'бег',
+            true,
+            texts.intentions,
+            texts.byBoth,
+            true,
+          ),
+          (
+            'пустой охват без фильтров не предлагает сброс',
+            SelectDailyChoiceAction(session: IntentionSearchSession()),
+            '',
+            false,
+            texts.actions,
+            (texts.scope, _emptyScopeMessage),
+            false,
+          ),
+        ]) {
+      testWidgets('$lang: $scenario', (tester) async {
+        final sport = _tag(1, 'Спорт');
+        final h = await _open(tester, locale: locale, purpose: purpose);
+        final prefix = switch (purpose) {
+          SelectDailyChoiceAction() => 'daily-choice-action',
+          SelectDailyChoiceSource() => 'daily-choice-source',
+        };
+        await tester.enterText(find.byKey(ValueKey('$prefix-filter')), filter);
+        if (required) {
+          h.conditions(purpose).cycle(sport, snapshotRevision: _revision);
+        }
+        await tester.pump(const Duration(milliseconds: 300));
+        h.repository.complete(
+          h.repository.queries.length - 1,
+          _firstPage(const []),
+        );
+        await tester.pumpAndSettle();
+
+        final (title, text) = message;
+        expect(_header(header, 0), findsOneWidget);
+        expect(_inEmptyState(title), findsOneWidget);
+        expect(_inEmptyState(text), findsOneWidget);
+        expect(
+          _inEmptyState(texts.reset),
+          reset ? findsOneWidget : findsNothing,
+        );
+      });
+    }
+
+    testWidgets('$lang: «${texts.reset}» снимает название и условия', (
+      tester,
+    ) async {
+      final sport = _tag(1, 'Спорт');
+      final work = _tag(2, 'Работа');
+      final purpose = SelectDailyChoiceAction(
+        session: IntentionSearchSession(),
+      );
+      final h = await _open(tester, locale: locale, purpose: purpose);
+      await tester.enterText(_actionField, 'бег');
+      final conditions = h.conditions(purpose)
+        ..cycle(sport, snapshotRevision: _revision)
+        // Второй шаг круга исключает тег.
+        ..cycle(work, snapshotRevision: _revision)
+        ..cycle(work, snapshotRevision: _revision);
+      await tester.pump(const Duration(milliseconds: 300));
+      h.repository.complete(
+        h.repository.queries.length - 1,
+        _firstPage(const []),
+      );
+      await tester.pumpAndSettle();
+      expect(conditions.current.conditions, hasLength(2));
+
+      await tester.tap(_inEmptyState(texts.reset));
+      await tester.pump();
+      final query = h.repository.queries.last;
+      expect(query.titleFilter, isNull);
+      expect(query.tagFilter, IntentionTagFilter.empty);
+      expect(query.cursor, isNull);
+      h.repository.complete(
+        h.repository.queries.length - 1,
+        _firstPage(_actions(3)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        tester
+            .widget<EditableText>(
+              find.descendant(
+                of: _actionField,
+                matching: find.byType(EditableText),
+              ),
+            )
+            .controller
+            .text,
+        isEmpty,
+      );
+      expect(tester.widget<FilterButton>(_filterButton).count, 0);
+      expect(_header(texts.actions, 3), findsOneWidget);
+      expect(_row(3), findsOneWidget);
+      expect(find.byType(EmptyState), findsNothing);
+    });
+  }
+
   testWidgets('поле поиска и кнопка фильтра остаются на месте при прокрутке, '
       'а заголовок выдачи уходит вверх вместе со строками', (tester) async {
     final h = await _open(tester);
@@ -237,6 +402,14 @@ void main() {
 Finder _title(String text) =>
     find.descendant(of: find.byType(TopBar), matching: find.text(text));
 
+Finder _header(String title, int count) => find.byWidgetPredicate(
+  (widget) =>
+      widget is CatalogHeader && widget.title == title && widget.count == count,
+);
+
+Finder _inEmptyState(String text) =>
+    find.descendant(of: find.byType(EmptyState), matching: find.text(text));
+
 Finder _row(int index) => find.byKey(
   ValueKey('daily-choice-action-${_action(index).id.toCanonicalString()}'),
 );
@@ -275,10 +448,14 @@ Tag _tag(int number, String name) => Tag(
 );
 
 final class _Harness {
-  _Harness(this.repository);
+  _Harness(this.container, this.repository);
 
+  final ProviderContainer container;
   final ControlledCatalogRepository repository;
   int closes = 0;
+
+  IntentionTagConditionsViewModel conditions(IntentionPickerPurpose purpose) =>
+      container.read(intentionTagConditionsViewModelProvider(purpose).notifier);
 }
 
 Future<_Harness> _open(
@@ -295,7 +472,7 @@ Future<_Harness> _open(
   final repository = ControlledCatalogRepository()..tagCatalogItems = tags;
   final container = reconciliationCatalogContainer(repository);
   addTearDown(container.dispose);
-  final h = _Harness(repository);
+  final h = _Harness(container, repository);
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: container,
@@ -309,7 +486,7 @@ Future<_Harness> _open(
               purpose ??
               SelectDailyChoiceAction(session: IntentionSearchSession()),
           closeLabel: _closeLabel,
-          emptyScopeMessage: 'Доступных активных действий нет.',
+          emptyScopeMessage: _emptyScopeMessage,
           onClose: () => h.closes++,
           onPick: (_) {},
           onOpenDetails: (_) {},
