@@ -2653,6 +2653,42 @@ abstract class AppLocalizations {
   /// **'Choose as many as you need'**
   String get tagsPanelAssignmentHint;
 
+  /// Заголовок панели тегов в режиме фильтра поиска намерений
+  ///
+  /// In en, this message translates to:
+  /// **'Filter by tags'**
+  String get tagsPanelFilterTitle;
+
+  /// Строка под заголовком панели тегов в режиме фильтра: нажатия переключают надобность по кругу
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to require a tag, tap again to exclude it'**
+  String get tagsPanelFilterHint;
+
+  /// Действие шапки панели фильтра, снимающее все условия по тегам
+  ///
+  /// In en, this message translates to:
+  /// **'Reset'**
+  String get tagsPanelResetConditions;
+
+  /// Доступное название действия «Сбросить» в панели фильтра
+  ///
+  /// In en, this message translates to:
+  /// **'Reset tag conditions'**
+  String get tagsPanelResetConditionsLabel;
+
+  /// Доступное название строки панели фильтра с условием «должен быть»
+  ///
+  /// In en, this message translates to:
+  /// **'{tagName}, must be present'**
+  String tagsPanelFilterPresentLabel(String tagName);
+
+  /// Доступное название строки панели фильтра с условием «должен отсутствовать»
+  ///
+  /// In en, this message translates to:
+  /// **'{tagName}, must be absent'**
+  String tagsPanelFilterAbsentLabel(String tagName);
+
   /// Заполнитель поля поиска панели тегов
   ///
   /// In en, this message translates to:

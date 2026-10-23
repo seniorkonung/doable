@@ -1769,6 +1769,29 @@ class AppLocalizationsRu extends AppLocalizations {
   String get tagsPanelAssignmentHint => 'Выберите сколько нужно';
 
   @override
+  String get tagsPanelFilterTitle => 'Фильтр по тегам';
+
+  @override
+  String get tagsPanelFilterHint =>
+      'Нажмите, чтобы потребовать тег, ещё раз — чтобы исключить';
+
+  @override
+  String get tagsPanelResetConditions => 'Сбросить';
+
+  @override
+  String get tagsPanelResetConditionsLabel => 'Сбросить условия по тегам';
+
+  @override
+  String tagsPanelFilterPresentLabel(String tagName) {
+    return '$tagName, должен быть';
+  }
+
+  @override
+  String tagsPanelFilterAbsentLabel(String tagName) {
+    return '$tagName, должен отсутствовать';
+  }
+
+  @override
   String get tagsPanelSearchPlaceholder => 'Найти или создать тег';
 
   @override

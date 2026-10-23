@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:ui' show Tristate;
+import 'dart:ui' show CheckedState, Tristate;
 
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/main.dart';
@@ -13,8 +13,11 @@ import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
+import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_view_model.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
@@ -24,6 +27,8 @@ import 'package:doable/src/tag/presentation/assignments/tag_assignments_section.
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/application/tagged_intentions_page.dart';
 import 'package:doable/src/tag/presentation/navigation/tag_navigation_page.dart';
+import 'package:doable/src/tag/presentation/panel/tags_panel.dart';
+import 'package:doable/src/tag/presentation/panel/tags_panel_context.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
@@ -99,6 +104,7 @@ void main() {
   _registerAssignmentScenarios();
   _registerNavigationEntryScenarios();
   _registerDraftSelectionScenarios();
+  _registerFilterPanelScenarios();
   const locale = Locale('ru');
 
   testWidgets('диктор сохраняет ввод, действия и подтверждение', (
@@ -761,6 +767,141 @@ void _registerDraftSelectionScenarios() {
     expect(tester.takeException(), isNull);
     semantics.dispose();
   });
+}
+
+void _registerFilterPanelScenarios() {
+  for (final locale in const [Locale('ru'), Locale('en')]) {
+    testWidgets('${locale.languageCode}: в панели фильтра диктор объявляет '
+        'надобность один раз и сбрасывает условия без назначений', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(420, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final semantics = tester.ensureSemantics();
+      late sqlite.Database raw;
+      final database = AppDatabase(
+        openInMemoryLocalDatabase(setup: (connection) => raw = connection),
+      );
+      await database.open();
+      addTearDown(database.close);
+      final repository = DriftPersonalGraphRepository(
+        database,
+        UuidV7IntentionIdGenerator(),
+        () => DateTime.utc(2026, 9, 25),
+        InMemoryDiagnosticsSink(),
+      );
+      seedRawGraph(raw, () {
+        for (final (number, name) in [
+          (firstTagNumber, 'Дом'),
+          (lastTagNumber, 'Работа'),
+        ]) {
+          raw.execute(
+            'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+            [tagFixtureId(number), name, tagPositionKey(number)],
+          );
+        }
+      });
+      final container = ProviderContainer(
+        overrides: [
+          personalGraphRepositoryProvider.overrideWithValue(repository),
+        ],
+      );
+      addTearDown(container.dispose);
+      final conditionsProvider = intentionTagConditionsViewModelProvider(
+        const BrowseIntentionCatalog(),
+      );
+      final conditionsSubscription = container.listen(
+        conditionsProvider,
+        (_, _) {},
+      );
+      addTearDown(conditionsSubscription.close);
+      final conditions = container.read(conditionsProvider.notifier);
+      final l10n = await AppLocalizations.delegate.load(locale);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: doableTheme(Brightness.light),
+            locale: locale,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            builder: (context, child) => GraphOperationPresenter(
+              child: child ?? const SizedBox.shrink(),
+            ),
+            home: Builder(
+              builder: (context) => Scaffold(
+                body: Center(
+                  child: TextButton(
+                    onPressed: () => showTagsPanel(
+                      context,
+                      TagsPanelFilterContext(conditions),
+                    ),
+                    child: const Text('Открыть'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
+      await tester.tap(find.text('Открыть'));
+      final home = find.byKey(
+        ValueKey('tags-panel-row-${tagFixtureId(firstTagNumber)}'),
+      );
+      await _until(tester, home);
+      await tester.pumpAndSettle();
+      expect(find.text(l10n.tagsPanelFilterTitle), findsOne);
+      expect(find.text(l10n.tagsPanelFilterHint), findsOne);
+
+      // Без условия строка называет только тег, а надобность у строки не
+      // объявляется ни состоянием отметки, ни повтором в названии.
+      for (final (label, requirement) in [
+        ('Дом', null),
+        (
+          l10n.tagsPanelFilterPresentLabel('Дом'),
+          IntentionTagRequirement.mustBePresent,
+        ),
+        (
+          l10n.tagsPanelFilterAbsentLabel('Дом'),
+          IntentionTagRequirement.mustBeAbsent,
+        ),
+      ]) {
+        if (requirement != null) {
+          _performSemanticsTap(tester, tester.getSemantics(home));
+          await tester.pump();
+        }
+        final node = tester.getSemantics(home);
+        expect(node.label, label);
+        expect(
+          node.flagsCollection.isChecked,
+          CheckedState.none,
+          reason: 'надобность объявляется только названием строки',
+        );
+        expect(node.getSemanticsData().hasAction(SemanticsAction.tap), true);
+        expect(
+          [
+            for (final condition in conditions.current.conditions)
+              condition.requirement,
+          ],
+          [?requirement],
+        );
+      }
+
+      final reset = find.bySemanticsLabel(l10n.tagsPanelResetConditionsLabel);
+      expect(tester.getSemantics(reset).flagsCollection.isButton, isTrue);
+      _performSemanticsTap(tester, tester.getSemantics(reset));
+      await tester.pump();
+
+      expect(conditions.current.conditions, isEmpty);
+      expect(reset, findsNothing);
+      expect(tester.getSemantics(home).label, 'Дом');
+      expect(raw.select('SELECT * FROM tag_assignments'), isEmpty);
+      expect(tester.takeException(), isNull);
+      semantics.dispose();
+    });
+  }
 }
 
 /// Переводит фокус клавишей Tab, пока он не окажется внутри [target].

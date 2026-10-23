@@ -11,16 +11,34 @@ final class TagsPanelState {
   const TagsPanelState({
     required this.catalog,
     this.search = TagsPanelSearch.initial,
+    this.canClearConditions = false,
   });
 
   final TagsPanelCatalog catalog;
   final TagsPanelSearch search;
 
-  TagsPanelState withCatalog(TagsPanelCatalog catalog) =>
-      TagsPanelState(catalog: catalog, search: search);
+  /// В фильтре есть хотя бы одно условие по тегам, и «Сбросить» видна —
+  /// независимо от того, загружен ли каталог. Вне фильтра всегда `false`.
+  final bool canClearConditions;
 
-  TagsPanelState withSearch(TagsPanelSearch search) =>
-      TagsPanelState(catalog: catalog, search: search);
+  TagsPanelState withCatalog(TagsPanelCatalog catalog) => TagsPanelState(
+    catalog: catalog,
+    search: search,
+    canClearConditions: canClearConditions,
+  );
+
+  TagsPanelState withSearch(TagsPanelSearch search) => TagsPanelState(
+    catalog: catalog,
+    search: search,
+    canClearConditions: canClearConditions,
+  );
+
+  TagsPanelState withCanClearConditions(bool canClearConditions) =>
+      TagsPanelState(
+        catalog: catalog,
+        search: search,
+        canClearConditions: canClearConditions,
+      );
 
   /// Тег можно переставить: полный список без сужения поиском показан на
   /// актуальных строках, и предыдущая перестановка не выполняется.
@@ -182,13 +200,26 @@ final class TagsPanelLoaded extends TagsPanelCatalog {
 }
 
 final class TagsPanelRow {
-  const TagsPanelRow({required this.tag, required this.isMarked});
+  const TagsPanelRow({required this.tag, required this.mark});
 
   final Tag tag;
+  final TagsPanelMark mark;
+}
 
-  /// Отметка контекста: при назначении — тег назначен намерению, при выборе
-  /// для черновика — тег входит в его набор.
-  final bool isMarked;
+/// Отметка строки: выбор тегов намерения или черновика либо надобность
+/// условия фильтра.
+sealed class TagsPanelMark {}
+
+/// Отметка выбора: при назначении — тег назначен намерению, при выборе для
+/// черновика — тег входит в его набор.
+enum TagsPanelSelectionMark implements TagsPanelMark { unmarked, marked }
+
+/// Надобность тега в условиях вызвавшего поиска; [none] — тег в фильтре не
+/// участвует.
+enum TagsPanelFilterMark implements TagsPanelMark {
+  none,
+  mustBePresent,
+  mustBeAbsent,
 }
 
 /// Начальные значения листа «Новый тег»: название и цвет можно изменить до

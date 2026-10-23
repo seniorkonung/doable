@@ -14,7 +14,10 @@ import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
+import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import 'package:doable/src/intention/presentation/editor/intention_draft_tag_set.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_view_model.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
@@ -177,6 +180,281 @@ void main() {
     ]);
     expect(h.repository.commands, isEmpty);
     expect(find.byType(SnackBar), findsNothing);
+  });
+
+  for (final (locale, texts) in [
+    (
+      const Locale('ru'),
+      (
+        title: 'Фильтр по тегам',
+        hint: 'Нажмите, чтобы потребовать тег, ещё раз — чтобы исключить',
+        reset: 'Сбросить',
+        resetLabel: 'Сбросить условия по тегам',
+        present: (String name) => '$name, должен быть',
+        absent: (String name) => '$name, должен отсутствовать',
+      ),
+    ),
+    (
+      const Locale('en'),
+      (
+        title: 'Filter by tags',
+        hint: 'Tap to require a tag, tap again to exclude it',
+        reset: 'Reset',
+        resetLabel: 'Reset tag conditions',
+        present: (String name) => '$name, must be present',
+        absent: (String name) => '$name, must be absent',
+      ),
+    ),
+  ]) {
+    testWidgets('${locale.languageCode}: Открытая панель показывает текущие '
+        'условия, а надобность объявляется один раз', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final h = await _pumpApp(
+        tester,
+        locale: locale,
+        panelContext: (container) => TagsPanelFilterContext(
+          _searchConditions(container)
+            ..cycle(_tag(1, 'Здоровье'), snapshotRevision: _revision)
+            ..cycle(_tag(2, 'Спорт'), snapshotRevision: _revision)
+            ..cycle(_tag(2, 'Спорт'), snapshotRevision: _revision),
+        ),
+      );
+      await h.open();
+
+      expect(find.text(texts.title), findsOne);
+      expect(find.text(texts.hint), findsOne);
+      expect(h.repository.readModes.single, isA<TagCatalogBrowseMode>());
+      h.repository.complete([
+        _tag(1, 'Здоровье'),
+        _tag(2, 'Спорт'),
+        _tag(3, 'Отдых'),
+      ]);
+      await tester.pump();
+
+      expect(_marks(tester), [
+        TagRowFilterMark.mustBePresent,
+        TagRowFilterMark.mustBeAbsent,
+        TagRowFilterMark.none,
+      ]);
+      // Надобность передаёт только доступное название: состояния отметки у
+      // строки фильтра нет.
+      for (final (number, label) in [
+        (1, texts.present('Здоровье')),
+        (2, texts.absent('Спорт')),
+        (3, 'Отдых'),
+      ]) {
+        expect(
+          tester.getSemantics(_row(number)),
+          isSemantics(
+            label: label,
+            hasCheckedState: false,
+            isEnabled: true,
+            hasTapAction: true,
+          ),
+        );
+      }
+      expect(find.text(texts.reset), findsOne);
+      expect(
+        tester.getSemantics(find.bySemanticsLabel(texts.resetLabel)),
+        isSemantics(isButton: true, hasTapAction: true),
+      );
+      semantics.dispose();
+    });
+
+    testWidgets('${locale.languageCode}: Нажатия переключают надобность по '
+        'кругу и сразу применяют поиск', (tester) async {
+      final semantics = tester.ensureSemantics();
+      late IntentionTagConditionSet conditions;
+      final h = await _pumpApp(
+        tester,
+        locale: locale,
+        panelContext: (container) =>
+            TagsPanelFilterContext(conditions = _searchConditions(container)),
+      );
+      await h.open();
+      h.repository.complete([_tag(1, 'Спорт'), _tag(2, 'Дом')]);
+      await tester.pump();
+      expect(find.text(texts.reset), findsNothing);
+
+      for (final (requirement, mark, label, filter) in [
+        (
+          IntentionTagRequirement.mustBePresent,
+          TagRowFilterMark.mustBePresent,
+          texts.present('Спорт'),
+          IntentionTagFilter(requiredTagIds: [_id(1)]),
+        ),
+        (
+          IntentionTagRequirement.mustBeAbsent,
+          TagRowFilterMark.mustBeAbsent,
+          texts.absent('Спорт'),
+          IntentionTagFilter(excludedTagIds: [_id(1)]),
+        ),
+      ]) {
+        await tester.tap(_row(1));
+        await tester.pump();
+        expect(_requirements(conditions), [(_id(1), requirement)]);
+        expect(_marks(tester), [mark, TagRowFilterMark.none]);
+        expect(tester.getSemantics(_row(1)).label, label);
+        expect(h.repository.catalogQueries.last.tagFilter, filter);
+        expect(find.text(texts.reset), findsOne);
+      }
+
+      await tester.tap(_row(1));
+      await tester.pump();
+      expect(_requirements(conditions), isEmpty);
+      expect(_marks(tester), [TagRowFilterMark.none, TagRowFilterMark.none]);
+      expect(tester.getSemantics(_row(1)).label, 'Спорт');
+      expect(
+        h.repository.catalogQueries.last.tagFilter,
+        IntentionTagFilter.empty,
+      );
+      expect(find.text(texts.reset), findsNothing);
+      expect(h.repository.commands, isEmpty);
+      semantics.dispose();
+    });
+
+    testWidgets('${locale.languageCode}: «Сбросить» снимает все условия по '
+        'тегам и исчезает', (tester) async {
+      late IntentionTagConditionSet conditions;
+      final h = await _pumpApp(
+        tester,
+        locale: locale,
+        panelContext: (container) => TagsPanelFilterContext(
+          conditions = _searchConditions(container)
+            ..cycle(_tag(1, 'Здоровье'), snapshotRevision: _revision)
+            ..cycle(_tag(2, 'Спорт'), snapshotRevision: _revision)
+            ..cycle(_tag(2, 'Спорт'), snapshotRevision: _revision),
+        ),
+      );
+      await h.open();
+      h.repository.complete([_tag(1, 'Здоровье'), _tag(2, 'Спорт')]);
+      await tester.pump();
+
+      await tester.tap(find.text(texts.reset));
+      await tester.pump();
+
+      expect(_requirements(conditions), isEmpty);
+      expect(_marks(tester), [TagRowFilterMark.none, TagRowFilterMark.none]);
+      expect(
+        h.repository.catalogQueries.last.tagFilter,
+        IntentionTagFilter.empty,
+      );
+      expect(find.text(texts.reset), findsNothing);
+      expect(h.isClosed, isFalse);
+    });
+  }
+
+  testWidgets('Создание тега без назначений: созданный в панели фильтра тег '
+      'становится условием «должен быть»', (tester) async {
+    late IntentionTagConditionSet conditions;
+    final h = await _pumpApp(
+      tester,
+      panelContext: (container) =>
+          TagsPanelFilterContext(conditions = _searchConditions(container)),
+    );
+    await h.open();
+    h.repository.complete([_tag(5, 'Дом')]);
+    await tester.pump();
+    await tester.enterText(_search, 'Парк');
+    await tester.pump();
+    await tester.tap(find.text('Создать тег «Парк»'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Создать тег'));
+    await tester.pump();
+
+    final created = _createdPackage(_tag(1, 'Парк'));
+    h.repository.command.complete(TagCommandSucceeded(created));
+    h.changes.add(created);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Новый тег'), findsNothing);
+    expect(_searchText(tester), isEmpty);
+    expect(_rowNames(tester), ['Парк', 'Дом']);
+    expect(_marks(tester), [
+      TagRowFilterMark.mustBePresent,
+      TagRowFilterMark.none,
+    ]);
+    expect(_requirements(conditions), [
+      (_id(1), IntentionTagRequirement.mustBePresent),
+    ]);
+    expect(h.repository.commands.single, isA<CreateTag>());
+    expect(find.byType(SnackBar), findsNothing);
+  });
+
+  testWidgets('Закрытие панели до подтверждения создания: в панели фильтра '
+      'тег не становится условием и не отмечен в новом открытии', (
+    tester,
+  ) async {
+    late IntentionTagConditionSet conditions;
+    final h = await _pumpApp(
+      tester,
+      panelContext: (container) =>
+          TagsPanelFilterContext(conditions = _searchConditions(container)),
+    );
+    await h.open();
+    h.repository.complete([_tag(5, 'Дом')]);
+    await tester.pump();
+    await tester.enterText(_search, 'Парк');
+    await tester.pump();
+    await tester.tap(find.text('Создать тег «Парк»'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Создать тег'));
+    await tester.pump();
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Готово'));
+    await tester.pumpAndSettle();
+    expect(h.isClosed, isTrue);
+
+    final created = _createdPackage(_tag(1, 'Парк'));
+    h.repository.command.complete(TagCommandSucceeded(created));
+    h.changes.add(created);
+    await tester.pumpAndSettle();
+    expect(_requirements(conditions), isEmpty);
+
+    await h.open();
+    h.repository.complete([_tag(1, 'Парк'), _tag(5, 'Дом')], revision: 2);
+    await tester.pump();
+    expect(_searchText(tester), isEmpty);
+    expect(_rowNames(tester), ['Парк', 'Дом']);
+    expect(_marks(tester), [TagRowFilterMark.none, TagRowFilterMark.none]);
+    expect(h.repository.commands.single, isA<CreateTag>());
+  });
+
+  testWidgets('удаление тега в панели фильтра снимает его условие вместе с '
+      'отметкой и «Сбросить»', (tester) async {
+    late IntentionTagConditionSet conditions;
+    final h = await _pumpApp(
+      tester,
+      panelContext: (container) => TagsPanelFilterContext(
+        conditions = _searchConditions(container)
+          ..cycle(_tag(1, 'Спорт'), snapshotRevision: _revision),
+      ),
+    );
+    await h.open();
+    h.repository.complete([_tag(1, 'Спорт'), _tag(2, 'Дом')]);
+    await tester.pump();
+    await _chooseFromMenu(tester, _row(1), 'Удалить тег');
+    await tester.tap(find.text('Удалить'));
+    await tester.pumpAndSettle();
+
+    final deleted = ConfirmedGraphResult<TagCommandSuccess>(
+      revision: const TagCatalogTestRevision(2),
+      value: TagDeleted(
+        TagDeletedChange(
+          revision: const TagCatalogTestRevision(2),
+          tagId: _id(1),
+        ),
+      ),
+    );
+    h.repository.command.complete(TagCommandSucceeded(deleted));
+    h.changes.add(deleted);
+    await tester.pumpAndSettle();
+
+    expect(_requirements(conditions), isEmpty);
+    expect(_rowNames(tester), ['Дом']);
+    expect(_marks(tester), [TagRowFilterMark.none]);
+    expect(find.text('Сбросить'), findsNothing);
   });
 
   testWidgets('Большой каталог получен целиком', (tester) async {
@@ -1386,6 +1664,7 @@ Future<_Harness> _pumpApp(
     overrides: [
       personalGraphRepositoryProvider.overrideWithValue(repository),
       tagsPanelChangesProvider.overrideWithValue(changes.stream),
+      intentionTagConditionsChangesProvider.overrideWithValue(changes.stream),
     ],
     retry: (retryCount, error) => null,
   );
@@ -1422,6 +1701,33 @@ Future<_Harness> _pumpApp(
   );
   return harness;
 }
+
+const _revision = TagCatalogTestRevision();
+
+/// Условия поиска каталога намерений, над которыми тестовая страница
+/// открывает панель фильтра.
+IntentionTagConditionSet _searchConditions(ProviderContainer container) {
+  final provider = intentionTagConditionsViewModelProvider(
+    const BrowseIntentionCatalog(),
+  );
+  container.listen(provider, (_, _) {});
+  return container.read(provider.notifier);
+}
+
+List<(TagId, IntentionTagRequirement)> _requirements(
+  IntentionTagConditionSet conditions,
+) => [
+  for (final condition in conditions.current.conditions)
+    (condition.tagId, condition.requirement),
+];
+
+ConfirmedGraphResult<TagCommandSuccess> _createdPackage(Tag tag) =>
+    ConfirmedGraphResult(
+      revision: const TagCatalogTestRevision(2),
+      value: TagCreated(
+        TagCreatedChange(revision: const TagCatalogTestRevision(2), after: tag),
+      ),
+    );
 
 TagId _id(int number) => (TagId.decode(
   '00000000-0000-4000-8000-${number.toString().padLeft(12, '0')}',

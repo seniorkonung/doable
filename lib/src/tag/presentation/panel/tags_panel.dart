@@ -189,6 +189,23 @@ final class _TagsPanelState extends ConsumerState<_TagsPanel> {
         l10n.tagsPanelTitle,
         l10n.tagsPanelAssignmentHint,
       ),
+      TagsPanelFilterContext() => (
+        l10n.tagsPanelFilterTitle,
+        l10n.tagsPanelFilterHint,
+      ),
+    };
+    // «Сбросить» видна, только пока в фильтре есть условие по тегам, поэтому
+    // после сброса исчезает.
+    final SheetAction? action = switch (widget.opening.context) {
+      TagsPanelFilterContext(:final conditions) when state.canClearConditions =>
+        (
+          label: l10n.tagsPanelResetConditions,
+          semanticLabel: l10n.tagsPanelResetConditionsLabel,
+          onPressed: conditions.clear,
+        ),
+      TagsPanelFilterContext() ||
+      TagsPanelAssignmentContext() ||
+      TagsPanelDraftContext() => null,
     };
 
     // Маршрут извещает о любом своём закрытии сразу, а содержимое
@@ -203,6 +220,7 @@ final class _TagsPanelState extends ConsumerState<_TagsPanel> {
         text: text,
         expandLabel: l10n.tagsPanelExpand,
         collapseLabel: l10n.tagsPanelCollapse,
+        action: action,
         pinned: SearchField(
           controller: _searchController,
           placeholder: l10n.tagsPanelSearchPlaceholder,
@@ -421,10 +439,24 @@ final class _LoadedCatalog extends StatelessWidget {
       builder: (context) => TagRow(
         name: name,
         color: tagColorPresentation(tag.color),
-        mark: row.isMarked
-            ? TagRowSelectionMark.checked
-            : TagRowSelectionMark.none,
-        label: name,
+        mark: switch (row.mark) {
+          TagsPanelSelectionMark.unmarked => TagRowSelectionMark.none,
+          TagsPanelSelectionMark.marked => TagRowSelectionMark.checked,
+          TagsPanelFilterMark.none => TagRowFilterMark.none,
+          TagsPanelFilterMark.mustBePresent => TagRowFilterMark.mustBePresent,
+          TagsPanelFilterMark.mustBeAbsent => TagRowFilterMark.mustBeAbsent,
+        },
+        // Отметку выбора диктор объявляет состоянием отметки строки, а
+        // надобность фильтра — только доступным названием.
+        label: switch (row.mark) {
+          TagsPanelSelectionMark() || TagsPanelFilterMark.none => name,
+          TagsPanelFilterMark.mustBePresent => AppLocalizations.of(
+            context,
+          ).tagsPanelFilterPresentLabel(name),
+          TagsPanelFilterMark.mustBeAbsent => AppLocalizations.of(
+            context,
+          ).tagsPanelFilterAbsentLabel(name),
+        },
         handle: handle,
         ground:
             ground ??

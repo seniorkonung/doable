@@ -9,6 +9,8 @@ import '../../../graph/application/graph_revision.dart';
 import '../../../graph/application/personal_graph_repository.dart';
 import '../../../graph/application/personal_graph_repository_provider.dart';
 import '../../../intention/application/intention_catalog.dart';
+import '../../../intention/domain/intention_id.dart';
+import '../../../intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import '../../../intention/presentation/editor/intention_draft_tag_set.dart';
 import '../../application/tag_catalog.dart';
 import '../../application/tag_change.dart';
@@ -39,7 +41,10 @@ final class TagsPanelViewModel extends _$TagsPanelViewModel {
   late TagsPanelContext _context;
   late PersonalGraphRepository _repository;
   StreamSubscription<ConfirmedGraphChangePackage>? _changes;
-  StreamSubscription<IntentionDraftTagSetSnapshot>? _draftChanges;
+
+  /// Изменения набора черновика или условий фильтра, по которым ставятся
+  /// отметки.
+  StreamSubscription<void>? _markChanges;
   GraphRevision? _shownRevision;
   GraphRevision? _requiredRevision;
   Future<void>? _activeRead;
@@ -58,18 +63,24 @@ final class TagsPanelViewModel extends _$TagsPanelViewModel {
     _generation++;
     _staleReadAttempts = 0;
     _changes = ref.watch(tagsPanelChangesProvider).listen(_onChange);
-    _draftChanges = switch (_context) {
+    _markChanges = switch (_context) {
       TagsPanelAssignmentContext() => null,
       TagsPanelDraftContext(:final tagSet) => tagSet.changes.listen(
-        (_) => _markDraft(tagSet),
+        (_) => _remark(),
+      ),
+      TagsPanelFilterContext(:final conditions) => conditions.changes.listen(
+        (_) => _remark(),
       ),
     };
     ref.onDispose(() {
       unawaited(_changes?.cancel());
-      unawaited(_draftChanges?.cancel());
+      unawaited(_markChanges?.cancel());
     });
     _requestRead();
-    return const TagsPanelState(catalog: TagsPanelLoading());
+    return TagsPanelState(
+      catalog: const TagsPanelLoading(),
+      canClearConditions: _canClearConditions(),
+    );
   }
 
   /// Корректный ввод сразу становится фильтром. Некорректный сохраняет
@@ -100,6 +111,10 @@ final class TagsPanelViewModel extends _$TagsPanelViewModel {
   /// Отметка следует за изменением набора, а повторное включение тега
   /// оставляет одно включение.
   ///
+  /// В фильтре нажатие переключает условие по тегу по кругу: «не участвует»,
+  /// «должен быть», «должен отсутствовать». Команды нет: `null`, а отметка
+  /// следует за изменением условий.
+  ///
   /// На неактуальных строках и без намерения нажатие недоступно: `null`.
   TagCommandStart? toggle(TagId tagId) {
     final catalog = state.catalog;
@@ -107,8 +122,9 @@ final class TagsPanelViewModel extends _$TagsPanelViewModel {
     final row = catalog.rows.where((row) => row.tag.id == tagId).firstOrNull;
     if (row == null) return null;
     final coordinator = ref.read(graphCommandCoordinatorProvider.notifier);
+    final isMarked = row.mark == TagsPanelSelectionMark.marked;
     switch (_context) {
-      case TagsPanelAssignmentContext(:final intentionId) when row.isMarked:
+      case TagsPanelAssignmentContext(:final intentionId) when isMarked:
         return coordinator.acceptTagRemoveAssignment(
           RemoveTagAssignment(tagId: tagId, intentionId: intentionId),
         );
@@ -116,10 +132,14 @@ final class TagsPanelViewModel extends _$TagsPanelViewModel {
         return coordinator.acceptTagAssign(
           AssignTag(tagId: tagId, intentionId: intentionId),
         );
-      case TagsPanelDraftContext(:final tagSet) when row.isMarked:
+      case TagsPanelDraftContext(:final tagSet) when isMarked:
         tagSet.remove(tagId);
       case TagsPanelDraftContext(:final tagSet):
         tagSet.add(row.tag);
+      // Строки показывают показанную ревизию, поэтому название и цвет
+      // условия берутся из её снимка.
+      case TagsPanelFilterContext(:final conditions):
+        conditions.cycle(row.tag, snapshotRevision: _shownRevision!);
     }
     return null;
   }
@@ -190,16 +210,17 @@ final class TagsPanelViewModel extends _$TagsPanelViewModel {
   /// подтверждения модель один раз очищает поиск и отмечает тег по контексту:
   /// для намерения — отдельной командой назначения, отклонение или отказ
   /// которой оставляют тег неотмеченным, для черновика — включением в его
-  /// набор. Открытие, закрытое до подтверждения, тег не отмечает, даже если
-  /// модель ещё жива.
+  /// набор, в фильтре — условием «должен быть». Открытие, закрытое до
+  /// подтверждения, тег не отмечает, даже если модель ещё жива.
   void acceptCreation(TagCommandAccepted creation) =>
       unawaited(_markCreated(creation.future));
 
   Future<void> _markCreated(Future<TagCommandCompletion> creation) async {
     final completion = await creation;
     if (!ref.mounted || opening.isClosed) return;
-    if (completion.result case GraphResultSuccess(
-      value: TagCreated(:final tag),
+    if (completion case TagCommandSucceededCompletion(
+      :final confirmedChange,
+      result: GraphResultSuccess(value: TagCreated(:final tag)),
     )) {
       state = state.withSearch(TagsPanelSearch.initial);
       final coordinator = ref.read(graphCommandCoordinatorProvider.notifier);
@@ -210,6 +231,10 @@ final class TagsPanelViewModel extends _$TagsPanelViewModel {
           );
         case TagsPanelDraftContext(:final tagSet):
           tagSet.add(tag);
+        // Созданного тега ещё нет в условиях, поэтому переключение по кругу
+        // делает его условием «должен быть».
+        case TagsPanelFilterContext(:final conditions):
+          conditions.cycle(tag, snapshotRevision: confirmedChange.revision);
       }
     }
   }
@@ -256,7 +281,8 @@ final class TagsPanelViewModel extends _$TagsPanelViewModel {
       TagsPanelAssignmentContext(:final intentionId) => TagCatalogSelectionMode(
         intentionId,
       ),
-      TagsPanelDraftContext() => const TagCatalogBrowseMode(),
+      TagsPanelDraftContext() ||
+      TagsPanelFilterContext() => const TagCatalogBrowseMode(),
     });
     if (!ref.mounted || generation != _generation) return;
     // Отказ чтения, за которым уже запрошено следующее, ничего не решает.
@@ -310,35 +336,87 @@ final class TagsPanelViewModel extends _$TagsPanelViewModel {
   )) {
     (TagsPanelAssignmentContext(), TagSelectionSnapshot(:final rows)) => [
       for (final row in rows)
-        TagsPanelRow(tag: row.tag, isMarked: row.isAssigned),
+        TagsPanelRow(
+          tag: row.tag,
+          mark: row.isAssigned
+              ? TagsPanelSelectionMark.marked
+              : TagsPanelSelectionMark.unmarked,
+        ),
     ],
     (TagsPanelDraftContext(:final tagSet), TagBrowseSnapshot(:final items)) =>
       _markedByDraft(items, tagSet),
+    (
+      TagsPanelFilterContext(:final conditions),
+      TagBrowseSnapshot(:final items),
+    ) =>
+      _markedByConditions(items, conditions),
     _ => null,
   };
 
-  /// Отметки черновика — его текущий набор. Строка созданного тега приходит
-  /// пакетом раньше, чем модель включает тег в набор, поэтому пакеты отметок
-  /// черновика не меняют.
-  void _markDraft(IntentionDraftTagSet tagSet) {
+  /// Отметки черновика и фильтра — текущие набор черновика и условия поиска.
+  /// Строка созданного тега приходит пакетом раньше, чем модель отмечает тег,
+  /// поэтому пакеты этих отметок не меняют.
+  void _remark() {
+    if (_context case TagsPanelFilterContext()) {
+      state = state.withCanClearConditions(_canClearConditions());
+    }
     if (state.catalog case final TagsPanelLoaded loaded) {
-      state = state.withCatalog(
-        loaded.withConfirmedRows(
-          _markedByDraft([
-            for (final row in loaded.confirmedRows) row.tag,
-          ], tagSet),
+      final tags = [for (final row in loaded.confirmedRows) row.tag];
+      final rows = switch (_context) {
+        TagsPanelAssignmentContext() => null,
+        TagsPanelDraftContext(:final tagSet) => _markedByDraft(tags, tagSet),
+        TagsPanelFilterContext(:final conditions) => _markedByConditions(
+          tags,
+          conditions,
         ),
-      );
+      };
+      if (rows != null) {
+        state = state.withCatalog(loaded.withConfirmedRows(rows));
+      }
     }
   }
+
+  bool _canClearConditions() => switch (_context) {
+    TagsPanelFilterContext(:final conditions) =>
+      conditions.current.conditions.isNotEmpty,
+    TagsPanelAssignmentContext() || TagsPanelDraftContext() => false,
+  };
 
   static List<TagsPanelRow> _markedByDraft(
     List<Tag> tags,
     IntentionDraftTagSet tagSet,
   ) => [
     for (final tag in tags)
-      TagsPanelRow(tag: tag, isMarked: tagSet.current.tagIds.contains(tag.id)),
+      TagsPanelRow(
+        tag: tag,
+        mark: tagSet.current.tagIds.contains(tag.id)
+            ? TagsPanelSelectionMark.marked
+            : TagsPanelSelectionMark.unmarked,
+      ),
   ];
+
+  static List<TagsPanelRow> _markedByConditions(
+    List<Tag> tags,
+    IntentionTagConditionSet conditions,
+  ) {
+    final requirements = {
+      for (final condition in conditions.current.conditions)
+        condition.tagId: condition.requirement,
+    };
+    return [
+      for (final tag in tags)
+        TagsPanelRow(
+          tag: tag,
+          mark: switch (requirements[tag.id]) {
+            null => TagsPanelFilterMark.none,
+            IntentionTagRequirement.mustBePresent =>
+              TagsPanelFilterMark.mustBePresent,
+            IntentionTagRequirement.mustBeAbsent =>
+              TagsPanelFilterMark.mustBeAbsent,
+          },
+        ),
+    ];
+  }
 
   void _readFailed(TagsPanelReadFailure failure) {
     state = state.withCatalog(switch (state.catalog) {
@@ -400,21 +478,28 @@ final class TagsPanelViewModel extends _$TagsPanelViewModel {
     List<TagsPanelRow> rows,
     ConfirmedGraphChangePackage package,
   ) {
-    final intentionId = switch (_context) {
-      TagsPanelAssignmentContext(:final intentionId) => intentionId,
-      TagsPanelDraftContext() => null,
+    final (
+      IntentionId? intentionId,
+      TagsPanelMark unmarked,
+    ) = switch (_context) {
+      TagsPanelAssignmentContext(:final intentionId) => (
+        intentionId,
+        TagsPanelSelectionMark.unmarked,
+      ),
+      TagsPanelDraftContext() => (null, TagsPanelSelectionMark.unmarked),
+      TagsPanelFilterContext() => (null, TagsPanelFilterMark.none),
     };
     var applied = rows;
     for (final change in package.changes) {
       applied = switch (change) {
         TagCreatedChange(:final after) => _inManualOrder([
-          TagsPanelRow(tag: after, isMarked: false),
+          TagsPanelRow(tag: after, mark: unmarked),
           ...applied,
         ]),
         TagUpdatedChange(:final after) => _inManualOrder([
           for (final row in applied)
             if (row.tag.id == after.id)
-              TagsPanelRow(tag: after, isMarked: row.isMarked)
+              TagsPanelRow(tag: after, mark: row.mark)
             else
               row,
         ]),
@@ -429,7 +514,9 @@ final class TagsPanelViewModel extends _$TagsPanelViewModel {
               if (row.tag.id == assignment.tagId)
                 TagsPanelRow(
                   tag: row.tag,
-                  isMarked: state == TagAssignmentState.assigned,
+                  mark: state == TagAssignmentState.assigned
+                      ? TagsPanelSelectionMark.marked
+                      : TagsPanelSelectionMark.unmarked,
                 )
               else
                 row,

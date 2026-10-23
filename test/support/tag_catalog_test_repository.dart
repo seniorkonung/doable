@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
+import 'package:doable/src/intention/application/intention_catalog.dart';
+import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/tag/application/tag_assignment_status.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
@@ -81,6 +83,18 @@ final class TagCatalogTestRepository extends Fake
     for (final observation in observations.values) {
       await observation.close();
     }
+  }
+
+  /// Запросы выдачи поиска намерений, над условиями которого открыта панель
+  /// фильтра. Выдача не завершается: проверки панели читают только запросы.
+  final catalogQueries = <IntentionCatalogQuery>[];
+
+  @override
+  Future<Result<IntentionCatalogPage>> getCatalogPage(
+    IntentionCatalogQuery query,
+  ) {
+    catalogQueries.add(query);
+    return Completer<Result<IntentionCatalogPage>>().future;
   }
 
   @override

@@ -149,7 +149,7 @@ void main() {
           (container.read(browse) as TagCatalogLoaded).items.first.name.value ==
               'Быт' &&
           panelCatalog().rows.first.tag.name.value == 'Быт' &&
-          panelCatalog().rows.first.isMarked &&
+          panelCatalog().rows.first.mark == TagsPanelSelectionMark.marked &&
           panelCatalog().rowsAreCurrent &&
           [
             container.read(assignments),

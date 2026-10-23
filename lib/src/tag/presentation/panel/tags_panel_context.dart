@@ -1,4 +1,5 @@
 import '../../../intention/domain/intention_id.dart';
+import '../../../intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import '../../../intention/presentation/editor/intention_draft_tag_set.dart';
 
 /// Контекст панели тегов по ADR-0040: определяет отметку строки и смысл
@@ -23,6 +24,16 @@ final class TagsPanelDraftContext extends TagsPanelContext {
   const TagsPanelDraftContext(this.tagSet);
 
   final IntentionDraftTagSet tagSet;
+}
+
+/// Условия поиска намерений по тегам: отметка показывает надобность тега в
+/// условиях вызвавшего поиска. Нажатие переключает условие по кругу и не
+/// отправляет команд графа, поэтому панель фильтра не назначает и не снимает
+/// тегов.
+final class TagsPanelFilterContext extends TagsPanelContext {
+  const TagsPanelFilterContext(this.conditions);
+
+  final IntentionTagConditionSet conditions;
 }
 
 /// Одно открытие панели тегов.

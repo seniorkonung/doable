@@ -1748,6 +1748,29 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tagsPanelAssignmentHint => 'Choose as many as you need';
 
   @override
+  String get tagsPanelFilterTitle => 'Filter by tags';
+
+  @override
+  String get tagsPanelFilterHint =>
+      'Tap to require a tag, tap again to exclude it';
+
+  @override
+  String get tagsPanelResetConditions => 'Reset';
+
+  @override
+  String get tagsPanelResetConditionsLabel => 'Reset tag conditions';
+
+  @override
+  String tagsPanelFilterPresentLabel(String tagName) {
+    return '$tagName, must be present';
+  }
+
+  @override
+  String tagsPanelFilterAbsentLabel(String tagName) {
+    return '$tagName, must be absent';
+  }
+
+  @override
   String get tagsPanelSearchPlaceholder => 'Find or create a tag';
 
   @override
