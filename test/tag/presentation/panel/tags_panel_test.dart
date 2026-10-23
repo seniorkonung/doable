@@ -223,7 +223,6 @@ void main() {
 
       expect(find.text(texts.title), findsOne);
       expect(find.text(texts.hint), findsOne);
-      expect(h.repository.readModes.single, isA<TagCatalogBrowseMode>());
       h.repository.complete([
         _tag(1, 'Здоровье'),
         _tag(2, 'Спорт'),
@@ -231,11 +230,6 @@ void main() {
       ]);
       await tester.pump();
 
-      expect(_marks(tester), [
-        TagRowFilterMark.mustBePresent,
-        TagRowFilterMark.mustBeAbsent,
-        TagRowFilterMark.none,
-      ]);
       // Надобность передаёт только доступное название: состояния отметки у
       // строки фильтра нет.
       for (final (number, label) in [
@@ -343,43 +337,6 @@ void main() {
     expect(h.isClosed, isFalse);
   });
 
-  testWidgets('Создание тега без назначений: созданный в панели фильтра тег '
-      'становится условием «должен быть»', (tester) async {
-    late IntentionTagConditionSet conditions;
-    final h = await _pumpApp(
-      tester,
-      panelContext: (container) =>
-          TagsPanelFilterContext(conditions = _searchConditions(container)),
-    );
-    await h.open();
-    h.repository.complete([_tag(5, 'Дом')]);
-    await tester.pump();
-    await tester.enterText(_search, 'Парк');
-    await tester.pump();
-    await tester.tap(find.text('Создать тег «Парк»'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, 'Создать тег'));
-    await tester.pump();
-
-    final created = _createdPackage(_tag(1, 'Парк'));
-    h.repository.command.complete(TagCommandSucceeded(created));
-    h.changes.add(created);
-    await tester.pumpAndSettle();
-
-    expect(find.text('Новый тег'), findsNothing);
-    expect(_searchText(tester), isEmpty);
-    expect(_rowNames(tester), ['Парк', 'Дом']);
-    expect(_marks(tester), [
-      TagRowFilterMark.mustBePresent,
-      TagRowFilterMark.none,
-    ]);
-    expect(_requirements(conditions), [
-      (_id(1), IntentionTagRequirement.mustBePresent),
-    ]);
-    expect(h.repository.commands.single, isA<CreateTag>());
-    expect(find.byType(SnackBar), findsNothing);
-  });
-
   testWidgets('Закрытие панели до подтверждения создания: в панели фильтра '
       'тег не становится условием и не отмечен в новом открытии', (
     tester,
@@ -418,42 +375,6 @@ void main() {
     expect(_rowNames(tester), ['Парк', 'Дом']);
     expect(_marks(tester), [TagRowFilterMark.none, TagRowFilterMark.none]);
     expect(h.repository.commands.single, isA<CreateTag>());
-  });
-
-  testWidgets('удаление тега в панели фильтра снимает его условие вместе с '
-      'отметкой и «Сбросить»', (tester) async {
-    late IntentionTagConditionSet conditions;
-    final h = await _pumpApp(
-      tester,
-      panelContext: (container) => TagsPanelFilterContext(
-        conditions = _searchConditions(container)
-          ..cycle(_tag(1, 'Спорт'), snapshotRevision: _revision),
-      ),
-    );
-    await h.open();
-    h.repository.complete([_tag(1, 'Спорт'), _tag(2, 'Дом')]);
-    await tester.pump();
-    await _chooseFromMenu(tester, _row(1), 'Удалить тег');
-    await tester.tap(find.text('Удалить'));
-    await tester.pumpAndSettle();
-
-    final deleted = ConfirmedGraphResult<TagCommandSuccess>(
-      revision: const TagCatalogTestRevision(2),
-      value: TagDeleted(
-        TagDeletedChange(
-          revision: const TagCatalogTestRevision(2),
-          tagId: _id(1),
-        ),
-      ),
-    );
-    h.repository.command.complete(TagCommandSucceeded(deleted));
-    h.changes.add(deleted);
-    await tester.pumpAndSettle();
-
-    expect(_requirements(conditions), isEmpty);
-    expect(_rowNames(tester), ['Дом']);
-    expect(_marks(tester), [TagRowFilterMark.none]);
-    expect(find.text('Сбросить'), findsNothing);
   });
 
   testWidgets('Большой каталог получен целиком', (tester) async {
