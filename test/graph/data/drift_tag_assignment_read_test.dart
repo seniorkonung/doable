@@ -7,7 +7,6 @@ import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
-import 'package:doable/src/tag/application/tag_assignment_status.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag_color.dart';
@@ -49,47 +48,6 @@ void main() {
 
   TagSelectionSnapshot selection(TagCatalogResult result) =>
       (result as TagCatalogSuccess).value as TagSelectionSnapshot;
-
-  test('точечное чтение различает пару и отсутствие для активного и архивированного намерения', () async {
-    final assignedTag =
-        (TagId.decode(tagFixtureId(firstTagNumber)) as TagIdDecodingSuccess).id;
-    final freeTag =
-        (TagId.decode(tagFixtureId(lastTagNumber)) as TagIdDecodingSuccess).id;
-    final missingTag =
-        (TagId.decode(tagFixtureId(999)) as TagIdDecodingSuccess).id;
-    for (final (assignedTarget, missingTarget) in [
-      (_intention(1), _intention(999)),
-      (_intention(2), _intention(999)),
-    ]) {
-      final assigned = await graph.getTagAssignmentStatus(
-        assignedTag,
-        assignedTarget,
-      );
-      final free = await graph.getTagAssignmentStatus(freeTag, assignedTarget);
-      expect((assigned as TagAssignmentStatusSuccess).value.value, isTrue);
-      expect((free as TagAssignmentStatusSuccess).value.value, isFalse);
-      expect(
-        assigned.value.revision.compareTo(free.value.revision),
-        GraphRevisionOrder.same,
-      );
-      expect(
-        await graph.getTagAssignmentStatus(missingTag, assignedTarget),
-        isA<TagAssignmentStatusError>().having(
-          (error) => error.failure,
-          'причина',
-          isA<TagAssignmentStatusTagNotFound>(),
-        ),
-      );
-      expect(
-        await graph.getTagAssignmentStatus(assignedTag, missingTarget),
-        isA<TagAssignmentStatusError>().having(
-          (error) => error.failure,
-          'причина',
-          isA<TagAssignmentStatusIntentionNotFound>(),
-        ),
-      );
-    }
-  });
 
   test(
     'полное чтение назначений даёт все 104 тега намерения в ручном порядке',
@@ -187,14 +145,6 @@ void main() {
     );
     expect(unassigned.items, hasLength(3));
     expect(unassigned.rows.map((row) => row.isAssigned), [false, false, false]);
-    final tagId = (TagId.decode(tagFixtureId(303)) as TagIdDecodingSuccess).id;
-    expect(
-      (await graph.getTagAssignmentStatus(
-        tagId,
-        _intention(101),
-      ) as TagAssignmentStatusSuccess).value.value,
-      isFalse,
-    );
     expect(raw.select('SELECT * FROM tag_assignments'), oldAssignments);
   });
 
@@ -212,15 +162,10 @@ void main() {
     final catalog = selection(
       await graph.getTagCatalog(TagCatalogSelectionMode(intentionId)),
     );
-    final status = (await graph.getTagAssignmentStatus(
-      tagId,
-      intentionId,
-    ) as TagAssignmentStatusSuccess).value;
     expect(
       catalog.revision.compareTo(before.revision),
       GraphRevisionOrder.same,
     );
-    expect(status.revision.compareTo(before.revision), GraphRevisionOrder.same);
     expect(() => before.items.clear(), throwsUnsupportedError);
     expect(() => catalog.items.clear(), throwsUnsupportedError);
     expect(() => catalog.rows.clear(), throwsUnsupportedError);
@@ -241,10 +186,6 @@ void main() {
     final renamedCatalog = selection(
       await graph.getTagCatalog(TagCatalogSelectionMode(intentionId)),
     );
-    final updated = (await graph.getTagAssignmentStatus(
-      tagId,
-      intentionId,
-    ) as TagAssignmentStatusSuccess).value;
     expect(after.items.map((tag) => tag.name.value), ['Я']);
     expect(after.items.map((tag) => tag.color), [TagColor.blue]);
     expect(renamedCatalog.items.map((tag) => tag.name.value), ['Я', 'Работа']);
@@ -254,7 +195,6 @@ void main() {
       renamedCatalog.revision.compareTo(after.revision),
       GraphRevisionOrder.same,
     );
-    expect(updated.revision.compareTo(after.revision), GraphRevisionOrder.same);
     expect(before.items.single.name.value, 'Дом');
     expect(before.items.single.color, TagColor.blue);
     expect(catalog.items.first.name.value, 'Дом');

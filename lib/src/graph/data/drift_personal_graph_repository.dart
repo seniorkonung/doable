@@ -70,13 +70,11 @@ import '../../statistics/application/intention_statistics_read_contract.dart';
 import '../../statistics/application/statistics_period.dart';
 import '../../statistics/application/statistics_read_contract.dart';
 import '../../tag/application/tag_catalog.dart';
-import '../../tag/application/tag_assignment_status.dart';
 import '../../tag/application/tag_assignments.dart';
 import '../../tag/application/tag_change.dart';
 import '../../tag/application/tag_command.dart';
 import '../../tag/application/tag_id_generator.dart';
 import '../../tag/application/tag_read_result.dart';
-import '../../tag/application/tagged_intentions_page.dart';
 import '../../tag/application/tag_result.dart';
 import '../../tag/domain/tag.dart' as tag_domain;
 import '../../tag/domain/tag_assignment.dart';
@@ -111,7 +109,6 @@ part 'drift_personal_graph_repository_relation_groups.dart';
 part 'drift_personal_graph_repository_selected_relations.dart';
 part 'drift_personal_graph_repository_choice_path_reads.dart';
 part 'drift_personal_graph_repository_tag_reads.dart';
-part 'drift_personal_graph_repository_tagged_intentions.dart';
 part 'drift_personal_graph_repository_tag_commands.dart';
 part 'drift_personal_graph_repository_fact_log.dart';
 part 'drift_personal_graph_repository_composition.dart';
@@ -243,17 +240,6 @@ final class DriftPersonalGraphRepository
   @override
   Future<TagAssignmentsResult> getTagAssignments(IntentionId intentionId) =>
       _readTagAssignments(intentionId);
-
-  @override
-  Future<TaggedIntentionsPageResult> getTaggedIntentionsPage(
-    TaggedIntentionsQuery query,
-  ) => _readTaggedIntentionsPage(query);
-
-  @override
-  Future<TagAssignmentStatusResult> getTagAssignmentStatus(
-    TagId tagId,
-    IntentionId intentionId,
-  ) => _readTagAssignmentStatus(tagId, intentionId);
 
   @override
   Stream<TagReadResult> watchTag(TagId id) => _watchTag(id);

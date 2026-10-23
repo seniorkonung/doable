@@ -1533,20 +1533,6 @@
       "type": "index",
       "data": {
         "on": 18,
-        "name": "tag_assignments_tag_order",
-        "sql": "CREATE INDEX tag_assignments_tag_order\n  ON tag_assignments (tag_id, creation_sequence);",
-        "unique": false,
-        "columns": []
-      }
-    },
-    {
-      "id": 36,
-      "references": [
-        18
-      ],
-      "type": "index",
-      "data": {
-        "on": 18,
         "name": "tag_assignments_intention",
         "sql": "CREATE INDEX tag_assignments_intention\n  ON tag_assignments (intention_id, tag_id);",
         "unique": false,
@@ -1554,7 +1540,7 @@
       }
     },
     {
-      "id": 37,
+      "id": 36,
       "references": [
         18
       ],
@@ -1569,7 +1555,7 @@
       }
     },
     {
-      "id": 38,
+      "id": 37,
       "references": [
         26
       ],
@@ -1583,7 +1569,7 @@
       }
     },
     {
-      "id": 39,
+      "id": 38,
       "references": [
         26
       ],
@@ -1597,7 +1583,7 @@
       }
     },
     {
-      "id": 40,
+      "id": 39,
       "references": [
         26
       ],
@@ -1611,7 +1597,7 @@
       }
     },
     {
-      "id": 41,
+      "id": 40,
       "references": [
         26
       ],
@@ -1625,7 +1611,7 @@
       }
     },
     {
-      "id": 42,
+      "id": 41,
       "references": [
         26
       ],
@@ -1640,7 +1626,7 @@
       }
     },
     {
-      "id": 43,
+      "id": 42,
       "references": [
         30
       ],
@@ -1654,7 +1640,7 @@
       }
     },
     {
-      "id": 44,
+      "id": 43,
       "references": [
         30
       ],
@@ -1668,7 +1654,7 @@
       }
     },
     {
-      "id": 45,
+      "id": 44,
       "references": [
         30
       ],
@@ -1682,7 +1668,7 @@
       }
     },
     {
-      "id": 46,
+      "id": 45,
       "references": [
         22,
         30
@@ -1699,7 +1685,7 @@
       }
     },
     {
-      "id": 47,
+      "id": 46,
       "references": [
         22
       ],
@@ -1713,7 +1699,7 @@
       }
     },
     {
-      "id": 48,
+      "id": 47,
       "references": [
         22
       ],
@@ -1727,7 +1713,7 @@
       }
     },
     {
-      "id": 49,
+      "id": 48,
       "references": [
         22
       ],
@@ -1742,7 +1728,7 @@
       }
     },
     {
-      "id": 50,
+      "id": 49,
       "references": [
         22,
         14
@@ -1759,7 +1745,7 @@
       }
     },
     {
-      "id": 51,
+      "id": 50,
       "references": [
         22,
         14
@@ -1776,7 +1762,7 @@
       }
     },
     {
-      "id": 52,
+      "id": 51,
       "references": [
         14,
         22
@@ -1793,7 +1779,7 @@
       }
     },
     {
-      "id": 53,
+      "id": 52,
       "references": [],
       "type": "table",
       "data": {
@@ -1818,58 +1804,58 @@
       }
     },
     {
-      "id": 54,
+      "id": 53,
       "references": [
         14,
-        53
+        52
       ],
       "type": "trigger",
       "data": {
         "on": 14,
         "references_in_body": [
           14,
-          53
+          52
         ],
         "name": "intentions_fts_after_insert",
         "sql": "CREATE TRIGGER intentions_fts_after_insert\nAFTER INSERT ON intentions\nBEGIN\n  INSERT INTO intention_titles_fts(rowid, title_search_key)\n  VALUES (new.rowid, new.title_search_key);\nEND;"
       }
     },
     {
-      "id": 55,
+      "id": 54,
       "references": [
         14,
-        53
+        52
       ],
       "type": "trigger",
       "data": {
         "on": 14,
         "references_in_body": [
           14,
-          53
+          52
         ],
         "name": "intentions_fts_after_update_search_content",
         "sql": "CREATE TRIGGER intentions_fts_after_update_search_content\nAFTER UPDATE ON intentions\nBEGIN\n  INSERT INTO intention_titles_fts(\n    intention_titles_fts, rowid, title_search_key\n  ) VALUES ('delete', old.rowid, old.title_search_key);\n  INSERT INTO intention_titles_fts(rowid, title_search_key)\n  VALUES (new.rowid, new.title_search_key);\nEND;"
       }
     },
     {
-      "id": 56,
+      "id": 55,
       "references": [
         14,
-        53
+        52
       ],
       "type": "trigger",
       "data": {
         "on": 14,
         "references_in_body": [
           14,
-          53
+          52
         ],
         "name": "intentions_fts_after_delete",
         "sql": "CREATE TRIGGER intentions_fts_after_delete\nAFTER DELETE ON intentions\nBEGIN\n  INSERT INTO intention_titles_fts(\n    intention_titles_fts, rowid, title_search_key\n  ) VALUES ('delete', old.rowid, old.title_search_key);\nEND;"
       }
     },
     {
-      "id": 57,
+      "id": 56,
       "references": [
         14
       ],
@@ -1883,7 +1869,7 @@
       }
     },
     {
-      "id": 58,
+      "id": 57,
       "references": [
         14
       ],
@@ -1897,7 +1883,7 @@
       }
     },
     {
-      "id": 59,
+      "id": 58,
       "references": [
         14
       ],
@@ -1911,7 +1897,7 @@
       }
     },
     {
-      "id": 60,
+      "id": 59,
       "references": [
         14
       ],
@@ -1925,7 +1911,7 @@
       }
     },
     {
-      "id": 61,
+      "id": 60,
       "references": [
         14
       ],
@@ -1939,7 +1925,7 @@
       }
     },
     {
-      "id": 62,
+      "id": 61,
       "references": [
         14
       ],
@@ -1953,7 +1939,7 @@
       }
     },
     {
-      "id": 63,
+      "id": 62,
       "references": [
         14
       ],
@@ -1967,7 +1953,7 @@
       }
     },
     {
-      "id": 64,
+      "id": 63,
       "references": [
         14
       ],
@@ -1981,7 +1967,7 @@
       }
     },
     {
-      "id": 65,
+      "id": 64,
       "references": [
         14
       ],
@@ -1995,7 +1981,7 @@
       }
     },
     {
-      "id": 66,
+      "id": 65,
       "references": [
         14
       ],
@@ -2009,7 +1995,7 @@
       }
     },
     {
-      "id": 67,
+      "id": 66,
       "references": [
         14
       ],
@@ -2023,7 +2009,7 @@
       }
     },
     {
-      "id": 68,
+      "id": 67,
       "references": [
         14
       ],
@@ -2350,15 +2336,6 @@
         {
           "dialect": "sqlite",
           "sql": "CREATE TRIGGER tags_immutable_identity AFTER UPDATE OF creation_sequence, id ON tags WHEN new.creation_sequence <> old.creation_sequence OR new.id <> old.id BEGIN SELECT RAISE (ABORT, 'tag identity is immutable');END"
-        }
-      ]
-    },
-    {
-      "name": "tag_assignments_tag_order",
-      "sql": [
-        {
-          "dialect": "sqlite",
-          "sql": "CREATE INDEX tag_assignments_tag_order ON tag_assignments (tag_id, creation_sequence)"
         }
       ]
     },

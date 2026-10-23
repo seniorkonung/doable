@@ -7,13 +7,13 @@ import 'dart:io';
 
 import 'package:doable/src/data/local/bootstrap/local_data_bootstrap_result.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
+import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
-import 'package:doable/src/tag/application/tagged_intentions_page.dart';
 import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
@@ -24,6 +24,7 @@ import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 import '../../support/tag_storage_fixture.dart';
+import '../../support/tagged_intention_ids.dart';
 
 void main() {
   // Пять последовательных процессов ограничены по времени внутри _runWorker.
@@ -110,7 +111,7 @@ void main() {
     expect(await harness.databaseFile.readAsBytes(), corrupted);
   });
 
-  test('Теги сохраняются после полного перезапуска: чтение, ручной порядок, правка цвета, перестановка, назначение архивированному действию, навигация и снятие', () async {
+  test('Теги сохраняются после полного перезапуска: чтение, ручной порядок, правка цвета, перестановка, назначение архивированному действию, выдача по тегу и снятие', () async {
     final harness = await LocalDatabaseHarness.fileBacked();
     addTearDown(harness.dispose);
     late sqlite.Database raw;
@@ -176,14 +177,13 @@ void main() {
         );
       }
       for (final (scope, expected) in [
-        (TaggedIntentionsScope.active, active),
-        (TaggedIntentionsScope.archived, archived),
+        (IntentionScope.active, active),
+        (IntentionScope.archived, archived),
       ]) {
-        final page = (await repository.getTaggedIntentionsPage(
-          TaggedIntentionsQuery(tagId: tagId, scope: scope),
-        ) as TaggedIntentionsPageSuccess).value;
-        expect(page.items.map((item) => item.id), expected);
-        expect(page.nextCursor, isNull);
+        expect(
+          await readTaggedIntentionIds(repository, tagId, scope),
+          expected.toSet(),
+        );
       }
       expect(retainedTagFixtureGraph(raw), graphBefore);
       expect(raw.select('PRAGMA integrity_check').single.values.single, 'ok');

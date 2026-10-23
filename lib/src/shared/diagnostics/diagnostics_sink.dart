@@ -171,24 +171,6 @@ final class TagAssignmentsReadDiagnosticsEvent extends DiagnosticsEvent {
   final TagReadDiagnosticsStage stage;
 }
 
-final class TaggedEntitiesPageReadDiagnosticsEvent extends DiagnosticsEvent {
-  const TaggedEntitiesPageReadDiagnosticsEvent({
-    required this.stage,
-    required DiagnosticsStatus status,
-  }) : super(status);
-
-  final TagReadDiagnosticsStage stage;
-}
-
-final class TagAssignmentStatusReadDiagnosticsEvent extends DiagnosticsEvent {
-  const TagAssignmentStatusReadDiagnosticsEvent({
-    required this.stage,
-    required DiagnosticsStatus status,
-  }) : super(status);
-
-  final TagReadDiagnosticsStage stage;
-}
-
 final class TagDetailReadDiagnosticsEvent extends DiagnosticsEvent {
   const TagDetailReadDiagnosticsEvent({
     required this.stage,

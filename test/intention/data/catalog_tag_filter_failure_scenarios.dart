@@ -46,109 +46,104 @@ void _catalogTagFilterFailureScenarios(
           DiagnosticsFailureCode.corruption,
         ),
       ]) {
-    test(
-      'отказ $label категории $code сохраняет навигацию и откат поиска',
-      () async {
-        final observer = _CatalogFilterFailureObserver(point, error);
-        late Database raw;
-        final (:repository, :diagnostics, database: _) = await replace(
-          observer,
-          (db) => raw = db,
+    test('отказ $label категории $code сохраняет продолжение выдачи по тегу и '
+        'откат поиска', () async {
+      final observer = _CatalogFilterFailureObserver(point, error);
+      late Database raw;
+      final (:repository, :diagnostics, database: _) = await replace(
+        observer,
+        (db) => raw = db,
+      );
+      seedTagStorageFixture(raw);
+      // Продолжению выдачи по тегу нужен второй получатель тега.
+      seedRawGraph(raw, () {
+        raw.execute(
+          'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)',
+          [tagFixtureId(4), 'Намерение 4', 104, 204],
         );
-        seedTagStorageFixture(raw);
-        // Продолжению навигации активного охвата нужен второй получатель тега.
-        seedRawGraph(raw, () {
-          raw.execute(
-            'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)',
-            [tagFixtureId(4), 'Намерение 4', 104, 204],
-          );
-          raw.execute(
-            'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-            [tagFixtureId(firstTagNumber), tagFixtureId(4)],
-          );
-        });
-        final required = _fixtureTag(firstTagNumber);
-        final excluded = _fixtureTag(lastTagNumber);
-        IntentionCatalogQuery query(TagId required, TagId excluded) =>
-            IntentionCatalogQuery(
-              scope: IntentionScope.active,
-              titleFilter: 'Намерение',
-              tagFilter: IntentionTagFilter(
-                requiredTagIds: [required],
-                excludedTagIds: [excluded],
-              ),
-              order: IntentionCatalogOrder.createdAtAscending,
-              pageSize: 1,
-            );
-        final first = (await repository.getTaggedIntentionsPage(
-          TaggedIntentionsQuery(
-            tagId: required,
-            scope: TaggedIntentionsScope.active,
+        raw.execute(
+          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+          [tagFixtureId(firstTagNumber), tagFixtureId(4)],
+        );
+      });
+      final required = _fixtureTag(firstTagNumber);
+      final excluded = _fixtureTag(lastTagNumber);
+      IntentionCatalogQuery query(TagId required, TagId excluded) =>
+          IntentionCatalogQuery(
+            scope: IntentionScope.active,
+            titleFilter: 'Намерение',
+            tagFilter: IntentionTagFilter(
+              requiredTagIds: [required],
+              excludedTagIds: [excluded],
+            ),
+            order: IntentionCatalogOrder.createdAtAscending,
             pageSize: 1,
-          ),
-        ) as TaggedIntentionsPageSuccess).value;
-        expect(first.nextCursor, isNotNull);
-        final before = _storedFilterFailureGraph(raw);
-        observer.arm();
+          );
+      IntentionCatalogQuery tagged({IntentionCatalogCursor? cursor}) =>
+          IntentionCatalogQuery(
+            scope: IntentionScope.active,
+            titleFilter: null,
+            tagFilter: IntentionTagFilter(requiredTagIds: [required]),
+            order: IntentionCatalogOrder.createdAtAscending,
+            pageSize: 1,
+            cursor: cursor,
+          );
+      final first = (await repository.getCatalogPage(
+        tagged(),
+      ) as ResultSuccess<IntentionCatalogPage>).value;
+      expect(first.nextCursor, isNotNull);
+      final before = _storedFilterFailureGraph(raw);
+      observer.arm();
 
-        expect(
-          await repository.getCatalogPage(query(required, excluded)),
-          isA<ResultFailure<IntentionCatalogPage>>().having(
-            (result) => result.failure,
-            'причина',
-            failure,
-          ),
-        );
-        expect(_storedFilterFailureGraph(raw), before);
-        expect(
-          diagnostics.events.last,
-          isA<CatalogPageReadDiagnosticsEvent>().having(
-            (event) => event.status,
-            'исход',
-            isA<DiagnosticsFailed>()
-                .having((status) => status.code, 'категория', code)
-                .having(
-                  (status) => status.duration,
-                  'длительность',
-                  greaterThanOrEqualTo(Duration.zero),
-                ),
-          ),
-        );
-        expect(diagnostics.events.toString(), isNot(contains('CANARY')));
-        expect(
-          diagnostics.events.toString(),
-          isNot(contains(tagFixtureId(firstTagNumber))),
-        );
+      expect(
+        await repository.getCatalogPage(query(required, excluded)),
+        isA<ResultFailure<IntentionCatalogPage>>().having(
+          (result) => result.failure,
+          'причина',
+          failure,
+        ),
+      );
+      expect(_storedFilterFailureGraph(raw), before);
+      expect(
+        diagnostics.events.last,
+        isA<CatalogPageReadDiagnosticsEvent>().having(
+          (event) => event.status,
+          'исход',
+          isA<DiagnosticsFailed>()
+              .having((status) => status.code, 'категория', code)
+              .having(
+                (status) => status.duration,
+                'длительность',
+                greaterThanOrEqualTo(Duration.zero),
+              ),
+        ),
+      );
+      expect(diagnostics.events.toString(), isNot(contains('CANARY')));
+      expect(
+        diagnostics.events.toString(),
+        isNot(contains(tagFixtureId(firstTagNumber))),
+      );
 
-        final continuation = await repository.getTaggedIntentionsPage(
-          TaggedIntentionsQuery(
-            tagId: required,
-            scope: first.scope,
-            pageSize: first.pageSize,
-            cursor: first.nextCursor,
-          ),
-        );
-        expect(continuation, isA<TaggedIntentionsPageSuccess>());
-        final next = (continuation as TaggedIntentionsPageSuccess).value;
-        expect(
-          next.revision.compareTo(first.revision),
-          GraphRevisionOrder.same,
-        );
-        expect(next.items.single.id, isNot(first.items.single.id));
-        expect(next.nextCursor, isNull);
+      final continuation = await repository.getCatalogPage(
+        tagged(cursor: first.nextCursor),
+      );
+      expect(continuation, isA<ResultSuccess<IntentionCatalogPage>>());
+      final next = (continuation as ResultSuccess<IntentionCatalogPage>).value;
+      expect(next.revision.compareTo(first.revision), GraphRevisionOrder.same);
+      expect(next.items.single.id, isNot(first.items.single.id));
+      expect(next.nextCursor, isNull);
 
-        final success = (await repository.getCatalogPage(
-          query(excluded, required),
-        ) as ResultSuccess<IntentionCatalogPage>).value;
-        expect(success.items.single.id, _id(tagFixtureId(3)));
-        expect((success as IntentionCatalogFirstPage).totalCount, 1);
-        expect(
-          success.revision.compareTo(first.revision),
-          GraphRevisionOrder.same,
-        );
-        expect(_storedFilterFailureGraph(raw), before);
-      },
-    );
+      final success = (await repository.getCatalogPage(
+        query(excluded, required),
+      ) as ResultSuccess<IntentionCatalogPage>).value;
+      expect(success.items.single.id, _id(tagFixtureId(3)));
+      expect((success as IntentionCatalogFirstPage).totalCount, 1);
+      expect(
+        success.revision.compareTo(first.revision),
+        GraphRevisionOrder.same,
+      );
+      expect(_storedFilterFailureGraph(raw), before);
+    });
   }
 }
 

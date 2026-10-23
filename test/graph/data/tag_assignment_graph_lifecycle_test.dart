@@ -1,6 +1,7 @@
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
+import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
@@ -9,7 +10,6 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
-import 'package:doable/src/tag/application/tagged_intentions_page.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -17,6 +17,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
+import '../../support/tagged_intention_ids.dart';
 
 IntentionId _intention(int number) =>
     (IntentionId.decode(tagFixtureId(number)) as IntentionIdDecodingSuccess).id;
@@ -67,18 +68,15 @@ void main() {
       .map((entry) => entry['tag_id'])
       .toList();
 
-  Future<void> expectNavigation(
+  Future<void> expectTagged(
     int tag,
-    TaggedIntentionsScope scope,
+    IntentionScope scope,
     List<int> intentions,
   ) async {
-    final result = await repository.getTaggedIntentionsPage(
-      TaggedIntentionsQuery(tagId: _tag(tag), scope: scope),
+    expect(
+      await readTaggedIntentionIds(repository, _tag(tag), scope),
+      intentions.map(_intention).toSet(),
     );
-    expect(result, isA<TaggedIntentionsPageSuccess>());
-    final page = (result as TaggedIntentionsPageSuccess).value;
-    expect(page.items.map((item) => item.id), intentions.map(_intention));
-    expect(page.nextCursor, isNull);
   }
 
   Map<String, List<List<Object?>>> graph() => {
@@ -162,24 +160,24 @@ void main() {
         expect(rows('tags'), tags);
         expect(rows('daily_choices'), dailyChoices);
         expect(rows('daily_choice_path_steps'), pathSteps);
-        await expectNavigation(
+        await expectTagged(
           firstTagNumber,
-          TaggedIntentionsScope.active,
+          IntentionScope.active,
           archived == 0 ? [1] : [],
         );
-        await expectNavigation(
+        await expectTagged(
           firstTagNumber,
-          TaggedIntentionsScope.archived,
+          IntentionScope.archived,
           archived == 0 ? [2] : [1, 2],
         );
-        await expectNavigation(
+        await expectTagged(
           lastTagNumber,
-          TaggedIntentionsScope.active,
+          IntentionScope.active,
           archived == 0 ? [3, 1] : [3],
         );
-        await expectNavigation(
+        await expectTagged(
           lastTagNumber,
-          TaggedIntentionsScope.archived,
+          IntentionScope.archived,
           archived == 0 ? [] : [1],
         );
         expect(raw.select('PRAGMA foreign_key_check'), isEmpty);

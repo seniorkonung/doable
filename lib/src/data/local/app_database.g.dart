@@ -5737,10 +5737,6 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'CREATE TRIGGER tags_immutable_identity AFTER UPDATE OF creation_sequence, id ON tags WHEN new.creation_sequence <> old.creation_sequence OR new.id <> old.id BEGIN SELECT RAISE (ABORT, \'tag identity is immutable\');END',
     'tags_immutable_identity',
   );
-  late final Index tagAssignmentsTagOrder = Index(
-    'tag_assignments_tag_order',
-    'CREATE INDEX tag_assignments_tag_order ON tag_assignments (tag_id, creation_sequence)',
-  );
   late final Index tagAssignmentsIntention = Index(
     'tag_assignments_intention',
     'CREATE INDEX tag_assignments_intention ON tag_assignments (intention_id, tag_id)',
@@ -5912,7 +5908,6 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     graphLogMarkDailyChoicePathStepUpdate,
     graphLogMarkDailyChoicePathStepDelete,
     tagsImmutableIdentity,
-    tagAssignmentsTagOrder,
     tagAssignmentsIntention,
     tagAssignmentsImmutableIdentity,
     dailyChoicesDateCompletionScheduleOrder,

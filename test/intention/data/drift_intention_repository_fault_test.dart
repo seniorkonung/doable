@@ -18,7 +18,6 @@ import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
-import 'package:doable/src/tag/application/tagged_intentions_page.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
@@ -29,6 +28,7 @@ import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/tag_positions.dart';
+import '../../support/tagged_intention_ids.dart';
 
 part 'catalog_tag_filter_failure_scenarios.dart';
 
@@ -1205,15 +1205,8 @@ Future<_ObservedCreationGraph> _observeCreationGraph(
         for (final tag in tags.items) [tag.id, tag.name.value],
       ],
       for (final tag in tags.items)
-        for (final scope in TaggedIntentionsScope.values)
-          [
-            for (final item in _readValue(
-              await repository.getTaggedIntentionsPage(
-                TaggedIntentionsQuery(tagId: tag.id, scope: scope),
-              ),
-            ).items)
-              item.id,
-          ],
+        for (final scope in [IntentionScope.active, IntentionScope.archived])
+          await readTaggedIntentionIds(repository, tag.id, scope),
       _storedCreationRows(raw),
     ],
     revision: page.revision,

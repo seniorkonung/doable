@@ -52,9 +52,6 @@ CREATE TABLE tag_assignments (
   UNIQUE (tag_id, intention_id)
 );
 
-CREATE INDEX tag_assignments_tag_order
-  ON tag_assignments (tag_id, creation_sequence);
-
 CREATE INDEX tag_assignments_intention
   ON tag_assignments (intention_id, tag_id);
 

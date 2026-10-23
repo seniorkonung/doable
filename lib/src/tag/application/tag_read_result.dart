@@ -3,10 +3,8 @@ import '../../graph/application/graph_revision.dart';
 import '../../intention/domain/intention_id.dart';
 import '../domain/tag.dart';
 import '../domain/tag_id.dart';
-import 'tag_assignment_status.dart';
 import 'tag_assignments.dart';
 import 'tag_catalog.dart';
-import 'tagged_intentions_page.dart';
 
 sealed class TagReadFailure implements GraphCommandFailure {
   const TagReadFailure();
@@ -52,23 +50,6 @@ abstract interface class TagReadContract {
   /// тегов, независимо от очерёдности назначения.
   /// Пустой успех отличается от отсутствия намерения.
   Future<TagAssignmentsResult> getTagAssignments(IntentionId intentionId);
-
-  /// Проверяет пару тега и намерения на согласованном снимке. Отсутствие
-  /// каждого участника и отказ чтения различны; остальные назначения
-  /// не загружаются.
-  Future<TagAssignmentStatusResult> getTagAssignmentStatus(
-    TagId tagId,
-    IntentionId intentionId,
-  );
-
-  /// Возвращает одну порцию непосредственно помеченных намерений выбранного
-  /// тега в порядке создания назначений. Охват определяется собственным
-  /// архивным состоянием намерения до разбиения на порции. Пустой успех
-  /// отличается от отсутствия тега; продолжение принадлежит этому тегу,
-  /// охвату, размеру порции и подтверждённому снимку.
-  Future<TaggedIntentionsPageResult> getTaggedIntentionsPage(
-    TaggedIntentionsQuery query,
-  );
 
   /// Наблюдает один тег без загрузки назначений; каждый успех несёт ревизию.
   Stream<TagReadResult> watchTag(TagId id);

@@ -30,73 +30,6 @@ extension _TagReading on DriftPersonalGraphRepository {
     return tags;
   }
 
-  Future<TagAssignmentStatusResult> _readTagAssignmentStatus(
-    TagId tagId,
-    IntentionId intentionId,
-  ) async {
-    final stopwatch = Stopwatch()..start();
-    var stage = TagReadDiagnosticsStage.validation;
-    void record(DiagnosticsStatus status) => _recordDiagnostics(
-      TagAssignmentStatusReadDiagnosticsEvent(stage: stage, status: status),
-    );
-
-    record(const DiagnosticsStarted());
-    try {
-      final snapshot = await _sequencer.run(
-        () => _database.transaction(() async {
-          stage = TagReadDiagnosticsStage.read;
-          final row = await _database
-              .customSelect(
-                '''SELECT EXISTS(SELECT 1 FROM tags WHERE id = ?) AS tag_exists,
-                 EXISTS(SELECT 1 FROM intentions WHERE id = ?) AS intention_exists,
-                 EXISTS(SELECT 1 FROM tag_assignments
-                   WHERE tag_id = ? AND intention_id = ?) AS is_assigned''',
-                variables: [
-                  Variable<String>(tagId.toCanonicalString()),
-                  Variable<String>(intentionId.toCanonicalString()),
-                  Variable<String>(tagId.toCanonicalString()),
-                  Variable<String>(intentionId.toCanonicalString()),
-                ],
-                readsFrom: {
-                  _database.tags,
-                  _database.intentions,
-                  _database.tagAssignments,
-                },
-              )
-              .getSingle();
-          final tagExists = requiredStoredInteger(row.data, 'tag_exists');
-          final intentionExists = requiredStoredInteger(
-            row.data,
-            'intention_exists',
-          );
-          final assigned = requiredStoredInteger(row.data, 'is_assigned');
-          if ((tagExists != 0 && tagExists != 1) ||
-              (intentionExists != 0 && intentionExists != 1) ||
-              (assigned != 0 && assigned != 1)) {
-            throw const StoredGraphCorruption();
-          }
-          if (tagExists == 0) throw const _TagStatusTagMissing();
-          if (intentionExists == 0) throw const _TagReadIntentionMissing();
-          return GraphSnapshot(
-            value: assigned == 1,
-            revision: _currentRevision,
-          );
-        }),
-      );
-      record(DiagnosticsSucceeded(stopwatch.elapsed));
-      return TagAssignmentStatusSuccess(snapshot);
-    } on Object catch (error) {
-      final failure = _classifyTagAssignmentStatusFailure(error);
-      record(
-        DiagnosticsFailed(
-          duration: stopwatch.elapsed,
-          code: _graphCommandDiagnosticsFailureCode(failure),
-        ),
-      );
-      return TagAssignmentStatusError(failure);
-    }
-  }
-
   Future<TagCatalogResult> _readTagCatalog(TagCatalogMode mode) async {
     final stopwatch = Stopwatch()..start();
     var stage = TagReadDiagnosticsStage.validation;
@@ -309,29 +242,6 @@ tag_domain.Tag _decodeAssignedTag(Map<String, Object?> data) {
 
 final class _TagReadIntentionMissing implements Exception {
   const _TagReadIntentionMissing();
-}
-
-final class _TagStatusTagMissing implements Exception {
-  const _TagStatusTagMissing();
-}
-
-TagAssignmentStatusFailure _classifyTagAssignmentStatusFailure(Object error) {
-  if (error is _TagStatusTagMissing) {
-    return const TagAssignmentStatusTagNotFound();
-  }
-  if (error is _TagReadIntentionMissing) {
-    return const TagAssignmentStatusIntentionNotFound();
-  }
-  if (error is StoredGraphCorruption) {
-    return const TagAssignmentStatusCorruption();
-  }
-  return switch (classifySqliteFailure(error)) {
-    SqliteCorruptionFailure() => const TagAssignmentStatusCorruption(),
-    SqliteUnavailableFailure() => const TagAssignmentStatusUnavailable(),
-    SqliteConstraintFailure() ||
-    SqliteStorageFullFailure() ||
-    SqliteUnexpectedFailure() => const TagAssignmentStatusUnexpected(),
-  };
 }
 
 TagCatalogReadFailure _classifyTagCatalogReadFailure(Object error) {

@@ -7,13 +7,10 @@ import 'package:doable/src/shared/diagnostics/developer_diagnostics_sink.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_assignments.dart';
-import 'package:doable/src/tag/application/tag_assignment_status.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
-import 'package:doable/src/tag/application/tagged_intentions_page.dart';
 import 'package:doable/src/tag/domain/tag_color.dart';
-import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -72,106 +69,6 @@ void main() {
         () => DateTime.utc(2026, 9, 25),
         sink,
       );
-
-  test('навигация сообщает код отказа без личных данных', () async {
-    seedTagStorageFixture(raw);
-    final sink = _RecordingSink();
-    final graph = repository(sink);
-    final id =
-        (TagId.decode(tagFixtureId(firstTagNumber)) as TagIdDecodingSuccess).id;
-    TaggedIntentionsQuery query({int pageSize = 1}) => TaggedIntentionsQuery(
-      tagId: id,
-      scope: TaggedIntentionsScope.active,
-      pageSize: pageSize,
-    );
-    const damagedIntentionId = 'CANARY-повреждённое-намерение';
-
-    expect(
-      await graph.getTaggedIntentionsPage(query()),
-      isA<TaggedIntentionsPageSuccess>(),
-    );
-
-    readFault.failure = sqlite.SqliteException(
-      extendedResultCode: sqlite.SqlError.SQLITE_BUSY,
-      message: 'CANARY-SQL-ошибка',
-      causingStatement: 'CANARY-запрос',
-      parametersToStatement: [tagFixtureId(firstTagNumber)],
-    );
-    expect(
-      await graph.getTaggedIntentionsPage(query()),
-      isA<TaggedIntentionsPageError>().having(
-        (error) => error.failure,
-        'причина',
-        isA<TaggedIntentionsUnavailableFailure>(),
-      ),
-    );
-    final unavailable = sink.events
-        .whereType<TaggedEntitiesPageReadDiagnosticsEvent>()
-        .last;
-    expect(
-      (unavailable.status as DiagnosticsFailed).code,
-      DiagnosticsFailureCode.unavailable,
-    );
-
-    readFault.failure = StateError('CANARY-неизвестная-причина');
-    expect(
-      await graph.getTaggedIntentionsPage(query()),
-      isA<TaggedIntentionsPageError>().having(
-        (error) => error.failure,
-        'причина',
-        isA<TaggedIntentionsUnexpectedFailure>(),
-      ),
-    );
-    final unknown = sink.events
-        .whereType<TaggedEntitiesPageReadDiagnosticsEvent>()
-        .last;
-    expect(
-      (unknown.status as DiagnosticsFailed).code,
-      DiagnosticsFailureCode.unexpected,
-    );
-
-    readFault.failure = null;
-    // Формат идентификатора намерения схема не проверяет.
-    seedRawGraph(raw, () {
-      raw.execute(
-        'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, 1, 1)',
-        [damagedIntentionId, 'Повреждённое'],
-      );
-      raw.execute(
-        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-        [tagFixtureId(firstTagNumber), damagedIntentionId],
-      );
-    });
-    expect(
-      await graph.getTaggedIntentionsPage(query(pageSize: 10)),
-      isA<TaggedIntentionsPageError>().having(
-        (error) => error.failure,
-        'причина',
-        isA<TaggedIntentionsCorruptionFailure>(),
-      ),
-    );
-    final corruption = sink.events
-        .whereType<TaggedEntitiesPageReadDiagnosticsEvent>()
-        .last;
-    expect(
-      (corruption.status as DiagnosticsFailed).code,
-      DiagnosticsFailureCode.corruption,
-    );
-    final recorded = sink.messages.join('\n');
-    for (final canary in [
-      'CANARY-SQL-ошибка',
-      'CANARY-запрос',
-      'CANARY-неизвестная-причина',
-      tagFixtureId(firstTagNumber),
-      damagedIntentionId,
-      tagFixtureId(101),
-      tagFixtureId(1),
-      'Дом',
-      'Намерение 1',
-    ]) {
-      expect(recorded, isNot(contains(canary)));
-    }
-  });
 
   test('реальные исходы и повреждение чтения оставляют только безопасную диагностику', () async {
     final sink = _RecordingSink();
@@ -375,112 +272,96 @@ void main() {
     }
   });
 
-  test('отказы трёх чтений различаются и не раскрывают данные пары', () async {
-    seedTagStorageFixture(raw);
-    final sink = _RecordingSink();
-    final graph = repository(sink);
-    final intentionId =
-        (IntentionId.decode(tagFixtureId(2)) as IntentionIdDecodingSuccess).id;
-    final tagId =
-        (TagId.decode(tagFixtureId(firstTagNumber)) as TagIdDecodingSuccess).id;
-    readFault.failAssignmentReads = true;
-    for (final (error, category, code) in [
-      (
-        sqlite.SqliteException(
-          extendedResultCode: sqlite.SqlError.SQLITE_BUSY,
-          message: 'CANARY-ошибка-чтения',
-          causingStatement: 'CANARY-запрос-чтения',
-          parametersToStatement: [tagFixtureId(2)],
+  test(
+    'отказы двух чтений различаются и не раскрывают данные намерения',
+    () async {
+      seedTagStorageFixture(raw);
+      final sink = _RecordingSink();
+      final graph = repository(sink);
+      final intentionId = (IntentionId.decode(
+        tagFixtureId(2),
+      ) as IntentionIdDecodingSuccess).id;
+      readFault.failAssignmentReads = true;
+      for (final (error, category, code) in [
+        (
+          sqlite.SqliteException(
+            extendedResultCode: sqlite.SqlError.SQLITE_BUSY,
+            message: 'CANARY-ошибка-чтения',
+            causingStatement: 'CANARY-запрос-чтения',
+            parametersToStatement: [tagFixtureId(2)],
+          ),
+          GraphFailureCategory.unavailable,
+          DiagnosticsFailureCode.unavailable,
         ),
-        GraphFailureCategory.unavailable,
-        DiagnosticsFailureCode.unavailable,
-      ),
-      (
-        sqlite.SqliteException(
-          extendedResultCode: sqlite.SqlError.SQLITE_CORRUPT,
-          message: 'CANARY-повреждение',
+        (
+          sqlite.SqliteException(
+            extendedResultCode: sqlite.SqlError.SQLITE_CORRUPT,
+            message: 'CANARY-повреждение',
+          ),
+          GraphFailureCategory.corruption,
+          DiagnosticsFailureCode.corruption,
         ),
-        GraphFailureCategory.corruption,
-        DiagnosticsFailureCode.corruption,
-      ),
-      (
-        StateError('CANARY-неизвестная-причина'),
-        GraphFailureCategory.unexpected,
-        DiagnosticsFailureCode.unexpected,
-      ),
-    ]) {
-      readFault.failure = error;
+        (
+          StateError('CANARY-неизвестная-причина'),
+          GraphFailureCategory.unexpected,
+          DiagnosticsFailureCode.unexpected,
+        ),
+      ]) {
+        readFault.failure = error;
+        expect(
+          await graph.getTagAssignments(intentionId),
+          isA<TagAssignmentsError>().having(
+            (result) => result.failure.category,
+            'категория',
+            category,
+          ),
+        );
+        expect(
+          await graph.getTagCatalog(TagCatalogSelectionMode(intentionId)),
+          isA<TagCatalogError>().having(
+            (result) => result.failure.category,
+            'категория',
+            category,
+          ),
+        );
+        expect(
+          (sink.events
+                      .whereType<TagAssignmentsReadDiagnosticsEvent>()
+                      .last
+                      .status
+                  as DiagnosticsFailed)
+              .code,
+          code,
+        );
+        expect(
+          (sink.events.whereType<TagCatalogReadDiagnosticsEvent>().last.status
+                  as DiagnosticsFailed)
+              .code,
+          code,
+        );
+      }
+      readFault.failure = null;
       expect(
         await graph.getTagAssignments(intentionId),
-        isA<TagAssignmentsError>().having(
-          (result) => result.failure.category,
-          'категория',
-          category,
-        ),
+        isA<TagAssignmentsSuccess>(),
       );
       expect(
         await graph.getTagCatalog(TagCatalogSelectionMode(intentionId)),
-        isA<TagCatalogError>().having(
-          (result) => result.failure.category,
-          'категория',
-          category,
-        ),
+        isA<TagCatalogSuccess>(),
       );
-      expect(
-        await graph.getTagAssignmentStatus(tagId, intentionId),
-        isA<TagAssignmentStatusError>().having(
-          (result) => result.failure.category,
-          'категория',
-          category,
-        ),
-      );
-      expect(
-        (sink.events.whereType<TagAssignmentsReadDiagnosticsEvent>().last.status
-                as DiagnosticsFailed)
-            .code,
-        code,
-      );
-      expect(
-        (sink.events.whereType<TagCatalogReadDiagnosticsEvent>().last.status
-                as DiagnosticsFailed)
-            .code,
-        code,
-      );
-      expect(
-        (sink.events
-                    .whereType<TagAssignmentStatusReadDiagnosticsEvent>()
-                    .last
-                    .status
-                as DiagnosticsFailed)
-            .code,
-        code,
-      );
-    }
-    readFault.failure = null;
-    expect(
-      await graph.getTagAssignments(intentionId),
-      isA<TagAssignmentsSuccess>(),
-    );
-    expect(
-      await graph.getTagCatalog(TagCatalogSelectionMode(intentionId)),
-      isA<TagCatalogSuccess>(),
-    );
-    expect(
-      await graph.getTagAssignmentStatus(tagId, intentionId),
-      isA<TagAssignmentStatusSuccess>(),
-    );
-    final recorded = [
-      ...sink.events.map((event) => event.toString()),
-      ...sink.messages,
-    ].join('\n');
-    for (final value in [
-      'CANARY',
-      tagFixtureId(2),
-      tagFixtureId(firstTagNumber),
-      'Дом',
-      'Намерение 2',
-    ]) {
-      expect(recorded, isNot(contains(value)));
-    }
-  });
+      final recorded = [
+        ...sink.events.map((event) => event.toString()),
+        ...sink.messages,
+      ].join('\n');
+      for (final value in [
+        'CANARY',
+        tagFixtureId(2),
+        tagFixtureId(firstTagNumber),
+        'Дом',
+        'Намерение 2',
+      ]) {
+        expect(recorded, isNot(contains(value)));
+      }
+    },
+  );
 }

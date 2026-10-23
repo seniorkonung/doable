@@ -5,8 +5,6 @@ import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
-import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/tag/application/tag_assignment_status.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
@@ -38,8 +36,6 @@ final class TagCatalogTestRepository extends Fake
 
   /// Результаты команд в порядке исполнения: каждая команда ждёт свой.
   final commandResults = <Completer<TagCommandResult>>[];
-  final statusReads = <Completer<TagAssignmentStatusResult>>[];
-  final statusQueries = <(TagId, IntentionId)>[];
   final observations = <TagId, StreamController<TagReadResult>>{};
 
   @override
@@ -67,17 +63,6 @@ final class TagCatalogTestRepository extends Fake
           GraphSnapshot(value: tag, revision: TagCatalogTestRevision(revision)),
         ),
       );
-
-  @override
-  Future<TagAssignmentStatusResult> getTagAssignmentStatus(
-    TagId id,
-    IntentionId intentionId,
-  ) {
-    statusQueries.add((id, intentionId));
-    final result = Completer<TagAssignmentStatusResult>();
-    statusReads.add(result);
-    return result.future;
-  }
 
   Future<void> dispose() async {
     for (final observation in observations.values) {
