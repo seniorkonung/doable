@@ -1,9 +1,9 @@
 import 'dart:async';
 
-import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
-import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/design_system/components/tag_dot.dart';
+import 'package:doable/src/design_system/components/tag_row.dart';
+import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -14,12 +14,12 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_purp
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_section.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
-import 'package:doable/src/intention/presentation/catalog/tag_condition_picker_page.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
+import 'package:doable/src/tag/presentation/panel/tags_panel_view_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -33,7 +33,7 @@ const _absent = IntentionTagRequirement.mustBeAbsent;
 const _purpose = BrowseIntentionCatalog();
 
 final _section = find.byType(IntentionTagConditionsSection);
-final _picker = find.byType(TagConditionPickerPage);
+final _panel = find.byType(TagRow);
 final _add = find.byKey(const ValueKey('intention-tag-conditions-add'));
 
 void main() {
@@ -186,27 +186,27 @@ void main() {
   });
 
   testWidgets(
-    'кнопка «+ Тег» открывает экран поиска тега с текущими условиями и передаёт выбор модели',
+    'кнопка «+ Тег» открывает панель фильтра с отметками текущих условий, а нажатия сразу применяют поиск',
     (tester) async {
       final h = await _open(tester);
       final health = _tag(1, 'Здоровье');
       final sport = _tag(2, 'Спорт');
       await h.select(sport, _absent);
 
-      await h.openPicker([health, sport]);
+      await h.openPanel([health, sport]);
 
-      expect(
-        find.descendant(
-          of: _picker,
-          matching: find.text('Уже выбран: должен отсутствовать'),
-        ),
-        findsOneWidget,
-      );
+      expect(find.text('Фильтр по тегам'), findsOneWidget);
+      expect(h.marks, [TagRowFilterMark.none, TagRowFilterMark.mustBeAbsent]);
 
-      await tester.tap(_pickerAction(health, _present));
-      await tester.pumpAndSettle();
+      // Первое нажатие добавляет условие в конец, второе меняет надобность
+      // на прежнем месте.
+      await tester.tap(_panelRow(health));
+      await tester.pump();
 
-      expect(_picker, findsNothing);
+      expect(h.marks, [
+        TagRowFilterMark.mustBePresent,
+        TagRowFilterMark.mustBeAbsent,
+      ]);
       expect(h.shown, ['не Спорт', 'Здоровье']);
       expect(
         h.appliedFilter,
@@ -215,44 +215,36 @@ void main() {
           excludedTagIds: [sport.id],
         ),
       );
+
+      await tester.tap(_panelRow(health));
+      await tester.pump();
+
+      expect(h.shown, ['не Спорт', 'не Здоровье']);
+      expect(
+        h.appliedFilter,
+        IntentionTagFilter(excludedTagIds: [sport.id, health.id]),
+      );
+      expect(h.repository.commands, isEmpty);
     },
   );
 
   testWidgets(
-    'повторный выбор тега на экране поиска меняет надобность существующего чипа',
+    'закрытие панели фильтра без нажатий сохраняет условия и выдачу',
     (tester) async {
       final h = await _open(tester);
       final health = _tag(1, 'Здоровье');
-      final sport = _tag(2, 'Спорт');
       await h.select(health, _present);
-      await h.select(sport, _absent);
+      final queriesBefore = h.repository.queries.length;
 
-      await h.openPicker([health, sport]);
-      await tester.tap(_pickerAction(health, _absent));
+      await h.openPanel([health]);
+      await tester.tap(find.text('Готово'));
       await tester.pumpAndSettle();
 
-      expect(h.shown, ['не Здоровье', 'не Спорт']);
+      expect(_panel, findsNothing);
+      expect(h.shown, ['Здоровье']);
+      expect(h.repository.queries, hasLength(queriesBefore));
     },
   );
-
-  testWidgets('закрытие экрана поиска тега без выбора сохраняет условия', (
-    tester,
-  ) async {
-    final h = await _open(tester);
-    final health = _tag(1, 'Здоровье');
-    await h.select(health, _present);
-    final queriesBefore = h.repository.queries.length;
-
-    await h.openPicker([health]);
-    await tester.tap(
-      find.descendant(of: _picker, matching: find.byType(BackButton)),
-    );
-    await tester.pumpAndSettle();
-
-    expect(_picker, findsNothing);
-    expect(h.shown, ['Здоровье']);
-    expect(h.repository.queries, hasLength(queriesBefore));
-  });
 
   testWidgets('раздел не читает каталог тегов и не выполняет команд тегов', (
     tester,
@@ -396,24 +388,6 @@ final class _Repository extends Fake implements PersonalGraphRepository {
   }
 }
 
-/// Раздел на странице, с которой доступен настоящий маршрут поиска тега.
-final class _Router extends RootStackRouter {
-  @override
-  List<AutoRoute> get routes => [
-    NamedRouteDef(
-      name: 'ConditionsHostRoute',
-      path: '/',
-      builder: (_, _) => const Scaffold(
-        body: SingleChildScrollView(
-          padding: EdgeInsets.all(16),
-          child: IntentionTagConditionsSection(purpose: _purpose),
-        ),
-      ),
-    ),
-    AutoRoute(page: TagConditionPickerRoute.page),
-  ];
-}
-
 final class _Harness {
   _Harness(this.tester, this.repository);
 
@@ -458,12 +432,17 @@ final class _Harness {
     await tester.pump();
   }
 
-  Future<void> openPicker(List<Tag> tags) async {
+  /// Отметки строк панели тегов в порядке показа.
+  List<TagRowMark> get marks => [
+    for (final row in tester.widgetList<TagRow>(_panel)) row.mark,
+  ];
+
+  Future<void> openPanel(List<Tag> tags) async {
     await tester.tap(_add);
-    // Индикатор загрузки анимируется бесконечно: ждём только переход маршрута.
+    // Индикатор загрузки анимируется бесконечно: ждём только открытие панели.
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
-    expect(_picker, findsOneWidget);
+    expect(find.text('Фильтр по тегам'), findsOneWidget);
     repository.completeTagCatalog(tags);
     await tester.pumpAndSettle();
   }
@@ -474,10 +453,8 @@ Future<_Harness> _open(WidgetTester tester, {String language = 'ru'}) async {
   final changes = StreamController<ConfirmedGraphChangePackage>.broadcast(
     sync: true,
   );
-  final router = _Router();
   addTearDown(() async {
     await tester.pumpWidget(const SizedBox.shrink());
-    router.dispose();
     await changes.close();
   });
   await tester.pumpWidget(
@@ -485,12 +462,19 @@ Future<_Harness> _open(WidgetTester tester, {String language = 'ru'}) async {
       overrides: [
         personalGraphRepositoryProvider.overrideWithValue(repository),
         intentionTagConditionsChangesProvider.overrideWithValue(changes.stream),
+        tagsPanelChangesProvider.overrideWithValue(changes.stream),
       ],
-      child: MaterialApp.router(
+      child: MaterialApp(
+        theme: doableTheme(Brightness.light),
         locale: Locale(language),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        routerConfig: router.config(),
+        home: const Scaffold(
+          body: SingleChildScrollView(
+            padding: EdgeInsets.all(16),
+            child: IntentionTagConditionsSection(purpose: _purpose),
+          ),
+        ),
       ),
     ),
   );
@@ -513,13 +497,8 @@ Finder _remove(Tag tag) => find.byKey(
   ValueKey('intention-tag-condition-remove-${tag.id.toCanonicalString()}'),
 );
 
-Finder _pickerAction(Tag tag, IntentionTagRequirement requirement) =>
-    find.byKey(
-      ValueKey(
-        'tag-condition-picker-${requirement.name}-'
-        '${tag.id.toCanonicalString()}',
-      ),
-    );
+Finder _panelRow(Tag tag) =>
+    find.byKey(ValueKey('tags-panel-row-${tag.id.toCanonicalString()}'));
 
 TagId _id(int number) => (TagId.decode(
   '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}',

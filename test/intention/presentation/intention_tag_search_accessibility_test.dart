@@ -4,6 +4,7 @@ import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/design_system/components/search_field.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
     hide IntentionCatalogPage;
@@ -85,13 +86,13 @@ final _tags = [
     _tag(index, 'Здоровье и долгие прогулки на свежем воздухе $index'),
 ];
 
-/// Число условий, выбранных до открытия экрана поиска тега.
+/// Число условий, выбранных до открытия панели фильтра.
 const _initialConditions = 6;
 
 void main() {
   for (final page in _pages) {
-    testWidgets('${page.name} и экран поиска тега доступны при открытой '
-        'клавиатуре и многих условиях', (tester) async {
+    testWidgets('${page.name} и панель фильтра по тегам доступны при '
+        'открытой клавиатуре и многих условиях', (tester) async {
       const locale = Locale('ru');
       tester.view.physicalSize = const Size(420, 900);
       tester.view.devicePixelRatio = 1;
@@ -155,8 +156,7 @@ void main() {
       );
       expect(repository.queries.last.titleFilter?.map((value) => value), 'ход');
 
-      // Много условий с длинными названиями, выбранных как на экране
-      // поиска тега.
+      // Много условий с длинными названиями.
       for (var index = 0; index < _initialConditions; index++) {
         container
             .read(conditionsProvider.notifier)
@@ -174,7 +174,7 @@ void main() {
       await _pumpFrames(tester);
       expect(tester.takeException(), isNull);
 
-      // Кнопка «+ Тег» открывает экран поиска тега.
+      // Кнопка «+ Тег» открывает панель тегов в режиме фильтра.
       final add = find.byKey(const ValueKey('intention-tag-conditions-add'));
       await _reach(tester, add);
       _expectTappable(tester, add);
@@ -184,18 +184,20 @@ void main() {
       );
       await tester.tap(add);
       await _pumpFrames(tester);
-      expect(router.current.name, TagConditionPickerRoute.name);
-      await _expectTagConditionPickerAccessible(tester, l10n);
+      await _expectTagsPanelAccessible(tester, l10n);
 
-      // Выбор последнего тега с надобностью «Нет» добавляет условие.
-      final absent = _pickerAction(
-        _tags.last,
-        IntentionTagRequirement.mustBeAbsent,
-      );
-      await _reach(tester, absent, within: _pickerList);
-      _expectTappable(tester, absent);
-      await tester.tap(absent);
+      // Два нажатия на последний тег добавляют условие «должен
+      // отсутствовать», а закрытие панели возвращает страницу поиска.
+      final lastTagRow = _panelRow(_tags.last);
+      await _reach(tester, lastTagRow, within: _panelList);
+      _expectTappable(tester, lastTagRow);
+      await tester.tap(lastTagRow);
+      await tester.pump();
+      await tester.tap(lastTagRow);
       await _pumpFrames(tester);
+      await tester.tap(find.text(l10n.tagsPanelDone));
+      await _pumpFrames(tester);
+      expect(find.text(l10n.tagsPanelFilterTitle), findsNothing);
       expect(tester.takeException(), isNull);
       if (page.route case final route?) {
         expect(router.current.name, route.routeName);
@@ -416,90 +418,49 @@ void main() {
   }
 }
 
-/// Проверяет открытый экран поиска тега: поле поиска, отметки выбранных
-/// тегов, действия «Есть» и «Нет» каждого тега и ориентиры доступности.
-Future<void> _expectTagConditionPickerAccessible(
+/// Проверяет открытую панель тегов в режиме фильтра: поле поиска и строки
+/// тегов достижимы над клавиатурой, а строки объявляют надобность текущих
+/// условий.
+Future<void> _expectTagsPanelAccessible(
   WidgetTester tester,
   AppLocalizations l10n,
 ) async {
   expect(tester.takeException(), isNull);
-  final search = find.byKey(const ValueKey('tag-condition-picker-search'));
-  await _reach(tester, search);
+  expect(find.text(l10n.tagsPanelFilterTitle), findsOneWidget);
+  final search = find.descendant(
+    of: find.byType(SearchField),
+    matching: find.byType(TextField),
+  );
   _expectTappable(tester, search);
   expect(
-    find.bySemanticsLabel(RegExp(RegExp.escape(l10n.tagCatalogSearch))),
+    find.bySemanticsLabel(RegExp(RegExp.escape(l10n.tagsPanelSearchLabel))),
     findsWidgets,
   );
-  await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
-  await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
-  await expectLater(tester, meetsGuideline(textContrastGuideline));
 
   for (final (index, tag) in _tags.indexed) {
     final name = tag.name.value;
-    final row = find.byKey(
-      ValueKey('tag-condition-picker-row-${tag.id.toCanonicalString()}'),
-    );
-    final present = _pickerAction(tag, IntentionTagRequirement.mustBePresent);
-    final absent = _pickerAction(tag, IntentionTagRequirement.mustBeAbsent);
-    await _reach(tester, present, within: _pickerList);
-    _expectTappable(tester, present);
-    expect(
-      tester.getSemantics(present),
-      isSemantics(
-        label: l10n.tagConditionPickerPresentNamed(name),
-        isButton: true,
-        hasTapAction: true,
-      ),
-    );
-    await _reach(tester, absent, within: _pickerList);
-    _expectTappable(tester, absent);
-    expect(
-      tester.getSemantics(absent),
-      isSemantics(
-        label: l10n.tagConditionPickerAbsentNamed(name),
-        isButton: true,
-        hasTapAction: true,
-      ),
-    );
-    _expectNotTruncated(
-      tester,
-      find.descendant(
-        of: row,
-        matching: find.byKey(const ValueKey('tag-condition-picker-name')),
-      ),
-    );
-    // Тег, уже входящий в условия, отмечен текущей надобностью.
-    final mark = switch (index) {
-      >= _initialConditions => null,
-      _ when index.isEven => l10n.tagConditionPickerSelectedPresent,
-      _ => l10n.tagConditionPickerSelectedAbsent,
-    };
-    expect(
-      find.descendant(
-        of: row,
-        matching: find.text(l10n.tagConditionPickerSelectedPresent),
-      ),
-      mark == l10n.tagConditionPickerSelectedPresent
-          ? findsOneWidget
-          : findsNothing,
-    );
-    expect(
-      find.descendant(
-        of: row,
-        matching: find.text(l10n.tagConditionPickerSelectedAbsent),
-      ),
-      mark == l10n.tagConditionPickerSelectedAbsent
-          ? findsOneWidget
-          : findsNothing,
-    );
+    final row = _panelRow(tag);
+    await _reach(tester, row, within: _panelList);
+    _expectTappable(tester, row);
+    // Тег, уже входящий в условия, объявлен с текущей надобностью.
+    expect(tester.getSemantics(row).label, switch (index) {
+      >= _initialConditions => name,
+      _ when index.isEven => l10n.tagsPanelFilterPresentLabel(name),
+      _ => l10n.tagsPanelFilterAbsentLabel(name),
+    });
   }
-  await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+  // Цели касания панели из модуля основ не меньше 44 точек.
+  await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
   await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
   await expectLater(tester, meetsGuideline(textContrastGuideline));
   expect(tester.takeException(), isNull);
 }
 
-final _pickerList = find.byKey(const ValueKey('tag-condition-picker-list'));
+/// Список строк открытой панели тегов.
+final _panelList = find.descendant(
+  of: find.byType(BottomSheet),
+  matching: find.byType(CustomScrollView),
+);
 
 /// Общая прокрутка параметров поиска и выдачи страницы поиска.
 final _pageScrollable = find
@@ -650,13 +611,8 @@ Finder _conditionRemove(TagId id) => find.byKey(
   ValueKey('intention-tag-condition-remove-${id.toCanonicalString()}'),
 );
 
-Finder _pickerAction(Tag tag, IntentionTagRequirement requirement) =>
-    find.byKey(
-      ValueKey(
-        'tag-condition-picker-${requirement.name}-'
-        '${tag.id.toCanonicalString()}',
-      ),
-    );
+Finder _panelRow(Tag tag) =>
+    find.byKey(ValueKey('tags-panel-row-${tag.id.toCanonicalString()}'));
 
 Result<IntentionCatalogFirstPage> _firstPage(List<IntentionSummary> items) =>
     ResultSuccess(

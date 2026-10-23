@@ -86,8 +86,8 @@ final class ControlledCatalogRepository
   final tagCommands = <TagCommand>[];
   final _tagCommandRequests = <Completer<TagCommandResult>>[];
 
-  /// Полный снимок каталога тегов для выбора тега условия поиска; без него
-  /// чтение каталога тегов отказывает.
+  /// Полный снимок каталога тегов для панели тегов в режиме фильтра; без
+  /// него чтение каталога тегов отказывает.
   List<Tag>? tagCatalogItems;
 
   @override

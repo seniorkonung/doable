@@ -515,7 +515,7 @@ Future<AppRouter> _pumpAppWithCatalog(
 /// Проверки подключения поиска по тегам к странице выбора участника.
 void _defineTagSearchTests() {
   // Охват архивированной связи проверяет отказ обновления ниже.
-  testWidgets('для активной связи условие добавляется через экран поиска тега, '
+  testWidgets('для активной связи условие добавляется в панели тегов, '
       'переключается и снимается с прежним охватом, а отмена ничего не '
       'возвращает', (tester) async {
     final purpose = _activeRelation;
@@ -529,17 +529,25 @@ void _defineTagSearchTests() {
 
     await tester.tap(_addCondition);
     await tester.pumpAndSettle();
-    expect(opened.router.current.name, TagConditionPickerRoute.name);
-    await tester.tap(
-      _tagPickerAction(sport, IntentionTagRequirement.mustBeAbsent),
-    );
+    expect(find.text('Filter by tags'), findsOneWidget);
+    // Первое нажатие требует тег, второе исключает его.
+    await tester.tap(_panelRow(sport));
     await _pumpUntilQueries(tester, repository, 3);
     _expectParticipantQuery(
       repository.queryAt(2),
       purpose,
+      IntentionTagFilter(requiredTagIds: [sport.id]),
+    );
+    await tester.tap(_panelRow(sport));
+    await _pumpUntilQueries(tester, repository, 4);
+    _expectParticipantQuery(
+      repository.queryAt(3),
+      purpose,
       IntentionTagFilter(excludedTagIds: [sport.id]),
     );
-    repository.complete(2, _tagSearchPage(_summaries([health], count: 2)));
+    repository.complete(3, _tagSearchPage(_summaries([health], count: 2)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Done'));
     await tester.pumpAndSettle();
 
     expect(opened.router.current.name, RelationParticipantPickerRoute.name);
@@ -547,25 +555,25 @@ void _defineTagSearchTests() {
     expect(findTextIgnoringInlineWidgets('Tags: Здоровье'), findsNWidgets(2));
 
     await tester.tap(_conditionToggle(sport));
-    await _pumpUntilQueries(tester, repository, 4);
+    await _pumpUntilQueries(tester, repository, 5);
     _expectParticipantQuery(
-      repository.queryAt(3),
+      repository.queryAt(4),
       purpose,
       IntentionTagFilter(requiredTagIds: [sport.id]),
     );
-    repository.complete(3, _tagSearchPage(_summaries([sport], count: 1)));
+    repository.complete(4, _tagSearchPage(_summaries([sport], count: 1)));
     await tester.pumpAndSettle();
     expect(_shownConditions(tester), ['Спорт']);
     expect(findTextIgnoringInlineWidgets('Tags: Спорт'), findsOneWidget);
 
     await tester.tap(_conditionRemove(sport));
-    await _pumpUntilQueries(tester, repository, 5);
+    await _pumpUntilQueries(tester, repository, 6);
     _expectParticipantQuery(
-      repository.queryAt(4),
+      repository.queryAt(5),
       purpose,
       IntentionTagFilter.empty,
     );
-    repository.complete(4, _tagSearchPage(_summaries(const [], count: 3)));
+    repository.complete(5, _tagSearchPage(_summaries(const [], count: 3)));
     await tester.pumpAndSettle();
     expect(_shownConditions(tester), isEmpty);
     expect(find.text('No tags'), findsNWidgets(3));
@@ -813,13 +821,8 @@ Finder _conditionRemove(Tag tag) => find.byKey(
   ValueKey('intention-tag-condition-remove-${tag.id.toCanonicalString()}'),
 );
 
-Finder _tagPickerAction(Tag tag, IntentionTagRequirement requirement) =>
-    find.byKey(
-      ValueKey(
-        'tag-condition-picker-${requirement.name}-'
-        '${tag.id.toCanonicalString()}',
-      ),
-    );
+Finder _panelRow(Tag tag) =>
+    find.byKey(ValueKey('tags-panel-row-${tag.id.toCanonicalString()}'));
 
 /// Тексты чипов раздела условий в порядке показа.
 List<String> _shownConditions(WidgetTester tester) => [

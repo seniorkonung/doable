@@ -135,9 +135,11 @@ void defineDailyChoicePickerContextTests({
       find.byKey(const ValueKey('intention-tag-conditions-add')),
     );
     await tester.pumpAndSettle();
-    expect(router.current.name, TagConditionPickerRoute.name);
-    await router.maybePop();
+    expect(find.text('Filter by tags'), findsOneWidget);
+    // Системное «назад» закрывает только панель тегов.
+    await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
+    expect(find.text('Filter by tags'), findsNothing);
     expect(router.current.matchId, pickerId);
     expect(launch.isActive, isTrue);
 
@@ -151,11 +153,7 @@ void defineDailyChoicePickerContextTests({
     );
     await tester.pumpAndSettle();
     await tester.tap(
-      find.byKey(
-        ValueKey(
-          'tag-condition-picker-mustBePresent-${tag.id.toCanonicalString()}',
-        ),
-      ),
+      find.byKey(ValueKey('tags-panel-row-${tag.id.toCanonicalString()}')),
     );
     for (var frame = 0; frame < 100 && repository.queries.length < 4; frame++) {
       await tester.pump(const Duration(milliseconds: 1));
@@ -165,6 +163,9 @@ void defineDailyChoicePickerContextTests({
     expect(repository.queryAt(3).readinessFilter, readinessFilter);
     repository.complete(3, result);
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Done'));
+    await tester.pumpAndSettle();
+    expect(router.current.matchId, pickerId);
     expect(launch.isActive, isTrue);
 
     await tester.tap(find.text('Гулять').last);

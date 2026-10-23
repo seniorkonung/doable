@@ -1260,8 +1260,8 @@ void main() {
     },
   );
 
-  testWidgets('условие, добавленное через экран поиска тега, сразу начинает '
-      'выдачу с верхней позиции', (tester) async {
+  testWidgets('условие, добавленное в панели тегов, сразу начинает выдачу с '
+      'верхней позиции', (tester) async {
     final repository = ControlledCatalogRepository();
     final health = _tag(1, 'Здоровье');
     final sport = _tag(2, 'Спорт');
@@ -1280,10 +1280,8 @@ void main() {
 
     await tester.tap(_addCondition);
     await tester.pumpAndSettle();
-    expect(router.current.name, TagConditionPickerRoute.name);
-    await tester.tap(
-      _pickerAction(health, IntentionTagRequirement.mustBePresent),
-    );
+    expect(find.text('Filter by tags'), findsOneWidget);
+    await tester.tap(_panelRow(health));
     await _pumpUntilQueries(tester, repository, 2);
 
     expect(
@@ -1295,6 +1293,8 @@ void main() {
       1,
       _firstPage(_taggedSummaries([health], last: 2, step: 2), revision: 1),
     );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Done'));
     await tester.pumpAndSettle();
 
     expectIntentionGraphRootPage(router);
@@ -1934,13 +1934,8 @@ final _addCondition = find.byKey(
   const ValueKey('intention-tag-conditions-add'),
 );
 
-Finder _pickerAction(Tag tag, IntentionTagRequirement requirement) =>
-    find.byKey(
-      ValueKey(
-        'tag-condition-picker-${requirement.name}-'
-        '${tag.id.toCanonicalString()}',
-      ),
-    );
+Finder _panelRow(Tag tag) =>
+    find.byKey(ValueKey('tags-panel-row-${tag.id.toCanonicalString()}'));
 
 /// Тексты чипов раздела условий в порядке показа.
 List<String> _shownConditions(WidgetTester tester) => [
