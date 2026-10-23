@@ -12,16 +12,13 @@ typedef _PageCase = ({
 enum _MatrixEntry {
   intention,
   dailyChoice,
-  tags,
   creation,
   condition,
   action,
   actionCandidate,
   relation,
-  renameTag,
   assignTags,
   draftTags,
-  createTag,
   replaceChoice,
   replaceTopDown,
   choosePath,
@@ -41,7 +38,6 @@ enum _MatrixEntry {
     _MatrixEntry.dailyChoice => find.byKey(
       const ValueKey('daily-choice-row-1'),
     ),
-    _MatrixEntry.tags => _openTags,
     _MatrixEntry.creation || _MatrixEntry.action => quickCreationAction(),
     _MatrixEntry.condition => find.byKey(
       const ValueKey('intention-tag-conditions-add'),
@@ -51,14 +47,12 @@ enum _MatrixEntry {
       'Бегать',
     ),
     _MatrixEntry.relation => _relationRow,
-    _MatrixEntry.renameTag => find.byTooltip('Edit tag'),
     _MatrixEntry.assignTags => find.byKey(
       const ValueKey('tag-assignments-choose'),
     ),
     _MatrixEntry.draftTags => find.byKey(
       const ValueKey('intention-editor-choose-tags'),
     ),
-    _MatrixEntry.createTag => find.byKey(const ValueKey('tag-catalog-create')),
     _MatrixEntry.replaceChoice => find.byKey(
       const ValueKey('daily-choice-replace-open'),
     ),
@@ -280,7 +274,6 @@ void _registerPageMatrixTests() {
 
   const read = _MatrixEntry.intention;
   const daily = _MatrixEntry.dailyChoice;
-  const tags = _MatrixEntry.tags;
   const cases = <_PageCase>[
     (
       name: 'намерение',
@@ -299,24 +292,6 @@ void _registerPageMatrixTests() {
       page: DailyChoiceDetailsPage,
       panel: true,
       entries: [daily],
-    ),
-    (
-      name: 'просмотр тегов',
-      page: TagCatalogPage,
-      panel: true,
-      entries: [tags],
-    ),
-    (
-      name: 'создание тега',
-      page: TagEditorPage,
-      panel: false,
-      entries: [tags, _MatrixEntry.createTag],
-    ),
-    (
-      name: 'изменение тега',
-      page: TagEditorPage,
-      panel: false,
-      entries: [tags, _MatrixEntry.renameTag],
     ),
     (
       name: 'поиск действия',
@@ -415,7 +390,6 @@ void _registerPageMatrixTests() {
       for (final entry in row.entries) {
         final root = switch (entry) {
           _MatrixEntry.intention ||
-          _MatrixEntry.tags ||
           _MatrixEntry.creation ||
           _MatrixEntry.condition => AppDestination.intentionGraph,
           _MatrixEntry.dailyChoice ||
@@ -449,15 +423,6 @@ void _registerPageMatrixTests() {
       await _until(tester, find.byType(row.page));
       await tester.pumpAndSettle();
       final variant = switch (tester.widget(find.byType(row.page))) {
-        TagCatalogPage(:final selectionContext) => switch (selectionContext) {
-          TagBrowseContext() => 'просмотр тегов',
-          TagAssignmentContext() => 'назначение тегов',
-          TagDraftContext() => 'теги черновика',
-        },
-        TagEditorPage(:final editorContext) => switch (editorContext) {
-          TagEditorCreating() => 'создание тега',
-          TagEditorRenaming() => 'изменение тега',
-        },
         RelationEditorPage(:final editorContext) => switch (editorContext) {
           RelationBlankCreationContext() => 'создание связи без участников',
           RelationCreationContext(:final direction) => switch (direction) {

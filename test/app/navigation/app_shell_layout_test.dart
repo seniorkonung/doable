@@ -536,8 +536,16 @@ void main() {
       await _until(tester, _messageOf(2));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byKey(const ValueKey('catalog-open-tags')));
-      await _until(tester, find.byType(TagCatalogPage));
+      await tester.tap(
+        find
+            .descendant(
+              of: find.byType(IntentionCatalogPage),
+              matching: find.byType(IntentionSummaryView),
+            )
+            .hitTestable()
+            .first,
+      );
+      await _until(tester, find.byType(IntentionDetailsPage));
       await tester.pumpAndSettle();
 
       expect(find.byType(AppNavigationBar), findsOneWidget);

@@ -1,16 +1,10 @@
 import 'dart:async';
 
-import 'package:doable/l10n/app_localizations.dart';
-import 'package:doable/src/app/routing/app_router.dart';
-import 'package:doable/src/data/local/app_database.dart' hide Tag;
-import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
-import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
-import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
@@ -21,11 +15,7 @@ import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sqlite3/sqlite3.dart' as sqlite;
 
-import '../../../support/app_root_pages.dart';
-import '../../../support/graph_seed.dart';
-import '../../../support/in_memory_diagnostics_sink.dart';
 import '../../../support/ordinary_page_test_app.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
 import '../../../support/tag_positions.dart';
@@ -41,223 +31,6 @@ void main() {
     WidgetsBinding.instance.handleAppLifecycleStateChanged(
       AppLifecycleState.resumed,
     );
-  });
-
-  testWidgets(
-    'отмена не удаляет; подтверждение охватывает незагруженные назначения и сохраняет граф',
-    (tester) async {
-      late sqlite.Database raw;
-      final database = AppDatabase(
-        openInMemoryLocalDatabase(setup: (db) => raw = db),
-      );
-      await database.open();
-      addTearDown(database.close);
-      seedRawGraph(raw, () {
-        for (var i = 1; i <= 107; i++) {
-          raw.execute(
-            'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-            [_id(i), 'Намерение $i', 0, i.isEven ? 1 : 0, i, i],
-          );
-        }
-        for (final (id, archived) in [(201, 0), (202, 1)]) {
-          raw.execute(
-            'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
-            [
-              _id(id),
-              _id(1),
-              _id(id == 201 ? 3 : 4),
-              id == 201 ? 'need' : 'can',
-              2,
-              archived,
-            ],
-          );
-        }
-        raw.execute(
-          'INSERT INTO daily_choices (id, source_intention_id, selected_intention_id, choice_date, is_completed) VALUES (?, ?, ?, ?, ?)',
-          [_id(203), _id(1), _id(3), '2026-09-25', 0],
-        );
-        raw.execute(
-          'INSERT INTO daily_choice_path_steps (id, daily_choice_id, long_term_relation_id) VALUES (?, ?, ?)',
-          [_id(204), _id(203), _id(201)],
-        );
-        for (var i = 1; i <= 52; i++) {
-          raw.execute(
-            'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
-            [_id(300 + i), 'Тег $i', tagPositionKey(300 + i)],
-          );
-        }
-        for (var i = 1; i <= 104; i++) {
-          raw.execute(
-            'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-            [_id(301), _id(i)],
-          );
-        }
-        // Назначения за пределами первой сотни относятся к обоим охватам.
-        for (final id in [106, 107]) {
-          raw.execute(
-            'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-            [_id(301), _id(id)],
-          );
-        }
-        raw.execute(
-          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-          [_id(302), _id(105)],
-        );
-      });
-      final retained = {
-        for (final table in [
-          'intentions',
-          'long_term_relations',
-          'daily_choices',
-          'daily_choice_path_steps',
-        ])
-          table: raw
-              .select('SELECT * FROM $table ORDER BY rowid')
-              .map((row) => row.values.toList())
-              .toList(),
-      };
-      final repository = DriftPersonalGraphRepository(
-        database,
-        UuidV7IntentionIdGenerator(),
-        () => DateTime.utc(2026, 9, 25),
-        InMemoryDiagnosticsSink(),
-      );
-      await _openRealCatalog(tester, repository);
-      expect(find.byKey(const ValueKey('tag-catalog-load-more')), findsNothing);
-
-      await tester.tap(find.byKey(ValueKey('tag-catalog-delete-${_id(301)}')));
-      await tester.pumpAndSettle();
-      seedRawGraph(raw, () {
-        raw.execute(
-          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-          [_id(301), _id(105)],
-        );
-      });
-      await tester.tap(find.byKey(const ValueKey('tag-delete-confirm')));
-      await _pumpUntil(
-        tester,
-        () => raw.select('SELECT * FROM tags WHERE id = ?', [_id(301)]).isEmpty,
-      );
-      expect(
-        raw.select('SELECT * FROM tag_assignments WHERE tag_id = ?', [
-          _id(301),
-        ]),
-        isEmpty,
-      );
-      expect(
-        raw.select('SELECT * FROM tag_assignments WHERE tag_id = ?', [
-          _id(302),
-        ]),
-        hasLength(1),
-      );
-      for (final entry in retained.entries) {
-        expect(
-          raw
-              .select('SELECT * FROM ${entry.key} ORDER BY rowid')
-              .map((row) => row.values.toList())
-              .toList(),
-          entry.value,
-        );
-      }
-      expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
-      expect(
-        find.byKey(ValueKey('tag-catalog-delete-${_id(301)}')),
-        findsNothing,
-      );
-      // Исчезновение тега из каталога и есть результат: успех не
-      // объявляется сообщением.
-      expect(find.byType(SnackBar), findsNothing);
-    },
-  );
-
-  testWidgets('сбой каскада показывает ошибку и оставляет тег в каталоге', (
-    tester,
-  ) async {
-    late sqlite.Database raw;
-    final database = AppDatabase(
-      openInMemoryLocalDatabase(setup: (db) => raw = db),
-    );
-    await database.open();
-    addTearDown(database.close);
-    seedRawGraph(raw, () {
-      raw.execute(
-        'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-        [_id(1), 'Дом', 0, 1, 1, 1],
-      );
-      raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
-        _id(301),
-        'Дом',
-        tagPositionKey(301),
-      ]);
-      raw.execute(
-        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-        [_id(301), _id(1)],
-      );
-    });
-    raw.execute('''
-      CREATE TEMP TRIGGER fail_tag_cascade AFTER DELETE ON tag_assignments
-      WHEN OLD.tag_id = '${_id(301)}'
-      BEGIN SELECT RAISE(ABORT, 'injected cascade failure'); END
-    ''');
-    final repository = DriftPersonalGraphRepository(
-      database,
-      UuidV7IntentionIdGenerator(),
-      () => DateTime.utc(2026, 9, 25),
-      InMemoryDiagnosticsSink(),
-    );
-    await _openRealCatalog(tester, repository);
-    await tester.tap(find.byKey(ValueKey('tag-catalog-delete-${_id(301)}')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('tag-delete-confirm')));
-    await _pumpUntil(
-      tester,
-      () => find.textContaining('непредвиденной ошибки').evaluate().isNotEmpty,
-    );
-    expect(find.textContaining('непредвиденной ошибки'), findsWidgets);
-    expect(
-      find.byKey(ValueKey('tag-catalog-delete-${_id(301)}')),
-      findsOneWidget,
-    );
-  });
-
-  testWidgets('устаревший id не удаляет новый одноимённый тег', (tester) async {
-    late sqlite.Database raw;
-    final database = AppDatabase(
-      openInMemoryLocalDatabase(setup: (db) => raw = db),
-    );
-    await database.open();
-    addTearDown(database.close);
-    seedRawGraph(raw, () {
-      raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
-        _id(301),
-        'Дом',
-        tagPositionKey(301),
-      ]);
-    });
-    final repository = DriftPersonalGraphRepository(
-      database,
-      UuidV7IntentionIdGenerator(),
-      () => DateTime.utc(2026, 9, 25),
-      InMemoryDiagnosticsSink(),
-    );
-    await _openRealCatalog(tester, repository);
-    await tester.tap(find.byKey(ValueKey('tag-catalog-delete-${_id(301)}')));
-    await tester.pumpAndSettle();
-    seedRawGraph(raw, () {
-      raw.execute('DELETE FROM tags WHERE id = ?', [_id(301)]);
-      raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
-        _id(302),
-        'Дом',
-        tagPositionKey(302),
-      ]);
-    });
-    await tester.tap(find.byKey(const ValueKey('tag-delete-confirm')));
-    await _pumpUntil(
-      tester,
-      () => find.textContaining('больше нет').evaluate().isNotEmpty,
-    );
-    expect(find.textContaining('больше нет'), findsWidgets);
-    expect(raw.select('SELECT id FROM tags').single['id'], _id(302));
   });
 
   const locale = Locale('ru');
@@ -330,45 +103,6 @@ void main() {
       },
     );
   }
-}
-
-Future<void> _openRealCatalog(
-  WidgetTester tester,
-  PersonalGraphRepository repository,
-) async {
-  final router = AppRouter();
-  addTearDown(router.dispose);
-  await tester.pumpWidget(
-    ProviderScope(
-      overrides: [
-        inMemoryQuickCreationModeOverride,
-        personalGraphRepositoryProvider.overrideWithValue(repository),
-      ],
-      child: MaterialApp.router(
-        theme: doableTheme(Brightness.light),
-        locale: const Locale('ru'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        routerConfig: router.config(),
-        builder: (context, child) => GraphOperationPresenter(child: child!),
-      ),
-    ),
-  );
-  tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-  await tester.pumpAndSettle();
-  await openIntentionGraph(tester);
-  await tester.tap(find.byKey(const ValueKey('catalog-open-tags')));
-  await tester.pumpAndSettle();
-}
-
-Future<void> _pumpUntil(WidgetTester tester, bool Function() done) async {
-  for (var attempt = 0; attempt < 30 && !done(); attempt++) {
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 20)),
-    );
-    await tester.pump(const Duration(milliseconds: 50));
-  }
-  expect(done(), isTrue);
 }
 
 final class _PendingRepository extends Fake implements PersonalGraphRepository {

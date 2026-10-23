@@ -16,7 +16,6 @@ import 'package:doable/src/intention/presentation/details/intention_details_page
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_page.dart';
-import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -213,20 +212,24 @@ void main() {
     expect(tester.takeException(), isNull);
   }, variant: _android);
 
-  testWidgets('«назад» в каталоге тегов поверх каталога намерений закрывает '
-      'только его и не меняет выбранный пункт', (tester) async {
+  testWidgets('«назад» на странице намерения поверх каталога намерений '
+      'закрывает только её и не меняет выбранный пункт', (tester) async {
     final app = await _start(tester);
     await _select(tester, AppDestination.intentionGraph);
+    await tester.enterText(_titleFilter, 'Намерение 01');
 
     await _open(
       tester,
-      find.byKey(const ValueKey('catalog-open-tags')),
-      TagCatalogPage,
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is IntentionSummaryView && widget.title == 'Намерение 01',
+      ),
+      IntentionDetailsPage,
     );
     expect(app.platform.frameworkHandlesBack, isTrue);
     await _back(tester);
 
-    expect(find.byType(TagCatalogPage), findsNothing);
+    expect(find.byType(IntentionDetailsPage), findsNothing);
     _expectRootPage(tester, app.router, AppDestination.intentionGraph);
     expect(app.platform.exits, 0);
     // Каталог без страниц поверх по-прежнему получает «назад».

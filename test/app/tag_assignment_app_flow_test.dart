@@ -47,7 +47,10 @@ void main() {
     final router = ready.container.read(appRouterProvider);
     await tester.pumpWidget(MainApp(runtime: runtime));
     await openIntentionGraph(tester, waitFor: _until);
-    await _until(tester, find.byKey(const ValueKey('catalog-open-tags')));
+    await _until(
+      tester,
+      find.byKey(const ValueKey('intention-tag-conditions-add')),
+    );
 
     final id = (IntentionId.decode(
       tagFixtureId(number),
@@ -199,26 +202,7 @@ void main() {
     expect(retainedTagFixtureGraph(raw), graphBefore);
 
     router.pop();
-    await _tap(tester, find.byKey(const ValueKey('catalog-open-tags')));
-    await _until(tester, find.text(newName));
-    expect(find.text(newName), findsOneWidget);
     await tester.pumpAndSettle();
-    final storedBeforeBrowseSearch = _storedGraph(raw);
-    final catalogSearch = find.byKey(const ValueKey('tag-catalog-search'));
-    for (final query in ['общ', 'спорт', 'общий']) {
-      await tester.enterText(catalogSearch, query);
-      await tester.pumpAndSettle();
-      expect(
-        find.text(newName),
-        query == 'спорт' ? findsNothing : findsOneWidget,
-      );
-      expect(_storedGraph(raw), storedBeforeBrowseSearch);
-    }
-    await tester.tap(find.byTooltip(localizations.tagCatalogClearSearch));
-    await tester.pumpAndSettle();
-    expect(find.text(newName), findsOneWidget);
-    expect(_storedGraph(raw), storedBeforeBrowseSearch);
-    router.pop();
     final choiceId = (DailyChoiceId.decode(
       tagFixtureId(201),
     ) as DailyChoiceIdDecodingSuccess).id;

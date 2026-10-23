@@ -476,7 +476,6 @@ final class _App {
     _seed(raw);
     await tester.pumpWidget(MainApp(runtime: runtime));
     await openIntentionGraph(tester, waitFor: _until);
-    await _until(tester, find.byKey(const ValueKey('catalog-open-tags')));
     await _until(tester, find.byType(IntentionSummaryView));
     await tester.pumpAndSettle();
     return _App(raw, lookupAppLocalizations(locale));

@@ -39,10 +39,6 @@ import 'package:doable/src/long_term_relation/presentation/details/relation_deta
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_page.dart';
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_state.dart';
 import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart';
-import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
-import 'package:doable/src/tag/presentation/catalog/tag_selection_context.dart';
-import 'package:doable/src/tag/presentation/editor/tag_editor_page.dart';
-import 'package:doable/src/tag/presentation/editor/tag_editor_state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -259,8 +255,6 @@ const _rootPages = {
   AppDestination.intentionGraph: IntentionCatalogPage,
 };
 
-final _openTags = find.byKey(const ValueKey('catalog-open-tags'));
-
 /// Строка связи «Читать» → «Бегать» в соседстве намерения.
 final _relationRow = find.byKey(
   ValueKey('relation-neighborhood-row-${tagFixtureId(_relation)}'),
@@ -335,12 +329,7 @@ void _expectAboveShell(
       expectedPanel ??
       (page == IntentionDetailsPage ||
           page == RelationDetailsPage ||
-          page == DailyChoiceDetailsPage ||
-          (page == TagCatalogPage &&
-              switch (tester.widget<TagCatalogPage>(top).selectionContext) {
-                TagBrowseContext() => true,
-                TagAssignmentContext() || TagDraftContext() => false,
-              }));
+          page == DailyChoiceDetailsPage);
   expect(
     find.byType(AppNavigationBar),
     ordinary ? findsOneWidget : findsNothing,

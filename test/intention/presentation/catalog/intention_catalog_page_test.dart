@@ -1019,7 +1019,9 @@ void main() {
       );
       expect(find.byType(FloatingActionButton), findsNothing);
       expect(
-        find.byKey(const ValueKey('catalog-open-tags')).hitTestable(),
+        find
+            .byKey(const ValueKey('intention-tag-conditions-add'))
+            .hitTestable(),
         findsOneWidget,
       );
       final create = quickCreationAction();

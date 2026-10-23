@@ -4,7 +4,6 @@ import 'dart:ui' show CheckedState, Tristate;
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
-import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/data/local/app_database.dart';
@@ -24,11 +23,9 @@ import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_catalog_view.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_selection_context.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_section.dart';
-import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/presentation/panel/tags_panel.dart';
 import 'package:doable/src/tag/presentation/panel/tags_panel_context.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/semantics.dart';
@@ -41,8 +38,6 @@ import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 import '../../support/tag_positions.dart';
-
-part 'tag_catalog_search_accessibility_scenarios.dart';
 
 Future<void> _until(WidgetTester tester, Finder finder) async {
   for (var attempt = 0; attempt < 100; attempt++) {
@@ -68,24 +63,6 @@ Future<void> _untilCondition(
   expect(condition(), isTrue);
 }
 
-Future<void> _dismissPresentedMessages(WidgetTester tester) async {
-  final messenger = ScaffoldMessenger.of(
-    tester.element(find.byKey(const ValueKey('tag-catalog-create'))),
-  );
-  for (var attempt = 0; attempt < 5; attempt++) {
-    await tester.pumpAndSettle();
-    if (find
-        .byKey(const ValueKey('graph-operation-message'))
-        .evaluate()
-        .isEmpty) {
-      return;
-    }
-    messenger.removeCurrentSnackBar();
-    await tester.pumpAndSettle();
-  }
-  expect(find.byKey(const ValueKey('graph-operation-message')), findsNothing);
-}
-
 Future<void> _tap(WidgetTester tester, Finder finder) async {
   await _until(tester, finder);
   await tester.pumpAndSettle();
@@ -96,107 +73,9 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
 }
 
 void main() {
-  _registerCatalogSearchScenarios();
   _registerAssignmentScenarios();
   _registerDraftSelectionScenarios();
   _registerFilterPanelScenarios();
-  const locale = Locale('ru');
-
-  testWidgets('диктор сохраняет ввод, действия и подтверждение', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(420, 900);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
-    final semantics = tester.ensureSemantics();
-    late sqlite.Database raw;
-    final database = AppDatabase(
-      openInMemoryLocalDatabase(setup: (connection) => raw = connection),
-    );
-    await database.open();
-    addTearDown(database.close);
-    final repository = DriftPersonalGraphRepository(
-      database,
-      UuidV7IntentionIdGenerator(),
-      () => DateTime.utc(2026, 9, 25),
-      InMemoryDiagnosticsSink(),
-    );
-    final router = AppRouter();
-    addTearDown(router.dispose);
-    final l10n = await AppLocalizations.delegate.load(locale);
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          inMemoryQuickCreationModeOverride,
-          personalGraphRepositoryProvider.overrideWithValue(repository),
-        ],
-        child: MaterialApp.router(
-          theme: doableTheme(Brightness.light),
-          locale: locale,
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          routerConfig: router.config(),
-        ),
-      ),
-    );
-    addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
-    await openIntentionGraph(tester, waitFor: _until);
-    await _tap(tester, find.byKey(const ValueKey('catalog-open-tags')));
-    final create = find.byKey(const ValueKey('tag-catalog-create'));
-    await _until(tester, create);
-    await tester.pumpAndSettle();
-    expect(tester.getSemantics(create).tooltip, l10n.tagCatalogCreate);
-    await _tap(tester, create);
-    final nameField = find.byKey(const ValueKey('tag-editor-name'));
-    await _until(tester, nameField);
-    expect(
-      find.bySemanticsLabel(RegExp(l10n.tagEditorNameLabel)),
-      findsWidgets,
-    );
-
-    final invalid = '🙂' * 256;
-    await tester.enterText(nameField, invalid);
-    await tester.pump();
-    await _tap(tester, find.byKey(const ValueKey('tag-editor-submit')));
-    final failure = find.byKey(const ValueKey('tag-editor-field-failure'));
-    await _until(tester, failure);
-    await tester.pumpAndSettle();
-    expect(tester.getSemantics(failure).label, isNotEmpty);
-    expect(tester.widget<TextField>(nameField).controller!.text, invalid);
-    expect(raw.select('SELECT * FROM tags'), isEmpty);
-
-    final corrected = 'Straße 🏠é ${('Длинное название ' * 8).trimRight()}';
-    await tester.enterText(nameField, corrected);
-    await tester.pump();
-    await _tap(tester, find.byKey(const ValueKey('tag-editor-submit')));
-    await _until(tester, find.text(corrected));
-    final id = raw.select('SELECT id FROM tags').single['id'] as String;
-    final delete = find.byKey(ValueKey('tag-catalog-delete-$id'));
-    await _until(tester, delete);
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(delete);
-    expect(tester.getSemantics(delete).tooltip, l10n.tagCatalogDelete);
-    await _tap(tester, delete);
-    final scope = find.byKey(const ValueKey('tag-delete-scope'));
-    await _until(tester, scope);
-    await tester.pumpAndSettle();
-    expect(find.textContaining(corrected), findsWidgets);
-    expect(
-      tester.getSemantics(scope).label,
-      contains(l10n.tagDeleteConfirmationScope),
-    );
-    final cancel = find.byKey(const ValueKey('tag-delete-cancel'));
-    final confirm = find.byKey(const ValueKey('tag-delete-confirm'));
-    await tester.ensureVisible(cancel);
-    expect(tester.getSemantics(cancel).label, l10n.tagDeleteCancel);
-    await tester.ensureVisible(confirm);
-    expect(tester.getSemantics(confirm).label, l10n.tagDeleteConfirm);
-    expect(tester.takeException(), isNull);
-    await tester.tap(cancel);
-    await tester.pumpAndSettle();
-    expect(raw.select('SELECT id FROM tags'), hasLength(1));
-    semantics.dispose();
-  });
 }
 
 void _registerAssignmentScenarios() {
@@ -253,7 +132,10 @@ void _registerAssignmentScenarios() {
         final router = ready.container.read(appRouterProvider);
         await tester.pumpWidget(MainApp(runtime: runtime));
         await openIntentionGraph(tester, waitFor: _until);
-        await _until(tester, find.byKey(const ValueKey('catalog-open-tags')));
+        await _until(
+          tester,
+          find.byKey(const ValueKey('intention-tag-conditions-add')),
+        );
         final id = (IntentionId.decode(
           tagFixtureId(number),
         ) as IntentionIdDecodingSuccess).id;
@@ -513,69 +395,6 @@ void _registerAssignmentScenarios() {
 
         expect(tester.takeException(), isNull);
 
-        router.pop();
-        await _tap(tester, find.byKey(const ValueKey('catalog-open-tags')));
-        await _until(tester, find.byKey(const ValueKey('tag-catalog-create')));
-        await _dismissPresentedMessages(tester);
-        expect(
-          find.byKey(const ValueKey('tag-catalog-load-more')),
-          findsNothing,
-        );
-        final delete = find.byKey(ValueKey('tag-catalog-delete-$newId'));
-        await tester.scrollUntilVisible(
-          delete,
-          300,
-          scrollable: find
-              .descendant(
-                of: find.byKey(const ValueKey('tag-catalog-list')),
-                matching: find.byType(Scrollable),
-              )
-              .first,
-        );
-        await _tap(tester, delete);
-        final scope = find.byKey(const ValueKey('tag-delete-scope'));
-        await _until(tester, scope);
-        await tester.pumpAndSettle();
-        expect(
-          tester.getSemantics(scope).label,
-          contains(l10n.tagDeleteConfirmationScope),
-        );
-        final cancel = find.byKey(const ValueKey('tag-delete-cancel'));
-        final confirm = find.byKey(const ValueKey('tag-delete-confirm'));
-        await tester.ensureVisible(cancel);
-        await tester.ensureVisible(confirm);
-        expect(tester.getSemantics(cancel).label, l10n.tagDeleteCancel);
-        expect(tester.getSemantics(confirm).label, l10n.tagDeleteConfirm);
-        _expectAction(tester.getSemantics(cancel));
-        _expectAction(tester.getSemantics(confirm));
-        expect(
-          _traversalIndex(tester, l10n.tagDeleteCancel),
-          lessThan(_traversalIndex(tester, l10n.tagDeleteConfirm)),
-        );
-        expect(tester.takeException(), isNull);
-        await tester.tap(cancel);
-        await tester.pumpAndSettle();
-        expect(
-          raw.select('SELECT id FROM tags WHERE id = ?', [newId]),
-          hasLength(1),
-        );
-        await _tap(tester, delete);
-        await _tap(tester, confirm);
-        await _untilCondition(
-          tester,
-          () => raw.select('SELECT id FROM tags WHERE id = ?', [newId]).isEmpty,
-        );
-        final tagId = (TagId.decode(newId) as TagIdDecodingSuccess).id;
-        await _untilCondition(
-          tester,
-          () => !ready.container
-              .read(graphCommandCoordinatorProvider.notifier)
-              .isTagRunning(tagId),
-        );
-        expect(
-          raw.select('SELECT id FROM tags WHERE id = ?', [newId]),
-          isEmpty,
-        );
         await tester.pumpWidget(const SizedBox.shrink());
         for (var attempt = 0; attempt < 4; attempt++) {
           await tester.runAsync(
