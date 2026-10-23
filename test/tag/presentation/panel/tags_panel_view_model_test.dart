@@ -514,6 +514,9 @@ void main() {
       TagEditorCreating(
         TagCreationFormKey(),
         initialName: 'Спорт',
+        initialColor: null,
+        placement: TagPlacement.first,
+        existingNames: [for (final row in panel.loaded.rows) row.tag.name],
         onCreationAccepted: panel.model.acceptCreation,
       ),
     );
@@ -989,7 +992,9 @@ void main() {
         TagEditorCreating(
           TagCreationFormKey(),
           initialName: copy.name,
+          initialColor: copy.color,
           placement: copy.placement,
+          existingNames: [for (final row in panel.loaded.rows) row.tag.name],
           onCreationAccepted: panel.model.acceptCreation,
         ),
       );
@@ -1177,7 +1182,9 @@ void main() {
         TagEditorCreating(
           TagCreationFormKey(),
           initialName: copy.name,
+          initialColor: copy.color,
           placement: copy.placement,
+          existingNames: [for (final row in panel.loaded.rows) row.tag.name],
           onCreationAccepted: panel.model.acceptCreation,
         ),
       );

@@ -9,15 +9,15 @@ sealed class TagEditorContext {
   const TagEditorContext();
 }
 
-/// Ключ создаётся владельцем маршрута и может пережить повторное открытие формы.
+/// Ключ создаётся вызывающим и может пережить повторное открытие листа.
 final class TagEditorCreating extends TagEditorContext {
   const TagEditorCreating(
     this.formKey, {
-    this.initialName = '',
-    this.initialColor,
-    this.placement = TagPlacement.first,
-    this.existingNames = const [],
-    this.onCreationAccepted,
+    required this.initialName,
+    required this.initialColor,
+    required this.placement,
+    required this.existingNames,
+    required this.onCreationAccepted,
   });
 
   final TagCreationFormKey formKey;
@@ -30,22 +30,21 @@ final class TagEditorCreating extends TagEditorContext {
   final TagPlacement placement;
 
   /// Названия снимка вызывающего; совпадение с ними занимает название ещё
-  /// при вводе. Без снимка занятость определяет запись.
+  /// при вводе.
   final List<TagName> existingNames;
 
   /// Получает принятую команду до её завершения: продолжение после успеха
   /// принадлежит вызывающему, а не экранной сессии формы.
-  final void Function(TagCommandAccepted creation)? onCreationAccepted;
+  final void Function(TagCommandAccepted creation) onCreationAccepted;
 }
 
 final class TagEditorRenaming extends TagEditorContext {
-  const TagEditorRenaming(this.tag, {this.existingNames = const []});
+  const TagEditorRenaming(this.tag, {required this.existingNames});
 
   final Tag tag;
 
   /// Названия снимка вызывающего, включая собственное: совпадение с другим
-  /// тегом занимает название ещё при вводе, а с собственным — нет. Без
-  /// снимка занятость определяет запись.
+  /// тегом занимает название ещё при вводе, а с собственным — нет.
   final List<TagName> existingNames;
 }
 
@@ -80,20 +79,16 @@ final class TagEditorSubmissionInterrupted extends TagEditorStatus {
 }
 
 final class TagEditorCompleted extends TagEditorStatus {
-  const TagEditorCompleted(this.tag);
-
-  final Tag tag;
+  const TagEditorCompleted();
 }
 
 sealed class TagEditorEvent {
   const TagEditorEvent();
 }
 
-/// Подтверждённый тег из результата команды.
+/// Команда подтверждена: лист закрывается.
 final class TagEditorSaved extends TagEditorEvent {
-  const TagEditorSaved(this.tag);
-
-  final Tag tag;
+  const TagEditorSaved();
 }
 
 /// Проверка введённого названия; повторяется при каждом вводе.

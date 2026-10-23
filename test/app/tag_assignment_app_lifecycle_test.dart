@@ -9,13 +9,13 @@ import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/design_system/components/tag_row.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_state.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_view_model.dart';
-import 'package:doable/src/tag/presentation/catalog/tag_catalog_state.dart';
-import 'package:doable/src/tag/presentation/catalog/tag_catalog_view_model.dart';
 import 'package:doable/src/tag/presentation/panel/tags_panel_context.dart';
 import 'package:doable/src/tag/presentation/panel/tags_panel_state.dart';
 import 'package:doable/src/tag/presentation/panel/tags_panel_view_model.dart';
@@ -96,7 +96,7 @@ void main() {
     },
   );
 
-  test('открытые каталог, панель тегов и назначения видят общее переименование и удаление', () async {
+  test('открытые панели тегов фильтра и назначения и секции назначений видят общее переименование и удаление', () async {
     late sqlite.Database raw;
     final runtime = AppRuntime(
       quickCreationModeStore: InMemoryQuickCreationModeStore(),
@@ -110,7 +110,15 @@ void main() {
     final container = ready.container;
     final target = _intentionId(1);
     final archivedIntention = _intentionId(2);
-    final browse = tagCatalogViewModelProvider();
+    final conditions = intentionTagConditionsViewModelProvider(
+      const BrowseIntentionCatalog(),
+    );
+    final conditionsSubscription = container.listen(conditions, (_, _) {});
+    final filter = tagsPanelViewModelProvider(
+      TagsPanelOpening(
+        TagsPanelFilterContext(container.read(conditions.notifier)),
+      ),
+    );
     final panel = tagsPanelViewModelProvider(
       TagsPanelOpening(TagsPanelAssignmentContext(target)),
     );
@@ -119,7 +127,8 @@ void main() {
       archivedIntention,
     );
     final subscriptions = [
-      container.listen(browse, (_, _) {}),
+      conditionsSubscription,
+      container.listen(filter, (_, _) {}),
       container.listen(panel, (_, _) {}),
       container.listen(assignments, (_, _) {}),
       container.listen(archivedAssignments, (_, _) {}),
@@ -133,11 +142,14 @@ void main() {
       () =>
           container.read(assignments) is TagAssignmentsLoaded &&
           container.read(panel).catalog is TagsPanelLoaded &&
+          container.read(filter).catalog is TagsPanelLoaded &&
           container.read(archivedAssignments) is TagAssignmentsLoaded,
     );
     final id = _tagId(firstTagNumber);
     TagsPanelLoaded panelCatalog() =>
         container.read(panel).catalog as TagsPanelLoaded;
+    TagsPanelLoaded filterCatalog() =>
+        container.read(filter).catalog as TagsPanelLoaded;
 
     final renamed = runtime.commandCoordinator.acceptTagUpdate(
       UpdateTag(tagId: id, name: TagName.fromInput('Быт'), color: null),
@@ -145,9 +157,8 @@ void main() {
     await renamed.future;
     await _until(
       () =>
-          container.read(browse) is TagCatalogLoaded &&
-          (container.read(browse) as TagCatalogLoaded).items.first.name.value ==
-              'Быт' &&
+          filterCatalog().rows.first.tag.name.value == 'Быт' &&
+          filterCatalog().rowsAreCurrent &&
           panelCatalog().rows.first.tag.name.value == 'Быт' &&
           panelCatalog().rows.first.mark == TagsPanelSelectionMark.marked &&
           panelCatalog().rowsAreCurrent &&
@@ -168,11 +179,8 @@ void main() {
     await deleted.future;
     await _until(
       () =>
-          container.read(browse) is TagCatalogLoaded &&
-          (container.read(browse) as TagCatalogLoaded).items.every(
-            (tag) => tag.id != id,
-          ) &&
-          (container.read(browse) as TagCatalogLoaded).canUseCurrentItems &&
+          filterCatalog().rows.every((row) => row.tag.id != id) &&
+          filterCatalog().rowsAreCurrent &&
           panelCatalog().rows.every((row) => row.tag.id != id) &&
           panelCatalog().rowsAreCurrent &&
           [

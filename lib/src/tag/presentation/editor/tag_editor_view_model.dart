@@ -5,8 +5,6 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_command_result.dart';
 import '../../application/tag_command.dart';
-import '../../application/tag_result.dart';
-import '../../domain/tag.dart';
 import '../../domain/tag_color.dart';
 import '../../domain/tag_name.dart';
 import 'tag_editor_state.dart';
@@ -84,7 +82,7 @@ final class TagEditorViewModel extends _$TagEditorViewModel {
       case TagCommandAccepted(:final token, :final future):
         _token = token;
         state = state.withStatus(const TagEditorSubmitting());
-        if (state.context case TagEditorCreating(:final onCreationAccepted?)) {
+        if (state.context case TagEditorCreating(:final onCreationAccepted)) {
           onCreationAccepted(start);
         }
         await _finish(future);
@@ -118,18 +116,10 @@ final class TagEditorViewModel extends _$TagEditorViewModel {
       switch (completion.result) {
         case GraphResultFailure(:final failure):
           state = state.withStatus(TagEditorSubmissionFailed(failure));
-        case GraphResultSuccess(:final value):
-          final Tag tag = switch (value) {
-            TagCreated(:final tag) => tag,
-            TagUpdated(:final after) => after,
-            TagUnchanged(:final tag) => tag,
-            TagDeleted() => throw StateError('Unexpected tag command result'),
-            TagAssignmentChanged() || TagAssignmentUnchanged() =>
-              throw StateError('Unexpected tag command result'),
-          };
+        case GraphResultSuccess():
           state = state.withStatus(
-            TagEditorCompleted(tag),
-            event: TagEditorSaved(tag),
+            const TagEditorCompleted(),
+            event: const TagEditorSaved(),
           );
       }
     } on Object {

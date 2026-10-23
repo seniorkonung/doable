@@ -81,7 +81,6 @@ void main() {
             tagFixtureId(201),
           ) as DailyChoiceIdDecodingSuccess).id,
         ),
-        TagCatalogRoute(),
       ]) {
         unawaited(router.push<void>(route));
         await tester.pumpAndSettle();

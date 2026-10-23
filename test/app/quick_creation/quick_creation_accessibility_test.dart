@@ -11,6 +11,7 @@ import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode_presentation.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/design_system/components/option_row.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
@@ -44,7 +45,7 @@ void main() {
         '${variant.size}, '
         'отступы ${variant.safe ? "24/32" : "0/0"}, '
         'клавиатура ${variant.keyboard}, '
-        '${variant.deep ? "просмотр тегов" : "корень"}', (tester) async {
+        '${variant.deep ? "дата дневных выборов" : "корень"}', (tester) async {
       final semantics = tester.ensureSemantics();
       tester.view.physicalSize = variant.size;
       tester.view.devicePixelRatio = 1;
@@ -83,7 +84,13 @@ void main() {
         _expectPanel(tester, destination);
       }
       if (variant.deep) {
-        unawaited(router.push<void>(TagCatalogRoute()));
+        unawaited(
+          router.push<void>(
+            DailyChoiceDateCatalogRoute(
+              date: CalendarDate.fromParts(2026, 9, 25),
+            ),
+          ),
+        );
         await tester.pumpAndSettle();
         _expectPanel(tester, AppDestination.intentionGraph);
       }

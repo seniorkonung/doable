@@ -6,7 +6,6 @@ import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
@@ -14,8 +13,9 @@ import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_state.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_view_model.dart';
-import 'package:doable/src/tag/presentation/catalog/tag_catalog_state.dart';
-import 'package:doable/src/tag/presentation/catalog/tag_catalog_view_model.dart';
+import 'package:doable/src/tag/presentation/panel/tags_panel_context.dart';
+import 'package:doable/src/tag/presentation/panel/tags_panel_state.dart';
+import 'package:doable/src/tag/presentation/panel/tags_panel_view_model.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -154,17 +154,19 @@ void main() {
         tagAssignmentsViewModelProvider(target),
         (_, _) {},
       );
-      final catalogSubscription = container.listen(
-        tagCatalogViewModelProvider(),
-        (_, _) {},
+      final panel = tagsPanelViewModelProvider(
+        TagsPanelOpening(TagsPanelAssignmentContext(target)),
       );
+      final panelSubscription = container.listen(panel, (_, _) {});
       addTearDown(assignmentsSubscription.close);
-      addTearDown(catalogSubscription.close);
-      final catalog = container.read(tagCatalogViewModelProvider().notifier);
+      addTearDown(panelSubscription.close);
       TagAssignmentsState assignmentState() =>
           container.read(tagAssignmentsViewModelProvider(target));
-      TagCatalogState catalogState() =>
-          container.read(tagCatalogViewModelProvider());
+      TagsPanelCatalog panelCatalog() => container.read(panel).catalog;
+      List<TagsPanelRow> panelRows() =>
+          (panelCatalog() as TagsPanelLoaded).rows;
+      bool isMarked(TagsPanelRow row) =>
+          row.mark == TagsPanelSelectionMark.marked;
 
       Future<void> until(bool Function() condition) async {
         for (var attempt = 0; attempt < 40 && !condition(); attempt++) {
@@ -173,37 +175,38 @@ void main() {
         expect(condition(), isTrue);
       }
 
-      Future<void> settled(GraphRevision revision) => until(
+      // Панель применяет подтверждённые пакеты без ревизии в состоянии,
+      // поэтому её согласование проверяется по ожидаемым строкам.
+      Future<void> settled(
+        GraphRevision revision,
+        bool Function(List<TagsPanelRow> rows) panelShows,
+      ) => until(
         () =>
-            catalogState() is TagCatalogLoaded &&
             assignmentState() is TagAssignmentsLoaded &&
-            (catalogState() as TagCatalogLoaded).freshness ==
-                TagCatalogFreshness.current &&
             (assignmentState() as TagAssignmentsLoaded).freshness ==
                 TagAssignmentsFreshness.current &&
-            (catalogState() as TagCatalogLoaded).revision.compareTo(revision) ==
-                GraphRevisionOrder.same &&
             (assignmentState() as TagAssignmentsLoaded).revision.compareTo(
                   revision,
                 ) ==
-                GraphRevisionOrder.same,
+                GraphRevisionOrder.same &&
+            switch (panelCatalog()) {
+              TagsPanelLoaded(rowsAreCurrent: true, :final rows) => panelShows(
+                rows,
+              ),
+              _ => false,
+            },
       );
 
-      await until(() => catalogState() is TagCatalogLoaded);
-      catalog.setMode(TagCatalogSelectionMode(target));
       await until(
         () =>
-            catalogState() is TagCatalogLoaded &&
-            (catalogState() as TagCatalogLoaded).mode ==
-                TagCatalogSelectionMode(target) &&
+            panelCatalog() is TagsPanelLoaded &&
             assignmentState() is TagAssignmentsLoaded,
       );
-      final selected = catalogState() as TagCatalogLoaded;
       final assigned = assignmentState() as TagAssignmentsLoaded;
-      expect(selected.items, hasLength(139));
+      expect(panelRows(), hasLength(139));
       expect(assigned.items, hasLength(138));
-      expect(selected.selectionRows.first.isAssigned, isTrue);
-      expect(selected.selectionRows[1].isAssigned, isFalse);
+      expect(isMarked(panelRows().first), isTrue);
+      expect(isMarked(panelRows()[1]), isFalse);
       expect(assigned.items.map((tag) => tag.id).toSet(), hasLength(138));
 
       final completion = await send(
@@ -214,11 +217,7 @@ void main() {
         TagAssignmentState.assigned,
         changed: true,
       );
-      await settled(completion.revision!);
-      expect(
-        (catalogState() as TagCatalogLoaded).selectionRows[1].isAssigned,
-        isTrue,
-      );
+      await settled(completion.revision!, (rows) => isMarked(rows[1]));
       expect(
         (assignmentState() as TagAssignmentsLoaded).items.map((tag) => tag.id),
         contains(_tag(lastTagNumber)),
@@ -228,11 +227,7 @@ void main() {
         RemoveTagAssignment(tagId: _tag(firstTagNumber), intentionId: target),
       );
       expectAssignmentChange(removed, TagAssignmentState.absent, changed: true);
-      await settled(removed.revision!);
-      expect(
-        (catalogState() as TagCatalogLoaded).selectionRows.first.isAssigned,
-        isFalse,
-      );
+      await settled(removed.revision!, (rows) => !isMarked(rows.first));
       expect(
         (assignmentState() as TagAssignmentsLoaded).items.map((tag) => tag.id),
         isNot(contains(_tag(firstTagNumber))),
@@ -246,10 +241,9 @@ void main() {
         ),
       );
       expect(success(renamed), isA<TagUpdated>());
-      await settled(renamed.revision!);
-      expect(
-        (catalogState() as TagCatalogLoaded).items[1].name.value,
-        'Переименованный',
+      await settled(
+        renamed.revision!,
+        (rows) => rows[1].tag.name.value == 'Переименованный',
       );
       expect(
         (assignmentState() as TagAssignmentsLoaded).items.first.name.value,
@@ -265,11 +259,8 @@ void main() {
       ) as IntentionCommandAccepted;
       final unrelatedCompletion = await unrelated.future;
       expect(unrelatedCompletion.isFailure, isFalse);
-      await settled(unrelatedCompletion.revision!);
-      expect(
-        (catalogState() as TagCatalogLoaded).selectionRows[1].isAssigned,
-        isTrue,
-      );
+      await settled(unrelatedCompletion.revision!, (rows) => true);
+      expect(isMarked(panelRows()[1]), isTrue);
       expect(
         (assignmentState() as TagAssignmentsLoaded).items.first.name.value,
         'Переименованный',
@@ -279,24 +270,26 @@ void main() {
         MoveTag(tagId: _tag(lastTagNumber), placement: TagPlacement.first),
       );
       expect(success(moved), isA<TagUpdated>());
-      await settled(moved.revision!);
+      await settled(
+        moved.revision!,
+        (rows) => rows.first.tag.id == _tag(lastTagNumber),
+      );
 
       final deleted = await send(DeleteTag(_tag(lastTagNumber)));
       expect(success(deleted), isA<TagDeleted>());
-      await settled(deleted.revision!);
-      expect(
-        (catalogState() as TagCatalogLoaded).items.map((tag) => tag.id),
-        isNot(contains(_tag(lastTagNumber))),
+      await settled(
+        deleted.revision!,
+        (rows) => rows.every((row) => row.tag.id != _tag(lastTagNumber)),
       );
       expect(
         (assignmentState() as TagAssignmentsLoaded).items.map((tag) => tag.id),
         isNot(contains(_tag(lastTagNumber))),
       );
-      final finalSelection = catalogState() as TagCatalogLoaded;
+      final finalRows = panelRows();
       final finalAssignments = assignmentState() as TagAssignmentsLoaded;
-      expect(finalSelection.items, hasLength(138));
-      expect(finalSelection.items.map((tag) => tag.id).toSet(), hasLength(138));
-      expect(finalSelection.selectionRows.first.isAssigned, isFalse);
+      expect(finalRows, hasLength(138));
+      expect(finalRows.map((row) => row.tag.id).toSet(), hasLength(138));
+      expect(isMarked(finalRows.first), isFalse);
       expect(finalAssignments.items, hasLength(137));
       expect(
         finalAssignments.items.map((tag) => tag.id).toSet(),

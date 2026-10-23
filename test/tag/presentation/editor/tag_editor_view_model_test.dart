@@ -23,7 +23,7 @@ void main() {
   test(
     'создание проверяет название, отклоняет повтор и сохраняет ввод при отказе',
     () async {
-      final h = _Harness(TagEditorCreating(TagCreationFormKey()));
+      final h = _Harness(_creating());
       addTearDown(h.dispose);
       h.model.changeName('  Дом  ');
       final first = h.model.submit();
@@ -42,7 +42,8 @@ void main() {
   );
 
   test('правка названия цветного тега отправляет его цвет и сохраняет цвет после отказа', () async {
-    final h = _Harness(TagEditorRenaming(_tag(1, 'Дом', color: TagColor.blue)));
+    final tag = _tag(1, 'Дом', color: TagColor.blue);
+    final h = _Harness(TagEditorRenaming(tag, existingNames: [tag.name]));
     addTearDown(h.dispose);
     expect(h.state.color, TagColor.blue);
     h.model.changeName('Работа');
@@ -68,7 +69,7 @@ void main() {
   });
 
   test('неизвестный отказ сохраняет ввод без обычного повтора', () async {
-    final h = _Harness(TagEditorCreating(TagCreationFormKey()));
+    final h = _Harness(_creating());
     addTearDown(h.dispose);
     h.model.changeName('Дом');
     final submit = h.model.submit();
@@ -81,7 +82,7 @@ void main() {
 
   test('пустое после удаления пробелов название делает создание недоступным '
       'без причины и сохраняет ввод', () async {
-    final h = _Harness(TagEditorCreating(TagCreationFormKey()));
+    final h = _Harness(_creating());
     addTearDown(h.dispose);
     h.model.changeName('   ');
     expect(h.state.nameCheck, isA<TagEditorNameEmpty>());
@@ -94,7 +95,7 @@ void main() {
   test(
     'недопустимый Unicode получает причину при вводе без вызова координатора',
     () async {
-      final h = _Harness(TagEditorCreating(TagCreationFormKey()));
+      final h = _Harness(_creating());
       addTearDown(h.dispose);
       h.model.changeName('Имя\u0000');
       expect(
@@ -110,12 +111,7 @@ void main() {
 
   test('название, совпадающее с тегом снимка без учёта регистра и пробелов, '
       'занято, а исправленное снова доступно', () async {
-    final h = _Harness(
-      TagEditorCreating(
-        TagCreationFormKey(),
-        existingNames: [TagName.fromInput('Дом')],
-      ),
-    );
+    final h = _Harness(_creating(existingNames: [TagName.fromInput('Дом')]));
     addTearDown(h.dispose);
     h.model.changeName('  дом  ');
     expect(h.state.nameCheck, isA<TagEditorNameOccupied>());
@@ -131,11 +127,7 @@ void main() {
       'завершения и завершается после закрытия сессии', () async {
     final accepted = <TagCommandAccepted>[];
     final h = _Harness(
-      TagEditorCreating(
-        TagCreationFormKey(),
-        initialName: 'парк',
-        onCreationAccepted: accepted.add,
-      ),
+      _creating(initialName: 'парк', onCreationAccepted: accepted.add),
     );
     addTearDown(h.dispose);
     expect(h.state.input, 'парк');
@@ -164,8 +156,7 @@ void main() {
     'создание начинает с цвета контекста и отправляет его размещение',
     () async {
       final h = _Harness(
-        TagEditorCreating(
-          TagCreationFormKey(),
+        _creating(
           initialName: 'Дом 2',
           initialColor: TagColor.blue,
           placement: AfterTagPlacement(_id(1)),
@@ -243,27 +234,38 @@ void main() {
     await submit;
   });
 
-  test(
-    'подтверждённое создание завершает сессию тегом из результата команды',
-    () async {
-      final h = _Harness(TagEditorCreating(TagCreationFormKey()));
-      addTearDown(h.dispose);
-      h.model.changeName('Дом');
-      final submit = h.model.submit();
-      h.repository.succeedCommand(
-        0,
-        TagCreated(
-          TagCreatedChange(revision: const _Revision(2), after: _tag(1, 'Дом')),
-        ),
-      );
-      await submit;
-      final saved = (h.state.event as TagEditorSaved).tag;
-      expect(saved.id, _id(1));
-      expect(saved.name.value, 'Дом');
-      expect(h.state.canSubmit, isFalse);
-    },
-  );
+  test('подтверждённое создание завершает сессию и закрывает лист', () async {
+    final h = _Harness(_creating());
+    addTearDown(h.dispose);
+    h.model.changeName('Дом');
+    final submit = h.model.submit();
+    h.repository.succeedCommand(
+      0,
+      TagCreated(
+        TagCreatedChange(revision: const _Revision(2), after: _tag(1, 'Дом')),
+      ),
+    );
+    await submit;
+    expect(h.state.event, isA<TagEditorSaved>());
+    expect(h.state.canSubmit, isFalse);
+  });
 }
+
+/// Контекст создания из панели без снимка названий и с пустым продолжением.
+TagEditorCreating _creating({
+  String initialName = '',
+  TagColor? initialColor,
+  TagPlacement placement = TagPlacement.first,
+  List<TagName> existingNames = const [],
+  void Function(TagCommandAccepted creation)? onCreationAccepted,
+}) => TagEditorCreating(
+  TagCreationFormKey(),
+  initialName: initialName,
+  initialColor: initialColor,
+  placement: placement,
+  existingNames: existingNames,
+  onCreationAccepted: onCreationAccepted ?? (_) {},
+);
 
 final class _Harness {
   _Harness(TagEditorContext context) {

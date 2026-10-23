@@ -10,6 +10,7 @@ import 'package:doable/src/app/navigation/ordinary_page_scaffold.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
+import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openInMemoryLocalDatabase;
 import 'package:flutter/material.dart';
@@ -59,7 +60,11 @@ void main() {
     final semantics = tester.ensureSemantics();
     final router = await _start(tester);
     await _select(tester, AppDestination.dailyChoices);
-    unawaited(router.push<void>(TagCatalogRoute()));
+    unawaited(
+      router.push<void>(
+        DailyChoiceDateCatalogRoute(date: CalendarDate.fromParts(2026, 9, 25)),
+      ),
+    );
     await tester.pumpAndSettle();
     var popRequests = 0;
     final taskResult = router.pushNativeRoute<String>(

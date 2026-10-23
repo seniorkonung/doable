@@ -592,6 +592,55 @@ void main() {
     );
   });
 
+  testWidgets('непарный surrogate после emoji сохраняется в поле вместе с '
+      'областью набора, а исправленный ввод сразу применяется', (tester) async {
+    final h = await _pumpApp(tester);
+    await h.open();
+    h.repository.complete([
+      _tag(1, 'Дом 😀'),
+      _tag(2, 'Работа'),
+    ], assignedIds: {});
+    await tester.pump();
+    const error =
+        'Недопустимые символы показаны как �. Ввод сохранён, но не '
+        'применён; показаны результаты последнего корректного запроса.';
+    TextEditingValue fieldValue() =>
+        tester.widget<TextField>(_search).controller!.value;
+
+    await tester.showKeyboard(_search);
+    const valid = TextEditingValue(
+      text: 'ДОМ 😀',
+      selection: TextSelection.collapsed(offset: 6),
+      composing: TextRange(start: 4, end: 6),
+    );
+    tester.testTextInput.updateEditingValue(valid);
+    await tester.pump();
+    expect(_rowNames(tester), ['Дом 😀']);
+
+    final invalid = valid.copyWith(
+      text: 'ДОМ 😀\ud800',
+      selection: const TextSelection.collapsed(offset: 7),
+      composing: const TextRange(start: 4, end: 7),
+    );
+    tester.testTextInput.updateEditingValue(invalid);
+    await tester.pump();
+    expect(fieldValue(), invalid);
+    expect(find.text(error), findsOne);
+    expect(_rowNames(tester), ['Дом 😀']);
+    expect(tester.takeException(), isNull);
+
+    const corrected = TextEditingValue(
+      text: 'РАБ',
+      selection: TextSelection.collapsed(offset: 3),
+    );
+    tester.testTextInput.updateEditingValue(corrected);
+    await tester.pump();
+    expect(fieldValue(), corrected);
+    expect(find.text(error), findsNothing);
+    expect(_rowNames(tester), ['Работа']);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Новое открытие начинает поиск заново', (tester) async {
     final h = await _pumpApp(tester);
     await h.open();

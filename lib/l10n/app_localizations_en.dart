@@ -1760,134 +1760,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tagSheetEditTitle => 'Edit tag';
 
   @override
-  String get tagCatalogTitle => 'Tags';
-
-  @override
-  String get tagCatalogSelectionTitle => 'Choose a tag';
-
-  @override
-  String get tagCatalogSearch => 'Search tags';
-
-  @override
-  String get tagCatalogClearSearch => 'Clear tag search';
-
-  @override
-  String get tagCatalogInvalidSearch =>
-      'Invalid characters are shown as �. Your input is retained but wasn’t applied; results use the last valid query.';
-
-  @override
-  String get tagCatalogNoMatches => 'No tags found';
-
-  @override
-  String get tagCatalogAssigned => 'Assigned';
-
-  @override
-  String get tagCatalogAvailable => 'Available to assign';
-
-  @override
-  String get tagCatalogAssign => 'Assign tag';
-
-  @override
-  String tagCatalogAssignNamed(String tagName) {
-    return 'Assign tag $tagName';
-  }
-
-  @override
-  String get tagCatalogAssigning => 'Assigning tag…';
-
-  @override
-  String get tagCatalogInDraft => 'In draft';
-
-  @override
-  String get tagCatalogAvailableForDraft => 'Available to add';
-
-  @override
-  String get tagCatalogAddToDraft => 'Add';
-
-  @override
-  String get tagCatalogAddToDraftSemantic => 'Add tag to draft';
-
-  @override
-  String tagCatalogAddToDraftNamed(String tagName) {
-    return 'Add tag $tagName to draft';
-  }
-
-  @override
-  String get tagCatalogDraftSubmitting =>
-      'The intention is being saved, so tags can’t be added now.';
-
-  @override
-  String get tagCatalogDraftClosed =>
-      'This draft is closed, so tags can’t be added.';
-
-  @override
-  String get tagCatalogLoading => 'Loading tags…';
-
-  @override
-  String get tagCatalogEmpty => 'No tags yet.';
-
-  @override
-  String get tagCatalogUnavailable => 'Tags couldn’t be loaded. Try again.';
-
-  @override
-  String get tagCatalogCorruption =>
-      'Stored tag data is damaged and can’t be shown.';
-
-  @override
-  String get tagCatalogUnexpected =>
-      'Tags couldn’t be loaded because of an unexpected error.';
-
-  @override
-  String get tagCatalogRefreshing => 'Refreshing tags…';
-
-  @override
-  String get tagCatalogCreate => 'Create tag';
-
-  @override
-  String get tagCatalogRename => 'Edit tag';
-
-  @override
-  String get tagCatalogDelete => 'Delete tag';
-
-  @override
-  String tagDeleteConfirmationTitle(String tagName) {
-    return 'Delete tag “$tagName”?';
-  }
-
-  @override
-  String get tagDeleteConfirmationScope =>
-      'This permanently deletes the tag and all its assignments to active and archived intentions at the time of execution, including assignments not loaded here. The intentions, relations, daily choices and their paths remain.';
-
-  @override
-  String get tagDeleteCancel => 'Cancel';
-
-  @override
-  String get tagDeleteConfirm => 'Delete tag and assignments';
-
-  @override
-  String get tagDeleteAlreadyRunning =>
-      'An operation on this tag is already in progress. Wait for its result.';
-
-  @override
-  String get tagDeleteSaving => 'Deleting tag and assignments…';
-
-  @override
-  String get tagCatalogSelected => 'Selected tag';
-
-  @override
-  String get tagCatalogAssignmentUnknown => 'Assignment not yet checked';
-
-  @override
   String get tagEditorCreateTitle => 'New tag';
 
   @override
-  String get tagEditorRenameTitle => 'Edit tag';
-
-  @override
   String get tagEditorNameLabel => 'Tag name';
-
-  @override
-  String get tagEditorNameLimit => 'No more than 255 visible characters.';
 
   @override
   String get tagColorNone => 'No color';
@@ -1937,19 +1813,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get tagEditorAlreadyRunning =>
       'Saving this tag is already in progress. Wait for its result.';
-
-  @override
-  String get tagEditorCancel => 'Cancel';
-
-  @override
-  String get tagEditorReadUnavailable => 'Tag couldn’t be read. Try again.';
-
-  @override
-  String get tagEditorReadCorruption => 'Stored tag data is damaged.';
-
-  @override
-  String get tagEditorReadUnexpected =>
-      'Tag couldn’t be read because of an unexpected error.';
 
   @override
   String get tagAssignmentAlreadyRunning =>

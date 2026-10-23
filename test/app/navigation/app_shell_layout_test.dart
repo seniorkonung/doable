@@ -28,7 +28,6 @@ import 'package:doable/src/intention/presentation/editor/intention_editor_page.d
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/long_term_relation/presentation/details/relation_details_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
-import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -43,7 +42,6 @@ import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 import '../../support/quick_creation.dart';
-import '../../support/tag_positions.dart';
 
 part 'ordinary_page_layout_scenarios.dart';
 

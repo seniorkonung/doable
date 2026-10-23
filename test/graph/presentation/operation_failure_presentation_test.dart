@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/design_system/components/sheet.dart';
+import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
@@ -14,10 +16,8 @@ import 'package:doable/src/intention/presentation/operation/operation_state.dart
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
-import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
-import 'package:doable/src/tag/presentation/catalog/tag_catalog_view.dart';
-import 'package:doable/src/tag/presentation/catalog/tag_selection_context.dart';
-import 'package:doable/src/tag/presentation/tag_failure_message.dart';
+import 'package:doable/src/tag/presentation/panel/tags_panel.dart';
+import 'package:doable/src/tag/presentation/panel/tags_panel_context.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -235,10 +235,7 @@ void main() {
           Builder(
             builder: (context) => OperationFailurePresentation(
               claim: null,
-              message: tagAssignmentStartMessage(
-                AppLocalizations.of(context),
-                const TagCommandAlreadyRunning(),
-              )!,
+              message: AppLocalizations.of(context).tagAssignmentAlreadyRunning,
               messageKey: const ValueKey('assignment-busy-message'),
             ),
           ),
@@ -391,9 +388,9 @@ void main() {
     );
   });
 
-  group('право отказа сессии создания под непрозрачным выбором тегов', () {
+  group('право отказа сессии создания под панелью тегов', () {
     testWidgets(
-      'отказ под выбором тегов остаётся у формы и предъявляется ею один раз после возвращения',
+      'отказ под панелью тегов остаётся у формы и предъявляется ею один раз после возвращения',
       (tester) async {
         final harness = _FailureHarness();
         addTearDown(harness.dispose);
@@ -412,15 +409,15 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        // Перекрытая форма отказ не показывает, и общая поверхность тоже.
-        expect(find.byType(TagCatalogView), findsOneWidget);
-        expect(find.text(_creationFailureMessage), findsNothing);
+        // Форма под панелью остаётся за барьером и право не отдаёт, поэтому
+        // общая поверхность отказ не показывает.
+        expect(find.byType(Sheet), findsOneWidget);
         expect(find.byType(SnackBar), findsNothing);
 
-        await tester.tap(find.byType(BackButton));
+        await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
 
-        expect(find.byType(TagCatalogView), findsNothing);
+        expect(find.byType(Sheet), findsNothing);
         expect(find.text(_creationFailureMessage), findsOneWidget);
         expect(find.byType(SnackBar), findsNothing);
       },
@@ -428,7 +425,7 @@ void main() {
 
     for (final removal in _HostRemoval.values) {
       testWidgets(
-        'удаление хоста под выбором тегов без возвращения (${removal.description}) передаёт отказ общей поверхности ровно один раз',
+        'удаление хоста под панелью тегов без возвращения (${removal.description}) передаёт отказ общей поверхности ровно один раз',
         (tester) async {
           final harness = _FailureHarness();
           addTearDown(harness.dispose);
@@ -446,15 +443,12 @@ void main() {
             const ResultFailure(IntentionUnavailableFailure()),
           );
           await tester.pumpAndSettle();
-          expect(find.text(_creationFailureMessage), findsNothing);
           expect(find.byType(SnackBar), findsNothing);
 
-          removal.apply(
-            Navigator.of(tester.element(find.byType(TagCatalogView))),
-          );
+          removal.apply(Navigator.of(tester.element(find.byType(Sheet))));
           await tester.pumpAndSettle();
 
-          expect(find.byType(TagCatalogView), findsNothing);
+          expect(find.byType(Sheet), findsNothing);
           expect(find.text(_creationFailureMessage), findsNothing);
           expect(find.text(_creationShellMessage), findsOneWidget);
           await _closeMessage(tester);
@@ -465,10 +459,10 @@ void main() {
   });
 }
 
-/// Способ окончательно удалить хост сессии вместе с перекрывающим его
-/// выбором тегов, не возвращаясь к нему.
+/// Способ окончательно удалить хост сессии вместе с перекрывающей его
+/// панелью тегов, не возвращаясь к нему.
 enum _HostRemoval {
-  /// Хост может построиться во время анимации ухода выбора: право тогда
+  /// Хост может построиться во время анимации ухода панели: право тогда
   /// освобождают и renderer, и сессия, а предъявление остаётся единственным.
   popUntil('popUntil к исходной странице'),
 
@@ -501,8 +495,7 @@ Future<void> _closeMessage(WidgetTester tester) async {
 String _notDeleted(String title) =>
     'Delete — “$title”: The intention couldn’t be deleted. Try again.';
 
-/// Открывает существующую страницу выбора тегов с контекстом черновика
-/// сессии непрозрачным маршрутом поверх её хоста.
+/// Открывает панель тегов с контекстом черновика сессии поверх её хоста.
 Future<void> _openTagChooser(WidgetTester tester) async {
   await tester.tap(find.text('Теги'));
   await tester.pumpAndSettle();
@@ -545,7 +538,7 @@ Future<void> _openCreationSession(
 }
 
 /// Управляемая сессия создания: рисует её отказ общим renderer, открывает
-/// над собой существующий выбор тегов с контекстом её черновика и закрывает
+/// над собой панель тегов с контекстом её черновика и закрывает
 /// свой маршрут только по решению сессии после её единственного
 /// подтверждения.
 final class _CreationSessionRoute extends ConsumerWidget {
@@ -566,14 +559,9 @@ final class _CreationSessionRoute extends ConsumerWidget {
           ),
           TextButton(
             onPressed: () => unawaited(
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => TagCatalogPage(
-                    selectionContext: TagDraftContext(
-                      ref.read(provider.notifier).draftTagSet,
-                    ),
-                  ),
-                ),
+              showTagsPanel(
+                context,
+                TagsPanelDraftContext(ref.read(provider.notifier).draftTagSet),
               ),
             ),
             child: const Text('Теги'),
@@ -728,6 +716,7 @@ final class _FailureHarness {
       UncontrolledProviderScope(
         container: container,
         child: MaterialApp(
+          theme: doableTheme(Brightness.light),
           locale: locale,
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,

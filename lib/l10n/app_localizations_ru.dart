@@ -1782,135 +1782,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get tagSheetEditTitle => 'Изменить тег';
 
   @override
-  String get tagCatalogTitle => 'Теги';
-
-  @override
-  String get tagCatalogSelectionTitle => 'Выбор тега';
-
-  @override
-  String get tagCatalogSearch => 'Поиск тегов';
-
-  @override
-  String get tagCatalogClearSearch => 'Очистить поиск тегов';
-
-  @override
-  String get tagCatalogInvalidSearch =>
-      'Недопустимые символы показаны как �. Ввод сохранён, но не применён; показаны результаты последнего корректного запроса.';
-
-  @override
-  String get tagCatalogNoMatches => 'Теги не найдены';
-
-  @override
-  String get tagCatalogAssigned => 'Назначен';
-
-  @override
-  String get tagCatalogAvailable => 'Доступен для назначения';
-
-  @override
-  String get tagCatalogAssign => 'Назначить тег';
-
-  @override
-  String tagCatalogAssignNamed(String tagName) {
-    return 'Назначить тег «$tagName»';
-  }
-
-  @override
-  String get tagCatalogAssigning => 'Назначаем тег…';
-
-  @override
-  String get tagCatalogInDraft => 'В черновике';
-
-  @override
-  String get tagCatalogAvailableForDraft => 'Можно добавить';
-
-  @override
-  String get tagCatalogAddToDraft => 'Добавить';
-
-  @override
-  String get tagCatalogAddToDraftSemantic => 'Добавить тег в черновик';
-
-  @override
-  String tagCatalogAddToDraftNamed(String tagName) {
-    return 'Добавить тег «$tagName» в черновик';
-  }
-
-  @override
-  String get tagCatalogDraftSubmitting =>
-      'Намерение сохраняется, поэтому добавить теги сейчас нельзя.';
-
-  @override
-  String get tagCatalogDraftClosed =>
-      'Черновик закрыт, поэтому добавить теги нельзя.';
-
-  @override
-  String get tagCatalogLoading => 'Загружаем теги…';
-
-  @override
-  String get tagCatalogEmpty => 'Тегов пока нет.';
-
-  @override
-  String get tagCatalogUnavailable =>
-      'Не удалось загрузить теги. Повторите попытку.';
-
-  @override
-  String get tagCatalogCorruption =>
-      'Сохранённые данные тегов повреждены и не могут быть показаны.';
-
-  @override
-  String get tagCatalogUnexpected =>
-      'Не удалось загрузить теги из-за непредвиденной ошибки.';
-
-  @override
-  String get tagCatalogRefreshing => 'Обновляем каталог тегов…';
-
-  @override
-  String get tagCatalogCreate => 'Создать тег';
-
-  @override
-  String get tagCatalogRename => 'Изменить тег';
-
-  @override
-  String get tagCatalogDelete => 'Удалить тег';
-
-  @override
-  String tagDeleteConfirmationTitle(String tagName) {
-    return 'Удалить тег «$tagName»?';
-  }
-
-  @override
-  String get tagDeleteConfirmationScope =>
-      'Тег и все его назначения активным и архивированным намерениям на момент выполнения будут удалены необратимо, включая незагруженные назначения. Сами намерения, связи, дневные выборы и их пути сохраняются.';
-
-  @override
-  String get tagDeleteCancel => 'Отмена';
-
-  @override
-  String get tagDeleteConfirm => 'Удалить тег и назначения';
-
-  @override
-  String get tagDeleteAlreadyRunning =>
-      'Изменение этого тега уже выполняется. Дождитесь результата.';
-
-  @override
-  String get tagDeleteSaving => 'Удаляем тег и назначения…';
-
-  @override
-  String get tagCatalogSelected => 'Выбранный тег';
-
-  @override
-  String get tagCatalogAssignmentUnknown => 'Назначение ещё не проверено';
-
-  @override
   String get tagEditorCreateTitle => 'Новый тег';
 
   @override
-  String get tagEditorRenameTitle => 'Изменение тега';
-
-  @override
   String get tagEditorNameLabel => 'Название тега';
-
-  @override
-  String get tagEditorNameLimit => 'Не более 255 отображаемых символов.';
 
   @override
   String get tagColorNone => 'Без цвета';
@@ -1960,20 +1835,6 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get tagEditorAlreadyRunning =>
       'Сохранение этого тега уже выполняется. Дождитесь результата.';
-
-  @override
-  String get tagEditorCancel => 'Отмена';
-
-  @override
-  String get tagEditorReadUnavailable =>
-      'Не удалось прочитать тег. Повторите попытку.';
-
-  @override
-  String get tagEditorReadCorruption => 'Сохранённые данные тега повреждены.';
-
-  @override
-  String get tagEditorReadUnexpected =>
-      'Не удалось прочитать тег из-за непредвиденной ошибки.';
 
   @override
   String get tagAssignmentAlreadyRunning =>

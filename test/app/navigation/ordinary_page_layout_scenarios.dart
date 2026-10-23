@@ -58,40 +58,6 @@ void _registerOrdinaryLayoutTests() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('поиск тегов при тексте 2×, $conditions: поле, очистка и '
-        'последний тег доступны над клавиатурой', (tester) async {
-      final app = await _start(
-        tester,
-        locale: locale,
-        screen: screen,
-        insets: insets,
-        seedAdditional: _seedLayoutTagCatalog,
-      );
-      final l10n = lookupAppLocalizations(locale);
-      unawaited(app.router.push(TagCatalogRoute()));
-      final input = find.byKey(const ValueKey('tag-catalog-search'));
-      await _until(tester, input);
-      await tester.pumpAndSettle();
-      await tester.enterText(input, 'Дом');
-      await tester.pumpAndSettle();
-      _expectFullyVisible(tester, input, insets);
-      final clear = find.byTooltip(l10n.tagCatalogClearSearch);
-      _expectFullyVisible(tester, clear, insets);
-      expect(clear.hitTestable(), findsOneWidget);
-      await tester.tap(clear);
-      await _settle(tester);
-      expect(tester.widget<TextField>(input).controller!.text, isEmpty);
-      await _scrollToEnd(tester, find.byType(TagCatalogPage));
-      final last = find.text('Тег 025');
-      _expectFullyVisible(tester, last, insets);
-      final create = find.byKey(const ValueKey('tag-catalog-create'));
-      _expectFullyVisible(tester, create, insets);
-      await tester.tap(create);
-      await tester.pumpAndSettle();
-      expect(app.router.current.name, TagEditorRoute.name);
-      expect(tester.takeException(), isNull);
-    });
-
     testWidgets('быстрое создание из каталогов при тексте 2×, $conditions: '
         'кнопка помещается в панели и запускает оба режима', (tester) async {
       final semantics = tester.ensureSemantics();
@@ -344,21 +310,6 @@ Future<void> _expectLoadingFooter(
   _expectFullyVisible(tester, message, insets);
   _expectFullyVisible(tester, find.byType(CircularProgressIndicator), insets);
   expect(tester.takeException(), isNull);
-}
-
-void _seedLayoutTagCatalog(sqlite.Database database) {
-  seedRawGraph(database, () {
-    for (var number = 1; number <= 25; number++) {
-      database.execute(
-        'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
-        [
-          tagFixtureId(9000 + number),
-          'Тег ${number.toString().padLeft(3, '0')}',
-          tagPositionKey(9000 + number),
-        ],
-      );
-    }
-  });
 }
 
 const _lastLayoutRelation = 53;
