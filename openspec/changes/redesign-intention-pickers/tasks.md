@@ -333,3 +333,16 @@
   - **Зависимости:** 2.1–2.11.
   - **Предполагаемые файлы:** нет, только проверка и сборка.
   - **Размер:** XS.
+
+- [ ] 2.13 Называть маршрут заголовком верхней панели, чтобы экранный диктор объявлял название экрана выбора при его открытии
+  - **Критерии приёмки:**
+    - Заголовок `TopBar` называет маршрут (`namesRoute`), как заголовки листа и диалога подтверждения дизайн-системы. При открытии поиска действия или исходного намерения TalkBack объявляет текст заголовка панели, как прежде объявлял заголовок `AppBar`.
+    - Заголовок остаётся одним узлом-заголовком с текстом заголовка и не становится кнопкой; узел крестика не меняется.
+    - Вид панели, тексты и обработчики не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/top_bar_test.dart` — проверка семантики заголовка требует у его узла `isHeader` и `namesRoute`.
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/action_picker/daily_choice_action_picker_page_test.dart test/daily_choice/presentation/source_picker/daily_choice_source_picker_page_test.dart test/intention/presentation/picker/intention_picker_view_test.dart` — потребители `TopBar` по-прежнему проходят.
+    - Объявление TalkBack на устройстве остаётся для ручной проверки пользователем.
+  - **Зависимости:** 2.8 — `TopBar`.
+  - **Предполагаемые файлы:** `lib/src/design_system/components/top_bar.dart`, `test/design_system/top_bar_test.dart`.
+  - **Размер:** XS.
