@@ -1,0 +1,119 @@
+## Phase 1: Краткие данные намерения в новом составе
+
+- [ ] 1.1 Добавить в краткую сводку намерения начало описания, которое одинаково строят чтение порции и снимок команды
+  - **Критерии приёмки:**
+    - Значение `IntentionDescriptionPreview` модуля приложения намерений строится из сохранённого описания по решению 5 дизайна:
+      - подряд идущие пробельные символы по определению `String.trim` заменяются одним пробелом;
+      - края обрезаются;
+      - остаются первые 512 расширенных графемных кластеров.
+
+      У существующего описания результат непуст.
+    - `IntentionSummary.descriptionPreview` заменяет поле `hasDescription`, а признак наличия описания выводится из него, поэтому пометка каталога не меняется.
+    - Чтение порции и снимок команды строят значение одной фабрикой из уже декодированного описания. Полная проверка описания при чтении остаётся прежней. Места сборки `IntentionSummary` в проверках передают начало описания вместо признака.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/application/intention_description_preview_test.dart`:
+      - свёртка переноса строки, табуляции, `U+00A0`, `U+3000` и `U+FEFF`;
+      - обрезка краёв;
+      - отрезание по границе кластера с составным emoji;
+      - непустой результат для описания с краевыми пробелами и переносами.
+    - `mise exec --no-deps -- flutter test test/intention/data/drift_intention_catalog_test.dart test/intention/data/drift_intention_repository_command_test.dart` — описание с краевыми пробелами и переносами даёт одно и то же начало в порции и в снимке изменения намерения.
+    - `mise run check:tests -- 0 1`: смена конструктора сводки меняет фикстуры по всему набору.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - новые: `lib/src/intention/application/intention_description_preview.dart`, `test/intention/application/intention_description_preview_test.dart`;
+    - изменяемые: `lib/src/intention/application/intention_catalog.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `test/intention/data/drift_intention_catalog_test.dart`, `test/intention/data/drift_intention_repository_command_test.dart`;
+    - механическая адаптация сборки `IntentionSummary` в `test/intention/presentation/catalog/catalog_test_support.dart`, `test/intention/presentation/details/details_test_support.dart`, `test/long_term_relation/presentation/neighborhood/neighborhood_test_support.dart`, `test/support/tag_assignment_changed.dart` и остальных проверках, которые собирают сводку.
+  - **Размер:** M — смена конструктора общей сводки; механическая адаптация фикстур входит в задачу, потому что поле нельзя заменить по частям.
+
+- [ ] 1.2 Перестать показывать количество связей в кратком представлении намерения: в каталоге, поисках, у соседей на странице намерения и у участника в подробностях связи
+  - **Критерии приёмки:**
+    - `IntentionSummaryView` не принимает и не рисует количество активных связей. Варианты состояния количества и строки `intentionActiveRelationCount*` удалены.
+    - Каталог, три поиска, строки соседей в разделе связей и подробности связи передают представлению только название, архивное состояние, пометки и теги. Сводка групп на странице намерения показывает свои количества как прежде.
+    - Проверки, которые искали количество в строках и у участников, удалены или переписаны. Проверки сброса оболочки наблюдают позднее удаление связи по сводке страницы намерения вместо строки каталога.
+  - **Проверка:**
+    - `mise run codegen` и `mise exec --no-deps -- flutter analyze`.
+    - `mise exec --no-deps -- flutter test test/intention/presentation/intention_summary_view_test.dart test/intention/presentation/catalog/intention_catalog_page_test.dart test/long_term_relation/presentation/participant_picker test/long_term_relation/presentation/details/relation_details_widget_test.dart test/long_term_relation/presentation/neighborhood/relation_neighborhood_widget_test.dart test/app/navigation/app_shell_operation_reset_test.dart`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - представление и его потребители: `lib/src/intention/presentation/intention_summary_view.dart`, `lib/src/intention/presentation/catalog/intention_catalog_page.dart`, `lib/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart`, `lib/src/daily_choice/presentation/source_picker/daily_choice_source_picker_page.dart`, `lib/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart`, `lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_sliver.dart`, `lib/src/long_term_relation/presentation/details/relation_details_page.dart`;
+    - строки: `lib/l10n/app_en.arb`, `lib/l10n/app_ru.arb` и генерируемые `lib/l10n/app_localizations*.dart`;
+    - проверки из списка выше.
+  - **Размер:** M — удаление одного параметра общего представления у всех его потребителей.
+
+- [ ] 1.3 Перестать перечитывать представления связей при изменении количества связей их участников
+  - **Критерии приёмки:**
+    - Модель соседства не перечитывает сводку и выбранную группу, когда меняются числа соседа. Изменения владельца по-прежнему согласуют сводку и группу по требованию «Согласованность счётчиков с изменениями графа».
+    - Модель подробностей связи и наблюдения подробностей связи и выбранных связей в репозитории реагируют на участников только через изменения их данных, а не на `IntentionRelationCountsChanged`.
+    - Проверки, которые ожидали обновление по числам участника, удалены. Проверки изменения названия и архивного состояния участника остаются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model_test.dart test/long_term_relation/presentation/details/relation_details_view_model_test.dart test/graph/data/drift_relation_watch_test.dart test/graph/data/drift_selected_relations_test.dart`.
+  - **Зависимости:** 1.2 — участники и соседи больше не показывают количество, поэтому его устаревание не видно.
+  - **Предполагаемые файлы:**
+    - `lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart`, `lib/src/long_term_relation/presentation/details/relation_details_view_model.dart`;
+    - `lib/src/graph/data/drift_personal_graph_repository_relation_details.dart`, `lib/src/graph/data/drift_personal_graph_repository_selected_relations.dart`;
+    - проверки из списка выше.
+  - **Размер:** M.
+
+- [ ] 1.4 Убрать количество связей из краткого представления участника связи и перестать вычислять его для участников групп, подробностей связи, выбранных связей и продолжений пути
+  - **Критерии приёмки:**
+    - `RelationParticipantSummary` содержит идентификатор, название и архивное состояние; тип отказа проверки количества удалён. Подробные данные намерения не дают отдельного числа активных связей, а их сводка количеств остаётся.
+    - Чтения участников групп связей, подробностей связи, выбранных связей и продолжений пути не выполняют агрегат количеств. Первая порция группы по-прежнему несёт сводку владельца, а продолжение больше не хранит число владельца.
+    - Поиск участника, форма связи и страница намерения собирают участника без количества. Места сборки участника в проверках адаптированы.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter analyze`.
+    - `mise exec --no-deps -- flutter test test/long_term_relation test/graph/data/drift_relation_group_page_test.dart test/graph/data/drift_relation_group_large_fixture_test.dart test/graph/data/drift_relation_archive_restore_test.dart test/graph/data/drift_selected_relations_test.dart test/daily_choice/application/choice_path_continuations_test.dart test/daily_choice/presentation/path test/intention/presentation/details`.
+    - `mise run check:tests -- 0 1`: смена общего типа участника меняет фикстуры по всему набору.
+  - **Зависимости:** 1.2 и 1.3 — ни одно представление и ни одна модель больше не читает количество участника.
+  - **Предполагаемые файлы:**
+    - тип участника и подробные данные: `lib/src/long_term_relation/application/long_term_relation_projection.dart`, `lib/src/intention/application/intention_details.dart`;
+    - чтения: `lib/src/graph/data/drift_personal_graph_repository_relation_groups.dart`, `lib/src/graph/data/drift_personal_graph_repository_relation_details.dart`, `lib/src/graph/data/drift_personal_graph_repository_selected_relations.dart`, `lib/src/graph/data/drift_personal_graph_repository_choice_path_reads.dart`;
+    - сборка участника: `lib/src/intention/presentation/details/intention_details_page.dart`, `lib/src/long_term_relation/presentation/editor/relation_editor_state.dart`, `lib/src/long_term_relation/presentation/editor/relation_editor_page.dart`, `lib/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart`;
+    - `test/long_term_relation/application/long_term_relation_projection_test.dart` и механическая адаптация сборки `RelationParticipantSummary` в проверках.
+  - **Размер:** M — смена общего типа участника; механическая адаптация фикстур входит в задачу.
+
+- [ ] 1.5 Перестать согласовывать количество связей в загруженных строках модели каталога
+  - **Критерии приёмки:**
+    - Модель каталога не переносит в строки числа из `IntentionRelationCountsChanged` и `DailyChoiceChange.intentionCounts`. Пакет, который меняет только количества, продвигает ревизию и не меняет выдачу, количество совпадений и позицию прокрутки.
+    - Проверки, которые ожидали числа в строках каталога, удалены или переписаны.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog test/graph/presentation`.
+  - **Зависимости:** 1.2 — строки каталога больше не показывают количество.
+  - **Предполагаемые файлы:**
+    - `lib/src/intention/presentation/catalog/intention_catalog_view_model.dart`;
+    - `test/intention/presentation/catalog/intention_catalog_count_reconciliation_test.dart` (удаляется), `test/intention/presentation/catalog/intention_catalog_action_selection_test.dart`, `test/graph/presentation/graph_reconciliation_checkpoint_test.dart`, `test/graph/presentation/package_consumers_test_support.dart`.
+  - **Размер:** S.
+
+- [ ] 1.6 Убрать количество связей из краткой сводки намерения и перестать вычислять его при чтении порции каталога и в снимках команд
+  - **Критерии приёмки:**
+    - `IntentionSummary` не содержит количества связей и операции его замены.
+      - Чтение порции не выполняет агрегат количеств.
+      - Снимки команд намерений и назначений тегов не читают количества. Архивирование по-прежнему читает затронутые количества для пакета изменений.
+    - Проверка повреждения соседства, которая ожидала отказ чтения каталога, проверяет отказ сводки владельца на странице намерения по ADR-0043. Предел объёма чтения порции в проверке большой фикстуры больше не включает сводки связей.
+    - Места сборки `IntentionSummary` в проверках не передают количество.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter analyze`.
+    - `mise exec --no-deps -- flutter test test/intention test/tag/application test/graph/presentation/graph_reconciliation_checkpoint_test.dart test/app/intention_app_lifecycle_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_view_model_test.dart`.
+    - `mise run check:tests -- 0 1`: смена конструктора сводки меняет фикстуры по всему набору.
+  - **Зависимости:** 1.1 — тот же конструктор сводки; 1.4 — поиск участника больше не переносит количество; 1.5 — модель каталога больше не заменяет число.
+  - **Предполагаемые файлы:**
+    - `lib/src/intention/application/intention_catalog.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `lib/src/graph/data/drift_personal_graph_repository_tag_commands.dart`;
+    - `test/intention/application/intention_contract_test.dart`, `test/intention/data/drift_intention_relation_counts_test.dart`, `test/intention/data/drift_intention_repository_large_fixture_test.dart`, `test/intention/data/drift_intention_repository_command_test.dart`, `test/intention/data/drift_intention_catalog_test.dart`;
+    - механическая адаптация сборки `IntentionSummary` в проверках.
+  - **Размер:** M — смена конструктора общей сводки; механическая адаптация фикстур входит в задачу.
+
+- [ ] 1.7 Подтвердить готовность первой фазы: количество связей видно только на странице намерения, а краткая сводка несёт одно начало описания
+  - **Критерии приёмки:**
+    - Выполнено условие «Ready to advance» первой фазы:
+      - количество связей видно только на странице намерения;
+      - изменённое требование о согласованности счётчиков выполняется;
+      - оба источника краткой сводки дают одно и то же начало описания;
+      - существующие экраны работают на новом составе данных.
+    - Пакет не содержит показа начала описания и нового вида поисков.
+    - Результаты проверок и путь к APK сообщены в сессии. Ручная проверка на устройстве остаётся за пользователем и не блокирует готовность фазы.
+  - **Проверка:**
+    - `mise run check` и `openspec validate redesign-intention-pickers --strict --no-interactive`; после фиксации изменений — `mise run codegen-check` на чистой рабочей копии.
+    - `mise exec --no-deps -- flutter build apk --release` с артефактом `build/app/outputs/flutter-apk/app-release.apk`. Если через DTD найдено запущенное приложение, выполнить hot restart и проверить `get_runtime_errors`; эмулятор и устройство не запускаются.
+    - Сообщить оставшиеся ручные проверки: количество связей пропало из строк каталога, поисков, у соседей и в подробностях связи и осталось в сводке страницы намерения; пометка наличия описания в каталоге прежняя.
+  - **Зависимости:** 1.1–1.6.
+  - **Предполагаемые файлы:** нет, только проверка и сборка.
+  - **Размер:** XS.
