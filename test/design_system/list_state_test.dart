@@ -98,6 +98,51 @@ void main() {
 
   for (final brightness in Brightness.values) {
     testWidgets('в ${brightness == Brightness.light ? 'светлой' : 'тёмной'} '
+        'теме подгрузка — одно кольцо 18 по центру строки высотой 40 без '
+        'видимого текста', (tester) async {
+      final colors = switch (brightness) {
+        Brightness.light => DoableColors.light,
+        Brightness.dark => DoableColors.dark,
+      };
+
+      await tester.pumpWidget(
+        _app(
+          brightness: brightness,
+          state: const ListState.more(text: 'Загрузка следующих действий'),
+        ),
+      );
+
+      final line = tester.getRect(_listState);
+      expect(line.size, const Size(360, 40));
+      final spinner = tester.getRect(_spinner);
+      expect(spinner.size, const Size.square(18));
+      expect(spinner.center, line.center);
+      expect(find.text('Загрузка следующих действий'), findsNothing);
+      expect(
+        _spinner,
+        paints
+          ..circle(color: colors.hairline, strokeWidth: 2)
+          ..arc(color: colors.muted, strokeWidth: 2),
+      );
+    });
+  }
+
+  testWidgets('подгрузка объявляется как статус своим текстом', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await tester.pumpWidget(
+      _app(state: const ListState.more(text: 'Загрузка следующих действий')),
+    );
+
+    expect(
+      tester.getSemantics(_listState),
+      isSemantics(label: 'Загрузка следующих действий', isLiveRegion: true),
+    );
+    expect(find.semantics.byFlag(SemanticsFlag.isLiveRegion), findsOneWidget);
+    semantics.dispose();
+  });
+
+  for (final brightness in Brightness.values) {
+    testWidgets('в ${brightness == Brightness.light ? 'светлой' : 'тёмной'} '
         'теме ошибка — карточка fill со значком danger, сообщением и '
         'повтором', (tester) async {
       final colors = switch (brightness) {

@@ -6,7 +6,8 @@ import '../doable_colors.dart';
 import '../doable_type.dart';
 import 'notice.dart';
 
-/// Состояние всего списка на месте его строк: загрузка или отказ загрузки.
+/// Состояние всего списка на месте его строк — загрузка или отказ загрузки —
+/// либо подгрузка следующей порции в конце списка.
 ///
 /// Экранный диктор Android не различает роли статуса и оповещения, а Flutter
 /// запрещает совмещать их с живой областью, поэтому оба вида объявляются
@@ -18,6 +19,12 @@ sealed class ListState extends StatelessWidget {
   /// Кольцо и текст о том, что загружается; объявляется как статус.
   const factory ListState.loading({required String text, Key? key}) =
       _LoadingListState;
+
+  /// Кольцо по центру строки высотой 40 в конце списка, пока в нём есть
+  /// незагруженные строки. Видимого текста нет: [text] называет, что
+  /// подгружается, и объявляется как статус.
+  const factory ListState.more({required String text, Key? key}) =
+      _MoreListState;
 
   /// Карточка отказа со значком, сообщением о том, что не загружено, и
   /// действием повтора, если повтор может помочь; объявляется как оповещение.
@@ -52,6 +59,28 @@ final class _LoadingListState extends ListState {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+final class _MoreListState extends ListState {
+  const _MoreListState({required this.text, super.key}) : super._();
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<DoableColors>()!;
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: text,
+      child: SizedBox(
+        height: 40,
+        child: Center(
+          child: _Spinner(color: colors.muted, trackColor: colors.hairline),
         ),
       ),
     );

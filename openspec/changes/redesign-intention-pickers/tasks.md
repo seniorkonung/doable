@@ -228,7 +228,7 @@
   - **Предполагаемые файлы:** `lib/src/intention/presentation/catalog/intention_catalog_purpose.dart`, `lib/src/intention/presentation/picker/intention_picker_row.dart`, `lib/l10n/app_en.arb`, `lib/l10n/app_ru.arb` и генерируемые `lib/l10n/app_localizations*.dart`, `test/intention/presentation/picker/intention_picker_row_test.dart`.
   - **Размер:** M.
 
-- [ ] 2.6 Добавить в дизайн-систему заголовок списка выбора и состояния выдачи: пустое состояние с иконкой и кнопкой и подгрузку следующей порции
+- [x] 2.6 Добавить в дизайн-систему заголовок списка выбора и состояния выдачи: пустое состояние с иконкой и кнопкой и подгрузку следующей порции
   - **Критерии приёмки:**
     - `CatalogHeader` в простом варианте пикера по README `CatalogHeader`: заголовок в стиле `section` объявляется заголовком, за ним через `space-2` стоит плашка количества `fill` не меньше 24×24 с текстом `label` цвета `muted`, в том числе с 0. Кнопки и плашки сортировки нет.
     - `EmptyState` по README `EmptyState` принимает необязательные иконку и одну тихую кнопку: плитку `fill` 52 с иконкой 24 цвета `muted` над заголовком и `Button.quiet` под текстом. Без них блок прежний.
