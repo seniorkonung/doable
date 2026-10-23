@@ -1334,7 +1334,7 @@ bool _isMarked(WidgetTester tester, TagId id) =>
           find.descendant(of: _row(id), matching: find.byType(TagRow)),
         )
         .mark ==
-    TagRowMark.checked;
+    TagRowSelectionMark.checked;
 
 String _text(WidgetTester tester, String key) =>
     tester.widget<TextField>(find.byKey(ValueKey(key))).controller!.text;

@@ -89,8 +89,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(homeRow, hasHome ? findsOneWidget : findsNothing);
       expect(workRow, hasWork ? findsOneWidget : findsNothing);
-      if (hasHome) expect(_mark(tester, homeRow), TagRowMark.checked);
-      if (hasWork) expect(_mark(tester, workRow), TagRowMark.none);
+      if (hasHome) expect(_mark(tester, homeRow), TagRowSelectionMark.checked);
+      if (hasWork) expect(_mark(tester, workRow), TagRowSelectionMark.none);
       if (!hasHome && !hasWork) {
         expect(
           find.text(localizations.tagsPanelCreateTag(query)),
@@ -104,7 +104,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(homeRow, findsOneWidget);
     expect(workRow, findsOneWidget);
-    expect(_mark(tester, homeRow), TagRowMark.checked);
+    expect(_mark(tester, homeRow), TagRowSelectionMark.checked);
     expect(_storedGraph(raw), storedBeforeSearch);
     expect(diagnostics.events, diagnosticsBeforeSearch);
 
@@ -116,7 +116,10 @@ void main() {
     expect(diagnostics.events, diagnosticsBeforeSearch);
     await _tap(tester, workRow);
     await _waitFor(tester, () => _assigned(raw, existingTagId, number));
-    await _waitFor(tester, () => _mark(tester, workRow) == TagRowMark.checked);
+    await _waitFor(
+      tester,
+      () => _mark(tester, workRow) == TagRowSelectionMark.checked,
+    );
     final storedAfterAssign = _storedGraph(raw);
     final assignmentsBefore = storedBeforeSearch['tag_assignments']!;
     expect(storedAfterAssign['tags'], storedBeforeSearch['tags']);
@@ -166,7 +169,7 @@ void main() {
       tester,
       () =>
           newRow.evaluate().isNotEmpty &&
-          _mark(tester, newRow) == TagRowMark.checked,
+          _mark(tester, newRow) == TagRowSelectionMark.checked,
     );
     await tester.pumpAndSettle();
     expect(find.text(localizations.tagEditorCreateTitle), findsNothing);

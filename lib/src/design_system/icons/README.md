@@ -28,6 +28,7 @@
 | [from_intention.svg](assets/from_intention.svg) | `Main.dc.html` | `choiceSheet` → ссылка `IntentionPicker.dc.html`, ведущий SVG |
 | [from_action.svg](assets/from_action.svg) | `Main.dc.html` | `choiceSheet` → ссылка `ActionPicker.dc.html`, ведущий SVG |
 | [check.svg](assets/check.svg) | `Main.dc.html` | `pinSheet` → `pick.intention.on`; та же галочка у `pick.relation.on` и `pick.choice.on` |
+| [exclude.svg](assets/exclude.svg) | `TagsPanel.dc.html` | Строка `rows` → `row.no`, SVG |
 | [chevron_right.svg](assets/chevron_right.svg) | `Main.dc.html` | `choiceSheet` → ссылка `IntentionPicker.dc.html`, завершающий SVG; тот же шеврон у `ActionPicker.dc.html` |
 | [chevron_down.svg](assets/chevron_down.svg) | `TagsPanel.dc.html` | Кнопка `toggleSize` в полном размере, SVG |
 | [search.svg](assets/search.svg) | `TagsPanel.dc.html` | Поле поиска `tags-search`, ведущий SVG |

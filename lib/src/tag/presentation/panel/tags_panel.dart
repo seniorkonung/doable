@@ -421,7 +421,9 @@ final class _LoadedCatalog extends StatelessWidget {
       builder: (context) => TagRow(
         name: name,
         color: tagColorPresentation(tag.color),
-        mark: row.isMarked ? TagRowMark.checked : TagRowMark.none,
+        mark: row.isMarked
+            ? TagRowSelectionMark.checked
+            : TagRowSelectionMark.none,
         label: name,
         handle: handle,
         ground:

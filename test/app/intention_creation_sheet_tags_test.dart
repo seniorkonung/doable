@@ -430,7 +430,7 @@ bool _isMarked(WidgetTester tester, TagId id) =>
           find.descendant(of: _row(id), matching: find.byType(TagRow)),
         )
         .mark ==
-    TagRowMark.checked;
+    TagRowSelectionMark.checked;
 
 Finder _chipStatus(TagId id) => find.byKey(
   ValueKey('intention-editor-tag-status-${id.toCanonicalString()}'),

@@ -20,6 +20,7 @@ enum DoableIconData {
   fromIntention('from_intention'),
   fromAction('from_action'),
   check('check'),
+  exclude('exclude'),
   chevronRight('chevron_right'),
   chevronDown('chevron_down'),
   search('search'),

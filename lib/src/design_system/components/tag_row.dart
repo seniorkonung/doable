@@ -8,8 +8,21 @@ import '../doable_shadows.dart';
 import '../doable_type.dart';
 import 'tag_dot.dart';
 
-/// Отметка тега в строке при выборе тегов намерения.
-enum TagRowMark { none, checked }
+/// Отметка тега в строке: выбор тегов намерения или надобность условия
+/// фильтра.
+sealed class TagRowMark {}
+
+/// Отметка выбора тегов намерения; диктор объявляет её состоянием отметки
+/// строки.
+enum TagRowSelectionMark implements TagRowMark { none, checked }
+
+/// Надобность тега в условиях фильтра. Состояния отметки у строки нет:
+/// надобность передаёт доступное название, которое задаёт потребитель.
+enum TagRowFilterMark implements TagRowMark {
+  none,
+  mustBePresent,
+  mustBeAbsent,
+}
 
 /// Фон строки: без фона, удерживаемая для меню или поднятая при
 /// перетаскивании.
@@ -83,8 +96,9 @@ final class TagRow extends StatelessWidget {
   final DoableTagColor? color;
   final TagRowMark mark;
 
-  /// Доступное название строки вместо названия тега. Отметку в нём не
-  /// повторяют: диктор объявляет её состоянием отметки строки из [mark].
+  /// Доступное название строки вместо названия тега. Отметку выбора в нём
+  /// не повторяют: диктор объявляет её состоянием отметки строки из [mark].
+  /// Надобность фильтра, наоборот, передаётся только им.
   final String label;
 
   final TagRowHandle handle;
@@ -105,12 +119,21 @@ final class TagRow extends StatelessWidget {
     final shadows = theme.extension<DoableShadows>()!;
     final borderRadius = BorderRadius.circular(DoableMetrics.radiusSm);
     final menu = this.menu;
+    final markIcon = switch (mark) {
+      TagRowSelectionMark.none || TagRowFilterMark.none => null,
+      TagRowSelectionMark.checked ||
+      TagRowFilterMark.mustBePresent => (DoableIconData.check, colors.accent),
+      TagRowFilterMark.mustBeAbsent => (DoableIconData.exclude, colors.muted),
+    };
 
     return MergeSemantics(
       child: Semantics(
         label: label,
         hint: menu?.holdHint,
-        checked: mark == TagRowMark.checked,
+        checked: switch (mark) {
+          TagRowSelectionMark() => mark == TagRowSelectionMark.checked,
+          TagRowFilterMark() => null,
+        },
         enabled: onPressed != null,
         customSemanticsActions: menu == null
             ? null
@@ -165,18 +188,17 @@ final class TagRow extends StatelessWidget {
                                   child: Text(
                                     name,
                                     style: DoableType.action.copyWith(
-                                      color: colors.ink,
+                                      color:
+                                          mark == TagRowFilterMark.mustBeAbsent
+                                          ? colors.muted
+                                          : colors.ink,
                                     ),
                                   ),
                                 ),
                               ),
-                              if (mark == TagRowMark.checked) ...[
+                              if (markIcon case (final icon, final color)) ...[
                                 const SizedBox(width: DoableMetrics.space3),
-                                DoableIcon(
-                                  DoableIconData.check,
-                                  size: 20,
-                                  color: colors.accent,
-                                ),
+                                DoableIcon(icon, size: 20, color: color),
                               ],
                             ],
                           ),

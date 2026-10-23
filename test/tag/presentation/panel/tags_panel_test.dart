@@ -87,9 +87,9 @@ void main() {
 
       expect(_rowNames(tester), ['Дом', 'Работа', 'Выходные']);
       expect(_marks(tester), [
-        TagRowMark.checked,
-        TagRowMark.none,
-        TagRowMark.none,
+        TagRowSelectionMark.checked,
+        TagRowSelectionMark.none,
+        TagRowSelectionMark.none,
       ]);
       // Отметка объявляется один раз: в названии строки только название
       // тега, а отметку передаёт состояние отметки.
@@ -152,9 +152,9 @@ void main() {
     h.repository.complete([_tag(1, 'Дом'), _tag(2, 'Работа'), _tag(3, 'Сад')]);
     await tester.pump();
     expect(_marks(tester), [
-      TagRowMark.checked,
-      TagRowMark.none,
-      TagRowMark.none,
+      TagRowSelectionMark.checked,
+      TagRowSelectionMark.none,
+      TagRowSelectionMark.none,
     ]);
 
     await tester.tap(_row(2));
@@ -162,18 +162,18 @@ void main() {
     await tester.tap(_row(1));
     await tester.pump();
     expect(_marks(tester), [
-      TagRowMark.none,
-      TagRowMark.checked,
-      TagRowMark.none,
+      TagRowSelectionMark.none,
+      TagRowSelectionMark.checked,
+      TagRowSelectionMark.none,
     ]);
     expect(tagSet.current.tagIds, [_id(2)]);
 
     tagSet.add(_tag(3, 'Сад'));
     await tester.pump();
     expect(_marks(tester), [
-      TagRowMark.none,
-      TagRowMark.checked,
-      TagRowMark.checked,
+      TagRowSelectionMark.none,
+      TagRowSelectionMark.checked,
+      TagRowSelectionMark.checked,
     ]);
     expect(h.repository.commands, isEmpty);
     expect(find.byType(SnackBar), findsNothing);
@@ -257,7 +257,10 @@ void main() {
     await tester.pump();
 
     expect(_rowNames(tester), ['Дом', 'Для дома']);
-    expect(_marks(tester), [TagRowMark.checked, TagRowMark.none]);
+    expect(_marks(tester), [
+      TagRowSelectionMark.checked,
+      TagRowSelectionMark.none,
+    ]);
 
     await tester.tap(_row(3));
     await tester.pump();
@@ -277,12 +280,15 @@ void main() {
     await tester.enterText(_search, 'работ');
     await tester.pump();
     expect(_rowNames(tester), ['Работа']);
-    expect(_marks(tester), [TagRowMark.none]);
+    expect(_marks(tester), [TagRowSelectionMark.none]);
 
     await tester.tap(find.bySemanticsLabel('Очистить поиск тегов'));
     await tester.pump();
     expect(_rowNames(tester), ['Дом', 'Работа']);
-    expect(_marks(tester), [TagRowMark.checked, TagRowMark.none]);
+    expect(_marks(tester), [
+      TagRowSelectionMark.checked,
+      TagRowSelectionMark.none,
+    ]);
     expect(h.repository.commands, isEmpty);
   });
 
@@ -443,7 +449,7 @@ void main() {
           .bottom,
       lessThanOrEqualTo(tester.getRect(find.text('Готово')).top),
     );
-    expect(_marks(tester), [TagRowMark.none]);
+    expect(_marks(tester), [TagRowSelectionMark.none]);
   });
 
   for (final (name, close) in <(String, Future<void> Function(WidgetTester))>[
@@ -574,7 +580,10 @@ void main() {
       expect(_searchText(tester), 'ра');
       expect(find.text('Создать тег «ра»'), findsOne);
       expect(_rowNames(tester), ['Работа', 'Рассада']);
-      expect(_marks(tester), [TagRowMark.none, TagRowMark.checked]);
+      expect(_marks(tester), [
+        TagRowSelectionMark.none,
+        TagRowSelectionMark.checked,
+      ]);
       expect(h.repository.commands, isEmpty);
       expect(h.repository.reads, hasLength(1));
     });
@@ -700,7 +709,10 @@ void main() {
         expect(find.text(action), findsOne);
       }
       expect(_grounds(tester), [TagRowGround.none, TagRowGround.held]);
-      expect(_marks(tester), [TagRowMark.checked, TagRowMark.none]);
+      expect(_marks(tester), [
+        TagRowSelectionMark.checked,
+        TagRowSelectionMark.none,
+      ]);
 
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
@@ -709,7 +721,10 @@ void main() {
       expect(find.byType(Sheet), findsOne);
       expect(h.isClosed, isFalse);
       expect(_grounds(tester), [TagRowGround.none, TagRowGround.none]);
-      expect(_marks(tester), [TagRowMark.checked, TagRowMark.none]);
+      expect(_marks(tester), [
+        TagRowSelectionMark.checked,
+        TagRowSelectionMark.none,
+      ]);
       expect(h.repository.commands, isEmpty);
       semantics.dispose();
     });
@@ -823,7 +838,7 @@ void main() {
       expect(find.byType(Dialog), findsNothing);
       expect(_searchText(tester), 'дом');
       expect(_rowNames(tester), ['Для дома']);
-      expect(_marks(tester), [TagRowMark.checked]);
+      expect(_marks(tester), [TagRowSelectionMark.checked]);
       expect(find.byType(SnackBar), findsNothing);
       semantics.dispose();
     });
@@ -855,7 +870,10 @@ void main() {
       expect(h.isClosed, isFalse);
       expect(_searchText(tester), 'дом');
       expect(_rowNames(tester), ['Дом', 'Для дома']);
-      expect(_marks(tester), [TagRowMark.none, TagRowMark.checked]);
+      expect(_marks(tester), [
+        TagRowSelectionMark.none,
+        TagRowSelectionMark.checked,
+      ]);
       expect(_grounds(tester), everyElement(TagRowGround.none));
       expect(h.repository.commands, isEmpty);
     });
@@ -1053,9 +1071,9 @@ void main() {
 
     expect(_rowNames(tester), ['Спорт', 'Работа', 'Дом']);
     expect(_marks(tester), [
-      TagRowMark.checked,
-      TagRowMark.none,
-      TagRowMark.none,
+      TagRowSelectionMark.checked,
+      TagRowSelectionMark.none,
+      TagRowSelectionMark.none,
     ]);
     final move = h.repository.commands.single as MoveTag;
     expect((move.tagId, move.placement), (_id(3), TagPlacement.first));

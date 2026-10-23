@@ -305,7 +305,7 @@ bool _isMarked(WidgetTester tester, TagId id) =>
           find.descendant(of: _panelRow(id), matching: find.byType(TagRow)),
         )
         .mark ==
-    TagRowMark.checked;
+    TagRowSelectionMark.checked;
 
 void _expectDraft(WidgetTester tester, List<TagId> tags) {
   expect(_text(tester, 'intention-editor-title'), _rawTitle);

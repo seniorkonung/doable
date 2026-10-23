@@ -25,7 +25,7 @@ void main() {
           row: TagRow(
             name: 'Работа',
             color: DoableTagColor.blue,
-            mark: TagRowMark.checked,
+            mark: TagRowSelectionMark.checked,
             label: 'Работа',
             handle: const TagRowDragHandle(index: 0, enabled: true),
             onPressed: () {},
@@ -80,6 +80,54 @@ void main() {
       expect(tickRect.left - name.right, DoableMetrics.space3);
     });
 
+    testWidgets('в $theme теме отметка «должен быть» — галочка accent, '
+        'а «исключён» — перечёркнутый круг muted с приглушённым названием', (
+      tester,
+    ) async {
+      final colors = _colorsOf(brightness);
+
+      await tester.pumpWidget(
+        _app(
+          brightness: brightness,
+          row: _row(mark: TagRowFilterMark.mustBePresent),
+        ),
+      );
+      expect(_exclude, findsNothing);
+      final tick = tester.widget<DoableIcon>(_tick);
+      expect(tick.size, 20);
+      expect(tick.color, colors.accent);
+      expect(_nameColor(tester), colors.ink);
+
+      await tester.pumpWidget(
+        _app(
+          brightness: brightness,
+          row: _row(mark: TagRowFilterMark.mustBeAbsent),
+        ),
+      );
+      expect(_tick, findsNothing);
+      final exclude = tester.widget<DoableIcon>(_exclude);
+      expect(exclude.size, 20);
+      expect(exclude.color, colors.muted);
+      final row = tester.getRect(find.byType(TagRow));
+      final excludeRect = tester.getRect(_exclude);
+      expect(row.right - excludeRect.right, DoableMetrics.space3);
+      expect(
+        excludeRect.left - tester.getRect(find.text('Работа')).right,
+        DoableMetrics.space3,
+      );
+      expect(_nameColor(tester), colors.muted);
+
+      await tester.pumpWidget(
+        _app(
+          brightness: brightness,
+          row: _row(mark: TagRowFilterMark.none),
+        ),
+      );
+      expect(_tick, findsNothing);
+      expect(_exclude, findsNothing);
+      expect(_nameColor(tester), colors.ink);
+    });
+
     testWidgets('в $theme теме удерживаемая строка получает фон fill, '
         'а поднятая — плоскость raised с тенью shadow-float', (tester) async {
       final colors = _colorsOf(brightness);
@@ -122,7 +170,7 @@ void main() {
         row: TagRow(
           name: name,
           color: DoableTagColor.green,
-          mark: TagRowMark.checked,
+          mark: TagRowSelectionMark.checked,
           label: name,
           handle: const TagRowDragHandle(index: 0, enabled: true),
           onPressed: () {},
@@ -148,7 +196,7 @@ void main() {
         row: TagRow(
           name: 'Разное',
           color: null,
-          mark: TagRowMark.none,
+          mark: TagRowSelectionMark.none,
           label: 'Разное',
           handle: const TagRowDragHandle(index: 0, enabled: true),
           onPressed: () {},
@@ -186,7 +234,7 @@ void main() {
         row: TagRow(
           name: 'Работа',
           color: DoableTagColor.blue,
-          mark: TagRowMark.none,
+          mark: TagRowSelectionMark.none,
           label: 'Работа',
           handle: const TagRowDragHandle(index: 0, enabled: true),
           onPressed: () => taps++,
@@ -215,7 +263,7 @@ void main() {
         row: TagRow(
           name: 'Работа',
           color: DoableTagColor.blue,
-          mark: TagRowMark.checked,
+          mark: TagRowSelectionMark.checked,
           label: 'Работа',
           handle: const TagRowDragHandle(index: 0, enabled: true),
           onPressed: () => taps++,
@@ -239,6 +287,43 @@ void main() {
     semantics.dispose();
   });
 
+  testWidgets('строка фильтра не объявляет состояние отметки выбора: '
+      'надобность передаёт доступное название', (tester) async {
+    final semantics = tester.ensureSemantics();
+
+    for (final (mark, label) in [
+      (TagRowFilterMark.none, 'Работа'),
+      (TagRowFilterMark.mustBePresent, 'Работа, должен быть'),
+      (TagRowFilterMark.mustBeAbsent, 'Работа, должен отсутствовать'),
+    ]) {
+      await tester.pumpWidget(
+        _app(
+          row: TagRow(
+            name: 'Работа',
+            color: DoableTagColor.blue,
+            mark: mark,
+            label: label,
+            handle: const TagRowDragHandle(index: 0, enabled: true),
+            onPressed: () {},
+          ),
+        ),
+      );
+      expect(
+        tester.getSemantics(find.byType(TagRow)),
+        matchesSemantics(
+          label: label,
+          hasEnabledState: true,
+          isEnabled: true,
+          hasTapAction: true,
+          isFocusable: true,
+          hasFocusAction: true,
+        ),
+        reason: '$mark',
+      );
+    }
+    semantics.dispose();
+  });
+
   testWidgets('недоступная строка не принимает нажатие и объявляет '
       'недоступность, сохраняя отметку', (tester) async {
     final semantics = tester.ensureSemantics();
@@ -248,7 +333,7 @@ void main() {
         row: const TagRow(
           name: 'Работа',
           color: DoableTagColor.blue,
-          mark: TagRowMark.checked,
+          mark: TagRowSelectionMark.checked,
           label: 'Работа',
           handle: TagRowDragHandle(index: 0, enabled: false),
           onPressed: null,
@@ -316,7 +401,7 @@ void main() {
     await tester.pumpWidget(
       _app(
         row: _row(
-          mark: TagRowMark.checked,
+          mark: TagRowSelectionMark.checked,
           menu: TagRowMenu(
             holdHint: 'Удерживайте, чтобы открыть действия тега',
             onOpen: () {},
@@ -378,7 +463,7 @@ void main() {
                   key: ValueKey(name),
                   name: name,
                   color: null,
-                  mark: TagRowMark.none,
+                  mark: TagRowSelectionMark.none,
                   label: name,
                   handle: TagRowDragHandle(index: index, enabled: enabled),
                   onPressed: () {},
@@ -437,8 +522,15 @@ final _tick = find.byWidgetPredicate(
   (widget) => widget is DoableIcon && widget.icon == DoableIconData.check,
 );
 
+final _exclude = find.byWidgetPredicate(
+  (widget) => widget is DoableIcon && widget.icon == DoableIconData.exclude,
+);
+
+Color? _nameColor(WidgetTester tester) =>
+    tester.widget<Text>(find.text('Работа')).style!.color;
+
 TagRow _row({
-  TagRowMark mark = TagRowMark.none,
+  TagRowMark mark = TagRowSelectionMark.none,
   TagRowHandle handle = const TagRowDragHandle(index: 0, enabled: true),
   TagRowGround ground = TagRowGround.none,
   TagRowMenu? menu,
