@@ -458,13 +458,18 @@ Future<void> _openRequiredHomeIntention(WidgetTester tester) async {
   );
   await _tap(
     tester,
-    find.byKey(
-      ValueKey(
-        'tag-condition-picker-mustBePresent-${tagFixtureId(firstTagNumber)}',
-      ),
-    ),
+    find.byKey(ValueKey('tags-panel-row-${tagFixtureId(firstTagNumber)}')),
   );
   await _until(tester, _conditionLabel);
+  // Панель фильтра применяет условие сразу, а «назад» только закрывает её.
+  await tester.binding.handlePopRoute();
+  await _waitFor(
+    tester,
+    () => find
+        .byKey(ValueKey('tags-panel-row-${tagFixtureId(firstTagNumber)}'))
+        .evaluate()
+        .isEmpty,
+  );
   await _until(tester, findTextIgnoringInlineWidgets('Теги: Дом'));
   await _tap(tester, find.text('Намерение 1'));
   await _openPanel(tester);

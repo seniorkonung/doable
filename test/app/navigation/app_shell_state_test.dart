@@ -39,7 +39,6 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_page
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
-import 'package:doable/src/intention/presentation/catalog/tag_condition_picker_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_id_generator.dart';
@@ -1061,15 +1060,16 @@ Future<void> _prepareIntentionCatalog(WidgetTester tester, _App app) async {
   );
   await _tap(
     tester,
-    find.byKey(
-      ValueKey(
-        'tag-condition-picker-mustBePresent-${tagFixtureId(_healthTag)}',
-      ),
-    ),
+    find.byKey(ValueKey('tags-panel-row-${tagFixtureId(_healthTag)}')),
   );
+  // Панель фильтра применяет условие сразу, а «назад» только закрывает её.
+  await tester.binding.handlePopRoute();
   await _waitFor(
     tester,
-    () => find.byType(TagConditionPickerPage).evaluate().isEmpty,
+    () => find
+        .byKey(ValueKey('tags-panel-row-${tagFixtureId(_healthTag)}'))
+        .evaluate()
+        .isEmpty,
   );
   await _until(tester, find.text(app.l10n.catalogTotalCount(_archivedCount)));
   await tester.pumpAndSettle();

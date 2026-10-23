@@ -24,7 +24,6 @@ import 'package:doable/src/graph/application/personal_graph_repository_provider.
 import 'package:doable/src/graph_format/graph_format_records.dart';
 import 'package:doable/src/graph_snapshots/graph_snapshot_store.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
-import 'package:doable/src/intention/presentation/catalog/tag_condition_picker_page.dart';
 import 'package:doable/src/statistics/application/statistics_period.dart';
 import 'package:doable/src/statistics/application/statistics_read_contract.dart';
 import 'package:doable/src/statistics/presentation/home_statistics_state.dart';
@@ -240,15 +239,16 @@ Future<void> _prepareIntentionCatalog(WidgetTester tester) async {
   );
   await _tap(
     tester,
-    find.byKey(
-      ValueKey(
-        'tag-condition-picker-mustBePresent-${tagFixtureId(_previousTag)}',
-      ),
-    ),
+    find.byKey(ValueKey('tags-panel-row-${tagFixtureId(_previousTag)}')),
   );
+  // Панель фильтра применяет условие сразу, а «назад» только закрывает её.
+  await tester.binding.handlePopRoute();
   await _waitFor(
     tester,
-    () => find.byType(TagConditionPickerPage).evaluate().isEmpty,
+    () => find
+        .byKey(ValueKey('tags-panel-row-${tagFixtureId(_previousTag)}'))
+        .evaluate()
+        .isEmpty,
   );
   await _settle(tester);
   await _tap(tester, find.byKey(const ValueKey('catalog-order-control')));

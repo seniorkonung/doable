@@ -412,18 +412,21 @@ void _registerNestedQuickCreationTests() {
   }
 }
 
+/// Добавляет условие в панели фильтра: первое нажатие на тег требует его,
+/// второе исключает. Затем «назад» закрывает панель.
 Future<void> _addSearchTag(
   WidgetTester tester,
   int number, {
   required bool present,
 }) async {
   await _tap(tester, _key('intention-tag-conditions-add'));
-  await _tap(
-    tester,
-    _key(
-      'tag-condition-picker-${present ? 'mustBePresent' : 'mustBeAbsent'}-${durabilityUuid(number)}',
-    ),
-  );
+  final row = _key('tags-panel-row-${durabilityUuid(number)}');
+  await _until(tester, () => row.evaluate().isNotEmpty);
+  await _tap(tester, row);
+  if (!present) await _tap(tester, row);
+  await tester.binding.handlePopRoute();
+  await tester.pumpAndSettle();
+  expect(row, findsNothing);
 }
 
 Future<void> _seedSearchGraph(AppDatabase database) async {

@@ -853,8 +853,8 @@ Future<void> _closeTop(WidgetTester tester, Type page) async {
   await tester.pumpAndSettle();
 }
 
-/// Добавляет условие по тегу [tag] через экран поиска тега действием «Есть»
-/// или «Нет».
+/// Добавляет условие по тегу [tag] в панели фильтра: первое нажатие на тег
+/// требует его, второе исключает. Затем «назад» закрывает панель.
 Future<void> _addCondition(
   WidgetTester tester,
   int tag, {
@@ -864,13 +864,9 @@ Future<void> _addCondition(
     tester,
     find.byKey(const ValueKey('intention-tag-conditions-add')),
   );
-  final requirement = present ? 'mustBePresent' : 'mustBeAbsent';
-  await _tap(
-    tester,
-    find.byKey(
-      ValueKey('tag-condition-picker-$requirement-${tagFixtureId(tag)}'),
-    ),
-  );
+  final row = find.byKey(ValueKey('tags-panel-row-${tagFixtureId(tag)}'));
+  await _tap(tester, row);
+  if (!present) await _tap(tester, row);
   await _waitFor(
     tester,
     () => find
@@ -878,6 +874,8 @@ Future<void> _addCondition(
         .evaluate()
         .isNotEmpty,
   );
+  await tester.binding.handlePopRoute();
+  await _waitFor(tester, () => row.evaluate().isEmpty);
   await tester.pumpAndSettle();
 }
 

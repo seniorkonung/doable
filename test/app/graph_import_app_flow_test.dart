@@ -24,7 +24,6 @@ import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
-import 'package:doable/src/intention/presentation/catalog/tag_condition_picker_page.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/statistics/application/statistics_period.dart';
@@ -475,15 +474,16 @@ Future<void> _filterIntentionCatalogByTag(WidgetTester tester, Tag tag) async {
   );
   await _tap(
     tester,
-    find.byKey(
-      ValueKey(
-        'tag-condition-picker-mustBePresent-${tag.id.toCanonicalString()}',
-      ),
-    ),
+    find.byKey(ValueKey('tags-panel-row-${tag.id.toCanonicalString()}')),
   );
+  // Панель фильтра применяет условие сразу, а «назад» только закрывает её.
+  await tester.binding.handlePopRoute();
   await app_flow.waitFor(
     tester,
-    () => find.byType(TagConditionPickerPage).evaluate().isEmpty,
+    () => find
+        .byKey(ValueKey('tags-panel-row-${tag.id.toCanonicalString()}'))
+        .evaluate()
+        .isEmpty,
   );
   // Выдача с условием прочитана за эти шаги.
   await app_flow.settle(tester);

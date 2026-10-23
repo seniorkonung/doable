@@ -194,6 +194,42 @@ void _registerPageMatrixTests() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('матрица: сценарий «Каталог тегов открывается поверх каталога '
+      'намерений» — панель фильтра перекрывает панель навигации, а «назад» '
+      'возвращает каталог с прежними параметрами', (tester) async {
+    final router = await _start(tester);
+    await _select(tester, AppDestination.intentionGraph);
+    final filter = find.byKey(const ValueKey('catalog-filter-field'));
+    await tester.enterText(filter, 'Читать');
+    await _tap(tester, _MatrixEntry.condition.finder);
+    await _until(
+      tester,
+      find.byKey(ValueKey('tags-panel-row-${tagFixtureId(_tag)}')),
+    );
+    await tester.pumpAndSettle();
+
+    final panel = find.byType(Sheet);
+    expect(panel, findsOneWidget);
+    expect(find.text('Filter by tags'), findsOneWidget);
+    expect(tester.getRect(panel).bottom, _screen(tester).height);
+    expect(find.byType(IntentionCatalogPage), findsOneWidget);
+    expect(_MatrixEntry.condition.finder.hitTestable(), findsNothing);
+    final bar = find.byType(AppNavigationBar);
+    expect(bar, findsOneWidget);
+    expect(
+      tester.widget<AppNavigationBar>(bar).selected,
+      AppDestination.intentionGraph,
+    );
+    expect(_destinations.hitTestable(), findsNothing);
+    expect(_announcedDestinations, findsNothing);
+
+    await tester.binding.handlePopRoute();
+    await _gone(tester, Sheet);
+    _expectRootPage(tester, router, AppDestination.intentionGraph);
+    expect(tester.widget<TextField>(filter).controller!.text, 'Читать');
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('матрица: панель тегов перекрывает панель создания и панель '
       'навигации, а «назад» закрывает только её', (tester) async {
     final router = await _start(tester);
@@ -291,12 +327,6 @@ void _registerPageMatrixTests() {
       page: TagEditorPage,
       panel: false,
       entries: [tags, _MatrixEntry.renameTag],
-    ),
-    (
-      name: 'условие по тегу',
-      page: TagConditionPickerPage,
-      panel: false,
-      entries: [_MatrixEntry.condition],
     ),
     (
       name: 'поиск действия',
