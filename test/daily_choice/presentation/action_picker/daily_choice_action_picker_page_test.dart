@@ -192,7 +192,7 @@ void main() {
       unawaited(selection.then((_) => selected = true));
       await _settleRoute(tester);
       final items = [
-        for (var index = 1; index <= 8; index++)
+        for (var index = 1; index <= 12; index++)
           testSummary(
             index: index,
             title: 'Действие $index',
