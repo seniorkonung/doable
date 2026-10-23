@@ -22,6 +22,8 @@ import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../support/tag_positions.dart';
+
 void main() {
   final version1 = GraphFormatVersion.ofCarrier(1);
 
@@ -123,8 +125,8 @@ void main() {
 
       // Каждая недопустимая строка отличается от одной из этих лишь причиной.
       final validLines = [
-        '{$tag,"name":"Дом","color":"blue"}',
-        '{$tag,"name":"Дом","color":null}',
+        '{$tag,"name":"Дом","color":"blue","position":"a0"}',
+        '{$tag,"name":"Дом","color":null,"position":"Zz0V"}',
         '{$intention,$createdAt,$updatedAt}',
         '{$relation,"type":"need","priority":"P1","description":null,'
             '"archived":false}',
@@ -139,17 +141,27 @@ void main() {
       }
 
       final invalidLines = {
-        'неизвестное поле': '{$tag,"name":"Дом","color":null,"icon":"дом"}',
+        'неизвестное поле':
+            '{$tag,"name":"Дом","color":null,"position":"a0","icon":"дом"}',
         'отсутствующее поле': '{$tag}',
-        'отсутствующий цвет тега': '{$tag,"name":"Дом"}',
-        'цвет тега не строка': '{$tag,"name":"Дом","color":6}',
-        'неизвестный код цвета тега': '{$tag,"name":"Дом","color":"red"}',
+        'отсутствующий цвет тега': '{$tag,"name":"Дом","position":"a0"}',
+        'цвет тега не строка': '{$tag,"name":"Дом","color":6,"position":"a0"}',
+        'неизвестный код цвета тега':
+            '{$tag,"name":"Дом","color":"red","position":"a0"}',
+        // Так записаны теги до появления ручного порядка.
+        'отсутствующее место тега': '{$tag,"name":"Дом","color":null}',
+        'место тега не строка':
+            '{$tag,"name":"Дом","color":null,"position":10}',
+        'место тега null': '{$tag,"name":"Дом","color":null,"position":null}',
+        'неканоническое место тега':
+            '{$tag,"name":"Дом","color":null,"position":"a00"}',
         // Так записаны факты в пакетах сборок этапов 1 и 2.
         'отсутствующий вид факта':
-            '{"kind":"tag","id":"${_tagIds[0]}","name":"Дом","color":null}',
+            '{"kind":"tag","id":"${_tagIds[0]}","name":"Дом","color":null,'
+            '"position":"a0"}',
         'неизвестный вид факта':
             '{"fact":"renamed","kind":"tag","id":"${_tagIds[0]}",'
-            '"name":"Дом","color":null}',
+            '"name":"Дом","color":null,"position":"a0"}',
         'неизвестный вид записи':
             '{$created,"kind":"note","id":"${_tagIds[0]}"}',
         'неизвестный вид удалённой сущности':
@@ -162,7 +174,7 @@ void main() {
         'неполный JSON': '{$tag,"name":"Дом"',
         'идентификатор не в канонической записи':
             '{$created,"kind":"tag","id":"${_tagIds[0].toUpperCase()}",'
-            '"name":"Дом","color":null}',
+            '"name":"Дом","color":null,"position":"a0"}',
         'название намерения с окружающими пробелами':
             '{$created,"kind":"intention","id":"${_intentionIds[0]}",'
             '"title":" Здоровье","description":null,"actionReady":false,'
@@ -172,7 +184,7 @@ void main() {
             '"title":"Здоровье","description":" \\n","actionReady":false,'
             '"archived":false,$createdAt,$updatedAt}',
         'название тега с окружающими пробелами':
-            '{$tag,"name":"Дом ","color":null}',
+            '{$tag,"name":"Дом ","color":null,"position":"a0"}',
         'время без микросекунд':
             '{$intention,"createdAt":"2026-03-29T00:00:00.000Z",$updatedAt}',
         'время не в UTC':
@@ -293,11 +305,23 @@ List<GraphFact> _expectedGoldenFacts() {
   return [
     GraphEntityCreated(
       TagRecord(
-        Tag(id: home, name: TagName.fromStored('Дом'), color: TagColor.blue),
+        Tag(
+          id: home,
+          name: TagName.fromStored('Дом'),
+          color: TagColor.blue,
+          position: tagPosition('Zz'),
+        ),
       ),
     ),
     GraphEntityChanged(
-      TagRecord(Tag(id: work, name: TagName.fromStored('Работа'), color: null)),
+      TagRecord(
+        Tag(
+          id: work,
+          name: TagName.fromStored('Работа'),
+          color: null,
+          position: tagPosition('a0'),
+        ),
+      ),
     ),
     GraphEntityChanged(
       IntentionRecord(

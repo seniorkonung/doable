@@ -13,10 +13,10 @@ extension _TagReading on DriftPersonalGraphRepository {
     final rows = await _database
         .customSelect(
           '''SELECT a.intention_id, a.tag_id AS assigned_tag_id,
-         t.id, t.name, t.color
+         t.id, t.name, t.color, t.position
        FROM tag_assignments a JOIN tags t ON t.id = a.tag_id
        WHERE a.intention_id IN (${List.filled(requested.length, '?').join(', ')})
-       ORDER BY a.intention_id ASC, a.tag_creation_sequence ASC''',
+       ORDER BY a.intention_id ASC, t.position ASC''',
           variables: [for (final id in requested.keys) Variable<String>(id)],
           readsFrom: {_database.tags, _database.tagAssignments},
         )
@@ -28,73 +28,6 @@ extension _TagReading on DriftPersonalGraphRepository {
       tags[id]!.add(_decodeAssignedTag(row.data));
     }
     return tags;
-  }
-
-  Future<TagAssignmentStatusResult> _readTagAssignmentStatus(
-    TagId tagId,
-    IntentionId intentionId,
-  ) async {
-    final stopwatch = Stopwatch()..start();
-    var stage = TagReadDiagnosticsStage.validation;
-    void record(DiagnosticsStatus status) => _recordDiagnostics(
-      TagAssignmentStatusReadDiagnosticsEvent(stage: stage, status: status),
-    );
-
-    record(const DiagnosticsStarted());
-    try {
-      final snapshot = await _sequencer.run(
-        () => _database.transaction(() async {
-          stage = TagReadDiagnosticsStage.read;
-          final row = await _database
-              .customSelect(
-                '''SELECT EXISTS(SELECT 1 FROM tags WHERE id = ?) AS tag_exists,
-                 EXISTS(SELECT 1 FROM intentions WHERE id = ?) AS intention_exists,
-                 EXISTS(SELECT 1 FROM tag_assignments
-                   WHERE tag_id = ? AND intention_id = ?) AS is_assigned''',
-                variables: [
-                  Variable<String>(tagId.toCanonicalString()),
-                  Variable<String>(intentionId.toCanonicalString()),
-                  Variable<String>(tagId.toCanonicalString()),
-                  Variable<String>(intentionId.toCanonicalString()),
-                ],
-                readsFrom: {
-                  _database.tags,
-                  _database.intentions,
-                  _database.tagAssignments,
-                },
-              )
-              .getSingle();
-          final tagExists = requiredStoredInteger(row.data, 'tag_exists');
-          final intentionExists = requiredStoredInteger(
-            row.data,
-            'intention_exists',
-          );
-          final assigned = requiredStoredInteger(row.data, 'is_assigned');
-          if ((tagExists != 0 && tagExists != 1) ||
-              (intentionExists != 0 && intentionExists != 1) ||
-              (assigned != 0 && assigned != 1)) {
-            throw const StoredGraphCorruption();
-          }
-          if (tagExists == 0) throw const _TagStatusTagMissing();
-          if (intentionExists == 0) throw const _TagReadIntentionMissing();
-          return GraphSnapshot(
-            value: assigned == 1,
-            revision: _currentRevision,
-          );
-        }),
-      );
-      record(DiagnosticsSucceeded(stopwatch.elapsed));
-      return TagAssignmentStatusSuccess(snapshot);
-    } on Object catch (error) {
-      final failure = _classifyTagAssignmentStatusFailure(error);
-      record(
-        DiagnosticsFailed(
-          duration: stopwatch.elapsed,
-          code: _graphCommandDiagnosticsFailureCode(failure),
-        ),
-      );
-      return TagAssignmentStatusError(failure);
-    }
   }
 
   Future<TagCatalogResult> _readTagCatalog(TagCatalogMode mode) async {
@@ -119,12 +52,12 @@ extension _TagReading on DriftPersonalGraphRepository {
           final rows = await _database
               .customSelect(
                 intentionId == null
-                    ? '''SELECT id, name, color FROM tags
-                   ORDER BY creation_sequence ASC'''
-                    : '''SELECT t.id, t.name, t.color,
+                    ? '''SELECT id, name, color, position FROM tags
+                   ORDER BY position ASC'''
+                    : '''SELECT t.id, t.name, t.color, t.position,
                    EXISTS(SELECT 1 FROM tag_assignments a WHERE a.tag_id = t.id AND a.intention_id = ?) AS is_assigned
                    FROM tags t
-                   ORDER BY t.creation_sequence ASC''',
+                   ORDER BY t.position ASC''',
                 variables: [
                   if (intentionId != null)
                     Variable<String>(intentionId.toCanonicalString()),
@@ -191,10 +124,11 @@ extension _TagReading on DriftPersonalGraphRepository {
           await _validateTagReadIntention(intentionId);
           final rows = await _database
               .customSelect(
-                '''SELECT a.tag_id AS assigned_tag_id, t.id, t.name, t.color
+                '''SELECT a.tag_id AS assigned_tag_id, t.id, t.name, t.color,
+                 t.position
                FROM tag_assignments a JOIN tags t ON t.id = a.tag_id
                WHERE a.intention_id = ?
-               ORDER BY a.tag_creation_sequence ASC''',
+               ORDER BY t.position ASC''',
                 variables: [Variable<String>(intentionId.toCanonicalString())],
                 readsFrom: {_database.tags, _database.tagAssignments},
               )
@@ -257,7 +191,7 @@ extension _TagReading on DriftPersonalGraphRepository {
           () => _database.transaction(() async {
             final row = await _database
                 .customSelect(
-                  'SELECT id, name, color FROM tags WHERE id = ?',
+                  'SELECT id, name, color, position FROM tags WHERE id = ?',
                   variables: [Variable<String>(id.toCanonicalString())],
                   readsFrom: {_database.tags},
                 )
@@ -295,9 +229,8 @@ extension _TagReading on DriftPersonalGraphRepository {
   }
 }
 
-/// Порядок назначений и существование тега гарантируют схема: ключ порядка
-/// назначения совпадает с порядком создания тега (триггеры), а внешний ключ не
-/// допускает назначения без тега.
+/// Существование тега гарантирует схема: внешний ключ не допускает назначения
+/// без тега.
 tag_domain.Tag _decodeAssignedTag(Map<String, Object?> data) {
   final tag = decodeStoredTag(data);
   if (requiredStoredString(data, 'assigned_tag_id') !=
@@ -309,29 +242,6 @@ tag_domain.Tag _decodeAssignedTag(Map<String, Object?> data) {
 
 final class _TagReadIntentionMissing implements Exception {
   const _TagReadIntentionMissing();
-}
-
-final class _TagStatusTagMissing implements Exception {
-  const _TagStatusTagMissing();
-}
-
-TagAssignmentStatusFailure _classifyTagAssignmentStatusFailure(Object error) {
-  if (error is _TagStatusTagMissing) {
-    return const TagAssignmentStatusTagNotFound();
-  }
-  if (error is _TagReadIntentionMissing) {
-    return const TagAssignmentStatusIntentionNotFound();
-  }
-  if (error is StoredGraphCorruption) {
-    return const TagAssignmentStatusCorruption();
-  }
-  return switch (classifySqliteFailure(error)) {
-    SqliteCorruptionFailure() => const TagAssignmentStatusCorruption(),
-    SqliteUnavailableFailure() => const TagAssignmentStatusUnavailable(),
-    SqliteConstraintFailure() ||
-    SqliteStorageFullFailure() ||
-    SqliteUnexpectedFailure() => const TagAssignmentStatusUnexpected(),
-  };
 }
 
 TagCatalogReadFailure _classifyTagCatalogReadFailure(Object error) {

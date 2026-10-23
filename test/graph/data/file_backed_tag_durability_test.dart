@@ -7,13 +7,13 @@ import 'dart:io';
 
 import 'package:doable/src/data/local/bootstrap/local_data_bootstrap_result.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
+import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
-import 'package:doable/src/tag/application/tagged_intentions_page.dart';
 import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
@@ -24,6 +24,7 @@ import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 import '../../support/tag_storage_fixture.dart';
+import '../../support/tagged_intention_ids.dart';
 
 void main() {
   // Пять последовательных процессов ограничены по времени внутри _runWorker.
@@ -110,7 +111,7 @@ void main() {
     expect(await harness.databaseFile.readAsBytes(), corrupted);
   });
 
-  test('чтение, правка цвета, назначение архивированному действию, навигация и снятие сохраняются после перезапусков', () async {
+  test('Теги сохраняются после полного перезапуска: чтение, ручной порядок, правка цвета, перестановка, назначение архивированному действию, выдача по тегу и снятие', () async {
     final harness = await LocalDatabaseHarness.fileBacked();
     addTearDown(harness.dispose);
     late sqlite.Database raw;
@@ -145,20 +146,26 @@ void main() {
         (IntentionId.decode(tagFixtureId(2)) as IntentionIdDecodingSuccess).id;
     final activeAction =
         (IntentionId.decode(tagFixtureId(1)) as IntentionIdDecodingSuccess).id;
+    // Тег, созданный позже, стоит в ручном порядке первым до перестановки.
+    late final TagId laterTagId;
 
     Future<void> expectState(
       DriftPersonalGraphRepository repository,
       TagId tagId, {
       required TagColor? color,
+      required bool movedFirst,
       required List<IntentionId> active,
       required List<IntentionId> archived,
     }) async {
       final catalog = (await repository.getTagCatalog(
         const TagCatalogBrowseMode(),
       ) as TagCatalogSuccess).value;
-      expect(catalog.items.map((tag) => (tag.id, tag.name.value, tag.color)), [
-        (tagId, 'Дом', color),
-      ]);
+      final later = (laterTagId, 'Работа', null);
+      final moved = (tagId, 'Дом', color);
+      expect(
+        catalog.items.map((tag) => (tag.id, tag.name.value, tag.color)),
+        movedFirst ? [moved, later] : [later, moved],
+      );
       for (final intentionId in [activeAction, archivedAction]) {
         final snapshot = (await repository.getTagAssignments(
           intentionId,
@@ -170,14 +177,13 @@ void main() {
         );
       }
       for (final (scope, expected) in [
-        (TaggedIntentionsScope.active, active),
-        (TaggedIntentionsScope.archived, archived),
+        (IntentionScope.active, active),
+        (IntentionScope.archived, archived),
       ]) {
-        final page = (await repository.getTaggedIntentionsPage(
-          TaggedIntentionsQuery(tagId: tagId, scope: scope),
-        ) as TaggedIntentionsPageSuccess).value;
-        expect(page.items.map((item) => item.id), expected);
-        expect(page.nextCursor, isNull);
+        expect(
+          await readTaggedIntentionIds(repository, tagId, scope),
+          expected.toSet(),
+        );
       }
       expect(retainedTagFixtureGraph(raw), graphBefore);
       expect(raw.select('PRAGMA integrity_check').single.values.single, 'ok');
@@ -192,11 +198,31 @@ void main() {
       isEmpty,
     );
     final created = await repository.execute(
-      CreateTag(name: TagName.fromInput('Дом'), color: null),
+      CreateTag(
+        name: TagName.fromInput('Дом'),
+        color: null,
+        placement: TagPlacement.first,
+      ),
     );
     final tagId =
         ((created as TagCommandSucceeded).value.value as TagCreated).tag.id;
-    await expectState(repository, tagId, color: null, active: [], archived: []);
+    final later = await repository.execute(
+      CreateTag(
+        name: TagName.fromInput('Работа'),
+        color: null,
+        placement: TagPlacement.first,
+      ),
+    );
+    laterTagId =
+        ((later as TagCommandSucceeded).value.value as TagCreated).tag.id;
+    await expectState(
+      repository,
+      tagId,
+      color: null,
+      movedFirst: false,
+      active: [],
+      archived: [],
+    );
 
     for (final intentionId in [archivedAction, activeAction, archivedAction]) {
       expect(
@@ -215,6 +241,7 @@ void main() {
       repository,
       tagId,
       color: null,
+      movedFirst: false,
       active: [activeAction],
       archived: [archivedAction],
     );
@@ -226,6 +253,13 @@ void main() {
           name: TagName.fromInput('Дом'),
           color: TagColor.blue,
         ),
+      ) as TagCommandSucceeded).value.value,
+      isA<TagUpdated>(),
+    );
+    // Стоящий вторым тег переставлен в начало.
+    expect(
+      (await repository.execute(
+        MoveTag(tagId: tagId, placement: TagPlacement.first),
       ) as TagCommandSucceeded).value.value,
       isA<TagUpdated>(),
     );
@@ -246,6 +280,7 @@ void main() {
       repository,
       tagId,
       color: TagColor.blue,
+      movedFirst: true,
       active: [],
       archived: [],
     );
@@ -271,6 +306,7 @@ void main() {
       repository,
       tagId,
       color: TagColor.blue,
+      movedFirst: true,
       active: [],
       archived: [archivedAction],
     );

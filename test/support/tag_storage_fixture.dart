@@ -1,6 +1,7 @@
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import 'graph_seed.dart';
+import 'tag_positions.dart';
 
 String tagFixtureId(int number) =>
     '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}';
@@ -8,20 +9,19 @@ String tagFixtureId(int number) =>
 const firstTagNumber = 301;
 const lastTagNumber = 302;
 
-/// Посторонний тег фикстуры жизненного цикла навигации.
-const restTagNumber = 306;
-
 /// Назначения двух тегов намерениям обоих охватов.
 void seedTagStorageFixture(sqlite.Database database) {
   seedRawGraph(database, () {
     _writeTagRecipientGraph(database);
-    database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+    database.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
       tagFixtureId(firstTagNumber),
       'Дом',
+      tagPositionKey(firstTagNumber),
     ]);
-    database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+    database.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
       tagFixtureId(lastTagNumber),
       'Работа',
+      tagPositionKey(lastTagNumber),
     ]);
     for (final number in [1, 2]) {
       database.execute(
@@ -78,96 +78,6 @@ void _writeTagRecipientGraph(sqlite.Database database) {
   );
 }
 
-/// Навигация различает одноимённые намерения; назначения другого тега
-/// чередуются с выбранным, но, как и непомеченный сосед, не входят в выдачу.
-void seedTagNavigationFixture(
-  sqlite.Database database, {
-  required int extraPairsPerScope,
-}) {
-  seedRawGraph(
-    database,
-    () => _writeTagNavigation(database, extraPairsPerScope: extraPairsPerScope),
-  );
-}
-
-void _writeTagNavigation(
-  sqlite.Database database, {
-  required int extraPairsPerScope,
-}) {
-  _writeTagRecipientGraph(database);
-  database.execute('UPDATE intentions SET title = ? WHERE id = ?', [
-    'Одинаковое намерение',
-    tagFixtureId(1),
-  ]);
-  database.execute('UPDATE intentions SET title = ? WHERE id = ?', [
-    'Непомеченный сосед',
-    tagFixtureId(3),
-  ]);
-  database.execute(
-    'INSERT INTO intentions (id, title, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
-    [tagFixtureId(4), 'Одинаковое намерение', 'Описание 4', 104, 204],
-  );
-  database.execute(
-    'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
-    [tagFixtureId(103), tagFixtureId(1), tagFixtureId(4), 'can', 3, 1],
-  );
-  for (final (number, name) in [
-    (firstTagNumber, 'Дом 🏷️'),
-    (303, 'Без назначений'),
-    (304, 'Только в архиве'),
-    (lastTagNumber, 'Работа'),
-  ]) {
-    database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-      tagFixtureId(number),
-      name,
-    ]);
-  }
-  for (final (tagNumber, intentionNumber) in [
-    (firstTagNumber, 1),
-    (lastTagNumber, 1),
-    (firstTagNumber, 4),
-    (firstTagNumber, 2),
-    (lastTagNumber, 2),
-    (lastTagNumber, 4),
-  ]) {
-    database.execute(
-      'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-      [tagFixtureId(tagNumber), tagFixtureId(intentionNumber)],
-    );
-  }
-  database.execute(
-    'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-    [tagFixtureId(304), tagFixtureId(2)],
-  );
-  for (var index = 0; index < extraPairsPerScope; index++) {
-    for (final archived in [0, 1]) {
-      final intentionId = tagFixtureId(1000 + archived * 100 + index);
-      final relationId = tagFixtureId(2000 + archived * 100 + index);
-      database.execute(
-        'INSERT INTO intentions (id, title, description, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-        [
-          intentionId,
-          'Получатель $archived/$index',
-          'Описание $archived/$index',
-          archived,
-          1000 + index,
-          1000 + index,
-        ],
-      );
-      database.execute(
-        'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
-        [relationId, tagFixtureId(1), intentionId, 'need', 2, archived],
-      );
-      for (final tagNumber in [firstTagNumber, lastTagNumber]) {
-        database.execute(
-          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-          [tagFixtureId(tagNumber), intentionId],
-        );
-      }
-    }
-  }
-}
-
 Map<String, List<List<Object?>>> retainedTagFixtureGraph(sqlite.Database db) =>
     {
       for (final table in [
@@ -182,50 +92,6 @@ Map<String, List<List<Object?>>> retainedTagFixtureGraph(sqlite.Database db) =>
             .map((row) => row.values.toList())
             .toList(),
     };
-
-/// Отдельное намерение, связи без назначений и назначения других тегов
-/// позволяют проверить границы каскада и физического удаления в навигации.
-void seedTagNavigationLifecycleFixture(sqlite.Database database) {
-  seedRawGraph(database, () {
-    _writeTagNavigation(database, extraPairsPerScope: 0);
-    database.execute(
-      'INSERT INTO intentions (id, title, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
-      [tagFixtureId(5), 'Отдельное намерение', 'Описание 5', 105, 205],
-    );
-    for (final (number, source, related) in [
-      (104, 3, 1),
-      (105, 3, 4),
-      (106, 4, 3),
-    ]) {
-      database.execute(
-        'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority) VALUES (?, ?, ?, ?, ?)',
-        [
-          tagFixtureId(number),
-          tagFixtureId(source),
-          tagFixtureId(related),
-          'can',
-          3,
-        ],
-      );
-    }
-    database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-      tagFixtureId(restTagNumber),
-      'Отдых',
-    ]);
-    for (final (tagNumber, intentionNumber) in [
-      (restTagNumber, 3),
-      (restTagNumber, 5),
-      (firstTagNumber, 5),
-      (lastTagNumber, 3),
-      (lastTagNumber, 5),
-    ]) {
-      database.execute(
-        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-        [tagFixtureId(tagNumber), tagFixtureId(intentionNumber)],
-      );
-    }
-  });
-}
 
 /// Большие воспроизводимые списки для измерения двух видов чтения.
 /// Первое намерение получает чётные теги, третье — каждый третий тег;
@@ -251,10 +117,14 @@ void seedLargeTagReadFixture(
     }
     for (var index = 0; index < tagCount; index++) {
       final id = tagFixtureId(10000 + index);
-      database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-        id,
-        'Тег ${index.toString().padLeft(5, '0')}',
-      ]);
+      database.execute(
+        'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+        [
+          id,
+          'Тег ${index.toString().padLeft(5, '0')}',
+          tagPositionKey(10000 + index),
+        ],
+      );
       for (final (number, assigned) in [
         (1, index.isEven),
         (3, index % 3 == 0),
@@ -284,7 +154,7 @@ int largeTagReadFixtureAssignmentCount({
 /// сохраняемый тег назначен исходному намерению и тем же получателям.
 void seedWidelyAssignedTagFixture(
   sqlite.Database database, {
-  int recipients = 2400,
+  required int recipients,
 }) {
   seedRawGraph(database, () {
     database.execute(
@@ -295,10 +165,10 @@ void seedWidelyAssignedTagFixture(
       (9000, 'Общий тег'),
       (9001, 'Сохранённый тег'),
     ]) {
-      database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-        tagFixtureId(number),
-        name,
-      ]);
+      database.execute(
+        'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+        [tagFixtureId(number), name, tagPositionKey(number)],
+      );
     }
     database.execute(
       'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
@@ -325,96 +195,3 @@ void seedWidelyAssignedTagFixture(
     }
   });
 }
-
-/// Смешанная выдача с архивом и таким же числом посторонних назначений.
-/// На каждую пару приходятся основной получатель, архивный у первой пары
-/// каждого периода [archivePeriod], и дополнительный, архивный у пары из
-/// середины периода. Выбранный и другой теги назначены обоим.
-void seedLargeTaggedEntitiesFixture(
-  sqlite.Database database, {
-  required int recipientPairs,
-  required int archivePeriod,
-}) {
-  seedRawGraph(database, () {
-    database.execute(
-      'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)',
-      [tagFixtureId(1), 'Исходное намерение', 1, 1],
-    );
-    for (final (number, name) in [
-      (9000, 'Выбранный тег'),
-      (9001, 'Другой тег'),
-    ]) {
-      database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-        tagFixtureId(number),
-        name,
-      ]);
-    }
-    for (var index = 0; index < recipientPairs; index++) {
-      final primary = _largeTaggedPrimary(index, archivePeriod);
-      final counterpart = _largeTaggedCounterpart(index, archivePeriod);
-      for (final recipient in [primary, counterpart]) {
-        database.execute(
-          'INSERT INTO intentions (id, title, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
-          [
-            recipient.id,
-            'Получатель ${recipient.title}',
-            recipient.archived ? 1 : 0,
-            index + 2,
-            index + 2,
-          ],
-        );
-      }
-      // Связь с архивированным получателем не может оставаться активной.
-      database.execute(
-        'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
-        [
-          tagFixtureId(300000 + index),
-          tagFixtureId(1),
-          primary.id,
-          index.isEven ? 'need' : 'can',
-          2,
-          primary.archived || index % 20 == 0 ? 1 : 0,
-        ],
-      );
-      // Назначения постороннего тега чередуются с выбранным, но не входят
-      // ни в основной запрос, ни в аудит ссылок выбранного тега.
-      for (final recipient in [primary, counterpart]) {
-        for (final tagNumber in [9000, 9001]) {
-          database.execute(
-            'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-            [tagFixtureId(tagNumber), recipient.id],
-          );
-        }
-      }
-    }
-  });
-}
-
-/// Получатели охвата из [seedLargeTaggedEntitiesFixture] в порядке назначения
-/// выбранного тега вместе с порядковым номером среди всех его назначений.
-List<(String id, int ordinal)> largeTaggedIntentions(
-  int recipientPairs, {
-  required int archivePeriod,
-  required bool archived,
-}) => [
-  for (var index = 0; index < recipientPairs; index++)
-    for (final (offset, recipient) in [
-      (0, _largeTaggedPrimary(index, archivePeriod)),
-      (1, _largeTaggedCounterpart(index, archivePeriod)),
-    ])
-      if (recipient.archived == archived) (recipient.id, index * 2 + offset),
-];
-
-typedef _LargeTaggedRecipient = ({String id, String title, bool archived});
-
-_LargeTaggedRecipient _largeTaggedPrimary(int index, int archivePeriod) => (
-  id: tagFixtureId(100000 + index),
-  title: '$index',
-  archived: index % archivePeriod == 0,
-);
-
-_LargeTaggedRecipient _largeTaggedCounterpart(int index, int archivePeriod) => (
-  id: tagFixtureId(200000 + index),
-  title: '$index/2',
-  archived: index % archivePeriod == archivePeriod ~/ 2,
-);

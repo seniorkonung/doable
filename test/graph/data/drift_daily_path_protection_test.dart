@@ -17,6 +17,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
+import '../../support/tag_positions.dart';
 
 String _uuid(int number) =>
     '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}';
@@ -82,9 +83,10 @@ void main() {
          VALUES (?, ?, ?, 'need', 2, NULL, 0)''',
         [_uuid(103), _uuid(1), _uuid(4)],
       );
-      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+      raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
         _uuid(301),
         'Путь',
+        tagPositionKey(301),
       ]);
       for (var number = 1; number <= 5; number++) {
         raw.execute(

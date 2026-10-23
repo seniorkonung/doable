@@ -244,15 +244,9 @@ BEGIN
   ) VALUES (new.tag_id, new.intention_id, 'insert');
 END;
 
--- Заполнение порядка тега — часть вставки назначения, а не его изменение.
--- Его UPDATE срабатывает раньше отметки вставки, и без этого условия
--- первой операцией нового назначения оказалось бы изменение. Вставку без
--- признака записи прерывает отметка вставки.
 CREATE TRIGGER graph_log_mark_tag_assignment_update
 AFTER UPDATE ON tag_assignments
-WHEN
-  old.tag_creation_sequence <> 0 AND
-  (SELECT capture FROM graph_log_control) = 1
+WHEN (SELECT capture FROM graph_log_control) = 1
 BEGIN
   SELECT RAISE(ABORT, 'graph write outside the graph write path')
   FROM graph_log_control

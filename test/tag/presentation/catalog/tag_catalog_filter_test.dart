@@ -46,27 +46,28 @@ void main() {
       expect(_filter('E\u0301').matches(TagName.fromInput('e\u0301')), isTrue);
     });
 
-    test('сохраняет окружающие пробелы запроса', () {
-      final filter = _filter(' дом ');
+    test('отбрасывает окружающие пробелы запроса', () {
+      final filter = _filter(' \t\u00A0дом\u3000\n');
 
-      expect(filter.matches(TagName.fromInput('Мой дом сегодня')), isTrue);
-      expect(filter.matches(TagName.fromInput('Дом')), isFalse);
-      expect(filter.matches(TagName.fromInput('Для дома')), isFalse);
+      expect(filter.matches(TagName.fromInput('Дом')), isTrue);
+      expect(filter.matches(TagName.fromInput('Для дома')), isTrue);
+      expect(filter.matches(TagName.fromInput('Работа')), isFalse);
     });
 
     test('сохраняет количество внутренних пробелов', () {
-      final filter = _filter('ДЛЯ  ДОМА');
+      final filter = _filter(' ДЛЯ  ДОМА ');
 
       expect(filter.matches(TagName.fromInput('Тег для  дома')), isTrue);
       expect(filter.matches(TagName.fromInput('Тег для дома')), isFalse);
     });
 
-    test('пробельный запрос участвует в буквальном поиске', () {
-      final filter = _filter(' \t');
+    test('запрос из одних пробелов не сужает список', () {
+      final filter = _filter(' \t\u00A0\u3000');
 
-      expect(filter.isEmpty, isFalse);
-      expect(filter.matches(TagName.fromInput('Для \tдома')), isTrue);
-      expect(filter.matches(TagName.fromInput('Для дома')), isFalse);
+      expect(filter.isEmpty, isTrue);
+      for (final name in ['Работа', 'Дом', 'Для \tдома']) {
+        expect(filter.matches(TagName.fromInput(name)), isTrue);
+      }
     });
 
     test('символы шаблонов и регулярных выражений ищет буквально', () {

@@ -26,11 +26,11 @@ import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart'
 import 'package:doable/src/daily_choice/presentation/source_picker/daily_choice_source_picker_page.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openInMemoryLocalDatabase;
+import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_section.dart';
-import 'package:doable/src/intention/presentation/catalog/tag_condition_picker_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
@@ -39,11 +39,6 @@ import 'package:doable/src/long_term_relation/presentation/details/relation_deta
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_page.dart';
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_state.dart';
 import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart';
-import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
-import 'package:doable/src/tag/presentation/catalog/tag_selection_context.dart';
-import 'package:doable/src/tag/presentation/editor/tag_editor_page.dart';
-import 'package:doable/src/tag/presentation/editor/tag_editor_state.dart';
-import 'package:doable/src/tag/presentation/navigation/tag_navigation_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -57,6 +52,7 @@ import '../../support/tag_storage_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 import '../../support/quick_creation.dart';
 import '../../support/temporary_graph_files.dart';
+import '../../support/tag_positions.dart';
 
 part 'app_shell_page_matrix.dart';
 part 'app_shell_unnamed_page_scenarios.dart';
@@ -259,8 +255,6 @@ const _rootPages = {
   AppDestination.intentionGraph: IntentionCatalogPage,
 };
 
-final _openTags = find.byKey(const ValueKey('catalog-open-tags'));
-
 /// Строка связи «Читать» → «Бегать» в соседстве намерения.
 final _relationRow = find.byKey(
   ValueKey('relation-neighborhood-row-${tagFixtureId(_relation)}'),
@@ -335,13 +329,7 @@ void _expectAboveShell(
       expectedPanel ??
       (page == IntentionDetailsPage ||
           page == RelationDetailsPage ||
-          page == DailyChoiceDetailsPage ||
-          page == TagNavigationPage ||
-          (page == TagCatalogPage &&
-              switch (tester.widget<TagCatalogPage>(top).selectionContext) {
-                TagBrowseContext() => true,
-                TagAssignmentContext() || TagDraftContext() => false,
-              }));
+          page == DailyChoiceDetailsPage);
   expect(
     find.byType(AppNavigationBar),
     ordinary ? findsOneWidget : findsNothing,
@@ -483,9 +471,10 @@ void _seed(sqlite.Database database) {
       'long_term_relation_id) VALUES (?, ?, ?)',
       [tagFixtureId(211), tagFixtureId(_choice), tagFixtureId(_relation)],
     );
-    database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+    database.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
       tagFixtureId(_tag),
       'Дом',
+      tagPositionKey(_tag),
     ]);
     database.execute(
       'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',

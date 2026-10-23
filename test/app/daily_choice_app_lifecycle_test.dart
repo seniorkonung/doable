@@ -41,11 +41,9 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
 import 'package:doable/src/statistics/application/statistics_read_contract.dart';
 import 'package:doable/src/statistics/application/intention_statistics_breakdown.dart';
 import 'package:doable/src/statistics/application/intention_statistics_read_contract.dart';
-import 'package:doable/src/tag/application/tag_assignment_status.dart';
 import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
-import 'package:doable/src/tag/application/tagged_intentions_page.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -1049,11 +1047,6 @@ final class _ObservedRepository implements PersonalGraphRepository {
   ) => _delegate.getCatalogPage(query);
 
   @override
-  Future<Result<IntentionCatalogReconciliationOutcome>>
-  getCatalogReconciliationPortion(IntentionCatalogReconciliationQuery query) =>
-      _delegate.getCatalogReconciliationPortion(query);
-
-  @override
   Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(
     IntentionId id,
   ) => _delegate.watchIntention(id);
@@ -1102,17 +1095,6 @@ final class _ObservedRepository implements PersonalGraphRepository {
   @override
   Future<TagAssignmentsResult> getTagAssignments(IntentionId intentionId) =>
       _delegate.getTagAssignments(intentionId);
-
-  @override
-  Future<TagAssignmentStatusResult> getTagAssignmentStatus(
-    TagId tagId,
-    IntentionId intentionId,
-  ) => _delegate.getTagAssignmentStatus(tagId, intentionId);
-
-  @override
-  Future<TaggedIntentionsPageResult> getTaggedIntentionsPage(
-    TaggedIntentionsQuery query,
-  ) => _delegate.getTaggedIntentionsPage(query);
 
   @override
   Stream<TagReadResult> watchTag(TagId id) => _delegate.watchTag(id);

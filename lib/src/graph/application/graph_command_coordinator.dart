@@ -333,34 +333,65 @@ final class DailyChoiceCommandCompletion extends GraphPresentableCompletion {
   bool get isFailure => confirmedResult is GraphResultFailure;
 }
 
-enum TagCommandKind { create, update, delete, assign, removeAssignment }
+enum TagCommandKind { create, update, delete, move, assign, removeAssignment }
 
-final class TagCommandCompletion extends GraphPresentableCompletion {
-  const TagCommandCompletion._({
-    required this.token,
-    required this.kind,
-    required this.confirmedResult,
-  });
+/// Завершение операции тега с политикой «только отказ» по ADR-0016.
+///
+/// Подтверждённый результат создания, изменения, удаления, перестановки,
+/// назначения и снятия назначения виден там, где операция выполнена, поэтому
+/// успех публикуется для согласования и права предъявления не образует, а
+/// отказ сразу принадлежит общей поверхности.
+sealed class TagCommandCompletion extends GraphCommandCompletion {
+  const TagCommandCompletion._({required this.token, required this.kind});
 
   @override
   final TagOperationToken token;
   final TagCommandKind kind;
-  final TagCommandResult confirmedResult;
+
+  TagCommandResult get confirmedResult;
 
   GraphResult<TagCommandSuccess, TagCommandFailure> get result =>
       switch (confirmedResult) {
         GraphResultSuccess(:final value) => GraphResultSuccess(value.value),
         GraphResultFailure(:final failure) => GraphResultFailure(failure),
       };
+}
+
+final class TagCommandSucceededCompletion extends TagCommandCompletion {
+  const TagCommandSucceededCompletion._({
+    required super.token,
+    required super.kind,
+    required this.confirmedResult,
+  }) : super._();
 
   @override
-  ConfirmedGraphChangePackage? get confirmedChange => switch (confirmedResult) {
-    GraphResultSuccess(:final value) => value,
-    GraphResultFailure() => null,
-  };
+  final TagCommandSucceeded confirmedResult;
 
   @override
-  bool get isFailure => confirmedResult is GraphResultFailure;
+  ConfirmedGraphChangePackage get confirmedChange => confirmedResult.value;
+
+  @override
+  bool get isFailure => false;
+}
+
+final class TagCommandFailedCompletion extends TagCommandCompletion
+    implements GraphPresentableCompletion {
+  const TagCommandFailedCompletion._({
+    required super.token,
+    required super.kind,
+    required this.confirmedResult,
+  }) : super._();
+
+  @override
+  final TagCommandFailed confirmedResult;
+
+  TagCommandFailure get failure => confirmedResult.failure;
+
+  @override
+  ConfirmedGraphChangePackage? get confirmedChange => null;
+
+  @override
+  bool get isFailure => true;
 }
 
 /// Исход экспорта графа, выполненного модулем операций с данными.
@@ -1023,6 +1054,9 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     TagCommandKind.delete,
   );
 
+  TagCommandStart acceptTagMove(MoveTag command) =>
+      _acceptTag({ExistingTagKey(command.tagId)}, command, TagCommandKind.move);
+
   TagCommandStart acceptTagAssign(AssignTag command) => _acceptTag(
     _assignmentKeys(command.tagId, command.intentionId),
     command,
@@ -1047,12 +1081,21 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     final token = TagOperationToken._();
     final acceptance = _acceptOperation(
       keys: keys,
-      entry: _PresentationEntry(token),
-      execute: () async => TagCommandCompletion._(
-        token: token,
-        kind: kind,
-        confirmedResult: await _executeTag(command),
-      ),
+      // Права инициатора у операций тегов нет: отказ сразу принадлежит
+      // оболочке.
+      entry: _PresentationEntry(token)..initiatorReleased = true,
+      execute: () async => switch (await _executeTag(command)) {
+        final TagCommandSucceeded result => TagCommandSucceededCompletion._(
+          token: token,
+          kind: kind,
+          confirmedResult: result,
+        ),
+        final TagCommandFailed result => TagCommandFailedCompletion._(
+          token: token,
+          kind: kind,
+          confirmedResult: result,
+        ),
+      },
     );
     return switch (acceptance) {
       _GraphCommandAccepted(:final future) => TagCommandAccepted(
@@ -1196,7 +1239,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
   _GraphCommandAcceptance _acceptOperation({
     required Set<GraphCommandKey> keys,
     required _PresentationEntry entry,
-    required Future<GraphPresentableCompletion> Function() execute,
+    required Future<GraphCommandCompletion> Function() execute,
   }) {
     if (_isDraining || _isReplacing) {
       return const _GraphCommandDraining();
@@ -1210,13 +1253,19 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
       _gates[key] = entry;
     }
     _entries[entry.token] = entry;
-    final operationFuture = Future<GraphPresentableCompletion>.sync(execute);
+    final operationFuture = Future<GraphCommandCompletion>.sync(execute);
 
-    final completionCompleter = Completer<GraphPresentableCompletion>();
+    final completionCompleter = Completer<GraphCommandCompletion>();
     late final Future<void> tracked;
     final publication = _publicationTail.then<void>((_) async {
       final completion = await operationFuture;
-      _placeAtPublication(entry, completion);
+      if (completion is GraphPresentableCompletion) {
+        _placeAtPublication(entry, completion);
+      } else {
+        // Успех операции с политикой «только отказ» права предъявления не
+        // образует.
+        _discardEntry(entry);
+      }
       for (final key in keys) {
         if (identical(_gates[key], entry)) {
           _gates.remove(key);
@@ -1799,7 +1848,7 @@ sealed class _GraphCommandAcceptance {
 final class _GraphCommandAccepted extends _GraphCommandAcceptance {
   const _GraphCommandAccepted(this.future);
 
-  final Future<GraphPresentableCompletion> future;
+  final Future<GraphCommandCompletion> future;
 }
 
 final class _GraphCommandAlreadyRunning extends _GraphCommandAcceptance {

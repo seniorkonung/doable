@@ -7,7 +7,6 @@ import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
-import 'package:doable/src/tag/application/tag_assignment_status.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag_color.dart';
@@ -19,6 +18,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
+import '../../support/tag_positions.dart';
 
 IntentionId _intention(int number) =>
     (IntentionId.decode(tagFixtureId(number)) as IntentionIdDecodingSuccess).id;
@@ -49,56 +49,20 @@ void main() {
   TagSelectionSnapshot selection(TagCatalogResult result) =>
       (result as TagCatalogSuccess).value as TagSelectionSnapshot;
 
-  test('точечное чтение различает пару и отсутствие для активного и архивированного намерения', () async {
-    final assignedTag =
-        (TagId.decode(tagFixtureId(firstTagNumber)) as TagIdDecodingSuccess).id;
-    final freeTag =
-        (TagId.decode(tagFixtureId(lastTagNumber)) as TagIdDecodingSuccess).id;
-    final missingTag =
-        (TagId.decode(tagFixtureId(999)) as TagIdDecodingSuccess).id;
-    for (final (assignedTarget, missingTarget) in [
-      (_intention(1), _intention(999)),
-      (_intention(2), _intention(999)),
-    ]) {
-      final assigned = await graph.getTagAssignmentStatus(
-        assignedTag,
-        assignedTarget,
-      );
-      final free = await graph.getTagAssignmentStatus(freeTag, assignedTarget);
-      expect((assigned as TagAssignmentStatusSuccess).value.value, isTrue);
-      expect((free as TagAssignmentStatusSuccess).value.value, isFalse);
-      expect(
-        assigned.value.revision.compareTo(free.value.revision),
-        GraphRevisionOrder.same,
-      );
-      expect(
-        await graph.getTagAssignmentStatus(missingTag, assignedTarget),
-        isA<TagAssignmentStatusError>().having(
-          (error) => error.failure,
-          'причина',
-          isA<TagAssignmentStatusTagNotFound>(),
-        ),
-      );
-      expect(
-        await graph.getTagAssignmentStatus(assignedTag, missingTarget),
-        isA<TagAssignmentStatusError>().having(
-          (error) => error.failure,
-          'причина',
-          isA<TagAssignmentStatusIntentionNotFound>(),
-        ),
-      );
-    }
-  });
-
   test(
-    'полное чтение назначений сохраняет порядок всех 104 тегов намерения',
+    'полное чтение назначений даёт все 104 тега намерения в ручном порядке',
     () async {
       seedRawGraph(raw, () {
+        // Места новых тегов обратны порядку их создания и назначения.
         for (var number = 303; number <= 405; number++) {
-          raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-            tagFixtureId(number),
-            'Тег $number',
-          ]);
+          raw.execute(
+            'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+            [
+              tagFixtureId(number),
+              'Тег $number',
+              tagPositionKey(1000 - number),
+            ],
+          );
           for (final (column, recipient) in [
             ('intention_id', tagFixtureId(1)),
           ]) {
@@ -114,11 +78,11 @@ void main() {
         expect(loaded.intentionId, target);
         expect(loaded.items.map((tag) => tag.name.value), [
           'Дом',
-          for (var number = 303; number <= 405; number++) 'Тег $number',
+          for (var number = 405; number >= 303; number--) 'Тег $number',
         ]);
         expect(loaded.items.map((tag) => tag.id.toCanonicalString()), [
           tagFixtureId(firstTagNumber),
-          for (var number = 303; number <= 405; number++) tagFixtureId(number),
+          for (var number = 405; number >= 303; number--) tagFixtureId(number),
         ]);
       }
     },
@@ -126,9 +90,10 @@ void main() {
 
   test('назначения другим намерениям и идентичность связи не становятся назначениями намерения', () async {
     seedRawGraph(raw, () {
-      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+      raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
         tagFixtureId(303),
         'Только другим намерениям',
+        tagPositionKey(303),
       ]);
       for (final number in [1, 3]) {
         raw.execute(
@@ -180,14 +145,6 @@ void main() {
     );
     expect(unassigned.items, hasLength(3));
     expect(unassigned.rows.map((row) => row.isAssigned), [false, false, false]);
-    final tagId = (TagId.decode(tagFixtureId(303)) as TagIdDecodingSuccess).id;
-    expect(
-      (await graph.getTagAssignmentStatus(
-        tagId,
-        _intention(101),
-      ) as TagAssignmentStatusSuccess).value.value,
-      isFalse,
-    );
     expect(raw.select('SELECT * FROM tag_assignments'), oldAssignments);
   });
 
@@ -205,15 +162,10 @@ void main() {
     final catalog = selection(
       await graph.getTagCatalog(TagCatalogSelectionMode(intentionId)),
     );
-    final status = (await graph.getTagAssignmentStatus(
-      tagId,
-      intentionId,
-    ) as TagAssignmentStatusSuccess).value;
     expect(
       catalog.revision.compareTo(before.revision),
       GraphRevisionOrder.same,
     );
-    expect(status.revision.compareTo(before.revision), GraphRevisionOrder.same);
     expect(() => before.items.clear(), throwsUnsupportedError);
     expect(() => catalog.items.clear(), throwsUnsupportedError);
     expect(() => catalog.rows.clear(), throwsUnsupportedError);
@@ -234,10 +186,6 @@ void main() {
     final renamedCatalog = selection(
       await graph.getTagCatalog(TagCatalogSelectionMode(intentionId)),
     );
-    final updated = (await graph.getTagAssignmentStatus(
-      tagId,
-      intentionId,
-    ) as TagAssignmentStatusSuccess).value;
     expect(after.items.map((tag) => tag.name.value), ['Я']);
     expect(after.items.map((tag) => tag.color), [TagColor.blue]);
     expect(renamedCatalog.items.map((tag) => tag.name.value), ['Я', 'Работа']);
@@ -247,7 +195,6 @@ void main() {
       renamedCatalog.revision.compareTo(after.revision),
       GraphRevisionOrder.same,
     );
-    expect(updated.revision.compareTo(after.revision), GraphRevisionOrder.same);
     expect(before.items.single.name.value, 'Дом');
     expect(before.items.single.color, TagColor.blue);
     expect(catalog.items.first.name.value, 'Дом');
@@ -255,72 +202,39 @@ void main() {
   });
 
   test(
-    'ключ порядка назначения повторяет создание тега и остаётся неизменным',
-    () {
-      final tagId = tagFixtureId(firstTagNumber);
-      final expected = raw.select(
-        'SELECT creation_sequence FROM tags WHERE id = ?',
-        [tagId],
-      ).single['creation_sequence'];
-      final assignment = raw.select(
-        'SELECT creation_sequence, tag_creation_sequence FROM tag_assignments WHERE tag_id = ? AND intention_id = ?',
-        [tagId, tagFixtureId(1)],
-      ).single;
-      expect(assignment['tag_creation_sequence'], expected);
-
-      expect(
-        () => seedRawGraph(
-          raw,
-          () => raw.execute(
-            'UPDATE tag_assignments SET tag_creation_sequence = ? WHERE creation_sequence = ?',
-            [(expected as int) + 1, assignment['creation_sequence']],
-          ),
-        ),
-        throwsA(isA<sqlite.SqliteException>()),
-      );
-      expect(
-        () => seedRawGraph(
-          raw,
-          () => raw.execute(
-            'INSERT INTO tag_assignments (tag_id, intention_id, tag_creation_sequence) VALUES (?, ?, ?)',
-            [tagFixtureId(lastTagNumber), tagFixtureId(1), expected],
-          ),
-        ),
-        throwsA(isA<sqlite.SqliteException>()),
-      );
-      expect(
-        raw.select(
-          'SELECT tag_creation_sequence FROM tag_assignments WHERE creation_sequence = ?',
-          [assignment['creation_sequence']],
-        ).single['tag_creation_sequence'],
-        expected,
-      );
-    },
-  );
-
-  test(
-    'повторное назначение не переносит тег в конец списка получателя',
+    'порядок тегов намерения не зависит от очерёдности назначения и создания',
     () async {
-      for (final (target, column, recipientId) in [
-        (_intention(1), 'intention_id', tagFixtureId(1)),
-      ]) {
-        seedRawGraph(raw, () {
-          raw.execute(
-            'INSERT INTO tag_assignments (tag_id, $column) VALUES (?, ?)',
-            [tagFixtureId(lastTagNumber), recipientId],
-          );
-          raw.execute(
-            'DELETE FROM tag_assignments WHERE tag_id = ? AND $column = ?',
-            [tagFixtureId(firstTagNumber), recipientId],
-          );
-          raw.execute(
-            'INSERT INTO tag_assignments (tag_id, $column) VALUES (?, ?)',
-            [tagFixtureId(firstTagNumber), recipientId],
-          );
-        });
-        final loaded = assignments(await graph.getTagAssignments(target));
-        expect(loaded.items.map((tag) => tag.name.value), ['Дом', 'Работа']);
-      }
+      final recipientId = tagFixtureId(1);
+      seedRawGraph(raw, () {
+        // «Спорт» создан последним, но стоит в ручном порядке первым.
+        raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
+          tagFixtureId(303),
+          'Спорт',
+          tagPositionKey(1),
+        ]);
+        raw.execute(
+          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+          [tagFixtureId(lastTagNumber), recipientId],
+        );
+        raw.execute(
+          'DELETE FROM tag_assignments WHERE tag_id = ? AND intention_id = ?',
+          [tagFixtureId(firstTagNumber), recipientId],
+        );
+        raw.execute(
+          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+          [tagFixtureId(firstTagNumber), recipientId],
+        );
+        raw.execute(
+          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+          [tagFixtureId(303), recipientId],
+        );
+      });
+      final loaded = assignments(await graph.getTagAssignments(_intention(1)));
+      expect(loaded.items.map((tag) => tag.name.value), [
+        'Спорт',
+        'Дом',
+        'Работа',
+      ]);
     },
   );
 
@@ -375,9 +289,11 @@ void main() {
   test('каталог выбора возвращает все 105 тегов без пропусков', () async {
     seedRawGraph(raw, () {
       for (var number = 303; number <= 405; number++) {
-        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        // Места новых тегов обратны порядку их создания.
+        raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
           tagFixtureId(number),
           'Тег $number',
+          tagPositionKey(1000 - number),
         ]);
       }
     });
@@ -388,12 +304,12 @@ void main() {
       expect(loaded.rows.map((row) => row.tag.name.value), [
         'Дом',
         'Работа',
-        for (var number = 303; number <= 405; number++) 'Тег $number',
+        for (var number = 405; number >= 303; number--) 'Тег $number',
       ]);
       expect(loaded.rows.map((row) => row.tag.id.toCanonicalString()), [
         tagFixtureId(firstTagNumber),
         tagFixtureId(lastTagNumber),
-        for (var number = 303; number <= 405; number++) tagFixtureId(number),
+        for (var number = 405; number >= 303; number--) tagFixtureId(number),
       ]);
       expect(loaded.rows.map((row) => row.isAssigned), [
         true,
@@ -452,9 +368,10 @@ void main() {
     final target = _intention(1);
     seedRawGraph(raw, () {
       for (var number = 303; number <= 439; number++) {
-        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
           tagFixtureId(number),
           'Тег $number',
+          tagPositionKey(number),
         ]);
         raw.execute(
           'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
@@ -462,9 +379,10 @@ void main() {
         );
       }
       // Формат идентификатора тега схема не проверяет.
-      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+      raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
         'некорректный-id',
         'Повреждённый',
+        tagPositionKey(200000),
       ]);
       raw.execute(
         'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',

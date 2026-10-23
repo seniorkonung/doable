@@ -5,8 +5,6 @@ import 'dart:io';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
-import 'package:doable/src/app/routing/app_router.gr.dart';
-import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/app/settings/settings_page.dart';
 import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
@@ -22,9 +20,7 @@ import 'package:doable/src/intention/application/intention_catalog.dart'
     show IntentionSaved;
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/domain/intention.dart';
-import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
-import 'package:doable/src/intention/presentation/catalog/tag_condition_picker_page.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/statistics/application/statistics_period.dart';
@@ -82,16 +78,17 @@ void main() {
     expect(find.byType(SettingsPage), findsOneWidget);
     expect(await target.graphState(), sourceGraph);
     expectQuickCreationMode(tester, QuickCreationMode.intention);
-    await target.openTagNavigation(
-      exported.tag,
-      intention: exported.assignedSecond,
-    );
-    expect(
-      tester.getTopLeft(find.byKey(ValueKey(exported.assignedFirst))).dy,
-      lessThan(
-        tester.getTopLeft(find.byKey(ValueKey(exported.assignedSecond))).dy,
-      ),
-    );
+    await _applyTagCondition(tester, exported.tag);
+    for (final (title, finds) in [
+      (exported.assignedFirst, findsOneWidget),
+      (exported.assignedSecond, findsOneWidget),
+      ('Здоровье', findsNothing),
+    ]) {
+      expect(
+        find.descendant(of: _catalogList, matching: find.text(title)),
+        finds,
+      );
+    }
   });
 
   testWidgets('сценарии «Подтверждение показывает дату и состав файла», '
@@ -107,7 +104,13 @@ void main() {
     );
     await app.waitForBackups(1);
     app.now = DateTime(2026, 10, 5, 14);
-    await app.execute(CreateTag(name: TagName.fromInput('Сад'), color: null));
+    await app.execute(
+      CreateTag(
+        name: TagName.fromInput('Сад'),
+        color: null,
+        placement: TagPlacement.first,
+      ),
+    );
     final beforeImport = await app.graphState();
     final stored = app.storedState();
     await app.openSettings();
@@ -259,19 +262,6 @@ extension _ImportScenarioSteps on ImportAppHarness {
     return documents.created.single;
   }
 
-  /// Открывает навигацию по тегу [tag] и ждёт в её выдаче намерение
-  /// [intention].
-  Future<void> openTagNavigation(
-    TagId tag, {
-    required IntentionId intention,
-  }) async {
-    unawaited(
-      container.read(appRouterProvider).push(TagNavigationRoute(tagId: tag)),
-    );
-    await app_flow.until(tester, find.byKey(ValueKey(intention)));
-    await tester.pumpAndSettle();
-  }
-
   /// Открывает панель строкой «Резервные копии» и ждёт прочитанный список.
   Future<void> openBackupsSheet() async {
     await tester.tap(find.text('Резервные копии'));
@@ -295,12 +285,12 @@ extension _ImportScenarioSteps on ImportAppHarness {
 }
 
 /// Граф файла экспорта сценария «Импорт экспорта воспроизводит граф»: синий
-/// тег [tag] назначен сначала намерению [assignedFirst], а затем намерению
-/// [assignedSecond], созданному раньше него.
+/// тег [tag] назначен сначала намерению с названием [assignedFirst], а затем
+/// намерению с названием [assignedSecond], созданному раньше него.
 typedef _ExportedGraph = ({
   TagId tag,
-  IntentionId assignedFirst,
-  IntentionId assignedSecond,
+  String assignedFirst,
+  String assignedSecond,
 });
 
 /// Создаёт командами граф сценария «Импорт экспорта воспроизводит граф»:
@@ -350,8 +340,8 @@ Future<_ExportedGraph> _seedExportedGraph(PersonalGraphRepository graph) async {
   await _createTag(graph, 'Вечер');
   return (
     tag: morning.id,
-    assignedFirst: running.id,
-    assignedSecond: swimming.id,
+    assignedFirst: running.title,
+    assignedSecond: swimming.title,
   );
 }
 
@@ -397,7 +387,11 @@ Future<Tag> _createTag(
   TagColor? color,
 }) async => (await _confirm<TagCreated>(
   graph,
-  CreateTag(name: TagName.fromInput(name), color: color),
+  CreateTag(
+    name: TagName.fromInput(name),
+    color: color,
+    placement: TagPlacement.first,
+  ),
 )).tag;
 
 Future<Intention> _createIntention(
@@ -454,29 +448,7 @@ final _catalogList = find.byKey(
 /// Открывает каталог намерений, задаёт условие «есть тег» [tag] и
 /// прокручивает выдачу и страницу.
 Future<void> _filterIntentionCatalogByTag(WidgetTester tester, Tag tag) async {
-  await openIntentionGraph(
-    tester,
-    waitFor: app_flow.until,
-    content: _catalogList,
-  );
-  await _tap(
-    tester,
-    find.byKey(const ValueKey('intention-tag-conditions-add')),
-  );
-  await _tap(
-    tester,
-    find.byKey(
-      ValueKey(
-        'tag-condition-picker-mustBePresent-${tag.id.toCanonicalString()}',
-      ),
-    ),
-  );
-  await app_flow.waitFor(
-    tester,
-    () => find.byType(TagConditionPickerPage).evaluate().isEmpty,
-  );
-  // Выдача с условием прочитана за эти шаги.
-  await app_flow.settle(tester);
+  await _applyTagCondition(tester, tag.id);
   for (final position in [
     _catalogPosition(tester),
     _catalogPagePosition(tester),
@@ -488,6 +460,35 @@ Future<void> _filterIntentionCatalogByTag(WidgetTester tester, Tag tag) async {
   expect(_tagConditions(), [tag.name.value]);
   expect(_catalogPosition(tester).pixels, isPositive);
   expect(_catalogPagePosition(tester).pixels, isPositive);
+}
+
+/// Открывает каталог намерений и задаёт в панели фильтра условие «есть тег»
+/// [tag]; выдача с условием прочитана.
+Future<void> _applyTagCondition(WidgetTester tester, TagId tag) async {
+  await openIntentionGraph(
+    tester,
+    waitFor: app_flow.until,
+    content: _catalogList,
+  );
+  await _tap(
+    tester,
+    find.byKey(const ValueKey('intention-tag-conditions-add')),
+  );
+  await _tap(
+    tester,
+    find.byKey(ValueKey('tags-panel-row-${tag.toCanonicalString()}')),
+  );
+  // Панель фильтра применяет условие сразу, а «назад» только закрывает её.
+  await tester.binding.handlePopRoute();
+  await app_flow.waitFor(
+    tester,
+    () => find
+        .byKey(ValueKey('tags-panel-row-${tag.toCanonicalString()}'))
+        .evaluate()
+        .isEmpty,
+  );
+  // Выдача с условием прочитана за эти шаги.
+  await app_flow.settle(tester);
 }
 
 /// Названия тегов в условиях каталога намерений.

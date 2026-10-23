@@ -6,6 +6,7 @@ import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../test/support/graph_seed.dart';
+import '../../test/support/tag_positions.dart';
 
 /// Число сущностей графа профиля решения 15 дизайна: пример владельца
 /// продукта.
@@ -78,7 +79,9 @@ final class GraphLogFixture {
   /// выключенном захвате фактов, как замена графа: лог остаётся на позиции 0.
   void populate(sqlite.Database database) {
     final statements = [
-      database.prepare('INSERT INTO tags (id, name) VALUES (?, ?)'),
+      database.prepare(
+        'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+      ),
       database.prepare('''INSERT INTO intentions
         (id, title, description, is_action_ready, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)'''),
@@ -107,7 +110,7 @@ final class GraphLogFixture {
     try {
       seedRawGraph(database, () {
         for (var tag = 0; tag < tags; tag++) {
-          insertTag.execute([_id(1, tag), 'Тег $tag']);
+          insertTag.execute([_id(1, tag), 'Тег $tag', tagPositionKey(tag)]);
         }
         final createdAt = DateTime.utc(2024).microsecondsSinceEpoch;
         for (var intention = 0; intention < intentions; intention++) {

@@ -6,6 +6,8 @@ import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/design_system/components/sheet.dart';
+import 'package:doable/src/design_system/components/tag_row.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
@@ -28,6 +30,7 @@ import '../support/intention_creation_storage_observer.dart';
 import '../support/intention_creation_origin.dart';
 import '../support/tag_storage_fixture.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
+import '../support/tag_positions.dart';
 
 const _rawTitle = '  Рисовать акварель  ';
 const _title = 'Рисовать акварель';
@@ -192,9 +195,10 @@ Future<_App> _launch(
         [tagFixtureId(id), title, archived],
       );
     }
-    raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+    raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
       tagFixtureId(301),
       'Дом',
+      tagPositionKey(301),
     ]);
     raw.execute(
       'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
@@ -233,7 +237,7 @@ Future<void> _open(WidgetTester tester, _App app) async {
 }
 
 /// Название, описание, готовность и теги команды подготавливаются
-/// реальными панелью, общим выбором и редактором тега.
+/// реальными панелью, панелью тегов и листом тега.
 Future<TagId> _prepare(WidgetTester tester, _App app) async {
   await _open(tester, app);
   await tester.enterText(_key('intention-editor-title'), _rawTitle);
@@ -241,48 +245,67 @@ Future<TagId> _prepare(WidgetTester tester, _App app) async {
   await _tap(tester, _key('intention-editor-readiness'));
   await _tap(tester, _key('intention-editor-readiness-confirm'));
   await _tap(tester, _key('intention-editor-choose-tags'));
-  await _add(tester, _home);
+  await _include(tester, _home);
   // Локальные правки не маскируются событиями постоянных команд.
   expect(app.completions, isEmpty);
   final sport = await _newTag(tester, app);
-  await _add(tester, sport);
   await tester.binding.handlePopRoute();
+  await _wait(tester, () => _tagsPanel(app).evaluate().isEmpty);
   await tester.pumpAndSettle();
   _expectDraft(tester, [_home, sport]);
   expect(app.completions.single, isA<TagCommandCompletion>());
   return sport;
 }
 
-/// Создаёт самостоятельный тег редактором над текущим общим выбором.
+/// Создаёт самостоятельный тег листом над открытой панелью тегов; панель
+/// сразу отмечает его в черновике.
 Future<TagId> _newTag(WidgetTester tester, _App app) async {
-  await _tap(tester, _key('tag-catalog-create'));
-  await _until(tester, _key('tag-editor-name'));
-  await tester.pumpAndSettle();
-  await tester.enterText(_key('tag-editor-name'), _sport);
-  await _tap(tester, _key('tag-editor-submit'));
-  await _wait(tester, () => _key('tag-editor-name').evaluate().isEmpty);
-  await _acceptMessage(
-    tester,
-    app.l10n.graphOperationMessage(
-      app.l10n.graphOperationCreate,
-      app.l10n.graphOperationTag,
-      app.l10n.tagCreated,
-    ),
+  final l10n = app.l10n;
+  await tester.enterText(
+    find.descendant(of: _tagsPanel(app), matching: find.byType(TextField)),
+    _sport,
   );
+  await tester.pump();
+  await _tap(tester, find.text(l10n.tagsPanelCreateTag(_sport)));
+  final create = find.widgetWithText(FilledButton, l10n.tagEditorCreateAction);
+  await _until(tester, create);
+  await tester.pumpAndSettle();
+  await _tap(tester, create);
+  await _wait(tester, () => create.evaluate().isEmpty);
   final sport = _tagIdFrom(
     app.raw.select('SELECT id FROM tags WHERE name = ?', [_sport]).single['id']
         as String,
   );
+  await _wait(
+    tester,
+    () => _panelRow(sport).evaluate().isNotEmpty && _isMarked(tester, sport),
+  );
+  // Созданный тег виден в панели тегов, поэтому успех не объявляется.
+  await tester.pumpAndSettle();
+  expect(find.byType(SnackBar), findsNothing);
   app.diagnostics.privateValues.add(sport.toCanonicalString());
   return sport;
 }
 
-Future<void> _add(WidgetTester tester, TagId id) async {
-  await _tap(tester, _key('tag-catalog-row-${id.toCanonicalString()}'));
-  final add = _key('tag-catalog-add-to-draft');
-  await _wait(tester, () => tester.widget<FilledButton>(add).onPressed != null);
-  await _tap(tester, add);
+/// Отмечает тег [id] в панели тегов: нажатие включает его в черновик.
+Future<void> _include(WidgetTester tester, TagId id) async {
+  await _tap(tester, _panelRow(id));
+  await _wait(tester, () => _isMarked(tester, id));
 }
+
+Finder _tagsPanel(_App app) =>
+    find.widgetWithText(Sheet, app.l10n.tagsPanelTitle);
+
+Finder _panelRow(TagId id) =>
+    find.byKey(ValueKey('tags-panel-row-${id.toCanonicalString()}'));
+
+bool _isMarked(WidgetTester tester, TagId id) =>
+    tester
+        .widget<TagRow>(
+          find.descendant(of: _panelRow(id), matching: find.byType(TagRow)),
+        )
+        .mark ==
+    TagRowSelectionMark.checked;
 
 void _expectDraft(WidgetTester tester, List<TagId> tags) {
   expect(_text(tester, 'intention-editor-title'), _rawTitle);
@@ -383,8 +406,9 @@ void _expectFaultPoint(_App app, List<TagId> tags) {
   final point = app.storage.faultPoint!;
   expect(point.inTransaction, isTrue);
   final row = point.graph['intentions']!.last;
-  // Порядок столбцов соответствует схемам intentions и tag_assignments.
-  // Проверяются также сохраняемые поисковый ключ и порядок тегов.
+  // Порядок столбцов соответствует схемам intentions и tag_assignments:
+  // строка назначения — creation_sequence, tag_id, intention_id. В строке
+  // намерения проверяется также сохраняемый поисковый ключ.
   expect(row, [
     isA<String>(),
     _title,
@@ -397,7 +421,7 @@ void _expectFaultPoint(_App app, List<TagId> tags) {
   ]);
   expect(row[6], row[7]);
   final assignments = point.graph['tag_assignments']!
-      .where((assignment) => assignment[3] == row.first)
+      .where((assignment) => assignment[2] == row.first)
       .toList();
   expect(assignments, hasLength(1));
   expect(assignments.length, lessThan(tags.length));
@@ -405,7 +429,6 @@ void _expectFaultPoint(_App app, List<TagId> tags) {
   expect(assignment, [
     isA<int>(),
     isIn(tags.map((tag) => tag.toCanonicalString())),
-    point.graph['tags']!.singleWhere((stored) => stored[1] == assignment[1])[0],
     row.first,
   ]);
   expect(point.graph['intention_titles_fts']!.last, ['рисовать акварель']);

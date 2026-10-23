@@ -8,7 +8,8 @@ import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/presentation/operation_failure_presentation.dart';
-import '../../../tag/presentation/catalog/tag_selection_context.dart';
+import '../../../tag/presentation/panel/tags_panel.dart';
+import '../../../tag/presentation/panel/tags_panel_context.dart';
 import '../../application/intention_result.dart';
 import '../../domain/intention.dart';
 import '../../domain/intention_id.dart';
@@ -23,26 +24,25 @@ import 'intention_editor_view_model.dart';
 /// обычной страницей. Высота панели следует за содержимым в пределах
 /// доступной области, оставляя видимую часть исходной страницы над ней.
 ///
-/// Теги черновика выбираются общим выбором тегов: хост открывает
-/// существующий маршрут выбора с контекстом набора своей сессии полноэкранно
-/// над панелью в том же корневом стеке. Маршрут панели остаётся под выбором
-/// и редактором тега и удерживает сессию; закрытие выбора возвращает ту же
-/// панель с её вводом и прокруткой. Выбранные теги показываются с
+/// Теги черновика выбираются в панели тегов: хост открывает её в контексте
+/// набора своей сессии поверх панели создания в том же корневом стеке.
+/// Маршрут панели создания остаётся под панелью тегов и листом тега и
+/// удерживает сессию; закрытие панели тегов возвращает ту же панель создания
+/// с её вводом и прокруткой. Выбранные теги показываются с
 /// актуальностью из проекции сессии. Отказ сохранения из-за удалённых тегов
-/// сохраняет набор: панель отмечает эти теги и предлагает явное исправление,
-/// которое снимает только их и само сохранение не отправляет.
+/// сам доказывает их удаление, поэтому сессия убирает эти теги из набора без
+/// ручного исправления; повтор остаётся явной отправкой.
 ///
 /// Ошибка поля показывается под своим полем: после отказа панель доводит
 /// поле и текст ошибки до видимости и удерживает их видимыми, пока человек
-/// не прокрутит панель или не изменит черновик. Общий отказ, исправление
-/// набора тегов и допустимый повтор закреплены рядом с сохранением и видны
-/// при любой прокрутке полей.
+/// не прокрутит панель или не изменит черновик. Общий отказ и допустимый
+/// повтор закреплены рядом с сохранением и видны при любой прокрутке полей.
 ///
 /// Сообщения общей поверхности приложения — успех создания, результаты
 /// других экранов и ошибка, которую форма не предъявила до ухода, — видны
 /// поверх полей панели над закреплённой областью. Пока форма жива, право её
-/// ошибки остаётся у неё и при временном перекрытии выбором тегов,
-/// редактором или диалогом.
+/// ошибки остаётся у неё и при временном перекрытии панелью тегов, листом
+/// тега или диалогом.
 ///
 /// Любой уход с формы — кнопка закрытия, нажатие вне панели, системное
 /// «назад» и программный `maybePop` — сначала обращается к единому решению
@@ -82,7 +82,8 @@ final class _IntentionEditorPageState
   /// Объяснение критериев действия уже открыто.
   var _isConfirmingReadiness = false;
 
-  /// Общий выбор тегов начат и удерживает запрет отправки до возврата.
+  /// Панель тегов открывается или открыта и удерживает запрет отправки до
+  /// своего закрытия.
   var _isChoosingTags = false;
 
   IntentionEditorViewModelProvider get _provider =>
@@ -131,7 +132,6 @@ final class _IntentionEditorPageState
     final titleFailure = failureAt(_FailurePlace.title);
     final descriptionFailure = failureAt(_FailurePlace.description);
     final pinnedFailure = failureAt(_FailurePlace.pinned);
-    final missingTagIds = editor.missingTagIds;
     return PopScope<Object?>(
       // Маршрут не закрывается сам: решение принимает сессия.
       canPop: false,
@@ -220,7 +220,6 @@ final class _IntentionEditorPageState
                 const SizedBox(height: 12),
                 IntentionCreationTags(
                   tags: editor.selectedTags,
-                  missingTagIds: missingTagIds,
                   enabled: !isDraftFixed,
                   onRemove: notifier.removeTag,
                   onRetryObservation: notifier.retryTagObservation,
@@ -247,41 +246,15 @@ final class _IntentionEditorPageState
                   messageKey: const ValueKey('intention-editor-failure'),
                 ),
               ),
-        // Исправление набора и повтор стоят вместе с сохранением и при
-        // нехватке ширины переносятся друг под друга.
         footer: Padding(
           padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
-          child: OverflowBar(
-            alignment: MainAxisAlignment.end,
-            overflowAlignment: OverflowBarAlignment.end,
-            spacing: 8,
-            overflowSpacing: 8,
-            children: [
-              if (missingTagIds.isNotEmpty)
-                // Исправление снимает только теги, отсутствие которых
-                // подтвердил отказ, и не отправляет сохранение. Как и снятие
-                // отдельного тега, оно не уводит фокус из поля ввода.
-                TextFieldTapRegion(
-                  child: OutlinedButton(
-                    key: const ValueKey('intention-editor-remove-missing-tags'),
-                    onPressed: isDraftFixed
-                        ? null
-                        : () => missingTagIds.forEach(notifier.removeTag),
-                    child: Text(
-                      localizations.editorRemoveMissingTags(
-                        missingTagIds.length,
-                      ),
-                    ),
-                  ),
-                ),
-              FilledButton(
-                key: const ValueKey('intention-editor-submit'),
-                onPressed: editor.canSubmit && !_isChoosingTags
-                    ? _submit
-                    : null,
-                child: Text(_submitLabel(localizations, editor)),
-              ),
-            ],
+          child: Align(
+            alignment: AlignmentDirectional.centerEnd,
+            child: FilledButton(
+              key: const ValueKey('intention-editor-submit'),
+              onPressed: editor.canSubmit && !_isChoosingTags ? _submit : null,
+              child: Text(_submitLabel(localizations, editor)),
+            ),
           ),
         ),
       ),
@@ -391,12 +364,12 @@ final class _IntentionEditorPageState
     }
   }
 
-  /// Открывает общий выбор тегов для набора черновика этой сессии.
+  /// Открывает панель тегов для набора черновика этой сессии.
   ///
-  /// Выбор добавляет теги только через контракт набора сессии, который после
-  /// отправки или закрытия отвергает изменения; возврат из выбора сам
-  /// черновик не меняет. Повторное нажатие до закрытия выбора второй выбор не
-  /// открывает.
+  /// Панель меняет набор только через контракт сессии, который после
+  /// отправки или закрытия отвергает изменения; закрытие панели само
+  /// черновик не меняет. Повторное нажатие до закрытия панели вторую панель
+  /// не открывает.
   Future<void> _chooseTags() async {
     if (!mounted ||
         _routeState != _EditorRouteState.active ||
@@ -413,9 +386,7 @@ final class _IntentionEditorPageState
     setState(() => _isChoosingTags = true);
     try {
       final tagSet = ref.read(_provider.notifier).draftTagSet;
-      await context.router.push<void>(
-        TagCatalogRoute(selectionContext: TagDraftContext(tagSet)),
-      );
+      await showTagsPanel(context, TagsPanelDraftContext(tagSet));
     } finally {
       if (mounted) {
         setState(() => _isChoosingTags = false);
@@ -538,8 +509,8 @@ String _failureMessage(
     (IntentionTextField.description, IntentionTextValidationReason.empty) ||
     (IntentionTextField.titleFilter, _) => localizations.editorInvalidInput,
   },
-  // Объяснение описывает проверку при сохранении; исправление снимает
-  // оставшиеся в черновике отсутствующие теги.
+  // Объяснение описывает проверку при сохранении; отсутствующие теги уже
+  // ушли из черновика.
   IntentionCreationTagsMissingFailure(:final missingTagIds) =>
     localizations.editorCreateTagsMissing(missingTagIds.length),
   IntentionGenericValidationFailure() => localizations.editorInvalidInput,
@@ -661,7 +632,8 @@ final class _CloseConfirmationDialogState
   }
 }
 
-/// Быстрые действия черновика: общий выбор тегов и начальной готовности.
+/// Быстрые действия черновика: выбор тегов в панели тегов и начальная
+/// готовность.
 ///
 /// Действия меняют только черновик сессии и не отправляют команд графа.
 /// Включённое состояние готовности отличается формой значка и признаком

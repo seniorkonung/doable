@@ -16,6 +16,7 @@ import '../../tag/domain/tag_assignment.dart';
 import '../../tag/domain/tag_color.dart';
 import '../../tag/domain/tag_id.dart';
 import '../../tag/domain/tag_name.dart';
+import '../../tag/domain/tag_position.dart';
 
 // Разбор строк таблиц графа в значения предметной модели. Чтения и команды
 // репозитория, захват фактов и чтение записей порциями разбирают столбцы
@@ -84,14 +85,23 @@ ChoicePathStepId _decodeStoredChoicePathStepId(String value) =>
       InvalidChoicePathStepIdDecoding() => throw const StoredGraphCorruption(),
     };
 
-/// Тег из столбцов `id`, `name` и `color`. Название проверяет `CHECK` схемы
-/// той же функцией [TagName.fromStored], поэтому здесь оно только
-/// преобразуется в тип.
+/// Тег из столбцов `id`, `name`, `color` и `position`. Название проверяет
+/// `CHECK` схемы той же функцией [TagName.fromStored], поэтому здесь оно
+/// только преобразуется в тип.
 Tag decodeStoredTag(Map<String, Object?> data) => Tag(
   id: decodeStoredTagId(requiredStoredString(data, 'id')),
   name: TagName.fromStored(requiredStoredString(data, 'name')),
   color: _decodeStoredTagColor(data),
+  position: decodeStoredTagPosition(requiredStoredString(data, 'position')),
 );
+
+/// `CHECK` схемы проверяет только алфавит ключа, поэтому каноническую форму
+/// проверяет разбор.
+TagPosition decodeStoredTagPosition(String value) =>
+    switch (TagPosition.decode(value)) {
+      TagPositionDecodingSuccess(:final position) => position,
+      NonCanonicalTagPositionDecoding() => throw const StoredGraphCorruption(),
+    };
 
 /// SQL `NULL` — тег без цвета. Строка без столбца `color` — проекция,
 /// забывшая цвет, а не тег без цвета, поэтому она тоже даёт отказ.

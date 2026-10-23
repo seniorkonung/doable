@@ -18,17 +18,13 @@ final class AppRouter extends RootStackRouter {
           AutoRoute(page: destination.page),
       ],
     ),
-    AutoRoute(page: TagCatalogRoute.page),
-    AutoRoute(page: TagEditorRoute.page),
-    AutoRoute(page: TagNavigationRoute.page),
-    AutoRoute(page: TagConditionPickerRoute.page),
     AutoRoute(page: DailyChoiceActionPickerRoute.page),
     AutoRoute(page: DailyChoiceSourcePickerRoute.page),
     // Создание намерения — модальная нижняя панель над сохранённой корневой
     // страницей в этом же стеке (ADR-0018). Маршрут прозрачен и сам по фону
     // не закрывается: закрытие решает сессия создания, а вход и выход
-    // анимирует сама панель. Из неё открываются только страницы-задачи
-    // выбора и редактирования тегов: они сохраняют защищённую сессию.
+    // анимирует сама панель. Теги черновика выбираются в панели тегов поверх
+    // неё в том же стеке, которая сохраняет защищённую сессию (ADR-0040).
     CustomRoute<void>(
       page: IntentionEditorRoute.page,
       opaque: false,

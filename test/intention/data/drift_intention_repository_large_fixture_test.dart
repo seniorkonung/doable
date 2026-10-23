@@ -1,15 +1,10 @@
-import 'dart:math';
-
 import 'package:doable/src/data/local/app_database.dart' hide Tags;
-import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/tag/application/tag_command.dart';
-import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -18,6 +13,7 @@ import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/intention_catalog_large_fixture.dart';
 import '../../support/local_database_harness.dart';
+import '../../support/tag_positions.dart';
 
 const _fixtureSize = 5000;
 const _pageSize = 10;
@@ -31,7 +27,6 @@ const _excludedTagBase = 110000;
 const _extraTagBase = 120000;
 const _backgroundTagBase = 130000;
 const _popularTag = 140000;
-const _massTag = 150000;
 
 /// Условия запроса: популярный обязательный тег и число редких обязательных
 /// и исключённых условий, которые берутся первыми тегами соответствующего
@@ -229,286 +224,7 @@ void main() {
       }
     }
   });
-
-  test(
-    'согласует массовое удаление исключённого тега ограниченными порциями',
-    () async {
-      final (:repository, :raw, :trace) = await _openJointFixture();
-      _populateMassExcludedTag(raw);
-
-      // До удаления массовый тег оставляет в выдаче 250 намерений с номерами
-      // вида 20k + 4. Выдача загружена до конца 25 обычными порциями, поэтому
-      // сохранённая область во много раз больше порции согласования.
-      final before = [
-        for (final index in _expectedTagOnlyMatches(_massConditions))
-          if (!_hasMassTag(index)) index,
-      ];
-      expect(before, hasLength(25 * _pageSize));
-      final loaded = <IntentionSummary>[];
-      final continuations = <IntentionCatalogCursor>[];
-      IntentionCatalogCursor? cursor;
-      do {
-        final page = _page(
-          await repository.getCatalogPage(_massQuery(cursor: cursor)),
-        );
-        loaded.addAll(page.items);
-        cursor = page.nextCursor;
-        if (cursor != null) continuations.add(cursor);
-      } while (cursor != null);
-      expect(loaded.map((item) => _fixtureIndexOf(item.id)), before);
-      expect(continuations, hasLength(24));
-
-      trace.isRecording = false;
-      final deletion = await repository.execute(DeleteTag(_tagId(_massTag)));
-      trace.isRecording = true;
-      expect(deletion, isA<TagCommandSucceeded>());
-      final deletionRevision = (deletion as TagCommandSucceeded).value.revision;
-
-      // Удаление открывает почти 2 000 совпадений внутри сохранённой
-      // области. Условие по удалённому тегу остаётся в запросе.
-      final after = _expectedTagOnlyMatches(_massConditions);
-      expect(after, hasLength(1994));
-      for (final (label, boundary, storedCount) in [
-        (
-          'ранее полностью загруженная выдача',
-          const IntentionCatalogCompletedBoundary(),
-          before.length,
-        ),
-        (
-          'частично загруженный префикс',
-          IntentionCatalogPartialPrefixBoundary(continuations[1]),
-          2 * _pageSize,
-        ),
-      ]) {
-        final storedRows = loaded.take(storedCount).toList();
-        final stored = before.take(storedCount).toList();
-        final areaEnd = switch (boundary) {
-          IntentionCatalogCompletedBoundary() => null,
-          IntentionCatalogPartialPrefixBoundary() => stored.last,
-        };
-        final area = [
-          for (final index in after)
-            if (areaEnd == null || _compareCatalogOrder(index, areaEnd) <= 0)
-              index,
-        ];
-        final missing = [
-          for (final index in area)
-            if (!stored.contains(index)) index,
-        ];
-        expect(missing, hasLength(area.length - stored.length), reason: label);
-
-        final reconciled = await _expectMassReconciliation(
-          repository,
-          raw,
-          trace,
-          label: label,
-          boundary: boundary,
-          stored: storedRows,
-          missing: missing,
-          totalCount: after.length,
-          revision: deletionRevision,
-        );
-        expect(
-          [...stored, ...reconciled]..sort(_compareCatalogOrder),
-          area,
-          reason: label,
-        );
-      }
-    },
-  );
 }
-
-/// Массовый тег назначен всем намерениям фикстуры, кроме номеров вида
-/// 20k + 4: среди активных готовых намерений с популярным тегом он
-/// оставляет только их.
-void _populateMassExcludedTag(sqlite.Database database) {
-  final insertAssignment = database.prepare(
-    'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-  );
-  database.execute('BEGIN');
-  try {
-    seedRawGraph(database, () {
-      database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-        _fixtureId(_massTag),
-        'Тег $_massTag',
-      ]);
-      for (var index = 0; index < _fixtureSize; index++) {
-        if (_hasMassTag(index)) {
-          insertAssignment.execute([_fixtureId(_massTag), _fixtureId(index)]);
-        }
-      }
-    });
-    database.execute('COMMIT');
-  } on Object {
-    database.execute('ROLLBACK');
-    rethrow;
-  } finally {
-    insertAssignment.close();
-  }
-}
-
-bool _hasMassTag(int fixtureIndex) => fixtureIndex % 20 != 4;
-
-/// Популярный обязательный тег и все исключённые условия; массовый тег
-/// добавляется к исключённым условиям запросом [_massQuery].
-const _massConditions = (popular: true, required: 0, excluded: _conditionCount);
-
-IntentionCatalogQuery _massQuery({IntentionCatalogCursor? cursor}) =>
-    _jointQuery(
-      titleFilter: null,
-      conditions: _massConditions,
-      excludesMassTag: true,
-      cursor: cursor,
-    );
-
-/// Проходит согласование области до конца скользящим окном сохранённых
-/// строк и возвращает номера недостающих совпадений в порядке получения.
-/// Каждая порция даёт только следующие недостающие совпадения и не читает
-/// больше строк, чем нужно порции, а число порций растёт линейно с числом
-/// сохранённых и недостающих строк.
-Future<List<int>> _expectMassReconciliation(
-  DriftPersonalGraphRepository repository,
-  sqlite.Database raw,
-  _SelectTrace trace, {
-  required String label,
-  required IntentionCatalogReconciliationBoundary boundary,
-  required List<IntentionSummary> stored,
-  required List<int> missing,
-  required int totalCount,
-  required GraphRevision revision,
-}) async {
-  final storedIndexes = [for (final row in stored) _fixtureIndexOf(row.id)];
-  final changesBefore = _connectionChanges(raw);
-  final reconciled = <int>[];
-  var readRows = 0;
-  var allowedRows = 0;
-  IntentionCatalogReconciliationCursor? cursor;
-  var windowStart = 0;
-  var portionNumber = 0;
-  do {
-    final windowEnd = min(windowStart + _pageSize, stored.length);
-    final windowRows = stored.sublist(windowStart, windowEnd);
-    final IntentionCatalogReconciliationWindow window =
-        windowEnd < stored.length
-        ? IntentionCatalogInnerReconciliationWindow(windowRows)
-        : IntentionCatalogFinalReconciliationWindow(windowRows);
-    trace.clear();
-    final result = await repository.getCatalogReconciliationPortion(
-      IntentionCatalogReconciliationQuery(
-        catalogQuery: _massQuery(),
-        boundary: boundary,
-        window: window,
-        cursor: cursor,
-      ),
-    );
-    expect(
-      result,
-      isA<ResultSuccess<IntentionCatalogReconciliationOutcome>>(),
-      reason: '$label, порция $portionNumber',
-    );
-    final outcome =
-        (result as ResultSuccess<IntentionCatalogReconciliationOutcome>).value;
-    expect(
-      outcome,
-      isA<IntentionCatalogReconciliationPortion>(),
-      reason: '$label, порция $portionNumber',
-    );
-    final portion = outcome as IntentionCatalogReconciliationPortion;
-    final isFirst = portionNumber == 0;
-    if (isFirst) {
-      expect(
-        (portion as IntentionCatalogReconciliationFirstPortion).totalCount,
-        totalCount,
-        reason: label,
-      );
-    } else {
-      expect(portion, isA<IntentionCatalogReconciliationContinuationPortion>());
-    }
-    expect(portion.revision.compareTo(revision), GraphRevisionOrder.same);
-
-    final indexes = [
-      for (final item in portion.items) _fixtureIndexOf(item.id),
-    ];
-    expect(
-      indexes,
-      hasLength(lessThanOrEqualTo(_pageSize)),
-      reason: '$label, порция $portionNumber',
-    );
-    // Порция — следующие недостающие совпадения не дальше верхнего края
-    // окна: последней строки внутреннего окна либо границы области.
-    final upperEdge = switch (window) {
-      IntentionCatalogInnerReconciliationWindow(:final upperEdgeRow) =>
-        _fixtureIndexOf(upperEdgeRow.id),
-      IntentionCatalogFinalReconciliationWindow() => null,
-    };
-    final expected = missing
-        .skip(reconciled.length)
-        .takeWhile(
-          (index) =>
-              upperEdge == null || _compareCatalogOrder(index, upperEdge) < 0,
-        )
-        .take(_pageSize);
-    expect(indexes, expected, reason: '$label, порция $portionNumber');
-    expect(
-      portion.nextCursor == null,
-      window is IntentionCatalogFinalReconciliationWindow &&
-          reconciled.length + indexes.length == missing.length,
-      reason: '$label, порция $portionNumber',
-    );
-    _expectBoundedReadVolume(
-      trace,
-      portion.items,
-      isFirst: isFirst,
-      portionRows: _pageSize + 1,
-    );
-    _expectFixtureTags(portion.items);
-    readRows += _selectedRows(trace);
-    allowedRows += _readVolumeLimit(
-      portion.items,
-      isFirst: isFirst,
-      portionRows: portion.items.length + 1,
-    );
-    reconciled.addAll(indexes);
-    cursor = portion.nextCursor;
-    if (cursor != null) {
-      final position = indexes.length == _pageSize
-          ? indexes.last
-          : _fixtureIndexOf(
-              (window as IntentionCatalogInnerReconciliationWindow)
-                  .upperEdgeRow
-                  .id,
-            );
-      while (windowStart < stored.length &&
-          _compareCatalogOrder(storedIndexes[windowStart], position) <= 0) {
-        windowStart += 1;
-      }
-    }
-    portionNumber++;
-  } while (cursor != null);
-
-  expect(reconciled, missing, reason: label);
-  // Заполненная порция забирает `pageSize` недостающих строк, а незаполненная
-  // исчерпывает окно из `pageSize` сохранённых строк либо завершает область,
-  // поэтому число порций линейно по обоим размерам.
-  expect(
-    portionNumber,
-    inInclusiveRange(
-      (missing.length + _pageSize - 1) ~/ _pageSize,
-      missing.length ~/ _pageSize +
-          max(1, (stored.length + _pageSize - 1) ~/ _pageSize),
-    ),
-    reason: label,
-  );
-  // Все порции вместе читают недостающие совпадения однократно, а
-  // сохранённые строки не читают вовсе: каждая порция читает не больше одной
-  // строки сверх своих.
-  expect(readRows, lessThanOrEqualTo(allowedRows), reason: label);
-  expect(_connectionChanges(raw), changesBefore, reason: label);
-  return reconciled;
-}
-
-int _connectionChanges(sqlite.Database raw) =>
-    raw.select('SELECT total_changes() AS count').single['count'] as int;
 
 /// Файловая база с большой фикстурой, совместными кандидатами и популярным
 /// тегом; трассировка очищена и ограничивает число SQL-параметров.
@@ -579,7 +295,7 @@ Future<void> _expectJointTraversal(
 /// Каждое намерение дополнительно имеет три фоновых тега вне условий.
 void _populateJointTagFixture(sqlite.Database database) {
   final insertTag = database.prepare(
-    'INSERT INTO tags (id, name) VALUES (?, ?)',
+    'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
   );
   final insertAssignment = database.prepare(
     'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
@@ -597,7 +313,11 @@ void _populateJointTagFixture(sqlite.Database database) {
         (_popularTag, 1),
       ]) {
         for (var index = 0; index < count; index++) {
-          insertTag.execute([_fixtureId(base + index), 'Тег ${base + index}']);
+          insertTag.execute([
+            _fixtureId(base + index),
+            'Тег ${base + index}',
+            tagPositionKey(base + index),
+          ]);
         }
       }
       for (var index = 0; index < _jointCandidateCount; index++) {
@@ -772,14 +492,18 @@ bool _matchesTagOnlyQuery(int fixtureIndex, _Conditions conditions) {
   return excludedTag == null || excludedTag >= conditions.excluded;
 }
 
-/// Фоновые теги намерения фикстуры в порядке их создания.
+/// Фоновые теги намерения фикстуры в ручном порядке по месту. Фикстура даёт
+/// места по возрастанию номера тега, поэтому ручной порядок в ней совпадает
+/// с порядком создания.
 List<int> _backgroundTags(int fixtureIndex) => [
   for (final offset in _backgroundTagOffsets)
     (fixtureIndex + offset) % _backgroundTagCount,
 ]..sort();
 
-/// Полный состав собственных тегов намерения фикстуры в порядке создания
-/// тегов: обязательные, исключённый, дополнительные, фоновые, популярный.
+/// Полный состав собственных тегов намерения фикстуры в ручном порядке по
+/// месту: обязательные, исключённый, дополнительные, фоновые, популярный.
+/// Фикстура даёт места по возрастанию номера тега, поэтому ручной порядок
+/// в ней совпадает с порядком создания.
 List<TagId> _fixtureTagIds(int fixtureIndex) {
   final jointIndex = _jointIndexOf(fixtureIndex);
   return [
@@ -810,7 +534,6 @@ IntentionCatalogQuery _jointQuery({
   int pageSize = _pageSize,
   String? titleFilter = 'редкое %_',
   _Conditions conditions = _allConditions,
-  bool excludesMassTag = false,
   IntentionCatalogCursor? cursor,
 }) => IntentionCatalogQuery(
   scope: IntentionScope.active,
@@ -823,7 +546,6 @@ IntentionCatalogQuery _jointQuery({
         _tagId(_requiredTagBase + index),
     ],
     excludedTagIds: [
-      if (excludesMassTag) _tagId(_massTag),
       for (var index = 0; index < conditions.excluded; index++)
         _tagId(_excludedTagBase + index),
     ],

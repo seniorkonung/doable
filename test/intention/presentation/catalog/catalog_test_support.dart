@@ -76,9 +76,6 @@ final class ControlledCatalogRepository
 
   final queries = <IntentionCatalogQuery>[];
   final _requests = <Completer<Result<IntentionCatalogPage>>>[];
-  final reconciliationQueries = <IntentionCatalogReconciliationQuery>[];
-  final _reconciliationRequests =
-      <Completer<Result<IntentionCatalogReconciliationOutcome>>>[];
   final commands = <IntentionCommand>[];
   final _commandRequests =
       <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
@@ -89,8 +86,8 @@ final class ControlledCatalogRepository
   final tagCommands = <TagCommand>[];
   final _tagCommandRequests = <Completer<TagCommandResult>>[];
 
-  /// Полный снимок каталога тегов для выбора тега условия поиска; без него
-  /// чтение каталога тегов отказывает.
+  /// Полный снимок каталога тегов для панели тегов в режиме фильтра; без
+  /// него чтение каталога тегов отказывает.
   List<Tag>? tagCatalogItems;
 
   @override
@@ -120,16 +117,6 @@ final class ControlledCatalogRepository
 
   void complete(int index, Result<IntentionCatalogPage> result) {
     _requests[index].complete(result);
-  }
-
-  IntentionCatalogReconciliationQuery reconciliationQueryAt(int index) =>
-      reconciliationQueries[index];
-
-  void completeReconciliation(
-    int index,
-    Result<IntentionCatalogReconciliationOutcome> result,
-  ) {
-    _reconciliationRequests[index].complete(result);
   }
 
   void completeCommand(int index, Result<IntentionCommandSuccess> result) {
@@ -166,15 +153,6 @@ final class ControlledCatalogRepository
     queries.add(query);
     final request = Completer<Result<IntentionCatalogPage>>();
     _requests.add(request);
-    return request.future;
-  }
-
-  @override
-  Future<Result<IntentionCatalogReconciliationOutcome>>
-  getCatalogReconciliationPortion(IntentionCatalogReconciliationQuery query) {
-    reconciliationQueries.add(query);
-    final request = Completer<Result<IntentionCatalogReconciliationOutcome>>();
-    _reconciliationRequests.add(request);
     return request.future;
   }
 
@@ -264,11 +242,6 @@ final class ControlledCatalogRepository
 
 final class TestCatalogCursor implements IntentionCatalogCursor {
   const TestCatalogCursor();
-}
-
-final class TestReconciliationCursor
-    implements IntentionCatalogReconciliationCursor {
-  const TestReconciliationCursor();
 }
 
 final class TestCatalogRevision implements GraphRevision {

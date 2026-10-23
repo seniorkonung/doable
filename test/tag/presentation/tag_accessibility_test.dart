@@ -1,31 +1,26 @@
 import 'dart:async';
-import 'dart:ui' show Tristate;
+import 'dart:ui' show CheckedState;
 
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
-import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
-import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
+import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
-import 'package:doable/src/intention/presentation/editor/intention_editor_view_model.dart';
-import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
-import 'package:doable/src/tag/presentation/catalog/tag_catalog_view.dart';
-import 'package:doable/src/tag/presentation/catalog/tag_selection_context.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_section.dart';
-import 'package:doable/src/tag/domain/tag_id.dart';
-import 'package:doable/src/tag/application/tagged_intentions_page.dart';
-import 'package:doable/src/tag/presentation/navigation/tag_navigation_page.dart';
+import 'package:doable/src/tag/presentation/panel/tags_panel.dart';
+import 'package:doable/src/tag/presentation/panel/tags_panel_context.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart' show RenderParagraph;
-import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -34,12 +29,9 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../../support/app_root_pages.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
-import '../../support/inline_text.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
-
-part 'tag_navigation_accessibility_scenarios.dart';
-part 'tag_catalog_search_accessibility_scenarios.dart';
+import '../../support/tag_positions.dart';
 
 Future<void> _until(WidgetTester tester, Finder finder) async {
   for (var attempt = 0; attempt < 100; attempt++) {
@@ -65,24 +57,6 @@ Future<void> _untilCondition(
   expect(condition(), isTrue);
 }
 
-Future<void> _dismissPresentedMessages(WidgetTester tester) async {
-  final messenger = ScaffoldMessenger.of(
-    tester.element(find.byKey(const ValueKey('tag-catalog-create'))),
-  );
-  for (var attempt = 0; attempt < 5; attempt++) {
-    await tester.pumpAndSettle();
-    if (find
-        .byKey(const ValueKey('graph-operation-message'))
-        .evaluate()
-        .isEmpty) {
-      return;
-    }
-    messenger.removeCurrentSnackBar();
-    await tester.pumpAndSettle();
-  }
-  expect(find.byKey(const ValueKey('graph-operation-message')), findsNothing);
-}
-
 Future<void> _tap(WidgetTester tester, Finder finder) async {
   await _until(tester, finder);
   await tester.pumpAndSettle();
@@ -93,105 +67,8 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
 }
 
 void main() {
-  _registerCatalogSearchScenarios();
   _registerAssignmentScenarios();
-  _registerNavigationEntryScenarios();
-  _registerDraftSelectionScenarios();
-  const locale = Locale('ru');
-
-  testWidgets('диктор сохраняет ввод, действия и подтверждение', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(420, 900);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
-    final semantics = tester.ensureSemantics();
-    late sqlite.Database raw;
-    final database = AppDatabase(
-      openInMemoryLocalDatabase(setup: (connection) => raw = connection),
-    );
-    await database.open();
-    addTearDown(database.close);
-    final repository = DriftPersonalGraphRepository(
-      database,
-      UuidV7IntentionIdGenerator(),
-      () => DateTime.utc(2026, 9, 25),
-      InMemoryDiagnosticsSink(),
-    );
-    final router = AppRouter();
-    addTearDown(router.dispose);
-    final l10n = await AppLocalizations.delegate.load(locale);
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          inMemoryQuickCreationModeOverride,
-          personalGraphRepositoryProvider.overrideWithValue(repository),
-        ],
-        child: MaterialApp.router(
-          theme: doableTheme(Brightness.light),
-          locale: locale,
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          routerConfig: router.config(),
-        ),
-      ),
-    );
-    addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
-    await openIntentionGraph(tester, waitFor: _until);
-    await _tap(tester, find.byKey(const ValueKey('catalog-open-tags')));
-    final create = find.byKey(const ValueKey('tag-catalog-create'));
-    await _until(tester, create);
-    await tester.pumpAndSettle();
-    expect(tester.getSemantics(create).tooltip, l10n.tagCatalogCreate);
-    await _tap(tester, create);
-    final nameField = find.byKey(const ValueKey('tag-editor-name'));
-    await _until(tester, nameField);
-    expect(
-      find.bySemanticsLabel(RegExp(l10n.tagEditorNameLabel)),
-      findsWidgets,
-    );
-
-    final invalid = '🙂' * 256;
-    await tester.enterText(nameField, invalid);
-    await _tap(tester, find.byKey(const ValueKey('tag-editor-submit')));
-    final failure = find.byKey(const ValueKey('tag-editor-field-failure'));
-    await _until(tester, failure);
-    await tester.pumpAndSettle();
-    expect(tester.getSemantics(failure).label, isNotEmpty);
-    expect(tester.widget<TextField>(nameField).controller!.text, invalid);
-    expect(raw.select('SELECT * FROM tags'), isEmpty);
-
-    final corrected = 'Straße 🏠é ${('Длинное название ' * 8).trimRight()}';
-    await tester.enterText(nameField, corrected);
-    await _tap(tester, find.byKey(const ValueKey('tag-editor-submit')));
-    await _until(tester, find.text(corrected));
-    final id = raw.select('SELECT id FROM tags').single['id'] as String;
-    final delete = find.byKey(ValueKey('tag-catalog-delete-$id'));
-    await _until(tester, delete);
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(delete);
-    expect(tester.getSemantics(delete).tooltip, l10n.tagCatalogDelete);
-    await _tap(tester, delete);
-    final scope = find.byKey(const ValueKey('tag-delete-scope'));
-    await _until(tester, scope);
-    await tester.pumpAndSettle();
-    expect(find.textContaining(corrected), findsWidgets);
-    expect(
-      tester.getSemantics(scope).label,
-      contains(l10n.tagDeleteConfirmationScope),
-    );
-    final cancel = find.byKey(const ValueKey('tag-delete-cancel'));
-    final confirm = find.byKey(const ValueKey('tag-delete-confirm'));
-    await tester.ensureVisible(cancel);
-    expect(tester.getSemantics(cancel).label, l10n.tagDeleteCancel);
-    await tester.ensureVisible(confirm);
-    expect(tester.getSemantics(confirm).label, l10n.tagDeleteConfirm);
-    expect(tester.takeException(), isNull);
-    await tester.tap(cancel);
-    await tester.pumpAndSettle();
-    expect(raw.select('SELECT id FROM tags'), hasLength(1));
-    semantics.dispose();
-  });
+  _registerFilterPanelScenarios();
 }
 
 void _registerAssignmentScenarios() {
@@ -230,10 +107,14 @@ void _registerAssignmentScenarios() {
         seedRawGraph(raw, () {
           for (var index = 0; index < 50; index++) {
             final id = tagFixtureId(10000 + index);
-            raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-              id,
-              'Дополнение ${index.toString().padLeft(3, '0')}',
-            ]);
+            raw.execute(
+              'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+              [
+                id,
+                'Дополнение ${index.toString().padLeft(3, '0')}',
+                tagPositionKey(10000 + index),
+              ],
+            );
             raw.execute(
               'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
               [id, tagFixtureId(number)],
@@ -244,7 +125,10 @@ void _registerAssignmentScenarios() {
         final router = ready.container.read(appRouterProvider);
         await tester.pumpWidget(MainApp(runtime: runtime));
         await openIntentionGraph(tester, waitFor: _until);
-        await _until(tester, find.byKey(const ValueKey('catalog-open-tags')));
+        await _until(
+          tester,
+          find.byKey(const ValueKey('intention-tag-conditions-add')),
+        );
         final id = (IntentionId.decode(
           tagFixtureId(number),
         ) as IntentionIdDecodingSuccess).id;
@@ -302,89 +186,142 @@ void _registerAssignmentScenarios() {
 
         await _tap(tester, choose);
         final assignedRow = find.byKey(
-          ValueKey('tag-catalog-row-${tagFixtureId(firstTagNumber)}'),
+          ValueKey('tags-panel-row-${tagFixtureId(firstTagNumber)}'),
+        );
+        final availableRow = find.byKey(
+          ValueKey('tags-panel-row-${tagFixtureId(lastTagNumber)}'),
         );
         await _until(tester, assignedRow);
         await tester.pumpAndSettle();
-        final assignedStatus = find.descendant(
-          of: assignedRow,
-          matching: find.text(l10n.tagCatalogAssigned),
-        );
-        expect(assignedStatus, findsOneWidget);
         expect(
-          tester.getSemantics(assignedStatus).label,
-          contains(l10n.tagCatalogAssigned),
+          tester.getSemantics(assignedRow),
+          isSemantics(
+            label: 'Дом',
+            hasCheckedState: true,
+            isChecked: true,
+            hasTapAction: true,
+          ),
         );
         expect(
-          tester
-              .getSemantics(assignedStatus)
-              .getSemanticsData()
-              .hasAction(SemanticsAction.tap),
-          isTrue,
+          tester.getSemantics(availableRow),
+          isSemantics(
+            label: 'Работа',
+            hasCheckedState: true,
+            isChecked: false,
+            hasTapAction: true,
+          ),
         );
-        expect(find.text(l10n.tagCatalogAvailable), findsWidgets);
-        await _tap(tester, find.byKey(const ValueKey('tag-catalog-create')));
-        final name = find.byKey(const ValueKey('tag-editor-name'));
+
+        final newName = 'Straße 🏠é ${'Длинное название ' * 7}'.trimRight();
+        await tester.enterText(
+          find.descendant(
+            of: find.byType(Sheet),
+            matching: find.byType(TextField),
+          ),
+          newName,
+        );
+        await tester.pump();
+        final createRow = find.bySemanticsLabel(
+          l10n.tagsPanelCreateTag(newName),
+        );
+        _expectAction(tester.getSemantics(createRow));
+        await _tap(tester, createRow);
+        final name = find.bySemanticsLabel(RegExp(l10n.tagEditorNameLabel));
         await _until(tester, name);
-        await tester.enterText(name, 'Дом');
-        await _tap(tester, find.byKey(const ValueKey('tag-editor-submit')));
-        final fieldFailure = find.byKey(
-          const ValueKey('tag-editor-field-failure'),
-        );
-        await _until(tester, fieldFailure);
         await tester.pumpAndSettle();
-        expect(
-          tester.getSemantics(fieldFailure).label,
-          contains(l10n.tagNameOccupied),
-        );
-        expect(tester.widget<TextField>(name).controller!.text, 'Дом');
-        _expectAction(
-          tester.getSemantics(find.byKey(const ValueKey('tag-editor-cancel'))),
-        );
         expect(
           _traversalIndex(tester, l10n.tagEditorNameLabel),
           lessThan(_traversalIndex(tester, l10n.tagEditorCreateAction)),
         );
-        expect(
-          _traversalIndex(tester, l10n.tagEditorCreateAction),
-          lessThan(_traversalIndex(tester, l10n.tagEditorCancel)),
-        );
-
-        final newName = 'Straße 🏠é ${'Длинное название ' * 7}'.trimRight();
-        await tester.enterText(name, newName);
-        await _tap(tester, find.byKey(const ValueKey('tag-editor-submit')));
-        await _until(
+        await _tap(
           tester,
-          find.bySemanticsLabel(l10n.tagCatalogAssignNamed(newName)),
+          find.widgetWithText(FilledButton, l10n.tagEditorCreateAction),
+        );
+        await _untilCondition(
+          tester,
+          () => raw.select('SELECT id FROM tags WHERE name = ?', [
+            newName,
+          ]).isNotEmpty,
         );
         final newId =
             raw.select('SELECT id FROM tags WHERE name = ?', [
                   newName,
                 ]).single['id']
                 as String;
-        expect(
-          raw.select('SELECT * FROM tag_assignments WHERE tag_id = ?', [newId]),
-          isEmpty,
-        );
-        final assign = find.byKey(const ValueKey('tag-catalog-assign'));
-        await tester.pumpAndSettle();
-        expect(
-          find.bySemanticsLabel(l10n.tagCatalogAssignNamed(newName)),
-          findsOneWidget,
-        );
-        _expectAction(tester.getSemantics(assign));
-        await _tap(tester, assign);
+        // Созданный в панели тег сразу назначен и объявлен отмеченным.
+        final newRow = find.byKey(ValueKey('tags-panel-row-$newId'));
         await _untilCondition(
           tester,
-          () => raw.select('SELECT * FROM tag_assignments WHERE tag_id = ?', [
-            newId,
-          ]).isNotEmpty,
+          () =>
+              raw.select('SELECT * FROM tag_assignments WHERE tag_id = ?', [
+                newId,
+              ]).isNotEmpty &&
+              find.bySemanticsLabel(newName).evaluate().isNotEmpty,
+        );
+        await tester.pumpAndSettle();
+        expect(
+          tester.getSemantics(newRow),
+          isSemantics(
+            label: newName,
+            hasCheckedState: true,
+            isChecked: true,
+            hasTapAction: true,
+          ),
         );
         expect(
           raw.select('SELECT * FROM tag_assignments WHERE tag_id = ?', [newId]),
           hasLength(1),
         );
-        router.pop();
+        // Отметка назначает тег нажатием, а удаление самого тега — отдельное
+        // действие строки с доступным подтверждением.
+        final rowNode = tester.getSemantics(newRow);
+        expect(
+          rowNode,
+          isSemantics(
+            label: newName,
+            hint: l10n.tagsPanelTagHoldHint,
+            hasCheckedState: true,
+            isChecked: true,
+            hasTapAction: true,
+            hasLongPressAction: true,
+            customActions: [
+              CustomSemanticsAction(label: l10n.tagsPanelEditTag),
+              CustomSemanticsAction(label: l10n.tagsPanelDuplicateTag),
+              CustomSemanticsAction(label: l10n.tagsPanelDeleteTag),
+            ],
+          ),
+        );
+        tester.binding.renderViews.first.owner!.semanticsOwner!.performAction(
+          rowNode.id,
+          SemanticsAction.customAction,
+          CustomSemanticsAction.getIdentifier(
+            CustomSemanticsAction(label: l10n.tagsPanelDeleteTag),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.bySemanticsLabel(l10n.tagsPanelDeleteTitle), findsWidgets);
+        expect(
+          tester
+              .getSemantics(
+                find.textContaining(l10n.tagsPanelDeleteTextAfter.trim()),
+              )
+              .label,
+          allOf(
+            contains(newName),
+            contains(l10n.tagsPanelDeleteTextAfter.trim()),
+          ),
+        );
+        final cancelDeletion = find.text(l10n.tagsPanelDeleteCancel);
+        final confirmDeletion = find.text(l10n.tagsPanelDeleteConfirm);
+        _expectAction(tester.getSemantics(cancelDeletion));
+        _expectAction(tester.getSemantics(confirmDeletion));
+        await tester.tap(cancelDeletion);
+        await tester.pumpAndSettle();
+        expect(
+          raw.select('SELECT id FROM tags WHERE id = ?', [newId]),
+          hasLength(1),
+        );
+        await _tap(tester, find.text(l10n.tagsPanelDone));
         await _until(tester, find.byType(IntentionDetailsPage));
         await tester.pumpAndSettle();
         expect(
@@ -451,69 +388,6 @@ void _registerAssignmentScenarios() {
 
         expect(tester.takeException(), isNull);
 
-        router.pop();
-        await _tap(tester, find.byKey(const ValueKey('catalog-open-tags')));
-        await _until(tester, find.byKey(const ValueKey('tag-catalog-create')));
-        await _dismissPresentedMessages(tester);
-        expect(
-          find.byKey(const ValueKey('tag-catalog-load-more')),
-          findsNothing,
-        );
-        final delete = find.byKey(ValueKey('tag-catalog-delete-$newId'));
-        await tester.scrollUntilVisible(
-          delete,
-          300,
-          scrollable: find
-              .descendant(
-                of: find.byKey(const ValueKey('tag-catalog-list')),
-                matching: find.byType(Scrollable),
-              )
-              .first,
-        );
-        await _tap(tester, delete);
-        final scope = find.byKey(const ValueKey('tag-delete-scope'));
-        await _until(tester, scope);
-        await tester.pumpAndSettle();
-        expect(
-          tester.getSemantics(scope).label,
-          contains(l10n.tagDeleteConfirmationScope),
-        );
-        final cancel = find.byKey(const ValueKey('tag-delete-cancel'));
-        final confirm = find.byKey(const ValueKey('tag-delete-confirm'));
-        await tester.ensureVisible(cancel);
-        await tester.ensureVisible(confirm);
-        expect(tester.getSemantics(cancel).label, l10n.tagDeleteCancel);
-        expect(tester.getSemantics(confirm).label, l10n.tagDeleteConfirm);
-        _expectAction(tester.getSemantics(cancel));
-        _expectAction(tester.getSemantics(confirm));
-        expect(
-          _traversalIndex(tester, l10n.tagDeleteCancel),
-          lessThan(_traversalIndex(tester, l10n.tagDeleteConfirm)),
-        );
-        expect(tester.takeException(), isNull);
-        await tester.tap(cancel);
-        await tester.pumpAndSettle();
-        expect(
-          raw.select('SELECT id FROM tags WHERE id = ?', [newId]),
-          hasLength(1),
-        );
-        await _tap(tester, delete);
-        await _tap(tester, confirm);
-        await _untilCondition(
-          tester,
-          () => raw.select('SELECT id FROM tags WHERE id = ?', [newId]).isEmpty,
-        );
-        final tagId = (TagId.decode(newId) as TagIdDecodingSuccess).id;
-        await _untilCondition(
-          tester,
-          () => !ready.container
-              .read(graphCommandCoordinatorProvider.notifier)
-              .isTagRunning(tagId),
-        );
-        expect(
-          raw.select('SELECT id FROM tags WHERE id = ?', [newId]),
-          isEmpty,
-        );
         await tester.pumpWidget(const SizedBox.shrink());
         for (var attempt = 0; attempt < 4; attempt++) {
           await tester.runAsync(
@@ -527,200 +401,139 @@ void _registerAssignmentScenarios() {
   }
 }
 
-void _registerDraftSelectionScenarios() {
-  const locale = Locale('ru');
-
-  testWidgets('добавление тегов в черновик доступно диктору и клавиатуре', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(420, 900);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
-    final semantics = tester.ensureSemantics();
-    late sqlite.Database raw;
-    final database = AppDatabase(
-      openInMemoryLocalDatabase(setup: (connection) => raw = connection),
-    );
-    await database.open();
-    addTearDown(database.close);
-    final diagnostics = InMemoryDiagnosticsSink();
-    final repository = DriftPersonalGraphRepository(
-      database,
-      UuidV7IntentionIdGenerator(),
-      () => DateTime.utc(2026, 9, 25),
-      diagnostics,
-    );
-    seedRawGraph(raw, () {
-      for (final (number, name) in [
-        (firstTagNumber, 'Дом'),
-        (lastTagNumber, 'Работа'),
-      ]) {
-        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-          tagFixtureId(number),
-          name,
-        ]);
-      }
-    });
-    final container = ProviderContainer(
-      overrides: [
-        personalGraphRepositoryProvider.overrideWithValue(repository),
-      ],
-    );
-    addTearDown(container.dispose);
-    final session = intentionEditorViewModelProvider(
-      IntentionCreationFormKey(),
-    );
-    final sessionSubscription = container.listen(session, (_, _) {});
-    addTearDown(sessionSubscription.close);
-    final tagSet = container.read(session.notifier).draftTagSet;
-    final l10n = await AppLocalizations.delegate.load(locale);
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: MaterialApp(
-          locale: locale,
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: TagCatalogView(
-            selectionContext: TagDraftContext(tagSet),
-            onOpenEditor: (_) async => null,
-            onOpenNavigation: (_) {},
+void _registerFilterPanelScenarios() {
+  for (final locale in const [Locale('ru'), Locale('en')]) {
+    testWidgets('${locale.languageCode}: в панели фильтра диктор объявляет '
+        'надобность один раз и сбрасывает условия без назначений', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(420, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final semantics = tester.ensureSemantics();
+      late sqlite.Database raw;
+      final database = AppDatabase(
+        openInMemoryLocalDatabase(setup: (connection) => raw = connection),
+      );
+      await database.open();
+      addTearDown(database.close);
+      final repository = DriftPersonalGraphRepository(
+        database,
+        UuidV7IntentionIdGenerator(),
+        () => DateTime.utc(2026, 9, 25),
+        InMemoryDiagnosticsSink(),
+      );
+      seedRawGraph(raw, () {
+        for (final (number, name) in [
+          (firstTagNumber, 'Дом'),
+          (lastTagNumber, 'Работа'),
+        ]) {
+          raw.execute(
+            'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+            [tagFixtureId(number), name, tagPositionKey(number)],
+          );
+        }
+      });
+      final container = ProviderContainer(
+        overrides: [
+          personalGraphRepositoryProvider.overrideWithValue(repository),
+        ],
+      );
+      addTearDown(container.dispose);
+      final conditionsProvider = intentionTagConditionsViewModelProvider(
+        const BrowseIntentionCatalog(),
+      );
+      final conditionsSubscription = container.listen(
+        conditionsProvider,
+        (_, _) {},
+      );
+      addTearDown(conditionsSubscription.close);
+      final conditions = container.read(conditionsProvider.notifier);
+      final l10n = await AppLocalizations.delegate.load(locale);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: doableTheme(Brightness.light),
+            locale: locale,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            builder: (context, child) => GraphOperationPresenter(
+              child: child ?? const SizedBox.shrink(),
+            ),
+            home: Builder(
+              builder: (context) => Scaffold(
+                body: Center(
+                  child: TextButton(
+                    onPressed: () => showTagsPanel(
+                      context,
+                      TagsPanelFilterContext(conditions),
+                    ),
+                    child: const Text('Открыть'),
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
-      ),
-    );
-    addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
-    final home = find.byKey(
-      ValueKey('tag-catalog-row-${tagFixtureId(firstTagNumber)}'),
-    );
-    final work = find.byKey(
-      ValueKey('tag-catalog-row-${tagFixtureId(lastTagNumber)}'),
-    );
-    final add = find.byKey(const ValueKey('tag-catalog-add-to-draft'));
-    await _until(tester, work);
-    await tester.pumpAndSettle();
-
-    for (final (row, name) in [(home, 'Дом'), (work, 'Работа')]) {
-      final status = find.descendant(
-        of: row,
-        matching: find.text(l10n.tagCatalogAvailableForDraft),
       );
-      expect(status, findsOneWidget);
-      final node = tester.getSemantics(status);
-      expect(node.label, contains(name));
-      expect(node.label, contains(l10n.tagCatalogAvailableForDraft));
-      expect(node.label, isNot(contains(l10n.tagCatalogInDraft)));
-      expect(node.label, isNot(contains(l10n.tagCatalogAvailable)));
-      expect(node.getSemanticsData().hasAction(SemanticsAction.tap), true);
-    }
-    final idle = tester.getSemantics(add);
-    expect(idle.label, l10n.tagCatalogAddToDraftSemantic);
-    expect(idle.flagsCollection.isButton, isTrue);
-    expect(idle.flagsCollection.isEnabled, Tristate.isFalse);
-    expect(_isInsideView(tester, add), isTrue);
+      addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
+      await tester.tap(find.text('Открыть'));
+      final home = find.byKey(
+        ValueKey('tags-panel-row-${tagFixtureId(firstTagNumber)}'),
+      );
+      await _until(tester, home);
+      await tester.pumpAndSettle();
+      expect(find.text(l10n.tagsPanelFilterTitle), findsOne);
+      expect(find.text(l10n.tagsPanelFilterHint), findsOne);
 
-    await _focusWithTab(tester, home);
-    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-    await tester.pump();
-    expect(
-      tester.getSemantics(home).flagsCollection.isSelected,
-      Tristate.isTrue,
-    );
-    expect(tagSet.current.tagIds, isEmpty);
-    final homeAction = tester.getSemantics(add);
-    expect(homeAction.label, l10n.tagCatalogAddToDraftNamed('Дом'));
-    expect(homeAction.label, contains(l10n.tagCatalogAddToDraft));
-    _expectAction(homeAction);
-
-    await _focusWithTab(tester, add);
-    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-    await tester.pump();
-    final homeIncluded = find.descendant(
-      of: home,
-      matching: find.text(l10n.tagCatalogInDraft),
-    );
-    expect(homeIncluded, findsOneWidget);
-    expect(
-      tester.getSemantics(homeIncluded).label,
-      isNot(contains(l10n.tagCatalogAvailableForDraft)),
-    );
-    expect(
-      tester.getSemantics(add).flagsCollection.isEnabled,
-      Tristate.isFalse,
-    );
-
-    _performSemanticsTap(
-      tester,
-      tester.getSemantics(
-        find.descendant(
-          of: work,
-          matching: find.text(l10n.tagCatalogAvailableForDraft),
+      // Без условия строка называет только тег, а надобность у строки не
+      // объявляется ни состоянием отметки, ни повтором в названии.
+      for (final (label, requirement) in [
+        ('Дом', null),
+        (
+          l10n.tagsPanelFilterPresentLabel('Дом'),
+          IntentionTagRequirement.mustBePresent,
         ),
-      ),
-    );
-    await tester.pump();
-    expect(
-      tester.getSemantics(work).flagsCollection.isSelected,
-      Tristate.isTrue,
-    );
-    expect(
-      tester.getSemantics(add).label,
-      l10n.tagCatalogAddToDraftNamed('Работа'),
-    );
-    _performSemanticsTap(tester, tester.getSemantics(add));
-    await tester.pump();
-    await _until(
-      tester,
-      find.descendant(of: work, matching: find.text(l10n.tagCatalogInDraft)),
-    );
+        (
+          l10n.tagsPanelFilterAbsentLabel('Дом'),
+          IntentionTagRequirement.mustBeAbsent,
+        ),
+      ]) {
+        if (requirement != null) {
+          _performSemanticsTap(tester, tester.getSemantics(home));
+          await tester.pump();
+        }
+        final node = tester.getSemantics(home);
+        expect(node.label, label);
+        expect(
+          node.flagsCollection.isChecked,
+          CheckedState.none,
+          reason: 'надобность объявляется только названием строки',
+        );
+        expect(node.getSemanticsData().hasAction(SemanticsAction.tap), true);
+        expect(
+          [
+            for (final condition in conditions.current.conditions)
+              condition.requirement,
+          ],
+          [?requirement],
+        );
+      }
 
-    expect(tagSet.current.tagIds.map((id) => id.toCanonicalString()), [
-      tagFixtureId(firstTagNumber),
-      tagFixtureId(lastTagNumber),
-    ]);
-    expect(_isInsideView(tester, add), isTrue);
-    expect(find.byType(SnackBar), findsNothing);
-    // Наблюдение выбранных тегов остаётся чтением; локальное добавление
-    // не выдаётся за постоянную команду или проверку назначения.
-    expect(
-      diagnostics.events.where(
-        (event) => switch (event) {
-          TagCommandDiagnosticsEvent() ||
-          TagAssignmentStatusReadDiagnosticsEvent() ||
-          IntentionCommandDiagnosticsEvent() => true,
-          _ => false,
-        },
-      ),
-      isEmpty,
-    );
-    expect(raw.select('SELECT * FROM tag_assignments'), isEmpty);
-    expect(raw.select('SELECT * FROM intentions'), isEmpty);
-    expect(raw.select('SELECT id FROM tags'), hasLength(2));
-    expect(tester.takeException(), isNull);
-    semantics.dispose();
-  });
-}
+      final reset = find.bySemanticsLabel(l10n.tagsPanelResetConditionsLabel);
+      expect(tester.getSemantics(reset).flagsCollection.isButton, isTrue);
+      _performSemanticsTap(tester, tester.getSemantics(reset));
+      await tester.pump();
 
-/// Переводит фокус клавишей Tab, пока он не окажется внутри [target].
-Future<void> _focusWithTab(WidgetTester tester, Finder target) async {
-  final targets = target.evaluate().toSet();
-  bool focusedInside() {
-    final focused = FocusManager.instance.primaryFocus?.context;
-    if (focused == null) return false;
-    if (targets.contains(focused)) return true;
-    var inside = false;
-    focused.visitAncestorElements((element) {
-      inside = targets.contains(element);
-      return !inside;
+      expect(conditions.current.conditions, isEmpty);
+      expect(reset, findsNothing);
+      expect(tester.getSemantics(home).label, 'Дом');
+      expect(raw.select('SELECT * FROM tag_assignments'), isEmpty);
+      expect(tester.takeException(), isNull);
+      semantics.dispose();
     });
-    return inside;
   }
-
-  for (var attempt = 0; attempt < 30 && !focusedInside(); attempt++) {
-    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-    await tester.pump();
-  }
-  expect(focusedInside(), isTrue, reason: 'Клавиатура не достигла $target');
 }
 
 void _performSemanticsTap(WidgetTester tester, SemanticsNode node) {
@@ -729,13 +542,6 @@ void _performSemanticsTap(WidgetTester tester, SemanticsNode node) {
     node.id,
     SemanticsAction.tap,
   );
-}
-
-bool _isInsideView(WidgetTester tester, Finder finder) {
-  final view = Offset.zero & tester.view.physicalSize;
-  final bounds = tester.getRect(finder);
-  return view.contains(bounds.topLeft) &&
-      view.contains(bounds.bottomRight - const Offset(1, 1));
 }
 
 void _expectAction(SemanticsNode node) {

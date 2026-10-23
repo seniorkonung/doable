@@ -132,6 +132,7 @@ enum DailyChoiceCommandDiagnosticsStage { validation, write, resultRead }
 enum TagCommandDiagnosticsType {
   create,
   update,
+  move,
   delete,
   assign,
   removeAssignment,
@@ -163,24 +164,6 @@ final class TagCatalogReadDiagnosticsEvent extends DiagnosticsEvent {
 
 final class TagAssignmentsReadDiagnosticsEvent extends DiagnosticsEvent {
   const TagAssignmentsReadDiagnosticsEvent({
-    required this.stage,
-    required DiagnosticsStatus status,
-  }) : super(status);
-
-  final TagReadDiagnosticsStage stage;
-}
-
-final class TaggedEntitiesPageReadDiagnosticsEvent extends DiagnosticsEvent {
-  const TaggedEntitiesPageReadDiagnosticsEvent({
-    required this.stage,
-    required DiagnosticsStatus status,
-  }) : super(status);
-
-  final TagReadDiagnosticsStage stage;
-}
-
-final class TagAssignmentStatusReadDiagnosticsEvent extends DiagnosticsEvent {
-  const TagAssignmentStatusReadDiagnosticsEvent({
     required this.stage,
     required DiagnosticsStatus status,
   }) : super(status);
@@ -318,42 +301,6 @@ final class CatalogPageReadDiagnosticsEvent extends DiagnosticsEvent {
   }) : super(status);
 
   final int pageSize;
-}
-
-/// Вид успешного завершения чтения согласования каталога.
-enum CatalogReconciliationReadCompletion {
-  /// Получена порция недостающих совпадений.
-  portion,
-
-  /// Граф изменился после начала согласования; его нужно повторить.
-  retry,
-}
-
-/// Чтение согласования каталога, отдельное от обычной порции каталога.
-///
-/// Конструкторы допускают только согласованные сочетания статуса и вида
-/// завершения: вид есть ровно у успешно завершённого чтения.
-final class CatalogReconciliationReadDiagnosticsEvent extends DiagnosticsEvent {
-  const CatalogReconciliationReadDiagnosticsEvent.started({
-    required this.pageSize,
-  }) : completion = null,
-       super(const DiagnosticsStarted());
-
-  CatalogReconciliationReadDiagnosticsEvent.completed({
-    required this.pageSize,
-    required Duration duration,
-    required CatalogReconciliationReadCompletion this.completion,
-  }) : super(DiagnosticsSucceeded(duration));
-
-  CatalogReconciliationReadDiagnosticsEvent.failed({
-    required this.pageSize,
-    required Duration duration,
-    required DiagnosticsFailureCode code,
-  }) : completion = null,
-       super(DiagnosticsFailed(duration: duration, code: code));
-
-  final int pageSize;
-  final CatalogReconciliationReadCompletion? completion;
 }
 
 final class IntentionDetailReadDiagnosticsEvent extends DiagnosticsEvent {

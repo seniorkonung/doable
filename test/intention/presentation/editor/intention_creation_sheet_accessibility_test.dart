@@ -3,6 +3,7 @@ import 'package:doable/src/app/navigation/app_shell_page.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
@@ -21,7 +22,6 @@ import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
-import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
@@ -32,6 +32,7 @@ import '../../../support/app_root_pages.dart';
 import '../../../support/quick_creation.dart';
 import '../catalog/catalog_test_support.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
+import '../../../support/tag_positions.dart';
 
 /// Доступность полного сценария нижней панели создания намерения: экранный
 /// диктор, клавиатура и guidelines Android.
@@ -148,7 +149,7 @@ void main() {
     );
 
     testWidgets(
-      'экранный диктор без жестов открывает панель, готовит все четыре поля черновика через общий выбор тегов и объяснение готовности и возвращается в ту же панель — $code',
+      'экранный диктор без жестов открывает панель, готовит все четыре поля черновика через панель тегов и объяснение готовности и возвращается в ту же панель — $code',
       (tester) async {
         final semantics = tester.ensureSemantics();
         _usePhone(tester);
@@ -223,33 +224,34 @@ void main() {
           ),
         );
 
-        // Общий выбор тегов закрывает панель от диктора и фокуса, а теги
-        // добавляются в черновик явными действиями.
+        // Панель тегов закрывает панель создания от диктора и фокуса, а
+        // нажатие на строку включает тег в черновик.
         tester.semantics.tap(_byTooltip(l10n.editorChooseTags));
         await tester.pumpAndSettle();
-        expect(router.current.name, TagCatalogRoute.name);
-        expect(_traversal(tester), contains(l10n.tagCatalogSelectionTitle));
+        expect(_tagsPanel(l10n), findsOneWidget);
+        expect(router.current.name, IntentionEditorRoute.name);
+        expect(
+          _traversal(tester),
+          contains('${l10n.tagsPanelTitle}\n${l10n.tagsPanelAssignmentHint}'),
+        );
         expect(_traversal(tester), isNot(contains(l10n.editorTitleLabel)));
         expect(_isFocusedIn(tester, find.byType(IntentionEditorPage)), isFalse);
         for (final tag in _tags) {
-          final name = tag.name.value;
-          tester.semantics.tap(
-            find.semantics.byLabel(
-              '$name\n${l10n.tagCatalogAvailableForDraft}',
-            ),
+          final row = find.semantics.byLabel(tag.name.value);
+          expect(
+            row.evaluate().single,
+            isSemantics(hasCheckedState: true, isChecked: false),
           );
-          await tester.pump();
-          tester.semantics.tap(
-            find.semantics.byLabel(l10n.tagCatalogAddToDraftNamed(name)),
-          );
+          tester.semantics.tap(row);
           await tester.pump();
           expect(
-            find.semantics.byLabel('$name\n${l10n.tagCatalogInDraft}'),
-            findsOne,
+            row.evaluate().single,
+            isSemantics(hasCheckedState: true, isChecked: true),
           );
         }
-        tester.semantics.tap(_nodeOf(tester, find.byType(BackButton)));
+        tester.semantics.tap(find.semantics.byLabel(l10n.tagsPanelDone));
         await tester.pumpAndSettle();
+        expect(_tagsPanel(l10n), findsNothing);
 
         // Возврат раскрывает ту же панель с прежним фокусом и выбранными
         // тегами, которые снимаются из черновика.
@@ -430,8 +432,8 @@ void main() {
         await tester.pumpAndSettle();
         expect(_traversal(tester), _panel(l10n, tags: tags));
 
-        // Удалённый тег назван в своём элементе, а исправление объявлено
-        // рядом с сообщением и сохранением.
+        // Удалённый тег уходит из черновика, объяснение объявлено рядом с
+        // сохранением, а сохранение снова доступно.
         tester.semantics.tap(find.semantics.byLabel(l10n.editorSaveAction));
         await tester.pump();
         repository.completeCommand(
@@ -440,22 +442,21 @@ void main() {
         );
         await tester.pumpAndSettle();
         final missingMessage = l10n.editorCreateTagsMissing(1);
-        final removeMissing = l10n.editorRemoveMissingTags(1);
-        final withMissingTag = _panel(l10n, tags: tags);
-        withMissingTag[withMissingTag.indexOf('Дом')] =
-            'Дом\n${l10n.editorDraftTagMissing}';
-        withMissingTag.insertAll(withMissingTag.length - 1, [
-          missingMessage,
-          removeMissing,
-        ]);
-        expect(_traversal(tester), withMissingTag);
+        final withoutMissingTag = _panel(l10n, tags: ['Работа']);
+        withoutMissingTag.insert(withoutMissingTag.length - 1, missingMessage);
+        expect(_traversal(tester), withoutMissingTag);
         expect(
           tester.getSemantics(find.byKey(_failure)),
           isSemantics(label: missingMessage, isLiveRegion: true),
         );
-        tester.semantics.tap(find.semantics.byLabel(removeMissing));
-        await tester.pumpAndSettle();
-        expect(_traversal(tester), _panel(l10n, tags: ['Работа']));
+        expect(
+          tester.getSemantics(find.byKey(_submit)),
+          isSemantics(
+            label: l10n.editorSaveAction,
+            isEnabled: true,
+            hasTapAction: true,
+          ),
+        );
         expect(repository.commands, hasLength(2));
 
         // Устранимый отказ предлагает повтор тем же действием.
@@ -607,22 +608,25 @@ void main() {
         );
         expect(_isFocusedIn(tester, find.byKey(_readiness)), isTrue);
 
-        // Общий выбор тегов принимает фокус целиком и возвращает его к
-        // действию выбора в той же панели.
+        // Панель тегов принимает фокус целиком и возвращает его к действию
+        // выбора в той же панели создания.
         await _tabTo(tester, find.byKey(_chooseTags));
         await tester.sendKeyEvent(LogicalKeyboardKey.enter);
         await tester.pumpAndSettle();
-        expect(router.current.name, TagCatalogRoute.name);
-        final selector = find.byType(TagCatalogPage);
-        await _tabTo(tester, find.byKey(_tagRow(_home)), within: selector);
+        final l10n = AppLocalizations.of(tester.element(find.byKey(_title)));
+        final panel = _tagsPanel(l10n);
+        expect(panel, findsOneWidget);
+        await _tabTo(tester, find.byKey(_panelRow(_home)), within: panel);
         await tester.sendKeyEvent(LogicalKeyboardKey.enter);
         await tester.pump();
-        await _tabTo(tester, find.byKey(_addToDraft), within: selector);
-        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-        await tester.pump();
-        await _tabTo(tester, find.byType(BackButton), within: selector);
+        await _tabTo(
+          tester,
+          find.descendant(of: panel, matching: find.byType(FilledButton)),
+          within: panel,
+        );
         await tester.sendKeyEvent(LogicalKeyboardKey.enter);
         await tester.pumpAndSettle();
+        expect(panel, findsNothing);
         expect(router.current.name, IntentionEditorRoute.name);
         expect(_isFocusedIn(tester, find.byKey(_chooseTags)), isTrue);
         expect(sessions.state(tester).draft.tagIds, [_home.id]);
@@ -735,10 +739,8 @@ void main() {
           ResultFailure(IntentionCreationTagsMissingFailure([_home.id])),
         );
         await tester.pumpAndSettle();
-        await _expectGuidelines(tester, 'удалённый тег и исправление');
+        await _expectGuidelines(tester, 'отказ из-за удалённого тега');
 
-        await tester.tap(find.byKey(_removeMissing));
-        await tester.pumpAndSettle();
         await tester.tap(find.byKey(_submit));
         await tester.pump();
         repository.completeCommand(
@@ -761,7 +763,6 @@ const _chooseTags = ValueKey('intention-editor-choose-tags');
 const _readiness = ValueKey('intention-editor-readiness');
 const _submit = ValueKey('intention-editor-submit');
 const _failure = ValueKey('intention-editor-failure');
-const _removeMissing = ValueKey('intention-editor-remove-missing-tags');
 const _closeButton = ValueKey('intention-editor-close');
 const _readinessConfirmation = ValueKey(
   'intention-editor-readiness-confirmation',
@@ -771,13 +772,16 @@ const _readinessConfirm = ValueKey('intention-editor-readiness-confirm');
 const _closeConfirmation = ValueKey('intention-editor-close-confirmation');
 const _closeContinue = ValueKey('intention-editor-close-continue');
 const _closeDiscard = ValueKey('intention-editor-close-discard');
-const _addToDraft = ValueKey('tag-catalog-add-to-draft');
 
 ValueKey<String> _tagRemove(Tag tag) =>
     ValueKey('intention-editor-tag-remove-${tag.id.toCanonicalString()}');
 
-ValueKey<String> _tagRow(Tag tag) =>
-    ValueKey('tag-catalog-row-${tag.id.toCanonicalString()}');
+ValueKey<String> _panelRow(Tag tag) =>
+    ValueKey('tags-panel-row-${tag.id.toCanonicalString()}');
+
+/// Панель тегов над панелью создания.
+Finder _tagsPanel(AppLocalizations l10n) =>
+    find.widgetWithText(Sheet, l10n.tagsPanelTitle);
 
 /// Пользовательские данные: интерфейс показывает их без перевода на любом
 /// языке.
@@ -1175,8 +1179,12 @@ Result<IntentionCommandSuccess> _savedResult() {
   );
 }
 
-Tag _tag(int number, String name) =>
-    Tag(id: _tagId(number), name: TagName.fromInput(name), color: null);
+Tag _tag(int number, String name) => Tag(
+  id: _tagId(number),
+  name: TagName.fromInput(name),
+  color: null,
+  position: tagPositionAt(number),
+);
 
 TagId _tagId(int number) => switch (TagId.decode(
   '018f47c2-6b7d-7abc-8def-${number.toString().padLeft(12, '0')}',

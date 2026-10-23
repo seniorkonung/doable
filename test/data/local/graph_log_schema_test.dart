@@ -54,7 +54,7 @@ void main() {
     }
     _addRelation(raw, _relation, _source, _selected);
     _addRelation(raw, _secondRelation, _selected, _other);
-    _addTag(raw, _tag, 'Дом');
+    _addTag(raw, _tag, 'Дом', 'a0');
   });
 
   test('новая установка включает захват без признака записи и начинает лог '
@@ -77,7 +77,7 @@ void main() {
   List<(String, void Function(), Set<_Mark>)> operations() => [
     (
       'создание тега',
-      () => _addTag(raw, _secondTag, 'Работа'),
+      () => _addTag(raw, _secondTag, 'Работа', 'a1'),
       {('tag', _secondTag, 'insert')},
     ),
     (
@@ -230,7 +230,7 @@ void main() {
       raw.execute("UPDATE tags SET name = 'Квартира' WHERE id = ?", [_tag]);
       raw.execute('DELETE FROM tag_assignments');
       raw.execute('DELETE FROM tags WHERE id = ?', [_tag]);
-      _addTag(raw, _secondTag, 'Работа');
+      _addTag(raw, _secondTag, 'Работа', 'a1');
       _addAssignment(raw, _secondTag, _source);
       raw.execute('DELETE FROM tag_assignments');
       _addAssignment(raw, _secondTag, _source);
@@ -252,7 +252,7 @@ void main() {
     addGraph();
     seedRawGraph(raw, () {
       _addIntention(raw, _created, 'Намерение без связей');
-      _addTag(raw, _secondTag, 'Работа');
+      _addTag(raw, _secondTag, 'Работа', 'a1');
       _addAssignment(raw, _tag, _source);
       _addAssignment(raw, _tag, _selected);
       _addAssignment(raw, _tag, _created);
@@ -307,7 +307,7 @@ void main() {
     raw.execute("UPDATE intentions SET title = 'Изменено' WHERE id = ?", [
       _created,
     ]);
-    _addTag(raw, _secondTag, 'Работа');
+    _addTag(raw, _secondTag, 'Работа', 'a1');
     raw.execute("UPDATE tags SET name = 'Офис' WHERE id = ?", [_secondTag]);
     _addAssignment(raw, _secondTag, _created);
     raw.execute(
@@ -565,8 +565,12 @@ void _addRelation(
   );
 }
 
-void _addTag(sqlite.Database db, String id, String name) {
-  db.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [id, name]);
+void _addTag(sqlite.Database db, String id, String name, String position) {
+  db.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
+    id,
+    name,
+    position,
+  ]);
 }
 
 void _addAssignment(sqlite.Database db, String tagId, String intentionId) {

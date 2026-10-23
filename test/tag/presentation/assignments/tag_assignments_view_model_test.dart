@@ -12,10 +12,13 @@ import 'package:doable/src/tag/domain/tag_assignment.dart';
 import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
+import 'package:doable/src/tag/domain/tag_position.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_state.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_view_model.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import '../../../support/tag_positions.dart';
 
 void main() {
   test('пустой снимок отличается от отсутствия намерения', () async {
@@ -147,6 +150,29 @@ void main() {
       expect(h.model.canActOn(_id(1)), isTrue);
     },
   );
+
+  test('перестановка тега сразу меняет порядок строк', () async {
+    final h = _Harness();
+    addTearDown(h.dispose);
+    h.reads.page(0, [_tag(1, 'Работа'), _tag(2, 'Дом'), _tag(3, 'Спорт')]);
+    await pumpEventQueue();
+    h.changes.add(
+      _Package(const _Revision(2), [
+        TagUpdatedChange(
+          revision: const _Revision(2),
+          before: _tag(3, 'Спорт'),
+          after: _tag(3, 'Спорт', position: tagPositionAt(0)),
+        ),
+      ]),
+    );
+    final refreshing = h.state as TagAssignmentsLoaded;
+    expect(refreshing.items.map((tag) => tag.name.value), [
+      'Спорт',
+      'Работа',
+      'Дом',
+    ]);
+    expect(refreshing.freshness, TagAssignmentsFreshness.refreshing);
+  });
 
   test(
     'более свежий снимок уже включает пакет без повторного чтения',
@@ -644,5 +670,10 @@ IntentionId _intentionId(int number) => (IntentionId.decode(
 TagId _id(int number) => (TagId.decode(
   '00000000-0000-4000-8000-${number.toString().padLeft(12, '0')}',
 ) as TagIdDecodingSuccess).id;
-Tag _tag(int number, String name, {TagColor? color}) =>
-    Tag(id: _id(number), name: TagName.fromInput(name), color: color);
+Tag _tag(int number, String name, {TagColor? color, TagPosition? position}) =>
+    Tag(
+      id: _id(number),
+      name: TagName.fromInput(name),
+      color: color,
+      position: position ?? tagPositionAt(number),
+    );

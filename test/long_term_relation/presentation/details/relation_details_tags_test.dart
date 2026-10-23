@@ -9,8 +9,6 @@ import 'package:doable/src/graph/application/personal_graph_repository_provider.
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
-import 'package:doable/src/tag/application/tagged_intentions_page.dart';
-import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -104,15 +102,6 @@ void main() {
         );
         await tester.pumpAndSettle();
         await openIntentionGraph(tester);
-        final tagId = (TagId.decode(
-          tagFixtureId(firstTagNumber),
-        ) as TagIdDecodingSuccess).id;
-        unawaited(router.push(TagNavigationRoute(tagId: tagId)));
-        await tester.pumpAndSettle();
-        await tester.tap(
-          find.byKey(const ValueKey(TaggedIntentionsScope.archived)),
-        );
-        await tester.pumpAndSettle();
         unawaited(
           router.push(RelationDetailsRoute(relationId: _relationId(number))),
         );
@@ -209,31 +198,18 @@ void main() {
             find.byKey(const ValueKey('tag-assignments-choose')),
             findsOneWidget,
           );
-          for (final action in ['open', 'remove']) {
-            expect(
-              find.byKey(
-                ValueKey('tag-assignment-$action-${tagFixtureId(tagNumber)}'),
-              ),
-              findsOneWidget,
-            );
-          }
+          expect(
+            find.byKey(
+              ValueKey('tag-assignment-remove-${tagFixtureId(tagNumber)}'),
+            ),
+            findsOneWidget,
+          );
           router.pop();
           await tester.pumpAndSettle();
         }
         expect(router.current.name, RelationDetailsRoute.name);
         expect(_storedGraph(raw), graphBefore);
         expect(tester.takeException(), isNull);
-        router.pop();
-        await tester.pumpAndSettle();
-        expect(router.current.name, TagNavigationRoute.name);
-        expect(
-          tester
-              .widget<ChoiceChip>(
-                find.byKey(const ValueKey(TaggedIntentionsScope.archived)),
-              )
-              .selected,
-          isTrue,
-        );
       },
     );
   }

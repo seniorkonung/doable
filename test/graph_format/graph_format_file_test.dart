@@ -25,6 +25,8 @@ import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../support/tag_positions.dart';
+
 void main() {
   final golden = File('test/graph_format/golden/graph_format_v1.jsonl')
       .readAsBytesSync();
@@ -88,6 +90,7 @@ void main() {
                 id: _tagId(_tagIds[0]),
                 name: TagName.fromStored('Тег $producedTags'),
                 color: null,
+                position: tagPositionAt(producedTags),
               ),
             );
           }
@@ -216,6 +219,11 @@ void main() {
           lines[1],
         ]),
         'удаление сущности': file([...lines.take(lines.length - 1), deletion]),
+        'повторённое место тега': file([
+          ...lines.take(2),
+          lines[2].replaceFirst('"position":"a0V"', '"position":"a1"'),
+          ...lines.skip(3),
+        ]),
         'намерения не по возрастанию времени создания': file([
           ...lines.take(3),
           lines[4],
@@ -429,9 +437,21 @@ List<GraphEntityRecord> _expectedGoldenRecords() {
 
   return [
     TagRecord(
-      Tag(id: home, name: TagName.fromStored('Дом'), color: TagColor.blue),
+      Tag(
+        id: home,
+        name: TagName.fromStored('Дом'),
+        color: TagColor.blue,
+        position: tagPosition('a1'),
+      ),
     ),
-    TagRecord(Tag(id: sport, name: TagName.fromStored('Спорт'), color: null)),
+    TagRecord(
+      Tag(
+        id: sport,
+        name: TagName.fromStored('Спорт'),
+        color: null,
+        position: tagPosition('a0V'),
+      ),
+    ),
     IntentionRecord(
       Intention(
         id: health,

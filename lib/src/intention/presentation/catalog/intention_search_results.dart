@@ -48,11 +48,10 @@ typedef IntentionSearchResultBuilder = Widget Function(
 
 /// Выдача поиска намерений назначения [purpose].
 ///
-/// Элемент один владеет прокруткой списка, переходом к верхней позиции при
-/// смене параметров поиска и размещением отказа обновления относительно
-/// загруженной и пустой выдачи. Страница передаёт состояние выдачи своего
-/// назначения и построение своих строк; элемент не читает граф, не выполняет
-/// команд и не меняет условия поиска.
+/// Элемент один владеет прокруткой списка и переходом к верхней позиции в
+/// начале новой выдачи. Страница передаёт состояние выдачи своего назначения
+/// и построение своих строк; элемент не читает граф, не выполняет команд и
+/// не меняет условия поиска.
 final class IntentionSearchResults extends ConsumerStatefulWidget {
   const IntentionSearchResults({
     required this.purpose,
@@ -104,25 +103,19 @@ final class IntentionSearchResults extends ConsumerStatefulWidget {
       _IntentionSearchResultsState();
 }
 
-/// Параметры поиска, смена которых начинает новую выдачу.
-typedef _SearchParameters = ({
-  IntentionScope scope,
-  String titleFilterText,
-  IntentionTagFilter tagFilter,
-  IntentionCatalogOrder order,
-});
-
 final class _IntentionSearchResultsState
     extends ConsumerState<IntentionSearchResults> {
-  final _scrollController = _ResultsScrollController();
+  final _scrollController = ScrollController();
   final _itemKeys = <IntentionId, GlobalKey>{};
 
   /// Сохранённое смещение списка выдачи между его показами.
   var _listStorage = PageStorageBucket();
 
-  /// Параметры, с которыми сравнивается каждое уведомление модели: действуют
-  /// в момент создания состояния или смены назначения поиска.
-  late _SearchParameters _parameters;
+  /// Запрос последней подтверждённой выдачи. Модель сохраняет его объект,
+  /// пока согласует и продолжает ту же выдачу, а каждое чтение первой порции —
+  /// после смены параметров, повтора или удаления исключённого тега — несёт
+  /// новый запрос.
+  IntentionCatalogQuery? _query;
   _VisualAnchor? _pendingVisualAnchor;
   bool _maintenanceScheduled = false;
 
@@ -132,10 +125,10 @@ final class _IntentionSearchResultsState
   @override
   void initState() {
     super.initState();
-    // База не ждёт первого уведомления модели: иначе первая смена параметров
-    // на уже загруженной выдаче сама стала бы базой и не начала бы выдачу с
-    // верхней позиции.
-    _parameters = _currentParameters();
+    // База не ждёт первого уведомления модели: иначе первая новая выдача
+    // после уже загруженной сама стала бы базой и не началась бы с верхней
+    // позиции.
+    _query = _confirmedQuery(widget.catalog);
   }
 
   @override
@@ -143,7 +136,7 @@ final class _IntentionSearchResultsState
     super.didUpdateWidget(oldWidget);
     if (oldWidget.purpose != widget.purpose) {
       // Выдача другого назначения не наследует ни позицию, ни якорь.
-      _parameters = _currentParameters();
+      _query = _confirmedQuery(widget.catalog);
       _pendingVisualAnchor = null;
       _listStorage = PageStorageBucket();
     }
@@ -202,80 +195,35 @@ final class _IntentionSearchResultsState
     };
   }
 
-  /// Отказ обновления стоит над сообщением о пустоте, поэтому не обновлённую
-  /// выдачу нельзя принять за успешное отсутствие совпадений.
-  Widget _buildEmpty(IntentionCatalogEmpty empty) => LayoutBuilder(
-    builder: (context, constraints) => Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        IntentionCatalogRefreshStatusArea(
-          availableHeight: constraints.maxHeight,
-          child: IntentionCatalogRefreshStatusView(
-            purpose: widget.purpose,
-            refresh: empty.refresh,
-          ),
-        ),
-        Expanded(
-          child: IntentionCatalogStatusView(
-            message: widget.emptyMessage(empty),
-          ),
-        ),
-      ],
-    ),
-  );
+  Widget _buildEmpty(IntentionCatalogEmpty empty) =>
+      IntentionCatalogStatusView(message: widget.emptyMessage(empty));
 
   Widget _buildLoaded(IntentionCatalogLoaded results) {
     final hasContinuationStatus =
         results.continuation is! IntentionCatalogContinuationIdle;
-    final list = LayoutBuilder(
-      builder: (context, constraints) => Stack(
-        children: [
-          ListView.builder(
-            key: widget.listKey,
-            controller: _scrollController,
-            padding: EdgeInsets.zero,
-            itemCount: results.items.length + (hasContinuationStatus ? 1 : 0),
-            itemBuilder: (context, index) {
-              if (index == results.items.length) {
-                return IntentionCatalogContinuationStatusView(
-                  purpose: widget.purpose,
-                  continuation: results.continuation,
-                );
-              }
-              _requestNextPage(index);
-              final summary = results.items[index];
-              final row = widget.itemBuilder(context, results, summary);
-              return switch (widget.viewAnchor) {
-                IntentionSearchResultsViewAnchor.scrollOffset => row,
-                IntentionSearchResultsViewAnchor.visibleIntention =>
-                  KeyedSubtree(key: _itemKeyFor(summary.id), child: row),
-              };
-            },
+    final list = ListView.builder(
+      key: widget.listKey,
+      controller: _scrollController,
+      padding: EdgeInsets.zero,
+      itemCount: results.items.length + (hasContinuationStatus ? 1 : 0),
+      itemBuilder: (context, index) {
+        if (index == results.items.length) {
+          return IntentionCatalogContinuationStatusView(
+            purpose: widget.purpose,
+            continuation: results.continuation,
+          );
+        }
+        _requestNextPage(index);
+        final summary = results.items[index];
+        final row = widget.itemBuilder(context, results, summary);
+        return switch (widget.viewAnchor) {
+          IntentionSearchResultsViewAnchor.scrollOffset => row,
+          IntentionSearchResultsViewAnchor.visibleIntention => KeyedSubtree(
+            key: _itemKeyFor(summary.id),
+            child: row,
           ),
-          // Отказ обновления ложится поверх верхнего края списка и не
-          // сдвигает строки; место под него список отводит перед своим
-          // началом, поэтому первые строки остаются достижимыми.
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: _ExtentObserver(
-              onChanged: _reserveRefreshStatusExtent,
-              child: Material(
-                color: Theme.of(context).colorScheme.surface,
-                elevation: 1,
-                child: IntentionCatalogRefreshStatusArea(
-                  availableHeight: constraints.maxHeight,
-                  child: IntentionCatalogRefreshStatusView(
-                    purpose: widget.purpose,
-                    refresh: results.refresh,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
+        };
+      },
     );
     final totalCountLabel = widget.totalCountLabel;
     if (totalCountLabel == null) {
@@ -305,32 +253,26 @@ final class _IntentionSearchResultsState
     });
   }
 
-  void _reserveRefreshStatusExtent(double extent) {
-    if (mounted) {
-      _scrollController.leadingInset = extent;
-    }
-  }
-
-  _SearchParameters _currentParameters() {
-    final selection = _notifier.selection;
-    return (
-      scope: selection.scope,
-      titleFilterText: selection.titleFilterText,
-      tagFilter: selection.tagFilter,
-      order: selection.order,
-    );
-  }
+  static IntentionCatalogQuery? _confirmedQuery(
+    AsyncValue<IntentionCatalogState> catalog,
+  ) => switch (catalog.value) {
+    IntentionCatalogConfirmedState(:final query) => query,
+    _ => null,
+  };
 
   void _handleCatalogStateChanged(
     AsyncValue<IntentionCatalogState>? previous,
     AsyncValue<IntentionCatalogState> next,
   ) {
-    // Модель публикует состояние при каждой смене параметров, в том числе
-    // когда список в этот момент не показан.
-    final parameters = _currentParameters();
-    if (parameters != _parameters) {
-      _parameters = parameters;
-      _startFromTop();
+    // Модель публикует каждую выдачу, в том числе когда список до неё не был
+    // показан.
+    final query = _confirmedQuery(next);
+    if (query != null && !identical(query, _query)) {
+      final startsNewResults = _query != null;
+      _query = query;
+      if (startsNewResults) {
+        _startFromTop();
+      }
     }
 
     final previousState = previous?.value;
@@ -350,12 +292,12 @@ final class _IntentionSearchResultsState
   }
 
   void _startFromTop() {
-    // Новые параметры начинают выдачу с верхней позиции: отложенный якорь
-    // прежней выдачи больше не действует.
+    // Новая выдача начинается с верхней позиции: отложенный якорь прежней
+    // выдачи больше не действует.
     _pendingVisualAnchor = null;
-    // Список может быть снят с экрана пустой выдачей: сохранённое смещение
-    // прежней выдачи тогда вернулось бы вместе с ним. Новое хранилище не
-    // переносит его в выдачу новых параметров.
+    // Список снят с экрана загрузкой или пустой выдачей: сохранённое смещение
+    // прежней выдачи вернулось бы вместе с ним. Новое хранилище не переносит
+    // его в новую выдачу.
     setState(() => _listStorage = PageStorageBucket());
     if (_scrollController.hasClients) {
       _scrollController.jumpTo(0);
@@ -547,115 +489,4 @@ final class _VisualAnchor {
     offsetWithinItem: offsetWithinItem,
     remainingApproaches: remainingApproaches - 1,
   );
-}
-
-/// Контроллер списка выдачи с местом перед её началом.
-///
-/// Место отводится под отказ обновления над списком: оно расширяет область
-/// прокрутки назад и не меняет ни смещение, ни экранное положение строк.
-final class _ResultsScrollController extends ScrollController {
-  double _leadingInset = 0;
-
-  set leadingInset(double value) {
-    _leadingInset = value;
-    for (final position in positions) {
-      (position as _ResultsScrollPosition).leadingInset = value;
-    }
-  }
-
-  @override
-  ScrollPosition createScrollPosition(
-    ScrollPhysics physics,
-    ScrollContext context,
-    ScrollPosition? oldPosition,
-  ) => _ResultsScrollPosition(
-    physics: physics,
-    context: context,
-    oldPosition: oldPosition,
-  ).._leadingInset = _leadingInset;
-}
-
-final class _ResultsScrollPosition extends ScrollPositionWithSingleContext {
-  _ResultsScrollPosition({
-    required super.physics,
-    required super.context,
-    super.oldPosition,
-  });
-
-  double _leadingInset = 0;
-  double _appliedLeadingInset = 0;
-
-  set leadingInset(double value) {
-    if (value == _leadingInset) {
-      return;
-    }
-    _leadingInset = value;
-    // Границы прокрутки меняются только при компоновке списка: появление
-    // места перед началом может сделать прокручиваемым список, который
-    // помещался на экране. Уведомление запрашивает эту компоновку.
-    notifyListeners();
-  }
-
-  @override
-  bool applyContentDimensions(double minScrollExtent, double maxScrollExtent) {
-    final insetChanged = _leadingInset != _appliedLeadingInset;
-    final wasAtStart =
-        insetChanged && hasContentDimensions && pixels <= this.minScrollExtent;
-    _appliedLeadingInset = _leadingInset;
-    final accepted = super.applyContentDimensions(
-      minScrollExtent - _leadingInset,
-      maxScrollExtent,
-    );
-    // Список в начале выдачи остаётся в начале: строки уходят из-под
-    // появившегося отказа и возвращаются на место после его снятия.
-    if (insetChanged &&
-        (wasAtStart || pixels < this.minScrollExtent) &&
-        pixels != this.minScrollExtent) {
-      correctPixels(this.minScrollExtent);
-      return false;
-    }
-    return accepted;
-  }
-}
-
-/// Сообщает высоту потомка после кадра, в котором она изменилась.
-final class _ExtentObserver extends SingleChildRenderObjectWidget {
-  const _ExtentObserver({required this.onChanged, super.child});
-
-  final ValueChanged<double> onChanged;
-
-  @override
-  RenderObject createRenderObject(BuildContext context) =>
-      _RenderExtentObserver(onChanged);
-
-  @override
-  void updateRenderObject(
-    BuildContext context,
-    _RenderExtentObserver renderObject,
-  ) {
-    renderObject.onChanged = onChanged;
-  }
-}
-
-final class _RenderExtentObserver extends RenderProxyBox {
-  _RenderExtentObserver(this.onChanged);
-
-  ValueChanged<double> onChanged;
-  double? _reportedExtent;
-
-  @override
-  void performLayout() {
-    super.performLayout();
-    final extent = size.height;
-    if (extent == _reportedExtent) {
-      return;
-    }
-    _reportedExtent = extent;
-    // Область прокрутки нельзя менять во время компоновки её соседа.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (attached && _reportedExtent == extent) {
-        onChanged(extent);
-      }
-    });
-  }
 }

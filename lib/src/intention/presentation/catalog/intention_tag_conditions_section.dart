@@ -1,10 +1,12 @@
-import 'package:auto_route/auto_route.dart';
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
-import '../../../app/routing/app_router.gr.dart';
 import '../../../design_system/components/tag_dot.dart';
+import '../../../tag/presentation/panel/tags_panel.dart';
+import '../../../tag/presentation/panel/tags_panel_context.dart';
 import '../../../tag/presentation/tag_phrase_text.dart';
 import 'intention_catalog_purpose.dart';
 import 'intention_tag_conditions_view_model.dart';
@@ -13,27 +15,13 @@ import 'intention_tag_conditions_view_model.dart';
 ///
 /// Условия показаны чипами в порядке добавления с переносом на новые строки.
 /// Нажатие на чип переключает надобность, крестик снимает условие, кнопка
-/// «+ Тег» открывает выбор тега и передаёт его результат модели условий.
-/// Раздел не читает граф и не выполняет команд тегов.
+/// «+ Тег» открывает панель тегов в режиме фильтра над условиями этого
+/// поиска: изменения в ней сразу применяются к выдаче, а закрытие условий не
+/// меняет. Раздел не читает граф и не выполняет команд тегов.
 final class IntentionTagConditionsSection extends ConsumerWidget {
   const IntentionTagConditionsSection({required this.purpose, super.key});
 
   final IntentionCatalogPurpose purpose;
-
-  Future<void> _add(
-    BuildContext context,
-    WidgetRef ref,
-    List<IntentionTagCondition> conditions,
-  ) async {
-    final selection = await context.router.push<IntentionTagConditionSelection>(
-      TagConditionPickerRoute(conditions: conditions),
-    );
-    // Поиск, закрытый раньше выбора тега, своих условий уже не хранит.
-    if (selection == null || !context.mounted) return;
-    ref
-        .read(intentionTagConditionsViewModelProvider(purpose).notifier)
-        .applySelection(selection);
-  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -54,7 +42,8 @@ final class IntentionTagConditionsSection extends ConsumerWidget {
           ),
         OutlinedButton.icon(
           key: const ValueKey('intention-tag-conditions-add'),
-          onPressed: () => _add(context, ref, conditions),
+          onPressed: () =>
+              unawaited(showTagsPanel(context, TagsPanelFilterContext(model))),
           icon: const Icon(Icons.add),
           label: Text(
             localizations.intentionTagConditionsAdd,
@@ -84,7 +73,7 @@ final class _ConditionChip extends StatelessWidget {
     final theme = Theme.of(context);
     final id = condition.tagId.toCanonicalString();
     final name = condition.name.value;
-    final (icon, requirementSemantics) = switch (condition.requirement) {
+    final (icon, semanticsLabel) = switch (condition.requirement) {
       IntentionTagRequirement.mustBePresent => (
         Icons.check,
         localizations.intentionTagConditionPresentSemantics(name),
@@ -94,11 +83,6 @@ final class _ConditionChip extends StatelessWidget {
         localizations.intentionTagConditionAbsentSemantics(name),
       ),
     };
-    final semanticsLabel = condition.isDeleted
-        ? localizations.intentionTagConditionDeletedSemantics(
-            requirementSemantics,
-          )
-        : requirementSemantics;
     return Material(
       key: ValueKey('intention-tag-condition-$id'),
       color: theme.colorScheme.surface,
@@ -136,19 +120,10 @@ final class _ConditionChip extends StatelessWidget {
                         // Длинное название переносится, а не обрезается.
                         Flexible(
                           child: tagPhraseText(
-                            phrase: (name) {
-                              final label = switch (condition.requirement) {
-                                IntentionTagRequirement.mustBePresent => name,
-                                IntentionTagRequirement.mustBeAbsent =>
-                                  localizations.intentionTagConditionAbsent(
-                                    name,
-                                  ),
-                              };
-                              return condition.isDeleted
-                                  ? localizations.intentionTagConditionDeleted(
-                                      label,
-                                    )
-                                  : label;
+                            phrase: (name) => switch (condition.requirement) {
+                              IntentionTagRequirement.mustBePresent => name,
+                              IntentionTagRequirement.mustBeAbsent =>
+                                localizations.intentionTagConditionAbsent(name),
                             },
                             tags: [(name: name, color: condition.color)],
                             dotSize: TagDotSize.medium,

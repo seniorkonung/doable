@@ -30,6 +30,8 @@ import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 
+import '../../support/tag_positions.dart';
+
 final statisticsToday = CalendarDate.fromParts(2026, 10, 12);
 
 final class IntentionStatisticsHarness {
@@ -65,6 +67,7 @@ final class IntentionStatisticsHarness {
     ) as TagIdDecodingSuccess).id,
     name: TagName.fromInput('Тег'),
     color: null,
+    position: tagPositionAt(1000),
   );
 
   Future<void> change(int revision, {int epoch = 0}) async {
@@ -72,6 +75,7 @@ final class IntentionStatisticsHarness {
       id: _tag.id,
       name: TagName.fromInput('Тег $epoch $revision'),
       color: _tag.color,
+      position: _tag.position,
     );
     final stamp = StatisticsTestRevision(revision, epoch);
     reader.commandResult = TagCommandSucceeded(

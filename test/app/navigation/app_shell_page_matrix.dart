@@ -12,17 +12,13 @@ typedef _PageCase = ({
 enum _MatrixEntry {
   intention,
   dailyChoice,
-  tags,
   creation,
   condition,
   action,
   actionCandidate,
   relation,
-  tag,
-  renameTag,
   assignTags,
   draftTags,
-  createTag,
   replaceChoice,
   replaceTopDown,
   choosePath,
@@ -42,7 +38,6 @@ enum _MatrixEntry {
     _MatrixEntry.dailyChoice => find.byKey(
       const ValueKey('daily-choice-row-1'),
     ),
-    _MatrixEntry.tags => _openTags,
     _MatrixEntry.creation || _MatrixEntry.action => quickCreationAction(),
     _MatrixEntry.condition => find.byKey(
       const ValueKey('intention-tag-conditions-add'),
@@ -52,17 +47,12 @@ enum _MatrixEntry {
       'Бегать',
     ),
     _MatrixEntry.relation => _relationRow,
-    _MatrixEntry.tag => find.byKey(
-      ValueKey('tag-catalog-open-${tagFixtureId(_tag)}'),
-    ),
-    _MatrixEntry.renameTag => find.byTooltip('Edit tag'),
     _MatrixEntry.assignTags => find.byKey(
       const ValueKey('tag-assignments-choose'),
     ),
     _MatrixEntry.draftTags => find.byKey(
       const ValueKey('intention-editor-choose-tags'),
     ),
-    _MatrixEntry.createTag => find.byKey(const ValueKey('tag-catalog-create')),
     _MatrixEntry.replaceChoice => find.byKey(
       const ValueKey('daily-choice-replace-open'),
     ),
@@ -152,9 +142,138 @@ void _registerPageMatrixTests() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('матрица: панель тегов перекрывает страницу намерения и панель '
+      'навигации, а «назад» закрывает только её', (tester) async {
+    final router = await _start(tester);
+    await _select(tester, AppDestination.intentionGraph);
+    await _open(
+      tester,
+      _summary(IntentionCatalogPage, 'Читать'),
+      IntentionDetailsPage,
+    );
+    await _tap(tester, _MatrixEntry.assignTags.finder);
+    await _until(
+      tester,
+      find.byKey(ValueKey('tags-panel-row-${tagFixtureId(_tag)}')),
+    );
+    await tester.pumpAndSettle();
+
+    final panel = find.byType(Sheet);
+    expect(panel, findsOneWidget);
+    expect(tester.getRect(panel).bottom, _screen(tester).height);
+    expect(find.byType(IntentionDetailsPage), findsOneWidget);
+    expect(_MatrixEntry.assignTags.finder.hitTestable(), findsNothing);
+    final bar = find.byType(AppNavigationBar);
+    expect(bar, findsOneWidget);
+    expect(
+      tester.widget<AppNavigationBar>(bar).selected,
+      AppDestination.intentionGraph,
+    );
+    expect(_destinations.hitTestable(), findsNothing);
+    expect(_announcedDestinations, findsNothing);
+
+    await tester.binding.handlePopRoute();
+    await _gone(tester, Sheet);
+    _expectAboveShell(
+      tester,
+      IntentionDetailsPage,
+      AppDestination.intentionGraph,
+    );
+    await _close(tester, IntentionDetailsPage);
+    _expectRootPage(tester, router, AppDestination.intentionGraph);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('матрица: сценарий «Каталог тегов открывается поверх каталога '
+      'намерений» — панель фильтра перекрывает панель навигации, а «назад» '
+      'возвращает каталог с прежними параметрами', (tester) async {
+    final router = await _start(tester);
+    await _select(tester, AppDestination.intentionGraph);
+    final filter = find.byKey(const ValueKey('catalog-filter-field'));
+    await tester.enterText(filter, 'Читать');
+    await _tap(tester, _MatrixEntry.condition.finder);
+    await _until(
+      tester,
+      find.byKey(ValueKey('tags-panel-row-${tagFixtureId(_tag)}')),
+    );
+    await tester.pumpAndSettle();
+
+    final panel = find.byType(Sheet);
+    expect(panel, findsOneWidget);
+    expect(find.text('Filter by tags'), findsOneWidget);
+    expect(tester.getRect(panel).bottom, _screen(tester).height);
+    expect(find.byType(IntentionCatalogPage), findsOneWidget);
+    expect(_MatrixEntry.condition.finder.hitTestable(), findsNothing);
+    final bar = find.byType(AppNavigationBar);
+    expect(bar, findsOneWidget);
+    expect(
+      tester.widget<AppNavigationBar>(bar).selected,
+      AppDestination.intentionGraph,
+    );
+    expect(_destinations.hitTestable(), findsNothing);
+    expect(_announcedDestinations, findsNothing);
+
+    await tester.binding.handlePopRoute();
+    await _gone(tester, Sheet);
+    _expectRootPage(tester, router, AppDestination.intentionGraph);
+    expect(tester.widget<TextField>(filter).controller!.text, 'Читать');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('матрица: панель тегов перекрывает панель создания и панель '
+      'навигации, а «назад» закрывает только её', (tester) async {
+    final router = await _start(tester);
+    await _select(tester, AppDestination.intentionGraph);
+    await openQuickCreation(
+      tester,
+      QuickCreationMode.intention,
+      openedPage: find.byType(IntentionEditorPage),
+      wait: _until,
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('intention-editor-title')),
+      'Черновик',
+    );
+    await _tap(tester, _MatrixEntry.draftTags.finder);
+    await _until(
+      tester,
+      find.byKey(ValueKey('tags-panel-row-${tagFixtureId(_tag)}')),
+    );
+    await tester.pumpAndSettle();
+
+    // Панель тегов — не маршрут: над формой в стеке ничего не появляется.
+    final panel = find.byType(Sheet);
+    expect(panel, findsOneWidget);
+    expect(tester.getRect(panel).bottom, _screen(tester).height);
+    expect(router.current.name, IntentionEditorRoute.name);
+    expect(_MatrixEntry.draftTags.finder.hitTestable(), findsNothing);
+    final bar = find.byType(AppNavigationBar);
+    expect(bar, findsOneWidget);
+    expect(
+      tester.widget<AppNavigationBar>(bar).selected,
+      AppDestination.intentionGraph,
+    );
+    expect(_destinations.hitTestable(), findsNothing);
+    expect(_announcedDestinations, findsNothing);
+
+    await tester.binding.handlePopRoute();
+    await _gone(tester, Sheet);
+    expect(router.current.name, IntentionEditorRoute.name);
+    expect(
+      tester
+          .widget<TextField>(
+            find.byKey(const ValueKey('intention-editor-title')),
+          )
+          .controller!
+          .text,
+      'Черновик',
+    );
+    _expectCreationSheetAboveCatalog(tester);
+    expect(tester.takeException(), isNull);
+  });
+
   const read = _MatrixEntry.intention;
   const daily = _MatrixEntry.dailyChoice;
-  const tags = _MatrixEntry.tags;
   const cases = <_PageCase>[
     (
       name: 'намерение',
@@ -173,48 +292,6 @@ void _registerPageMatrixTests() {
       page: DailyChoiceDetailsPage,
       panel: true,
       entries: [daily],
-    ),
-    (
-      name: 'навигация по тегу',
-      page: TagNavigationPage,
-      panel: true,
-      entries: [tags, _MatrixEntry.tag],
-    ),
-    (
-      name: 'просмотр тегов',
-      page: TagCatalogPage,
-      panel: true,
-      entries: [tags],
-    ),
-    (
-      name: 'назначение тегов',
-      page: TagCatalogPage,
-      panel: false,
-      entries: [read, _MatrixEntry.assignTags],
-    ),
-    (
-      name: 'теги черновика',
-      page: TagCatalogPage,
-      panel: false,
-      entries: [_MatrixEntry.creation, _MatrixEntry.draftTags],
-    ),
-    (
-      name: 'создание тега',
-      page: TagEditorPage,
-      panel: false,
-      entries: [tags, _MatrixEntry.createTag],
-    ),
-    (
-      name: 'изменение тега',
-      page: TagEditorPage,
-      panel: false,
-      entries: [tags, _MatrixEntry.renameTag],
-    ),
-    (
-      name: 'условие по тегу',
-      page: TagConditionPickerPage,
-      panel: false,
-      entries: [_MatrixEntry.condition],
     ),
     (
       name: 'поиск действия',
@@ -313,7 +390,6 @@ void _registerPageMatrixTests() {
       for (final entry in row.entries) {
         final root = switch (entry) {
           _MatrixEntry.intention ||
-          _MatrixEntry.tags ||
           _MatrixEntry.creation ||
           _MatrixEntry.condition => AppDestination.intentionGraph,
           _MatrixEntry.dailyChoice ||
@@ -347,15 +423,6 @@ void _registerPageMatrixTests() {
       await _until(tester, find.byType(row.page));
       await tester.pumpAndSettle();
       final variant = switch (tester.widget(find.byType(row.page))) {
-        TagCatalogPage(:final selectionContext) => switch (selectionContext) {
-          TagBrowseContext() => 'просмотр тегов',
-          TagAssignmentContext() => 'назначение тегов',
-          TagDraftContext() => 'теги черновика',
-        },
-        TagEditorPage(:final editorContext) => switch (editorContext) {
-          TagEditorCreating() => 'создание тега',
-          TagEditorRenaming() => 'изменение тега',
-        },
         RelationEditorPage(:final editorContext) => switch (editorContext) {
           RelationBlankCreationContext() => 'создание связи без участников',
           RelationCreationContext(:final direction) => switch (direction) {

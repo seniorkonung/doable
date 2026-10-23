@@ -31,7 +31,7 @@ final class TagCatalogSelectionMode extends TagCatalogMode {
   int get hashCode => Object.hash(TagCatalogSelectionMode, intentionId);
 }
 
-/// Полный неизменяемый каталог в порядке создания тегов на одной ревизии.
+/// Полный неизменяемый каталог в ручном порядке тегов на одной ревизии.
 sealed class TagCatalogSnapshot {
   factory TagCatalogSnapshot({
     required List<Tag> items,

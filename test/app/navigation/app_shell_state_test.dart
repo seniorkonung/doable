@@ -39,7 +39,6 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_page
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
-import 'package:doable/src/intention/presentation/catalog/tag_condition_picker_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_id_generator.dart';
@@ -50,11 +49,9 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
 import 'package:doable/src/statistics/application/statistics_read_contract.dart';
 import 'package:doable/src/statistics/application/intention_statistics_breakdown.dart';
 import 'package:doable/src/statistics/application/intention_statistics_read_contract.dart';
-import 'package:doable/src/tag/application/tag_assignment_status.dart';
 import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
-import 'package:doable/src/tag/application/tagged_intentions_page.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -70,6 +67,7 @@ import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 import '../../support/inline_text.dart';
+import '../../support/tag_positions.dart';
 
 /// Активные намерения «Намерение 01» … «Намерение 40»: выдача каталога
 /// длиннее экрана.
@@ -981,9 +979,10 @@ void _seed(sqlite.Database database) {
       [tagFixtureId(_healthTag), tagFixtureId(number)],
     );
 
-    database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+    database.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
       tagFixtureId(_healthTag),
       'Здоровье',
+      tagPositionKey(_healthTag),
     ]);
     for (var number = 1; number <= _activeCount; number++) {
       insertIntention(number, _activeTitle(number));
@@ -1059,15 +1058,16 @@ Future<void> _prepareIntentionCatalog(WidgetTester tester, _App app) async {
   );
   await _tap(
     tester,
-    find.byKey(
-      ValueKey(
-        'tag-condition-picker-mustBePresent-${tagFixtureId(_healthTag)}',
-      ),
-    ),
+    find.byKey(ValueKey('tags-panel-row-${tagFixtureId(_healthTag)}')),
   );
+  // Панель фильтра применяет условие сразу, а «назад» только закрывает её.
+  await tester.binding.handlePopRoute();
   await _waitFor(
     tester,
-    () => find.byType(TagConditionPickerPage).evaluate().isEmpty,
+    () => find
+        .byKey(ValueKey('tags-panel-row-${tagFixtureId(_healthTag)}'))
+        .evaluate()
+        .isEmpty,
   );
   await _until(tester, find.text(app.l10n.catalogTotalCount(_archivedCount)));
   await tester.pumpAndSettle();
@@ -1484,7 +1484,7 @@ final class _ObservedRepository implements PersonalGraphRepository {
   /// Команда намерения принята координатором и ждёт [releaseCommand].
   var isHolding = false;
 
-  /// Обращения к выдаче каталога намерений: порции и чтения согласования.
+  /// Обращения к выдаче каталога намерений: первая порция и продолжения.
   var catalogReads = 0;
 
   /// Получения первой порции выдачи каталога намерений.
@@ -1547,13 +1547,6 @@ final class _ObservedRepository implements PersonalGraphRepository {
   }
 
   @override
-  Future<Result<IntentionCatalogReconciliationOutcome>>
-  getCatalogReconciliationPortion(IntentionCatalogReconciliationQuery query) {
-    catalogReads++;
-    return _delegate.getCatalogReconciliationPortion(query);
-  }
-
-  @override
   Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
     DailyChoiceCatalogQuery query,
   ) {
@@ -1610,17 +1603,6 @@ final class _ObservedRepository implements PersonalGraphRepository {
   @override
   Future<TagAssignmentsResult> getTagAssignments(IntentionId intentionId) =>
       _delegate.getTagAssignments(intentionId);
-
-  @override
-  Future<TagAssignmentStatusResult> getTagAssignmentStatus(
-    TagId tagId,
-    IntentionId intentionId,
-  ) => _delegate.getTagAssignmentStatus(tagId, intentionId);
-
-  @override
-  Future<TaggedIntentionsPageResult> getTaggedIntentionsPage(
-    TaggedIntentionsQuery query,
-  ) => _delegate.getTaggedIntentionsPage(query);
 
   @override
   Stream<TagReadResult> watchTag(TagId id) => _delegate.watchTag(id);

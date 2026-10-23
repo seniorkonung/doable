@@ -5,6 +5,8 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../support/tag_positions.dart';
+
 void main() {
   group('идентичность тега', () {
     test('принимает канонические ненулевые UUID разных версий', () {
@@ -47,13 +49,24 @@ void main() {
       final firstId = _tagId('018f0b5d-6b2e-7c80-8000-000000000001');
       final secondId = _tagId('018f0b5d-6b2e-7c80-8000-000000000002');
       final name = TagName.fromInput('  Дом  ');
-      final first = Tag(id: firstId, name: name, color: null);
+      final first = Tag(
+        id: firstId,
+        name: name,
+        color: null,
+        position: tagPositionAt(1000),
+      );
       final renamed = Tag(
         id: firstId,
         name: TagName.fromInput('Быт'),
         color: first.color,
+        position: first.position,
       );
-      final second = Tag(id: secondId, name: name, color: null);
+      final second = Tag(
+        id: secondId,
+        name: name,
+        color: null,
+        position: tagPositionAt(1001),
+      );
 
       expect(first.name.value, 'Дом');
       expect(renamed.id, first.id);

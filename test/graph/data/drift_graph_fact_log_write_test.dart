@@ -29,6 +29,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
+import '../../support/tag_positions.dart';
 
 final _now = DateTime.utc(2026, 10, 17, 12, 30, 0, 0, 1);
 
@@ -93,10 +94,41 @@ void main() {
 
     final tag = (await expectOnePackage<TagCreated>(
       repository.execute(
-        CreateTag(name: TagName.fromInput('Дом'), color: null),
+        CreateTag(
+          name: TagName.fromInput('Дом'),
+          color: null,
+          placement: TagPlacement.first,
+        ),
       ),
       ['создание тега'],
     )).tag;
+    // Тег, вставший перед первым, не переписывает место прежнего тега.
+    final first = (await expectOnePackage<TagCreated>(
+      repository.execute(
+        CreateTag(
+          name: TagName.fromInput('Работа'),
+          color: null,
+          placement: TagPlacement.first,
+        ),
+      ),
+      ['создание тега'],
+    )).tag;
+    // Тег между соседями не переписывает места ни одного из них.
+    await expectOnePackage<TagCreated>(
+      repository.execute(
+        CreateTag(
+          name: TagName.fromInput('Сад'),
+          color: null,
+          placement: AfterTagPlacement(first.id),
+        ),
+      ),
+      ['создание тега'],
+    );
+    // Перестановка переписывает только место переставленного тега.
+    await expectOnePackage<TagUpdated>(
+      repository.execute(MoveTag(tagId: tag.id, placement: TagPlacement.first)),
+      ['изменение тега'],
+    );
     final source = (await expectOnePackage<IntentionSaved>(
       repository.execute(
         CreateIntention.withInitialState(
@@ -224,8 +256,8 @@ void main() {
   test('прямая запись в таблицу графа отклоняется и после подтверждённой '
       'команды, и после отказа команды', () async {
     Future<void> insertTag() => database.customStatement(
-      'INSERT INTO tags (id, name) VALUES (?, ?)',
-      ['018f0b5d-6b2e-7c80-8000-000000000021', 'Дом'],
+      'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+      ['018f0b5d-6b2e-7c80-8000-000000000021', 'Дом', tagPositionKey(200000)],
     );
     final bypassRejection = throwsA(
       isA<sqlite.SqliteException>().having(
@@ -258,7 +290,11 @@ void main() {
       'отклоняется повреждением без изменения базы и лога фактов', () async {
     final tag = _confirmed<TagCreated>(
       await repository.execute(
-        CreateTag(name: TagName.fromInput('Дом'), color: null),
+        CreateTag(
+          name: TagName.fromInput('Дом'),
+          color: null,
+          placement: TagPlacement.first,
+        ),
       ),
     ).tag;
     await seedGraph(database, () async {

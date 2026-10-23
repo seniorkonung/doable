@@ -19,7 +19,9 @@ void _registerQuickCreationFlowTests() {
         final previous = List.of(app.router.stackData);
         switch (flow) {
           case _Flow.intention:
+            // Выбор тегов — панель над формой, а не следующий маршрут.
             await _tap(tester, _key('intention-editor-choose-tags'));
+            expect(find.byType(Sheet), findsOneWidget);
           case _Flow.relation:
             await _reveal(tester, _key('relation-editor-change-source'));
             await _tap(tester, _key('relation-editor-change-source'));
@@ -62,6 +64,7 @@ void _registerQuickCreationFlowTests() {
         if (flow == _Flow.intention || flow == _Flow.relation) {
           await tester.binding.handlePopRoute();
           await tester.pumpAndSettle();
+          expect(find.byType(Sheet), findsNothing);
           expect(
             [for (final route in app.router.stackData) route.matchId],
             [for (final route in previous) route.matchId],
@@ -409,18 +412,21 @@ void _registerNestedQuickCreationTests() {
   }
 }
 
+/// Добавляет условие в панели фильтра: первое нажатие на тег требует его,
+/// второе исключает. Затем «назад» закрывает панель.
 Future<void> _addSearchTag(
   WidgetTester tester,
   int number, {
   required bool present,
 }) async {
   await _tap(tester, _key('intention-tag-conditions-add'));
-  await _tap(
-    tester,
-    _key(
-      'tag-condition-picker-${present ? 'mustBePresent' : 'mustBeAbsent'}-${durabilityUuid(number)}',
-    ),
-  );
+  final row = _key('tags-panel-row-${durabilityUuid(number)}');
+  await _until(tester, () => row.evaluate().isNotEmpty);
+  await _tap(tester, row);
+  if (!present) await _tap(tester, row);
+  await tester.binding.handlePopRoute();
+  await tester.pumpAndSettle();
+  expect(row, findsNothing);
 }
 
 Future<void> _seedSearchGraph(AppDatabase database) async {
@@ -431,8 +437,8 @@ Future<void> _seedSearchGraph(AppDatabase database) async {
       (901, 'Вторая группа'),
     ]) {
       await database.customStatement(
-        'INSERT INTO tags (id, name) VALUES (?, ?)',
-        [durabilityUuid(number), name],
+        'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+        [durabilityUuid(number), name, tagPositionKey(number)],
       );
     }
     for (var i = 0; i < 160; i++) {

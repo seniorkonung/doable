@@ -9,29 +9,23 @@ import 'intention_editor_state.dart';
 
 /// Выбранные теги черновика создания намерения.
 ///
-/// Показывает проекцию сессии компактными элементами в порядке набора: с
+/// Показывает проекцию сессии компактными элементами в её порядке: с
 /// последними известными названием и цветом, состоянием наблюдения и
-/// доступным снятием.
-/// Тег, отсутствие которого подтвердил отказ создания, показывается
-/// удалённым независимо от проекции. Снятие и повтор наблюдения передаются
+/// доступным снятием. Снятие и повтор наблюдения передаются
 /// владельцу через [onRemove] и [onRetryObservation] и меняют только черновик
 /// и его проекцию: виджет назначений не записывает и тегов не читает. Пустой
 /// набор места не занимает.
 final class IntentionCreationTags extends StatelessWidget {
   const IntentionCreationTags({
     required this.tags,
-    required this.missingTagIds,
     required this.enabled,
     required this.onRemove,
     required this.onRetryObservation,
     super.key,
   });
 
-  /// Проекция выбранных тегов сессии с ключами и порядком набора черновика.
+  /// Проекция выбранных тегов сессии в ручном порядке.
   final Map<TagId, IntentionDraftTag> tags;
-
-  /// Выбранные теги, отсутствие которых подтвердил последний отказ создания.
-  final Set<TagId> missingTagIds;
 
   /// Черновик принимает правки: во время отправки и после завершения сессии
   /// снятие недоступно.
@@ -58,11 +52,7 @@ final class IntentionCreationTags extends StatelessWidget {
               id: id,
               name: tag.name.value,
               color: tagColorPresentation(tag.color),
-              // Отказ создания подтвердил отсутствие в транзакции: это
-              // сильнее ещё не обновлённой проекции.
-              status: missingTagIds.contains(id)
-                  ? const IntentionDraftTagMissing()
-                  : tag.status,
+              status: tag.status,
               onRemove: enabled ? () => onRemove(id) : null,
               onRetryObservation: () => onRetryObservation(id),
             ),
@@ -75,9 +65,8 @@ final class IntentionCreationTags extends StatelessWidget {
 /// Компактный элемент выбранного тега: название, состояние и снятие из
 /// черновика.
 ///
-/// Состояние отличается не только цветом: проверка — значком, удаление —
-/// зачёркнутым названием, значком и текстом, отказ чтения — значком и
-/// текстом причины. Экранный диктор получает название вместе с состоянием;
+/// Состояние отличается не только цветом: проверка — значком, отказ чтения —
+/// значком и текстом причины. Экранный диктор получает название вместе с состоянием;
 /// повтор проверки предлагается только при устранимом отказе чтения.
 final class _DraftTagChip extends StatelessWidget {
   const _DraftTagChip({
@@ -102,7 +91,7 @@ final class _DraftTagChip extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final key = id.toCanonicalString();
-    final (Widget? marker, _DraftTagProblem? problem) = switch (status) {
+    final (Widget? marker, _DraftTagReadProblem? problem) = switch (status) {
       IntentionDraftTagAvailable() => (null, null),
       IntentionDraftTagLoading() => (
         Icon(
@@ -113,13 +102,9 @@ final class _DraftTagChip extends StatelessWidget {
         ),
         null,
       ),
-      IntentionDraftTagMissing() => (
-        null,
-        _DraftTagProblem.missing(localizations.editorDraftTagMissing),
-      ),
       IntentionDraftTagReadFailed(:final failure, :final canRetry) => (
         null,
-        _DraftTagProblem.readFailed(
+        _DraftTagReadProblem(
           _readFailureMessage(localizations, failure),
           canRetry: canRetry,
         ),
@@ -157,11 +142,7 @@ final class _DraftTagChip extends StatelessWidget {
                           child: Text(
                             name,
                             key: ValueKey('intention-editor-tag-name-$key'),
-                            style: theme.textTheme.labelLarge?.copyWith(
-                              decoration: (problem?.isMissing ?? false)
-                                  ? TextDecoration.lineThrough
-                                  : null,
-                            ),
+                            style: theme.textTheme.labelLarge,
                           ),
                         ),
                         if (marker != null) ...[
@@ -174,7 +155,11 @@ final class _DraftTagChip extends StatelessWidget {
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(problem.icon, size: 16, color: colors.error),
+                          Icon(
+                            Icons.sync_problem,
+                            size: 16,
+                            color: colors.error,
+                          ),
                           const SizedBox(width: 4),
                           Flexible(
                             child: Text(
@@ -191,7 +176,7 @@ final class _DraftTagChip extends StatelessWidget {
                 ),
               ),
             ),
-            if (problem case _DraftTagProblem(canRetry: true))
+            if (problem case _DraftTagReadProblem(canRetry: true))
               IconButton(
                 key: ValueKey('intention-editor-tag-retry-$key'),
                 tooltip: localizations.editorRetryDraftTag(name),
@@ -211,23 +196,11 @@ final class _DraftTagChip extends StatelessWidget {
   }
 }
 
-/// Недоступность выбранного тега для показа: подтверждённое отсутствие или
-/// отказ чтения.
-final class _DraftTagProblem {
-  /// Отсутствие окончательно: удалённый тег не возвращается с прежним
-  /// идентификатором, поэтому повтор не предлагается.
-  const _DraftTagProblem.missing(this.message)
-    : icon = Icons.label_off_outlined,
-      isMissing = true,
-      canRetry = false;
+/// Отказ чтения выбранного тега для показа.
+final class _DraftTagReadProblem {
+  const _DraftTagReadProblem(this.message, {required this.canRetry});
 
-  const _DraftTagProblem.readFailed(this.message, {required this.canRetry})
-    : icon = Icons.sync_problem,
-      isMissing = false;
-
-  final IconData icon;
   final String message;
-  final bool isMissing;
 
   /// Повтор наблюдения разрешён контрактом сессии.
   final bool canRetry;

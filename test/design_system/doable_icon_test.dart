@@ -47,14 +47,14 @@ void main() {
     },
   );
 
-  testWidgets('все 23 ресурса сохраняют исходную графику в обеих темах', (
+  testWidgets('все 32 ресурса сохраняют исходную графику в обеих темах', (
     tester,
   ) async {
     await (FontLoader('Inter')..addFont(
           rootBundle.load('lib/src/design_system/fonts/InterVariable.ttf'),
         ))
         .load();
-    await tester.binding.setSurfaceSize(const Size(560, 736));
+    await tester.binding.setSurfaceSize(const Size(560, 1024));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
     await tester.pumpWidget(
@@ -112,7 +112,16 @@ Widget _sampleRow(DoableIconData icon, DoableColors colors) {
     DoableIconData.relationMini ||
     DoableIconData.calendarMini => (14.0, colors.muted, colors.bg),
     DoableIconData.check => (20.0, colors.accent, colors.fill),
+    DoableIconData.exclude => (20.0, colors.muted, colors.raised),
+    DoableIconData.plusSmall => (18.0, colors.accent, colors.raised),
     DoableIconData.chevronRight => (20.0, colors.muted, colors.bg),
+    DoableIconData.chevronDown => (28.0, colors.grip, colors.raised),
+    DoableIconData.search => (20.0, colors.muted, colors.fill),
+    DoableIconData.clear => (12.0, colors.fill, colors.grip),
+    DoableIconData.grip => (16.0, colors.grip, colors.bg),
+    DoableIconData.edit ||
+    DoableIconData.copy => (22.0, colors.ink, colors.raised),
+    DoableIconData.delete => (22.0, colors.danger, colors.raised),
     DoableIconData.settings => (22.0, colors.ink, colors.bg),
     DoableIconData.lockOpen => (20.0, colors.muted, colors.fill),
     DoableIconData.warning => (20.0, colors.accent, colors.fill),

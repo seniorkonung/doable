@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' show Tristate;
 
+import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
@@ -13,7 +14,11 @@ import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode_presentation.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode_store.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_daily_choice_start_sheet.dart';
+import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/daily_choice/domain/calendar_date.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_date_catalog_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_page.dart';
 import 'package:doable/src/shared/diagnostics/developer_diagnostics_sink.dart';
@@ -148,9 +153,8 @@ void main() {
       await _choose(tester, a);
       await _complete(tester, attempts.first.held.future);
 
-      // Второй экземпляр панели принадлежит обычному просмотру тегов.
-      await tester.tap(find.byKey(const ValueKey('catalog-open-tags')));
-      await _settle(tester);
+      // Второй экземпляр панели принадлежит обычной странице над каталогом.
+      await _openOrdinaryPage(tester);
       for (final mode in modes.skip(1)) {
         await _choose(tester, mode);
         expectQuickCreationMode(tester, mode);
@@ -159,8 +163,7 @@ void main() {
         await tester.binding.handlePopRoute();
         await _settle(tester);
         expectQuickCreationMode(tester, mode);
-        await tester.tap(find.byKey(const ValueKey('catalog-open-tags')));
-        await _settle(tester);
+        await _openOrdinaryPage(tester);
         expectQuickCreationMode(tester, mode);
       }
       expect(await tester.runAsync(modeFile.readAsString), initial.storageKey);
@@ -293,6 +296,24 @@ Future<void> _settle(WidgetTester tester) async {
     }
   }
   throw StateError('Чтение или анимация приложения не завершились.');
+}
+
+/// Открывает над каталогом намерений каталог дневных выборов на дату —
+/// обычную страницу с собственной панелью.
+Future<void> _openOrdinaryPage(WidgetTester tester) async {
+  unawaited(
+    tester
+        .element(find.byType(IntentionCatalogPage))
+        .router
+        .root
+        .push(
+          DailyChoiceDateCatalogRoute(
+            date: CalendarDate.fromParts(2026, 9, 25),
+          ),
+        ),
+  );
+  await _settle(tester);
+  expect(find.byType(DailyChoiceDateCatalogPage), findsOneWidget);
 }
 
 Future<void> _openMenu(WidgetTester tester) async {

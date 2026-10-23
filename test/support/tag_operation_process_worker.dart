@@ -2,12 +2,11 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:ui';
 
-import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
-import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
+import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
@@ -18,7 +17,6 @@ import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_id_generator.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
-import 'package:doable/src/tag/application/tagged_intentions_page.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -26,6 +24,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'in_memory_diagnostics_sink.dart';
 import 'tag_storage_fixture.dart';
+import 'tagged_intention_ids.dart';
 
 const tagWorkerDatabasePath = 'DOABLE_TAG_DATABASE_PATH';
 const tagWorkerOperation = 'DOABLE_TAG_OPERATION';
@@ -138,7 +137,11 @@ Future<void> _mutateAssignments(GraphCommandCoordinator coordinator) async {
     final created = await _expectSuccess(
       coordinator.acceptTagCreation(
         TagCreationFormKey(),
-        CreateTag(name: TagName.fromInput(name), color: null),
+        CreateTag(
+          name: TagName.fromInput(name),
+          color: null,
+          placement: TagPlacement.first,
+        ),
       ),
     );
     expect((created as TagCreated).tag.id, _tag(number));
@@ -205,9 +208,11 @@ Future<void> _verifyAssignments(
   final catalog = (await repository.getTagCatalog(
     const TagCatalogBrowseMode(),
   ) as TagCatalogSuccess).value;
+  // Каждый новый тег встаёт первым, поэтому созданный позже «Работа» стоит
+  // перед «Быт».
   expect(catalog.items.map((tag) => (tag.id, tag.name.value)).toList(), [
-    (_tag(301), 'Быт'),
     (_tag(303), 'Работа'),
+    (_tag(301), 'Быт'),
   ]);
   for (final target in <IntentionId>[_intention(1)]) {
     final snapshot = (await repository.getTagAssignments(
@@ -215,8 +220,8 @@ Future<void> _verifyAssignments(
     ) as TagAssignmentsSuccess).value;
     expect(snapshot.intentionId, target);
     expect(snapshot.items.map((tag) => (tag.id, tag.name.value)), [
-      (_tag(301), 'Быт'),
       (_tag(303), 'Работа'),
+      (_tag(301), 'Быт'),
     ]);
   }
   final secondPage = (await repository.getTagAssignments(
@@ -228,67 +233,19 @@ Future<void> _verifyAssignments(
   );
   final rows = await database.customSelect('PRAGMA foreign_key_check').get();
   expect(rows, isEmpty);
-  await _expectNavigation(
-    repository,
-    _tag(301),
-    'Быт',
-    active: [_intention(1)],
-    archived: [],
-  );
-  await _expectNavigation(
-    repository,
-    _tag(303),
-    'Работа',
-    active: [_intention(1)],
-    archived: secondIntentionAssigned ? [_intention(2)] : [],
-  );
-}
-
-Future<void> _expectNavigation(
-  DriftPersonalGraphRepository repository,
-  TagId tagId,
-  String name, {
-  required List<IntentionId> active,
-  required List<IntentionId> archived,
-}) async {
-  final locale = TestWidgetsFlutterBinding.instance.platformDispatcher.locale;
-  final l10n = await AppLocalizations.delegate.load(locale);
-  expect(l10n.localeName, locale.languageCode);
-  for (final (scope, expected) in [
-    (TaggedIntentionsScope.active, active),
-    (TaggedIntentionsScope.archived, archived),
+  for (final (tagId, active, archived) in [
+    (_tag(301), [_intention(1)], <IntentionId>[]),
+    (_tag(303), [_intention(1)], [if (secondIntentionAssigned) _intention(2)]),
   ]) {
-    for (final pageSize in [1, 2, 50, 100]) {
-      final targets = <IntentionId>[];
-      TaggedIntentionsCursor? cursor;
-      GraphRevision? revision;
-      do {
-        final result = await repository.getTaggedIntentionsPage(
-          TaggedIntentionsQuery(
-            tagId: tagId,
-            scope: scope,
-            pageSize: pageSize,
-            cursor: cursor,
-          ),
-        );
-        expect(result, isA<TaggedIntentionsPageSuccess>());
-        final page = (result as TaggedIntentionsPageSuccess).value;
-        expect(page.tag.id, tagId);
-        expect(page.tag.name.value, name);
-        expect(l10n.tagNavigationTag(page.tag.name.value), contains(name));
-        expect(page.scope, scope);
-        expect(page.items.length, lessThanOrEqualTo(pageSize));
-        expect(
-          revision?.compareTo(page.revision) ?? GraphRevisionOrder.same,
-          GraphRevisionOrder.same,
-        );
-        revision = page.revision;
-        targets.addAll(page.items.map((item) => item.id));
-        expect(targets.toSet(), hasLength(targets.length));
-        expect(targets.length, lessThanOrEqualTo(expected.length));
-        cursor = page.nextCursor;
-      } while (cursor != null);
-      expect(targets, expected, reason: '$scope, порция $pageSize');
+    for (final (scope, expected) in [
+      (IntentionScope.active, active),
+      (IntentionScope.archived, archived),
+    ]) {
+      expect(
+        await readTaggedIntentionIds(repository, tagId, scope),
+        expected.toSet(),
+        reason: '$scope',
+      );
     }
   }
 }

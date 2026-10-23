@@ -27,6 +27,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
+import '../support/tag_positions.dart';
 
 void main() {
   group('сводка изменений по фактам пакетов', () {
@@ -268,7 +269,11 @@ void main() {
         const CreateIntention(title: 'Бегать', description: 'По утрам'),
       )).intention;
       final home = (await confirm<TagCreated>(
-        CreateTag(name: TagName.fromInput('Дом'), color: null),
+        CreateTag(
+          name: TagName.fromInput('Дом'),
+          color: null,
+          placement: TagPlacement.first,
+        ),
       )).tag;
       final previous = await repository.readCurrentPosition();
 
@@ -281,7 +286,11 @@ void main() {
       );
       await confirm<TagDeleted>(DeleteTag(home.id));
       await confirm<TagCreated>(
-        CreateTag(name: TagName.fromInput('Работа'), color: null),
+        CreateTag(
+          name: TagName.fromInput('Работа'),
+          color: null,
+          placement: TagPlacement.first,
+        ),
       );
 
       expect(_shown(await summaryAfter(previous)), (
@@ -291,11 +300,43 @@ void main() {
       ));
     });
 
+    test('перестановка тега даёт «1 изменено»', () async {
+      final home = (await confirm<TagCreated>(
+        CreateTag(
+          name: TagName.fromInput('Дом'),
+          color: null,
+          placement: TagPlacement.first,
+        ),
+      )).tag;
+      await confirm<TagCreated>(
+        CreateTag(
+          name: TagName.fromInput('Работа'),
+          color: null,
+          placement: TagPlacement.first,
+        ),
+      );
+      final previous = await repository.readCurrentPosition();
+
+      await confirm<TagUpdated>(
+        MoveTag(tagId: home.id, placement: TagPlacement.first),
+      );
+
+      expect(_shown(await summaryAfter(previous)), (
+        added: 0,
+        changed: 1,
+        deleted: 0,
+      ));
+    });
+
     test(
       'изменённый байт снимка на начале диапазона сводку не меняет',
       () async {
         await confirm<TagCreated>(
-          CreateTag(name: TagName.fromInput('Дом'), color: null),
+          CreateTag(
+            name: TagName.fromInput('Дом'),
+            color: null,
+            placement: TagPlacement.first,
+          ),
         );
         final snapshot = await store.writeSnapshot(1);
         final file = File.fromUri(snapshots.uri.resolve(snapshot.fileName));
@@ -303,7 +344,11 @@ void main() {
         bytes[bytes.length ~/ 2] ^= 0xff;
         await file.writeAsBytes(bytes);
         await confirm<TagCreated>(
-          CreateTag(name: TagName.fromInput('Дача'), color: null),
+          CreateTag(
+            name: TagName.fromInput('Дача'),
+            color: null,
+            placement: TagPlacement.first,
+          ),
         );
         await expectLater(
           () async => (await store.readStateAt(2)).records.drain<void>(),
@@ -335,7 +380,12 @@ Object _shown(GraphChangeSummary summary) => switch (summary) {
 final _createdAt = DateTime.utc(2026, 10, 1, 7);
 
 TagRecord _tag(int number, String name) => TagRecord(
-  Tag(id: _tagId(number), name: TagName.fromStored(name), color: null),
+  Tag(
+    id: _tagId(number),
+    name: TagName.fromStored(name),
+    color: null,
+    position: tagPositionAt(number),
+  ),
 );
 
 IntentionRecord _intention(int number, String title, {bool archived = false}) =>

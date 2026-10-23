@@ -4,16 +4,28 @@ import '../../../tag/domain/tag.dart';
 import '../../../tag/domain/tag_color.dart';
 import '../../../tag/domain/tag_id.dart';
 import '../../../tag/domain/tag_name.dart';
+import '../../../tag/domain/tag_position.dart';
 import '../../application/intention_result.dart';
 import '../../domain/intention.dart';
 import '../../domain/intention_id.dart';
 import '../../domain/intention_text.dart';
 import '../operation/operation_state.dart';
 import 'intention_creation_close.dart';
-import 'intention_draft_tag_set.dart';
 
 export 'intention_creation_close.dart';
 export 'intention_draft_tag_set.dart';
+
+/// Принимает ли сессия создания изменения своего черновика.
+enum IntentionDraftAvailability {
+  editable,
+
+  /// Принятая отправка выполняется: черновик зафиксирован до её результата.
+  submitting,
+
+  /// Сессия завершена успешным созданием, закрытием по запросу или
+  /// освобождена.
+  closed,
+}
 
 sealed class IntentionEditorEvent {
   const IntentionEditorEvent();
@@ -72,8 +84,8 @@ final class IntentionCreationDraft {
       ? this
       : _copy(tagIds: Set.unmodifiable({...tagIds, id}));
 
-  IntentionCreationDraft withoutTag(TagId id) => tagIds.contains(id)
-      ? _copy(tagIds: Set.unmodifiable(tagIds.where((tagId) => tagId != id)))
+  IntentionCreationDraft withoutTags(Set<TagId> ids) => tagIds.any(ids.contains)
+      ? _copy(tagIds: Set.unmodifiable(tagIds.where((id) => !ids.contains(id))))
       : this;
 
   IntentionCreationDraft withReadiness(IntentionReadiness value) =>
@@ -92,8 +104,8 @@ final class IntentionCreationDraft {
   );
 }
 
-/// Выбранный тег черновика для показа: последние известные название и цвет
-/// и состояние его наблюдения.
+/// Выбранный тег черновика для показа: последние известные название, цвет
+/// и место в ручном порядке и состояние его наблюдения.
 ///
 /// Проекция отделена от набора идентичностей черновика: её изменения не
 /// меняют состав набора, изменённость черновика и данные отправки и не
@@ -102,20 +114,30 @@ final class IntentionDraftTag {
   const IntentionDraftTag({
     required this.name,
     required this.color,
+    required this.position,
     required this.status,
   });
 
   /// Последнее подтверждённое название: сначала из выбора, затем из
-  /// наблюдения. Сохраняется при отсутствии тега и отказе чтения.
+  /// наблюдения. Сохраняется при отказе чтения.
   final TagName name;
 
   /// Последний подтверждённый цвет; `null` — «Без цвета». Источник и
   /// сохранение те же, что у [name].
   final TagColor? color;
+
+  /// Последнее подтверждённое место; источник и сохранение те же, что у
+  /// [name].
+  final TagPosition position;
   final IntentionDraftTagStatus status;
 
   IntentionDraftTag withStatus(IntentionDraftTagStatus value) =>
-      IntentionDraftTag(name: name, color: color, status: value);
+      IntentionDraftTag(
+        name: name,
+        color: color,
+        position: position,
+        status: value,
+      );
 }
 
 sealed class IntentionDraftTagStatus {
@@ -131,13 +153,6 @@ final class IntentionDraftTagLoading extends IntentionDraftTagStatus {
 /// Наблюдение подтвердило тег и его актуальные название и цвет.
 final class IntentionDraftTagAvailable extends IntentionDraftTagStatus {
   const IntentionDraftTagAvailable();
-}
-
-/// Наблюдение подтвердило отсутствие тега. Удалённый тег не возвращается с
-/// прежним идентификатором, поэтому он остаётся в наборе недоступным с
-/// последними известными названием и цветом до явного снятия.
-final class IntentionDraftTagMissing extends IntentionDraftTagStatus {
-  const IntentionDraftTagMissing();
 }
 
 /// Наблюдение завершилось отказом чтения; это не отсутствие тега.
@@ -173,9 +188,9 @@ final class IntentionEditorState {
 
   final IntentionCreationDraft draft;
 
-  /// Выбранные теги для показа — неизменяемая проекция с теми же ключами и
-  /// в том же порядке, что и набор черновика. Она не входит в черновик и не
-  /// влияет на его изменённость.
+  /// Выбранные теги для показа — неизменяемая проекция с теми же ключами,
+  /// что и набор черновика, в ручном порядке по месту тега. Она не входит в
+  /// черновик и не влияет на его изменённость.
   final Map<TagId, IntentionDraftTag> selectedTags;
   final OperationState<Intention> operation;
   final IntentionEditorEvent? event;
@@ -203,25 +218,6 @@ final class IntentionEditorState {
     },
   };
 
-  IntentionDraftTagSetSnapshot get draftTagSet => IntentionDraftTagSetSnapshot(
-    tagIds: draft.tagIds,
-    availability: draftAvailability,
-  );
-
-  /// Выбранные теги черновика, отсутствие которых подтвердил последний отказ
-  /// создания, — данные для показа недоступных тегов. Пока набор не пуст,
-  /// новая проверка недоступна: каждый такой тег снимается только явно.
-  Set<TagId> get missingTagIds => switch (operation) {
-    OperationFailed<Intention>(
-      failure: IntentionCreationTagsMissingFailure(:final missingTagIds),
-    ) =>
-      Set.unmodifiable(draft.tagIds.where(missingTagIds.contains)),
-    OperationIdle<Intention>() ||
-    OperationRunning<Intention>() ||
-    OperationSucceeded<Intention>() ||
-    OperationFailed<Intention>() => const {},
-  };
-
   bool get canRetry => switch (operation) {
     OperationFailed<Intention>(failure: IntentionUnavailableFailure()) => true,
     OperationIdle<Intention>() ||
@@ -231,10 +227,18 @@ final class IntentionEditorState {
   };
 
   /// Отправка недоступна, пока ожидается ответ на подтверждение закрытия
-  /// или после завершения сессии.
+  /// или после завершения сессии. После отказа из-за отсутствующих тегов
+  /// черновик уже без них, поэтому новая отправка доступна сразу.
   bool get canSubmit => switch (closing) {
-    IntentionCreationCloseNotRequested() =>
-      operation is OperationIdle<Intention> || canRetry,
+    IntentionCreationCloseNotRequested() => switch (operation) {
+      OperationIdle<Intention>() ||
+      OperationFailed<Intention>(
+        failure: IntentionCreationTagsMissingFailure(),
+      ) => true,
+      OperationRunning<Intention>() ||
+      OperationSucceeded<Intention>() ||
+      OperationFailed<Intention>() => canRetry,
+    },
     IntentionCreationCloseConfirming() ||
     IntentionCreationClosedOnRequest() => false,
   };
@@ -253,11 +257,12 @@ final class IntentionEditorState {
       ? this
       : _withEditedTags(
           draft.withTag(tag.id),
-          selectedTags: Map.unmodifiable({
+          selectedTags: _inManualOrder({
             ...selectedTags,
             tag.id: IntentionDraftTag(
               name: tag.name,
               color: tag.color,
+              position: tag.position,
               status: const IntentionDraftTagLoading(),
             ),
           }),
@@ -265,11 +270,24 @@ final class IntentionEditorState {
 
   IntentionEditorState withoutTag(TagId id) => draft.tagIds.contains(id)
       ? _withEditedTags(
-          draft.withoutTag(id),
-          selectedTags: Map.unmodifiable({
-            for (final MapEntry(:key, :value) in selectedTags.entries)
-              if (key != id) key: value,
-          }),
+          draft.withoutTags({id}),
+          selectedTags: _selectedTagsWithout({id}),
+        )
+      : this;
+
+  /// Убирает из набора теги [ids], удаление которых подтверждено.
+  ///
+  /// Удаление — не правка пользователя: отправка и право предъявления
+  /// ошибки не меняются.
+  IntentionEditorState withoutDeletedTags(Set<TagId> ids) =>
+      draft.tagIds.any(ids.contains)
+      ? IntentionEditorState._(
+          draft: draft.withoutTags(ids),
+          selectedTags: _selectedTagsWithout(ids),
+          operation: operation,
+          event: event,
+          failurePresentation: failurePresentation,
+          closing: closing,
         )
       : this;
 
@@ -280,7 +298,7 @@ final class IntentionEditorState {
       draft.tagIds.contains(id)
       ? IntentionEditorState._(
           draft: draft,
-          selectedTags: Map.unmodifiable({...selectedTags, id: tag}),
+          selectedTags: _inManualOrder({...selectedTags, id: tag}),
           operation: operation,
           event: event,
           failurePresentation: failurePresentation,
@@ -295,23 +313,38 @@ final class IntentionEditorState {
   /// [failurePresentation]; прежнее неподтверждённое право сессия передаёт
   /// общей поверхности. Ожидающее подтверждение закрытия объясняло прежнее
   /// состояние отправки и потому перестаёт действовать.
+  ///
+  /// Отказ из-за отсутствующих тегов сам доказывает их удаление, поэтому они
+  /// уходят из набора вместе с отказом.
   IntentionEditorState withOperation(
     OperationState<Intention> value, {
     IntentionEditorEvent? event,
     GraphInitiatorPresentationClaim? failurePresentation,
-  }) => IntentionEditorState._(
-    draft: draft,
-    selectedTags: selectedTags,
-    operation: value,
-    event: event,
-    failurePresentation: failurePresentation,
-    closing: switch (closing) {
-      IntentionCreationCloseConfirming() =>
-        const IntentionCreationCloseNotRequested(),
-      IntentionCreationCloseNotRequested() ||
-      IntentionCreationClosedOnRequest() => closing,
-    },
-  );
+  }) {
+    final next = IntentionEditorState._(
+      draft: draft,
+      selectedTags: selectedTags,
+      operation: value,
+      event: event,
+      failurePresentation: failurePresentation,
+      closing: switch (closing) {
+        IntentionCreationCloseConfirming() =>
+          const IntentionCreationCloseNotRequested(),
+        IntentionCreationCloseNotRequested() ||
+        IntentionCreationClosedOnRequest() => closing,
+      },
+    );
+    return switch (value) {
+      OperationFailed<Intention>(
+        failure: IntentionCreationTagsMissingFailure(:final missingTagIds),
+      ) =>
+        next.withoutDeletedTags(missingTagIds),
+      OperationIdle<Intention>() ||
+      OperationRunning<Intention>() ||
+      OperationSucceeded<Intention>() ||
+      OperationFailed<Intention>() => next,
+    };
+  }
 
   IntentionEditorState withoutEvent() => IntentionEditorState._(
     draft: draft,
@@ -342,6 +375,12 @@ final class IntentionEditorState {
     failurePresentation: null,
     closing: const IntentionCreationClosedOnRequest(),
   );
+
+  Map<TagId, IntentionDraftTag> _selectedTagsWithout(Set<TagId> ids) =>
+      Map.unmodifiable({
+        for (final MapEntry(:key, :value) in selectedTags.entries)
+          if (!ids.contains(key)) key: value,
+      });
 
   IntentionEditorState _withClosing(IntentionCreationClosing value) =>
       IntentionEditorState._(
@@ -384,9 +423,7 @@ final class IntentionEditorState {
     IntentionCreationDraft draft, {
     required Map<TagId, IntentionDraftTag> selectedTags,
   }) {
-    final nextOperation = _operationAfterEditing(
-      _DraftTagSetEdit(draft.tagIds),
-    );
+    final nextOperation = _operationAfterEditing(const _DraftTagSetEdit());
     return IntentionEditorState._(
       draft: draft,
       selectedTags: selectedTags,
@@ -412,11 +449,9 @@ final class IntentionEditorState {
       IntentionTextInputValidationFailure(:final textFailure) =>
         edit is _DraftTextEdit && edit.field == textFailure.field,
       IntentionGenericValidationFailure() => edit is _DraftTextEdit,
-      // Удалённый тег не возвращается с прежним идентификатором: новая
-      // проверка имеет смысл только после явного снятия каждого
-      // отсутствующего тега, а одноимённая замена отказ не снимает.
-      IntentionCreationTagsMissingFailure(:final missingTagIds) =>
-        edit is _DraftTagSetEdit && !edit.tagIds.any(missingTagIds.contains),
+      // Отсутствующие теги ушли из набора вместе с отказом; его объяснение
+      // остаётся до правки набора.
+      IntentionCreationTagsMissingFailure() => edit is _DraftTagSetEdit,
       IntentionNotFoundFailure() ||
       IntentionConflictFailure() ||
       IntentionHasBlockingRelationsFailure() ||
@@ -439,9 +474,16 @@ final class _DraftTextEdit extends _DraftEdit {
   final IntentionTextField field;
 }
 
-/// Изменение состава набора тегов; [tagIds] — набор после правки.
 final class _DraftTagSetEdit extends _DraftEdit {
-  const _DraftTagSetEdit(this.tagIds);
-
-  final Set<TagId> tagIds;
+  const _DraftTagSetEdit();
 }
+
+/// Неизменяемая проекция [tags] в ручном порядке по месту тега.
+Map<TagId, IntentionDraftTag> _inManualOrder(
+  Map<TagId, IntentionDraftTag> tags,
+) => Map.unmodifiable(
+  Map.fromEntries(
+    tags.entries.toList()
+      ..sort((a, b) => a.value.position.compareTo(b.value.position)),
+  ),
+);

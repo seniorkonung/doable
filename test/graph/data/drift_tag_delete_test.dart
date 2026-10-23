@@ -15,6 +15,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
+import '../../support/tag_positions.dart';
 
 String _uuid(int number) =>
     '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}';
@@ -87,13 +88,15 @@ void main() {
         'INSERT INTO daily_choice_path_steps (id, daily_choice_id, long_term_relation_id) VALUES (?, ?, ?)',
         [_uuid(203), _uuid(202), _uuid(201)],
       );
-      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+      raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
         _uuid(301),
         'Дом',
+        tagPositionKey(301),
       ]);
-      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+      raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
         _uuid(302),
         'Работа',
+        tagPositionKey(302),
       ]);
       for (var i = 1; i <= 104; i++) {
         raw.execute(
@@ -168,9 +171,10 @@ void main() {
           [_uuid(i), 'Намерение $i', 0, i - 1, i, i],
         );
       }
-      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+      raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
         _uuid(401),
         'Дом',
+        tagPositionKey(401),
       ]);
       for (var i = 1; i <= 2; i++) {
         raw.execute(
@@ -203,17 +207,19 @@ void main() {
 
   test('устаревший id не удаляет новый одноимённый тег', () async {
     seedRawGraph(raw, () {
-      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+      raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
         _uuid(501),
         'Дом',
+        tagPositionKey(501),
       ]);
     });
     final deleted = await repository.execute(DeleteTag(_tagId(501)));
     expect(deleted, isA<TagCommandSucceeded>());
     seedRawGraph(raw, () {
-      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+      raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
         _uuid(502),
         'Дом',
+        tagPositionKey(502),
       ]);
     });
     final revision = await currentRevision();

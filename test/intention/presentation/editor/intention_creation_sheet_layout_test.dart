@@ -33,6 +33,7 @@ import '../../../support/app_root_pages.dart';
 import '../../../support/quick_creation.dart';
 import '../catalog/catalog_test_support.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
+import '../../../support/tag_positions.dart';
 
 void main() {
   setUp(() {
@@ -686,27 +687,37 @@ void main() {
           _expectPinned(tester, recovery);
           expect(_fieldsPosition(tester).pixels, pixels);
           expect(find.byType(SnackBar), findsNothing);
-          _expectDraftValues(sessions.state(tester).draft, draft);
           expect(repository.commands, hasLength(1));
           expect(tester.takeException(), isNull);
 
           switch (recovery) {
-            case _Recovery.removeMissingTags:
-              expect(_submitButton(tester).onPressed, isNull);
+            case _Recovery.resubmit:
+              // Отказ сам убрал отсутствующий тег и сохранил остальное.
+              final state = sessions.state(tester);
+              expect(state.draft.title, draft.title);
+              expect(state.draft.description, draft.description);
+              expect(state.draft.readiness, draft.readiness);
+              expect(state.draft.tagIds, [_tagId(2)]);
+              expect(find.byKey(_tagChip(1)), findsNothing);
               await tester.tapAt(
                 const Alignment(
                   0.8,
                   0,
-                ).withinRect(tester.getRect(find.byKey(_removeMissing))),
+                ).withinRect(tester.getRect(find.byKey(_submit))),
               );
-              await tester.pumpAndSettle();
+              await tester.pump();
 
-              // Исправление меняет только набор и само не отправляет.
-              expect(sessions.state(tester).draft.tagIds, [_tagId(2)]);
-              expect(find.byKey(_failure), findsNothing);
-              expect(_submitButton(tester).onPressed, isNotNull);
-              expect(repository.commands, hasLength(1));
+              expect(repository.commands, hasLength(2));
+              expect(
+                repository.commands.last,
+                isA<CreateIntention>().having(
+                  (command) => command.tagIds,
+                  'теги',
+                  [_tagId(2)],
+                ),
+              );
             case _Recovery.retry:
+              _expectDraftValues(sessions.state(tester).draft, draft);
               await tester.tap(find.byKey(_submit));
               await tester.pump();
 
@@ -738,6 +749,7 @@ void main() {
               expect(find.byKey(_failure), findsOneWidget);
               expect(find.byType(SnackBar), findsNothing);
             case _Recovery.none:
+              _expectDraftValues(sessions.state(tester).draft, draft);
               expect(_submitButton(tester).onPressed, isNull);
               // Правки, не устраняющие причину, отказ не снимают.
               await tester.enterText(find.byKey(_title), 'Другое намерение');
@@ -753,7 +765,7 @@ void main() {
     }
 
     testWidgets(
-      'любой отказ сохраняет все четыре поля черновика в той же компактной панели',
+      'любой отказ сохраняет все четыре поля черновика в той же компактной панели, кроме отсутствующих тегов',
       (tester) async {
         _usePhone(tester, _portrait);
         final failures = [
@@ -787,8 +799,19 @@ void main() {
             isA<OperationFailed<Intention>>(),
             reason: name,
           );
-          _expectDraftValues(state.draft, draft, reason: name);
-          expect(state.draft.tagIds, [_tagId(1)], reason: name);
+          // Отсутствующий тег уходит из набора вместе с отказом.
+          final isTagMissing = switch (failure) {
+            ResultFailure(failure: IntentionCreationTagsMissingFailure()) =>
+              true,
+            _ => false,
+          };
+          expect(state.draft.title, draft.title, reason: name);
+          expect(state.draft.description, draft.description, reason: name);
+          expect(
+            state.draft.tagIds,
+            isTagMissing ? isEmpty : [_tagId(1)],
+            reason: name,
+          );
           expect(state.draft.readiness, IntentionReadiness.ready, reason: name);
           expect(_controller(tester, _title).text, '  Намерение', reason: name);
           expect(
@@ -796,7 +819,11 @@ void main() {
             'Описание\n',
             reason: name,
           );
-          expect(find.byKey(_tagChip(1)), findsOneWidget, reason: name);
+          expect(
+            find.byKey(_tagChip(1)),
+            isTagMissing ? findsNothing : findsOneWidget,
+            reason: name,
+          );
           _expectCompact(tester, _sheetRect(tester), _portrait);
           _expectSubmitAvailable(tester, _portrait);
           expect(repository.commands, hasLength(1), reason: name);
@@ -908,17 +935,13 @@ void main() {
           await _expectFailureRecoverable(
             tester,
             device,
-            _removeMissing,
-            'A selected tag was deleted from the catalog. Remove it from '
-            'the draft to save the intention.',
+            _submit,
+            'A selected tag was deleted from the catalog and removed from the '
+            'draft. Save the intention again.',
           );
-          await tester.tapAt(
-            _expectTappable(tester, find.byKey(_removeMissing)),
-          );
-          await tester.pumpAndSettle();
           expect(sessions.state(tester).draft.tagIds, [_tagId(2)]);
           // Отказ прочитан в панели при исходной клавиатуре и не
-          // повторяется на общей поверхности после исправления.
+          // повторяется на общей поверхности.
           expect(find.byType(SnackBar), findsNothing);
           await expectUsable(keyboard: true);
 
@@ -1154,7 +1177,7 @@ Future<void> _expectMessageReadable(WidgetTester tester, Finder message) async {
 }
 
 /// Способ восстановления после общего отказа, который предлагает панель.
-enum _Recovery { removeMissingTags, retry, none }
+enum _Recovery { resubmit, retry, none }
 
 /// Ошибки полей: название поля в описании проверки, поле и причина отказа,
 /// ключ поля и текст ошибки.
@@ -1182,9 +1205,9 @@ const _fieldFailures =
 final _pinnedFailures = <(IntentionFailure, String, _Recovery)>[
   (
     IntentionCreationTagsMissingFailure([_tagId(1)]),
-    'A selected tag was deleted from the catalog. Remove it from the draft '
-        'to save the intention.',
-    _Recovery.removeMissingTags,
+    'A selected tag was deleted from the catalog and removed from the draft. '
+        'Save the intention again.',
+    _Recovery.resubmit,
   ),
   (
     const IntentionUnavailableFailure(),
@@ -1262,39 +1285,33 @@ void _expectPinned(WidgetTester tester, _Recovery recovery) {
   final fields = tester.getRect(find.byKey(_fields));
   final status = tester.getRect(find.byKey(_status));
   final message = tester.getRect(find.byKey(_failure));
-  final actions = [
-    _submit,
-    if (recovery == _Recovery.removeMissingTags) _removeMissing,
-  ];
   expect(fields.height, greaterThan(0));
   expect(status.top, greaterThanOrEqualTo(fields.bottom));
   expect(message.top, greaterThanOrEqualTo(status.top));
   expect(message.top, lessThan(status.bottom));
-  for (final action in actions) {
-    final rect = tester.getRect(find.byKey(action));
-    expect(rect.top, greaterThanOrEqualTo(status.bottom));
-    expect(rect.bottom, lessThanOrEqualTo(_visibleBottom(tester)));
-    // Ручка выделения поля может перекрывать центр кнопки исправления.
-    expect(
-      find.byKey(action).hitTestable(at: const Alignment(0.8, 0)),
-      findsOneWidget,
-    );
-  }
+  final submit = tester.getRect(find.byKey(_submit));
+  expect(submit.top, greaterThanOrEqualTo(status.bottom));
+  expect(submit.bottom, lessThanOrEqualTo(_visibleBottom(tester)));
+  // Ручка выделения поля может перекрывать центр кнопки.
+  expect(
+    find.byKey(_submit).hitTestable(at: const Alignment(0.8, 0)),
+    findsOneWidget,
+  );
   expect(
     find.widgetWithText(FilledButton, 'Try again'),
     recovery == _Recovery.retry ? findsOneWidget : findsNothing,
-  );
-  expect(
-    find.byKey(_removeMissing),
-    recovery == _Recovery.removeMissingTags ? findsOneWidget : findsNothing,
   );
 }
 
 FilledButton _submitButton(WidgetTester tester) =>
     tester.widget<FilledButton>(find.byKey(_submit));
 
-Tag _tag(int number, String name) =>
-    Tag(id: _tagId(number), name: TagName.fromInput(name), color: null);
+Tag _tag(int number, String name) => Tag(
+  id: _tagId(number),
+  name: TagName.fromInput(name),
+  color: null,
+  position: tagPositionAt(number),
+);
 
 TagId _tagId(int number) => switch (TagId.decode(
   '018f47c2-6b7d-7abc-8def-${number.toString().padLeft(12, '0')}',
@@ -1329,7 +1346,6 @@ const _description = ValueKey('intention-editor-description');
 const _submit = ValueKey('intention-editor-submit');
 const _status = ValueKey('intention-creation-sheet-status');
 const _failure = ValueKey('intention-editor-failure');
-const _removeMissing = ValueKey('intention-editor-remove-missing-tags');
 const _readiness = ValueKey('intention-editor-readiness');
 const _chooseTags = ValueKey('intention-editor-choose-tags');
 const _readinessCancel = ValueKey('intention-editor-readiness-cancel');

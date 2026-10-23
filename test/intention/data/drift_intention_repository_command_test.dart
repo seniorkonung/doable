@@ -27,6 +27,7 @@ import 'package:sqlite3/sqlite3.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
+import '../../support/tag_positions.dart';
 
 void main() {
   late AppDatabase database;
@@ -67,15 +68,28 @@ void main() {
       setUp(() {
         seedTagStorageFixture(raw);
         id = _id(tagFixtureId(1));
-        expectedTagNames = ['Дом'];
+        // Место 1000 + (37 · index) mod 105 перемешивает теги: ручной порядок
+        // не совпадает ни с порядком создания, ни с обратным порядком
+        // назначения. «Дом» из фикстуры стоит перед ними.
+        int place(int index) => 1000 + index * 37 % 105;
+        expectedTagNames = [
+          'Дом',
+          for (final index in List.generate(
+            105,
+            (index) => index,
+          )..sort((a, b) => place(a).compareTo(place(b))))
+            'Собственный тег $index',
+        ];
         seedRawGraph(raw, () {
           for (var index = 0; index < 105; index++) {
-            final name = 'Собственный тег $index';
-            expectedTagNames.add(name);
-            raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-              tagFixtureId(2000 - index),
-              name,
-            ]);
+            raw.execute(
+              'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+              [
+                tagFixtureId(2000 - index),
+                'Собственный тег $index',
+                tagPositionKey(place(index)),
+              ],
+            );
           }
           for (var index = 104; index >= 0; index--) {
             raw.execute(
@@ -1549,8 +1563,9 @@ void main() {
     );
 
     group('Создание с полным начальным состоянием', () {
-      // «Выходные» созданы раньше «Дома»: собственные теги снимка следуют
-      // порядку создания тегов, а не порядку выбора в команде.
+      // Место «Выходных» стоит раньше места «Дома», и в фикстуре ручной
+      // порядок совпадает с порядком создания. Собственные теги снимка следуют
+      // ручному порядку тегов по месту, а не порядку выбора в команде.
       final weekendTagId = _tagId(tagFixtureId(firstTagNumber));
       final homeTagId = _tagId(tagFixtureId(lastTagNumber));
       final newId = _id(_firstUuid);
@@ -1574,14 +1589,18 @@ void main() {
 
       setUp(() async {
         seedRawGraph(raw, () {
-          raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-            weekendTagId.toCanonicalString(),
-            'Выходные',
-          ]);
-          raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-            homeTagId.toCanonicalString(),
-            'Дом',
-          ]);
+          raw.execute(
+            'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+            [
+              weekendTagId.toCanonicalString(),
+              'Выходные',
+              tagPositionKey(200000),
+            ],
+          );
+          raw.execute(
+            'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+            [homeTagId.toCanonicalString(), 'Дом', tagPositionKey(200001)],
+          );
         });
         await _insertIntention(
           database,
@@ -1852,7 +1871,11 @@ void main() {
         _tagCommandSuccess(await repository.execute(DeleteTag(homeTagId)));
         final recreated = _tagCommandSuccess(
           await repository.execute(
-            CreateTag(name: TagName.fromInput('Дом'), color: null),
+            CreateTag(
+              name: TagName.fromInput('Дом'),
+              color: null,
+              placement: TagPlacement.first,
+            ),
           ),
         );
         final recreatedTagId = (recreated.value as TagCreated).tag.id;
@@ -1905,7 +1928,8 @@ void main() {
           GraphRevisionOrder.same,
         );
 
-        // Явное исправление набора назначает новый «Дом» по его идентичности.
+        // Явное исправление набора назначает новый «Дом» по его идентичности;
+        // созданный позже, он стоит в ручном порядке первым.
         final saved = _commandSuccess(
           await repository.execute(
             CreateIntention.withInitialState(
@@ -1920,7 +1944,7 @@ void main() {
           saved.catalogMutation.after!.summary.tags.map(
             (tag) => (tag.id, tag.name.value),
           ),
-          [(weekendTagId, 'Выходные'), (recreatedTagId, 'Дом')],
+          [(recreatedTagId, 'Дом'), (weekendTagId, 'Выходные')],
         );
         expect(
           _catalogItems(await repository.getCatalogPage(recreatedTagQuery))

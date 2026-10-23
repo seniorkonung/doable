@@ -13,6 +13,8 @@ import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/tag_positions.dart';
+
 void main() {
   group('поисковый ключ названия намерения', () {
     test('сопоставляет фильтр с названием через единый поисковый ключ', () {
@@ -150,16 +152,19 @@ void main() {
           id: health,
           name: TagName.fromInput('Здоровье'),
           color: null,
+          position: tagPositionAt(1000),
         );
         final renamed = Tag(
           id: health,
           name: TagName.fromInput('Самочувствие'),
           color: original.color,
+          position: original.position,
         );
         final sameName = Tag(
           id: rest,
           name: TagName.fromInput('Здоровье'),
           color: null,
+          position: tagPositionAt(1001),
         );
         final required = IntentionTagFilter(requiredTagIds: [original.id]);
         final excluded = IntentionTagFilter(excludedTagIds: [original.id]);
@@ -194,16 +199,19 @@ void main() {
         id: _tagId('00000000-0000-4000-8000-000000000101'),
         name: TagName.fromStored('Здоровье'),
         color: null,
+        position: tagPositionAt(1002),
       );
       final rest = Tag(
         id: _tagId('00000000-0000-4000-8000-000000000102'),
         name: TagName.fromStored('Отдых'),
         color: null,
+        position: tagPositionAt(1003),
       );
       final sport = Tag(
         id: _tagId('00000000-0000-4000-8000-000000000103'),
         name: TagName.fromStored('Спорт'),
         color: null,
+        position: tagPositionAt(1004),
       );
       const candidateId = '00000000-0000-4000-8000-000000000001';
       final otherParticipant = _intentionId(
@@ -306,11 +314,13 @@ void main() {
           id: _tagId('00000000-0000-4000-8000-000000000002'),
           name: TagName.fromStored('Первый тег'),
           color: null,
+          position: tagPositionAt(1005),
         ),
         Tag(
           id: _tagId('00000000-0000-4000-8000-000000000001'),
           name: TagName.fromStored('Второй тег'),
           color: null,
+          position: tagPositionAt(1006),
         ),
       ];
       final summary = IntentionSummary(
@@ -358,11 +368,17 @@ void main() {
         createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 2)),
         tags: [
-          Tag(id: firstId, name: TagName.fromStored('Первый тег'), color: null),
+          Tag(
+            id: firstId,
+            name: TagName.fromStored('Первый тег'),
+            color: null,
+            position: tagPositionAt(1007),
+          ),
           Tag(
             id: secondId,
             name: TagName.fromStored('Второй тег'),
             color: null,
+            position: tagPositionAt(1008),
           ),
         ],
       );
@@ -372,6 +388,7 @@ void main() {
           id: secondId,
           name: TagName.fromStored('Второй тег'),
           color: TagColor.blue,
+          position: tagPositionAt(1008),
         ),
       );
 
@@ -382,6 +399,58 @@ void main() {
       ]);
       expect(copy.tags.map((tag) => tag.color), [null, TagColor.blue]);
       expect(summary.tags.last.color, isNull);
+      expect(copy.id, summary.id);
+      expect(copy.title, summary.title);
+      expect(copy.hasDescription, summary.hasDescription);
+      expect(copy.readiness, summary.readiness);
+      expect(copy.archiveState, summary.archiveState);
+      expect(copy.activeRelationCount, summary.activeRelationCount);
+      expect(copy.createdAt, summary.createdAt);
+      expect(copy.updatedAt, summary.updatedAt);
+    });
+
+    test('изменение только места тега переставляет его в сводке', () {
+      final firstId = _tagId('00000000-0000-4000-8000-000000000002');
+      final secondId = _tagId('00000000-0000-4000-8000-000000000001');
+      final summary = IntentionSummary(
+        id: _intentionId('00000000-0000-4000-8000-000000000003'),
+        title: 'Гулять',
+        hasDescription: true,
+        readiness: IntentionReadiness.ready,
+        archiveState: IntentionArchiveState.archived,
+        activeRelationCount: 2,
+        createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
+        updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 2)),
+        tags: [
+          Tag(
+            id: firstId,
+            name: TagName.fromStored('Первый тег'),
+            color: null,
+            position: tagPositionAt(1015),
+          ),
+          Tag(
+            id: secondId,
+            name: TagName.fromStored('Второй тег'),
+            color: TagColor.blue,
+            position: tagPositionAt(1016),
+          ),
+        ],
+      );
+
+      final copy = summary.withUpdatedTag(
+        Tag(
+          id: secondId,
+          name: TagName.fromStored('Второй тег'),
+          color: TagColor.blue,
+          position: tagPositionAt(1014),
+        ),
+      );
+
+      expect(copy.tags.map((tag) => (tag.id, tag.position)), [
+        (secondId, tagPositionAt(1014)),
+        (firstId, tagPositionAt(1015)),
+      ]);
+      expect(summary.tags.map((tag) => tag.id), [firstId, secondId]);
       expect(copy.id, summary.id);
       expect(copy.title, summary.title);
       expect(copy.hasDescription, summary.hasDescription);
@@ -407,6 +476,7 @@ void main() {
             id: _tagId('00000000-0000-4000-8000-000000000001'),
             name: TagName.fromStored('Здоровье'),
             color: null,
+            position: tagPositionAt(1010),
           ),
         ],
       );
@@ -416,6 +486,7 @@ void main() {
           id: _tagId('00000000-0000-4000-8000-000000000002'),
           name: TagName.fromStored('Здоровье'),
           color: TagColor.blue,
+          position: tagPositionAt(1011),
         ),
       );
 
@@ -438,11 +509,17 @@ void main() {
         createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 2)),
         tags: [
-          Tag(id: firstId, name: TagName.fromStored('Первый тег'), color: null),
+          Tag(
+            id: firstId,
+            name: TagName.fromStored('Первый тег'),
+            color: null,
+            position: tagPositionAt(1012),
+          ),
           Tag(
             id: secondId,
             name: TagName.fromStored('Второй тег'),
             color: null,
+            position: tagPositionAt(1013),
           ),
         ],
       );
@@ -477,6 +554,7 @@ void main() {
             id: _tagId('00000000-0000-4000-8000-000000000001'),
             name: TagName.fromStored('Здоровье'),
             color: null,
+            position: tagPositionAt(1014),
           ),
         ],
       );
@@ -739,55 +817,6 @@ void main() {
     });
   });
 
-  group('контракт чтения согласования каталога', () {
-    test('окно сохранённых строк не зависит от изменения исходного списка', () {
-      final second = _summary(id: '00000000-0000-4000-8000-000000000002');
-      final first = _summary(id: '00000000-0000-4000-8000-000000000001');
-      final stored = [second, first];
-
-      final window = IntentionCatalogInnerReconciliationWindow(stored);
-      stored.clear();
-
-      expect(window.storedIntentionIds, [second.id, first.id]);
-      expect(window.upperEdgeRow.id, first.id);
-    });
-
-    test('внутреннее окно без сохранённых строк не создаётся', () {
-      expect(
-        () => IntentionCatalogInnerReconciliationWindow(const []),
-        throwsArgumentError,
-      );
-    });
-
-    test('ранее завершённая выдача, включая пустую, — отдельная граница, '
-        'а окно с последней строкой области может быть пустым', () {
-      final reconciliation = IntentionCatalogReconciliationQuery(
-        catalogQuery: _query(),
-        boundary: const IntentionCatalogCompletedBoundary(),
-        window: IntentionCatalogFinalReconciliationWindow(const []),
-      );
-
-      expect(_boundaryDescription(reconciliation.boundary), 'completed');
-      expect(_windowDescription(reconciliation.window), 'final');
-      expect(reconciliation.window.storedIntentionIds, isEmpty);
-      expect(reconciliation.cursor, isNull);
-    });
-
-    test('первая порция отклоняет количество меньше своих строк', () {
-      final summary = _summary(id: '00000000-0000-4000-8000-000000000001');
-
-      expect(
-        () => IntentionCatalogReconciliationFirstPortion(
-          items: [summary],
-          totalCount: 0,
-          nextCursor: null,
-          revision: const _TestGraphRevision(epoch: 'первая', sequence: 0),
-        ),
-        throwsA(isA<IntentionCatalogPageValidationException>()),
-      );
-    });
-  });
-
   group('полное начальное состояние создания намерения', () {
     final home = _tagId('00000000-0000-4000-8000-000000000001');
     final weekend = _tagId('00000000-0000-4000-8000-000000000002');
@@ -950,18 +979,6 @@ Intention _intention() {
     updatedAt: timestamp,
   );
 }
-
-String _boundaryDescription(IntentionCatalogReconciliationBoundary boundary) =>
-    switch (boundary) {
-      IntentionCatalogPartialPrefixBoundary() => 'partial',
-      IntentionCatalogCompletedBoundary() => 'completed',
-    };
-
-String _windowDescription(IntentionCatalogReconciliationWindow window) =>
-    switch (window) {
-      IntentionCatalogInnerReconciliationWindow() => 'inner',
-      IntentionCatalogFinalReconciliationWindow() => 'final',
-    };
 
 Matcher _throwsQueryFailure(IntentionCatalogQueryValidationFailure failure) =>
     throwsA(

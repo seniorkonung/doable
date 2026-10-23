@@ -159,7 +159,6 @@ final class _RelationParticipantPickerPageState
         selection: state.selection,
         query: state.query,
         revision: state.revision,
-        refresh: state.refresh,
       ),
     );
   }

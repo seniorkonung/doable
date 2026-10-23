@@ -28,9 +28,6 @@ import 'package:doable/src/intention/presentation/editor/intention_editor_page.d
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/long_term_relation/presentation/details/relation_details_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
-import 'package:doable/src/tag/domain/tag_id.dart';
-import 'package:doable/src/tag/presentation/navigation/tag_navigation_page.dart';
-import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -537,8 +534,16 @@ void main() {
       await _until(tester, _messageOf(2));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byKey(const ValueKey('catalog-open-tags')));
-      await _until(tester, find.byType(TagCatalogPage));
+      await tester.tap(
+        find
+            .descendant(
+              of: find.byType(IntentionCatalogPage),
+              matching: find.byType(IntentionSummaryView),
+            )
+            .hitTestable()
+            .first,
+      );
+      await _until(tester, find.byType(IntentionDetailsPage));
       await tester.pumpAndSettle();
 
       expect(find.byType(AppNavigationBar), findsOneWidget);

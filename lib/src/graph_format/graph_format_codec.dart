@@ -19,6 +19,7 @@ import '../tag/domain/tag_assignment.dart';
 import '../tag/domain/tag_color.dart';
 import '../tag/domain/tag_id.dart';
 import '../tag/domain/tag_name.dart';
+import '../tag/domain/tag_position.dart';
 import 'graph_format_records.dart';
 
 /// Предел записи: наибольшая длина одной записи в байтах UTF-8 без перевода
@@ -292,6 +293,7 @@ Map<String, Object?> _writeRecord(GraphEntityRecord record) => switch (record) {
     'id': tag.id.toCanonicalString(),
     'name': tag.name.value,
     'color': tag.color?.code,
+    'position': tag.position.value,
   },
   IntentionRecord(:final intention) => {
     'kind': _intentionKind,
@@ -416,6 +418,7 @@ GraphEntityRecord _readEntity(String kind, _JsonFields fields) =>
           id: _readTagId(fields.string('id')),
           name: TagName.fromStored(fields.string('name')),
           color: _readTagColor(fields.nullableString('color')),
+          position: _readTagPosition(fields.string('position')),
         ),
       ),
       _intentionKind => IntentionRecord(_readIntention(fields)),
@@ -602,6 +605,12 @@ TagColor? _readTagColor(String? code) {
     UnknownTagColorDecoding() => throw const GraphFormatCorruption(),
   };
 }
+
+/// Неканонический ключ — повреждение: формат не исправляет место.
+TagPosition _readTagPosition(String text) => switch (TagPosition.decode(text)) {
+  TagPositionDecodingSuccess(:final position) => position,
+  NonCanonicalTagPositionDecoding() => throw const GraphFormatCorruption(),
+};
 
 IntentionId _readIntentionId(String text) => switch (IntentionId.decode(text)) {
   IntentionIdDecodingSuccess(:final id) => id,

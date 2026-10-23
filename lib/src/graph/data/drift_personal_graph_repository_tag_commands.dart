@@ -7,6 +7,7 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
     final type = switch (command) {
       CreateTag() => TagCommandDiagnosticsType.create,
       UpdateTag() => TagCommandDiagnosticsType.update,
+      MoveTag() => TagCommandDiagnosticsType.move,
       DeleteTag() => TagCommandDiagnosticsType.delete,
       AssignTag() => TagCommandDiagnosticsType.assign,
       RemoveTagAssignment() => TagCommandDiagnosticsType.removeAssignment,
@@ -25,6 +26,7 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
         (_) => switch (command) {
           CreateTag() => _createTag(command, onStage: (value) => stage = value),
           UpdateTag() => _updateTag(command, onStage: (value) => stage = value),
+          MoveTag() => _moveTag(command, onStage: (value) => stage = value),
           DeleteTag() => _deleteTag(command, onStage: (value) => stage = value),
           AssignTag() => _assignTag(command, onStage: (value) => stage = value),
           RemoveTagAssignment() => _removeTagAssignment(
@@ -36,7 +38,10 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
           // После отката индекс имени остаётся окончательным арбитром гонки.
           final conflictingName = switch (command) {
             CreateTag(:final name) || UpdateTag(:final name) => name,
-            DeleteTag() || AssignTag() || RemoveTagAssignment() => null,
+            MoveTag() ||
+            DeleteTag() ||
+            AssignTag() ||
+            RemoveTagAssignment() => null,
           };
           if (conflictingName == null) return;
           if (classifySqliteFailure(error) case SqliteConstraintFailure(
@@ -50,7 +55,10 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
                 switch (command) {
                   CreateTag() => true,
                   UpdateTag(:final tagId) => occupied.id != tagId,
-                  DeleteTag() || AssignTag() || RemoveTagAssignment() => false,
+                  MoveTag() ||
+                  DeleteTag() ||
+                  AssignTag() ||
+                  RemoveTagAssignment() => false,
                 }) {
               throw _TagNameOccupied(occupied.id);
             }
@@ -75,6 +83,10 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
     CreateTag command, {
     required void Function(TagCommandDiagnosticsStage) onStage,
   }) async {
+    // Соседи читаются в транзакции записи, поэтому другая запись не может
+    // занять вычисленный ключ.
+    final (previous, next) = await _placementNeighbours(command.placement);
+    final position = TagPosition.between(previous?.position, next?.position);
     onStage(TagCommandDiagnosticsStage.write);
     final id = _tagIdGenerator.generate();
     await _database
@@ -84,14 +96,50 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
             id: id.toCanonicalString(),
             name: command.name.value,
             color: Value(command.color?.code),
+            position: position.value,
           ),
         );
     onStage(TagCommandDiagnosticsStage.resultRead);
     final tag = await _findTagById(id);
-    if (tag == null || tag.name != command.name || tag.color != command.color) {
+    if (tag == null ||
+        tag.name != command.name ||
+        tag.color != command.color ||
+        tag.position != position) {
       throw const StoredGraphCorruption();
     }
     return _CommittedTagCreated(tag);
+  }
+
+  /// Соседи места по [placement]: тег перед местом и тег после него;
+  /// `null` — края каталога.
+  Future<(tag_domain.Tag?, tag_domain.Tag?)> _placementNeighbours(
+    TagPlacement placement,
+  ) async {
+    switch (placement) {
+      case FirstTagPlacement():
+        return (null, await _findTagAfter(null));
+      case AfterTagPlacement(:final tagId):
+        final source = await _findTagById(tagId);
+        if (source == null) throw _TagMissing(tagId);
+        return (source, await _findTagAfter(source.position));
+    }
+  }
+
+  /// Первый по месту тег после [position], а без него — первый тег каталога;
+  /// `null` — такого тега нет.
+  Future<tag_domain.Tag?> _findTagAfter(TagPosition? position) async {
+    final row = await _database
+        .customSelect(
+          position == null
+              ? 'SELECT id, name, color, position FROM tags '
+                    'ORDER BY position LIMIT 1'
+              : 'SELECT id, name, color, position FROM tags '
+                    'WHERE position > ? ORDER BY position LIMIT 1',
+          variables: [if (position != null) Variable<String>(position.value)],
+          readsFrom: {_database.tags},
+        )
+        .getSingleOrNull();
+    return row == null ? null : decodeStoredTag(row.data);
   }
 
   Future<_CommittedTagCommand> _updateTag(
@@ -122,6 +170,37 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
     if (after == null ||
         after.name != command.name ||
         after.color != command.color) {
+      throw const StoredGraphCorruption();
+    }
+    return _CommittedTagUpdated(before: before, after: after);
+  }
+
+  Future<_CommittedTagCommand> _moveTag(
+    MoveTag command, {
+    required void Function(TagCommandDiagnosticsStage) onStage,
+  }) async {
+    final before = await _findTagById(command.tagId);
+    if (before == null) throw _TagMissing(command.tagId);
+    final (previous, next) = await _placementNeighbours(command.placement);
+    // Тег уже на месте, если он сам задаёт размещение или стоит сразу за ним.
+    if (previous?.id == before.id || next?.id == before.id) {
+      return _CommittedTagUnchanged(before);
+    }
+    final position = TagPosition.between(previous?.position, next?.position);
+
+    onStage(TagCommandDiagnosticsStage.write);
+    final rows =
+        await (_database.update(
+              _database.tags,
+            )..where((row) => row.id.equals(command.tagId.toCanonicalString())))
+            .write(local.TagsCompanion(position: Value(position.value)));
+    if (rows != 1) throw _TagMissing(command.tagId);
+    onStage(TagCommandDiagnosticsStage.resultRead);
+    final after = await _findTagById(command.tagId);
+    if (after == null ||
+        after.name != before.name ||
+        after.color != before.color ||
+        after.position != position) {
       throw const StoredGraphCorruption();
     }
     return _CommittedTagUpdated(before: before, after: after);
@@ -275,7 +354,7 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
   Future<tag_domain.Tag?> _findTagById(TagId id) async {
     final row = await _database
         .customSelect(
-          'SELECT id, name, color FROM tags WHERE id = ?',
+          'SELECT id, name, color, position FROM tags WHERE id = ?',
           variables: [Variable<String>(id.toCanonicalString())],
           readsFrom: {_database.tags},
         )
@@ -293,7 +372,7 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
     if (ids.isEmpty) return const {};
     final rows = await _database
         .customSelect(
-          'SELECT id, name, color FROM tags '
+          'SELECT id, name, color, position FROM tags '
           'WHERE id IN (SELECT value FROM json_each(?))',
           variables: [
             Variable<String>(
@@ -317,7 +396,7 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
   Future<tag_domain.Tag?> _findTagByNameKey(String key) async {
     final row = await _database
         .customSelect(
-          'SELECT id, name, color FROM tags WHERE name_key = ?',
+          'SELECT id, name, color, position FROM tags WHERE name_key = ?',
           variables: [Variable<String>(key)],
           readsFrom: {_database.tags},
         )

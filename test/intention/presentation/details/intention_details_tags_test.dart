@@ -4,6 +4,7 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
@@ -11,9 +12,6 @@ import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_state.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_view_model.dart';
-import 'package:doable/src/tag/application/tagged_intentions_page.dart';
-import 'package:doable/src/tag/domain/tag_id.dart';
-import 'package:doable/src/tag/presentation/catalog/tag_selection_context.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -48,10 +46,6 @@ void main() {
           ]);
         });
         final graphBefore = retainedTagFixtureGraph(raw);
-        final assignmentsBefore = raw
-            .select('SELECT * FROM tag_assignments ORDER BY creation_sequence')
-            .map((row) => row.values.toList())
-            .toList();
         final repository = DriftPersonalGraphRepository(
           database,
           UuidV7IntentionIdGenerator(),
@@ -77,15 +71,6 @@ void main() {
         );
         await tester.pumpAndSettle();
         await openIntentionGraph(tester);
-        final tagId = (TagId.decode(
-          tagFixtureId(firstTagNumber),
-        ) as TagIdDecodingSuccess).id;
-        unawaited(router.push(TagNavigationRoute(tagId: tagId)));
-        await tester.pumpAndSettle();
-        await tester.tap(
-          find.byKey(const ValueKey(TaggedIntentionsScope.archived)),
-        );
-        await tester.pumpAndSettle();
         unawaited(
           router.push(IntentionDetailsRoute(intentionId: _intentionId(number))),
         );
@@ -105,79 +90,51 @@ void main() {
         await tester.pumpAndSettle();
         expect(choose, findsOneWidget);
         expect(find.text('Дом'), findsOneWidget);
-        final open = find.byKey(
-          ValueKey('tag-assignment-open-${tagFixtureId(firstTagNumber)}'),
-        );
-        expect(open, findsOneWidget);
-        await Scrollable.ensureVisible(tester.element(open), alignment: 0.3);
-        await tester.pumpAndSettle();
-        await tester.tap(open);
-        await tester.pumpAndSettle();
-        expect(router.current.name, TagNavigationRoute.name);
-        expect(
-          router.current
-              .argsAs<TagNavigationRouteArgs>()
-              .tagId
-              .toCanonicalString(),
-          tagFixtureId(firstTagNumber),
-        );
-        expect(
-          tester
-              .widget<ChoiceChip>(
-                find.byKey(const ValueKey(TaggedIntentionsScope.active)),
-              )
-              .selected,
-          isTrue,
-        );
-        expect(retainedTagFixtureGraph(raw), graphBefore);
-        expect(
-          raw
-              .select(
-                'SELECT * FROM tag_assignments ORDER BY creation_sequence',
-              )
-              .map((row) => row.values.toList())
-              .toList(),
-          assignmentsBefore,
-        );
-        router.pop();
-        await tester.pumpAndSettle();
-        expect(router.current.name, IntentionDetailsRoute.name);
         await Scrollable.ensureVisible(tester.element(choose), alignment: 0.3);
         await tester.pumpAndSettle();
         await tester.tap(choose);
         await tester.pumpAndSettle();
-        expect(router.current.name, TagCatalogRoute.name);
-        expect(
-          router.current.argsAs<TagCatalogRouteArgs>().selectionContext,
-          TagAssignmentContext(_intentionId(number)),
-        );
+        // Панель открыта над страницей намерения, а не отдельной страницей.
+        expect(router.current.name, IntentionDetailsRoute.name);
+        expect(find.byType(Sheet), findsOneWidget);
+        expect(find.text('Теги'), findsOneWidget);
 
-        await tester.tap(find.byKey(const ValueKey('tag-catalog-create')));
-        await tester.pumpAndSettle();
-        await tester.enterText(
-          find.byKey(const ValueKey('tag-editor-name')),
-          'Новый тег $number',
-        );
-        await tester.tap(find.byKey(const ValueKey('tag-editor-submit')));
+        // Нажатие на существующий тег сразу назначает его этому намерению
+        // без восстановления архивного и без изменения остальных данных.
+        final workId = tagFixtureId(lastTagNumber);
+        await tester.tap(find.byKey(ValueKey('tags-panel-row-$workId')));
         await _waitUntil(
           tester,
-          () =>
-              find.byKey(const ValueKey('tag-editor-name')).evaluate().isEmpty,
+          () => raw.select(
+            'SELECT * FROM tag_assignments WHERE tag_id = ? AND intention_id = ?',
+            [workId, tagFixtureId(number)],
+          ).isNotEmpty,
         );
-        expect(router.current.name, TagCatalogRoute.name);
+        expect(retainedTagFixtureGraph(raw), graphBefore);
+
+        await tester.enterText(
+          find.descendant(
+            of: find.byType(Sheet),
+            matching: find.byType(TextField),
+          ),
+          'Новый тег $number',
+        );
+        await tester.pump();
+        await tester.tap(find.text('Создать тег «Новый тег $number»'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(FilledButton, 'Создать тег'));
+        await _waitUntil(
+          tester,
+          () => raw.select('SELECT id FROM tags WHERE name = ?', [
+            'Новый тег $number',
+          ]).isNotEmpty,
+        );
         final newTagId =
             raw.select('SELECT id FROM tags WHERE name = ?', [
                   'Новый тег $number',
                 ]).single['id']
                 as String;
-        expect(
-          raw.select('SELECT * FROM tag_assignments WHERE tag_id = ?', [
-            newTagId,
-          ]),
-          isEmpty,
-        );
-
-        await tester.tap(find.byKey(const ValueKey('tag-catalog-assign')));
+        // Созданный в панели тег сразу назначен именно этому намерению.
         await _waitUntil(
           tester,
           () => raw.select(
@@ -186,14 +143,14 @@ void main() {
           ).isNotEmpty,
         );
         expect(
-          raw.select(
-            'SELECT * FROM tag_assignments WHERE tag_id = ? AND intention_id = ?',
-            [newTagId, tagFixtureId(number)],
-          ),
+          raw.select('SELECT * FROM tag_assignments WHERE tag_id = ?', [
+            newTagId,
+          ]),
           hasLength(1),
         );
-        router.pop();
+        await tester.tap(find.text('Готово'));
         await tester.pumpAndSettle();
+        expect(find.byType(Sheet), findsNothing);
         final remove = find.byKey(ValueKey('tag-assignment-remove-$newTagId'));
         await Scrollable.ensureVisible(tester.element(remove), alignment: 0.3);
         await tester.pumpAndSettle();
@@ -267,17 +224,6 @@ void main() {
         await tester.tap(find.widgetWithText(TextButton, 'Отмена'));
         await tester.pumpAndSettle();
         expect(retainedTagFixtureGraph(raw), graphBefore);
-        router.pop();
-        await tester.pumpAndSettle();
-        expect(router.current.name, TagNavigationRoute.name);
-        expect(
-          tester
-              .widget<ChoiceChip>(
-                find.byKey(const ValueKey(TaggedIntentionsScope.archived)),
-              )
-              .selected,
-          isTrue,
-        );
       },
     );
   }

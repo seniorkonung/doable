@@ -29,7 +29,6 @@ import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
-import 'package:doable/src/intention/presentation/catalog/tag_condition_picker_page.dart';
 import 'package:doable/src/statistics/application/statistics_period.dart';
 import 'package:doable/src/statistics/presentation/home_statistics_state.dart';
 import 'package:doable/src/statistics/presentation/home_statistics_view_model.dart';
@@ -159,7 +158,13 @@ void main() {
     );
     await app.waitForBackups(1);
     final backupState = await app.graphState();
-    await app.execute(CreateTag(name: TagName.fromInput('Сад'), color: null));
+    await app.execute(
+      CreateTag(
+        name: TagName.fromInput('Сад'),
+        color: null,
+        placement: TagPlacement.first,
+      ),
+    );
 
     // Обновление — новый запуск над тем же хранилищем и каталогом снимков:
     // версия схемы и формата данных у обновлённого приложения та же.
@@ -190,7 +195,13 @@ void main() {
     );
     await app.waitForBackups(1);
     app.now = DateTime(2026, 10, 5, 14);
-    await app.execute(CreateTag(name: TagName.fromInput('Сад'), color: null));
+    await app.execute(
+      CreateTag(
+        name: TagName.fromInput('Сад'),
+        color: null,
+        placement: TagPlacement.first,
+      ),
+    );
     await app.openSettings();
     await app.openBackupsSheet();
     await app.chooseBackup(
@@ -289,7 +300,13 @@ void main() {
     );
     await app.waitForBackups(1);
     app.now = DateTime(2026, 10, 6, 8, 40);
-    await app.execute(CreateTag(name: TagName.fromInput('Сад'), color: null));
+    await app.execute(
+      CreateTag(
+        name: TagName.fromInput('Сад'),
+        color: null,
+        placement: TagPlacement.first,
+      ),
+    );
     await app.openSettings();
     await app.openBackupsSheet();
     await app.chooseBackup(
@@ -331,7 +348,13 @@ void main() {
     await app.waitForBackups(1);
     final backupState = await app.graphState();
     app.now = DateTime(2026, 10, 6, 8, 40);
-    await app.execute(CreateTag(name: TagName.fromInput('Сад'), color: null));
+    await app.execute(
+      CreateTag(
+        name: TagName.fromInput('Сад'),
+        color: null,
+        placement: TagPlacement.first,
+      ),
+    );
     await app.openSettings();
     await app.openBackupsSheet();
     await app.chooseBackup(
@@ -400,7 +423,13 @@ void main() {
     for (final intention in long) {
       await app.execute(DeleteIntention(intention.id));
     }
-    await app.execute(CreateTag(name: TagName.fromInput('Дом'), color: null));
+    await app.execute(
+      CreateTag(
+        name: TagName.fromInput('Дом'),
+        color: null,
+        placement: TagPlacement.first,
+      ),
+    );
     await app.openSettings();
     app.fillStorage();
     final before = app.storedState();
@@ -692,7 +721,11 @@ Future<T> _confirm<T extends GraphCommandOutcome>(
 Future<Tag> _createTag(PersonalGraphRepository graph, String name) async =>
     (await _confirm<TagCreated>(
       graph,
-      CreateTag(name: TagName.fromInput(name), color: null),
+      CreateTag(
+        name: TagName.fromInput(name),
+        color: null,
+        placement: TagPlacement.first,
+      ),
     )).tag;
 
 Future<Intention> _createIntention(
@@ -744,15 +777,16 @@ Future<void> _filterIntentionCatalogByTag(WidgetTester tester, Tag tag) async {
   );
   await _tap(
     tester,
-    find.byKey(
-      ValueKey(
-        'tag-condition-picker-mustBePresent-${tag.id.toCanonicalString()}',
-      ),
-    ),
+    find.byKey(ValueKey('tags-panel-row-${tag.id.toCanonicalString()}')),
   );
+  // Панель фильтра применяет условие сразу, а «назад» только закрывает её.
+  await tester.binding.handlePopRoute();
   await app_flow.waitFor(
     tester,
-    () => find.byType(TagConditionPickerPage).evaluate().isEmpty,
+    () => find
+        .byKey(ValueKey('tags-panel-row-${tag.id.toCanonicalString()}'))
+        .evaluate()
+        .isEmpty,
   );
   // Выдача с условием прочитана за эти шаги.
   await app_flow.settle(tester);

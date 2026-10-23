@@ -12,6 +12,8 @@ import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openFileBackedLocalDatabase;
+import 'package:doable/src/design_system/components/sheet.dart';
+import 'package:doable/src/design_system/components/tag_row.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -42,10 +44,6 @@ import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_state.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_view_model.dart';
-import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
-import 'package:doable/src/tag/presentation/navigation/tag_navigation_page.dart';
-import 'package:doable/src/tag/presentation/navigation/tag_navigation_state.dart';
-import 'package:doable/src/tag/presentation/navigation/tag_navigation_view_model.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -61,6 +59,7 @@ import '../support/local_database_harness.dart';
 import '../support/tag_storage_fixture.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
 import '../support/quick_creation.dart';
+import '../support/tag_positions.dart';
 
 // Названия намерений и тегов — данные человека: они одинаковы в обеих
 // локалях.
@@ -105,7 +104,7 @@ const _rawTitle = '  Рисовать акварель ';
 const _title = 'Рисовать акварель';
 const _description = 'Пейзаж у реки';
 
-/// Тег, который человек создаёт настоящим редактором из общего выбора.
+/// Тег, который человек создаёт настоящим листом из панели тегов.
 const _sport = 'Спорт';
 
 /// Название намерения, созданного с минимальными данными: поиску каталога
@@ -132,16 +131,10 @@ final _readinessConfirm = find.byKey(
   const ValueKey('intention-editor-readiness-confirm'),
 );
 final _submit = find.byKey(const ValueKey('intention-editor-submit'));
-final _addToDraftAction = find.byKey(
-  const ValueKey('tag-catalog-add-to-draft'),
-);
-final _createTagAction = find.byKey(const ValueKey('tag-catalog-create'));
-final _tagEditorName = find.byKey(const ValueKey('tag-editor-name'));
-final _tagEditorSubmit = find.byKey(const ValueKey('tag-editor-submit'));
 final _message = find.byKey(const ValueKey('graph-operation-message'));
 
 /// Сквозная проверка быстрого создания намерения: меню и кнопка общей
-/// панели, компактная форма, общий выбор тегов и настоящий редактор тега
+/// панели, компактная форма, панель тегов и настоящий лист тега
 /// на настоящих AppRouter, сессии черновика, координаторе команд, общей
 /// поверхности сообщений и Drift-адаптере через настроенное файловое
 /// соединение.
@@ -150,11 +143,7 @@ final _message = find.byKey(const ValueKey('graph-operation-message'));
 /// Записи видны через наблюдатель соединения, граф — по строкам хранилища и
 /// публичным чтениям модуля графа, результат — по завершениям координатора и
 /// сообщениям общей поверхности, согласование — по подтверждённым снимкам
-/// каталога и навигации по тегу и по видимой выдаче каталога.
-///
-/// Навигация по тегу — страница поверх корневой: под модальной панелью,
-/// открытой из каталога, она существовать не может. Поэтому её проверка
-/// открывает навигацию после результата.
+/// каталога и по видимой выдаче каталога, в том числе с условием по тегу.
 void main() {
   // Проверки читают системные строки из локализаций: второй язык не меняет
   // создание, согласование и чтение результата.
@@ -162,11 +151,11 @@ void main() {
     final code = locale.languageCode;
 
     testWidgets(
-      'намерение, подготовленное через общую кнопку, панель, общий выбор и '
-      'настоящий редактор тега, открывается по новому идентификатору при '
+      'намерение, подготовленное через общую кнопку, панель, панель тегов и '
+      'настоящий лист тега, открывается по новому идентификатору при '
       'совпадении названия и сохраняется одним подтверждённым результатом, '
       'учитывается ровно один раз в выдаче с прежними условиями и позицией, '
-      'отражается навигацией по тегам и читается после '
+      'попадает в выдачу с условием по каждому выбранному тегу и читается после '
       'повторного открытия хранилища вместе с минимальным созданием на $code',
       (tester) async {
         final install = await _install(tester, locale);
@@ -189,12 +178,13 @@ void main() {
         expect(app.completions, isEmpty);
 
         // Все четыре поля черновика готовятся только через интерфейс панели,
-        // общего выбора и редактора тега.
+        // панели тегов и листа тега.
         final sport = await _prepareFullDraft(tester, app, tags: [_homeTag]);
         expect(_text(tester, 'intention-editor-title'), _rawTitle);
         expect(_text(tester, 'intention-editor-description'), _description);
         expect(_iconOf(tester, _readiness), Icons.check_circle);
-        expect(_chipNames(tester), ['Дом', _sport]);
+        // Созданный позже «Спорт» стоит первым в ручном порядке.
+        expect(_chipNames(tester), [_sport, 'Дом']);
 
         // До отправки граф получил только самостоятельный тег: ни намерения,
         // ни назначений.
@@ -211,13 +201,14 @@ void main() {
         chooseTags();
         final creation = await _creation(tester, app);
         await _waitFor(tester, () => _sheet.evaluate().isEmpty);
+        // Созданное намерение показывает теги в том же ручном порядке.
         await _expectCreatedPage(
           tester,
           app,
           creation,
           title: _title,
           description: _description,
-          tags: ['Дом', _sport],
+          tags: [_sport, 'Дом'],
           readiness: IntentionReadiness.ready,
         );
         final created = _createdId(creation);
@@ -245,7 +236,7 @@ void main() {
         expect(app.completions, hasLength(2));
         _expectConfirmedPackage(
           creation,
-          tags: ['Дом', _sport],
+          tags: [_sport, 'Дом'],
           readiness: IntentionReadiness.ready,
         );
         expect(_storedIntentionIds(app.raw), [...intentionsBefore, created]);
@@ -294,7 +285,7 @@ void main() {
         expect(summary.createdAt.value, summary.updatedAt.value);
         expect(
           [for (final tag in summary.tags) tag.name.value],
-          ['Дом', _sport],
+          [_sport, 'Дом'],
         );
         // Новая строка встала над видимыми: список сдвинулся на неё, а
         // видимые строки остались на своих местах экрана.
@@ -315,26 +306,27 @@ void main() {
           find.descendant(
             of: createdRows,
             matching: findTextIgnoringInlineWidgets(
-              l10n.intentionSummaryTags('Дом, $_sport'),
+              l10n.intentionSummaryTags('$_sport, Дом'),
             ),
           ),
           findsOneWidget,
         );
 
-        // Навигация по каждому выбранному тегу показывает новое намерение
-        // ровно один раз на ревизии создания.
-        await _openTagNavigation(tester, app, home);
-        expect(_navigationIds(tester, home), [
-          _intentionId(_walk),
-          _intentionId(_atWork),
-          for (final number in _activeSketches) _intentionId(number),
-          created,
-        ]);
-        await _closeTop(tester, TagNavigationPage);
-        await _openTagNavigation(tester, app, sport, fromTagCatalog: true);
-        expect(_navigationIds(tester, sport), [created]);
-        await _closeTop(tester, TagNavigationPage);
-        await _closeTop(tester, TagCatalogPage);
+        // Выдача уже требует «Дом» и показывает новое намерение один раз.
+        // Условие по второму выбранному тегу оставляет в ней только его, а
+        // снятие условия возвращает прежнюю выдачу.
+        final idsWithCreated = _ids(catalog);
+        await _addCondition(tester, sport, present: true);
+        await _waitForCatalogIds(tester, app, [created]);
+        await _tap(
+          tester,
+          find.byKey(
+            ValueKey(
+              'intention-tag-condition-remove-${sport.toCanonicalString()}',
+            ),
+          ),
+        );
+        await _waitForCatalogIds(tester, app, idsWithCreated);
         expectIntentionGraphRootPage(app.router);
 
         // Минимальное создание через ту же кнопку по-прежнему даёт пустой
@@ -406,7 +398,7 @@ void main() {
           title: _title,
           description: _description,
           readiness: IntentionReadiness.ready,
-          tags: ['Дом', _sport],
+          tags: [_sport, 'Дом'],
         );
         await _expectDurableIntention(
           tester,
@@ -440,18 +432,14 @@ Iterable<int> get _sketches =>
 
 bool _isArchivedSketch(int number) => number % 4 == 0;
 
-/// Активные этюды в порядке создания их назначений «Дом».
-Iterable<int> get _activeSketches =>
-    _sketches.where((number) => !_isArchivedSketch(number));
-
 /// Активные и архивированные намерения, этюды и три тега.
 void _seedGraph(sqlite.Database database) {
   seedRawGraph(database, () {
     for (final MapEntry(key: number, value: name) in _tagNames.entries) {
-      database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-        tagFixtureId(number),
-        name,
-      ]);
+      database.execute(
+        'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+        [tagFixtureId(number), name, tagPositionKey(number)],
+      );
     }
     void intention(
       int number,
@@ -609,8 +597,8 @@ Future<void> _searchCatalog(WidgetTester tester, _Launch app) async {
     find.byKey(const ValueKey('catalog-filter-field')),
     _catalogFilter,
   );
-  await _addCondition(tester, _homeTag, present: true);
-  await _addCondition(tester, _workTag, present: false);
+  await _addCondition(tester, _tagId(_homeTag), present: true);
+  await _addCondition(tester, _tagId(_workTag), present: false);
   await _selectOption(
     tester,
     'catalog-order-control',
@@ -682,10 +670,10 @@ Future<void> _openSheet(WidgetTester tester, _Launch app) async {
 
 /// Готовит в панели, открытой общей кнопкой, все четыре поля черновика: сырое
 /// название, описание, явно подтверждённую готовность и набор из
-/// существующих тегов [tags] и тега «Спорт», созданного настоящим редактором
-/// из общего выбора. Принимает сообщение о созданном теге, возвращается в
-/// ту же панель и возвращает идентификатор созданного тега. Быстрый вызов
-/// сохранения после открытия выбора не принимает и не откладывает отправку.
+/// существующих тегов [tags] и тега «Спорт», созданного настоящим листом из
+/// панели тегов. Возвращается в ту же панель и возвращает идентификатор
+/// созданного тега. Быстрый вызов сохранения после открытия панели тегов не
+/// принимает и не откладывает отправку.
 Future<TagId> _prepareFullDraft(
   WidgetTester tester,
   _Launch app, {
@@ -721,57 +709,70 @@ Future<TagId> _prepareFullDraft(
   await _tap(tester, _chooseTags);
   await _until(tester, _row(_tagId(_homeTag)));
   await tester.pumpAndSettle();
-  expect(find.byType(AppNavigationBar), findsNothing);
-  expect(find.byTooltip(l10n.tagNavigationTitle), findsNothing);
+  // Панель тегов открыта над панелью создания и перекрывает навигацию; она
+  // не маршрут, поэтому стек не меняется.
+  expect(_tagsPanel(l10n), findsOneWidget);
+  expect(
+    appNavigationDestinations(skipOffstage: false).hitTestable(),
+    findsNothing,
+  );
   expect(_stack(app), [
     ...history.map((route) => route.name),
     IntentionEditorRoute.name,
-    TagCatalogRoute.name,
   ]);
   for (final tag in tags) {
-    await _addToDraft(tester, _tagId(tag));
+    await _includeInDraft(tester, _tagId(tag));
   }
-  await _tap(tester, find.byType(BackButton));
-  await tester.pumpAndSettle();
+  await _closeTagsPanel(tester, l10n);
   final graphBefore = _storedCreationTables(app.raw);
   final staleSubmit = tester.widget<FilledButton>(_submit).onPressed!;
 
-  // Два нажатия до следующего кадра идут через настоящую панель и роутер.
+  // Два нажатия до следующего кадра идут через настоящую панель. Отправка
+  // приходит обработчиком прежнего кадра: касания уже перехватывает
+  // затемнение открывающейся панели тегов.
   await tester.tap(_chooseTags);
-  await tester.tap(_submit);
+  staleSubmit();
   await _until(tester, _row(_tagId(_homeTag)));
   await tester.pumpAndSettle();
+  expect(_tagsPanel(l10n), findsOneWidget);
   expect(_stack(app), [
     ...history.map((route) => route.name),
     IntentionEditorRoute.name,
-    TagCatalogRoute.name,
   ]);
   expect(app.completions, isEmpty);
   expect(_storedCreationTables(app.raw), graphBefore);
 
-  await _tap(tester, _createTagAction);
-  await _until(tester, _tagEditorName);
-  await tester.pumpAndSettle();
-  expect(_stack(app).last, TagEditorRoute.name);
-  expect(find.byType(AppNavigationBar), findsNothing);
-  staleSubmit();
-  await tester.enterText(_tagEditorName, _sport);
-  await _tap(tester, _tagEditorSubmit);
-  await _waitFor(tester, () => _tagEditorName.evaluate().isEmpty);
-  await _acceptMessage(
-    tester,
-    l10n.graphOperationMessage(
-      l10n.graphOperationCreate,
-      l10n.graphOperationTag,
-      l10n.tagCreated,
-    ),
+  await tester.enterText(
+    find.descendant(of: _tagsPanel(l10n), matching: find.byType(TextField)),
+    _sport,
   );
-  final sport = _storedTagId(app.raw, _sport);
-  await _addToDraft(tester, sport);
-
-  await _tap(tester, find.byType(BackButton));
-  await _waitFor(tester, () => find.byType(TagCatalogPage).evaluate().isEmpty);
+  await tester.pump();
+  await _tap(tester, find.text(l10n.tagsPanelCreateTag(_sport)));
+  final createAction = find.widgetWithText(
+    FilledButton,
+    l10n.tagEditorCreateAction,
+  );
+  await _until(tester, createAction);
   await tester.pumpAndSettle();
+  expect(
+    appNavigationDestinations(skipOffstage: false).hitTestable(),
+    findsNothing,
+  );
+  staleSubmit();
+  await _tap(tester, createAction);
+  await _waitFor(tester, () => createAction.evaluate().isEmpty);
+  final sport = _storedTagId(app.raw, _sport);
+  // Созданный тег сразу отмечен в панели тегов, поэтому успех не
+  // объявляется.
+  await _waitFor(
+    tester,
+    () => _row(sport).evaluate().isNotEmpty && _isMarked(tester, sport),
+    reason: () => '«$_sport» не отмечен в панели тегов',
+  );
+  await tester.pumpAndSettle();
+  expect(find.byType(SnackBar), findsNothing);
+
+  await _closeTagsPanel(tester, l10n);
   expect(_stack(app), [
     ...history.map((route) => route.name),
     IntentionEditorRoute.name,
@@ -787,80 +788,65 @@ Future<TagId> _prepareFullDraft(
   return sport;
 }
 
-/// Выбирает строку тега [id] кандидатом и явно добавляет его в черновик,
-/// дождавшись подтверждения кандидата.
-Future<void> _addToDraft(WidgetTester tester, TagId id) async {
+/// Отмечает тег [id] в панели тегов: нажатие включает его в черновик.
+Future<void> _includeInDraft(WidgetTester tester, TagId id) async {
   await _tap(tester, _row(id));
   await _waitFor(
     tester,
-    () => tester.widget<FilledButton>(_addToDraftAction).onPressed != null,
-    reason: () => 'Добавление «$id» не стало доступным',
+    () => _isMarked(tester, id),
+    reason: () => 'Тег «$id» не отмечен в панели тегов',
   );
-  await _tap(tester, _addToDraftAction);
   await tester.pumpAndSettle();
 }
 
-/// Открывает навигацию по тегу [tag] из каталога тегов, открытого кнопкой
-/// каталога намерений либо уже открытого ([fromTagCatalog]), и ждёт её
-/// актуальную выдачу.
-Future<void> _openTagNavigation(
+/// Закрывает панель тегов кнопкой «Готово» и ждёт панель создания под ней.
+Future<void> _closeTagsPanel(WidgetTester tester, AppLocalizations l10n) async {
+  await _tap(tester, find.text(l10n.tagsPanelDone));
+  await _waitFor(tester, () => _tagsPanel(l10n).evaluate().isEmpty);
+  await tester.pumpAndSettle();
+}
+
+/// Ждёт выдачу каталога, состоящую ровно из намерений [ids].
+Future<void> _waitForCatalogIds(
   WidgetTester tester,
   _Launch app,
-  TagId tag, {
-  bool fromTagCatalog = false,
-}) async {
-  if (!fromTagCatalog) {
-    await _tap(tester, find.byKey(const ValueKey('catalog-open-tags')));
-  }
-  await _tap(
-    tester,
-    find.byKey(ValueKey('tag-catalog-open-${tag.toCanonicalString()}')),
-  );
-  await _until(tester, _navigationPage(tag));
+  List<IntentionId> ids,
+) async {
   await _waitFor(
     tester,
-    () => switch (_navigation(tester, tag)) {
-      final TagNavigationLoaded state => state.canUseCurrentItems,
+    () => switch (_catalogState(app)) {
+      final IntentionCatalogLoaded catalog => listEquals(_ids(catalog), ids),
       _ => false,
     },
-    reason: () => '${_navigation(tester, tag)}',
+    reason: () => '${_catalogState(app)}',
   );
   await tester.pumpAndSettle();
-  expect(app.router.current.name, TagNavigationRoute.name);
 }
 
-/// Закрывает верхнюю страницу [page] системным действием «назад».
-Future<void> _closeTop(WidgetTester tester, Type page) async {
-  await tester.binding.handlePopRoute();
-  await _waitFor(tester, () => find.byType(page).evaluate().isEmpty);
-  await tester.pumpAndSettle();
-}
-
-/// Добавляет условие по тегу [tag] через экран поиска тега действием «Есть»
-/// или «Нет».
+/// Добавляет условие по тегу [tag] в панели фильтра: первое нажатие на тег
+/// требует его, второе исключает. Затем «назад» закрывает панель.
 Future<void> _addCondition(
   WidgetTester tester,
-  int tag, {
+  TagId tag, {
   required bool present,
 }) async {
   await _tap(
     tester,
     find.byKey(const ValueKey('intention-tag-conditions-add')),
   );
-  final requirement = present ? 'mustBePresent' : 'mustBeAbsent';
-  await _tap(
-    tester,
-    find.byKey(
-      ValueKey('tag-condition-picker-$requirement-${tagFixtureId(tag)}'),
-    ),
-  );
+  final id = tag.toCanonicalString();
+  final row = find.byKey(ValueKey('tags-panel-row-$id'));
+  await _tap(tester, row);
+  if (!present) await _tap(tester, row);
   await _waitFor(
     tester,
     () => find
-        .byKey(ValueKey('intention-tag-condition-${tagFixtureId(tag)}'))
+        .byKey(ValueKey('intention-tag-condition-$id'))
         .evaluate()
         .isNotEmpty,
   );
+  await tester.binding.handlePopRoute();
+  await _waitFor(tester, () => row.evaluate().isEmpty);
   await tester.pumpAndSettle();
 }
 
@@ -1120,7 +1106,7 @@ void _expectStoredIntention(
 
 /// Полный результат после повторного открытия хранилища, прочитанный
 /// публичными чтениями модуля графа: подробности намерения и назначения
-/// в порядке создания тегов.
+/// в ручном порядке тегов.
 Future<void> _expectDurableIntention(
   WidgetTester tester,
   _Launch app,
@@ -1217,8 +1203,7 @@ List<IntentionId> _ids(IntentionCatalogLoaded catalog) => [
 bool _catalogCurrentAt(_Launch app, GraphRevision revision) =>
     switch (_catalogState(app)) {
       final IntentionCatalogLoaded catalog =>
-        catalog.revision.compareTo(revision) == GraphRevisionOrder.same &&
-            catalog.refresh is IntentionCatalogRefreshIdle,
+        catalog.revision.compareTo(revision) == GraphRevisionOrder.same,
       _ => false,
     };
 
@@ -1231,23 +1216,6 @@ void _expectSameSearch(
   expect(actual.nextCursor, isNull);
   expect(actual.continuation, isA<IntentionCatalogContinuationIdle>());
 }
-
-/// Состояние навигации по тегу [tag]: каждая её страница владеет
-/// собственным экземпляром модели.
-TagNavigationState _navigation(WidgetTester tester, TagId tag) =>
-    ProviderScope.containerOf(
-      tester.element(_navigationPage(tag)),
-      listen: false,
-    ).read(tagNavigationViewModelProvider(tag));
-
-Finder _navigationPage(TagId tag) => find.byWidgetPredicate(
-  (widget) => widget is TagNavigationPage && widget.tagId == tag,
-);
-
-List<IntentionId> _navigationIds(WidgetTester tester, TagId tag) => [
-  for (final item in (_navigation(tester, tag) as TagNavigationLoaded).items)
-    item.id,
-];
 
 /// Видимая строка выдачи каталога: название и положение на экране.
 typedef _CatalogRow = ({String title, Rect rect});
@@ -1305,8 +1273,20 @@ ScrollPosition _catalogPagePosition(WidgetTester tester) => tester
     )
     .position;
 
+Finder _tagsPanel(AppLocalizations l10n) =>
+    find.widgetWithText(Sheet, l10n.tagsPanelTitle);
+
 Finder _row(TagId id) =>
-    find.byKey(ValueKey('tag-catalog-row-${id.toCanonicalString()}'));
+    find.byKey(ValueKey('tags-panel-row-${id.toCanonicalString()}'));
+
+/// Строка тега [id] в панели отмечена: тег входит в набор черновика.
+bool _isMarked(WidgetTester tester, TagId id) =>
+    tester
+        .widget<TagRow>(
+          find.descendant(of: _row(id), matching: find.byType(TagRow)),
+        )
+        .mark ==
+    TagRowSelectionMark.checked;
 
 String _text(WidgetTester tester, String key) =>
     tester.widget<TextField>(find.byKey(ValueKey(key))).controller!.text;

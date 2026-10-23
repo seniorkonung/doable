@@ -18,6 +18,8 @@ import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
+import 'package:doable/src/tag/presentation/assignments/tag_assignments_state.dart';
+import 'package:doable/src/tag/presentation/assignments/tag_assignments_view_model.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -28,8 +30,9 @@ import 'package_consumers_test_support.dart';
 
 /// Пакеты команд тегов на настоящем хранилище: каталожная мутация команды
 /// назначения — изменение кратких данных существующего намерения для всех
-/// потребителей вне поиска. Правка тега меняет краткие данные только там,
-/// где показаны теги намерения, — в поиске.
+/// потребителей вне поиска. Правка и перестановка тега меняют краткие данные
+/// только там, где показаны теги намерения, — в поиске и в назначениях
+/// страницы намерения.
 ///
 /// Граф фикстуры: связи 101 (1→2), 102 (2→3), 103 (1→4), 104 (1→5),
 /// дневной выбор 201 от 1 к 3 по пути 101, 102 и отдельное намерение 6.
@@ -77,7 +80,11 @@ void main() {
       isA<GraphCommandSucceeded>(),
     );
     final created = await repository.execute(
-      CreateTag(name: TagName.fromInput('Здоровье'), color: null),
+      CreateTag(
+        name: TagName.fromInput('Здоровье'),
+        color: null,
+        placement: TagPlacement.first,
+      ),
     );
     tagId = ((created as TagCommandSucceeded).value.value as TagCreated).tag.id;
 
@@ -285,6 +292,96 @@ void main() {
     await quiescePackageConsumers();
 
     expect(observedTags(), [(tagId, 'Здоровье', TagColor.blue)]);
+    expect(
+      search()!.items.map((item) => item.id),
+      searchBefore.items.map((item) => item.id),
+    );
+    expect(search()!.totalCount, searchBefore.totalCount);
+    for (final probe in probes.all) {
+      expect(probe.forbiddenStates, isEmpty, reason: probe.name);
+    }
+    expect(probes.visibleContent(), contentBefore);
+    expect(probes.intentionDetailsEdit(observed), formBefore);
+    expect(probes.dailyCatalogSelection, selectionBefore);
+  });
+
+  test('перестановка назначенного тега меняет порядок тегов найденного '
+      'намерения и назначений страницы и не затрагивает остальных '
+      'потребителей', () async {
+    const browse = BrowseIntentionCatalog();
+    final createdSport = await repository.execute(
+      CreateTag(
+        name: TagName.fromInput('Спорт'),
+        color: null,
+        placement: AfterTagPlacement(tagId),
+      ),
+    );
+    final sportId =
+        ((createdSport as TagCommandSucceeded).value.value as TagCreated)
+            .tag
+            .id;
+    await run(AssignTag(tagId: tagId, intentionId: observed));
+    final assigned = await run(
+      AssignTag(tagId: sportId, intentionId: observed),
+    );
+    await settlePackageConsumersUntil(
+      () => probes.observingSettledAt(assigned),
+      diagnostics: probes.describe,
+    );
+    container.listen(intentionCatalogViewModelProvider(browse), (_, _) {});
+    IntentionCatalogLoaded? search() =>
+        switch (container.read(intentionCatalogViewModelProvider(browse))) {
+          AsyncData(value: final IntentionCatalogLoaded loaded) => loaded,
+          _ => null,
+        };
+    List<String> searchTags() => [
+      for (final tag
+          in search()!.items.singleWhere((item) => item.id == observed).tags)
+        tag.name.value,
+    ];
+    final assignmentOrders = <List<String>>[];
+    container.listen(tagAssignmentsViewModelProvider(observed), (_, next) {
+      if (next is TagAssignmentsLoaded) {
+        assignmentOrders.add([for (final tag in next.items) tag.name.value]);
+      }
+    });
+    TagAssignmentsLoaded? assignments() =>
+        switch (container.read(tagAssignmentsViewModelProvider(observed))) {
+          final TagAssignmentsLoaded loaded => loaded,
+          _ => null,
+        };
+    await settlePackageConsumersUntil(
+      () =>
+          search()?.revision.compareTo(assigned) == GraphRevisionOrder.same &&
+          assignments()?.revision.compareTo(assigned) ==
+              GraphRevisionOrder.same,
+    );
+    expect(searchTags(), ['Здоровье', 'Спорт']);
+    expect(assignmentOrders.last, ['Здоровье', 'Спорт']);
+    final searchBefore = search()!;
+    final contentBefore = probes.visibleContent();
+    final formBefore = probes.intentionDetailsEdit(observed);
+    final selectionBefore = probes.dailyCatalogSelection;
+
+    probes.reset();
+    assignmentOrders.clear();
+    final completion = await (coordinator.acceptTagMove(
+      MoveTag(tagId: sportId, placement: TagPlacement.first),
+    ) as TagCommandAccepted).future;
+    final confirmed = completion.confirmedResult;
+    expect((confirmed as TagCommandSucceeded).value.value, isA<TagUpdated>());
+    final moved = confirmed.value.revision;
+    await settlePackageConsumersUntil(
+      () =>
+          search()?.revision.compareTo(moved) == GraphRevisionOrder.same &&
+          assignments()?.revision.compareTo(moved) == GraphRevisionOrder.same,
+    );
+    await quiescePackageConsumers();
+
+    expect(searchTags(), ['Спорт', 'Здоровье']);
+    // Новый порядок виден с первого состояния после пакета, до перечитывания.
+    expect(assignmentOrders, isNotEmpty);
+    expect(assignmentOrders, everyElement(['Спорт', 'Здоровье']));
     expect(
       search()!.items.map((item) => item.id),
       searchBefore.items.map((item) => item.id),

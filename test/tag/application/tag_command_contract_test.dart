@@ -11,9 +11,11 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:doable/src/tag/domain/tag_assignment.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/tag_positions.dart';
+
 void main() {
-  test('редактирование сохраняет идентичность и допускает изменение только '
-      'цвета, но не полное совпадение', () {
+  test('изменение тега сохраняет идентичность и допускает смену только '
+      'цвета или только места, но не полное совпадение трёх полей', () {
     const revision = _Revision(1);
     final before = _tag(1, 'Дом');
     final otherId = _tag(2, 'Быт');
@@ -21,11 +23,19 @@ void main() {
       id: before.id,
       name: TagName.fromInput('Дом'),
       color: null,
+      position: before.position,
     );
     final recolored = Tag(
       id: before.id,
       name: before.name,
       color: TagColor.blue,
+      position: before.position,
+    );
+    final moved = Tag(
+      id: before.id,
+      name: before.name,
+      color: before.color,
+      position: tagPositionAt(100),
     );
 
     expect(
@@ -60,6 +70,14 @@ void main() {
         after: recolored,
       ).after.color,
       TagColor.blue,
+    );
+    expect(
+      TagUpdatedChange(
+        revision: revision,
+        before: before,
+        after: moved,
+      ).after.position,
+      tagPositionAt(100),
     );
   });
 
@@ -201,7 +219,12 @@ IntentionId _intentionId(int suffix) => (IntentionId.decode(
 Tag _tag(int suffix, String name) {
   final text = '00000000-0000-4000-8000-${suffix.toString().padLeft(12, '0')}';
   final decoded = TagId.decode(text) as TagIdDecodingSuccess;
-  return Tag(id: decoded.id, name: TagName.fromInput(name), color: null);
+  return Tag(
+    id: decoded.id,
+    name: TagName.fromInput(name),
+    color: null,
+    position: tagPositionAt(suffix),
+  );
 }
 
 IntentionCatalogEntrySnapshot _entry(IntentionId id, List<Tag> tags) => _Entry(

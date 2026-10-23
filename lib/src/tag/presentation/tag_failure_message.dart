@@ -1,5 +1,4 @@
 import '../../../l10n/app_localizations.dart';
-import '../../graph/application/graph_command_coordinator.dart';
 import '../application/tag_result.dart';
 import '../domain/tag_name.dart';
 
@@ -35,14 +34,4 @@ String tagAssignmentFailureMessage(
   TagUnexpectedFailure() => localizations.tagAssignmentUnexpected,
   TagNameInputFailure() ||
   TagNameOccupiedFailure() => localizations.tagAssignmentUnexpected,
-};
-
-/// Отклонённая до исполнения команда не получает claim общей очереди.
-String? tagAssignmentStartMessage(
-  AppLocalizations localizations,
-  TagCommandStart start,
-) => switch (start) {
-  TagCommandAccepted() => null,
-  TagCommandAlreadyRunning() => localizations.tagAssignmentAlreadyRunning,
-  GraphCommandCoordinatorDraining() => localizations.tagAssignmentUnexpected,
 };

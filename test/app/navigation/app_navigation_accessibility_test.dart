@@ -19,7 +19,6 @@ import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
-import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -82,12 +81,6 @@ void main() {
             tagFixtureId(201),
           ) as DailyChoiceIdDecodingSuccess).id,
         ),
-        TagNavigationRoute(
-          tagId: (TagId.decode(
-            tagFixtureId(firstTagNumber),
-          ) as TagIdDecodingSuccess).id,
-        ),
-        TagCatalogRoute(),
       ]) {
         unawaited(router.push<void>(route));
         await tester.pumpAndSettle();

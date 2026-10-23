@@ -72,7 +72,11 @@ void main() {
       tagNumber++;
       expect(
         await repository.execute(
-          CreateTag(name: TagName.fromInput('Тег $tagNumber'), color: null),
+          CreateTag(
+            name: TagName.fromInput('Тег $tagNumber'),
+            color: null,
+            placement: TagPlacement.first,
+          ),
         ),
         isA<GraphCommandSucceeded>(),
       );

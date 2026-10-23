@@ -18,6 +18,7 @@
 | [graph.svg](assets/graph.svg) | `Main.dc.html` | `nav[aria-label="Sections"]` → `nav.graph.away` |
 | [graph_filled.svg](assets/graph_filled.svg) | `Main.dc.html` | `nav[aria-label="Sections"]` → `nav.graph.up` |
 | [plus.svg](assets/plus.svg) | `Main.dc.html` | Кнопка `addTap`, первый SVG |
+| [plus_small.svg](assets/plus_small.svg) | `TagsPanel.dc.html` | Кнопка `openNewTag`, SVG |
 | [intention.svg](assets/intention.svg) | `Main.dc.html` | `pinSheet` → кнопка `pick.intention.go`, ведущий SVG |
 | [relation.svg](assets/relation.svg) | `Main.dc.html` | `pinSheet` → кнопка `pick.relation.go`, ведущий SVG |
 | [calendar.svg](assets/calendar.svg) | `Main.dc.html` | `pinSheet` → кнопка `pick.choice.go`, ведущий SVG |
@@ -27,7 +28,15 @@
 | [from_intention.svg](assets/from_intention.svg) | `Main.dc.html` | `choiceSheet` → ссылка `IntentionPicker.dc.html`, ведущий SVG |
 | [from_action.svg](assets/from_action.svg) | `Main.dc.html` | `choiceSheet` → ссылка `ActionPicker.dc.html`, ведущий SVG |
 | [check.svg](assets/check.svg) | `Main.dc.html` | `pinSheet` → `pick.intention.on`; та же галочка у `pick.relation.on` и `pick.choice.on` |
+| [exclude.svg](assets/exclude.svg) | `TagsPanel.dc.html` | Строка `rows` → `row.no`, SVG |
 | [chevron_right.svg](assets/chevron_right.svg) | `Main.dc.html` | `choiceSheet` → ссылка `IntentionPicker.dc.html`, завершающий SVG; тот же шеврон у `ActionPicker.dc.html` |
+| [chevron_down.svg](assets/chevron_down.svg) | `TagsPanel.dc.html` | Кнопка `toggleSize` в полном размере, SVG |
+| [search.svg](assets/search.svg) | `TagsPanel.dc.html` | Поле поиска `tags-search`, ведущий SVG |
+| [clear.svg](assets/clear.svg) | `TagsPanel.dc.html` | Кнопка `clearQ`, SVG |
+| [grip.svg](assets/grip.svg) | `TagsPanel.dc.html` | Строка `rows` → кнопка `row.grab`, SVG |
+| [edit.svg](assets/edit.svg) | `TagsPanel.dc.html` | Меню `menuOpen` → пункт `menuEdit`, SVG |
+| [copy.svg](assets/copy.svg) | `TagsPanel.dc.html` | Меню `menuOpen` → пункт `menuDuplicate`, SVG |
+| [delete.svg](assets/delete.svg) | `TagsPanel.dc.html` | Меню `menuOpen` → пункт `menuDelete`, SVG |
 | [settings.svg](assets/settings.svg) | `Home.dc.html` | Ссылка `Settings.dc.html` |
 | [export.svg](assets/export.svg) | `Settings.dc.html` | Кнопка `openExport`, ведущий SVG |
 | [lock_open.svg](assets/lock_open.svg) | `Settings.dc.html` | `exportOpen` → предупреждение панели, SVG |

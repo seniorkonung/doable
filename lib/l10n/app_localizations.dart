@@ -770,24 +770,6 @@ abstract class AppLocalizations {
   /// **'More intentions couldn’t be loaded because of an unexpected error.'**
   String get catalogLoadMoreUnexpected;
 
-  /// Устранимый отказ обновления над сохранённой выдачей каталога
-  ///
-  /// In en, this message translates to:
-  /// **'The intention list isn’t up to date: changes couldn’t be loaded.'**
-  String get catalogRefreshUnavailable;
-
-  /// Отказ обновления сохранённой выдачи из-за повреждения данных
-  ///
-  /// In en, this message translates to:
-  /// **'The intention list isn’t up to date: stored data is damaged.'**
-  String get catalogRefreshCorruption;
-
-  /// Отказ обновления сохранённой выдачи из-за непредвиденной ошибки
-  ///
-  /// In en, this message translates to:
-  /// **'The intention list isn’t up to date because of an unexpected error.'**
-  String get catalogRefreshUnexpected;
-
   /// Признак готовности намерения к действию
   ///
   /// In en, this message translates to:
@@ -1838,12 +1820,6 @@ abstract class AppLocalizations {
   /// **'Checking tag'**
   String get editorDraftTagChecking;
 
-  /// Состояние выбранного тега черновика, отсутствие которого подтверждено; тег остаётся в черновике до явного снятия
-  ///
-  /// In en, this message translates to:
-  /// **'Tag deleted'**
-  String get editorDraftTagMissing;
-
   /// Устранимый отказ чтения выбранного тега черновика; не означает удаление тега
   ///
   /// In en, this message translates to:
@@ -1868,17 +1844,11 @@ abstract class AppLocalizations {
   /// **'Check tag {tagName} again'**
   String editorRetryDraftTag(String tagName);
 
-  /// Отказ создания намерения: выбранные теги черновика отсутствуют при сохранении; объясняет исправление набора
+  /// Отказ создания намерения: выбранные теги черновика отсутствуют при сохранении; они уже убраны из черновика, и сохранение снова доступно
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{A selected tag was deleted from the catalog. Remove it from the draft to save the intention.} other{{count} selected tags were deleted from the catalog. Remove them from the draft to save the intention.}}'**
+  /// **'{count, plural, =1{A selected tag was deleted from the catalog and removed from the draft. Save the intention again.} other{{count} selected tags were deleted from the catalog and removed from the draft. Save the intention again.}}'**
   String editorCreateTagsMissing(int count);
-
-  /// Явное исправление отказа создания: снимает из черновика только выбранные теги, отсутствие которых подтвердило сохранение; сохранение не отправляет
-  ///
-  /// In en, this message translates to:
-  /// **'{count, plural, =1{Remove deleted tag} other{Remove deleted tags}}'**
-  String editorRemoveMissingTags(int count);
 
   /// Вид операции создания намерения в сообщении оболочки
   ///
@@ -2011,6 +1981,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'tag'**
   String get graphOperationTag;
+
+  /// Перестановка тега в ручном порядке в общем сообщении
+  ///
+  /// In en, this message translates to:
+  /// **'Move'**
+  String get graphOperationMoveTag;
 
   /// Назначение тега получателю в общем сообщении
   ///
@@ -2437,203 +2413,11 @@ abstract class AppLocalizations {
   /// **'Import and replace'**
   String get dataImportConfirm;
 
-  /// Заголовок навигации по тегу
-  ///
-  /// In en, this message translates to:
-  /// **'Tagged intentions'**
-  String get tagNavigationTitle;
-
-  /// Текущий тег навигации
-  ///
-  /// In en, this message translates to:
-  /// **'Tag: {tagName}'**
-  String tagNavigationTag(String tagName);
-
-  /// Подпись переключателя активного и архивного охватов
-  ///
-  /// In en, this message translates to:
-  /// **'Result scope'**
-  String get tagNavigationScope;
-
-  /// Первое чтение выбранного охвата
-  ///
-  /// In en, this message translates to:
-  /// **'Loading tagged intentions…'**
-  String get tagNavigationLoading;
-
-  /// Пустой активный охват существующего тега
-  ///
-  /// In en, this message translates to:
-  /// **'No active intentions have this tag.'**
-  String get tagNavigationEmptyActive;
-
-  /// Пустой архивный охват существующего тега
-  ///
-  /// In en, this message translates to:
-  /// **'No archived intentions have this tag.'**
-  String get tagNavigationEmptyArchived;
-
-  /// Вид и собственное активное состояние намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Intention, active'**
-  String get tagNavigationIntentionActive;
-
-  /// Вид и собственное архивное состояние намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Intention, archived'**
-  String get tagNavigationIntentionArchived;
-
-  /// Доступная подсказка перехода к конкретному намерению
-  ///
-  /// In en, this message translates to:
-  /// **'Open details'**
-  String get tagNavigationOpenDetails;
-
-  /// Актуализация списка без действий по прежним строкам
-  ///
-  /// In en, this message translates to:
-  /// **'Refreshing results. The displayed data may be out of date.'**
-  String get tagNavigationRefreshing;
-
-  /// Устранимый отказ актуализации после изменения графа
-  ///
-  /// In en, this message translates to:
-  /// **'Could not refresh results. The displayed data may be out of date. Try loading again.'**
-  String get tagNavigationRefreshUnavailable;
-
-  /// Повреждение при актуализации
-  ///
-  /// In en, this message translates to:
-  /// **'Could not refresh results: stored data is damaged. The displayed data may be out of date.'**
-  String get tagNavigationRefreshCorruption;
-
-  /// Неизвестный отказ актуализации
-  ///
-  /// In en, this message translates to:
-  /// **'Could not refresh results because of an unexpected error. The displayed data may be out of date.'**
-  String get tagNavigationRefreshUnexpected;
-
-  /// Наличие следующей порции
-  ///
-  /// In en, this message translates to:
-  /// **'More intentions have this tag.'**
-  String get tagNavigationMoreAvailable;
-
-  /// Явная подгрузка навигации
-  ///
-  /// In en, this message translates to:
-  /// **'Show more intentions'**
-  String get tagNavigationLoadMore;
-
-  /// Выполняющаяся подгрузка навигации
-  ///
-  /// In en, this message translates to:
-  /// **'Loading more intentions…'**
-  String get tagNavigationLoadingMore;
-
-  /// Конец непустой выдачи навигации
-  ///
-  /// In en, this message translates to:
-  /// **'All intentions are shown.'**
-  String get tagNavigationAllShown;
-
-  /// Устранимый отказ первого чтения навигации
-  ///
-  /// In en, this message translates to:
-  /// **'Could not load tagged intentions. Try again.'**
-  String get tagNavigationUnavailable;
-
-  /// Повреждение при первом чтении навигации
-  ///
-  /// In en, this message translates to:
-  /// **'Stored tagged intention data is damaged and cannot be shown.'**
-  String get tagNavigationCorruption;
-
-  /// Неизвестный отказ первого чтения навигации
-  ///
-  /// In en, this message translates to:
-  /// **'Could not load tagged intentions because of an unexpected error.'**
-  String get tagNavigationUnexpected;
-
-  /// Истёкший снимок навигации
-  ///
-  /// In en, this message translates to:
-  /// **'The list has changed. Reopen tag navigation.'**
-  String get tagNavigationSnapshotExpired;
-
-  /// Устранимый отказ подгрузки навигации
-  ///
-  /// In en, this message translates to:
-  /// **'Could not load more intentions.'**
-  String get tagNavigationLoadMoreUnavailable;
-
-  /// Повреждение при подгрузке навигации
-  ///
-  /// In en, this message translates to:
-  /// **'Stored data is damaged; more intentions cannot be shown.'**
-  String get tagNavigationLoadMoreCorruption;
-
-  /// Неизвестный отказ подгрузки навигации
-  ///
-  /// In en, this message translates to:
-  /// **'Could not load more intentions because of an unexpected error.'**
-  String get tagNavigationLoadMoreUnexpected;
-
-  /// Заголовок экрана выбора тега для условия поиска намерений
-  ///
-  /// In en, this message translates to:
-  /// **'Tag for search condition'**
-  String get tagConditionPickerTitle;
-
-  /// Действие «Есть»: выбрать тег с надобностью «должен быть»
-  ///
-  /// In en, this message translates to:
-  /// **'With'**
-  String get tagConditionPickerPresent;
-
-  /// Действие «Нет»: выбрать тег с надобностью «должен отсутствовать»
-  ///
-  /// In en, this message translates to:
-  /// **'Without'**
-  String get tagConditionPickerAbsent;
-
-  /// Семантика действия «Есть» вместе с названием тега
-  ///
-  /// In en, this message translates to:
-  /// **'With, {tagName}'**
-  String tagConditionPickerPresentNamed(String tagName);
-
-  /// Семантика действия «Нет» вместе с названием тега
-  ///
-  /// In en, this message translates to:
-  /// **'Without, {tagName}'**
-  String tagConditionPickerAbsentNamed(String tagName);
-
-  /// Отметка тега, уже входящего в условия поиска с надобностью «должен быть»
-  ///
-  /// In en, this message translates to:
-  /// **'Already selected: must be present'**
-  String get tagConditionPickerSelectedPresent;
-
-  /// Отметка тега, уже входящего в условия поиска с надобностью «должен отсутствовать»
-  ///
-  /// In en, this message translates to:
-  /// **'Already selected: must be absent'**
-  String get tagConditionPickerSelectedAbsent;
-
   /// Текст чипа условия с надобностью «должен отсутствовать»
   ///
   /// In en, this message translates to:
   /// **'not {tagName}'**
   String intentionTagConditionAbsent(String tagName);
-
-  /// Текст чипа условия по удалённому тегу с последним известным названием
-  ///
-  /// In en, this message translates to:
-  /// **'{condition} (tag deleted)'**
-  String intentionTagConditionDeleted(String condition);
 
   /// Семантика условия с надобностью «должен быть»
   ///
@@ -2646,12 +2430,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{tagName}, must be absent'**
   String intentionTagConditionAbsentSemantics(String tagName);
-
-  /// Семантика условия по удалённому тегу
-  ///
-  /// In en, this message translates to:
-  /// **'{condition}, tag deleted'**
-  String intentionTagConditionDeletedSemantics(String condition);
 
   /// Назначение нажатия на чип условия
   ///
@@ -2677,215 +2455,233 @@ abstract class AppLocalizations {
   /// **'Add tag condition'**
   String get intentionTagConditionsAddSemantics;
 
-  /// Заголовок каталога тегов и переход к нему
+  /// Заголовок панели тегов при выборе тегов намерения
   ///
   /// In en, this message translates to:
   /// **'Tags'**
-  String get tagCatalogTitle;
+  String get tagsPanelTitle;
 
-  /// Заголовок каталога выбора
+  /// Строка под заголовком панели тегов при выборе тегов намерения
   ///
   /// In en, this message translates to:
-  /// **'Choose a tag'**
-  String get tagCatalogSelectionTitle;
+  /// **'Choose as many as you need'**
+  String get tagsPanelAssignmentHint;
 
-  /// Подпись поискового поля каталога и выбора тега
+  /// Заголовок панели тегов в режиме фильтра поиска намерений
+  ///
+  /// In en, this message translates to:
+  /// **'Filter by tags'**
+  String get tagsPanelFilterTitle;
+
+  /// Строка под заголовком панели тегов в режиме фильтра: нажатия переключают надобность по кругу
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to require a tag, tap again to exclude it'**
+  String get tagsPanelFilterHint;
+
+  /// Действие шапки панели фильтра, снимающее все условия по тегам
+  ///
+  /// In en, this message translates to:
+  /// **'Reset'**
+  String get tagsPanelResetConditions;
+
+  /// Доступное название действия «Сбросить» в панели фильтра
+  ///
+  /// In en, this message translates to:
+  /// **'Reset tag conditions'**
+  String get tagsPanelResetConditionsLabel;
+
+  /// Доступное название строки панели фильтра с условием «должен быть»
+  ///
+  /// In en, this message translates to:
+  /// **'{tagName}, must be present'**
+  String tagsPanelFilterPresentLabel(String tagName);
+
+  /// Доступное название строки панели фильтра с условием «должен отсутствовать»
+  ///
+  /// In en, this message translates to:
+  /// **'{tagName}, must be absent'**
+  String tagsPanelFilterAbsentLabel(String tagName);
+
+  /// Заполнитель поля поиска панели тегов
+  ///
+  /// In en, this message translates to:
+  /// **'Find or create a tag'**
+  String get tagsPanelSearchPlaceholder;
+
+  /// Доступное название поля поиска панели тегов
   ///
   /// In en, this message translates to:
   /// **'Search tags'**
-  String get tagCatalogSearch;
+  String get tagsPanelSearchLabel;
 
-  /// Доступная подпись очистки поискового поля
+  /// Доступное название очистки поиска панели тегов
   ///
   /// In en, this message translates to:
   /// **'Clear tag search'**
-  String get tagCatalogClearSearch;
+  String get tagsPanelClearSearch;
 
-  /// Ошибка некорректного Unicode с объяснением сохранения последнего корректного фильтра
+  /// Ошибка некорректного Unicode в поиске панели с объяснением сохранения последнего корректного фильтра
   ///
   /// In en, this message translates to:
   /// **'Invalid characters are shown as �. Your input is retained but wasn’t applied; results use the last valid query.'**
-  String get tagCatalogInvalidSearch;
+  String get tagsPanelInvalidSearch;
 
-  /// Нет совпадений для применённого корректного непустого запроса
+  /// Кнопка, которая только закрывает панель тегов
   ///
   /// In en, this message translates to:
-  /// **'No tags found'**
-  String get tagCatalogNoMatches;
+  /// **'Done'**
+  String get tagsPanelDone;
 
-  /// Тег уже назначен получателю
+  /// Доступное название ручки панели тегов в половинном размере
   ///
   /// In en, this message translates to:
-  /// **'Assigned'**
-  String get tagCatalogAssigned;
+  /// **'Expand tags panel'**
+  String get tagsPanelExpand;
 
-  /// Тег доступен для назначения
+  /// Доступное название ручки панели тегов в полном размере
   ///
   /// In en, this message translates to:
-  /// **'Available to assign'**
-  String get tagCatalogAvailable;
+  /// **'Collapse tags panel'**
+  String get tagsPanelCollapse;
 
-  /// Явное действие назначения
-  ///
-  /// In en, this message translates to:
-  /// **'Assign tag'**
-  String get tagCatalogAssign;
-
-  /// Семантика действия назначения
-  ///
-  /// In en, this message translates to:
-  /// **'Assign tag {tagName}'**
-  String tagCatalogAssignNamed(String tagName);
-
-  /// Ожидание подтверждения назначения
-  ///
-  /// In en, this message translates to:
-  /// **'Assigning tag…'**
-  String get tagCatalogAssigning;
-
-  /// Тег уже входит в набор черновика создаваемого намерения; назначение ещё не сохранено
-  ///
-  /// In en, this message translates to:
-  /// **'In draft'**
-  String get tagCatalogInDraft;
-
-  /// Тег можно явно добавить в набор черновика создаваемого намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Available to add'**
-  String get tagCatalogAvailableForDraft;
-
-  /// Видимая подпись явного добавления выбранного тега в черновик
-  ///
-  /// In en, this message translates to:
-  /// **'Add'**
-  String get tagCatalogAddToDraft;
-
-  /// Доступная подпись добавления в черновик, пока тег не выбран
-  ///
-  /// In en, this message translates to:
-  /// **'Add tag to draft'**
-  String get tagCatalogAddToDraftSemantic;
-
-  /// Доступная подпись добавления выбранного тега в черновик без сохранения назначения
-  ///
-  /// In en, this message translates to:
-  /// **'Add tag {tagName} to draft'**
-  String tagCatalogAddToDraftNamed(String tagName);
-
-  /// Добавление в черновик недоступно, пока выполняется принятая отправка
-  ///
-  /// In en, this message translates to:
-  /// **'The intention is being saved, so tags can’t be added now.'**
-  String get tagCatalogDraftSubmitting;
-
-  /// Добавление недоступно: сессия черновика завершена
-  ///
-  /// In en, this message translates to:
-  /// **'This draft is closed, so tags can’t be added.'**
-  String get tagCatalogDraftClosed;
-
-  /// Начальная загрузка каталога тегов
+  /// Первоначальная загрузка каталога панели тегов
   ///
   /// In en, this message translates to:
   /// **'Loading tags…'**
-  String get tagCatalogLoading;
+  String get tagsPanelLoading;
 
-  /// Подтверждённо пустой каталог тегов
+  /// Устранимый отказ первоначального чтения каталога панели; рядом действие повтора
   ///
   /// In en, this message translates to:
-  /// **'No tags yet.'**
-  String get tagCatalogEmpty;
+  /// **'Couldn’t load tags.'**
+  String get tagsPanelLoadUnavailable;
 
-  /// Временная ошибка чтения каталога тегов
+  /// Повреждение данных при первоначальном чтении каталога панели; без повтора
   ///
   /// In en, this message translates to:
-  /// **'Tags couldn’t be loaded. Try again.'**
-  String get tagCatalogUnavailable;
+  /// **'Saved tag data is corrupted and can’t be shown.'**
+  String get tagsPanelLoadCorruption;
 
-  /// Повреждение данных при чтении каталога тегов
+  /// Неизвестный отказ первоначального чтения каталога панели; без повтора
   ///
   /// In en, this message translates to:
-  /// **'Stored tag data is damaged and can’t be shown.'**
-  String get tagCatalogCorruption;
+  /// **'Couldn’t load tags because of an unexpected error.'**
+  String get tagsPanelLoadUnexpected;
 
-  /// Непредвиденная ошибка чтения каталога тегов
+  /// Устранимый отказ фонового обновления над неактуальным списком; рядом действие повтора
   ///
   /// In en, this message translates to:
-  /// **'Tags couldn’t be loaded because of an unexpected error.'**
-  String get tagCatalogUnexpected;
+  /// **'Couldn’t update tags. The list may be out of date.'**
+  String get tagsPanelRefreshUnavailable;
 
-  /// Актуализация каталога тегов
+  /// Повреждение данных при фоновом обновлении над неактуальным списком; без повтора
   ///
   /// In en, this message translates to:
-  /// **'Refreshing tags…'**
-  String get tagCatalogRefreshing;
+  /// **'Couldn’t update tags: saved data is corrupted. The list may be out of date.'**
+  String get tagsPanelRefreshCorruption;
 
-  /// Создать тег из каталога
+  /// Неизвестный отказ фонового обновления над неактуальным списком; без повтора
   ///
   /// In en, this message translates to:
-  /// **'Create tag'**
-  String get tagCatalogCreate;
+  /// **'Couldn’t update tags because of an unexpected error. The list may be out of date.'**
+  String get tagsPanelRefreshUnexpected;
 
-  /// Изменить выбранный тег
+  /// Намерения, для которого открыта панель тегов, больше нет
+  ///
+  /// In en, this message translates to:
+  /// **'This intention no longer exists.'**
+  String get tagsPanelIntentionMissing;
+
+  /// Заголовок пустого каталога в панели тегов
+  ///
+  /// In en, this message translates to:
+  /// **'No tags yet'**
+  String get tagsPanelEmptyTitle;
+
+  /// Подсказка пустого каталога в панели тегов
+  ///
+  /// In en, this message translates to:
+  /// **'Type a name in search to create the first one'**
+  String get tagsPanelEmptyText;
+
+  /// Строка панели тегов, создающая тег с названием из поиска
+  ///
+  /// In en, this message translates to:
+  /// **'Create tag “{query}”'**
+  String tagsPanelCreateTag(String query);
+
+  /// Доступное название меню тега, открытого удержанием строки панели
+  ///
+  /// In en, this message translates to:
+  /// **'Tag: {tagName}'**
+  String tagsPanelTagMenu(String tagName);
+
+  /// Подсказка диктора на строке тега: удержание открывает действия тега
+  ///
+  /// In en, this message translates to:
+  /// **'Long press to open tag actions'**
+  String get tagsPanelTagHoldHint;
+
+  /// Действие меню тега, открывающее лист изменения тега
   ///
   /// In en, this message translates to:
   /// **'Edit tag'**
-  String get tagCatalogRename;
+  String get tagsPanelEditTag;
 
-  /// Удалить выбранный тег
+  /// Действие меню тега, открывающее лист создания копии тега
+  ///
+  /// In en, this message translates to:
+  /// **'Duplicate tag'**
+  String get tagsPanelDuplicateTag;
+
+  /// Разрушительное действие меню тега, открывающее подтверждение удаления самого тега
   ///
   /// In en, this message translates to:
   /// **'Delete tag'**
-  String get tagCatalogDelete;
+  String get tagsPanelDeleteTag;
 
-  /// Заголовок подтверждения удаления конкретного тега
+  /// Заголовок подтверждения удаления тега
   ///
   /// In en, this message translates to:
-  /// **'Delete tag “{tagName}”?'**
-  String tagDeleteConfirmationTitle(String tagName);
+  /// **'Delete tag?'**
+  String get tagsPanelDeleteTitle;
 
-  /// Полный охват удаления тега независимо от загруженной порции
+  /// Текст подтверждения удаления до выделенного названия тега
   ///
   /// In en, this message translates to:
-  /// **'This permanently deletes the tag and all its assignments to active and archived intentions at the time of execution, including assignments not loaded here. The intentions, relations, daily choices and their paths remain.'**
-  String get tagDeleteConfirmationScope;
+  /// **'This permanently deletes the tag '**
+  String get tagsPanelDeleteTextBefore;
 
-  /// Отменить удаление тега
+  /// Текст подтверждения удаления после выделенного названия тега: полный охват удаления и что сохраняется
+  ///
+  /// In en, this message translates to:
+  /// **' and all its assignments to active and archived intentions. The intentions, relations, daily choices and their paths remain.'**
+  String get tagsPanelDeleteTextAfter;
+
+  /// Отмена удаления тега
   ///
   /// In en, this message translates to:
   /// **'Cancel'**
-  String get tagDeleteCancel;
+  String get tagsPanelDeleteCancel;
 
-  /// Подтвердить удаление тега и всех назначений
+  /// Подтверждение удаления тега и всех его назначений
   ///
   /// In en, this message translates to:
-  /// **'Delete tag and assignments'**
-  String get tagDeleteConfirm;
+  /// **'Delete'**
+  String get tagsPanelDeleteConfirm;
 
-  /// Повторный вход во время команды того же тега
+  /// Заполнитель поля названия в листе тега
   ///
   /// In en, this message translates to:
-  /// **'An operation on this tag is already in progress. Wait for its result.'**
-  String get tagDeleteAlreadyRunning;
+  /// **'Name'**
+  String get tagSheetNamePlaceholder;
 
-  /// Ожидание подтверждения удаления тега
+  /// Заголовок листа изменения тега
   ///
   /// In en, this message translates to:
-  /// **'Deleting tag and assignments…'**
-  String get tagDeleteSaving;
-
-  /// Тег выбран после завершения формы
-  ///
-  /// In en, this message translates to:
-  /// **'Selected tag'**
-  String get tagCatalogSelected;
-
-  /// Состояние назначения выбранного тега ещё не подтверждено
-  ///
-  /// In en, this message translates to:
-  /// **'Assignment not yet checked'**
-  String get tagCatalogAssignmentUnknown;
+  /// **'Edit tag'**
+  String get tagSheetEditTitle;
 
   /// Заголовок формы создания тега
   ///
@@ -2893,23 +2689,11 @@ abstract class AppLocalizations {
   /// **'New tag'**
   String get tagEditorCreateTitle;
 
-  /// Заголовок формы изменения тега
-  ///
-  /// In en, this message translates to:
-  /// **'Edit tag'**
-  String get tagEditorRenameTitle;
-
   /// Подпись поля названия тега
   ///
   /// In en, this message translates to:
   /// **'Tag name'**
   String get tagEditorNameLabel;
-
-  /// Ограничение длины названия тега
-  ///
-  /// In en, this message translates to:
-  /// **'No more than 255 visible characters.'**
-  String get tagEditorNameLimit;
 
   /// Название варианта цвета тега: Без цвета
   ///
@@ -3006,114 +2790,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Saving this tag is already in progress. Wait for its result.'**
   String get tagEditorAlreadyRunning;
-
-  /// Уйти с формы без новой команды
-  ///
-  /// In en, this message translates to:
-  /// **'Cancel'**
-  String get tagEditorCancel;
-
-  /// Выбрать тег при конфликте названия
-  ///
-  /// In en, this message translates to:
-  /// **'Use existing tag'**
-  String get tagEditorUseExisting;
-
-  /// Чтение после подтверждённой записи
-  ///
-  /// In en, this message translates to:
-  /// **'Tag saved. Refreshing its details…'**
-  String get tagEditorReadingCommitted;
-
-  /// Ошибка чтения после подтверждённой записи
-  ///
-  /// In en, this message translates to:
-  /// **'Tag saved, but its details couldn’t be refreshed.'**
-  String get tagEditorCommittedReadFailed;
-
-  /// Тег исчез после подтверждённой записи
-  ///
-  /// In en, this message translates to:
-  /// **'Tag saved, but is no longer found. Refresh the catalog.'**
-  String get tagEditorCommittedMissing;
-
-  /// Повторная проверка существующего тега по id
-  ///
-  /// In en, this message translates to:
-  /// **'Checking existing tag…'**
-  String get tagEditorReadingExisting;
-
-  /// Конфликтный тег исчез до выбора
-  ///
-  /// In en, this message translates to:
-  /// **'The existing tag is gone. Correct the name or refresh the catalog.'**
-  String get tagEditorExistingMissing;
-
-  /// Временный отказ чтения одного тега
-  ///
-  /// In en, this message translates to:
-  /// **'Tag couldn’t be read. Try again.'**
-  String get tagEditorReadUnavailable;
-
-  /// Повреждение чтения одного тега
-  ///
-  /// In en, this message translates to:
-  /// **'Stored tag data is damaged.'**
-  String get tagEditorReadCorruption;
-
-  /// Неизвестный отказ чтения одного тега
-  ///
-  /// In en, this message translates to:
-  /// **'Tag couldn’t be read because of an unexpected error.'**
-  String get tagEditorReadUnexpected;
-
-  /// Подтверждение создания тега
-  ///
-  /// In en, this message translates to:
-  /// **'Tag created.'**
-  String get tagCreated;
-
-  /// Подтверждение изменения тега
-  ///
-  /// In en, this message translates to:
-  /// **'Tag updated.'**
-  String get tagUpdated;
-
-  /// Подтверждение неизменного названия тега
-  ///
-  /// In en, this message translates to:
-  /// **'Tag name unchanged.'**
-  String get tagUnchanged;
-
-  /// Подтверждение удаления тега и назначений
-  ///
-  /// In en, this message translates to:
-  /// **'Tag deleted with all its assignments.'**
-  String get tagDeleted;
-
-  /// Подтверждение нового назначения тега
-  ///
-  /// In en, this message translates to:
-  /// **'Tag assigned.'**
-  String get tagAssigned;
-
-  /// Подтверждение повторного назначения
-  ///
-  /// In en, this message translates to:
-  /// **'Tag already assigned.'**
-  String get tagAlreadyAssigned;
-
-  /// Подтверждение снятия назначения
-  ///
-  /// In en, this message translates to:
-  /// **'Tag assignment removed.'**
-  String get tagAssignmentRemoved;
-
-  /// Подтверждение повторного снятия
-  ///
-  /// In en, this message translates to:
-  /// **'Tag assignment already absent.'**
-  String get tagAssignmentAlreadyAbsent;
 
   /// Занятость ключей назначения при повторном действии
   ///
@@ -3268,7 +2944,7 @@ abstract class AppLocalizations {
   /// Название тега уже занято
   ///
   /// In en, this message translates to:
-  /// **'A tag with this name already exists. Choose another name or use the existing tag.'**
+  /// **'A tag with this name already exists.'**
   String get tagNameOccupied;
 
   /// Тег отсутствует при изменении

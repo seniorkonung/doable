@@ -24,7 +24,8 @@ final class TagChangeValidationException implements Exception {
   final TagChangeValidationFailure failure;
 }
 
-/// Редактирование одного тега: отличается название, цвет или оба поля.
+/// Изменение одного тега: отличается хотя бы одно из полей название, цвет
+/// и место.
 final class TagUpdatedChange extends TagChange {
   factory TagUpdatedChange({
     required GraphRevision revision,
@@ -36,7 +37,9 @@ final class TagUpdatedChange extends TagChange {
         TagChangeValidationFailure.identityMismatch,
       );
     }
-    if (before.name == after.name && before.color == after.color) {
+    if (before.name == after.name &&
+        before.color == after.color &&
+        before.position == after.position) {
       throw const TagChangeValidationException(
         TagChangeValidationFailure.unchanged,
       );
@@ -56,8 +59,8 @@ final class TagUpdatedChange extends TagChange {
   final Tag after;
 }
 
-/// Полное совпадение сохранённых названия и цвета подтверждается без новой
-/// ревизии.
+/// Полное совпадение сохранённых названия и цвета или размещение на текущем
+/// месте подтверждается без новой ревизии.
 final class TagUnchangedChange extends TagChange {
   const TagUnchangedChange({required this.revision, required this.tag});
 

@@ -3,7 +3,7 @@ import '../../graph/application/graph_revision.dart';
 import '../../intention/domain/intention_id.dart';
 import '../domain/tag.dart';
 
-/// Все назначенные намерению теги в порядке создания тегов на одной ревизии.
+/// Все назначенные намерению теги в ручном порядке тегов на одной ревизии.
 /// Пустой успех означает существующее намерение без назначений.
 final class TagAssignmentsSnapshot {
   TagAssignmentsSnapshot({

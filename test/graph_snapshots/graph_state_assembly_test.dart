@@ -17,6 +17,8 @@ import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../support/tag_positions.dart';
+
 void main() {
   group('сборка состояния графа на позиции', () {
     test('пустые база и диапазон дают пустой граф', () async {
@@ -484,7 +486,12 @@ final _evening = DateTime.utc(2026, 10, 1, 19);
 const _minute = Duration(minutes: 1);
 
 TagRecord _tag(int number, String name) => TagRecord(
-  Tag(id: _tagId(number), name: TagName.fromStored(name), color: null),
+  Tag(
+    id: _tagId(number),
+    name: TagName.fromStored(name),
+    color: null,
+    position: tagPositionAt(number),
+  ),
 );
 
 IntentionRecord _intention(

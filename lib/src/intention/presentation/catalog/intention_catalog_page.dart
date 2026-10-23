@@ -48,17 +48,7 @@ final class _IntentionCatalogPageState
     );
     final selection = catalog.value?.selection ?? notifier.selection;
     return Scaffold(
-      appBar: AppBar(
-        title: Text(localizations.appDestinationIntentionGraph),
-        actions: [
-          IconButton(
-            key: const ValueKey('catalog-open-tags'),
-            tooltip: localizations.tagCatalogTitle,
-            onPressed: () => context.router.push(TagCatalogRoute()),
-            icon: const Icon(Icons.label_outline),
-          ),
-        ],
-      ),
+      appBar: AppBar(title: Text(localizations.appDestinationIntentionGraph)),
       body: IntentionSearchLayout(
         // Загруженная выдача получает всю высоту тела страницы: прокрученные
         // до конца параметры и список оставляют последнюю строку и состояние

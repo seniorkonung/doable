@@ -6,7 +6,6 @@ import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
-import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
 import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
@@ -14,7 +13,6 @@ import 'package:doable/src/data/local/app_database.dart'
     show openInMemoryLocalDatabase;
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
-import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -74,35 +72,29 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('шапка каталога намерений ведёт к каталогу тегов и не ведёт к '
-      'каталогу дневных выборов', (tester) async {
-    await _start(tester);
-    await _select(tester, AppDestination.intentionGraph);
+  for (final locale in const [Locale('en'), Locale('ru')]) {
+    testWidgets('шапка каталога намерений не ведёт ни к каталогу дневных '
+        'выборов, ни к тегам (${locale.languageCode})', (tester) async {
+      final localizations = lookupAppLocalizations(locale);
+      await _start(tester, locale: locale);
+      await _select(tester, AppDestination.intentionGraph);
 
-    final appBar = find.descendant(
-      of: find.byType(IntentionCatalogPage),
-      matching: find.byType(AppBar),
-    );
-    expect(
-      find.descendant(
-        of: appBar,
-        matching: find.byTooltip(l10n.appDestinationDailyChoices),
-      ),
-      findsNothing,
-    );
-    final tags = find.descendant(
-      of: appBar,
-      matching: find.byTooltip(l10n.tagCatalogTitle),
-    );
-    expect(tags, findsOneWidget);
-
-    await tester.tap(tags);
-    await tester.pumpAndSettle();
-
-    // Просмотр каталога тегов сохраняет постоянную навигацию.
-    expect(find.byType(TagCatalogPage), findsOneWidget);
-    expect(find.byType(AppNavigationBar), findsOneWidget);
-  });
+      final appBar = find.descendant(
+        of: find.byType(IntentionCatalogPage),
+        matching: find.byType(AppBar),
+      );
+      expect(appBar, findsOneWidget);
+      for (final destination in [
+        localizations.appDestinationDailyChoices,
+        localizations.tagsPanelTitle,
+      ]) {
+        expect(
+          find.descendant(of: appBar, matching: find.byTooltip(destination)),
+          findsNothing,
+        );
+      }
+    });
+  }
 
   testWidgets('переключение пунктов идёт без анимации перехода', (
     tester,

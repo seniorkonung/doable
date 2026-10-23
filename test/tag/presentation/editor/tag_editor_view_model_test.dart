@@ -7,7 +7,6 @@ import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
-import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_color.dart';
@@ -18,11 +17,13 @@ import 'package:doable/src/tag/presentation/editor/tag_editor_view_model.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/tag_positions.dart';
+
 void main() {
   test(
     'создание проверяет название, отклоняет повтор и сохраняет ввод при отказе',
     () async {
-      final h = _Harness(TagEditorCreating(TagCreationFormKey()));
+      final h = _Harness(_creating());
       addTearDown(h.dispose);
       h.model.changeName('  Дом  ');
       final first = h.model.submit();
@@ -36,13 +37,13 @@ void main() {
       await first;
       expect(h.state.input, '  Дом  ');
       expect(h.state.status, isA<TagEditorSubmissionFailed>());
-      expect(h.state.failurePresentation, isNotNull);
       expect(h.state.canSubmit, isTrue);
     },
   );
 
   test('правка названия цветного тега отправляет его цвет и сохраняет цвет после отказа', () async {
-    final h = _Harness(TagEditorRenaming(_tag(1, 'Дом', color: TagColor.blue)));
+    final tag = _tag(1, 'Дом', color: TagColor.blue);
+    final h = _Harness(TagEditorRenaming(tag, existingNames: [tag.name]));
     addTearDown(h.dispose);
     expect(h.state.color, TagColor.blue);
     h.model.changeName('Работа');
@@ -67,43 +68,8 @@ void main() {
     await retry;
   });
 
-  test(
-    'подтверждённая правка цветного тега сохраняет цвет до потребления события',
-    () async {
-      final before = _tag(1, 'Дом', color: TagColor.blue);
-      final after = _tag(1, 'Быт', color: TagColor.blue);
-      final h = _Harness(TagEditorRenaming(before));
-      addTearDown(h.dispose);
-      h.model.changeName('Быт');
-      final submit = h.model.submit();
-      h.repository.succeedCommand(
-        0,
-        TagUpdated(
-          TagUpdatedChange(
-            revision: const _Revision(2),
-            before: before,
-            after: after,
-          ),
-        ),
-      );
-      await pumpEventQueue();
-      h.repository.failRead(0, const TagReadUnavailableFailure());
-      await submit;
-      expect(h.state.status, isA<TagEditorCommittedReadFailed>());
-      expect(h.state.color, TagColor.blue);
-
-      final retry = h.model.retryCommittedRead();
-      h.repository.completeRead(1, after);
-      await retry;
-      expect((h.state.event as TagEditorSaved).tag.color, TagColor.blue);
-      h.model.consumeEvent();
-      expect(h.state.event, isNull);
-      expect(h.state.color, TagColor.blue);
-    },
-  );
-
   test('неизвестный отказ сохраняет ввод без обычного повтора', () async {
-    final h = _Harness(TagEditorCreating(TagCreationFormKey()));
+    final h = _Harness(_creating());
     addTearDown(h.dispose);
     h.model.changeName('Дом');
     final submit = h.model.submit();
@@ -114,114 +80,162 @@ void main() {
     expect(h.state.canSubmit, isFalse);
   });
 
+  test('пустое после удаления пробелов название делает создание недоступным '
+      'без причины и сохраняет ввод', () async {
+    final h = _Harness(_creating());
+    addTearDown(h.dispose);
+    h.model.changeName('   ');
+    expect(h.state.nameCheck, isA<TagEditorNameEmpty>());
+    expect(h.state.canSubmit, isFalse);
+    await h.model.submit();
+    expect(h.repository.commands, isEmpty);
+    expect(h.state.input, '   ');
+  });
+
   test(
-    'недопустимый Unicode остаётся в форме без вызова координатора',
+    'недопустимый Unicode получает причину при вводе без вызова координатора',
     () async {
-      final h = _Harness(TagEditorCreating(TagCreationFormKey()));
+      final h = _Harness(_creating());
       addTearDown(h.dispose);
       h.model.changeName('Имя\u0000');
+      expect(
+        (h.state.nameCheck as TagEditorNameInvalid).reason,
+        TagNameFailureReason.invalidUnicodeRepertoire,
+      );
+      expect(h.state.canSubmit, isFalse);
       await h.model.submit();
       expect(h.repository.commands, isEmpty);
       expect(h.state.input, 'Имя\u0000');
-      expect(
-        (h.state.status as TagEditorSubmissionFailed).failure,
-        isA<TagNameInputFailure>().having(
-          (failure) => failure.reason,
-          'причина',
-          TagNameFailureReason.invalidUnicodeRepertoire,
+    },
+  );
+
+  test('название, совпадающее с тегом снимка без учёта регистра и пробелов, '
+      'занято, а исправленное снова доступно', () async {
+    final h = _Harness(_creating(existingNames: [TagName.fromInput('Дом')]));
+    addTearDown(h.dispose);
+    h.model.changeName('  дом  ');
+    expect(h.state.nameCheck, isA<TagEditorNameOccupied>());
+    expect(h.state.canSubmit, isFalse);
+    await h.model.submit();
+    expect(h.repository.commands, isEmpty);
+
+    h.model.changeName('Домик');
+    expect(h.state.canSubmit, isTrue);
+  });
+
+  test('принятое создание с начальным названием передаётся вызывающему до '
+      'завершения и завершается после закрытия сессии', () async {
+    final accepted = <TagCommandAccepted>[];
+    final h = _Harness(
+      _creating(initialName: 'парк', onCreationAccepted: accepted.add),
+    );
+    addTearDown(h.dispose);
+    expect(h.state.input, 'парк');
+    unawaited(h.model.submit());
+    expect(accepted, hasLength(1));
+    expect(
+      (h.repository.commands.single.command as CreateTag).name.value,
+      'парк',
+    );
+
+    h.model.closeSession();
+    h.repository.succeedCommand(
+      0,
+      TagCreated(
+        TagCreatedChange(revision: const _Revision(2), after: _tag(1, 'парк')),
+      ),
+    );
+    final completion = await accepted.single.future;
+    expect(
+      completion.result,
+      isA<GraphResultSuccess<TagCommandSuccess, TagCommandFailure>>(),
+    );
+  });
+
+  test(
+    'создание начинает с цвета контекста и отправляет его размещение',
+    () async {
+      final h = _Harness(
+        _creating(
+          initialName: 'Дом 2',
+          initialColor: TagColor.blue,
+          placement: AfterTagPlacement(_id(1)),
         ),
       );
-    },
-  );
-
-  test(
-    'конфликт читает именно переданный id и не подменяет исчезнувший тег',
-    () async {
-      final h = _Harness(TagEditorCreating(TagCreationFormKey()));
       addTearDown(h.dispose);
-      h.model.changeName('Дом');
-      final submit = h.model.submit();
-      h.repository.failCommand(0, TagNameOccupiedFailure(_id(1)));
-      await submit;
-      final selection = h.model.useExisting();
-      expect(h.repository.readIds, [_id(1)]);
-      h.repository.completeRead(0, null);
-      await selection;
-      expect(h.state.status, isA<TagEditorExistingMissing>());
-      expect(h.state.event, isNull);
-      expect(h.state.input, 'Дом');
-      expect(h.repository.commands, hasLength(1));
-    },
-  );
+      expect((h.state.input, h.state.color), ('Дом 2', TagColor.blue));
 
-  test(
-    'выбор занятого тега возвращает прочитанный тег без новой команды',
-    () async {
-      final h = _Harness(TagEditorCreating(TagCreationFormKey()));
-      addTearDown(h.dispose);
-      h.model.changeName('Дом');
-      final submit = h.model.submit();
-      h.repository.failCommand(0, TagNameOccupiedFailure(_id(1)));
-      await submit;
-      final selection = h.model.useExisting();
-      h.repository.completeRead(0, _tag(1, 'Быт'));
-      await selection;
+      h.model.changeName('Дом и сад');
+      h.model.changeColor(TagColor.green);
+      unawaited(h.model.submit());
+
+      final command = h.repository.commands.single.command as CreateTag;
       expect(
-        (h.state.event as TagEditorExistingSelected).tag.name.value,
-        'Быт',
+        (command.name.value, command.color),
+        ('Дом и сад', TagColor.green),
       );
-      expect(h.repository.commands, hasLength(1));
-      h.model.consumeEvent();
-      expect(h.state.event, isNull);
+      expect((command.placement as AfterTagPlacement).tagId, _id(1));
+      h.repository.failCommand(0, const TagUnavailableFailure());
     },
   );
 
-  test(
-    'конфликт не подменяет полученный id другим одноимённым тегом',
-    () async {
-      final h = _Harness(TagEditorCreating(TagCreationFormKey()));
-      addTearDown(h.dispose);
-      h.model.changeName('Дом');
-      final submit = h.model.submit();
-      h.repository.failCommand(0, TagNameOccupiedFailure(_id(1)));
-      await submit;
-      final selection = h.model.useExisting();
-      h.repository.completeRead(0, _tag(2, 'Дом'));
-      await selection;
-      expect(h.repository.readIds, [_id(1)]);
-      expect(h.state.status, isA<TagEditorExistingReadFailed>());
-      expect(h.state.event, isNull);
-      expect(h.repository.commands, hasLength(1));
-    },
-  );
-
-  test('ошибка чтения после commit повторяет только чтение', () async {
-    final h = _Harness(TagEditorCreating(TagCreationFormKey()));
+  test('Изменение только регистра собственного названия', () async {
+    final tag = _tag(1, 'дом');
+    final h = _Harness(
+      TagEditorRenaming(tag, existingNames: [tag.name, _name('Работа')]),
+    );
     addTearDown(h.dispose);
     h.model.changeName('Дом');
+    expect(h.state.nameCheck, isA<TagEditorNameAccepted>());
+    expect(h.state.canSubmit, isTrue);
+
     final submit = h.model.submit();
-    h.repository.succeedCommand(
-      0,
-      TagCreated(
-        TagCreatedChange(revision: const _Revision(2), after: _tag(1, 'Дом')),
-      ),
-    );
-    await pumpEventQueue();
-    expect(h.repository.readIds, [_id(1)]);
-    h.repository.failRead(0, const TagReadUnavailableFailure());
+    final command = h.repository.commands.single.command as UpdateTag;
+    expect((command.tagId, command.name.value), (tag.id, 'Дом'));
+    h.repository.failCommand(0, const TagUnavailableFailure());
     await submit;
-    expect(h.state.status, isA<TagEditorCommittedReadFailed>());
+  });
+
+  test('Переименование в занятое название', () async {
+    final tag = _tag(1, 'Дом');
+    final h = _Harness(
+      TagEditorRenaming(tag, existingNames: [tag.name, _name('Работа')]),
+    );
+    addTearDown(h.dispose);
+    h.model.changeName('работа');
+    expect(h.state.nameCheck, isA<TagEditorNameOccupied>());
     expect(h.state.canSubmit, isFalse);
-    final retry = h.model.retryCommittedRead();
-    expect(h.repository.commands, hasLength(1));
-    expect(h.repository.readIds, [_id(1), _id(1)]);
-    h.repository.completeRead(1, _tag(1, 'Дом'));
-    await retry;
-    expect((h.state.event as TagEditorSaved).tag.id, _id(1));
+    await h.model.submit();
+    expect(h.repository.commands, isEmpty);
+    expect(h.state.input, 'работа');
   });
 
-  test('повтор чтения после commit не принимает старую ревизию', () async {
-    final h = _Harness(TagEditorCreating(TagCreationFormKey()));
+  test('«Сохранить» недоступна при прежних названии и цвете и доступна после '
+      'смены только цвета', () async {
+    final tag = _tag(1, 'Дом', color: TagColor.blue);
+    final h = _Harness(TagEditorRenaming(tag, existingNames: [tag.name]));
+    addTearDown(h.dispose);
+    expect(h.state.canSubmit, isFalse);
+    h.model.changeName('  Дом  ');
+    expect(h.state.canSubmit, isFalse);
+    await h.model.submit();
+    expect(h.repository.commands, isEmpty);
+
+    h.model.changeColor(null);
+    expect(h.state.canSubmit, isTrue);
+    h.model.changeColor(TagColor.blue);
+    expect(h.state.canSubmit, isFalse);
+    h.model.changeColor(TagColor.green);
+
+    final submit = h.model.submit();
+    final command = h.repository.commands.single.command as UpdateTag;
+    expect((command.name.value, command.color), ('Дом', TagColor.green));
+    h.repository.failCommand(0, const TagUnavailableFailure());
+    await submit;
+  });
+
+  test('подтверждённое создание завершает сессию и закрывает лист', () async {
+    final h = _Harness(_creating());
     addTearDown(h.dispose);
     h.model.changeName('Дом');
     final submit = h.model.submit();
@@ -231,37 +245,27 @@ void main() {
         TagCreatedChange(revision: const _Revision(2), after: _tag(1, 'Дом')),
       ),
     );
-    await pumpEventQueue();
-    h.repository.failRead(0, const TagReadUnavailableFailure());
     await submit;
-    final retry = h.model.retryCommittedRead();
-    h.repository.completeRead(1, _tag(1, 'Старое'), revision: 1);
-    await retry;
-    expect(h.state.status, isA<TagEditorCommittedReadFailed>());
-    expect(h.state.event, isNull);
-    expect(h.repository.commands, hasLength(1));
-  });
-
-  test('чтение после создания не выдаёт другой тег как сохранённый', () async {
-    final h = _Harness(TagEditorCreating(TagCreationFormKey()));
-    addTearDown(h.dispose);
-    h.model.changeName('Дом');
-    final submit = h.model.submit();
-    h.repository.succeedCommand(
-      0,
-      TagCreated(
-        TagCreatedChange(revision: const _Revision(2), after: _tag(1, 'Дом')),
-      ),
-    );
-    await pumpEventQueue();
-    h.repository.completeRead(0, _tag(2, 'Дом'));
-    await submit;
-    expect(h.repository.readIds, [_id(1)]);
-    expect(h.state.status, isA<TagEditorCommittedReadFailed>());
-    expect(h.state.event, isNull);
-    expect(h.repository.commands, hasLength(1));
+    expect(h.state.event, isA<TagEditorSaved>());
+    expect(h.state.canSubmit, isFalse);
   });
 }
+
+/// Контекст создания из панели без снимка названий и с пустым продолжением.
+TagEditorCreating _creating({
+  String initialName = '',
+  TagColor? initialColor,
+  TagPlacement placement = TagPlacement.first,
+  List<TagName> existingNames = const [],
+  void Function(TagCommandAccepted creation)? onCreationAccepted,
+}) => TagEditorCreating(
+  TagCreationFormKey(),
+  initialName: initialName,
+  initialColor: initialColor,
+  placement: placement,
+  existingNames: existingNames,
+  onCreationAccepted: onCreationAccepted ?? (_) {},
+);
 
 final class _Harness {
   _Harness(TagEditorContext context) {
@@ -300,8 +304,6 @@ final class _CommandRequest {
 
 final class _Repository extends Fake implements PersonalGraphRepository {
   final commands = <_CommandRequest>[];
-  final readIds = <TagId>[];
-  final reads = <StreamController<TagReadResult>>[];
 
   @override
   Future<GraphCommandResult<TSuccess, TFailure>> execute<
@@ -314,14 +316,6 @@ final class _Repository extends Fake implements PersonalGraphRepository {
         as GraphCommandResult<TSuccess, TFailure>;
   }
 
-  @override
-  Stream<TagReadResult> watchTag(TagId id) {
-    readIds.add(id);
-    final controller = StreamController<TagReadResult>();
-    reads.add(controller);
-    return controller.stream;
-  }
-
   void failCommand(int index, TagCommandFailure failure) =>
       commands[index].completer.complete(TagCommandFailed(failure));
 
@@ -331,16 +325,6 @@ final class _Repository extends Fake implements PersonalGraphRepository {
           ConfirmedGraphResult(revision: const _Revision(2), value: success),
         ),
       );
-
-  void completeRead(int index, Tag? tag, {int revision = 2}) =>
-      reads[index].add(
-        TagReadSuccess(
-          GraphSnapshot(value: tag, revision: _Revision(revision)),
-        ),
-      );
-
-  void failRead(int index, TagReadFailure failure) =>
-      reads[index].add(TagReadError(failure));
 }
 
 final class _Revision implements GraphRevision {
@@ -359,5 +343,10 @@ final class _Revision implements GraphRevision {
 TagId _id(int number) => (TagId.decode(
   '00000000-0000-4000-8000-${number.toString().padLeft(12, '0')}',
 ) as TagIdDecodingSuccess).id;
-Tag _tag(int number, String name, {TagColor? color}) =>
-    Tag(id: _id(number), name: TagName.fromInput(name), color: color);
+TagName _name(String value) => TagName.fromInput(value);
+Tag _tag(int number, String name, {TagColor? color}) => Tag(
+  id: _id(number),
+  name: _name(name),
+  color: color,
+  position: tagPositionAt(number),
+);

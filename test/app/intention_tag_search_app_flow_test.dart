@@ -1,10 +1,17 @@
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/main.dart';
+import 'package:doable/src/app/quick_creation/quick_creation_daily_choice_start_sheet.dart';
+import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
+import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
+import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
+import 'package:doable/src/design_system/components/search_field.dart';
+import 'package:doable/src/design_system/components/tag_row.dart';
+import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
-import 'package:doable/src/intention/presentation/catalog/tag_condition_picker_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
+import 'package:doable/src/tag/presentation/assignments/tag_assignments_section.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -15,6 +22,8 @@ import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/tag_storage_fixture.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
+import '../support/quick_creation.dart';
+import '../support/tag_positions.dart';
 
 const _health = 301;
 const _sport = 302;
@@ -55,15 +64,15 @@ void main() {
       expect(_conditions(tester, page), isEmpty);
 
       // Поиск только по обязательным тегам.
-      await _addCondition(tester, _health, present: true);
-      await _addCondition(tester, _rest, present: true);
+      await _addCondition(tester, l10n, _health, present: true);
+      await _addCondition(tester, l10n, _rest, present: true);
       await _expectResults(tester, page, [
         ('Ходить в парк', healthRest),
         ('Читать в тишине', healthRest),
         ('Ходить в зал', all),
         ('Ходить в парк', healthRest),
       ]);
-      await _addCondition(tester, _sport, present: false);
+      await _addCondition(tester, l10n, _sport, present: false);
       final combined = [
         'Здоровье',
         'Отдых',
@@ -98,27 +107,26 @@ void main() {
         ('Ходить в парк', healthRest),
       ]);
 
-      // Уже выбранный тег отмечен; закрытие без выбора сохраняет условия.
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('intention-tag-conditions-add')),
-      );
-      final sportRow = find.byKey(
-        ValueKey('tag-condition-picker-row-${tagFixtureId(_sport)}'),
-      );
-      await _until(tester, sportRow);
-      expect(
-        find.descendant(
-          of: sportRow,
-          matching: find.text(l10n.tagConditionPickerSelectedAbsent),
-        ),
-        findsOneWidget,
-      );
-      await _closeTop(tester, TagConditionPickerPage);
+      // Панель отмечает текущие условия, а «назад» закрывает её, не меняя
+      // условий.
+      await _openFilterPanel(tester);
+      expect(_panelMarks(tester), [
+        TagRowFilterMark.mustBePresent,
+        TagRowFilterMark.mustBeAbsent,
+        TagRowFilterMark.mustBePresent,
+      ]);
+      await tester.binding.handlePopRoute();
+      await _waitFor(tester, () => find.byType(TagRow).evaluate().isEmpty);
+      await tester.pumpAndSettle();
       expect(_conditions(tester, page), combined);
 
-      // Повторный выбор тега меняет надобность, а не добавляет условие.
-      await _addCondition(tester, _sport, present: true);
+      // Чип по-прежнему меняет надобность на прежнем месте.
+      await _tap(
+        tester,
+        find.byKey(
+          ValueKey('intention-tag-condition-toggle-${tagFixtureId(_sport)}'),
+        ),
+      );
       expect(_conditions(tester, page), ['Здоровье', 'Отдых', 'Спорт']);
       await _expectResults(tester, page, [('Ходить в зал', all)]);
       await _tap(
@@ -158,7 +166,7 @@ void main() {
           ValueKey('intention-tag-condition-toggle-${tagFixtureId(_sport)}'),
         ),
       );
-      await _addCondition(tester, _health, present: false);
+      await _addCondition(tester, l10n, _health, present: false);
       await _until(tester, find.text(l10n.catalogTagConditionsEmpty));
       expect(find.text(l10n.catalogActiveEmpty), findsNothing);
       expect(_results(tester, page), isEmpty);
@@ -169,6 +177,274 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('Удаление обязательного тега расширяет выдачу', (tester) async {
+    final app = await _App.pump(tester, const Locale('ru'));
+    final l10n = app.l10n;
+    const page = IntentionCatalogPage;
+    final healthRest = l10n.intentionSummaryTags('Здоровье, Отдых');
+    final rest = l10n.intentionSummaryTags('Отдых');
+    final health = tagFixtureId(_health);
+    await _addCondition(tester, l10n, _health, present: true);
+    await _addCondition(tester, l10n, _sport, present: false);
+    await _expectResults(tester, page, [
+      ('Ходить в парк', healthRest),
+      ('Читать в тишине', healthRest),
+      ('Ходить до магазина', l10n.intentionSummaryTags('Здоровье')),
+      ('Ходить в парк', healthRest),
+    ]);
+    await _tap(tester, find.text('Читать в тишине'));
+    await _openPanel(tester, l10n);
+
+    await _chooseFromMenu(tester, _panelRow(_health), l10n.tagsPanelDeleteTag);
+    await _tap(tester, find.text(l10n.tagsPanelDeleteConfirm));
+    await _waitFor(tester, () => _panelRow(_health).evaluate().isEmpty);
+    expect(_panelNames(tester), ['Спорт', 'Отдых']);
+    await _waitFor(tester, () => _assignmentRow(_health).evaluate().isEmpty);
+    expect(_assignmentRow(_rest), findsOneWidget);
+    expect(
+      app.raw.select('SELECT * FROM tags WHERE id = ?', [health]),
+      isEmpty,
+    );
+    expect(
+      app.raw.select('SELECT * FROM tag_assignments WHERE tag_id = ?', [
+        health,
+      ]),
+      isEmpty,
+    );
+
+    await _closePanelAndPage(tester, l10n);
+    expect(_conditions(tester, page), [
+      l10n.intentionTagConditionAbsent('Спорт'),
+    ]);
+    await _expectResults(tester, page, [
+      ('Ходить в парк', rest),
+      ('Гулять без тегов', l10n.intentionSummaryNoTags),
+      ('Читать в тишине', rest),
+      ('Ходить до магазина', l10n.intentionSummaryNoTags),
+      ('Ходить в парк', rest),
+    ]);
+    expect(find.byType(SnackBar, skipOffstage: false), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Нажатия переключают надобность по кругу', (tester) async {
+    final app = await _App.pump(tester, const Locale('ru'));
+    final l10n = app.l10n;
+    const page = IntentionCatalogPage;
+    final healthRest = l10n.intentionSummaryTags('Здоровье, Отдых');
+    final all = l10n.intentionSummaryTags('Здоровье, Спорт, Отдых');
+    final health = l10n.intentionSummaryTags('Здоровье');
+    await _openFilterPanel(tester);
+
+    await _cycle(tester, _sport, TagRowFilterMark.mustBePresent);
+    expect(_conditions(tester, page), ['Спорт']);
+    await _expectResults(tester, page, [('Ходить в зал', all)]);
+
+    await _cycle(tester, _sport, TagRowFilterMark.mustBeAbsent);
+    expect(_conditions(tester, page), [
+      l10n.intentionTagConditionAbsent('Спорт'),
+    ]);
+    await _expectResults(tester, page, [
+      ('Ходить в парк', healthRest),
+      ('Гулять без тегов', l10n.intentionSummaryNoTags),
+      ('Читать в тишине', healthRest),
+      ('Ходить до магазина', health),
+      ('Ходить в парк', healthRest),
+    ]);
+
+    await _cycle(tester, _sport, TagRowFilterMark.none);
+    expect(_conditions(tester, page), isEmpty);
+    await _expectResults(tester, page, [
+      ('Ходить в парк', healthRest),
+      ('Гулять без тегов', l10n.intentionSummaryNoTags),
+      ('Читать в тишине', healthRest),
+      ('Ходить в зал', all),
+      ('Ходить до магазина', health),
+      ('Ходить в парк', healthRest),
+    ]);
+    expect(find.byType(TagRow), findsNWidgets(3));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('«Сбросить» снимает все условия по тегам', (tester) async {
+    final app = await _App.pump(tester, const Locale('ru'));
+    final l10n = app.l10n;
+    const page = IntentionCatalogPage;
+    final healthRest = l10n.intentionSummaryTags('Здоровье, Отдых');
+    await tester.enterText(
+      find.byKey(const ValueKey('catalog-filter-field')),
+      'ходить',
+    );
+    await _openFilterPanel(tester);
+    await _cycle(tester, _health, TagRowFilterMark.mustBePresent);
+    await _cycle(tester, _sport, TagRowFilterMark.mustBePresent);
+    await _cycle(tester, _sport, TagRowFilterMark.mustBeAbsent);
+    await _expectResults(tester, page, [
+      ('Ходить в парк', healthRest),
+      ('Ходить до магазина', l10n.intentionSummaryTags('Здоровье')),
+      ('Ходить в парк', healthRest),
+    ]);
+
+    await _tap(tester, find.text(l10n.tagsPanelResetConditions));
+    await _waitFor(
+      tester,
+      () => find.text(l10n.tagsPanelResetConditions).evaluate().isEmpty,
+    );
+
+    expect(_conditions(tester, page), isEmpty);
+    expect(_panelMarks(tester), everyElement(TagRowFilterMark.none));
+    await _expectResults(tester, page, [
+      ('Ходить в парк', healthRest),
+      ('Ходить в зал', l10n.intentionSummaryTags('Здоровье, Спорт, Отдых')),
+      ('Ходить до магазина', l10n.intentionSummaryTags('Здоровье')),
+      ('Ходить в парк', healthRest),
+    ]);
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const ValueKey('catalog-filter-field')))
+          .controller!
+          .text,
+      'ходить',
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Созданный в фильтре тег становится условием', (tester) async {
+    final app = await _App.pump(tester, const Locale('ru'));
+    final l10n = app.l10n;
+    const page = IntentionCatalogPage;
+    final assignmentsBefore = _assignments(app.raw);
+    await _openFilterPanel(tester);
+
+    await tester.enterText(
+      find.descendant(
+        of: find.byType(SearchField),
+        matching: find.byType(TextField),
+      ),
+      'Парк',
+    );
+    await tester.pump();
+    await _tap(tester, find.text(l10n.tagsPanelCreateTag('Парк')));
+    final createAction = find.widgetWithText(
+      FilledButton,
+      l10n.tagEditorCreateAction,
+    );
+    await _until(tester, createAction);
+    await tester.pumpAndSettle();
+    await _tap(tester, createAction);
+    await _waitFor(
+      tester,
+      () =>
+          _panelNames(tester).firstOrNull == 'Парк' &&
+          _panelMarks(tester).first == TagRowFilterMark.mustBePresent,
+    );
+    await tester.pumpAndSettle();
+
+    expect(_panelNames(tester), ['Парк', 'Здоровье', 'Спорт', 'Отдых']);
+    expect(_conditions(tester, page), ['Парк']);
+    await _until(tester, find.text(l10n.catalogTagConditionsEmpty));
+    expect(_results(tester, page), isEmpty);
+    // Создание в фильтре не назначает тег ни одному намерению.
+    expect(_assignments(app.raw), assignmentsBefore);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Удаление снимает условие и в другом открытом поиске', (
+    tester,
+  ) async {
+    final app = await _App.pump(tester, const Locale('ru'));
+    final l10n = app.l10n;
+    const catalog = IntentionCatalogPage;
+    const actions = DailyChoiceActionPickerPage;
+    final healthRest = l10n.intentionSummaryTags('Здоровье, Отдых');
+    final health = l10n.intentionSummaryTags('Здоровье');
+    await _addCondition(tester, l10n, _sport, present: true);
+    await _expectResults(tester, catalog, [
+      ('Ходить в зал', l10n.intentionSummaryTags('Здоровье, Спорт, Отдых')),
+    ]);
+    await openQuickCreation(
+      tester,
+      QuickCreationMode.dailyChoice,
+      openedPage: find.byType(QuickCreationDailyChoiceStartSheet),
+      wait: _until,
+    );
+    await chooseQuickCreationDailyChoiceStart(
+      tester,
+      ChoicePathDraftDirection.bottomUp,
+      openedPage: find.byKey(const ValueKey('daily-choice-action-filter')),
+      wait: _until,
+    );
+    await _addCondition(tester, l10n, _sport, present: false);
+    expect(_conditions(tester, actions), [
+      l10n.intentionTagConditionAbsent('Спорт'),
+    ]);
+
+    await _openFilterPanel(tester);
+    await _chooseFromMenu(tester, _panelRow(_sport), l10n.tagsPanelDeleteTag);
+    await _tap(tester, find.text(l10n.tagsPanelDeleteConfirm));
+    await _waitFor(tester, () => _panelRow(_sport).evaluate().isEmpty);
+    await _closeFilterPanel(tester, l10n);
+
+    expect(_conditions(tester, actions), isEmpty);
+    await _expectResults(tester, actions, [
+      ('Ходить в зал', healthRest),
+      ('Ходить до магазина', health),
+      ('Ходить в парк', healthRest),
+    ]);
+    await _closeTop(tester, actions);
+    expect(_conditions(tester, catalog), isEmpty);
+    await _expectResults(tester, catalog, [
+      ('Ходить в парк', healthRest),
+      ('Гулять без тегов', l10n.intentionSummaryNoTags),
+      ('Читать в тишине', healthRest),
+      ('Ходить в зал', healthRest),
+      ('Ходить до магазина', health),
+      ('Ходить в парк', healthRest),
+    ]);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Перестановка меняет порядок во всех представлениях', (
+    tester,
+  ) async {
+    final app = await _App.pump(tester, const Locale('ru'));
+    final l10n = app.l10n;
+    const page = IntentionCatalogPage;
+    final positionsBefore = _positions(app.raw);
+    // У «Читать в тишине» назначены «Здоровье» и «Отдых», но не «Спорт».
+    await _tap(tester, find.text('Читать в тишине'));
+    await _openPanel(tester, l10n);
+
+    await _dragToFirst(tester, _panelRow(_rest));
+    await _waitFor(tester, () => _positions(app.raw) != positionsBefore);
+    await tester.pumpAndSettle();
+    expect(_panelNames(tester), ['Отдых', 'Здоровье', 'Спорт']);
+    // Перестановка меняет место только переставленного тега.
+    final positions = _positions(app.raw);
+    expect(
+      {...positions}..remove(tagFixtureId(_rest)),
+      {...positionsBefore}..remove(tagFixtureId(_rest)),
+    );
+    await _waitFor(
+      tester,
+      () =>
+          tester.getTopLeft(_assignmentRow(_rest)).dy <
+          tester.getTopLeft(_assignmentRow(_health)).dy,
+    );
+
+    await _closePanelAndPage(tester, l10n);
+    final restHealth = l10n.intentionSummaryTags('Отдых, Здоровье');
+    await _expectResults(tester, page, [
+      ('Ходить в парк', restHealth),
+      ('Гулять без тегов', l10n.intentionSummaryNoTags),
+      ('Читать в тишине', restHealth),
+      ('Ходить в зал', l10n.intentionSummaryTags('Отдых, Здоровье, Спорт')),
+      ('Ходить до магазина', l10n.intentionSummaryTags('Здоровье')),
+      ('Ходить в парк', restHealth),
+    ]);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 final class _App {
@@ -200,7 +476,6 @@ final class _App {
     _seed(raw);
     await tester.pumpWidget(MainApp(runtime: runtime));
     await openIntentionGraph(tester, waitFor: _until);
-    await _until(tester, find.byKey(const ValueKey('catalog-open-tags')));
     await _until(tester, find.byType(IntentionSummaryView));
     await tester.pumpAndSettle();
     return _App(raw, lookupAppLocalizations(locale));
@@ -216,10 +491,10 @@ void _seed(sqlite.Database database) {
       (_sport, 'Спорт'),
       (_rest, 'Отдых'),
     ]) {
-      database.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
-        tagFixtureId(number),
-        name,
-      ]);
+      database.execute(
+        'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+        [tagFixtureId(number), name, tagPositionKey(number)],
+      );
     }
     for (final (number, title, ready, archived, tags) in [
       (1, 'Ходить в парк', 1, 0, [_health, _rest]),
@@ -288,6 +563,12 @@ Map<String, List<List<Object?>>> _storedGraph(sqlite.Database raw) => {
         .toList(),
 };
 
+/// Назначения тегов хранилища в порядке записи.
+List<List<Object?>> _assignments(sqlite.Database raw) => raw
+    .select('SELECT * FROM tag_assignments ORDER BY rowid')
+    .map((row) => row.values.toList())
+    .toList();
+
 Object? _connectionChanges(sqlite.Database raw) =>
     raw.select('SELECT total_changes() AS count').single['count'];
 
@@ -350,27 +631,42 @@ Future<void> _expectResults(
   expect(_results(tester, page), expected);
 }
 
-/// Добавляет условие через экран поиска тега действием «Есть» или «Нет».
+/// Добавляет условие в панели фильтра: первое нажатие на тег требует его,
+/// второе исключает. Затем панель закрывается кнопкой «Готово».
 Future<void> _addCondition(
   WidgetTester tester,
+  AppLocalizations l10n,
   int tag, {
   required bool present,
 }) async {
+  await _openFilterPanel(tester);
+  await _cycle(tester, tag, TagRowFilterMark.mustBePresent);
+  if (!present) await _cycle(tester, tag, TagRowFilterMark.mustBeAbsent);
+  await _closeFilterPanel(tester, l10n);
+}
+
+/// Открывает панель фильтра кнопкой «+ Тег» и ждёт строк тегов.
+Future<void> _openFilterPanel(WidgetTester tester) async {
   await _tap(
     tester,
     find.byKey(const ValueKey('intention-tag-conditions-add')),
   );
-  final requirement = present ? 'mustBePresent' : 'mustBeAbsent';
-  await _tap(
-    tester,
-    find.byKey(
-      ValueKey('tag-condition-picker-$requirement-${tagFixtureId(tag)}'),
-    ),
-  );
-  await _waitFor(
-    tester,
-    () => find.byType(TagConditionPickerPage).evaluate().isEmpty,
-  );
+  await _until(tester, find.byType(TagRow));
+  await tester.pumpAndSettle();
+}
+
+/// Нажимает строку тега в панели фильтра и ждёт её отметки [mark].
+Future<void> _cycle(WidgetTester tester, int tag, TagRowFilterMark mark) async {
+  await _tap(tester, _panelRow(tag));
+  await _waitFor(tester, () => _panelMark(tester, tag) == mark);
+}
+
+Future<void> _closeFilterPanel(
+  WidgetTester tester,
+  AppLocalizations l10n,
+) async {
+  await _tap(tester, find.text(l10n.tagsPanelDone));
+  await _waitFor(tester, () => find.byType(TagRow).evaluate().isEmpty);
   await tester.pumpAndSettle();
 }
 
@@ -422,3 +718,85 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
   await tester.tap(finder);
   await tester.pump();
 }
+
+Future<void> _openPanel(WidgetTester tester, AppLocalizations l10n) async {
+  await _tap(
+    tester,
+    find.byKey(const ValueKey('tag-assignments-choose'), skipOffstage: false),
+  );
+  await _until(tester, find.text(l10n.tagsPanelDone));
+  await tester.pumpAndSettle();
+}
+
+/// Закрывает панель кнопкой «Готово», а страницу намерения — «назад».
+Future<void> _closePanelAndPage(
+  WidgetTester tester,
+  AppLocalizations l10n,
+) async {
+  await _tap(tester, find.text(l10n.tagsPanelDone));
+  await tester.pumpAndSettle();
+  await tester.binding.handlePopRoute();
+  await _waitFor(
+    tester,
+    () => find.byType(TagAssignmentsSection).evaluate().isEmpty,
+  );
+  await tester.pumpAndSettle();
+}
+
+/// Удерживает строку панели и выбирает пункт меню тега.
+Future<void> _chooseFromMenu(
+  WidgetTester tester,
+  Finder row,
+  String action,
+) async {
+  await _until(tester, row);
+  await tester.longPress(row);
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(action));
+  await tester.pumpAndSettle();
+}
+
+/// Перетаскивает строку панели за ручку выше первой строки и отпускает её.
+Future<void> _dragToFirst(WidgetTester tester, Finder row) async {
+  final grip = find.descendant(
+    of: row,
+    matching: find.byWidgetPredicate(
+      (widget) => widget is DoableIcon && widget.icon == DoableIconData.grip,
+    ),
+  );
+  final first = find.byType(TagRow).first;
+  final distance = tester.getTopLeft(first).dy - tester.getCenter(grip).dy - 20;
+  final drag = await tester.startGesture(tester.getCenter(grip));
+  for (var step = 0; step < 10; step++) {
+    await drag.moveBy(Offset(0, distance / 10));
+    await tester.pump();
+  }
+  await drag.up();
+  await tester.pumpAndSettle();
+}
+
+Finder _panelRow(int tag) =>
+    find.byKey(ValueKey('tags-panel-row-${tagFixtureId(tag)}'));
+
+Finder _assignmentRow(int tag) =>
+    find.byKey(ValueKey('tag-assignment-row-${tagFixtureId(tag)}'));
+
+List<String> _panelNames(WidgetTester tester) => [
+  for (final row in tester.widgetList<TagRow>(find.byType(TagRow))) row.name,
+];
+
+List<TagRowMark> _panelMarks(WidgetTester tester) => [
+  for (final row in tester.widgetList<TagRow>(find.byType(TagRow))) row.mark,
+];
+
+TagRowMark _panelMark(WidgetTester tester, int tag) => tester
+    .widget<TagRow>(
+      find.descendant(of: _panelRow(tag), matching: find.byType(TagRow)),
+    )
+    .mark;
+
+/// Места тегов хранилища по их идентификаторам.
+Map<String, String> _positions(sqlite.Database raw) => {
+  for (final row in raw.select('SELECT id, position FROM tags'))
+    row['id'] as String: row['position'] as String,
+};

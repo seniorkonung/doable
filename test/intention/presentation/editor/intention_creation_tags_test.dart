@@ -20,6 +20,7 @@ import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
+import 'package:doable/src/tag/domain/tag_position.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -28,15 +29,16 @@ import '../../../support/app_root_pages.dart';
 import '../../../support/quick_creation.dart';
 import '../catalog/catalog_test_support.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
+import '../../../support/tag_positions.dart';
 
-/// Показ актуальности выбранных тегов в панели создания и исправление их
-/// отсутствия.
+/// Показ актуальности и ручного порядка выбранных тегов в панели создания и
+/// отказ создания из-за удалённых тегов.
 ///
 /// Сценарии идут на английском; русские состояния тегов проверяет
-/// сценарий исправления отсутствующих тегов.
+/// сценарий доступности.
 ///
 /// Наблюдение каждого выбранного тега управляется тестом, поэтому проверки
-/// задают загрузку, переименование, отсутствие и отказ чтения. Теги
+/// задают загрузку, переименование, перестановку и отказ чтения. Теги
 /// добавляются через контракт набора сессии, как это делает общий выбор.
 void main() {
   setUp(() {
@@ -134,12 +136,48 @@ void main() {
     },
   );
 
-  testWidgets('подтверждённое отсутствие сохраняет тег с последним названием, '
-      'признаком удаления и явным снятием, а одноимённый новый тег его не '
-      'заменяет', (tester) async {
+  testWidgets(
+    'выбранные теги идут в ручном порядке независимо от порядка добавления, '
+    'а подтверждённая перестановка меняет только их показ',
+    (tester) async {
+      final observations = _TagObservations();
+      final sessions = _EditorSessions();
+      final repository = ControlledCatalogRepository()
+        ..tagObservations = observations.watch;
+      await _openEditor(tester, repository, observers: [sessions]);
+      sessions.notifier(tester).draftTagSet
+        ..add(_tag(3, 'Сад'))
+        ..add(_tag(1, 'Дом'))
+        ..add(_tag(2, 'Работа'));
+      await tester.pumpAndSettle();
+
+      expect(_chipOrder(tester, [1, 2, 3]), ['Дом', 'Работа', 'Сад']);
+
+      // «Сад» переставлен в начало ручного порядка.
+      observations.emit(
+        _tagId(3),
+        _tag(3, 'Сад', position: tagPositionAt(0)),
+        revision: 1,
+      );
+      await tester.pumpAndSettle();
+
+      expect(_chipOrder(tester, [1, 2, 3]), ['Сад', 'Дом', 'Работа']);
+      expect(sessions.state(tester).draft.tagIds, [
+        _tagId(3),
+        _tagId(1),
+        _tagId(2),
+      ]);
+      expect(repository.commands, isEmpty);
+    },
+  );
+
+  testWidgets('устранимый отказ наблюдения показывает причину и предлагает '
+      'доступный повтор, который заново наблюдает тег без изменения набора', (
+    tester,
+  ) async {
     final semantics = tester.ensureSemantics();
-    for (final (locale, deleted, remove) in [
-      (const Locale('en'), 'Tag deleted', 'Remove tag Дом from draft'),
+    for (final (locale, failed, retry) in [
+      (const Locale('en'), "Couldn't check tag", 'Check tag Дом again'),
     ]) {
       final observations = _TagObservations();
       final sessions = _EditorSessions();
@@ -151,127 +189,48 @@ void main() {
         locale: locale,
         observers: [sessions],
       );
-      final tagSet = sessions.notifier(tester).draftTagSet;
 
-      tagSet.add(_tag(1, 'Дом'));
+      sessions.notifier(tester).draftTagSet.add(_tag(1, 'Дом'));
       await tester.pumpAndSettle();
-      observations.emit(_tagId(1), _tag(1, 'Дом'), revision: 1);
-      await tester.pumpAndSettle();
-      observations.emit(_tagId(1), null, revision: 2);
+      observations.fail(_tagId(1), const TagReadUnavailableFailure());
       await tester.pumpAndSettle();
 
       expect(_chipName(tester, 1), 'Дом');
-      expect(_statusText(tester, 1), deleted);
-      expect(find.byKey(_chipRetry(1)), findsNothing);
+      expect(_statusText(tester, 1), failed);
       expect(
         tester.getSemantics(find.byKey(_chip(1))),
-        isSemantics(label: 'Дом\n$deleted'),
+        isSemantics(label: 'Дом\n$failed'),
       );
       expect(
-        tester.getSemantics(find.byKey(_chipRemove(1))),
+        tester.getSemantics(find.byKey(_chipRetry(1))),
         isSemantics(
-          tooltip: remove,
+          tooltip: retry,
           isButton: true,
           hasEnabledState: true,
           isEnabled: true,
           hasTapAction: true,
         ),
       );
-      expect(sessions.state(tester).draft.tagIds, [_tagId(1)]);
 
-      // Одноимённый тег с другим идентификатором — отдельный выбор.
-      tagSet.add(_tag(2, 'Дом'));
-      await tester.pumpAndSettle();
-      observations.emit(_tagId(2), _tag(2, 'Дом'), revision: 3);
+      await tester.tap(find.byKey(_chipRetry(1)));
       await tester.pumpAndSettle();
 
-      expect(sessions.state(tester).draft.tagIds, [_tagId(1), _tagId(2)]);
+      expect(find.byKey(_chipLoading(1)), findsOneWidget);
+      expect(find.byKey(_chipRetry(1)), findsNothing);
+
+      observations.emit(_tagId(1), _tag(1, 'Дом'), revision: 1);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(_chipStatus(1)), findsNothing);
+      expect(find.byKey(_chipLoading(1)), findsNothing);
       expect(_chipName(tester, 1), 'Дом');
-      expect(_statusText(tester, 1), deleted);
-      expect(_chipName(tester, 2), 'Дом');
-      expect(find.byKey(_chipStatus(2)), findsNothing);
-
-      // Удалённый тег уходит из черновика только явным снятием.
-      await tester.tap(find.byKey(_chipRemove(1)));
-      await tester.pumpAndSettle();
-
-      expect(sessions.state(tester).draft.tagIds, [_tagId(2)]);
-      expect(find.byKey(_chip(1)), findsNothing);
-      expect(_chipName(tester, 2), 'Дом');
+      expect(sessions.state(tester).draft.tagIds, [_tagId(1)]);
       expect(repository.commands, isEmpty);
       expect(repository.tagCommands, isEmpty);
       await tester.pumpWidget(const SizedBox.shrink());
     }
     semantics.dispose();
   });
-
-  testWidgets(
-    'устранимый отказ наблюдения не выдаётся за удаление и предлагает '
-    'доступный повтор, который заново наблюдает тег без изменения набора',
-    (tester) async {
-      final semantics = tester.ensureSemantics();
-      for (final (locale, failed, retry, deleted) in [
-        (
-          const Locale('en'),
-          "Couldn't check tag",
-          'Check tag Дом again',
-          'Tag deleted',
-        ),
-      ]) {
-        final observations = _TagObservations();
-        final sessions = _EditorSessions();
-        final repository = ControlledCatalogRepository()
-          ..tagObservations = observations.watch;
-        await _openEditor(
-          tester,
-          repository,
-          locale: locale,
-          observers: [sessions],
-        );
-
-        sessions.notifier(tester).draftTagSet.add(_tag(1, 'Дом'));
-        await tester.pumpAndSettle();
-        observations.fail(_tagId(1), const TagReadUnavailableFailure());
-        await tester.pumpAndSettle();
-
-        expect(_chipName(tester, 1), 'Дом');
-        expect(_statusText(tester, 1), failed);
-        expect(find.text(deleted), findsNothing);
-        expect(
-          tester.getSemantics(find.byKey(_chip(1))),
-          isSemantics(label: 'Дом\n$failed'),
-        );
-        expect(
-          tester.getSemantics(find.byKey(_chipRetry(1))),
-          isSemantics(
-            tooltip: retry,
-            isButton: true,
-            hasEnabledState: true,
-            isEnabled: true,
-            hasTapAction: true,
-          ),
-        );
-
-        await tester.tap(find.byKey(_chipRetry(1)));
-        await tester.pumpAndSettle();
-
-        expect(find.byKey(_chipLoading(1)), findsOneWidget);
-        expect(find.byKey(_chipRetry(1)), findsNothing);
-
-        observations.emit(_tagId(1), _tag(1, 'Дом'), revision: 1);
-        await tester.pumpAndSettle();
-
-        expect(find.byKey(_chipStatus(1)), findsNothing);
-        expect(find.byKey(_chipLoading(1)), findsNothing);
-        expect(_chipName(tester, 1), 'Дом');
-        expect(sessions.state(tester).draft.tagIds, [_tagId(1)]);
-        expect(repository.commands, isEmpty);
-        expect(repository.tagCommands, isEmpty);
-        await tester.pumpWidget(const SizedBox.shrink());
-      }
-      semantics.dispose();
-    },
-  );
 
   for (final (failure, en) in [
     (
@@ -285,7 +244,7 @@ void main() {
   ]) {
     testWidgets(
       'неповторяемый отказ наблюдения ${failure.runtimeType} показывает '
-      'причину без повтора и удаления и сохраняет явное снятие',
+      'причину без повтора и сохраняет явное снятие',
       (tester) async {
         final semantics = tester.ensureSemantics();
         for (final (locale, message) in [(const Locale('en'), en)]) {
@@ -328,124 +287,35 @@ void main() {
   }
 
   testWidgets(
-    'отказ создания из-за удалённых тегов объясняет исправление и отмечает '
-    'именно их, сохраняет набор до явной правки, а исправление не отправляет '
-    'сохранение повторно',
+    'отказ создания из-за удалённых тегов объясняет удаление, убирает именно '
+    'их из набора и снова разрешает только явную отправку',
     (tester) async {
       final semantics = tester.ensureSemantics();
-      for (final (locale, explanation, fix, deleted, save) in [
-        (
-          const Locale('en'),
-          '2 selected tags were deleted from the catalog. Remove them from '
-              'the draft to save the intention.',
-          'Remove deleted tags',
-          'Tag deleted',
-          'Save',
-        ),
-      ]) {
-        final observations = _TagObservations();
-        final sessions = _EditorSessions();
-        final repository = ControlledCatalogRepository()
-          ..tagObservations = observations.watch;
-        await _openEditor(
-          tester,
-          repository,
-          locale: locale,
-          observers: [sessions],
-        );
-        final tagSet = sessions.notifier(tester).draftTagSet;
-        for (final (number, name) in [(1, 'Дом'), (2, 'Работа'), (3, 'Сад')]) {
-          tagSet.add(_tag(number, name));
-          await tester.pumpAndSettle();
-          // Наблюдение ещё видит теги: отсутствие подтверждает только
-          // проверка при сохранении.
-          observations.emit(_tagId(number), _tag(number, name), revision: 1);
-          await tester.pumpAndSettle();
-        }
-        await tester.enterText(find.byKey(_title), 'Намерение');
-        await tester.pumpAndSettle();
-
-        await tester.tap(find.byKey(_submit));
-        await tester.pumpAndSettle();
-        expect(repository.commands, hasLength(1));
-        repository.completeCommand(
-          0,
-          ResultFailure(
-            IntentionCreationTagsMissingFailure([_tagId(1), _tagId(3)]),
-          ),
-        );
-        await tester.pumpAndSettle();
-
-        expect(
-          tester.getSemantics(find.byKey(_failure)),
-          isSemantics(label: explanation, isLiveRegion: true),
-        );
-        expect(_statusText(tester, 1), deleted);
-        expect(find.byKey(_chipStatus(2)), findsNothing);
-        expect(_statusText(tester, 3), deleted);
-        expect(sessions.state(tester).draft.tagIds, [
-          _tagId(1),
-          _tagId(2),
-          _tagId(3),
-        ]);
-        expect(_submitButton(tester).onPressed, isNull);
-        expect(
-          tester.getSemantics(find.byKey(_removeMissing)),
-          isSemantics(
-            label: fix,
-            isButton: true,
-            hasEnabledState: true,
-            isEnabled: true,
-            hasTapAction: true,
-          ),
-        );
-
-        // Правка, которая не снимает удалённые теги, отказ не снимает.
-        await tester.enterText(find.byKey(_title), 'Другое намерение');
-        await tester.pumpAndSettle();
-        await tester.tap(find.byKey(_chipRemove(2)));
-        await tester.pumpAndSettle();
-        expect(sessions.state(tester).draft.tagIds, [_tagId(1), _tagId(3)]);
-        expect(find.byKey(_failure), findsOneWidget);
-        expect(_submitButton(tester).onPressed, isNull);
-
-        await tester.tap(find.byKey(_removeMissing));
-        await tester.pumpAndSettle();
-
-        expect(sessions.state(tester).draft.tagIds, isEmpty);
-        expect(find.byKey(_failure), findsNothing);
-        expect(find.byKey(_removeMissing), findsNothing);
-        expect(find.text(save), findsOneWidget);
-        expect(_submitButton(tester).onPressed, isNotNull);
-        await tester.pumpAndSettle();
-        expect(repository.commands, hasLength(1));
-        expect(repository.tagCommands, isEmpty);
-        await tester.pumpWidget(const SizedBox.shrink());
-      }
-      semantics.dispose();
-    },
-  );
-
-  testWidgets(
-    'после явного снятия каждого удалённого тега сохранение отправляет '
-    'только оставшийся набор и только по нажатию',
-    (tester) async {
       final observations = _TagObservations();
       final sessions = _EditorSessions();
       final repository = ControlledCatalogRepository()
         ..tagObservations = observations.watch;
       await _openEditor(tester, repository, observers: [sessions]);
       final tagSet = sessions.notifier(tester).draftTagSet;
-      tagSet
-        ..add(_tag(1, 'Дом'))
-        ..add(_tag(2, 'Работа'));
-      await tester.pumpAndSettle();
+      for (final (number, name) in [(1, 'Дом'), (2, 'Работа'), (3, 'Сад')]) {
+        tagSet.add(_tag(number, name));
+        await tester.pumpAndSettle();
+        // Наблюдение ещё видит теги: отсутствие подтверждает только проверка
+        // при сохранении.
+        observations.emit(_tagId(number), _tag(number, name), revision: 1);
+        await tester.pumpAndSettle();
+      }
       await tester.enterText(find.byKey(_title), 'Намерение');
+      await tester.pumpAndSettle();
+
       await tester.tap(find.byKey(_submit));
       await tester.pumpAndSettle();
+      expect(repository.commands, hasLength(1));
       repository.completeCommand(
         0,
-        ResultFailure(IntentionCreationTagsMissingFailure([_tagId(1)])),
+        ResultFailure(
+          IntentionCreationTagsMissingFailure([_tagId(1), _tagId(3)]),
+        ),
       );
       await tester.pumpAndSettle();
 
@@ -453,17 +323,18 @@ void main() {
         tester.getSemantics(find.byKey(_failure)),
         isSemantics(
           label:
-              'A selected tag was deleted from the catalog. Remove it from '
-              'the draft to save the intention.',
+              '2 selected tags were deleted from the catalog and removed from '
+              'the draft. Save the intention again.',
+          isLiveRegion: true,
         ),
       );
-      expect(find.text('Remove deleted tag'), findsOneWidget);
-      expect(_statusText(tester, 1), 'Tag deleted');
-
-      await tester.tap(find.byKey(_chipRemove(1)));
-      await tester.pumpAndSettle();
-
-      expect(find.byKey(_failure), findsNothing);
+      expect(find.byKey(_chip(1)), findsNothing);
+      expect(_chipName(tester, 2), 'Работа');
+      expect(find.byKey(_chip(3)), findsNothing);
+      expect(sessions.state(tester).draft.tagIds, [_tagId(2)]);
+      expect(find.text('Save'), findsOneWidget);
+      expect(_submitButton(tester).onPressed, isNotNull);
+      // Отказ не повторяет сохранение сам.
       expect(repository.commands, hasLength(1));
 
       await tester.tap(find.byKey(_submit));
@@ -472,16 +343,17 @@ void main() {
       expect(repository.commands, hasLength(2));
       expect(
         repository.commands.last,
-        isA<CreateIntention>().having((command) => command.tagIds, 'теги', [
-          _tagId(2),
-        ]),
+        isA<CreateIntention>()
+            .having((command) => command.title, 'название', 'Намерение')
+            .having((command) => command.tagIds, 'теги', [_tagId(2)]),
       );
+      expect(repository.tagCommands, isEmpty);
+      semantics.dispose();
     },
   );
 
   testWidgets(
-    'состояния выбранных тегов, их снятие, повтор проверки и исправление '
-    'удалённых тегов доступны',
+    'состояния выбранных тегов, их снятие и повтор проверки доступны',
     (tester) async {
       final semantics = tester.ensureSemantics();
 
@@ -507,21 +379,13 @@ void main() {
         ..add(_tag(4, 'Дача'));
       await tester.pumpAndSettle();
       observations
-        ..emit(_tagId(1), null, revision: 1)
+        ..emit(_tagId(1), _tag(1, longName.trim()), revision: 1)
         ..fail(_tagId(2), const TagReadUnavailableFailure())
         ..fail(_tagId(3), const TagReadCorruptionFailure());
       await tester.pumpAndSettle();
-      await tester.enterText(find.byKey(_title), 'Намерение');
-      await tester.tap(find.byKey(_submit));
-      await tester.pumpAndSettle();
-      repository.completeCommand(
-        0,
-        ResultFailure(IntentionCreationTagsMissingFailure([_tagId(1)])),
-      );
-      await tester.pumpAndSettle();
 
       expect(tester.takeException(), isNull);
-      expect(_statusText(tester, 1), 'Тег удалён');
+      expect(find.byKey(_chipStatus(1)), findsNothing);
       expect(_statusText(tester, 2), 'Не удалось проверить тег');
       expect(_statusText(tester, 3), 'Данные тега повреждены');
       expect(find.byKey(_chipLoading(4)), findsOneWidget);
@@ -533,7 +397,6 @@ void main() {
         _chipRemove(2),
         _chipRemove(3),
         _chipRemove(4),
-        _removeMissing,
       ]) {
         await tester.ensureVisible(find.byKey(target));
         await tester.pumpAndSettle();
@@ -560,7 +423,6 @@ void main() {
 const _title = ValueKey('intention-editor-title');
 const _submit = ValueKey('intention-editor-submit');
 const _failure = ValueKey('intention-editor-failure');
-const _removeMissing = ValueKey('intention-editor-remove-missing-tags');
 
 ValueKey<String> _chip(int number) =>
     ValueKey('intention-editor-tag-${_tagId(number).toCanonicalString()}');
@@ -584,6 +446,20 @@ ValueKey<String> _chipLoading(int number) => ValueKey(
   'intention-editor-tag-loading-${_tagId(number).toCanonicalString()}',
 );
 
+/// Показанные названия выбранных тегов [numbers] в порядке чтения.
+List<String?> _chipOrder(WidgetTester tester, List<int> numbers) {
+  final chips =
+      [
+        for (final number in numbers)
+          (number: number, at: tester.getTopLeft(find.byKey(_chip(number)))),
+      ]..sort(
+        (a, b) => a.at.dy == b.at.dy
+            ? a.at.dx.compareTo(b.at.dx)
+            : a.at.dy.compareTo(b.at.dy),
+      );
+  return [for (final chip in chips) _chipName(tester, chip.number)];
+}
+
 /// Показанное название выбранного тега.
 String? _chipName(WidgetTester tester, int number) =>
     tester.widget<Text>(find.byKey(_chipNameKey(number))).data;
@@ -595,8 +471,13 @@ String? _statusText(WidgetTester tester, int number) =>
 FilledButton _submitButton(WidgetTester tester) =>
     tester.widget<FilledButton>(find.byKey(_submit));
 
-Tag _tag(int number, String name, {TagColor? color}) =>
-    Tag(id: _tagId(number), name: TagName.fromInput(name), color: color);
+Tag _tag(int number, String name, {TagColor? color, TagPosition? position}) =>
+    Tag(
+      id: _tagId(number),
+      name: TagName.fromInput(name),
+      color: color,
+      position: position ?? tagPositionAt(number),
+    );
 
 TagId _tagId(int number) => switch (TagId.decode(
   '018f47c2-6b7d-7abc-8def-${number.toString().padLeft(12, '0')}',

@@ -5,6 +5,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_revision.dart';
 import '../../../graph/application/personal_graph_repository_provider.dart';
+import '../../../tag/application/tag_change.dart';
 import '../../../tag/application/tag_read_result.dart';
 import '../../../tag/domain/tag.dart';
 import '../../../tag/domain/tag_id.dart';
@@ -29,8 +30,8 @@ part 'intention_editor_view_model.g.dart';
 ///
 /// Все способы ухода обращаются к единому решению [requestClose]: неизменённый
 /// черновик закрывается сразу, изменённый — после одного подтверждения,
-/// связанного с ключом сессии и состоянием отправки. Переходы в выбор и
-/// редактор тегов сессию не завершают. Закрытие не отменяет принятую отправку:
+/// связанного с ключом сессии и состоянием отправки. Панель тегов и лист тега
+/// поверх формы сессию не завершают. Закрытие не отменяет принятую отправку:
 /// её будущий результат переходит общей поверхности.
 ///
 /// Отказ сохраняет весь черновик без нормализации. Право предъявления
@@ -48,19 +49,27 @@ part 'intention_editor_view_model.g.dart';
 ///
 /// Проекцию выбранных тегов сессия поддерживает собственным наблюдением
 /// `watchTag` каждого выбранного идентификатора. Наблюдение меняет только
-/// проекцию, не отправляет команд графа и освобождается при снятии тега и
-/// завершении сессии.
+/// проекцию, не отправляет команд графа и освобождается, когда тег уходит из
+/// набора, и при завершении сессии. Тег, удаление которого подтвердил пакет
+/// координатора или наблюдение, уходит из набора при любом состоянии его
+/// наблюдения; во время отправки — после её результата, потому что до него
+/// черновик зафиксирован.
 @riverpod
 final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
   late GraphCommandCoordinator _coordinator;
   late IntentionCreationFormKey _formKey;
   late TagReadContract _tagReads;
   late _SessionDraftTagSet _draftTagSet;
+  StreamSubscription<GraphCommandCompletion>? _completions;
   IntentionOperationToken? _activeToken;
 
   /// Право ошибки, которое публикует текущее состояние сессии.
   GraphInitiatorPresentationClaim? _publishedFailureClaim;
   final _tagObservations = <TagId, _DraftTagObservation>{};
+
+  /// Выбранные теги, удаление которых во время отправки подтвердил пакет
+  /// координатора или наблюдение; они уходят из набора после её результата.
+  final _tagsDeletedDuringSubmission = <TagId>{};
   var _tagObservationGeneration = 0;
 
   @override
@@ -71,8 +80,9 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
     const initial = IntentionEditorState.initial();
     final draftTagSet = _draftTagSet = _SessionDraftTagSet(
       this,
-      initial.draftTagSet,
+      initial.draft.tagIds,
     );
+    _completions = _coordinator.completions.listen(_onCompletion);
     listenSelf((previous, next) {
       _publishFailureClaim(next.failurePresentation);
       if (previous == null) {
@@ -81,16 +91,18 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
       switch (next.draftAvailability) {
         case IntentionDraftAvailability.editable ||
             IntentionDraftAvailability.submitting:
-          if (!identical(previous.draft.tagIds, next.draft.tagIds) ||
-              previous.draftAvailability != next.draftAvailability) {
-            draftTagSet._publish(next.draftTagSet);
+          if (!identical(previous.draft.tagIds, next.draft.tagIds)) {
+            draftTagSet._publish(next.draft.tagIds);
           }
+          _releaseTagObservationsOutside(next.draft.tagIds);
         case IntentionDraftAvailability.closed:
           draftTagSet._close();
           _releaseTagObservations();
+          _releaseCompletions();
       }
     });
     ref.onDispose(() {
+      _releaseCompletions();
       draftTagSet._close();
       _releaseTagObservations();
       final activeToken = _activeToken;
@@ -102,7 +114,7 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
     return initial;
   }
 
-  /// Контракт набора тегов этой сессии для общего выбора тегов.
+  /// Контракт набора тегов этой сессии для панели тегов.
   IntentionDraftTagSet get draftTagSet => _draftTagSet;
 
   void changeTitle(String value) {
@@ -120,7 +132,6 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
   void removeTag(TagId id) {
     if (_acceptsDraftChanges && state.draft.tagIds.contains(id)) {
       state = state.withoutTag(id);
-      _releaseTagObservation(id);
     }
   }
 
@@ -281,6 +292,7 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
           failurePresentation: _claimFailure(completion.token),
         ),
       };
+      _removeTagsDeletedDuringSubmission();
     } on Object {
       // Закрытая по запросу сессия уже передала результат общей поверхности.
       if (!ref.mounted || state.closing is IntentionCreationClosedOnRequest) {
@@ -294,7 +306,15 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
       state = state.withOperation(
         const OperationFailed<Intention>(IntentionUnexpectedFailure()),
       );
+      _removeTagsDeletedDuringSubmission();
     }
+  }
+
+  void _removeTagsDeletedDuringSubmission() {
+    if (_acceptsDraftChanges) {
+      state = state.withoutDeletedTags(_tagsDeletedDuringSubmission);
+    }
+    _tagsDeletedDuringSubmission.clear();
   }
 
   /// Завершает сессию по запросу закрытия, не отменяя принятую отправку.
@@ -348,22 +368,10 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
         IntentionDraftAvailability.closed => false,
       };
 
-  IntentionDraftTagAddition _addTag(Tag tag) {
-    if (!ref.mounted) {
-      return IntentionDraftTagAddition.sessionClosed;
-    }
-    switch (state.draftAvailability) {
-      case IntentionDraftAvailability.submitting:
-        return IntentionDraftTagAddition.submitting;
-      case IntentionDraftAvailability.closed:
-        return IntentionDraftTagAddition.sessionClosed;
-      case IntentionDraftAvailability.editable:
-        if (state.draft.tagIds.contains(tag.id)) {
-          return IntentionDraftTagAddition.alreadyIncluded;
-        }
-        state = state.withTag(tag);
-        _observeTag(tag.id);
-        return IntentionDraftTagAddition.added;
+  void _addTag(Tag tag) {
+    if (_acceptsDraftChanges && !state.draft.tagIds.contains(tag.id)) {
+      state = state.withTag(tag);
+      _observeTag(tag.id);
     }
   }
 
@@ -419,28 +427,60 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
         observation.revision = value.revision;
         // Новая ревизия без изменения тега не публикует проекцию заново.
         switch ((observed, tag.status)) {
-          case (null, IntentionDraftTagMissing()):
-            return;
-          case (final Tag current, IntentionDraftTagAvailable())
-              when current.name == tag.name && current.color == tag.color:
-            return;
           case (null, _):
-            state = state.withSelectedTag(
-              id,
-              tag.withStatus(const IntentionDraftTagMissing()),
-            );
+            _tagDeleted(id);
+          case (final Tag current, IntentionDraftTagAvailable())
+              when current.name == tag.name &&
+                  current.color == tag.color &&
+                  current.position == tag.position:
+            return;
           case (final Tag current, _):
             state = state.withSelectedTag(
               id,
               IntentionDraftTag(
                 name: current.name,
                 color: current.color,
+                position: current.position,
                 status: const IntentionDraftTagAvailable(),
               ),
             );
         }
       case TagReadError(:final failure):
         _tagObservationFailed(id, generation, failure);
+    }
+  }
+
+  /// Подтверждённое удаление выбранного тега действует независимо от
+  /// наблюдения, которое могло уже завершиться отказом. Удаление, которое
+  /// наблюдение уже применило, набор не меняет.
+  void _onCompletion(GraphCommandCompletion completion) {
+    if (!ref.mounted) {
+      return;
+    }
+    for (final change in completion.confirmedChange?.changes ?? const []) {
+      if (change case TagDeletedChange(:final tagId)
+          when state.draft.tagIds.contains(tagId)) {
+        _tagDeleted(tagId);
+      }
+    }
+  }
+
+  void _releaseCompletions() {
+    unawaited(_completions?.cancel());
+    _completions = null;
+  }
+
+  /// Удалённый тег не возвращается с прежним идентификатором, поэтому
+  /// наблюдение больше не нужно, а тег уходит из набора.
+  void _tagDeleted(TagId id) {
+    switch (state.draftAvailability) {
+      case IntentionDraftAvailability.editable:
+        state = state.withoutDeletedTags({id});
+      case IntentionDraftAvailability.submitting:
+        _releaseTagObservation(id);
+        _tagsDeletedDuringSubmission.add(id);
+      case IntentionDraftAvailability.closed:
+        return;
     }
   }
 
@@ -459,8 +499,7 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
     );
   }
 
-  /// Подтверждённое отсутствие окончательно и переживает окончание потока;
-  /// иное окончание без установленной причины — неизвестный отказ.
+  /// Окончание без установленной причины — неизвестный отказ.
   void _tagObservationEnded(TagId id, int generation) {
     final observation = _activeTagObservation(id, generation);
     final tag = state.selectedTags[id];
@@ -468,7 +507,7 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
       return;
     }
     switch (tag.status) {
-      case IntentionDraftTagMissing() || IntentionDraftTagReadFailed():
+      case IntentionDraftTagReadFailed():
         observation.release();
       case IntentionDraftTagLoading() || IntentionDraftTagAvailable():
         _tagObservationFailed(id, generation, const TagReadUnexpectedFailure());
@@ -491,6 +530,14 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
   void _releaseTagObservation(TagId id) =>
       _tagObservations.remove(id)?.release();
 
+  void _releaseTagObservationsOutside(Set<TagId> tagIds) {
+    for (final id in [..._tagObservations.keys]) {
+      if (!tagIds.contains(id)) {
+        _releaseTagObservation(id);
+      }
+    }
+  }
+
   void _releaseTagObservations() {
     for (final observation in _tagObservations.values) {
       observation.release();
@@ -506,45 +553,48 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
 }
 
 /// Контракт набора тегов, связанный с одним построением сессии: публикует
-/// изменения набора и его доступности, а после закрытия сессии публикует
-/// закрытое состояние, завершает поток и отвергает добавление.
+/// только смену набора идентификаторов, а после закрытия сессии завершает
+/// поток и отвергает изменения, даже если сессия построена заново.
 final class _SessionDraftTagSet implements IntentionDraftTagSet {
   _SessionDraftTagSet(this._session, this._current);
 
   final IntentionEditorViewModel _session;
-  final _changes = StreamController<IntentionDraftTagSetSnapshot>.broadcast();
-  IntentionDraftTagSetSnapshot _current;
+  final _changes = StreamController<Set<TagId>>.broadcast();
+  Set<TagId> _current;
   bool _isClosed = false;
 
   @override
-  IntentionDraftTagSetSnapshot get current => _current;
+  Set<TagId> get current => _current;
 
   @override
-  Stream<IntentionDraftTagSetSnapshot> get changes => _changes.stream;
+  Stream<Set<TagId>> get changes => _changes.stream;
 
   @override
-  IntentionDraftTagAddition add(Tag tag) => _isClosed
-      ? IntentionDraftTagAddition.sessionClosed
-      : _session._addTag(tag);
+  void add(Tag tag) {
+    if (!_isClosed) {
+      _session._addTag(tag);
+    }
+  }
 
-  void _publish(IntentionDraftTagSetSnapshot snapshot) {
+  @override
+  void remove(TagId tagId) {
+    if (!_isClosed) {
+      _session.removeTag(tagId);
+    }
+  }
+
+  void _publish(Set<TagId> tagIds) {
     if (_isClosed) {
       return;
     }
-    _current = snapshot;
-    _changes.add(snapshot);
+    _current = tagIds;
+    _changes.add(tagIds);
   }
 
   void _close() {
     if (_isClosed) {
       return;
     }
-    _publish(
-      IntentionDraftTagSetSnapshot(
-        tagIds: _current.tagIds,
-        availability: IntentionDraftAvailability.closed,
-      ),
-    );
     _isClosed = true;
     unawaited(_changes.close());
   }

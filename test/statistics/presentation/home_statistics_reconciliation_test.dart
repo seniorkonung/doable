@@ -23,6 +23,8 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/tag_positions.dart';
+
 void main() {
   test('скрытая модель не начинает чтений даже при смене условий', () async {
     final h = _Harness(visible: false);
@@ -545,6 +547,7 @@ final class _Harness {
     ) as TagIdDecodingSuccess).id,
     name: TagName.fromInput('Тег'),
     color: null,
+    position: tagPositionAt(1000),
   );
   late final ProviderContainer container;
   late final ProviderSubscription<HomeStatisticsState> subscription;
@@ -570,6 +573,7 @@ final class _Harness {
       id: _tag.id,
       name: TagName.fromInput('Тег $revision'),
       color: _tag.color,
+      position: _tag.position,
     );
     final stamp = _Revision(revision, epoch);
     reader.commandResult = TagCommandSucceeded(

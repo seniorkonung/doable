@@ -20,6 +20,8 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/tag_positions.dart';
+
 void main() {
   test(
     'каталоги с одинаковой начальной датой независимо читают разные '
@@ -439,6 +441,7 @@ final class _Harness {
     ) as TagIdDecodingSuccess).id,
     name: TagName.fromInput('Дом'),
     color: null,
+    position: tagPositionAt(1000),
   );
 
   DailyChoiceCalendarDayMarksViewModel get model =>
@@ -456,6 +459,7 @@ final class _Harness {
       id: _tag.id,
       name: unchanged ? _tag.name : TagName.fromInput('Тег $revision'),
       color: _tag.color,
+      position: _tag.position,
     );
     final graphRevision = _Revision(revision);
     repository.commandResult = failure

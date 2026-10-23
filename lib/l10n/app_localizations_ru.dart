@@ -494,18 +494,6 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось загрузить следующие намерения из-за непредвиденной ошибки.';
 
   @override
-  String get catalogRefreshUnavailable =>
-      'Список намерений не обновлён: не удалось получить изменения.';
-
-  @override
-  String get catalogRefreshCorruption =>
-      'Список намерений не обновлён: сохранённые данные повреждены.';
-
-  @override
-  String get catalogRefreshUnexpected =>
-      'Список намерений не обновлён из-за непредвиденной ошибки.';
-
-  @override
   String get catalogReady => 'Готово к действию';
 
   @override
@@ -1137,9 +1125,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get editorDraftTagChecking => 'Проверяем тег';
 
   @override
-  String get editorDraftTagMissing => 'Тег удалён';
-
-  @override
   String get editorDraftTagReadUnavailable => 'Не удалось проверить тег';
 
   @override
@@ -1160,19 +1145,8 @@ class AppLocalizationsRu extends AppLocalizations {
       count,
       locale: localeName,
       other:
-          'Удалено из каталога выбранных тегов: $count. Уберите их из черновика, чтобы сохранить намерение.',
-      one: 'Выбранный тег удалён из каталога. Уберите его из черновика, чтобы сохранить намерение.',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String editorRemoveMissingTags(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'Убрать удалённые теги',
-      one: 'Убрать удалённый тег',
+          'Удалено из каталога выбранных тегов: $count. Они убраны из черновика. Сохраните намерение ещё раз.',
+      one: 'Выбранный тег удалён из каталога и убран из черновика. Сохраните намерение ещё раз.',
     );
     return '$_temp0';
   }
@@ -1256,6 +1230,9 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get graphOperationTag => 'тег';
+
+  @override
+  String get graphOperationMoveTag => 'Перестановка';
 
   @override
   String get graphOperationAssignTag => 'Назначение';
@@ -1644,125 +1621,8 @@ class AppLocalizationsRu extends AppLocalizations {
   String get dataImportConfirm => 'Импортировать и заменить';
 
   @override
-  String get tagNavigationTitle => 'Намерения с тегом';
-
-  @override
-  String tagNavigationTag(String tagName) {
-    return 'Тег: $tagName';
-  }
-
-  @override
-  String get tagNavigationScope => 'Охват результатов';
-
-  @override
-  String get tagNavigationLoading => 'Загружаем намерения с тегом…';
-
-  @override
-  String get tagNavigationEmptyActive => 'С этим тегом нет активных намерений.';
-
-  @override
-  String get tagNavigationEmptyArchived =>
-      'С этим тегом нет архивированных намерений.';
-
-  @override
-  String get tagNavigationIntentionActive => 'Намерение, активно';
-
-  @override
-  String get tagNavigationIntentionArchived => 'Намерение, в архиве';
-
-  @override
-  String get tagNavigationOpenDetails => 'Открыть подробности';
-
-  @override
-  String get tagNavigationRefreshing =>
-      'Обновляем выдачу. Показанные данные могут быть устаревшими.';
-
-  @override
-  String get tagNavigationRefreshUnavailable =>
-      'Не удалось обновить выдачу. Показанные данные могут быть устаревшими. Повторите чтение.';
-
-  @override
-  String get tagNavigationRefreshCorruption =>
-      'Не удалось обновить выдачу: сохранённые данные повреждены. Показанные данные могут быть устаревшими.';
-
-  @override
-  String get tagNavigationRefreshUnexpected =>
-      'Не удалось обновить выдачу из-за непредвиденной ошибки. Показанные данные могут быть устаревшими.';
-
-  @override
-  String get tagNavigationMoreAvailable => 'Есть ещё намерения с этим тегом.';
-
-  @override
-  String get tagNavigationLoadMore => 'Показать ещё намерения';
-
-  @override
-  String get tagNavigationLoadingMore => 'Загружаем ещё намерения…';
-
-  @override
-  String get tagNavigationAllShown => 'Все намерения показаны.';
-
-  @override
-  String get tagNavigationUnavailable =>
-      'Не удалось загрузить намерения с тегом. Повторите попытку.';
-
-  @override
-  String get tagNavigationCorruption =>
-      'Сохранённые данные помеченных намерений повреждены и не могут быть показаны.';
-
-  @override
-  String get tagNavigationUnexpected =>
-      'Не удалось загрузить намерения с тегом из-за непредвиденной ошибки.';
-
-  @override
-  String get tagNavigationSnapshotExpired =>
-      'Список изменился. Откройте навигацию по тегу заново.';
-
-  @override
-  String get tagNavigationLoadMoreUnavailable =>
-      'Не удалось загрузить следующую порцию намерений.';
-
-  @override
-  String get tagNavigationLoadMoreCorruption =>
-      'Сохранённые данные повреждены; следующая порция намерений недоступна.';
-
-  @override
-  String get tagNavigationLoadMoreUnexpected =>
-      'Не удалось загрузить следующую порцию намерений из-за непредвиденной ошибки.';
-
-  @override
-  String get tagConditionPickerTitle => 'Тег для условия поиска';
-
-  @override
-  String get tagConditionPickerPresent => 'Есть';
-
-  @override
-  String get tagConditionPickerAbsent => 'Нет';
-
-  @override
-  String tagConditionPickerPresentNamed(String tagName) {
-    return 'Есть, $tagName';
-  }
-
-  @override
-  String tagConditionPickerAbsentNamed(String tagName) {
-    return 'Нет, $tagName';
-  }
-
-  @override
-  String get tagConditionPickerSelectedPresent => 'Уже выбран: должен быть';
-
-  @override
-  String get tagConditionPickerSelectedAbsent =>
-      'Уже выбран: должен отсутствовать';
-
-  @override
   String intentionTagConditionAbsent(String tagName) {
     return 'не $tagName';
-  }
-
-  @override
-  String intentionTagConditionDeleted(String condition) {
-    return '$condition (тег удалён)';
   }
 
   @override
@@ -1773,11 +1633,6 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String intentionTagConditionAbsentSemantics(String tagName) {
     return '$tagName, должен отсутствовать';
-  }
-
-  @override
-  String intentionTagConditionDeletedSemantics(String condition) {
-    return '$condition, тег удалён';
   }
 
   @override
@@ -1796,135 +1651,141 @@ class AppLocalizationsRu extends AppLocalizations {
   String get intentionTagConditionsAddSemantics => 'Добавить условие по тегу';
 
   @override
-  String get tagCatalogTitle => 'Теги';
+  String get tagsPanelTitle => 'Теги';
 
   @override
-  String get tagCatalogSelectionTitle => 'Выбор тега';
+  String get tagsPanelAssignmentHint => 'Выберите сколько нужно';
 
   @override
-  String get tagCatalogSearch => 'Поиск тегов';
+  String get tagsPanelFilterTitle => 'Фильтр по тегам';
 
   @override
-  String get tagCatalogClearSearch => 'Очистить поиск тегов';
+  String get tagsPanelFilterHint =>
+      'Нажмите, чтобы потребовать тег, ещё раз — чтобы исключить';
 
   @override
-  String get tagCatalogInvalidSearch =>
+  String get tagsPanelResetConditions => 'Сбросить';
+
+  @override
+  String get tagsPanelResetConditionsLabel => 'Сбросить условия по тегам';
+
+  @override
+  String tagsPanelFilterPresentLabel(String tagName) {
+    return '$tagName, должен быть';
+  }
+
+  @override
+  String tagsPanelFilterAbsentLabel(String tagName) {
+    return '$tagName, должен отсутствовать';
+  }
+
+  @override
+  String get tagsPanelSearchPlaceholder => 'Найти или создать тег';
+
+  @override
+  String get tagsPanelSearchLabel => 'Поиск тегов';
+
+  @override
+  String get tagsPanelClearSearch => 'Очистить поиск тегов';
+
+  @override
+  String get tagsPanelInvalidSearch =>
       'Недопустимые символы показаны как �. Ввод сохранён, но не применён; показаны результаты последнего корректного запроса.';
 
   @override
-  String get tagCatalogNoMatches => 'Теги не найдены';
+  String get tagsPanelDone => 'Готово';
 
   @override
-  String get tagCatalogAssigned => 'Назначен';
+  String get tagsPanelExpand => 'Раскрыть панель тегов';
 
   @override
-  String get tagCatalogAvailable => 'Доступен для назначения';
+  String get tagsPanelCollapse => 'Свернуть панель тегов';
 
   @override
-  String get tagCatalogAssign => 'Назначить тег';
+  String get tagsPanelLoading => 'Загружаем теги…';
 
   @override
-  String tagCatalogAssignNamed(String tagName) {
-    return 'Назначить тег «$tagName»';
-  }
+  String get tagsPanelLoadUnavailable => 'Не удалось загрузить теги.';
 
   @override
-  String get tagCatalogAssigning => 'Назначаем тег…';
-
-  @override
-  String get tagCatalogInDraft => 'В черновике';
-
-  @override
-  String get tagCatalogAvailableForDraft => 'Можно добавить';
-
-  @override
-  String get tagCatalogAddToDraft => 'Добавить';
-
-  @override
-  String get tagCatalogAddToDraftSemantic => 'Добавить тег в черновик';
-
-  @override
-  String tagCatalogAddToDraftNamed(String tagName) {
-    return 'Добавить тег «$tagName» в черновик';
-  }
-
-  @override
-  String get tagCatalogDraftSubmitting =>
-      'Намерение сохраняется, поэтому добавить теги сейчас нельзя.';
-
-  @override
-  String get tagCatalogDraftClosed =>
-      'Черновик закрыт, поэтому добавить теги нельзя.';
-
-  @override
-  String get tagCatalogLoading => 'Загружаем теги…';
-
-  @override
-  String get tagCatalogEmpty => 'Тегов пока нет.';
-
-  @override
-  String get tagCatalogUnavailable =>
-      'Не удалось загрузить теги. Повторите попытку.';
-
-  @override
-  String get tagCatalogCorruption =>
+  String get tagsPanelLoadCorruption =>
       'Сохранённые данные тегов повреждены и не могут быть показаны.';
 
   @override
-  String get tagCatalogUnexpected =>
+  String get tagsPanelLoadUnexpected =>
       'Не удалось загрузить теги из-за непредвиденной ошибки.';
 
   @override
-  String get tagCatalogRefreshing => 'Обновляем каталог тегов…';
+  String get tagsPanelRefreshUnavailable =>
+      'Не удалось обновить теги. Список может быть устаревшим.';
 
   @override
-  String get tagCatalogCreate => 'Создать тег';
+  String get tagsPanelRefreshCorruption =>
+      'Не удалось обновить теги: сохранённые данные повреждены. Список может быть устаревшим.';
 
   @override
-  String get tagCatalogRename => 'Изменить тег';
+  String get tagsPanelRefreshUnexpected =>
+      'Не удалось обновить теги из-за непредвиденной ошибки. Список может быть устаревшим.';
 
   @override
-  String get tagCatalogDelete => 'Удалить тег';
+  String get tagsPanelIntentionMissing => 'Этого намерения больше нет.';
 
   @override
-  String tagDeleteConfirmationTitle(String tagName) {
-    return 'Удалить тег «$tagName»?';
+  String get tagsPanelEmptyTitle => 'Тегов пока нет';
+
+  @override
+  String get tagsPanelEmptyText =>
+      'Введите название в поиске, чтобы создать первый';
+
+  @override
+  String tagsPanelCreateTag(String query) {
+    return 'Создать тег «$query»';
   }
 
   @override
-  String get tagDeleteConfirmationScope =>
-      'Тег и все его назначения активным и архивированным намерениям на момент выполнения будут удалены необратимо, включая незагруженные назначения. Сами намерения, связи, дневные выборы и их пути сохраняются.';
+  String tagsPanelTagMenu(String tagName) {
+    return 'Тег: $tagName';
+  }
 
   @override
-  String get tagDeleteCancel => 'Отмена';
+  String get tagsPanelTagHoldHint => 'Удерживайте, чтобы открыть действия тега';
 
   @override
-  String get tagDeleteConfirm => 'Удалить тег и назначения';
+  String get tagsPanelEditTag => 'Изменить тег';
 
   @override
-  String get tagDeleteAlreadyRunning =>
-      'Изменение этого тега уже выполняется. Дождитесь результата.';
+  String get tagsPanelDuplicateTag => 'Дублировать тег';
 
   @override
-  String get tagDeleteSaving => 'Удаляем тег и назначения…';
+  String get tagsPanelDeleteTag => 'Удалить тег';
 
   @override
-  String get tagCatalogSelected => 'Выбранный тег';
+  String get tagsPanelDeleteTitle => 'Удалить тег?';
 
   @override
-  String get tagCatalogAssignmentUnknown => 'Назначение ещё не проверено';
+  String get tagsPanelDeleteTextBefore => 'Будут необратимо удалены тег ';
+
+  @override
+  String get tagsPanelDeleteTextAfter =>
+      ' и все его назначения активным и архивированным намерениям. Сами намерения, связи, дневные выборы и их пути сохранятся.';
+
+  @override
+  String get tagsPanelDeleteCancel => 'Отмена';
+
+  @override
+  String get tagsPanelDeleteConfirm => 'Удалить';
+
+  @override
+  String get tagSheetNamePlaceholder => 'Название';
+
+  @override
+  String get tagSheetEditTitle => 'Изменить тег';
 
   @override
   String get tagEditorCreateTitle => 'Новый тег';
 
   @override
-  String get tagEditorRenameTitle => 'Изменение тега';
-
-  @override
   String get tagEditorNameLabel => 'Название тега';
-
-  @override
-  String get tagEditorNameLimit => 'Не более 255 отображаемых символов.';
 
   @override
   String get tagColorNone => 'Без цвета';
@@ -1974,65 +1835,6 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get tagEditorAlreadyRunning =>
       'Сохранение этого тега уже выполняется. Дождитесь результата.';
-
-  @override
-  String get tagEditorCancel => 'Отмена';
-
-  @override
-  String get tagEditorUseExisting => 'Использовать существующий тег';
-
-  @override
-  String get tagEditorReadingCommitted => 'Тег сохранён. Обновляем его данные…';
-
-  @override
-  String get tagEditorCommittedReadFailed =>
-      'Тег сохранён, но данные не удалось обновить.';
-
-  @override
-  String get tagEditorCommittedMissing =>
-      'Тег сохранён, но больше не найден. Обновите каталог.';
-
-  @override
-  String get tagEditorReadingExisting => 'Проверяем существующий тег…';
-
-  @override
-  String get tagEditorExistingMissing =>
-      'Существующего тега больше нет. Исправьте название или обновите каталог.';
-
-  @override
-  String get tagEditorReadUnavailable =>
-      'Не удалось прочитать тег. Повторите попытку.';
-
-  @override
-  String get tagEditorReadCorruption => 'Сохранённые данные тега повреждены.';
-
-  @override
-  String get tagEditorReadUnexpected =>
-      'Не удалось прочитать тег из-за непредвиденной ошибки.';
-
-  @override
-  String get tagCreated => 'Тег создан.';
-
-  @override
-  String get tagUpdated => 'Тег изменён.';
-
-  @override
-  String get tagUnchanged => 'Название тега не изменилось.';
-
-  @override
-  String get tagDeleted => 'Тег удалён вместе со всеми назначениями.';
-
-  @override
-  String get tagAssigned => 'Тег назначен.';
-
-  @override
-  String get tagAlreadyAssigned => 'Тег уже назначен.';
-
-  @override
-  String get tagAssignmentRemoved => 'Назначение тега снято.';
-
-  @override
-  String get tagAssignmentAlreadyAbsent => 'Назначение тега уже отсутствует.';
 
   @override
   String get tagAssignmentAlreadyRunning =>
@@ -2126,8 +1928,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get tagNameNonCanonical => 'Удалите пробелы по краям названия тега.';
 
   @override
-  String get tagNameOccupied =>
-      'Тег с таким названием уже есть. Выберите другое название или используйте существующий тег.';
+  String get tagNameOccupied => 'Тег с таким названием уже есть.';
 
   @override
   String get tagNotFound => 'Этого тега больше нет. Обновите каталог.';

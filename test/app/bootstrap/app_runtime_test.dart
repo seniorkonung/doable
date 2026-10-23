@@ -43,7 +43,6 @@ import '../../support/daily_choice_local_date.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_read_contract_test_fallback.dart';
 import '../../support/statistics_read_contract_test_fallback.dart';
-import '../../support/catalog_reconciliation_test_fallback.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 
 const _unsupportedSchemaVersion = AppDatabase.currentSchemaVersion + 1;
@@ -146,7 +145,13 @@ void main() {
       expect(
         await ready.container
             .read(personalGraphRepositoryProvider)
-            .execute(CreateTag(name: TagName.fromInput('Дом'), color: null)),
+            .execute(
+              CreateTag(
+                name: TagName.fromInput('Дом'),
+                color: null,
+                placement: TagPlacement.first,
+              ),
+            ),
         isA<GraphCommandSucceeded>(),
       );
 
@@ -329,10 +334,7 @@ CalendarDate _dateOf(DateTime moment) =>
     CalendarDate.fromParts(moment.year, moment.month, moment.day);
 
 final class _ControlledPersonalGraphRepository
-    with
-        StatisticsReadContractTestFallback,
-        TagReadContractTestFallback,
-        CatalogReconciliationTestFallback
+    with StatisticsReadContractTestFallback, TagReadContractTestFallback
     implements PersonalGraphRepository {
   @override
   Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(

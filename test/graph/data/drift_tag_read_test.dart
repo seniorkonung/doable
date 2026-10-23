@@ -18,6 +18,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
+import '../../support/tag_positions.dart';
 
 String _uuid(int number) =>
     '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}';
@@ -61,13 +62,12 @@ void main() {
   });
   tearDown(() => database.close());
 
-  void addTag(int number, String name, {String? color}) {
+  void addTag(int number, String name, {String? color, int? position}) {
     seedRawGraph(raw, () {
-      raw.execute('INSERT INTO tags (id, name, color) VALUES (?, ?, ?)', [
-        _uuid(number),
-        name,
-        color,
-      ]);
+      raw.execute(
+        'INSERT INTO tags (id, name, color, position) VALUES (?, ?, ?, ?)',
+        [_uuid(number), name, color, tagPositionKey(position ?? number)],
+      );
     });
   }
 
@@ -90,29 +90,38 @@ void main() {
     expect(() => loaded.items.clear(), throwsUnsupportedError);
   });
 
-  test('пустой каталог и полный снимок сохраняют порядок создания', () async {
+  test('пустой каталог и полный снимок идут в ручном порядке', () async {
     final empty = snapshot(
       await repository.getTagCatalog(const TagCatalogBrowseMode()),
     );
     expect(empty.items, isEmpty);
 
+    // Места обратны порядку создания и не следуют названиям.
     for (var number = 1; number <= 7; number++) {
-      addTag(number, 'Тег $number', color: number.isOdd ? 'blue' : null);
+      addTag(
+        number,
+        'Тег $number',
+        color: number.isOdd ? 'blue' : null,
+        position: 8 - number,
+      );
     }
     final loaded = snapshot(
       await repository.getTagCatalog(const TagCatalogBrowseMode()),
     );
     expect(loaded.items.map((tag) => tag.name.value), [
-      for (var number = 1; number <= 7; number++) 'Тег $number',
+      for (var number = 7; number >= 1; number--) 'Тег $number',
     ]);
     expect(loaded.items.map((tag) => tag.color), [
-      for (var number = 1; number <= 7; number++)
+      for (var number = 7; number >= 1; number--)
         number.isOdd ? TagColor.blue : null,
+    ]);
+    expect(loaded.items.map((tag) => tag.position.value), [
+      for (var index = 1; index <= 7; index++) tagPositionKey(index),
     ]);
   });
 
   test('общий декодер отличает пропущенный столбец цвета от SQL NULL', () {
-    final row = {'id': _uuid(1), 'name': 'Дом'};
+    final row = {'id': _uuid(1), 'name': 'Дом', 'position': 'a0'};
 
     expect(decodeStoredTag({...row, 'color': 'blue'}).color, TagColor.blue);
     expect(decodeStoredTag({...row, 'color': null}).color, isNull);
@@ -120,6 +129,30 @@ void main() {
       row,
       {...row, 'color': 'red'},
       {...row, 'color': 1},
+    ]) {
+      expect(
+        () => decodeStoredTag(invalid),
+        throwsA(isA<StoredGraphCorruption>()),
+        reason: 'Строка $invalid',
+      );
+    }
+  });
+
+  test('общий декодер принимает только каноническое место', () {
+    final row = {'id': _uuid(1), 'name': 'Дом', 'color': null};
+
+    expect(
+      decodeStoredTag({...row, 'position': 'Zz0V'}).position.value,
+      'Zz0V',
+    );
+    // Схема пропускает любой ключ из цифр и латинских букв, поэтому
+    // неканоническую форму отклоняет декодер.
+    for (final invalid in [
+      row,
+      {...row, 'position': null},
+      {...row, 'position': 1},
+      {...row, 'position': 'a00'},
+      {...row, 'position': 'b0'},
     ]) {
       expect(
         () => decodeStoredTag(invalid),
@@ -179,9 +212,10 @@ void main() {
       addTag(number, 'Тег $number');
     }
     seedRawGraph(raw, () {
-      raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+      raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
         'некорректный UUID',
         'Повреждённый',
+        'a0',
       ]);
     });
     final result = await repository.getTagCatalog(const TagCatalogBrowseMode());
@@ -215,7 +249,7 @@ void main() {
     await seedGraph(
       database,
       () => database.customUpdate(
-        "INSERT INTO tags (id, name, color) VALUES (?, ?, 'blue')",
+        "INSERT INTO tags (id, name, color, position) VALUES (?, ?, 'blue', 'a0')",
         variables: [Variable<String>(_uuid(1)), const Variable<String>('Дом')],
         updates: {database.tags},
       ),

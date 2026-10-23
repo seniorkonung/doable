@@ -40,6 +40,8 @@ import '../../../support/inline_text.dart';
 import '../../../support/quick_creation.dart';
 import 'catalog_test_support.dart';
 import 'catalog_reconciliation_test_support.dart';
+import '../../../support/tag_condition_cycles.dart';
+import '../../../support/tag_positions.dart';
 
 void main() {
   testWidgets('показывает загрузку до подтверждённой первой страницы', (
@@ -776,82 +778,6 @@ void main() {
     );
   });
 
-  testWidgets('массовое согласование после удаления исключённого тега '
-      'сохраняет экранное положение видимого намерения', (tester) async {
-    final repository = ControlledCatalogRepository();
-    final container = reconciliationCatalogContainer(repository);
-    addTearDown(container.dispose);
-    final health = _tag(1, 'Здоровье');
-    final rest = _tag(2, 'Отдых');
-    final items = _taggedSummaries([health], first: 60, last: 2, step: 2);
-    await _loadTaggedCatalog(
-      tester,
-      container,
-      repository,
-      IntentionTagFilter(
-        requiredTagIds: [health.id],
-        excludedTagIds: [rest.id],
-      ),
-      IntentionCatalogFirstPage(
-        items: items,
-        totalCount: items.length,
-        nextCursor: null,
-        revision: const TestCatalogRevision(1),
-      ),
-    );
-    // Перед видимым намерением откроется больше строк, чем помещается в
-    // построенную область списка.
-    final anchor = await _scrollToMiddle(tester, items, distance: 1800);
-    final positionBefore = _catalogScrollPosition(tester).pixels;
-    final loadingStates = _observeCatalogLoading(container);
-
-    await _completeCatalogWidgetTagCommand(
-      tester,
-      container,
-      repository,
-      DeleteTag(rest.id),
-      tagDeletionSuccess(
-        tagId: rest.id,
-        revision: const TestCatalogRevision(2),
-      ),
-    );
-    await _pumpUntilReconciliationQueries(tester, repository, 1);
-
-    // Ожидание чтения согласования не заменяет загруженный список.
-    expect(
-      _catalogScrollPosition(tester).pixels,
-      moreOrLessEquals(positionBefore, epsilon: 0.01),
-    );
-    expect(
-      _catalogTileTop(tester, anchor.title),
-      moreOrLessEquals(anchor.top, epsilon: 0.01),
-    );
-
-    final missing = _taggedSummaries([health], first: 59, last: 1, step: 2);
-    repository.completeReconciliation(
-      0,
-      reconciliationFirstPortion(
-        missing,
-        totalCount: items.length + missing.length,
-        revision: 2,
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    final current = _loadedCatalog(container);
-    expect(current.items, hasLength(items.length + missing.length));
-    expect(
-      current.items.indexWhere((item) => item.title == anchor.title),
-      greaterThan(anchor.index),
-    );
-    expect(find.text('Total intentions: 60'), findsOneWidget);
-    expect(
-      _catalogTileTop(tester, anchor.title),
-      moreOrLessEquals(anchor.top, epsilon: 0.01),
-    );
-    expect(loadingStates, isEmpty);
-  });
-
   testWidgets('одиночное назначение и снятие тега сохраняют экранное '
       'положение видимого намерения либо переводят его к ближайшему '
       'соседу', (tester) async {
@@ -1093,7 +1019,9 @@ void main() {
       );
       expect(find.byType(FloatingActionButton), findsNothing);
       expect(
-        find.byKey(const ValueKey('catalog-open-tags')).hitTestable(),
+        find
+            .byKey(const ValueKey('intention-tag-conditions-add'))
+            .hitTestable(),
         findsOneWidget,
       );
       final create = quickCreationAction();
@@ -1335,8 +1263,8 @@ void main() {
     },
   );
 
-  testWidgets('условие, добавленное через экран поиска тега, сразу начинает '
-      'выдачу с верхней позиции', (tester) async {
+  testWidgets('условие, добавленное в панели тегов, сразу начинает выдачу с '
+      'верхней позиции', (tester) async {
     final repository = ControlledCatalogRepository();
     final health = _tag(1, 'Здоровье');
     final sport = _tag(2, 'Спорт');
@@ -1355,10 +1283,8 @@ void main() {
 
     await tester.tap(_addCondition);
     await tester.pumpAndSettle();
-    expect(router.current.name, TagConditionPickerRoute.name);
-    await tester.tap(
-      _pickerAction(health, IntentionTagRequirement.mustBePresent),
-    );
+    expect(find.text('Filter by tags'), findsOneWidget);
+    await tester.tap(_panelRow(health));
     await _pumpUntilQueries(tester, repository, 2);
 
     expect(
@@ -1370,6 +1296,8 @@ void main() {
       1,
       _firstPage(_taggedSummaries([health], last: 2, step: 2), revision: 1),
     );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Done'));
     await tester.pumpAndSettle();
 
     expectIntentionGraphRootPage(router);
@@ -1401,24 +1329,24 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('catalog-scope-control')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Archived').last);
-    await _pumpUntilQueries(tester, repository, 4);
-    expect(repository.queryAt(3).scope, IntentionScope.archived);
-    expect(repository.queryAt(3).tagFilter, filter);
-    repository.complete(3, _firstPage(_taggedSummaries([health], last: 59)));
+    await _pumpUntilQueries(tester, repository, 5);
+    expect(repository.queryAt(4).scope, IntentionScope.archived);
+    expect(repository.queryAt(4).tagFilter, filter);
+    repository.complete(4, _firstPage(_taggedSummaries([health], last: 59)));
     await tester.pumpAndSettle();
     expect(_shownConditions(tester), ['Здоровье', 'not Спорт']);
 
     await tester.tap(find.byKey(const ValueKey('catalog-order-control')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Created: oldest first').last);
-    await _pumpUntilQueries(tester, repository, 5);
-    expect(repository.queryAt(4).scope, IntentionScope.archived);
+    await _pumpUntilQueries(tester, repository, 6);
+    expect(repository.queryAt(5).scope, IntentionScope.archived);
     expect(
-      repository.queryAt(4).order,
+      repository.queryAt(5).order,
       IntentionCatalogOrder.createdAtAscending,
     );
-    expect(repository.queryAt(4).tagFilter, filter);
-    repository.complete(4, _firstPage(_taggedSummaries([health], last: 59)));
+    expect(repository.queryAt(5).tagFilter, filter);
+    repository.complete(5, _firstPage(_taggedSummaries([health], last: 59)));
     await tester.pumpAndSettle();
     expect(_shownConditions(tester), ['Здоровье', 'not Спорт']);
   });
@@ -1452,61 +1380,73 @@ void main() {
     expect(find.text(byScope), findsNothing);
   });
 
-  testWidgets('отказ обновления из-за недоступности показан над сохранённым '
-      'списком, а повтор согласует выдачу', (tester) async {
+  testWidgets('отказ новой выдачи после удаления исключённого тега показан '
+      'отказом первой порции, а повтор показывает прежде отсечённые '
+      'намерения', (tester) async {
     final repository = ControlledCatalogRepository();
     final container = reconciliationCatalogContainer(repository);
     addTearDown(container.dispose);
     final health = _tag(1, 'Здоровье');
     final rest = _tag(2, 'Отдых');
-    final items = _taggedSummaries([health], last: 2, step: 2);
-    await _failCatalogRefresh(
+    final filter = IntentionTagFilter(
+      requiredTagIds: [health.id],
+      excludedTagIds: [rest.id],
+    );
+    await _loadTaggedCatalog(
       tester,
       container,
       repository,
-      required: health,
-      deletedExcluded: rest,
-      items: items,
-      failure: const IntentionUnavailableFailure(),
+      filter,
+      IntentionCatalogFirstPage(
+        items: _taggedSummaries([health], first: 4, last: 2, step: 2),
+        totalCount: 2,
+        nextCursor: null,
+        revision: const TestCatalogRevision(1),
+      ),
     );
+    final restarted = repository.queries.length;
 
-    final message = find.text(
-      'The intention list isn’t up to date: changes couldn’t be loaded.',
+    await _completeCatalogWidgetTagCommand(
+      tester,
+      container,
+      repository,
+      DeleteTag(rest.id),
+      tagDeletionSuccess(
+        tagId: rest.id,
+        revision: const TestCatalogRevision(2),
+      ),
     );
+    await _pumpUntilQueries(tester, repository, restarted + 1);
+    final remaining = IntentionTagFilter(requiredTagIds: [health.id]);
+    expect(repository.queryAt(restarted).tagFilter, remaining);
+    expect(repository.queryAt(restarted).cursor, isNull);
+    repository.complete(
+      restarted,
+      const ResultFailure(IntentionUnavailableFailure()),
+    );
+    await tester.pumpAndSettle();
+
+    final message = find.text('Intentions couldn’t be loaded. Try again.');
     expect(message, findsOneWidget);
-    expect(find.text('Total intentions: 30'), findsOneWidget);
-    expect(_loadedCatalog(container).items, items);
-    // Отказ виден и не закрывает первую строку списка.
-    final list = tester.getRect(
-      find.byKey(const PageStorageKey<String>('intention-catalog-list')),
-    );
-    expect(message.hitTestable(), findsOneWidget);
-    expect(find.text('Намерение 60').hitTestable(), findsOneWidget);
+    expect(find.byType(IntentionSummaryView), findsNothing);
 
     await tester.tap(find.widgetWithText(FilledButton, 'Try again'));
-    await _pumpUntilReconciliationQueries(tester, repository, 2);
-    final missing = _taggedSummaries([health], first: 59, last: 1, step: 2);
-    repository.completeReconciliation(
-      1,
-      reconciliationFirstPortion(
-        missing,
-        totalCount: items.length + missing.length,
-        revision: 2,
-      ),
+    await _pumpUntilQueries(tester, repository, restarted + 2);
+    expect(repository.queryAt(restarted + 1).tagFilter, remaining);
+    repository.complete(
+      restarted + 1,
+      _firstPage(_taggedSummaries([health], first: 4, last: 1), revision: 2),
     );
     await tester.pumpAndSettle();
 
     expect(message, findsNothing);
-    expect(find.text('Total intentions: 60'), findsOneWidget);
-    expect(_loadedCatalog(container).items, hasLength(60));
-    expect(
-      _catalogTileTop(tester, 'Намерение 60'),
-      moreOrLessEquals(list.top, epsilon: 0.01),
-    );
+    expect(find.text('Total intentions: 4'), findsOneWidget);
+    expect(find.byType(IntentionSummaryView), findsNWidgets(4));
   });
 
-  testWidgets('после подтверждённых переименования и удаления тега строки '
-      'и чипы показывают согласованные данные', (tester) async {
+  testWidgets('после подтверждённого переименования тега строки и чипы '
+      'показывают новое название, а удаление снимает условие и показывает '
+      'выдачу по оставшимся условиям', (tester) async {
     final repository = ControlledCatalogRepository();
     final container = reconciliationCatalogContainer(repository);
     addTearDown(container.dispose);
@@ -1536,6 +1476,7 @@ void main() {
     );
     expect(find.text('Total intentions: 3'), findsOneWidget);
 
+    final restarted = repository.queries.length;
     await _completeCatalogWidgetTagCommand(
       tester,
       container,
@@ -1546,18 +1487,18 @@ void main() {
         revision: const TestCatalogRevision(3),
       ),
     );
+    await _pumpUntilQueries(tester, repository, restarted + 1);
+    expect(repository.queryAt(restarted).tagFilter, IntentionTagFilter.empty);
+    repository.complete(
+      restarted,
+      _firstPage(_taggedSummaries(const [], first: 5, last: 1), revision: 3),
+    );
     await tester.pumpAndSettle();
 
-    expect(_shownConditions(tester), ['Самочувствие (tag deleted)']);
-    expect(find.byType(IntentionSummaryView), findsNothing);
-    expect(
-      find.text('No intentions match the tag conditions.'),
-      findsOneWidget,
-    );
-    expect(
-      repository.queries.last.tagFilter,
-      IntentionTagFilter(requiredTagIds: [health.id]),
-    );
+    expect(_shownConditions(tester), isEmpty);
+    expect(find.text('Total intentions: 5'), findsOneWidget);
+    expect(find.byType(IntentionSummaryView), findsNWidgets(5));
+    expect(repository.queries, hasLength(restarted + 1));
   });
 }
 
@@ -1996,13 +1937,8 @@ final _addCondition = find.byKey(
   const ValueKey('intention-tag-conditions-add'),
 );
 
-Finder _pickerAction(Tag tag, IntentionTagRequirement requirement) =>
-    find.byKey(
-      ValueKey(
-        'tag-condition-picker-${requirement.name}-'
-        '${tag.id.toCanonicalString()}',
-      ),
-    );
+Finder _panelRow(Tag tag) =>
+    find.byKey(ValueKey('tags-panel-row-${tag.id.toCanonicalString()}'));
 
 /// Тексты чипов раздела условий в порядке показа.
 List<String> _shownConditions(WidgetTester tester) => [
@@ -2033,32 +1969,28 @@ Future<void> _scrollCatalogDown(WidgetTester tester) async {
   expect(_catalogScrollPosition(tester).pixels, greaterThan(0));
 }
 
-/// Передаёт модели условий выбор так же, как его возвращает экран поиска
-/// тега.
+/// Задаёт условие переключениями модели условий, как нажатиями в панели
+/// тегов; каждое переключение сразу начинает новую выдачу.
 Future<void> _selectCondition(
   WidgetTester tester,
   ProviderContainer container,
   Tag tag,
   IntentionTagRequirement requirement,
 ) async {
-  container
-      .read(
-        intentionTagConditionsViewModelProvider(const BrowseIntentionCatalog())
-            .notifier,
-      )
-      .applySelection(
-        IntentionTagConditionSelection(
-          tag: tag,
-          requirement: requirement,
-          snapshotRevision: const TestCatalogRevision(0),
-        ),
-      );
-  await tester.pump();
+  final conditions = container.read(
+    intentionTagConditionsViewModelProvider(const BrowseIntentionCatalog())
+        .notifier,
+  );
+  for (var i = 0; i < tagConditionCycles(requirement); i++) {
+    conditions.cycle(tag, snapshotRevision: const TestCatalogRevision(0));
+    await tester.pump();
+  }
 }
 
-/// Открывает каталог и выбирает условия через модель раздела условий.
+/// Открывает каталог и задаёт условия через модель раздела условий.
 ///
-/// Каждое условие сразу начинает новую выдачу; [page] отвечает на последнюю.
+/// Каждое переключение сразу начинает новую выдачу; [page] отвечает на
+/// последнюю.
 Future<void> _openCatalogWithConditions(
   WidgetTester tester,
   ProviderContainer container,
@@ -2069,54 +2001,14 @@ Future<void> _openCatalogWithConditions(
   await tester.pumpWidget(_testAppWithContainer(container));
   repository.complete(0, _firstPage(const []));
   await tester.pumpAndSettle();
+  var queries = 1;
   for (final (tag, requirement) in conditions) {
     await _selectCondition(tester, container, tag, requirement);
+    queries += tagConditionCycles(requirement);
   }
-  await _pumpUntilQueries(tester, repository, conditions.length + 1);
-  repository.complete(conditions.length, page);
+  await _pumpUntilQueries(tester, repository, queries);
+  repository.complete(queries - 1, page);
   await tester.pumpAndSettle();
-}
-
-/// Доводит каталог до отказа обновления после удаления исключённого тега.
-Future<void> _failCatalogRefresh(
-  WidgetTester tester,
-  ProviderContainer container,
-  ControlledCatalogRepository repository, {
-  required Tag required,
-  required Tag deletedExcluded,
-  required List<IntentionSummary> items,
-  required IntentionFailure failure,
-}) async {
-  await _loadTaggedCatalog(
-    tester,
-    container,
-    repository,
-    IntentionTagFilter(
-      requiredTagIds: [required.id],
-      excludedTagIds: [deletedExcluded.id],
-    ),
-    IntentionCatalogFirstPage(
-      items: items,
-      totalCount: items.length,
-      nextCursor: null,
-      revision: const TestCatalogRevision(1),
-    ),
-  );
-  await _completeCatalogWidgetTagCommand(
-    tester,
-    container,
-    repository,
-    DeleteTag(deletedExcluded.id),
-    tagDeletionSuccess(
-      tagId: deletedExcluded.id,
-      revision: const TestCatalogRevision(2),
-    ),
-  );
-  await _pumpUntilReconciliationQueries(tester, repository, 1);
-  repository.completeReconciliation(0, ResultFailure(failure));
-  await tester.pump();
-  await tester.pump();
-  await tester.pump();
 }
 
 int _summaryIndex(IntentionSummary summary) =>
@@ -2133,6 +2025,7 @@ Tag _tag(int index, String name) => Tag(
   },
   name: TagName.fromInput(name),
   color: null,
+  position: tagPositionAt(index),
 );
 
 IntentionCatalogLoaded _loadedCatalog(ProviderContainer container) =>
@@ -2197,20 +2090,6 @@ Future<void> _completeCatalogWidgetTagAssignment(
     command,
     result,
   );
-}
-
-Future<void> _pumpUntilReconciliationQueries(
-  WidgetTester tester,
-  ControlledCatalogRepository repository,
-  int count,
-) async {
-  for (var attempt = 0; attempt < 1000; attempt++) {
-    if (repository.reconciliationQueries.length >= count) {
-      return;
-    }
-    await tester.pump(const Duration(milliseconds: 1));
-  }
-  fail('Не дождались $count чтений согласования каталога.');
 }
 
 Future<void> _pumpUntilQueries(

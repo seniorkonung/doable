@@ -18,7 +18,6 @@ import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
-import 'package:doable/src/tag/application/tagged_intentions_page.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
@@ -28,6 +27,8 @@ import 'package:sqlite3/sqlite3.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
+import '../../support/tag_positions.dart';
+import '../../support/tagged_intention_ids.dart';
 
 part 'catalog_tag_filter_failure_scenarios.dart';
 
@@ -46,22 +47,6 @@ void main() {
   tearDown(() => database.close());
 
   _catalogTagFilterFailureScenarios((observer, setup) async {
-    final replacement = await _replaceDatabase(
-      observer,
-      database,
-      diagnostics,
-      setup: setup,
-    );
-    database = replacement.database;
-    repository = replacement.repository;
-    return (
-      database: database,
-      repository: repository,
-      diagnostics: diagnostics,
-    );
-  });
-
-  _catalogReconciliationFailureScenarios((observer, setup) async {
     final replacement = await _replaceDatabase(
       observer,
       database,
@@ -119,8 +104,8 @@ void main() {
         );
         await seedGraph(database, () async {
           await database.customStatement(
-            'INSERT INTO tags (id, name) VALUES (?, ?)',
-            [_relationUuid, 'CANARY-тег'],
+            'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+            [_relationUuid, 'CANARY-тег', tagPositionKey(200000)],
           );
           await database.customStatement(
             'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
@@ -338,17 +323,23 @@ void main() {
         createdAt: DateTime.utc(2026, 9, 2),
       );
       seedRawGraph(raw, () {
-        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
           homeTagId.toCanonicalString(),
           'Дом',
+          tagPositionKey(200001),
         ]);
-        raw.execute('INSERT INTO tags (id, name) VALUES (?, ?)', [
+        raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
           weekendTagId.toCanonicalString(),
           'Выходные',
+          tagPositionKey(200002),
         ]);
       });
       final created = await repository.execute(
-        CreateTag(name: TagName.fromInput('Спорт'), color: null),
+        CreateTag(
+          name: TagName.fromInput('Спорт'),
+          color: null,
+          placement: TagPlacement.first,
+        ),
       );
       expect(created, isA<TagCommandSucceeded>());
       return ((created as TagCommandSucceeded).value.value as TagCreated)
@@ -378,7 +369,8 @@ void main() {
         GraphRevisionOrder.same,
         reason: reason,
       );
-      expect(after.tagNames, ['Дом', 'Выходные', 'Спорт'], reason: reason);
+      // Созданный командой «Спорт» встаёт в ручном порядке первым.
+      expect(after.tagNames, ['Спорт', 'Дом', 'Выходные'], reason: reason);
       expect(
         _watched(await repository.watchIntention(newId).first),
         isNull,
@@ -483,9 +475,9 @@ void main() {
         final summary = confirmed.value.catalogMutation.after!.summary;
         expect(summary.id, newId, reason: reason);
         expect(summary.tags.map((tag) => tag.id), [
+          sportTagId,
           homeTagId,
           weekendTagId,
-          sportTagId,
         ], reason: reason);
       }
     });
@@ -1213,15 +1205,8 @@ Future<_ObservedCreationGraph> _observeCreationGraph(
         for (final tag in tags.items) [tag.id, tag.name.value],
       ],
       for (final tag in tags.items)
-        for (final scope in TaggedIntentionsScope.values)
-          [
-            for (final item in _readValue(
-              await repository.getTaggedIntentionsPage(
-                TaggedIntentionsQuery(tagId: tag.id, scope: scope),
-              ),
-            ).items)
-              item.id,
-          ],
+        for (final scope in [IntentionScope.active, IntentionScope.archived])
+          await readTaggedIntentionIds(repository, tag.id, scope),
       _storedCreationRows(raw),
     ],
     revision: page.revision,

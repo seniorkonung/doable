@@ -446,7 +446,7 @@ void main() {
       'Сделать копию сейчас',
     ]);
     expect(await app.backupKinds(), [GraphBackupKind.daily]);
-    expect(await app.tagNames(), ['Дом', 'Сад']);
+    expect(await app.tagNames(), ['Сад', 'Дом']);
   });
 
   testWidgets('«Восстановить копию», нажатое дважды, закрывает подтверждение '
@@ -615,7 +615,11 @@ final class _BackupsApp {
   Future<void> createTag(String name) async {
     expect(
       await _repository.execute(
-        CreateTag(name: TagName.fromInput(name), color: null),
+        CreateTag(
+          name: TagName.fromInput(name),
+          color: null,
+          placement: TagPlacement.first,
+        ),
       ),
       isA<GraphCommandSucceeded>(),
     );
@@ -683,7 +687,11 @@ final class _RestoreFromSheetApp {
       final repository = container.read(personalGraphRepositoryProvider);
       expect(
         await repository.execute(
-          CreateTag(name: TagName.fromInput('Дом'), color: null),
+          CreateTag(
+            name: TagName.fromInput('Дом'),
+            color: null,
+            placement: TagPlacement.first,
+          ),
         ),
         isA<GraphCommandSucceeded>(),
       );
@@ -692,7 +700,11 @@ final class _RestoreFromSheetApp {
       await container.read(graphBackupsProvider).makeDailyBackupIfDue();
       expect(
         await repository.execute(
-          CreateTag(name: TagName.fromInput('Сад'), color: null),
+          CreateTag(
+            name: TagName.fromInput('Сад'),
+            color: null,
+            placement: TagPlacement.first,
+          ),
         ),
         isA<GraphCommandSucceeded>(),
       );
@@ -739,7 +751,8 @@ final class _RestoreFromSheetApp {
     return [for (final backup in backups!) backup.kind];
   }
 
-  /// Названия тегов графа в порядке создания.
+  /// Названия тегов графа в ручном порядке по месту: новый тег встаёт перед
+  /// текущим первым, поэтому «Сад», созданный позже «Дома», стоит первым.
   Future<List<String>> tagNames() async {
     final catalog = await _tester.runAsync(
       () => _container

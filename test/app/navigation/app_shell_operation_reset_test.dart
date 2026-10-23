@@ -8,7 +8,9 @@ import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
-import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/design_system/components/sheet.dart';
+import 'package:doable/src/data/local/app_database.dart'
+    show openInMemoryLocalDatabase;
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -28,7 +30,6 @@ import 'package:doable/src/long_term_relation/presentation/details/relation_deta
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_page.dart';
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_state.dart';
 import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart';
-import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -267,8 +268,7 @@ void main() {
   testWidgets('удаление связи с актуальной верхней страницы закрывает только '
       'её просмотр и один раз предъявляет результат', (tester) async {
     final app = await _ControlledApp.start(tester, activeRelationCount: 1);
-    await tester.tap(find.byTooltip('Теги'));
-    await tester.pumpAndSettle();
+    await app.openDetails(tester);
     await app.openRelationDetails(tester);
     await app.deleteRelation(tester);
 
@@ -281,9 +281,9 @@ void main() {
 
     expect(app.router.stack.map((page) => page.name), [
       AppShellRoute.name,
-      TagCatalogRoute.name,
+      IntentionDetailsRoute.name,
     ]);
-    expect(find.byType(TagCatalogPage), findsOneWidget);
+    expect(find.byType(IntentionDetailsPage), findsOneWidget);
     expect(find.byType(RelationDetailsPage, skipOffstage: false), findsNothing);
     expect(find.text(_relationDeleteSuccess), findsOneWidget);
     await _expireMessages(tester);
@@ -294,20 +294,29 @@ void main() {
     expect(app.repository.commands, isEmpty);
   });
 
-  testWidgets('позднее удаление намерения сохраняет каталог тегов, '
-      'открытый через «Теги» до освобождения сброшенной страницы', (
+  testWidgets('позднее удаление намерения сохраняет панель тегов, '
+      'открытую кнопкой «+ Тег» до освобождения сброшенной страницы', (
     tester,
   ) async {
+    final l10n = lookupAppLocalizations(const Locale('ru'));
     final app = await _ControlledApp.start(tester);
     await app.openDetails(tester);
     await app.delete(tester);
 
     await _select(tester, AppDestination.intentionGraph, settle: false);
+    // Каталог возвращается на место вместе с анимацией закрытия страницы;
+    // «+ Тег» нажимаем, как только кнопка доступна, а страница ещё не
+    // освобождена.
+    final add = find.byKey(const ValueKey('intention-tag-conditions-add'));
+    await _until(tester, () => add.hitTestable().evaluate().isNotEmpty);
+    expect(
+      find.byType(IntentionDetailsPage, skipOffstage: false),
+      findsOneWidget,
+    );
+    await tester.tap(add);
     await tester.pump();
-    await tester.tap(find.byTooltip('Теги'));
     await tester.pump();
-    await tester.pump();
-    expect(app.router.stackData.last.name, TagCatalogRoute.name);
+    expect(find.text(l10n.tagsPanelFilterTitle), findsOneWidget);
 
     app.complete(
       testDetailsDeletedResult(
@@ -318,25 +327,35 @@ void main() {
     await _until(tester, () => !app.coordinator.isRunning(app.intention.id));
     await tester.pumpAndSettle();
 
-    expect(find.byType(TagCatalogPage), findsOneWidget);
-    expect(app.router.stack.map((page) => page.name), [
-      AppShellRoute.name,
-      TagCatalogRoute.name,
-    ]);
-    expect(find.text(_deleteSuccess), findsOneWidget);
+    expect(find.text(l10n.tagsPanelFilterTitle), findsOneWidget);
+    expect(app.router.stack.map((page) => page.name), [AppShellRoute.name]);
+    expect(app.router.topRoute.name, IntentionCatalogRoute.name);
+    expect(
+      find.byType(IntentionDetailsPage, skipOffstage: false),
+      findsNothing,
+    );
+    // Сообщение показано над нижней частью открытой панели.
+    expect(
+      find.descendant(
+        of: find.byType(Sheet),
+        matching: find.text(_deleteSuccess),
+      ),
+      findsOneWidget,
+    );
     await _expireMessages(tester);
     expect(app.repository.commands.single, isA<DeleteIntention>());
-    unawaited(app.router.maybePop());
+    await tester.tap(find.text(l10n.tagsPanelDone));
     await tester.pumpAndSettle();
+    expect(find.text(l10n.tagsPanelFilterTitle), findsNothing);
     _expectRoot(tester, app.router, AppDestination.intentionGraph);
+    _expectSelected(tester, AppDestination.intentionGraph);
     expect(find.text(app.intention.title), findsNothing);
   });
 
   testWidgets('успешный повтор удаления после отказа закрывает только '
       'принявшую повтор страницу', (tester) async {
     final app = await _ControlledApp.start(tester);
-    await tester.tap(find.byTooltip('Теги'));
-    await tester.pumpAndSettle();
+    await app.openOtherDetails(tester);
     await app.openDetails(tester);
     await app.delete(tester);
     app.complete(const ResultFailure(IntentionUnavailableFailure()));
@@ -362,11 +381,11 @@ void main() {
     await _until(tester, () => !app.coordinator.isRunning(app.intention.id));
     await tester.pumpAndSettle();
 
-    expect(find.byType(TagCatalogPage), findsOneWidget);
-    expect(
-      find.byType(IntentionDetailsPage, skipOffstage: false),
-      findsNothing,
-    );
+    expect(find.text('Другое намерение'), findsOneWidget);
+    expect(app.router.stack.map((page) => page.name), [
+      AppShellRoute.name,
+      IntentionDetailsRoute.name,
+    ]);
     expect(find.text(_deleteSuccess), findsOneWidget);
     await _expireMessages(tester);
   });
@@ -612,11 +631,28 @@ final class _ControlledApp {
     return app;
   }
 
-  Future<void> openDetails(WidgetTester tester) async {
-    unawaited(router.push(IntentionDetailsRoute(intentionId: intention.id)));
+  Future<void> openDetails(WidgetTester tester) =>
+      _openDetails(tester, intention);
+
+  /// Открывает страницу другого намерения — обычную страницу, которую
+  /// операции над [intention] не затрагивают.
+  Future<void> openOtherDetails(WidgetTester tester) => _openDetails(
+    tester,
+    testDetailsIntention(index: 2, title: 'Другое намерение'),
+  );
+
+  Future<void> _openDetails(WidgetTester tester, Intention shown) async {
+    final requests = repository.detailRequests.length;
+    unawaited(router.push(IntentionDetailsRoute(intentionId: shown.id)));
     await tester.pump();
     await tester.pump();
-    repository.detailRequests.single.add(ResultSuccess(intention));
+    // Страница и её соседство наблюдают намерение; общий поток получает
+    // только первая открытая страница, поэтому отвечаем каждому новому.
+    final opened = repository.detailRequests.skip(requests).toList();
+    expect(opened, isNotEmpty);
+    for (final request in opened) {
+      request.add(ResultSuccess(shown));
+    }
     await tester.pumpAndSettle();
   }
 

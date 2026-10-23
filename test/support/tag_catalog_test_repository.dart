@@ -3,8 +3,8 @@ import 'dart:async';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
-import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/tag/application/tag_assignment_status.dart';
+import 'package:doable/src/intention/application/intention_catalog.dart';
+import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
@@ -32,10 +32,10 @@ final class TagCatalogTestRepository extends Fake
     implements PersonalGraphRepository {
   final reads = <Completer<TagCatalogResult>>[];
   final readModes = <TagCatalogMode>[];
-  final command = Completer<TagCommandResult>();
   final commands = <GraphCommand<GraphCommandOutcome, GraphCommandFailure>>[];
-  final statusReads = <Completer<TagAssignmentStatusResult>>[];
-  final statusQueries = <(TagId, IntentionId)>[];
+
+  /// Результаты команд в порядке исполнения: каждая команда ждёт свой.
+  final commandResults = <Completer<TagCommandResult>>[];
   final observations = <TagId, StreamController<TagReadResult>>{};
 
   @override
@@ -44,8 +44,13 @@ final class TagCatalogTestRepository extends Fake
     TFailure extends GraphCommandFailure
   >(GraphCommand<TSuccess, TFailure> command) async {
     commands.add(command);
-    return await this.command.future as GraphCommandResult<TSuccess, TFailure>;
+    final result = Completer<TagCommandResult>();
+    commandResults.add(result);
+    return await result.future as GraphCommandResult<TSuccess, TFailure>;
   }
+
+  /// Результат последней исполняемой команды.
+  Completer<TagCommandResult> get command => commandResults.last;
 
   @override
   Stream<TagReadResult> watchTag(TagId id) => observations
@@ -59,21 +64,22 @@ final class TagCatalogTestRepository extends Fake
         ),
       );
 
-  @override
-  Future<TagAssignmentStatusResult> getTagAssignmentStatus(
-    TagId id,
-    IntentionId intentionId,
-  ) {
-    statusQueries.add((id, intentionId));
-    final result = Completer<TagAssignmentStatusResult>();
-    statusReads.add(result);
-    return result.future;
-  }
-
   Future<void> dispose() async {
     for (final observation in observations.values) {
       await observation.close();
     }
+  }
+
+  /// Запросы выдачи поиска намерений, над условиями которого открыта панель
+  /// фильтра. Выдача не завершается: проверки панели читают только запросы.
+  final catalogQueries = <IntentionCatalogQuery>[];
+
+  @override
+  Future<Result<IntentionCatalogPage>> getCatalogPage(
+    IntentionCatalogQuery query,
+  ) {
+    catalogQueries.add(query);
+    return Completer<Result<IntentionCatalogPage>>().future;
   }
 
   @override
@@ -83,6 +89,9 @@ final class TagCatalogTestRepository extends Fake
     readModes.add(mode);
     return read.future;
   }
+
+  void fail(TagCatalogReadFailure failure) =>
+      reads.last.complete(TagCatalogError(failure));
 
   void complete(List<Tag> tags, {int revision = 1, Set<TagId>? assignedIds}) =>
       reads.last.complete(

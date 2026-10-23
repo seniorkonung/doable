@@ -489,18 +489,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'More intentions couldn’t be loaded because of an unexpected error.';
 
   @override
-  String get catalogRefreshUnavailable =>
-      'The intention list isn’t up to date: changes couldn’t be loaded.';
-
-  @override
-  String get catalogRefreshCorruption =>
-      'The intention list isn’t up to date: stored data is damaged.';
-
-  @override
-  String get catalogRefreshUnexpected =>
-      'The intention list isn’t up to date because of an unexpected error.';
-
-  @override
   String get catalogReady => 'Ready for action';
 
   @override
@@ -1131,9 +1119,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get editorDraftTagChecking => 'Checking tag';
 
   @override
-  String get editorDraftTagMissing => 'Tag deleted';
-
-  @override
   String get editorDraftTagReadUnavailable => 'Couldn\'t check tag';
 
   @override
@@ -1154,19 +1139,8 @@ class AppLocalizationsEn extends AppLocalizations {
       count,
       locale: localeName,
       other:
-          '$count selected tags were deleted from the catalog. Remove them from the draft to save the intention.',
-      one: 'A selected tag was deleted from the catalog. Remove it from the draft to save the intention.',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String editorRemoveMissingTags(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'Remove deleted tags',
-      one: 'Remove deleted tag',
+          '$count selected tags were deleted from the catalog and removed from the draft. Save the intention again.',
+      one: 'A selected tag was deleted from the catalog and removed from the draft. Save the intention again.',
     );
     return '$_temp0';
   }
@@ -1250,6 +1224,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get graphOperationTag => 'tag';
+
+  @override
+  String get graphOperationMoveTag => 'Move';
 
   @override
   String get graphOperationAssignTag => 'Assign';
@@ -1622,126 +1599,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dataImportConfirm => 'Import and replace';
 
   @override
-  String get tagNavigationTitle => 'Tagged intentions';
-
-  @override
-  String tagNavigationTag(String tagName) {
-    return 'Tag: $tagName';
-  }
-
-  @override
-  String get tagNavigationScope => 'Result scope';
-
-  @override
-  String get tagNavigationLoading => 'Loading tagged intentions…';
-
-  @override
-  String get tagNavigationEmptyActive => 'No active intentions have this tag.';
-
-  @override
-  String get tagNavigationEmptyArchived =>
-      'No archived intentions have this tag.';
-
-  @override
-  String get tagNavigationIntentionActive => 'Intention, active';
-
-  @override
-  String get tagNavigationIntentionArchived => 'Intention, archived';
-
-  @override
-  String get tagNavigationOpenDetails => 'Open details';
-
-  @override
-  String get tagNavigationRefreshing =>
-      'Refreshing results. The displayed data may be out of date.';
-
-  @override
-  String get tagNavigationRefreshUnavailable =>
-      'Could not refresh results. The displayed data may be out of date. Try loading again.';
-
-  @override
-  String get tagNavigationRefreshCorruption =>
-      'Could not refresh results: stored data is damaged. The displayed data may be out of date.';
-
-  @override
-  String get tagNavigationRefreshUnexpected =>
-      'Could not refresh results because of an unexpected error. The displayed data may be out of date.';
-
-  @override
-  String get tagNavigationMoreAvailable => 'More intentions have this tag.';
-
-  @override
-  String get tagNavigationLoadMore => 'Show more intentions';
-
-  @override
-  String get tagNavigationLoadingMore => 'Loading more intentions…';
-
-  @override
-  String get tagNavigationAllShown => 'All intentions are shown.';
-
-  @override
-  String get tagNavigationUnavailable =>
-      'Could not load tagged intentions. Try again.';
-
-  @override
-  String get tagNavigationCorruption =>
-      'Stored tagged intention data is damaged and cannot be shown.';
-
-  @override
-  String get tagNavigationUnexpected =>
-      'Could not load tagged intentions because of an unexpected error.';
-
-  @override
-  String get tagNavigationSnapshotExpired =>
-      'The list has changed. Reopen tag navigation.';
-
-  @override
-  String get tagNavigationLoadMoreUnavailable =>
-      'Could not load more intentions.';
-
-  @override
-  String get tagNavigationLoadMoreCorruption =>
-      'Stored data is damaged; more intentions cannot be shown.';
-
-  @override
-  String get tagNavigationLoadMoreUnexpected =>
-      'Could not load more intentions because of an unexpected error.';
-
-  @override
-  String get tagConditionPickerTitle => 'Tag for search condition';
-
-  @override
-  String get tagConditionPickerPresent => 'With';
-
-  @override
-  String get tagConditionPickerAbsent => 'Without';
-
-  @override
-  String tagConditionPickerPresentNamed(String tagName) {
-    return 'With, $tagName';
-  }
-
-  @override
-  String tagConditionPickerAbsentNamed(String tagName) {
-    return 'Without, $tagName';
-  }
-
-  @override
-  String get tagConditionPickerSelectedPresent =>
-      'Already selected: must be present';
-
-  @override
-  String get tagConditionPickerSelectedAbsent =>
-      'Already selected: must be absent';
-
-  @override
   String intentionTagConditionAbsent(String tagName) {
     return 'not $tagName';
-  }
-
-  @override
-  String intentionTagConditionDeleted(String condition) {
-    return '$condition (tag deleted)';
   }
 
   @override
@@ -1752,11 +1611,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String intentionTagConditionAbsentSemantics(String tagName) {
     return '$tagName, must be absent';
-  }
-
-  @override
-  String intentionTagConditionDeletedSemantics(String condition) {
-    return '$condition, tag deleted';
   }
 
   @override
@@ -1775,134 +1629,141 @@ class AppLocalizationsEn extends AppLocalizations {
   String get intentionTagConditionsAddSemantics => 'Add tag condition';
 
   @override
-  String get tagCatalogTitle => 'Tags';
+  String get tagsPanelTitle => 'Tags';
 
   @override
-  String get tagCatalogSelectionTitle => 'Choose a tag';
+  String get tagsPanelAssignmentHint => 'Choose as many as you need';
 
   @override
-  String get tagCatalogSearch => 'Search tags';
+  String get tagsPanelFilterTitle => 'Filter by tags';
 
   @override
-  String get tagCatalogClearSearch => 'Clear tag search';
+  String get tagsPanelFilterHint =>
+      'Tap to require a tag, tap again to exclude it';
 
   @override
-  String get tagCatalogInvalidSearch =>
+  String get tagsPanelResetConditions => 'Reset';
+
+  @override
+  String get tagsPanelResetConditionsLabel => 'Reset tag conditions';
+
+  @override
+  String tagsPanelFilterPresentLabel(String tagName) {
+    return '$tagName, must be present';
+  }
+
+  @override
+  String tagsPanelFilterAbsentLabel(String tagName) {
+    return '$tagName, must be absent';
+  }
+
+  @override
+  String get tagsPanelSearchPlaceholder => 'Find or create a tag';
+
+  @override
+  String get tagsPanelSearchLabel => 'Search tags';
+
+  @override
+  String get tagsPanelClearSearch => 'Clear tag search';
+
+  @override
+  String get tagsPanelInvalidSearch =>
       'Invalid characters are shown as �. Your input is retained but wasn’t applied; results use the last valid query.';
 
   @override
-  String get tagCatalogNoMatches => 'No tags found';
+  String get tagsPanelDone => 'Done';
 
   @override
-  String get tagCatalogAssigned => 'Assigned';
+  String get tagsPanelExpand => 'Expand tags panel';
 
   @override
-  String get tagCatalogAvailable => 'Available to assign';
+  String get tagsPanelCollapse => 'Collapse tags panel';
 
   @override
-  String get tagCatalogAssign => 'Assign tag';
+  String get tagsPanelLoading => 'Loading tags…';
 
   @override
-  String tagCatalogAssignNamed(String tagName) {
-    return 'Assign tag $tagName';
+  String get tagsPanelLoadUnavailable => 'Couldn’t load tags.';
+
+  @override
+  String get tagsPanelLoadCorruption =>
+      'Saved tag data is corrupted and can’t be shown.';
+
+  @override
+  String get tagsPanelLoadUnexpected =>
+      'Couldn’t load tags because of an unexpected error.';
+
+  @override
+  String get tagsPanelRefreshUnavailable =>
+      'Couldn’t update tags. The list may be out of date.';
+
+  @override
+  String get tagsPanelRefreshCorruption =>
+      'Couldn’t update tags: saved data is corrupted. The list may be out of date.';
+
+  @override
+  String get tagsPanelRefreshUnexpected =>
+      'Couldn’t update tags because of an unexpected error. The list may be out of date.';
+
+  @override
+  String get tagsPanelIntentionMissing => 'This intention no longer exists.';
+
+  @override
+  String get tagsPanelEmptyTitle => 'No tags yet';
+
+  @override
+  String get tagsPanelEmptyText =>
+      'Type a name in search to create the first one';
+
+  @override
+  String tagsPanelCreateTag(String query) {
+    return 'Create tag “$query”';
   }
 
   @override
-  String get tagCatalogAssigning => 'Assigning tag…';
-
-  @override
-  String get tagCatalogInDraft => 'In draft';
-
-  @override
-  String get tagCatalogAvailableForDraft => 'Available to add';
-
-  @override
-  String get tagCatalogAddToDraft => 'Add';
-
-  @override
-  String get tagCatalogAddToDraftSemantic => 'Add tag to draft';
-
-  @override
-  String tagCatalogAddToDraftNamed(String tagName) {
-    return 'Add tag $tagName to draft';
+  String tagsPanelTagMenu(String tagName) {
+    return 'Tag: $tagName';
   }
 
   @override
-  String get tagCatalogDraftSubmitting =>
-      'The intention is being saved, so tags can’t be added now.';
+  String get tagsPanelTagHoldHint => 'Long press to open tag actions';
 
   @override
-  String get tagCatalogDraftClosed =>
-      'This draft is closed, so tags can’t be added.';
+  String get tagsPanelEditTag => 'Edit tag';
 
   @override
-  String get tagCatalogLoading => 'Loading tags…';
+  String get tagsPanelDuplicateTag => 'Duplicate tag';
 
   @override
-  String get tagCatalogEmpty => 'No tags yet.';
+  String get tagsPanelDeleteTag => 'Delete tag';
 
   @override
-  String get tagCatalogUnavailable => 'Tags couldn’t be loaded. Try again.';
+  String get tagsPanelDeleteTitle => 'Delete tag?';
 
   @override
-  String get tagCatalogCorruption =>
-      'Stored tag data is damaged and can’t be shown.';
+  String get tagsPanelDeleteTextBefore => 'This permanently deletes the tag ';
 
   @override
-  String get tagCatalogUnexpected =>
-      'Tags couldn’t be loaded because of an unexpected error.';
+  String get tagsPanelDeleteTextAfter =>
+      ' and all its assignments to active and archived intentions. The intentions, relations, daily choices and their paths remain.';
 
   @override
-  String get tagCatalogRefreshing => 'Refreshing tags…';
+  String get tagsPanelDeleteCancel => 'Cancel';
 
   @override
-  String get tagCatalogCreate => 'Create tag';
+  String get tagsPanelDeleteConfirm => 'Delete';
 
   @override
-  String get tagCatalogRename => 'Edit tag';
+  String get tagSheetNamePlaceholder => 'Name';
 
   @override
-  String get tagCatalogDelete => 'Delete tag';
-
-  @override
-  String tagDeleteConfirmationTitle(String tagName) {
-    return 'Delete tag “$tagName”?';
-  }
-
-  @override
-  String get tagDeleteConfirmationScope =>
-      'This permanently deletes the tag and all its assignments to active and archived intentions at the time of execution, including assignments not loaded here. The intentions, relations, daily choices and their paths remain.';
-
-  @override
-  String get tagDeleteCancel => 'Cancel';
-
-  @override
-  String get tagDeleteConfirm => 'Delete tag and assignments';
-
-  @override
-  String get tagDeleteAlreadyRunning =>
-      'An operation on this tag is already in progress. Wait for its result.';
-
-  @override
-  String get tagDeleteSaving => 'Deleting tag and assignments…';
-
-  @override
-  String get tagCatalogSelected => 'Selected tag';
-
-  @override
-  String get tagCatalogAssignmentUnknown => 'Assignment not yet checked';
+  String get tagSheetEditTitle => 'Edit tag';
 
   @override
   String get tagEditorCreateTitle => 'New tag';
 
   @override
-  String get tagEditorRenameTitle => 'Edit tag';
-
-  @override
   String get tagEditorNameLabel => 'Tag name';
-
-  @override
-  String get tagEditorNameLimit => 'No more than 255 visible characters.';
 
   @override
   String get tagColorNone => 'No color';
@@ -1952,64 +1813,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get tagEditorAlreadyRunning =>
       'Saving this tag is already in progress. Wait for its result.';
-
-  @override
-  String get tagEditorCancel => 'Cancel';
-
-  @override
-  String get tagEditorUseExisting => 'Use existing tag';
-
-  @override
-  String get tagEditorReadingCommitted => 'Tag saved. Refreshing its details…';
-
-  @override
-  String get tagEditorCommittedReadFailed =>
-      'Tag saved, but its details couldn’t be refreshed.';
-
-  @override
-  String get tagEditorCommittedMissing =>
-      'Tag saved, but is no longer found. Refresh the catalog.';
-
-  @override
-  String get tagEditorReadingExisting => 'Checking existing tag…';
-
-  @override
-  String get tagEditorExistingMissing =>
-      'The existing tag is gone. Correct the name or refresh the catalog.';
-
-  @override
-  String get tagEditorReadUnavailable => 'Tag couldn’t be read. Try again.';
-
-  @override
-  String get tagEditorReadCorruption => 'Stored tag data is damaged.';
-
-  @override
-  String get tagEditorReadUnexpected =>
-      'Tag couldn’t be read because of an unexpected error.';
-
-  @override
-  String get tagCreated => 'Tag created.';
-
-  @override
-  String get tagUpdated => 'Tag updated.';
-
-  @override
-  String get tagUnchanged => 'Tag name unchanged.';
-
-  @override
-  String get tagDeleted => 'Tag deleted with all its assignments.';
-
-  @override
-  String get tagAssigned => 'Tag assigned.';
-
-  @override
-  String get tagAlreadyAssigned => 'Tag already assigned.';
-
-  @override
-  String get tagAssignmentRemoved => 'Tag assignment removed.';
-
-  @override
-  String get tagAssignmentAlreadyAbsent => 'Tag assignment already absent.';
 
   @override
   String get tagAssignmentAlreadyRunning =>
@@ -2102,8 +1905,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tagNameNonCanonical => 'Remove whitespace around the tag name.';
 
   @override
-  String get tagNameOccupied =>
-      'A tag with this name already exists. Choose another name or use the existing tag.';
+  String get tagNameOccupied => 'A tag with this name already exists.';
 
   @override
   String get tagNotFound => 'This tag no longer exists. Refresh the catalog.';

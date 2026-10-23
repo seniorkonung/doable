@@ -1,9 +1,9 @@
 import 'dart:async';
 
-import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
-import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/design_system/components/tag_dot.dart';
+import 'package:doable/src/design_system/components/tag_row.dart';
+import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -14,32 +14,32 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_purp
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_section.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
-import 'package:doable/src/intention/presentation/catalog/tag_condition_picker_page.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
-import 'package:doable/src/tag/application/tag_change.dart';
-import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
+import 'package:doable/src/tag/presentation/panel/tags_panel_view_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/tag_catalog_test_repository.dart';
 import '../../../support/inline_text.dart';
+import '../../../support/tag_positions.dart';
+import '../../../support/tag_condition_cycles.dart';
 
 const _present = IntentionTagRequirement.mustBePresent;
 const _absent = IntentionTagRequirement.mustBeAbsent;
 const _purpose = BrowseIntentionCatalog();
 
 final _section = find.byType(IntentionTagConditionsSection);
-final _picker = find.byType(TagConditionPickerPage);
+final _panel = find.byType(TagRow);
 final _add = find.byKey(const ValueKey('intention-tag-conditions-add'));
 
 void main() {
   testWidgets(
-    'точки цветного и бесцветного тегов стоят перед названием при смене надобности и удалении',
+    'точки цветного и бесцветного тегов стоят перед названием при смене надобности',
     (tester) async {
       final h = await _open(tester);
       final home = _tag(1, 'Дом', color: TagColor.blue);
@@ -72,10 +72,6 @@ void main() {
       await tester.tap(_toggle(work));
       await tester.pump();
       expectLabels(['не \uFFFCДом', '\uFFFCРабота']);
-
-      await h.delete(home, revision: 2);
-      await h.delete(work, revision: 3);
-      expectLabels(['не \uFFFCДом (тег удалён)', '\uFFFCРабота (тег удалён)']);
     },
   );
 
@@ -110,24 +106,6 @@ void main() {
       expect(_chipIcon(health, Icons.block), findsNothing);
       expect(_chipIcon(sport, Icons.block), findsOneWidget);
       expect(_chipIcon(sport, Icons.check), findsNothing);
-    },
-  );
-
-  testWidgets(
-    'удалённый тег показан последним известным названием с пометкой и прежней надобностью',
-    (tester) async {
-      final h = await _open(tester);
-      final health = _tag(1, 'Здоровье');
-      final sport = _tag(2, 'Спорт');
-      await h.select(health, _present);
-      await h.select(sport, _absent);
-
-      await h.delete(health, revision: 2);
-      await h.delete(sport, revision: 3);
-
-      expect(h.shown, ['Здоровье (тег удалён)', 'не Спорт (тег удалён)']);
-      expect(_chipIcon(health, Icons.check), findsOneWidget);
-      expect(_chipIcon(sport, Icons.block), findsOneWidget);
     },
   );
 
@@ -189,19 +167,16 @@ void main() {
     },
   );
 
-  testWidgets('крестик снимает условие, в том числе удалённого тега', (
-    tester,
-  ) async {
+  testWidgets('крестик снимает условие', (tester) async {
     final h = await _open(tester);
     final health = _tag(1, 'Здоровье');
     final sport = _tag(2, 'Спорт');
     await h.select(health, _present);
     await h.select(sport, _absent);
-    await h.delete(health, revision: 2);
 
     await tester.tap(_remove(sport));
     await tester.pump();
-    expect(h.shown, ['Здоровье (тег удалён)']);
+    expect(h.shown, ['Здоровье']);
     expect(h.appliedFilter, IntentionTagFilter(requiredTagIds: [health.id]));
 
     await tester.tap(_remove(health));
@@ -212,27 +187,27 @@ void main() {
   });
 
   testWidgets(
-    'кнопка «+ Тег» открывает экран поиска тега с текущими условиями и передаёт выбор модели',
+    'кнопка «+ Тег» открывает панель фильтра с отметками текущих условий, а нажатия сразу применяют поиск',
     (tester) async {
       final h = await _open(tester);
       final health = _tag(1, 'Здоровье');
       final sport = _tag(2, 'Спорт');
       await h.select(sport, _absent);
 
-      await h.openPicker([health, sport]);
+      await h.openPanel([health, sport]);
 
-      expect(
-        find.descendant(
-          of: _picker,
-          matching: find.text('Уже выбран: должен отсутствовать'),
-        ),
-        findsOneWidget,
-      );
+      expect(find.text('Фильтр по тегам'), findsOneWidget);
+      expect(h.marks, [TagRowFilterMark.none, TagRowFilterMark.mustBeAbsent]);
 
-      await tester.tap(_pickerAction(health, _present));
-      await tester.pumpAndSettle();
+      // Первое нажатие добавляет условие в конец, второе меняет надобность
+      // на прежнем месте.
+      await tester.tap(_panelRow(health));
+      await tester.pump();
 
-      expect(_picker, findsNothing);
+      expect(h.marks, [
+        TagRowFilterMark.mustBePresent,
+        TagRowFilterMark.mustBeAbsent,
+      ]);
       expect(h.shown, ['не Спорт', 'Здоровье']);
       expect(
         h.appliedFilter,
@@ -241,44 +216,36 @@ void main() {
           excludedTagIds: [sport.id],
         ),
       );
+
+      await tester.tap(_panelRow(health));
+      await tester.pump();
+
+      expect(h.shown, ['не Спорт', 'не Здоровье']);
+      expect(
+        h.appliedFilter,
+        IntentionTagFilter(excludedTagIds: [sport.id, health.id]),
+      );
+      expect(h.repository.commands, isEmpty);
     },
   );
 
   testWidgets(
-    'повторный выбор тега на экране поиска меняет надобность существующего чипа',
+    'закрытие панели фильтра без нажатий сохраняет условия и выдачу',
     (tester) async {
       final h = await _open(tester);
       final health = _tag(1, 'Здоровье');
-      final sport = _tag(2, 'Спорт');
       await h.select(health, _present);
-      await h.select(sport, _absent);
+      final queriesBefore = h.repository.queries.length;
 
-      await h.openPicker([health, sport]);
-      await tester.tap(_pickerAction(health, _absent));
+      await h.openPanel([health]);
+      await tester.tap(find.text('Готово'));
       await tester.pumpAndSettle();
 
-      expect(h.shown, ['не Здоровье', 'не Спорт']);
+      expect(_panel, findsNothing);
+      expect(h.shown, ['Здоровье']);
+      expect(h.repository.queries, hasLength(queriesBefore));
     },
   );
-
-  testWidgets('закрытие экрана поиска тега без выбора сохраняет условия', (
-    tester,
-  ) async {
-    final h = await _open(tester);
-    final health = _tag(1, 'Здоровье');
-    await h.select(health, _present);
-    final queriesBefore = h.repository.queries.length;
-
-    await h.openPicker([health]);
-    await tester.tap(
-      find.descendant(of: _picker, matching: find.byType(BackButton)),
-    );
-    await tester.pumpAndSettle();
-
-    expect(_picker, findsNothing);
-    expect(h.shown, ['Здоровье']);
-    expect(h.repository.queries, hasLength(queriesBefore));
-  });
 
   testWidgets('раздел не читает каталог тегов и не выполняет команд тегов', (
     tester,
@@ -300,7 +267,6 @@ void main() {
         language,
         presentLabel,
         absentLabel,
-        deletedLabel,
         toggleHint,
         removeLabel,
         addLabel,
@@ -311,37 +277,32 @@ void main() {
           'ru',
           'Здоровье, должен быть',
           'Спорт, должен отсутствовать',
-          'Отдых, должен отсутствовать, тег удалён',
           'Переключить надобность: должен быть или должен отсутствовать',
           'Снять условие: Спорт',
           'Добавить условие по тегу',
-          ['Здоровье', 'не Спорт', 'не Отдых (тег удалён)'],
+          ['Здоровье', 'не Спорт'],
         ),
         (
           'en',
           'Здоровье, must be present',
           'Спорт, must be absent',
-          'Отдых, must be absent, tag deleted',
           'Toggle requirement: must be present or must be absent',
           'Remove condition: Спорт',
           'Add tag condition',
-          ['Здоровье', 'not Спорт', 'not Отдых (tag deleted)'],
+          ['Здоровье', 'not Спорт'],
         ),
       ]) {
     testWidgets(
-      '$language: диктор читает надобность, пометку удаления и назначение действий, ориентиры доступности выполнены',
+      '$language: диктор читает надобность и назначение действий, ориентиры доступности выполнены',
       (tester) async {
         final handle = tester.ensureSemantics();
         final h = await _open(tester, language: language);
-        final rest = _tag(3, 'Отдых');
         await h.select(_tag(1, 'Здоровье'), _present);
         await h.select(_tag(2, 'Спорт'), _absent);
-        await h.select(rest, _absent);
-        await h.delete(rest, revision: 2);
 
         // Названия тегов выводятся без перевода и преобразования.
         expect(h.shown, visible);
-        for (final label in [presentLabel, absentLabel, deletedLabel]) {
+        for (final label in [presentLabel, absentLabel]) {
           expect(
             tester.getSemantics(find.bySemanticsLabel(label)),
             isSemantics(
@@ -405,10 +366,6 @@ final class _Repository extends Fake implements PersonalGraphRepository {
     return read.future;
   }
 
-  /// Уточнение выбора из снимка остаётся без ответа: условие не меняется.
-  @override
-  Stream<TagReadResult> watchTag(TagId id) => const Stream.empty();
-
   @override
   Future<GraphCommandResult<TSuccess, TFailure>> execute<
     TSuccess extends GraphCommandOutcome,
@@ -432,30 +389,11 @@ final class _Repository extends Fake implements PersonalGraphRepository {
   }
 }
 
-/// Раздел на странице, с которой доступен настоящий маршрут поиска тега.
-final class _Router extends RootStackRouter {
-  @override
-  List<AutoRoute> get routes => [
-    NamedRouteDef(
-      name: 'ConditionsHostRoute',
-      path: '/',
-      builder: (_, _) => const Scaffold(
-        body: SingleChildScrollView(
-          padding: EdgeInsets.all(16),
-          child: IntentionTagConditionsSection(purpose: _purpose),
-        ),
-      ),
-    ),
-    AutoRoute(page: TagConditionPickerRoute.page),
-  ];
-}
-
 final class _Harness {
-  _Harness(this.tester, this.repository, this.changes);
+  _Harness(this.tester, this.repository);
 
   final WidgetTester tester;
   final _Repository repository;
-  final StreamController<ConfirmedGraphChangePackage> changes;
 
   ProviderContainer get _container =>
       ProviderScope.containerOf(tester.element(_section));
@@ -481,37 +419,29 @@ final class _Harness {
     return filter;
   }
 
-  /// Передаёт модели выбор так же, как его возвращает экран поиска тега.
+  /// Задаёт условие переключениями модели, как нажатиями в панели тегов:
+  /// «должен отсутствовать» требует второго переключения.
   Future<void> select(Tag tag, IntentionTagRequirement requirement) async {
-    _container
-        .read(intentionTagConditionsViewModelProvider(_purpose).notifier)
-        .applySelection(
-          IntentionTagConditionSelection(
-            tag: tag,
-            requirement: requirement,
-            snapshotRevision: const TagCatalogTestRevision(),
-          ),
-        );
-    await tester.pump();
-  }
-
-  /// Подтверждает физическое удаление тега другим экраном приложения.
-  Future<void> delete(Tag tag, {required int revision}) async {
-    final confirmed = TagCatalogTestRevision(revision);
-    changes.add(
-      _Package(confirmed, [
-        TagDeletedChange(revision: confirmed, tagId: tag.id),
-      ]),
+    final conditions = _container.read(
+      intentionTagConditionsViewModelProvider(_purpose).notifier,
     );
-    await tester.pump();
+    for (var i = 0; i < tagConditionCycles(requirement); i++) {
+      conditions.cycle(tag, snapshotRevision: const TagCatalogTestRevision());
+      await tester.pump();
+    }
   }
 
-  Future<void> openPicker(List<Tag> tags) async {
+  /// Отметки строк панели тегов в порядке показа.
+  List<TagRowMark> get marks => [
+    for (final row in tester.widgetList<TagRow>(_panel)) row.mark,
+  ];
+
+  Future<void> openPanel(List<Tag> tags) async {
     await tester.tap(_add);
-    // Индикатор загрузки анимируется бесконечно: ждём только переход маршрута.
+    // Индикатор загрузки анимируется бесконечно: ждём только открытие панели.
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
-    expect(_picker, findsOneWidget);
+    expect(find.text('Фильтр по тегам'), findsOneWidget);
     repository.completeTagCatalog(tags);
     await tester.pumpAndSettle();
   }
@@ -522,10 +452,8 @@ Future<_Harness> _open(WidgetTester tester, {String language = 'ru'}) async {
   final changes = StreamController<ConfirmedGraphChangePackage>.broadcast(
     sync: true,
   );
-  final router = _Router();
   addTearDown(() async {
     await tester.pumpWidget(const SizedBox.shrink());
-    router.dispose();
     await changes.close();
   });
   await tester.pumpWidget(
@@ -533,25 +461,24 @@ Future<_Harness> _open(WidgetTester tester, {String language = 'ru'}) async {
       overrides: [
         personalGraphRepositoryProvider.overrideWithValue(repository),
         intentionTagConditionsChangesProvider.overrideWithValue(changes.stream),
+        tagsPanelChangesProvider.overrideWithValue(changes.stream),
       ],
-      child: MaterialApp.router(
+      child: MaterialApp(
+        theme: doableTheme(Brightness.light),
         locale: Locale(language),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        routerConfig: router.config(),
+        home: const Scaffold(
+          body: SingleChildScrollView(
+            padding: EdgeInsets.all(16),
+            child: IntentionTagConditionsSection(purpose: _purpose),
+          ),
+        ),
       ),
     ),
   );
   await tester.pump();
-  return _Harness(tester, repository, changes);
-}
-
-final class _Package implements ConfirmedGraphChangePackage {
-  const _Package(this.revision, this.changes);
-  @override
-  final GraphRevision revision;
-  @override
-  final List<GraphChange> changes;
+  return _Harness(tester, repository);
 }
 
 Finder _chip(Tag tag) => find.byKey(
@@ -569,17 +496,16 @@ Finder _remove(Tag tag) => find.byKey(
   ValueKey('intention-tag-condition-remove-${tag.id.toCanonicalString()}'),
 );
 
-Finder _pickerAction(Tag tag, IntentionTagRequirement requirement) =>
-    find.byKey(
-      ValueKey(
-        'tag-condition-picker-${requirement.name}-'
-        '${tag.id.toCanonicalString()}',
-      ),
-    );
+Finder _panelRow(Tag tag) =>
+    find.byKey(ValueKey('tags-panel-row-${tag.id.toCanonicalString()}'));
 
 TagId _id(int number) => (TagId.decode(
   '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}',
 ) as TagIdDecodingSuccess).id;
 
-Tag _tag(int number, String name, {TagColor? color}) =>
-    Tag(id: _id(number), name: TagName.fromInput(name), color: color);
+Tag _tag(int number, String name, {TagColor? color}) => Tag(
+  id: _id(number),
+  name: TagName.fromInput(name),
+  color: color,
+  position: tagPositionAt(number),
+);
