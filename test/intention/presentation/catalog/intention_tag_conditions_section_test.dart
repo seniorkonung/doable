@@ -27,6 +27,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../../support/tag_catalog_test_repository.dart';
 import '../../../support/inline_text.dart';
 import '../../../support/tag_positions.dart';
+import '../../../support/tag_condition_cycles.dart';
 
 const _present = IntentionTagRequirement.mustBePresent;
 const _absent = IntentionTagRequirement.mustBeAbsent;
@@ -418,18 +419,16 @@ final class _Harness {
     return filter;
   }
 
-  /// Передаёт модели выбор так же, как его возвращает экран поиска тега.
+  /// Задаёт условие переключениями модели, как нажатиями в панели тегов:
+  /// «должен отсутствовать» требует второго переключения.
   Future<void> select(Tag tag, IntentionTagRequirement requirement) async {
-    _container
-        .read(intentionTagConditionsViewModelProvider(_purpose).notifier)
-        .applySelection(
-          IntentionTagConditionSelection(
-            tag: tag,
-            requirement: requirement,
-            snapshotRevision: const TagCatalogTestRevision(),
-          ),
-        );
-    await tester.pump();
+    final conditions = _container.read(
+      intentionTagConditionsViewModelProvider(_purpose).notifier,
+    );
+    for (var i = 0; i < tagConditionCycles(requirement); i++) {
+      conditions.cycle(tag, snapshotRevision: const TagCatalogTestRevision());
+      await tester.pump();
+    }
   }
 
   /// Отметки строк панели тегов в порядке показа.

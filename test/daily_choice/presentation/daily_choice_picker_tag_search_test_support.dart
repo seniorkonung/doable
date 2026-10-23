@@ -24,6 +24,7 @@ import '../../support/app_root_pages.dart';
 import '../../support/inline_text.dart';
 import '../../intention/presentation/catalog/intention_picker_session_test_support.dart';
 import '../../support/tag_positions.dart';
+import '../../support/tag_condition_cycles.dart';
 
 /// Страница выбора намерения для дневного выбора и её ограничения поиска.
 ///
@@ -252,26 +253,22 @@ Future<void> _applyConditions(
   List<(Tag, IntentionTagRequirement)> conditions,
   Result<IntentionCatalogFirstPage> result,
 ) async {
-  final expectedQueries = repository.queries.length + conditions.length;
+  final model = container.read(
+    intentionTagConditionsViewModelProvider(
+      tester
+          .widget<IntentionTagConditionsSection>(
+            find.byType(IntentionTagConditionsSection),
+          )
+          .purpose,
+    ).notifier,
+  );
+  var expectedQueries = repository.queries.length;
   for (final (tag, requirement) in conditions) {
-    container
-        .read(
-          intentionTagConditionsViewModelProvider(
-            tester
-                .widget<IntentionTagConditionsSection>(
-                  find.byType(IntentionTagConditionsSection),
-                )
-                .purpose,
-          ).notifier,
-        )
-        .applySelection(
-          IntentionTagConditionSelection(
-            tag: tag,
-            requirement: requirement,
-            snapshotRevision: const TestCatalogRevision(0),
-          ),
-        );
-    await tester.pump();
+    for (var i = 0; i < tagConditionCycles(requirement); i++) {
+      model.cycle(tag, snapshotRevision: const TestCatalogRevision(0));
+      expectedQueries++;
+      await tester.pump();
+    }
   }
   await _pumpUntilQueries(tester, repository, expectedQueries);
   repository.complete(expectedQueries - 1, result);

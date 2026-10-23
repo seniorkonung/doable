@@ -40,6 +40,7 @@ import '../../../support/inline_text.dart';
 import '../../../support/quick_creation.dart';
 import 'catalog_test_support.dart';
 import 'catalog_reconciliation_test_support.dart';
+import '../../../support/tag_condition_cycles.dart';
 import '../../../support/tag_positions.dart';
 
 void main() {
@@ -1326,24 +1327,24 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('catalog-scope-control')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Archived').last);
-    await _pumpUntilQueries(tester, repository, 4);
-    expect(repository.queryAt(3).scope, IntentionScope.archived);
-    expect(repository.queryAt(3).tagFilter, filter);
-    repository.complete(3, _firstPage(_taggedSummaries([health], last: 59)));
+    await _pumpUntilQueries(tester, repository, 5);
+    expect(repository.queryAt(4).scope, IntentionScope.archived);
+    expect(repository.queryAt(4).tagFilter, filter);
+    repository.complete(4, _firstPage(_taggedSummaries([health], last: 59)));
     await tester.pumpAndSettle();
     expect(_shownConditions(tester), ['Здоровье', 'not Спорт']);
 
     await tester.tap(find.byKey(const ValueKey('catalog-order-control')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Created: oldest first').last);
-    await _pumpUntilQueries(tester, repository, 5);
-    expect(repository.queryAt(4).scope, IntentionScope.archived);
+    await _pumpUntilQueries(tester, repository, 6);
+    expect(repository.queryAt(5).scope, IntentionScope.archived);
     expect(
-      repository.queryAt(4).order,
+      repository.queryAt(5).order,
       IntentionCatalogOrder.createdAtAscending,
     );
-    expect(repository.queryAt(4).tagFilter, filter);
-    repository.complete(4, _firstPage(_taggedSummaries([health], last: 59)));
+    expect(repository.queryAt(5).tagFilter, filter);
+    repository.complete(5, _firstPage(_taggedSummaries([health], last: 59)));
     await tester.pumpAndSettle();
     expect(_shownConditions(tester), ['Здоровье', 'not Спорт']);
   });
@@ -1966,32 +1967,28 @@ Future<void> _scrollCatalogDown(WidgetTester tester) async {
   expect(_catalogScrollPosition(tester).pixels, greaterThan(0));
 }
 
-/// Передаёт модели условий выбор так же, как его возвращает экран поиска
-/// тега.
+/// Задаёт условие переключениями модели условий, как нажатиями в панели
+/// тегов; каждое переключение сразу начинает новую выдачу.
 Future<void> _selectCondition(
   WidgetTester tester,
   ProviderContainer container,
   Tag tag,
   IntentionTagRequirement requirement,
 ) async {
-  container
-      .read(
-        intentionTagConditionsViewModelProvider(const BrowseIntentionCatalog())
-            .notifier,
-      )
-      .applySelection(
-        IntentionTagConditionSelection(
-          tag: tag,
-          requirement: requirement,
-          snapshotRevision: const TestCatalogRevision(0),
-        ),
-      );
-  await tester.pump();
+  final conditions = container.read(
+    intentionTagConditionsViewModelProvider(const BrowseIntentionCatalog())
+        .notifier,
+  );
+  for (var i = 0; i < tagConditionCycles(requirement); i++) {
+    conditions.cycle(tag, snapshotRevision: const TestCatalogRevision(0));
+    await tester.pump();
+  }
 }
 
-/// Открывает каталог и выбирает условия через модель раздела условий.
+/// Открывает каталог и задаёт условия через модель раздела условий.
 ///
-/// Каждое условие сразу начинает новую выдачу; [page] отвечает на последнюю.
+/// Каждое переключение сразу начинает новую выдачу; [page] отвечает на
+/// последнюю.
 Future<void> _openCatalogWithConditions(
   WidgetTester tester,
   ProviderContainer container,
@@ -2002,11 +1999,13 @@ Future<void> _openCatalogWithConditions(
   await tester.pumpWidget(_testAppWithContainer(container));
   repository.complete(0, _firstPage(const []));
   await tester.pumpAndSettle();
+  var queries = 1;
   for (final (tag, requirement) in conditions) {
     await _selectCondition(tester, container, tag, requirement);
+    queries += tagConditionCycles(requirement);
   }
-  await _pumpUntilQueries(tester, repository, conditions.length + 1);
-  repository.complete(conditions.length, page);
+  await _pumpUntilQueries(tester, repository, queries);
+  repository.complete(queries - 1, page);
   await tester.pumpAndSettle();
 }
 

@@ -72,19 +72,6 @@ final class IntentionTagCondition {
   int get hashCode => Object.hash(tagId, requirement, name, color);
 }
 
-/// Выбор тега с надобностью из снимка каталога тегов на [snapshotRevision].
-final class IntentionTagConditionSelection {
-  const IntentionTagConditionSelection({
-    required this.tag,
-    required this.requirement,
-    required this.snapshotRevision,
-  });
-
-  final Tag tag;
-  final IntentionTagRequirement requirement;
-  final GraphRevision snapshotRevision;
-}
-
 /// Условия одного назначения поиска в порядке добавления, по одному на тег.
 final class IntentionTagConditionsState {
   IntentionTagConditionsState(Iterable<IntentionTagCondition> conditions)
@@ -170,22 +157,6 @@ final class IntentionTagConditionsViewModel
     // Модель каталога хранит применённый фильтр и живёт не меньше условий.
     ref.listen(intentionCatalogViewModelProvider(purpose), (_, _) {});
     return _snapshot();
-  }
-
-  /// Добавляет условие по выбранному тегу либо меняет надобность уже
-  /// существующего условия, сохраняя его место.
-  ///
-  /// Выбор тега из снимка, устаревшего к подтверждённому удалению этого тега,
-  /// не меняет ни условий, ни выдачи.
-  void applySelection(IntentionTagConditionSelection selection) {
-    final IntentionTagConditionSelection(
-      :tag,
-      :requirement,
-      :snapshotRevision,
-    ) = selection;
-    if (_deletedTagIds.contains(tag.id)) return;
-    _put(tag, requirement, snapshotRevision);
-    _publish();
   }
 
   @override

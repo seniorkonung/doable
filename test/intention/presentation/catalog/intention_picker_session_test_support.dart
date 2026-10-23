@@ -24,6 +24,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'catalog_reconciliation_test_support.dart';
 import 'catalog_test_support.dart';
 import '../../../support/app_root_pages.dart';
+import '../../../support/tag_condition_cycles.dart';
 import '../../../support/tag_positions.dart';
 
 /// Проверяет жизнь поисков одного назначения в настоящем стеке маршрутов.
@@ -59,22 +60,18 @@ void defineIntentionPickerSessionTests({
       (health, IntentionTagRequirement.mustBePresent),
       (rest, IntentionTagRequirement.mustBeAbsent),
     ]) {
-      conditions.applySelection(
-        IntentionTagConditionSelection(
-          tag: tag,
-          requirement: requirement,
-          snapshotRevision: const TestCatalogRevision(1),
-        ),
-      );
-      await tester.pump();
+      for (var i = 0; i < tagConditionCycles(requirement); i++) {
+        conditions.cycle(tag, snapshotRevision: const TestCatalogRevision(1));
+        await tester.pump();
+      }
     }
-    repository.complete(4, _page('Первая', hasMore: true));
+    repository.complete(5, _page('Первая', hasMore: true));
     await tester.pumpAndSettle();
     final continuation = container
         .read(intentionCatalogViewModelProvider(first).notifier)
         .loadNextPageIfNeeded(visibleIndex: 59);
     repository.complete(
-      5,
+      6,
       ResultSuccess(
         IntentionCatalogContinuationPage(
           items: _items('Первая', 60),
@@ -98,21 +95,21 @@ void defineIntentionPickerSessionTests({
     unawaited(router.push<void>(route));
     await _settleRoute(tester);
     final second = _purpose(tester);
-    final initialQuery = repository.queryAt(6);
+    final initialQuery = repository.queryAt(7);
     expect(initialQuery.titleFilter, isNull);
     expect(initialQuery.tagFilter, IntentionTagFilter.empty);
     expect(initialQuery.scope, scope);
     expect(initialQuery.excludedIntentionId, excludedIntentionId);
     expect(initialQuery.readinessFilter, readinessFilter);
     expect(initialQuery.pageSize, 60);
-    repository.complete(6, _page('Вторая'));
+    repository.complete(7, _page('Вторая'));
     await tester.pumpAndSettle();
     expect(_position(tester, listKey).pixels, 0);
 
     await tester.enterText(find.byKey(ValueKey(filterKey)), 'Вторая');
     await tester.pump(const Duration(milliseconds: 300));
     await tester.pump();
-    repository.complete(7, _page('Вторая'));
+    repository.complete(8, _page('Вторая'));
     await tester.pumpAndSettle();
     final secondConditions = container.read(
       intentionTagConditionsViewModelProvider(second).notifier,
@@ -121,16 +118,15 @@ void defineIntentionPickerSessionTests({
       (health, IntentionTagRequirement.mustBeAbsent),
       (rest, IntentionTagRequirement.mustBePresent),
     ]) {
-      secondConditions.applySelection(
-        IntentionTagConditionSelection(
-          tag: tag,
-          requirement: requirement,
+      for (var i = 0; i < tagConditionCycles(requirement); i++) {
+        secondConditions.cycle(
+          tag,
           snapshotRevision: const TestCatalogRevision(1),
-        ),
-      );
-      await tester.pump();
+        );
+        await tester.pump();
+      }
     }
-    repository.complete(9, _page('Вторая'));
+    repository.complete(11, _page('Вторая'));
     await tester.pumpAndSettle();
     _position(tester, listKey).jumpTo(200);
     await tester.pumpAndSettle();

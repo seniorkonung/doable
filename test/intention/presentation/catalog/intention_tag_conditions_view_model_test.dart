@@ -157,7 +157,7 @@ void main() {
       'выдачи', () {
     final h = _Harness();
     addTearDown(h.dispose);
-    h.select(_tag(1, 'Здоровье'), _present);
+    h.cycle(_tag(1, 'Здоровье'));
     expect(h.appliedFilter, IntentionTagFilter(requiredTagIds: [_id(1)]));
     final queries = h.repository.queries.length;
 
@@ -175,10 +175,12 @@ void main() {
       'фильтра', () {
     final h = _Harness();
     addTearDown(h.dispose);
-    h.select(_tag(1, 'Здоровье'), _present);
-    h.select(_tag(2, 'Спорт'), _absent);
-    h.select(_tag(3, 'Отдых'), _present);
-    h.select(_tag(4, 'Работа'), _absent);
+    h.cycle(_tag(1, 'Здоровье'));
+    h.cycle(_tag(2, 'Спорт'));
+    h.cycle(_tag(2, 'Спорт'));
+    h.cycle(_tag(3, 'Отдых'));
+    h.cycle(_tag(4, 'Работа'));
+    h.cycle(_tag(4, 'Работа'));
     h.appliedFilter;
     final queries = h.repository.queries.length;
 
@@ -194,7 +196,7 @@ void main() {
   test('новый тег с прежним названием не восстанавливает снятое условие', () {
     final h = _Harness();
     addTearDown(h.dispose);
-    h.select(_tag(1, 'Здоровье'), _present);
+    h.cycle(_tag(1, 'Здоровье'));
     h.delete(2, _id(1));
 
     h.package(3, [
@@ -207,42 +209,18 @@ void main() {
     expect(h.conditions, isEmpty);
   });
 
-  test('выбор уже удалённого тега из устаревшего снимка не меняет условий и '
-      'выдачи', () {
-    final h = _Harness();
-    addTearDown(h.dispose);
-    h.select(_tag(2, 'Спорт'), _present);
-    h.delete(2, _id(1));
-    h.appliedFilter;
-    final queries = h.repository.queries.length;
-
-    h.select(_tag(1, 'Здоровье'), _absent, revision: 1);
-
-    expect(h.shown, [(_id(2), _present, 'Спорт')]);
-    expect(h.appliedFilter, IntentionTagFilter(requiredTagIds: [_id(2)]));
-    expect(h.repository.queries, hasLength(queries));
-  });
-
-  test('повторный выбор из более нового снимка обновляет название и '
+  test('переключение тегом из более нового снимка обновляет название и '
       'цвет', () {
     final h = _Harness();
     addTearDown(h.dispose);
-    h.select(_tag(1, 'Здоровье'), _present);
+    h.cycle(_tag(1, 'Здоровье'));
     h.package(2, [
       TagCreatedChange(revision: const _Revision(2), after: _tag(8, 'Быт')),
     ]);
 
-    h.select(
-      _tag(1, 'Самочувствие', color: TagColor.blue),
-      _absent,
-      revision: 2,
-    );
-    expect(h.shown, [(_id(1), _absent, 'Самочувствие')]);
-    expect(h.colors, {_id(1): TagColor.blue});
+    h.cycle(_tag(1, 'Самочувствие', color: TagColor.blue), revision: 2);
 
-    // Прежний снимок не возвращает уже подтверждённые название и цвет.
-    h.select(_tag(1, 'Здоровье'), _present, revision: 1);
-    expect(h.shown, [(_id(1), _present, 'Самочувствие')]);
+    expect(h.shown, [(_id(1), _absent, 'Самочувствие')]);
     expect(h.colors, {_id(1): TagColor.blue});
   });
 
@@ -254,7 +232,7 @@ void main() {
     final subscription = h.container.listen(conditions, (_, _) {});
     addTearDown(subscription.close);
 
-    h.select(_tag(1, 'Здоровье'), _present);
+    h.cycle(_tag(1, 'Здоровье'));
     expect(h.container.read(conditions).conditions, isEmpty);
     expect(
       h.container
@@ -264,15 +242,9 @@ void main() {
       IntentionTagFilter.empty,
     );
 
-    h.container
-        .read(conditions.notifier)
-        .applySelection(
-          IntentionTagConditionSelection(
-            tag: _tag(2, 'Спорт'),
-            requirement: _absent,
-            snapshotRevision: const _Revision(1),
-          ),
-        );
+    h.container.read(conditions.notifier)
+      ..cycle(_tag(2, 'Спорт'), snapshotRevision: const _Revision(1))
+      ..cycle(_tag(2, 'Спорт'), snapshotRevision: const _Revision(1));
     expect(h.shown, [(_id(1), _present, 'Здоровье')]);
     expect(h.appliedFilter, IntentionTagFilter(requiredTagIds: [_id(1)]));
     expect(
@@ -334,20 +306,6 @@ final class _Harness {
     container.read(intentionCatalogViewModelProvider(purpose));
     expect(repository.queries.last.tagFilter, filter);
     return filter;
-  }
-
-  void select(
-    Tag tag,
-    IntentionTagRequirement requirement, {
-    int revision = 1,
-  }) {
-    model.applySelection(
-      IntentionTagConditionSelection(
-        tag: tag,
-        requirement: requirement,
-        snapshotRevision: _Revision(revision),
-      ),
-    );
   }
 
   void cycle(Tag tag, {int revision = 1}) =>

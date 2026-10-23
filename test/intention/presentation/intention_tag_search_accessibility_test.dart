@@ -29,6 +29,7 @@ import '../../support/app_root_pages.dart';
 import '../../support/inline_text.dart';
 import 'catalog/catalog_reconciliation_test_support.dart';
 import 'catalog/catalog_test_support.dart';
+import '../../support/tag_condition_cycles.dart';
 import '../../support/tag_positions.dart';
 
 /// Нижняя граница области над открытой клавиатурой: окно 900, inset 300.
@@ -157,19 +158,18 @@ void main() {
       expect(repository.queries.last.titleFilter?.map((value) => value), 'ход');
 
       // Много условий с длинными названиями.
+      final model = container.read(conditionsProvider.notifier);
       for (var index = 0; index < _initialConditions; index++) {
-        container
-            .read(conditionsProvider.notifier)
-            .applySelection(
-              IntentionTagConditionSelection(
-                tag: _tags[index],
-                requirement: index.isEven
-                    ? IntentionTagRequirement.mustBePresent
-                    : IntentionTagRequirement.mustBeAbsent,
-                snapshotRevision: const TestCatalogRevision(0),
-              ),
-            );
-        await tester.pump();
+        final requirement = index.isEven
+            ? IntentionTagRequirement.mustBePresent
+            : IntentionTagRequirement.mustBeAbsent;
+        for (var i = 0; i < tagConditionCycles(requirement); i++) {
+          model.cycle(
+            _tags[index],
+            snapshotRevision: const TestCatalogRevision(0),
+          );
+          await tester.pump();
+        }
       }
       await _pumpFrames(tester);
       expect(tester.takeException(), isNull);

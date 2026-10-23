@@ -1707,32 +1707,6 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось загрузить следующую порцию намерений из-за непредвиденной ошибки.';
 
   @override
-  String get tagConditionPickerTitle => 'Тег для условия поиска';
-
-  @override
-  String get tagConditionPickerPresent => 'Есть';
-
-  @override
-  String get tagConditionPickerAbsent => 'Нет';
-
-  @override
-  String tagConditionPickerPresentNamed(String tagName) {
-    return 'Есть, $tagName';
-  }
-
-  @override
-  String tagConditionPickerAbsentNamed(String tagName) {
-    return 'Нет, $tagName';
-  }
-
-  @override
-  String get tagConditionPickerSelectedPresent => 'Уже выбран: должен быть';
-
-  @override
-  String get tagConditionPickerSelectedAbsent =>
-      'Уже выбран: должен отсутствовать';
-
-  @override
   String intentionTagConditionAbsent(String tagName) {
     return 'не $tagName';
   }

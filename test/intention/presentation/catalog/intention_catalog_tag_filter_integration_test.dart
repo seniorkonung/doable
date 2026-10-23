@@ -696,8 +696,10 @@ void main() {
       await confirmed();
       final snapshot = await _tagSnapshot(repository);
       final model = container.read(conditions.notifier);
-      model.applySelection(snapshot.select(301, _present));
-      model.applySelection(snapshot.select(302, _absent));
+      snapshot
+        ..cycle(model, 301)
+        ..cycle(model, 302)
+        ..cycle(model, 302);
       expect((await confirmed()).totalCount, 5);
 
       await _completeTag(
@@ -757,15 +759,14 @@ void main() {
       await confirmed();
       await confirmed(action);
       final snapshot = await _tagSnapshot(repository);
-      container
-          .read(conditions.notifier)
-          .applySelection(snapshot.select(302, _present));
-      container.read(
-          intentionTagConditionsViewModelProvider(_actionSearchPurpose)
-              .notifier,
-        )
-        ..applySelection(snapshot.select(301, _present))
-        ..applySelection(snapshot.select(302, _absent));
+      snapshot.cycle(container.read(conditions.notifier), 302);
+      final actionConditions = container.read(
+        intentionTagConditionsViewModelProvider(_actionSearchPurpose).notifier,
+      );
+      snapshot
+        ..cycle(actionConditions, 301)
+        ..cycle(actionConditions, 302)
+        ..cycle(actionConditions, 302);
       final browseBefore = await confirmed();
       final actionBefore = await confirmed(action);
       expect(browseBefore.totalCount, 1);
@@ -829,14 +830,12 @@ final class _TagSnapshot {
 
   List<String> get names => [for (final tag in tags) tag.name.value];
 
-  IntentionTagConditionSelection select(
-    int number,
-    IntentionTagRequirement requirement,
-  ) => IntentionTagConditionSelection(
-    tag: tags.singleWhere((tag) => tag.id == _tagId(number)),
-    requirement: requirement,
-    snapshotRevision: revision,
-  );
+  /// Переключает условие по тегу [number] так же, как нажатие в панели.
+  void cycle(IntentionTagConditionSet conditions, int number) =>
+      conditions.cycle(
+        tags.singleWhere((tag) => tag.id == _tagId(number)),
+        snapshotRevision: revision,
+      );
 }
 
 Future<_TagSnapshot> _tagSnapshot(
