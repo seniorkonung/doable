@@ -130,10 +130,6 @@ void main() {
       }
     }
 
-    Map<IntentionId, int> catalogCounts() => {
-      for (final item in catalog().items) item.id: item.activeRelationCount,
-    };
-
     setUp(() async {
       database = AppDatabase(
         openInMemoryLocalDatabase(setup: (db) => raw = db),
@@ -206,7 +202,6 @@ void main() {
       await settle(initialRevision);
       final countsBefore = neighborhood().counts;
       final detailsCountsBefore = details().details.relationCounts;
-      final catalogCountsBefore = catalogCounts();
       expect(catalog().items.map((item) => item.id), expected);
       expect(catalog().totalCount, expected.length);
 
@@ -273,7 +268,6 @@ void main() {
       expect(neighborhood().counts, countsBefore);
       expect(details().details.relationCounts, detailsCountsBefore);
       expect(catalog().totalCount, expected.length);
-      expect(catalogCounts(), catalogCountsBefore);
     });
   });
 
@@ -865,12 +859,6 @@ void main() {
       final catalogAfter =
           container.read(catalogProvider).requireValue
               as IntentionCatalogLoaded;
-      expect(catalogAfter.items.map((item) => item.activeRelationCount), [
-        1,
-        1,
-        1,
-        1,
-      ]);
       expect(
         catalogAfter.items.map(
           (item) =>
@@ -885,7 +873,6 @@ void main() {
               as IntentionCatalogLoaded;
       expect(filteredAfter.selection.titleFilterText, 'Намерение 1');
       expect(filteredAfter.items.single.id, ids[0]);
-      expect(filteredAfter.items.single.activeRelationCount, 1);
       expect(filteredAfter.totalCount, 1);
       for (final id in ids) {
         final details = container.read(
@@ -968,11 +955,10 @@ void main() {
       );
       await pumpEventQueue();
 
-      expect(harness.catalogCounts, {
-        testIntentionId(1002): 1,
-        testIntentionId(1001): 1,
-        testIntentionId(1): 2,
-      });
+      expect(
+        harness.catalog.revision.compareTo(const TestGraphRevision(9)),
+        GraphRevisionOrder.same,
+      );
       expect(harness.catalog.items.map((item) => item.id), [
         testIntentionId(1002),
         testIntentionId(1001),
@@ -1007,8 +993,6 @@ void main() {
       await pumpEventQueue();
 
       expect(harness.catalogTitles[testIntentionId(1001)], 'Переименованное');
-      expect(harness.catalogCounts[testIntentionId(1001)], 1);
-      expect(harness.catalogCounts[testIntentionId(1)], 2);
       expect(harness.catalog.items, hasLength(3));
       expect(harness.catalog.totalCount, 3);
       expect(harness.neighborhood.items.first.related.title, 'Переименованное');
@@ -1128,251 +1112,240 @@ void main() {
     },
   );
 
-  test(
-    'перемещение связи согласует каталог и подробные данные всех участников',
-    () async {
-      final repository = _CheckpointGraphRepository();
-      final container = ProviderContainer(
-        overrides: [
-          personalGraphRepositoryProvider.overrideWithValue(repository),
-          catalogPagingPolicyProvider.overrideWithValue(
-            CatalogPagingPolicy(
-              pageSize: 4,
-              prefetchRemaining: 0,
-              filterDebounce: Duration.zero,
-            ),
+  test('перемещение связи продвигает ревизию каталога без замены строк и '
+      'согласует подробные данные всех участников', () async {
+    final repository = _CheckpointGraphRepository();
+    final container = ProviderContainer(
+      overrides: [
+        personalGraphRepositoryProvider.overrideWithValue(repository),
+        catalogPagingPolicyProvider.overrideWithValue(
+          CatalogPagingPolicy(
+            pageSize: 4,
+            prefetchRemaining: 0,
+            filterDebounce: Duration.zero,
           ),
-        ],
-        retry: (retryCount, error) => null,
-      );
-      final participantIds = [
-        testIntentionId(1),
-        testIntentionId(2),
-        testIntentionId(3),
-        testIntentionId(4),
-      ];
-      final catalogSubscription = container.listen(
-        intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
-        (_, _) {},
-        fireImmediately: true,
-      );
-      final detailSubscriptions = [
-        for (final id in participantIds)
-          container.listen(
-            intentionDetailsViewModelProvider(id),
-            (_, _) {},
-            fireImmediately: true,
-          ),
-      ];
-      addTearDown(() async {
-        catalogSubscription.close();
-        for (final subscription in detailSubscriptions) {
-          subscription.close();
-        }
-        container.dispose();
-        await repository.dispose();
-      });
+        ),
+      ],
+      retry: (retryCount, error) => null,
+    );
+    final participantIds = [
+      testIntentionId(1),
+      testIntentionId(2),
+      testIntentionId(3),
+      testIntentionId(4),
+    ];
+    final catalogSubscription = container.listen(
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
+      (_, _) {},
+      fireImmediately: true,
+    );
+    final detailSubscriptions = [
+      for (final id in participantIds)
+        container.listen(
+          intentionDetailsViewModelProvider(id),
+          (_, _) {},
+          fireImmediately: true,
+        ),
+    ];
+    addTearDown(() async {
+      catalogSubscription.close();
+      for (final subscription in detailSubscriptions) {
+        subscription.close();
+      }
+      container.dispose();
+      await repository.dispose();
+    });
 
-      final summaries = [
-        catalog_support.testSummary(
-          index: 4,
-          title: 'Участник Г',
-          activeRelationCount: 0,
-        ),
-        catalog_support.testSummary(
-          index: 3,
-          title: 'Участник В',
-          activeRelationCount: 0,
-        ),
-        catalog_support.testSummary(
-          index: 2,
-          title: 'Участник Б',
-          activeRelationCount: 1,
-        ),
-        catalog_support.testSummary(
-          index: 1,
-          title: 'Участник А',
-          activeRelationCount: 1,
-        ),
-      ];
-      repository.completeCatalogPage(
-        0,
-        ResultSuccess(
-          IntentionCatalogFirstPage(
-            items: summaries,
-            totalCount: summaries.length,
-            nextCursor: null,
-            revision: const TestGraphRevision(4),
-          ),
-        ),
-      );
-      await container.read(
-        intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
-            .future,
-      );
-      for (var index = 0; index < participantIds.length; index++) {
-        repository.emitIntention(
-          participantIds[index],
-          testNeighborhoodIntention(
-            id: participantIds[index],
-            title: 'Участник ${String.fromCharCode(1040 + index)}',
-          ),
-          counts: switch (index) {
-            0 => testRelationCounts(activeNeedOutgoing: 1),
-            1 => testRelationCounts(activeNeedIncoming: 1),
-            _ => testRelationCounts(),
-          },
+    final summaries = [
+      catalog_support.testSummary(
+        index: 4,
+        title: 'Участник Г',
+        activeRelationCount: 0,
+      ),
+      catalog_support.testSummary(
+        index: 3,
+        title: 'Участник В',
+        activeRelationCount: 0,
+      ),
+      catalog_support.testSummary(
+        index: 2,
+        title: 'Участник Б',
+        activeRelationCount: 1,
+      ),
+      catalog_support.testSummary(
+        index: 1,
+        title: 'Участник А',
+        activeRelationCount: 1,
+      ),
+    ];
+    repository.completeCatalogPage(
+      0,
+      ResultSuccess(
+        IntentionCatalogFirstPage(
+          items: summaries,
+          totalCount: summaries.length,
+          nextCursor: null,
           revision: const TestGraphRevision(4),
-        );
-      }
-      await pumpEventQueue();
-
-      final relationBefore = catalog_support.testRelation(
-        sourceIntentionId: participantIds[0],
-        relatedIntentionId: participantIds[1],
-        index: 41,
-      );
-      final relationAfter = LongTermRelation(
-        id: relationBefore.id,
-        sourceIntentionId: participantIds[2],
-        relatedIntentionId: participantIds[3],
-        type: relationBefore.type,
-        priority: relationBefore.priority,
-        scope: relationBefore.scope,
-        creationSequence: relationBefore.creationSequence,
-      );
-      final coordinator = container.read(
-        graphCommandCoordinatorProvider.notifier,
-      );
-      final accepted = coordinator.acceptRelationUpdate(
-        UpdateLongTermRelation(
-          relationId: relationBefore.id,
-          patch: LongTermRelationPatch(
-            sourceIntentionId: LongTermRelationFieldSet(participantIds[2]),
-            relatedIntentionId: LongTermRelationFieldSet(participantIds[3]),
-          ),
         ),
-      );
-      expect(accepted, isA<LongTermRelationCommandAccepted>());
-      repository.completeRelationCommand(
-        0,
-        GraphCommandSucceeded(
-          ConfirmedGraphResult(
-            revision: const TestGraphRevision(9),
-            value: LongTermRelationUpdated(
-              before: relationBefore,
-              relation: relationAfter,
-              description: null,
-              changes: [
-                IntentionRelationCountsChanged(
-                  revision: const TestGraphRevision(9),
-                  intentionId: participantIds[0],
-                  counts: testRelationCounts(),
-                ),
-                IntentionRelationCountsChanged(
-                  revision: const TestGraphRevision(9),
-                  intentionId: participantIds[1],
-                  counts: testRelationCounts(),
-                ),
-                IntentionRelationCountsChanged(
-                  revision: const TestGraphRevision(9),
-                  intentionId: participantIds[2],
-                  counts: testRelationCounts(activeNeedOutgoing: 1),
-                ),
-                IntentionRelationCountsChanged(
-                  revision: const TestGraphRevision(9),
-                  intentionId: participantIds[3],
-                  counts: testRelationCounts(activeNeedIncoming: 1),
-                ),
-                LongTermRelationUpdatedChange(
-                  revision: const TestGraphRevision(9),
-                  before: relationBefore,
-                  after: relationAfter,
-                ),
-              ],
-            ),
-          ),
+      ),
+    );
+    await container.read(
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog()).future,
+    );
+    for (var index = 0; index < participantIds.length; index++) {
+      repository.emitIntention(
+        participantIds[index],
+        testNeighborhoodIntention(
+          id: participantIds[index],
+          title: 'Участник ${String.fromCharCode(1040 + index)}',
         ),
-      );
-      await (accepted as LongTermRelationCommandAccepted).future;
-      await pumpEventQueue();
-
-      IntentionCatalogLoaded catalog() =>
-          container
-                  .read(
-                    intentionCatalogViewModelProvider(
-                      const BrowseIntentionCatalog(),
-                    ),
-                  )
-                  .requireValue
-              as IntentionCatalogLoaded;
-      int activeCount(IntentionId id) => (container.read(
-        intentionDetailsViewModelProvider(id),
-      ) as IntentionDetailsLoaded).details.relationCounts.active;
-      String title(IntentionId id) => (container.read(
-        intentionDetailsViewModelProvider(id),
-      ) as IntentionDetailsLoaded).details.intention.title;
-
-      expect(
-        {for (final item in catalog().items) item.id: item.activeRelationCount},
-        {
-          participantIds[3]: 1,
-          participantIds[2]: 1,
-          participantIds[1]: 0,
-          participantIds[0]: 0,
+        counts: switch (index) {
+          0 => testRelationCounts(activeNeedOutgoing: 1),
+          1 => testRelationCounts(activeNeedIncoming: 1),
+          _ => testRelationCounts(),
         },
+        revision: const TestGraphRevision(4),
       );
-      expect(
-        catalog().items.map((item) => item.id),
-        summaries.map((item) => item.id),
-      );
-      expect(catalog().totalCount, 4);
+    }
+    await pumpEventQueue();
 
-      for (var index = 0; index < participantIds.length; index++) {
-        repository.emitIntention(
-          participantIds[index],
-          testNeighborhoodIntention(
-            id: participantIds[index],
-            title: 'Устаревший участник',
-          ),
-          counts: index < 2
-              ? testRelationCounts()
-              : testRelationCounts(activeNeedOutgoing: 1),
-          revision: const TestGraphRevision(7),
-        );
-      }
-      await pumpEventQueue();
-      expect([for (final id in participantIds) activeCount(id)], [1, 1, 0, 0]);
-      expect(
-        [for (final id in participantIds) title(id)],
-        ['Участник А', 'Участник Б', 'Участник В', 'Участник Г'],
-      );
-
-      for (var index = 0; index < participantIds.length; index++) {
-        repository.emitIntention(
-          participantIds[index],
-          testNeighborhoodIntention(
-            id: participantIds[index],
-            title: 'Участник ${String.fromCharCode(1040 + index)}',
-          ),
-          counts: switch (index) {
-            0 || 1 => testRelationCounts(),
-            2 => testRelationCounts(activeNeedOutgoing: 1),
-            3 => testRelationCounts(activeNeedIncoming: 1),
-            _ => throw StateError('Неизвестный участник.'),
-          },
+    final relationBefore = catalog_support.testRelation(
+      sourceIntentionId: participantIds[0],
+      relatedIntentionId: participantIds[1],
+      index: 41,
+    );
+    final relationAfter = LongTermRelation(
+      id: relationBefore.id,
+      sourceIntentionId: participantIds[2],
+      relatedIntentionId: participantIds[3],
+      type: relationBefore.type,
+      priority: relationBefore.priority,
+      scope: relationBefore.scope,
+      creationSequence: relationBefore.creationSequence,
+    );
+    final coordinator = container.read(
+      graphCommandCoordinatorProvider.notifier,
+    );
+    final accepted = coordinator.acceptRelationUpdate(
+      UpdateLongTermRelation(
+        relationId: relationBefore.id,
+        patch: LongTermRelationPatch(
+          sourceIntentionId: LongTermRelationFieldSet(participantIds[2]),
+          relatedIntentionId: LongTermRelationFieldSet(participantIds[3]),
+        ),
+      ),
+    );
+    expect(accepted, isA<LongTermRelationCommandAccepted>());
+    repository.completeRelationCommand(
+      0,
+      GraphCommandSucceeded(
+        ConfirmedGraphResult(
           revision: const TestGraphRevision(9),
-        );
-      }
-      await pumpEventQueue();
+          value: LongTermRelationUpdated(
+            before: relationBefore,
+            relation: relationAfter,
+            description: null,
+            changes: [
+              IntentionRelationCountsChanged(
+                revision: const TestGraphRevision(9),
+                intentionId: participantIds[0],
+                counts: testRelationCounts(),
+              ),
+              IntentionRelationCountsChanged(
+                revision: const TestGraphRevision(9),
+                intentionId: participantIds[1],
+                counts: testRelationCounts(),
+              ),
+              IntentionRelationCountsChanged(
+                revision: const TestGraphRevision(9),
+                intentionId: participantIds[2],
+                counts: testRelationCounts(activeNeedOutgoing: 1),
+              ),
+              IntentionRelationCountsChanged(
+                revision: const TestGraphRevision(9),
+                intentionId: participantIds[3],
+                counts: testRelationCounts(activeNeedIncoming: 1),
+              ),
+              LongTermRelationUpdatedChange(
+                revision: const TestGraphRevision(9),
+                before: relationBefore,
+                after: relationAfter,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await (accepted as LongTermRelationCommandAccepted).future;
+    await pumpEventQueue();
 
-      expect([for (final id in participantIds) activeCount(id)], [0, 0, 1, 1]);
-      expect(
-        [for (final id in participantIds) title(id)],
-        ['Участник А', 'Участник Б', 'Участник В', 'Участник Г'],
+    IntentionCatalogLoaded catalog() =>
+        container
+                .read(
+                  intentionCatalogViewModelProvider(
+                    const BrowseIntentionCatalog(),
+                  ),
+                )
+                .requireValue
+            as IntentionCatalogLoaded;
+    int activeCount(IntentionId id) => (container.read(
+      intentionDetailsViewModelProvider(id),
+    ) as IntentionDetailsLoaded).details.relationCounts.active;
+    String title(IntentionId id) => (container.read(
+      intentionDetailsViewModelProvider(id),
+    ) as IntentionDetailsLoaded).details.intention.title;
+
+    expect(catalog().items, summaries);
+    expect(catalog().totalCount, 4);
+    expect(
+      catalog().revision.compareTo(const TestGraphRevision(9)),
+      GraphRevisionOrder.same,
+    );
+
+    for (var index = 0; index < participantIds.length; index++) {
+      repository.emitIntention(
+        participantIds[index],
+        testNeighborhoodIntention(
+          id: participantIds[index],
+          title: 'Устаревший участник',
+        ),
+        counts: index < 2
+            ? testRelationCounts()
+            : testRelationCounts(activeNeedOutgoing: 1),
+        revision: const TestGraphRevision(7),
       );
-    },
-  );
+    }
+    await pumpEventQueue();
+    expect([for (final id in participantIds) activeCount(id)], [1, 1, 0, 0]);
+    expect(
+      [for (final id in participantIds) title(id)],
+      ['Участник А', 'Участник Б', 'Участник В', 'Участник Г'],
+    );
+
+    for (var index = 0; index < participantIds.length; index++) {
+      repository.emitIntention(
+        participantIds[index],
+        testNeighborhoodIntention(
+          id: participantIds[index],
+          title: 'Участник ${String.fromCharCode(1040 + index)}',
+        ),
+        counts: switch (index) {
+          0 || 1 => testRelationCounts(),
+          2 => testRelationCounts(activeNeedOutgoing: 1),
+          3 => testRelationCounts(activeNeedIncoming: 1),
+          _ => throw StateError('Неизвестный участник.'),
+        },
+        revision: const TestGraphRevision(9),
+      );
+    }
+    await pumpEventQueue();
+
+    expect([for (final id in participantIds) activeCount(id)], [0, 0, 1, 1]);
+    expect(
+      [for (final id in participantIds) title(id)],
+      ['Участник А', 'Участник Б', 'Участник В', 'Участник Г'],
+    );
+  });
 
   test(
     'пакет только тега сохраняет каталог и обновляет группу перед продолжением',
@@ -1562,7 +1535,6 @@ void main() {
           revision: const TestGraphRevision(4),
         ),
       );
-      final countsBefore = harness.catalogCounts;
       final detailsBefore = harness.detailsCounts;
       harness.scrollNeighborhoodTo(0);
       expect(repository.groupQueries[1].cursor, isNotNull);
@@ -1659,7 +1631,6 @@ void main() {
         harness.neighborhood.counts,
         testRelationCounts(activeNeedOutgoing: 2),
       );
-      expect(harness.catalogCounts, countsBefore);
       expect(
         harness.catalog.items
             .singleWhere((item) => item.id == harness.ownerId)
@@ -1756,10 +1727,6 @@ final class _CheckpointHarness {
               )
               .requireValue
           as IntentionCatalogLoaded;
-
-  Map<IntentionId, int> get catalogCounts => {
-    for (final item in catalog.items) item.id: item.activeRelationCount,
-  };
 
   Map<IntentionId, String> get catalogTitles => {
     for (final item in catalog.items) item.id: item.title,

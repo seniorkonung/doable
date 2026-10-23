@@ -3,12 +3,10 @@ import 'dart:async';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../app/navigation/graph_generation.dart';
-import '../../../graph/application/graph_change.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_revision.dart';
 import '../../../graph/application/personal_graph_repository.dart';
 import '../../../graph/application/personal_graph_repository_provider.dart';
-import '../../../long_term_relation/application/relation_counts.dart';
 import '../../../tag/application/tag_change.dart';
 import '../../../tag/domain/tag.dart';
 import '../../../tag/domain/tag_id.dart';
@@ -674,29 +672,6 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       reconciled = next;
     }
 
-    final absoluteCounts = <IntentionId, RelationCounts>{};
-    for (final change in package.countChanges) {
-      if (absoluteCounts.containsKey(change.intentionId)) {
-        return null;
-      }
-      absoluteCounts[change.intentionId] = change.counts;
-    }
-    for (final change in package.dailyChanges) {
-      for (final entry in change.intentionCounts.entries) {
-        final previous = absoluteCounts[entry.key];
-        if (previous != null && previous != entry.value) {
-          return null;
-        }
-        absoluteCounts[entry.key] = entry.value;
-      }
-    }
-    for (final entry in absoluteCounts.entries) {
-      reconciled = _applyCountsContent(
-        reconciled,
-        entry.key,
-        entry.value.active,
-      );
-    }
     for (final updated in package.updatedTags) {
       reconciled = _applyUpdatedTagContent(reconciled, updated);
     }
@@ -704,36 +679,6 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       reconciled = _applyDeletedTagContent(reconciled, deletedTagId);
     }
     return _withRevision(reconciled, package.revision);
-  }
-
-  /// Заменяет абсолютное количество активных связей загруженной строки.
-  ///
-  /// Состав загруженной части, число совпадений и курсор сохраняются:
-  /// у намерения вне выдачи нет строки, которую следует заменить.
-  IntentionCatalogConfirmedState _applyCountsContent(
-    IntentionCatalogConfirmedState confirmed,
-    IntentionId intentionId,
-    int activeRelationCount,
-  ) {
-    if (confirmed is! IntentionCatalogLoaded) {
-      return confirmed;
-    }
-    final index = confirmed.items.indexWhere((item) => item.id == intentionId);
-    if (index < 0) {
-      return confirmed;
-    }
-
-    final items = [...confirmed.items];
-    items[index] = items[index].withActiveRelationCount(activeRelationCount);
-    return IntentionCatalogLoaded(
-      selection: confirmed.selection,
-      query: confirmed.query,
-      items: items,
-      totalCount: confirmed.totalCount,
-      nextCursor: confirmed.nextCursor,
-      revision: confirmed.revision,
-      continuation: confirmed.continuation,
-    );
   }
 
   /// Заменяет полное состояние отредактированного тега в загруженных строках.
@@ -889,10 +834,10 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
 /// Каталожная часть подтверждённого пакета изменений графа.
 ///
 /// Пакет применяется целиком и ровно один раз: каталожные мутации задают
-/// состав загруженной части, а абсолютные количества, включая переданные
-/// дневной командой, заменяют числа уже загруженных строк. Факт изменения
+/// состав загруженной части. Количества связей каталог не показывает, поэтому
+/// пакет, который меняет только их, лишь продвигает ревизию. Факт изменения
 /// назначения тега намерению сам принадлежность не меняет: её задаёт
-/// каталожная мутация того же намерения, поэтому количество изменяется
+/// каталожная мутация того же намерения, поэтому число совпадений изменяется
 /// один раз. Наличие этой мутации гарантируют контракты результатов:
 /// `TagAssignmentChanged` требует каталожную мутацию и сверяет её намерение
 /// с намерением пары, а `IntentionSaved` создания несёт факты всех начальных
@@ -908,16 +853,10 @@ final class _CatalogChangePackage {
     : mutations = List.unmodifiable(
         changes.whereType<IntentionCatalogMutation>(),
       ),
-      countChanges = List.unmodifiable(
-        changes.whereType<IntentionRelationCountsChanged>(),
-      ),
-      dailyChanges = List.unmodifiable(changes.whereType<DailyChoiceChange>()),
       tagChanges = List.unmodifiable(changes.whereType<TagChange>());
 
   final GraphRevision revision;
   final List<IntentionCatalogMutation> mutations;
-  final List<IntentionRelationCountsChanged> countChanges;
-  final List<DailyChoiceChange> dailyChanges;
   final List<TagChange> tagChanges;
 
   /// Новые полные состояния тегов, отредактированных пакетом.
@@ -929,10 +868,7 @@ final class _CatalogChangePackage {
       tagChanges.whereType<TagDeletedChange>().map((change) => change.tagId);
 
   bool get hasForeignRevision =>
-      mutations.any(_isForeign) ||
-      countChanges.any(_isForeign) ||
-      dailyChanges.any(_isForeign) ||
-      tagChanges.any(_isForeign);
+      mutations.any(_isForeign) || tagChanges.any(_isForeign);
 
   bool _isForeign(GraphChange change) =>
       change.revision.compareTo(revision) != GraphRevisionOrder.same;
