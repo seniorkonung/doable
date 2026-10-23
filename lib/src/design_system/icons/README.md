@@ -43,6 +43,10 @@
 | [backups.svg](assets/backups.svg) | `Settings.dc.html` | Кнопка `openBackups`, ведущий SVG |
 | [import.svg](assets/import.svg) | `Settings.dc.html` | Кнопка `pickFile`, ведущий SVG |
 | [warning.svg](assets/warning.svg) | `Settings.dc.html` | Блок `failed` → предупреждение, SVG |
+| [close.svg](assets/close.svg) | `ActionPicker.dc.html` | `header` → ссылка `Main.dc.html` с `cancelLabel`, SVG; тот же крестик у кнопки `cancel` |
+| [filter.svg](assets/filter.svg) | `ActionPicker.dc.html` | `section[aria-label="Filters"]` → кнопка `openFilter`, SVG |
+| [bolt.svg](assets/bolt.svg) | `ActionPicker.dc.html` | Строка `rows` → метка `row.isAct`, SVG |
+| [arrow_up_right.svg](assets/arrow_up_right.svg) | `ActionPicker.dc.html` | Строка `rows` → кнопка `row.info`, SVG |
 
 Мини-значки имеют линию 2 при размере 14, значки меню — линию 1,75 при размере 22.
 Календарь навигации содержит отметки дней, календарь меню и мини-значок — нет.

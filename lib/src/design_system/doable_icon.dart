@@ -34,7 +34,11 @@ enum DoableIconData {
   lockOpen('lock_open'),
   backups('backups'),
   import('import'),
-  warning('warning');
+  warning('warning'),
+  close('close'),
+  filter('filter'),
+  bolt('bolt'),
+  arrowUpRight('arrow_up_right');
 
   const DoableIconData(this._assetName);
 
