@@ -115,7 +115,7 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
     return initial;
   }
 
-  /// Контракт набора тегов этой сессии для общего выбора тегов.
+  /// Контракт набора тегов этой сессии для панели тегов.
   IntentionDraftTagSet get draftTagSet => _draftTagSet;
 
   void changeTitle(String value) {

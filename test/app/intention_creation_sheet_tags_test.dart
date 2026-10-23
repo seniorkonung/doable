@@ -8,6 +8,8 @@ import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/design_system/components/sheet.dart';
+import 'package:doable/src/design_system/components/tag_row.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
@@ -46,27 +48,22 @@ const _creationTables = [
 final _sheet = find.byKey(const ValueKey('intention-creation-sheet'));
 final _chooseTags = find.byKey(const ValueKey('intention-editor-choose-tags'));
 final _close = find.byKey(const ValueKey('intention-editor-close'));
-final _search = find.byKey(const ValueKey('tag-catalog-search'));
-final _addToDraft = find.byKey(const ValueKey('tag-catalog-add-to-draft'));
-final _createTag = find.byKey(const ValueKey('tag-catalog-create'));
-final _tagEditorName = find.byKey(const ValueKey('tag-editor-name'));
-final _tagEditorSubmit = find.byKey(const ValueKey('tag-editor-submit'));
 final _submit = find.byKey(const ValueKey('intention-editor-submit'));
 final _failure = find.byKey(const ValueKey('intention-editor-failure'));
 final _message = find.byKey(const ValueKey('graph-operation-message'));
 
-/// Теги панели создания и общий выбор тегов на настоящих маршрутах
-/// приложения, настоящем редакторе тега и Drift-адаптере in-memory
-/// хранилища.
+/// Теги панели создания и панель тегов над ней на настоящих маршрутах
+/// приложения, настоящем листе тега и Drift-адаптере in-memory хранилища.
 ///
-/// Набор черновика виден по элементам панели и по контексту открытого
-/// выбора, граф — по строкам хранилища. Панель открывается через меню и
-/// общую кнопку, а выбор — её действием, сохраняя настоящую сборку контекста.
+/// Набор черновика виден по элементам панели создания и отметкам панели
+/// тегов, граф — по строкам хранилища. Панель создания открывается через
+/// меню и общую кнопку, а панель тегов — её действием, сохраняя настоящую
+/// сборку контекста.
 void main() {
   testWidgets(
-    'выбор из компактной панели создаёт самостоятельный тег настоящим '
-    'редактором, возвращает ту же панель и её прокрутку, а сброс черновика '
-    'сохраняет созданный тег',
+    'панель тегов над компактной панелью создаёт самостоятельный тег настоящим '
+    'листом и отмечает его в черновике, закрытие возвращает ту же панель и её '
+    'прокрутку, а сброс черновика сохраняет созданный тег',
     (tester) async {
       final app = await _App.start(tester);
       final l10n = app.l10n;
@@ -91,36 +88,40 @@ void main() {
       _expectCompactPanel(tester);
       final sheetRect = tester.getRect(_sheet);
 
-      await app.openChooser(tester);
+      await app.openTagsPanel(tester);
       await _tap(tester, _row(home));
-      await _tap(tester, _addToDraft);
+      await _waitForStorage(tester, () => _isMarked(tester, home));
+      expect(app.storedGraph(), graphBefore);
 
-      // Настоящий редактор открывается над выбором и сразу сохраняет
-      // самостоятельный тег, не включая его в черновик.
-      await _tap(tester, _createTag);
-      await _until(tester, _tagEditorName);
-      await tester.pumpAndSettle();
-      await tester.enterText(_tagEditorName, 'Сарай');
+      // Настоящий лист открывается над панелью тегов и сохраняет
+      // самостоятельный тег, который сразу отмечается в черновике.
+      await tester.enterText(_tagsPanelSearch(l10n), 'Сарай');
       await tester.pump();
-      await _tap(tester, _tagEditorSubmit);
-      await _waitForStorage(tester, () => _tagEditorName.evaluate().isEmpty);
-      final shed = app.storedTagId('Сарай');
-      await _until(tester, _row(shed));
-      await tester.pumpAndSettle();
-      expect(
-        _rowStatus(shed, l10n.tagCatalogAvailableForDraft),
-        findsOneWidget,
+      await _tap(tester, find.text(l10n.tagsPanelCreateTag('Сарай')));
+      final createAction = find.widgetWithText(
+        FilledButton,
+        l10n.tagEditorCreateAction,
       );
+      await _until(tester, createAction);
+      await tester.pumpAndSettle();
+      await _tap(tester, createAction);
+      await _waitForStorage(tester, () => createAction.evaluate().isEmpty);
+      final shed = app.storedTagId('Сарай');
+      await _waitForStorage(
+        tester,
+        () => _row(shed).evaluate().isNotEmpty && _isMarked(tester, shed),
+      );
+      await tester.pumpAndSettle();
+      expect(_isMarked(tester, home), isTrue);
+      expect(app.storedGraph(), graphBefore);
 
-      // Новый тег входит в черновик только явным добавлением.
-      await _tap(tester, _row(shed));
-      await _tap(tester, _addToDraft);
-
-      // Возврат показывает ту же компактную панель с прежней прокруткой.
-      await _tap(tester, find.byType(BackButton));
+      // Закрытие панели тегов показывает ту же компактную панель с прежней
+      // прокруткой.
+      await _tap(tester, find.text(l10n.tagsPanelDone));
       await tester.pumpAndSettle();
       expect(_sheet, findsOneWidget);
-      expect(_search, findsNothing);
+      expect(_tagsPanel(l10n), findsNothing);
+      expect(app.router.current.name, IntentionEditorRoute.name);
       _expectCompactPanel(tester);
       expect(tester.getRect(_sheet), sheetRect);
       expect(_fieldsScroll(tester).pixels, fieldsOffset);
@@ -128,11 +129,11 @@ void main() {
       expect(_text(tester, 'intention-editor-description'), _longDescription);
       // Созданный тег встаёт первым в ручном порядке.
       expect(_chipNames(tester), ['Сарай', 'Дом']);
-      // Созданный тег виден в выборе, поэтому успех не объявляется.
+      // Созданный тег виден в панели тегов, поэтому успех не объявляется.
       expect(_message, findsNothing);
 
-      // Сброс черновика не создаёт намерение и назначения, а созданный
-      // выбором тег остаётся самостоятельной меткой.
+      // Сброс черновика не создаёт намерение и назначения, а созданный в
+      // панели тегов тег остаётся самостоятельной меткой.
       await _tap(tester, _close);
       await tester.pumpAndSettle();
       await _tap(
@@ -148,49 +149,45 @@ void main() {
       await app.openPanel(tester);
       expect(_chipNames(tester), isEmpty);
       _expectCompactPanel(tester);
-      await app.openChooser(tester);
-      expect(
-        _rowStatus(shed, l10n.tagCatalogAvailableForDraft),
-        findsOneWidget,
-      );
+      await app.openTagsPanel(tester);
+      await _until(tester, _row(shed));
+      expect(_isMarked(tester, shed), isFalse);
     },
   );
 
   testWidgets(
-    'выбор, открытый одновременно с закрытием неизменённой панели, не меняет '
-    'закрытую сессию и не влияет на новое открытие панели',
+    'панель тегов, открытая одновременно с закрытием неизменённой панели '
+    'создания, закрывается вместе с ней и не влияет на новое открытие',
     (tester) async {
       final app = await _App.start(tester);
       final l10n = app.l10n;
       final home = _tagId(_homeTag);
 
       await app.openPanel(tester);
+      final close = tester.widget<IconButton>(_close).onPressed!;
+      // Закрытие приходит обработчиком прежнего кадра: касания уже
+      // перехватывает затемнение открывающейся панели тегов.
       await tester.tap(_chooseTags);
-      await tester.tap(_close);
-      await tester.pump();
-      await _until(tester, _row(home));
+      close();
       await tester.pumpAndSettle();
 
-      // Неизменённая панель закрылась сразу, а запоздалый выбор открыт над
-      // каталогом с набором уже закрытой сессии.
+      // Неизменённая панель создания закрылась сразу и унесла панель тегов,
+      // открытую над ней.
       expect(_sheet, findsNothing);
-      expect(find.text(l10n.tagCatalogDraftClosed), findsOneWidget);
-      await _tap(tester, _row(home));
-      expect(tester.widget<FilledButton>(_addToDraft).onPressed, isNull);
-
-      await _tap(tester, find.byType(BackButton));
-      await tester.pumpAndSettle();
+      expect(_tagsPanel(l10n), findsNothing);
       expectIntentionGraphRootPage(app.router);
 
-      // Новая панель получает собственный набор, на который прежний выбор
-      // не влияет.
+      // Новая панель создания получает собственный набор, на который
+      // прежнее открытие не влияет.
       await app.openPanel(tester);
       expect(_chipNames(tester), isEmpty);
-      await app.openChooser(tester);
+      await app.openTagsPanel(tester);
+      expect(_isMarked(tester, home), isFalse);
       await _tap(tester, _row(home));
-      await _tap(tester, _addToDraft);
-      await _tap(tester, find.byType(BackButton));
+      await _waitForStorage(tester, () => _isMarked(tester, home));
+      await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
+      expect(_tagsPanel(l10n), findsNothing);
       expect(_chipNames(tester), ['Дом']);
       expect(app.storedTable('intentions'), isEmpty);
       expect(app.storedTable('tag_assignments'), isEmpty);
@@ -199,21 +196,21 @@ void main() {
 
   testWidgets(
     'панель показывает переименование выбранного тега другим экраном, '
-    'удаление убирает его из черновика без подмены одноимённым новым тегом, '
-    'а сохранение создаёт намерение только с оставшимся тегом',
+    'удаление в панели тегов убирает его из черновика без подмены одноимённым '
+    'новым тегом, а сохранение создаёт намерение только с оставшимся тегом',
     (tester) async {
       final app = await _App.start(tester);
+      final l10n = app.l10n;
       final home = _tagId(_homeTag);
       final work = _tagId(_workTag);
 
       await app.openPanel(tester);
       await tester.enterText(_field('intention-editor-title'), _rawTitle);
-      await app.openChooser(tester);
+      await app.openTagsPanel(tester);
       await _tap(tester, _row(home));
-      await _tap(tester, _addToDraft);
       await _tap(tester, _row(work));
-      await _tap(tester, _addToDraft);
-      await _tap(tester, find.byType(BackButton));
+      await _waitForStorage(tester, () => _isMarked(tester, work));
+      await _tap(tester, find.text(l10n.tagsPanelDone));
       await tester.pumpAndSettle();
       expect(_chipNames(tester), ['Дом', 'Работа']);
 
@@ -228,12 +225,22 @@ void main() {
       await _waitForStorage(tester, () => _chipNames(tester).first == 'Быт');
       expect(_chipStatus(home), findsNothing);
 
-      // Удалённый тег уходит из черновика, а одноимённый новый тег его не
-      // заменяет.
-      await app.runTagCommand(
-        tester,
-        app.coordinator.acceptTagDelete(DeleteTag(home)),
-      );
+      // Тег, удалённый в панели тегов, уходит из неё и из черновика, а
+      // одноимённый новый тег его не заменяет.
+      await app.openTagsPanel(tester);
+      await tester.longPress(_row(home));
+      await tester.pumpAndSettle();
+      await _tap(tester, find.text(l10n.tagsPanelDeleteTag));
+      await tester.pumpAndSettle();
+      await _tap(tester, find.text(l10n.tagsPanelDeleteConfirm));
+      await _waitForStorage(tester, () => _row(home).evaluate().isEmpty);
+      await tester.pumpAndSettle();
+      expect(_isMarked(tester, work), isTrue);
+      expect(_message, findsNothing);
+      await _tap(tester, find.text(l10n.tagsPanelDone));
+      await tester.pumpAndSettle();
+      expect(_chipNames(tester), ['Работа']);
+      expect(_text(tester, 'intention-editor-title'), _rawTitle);
       await app.runTagCommand(
         tester,
         app.coordinator.acceptTagCreation(
@@ -342,12 +349,14 @@ final class _App {
     expect(router.current.name, IntentionEditorRoute.name);
   }
 
-  /// Открывает общий выбор тегов действием панели и ждёт каталог тегов.
-  Future<void> openChooser(WidgetTester tester) async {
+  /// Открывает панель тегов действием панели создания и ждёт её строки.
+  /// Панель — не маршрут: над формой в стеке ничего не появляется.
+  Future<void> openTagsPanel(WidgetTester tester) async {
     await _tap(tester, _chooseTags);
-    await _until(tester, _row(_tagId(_homeTag)));
+    await _until(tester, find.byType(TagRow));
     await tester.pumpAndSettle();
-    expect(router.current.name, TagCatalogRoute.name);
+    expect(_tagsPanel(l10n), findsOneWidget);
+    expect(router.current.name, IntentionEditorRoute.name);
   }
 
   /// Дожидается успеха команды тега другого экрана; успех виден в данных и
@@ -405,11 +414,23 @@ void _expectCompactPanel(WidgetTester tester) {
 
 Finder _field(String key) => find.byKey(ValueKey(key));
 
-Finder _row(TagId id) =>
-    find.byKey(ValueKey('tag-catalog-row-${id.toCanonicalString()}'));
+Finder _tagsPanel(AppLocalizations l10n) =>
+    find.widgetWithText(Sheet, l10n.tagsPanelTitle);
 
-Finder _rowStatus(TagId id, String status) =>
-    find.descendant(of: _row(id), matching: find.text(status));
+Finder _tagsPanelSearch(AppLocalizations l10n) =>
+    find.descendant(of: _tagsPanel(l10n), matching: find.byType(TextField));
+
+Finder _row(TagId id) =>
+    find.byKey(ValueKey('tags-panel-row-${id.toCanonicalString()}'));
+
+/// Строка тега [id] в панели отмечена: тег входит в набор черновика.
+bool _isMarked(WidgetTester tester, TagId id) =>
+    tester
+        .widget<TagRow>(
+          find.descendant(of: _row(id), matching: find.byType(TagRow)),
+        )
+        .mark ==
+    TagRowMark.checked;
 
 Finder _chipStatus(TagId id) => find.byKey(
   ValueKey('intention-editor-tag-status-${id.toCanonicalString()}'),

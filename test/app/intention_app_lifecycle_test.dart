@@ -6,6 +6,8 @@ import 'package:doable/src/daily_choice/application/choice_path_continuations.da
 
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/design_system/components/sheet.dart';
+import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
@@ -663,8 +665,8 @@ Future<void> _failSubmissionWithoutFocus(
 enum _SheetTransition {
   panel('открытие и закрытие панели'),
   confirmation('подтверждение закрытия над панелью'),
-  chooser('выбор тегов над панелью'),
-  editor('редактор тега над выбором');
+  chooser('панель тегов над панелью создания'),
+  editor('лист тега над панелью тегов');
 
   const _SheetTransition(this.description);
 
@@ -710,11 +712,9 @@ enum _SheetTransition {
         await tester.pump();
         await tester.sendKeyEvent(LogicalKeyboardKey.enter);
         await tester.pumpAndSettle();
-        expect(find.byType(BackButton), findsOneWidget);
+        expect(_tagsPanel, findsOneWidget);
       case _SheetTransition.editor:
-        await tester.tap(find.byKey(const ValueKey('tag-catalog-create')));
-        await tester.pumpAndSettle();
-        expect(find.byKey(const ValueKey('tag-editor-name')), findsOneWidget);
+        await _openNewTagSheet(tester);
     }
   }
 
@@ -731,21 +731,23 @@ enum _SheetTransition {
         await tester.pumpAndSettle();
         expect(_fieldText(tester), 'Черновик');
       case _SheetTransition.chooser:
-        await tester.tap(find.byType(BackButton));
+        await tester.tap(find.text('Done'));
         await tester.pumpAndSettle();
+        expect(_tagsPanel, findsNothing);
         expect(_fieldText(tester), 'Черновик');
       case _SheetTransition.editor:
-        await tester.tap(find.byKey(const ValueKey('tag-editor-cancel')));
+        await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
-        expect(find.byKey(const ValueKey('tag-editor-name')), findsNothing);
+        expect(_newTagSheet, findsNothing);
+        expect(_tagsPanel, findsOneWidget);
     }
   }
 }
 
 /// Временное перекрытие живой панели.
 enum _FormOverlay {
-  chooser('непрозрачный выбор тегов'),
-  editor('непрозрачный редактор тега над выбором'),
+  chooser('панель тегов'),
+  editor('лист тега над панелью тегов'),
   dialog('диалог объяснения готовности');
 
   const _FormOverlay(this.description);
@@ -757,12 +759,10 @@ enum _FormOverlay {
       case _FormOverlay.chooser:
         await tester.tap(find.byKey(_chooseTags));
         await tester.pumpAndSettle();
-        expect(find.byType(BackButton), findsOneWidget);
+        expect(_tagsPanel, findsOneWidget);
       case _FormOverlay.editor:
         await _FormOverlay.chooser.cover(tester);
-        await tester.tap(find.byKey(const ValueKey('tag-catalog-create')));
-        await tester.pumpAndSettle();
-        expect(find.byKey(const ValueKey('tag-editor-name')), findsOneWidget);
+        await _openNewTagSheet(tester);
       case _FormOverlay.dialog:
         await tester.tap(
           find.byKey(const ValueKey('intention-editor-readiness')),
@@ -775,23 +775,23 @@ enum _FormOverlay {
     }
   }
 
-  /// Снимает верхнюю из нескольких перекрывающих страниц, оставляя панель
-  /// перекрытой.
+  /// Снимает верхнее из нескольких перекрытий, оставляя панель перекрытой.
   Future<void> uncoverPartly(WidgetTester tester) async {
     switch (this) {
       case _FormOverlay.chooser || _FormOverlay.dialog:
         return;
       case _FormOverlay.editor:
-        await tester.tap(find.byKey(const ValueKey('tag-editor-cancel')));
+        await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
-        expect(find.byType(BackButton), findsOneWidget);
+        expect(_newTagSheet, findsNothing);
+        expect(_tagsPanel, findsOneWidget);
     }
   }
 
   Future<void> uncover(WidgetTester tester) async {
     switch (this) {
       case _FormOverlay.chooser || _FormOverlay.editor:
-        await tester.tap(find.byType(BackButton));
+        await tester.tap(find.text('Done'));
       case _FormOverlay.dialog:
         await tester.tap(
           find.byKey(const ValueKey('intention-editor-readiness-cancel')),
@@ -800,6 +800,22 @@ enum _FormOverlay {
     await tester.pumpAndSettle();
     expect(find.byType(IntentionEditorPage), findsOneWidget);
   }
+}
+
+/// Панель тегов над панелью создания и лист «Новый тег» над ней.
+final _tagsPanel = find.widgetWithText(Sheet, 'Tags');
+final _newTagSheet = find.widgetWithText(Sheet, 'New tag');
+
+/// Открывает лист «Новый тег» строкой создания открытой панели тегов.
+Future<void> _openNewTagSheet(WidgetTester tester) async {
+  await tester.enterText(
+    find.descendant(of: _tagsPanel, matching: find.byType(TextField)),
+    'Новый',
+  );
+  await tester.pump();
+  await tester.tap(find.text('Create tag “Новый”'));
+  await tester.pumpAndSettle();
+  expect(_newTagSheet, findsOneWidget);
 }
 
 Future<void> _closeOperationMessage(WidgetTester tester) async {
@@ -888,6 +904,14 @@ Future<void> _pumpUntil(WidgetTester tester, bool Function() condition) async {
 final class _DelayedPersonalGraphRepository
     with StatisticsReadContractTestFallback, TagReadContractTestFallback
     implements PersonalGraphRepository {
+  /// Панель тегов над панелью создания показывает пустой каталог и строку
+  /// создания по запросу.
+  @override
+  Future<TagCatalogResult> getTagCatalog(TagCatalogMode mode) async =>
+      TagCatalogSuccess(
+        TagCatalogSnapshot(items: const [], revision: const _Revision(0)),
+      );
+
   @override
   Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(
     DailyChoiceDayStatusQuery query,

@@ -12,6 +12,8 @@ import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openFileBackedLocalDatabase;
+import 'package:doable/src/design_system/components/sheet.dart';
+import 'package:doable/src/design_system/components/tag_row.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -106,7 +108,7 @@ const _rawTitle = '  Рисовать акварель ';
 const _title = 'Рисовать акварель';
 const _description = 'Пейзаж у реки';
 
-/// Тег, который человек создаёт настоящим редактором из общего выбора.
+/// Тег, который человек создаёт настоящим листом из панели тегов.
 const _sport = 'Спорт';
 
 /// Название намерения, созданного с минимальными данными: поиску каталога
@@ -133,16 +135,10 @@ final _readinessConfirm = find.byKey(
   const ValueKey('intention-editor-readiness-confirm'),
 );
 final _submit = find.byKey(const ValueKey('intention-editor-submit'));
-final _addToDraftAction = find.byKey(
-  const ValueKey('tag-catalog-add-to-draft'),
-);
-final _createTagAction = find.byKey(const ValueKey('tag-catalog-create'));
-final _tagEditorName = find.byKey(const ValueKey('tag-editor-name'));
-final _tagEditorSubmit = find.byKey(const ValueKey('tag-editor-submit'));
 final _message = find.byKey(const ValueKey('graph-operation-message'));
 
 /// Сквозная проверка быстрого создания намерения: меню и кнопка общей
-/// панели, компактная форма, общий выбор тегов и настоящий редактор тега
+/// панели, компактная форма, панель тегов и настоящий лист тега
 /// на настоящих AppRouter, сессии черновика, координаторе команд, общей
 /// поверхности сообщений и Drift-адаптере через настроенное файловое
 /// соединение.
@@ -163,8 +159,8 @@ void main() {
     final code = locale.languageCode;
 
     testWidgets(
-      'намерение, подготовленное через общую кнопку, панель, общий выбор и '
-      'настоящий редактор тега, открывается по новому идентификатору при '
+      'намерение, подготовленное через общую кнопку, панель, панель тегов и '
+      'настоящий лист тега, открывается по новому идентификатору при '
       'совпадении названия и сохраняется одним подтверждённым результатом, '
       'учитывается ровно один раз в выдаче с прежними условиями и позицией, '
       'отражается навигацией по тегам и читается после '
@@ -190,7 +186,7 @@ void main() {
         expect(app.completions, isEmpty);
 
         // Все четыре поля черновика готовятся только через интерфейс панели,
-        // общего выбора и редактора тега.
+        // панели тегов и листа тега.
         final sport = await _prepareFullDraft(tester, app, tags: [_homeTag]);
         expect(_text(tester, 'intention-editor-title'), _rawTitle);
         expect(_text(tester, 'intention-editor-description'), _description);
@@ -685,10 +681,10 @@ Future<void> _openSheet(WidgetTester tester, _Launch app) async {
 
 /// Готовит в панели, открытой общей кнопкой, все четыре поля черновика: сырое
 /// название, описание, явно подтверждённую готовность и набор из
-/// существующих тегов [tags] и тега «Спорт», созданного настоящим редактором
-/// из общего выбора. Принимает сообщение о созданном теге, возвращается в
-/// ту же панель и возвращает идентификатор созданного тега. Быстрый вызов
-/// сохранения после открытия выбора не принимает и не откладывает отправку.
+/// существующих тегов [tags] и тега «Спорт», созданного настоящим листом из
+/// панели тегов. Возвращается в ту же панель и возвращает идентификатор
+/// созданного тега. Быстрый вызов сохранения после открытия панели тегов не
+/// принимает и не откладывает отправку.
 Future<TagId> _prepareFullDraft(
   WidgetTester tester,
   _Launch app, {
@@ -724,53 +720,70 @@ Future<TagId> _prepareFullDraft(
   await _tap(tester, _chooseTags);
   await _until(tester, _row(_tagId(_homeTag)));
   await tester.pumpAndSettle();
-  expect(find.byType(AppNavigationBar), findsNothing);
-  expect(find.byTooltip(l10n.tagNavigationTitle), findsNothing);
+  // Панель тегов открыта над панелью создания и перекрывает навигацию; она
+  // не маршрут, поэтому стек не меняется.
+  expect(_tagsPanel(l10n), findsOneWidget);
+  expect(
+    appNavigationDestinations(skipOffstage: false).hitTestable(),
+    findsNothing,
+  );
   expect(_stack(app), [
     ...history.map((route) => route.name),
     IntentionEditorRoute.name,
-    TagCatalogRoute.name,
   ]);
   for (final tag in tags) {
-    await _addToDraft(tester, _tagId(tag));
+    await _includeInDraft(tester, _tagId(tag));
   }
-  await _tap(tester, find.byType(BackButton));
-  await tester.pumpAndSettle();
+  await _closeTagsPanel(tester, l10n);
   final graphBefore = _storedCreationTables(app.raw);
   final staleSubmit = tester.widget<FilledButton>(_submit).onPressed!;
 
-  // Два нажатия до следующего кадра идут через настоящую панель и роутер.
+  // Два нажатия до следующего кадра идут через настоящую панель. Отправка
+  // приходит обработчиком прежнего кадра: касания уже перехватывает
+  // затемнение открывающейся панели тегов.
   await tester.tap(_chooseTags);
-  await tester.tap(_submit);
+  staleSubmit();
   await _until(tester, _row(_tagId(_homeTag)));
   await tester.pumpAndSettle();
+  expect(_tagsPanel(l10n), findsOneWidget);
   expect(_stack(app), [
     ...history.map((route) => route.name),
     IntentionEditorRoute.name,
-    TagCatalogRoute.name,
   ]);
   expect(app.completions, isEmpty);
   expect(_storedCreationTables(app.raw), graphBefore);
 
-  await _tap(tester, _createTagAction);
-  await _until(tester, _tagEditorName);
-  await tester.pumpAndSettle();
-  expect(_stack(app).last, TagEditorRoute.name);
-  expect(find.byType(AppNavigationBar), findsNothing);
-  staleSubmit();
-  await tester.enterText(_tagEditorName, _sport);
+  await tester.enterText(
+    find.descendant(of: _tagsPanel(l10n), matching: find.byType(TextField)),
+    _sport,
+  );
   await tester.pump();
-  await _tap(tester, _tagEditorSubmit);
-  await _waitFor(tester, () => _tagEditorName.evaluate().isEmpty);
-  // Созданный тег виден в общем выборе, поэтому успех не объявляется.
+  await _tap(tester, find.text(l10n.tagsPanelCreateTag(_sport)));
+  final createAction = find.widgetWithText(
+    FilledButton,
+    l10n.tagEditorCreateAction,
+  );
+  await _until(tester, createAction);
+  await tester.pumpAndSettle();
+  expect(
+    appNavigationDestinations(skipOffstage: false).hitTestable(),
+    findsNothing,
+  );
+  staleSubmit();
+  await _tap(tester, createAction);
+  await _waitFor(tester, () => createAction.evaluate().isEmpty);
+  final sport = _storedTagId(app.raw, _sport);
+  // Созданный тег сразу отмечен в панели тегов, поэтому успех не
+  // объявляется.
+  await _waitFor(
+    tester,
+    () => _row(sport).evaluate().isNotEmpty && _isMarked(tester, sport),
+    reason: () => '«$_sport» не отмечен в панели тегов',
+  );
   await tester.pumpAndSettle();
   expect(find.byType(SnackBar), findsNothing);
-  final sport = _storedTagId(app.raw, _sport);
-  await _addToDraft(tester, sport);
 
-  await _tap(tester, find.byType(BackButton));
-  await _waitFor(tester, () => find.byType(TagCatalogPage).evaluate().isEmpty);
-  await tester.pumpAndSettle();
+  await _closeTagsPanel(tester, l10n);
   expect(_stack(app), [
     ...history.map((route) => route.name),
     IntentionEditorRoute.name,
@@ -786,16 +799,21 @@ Future<TagId> _prepareFullDraft(
   return sport;
 }
 
-/// Выбирает строку тега [id] кандидатом и явно добавляет его в черновик,
-/// дождавшись подтверждения кандидата.
-Future<void> _addToDraft(WidgetTester tester, TagId id) async {
+/// Отмечает тег [id] в панели тегов: нажатие включает его в черновик.
+Future<void> _includeInDraft(WidgetTester tester, TagId id) async {
   await _tap(tester, _row(id));
   await _waitFor(
     tester,
-    () => tester.widget<FilledButton>(_addToDraftAction).onPressed != null,
-    reason: () => 'Добавление «$id» не стало доступным',
+    () => _isMarked(tester, id),
+    reason: () => 'Тег «$id» не отмечен в панели тегов',
   );
-  await _tap(tester, _addToDraftAction);
+  await tester.pumpAndSettle();
+}
+
+/// Закрывает панель тегов кнопкой «Готово» и ждёт панель создания под ней.
+Future<void> _closeTagsPanel(WidgetTester tester, AppLocalizations l10n) async {
+  await _tap(tester, find.text(l10n.tagsPanelDone));
+  await _waitFor(tester, () => _tagsPanel(l10n).evaluate().isEmpty);
   await tester.pumpAndSettle();
 }
 
@@ -1303,8 +1321,20 @@ ScrollPosition _catalogPagePosition(WidgetTester tester) => tester
     )
     .position;
 
+Finder _tagsPanel(AppLocalizations l10n) =>
+    find.widgetWithText(Sheet, l10n.tagsPanelTitle);
+
 Finder _row(TagId id) =>
-    find.byKey(ValueKey('tag-catalog-row-${id.toCanonicalString()}'));
+    find.byKey(ValueKey('tags-panel-row-${id.toCanonicalString()}'));
+
+/// Строка тега [id] в панели отмечена: тег входит в набор черновика.
+bool _isMarked(WidgetTester tester, TagId id) =>
+    tester
+        .widget<TagRow>(
+          find.descendant(of: _row(id), matching: find.byType(TagRow)),
+        )
+        .mark ==
+    TagRowMark.checked;
 
 String _text(WidgetTester tester, String key) =>
     tester.widget<TextField>(find.byKey(ValueKey(key))).controller!.text;

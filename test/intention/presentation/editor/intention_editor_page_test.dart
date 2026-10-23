@@ -10,6 +10,7 @@ import 'package:doable/src/app/quick_creation/quick_creation_button.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -1700,6 +1701,7 @@ void main() {
         await tester.tap(find.byKey(_chooseTags));
         expect(repository.commands, hasLength(1));
         await tester.pumpAndSettle();
+        expect(_tagsPanel, findsNothing);
         expect(router.stackData.map((route) => route.name), [
           AppShellRoute.name,
           IntentionEditorRoute.name,
@@ -1708,6 +1710,7 @@ void main() {
         choose();
         submit();
         await tester.pumpAndSettle();
+        expect(_tagsPanel, findsNothing);
         expect(repository.commands, hasLength(1));
 
         final result = _savedResult(title: draft.title);
@@ -1728,6 +1731,7 @@ void main() {
         choose();
         submit();
         await tester.pump(const Duration(seconds: 1));
+        expect(_tagsPanel, findsNothing);
         expect(router.current.name, IntentionDetailsRoute.name);
         expect(repository.commands, hasLength(1));
         await tester.binding.handlePopRoute();
@@ -1762,20 +1766,23 @@ void main() {
           tester.element(find.byType(IntentionEditorPage)),
         );
         final draft = sessions.state(tester).draft;
+        final destination = _selectedDestination(tester);
         final submit = tester
             .widget<FilledButton>(find.byKey(_submit))
             .onPressed!;
 
-        // Между двумя действиями нет кадра с обновлёнными кнопками.
+        // Между двумя действиями нет кадра с обновлёнными кнопками. Отправка
+        // приходит обработчиком прежнего кадра: касания уже перехватывает
+        // затемнение открывающейся панели.
         await tester.tap(find.byKey(_chooseTags));
-        await tester.tap(find.byKey(_submit));
+        submit();
         expect(repository.commands, isEmpty);
         await tester.pumpAndSettle();
 
+        expect(_tagsPanel, findsOneWidget);
         expect(router.stackData.map((route) => route.name), [
           AppShellRoute.name,
           IntentionEditorRoute.name,
-          TagCatalogRoute.name,
         ]);
         _expectDraftValues(container.read(session).draft, draft);
         expect(
@@ -1788,26 +1795,28 @@ void main() {
         await tester.pumpAndSettle();
         expect(repository.commands, isEmpty);
 
-        await tester.tap(find.byKey(_tagRow(1)));
+        await tester.tap(find.byKey(_panelRow(1)));
         await tester.pump();
-        await tester.tap(
-          find.byKey(const ValueKey('tag-catalog-add-to-draft')),
-        );
+        expect(container.read(session).draft.tagIds, [_tagId(1)]);
+        await tester.enterText(_panelSearch, 'Новый');
         await tester.pump();
-        await tester.tap(find.byKey(const ValueKey('tag-catalog-create')));
+        await tester.tap(find.text('Create tag “Новый”'));
         await tester.pumpAndSettle();
-        expect(router.current.name, TagEditorRoute.name);
+        expect(find.text('New tag'), findsOneWidget);
         submit();
         await tester.pumpAndSettle();
         expect(repository.commands, isEmpty);
-        await tester.tap(find.byKey(const ValueKey('tag-editor-cancel')));
+        // Системное «назад» закрывает только лист тега над панелью.
+        await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
-        expect(router.current.name, TagCatalogRoute.name);
+        expect(find.text('New tag'), findsNothing);
+        expect(_tagsPanel, findsOneWidget);
         submit();
         expect(repository.commands, isEmpty);
 
-        await tester.tap(find.byType(BackButton));
+        await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
+        expect(_tagsPanel, findsNothing);
         expect(router.stackData.map((route) => route.name), [
           AppShellRoute.name,
           IntentionEditorRoute.name,
@@ -1815,12 +1824,15 @@ void main() {
         expect(sessions.state(tester).draft.title, draft.title);
         expect(sessions.state(tester).draft.description, draft.description);
         expect(sessions.state(tester).draft.tagIds, [_tagId(1)]);
+        expect(_selectedDestination(tester), destination);
         expect(repository.commands, isEmpty);
+        expect(repository.tagCommands, isEmpty);
 
         await tester.tap(find.byKey(_chooseTags));
         await tester.pumpAndSettle();
-        await tester.tap(find.byType(BackButton));
+        await tester.tap(_panelDone);
         await tester.pumpAndSettle();
+        expect(_tagsPanel, findsNothing);
         expect(repository.commands, isEmpty);
         await tester.tap(find.byKey(_submit));
         expect(repository.commands, hasLength(1));
@@ -1861,16 +1873,19 @@ void main() {
         final form = router.stackData.last;
         await tester.tap(find.byKey(_chooseTags));
         await tester.pumpAndSettle();
+        expect(_tagsPanel, findsOneWidget);
         router.removeRoute(form);
         await tester.pumpAndSettle();
         expect(
           find.byType(IntentionEditorPage, skipOffstage: false),
           findsNothing,
         );
+        // Панель тегов уходит вместе с маршрутом, над которым открыта.
+        expect(_tagsPanel, findsNothing);
         choose();
         submit();
-        await tester.tap(find.byType(BackButton));
         await tester.pumpAndSettle();
+        expect(_tagsPanel, findsNothing);
         expectIntentionGraphRootPage(router);
         expect(repository.commands, isEmpty);
         expect(tester.takeException(), isNull);
@@ -1895,9 +1910,10 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(find.byKey(_chooseTags));
         await tester.pumpAndSettle();
-        expect(router.current.name, TagCatalogRoute.name);
-        await tester.tap(find.byType(BackButton));
+        expect(_tagsPanel, findsOneWidget);
+        await tester.tap(_panelDone);
         await tester.pumpAndSettle();
+        expect(_tagsPanel, findsNothing);
         expect(router.current.name, IntentionEditorRoute.name);
         expect(repository.commands, isEmpty);
         expect(
@@ -1908,7 +1924,7 @@ void main() {
     );
 
     testWidgets(
-      'действие панели открывает общий выбор с набором своей сессии, а выбранные теги показаны компактно с доступным снятием',
+      'действие панели создания открывает панель тегов с набором своей сессии, а выбранные теги показаны компактно с доступным снятием',
       (tester) async {
         final semantics = tester.ensureSemantics();
         const choose = 'Choose tags';
@@ -1938,18 +1954,15 @@ void main() {
 
         await tester.tap(find.byKey(_chooseTags));
         await tester.pumpAndSettle();
-        expect(router.current.name, TagCatalogRoute.name);
+        expect(_tagsPanel, findsOneWidget);
         for (final number in [1, 2]) {
-          await tester.tap(find.byKey(_tagRow(number)));
-          await tester.pump();
-          await tester.tap(
-            find.byKey(const ValueKey('tag-catalog-add-to-draft')),
-          );
+          await tester.tap(find.byKey(_panelRow(number)));
           await tester.pump();
         }
-        await tester.tap(find.byType(BackButton));
+        await tester.tap(_panelDone);
         await tester.pumpAndSettle();
 
+        expect(_tagsPanel, findsNothing);
         expect(router.current.name, IntentionEditorRoute.name);
         expect(sessions.state(tester).draft.tagIds, [_tagId(1), _tagId(2)]);
         expect(
@@ -2035,6 +2048,7 @@ void main() {
           await tester.tap(find.byKey(action), warnIfMissed: false);
         }
         await tester.pumpAndSettle();
+        expect(_tagsPanel, findsNothing);
         expect(router.current.name, IntentionEditorRoute.name);
         _expectDraftValues(sessions.state(tester).draft, draft);
         expect(find.byKey(_tagChip(1)), findsOneWidget);
@@ -2054,9 +2068,10 @@ void main() {
         }
         await tester.tap(find.byKey(_chooseTags));
         await tester.pumpAndSettle();
-        expect(router.current.name, TagCatalogRoute.name);
-        await tester.tap(find.byType(BackButton));
+        expect(_tagsPanel, findsOneWidget);
+        await tester.tap(_panelDone);
         await tester.pumpAndSettle();
+        expect(_tagsPanel, findsNothing);
         expect(router.current.name, IntentionEditorRoute.name);
         expect(find.byKey(_tagChip(1)), findsOneWidget);
         expect(repository.commands, hasLength(1));
@@ -2065,30 +2080,35 @@ void main() {
     );
 
     testWidgets(
-      'повторное нажатие выбора тегов до его открытия открывает один выбор',
+      'повторное нажатие выбора тегов до открытия панели открывает одну панель тегов',
       (tester) async {
         final repository = ControlledCatalogRepository()
           ..tagCatalogItems = [_tag(1, 'Дом')];
         final router = await _openEditor(tester, repository);
+        final choose = tester
+            .widget<IconButton>(find.byKey(_chooseTags))
+            .onPressed!;
 
+        // Второе нажатие приходит из того же кадра, до открытия панели.
         await tester.tap(find.byKey(_chooseTags));
-        await tester.tap(find.byKey(_chooseTags));
+        choose();
         await tester.pumpAndSettle();
 
+        expect(_tagsPanel, findsOneWidget);
         expect(router.stack.map((page) => page.routeData.name), [
           AppShellRoute.name,
           IntentionEditorRoute.name,
-          TagCatalogRoute.name,
         ]);
 
-        await tester.tap(find.byType(BackButton));
+        await tester.tap(_panelDone);
         await tester.pumpAndSettle();
+        expect(_tagsPanel, findsNothing);
         expect(router.current.name, IntentionEditorRoute.name);
 
-        // Закрытый выбор снова открывается тем же действием.
+        // Закрытая панель снова открывается тем же действием.
         await tester.tap(find.byKey(_chooseTags));
         await tester.pumpAndSettle();
-        expect(router.current.name, TagCatalogRoute.name);
+        expect(_tagsPanel, findsOneWidget);
       },
     );
   });
@@ -2210,8 +2230,16 @@ ValueKey<String> _tagChipRemove(int number) => ValueKey(
   'intention-editor-tag-remove-${_tagId(number).toCanonicalString()}',
 );
 
-ValueKey<String> _tagRow(int number) =>
-    ValueKey('tag-catalog-row-${_tagId(number).toCanonicalString()}');
+ValueKey<String> _panelRow(int number) =>
+    ValueKey('tags-panel-row-${_tagId(number).toCanonicalString()}');
+
+/// Панель тегов; лист «Новый тег» над ней называется иначе.
+final _tagsPanel = find.widgetWithText(Sheet, 'Tags');
+final _panelSearch = find.descendant(
+  of: _tagsPanel,
+  matching: find.byType(TextField),
+);
+final _panelDone = find.descendant(of: _tagsPanel, matching: find.text('Done'));
 
 /// Значок быстрой отметки: форма значка отличает включённое состояние.
 IconData? _iconOf(WidgetTester tester, Key option) => tester
@@ -2285,8 +2313,8 @@ const _closeConfirmation = ValueKey('intention-editor-close-confirmation');
 const _closeContinue = ValueKey('intention-editor-close-continue');
 const _closeDiscard = ValueKey('intention-editor-close-discard');
 
-/// Последняя построенная сессия формы создания. Проверки, которым не нужен
-/// общий выбор тегов, меняют набор тегов через сессию; новое открытие формы
+/// Последняя построенная сессия формы создания. Проверки, которым не нужна
+/// панель тегов, меняют набор тегов через сессию; новое открытие формы
 /// получает новую сессию.
 final class _EditorSessions extends ProviderObserver {
   IntentionEditorViewModelProvider? _latest;

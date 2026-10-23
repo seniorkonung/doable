@@ -194,6 +194,58 @@ void _registerPageMatrixTests() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('матрица: панель тегов перекрывает панель создания и панель '
+      'навигации, а «назад» закрывает только её', (tester) async {
+    final router = await _start(tester);
+    await _select(tester, AppDestination.intentionGraph);
+    await openQuickCreation(
+      tester,
+      QuickCreationMode.intention,
+      openedPage: find.byType(IntentionEditorPage),
+      wait: _until,
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('intention-editor-title')),
+      'Черновик',
+    );
+    await _tap(tester, _MatrixEntry.draftTags.finder);
+    await _until(
+      tester,
+      find.byKey(ValueKey('tags-panel-row-${tagFixtureId(_tag)}')),
+    );
+    await tester.pumpAndSettle();
+
+    // Панель тегов — не маршрут: над формой в стеке ничего не появляется.
+    final panel = find.byType(Sheet);
+    expect(panel, findsOneWidget);
+    expect(tester.getRect(panel).bottom, _screen(tester).height);
+    expect(router.current.name, IntentionEditorRoute.name);
+    expect(_MatrixEntry.draftTags.finder.hitTestable(), findsNothing);
+    final bar = find.byType(AppNavigationBar);
+    expect(bar, findsOneWidget);
+    expect(
+      tester.widget<AppNavigationBar>(bar).selected,
+      AppDestination.intentionGraph,
+    );
+    expect(_destinations.hitTestable(), findsNothing);
+    expect(_announcedDestinations, findsNothing);
+
+    await tester.binding.handlePopRoute();
+    await _gone(tester, Sheet);
+    expect(router.current.name, IntentionEditorRoute.name);
+    expect(
+      tester
+          .widget<TextField>(
+            find.byKey(const ValueKey('intention-editor-title')),
+          )
+          .controller!
+          .text,
+      'Черновик',
+    );
+    _expectCreationSheetAboveCatalog(tester);
+    expect(tester.takeException(), isNull);
+  });
+
   const read = _MatrixEntry.intention;
   const daily = _MatrixEntry.dailyChoice;
   const tags = _MatrixEntry.tags;
@@ -227,12 +279,6 @@ void _registerPageMatrixTests() {
       page: TagCatalogPage,
       panel: true,
       entries: [tags],
-    ),
-    (
-      name: 'теги черновика',
-      page: TagCatalogPage,
-      panel: false,
-      entries: [_MatrixEntry.creation, _MatrixEntry.draftTags],
     ),
     (
       name: 'создание тега',

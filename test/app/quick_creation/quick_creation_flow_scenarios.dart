@@ -19,7 +19,9 @@ void _registerQuickCreationFlowTests() {
         final previous = List.of(app.router.stackData);
         switch (flow) {
           case _Flow.intention:
+            // Выбор тегов — панель над формой, а не следующий маршрут.
             await _tap(tester, _key('intention-editor-choose-tags'));
+            expect(find.byType(Sheet), findsOneWidget);
           case _Flow.relation:
             await _reveal(tester, _key('relation-editor-change-source'));
             await _tap(tester, _key('relation-editor-change-source'));
@@ -62,6 +64,7 @@ void _registerQuickCreationFlowTests() {
         if (flow == _Flow.intention || flow == _Flow.relation) {
           await tester.binding.handlePopRoute();
           await tester.pumpAndSettle();
+          expect(find.byType(Sheet), findsNothing);
           expect(
             [for (final route in app.router.stackData) route.matchId],
             [for (final route in previous) route.matchId],
