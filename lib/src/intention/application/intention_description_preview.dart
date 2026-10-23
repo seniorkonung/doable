@@ -30,8 +30,8 @@ final class IntentionDescriptionPreview {
   // Те же символы, что обрезает `String.trim`: Unicode White_Space и U+FEFF.
   // `\s` не подходит: он не включает U+0085.
   static final _whitespaceRun = RegExp(
-    '[\t\n\u000B\f\r \u0085   - '
-    '    　﻿]+',
+    '[\t\n\u000B\f\r \u0085\u00A0\u1680\u2000-\u200A'
+    '\u2028\u2029\u202F\u205F\u3000\uFEFF]+',
   );
 
   final String text;
