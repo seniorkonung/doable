@@ -1010,7 +1010,6 @@ void main() {
         ['Семья'],
         <String>[],
       ]);
-      expect(page.items.first.activeRelationCount, 1);
       final assignments = (await repository.getTagAssignments(
         page.items.first.id,
       ) as TagAssignmentsSuccess).value;

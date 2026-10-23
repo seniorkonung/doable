@@ -2274,7 +2274,6 @@ Result<IntentionCommandSuccess> _savedResult({Intention? intention}) {
             descriptionPreview: testDescriptionPreview(intention.description),
             readiness: intention.readiness,
             archiveState: intention.archiveState,
-            activeRelationCount: 0,
             createdAt: intention.createdAt,
             updatedAt: intention.updatedAt,
           ),

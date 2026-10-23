@@ -973,7 +973,6 @@ void main() {
       await harness.completeParticipantRename(
         participantIndex: 1001,
         title: 'Переименованное',
-        activeRelationCount: 1,
         revision: const TestGraphRevision(11),
       );
       repository.completeGroupPage(
@@ -1157,26 +1156,10 @@ void main() {
     });
 
     final summaries = [
-      catalog_support.testSummary(
-        index: 4,
-        title: 'Участник Г',
-        activeRelationCount: 0,
-      ),
-      catalog_support.testSummary(
-        index: 3,
-        title: 'Участник В',
-        activeRelationCount: 0,
-      ),
-      catalog_support.testSummary(
-        index: 2,
-        title: 'Участник Б',
-        activeRelationCount: 1,
-      ),
-      catalog_support.testSummary(
-        index: 1,
-        title: 'Участник А',
-        activeRelationCount: 1,
-      ),
+      catalog_support.testSummary(index: 4, title: 'Участник Г'),
+      catalog_support.testSummary(index: 3, title: 'Участник В'),
+      catalog_support.testSummary(index: 2, title: 'Участник Б'),
+      catalog_support.testSummary(index: 1, title: 'Участник А'),
     ];
     repository.completeCatalogPage(
       0,
@@ -1550,12 +1533,10 @@ void main() {
       final ownerBefore = catalog_support.testSummary(
         index: 1,
         title: 'Владелец',
-        activeRelationCount: 1,
       );
       final ownerAfter = catalog_support.testSummary(
         index: 1,
         title: 'Владелец',
-        activeRelationCount: 1,
         tags: [
           tag_domain.Tag(
             id: tagId,
@@ -1755,21 +1736,9 @@ final class _CheckpointHarness {
       ResultSuccess(
         IntentionCatalogFirstPage(
           items: [
-            catalog_support.testSummary(
-              index: 1002,
-              title: 'Связанное 2',
-              activeRelationCount: 0,
-            ),
-            catalog_support.testSummary(
-              index: 1001,
-              title: 'Связанное 1',
-              activeRelationCount: 1,
-            ),
-            catalog_support.testSummary(
-              index: 1,
-              title: 'Владелец',
-              activeRelationCount: 1,
-            ),
+            catalog_support.testSummary(index: 1002, title: 'Связанное 2'),
+            catalog_support.testSummary(index: 1001, title: 'Связанное 1'),
+            catalog_support.testSummary(index: 1, title: 'Владелец'),
           ],
           totalCount: 3,
           nextCursor: null,
@@ -1859,19 +1828,16 @@ final class _CheckpointHarness {
   Future<void> completeParticipantRename({
     required int participantIndex,
     required String title,
-    required int activeRelationCount,
     required GraphRevision revision,
   }) async {
     final participantId = testIntentionId(participantIndex);
     final before = catalog_support.testSummary(
       index: participantIndex,
       title: 'Связанное 1',
-      activeRelationCount: activeRelationCount,
     );
     final after = catalog_support.testSummary(
       index: participantIndex,
       title: title,
-      activeRelationCount: activeRelationCount,
     );
     final commandIndex = repository.intentionCommands.length;
     final start = coordinator.acceptExisting(

@@ -1202,7 +1202,6 @@ IntentionSummary _summary(Intention intention) => IntentionSummary(
   descriptionPreview: testDescriptionPreview(intention.description),
   readiness: intention.readiness,
   archiveState: intention.archiveState,
-  activeRelationCount: 0,
   createdAt: intention.createdAt,
   updatedAt: intention.updatedAt,
 );

@@ -265,12 +265,10 @@ final class IntentionSummary {
     required this.descriptionPreview,
     required this.readiness,
     required this.archiveState,
-    required int activeRelationCount,
     required this.createdAt,
     required this.updatedAt,
     List<Tag> tags = const [],
   }) : title = IntentionText.normalizeTitle(title),
-       activeRelationCount = _requireNonNegativeCount(activeRelationCount),
        tags = List.unmodifiable(tags);
 
   final IntentionId id;
@@ -280,30 +278,12 @@ final class IntentionSummary {
   final IntentionDescriptionPreview? descriptionPreview;
   final IntentionReadiness readiness;
   final IntentionArchiveState archiveState;
-  final int activeRelationCount;
   final IntentionTimestamp createdAt;
   final IntentionTimestamp updatedAt;
 
   /// Полный подтверждённый состав собственных тегов в ручном порядке тегов.
   /// Пустой список означает проверенное отсутствие назначений.
   final List<Tag> tags;
-
-  /// Заменяет только производный счётчик активных связей.
-  ///
-  /// Остальные данные краткого представления переносятся без изменений,
-  /// поэтому соответствие фильтру, порядок и временные метки сохраняются.
-  IntentionSummary withActiveRelationCount(int activeRelationCount) =>
-      IntentionSummary(
-        id: id,
-        title: title,
-        descriptionPreview: descriptionPreview,
-        readiness: readiness,
-        archiveState: archiveState,
-        activeRelationCount: activeRelationCount,
-        createdAt: createdAt,
-        updatedAt: updatedAt,
-        tags: tags,
-      );
 
   /// Заменяет полное состояние назначенного тега той же идентичности:
   /// название, цвет и место, и упорядочивает теги по месту.
@@ -321,7 +301,6 @@ final class IntentionSummary {
       descriptionPreview: descriptionPreview,
       readiness: readiness,
       archiveState: archiveState,
-      activeRelationCount: activeRelationCount,
       createdAt: createdAt,
       updatedAt: updatedAt,
       // Места уникальны, поэтому нестабильная сортировка однозначна.
@@ -344,7 +323,6 @@ final class IntentionSummary {
       descriptionPreview: descriptionPreview,
       readiness: readiness,
       archiveState: archiveState,
-      activeRelationCount: activeRelationCount,
       createdAt: createdAt,
       updatedAt: updatedAt,
       tags: [
@@ -352,17 +330,6 @@ final class IntentionSummary {
           if (tag.id != deletedTagId) tag,
       ],
     );
-  }
-
-  static int _requireNonNegativeCount(int value) {
-    if (value < 0) {
-      throw ArgumentError.value(
-        value,
-        'activeRelationCount',
-        'Количество активных связей не может быть отрицательным.',
-      );
-    }
-    return value;
   }
 }
 

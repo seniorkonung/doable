@@ -742,7 +742,6 @@ IntentionSummary _summary(int id, String title) => IntentionSummary(
   descriptionPreview: null,
   readiness: IntentionReadiness.notReady,
   archiveState: IntentionArchiveState.active,
-  activeRelationCount: 0,
   createdAt: IntentionTimestamp(DateTime.utc(2026)),
   updatedAt: IntentionTimestamp(DateTime.utc(2026)),
 );

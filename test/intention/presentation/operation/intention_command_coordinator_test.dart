@@ -1316,7 +1316,6 @@ final class _TestCatalogEntrySnapshot implements IntentionCatalogEntrySnapshot {
          descriptionPreview: null,
          readiness: readiness,
          archiveState: IntentionArchiveState.active,
-         activeRelationCount: 0,
          createdAt: IntentionTimestamp(DateTime.utc(2026)),
          updatedAt: IntentionTimestamp(DateTime.utc(2026)),
          tags: tags,

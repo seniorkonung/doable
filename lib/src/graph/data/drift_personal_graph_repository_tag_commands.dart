@@ -298,12 +298,7 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
   ) async {
     final stored = await _readCommandSnapshot(intentionId);
     if (stored == null) throw const StoredGraphCorruption();
-    final counts = await _readVerifiedRelationCounts(intentionId);
-    return (
-      id: intentionId,
-      counts: counts,
-      entry: await _catalogEntrySnapshot(stored, counts),
-    );
+    return (id: intentionId, entry: await _catalogEntrySnapshot(stored));
   }
 
   /// Команда тега не меняет строку намерения и его связи: снимок «после»
@@ -315,10 +310,7 @@ extension _TagCommandExecution on DriftPersonalGraphRepository {
     onStage(TagCommandDiagnosticsStage.resultRead);
     final stored = await _readCommandSnapshot(before.id);
     if (stored == null) throw const StoredGraphCorruption();
-    return (
-      before: before.entry,
-      after: await _catalogEntrySnapshot(stored, before.counts),
-    );
+    return (before: before.entry, after: await _catalogEntrySnapshot(stored));
   }
 
   Future<void> _checkAssignmentIdentities(
@@ -460,7 +452,6 @@ final class _CommittedTagDeleted extends _CommittedTagCommand {
 
 typedef _TagIntentionCatalogEntryBefore = ({
   IntentionId id,
-  RelationCounts counts,
   IntentionCatalogEntrySnapshot entry,
 });
 

@@ -29,7 +29,6 @@ final class _TagAssignmentCatalogEntry
         descriptionPreview: null,
         readiness: IntentionReadiness.notReady,
         archiveState: IntentionArchiveState.active,
-        activeRelationCount: 0,
         createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 2)),
         tags: const [],

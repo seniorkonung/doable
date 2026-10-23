@@ -401,16 +401,12 @@ IntentionId testDetailsIntentionId(int index) {
   };
 }
 
-IntentionSummary testDetailsSummary(
-  Intention intention, {
-  int activeRelationCount = 0,
-}) => IntentionSummary(
+IntentionSummary testDetailsSummary(Intention intention) => IntentionSummary(
   id: intention.id,
   title: intention.title,
   descriptionPreview: testDescriptionPreview(intention.description),
   readiness: intention.readiness,
   archiveState: intention.archiveState,
-  activeRelationCount: activeRelationCount,
   createdAt: intention.createdAt,
   updatedAt: intention.updatedAt,
 );

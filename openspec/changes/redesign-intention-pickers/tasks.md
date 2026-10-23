@@ -83,7 +83,7 @@
     - `test/intention/presentation/catalog/intention_catalog_count_reconciliation_test.dart` (удаляется), `test/intention/presentation/catalog/intention_catalog_action_selection_test.dart`, `test/graph/presentation/graph_reconciliation_checkpoint_test.dart`, `test/graph/presentation/package_consumers_test_support.dart`.
   - **Размер:** S.
 
-- [ ] 1.6 Убрать количество связей из краткой сводки намерения и перестать вычислять его при чтении порции каталога и в снимках команд
+- [x] 1.6 Убрать количество связей из краткой сводки намерения и перестать вычислять его при чтении порции каталога и в снимках команд
   - **Критерии приёмки:**
     - `IntentionSummary` не содержит количества связей и операции его замены.
       - Чтение порции не выполняет агрегат количеств.

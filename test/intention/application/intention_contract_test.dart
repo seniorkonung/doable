@@ -310,55 +310,6 @@ void main() {
       expect(_query().excludedIntentionId, isNull);
     });
 
-    test('замена счётчика связей сохраняет теги и остальные данные сводки', () {
-      final suppliedTags = [
-        Tag(
-          id: _tagId('00000000-0000-4000-8000-000000000002'),
-          name: TagName.fromStored('Первый тег'),
-          color: null,
-          position: tagPositionAt(1005),
-        ),
-        Tag(
-          id: _tagId('00000000-0000-4000-8000-000000000001'),
-          name: TagName.fromStored('Второй тег'),
-          color: null,
-          position: tagPositionAt(1006),
-        ),
-      ];
-      final summary = IntentionSummary(
-        id: _intentionId('00000000-0000-4000-8000-000000000003'),
-        title: 'Гулять',
-        descriptionPreview: IntentionDescriptionPreview.fromDescription(
-          'Описание',
-        ),
-        readiness: IntentionReadiness.ready,
-        archiveState: IntentionArchiveState.archived,
-        activeRelationCount: 2,
-        createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
-        updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 2)),
-        tags: suppliedTags,
-      );
-
-      final copy = summary.withActiveRelationCount(7);
-
-      expect(copy.activeRelationCount, 7);
-      expect(summary.activeRelationCount, 2);
-      expect(copy.id, summary.id);
-      expect(copy.title, summary.title);
-      expect(copy.descriptionPreview?.text, summary.descriptionPreview?.text);
-      expect(copy.readiness, summary.readiness);
-      expect(copy.archiveState, summary.archiveState);
-      expect(copy.createdAt, summary.createdAt);
-      expect(copy.updatedAt, summary.updatedAt);
-      expect(copy.tags, suppliedTags);
-      suppliedTags.clear();
-      expect(copy.tags, summary.tags);
-      expect(copy.tags.map((tag) => tag.name.value), [
-        'Первый тег',
-        'Второй тег',
-      ]);
-    });
-
     test('изменение только цвета тега заменяет его состояние в сводке', () {
       final firstId = _tagId('00000000-0000-4000-8000-000000000002');
       final secondId = _tagId('00000000-0000-4000-8000-000000000001');
@@ -370,7 +321,6 @@ void main() {
         ),
         readiness: IntentionReadiness.ready,
         archiveState: IntentionArchiveState.archived,
-        activeRelationCount: 2,
         createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 2)),
         tags: [
@@ -410,7 +360,6 @@ void main() {
       expect(copy.descriptionPreview?.text, summary.descriptionPreview?.text);
       expect(copy.readiness, summary.readiness);
       expect(copy.archiveState, summary.archiveState);
-      expect(copy.activeRelationCount, summary.activeRelationCount);
       expect(copy.createdAt, summary.createdAt);
       expect(copy.updatedAt, summary.updatedAt);
     });
@@ -426,7 +375,6 @@ void main() {
         ),
         readiness: IntentionReadiness.ready,
         archiveState: IntentionArchiveState.archived,
-        activeRelationCount: 2,
         createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 2)),
         tags: [
@@ -464,7 +412,6 @@ void main() {
       expect(copy.descriptionPreview?.text, summary.descriptionPreview?.text);
       expect(copy.readiness, summary.readiness);
       expect(copy.archiveState, summary.archiveState);
-      expect(copy.activeRelationCount, summary.activeRelationCount);
       expect(copy.createdAt, summary.createdAt);
       expect(copy.updatedAt, summary.updatedAt);
     });
@@ -476,7 +423,6 @@ void main() {
         descriptionPreview: null,
         readiness: IntentionReadiness.notReady,
         archiveState: IntentionArchiveState.active,
-        activeRelationCount: 0,
         createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
         tags: [
@@ -515,7 +461,6 @@ void main() {
         ),
         readiness: IntentionReadiness.ready,
         archiveState: IntentionArchiveState.archived,
-        activeRelationCount: 2,
         createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 2)),
         tags: [
@@ -544,7 +489,6 @@ void main() {
       expect(copy.descriptionPreview?.text, summary.descriptionPreview?.text);
       expect(copy.readiness, summary.readiness);
       expect(copy.archiveState, summary.archiveState);
-      expect(copy.activeRelationCount, summary.activeRelationCount);
       expect(copy.createdAt, summary.createdAt);
       expect(copy.updatedAt, summary.updatedAt);
     });
@@ -556,7 +500,6 @@ void main() {
         descriptionPreview: null,
         readiness: IntentionReadiness.notReady,
         archiveState: IntentionArchiveState.active,
-        activeRelationCount: 0,
         createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
         tags: [
@@ -970,7 +913,6 @@ IntentionSummary _summary({
     descriptionPreview: null,
     readiness: readiness,
     archiveState: archiveState,
-    activeRelationCount: 0,
     createdAt: created,
     updatedAt: IntentionTimestamp(updatedAt ?? created.value),
     tags: tags,

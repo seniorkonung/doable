@@ -140,7 +140,6 @@ void main() {
               entry.summary.tags.first.id.toCanonicalString(),
               tagFixtureId(firstTagNumber),
             );
-            expect(entry.summary.activeRelationCount, 1);
             expect(() => entry.summary.tags.clear(), throwsUnsupportedError);
           }
         },
@@ -208,14 +207,6 @@ void main() {
             mutation.before.summary.createdAt,
           );
           expect(mutation.after.summary.updatedAt, saved.intention.updatedAt);
-          expect(
-            mutation.before.summary.activeRelationCount,
-            isArchived == 1 ? 0 : 1,
-          );
-          expect(
-            mutation.after.summary.activeRelationCount,
-            command(id) is ArchiveIntention || isArchived == 1 ? 0 : 1,
-          );
         });
       }
 
@@ -443,7 +434,6 @@ void main() {
               for (final entry in [mutation.before, mutation.after]) {
                 expect(entry.summary.id, id);
                 expect(entry.summary.title, 'Намерение 1');
-                expect(entry.summary.activeRelationCount, 1);
                 expect(
                   entry.summary.createdAt.value.microsecondsSinceEpoch,
                   101,
@@ -2035,7 +2025,6 @@ List<Object?> _summaryFacts(IntentionSummary summary) => [
   summary.descriptionPreview?.text,
   summary.readiness,
   summary.archiveState,
-  summary.activeRelationCount,
   summary.createdAt,
   summary.updatedAt,
   [for (final tag in summary.tags) (tag.id, tag.name.value)],
