@@ -156,3 +156,180 @@
   - **Зависимости:** 1.9 — перебор набора свёртки уже покрывает обрезку краёв.
   - **Предполагаемые файлы:** `test/intention/application/intention_description_preview_test.dart`.
   - **Размер:** XS.
+
+## Phase 2: Поиски дневного выбора на экране выбора дизайна
+
+- [ ] 2.1 Добавить иконки фильтра, молнии, стрелки вверх-вправо и крестика шапки из макета экрана выбора
+  - **Критерии приёмки:**
+    - Фильтр 20, залитая молния 14, стрелка вверх-вправо 20 и крестик шапки 24 перенесены из `context/doable-design/design/ActionPicker.dc.html` по правилам `lib/src/design_system/icons/README.md`. Таблица README называет макет и блок каждого ресурса.
+    - `DoableIconData` содержит четыре новых значения, а эталон всех иконок показывает их в обеих темах в размерах и цветах их компонентов.
+    - Иконка архива не добавляется: её использует только строка архивированного намерения.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test --update-goldens test/design_system/doable_icon_test.dart`, сверка нового эталона с макетом, затем `mise exec --no-deps -- flutter test test/design_system/doable_icon_test.dart`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** четыре SVG в `lib/src/design_system/icons/assets/`, `lib/src/design_system/doable_icon.dart`, `lib/src/design_system/icons/README.md`, `test/design_system/doable_icon_test.dart`, `test/design_system/goldens/doable_icons.png`.
+  - **Размер:** S.
+
+- [ ] 2.2 Добавить в дизайн-систему малый тег-чип и метку-значок для строки списка
+  - **Критерии приёмки:**
+    - `TagChip.small` по разделу `sm` README `context/doable-design-system/components/TagChip/README.md`: точка 7 и название в стиле `caption` в одну строку на фоне `bg`; название `muted`, у выделенного тега — `ink`. Чип не является кнопкой.
+    - `Badge.mark` по разделу «A mark» README `Badge`: плитка 22×20 на `bg` с иконкой 14 в тоне `ink`, без собственного узла экранного диктора.
+    - Компоненты получают готовые название, цвет и иконку (ADR-0030). Чип формы, метка-слово и приглушённые варианты для архивированного намерения не добавляются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/tag_chip_test.dart test/design_system/badge_test.dart` — значения токенов в обеих темах, выделенный тег, отсутствие узла у метки, текст масштаба 2 без переполнения.
+  - **Зависимости:** 2.1 — иконка молнии.
+  - **Предполагаемые файлы:** `lib/src/design_system/components/tag_chip.dart`, `lib/src/design_system/components/badge.dart`, `test/design_system/tag_chip_test.dart`, `test/design_system/badge_test.dart`.
+  - **Размер:** S.
+
+- [ ] 2.3 Добавить в дизайн-систему линию меток и тегов, которая показывает поместившиеся теги и число остальных
+  - **Критерии приёмки:**
+    - `TagLine` по README `TagLine` и решению 4 дизайна раскладывает метки и теги собственным `RenderBox` в одну строку высотой 20:
+      - метки стоят первыми и места не уступают;
+      - теги идут в порядке потребителя, пока после тега остаётся место под число;
+      - не поместившиеся теги заменяет «+N» в стиле `caption` цвета `muted` с табличными цифрами;
+      - хотя бы один тег виден всегда, а слишком широкий обрезается краем линии.
+    - Линия перераскладывается при смене ширины, растёт вместе с крупным текстом и не создаёт узлов экранного диктора.
+    - Потребитель передаёт все теги, поэтому числа непереданных тегов (`more` в README) у линии нет.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/tag_line_test.dart` — все теги помещаются; «+N» и место под него; обрезка единственного тега; метки на узкой линии; смена ширины; отсутствие узлов; обе темы; текст масштаба 2.
+  - **Зависимости:** 2.2 — метки и чипы линии.
+  - **Предполагаемые файлы:** `lib/src/design_system/components/tag_line.dart`, `test/design_system/tag_line_test.dart`.
+  - **Размер:** M — собственная раскладка.
+
+- [ ] 2.4 Добавить в дизайн-систему строку выбора с областью выбора и стрелкой к странице
+  - **Критерии приёмки:**
+    - `PickerRow` по README `PickerRow` и решению 4 дизайна — карточка `fill` с углами `radius-lg` из двух областей нажатия:
+      - текст: название в стиле `action` без обрезки, необязательное описание `note` цвета `muted` не длиннее двух строк с многоточием и линия меток и тегов, если они есть;
+      - стрелка вверх-вправо 20 цвета `muted` по центру всей высоты в области шириной 48.
+    - Область текста — один узел-кнопка с готовым доступным названием, стрелка — отдельная кнопка со своим названием, и каждая область вызывает свой обработчик.
+    - Приглушённого вида архивированного намерения нет.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/picker_row_test.dart` — обе темы; перенос длинного названия; две строки описания с многоточием; строка без описания и линии; узлы и обработчики обеих областей; текст масштаба 2.
+  - **Зависимости:** 2.1 — стрелка; 2.3 — линия меток и тегов.
+  - **Предполагаемые файлы:** `lib/src/design_system/components/picker_row.dart`, `test/design_system/picker_row_test.dart`.
+  - **Размер:** S.
+
+- [ ] 2.5 Сопоставить краткую сводку намерения строке экрана выбора: начало описания, молния, обязательные теги первыми и доступное название
+  - **Критерии приёмки:**
+    - В `intention_catalog_purpose.dart` появляется sealed-подтип `IntentionPickerPurpose` с наследниками `SelectDailyChoiceAction` и `SelectDailyChoiceSource`. Вид выбираемого — действие или намерение — выводится его исчерпывающим разбором (решение 1 дизайна). `SelectRelationParticipant` остаётся прямым наследником `IntentionCatalogPurpose`, потому что поиск участника сохраняет прежний вид. Разборы модели каталога не меняются.
+    - Адаптер `IntentionPickerRow` переводит `IntentionSummary` в `PickerRow` по решению 4 дизайна:
+      - описание — начало описания из сводки;
+      - молния — у намерения с готовностью к действию;
+      - теги из обязательных условий применённого запроса выдачи идут первыми и выделены, внутри обеих групп сохраняется ручной порядок сводки, а цвет переводит `tagColorPresentation`.
+    - Доступное название области выбора собирается из локализации: название; в поиске исходного намерения — действие это или намерение; начало описания; все теги в порядке показа либо «без тегов». Подпись стрелки называет открытие страницы этого действия или намерения.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/picker/intention_picker_row_test.dart` в обоих языках:
+      - сценарий «Карточка показывает начало описания и теги, которые поместились»;
+      - сценарий «Молния отмечает действия в поиске исходного намерения» и молния в каждой строке поиска действия;
+      - сценарий «Теги из фильтра стоят первыми»;
+      - доступное название строки без тегов и подпись стрелки.
+    - `mise run codegen` и `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 2.2–2.4.
+  - **Предполагаемые файлы:** `lib/src/intention/presentation/catalog/intention_catalog_purpose.dart`, `lib/src/intention/presentation/picker/intention_picker_row.dart`, `lib/l10n/app_en.arb`, `lib/l10n/app_ru.arb` и генерируемые `lib/l10n/app_localizations*.dart`, `test/intention/presentation/picker/intention_picker_row_test.dart`.
+  - **Размер:** M.
+
+- [ ] 2.6 Добавить в дизайн-систему заголовок списка выбора и состояния выдачи: пустое состояние с иконкой и кнопкой и подгрузку следующей порции
+  - **Критерии приёмки:**
+    - `CatalogHeader` в простом варианте пикера по README `CatalogHeader`: заголовок в стиле `section` объявляется заголовком, за ним через `space-2` стоит плашка количества `fill` не меньше 24×24 с текстом `label` цвета `muted`, в том числе с 0. Кнопки и плашки сортировки нет.
+    - `EmptyState` по README `EmptyState` принимает необязательные иконку и одну тихую кнопку: плитку `fill` 52 с иконкой 24 цвета `muted` над заголовком и `Button.quiet` под текстом. Без них блок прежний.
+    - `ListState.more` по README `ListState` — кольцо 18 по центру строки высотой 40 без видимого текста. Текст служит доступным названием и объявляется живой областью, как загрузка.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/catalog_header_test.dart test/design_system/empty_state_test.dart test/design_system/list_state_test.dart` — обе темы, размеры и расстояния, узлы-заголовки, кнопка и её обработчик, живая область подгрузки, текст масштаба 2.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `lib/src/design_system/components/catalog_header.dart`, `lib/src/design_system/components/empty_state.dart`, `lib/src/design_system/components/list_state.dart`, `test/design_system/catalog_header_test.dart`, `test/design_system/empty_state_test.dart`, `test/design_system/list_state_test.dart`.
+  - **Размер:** M.
+
+- [ ] 2.7 Показать выдачу экрана выбора состояниями дизайн-системы: заголовок с количеством, строки, подгрузку, отказы и выбор с ревизией выдачи
+  - **Критерии приёмки:**
+    - `IntentionPickerResults` сопоставляет состояние модели каталога своего назначения по таблице решения 3 дизайна:
+      - загрузка и пауза ввода — `ListState.loading`;
+      - загруженная выдача — `CustomScrollView`: заголовок «Действия» или «Намерения» с точным количеством прокручивается вместе со строками `IntentionPickerRow` через `space-2`; в конце стоит `ListState.more`, пока есть следующая порция, либо отказ продолжения — `ListState.error`, устранимый с повтором `retryNextPage`;
+      - успешная пустая выдача — заголовок с 0 и `EmptyState` в оставшейся высоте с заголовком «Выбрать не из чего» и сообщением страницы о пустом охвате, без кнопки;
+      - отказы первой порции — `ListState.error`, с повтором `retry` только у устранимого; недопустимый фильтр — ничего.
+    - Подгрузка следует прежнему контракту модели: построенная строка после кадра вызывает `loadNextPageIfNeeded`. Неидентичный `query` подтверждённой выдачи возвращает список к началу. Список и строки несут прежние ключи поисков: `daily-choice-action-list` и `daily-choice-action-<идентификатор>` либо `daily-choice-source-…`.
+    - Нажатие на строку передаёт `GraphSnapshot<IntentionSummary>` со сводкой строки и ревизией выдачи, из которой строка построена; стрелка передаёт идентификатор намерения.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/picker/intention_picker_results_test.dart` — каждое состояние таблицы; количество в заголовке; подгрузка небольшой фикстуры на несколько порций; кольцо подгрузки только пока есть порции; повтор продолжения; возврат к началу при новом запросе; ревизия снимка выбора после смены ревизии выдачи.
+    - `mise run codegen` и `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 2.5 — строка; 2.6 — заголовок и состояния.
+  - **Предполагаемые файлы:** `lib/src/intention/presentation/picker/intention_picker_results.dart`, `lib/l10n/app_en.arb`, `lib/l10n/app_ru.arb` и генерируемые `lib/l10n/app_localizations*.dart`, `test/intention/presentation/picker/intention_picker_results_test.dart`.
+  - **Размер:** M.
+
+- [ ] 2.8 Добавить в дизайн-систему верхнюю панель с крестиком и кнопку фильтра по тегам
+  - **Критерии приёмки:**
+    - `TopBar` по README `TopBar` и решению 8 дизайна: высота 44 под системным отступом, без фона, линии и тени; слева крестик 24 цвета `ink` в области нажатия 44 с доступным названием от потребителя; заголовок в стиле `title` по центру панели, не шире её без 64 с каждой стороны, объявляется заголовком. Стрелки «назад» и правого действия нет.
+    - `FilterButton` в варианте `tile` по README `FilterButton`: квадрат 44 с углами `radius-sm` на `fill` и иконкой фильтра 20 цвета `muted`; при условиях — иконка и число в `accent` на `accent-soft`, число в стиле `label` с табличными цифрами. Это кнопка с доступным названием от потребителя. Варианта `bare` нет.
+    - Оба компонента получают готовые тексты и обработчики (ADR-0030).
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/top_bar_test.dart test/design_system/filter_button_test.dart` — обе темы, значения токенов, системный отступ, узлы кнопки и заголовка, обработчики, кнопка без условий и с ними, текст масштаба 2.
+  - **Зависимости:** 2.1 — иконки крестика и фильтра.
+  - **Предполагаемые файлы:** `lib/src/design_system/components/top_bar.dart`, `lib/src/design_system/components/filter_button.dart`, `test/design_system/top_bar_test.dart`, `test/design_system/filter_button_test.dart`.
+  - **Размер:** M.
+
+- [ ] 2.9 Собрать экран выбора: крестик с заголовком, поле поиска и кнопка фильтра закреплены над выдачей
+  - **Критерии приёмки:**
+    - `IntentionPickerView` по решениям 1 и 2 дизайна получает назначение `IntentionPickerPurpose`, подпись крестика, сообщение о пустом охвате и обработчики закрытия, выбора и открытия подробностей. Маршрутов, права запуска и типа результата экран не знает. Это `Scaffold`:
+      - в `appBar` — `TopBar` с крестиком и заголовком «Выбор действия» или «Выбор намерения»;
+      - под ним — ряд из `SearchField` с заполнителем «Поиск по названию» и ошибкой недопустимого фильтра и `FilterButton`;
+      - остальную высоту занимает `IntentionPickerResults`: список прокручивается под рядом поиска, а клавиатура сжимает только его.
+    - `FilterButton` показывает число условий модели `IntentionTagConditionsViewModel` назначения, называет фильтр по тегам с числом условий и открывает `showTagsPanel` с `TagsPanelFilterContext` этой модели. Под полем условий нет.
+    - Крестик и поле несут прежние ключи поисков: `daily-choice-action-cancel` и `daily-choice-action-filter` либо `daily-choice-source-…`.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/picker/intention_picker_view_test.dart` в обоих языках:
+      - заголовки по назначению и закрытие крестиком;
+      - сценарий «Кнопка фильтра показывает число условий» с открытием панели кнопкой;
+      - сценарий «Поиск и фильтр остаются на месте при прокрутке»;
+      - ошибка недопустимого фильтра строкой поля без выдачи;
+      - при тексте масштаба 2 и открытой клавиатуре шапка, поле и первая строка видны, а список прокручивается;
+      - правила доступности Android для областей нажатия, их подписей и контраста текста.
+    - `mise run codegen` и `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 2.7 — выдача; 2.8 — шапка и кнопка фильтра.
+  - **Предполагаемые файлы:** `lib/src/intention/presentation/picker/intention_picker_view.dart`, `lib/l10n/app_en.arb`, `lib/l10n/app_ru.arb` и генерируемые `lib/l10n/app_localizations*.dart`, `test/intention/presentation/picker/intention_picker_view_test.dart`.
+  - **Размер:** M.
+
+- [ ] 2.10 Называть на экране выбора причину пустой выдачи и снимать название и все условия одним действием «Сбросить фильтры»
+  - **Критерии приёмки:**
+    - Модель каталога получает `clearTitleFilter()`: пустой фильтр названия применяется сразу, без паузы ввода.
+    - Если пустую выдачу дал фильтр, `EmptyState` по `IntentionCatalogEmpty.query` и решению 6 дизайна показывает иконку поиска, тексты по виду выбираемого для причины — только название, только условия по тегам или оба сразу — и кнопку «Сбросить фильтры». Пустой охват без фильтров по-прежнему показывает сообщение страницы без кнопки. Заголовок выдачи остаётся с 0.
+    - «Сбросить фильтры» очищает поле, вызывает `clearTitleFilter()` и `clear()` модели условий. После этого поле пусто, кнопка фильтра без числа, а выдача с начала содержит весь допустимый охват.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog/intention_catalog_view_model_test.dart` — `clearTitleFilter()` сразу читает первую порцию с пустым фильтром названия.
+    - `mise exec --no-deps -- flutter test test/intention/presentation/picker/intention_picker_view_test.dart` в обоих языках — сценарии «Пустая выдача называет обе причины», «„Сбросить фильтры“ снимает название и условия», «Пустой охват без фильтров не предлагает сброс» и «Пустая выдача по условиям отличается от пустого охвата», а также причины только по названию и только по условиям.
+    - `mise run codegen` и `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 2.6 — пустое состояние с иконкой и кнопкой; 2.9 — экран.
+  - **Предполагаемые файлы:** `lib/src/intention/presentation/catalog/intention_catalog_view_model.dart`, `lib/src/intention/presentation/picker/intention_picker_results.dart`, `lib/src/intention/presentation/picker/intention_picker_view.dart`, `lib/l10n/app_en.arb`, `lib/l10n/app_ru.arb` и генерируемые `lib/l10n/app_localizations*.dart`, `test/intention/presentation/catalog/intention_catalog_view_model_test.dart`, `test/intention/presentation/picker/intention_picker_view_test.dart`.
+  - **Размер:** M.
+
+- [ ] 2.11 Перевести поиски действия и исходного намерения на экран выбора с прежними правом запуска и результатом
+  - **Критерии приёмки:**
+    - `DailyChoiceActionPickerPage` и `DailyChoiceSourcePickerPage` в начальном и вспомогательном контекстах показывают `IntentionPickerView` своего назначения и сохраняют `@RoutePage`, `PopScope`, отмену запуска и проверку верхнего маршрута перед выбором, закрытием и открытием подробностей. Результат — идентификатор из снимка выбора.
+      - Подпись крестика — «Отменить создание» в начальном контексте и «Отменить выбор действия» или «Отменить выбор намерения» во вспомогательном.
+      - Нижней кнопки «Отменить создание» нет: выйти можно только крестиком и системным «назад».
+    - Строки, которые потеряли последнего потребителя, удалены: прежний заголовок «Выбор основания», подписи количества, подсказки выбора и подробностей и сообщения об отсутствии совпадений по названию.
+    - Проверки страниц сохраняют контракт права запуска и результата на новом экране, а проверки прежнего вида удалены, если то же поведение проверяет экран выбора. Сквозные проверки создания и замены пути дневного выбора, быстрого создания, оболочки и поиска по тегам находят строки, крестик, поле, стрелку и кнопку фильтра нового экрана. Из проверки доступности чипов условий удалён вариант поиска действия: чипов в нём больше нет.
+  - **Проверка:**
+    - `mise run codegen` и `mise exec --no-deps -- flutter analyze`.
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation test/app/creation_flows_integration_test.dart test/app/quick_creation test/app/navigation test/app/intention_tag_search_app_flow_test.dart test/app/daily_choice_app_lifecycle_test.dart test/app/routing/app_router_test.dart test/intention/presentation/intention_tag_search_accessibility_test.dart test/long_term_relation/presentation/participant_picker` — проверки страниц, в том числе сценарии «Поиск действия открывается экраном выбора» и «Стрелка открывает подробные данные без выбора»; сквозные потоки через оба поиска; поиск участника, который делит с ними проверки сессии.
+  - **Зависимости:** 2.10.
+  - **Предполагаемые файлы:**
+    - страницы: `lib/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart`, `lib/src/daily_choice/presentation/source_picker/daily_choice_source_picker_page.dart`;
+    - строки: `lib/l10n/app_en.arb`, `lib/l10n/app_ru.arb` и генерируемые `lib/l10n/app_localizations*.dart`;
+    - проверки страниц: `test/daily_choice/presentation/action_picker/daily_choice_action_picker_page_test.dart`, `test/daily_choice/presentation/source_picker/daily_choice_source_picker_page_test.dart`, `test/daily_choice/presentation/daily_choice_picker_context_test_support.dart`, `test/daily_choice/presentation/daily_choice_picker_tag_search_test_support.dart`, `test/intention/presentation/catalog/intention_picker_session_test_support.dart`;
+    - механическая адаптация потоков: `test/daily_choice/presentation/daily_choice_creation_launcher_test.dart`, `test/daily_choice/presentation/daily_choice_path_replacement_flow_test.dart`, `test/app/creation_flows_test_support.dart`, `test/app/quick_creation/quick_creation_flow_scenarios.dart`, `test/app/quick_creation/quick_creation_launcher_test_support.dart`, `test/app/quick_creation/quick_creation_navigation_test.dart`, `test/app/navigation/app_shell_pages_above_test.dart`, `test/app/navigation/app_shell_page_matrix.dart`, `test/app/intention_tag_search_app_flow_test.dart`, `test/intention/presentation/intention_tag_search_accessibility_test.dart`.
+  - **Размер:** M — две тонкие страницы; механическая адаптация проверок потоков входит в задачу, потому что страницы нельзя перевести по частям, не сломав эти проверки.
+
+- [ ] 2.12 Подтвердить готовность второй фазы: поиски действия и исходного намерения работают на экране выбора по спецификации
+  - **Критерии приёмки:**
+    - Выполнено условие «Ready to advance» второй фазы:
+      - поиски действия и исходного намерения выполняют требования экрана, строки и сброса фильтров из спецификации;
+      - состояния выдачи, доступность и оба языка соответствуют спецификации;
+      - потоки создания и замены пути дневного выбора работают через новый экран.
+    - Пакет не переводит поиск участника, не добавляет метку архива и вид строки архивированного намерения и не меняет общие виджеты поиска каталога.
+    - Результаты проверок и путь к APK сообщены в сессии. Ручная проверка на устройстве остаётся за пользователем и не блокирует готовность фазы.
+  - **Проверка:**
+    - `mise run check` и `mise exec --no-deps -- openspec validate redesign-intention-pickers --strict --no-interactive`; после фиксации изменений — `mise run codegen-check` на чистой рабочей копии.
+    - `mise exec --no-deps -- flutter build apk --release` с артефактом `build/app/outputs/flutter-apk/app-release.apk`. Если через DTD найдено запущенное приложение, выполнить hot restart и проверить `get_runtime_errors`; эмулятор и устройство не запускаются.
+    - Сообщить оставшиеся ручные проверки: вид обоих поисков в обеих темах против макетов `ActionPicker.dc.html` и `IntentionPicker.dc.html`; закреплённая шапка при клавиатуре; линия тегов с «+N»; число на кнопке фильтра и панель; «Сбросить фильтры»; выход крестиком и системным «назад» в начальном и вспомогательном контекстах; создание и замена пути дневного выбора.
+  - **Зависимости:** 2.1–2.11.
+  - **Предполагаемые файлы:** нет, только проверка и сборка.
+  - **Размер:** XS.
