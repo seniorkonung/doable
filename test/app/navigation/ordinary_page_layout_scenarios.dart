@@ -84,16 +84,6 @@ void _registerOrdinaryLayoutTests() {
       await _scrollToEnd(tester, find.byType(TagCatalogPage));
       final last = find.text('Тег 025');
       _expectFullyVisible(tester, last, insets);
-      final open = find.byKey(
-        ValueKey('tag-catalog-open-${tagFixtureId(9025)}'),
-      );
-      _expectFullyVisible(tester, open, insets);
-      expect(open.hitTestable(), findsOneWidget);
-      await tester.tap(open);
-      await tester.pumpAndSettle();
-      expect(app.router.current.name, TagNavigationRoute.name);
-      app.router.pop();
-      await tester.pumpAndSettle();
       final create = find.byKey(const ValueKey('tag-catalog-create'));
       _expectFullyVisible(tester, create, insets);
       await tester.tap(create);
@@ -286,7 +276,7 @@ void _registerOrdinaryPaginationTests() {
         locale: locale,
         screen: screen,
         insets: insets,
-        intentions: 105,
+        intentions: _lastLayoutRelation,
         observer: faults,
         seedAdditional: _seedOrdinaryLayout,
       );
@@ -337,73 +327,6 @@ void _registerOrdinaryPaginationTests() {
       expect(find.byType(RelationDetailsPage), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
-
-    testWidgets('выдача по тегу, $conditions: подгрузка, загрузка, отказ '
-        'и повтор доступны над панелью', (tester) async {
-      final faults = _ReadFaults();
-      final app = await _start(
-        tester,
-        locale: locale,
-        screen: screen,
-        insets: insets,
-        intentions: 105,
-        observer: faults,
-        seedAdditional: _seedOrdinaryLayout,
-      );
-      final l10n = lookupAppLocalizations(locale);
-      final tagId =
-          (TagId.decode(tagFixtureId(8000)) as TagIdDecodingSuccess).id;
-      unawaited(app.router.push(TagNavigationRoute(tagId: tagId)));
-      await _until(tester, find.byType(TagNavigationPage));
-      await _settle(tester);
-      final page = find.byType(TagNavigationPage);
-      await _scrollToEnd(tester, page);
-      final more = find.widgetWithText(
-        OutlinedButton,
-        l10n.tagNavigationLoadMore,
-      );
-      _expectFullyVisible(tester, more, insets);
-      expect(more.hitTestable(), findsOneWidget);
-      faults.isFailing = true;
-      faults.pause();
-      await tester.tap(more);
-      await tester.pump();
-      final loading = find.text(l10n.tagNavigationLoadingMore);
-      expect(loading, findsOneWidget);
-      await _expectLoadingFooter(tester, loading, insets);
-      faults.resume();
-      await _settle(tester);
-      await _scrollToEnd(tester, page);
-      _expectFullyVisible(
-        tester,
-        find.text(l10n.tagNavigationLoadMoreUnavailable),
-        insets,
-      );
-      final retry = find.widgetWithText(OutlinedButton, l10n.commonRetry);
-      _expectFullyVisible(tester, retry, insets);
-      expect(retry.hitTestable(), findsOneWidget);
-      faults.isFailing = false;
-      await tester.tap(retry);
-      await _settle(tester);
-      await _scrollToEnd(tester, page);
-      await tester.tap(more);
-      await _settle(tester);
-      await _scrollToEnd(tester, page);
-      _expectFullyVisible(
-        tester,
-        find.text(l10n.tagNavigationAllShown),
-        insets,
-      );
-      final last = find.widgetWithText(ListTile, _intentionTitle(105));
-      _expectFullyVisible(tester, last, insets);
-      expect(last.hitTestable(), findsOneWidget);
-      await tester.tap(last);
-      await _until(
-        tester,
-        find.byKey(const ValueKey('intention-details-title')),
-      );
-      expect(tester.takeException(), isNull);
-    });
   }
 }
 
@@ -440,20 +363,9 @@ void _seedLayoutTagCatalog(sqlite.Database database) {
 
 const _lastLayoutRelation = 53;
 
-/// Три порции помеченных намерений и две порции связей одной исходящей группы.
+/// Две порции связей одной исходящей группы.
 void _seedOrdinaryLayout(sqlite.Database database) {
   seedRawGraph(database, () {
-    database.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
-      tagFixtureId(8000),
-      'Дом',
-      tagPositionKey(8000),
-    ]);
-    for (var number = 1; number <= 105; number++) {
-      database.execute(
-        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-        [tagFixtureId(8000), tagFixtureId(number)],
-      );
-    }
     // Вместе со связью из основного засева у первого намерения 52 связи.
     for (var number = 3; number <= _lastLayoutRelation; number++) {
       database.execute(

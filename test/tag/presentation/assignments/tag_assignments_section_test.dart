@@ -46,7 +46,6 @@ Widget _host({
   required IntentionId intentionId,
   required Locale locale,
   required ValueChanged<IntentionId> onChoose,
-  ValueChanged<TagId>? onOpen,
   TagReadContract? reads,
   Stream<ConfirmedGraphChangePackage>? changes,
 
@@ -70,7 +69,6 @@ Widget _host({
                 intentionId: intentionId,
                 isArchived: isArchived,
                 onChooseTag: onChoose,
-                onOpenTag: onOpen ?? (_) {},
               )
             : const SizedBox.shrink(),
       ),
@@ -146,58 +144,45 @@ void main() {
     (const Locale('en'), 'Remove assignment'),
   ]) {
     testWidgets(
-      'назначение намерения открывает точный тег без изменений: ${locale.languageCode}',
+      'строка назначения показывает точку, название и снятие без перехода к тегу: ${locale.languageCode}',
       (tester) async {
         final semantics = tester.ensureSemantics();
-        final opened = <TagId>[];
-        final graphBefore = retainedTagFixtureGraph(raw);
-        final assignmentsBefore = raw
-            .select('SELECT * FROM tag_assignments ORDER BY creation_sequence')
-            .map((row) => row.values.toList())
-            .toList();
         await tester.pumpWidget(
           _host(
             repository: repository,
             intentionId: _intentionId(1),
             locale: locale,
             onChoose: (_) {},
-            onOpen: opened.add,
           ),
         );
-        final open = find.byKey(
-          ValueKey('tag-assignment-open-${tagFixtureId(firstTagNumber)}'),
+        final row = find.byKey(
+          ValueKey('tag-assignment-row-${tagFixtureId(firstTagNumber)}'),
         );
-        await _pumpUntil(tester, () => open.evaluate().isNotEmpty);
-        expect(find.byKey(const ValueKey('tag-catalog-search')), findsNothing);
-        final l10n = AppLocalizations.of(tester.element(open));
+        await _pumpUntil(tester, () => row.evaluate().isNotEmpty);
         expect(
-          tester.getSemantics(open).label,
-          contains(l10n.tagNavigationTitle),
+          find.descendant(of: row, matching: find.byType(TagDot)),
+          findsOneWidget,
         );
         expect(
-          tester
-              .getSemantics(find.byTooltip(l10n.tagNavigationTag('Дом')))
-              .tooltip,
-          l10n.tagNavigationTag('Дом'),
+          find.descendant(of: row, matching: find.text('Дом')),
+          findsOneWidget,
         );
-        expect(tester.getSemantics(open).flagsCollection.isButton, isTrue);
-        expect(find.byTooltip('$removeText: Дом'), findsOneWidget);
         expect(
-          tester.getSemantics(find.byTooltip('$removeText: Дом')).tooltip,
-          '$removeText: Дом',
+          find.descendant(
+            of: row,
+            matching: find.byWidgetPredicate(
+              (widget) => widget is ButtonStyleButton,
+            ),
+          ),
+          findsOneWidget,
         );
-        await tester.tap(open);
-        expect(opened, [_tagId(firstTagNumber)]);
-        expect(retainedTagFixtureGraph(raw), graphBefore);
-        expect(
-          raw
-              .select(
-                'SELECT * FROM tag_assignments ORDER BY creation_sequence',
-              )
-              .map((row) => row.values.toList())
-              .toList(),
-          assignmentsBefore,
+        final remove = find.descendant(
+          of: row,
+          matching: find.byTooltip('$removeText: Дом'),
         );
+        expect(remove, findsOneWidget);
+        expect(tester.getSemantics(remove).tooltip, '$removeText: Дом');
+        expect(find.byIcon(Icons.arrow_forward), findsNothing);
         semantics.dispose();
       },
     );
@@ -284,7 +269,6 @@ void main() {
     tester,
   ) async {
     final reads = _PendingReads();
-    final opened = <TagId>[];
     final chosen = <IntentionId>[];
     final changes = StreamController<ConfirmedGraphChangePackage>.broadcast(
       sync: true,
@@ -296,7 +280,6 @@ void main() {
         intentionId: _intentionId(1),
         locale: const Locale('ru'),
         onChoose: chosen.add,
-        onOpen: opened.add,
         reads: reads,
         changes: changes.stream,
       ),
@@ -310,9 +293,6 @@ void main() {
           find.byKey(const ValueKey('tag-assignments-choose')),
         )
         .onPressed!;
-    await tester.tap(
-      find.byKey(ValueKey('tag-assignment-open-${tagFixtureId(301)}')),
-    );
     changes.add(
       _Package(const _Revision(1), [
         TagDeletedChange(revision: const _Revision(1), tagId: _tagId(302)),
@@ -337,93 +317,7 @@ void main() {
     reads.page(2, [_tag(301, 'Дом'), _tag(302, 'Работа')], revision: 1);
     await tester.pumpAndSettle();
     expect(find.text('Работа'), findsOneWidget);
-    final openNext = find.byKey(
-      ValueKey('tag-assignment-open-${tagFixtureId(302)}'),
-    );
-    await tester.ensureVisible(openNext);
-    await tester.pumpAndSettle();
-    await tester.tap(openNext);
-    expect(opened, [_tagId(301), _tagId(302)]);
   });
-
-  for (final (kind, intentionId) in [('намерения', _intentionId(2))]) {
-    testWidgets(
-      'устаревшее или удалённое назначение $kind не открывается даже прежним действием',
-      (tester) async {
-        final reads = _PendingReads();
-        final changes = StreamController<ConfirmedGraphChangePackage>.broadcast(
-          sync: true,
-        );
-        addTearDown(changes.close);
-        final opened = <TagId>[];
-        await tester.pumpWidget(
-          _host(
-            repository: repository,
-            intentionId: intentionId,
-            isArchived: true,
-            locale: const Locale('ru'),
-            onChoose: (_) {},
-            onOpen: opened.add,
-            reads: reads,
-            changes: changes.stream,
-          ),
-        );
-        reads.page(0, [_tag(301, 'Дом'), _tag(302, 'Работа')]);
-        await tester.pumpAndSettle();
-        final openHome = find.byKey(
-          ValueKey('tag-assignment-open-${tagFixtureId(301)}'),
-        );
-        final openWork = find.byKey(
-          ValueKey('tag-assignment-open-${tagFixtureId(302)}'),
-        );
-        final previousHomeAction = tester
-            .widget<TextButton>(openHome)
-            .onPressed!;
-        final previousWorkAction = tester
-            .widget<TextButton>(openWork)
-            .onPressed!;
-        changes.add(
-          _Package(const _Revision(1), [
-            TagUpdatedChange(
-              revision: const _Revision(1),
-              before: _tag(301, 'Дом'),
-              after: _tag(301, 'Быт'),
-            ),
-            TagDeletedChange(revision: const _Revision(1), tagId: _tagId(302)),
-          ]),
-        );
-        previousHomeAction();
-        previousWorkAction();
-        expect(opened, isEmpty);
-        await tester.pump();
-        expect(tester.widget<TextButton>(openHome).onPressed, isNull);
-        expect(openWork, findsNothing);
-        reads.page(1, [_tag(302, 'Работа')]);
-        await tester.pump();
-        reads.fail(2, const TagAssignmentsUnavailableFailure());
-        await tester.pumpAndSettle();
-        expect(tester.widget<TextButton>(openHome).onPressed, isNull);
-        expect(openWork, findsNothing);
-        previousHomeAction();
-        previousWorkAction();
-        expect(opened, isEmpty);
-
-        await tester.ensureVisible(find.text('Повторить'));
-        await tester.tap(find.text('Повторить'));
-        await tester.pump();
-        reads.page(3, [_tag(301, 'Быт'), _tag(303, 'Работа')], revision: 1);
-        await tester.pumpAndSettle();
-        previousWorkAction();
-        expect(opened, isEmpty);
-        final openReplacement = find.byKey(
-          ValueKey('tag-assignment-open-${tagFixtureId(303)}'),
-        );
-        await tester.ensureVisible(openReplacement);
-        await tester.tap(openReplacement);
-        expect(opened, [_tagId(303)]);
-      },
-    );
-  }
 
   testWidgets('отсутствие намерения не предлагает повтор', (tester) async {
     final reads = _PendingReads();
@@ -509,13 +403,11 @@ void main() {
     final reads = _PendingReads();
     final pending = _PendingRepository();
     final chosen = <IntentionId>[];
-    final opened = <TagId>[];
     Widget host(IntentionId intentionId) => _host(
       repository: pending,
       intentionId: intentionId,
       locale: const Locale('ru'),
       onChoose: chosen.add,
-      onOpen: opened.add,
       reads: reads,
     );
     await tester.pumpWidget(host(_intentionId(1)));
@@ -531,20 +423,13 @@ void main() {
           find.byKey(ValueKey('tag-assignment-remove-${tagFixtureId(301)}')),
         )
         .onPressed!;
-    final previousOpen = tester
-        .widget<TextButton>(
-          find.byKey(ValueKey('tag-assignment-open-${tagFixtureId(301)}')),
-        )
-        .onPressed!;
 
     await tester.pumpWidget(host(_intentionId(2)));
     reads.page(1, [_tag(301, 'Дом')]);
     await tester.pumpAndSettle();
     previousChoose();
-    previousOpen();
     previousRemove();
     expect(chosen, isEmpty);
-    expect(opened, isEmpty);
     expect(pending.commands, isEmpty);
     await tester.tap(find.byKey(const ValueKey('tag-assignments-choose')));
     expect(chosen, [_intentionId(2)]);
@@ -695,14 +580,12 @@ void main() {
       });
       final reads = _PendingReads();
       final intentionId = _intentionId(1);
-      final opened = <TagId>[];
       await tester.pumpWidget(
         _host(
           repository: repository,
           intentionId: intentionId,
           locale: const Locale('ru'),
           onChoose: (_) {},
-          onOpen: opened.add,
           reads: reads,
           isArchived: true,
         ),
@@ -715,14 +598,6 @@ void main() {
         find.bySemanticsLabel('Назначения тегов: намерение, в архиве'),
         findsOneWidget,
       );
-      final open = find.byKey(
-        ValueKey('tag-assignment-open-${tagFixtureId(301)}'),
-      );
-      await tester.ensureVisible(open);
-      await tester.pumpAndSettle();
-      expect(tester.getSemantics(open).label, contains('Намерения с тегом'));
-      await tester.tap(open);
-      expect(opened, [_tagId(301)]);
       await tester.ensureVisible(
         find.byKey(ValueKey('tag-assignment-remove-${tagFixtureId(301)}')),
       );

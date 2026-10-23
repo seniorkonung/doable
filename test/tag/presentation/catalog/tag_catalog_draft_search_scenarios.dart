@@ -568,7 +568,6 @@ final class _DraftSearchRouter extends RootStackRouter {
         onOpenEditor: (editorContext) => context.router.push<Tag>(
           TagEditorRoute(editorContext: editorContext),
         ),
-        onOpenNavigation: (_) {},
       ),
     ),
     AutoRoute(page: TagEditorRoute.page),

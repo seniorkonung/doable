@@ -1562,7 +1562,6 @@ void main() {
       addTearDown(catalogSubscription.close);
       repository.complete(_page([_tag(1, 'Дом'), _tag(2, 'Работа')]));
       final tagSet = container.read(session.notifier).draftTagSet;
-      var navigations = 0;
 
       await tester.pumpWidget(
         UncontrolledProviderScope(
@@ -1574,7 +1573,6 @@ void main() {
             home: TagCatalogView(
               selectionContext: TagDraftContext(tagSet),
               onOpenEditor: (_) async => null,
-              onOpenNavigation: (_) => navigations++,
             ),
           ),
         ),
@@ -1585,12 +1583,6 @@ void main() {
       expect(find.text('Choose a tag'), findsOneWidget);
       expect(find.text('Available to assign'), findsNothing);
       expect(find.byKey(const ValueKey('tag-catalog-assign')), findsNothing);
-      expect(
-        find.byKey(
-          ValueKey('tag-catalog-open-${_tag(1, 'Дом').id.toCanonicalString()}'),
-        ),
-        findsNothing,
-      );
 
       await tester.tap(find.text('Дом'));
       await tester.pump();
@@ -1610,7 +1602,6 @@ void main() {
       );
       expect(tagSet.current.tagIds, isEmpty);
       expect(repository._commands, isEmpty);
-      expect(navigations, 0);
     },
   );
   testWidgets(
@@ -2066,7 +2057,6 @@ final class _DraftChooser {
           builder: (_) => TagCatalogView(
             selectionContext: TagDraftContext(tagSet),
             onOpenEditor: _onOpenEditor,
-            onOpenNavigation: (_) {},
           ),
         ),
       ),

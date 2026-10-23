@@ -465,9 +465,6 @@ final class _LoadedDetails extends StatelessWidget {
               onChooseTag: (intentionId) => unawaited(
                 showTagsPanel(context, TagsPanelAssignmentContext(intentionId)),
               ),
-              onOpenTag: (tagId) => unawaited(
-                context.router.push<void>(TagNavigationRoute(tagId: tagId)),
-              ),
             ),
           ),
         ),

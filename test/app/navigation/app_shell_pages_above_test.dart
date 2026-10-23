@@ -43,7 +43,6 @@ import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_selection_context.dart';
 import 'package:doable/src/tag/presentation/editor/tag_editor_page.dart';
 import 'package:doable/src/tag/presentation/editor/tag_editor_state.dart';
-import 'package:doable/src/tag/presentation/navigation/tag_navigation_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -337,7 +336,6 @@ void _expectAboveShell(
       (page == IntentionDetailsPage ||
           page == RelationDetailsPage ||
           page == DailyChoiceDetailsPage ||
-          page == TagNavigationPage ||
           (page == TagCatalogPage &&
               switch (tester.widget<TagCatalogPage>(top).selectionContext) {
                 TagBrowseContext() => true,

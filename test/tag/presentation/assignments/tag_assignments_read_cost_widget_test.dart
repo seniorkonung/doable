@@ -71,7 +71,6 @@ void main() {
                   intentionId: intentionId,
                   isArchived: false,
                   onChooseTag: (_) {},
-                  onOpenTag: (_) {},
                 ),
               ),
             ),

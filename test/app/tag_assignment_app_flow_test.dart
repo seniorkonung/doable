@@ -10,7 +10,6 @@ import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/design_system/components/tag_row.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/tag/presentation/navigation/tag_navigation_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -184,21 +183,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(Sheet), findsNothing);
     expect(find.byType(SnackBar), findsNothing);
-    await _tap(
-      tester,
-      find.byKey(
-        ValueKey('tag-assignment-open-$newTagId'),
-        skipOffstage: false,
-      ),
-    );
-    await _until(tester, find.byType(TagNavigationPage));
-    await tester.pumpAndSettle();
-    expect(
-      router.current.argsAs<TagNavigationRouteArgs>().tagId.toCanonicalString(),
-      newTagId,
-    );
-    expect(find.byKey(const ValueKey('tag-catalog-search')), findsNothing);
-    router.pop();
     await _tap(tester, remove);
     await _waitFor(tester, () => _assignments(raw, newTagId).isEmpty);
     expect(

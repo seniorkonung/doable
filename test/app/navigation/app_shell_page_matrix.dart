@@ -18,7 +18,6 @@ enum _MatrixEntry {
   action,
   actionCandidate,
   relation,
-  tag,
   renameTag,
   assignTags,
   draftTags,
@@ -52,9 +51,6 @@ enum _MatrixEntry {
       'Бегать',
     ),
     _MatrixEntry.relation => _relationRow,
-    _MatrixEntry.tag => find.byKey(
-      ValueKey('tag-catalog-open-${tagFixtureId(_tag)}'),
-    ),
     _MatrixEntry.renameTag => find.byTooltip('Edit tag'),
     _MatrixEntry.assignTags => find.byKey(
       const ValueKey('tag-assignments-choose'),
@@ -303,12 +299,6 @@ void _registerPageMatrixTests() {
       page: DailyChoiceDetailsPage,
       panel: true,
       entries: [daily],
-    ),
-    (
-      name: 'навигация по тегу',
-      page: TagNavigationPage,
-      panel: true,
-      entries: [tags, _MatrixEntry.tag],
     ),
     (
       name: 'просмотр тегов',

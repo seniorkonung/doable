@@ -479,7 +479,6 @@ _showDraftCatalog(WidgetTester tester, {required String language}) async {
         home: TagCatalogView(
           selectionContext: TagDraftContext(tagSet),
           onOpenEditor: (_) async => null,
-          onOpenNavigation: (_) {},
         ),
       ),
     ),
@@ -524,7 +523,6 @@ Future<_ControlledRepository> _showCatalog(
         home: TagCatalogView(
           selectionContext: TagAssignmentContext(intentionId),
           onOpenEditor: (_) async => null,
-          onOpenNavigation: (_) {},
         ),
       ),
     ),

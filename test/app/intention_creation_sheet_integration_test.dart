@@ -44,10 +44,6 @@ import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_state.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_view_model.dart';
-import 'package:doable/src/tag/presentation/catalog/tag_catalog_page.dart';
-import 'package:doable/src/tag/presentation/navigation/tag_navigation_page.dart';
-import 'package:doable/src/tag/presentation/navigation/tag_navigation_state.dart';
-import 'package:doable/src/tag/presentation/navigation/tag_navigation_view_model.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -147,11 +143,7 @@ final _message = find.byKey(const ValueKey('graph-operation-message'));
 /// Записи видны через наблюдатель соединения, граф — по строкам хранилища и
 /// публичным чтениям модуля графа, результат — по завершениям координатора и
 /// сообщениям общей поверхности, согласование — по подтверждённым снимкам
-/// каталога и навигации по тегу и по видимой выдаче каталога.
-///
-/// Навигация по тегу — страница поверх корневой: под модальной панелью,
-/// открытой из каталога, она существовать не может. Поэтому её проверка
-/// открывает навигацию после результата.
+/// каталога и по видимой выдаче каталога, в том числе с условием по тегу.
 void main() {
   // Проверки читают системные строки из локализаций: второй язык не меняет
   // создание, согласование и чтение результата.
@@ -163,7 +155,7 @@ void main() {
       'настоящий лист тега, открывается по новому идентификатору при '
       'совпадении названия и сохраняется одним подтверждённым результатом, '
       'учитывается ровно один раз в выдаче с прежними условиями и позицией, '
-      'отражается навигацией по тегам и читается после '
+      'попадает в выдачу с условием по каждому выбранному тегу и читается после '
       'повторного открытия хранилища вместе с минимальным созданием на $code',
       (tester) async {
         final install = await _install(tester, locale);
@@ -320,20 +312,21 @@ void main() {
           findsOneWidget,
         );
 
-        // Навигация по каждому выбранному тегу показывает новое намерение
-        // ровно один раз на ревизии создания.
-        await _openTagNavigation(tester, app, home);
-        expect(_navigationIds(tester, home), [
-          _intentionId(_walk),
-          _intentionId(_atWork),
-          for (final number in _activeSketches) _intentionId(number),
-          created,
-        ]);
-        await _closeTop(tester, TagNavigationPage);
-        await _openTagNavigation(tester, app, sport, fromTagCatalog: true);
-        expect(_navigationIds(tester, sport), [created]);
-        await _closeTop(tester, TagNavigationPage);
-        await _closeTop(tester, TagCatalogPage);
+        // Выдача уже требует «Дом» и показывает новое намерение один раз.
+        // Условие по второму выбранному тегу оставляет в ней только его, а
+        // снятие условия возвращает прежнюю выдачу.
+        final idsWithCreated = _ids(catalog);
+        await _addCondition(tester, sport, present: true);
+        await _waitForCatalogIds(tester, app, [created]);
+        await _tap(
+          tester,
+          find.byKey(
+            ValueKey(
+              'intention-tag-condition-remove-${sport.toCanonicalString()}',
+            ),
+          ),
+        );
+        await _waitForCatalogIds(tester, app, idsWithCreated);
         expectIntentionGraphRootPage(app.router);
 
         // Минимальное создание через ту же кнопку по-прежнему даёт пустой
@@ -438,10 +431,6 @@ Iterable<int> get _sketches =>
     Iterable.generate(_sketchCount, (index) => _firstSketch + index);
 
 bool _isArchivedSketch(int number) => number % 4 == 0;
-
-/// Активные этюды в порядке создания их назначений «Дом».
-Iterable<int> get _activeSketches =>
-    _sketches.where((number) => !_isArchivedSketch(number));
 
 /// Активные и архивированные намерения, этюды и три тега.
 void _seedGraph(sqlite.Database database) {
@@ -608,8 +597,8 @@ Future<void> _searchCatalog(WidgetTester tester, _Launch app) async {
     find.byKey(const ValueKey('catalog-filter-field')),
     _catalogFilter,
   );
-  await _addCondition(tester, _homeTag, present: true);
-  await _addCondition(tester, _workTag, present: false);
+  await _addCondition(tester, _tagId(_homeTag), present: true);
+  await _addCondition(tester, _tagId(_workTag), present: false);
   await _selectOption(
     tester,
     'catalog-order-control',
@@ -817,39 +806,20 @@ Future<void> _closeTagsPanel(WidgetTester tester, AppLocalizations l10n) async {
   await tester.pumpAndSettle();
 }
 
-/// Открывает навигацию по тегу [tag] из каталога тегов, открытого кнопкой
-/// каталога намерений либо уже открытого ([fromTagCatalog]), и ждёт её
-/// актуальную выдачу.
-Future<void> _openTagNavigation(
+/// Ждёт выдачу каталога, состоящую ровно из намерений [ids].
+Future<void> _waitForCatalogIds(
   WidgetTester tester,
   _Launch app,
-  TagId tag, {
-  bool fromTagCatalog = false,
-}) async {
-  if (!fromTagCatalog) {
-    await _tap(tester, find.byKey(const ValueKey('catalog-open-tags')));
-  }
-  await _tap(
-    tester,
-    find.byKey(ValueKey('tag-catalog-open-${tag.toCanonicalString()}')),
-  );
-  await _until(tester, _navigationPage(tag));
+  List<IntentionId> ids,
+) async {
   await _waitFor(
     tester,
-    () => switch (_navigation(tester, tag)) {
-      final TagNavigationLoaded state => state.canUseCurrentItems,
+    () => switch (_catalogState(app)) {
+      final IntentionCatalogLoaded catalog => listEquals(_ids(catalog), ids),
       _ => false,
     },
-    reason: () => '${_navigation(tester, tag)}',
+    reason: () => '${_catalogState(app)}',
   );
-  await tester.pumpAndSettle();
-  expect(app.router.current.name, TagNavigationRoute.name);
-}
-
-/// Закрывает верхнюю страницу [page] системным действием «назад».
-Future<void> _closeTop(WidgetTester tester, Type page) async {
-  await tester.binding.handlePopRoute();
-  await _waitFor(tester, () => find.byType(page).evaluate().isEmpty);
   await tester.pumpAndSettle();
 }
 
@@ -857,20 +827,21 @@ Future<void> _closeTop(WidgetTester tester, Type page) async {
 /// требует его, второе исключает. Затем «назад» закрывает панель.
 Future<void> _addCondition(
   WidgetTester tester,
-  int tag, {
+  TagId tag, {
   required bool present,
 }) async {
   await _tap(
     tester,
     find.byKey(const ValueKey('intention-tag-conditions-add')),
   );
-  final row = find.byKey(ValueKey('tags-panel-row-${tagFixtureId(tag)}'));
+  final id = tag.toCanonicalString();
+  final row = find.byKey(ValueKey('tags-panel-row-$id'));
   await _tap(tester, row);
   if (!present) await _tap(tester, row);
   await _waitFor(
     tester,
     () => find
-        .byKey(ValueKey('intention-tag-condition-${tagFixtureId(tag)}'))
+        .byKey(ValueKey('intention-tag-condition-$id'))
         .evaluate()
         .isNotEmpty,
   );
@@ -1245,23 +1216,6 @@ void _expectSameSearch(
   expect(actual.nextCursor, isNull);
   expect(actual.continuation, isA<IntentionCatalogContinuationIdle>());
 }
-
-/// Состояние навигации по тегу [tag]: каждая её страница владеет
-/// собственным экземпляром модели.
-TagNavigationState _navigation(WidgetTester tester, TagId tag) =>
-    ProviderScope.containerOf(
-      tester.element(_navigationPage(tag)),
-      listen: false,
-    ).read(tagNavigationViewModelProvider(tag));
-
-Finder _navigationPage(TagId tag) => find.byWidgetPredicate(
-  (widget) => widget is TagNavigationPage && widget.tagId == tag,
-);
-
-List<IntentionId> _navigationIds(WidgetTester tester, TagId tag) => [
-  for (final item in (_navigation(tester, tag) as TagNavigationLoaded).items)
-    item.id,
-];
 
 /// Видимая строка выдачи каталога: название и положение на экране.
 typedef _CatalogRow = ({String title, Rect rect});

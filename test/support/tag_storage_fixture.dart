@@ -9,9 +9,6 @@ String tagFixtureId(int number) =>
 const firstTagNumber = 301;
 const lastTagNumber = 302;
 
-/// Посторонний тег фикстуры жизненного цикла навигации.
-const restTagNumber = 306;
-
 /// Назначения двух тегов намерениям обоих охватов.
 void seedTagStorageFixture(sqlite.Database database) {
   seedRawGraph(database, () {
@@ -187,51 +184,6 @@ Map<String, List<List<Object?>>> retainedTagFixtureGraph(sqlite.Database db) =>
             .toList(),
     };
 
-/// Отдельное намерение, связи без назначений и назначения других тегов
-/// позволяют проверить границы каскада и физического удаления в навигации.
-void seedTagNavigationLifecycleFixture(sqlite.Database database) {
-  seedRawGraph(database, () {
-    _writeTagNavigation(database, extraPairsPerScope: 0);
-    database.execute(
-      'INSERT INTO intentions (id, title, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
-      [tagFixtureId(5), 'Отдельное намерение', 'Описание 5', 105, 205],
-    );
-    for (final (number, source, related) in [
-      (104, 3, 1),
-      (105, 3, 4),
-      (106, 4, 3),
-    ]) {
-      database.execute(
-        'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority) VALUES (?, ?, ?, ?, ?)',
-        [
-          tagFixtureId(number),
-          tagFixtureId(source),
-          tagFixtureId(related),
-          'can',
-          3,
-        ],
-      );
-    }
-    database.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
-      tagFixtureId(restTagNumber),
-      'Отдых',
-      tagPositionKey(restTagNumber),
-    ]);
-    for (final (tagNumber, intentionNumber) in [
-      (restTagNumber, 3),
-      (restTagNumber, 5),
-      (firstTagNumber, 5),
-      (lastTagNumber, 3),
-      (lastTagNumber, 5),
-    ]) {
-      database.execute(
-        'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
-        [tagFixtureId(tagNumber), tagFixtureId(intentionNumber)],
-      );
-    }
-  });
-}
-
 /// Большие воспроизводимые списки для измерения двух видов чтения.
 /// Первое намерение получает чётные теги, третье — каждый третий тег;
 /// при плотных получателях второе и четвёртое намерения получают все теги.
@@ -293,7 +245,7 @@ int largeTagReadFixtureAssignmentCount({
 /// сохраняемый тег назначен исходному намерению и тем же получателям.
 void seedWidelyAssignedTagFixture(
   sqlite.Database database, {
-  int recipients = 2400,
+  required int recipients,
 }) {
   seedRawGraph(database, () {
     database.execute(

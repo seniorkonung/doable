@@ -25,8 +25,6 @@ import 'package:doable/src/tag/presentation/catalog/tag_catalog_view.dart';
 import 'package:doable/src/tag/presentation/catalog/tag_selection_context.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_section.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
-import 'package:doable/src/tag/application/tagged_intentions_page.dart';
-import 'package:doable/src/tag/presentation/navigation/tag_navigation_page.dart';
 import 'package:doable/src/tag/presentation/panel/tags_panel.dart';
 import 'package:doable/src/tag/presentation/panel/tags_panel_context.dart';
 import 'package:flutter/material.dart';
@@ -40,12 +38,10 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../../support/app_root_pages.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
-import '../../support/inline_text.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 import '../../support/tag_positions.dart';
 
-part 'tag_navigation_accessibility_scenarios.dart';
 part 'tag_catalog_search_accessibility_scenarios.dart';
 
 Future<void> _until(WidgetTester tester, Finder finder) async {
@@ -102,7 +98,6 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
 void main() {
   _registerCatalogSearchScenarios();
   _registerAssignmentScenarios();
-  _registerNavigationEntryScenarios();
   _registerDraftSelectionScenarios();
   _registerFilterPanelScenarios();
   const locale = Locale('ru');
@@ -652,7 +647,6 @@ void _registerDraftSelectionScenarios() {
           home: TagCatalogView(
             selectionContext: TagDraftContext(tagSet),
             onOpenEditor: (_) async => null,
-            onOpenNavigation: (_) {},
           ),
         ),
       ),

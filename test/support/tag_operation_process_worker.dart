@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:ui';
 
-import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -257,9 +256,6 @@ Future<void> _expectNavigation(
   required List<IntentionId> active,
   required List<IntentionId> archived,
 }) async {
-  final locale = TestWidgetsFlutterBinding.instance.platformDispatcher.locale;
-  final l10n = await AppLocalizations.delegate.load(locale);
-  expect(l10n.localeName, locale.languageCode);
   for (final (scope, expected) in [
     (TaggedIntentionsScope.active, active),
     (TaggedIntentionsScope.archived, archived),
@@ -281,7 +277,6 @@ Future<void> _expectNavigation(
         final page = (result as TaggedIntentionsPageSuccess).value;
         expect(page.tag.id, tagId);
         expect(page.tag.name.value, name);
-        expect(l10n.tagNavigationTag(page.tag.name.value), contains(name));
         expect(page.scope, scope);
         expect(page.items.length, lessThanOrEqualTo(pageSize));
         expect(

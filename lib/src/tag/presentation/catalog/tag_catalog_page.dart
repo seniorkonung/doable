@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 
@@ -13,7 +11,7 @@ import 'tag_selection_context.dart';
 /// Контекст выбора задаёт вызывающий сценарий: просмотр каталога, постоянное
 /// назначение существующему намерению или добавление в набор черновика
 /// сессии создания. Страница передаёт его общему компоненту вместе с
-/// маршрутами редактора и навигации по тегу. Сессию черновика страница не
+/// маршрутом редактора. Сессию черновика страница не
 /// удерживает и не завершает: её владелец остаётся под выбором, а закрытие
 /// страницы закрывает только выбор.
 @RoutePage()
@@ -30,7 +28,5 @@ final class TagCatalogPage extends StatelessWidget {
     selectionContext: selectionContext,
     onOpenEditor: (editorContext) =>
         context.router.push<Tag>(TagEditorRoute(editorContext: editorContext)),
-    onOpenNavigation: (tagId) =>
-        unawaited(context.router.push<void>(TagNavigationRoute(tagId: tagId))),
   );
 }

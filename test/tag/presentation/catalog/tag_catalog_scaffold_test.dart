@@ -42,7 +42,6 @@ void main() {
               home: TagCatalogView(
                 selectionContext: selectionContext,
                 onOpenEditor: (_) async => null,
-                onOpenNavigation: (_) {},
               ),
             ),
           ),

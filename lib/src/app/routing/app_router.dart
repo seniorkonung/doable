@@ -20,7 +20,6 @@ final class AppRouter extends RootStackRouter {
     ),
     AutoRoute(page: TagCatalogRoute.page),
     AutoRoute(page: TagEditorRoute.page),
-    AutoRoute(page: TagNavigationRoute.page),
     AutoRoute(page: DailyChoiceActionPickerRoute.page),
     AutoRoute(page: DailyChoiceSourcePickerRoute.page),
     // Создание намерения — модальная нижняя панель над сохранённой корневой

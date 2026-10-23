@@ -331,7 +331,6 @@ Future<_Harness> _show(
           builder: (_, intentionId, _) => TagCatalogView(
             selectionContext: TagAssignmentContext(intentionId),
             onOpenEditor: onOpenEditor ?? (_) async => null,
-            onOpenNavigation: (_) {},
           ),
         ),
       ),
@@ -440,7 +439,6 @@ final class _DraftHarness {
             builder: (_, _) => TagCatalogView(
               selectionContext: TagDraftContext(tagSet.value),
               onOpenEditor: _onOpenEditor,
-              onOpenNavigation: (_) {},
             ),
           ),
         ),

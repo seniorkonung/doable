@@ -50,7 +50,6 @@ void main() {
           home: TagCatalogView(
             selectionContext: TagDraftContext(draft.tagSet),
             onOpenEditor: (_) async => null,
-            onOpenNavigation: (_) {},
           ),
         ),
       );
@@ -256,7 +255,6 @@ void main() {
           home: TagCatalogView(
             selectionContext: TagAssignmentContext(intentionId),
             onOpenEditor: (_) async => null,
-            onOpenNavigation: (_) {},
           ),
         ),
       );
@@ -274,7 +272,6 @@ void main() {
             builder: (_) => TagCatalogView(
               selectionContext: TagDraftContext(draft.tagSet),
               onOpenEditor: (_) async => null,
-              onOpenNavigation: (_) {},
             ),
           ),
         ),
