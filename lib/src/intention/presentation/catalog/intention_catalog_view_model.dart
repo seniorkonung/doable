@@ -167,6 +167,16 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     });
   }
 
+  /// Сразу применяет пустой фильтр названия, без паузы ввода.
+  void clearTitleFilter() {
+    if (_titleFilterText.isEmpty && !_isDebouncingFilter) {
+      return;
+    }
+    _titleFilterText = '';
+    _filterValidationFailure = null;
+    _applyParametersImmediately();
+  }
+
   /// Сразу применяет оба набора вместе с текущим текстом и ограничениями.
   void changeTagFilter(IntentionTagFilter filter) {
     if (_tagFilter == filter) {

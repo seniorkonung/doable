@@ -605,6 +605,56 @@ void main() {
     },
   );
 
+  test(
+    'снятие фильтра названия сразу читает первую порцию без паузы ввода',
+    () async {
+      final repository = ControlledCatalogRepository();
+      // Пауза ввода длиннее теста: запрос без неё возможен только сразу.
+      final container = _catalogContainer(
+        repository,
+        filterDebounce: const Duration(hours: 1),
+      );
+      final subscription = container.listen(
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      addTearDown(container.dispose);
+      final notifier = container.read(
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+            .notifier,
+      );
+      repository.queryAt(0);
+      notifier
+        ..changeTitleFilter('бег')
+        ..changeOrder(IntentionCatalogOrder.updatedAtAscending);
+      await _waitForQueries(repository, 2);
+      expect(repository.queryAt(1).titleFilter?.map((value) => value), 'бег');
+      repository.complete(
+        1,
+        ResultSuccess(
+          IntentionCatalogFirstPage(
+            items: const [],
+            totalCount: 0,
+            nextCursor: null,
+            revision: const TestCatalogRevision(1),
+          ),
+        ),
+      );
+      await _waitForState<IntentionCatalogEmpty>(container);
+
+      notifier.clearTitleFilter();
+      await _waitForQueries(repository, 3);
+
+      final query = repository.queryAt(2);
+      expect(query.titleFilter, isNull);
+      expect(query.order, IntentionCatalogOrder.updatedAtAscending);
+      expect(query.cursor, isNull);
+      expect(notifier.selection.titleFilterText, isEmpty);
+    },
+  );
+
   test('отклоняет недопустимый фильтр без обращения к repository', () async {
     final scenarios = <(String, IntentionCatalogFilterValidationFailure)>[
       (
