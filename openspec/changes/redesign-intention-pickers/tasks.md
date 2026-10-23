@@ -116,3 +116,15 @@
   - **Зависимости:** 1.1–1.6.
   - **Предполагаемые файлы:** нет, только проверка и сборка.
   - **Размер:** XS.
+
+- [ ] 1.8 Записать набор пробельных символов начала описания без невидимых литералов и закрепить его тестом
+  - **Критерии приёмки:**
+    - Регулярное выражение свёртки в `IntentionDescriptionPreview` перечисляет весь набор решения 5 дизайна, то есть Unicode `White_Space` и `U+FEFF`, только видимыми экранированиями: управляющими (`\t`, `\n`, `\r` и т. п.) и `\uXXXX`. Кроме обычного пробела `U+0020`, сырых пробельных и невидимых символов в исходнике нет.
+    - Набор и поведение фабрики не меняются: начало любого описания остаётся прежним.
+    - Тест фабрики сворачивает и обрезает каждый символ набора, включая `U+0085`, `U+1680`, `U+2000`–`U+200A`, `U+2028`, `U+2029`, `U+202F` и `U+205F`. Если из набора пропадёт любой символ, тест упадёт. Пробельные символы в тестах тоже записаны экранированием `\uXXXX`.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/application/intention_description_preview_test.dart`.
+    - `mise exec --no-deps -- flutter analyze lib/src/intention/application/intention_description_preview.dart test/intention/application/intention_description_preview_test.dart`.
+  - **Зависимости:** 1.1.
+  - **Предполагаемые файлы:** `lib/src/intention/application/intention_description_preview.dart`, `test/intention/application/intention_description_preview_test.dart`.
+  - **Размер:** XS.

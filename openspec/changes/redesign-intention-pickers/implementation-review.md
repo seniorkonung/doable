@@ -3,9 +3,9 @@
 ## Assessment
 
 **Format version:** 1
-**Result:** Changes needed
+**Result:** No unresolved findings
 **Coverage status:** Complete
-**Summary:** Фаза 1 по существу выполнена. Количество связей больше не попадает в краткие данные намерения и участника связи и не показывается вне страницы намерения. Сводка групп страницы намерения по-прежнему получает и согласует числа владельца. Начало описания строит одна фабрика для обоих источников краткой сводки. `mise run check` и `mise run codegen-check` на проверяемой голове проходят. Осталось одно замечание низкой важности, F1: набор пробельных символов фабрики начала описания частично записан невидимыми литералами, и большую его часть тесты не закрепляют. Принятых остаточных рисков нет.
+**Summary:** Фаза 1 по существу выполнена. Количество связей больше не попадает в краткие данные намерения и участника связи и не показывается вне страницы намерения. Сводка групп страницы намерения по-прежнему получает и согласует числа владельца. Начало описания строит одна фабрика для обоих источников краткой сводки. `mise run check` и `mise run codegen-check` на проверяемой голове проходят. Активных замечаний и принятых остаточных рисков нет.
 
 ## Review target
 
@@ -44,20 +44,13 @@
 
 | Pass | Status | Evidence or limitation |
 |---|---|---|
-| Independent decision review | Complete | U1 и U2 делят пути (`intention_catalog.dart`, `drift_personal_graph_repository.dart`, страницы каталога и поисков, тесты), поэтому их проверял один свежий изолированный ревьюер по `implementation-decision-review`. Он получил объединённый нейтральный бриф обеих целей и все 83 пути поставки и тестов на 2fcc2167a573edff9d6f8bbe117dea938a16d6cd..cff4f8b9cd5e25030137aac3369841b1440e6d89. Артефактов планирования, истории коммитов и отчёта он не видел. Он нашёл замечание F1. Отдельно он сравнил регулярное выражение головы с `String.trim` по всем кодовым точкам и расхождений не нашёл. Сам ревьюер запускал `intention_description_preview_test.dart`, `intention_catalog_action_selection_test.dart` и `drift_intention_repository_command_test.dart`: все прошли. |
+| Independent decision review | Complete | U1 и U2 делят пути (`intention_catalog.dart`, `drift_personal_graph_repository.dart`, страницы каталога и поисков, тесты), поэтому их проверял один свежий изолированный ревьюер по `implementation-decision-review`. Он получил объединённый нейтральный бриф обеих целей и все 83 пути поставки и тестов на 2fcc2167a573edff9d6f8bbe117dea938a16d6cd..cff4f8b9cd5e25030137aac3369841b1440e6d89. Артефактов планирования, истории коммитов и отчёта он не видел. Он сравнил регулярное выражение головы с `String.trim` по всем кодовым точкам и расхождений не нашёл. Сам ревьюер запускал `intention_description_preview_test.dart`, `intention_catalog_action_selection_test.dart` и `drift_intention_repository_command_test.dart`: все прошли. |
 | OpenSpec conformance | Complete | Все проверки шли в этой рабочей копии на HEAD = cff4f8b9cd5e25030137aac3369841b1440e6d89; вне отчёта она чистая. `mise run check` завершился с кодом 0: `dart format`, проверки скриптов и `flutter analyze` без замечаний, 3191 обычный тест и 18 процессных тестов прошли. `mise run codegen-check` завершился с кодом 0, генерация не изменила файлов. На время этого прогона отчёт выносился из рабочей копии. `mise exec --no-deps -- openspec validate redesign-intention-pickers --strict --no-interactive --json` даёт valid. Критерии приёмки задач 1.1–1.7 сверены с диффом в обе стороны. Отметки 1.1–1.7 подкреплены кодом и тестами. Каждый путь поставки отнесён к U1 или U2. Лишних путей обработки, недостижимых состояний и тестов без регресса не найдено. Сборка APK из проверки 1.7 в этом ревью не повторялась. |
 | Code quality | Complete | Линзы `code-review-and-quality` применены ко всем путям поставки U1 и U2: корректность, читаемость, архитектура, безопасность и производительность. Прослежены оставшиеся вызовы `_readVerifiedRelationCounts`, `_readVerifiedRelationCountsFor` и `_relationCountAggregates`. Проверено, что в `lib/`, `test/` и `benchmark/` не осталось `activeRelationCount`, `ActiveRelationCountView`, `knownActiveCounts` и `IntentionSummary.hasDescription`. |
 
 ## Findings
 
-### F1 · Low — Набор пробельных символов начала описания записан невидимыми литералами и почти не закреплён тестами
-
-- **Evidence:** В `lib/src/intention/application/intention_description_preview.dart:33-36` регулярное выражение `_whitespaceRun` записывает часть набора экранированием (`\t\n\u000B\f\r`, `\u0085`). Остальное — сырые литералы U+00A0, U+1680, U+2000–U+200A, U+2028, U+2029, U+202F, U+205F, U+3000 и U+FEFF. В исходнике они выглядят как обычные пробелы или перенос строки, а U+FEFF не виден совсем. В других местах проект записывает такие символы экранированием `\uXXXX` (например, `lib/src/tag/presentation/catalog/tag_catalog_search_controller.dart:37`). Комментарий на строках 31–32 требует совпадения с `String.trim` и отдельно упоминает U+0085. При этом `test/intention/application/intention_description_preview_test.dart` проверяет только `\t`, `\n`, `\r`, U+00A0, U+3000 и U+FEFF. U+0085, U+2028, U+2029, U+1680 и диапазон U+2000–U+200A никакой тест не задевает. Сейчас набор верен: ревьюер сравнил его с `String.trim` по всем кодовым точкам и расхождений не нашёл.
-- **Evidence revisions:** ["cff4f8b9cd5e25030137aac3369841b1440e6d89"]
-- **Impact:** Читатель и ревьюер не могут проверить по исходнику, что набор совпадает с определением решения 5 дизайна. Редакторы и форматтеры удаляют или нормализуют такие символы, например «необычные разделители строк» U+2028 и U+2029 или U+FEFF. Если это случится, описания с этими символами перестанут сворачиваться и обрезаться, и ни один тест не упадёт. Пользователь увидит в строке поиска лишние пробелы и переносы, хотя спецификация обещает обратное.
-- **Required outcome:** Набор пробельных символов фабрики начала описания читается в исходнике без невидимых символов. Если из набора пропадёт символ, которого нет в `\s`, или символ, который инструменты обычно удаляют (как минимум U+0085, U+2028 и U+2029), должен упасть тест.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** ["lib/src/intention/application/intention_description_preview.dart", "test/intention/application/intention_description_preview_test.dart"]
+No unresolved findings remain in the implementation review.
 
 ## Review coverage
 
