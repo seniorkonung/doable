@@ -52,6 +52,7 @@ final class TopBar extends StatelessWidget implements PreferredSizeWidget {
                 child: Semantics(
                   container: true,
                   header: true,
+                  namesRoute: true,
                   child: Text(
                     title,
                     maxLines: 1,

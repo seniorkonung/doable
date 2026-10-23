@@ -51,7 +51,9 @@ void main() {
   });
 
   testWidgets('крестик — кнопка с названием от потребителя и вызывает его '
-      'обработчик, а заголовок объявляется заголовком', (tester) async {
+      'обработчик, а заголовок объявляется заголовком и называет маршрут', (
+    tester,
+  ) async {
     final semantics = tester.ensureSemantics();
     var closings = 0;
 
@@ -65,7 +67,12 @@ void main() {
     expect(cross.childrenCount, 0);
     expect(
       tester.getSemantics(find.text('Выбор')),
-      isSemantics(label: 'Выбор', isHeader: true, isButton: false),
+      isSemantics(
+        label: 'Выбор',
+        isHeader: true,
+        namesRoute: true,
+        isButton: false,
+      ),
     );
 
     await tester.tap(_crossArea());
