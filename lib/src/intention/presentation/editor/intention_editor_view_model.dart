@@ -67,8 +67,8 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
   GraphInitiatorPresentationClaim? _publishedFailureClaim;
   final _tagObservations = <TagId, _DraftTagObservation>{};
 
-  /// Выбранные теги, отсутствие которых наблюдение подтвердило во время
-  /// отправки; они уходят из набора после её результата.
+  /// Выбранные теги, удаление которых во время отправки подтвердил пакет
+  /// координатора или наблюдение; они уходят из набора после её результата.
   final _tagsDeletedDuringSubmission = <TagId>{};
   var _tagObservationGeneration = 0;
 
