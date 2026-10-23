@@ -561,7 +561,7 @@ final class _Entry extends Fake implements IntentionCatalogEntrySnapshot {
     : summary = IntentionSummary(
         id: id,
         title: 'Одинаковое намерение',
-        hasDescription: false,
+        descriptionPreview: null,
         readiness: IntentionReadiness.notReady,
         archiveState: IntentionArchiveState.active,
         activeRelationCount: 0,

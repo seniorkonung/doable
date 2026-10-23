@@ -4,6 +4,7 @@ import '../../tag/domain/tag_id.dart';
 import '../domain/intention.dart';
 import '../domain/intention_id.dart';
 import '../domain/intention_text.dart';
+import 'intention_description_preview.dart';
 import 'title_search_key.dart';
 
 enum IntentionScope { active, archived, all }
@@ -261,7 +262,7 @@ final class IntentionSummary {
   IntentionSummary({
     required this.id,
     required String title,
-    required this.hasDescription,
+    required this.descriptionPreview,
     required this.readiness,
     required this.archiveState,
     required int activeRelationCount,
@@ -274,7 +275,9 @@ final class IntentionSummary {
 
   final IntentionId id;
   final String title;
-  final bool hasDescription;
+
+  /// Начало описания; `null` означает отсутствие описания.
+  final IntentionDescriptionPreview? descriptionPreview;
   final IntentionReadiness readiness;
   final IntentionArchiveState archiveState;
   final int activeRelationCount;
@@ -293,7 +296,7 @@ final class IntentionSummary {
       IntentionSummary(
         id: id,
         title: title,
-        hasDescription: hasDescription,
+        descriptionPreview: descriptionPreview,
         readiness: readiness,
         archiveState: archiveState,
         activeRelationCount: activeRelationCount,
@@ -315,7 +318,7 @@ final class IntentionSummary {
     return IntentionSummary(
       id: id,
       title: title,
-      hasDescription: hasDescription,
+      descriptionPreview: descriptionPreview,
       readiness: readiness,
       archiveState: archiveState,
       activeRelationCount: activeRelationCount,
@@ -338,7 +341,7 @@ final class IntentionSummary {
     return IntentionSummary(
       id: id,
       title: title,
-      hasDescription: hasDescription,
+      descriptionPreview: descriptionPreview,
       readiness: readiness,
       archiveState: archiveState,
       activeRelationCount: activeRelationCount,

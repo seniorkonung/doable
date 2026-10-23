@@ -280,7 +280,7 @@ void main() {
             index: index,
             title: 'Долгая прогулка до дальнего парка $index',
             readiness: IntentionReadiness.ready,
-            hasDescription: true,
+            description: 'Описание',
             tags: index == 2 ? const [] : rowTags,
           ),
       ];

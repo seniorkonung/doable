@@ -32,6 +32,7 @@ import 'package:doable/src/statistics/application/intention_statistics_read_cont
 
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/statistics_read_contract_test_fallback.dart';
+import '../../../support/intention_description_preview.dart';
 
 final class ControlledDetailRequest {
   ControlledDetailRequest({bool broadcast = false}) {
@@ -406,7 +407,7 @@ IntentionSummary testDetailsSummary(
 }) => IntentionSummary(
   id: intention.id,
   title: intention.title,
-  hasDescription: intention.description != null,
+  descriptionPreview: testDescriptionPreview(intention.description),
   readiness: intention.readiness,
   archiveState: intention.archiveState,
   activeRelationCount: activeRelationCount,

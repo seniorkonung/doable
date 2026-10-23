@@ -231,7 +231,7 @@ IntentionCatalogEntrySnapshot _entry(IntentionId id, List<Tag> tags) => _Entry(
   IntentionSummary(
     id: id,
     title: 'Намерение',
-    hasDescription: false,
+    descriptionPreview: null,
     readiness: IntentionReadiness.notReady,
     archiveState: IntentionArchiveState.active,
     activeRelationCount: 0,

@@ -15,6 +15,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/tag_positions.dart';
 
+import 'package:doable/src/intention/application/intention_description_preview.dart';
+
 void main() {
   group('поисковый ключ названия намерения', () {
     test('сопоставляет фильтр с названием через единый поисковый ключ', () {
@@ -326,7 +328,9 @@ void main() {
       final summary = IntentionSummary(
         id: _intentionId('00000000-0000-4000-8000-000000000003'),
         title: 'Гулять',
-        hasDescription: true,
+        descriptionPreview: IntentionDescriptionPreview.fromDescription(
+          'Описание',
+        ),
         readiness: IntentionReadiness.ready,
         archiveState: IntentionArchiveState.archived,
         activeRelationCount: 2,
@@ -341,7 +345,7 @@ void main() {
       expect(summary.activeRelationCount, 2);
       expect(copy.id, summary.id);
       expect(copy.title, summary.title);
-      expect(copy.hasDescription, summary.hasDescription);
+      expect(copy.descriptionPreview?.text, summary.descriptionPreview?.text);
       expect(copy.readiness, summary.readiness);
       expect(copy.archiveState, summary.archiveState);
       expect(copy.createdAt, summary.createdAt);
@@ -361,7 +365,9 @@ void main() {
       final summary = IntentionSummary(
         id: _intentionId('00000000-0000-4000-8000-000000000003'),
         title: 'Гулять',
-        hasDescription: true,
+        descriptionPreview: IntentionDescriptionPreview.fromDescription(
+          'Описание',
+        ),
         readiness: IntentionReadiness.ready,
         archiveState: IntentionArchiveState.archived,
         activeRelationCount: 2,
@@ -401,7 +407,7 @@ void main() {
       expect(summary.tags.last.color, isNull);
       expect(copy.id, summary.id);
       expect(copy.title, summary.title);
-      expect(copy.hasDescription, summary.hasDescription);
+      expect(copy.descriptionPreview?.text, summary.descriptionPreview?.text);
       expect(copy.readiness, summary.readiness);
       expect(copy.archiveState, summary.archiveState);
       expect(copy.activeRelationCount, summary.activeRelationCount);
@@ -415,7 +421,9 @@ void main() {
       final summary = IntentionSummary(
         id: _intentionId('00000000-0000-4000-8000-000000000003'),
         title: 'Гулять',
-        hasDescription: true,
+        descriptionPreview: IntentionDescriptionPreview.fromDescription(
+          'Описание',
+        ),
         readiness: IntentionReadiness.ready,
         archiveState: IntentionArchiveState.archived,
         activeRelationCount: 2,
@@ -453,7 +461,7 @@ void main() {
       expect(summary.tags.map((tag) => tag.id), [firstId, secondId]);
       expect(copy.id, summary.id);
       expect(copy.title, summary.title);
-      expect(copy.hasDescription, summary.hasDescription);
+      expect(copy.descriptionPreview?.text, summary.descriptionPreview?.text);
       expect(copy.readiness, summary.readiness);
       expect(copy.archiveState, summary.archiveState);
       expect(copy.activeRelationCount, summary.activeRelationCount);
@@ -465,7 +473,7 @@ void main() {
       final summary = IntentionSummary(
         id: _intentionId('00000000-0000-4000-8000-000000000003'),
         title: 'Гулять',
-        hasDescription: false,
+        descriptionPreview: null,
         readiness: IntentionReadiness.notReady,
         archiveState: IntentionArchiveState.active,
         activeRelationCount: 0,
@@ -502,7 +510,9 @@ void main() {
       final summary = IntentionSummary(
         id: _intentionId('00000000-0000-4000-8000-000000000003'),
         title: 'Гулять',
-        hasDescription: true,
+        descriptionPreview: IntentionDescriptionPreview.fromDescription(
+          'Описание',
+        ),
         readiness: IntentionReadiness.ready,
         archiveState: IntentionArchiveState.archived,
         activeRelationCount: 2,
@@ -531,7 +541,7 @@ void main() {
       expect(summary.tags.map((tag) => tag.id), [firstId, secondId]);
       expect(copy.id, summary.id);
       expect(copy.title, summary.title);
-      expect(copy.hasDescription, summary.hasDescription);
+      expect(copy.descriptionPreview?.text, summary.descriptionPreview?.text);
       expect(copy.readiness, summary.readiness);
       expect(copy.archiveState, summary.archiveState);
       expect(copy.activeRelationCount, summary.activeRelationCount);
@@ -543,7 +553,7 @@ void main() {
       final summary = IntentionSummary(
         id: _intentionId('00000000-0000-4000-8000-000000000003'),
         title: 'Гулять',
-        hasDescription: false,
+        descriptionPreview: null,
         readiness: IntentionReadiness.notReady,
         archiveState: IntentionArchiveState.active,
         activeRelationCount: 0,
@@ -957,7 +967,7 @@ IntentionSummary _summary({
   return IntentionSummary(
     id: _intentionId(id),
     title: title,
-    hasDescription: false,
+    descriptionPreview: null,
     readiness: readiness,
     archiveState: archiveState,
     activeRelationCount: 0,

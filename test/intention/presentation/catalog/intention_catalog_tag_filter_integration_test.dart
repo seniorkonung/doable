@@ -522,7 +522,7 @@ void main() {
         if (after.contains(_created)) {
           final row = current.items.singleWhere((item) => item.id == createdId);
           expect(row.title, 'Ходить по лесу');
-          expect(row.hasDescription, isTrue);
+          expect(row.descriptionPreview, isNotNull);
           expect(row.readiness, IntentionReadiness.ready);
           expect(row.tags.map((tag) => (tag.id, tag.name.value)), [
             (_tagId(301), 'Здоровье'),

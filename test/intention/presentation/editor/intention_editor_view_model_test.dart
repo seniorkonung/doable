@@ -27,6 +27,7 @@ import '../catalog/catalog_reconciliation_test_support.dart'
     show tagDeletionSuccess;
 import '../catalog/catalog_test_support.dart';
 import '../../../support/tag_positions.dart';
+import '../../../support/intention_description_preview.dart';
 
 void main() {
   test(
@@ -2270,7 +2271,7 @@ Result<IntentionCommandSuccess> _savedResult({Intention? intention}) {
           IntentionSummary(
             id: intention.id,
             title: intention.title,
-            hasDescription: intention.description != null,
+            descriptionPreview: testDescriptionPreview(intention.description),
             readiness: intention.readiness,
             archiveState: intention.archiveState,
             activeRelationCount: 0,

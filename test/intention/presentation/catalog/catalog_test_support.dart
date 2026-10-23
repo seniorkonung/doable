@@ -34,6 +34,7 @@ import 'package:doable/src/tag/domain/tag_id.dart';
 
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/statistics_read_contract_test_fallback.dart';
+import '../../../support/intention_description_preview.dart';
 
 final class ControlledCatalogRepository
     with StatisticsReadContractTestFallback, TagReadContractTestFallback
@@ -278,7 +279,7 @@ final class TestCatalogEntrySnapshot implements IntentionCatalogEntrySnapshot {
 IntentionSummary testSummary({
   int index = 1,
   String title = 'Намерение',
-  bool hasDescription = false,
+  String? description,
   IntentionReadiness readiness = IntentionReadiness.notReady,
   IntentionArchiveState archiveState = IntentionArchiveState.active,
   int activeRelationCount = 0,
@@ -303,7 +304,7 @@ IntentionSummary testSummary({
   return IntentionSummary(
     id: id,
     title: title,
-    hasDescription: hasDescription,
+    descriptionPreview: testDescriptionPreview(description),
     readiness: readiness,
     archiveState: archiveState,
     activeRelationCount: activeRelationCount,

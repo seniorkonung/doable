@@ -159,7 +159,7 @@ final class _DailyChoiceSourcePickerPageState
                         IntentionReadiness.ready => l10n.catalogReady,
                         IntentionReadiness.notReady => l10n.catalogNotReady,
                       },
-                      summary.hasDescription
+                      summary.descriptionPreview != null
                           ? l10n.catalogHasDescription
                           : l10n.catalogNoDescription,
                     ],

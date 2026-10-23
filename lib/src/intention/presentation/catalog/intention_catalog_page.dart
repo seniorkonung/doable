@@ -260,7 +260,7 @@ final class _IntentionSummaryTile extends StatelessWidget {
       IntentionReadiness.ready => localizations.catalogReady,
       IntentionReadiness.notReady => localizations.catalogNotReady,
     };
-    final description = summary.hasDescription
+    final description = summary.descriptionPreview != null
         ? localizations.catalogHasDescription
         : localizations.catalogNoDescription;
     return IntentionSummaryView(

@@ -77,7 +77,7 @@ void main() {
           index: 3,
           title: 'Позвонить',
           readiness: IntentionReadiness.ready,
-          hasDescription: true,
+          description: 'Описание',
         ),
       ]);
       await tester.pumpAndSettle();

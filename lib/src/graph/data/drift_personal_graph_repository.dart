@@ -46,6 +46,7 @@ import '../../graph_snapshots/graph_snapshot_store.dart'
 import '../../intention/application/intention_command.dart';
 import '../../intention/application/intention_id_generator.dart';
 import '../../intention/application/intention_catalog.dart';
+import '../../intention/application/intention_description_preview.dart';
 import '../../intention/application/intention_details.dart';
 import '../../intention/application/intention_result.dart';
 import '../../intention/application/title_search_key.dart';
@@ -1367,7 +1368,12 @@ final class DriftPersonalGraphRepository
   ) => IntentionSummary(
     id: intention.id,
     title: intention.title,
-    hasDescription: intention.description != null,
+    descriptionPreview: switch (intention.description) {
+      final description? => IntentionDescriptionPreview.fromDescription(
+        description,
+      ),
+      null => null,
+    },
     readiness: intention.readiness,
     archiveState: intention.archiveState,
     activeRelationCount: relationCounts.active,
@@ -1394,16 +1400,10 @@ final class DriftPersonalGraphRepository
     final intention = stored.intention;
     final tags = await _readIntentionTags([intention.id]);
     return _DriftIntentionCatalogEntrySnapshot(
-      summary: IntentionSummary(
-        id: intention.id,
-        title: intention.title,
-        hasDescription: intention.description != null,
-        readiness: intention.readiness,
-        archiveState: intention.archiveState,
-        activeRelationCount: relationCounts.active,
-        createdAt: intention.createdAt,
-        updatedAt: intention.updatedAt,
-        tags: tags[intention.id] ?? (throw const StoredGraphCorruption()),
+      summary: _rehydrateSummary(
+        intention,
+        relationCounts,
+        tags[intention.id] ?? (throw const StoredGraphCorruption()),
       ),
       storedTitleSearchKey: stored.titleSearchKey,
     );

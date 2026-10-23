@@ -172,7 +172,7 @@ void main() {
           for (final entry in [mutation.before, mutation.after]) {
             expect(entry.summary.id, id);
             expect(entry.summary.title, 'Намерение 1');
-            expect(entry.summary.hasDescription, isTrue);
+            expect(entry.summary.descriptionPreview, isNotNull);
             expect(
               entry.summary.tags.map((tag) => tag.name.value),
               expectedTagNames,
@@ -909,6 +909,42 @@ void main() {
         _successfulCommand(IntentionCommandDiagnosticsType.update),
       ]);
     });
+
+    test(
+      'снимок изменения и порция каталога дают одно начало описания',
+      () async {
+        await _insertIntention(
+          database,
+          id: _firstUuid,
+          title: 'Убрать дом',
+          createdAt: DateTime.utc(2026, 9, 2, 10),
+        );
+
+        final saved = _commandSuccess(
+          await repository.execute(
+            UpdateIntention(
+              id: _id(_firstUuid),
+              title: 'Убрать дом',
+              description: '\n  Вымыть\n\n\tокна  \n',
+            ),
+          ),
+        ) as IntentionSaved;
+        final mutation = saved.catalogMutation as IntentionCatalogUpdated;
+        final page = _firstCatalogPage(
+          await repository.getCatalogPage(
+            IntentionCatalogQuery(
+              scope: IntentionScope.all,
+              titleFilter: null,
+              order: IntentionCatalogOrder.createdAtDescending,
+              pageSize: 1,
+            ),
+          ),
+        );
+
+        expect(mutation.after.summary.descriptionPreview?.text, 'Вымыть окна');
+        expect(page.items.single.descriptionPreview?.text, 'Вымыть окна');
+      },
+    );
 
     test(
       'не выполняет запись и возвращает прежнее намерение при no-op update',
@@ -1996,7 +2032,7 @@ ConfirmedGraphResult<IntentionCommandSuccess> _confirmedCommand(
 List<Object?> _summaryFacts(IntentionSummary summary) => [
   summary.id,
   summary.title,
-  summary.hasDescription,
+  summary.descriptionPreview?.text,
   summary.readiness,
   summary.archiveState,
   summary.activeRelationCount,

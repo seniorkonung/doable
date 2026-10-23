@@ -154,7 +154,7 @@ final class _DailyChoiceActionPickerPageState
                     archiveState: summary.archiveState,
                     showArchiveState: false,
                     traits: [
-                      summary.hasDescription
+                      summary.descriptionPreview != null
                           ? l10n.catalogHasDescription
                           : l10n.catalogNoDescription,
                     ],

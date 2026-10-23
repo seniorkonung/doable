@@ -45,6 +45,7 @@ import '../support/tag_read_contract_test_fallback.dart';
 import '../support/statistics_read_contract_test_fallback.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
 import '../support/quick_creation.dart';
+import '../support/intention_description_preview.dart';
 
 void main() {
   testWidgets(
@@ -1198,7 +1199,7 @@ Intention _copyIntention(
 IntentionSummary _summary(Intention intention) => IntentionSummary(
   id: intention.id,
   title: intention.title,
-  hasDescription: intention.description != null,
+  descriptionPreview: testDescriptionPreview(intention.description),
   readiness: intention.readiness,
   archiveState: intention.archiveState,
   activeRelationCount: 0,

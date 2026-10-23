@@ -82,7 +82,7 @@ void main() {
             testSummary(
               index: 1,
               title: 'Позвонить врачу',
-              hasDescription: true,
+              description: 'Описание',
               readiness: IntentionReadiness.ready,
             ),
             testSummary(index: 2, title: 'Выбрать страховку'),
@@ -165,7 +165,7 @@ void main() {
           items: [
             testSummary(
               title: 'Доступное намерение',
-              hasDescription: true,
+              description: 'Описание',
               readiness: IntentionReadiness.ready,
             ),
           ],
