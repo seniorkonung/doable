@@ -11,10 +11,7 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/catalog_paging_policy.dart';
-import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
-import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -32,9 +29,13 @@ void main() {
         DailyChoiceSourcePickerRoute(pickerContext: pickerContext),
     keyPrefix: 'daily-choice-source',
     readinessFilter: IntentionReadinessFilter.all,
+    ruTexts: (
+      title: 'Выбор намерения',
+      header: 'Намерения',
+      auxiliaryCancel: 'Отменить выбор намерения',
+    ),
     emptyMessage: 'No active intentions are available.',
-    noMatchesMessage: 'No intentions match this title.',
-    detailsTooltip: 'Open intention details',
+    noMatchesMessage: 'No intentions with this name',
   );
   defineDailyChoicePickerTagSearchTests(
     DailyChoicePickerTagSearchCase(
@@ -45,130 +46,10 @@ void main() {
         IntentionReadiness.ready,
         IntentionReadiness.notReady,
       ],
-      totalCountLabel: (count) => 'Total intentions: $count',
-      emptyScopeMessage: 'No active intentions are available.',
+      header: 'Intentions',
       unavailableMessage: 'Intentions couldn’t be loaded. Try again.',
     ),
   );
-
-  testWidgets(
-    'выбирает одноимённое основание по идентификатору и открывает подробности',
-    (tester) async {
-      final repository = ControlledParticipantPickerRepository();
-      addTearDown(repository.dispose);
-      final router = await _pumpApp(tester, repository);
-      addTearDown(router.dispose);
-
-      final selection = router.push<IntentionId>(
-        DailyChoiceSourcePickerRoute(),
-      );
-      await _settleRoute(tester);
-      expect(repository.queryAt(1).scope, IntentionScope.active);
-      expect(
-        repository.queryAt(1).readinessFilter,
-        IntentionReadinessFilter.all,
-      );
-      _completeFirst(repository, 1, [
-        testSummary(
-          index: 2,
-          title: 'Позвонить',
-          readiness: IntentionReadiness.notReady,
-        ),
-        testSummary(
-          index: 3,
-          title: 'Позвонить',
-          readiness: IntentionReadiness.ready,
-          description: 'Описание',
-        ),
-      ]);
-      await tester.pumpAndSettle();
-      expect(find.text('Позвонить'), findsNWidgets(2));
-      expect(find.text('Has description'), findsOneWidget);
-      expect(find.text('No description'), findsOneWidget);
-      expect(find.text('Ready for action'), findsOneWidget);
-      expect(find.text('Not ready for action'), findsOneWidget);
-
-      await tester.tap(find.byTooltip('Open intention details').last);
-      await _settleRoute(tester);
-      expect(find.byType(IntentionDetailsPage), findsOneWidget);
-      expect(
-        router.current.argsAs<IntentionDetailsRouteArgs>().intentionId,
-        testSummary(index: 3).id,
-      );
-
-      await router.maybePop();
-      await _settleRoute(tester);
-      expect(find.text('Позвонить'), findsNWidgets(2));
-      expect(repository.queries, hasLength(2));
-      await tester.tap(find.text('Позвонить').last);
-      await tester.pumpAndSettle();
-      expect(await selection, testSummary(index: 3).id);
-    },
-  );
-
-  for (final (language, markLabel, totalCount) in [
-    ('en', 'Favorite intention', 'Total intentions: 2'),
-  ]) {
-    testWidgets(
-      '$language: одноимённые исходные намерения показаны без отметки '
-      'избранного и выбираются по идентификатору',
-      (tester) async {
-        final semantics = tester.ensureSemantics();
-        final repository = ControlledParticipantPickerRepository();
-        addTearDown(repository.dispose);
-        final router = await _pumpApp(
-          tester,
-          repository,
-          locale: Locale(language),
-        );
-        addTearDown(router.dispose);
-
-        final selection = router.push<IntentionId>(
-          DailyChoiceSourcePickerRoute(),
-        );
-        await _settleRoute(tester);
-        expect(repository.queryAt(1).titleFilter, isNull);
-        expect(repository.queryAt(1).tagFilter, IntentionTagFilter.empty);
-        _completeFirst(repository, 1, [
-          testSummary(
-            index: 2,
-            title: 'Гулять',
-            readiness: IntentionReadiness.ready,
-          ),
-          testSummary(
-            index: 3,
-            title: 'Гулять',
-            readiness: IntentionReadiness.ready,
-          ),
-        ]);
-        await tester.pumpAndSettle();
-
-        final rows = find.byType(IntentionSummaryView);
-        expect(rows, findsNWidgets(2));
-        expect(find.text(totalCount), findsOneWidget);
-        expect(find.byIcon(Icons.star), findsNothing);
-        expect(
-          tester.getSemantics(rows.at(0)).label,
-          isNot(contains(markLabel)),
-        );
-        expect(
-          tester.getSemantics(rows.at(1)).label,
-          isNot(contains(markLabel)),
-        );
-
-        expect(find.byIcon(Icons.star_border), findsNothing);
-        expect(find.text(markLabel), findsNothing);
-        expect(find.byTooltip(markLabel), findsNothing);
-
-        // Выбор по-прежнему возвращает намерение строки по идентификатору.
-        await tester.tap(find.text('Гулять').first);
-        await tester.pumpAndSettle();
-        expect(await selection, testSummary(index: 2).id);
-
-        semantics.dispose();
-      },
-    );
-  }
 
   testWidgets('различает загрузку, пустой результат и устранимую ошибку', (
     tester,
@@ -229,7 +110,7 @@ void main() {
       );
       _completeFirst(repository, 2, []);
       await tester.pumpAndSettle();
-      expect(find.text('No intentions match this title.'), findsOneWidget);
+      expect(find.text('No intentions with this name'), findsOneWidget);
       await tester.tap(
         find.byKey(const ValueKey('daily-choice-source-cancel')),
       );
@@ -237,129 +118,7 @@ void main() {
       expect(await selection, isNull);
     },
   );
-
-  testWidgets('подгружает пять порций по 50 из 250 намерений', (tester) async {
-    final repository = ControlledParticipantPickerRepository();
-    addTearDown(repository.dispose);
-    final router = await _pumpApp(tester, repository, pageSize: 50);
-    addTearDown(router.dispose);
-
-    final selection = router.push<IntentionId>(DailyChoiceSourcePickerRoute());
-    await _settleRoute(tester);
-    expect(repository.queryAt(1).pageSize, 50);
-    repository.complete(
-      1,
-      ResultSuccess(
-        IntentionCatalogFirstPage(
-          items: _intentions(1),
-          totalCount: 250,
-          nextCursor: const TestPickerCursor(),
-          revision: const TestPickerRevision(1),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    for (var page = 2; page <= 5; page++) {
-      for (
-        var attempt = 0;
-        attempt < 30 && repository.queries.length <= page;
-        attempt++
-      ) {
-        await tester.drag(
-          find.byKey(const PageStorageKey<String>('daily-choice-source-list')),
-          const Offset(0, -600),
-        );
-        await tester.pump();
-      }
-      expect(repository.queries.length, greaterThan(page));
-      expect(repository.queryAt(page).pageSize, 50);
-      repository.complete(
-        page,
-        ResultSuccess(
-          IntentionCatalogContinuationPage(
-            items: _intentions(page),
-            nextCursor: page == 5 ? null : const TestPickerCursor(),
-            revision: const TestPickerRevision(1),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-    }
-    final list = find.byKey(
-      const PageStorageKey<String>('daily-choice-source-list'),
-    );
-    await tester.scrollUntilVisible(
-      find.text('Намерение 1'),
-      400,
-      scrollable: find.descendant(of: list, matching: find.byType(Scrollable)),
-      maxScrolls: 100,
-    );
-    await tester.pumpAndSettle();
-    expect(find.text('Намерение 1'), findsOneWidget);
-    await tester.tap(find.text('Намерение 1'));
-    await tester.pumpAndSettle();
-    expect(await selection, testSummary(index: 1).id);
-    expect(repository.queries, hasLength(6));
-  });
-
-  testWidgets('локализует выбор и сохраняет основания', (tester) async {
-    tester.view.physicalSize = const Size(1200, 1000);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
-    final handle = tester.ensureSemantics();
-    final repository = ControlledParticipantPickerRepository();
-    addTearDown(repository.dispose);
-    final router = await _pumpApp(
-      tester,
-      repository,
-      locale: const Locale('ru'),
-    );
-    addTearDown(router.dispose);
-    final selection = router.push<IntentionId>(DailyChoiceSourcePickerRoute());
-    await _settleRoute(tester);
-    _completeFirst(repository, 1, [
-      testSummary(
-        index: 2,
-        title: 'Быть здоровым',
-        readiness: IntentionReadiness.ready,
-      ),
-    ]);
-    await tester.pumpAndSettle();
-
-    expect(find.text('Выбор основания'), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('daily-choice-source-filter')),
-      findsOneWidget,
-    );
-    final option = tester.getSemantics(find.byType(IntentionSummaryView));
-    expect(option.label, contains('Быть здоровым'));
-    expect(option.hint, 'Выбрать это намерение как новое основание');
-    final details = tester.getSemantics(
-      find.byTooltip('Открыть подробности намерения'),
-    );
-    expect(details.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
-    await tester.tap(find.text('Быть здоровым'));
-    await tester.pumpAndSettle();
-    expect(await selection, testSummary(index: 2).id);
-    handle.dispose();
-  });
 }
-
-List<IntentionSummary> _intentions(int page) => [
-  for (
-    var index = 250 - (page - 1) * 50;
-    index > 200 - (page - 1) * 50;
-    index--
-  )
-    testSummary(
-      index: index,
-      title: 'Намерение $index',
-      readiness: index.isEven
-          ? IntentionReadiness.ready
-          : IntentionReadiness.notReady,
-    ),
-];
 
 void _completeFirst(
   ControlledParticipantPickerRepository repository,
@@ -387,7 +146,6 @@ Future<AppRouter> _pumpApp(
   WidgetTester tester,
   ControlledParticipantPickerRepository repository, {
   Locale locale = const Locale('en'),
-  int pageSize = 50,
 }) async {
   final router = AppRouter();
   await tester.pumpWidget(
@@ -397,7 +155,7 @@ Future<AppRouter> _pumpApp(
         personalGraphRepositoryProvider.overrideWithValue(repository),
         catalogPagingPolicyProvider.overrideWithValue(
           CatalogPagingPolicy(
-            pageSize: pageSize,
+            pageSize: 50,
             prefetchRemaining: 20,
             filterDebounce: const Duration(milliseconds: 250),
           ),

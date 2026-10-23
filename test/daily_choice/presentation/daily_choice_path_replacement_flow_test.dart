@@ -404,7 +404,7 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(
-          find.text(bottomUp ? 'Выбор действия' : 'Выбор основания'),
+          find.text(bottomUp ? 'Выбор действия' : 'Выбор намерения'),
           findsOneWidget,
         );
         await _tap(

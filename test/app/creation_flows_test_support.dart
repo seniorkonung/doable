@@ -131,10 +131,7 @@ enum _Flow {
         final prefix = this == topDown ? 'source' : 'action';
         final number = this == topDown ? 1 : 4;
         final row = _key('daily-choice-$prefix-${durabilityUuid(number)}');
-        await _tap(
-          tester,
-          find.descendant(of: row, matching: find.byType(IntentionSummaryView)),
-        );
+        await _tap(tester, row);
         expect(find.byType(AppNavigationBar), findsNothing);
         await _tap(tester, _key('choice-path-continue-${durabilityUuid(103)}'));
         await _tap(

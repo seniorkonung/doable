@@ -26,6 +26,7 @@ import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart'
 import 'package:doable/src/daily_choice/presentation/source_picker/daily_choice_source_picker_page.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openInMemoryLocalDatabase;
+import 'package:doable/src/design_system/components/picker_row.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
@@ -283,11 +284,17 @@ final _announcedDestinations = find.semantics.byPredicate(
   describeMatch: (_) => 'пункты панели для экранного диктора',
 );
 
-/// Строка выдачи намерений с названием [title] на странице [page].
+/// Строка выдачи намерений с названием [title] на странице [page]: в
+/// каталоге и поиске участника — прежняя, в поисках дневного выбора — строка
+/// экрана выбора.
 Finder _summary(Type page, String title) => find.descendant(
   of: find.byType(page),
   matching: find.byWidgetPredicate(
-    (widget) => widget is IntentionSummaryView && widget.title == title,
+    (widget) => switch (widget) {
+      IntentionSummaryView(title: final shown) ||
+      PickerRow(name: final shown) => shown == title,
+      _ => false,
+    },
   ),
 );
 

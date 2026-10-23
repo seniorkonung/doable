@@ -35,7 +35,8 @@ import '../../support/tag_positions.dart';
 /// Нижняя граница области над открытой клавиатурой: окно 900, inset 300.
 const _keyboardTop = 600.0;
 
-/// Страница поиска намерений и то, чем она отличается от остальных трёх.
+/// Страница поиска намерений с чипами условий и то, чем она отличается от
+/// другой.
 final class _SearchPage {
   const _SearchPage({
     required this.name,
@@ -54,21 +55,15 @@ final class _SearchPage {
 
 final _secondParticipant = testSummary(index: 99).id;
 
-/// Страницы с разной компоновкой поиска: корневой каталог под панелью
-/// навигации, поиск для дневного выбора (поиск исходного намерения собран
-/// так же) и поиск участника, чья выдача всегда стоит под параметрами.
+/// Страницы с чипами условий и разной компоновкой поиска: корневой каталог
+/// под панелью навигации и поиск участника, чья выдача всегда стоит под
+/// параметрами.
 final _pages = [
   const _SearchPage(
     name: 'каталог намерений',
     route: null,
     filterKey: 'catalog-filter-field',
     listKey: 'intention-catalog-list',
-  ),
-  _SearchPage(
-    name: 'поиск действия',
-    route: DailyChoiceActionPickerRoute(),
-    filterKey: 'daily-choice-action-filter',
-    listKey: 'daily-choice-action-list',
   ),
   _SearchPage(
     name: 'поиск участника долговременной связи',

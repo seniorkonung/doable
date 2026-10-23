@@ -300,7 +300,7 @@
   - **Предполагаемые файлы:** `lib/src/intention/presentation/catalog/intention_catalog_view_model.dart`, `lib/src/intention/presentation/picker/intention_picker_results.dart`, `lib/src/intention/presentation/picker/intention_picker_view.dart`, `lib/l10n/app_en.arb`, `lib/l10n/app_ru.arb` и генерируемые `lib/l10n/app_localizations*.dart`, `test/intention/presentation/catalog/intention_catalog_view_model_test.dart`, `test/intention/presentation/picker/intention_picker_view_test.dart`.
   - **Размер:** M.
 
-- [ ] 2.11 Перевести поиски действия и исходного намерения на экран выбора с прежними правом запуска и результатом
+- [x] 2.11 Перевести поиски действия и исходного намерения на экран выбора с прежними правом запуска и результатом
   - **Критерии приёмки:**
     - `DailyChoiceActionPickerPage` и `DailyChoiceSourcePickerPage` в начальном и вспомогательном контекстах показывают `IntentionPickerView` своего назначения и сохраняют `@RoutePage`, `PopScope`, отмену запуска и проверку верхнего маршрута перед выбором, закрытием и открытием подробностей. Результат — идентификатор из снимка выбора.
       - Подпись крестика — «Отменить создание» в начальном контексте и «Отменить выбор действия» или «Отменить выбор намерения» во вспомогательном.

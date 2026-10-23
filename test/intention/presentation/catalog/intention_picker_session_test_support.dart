@@ -14,6 +14,7 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_stat
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_section.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
+import 'package:doable/src/intention/presentation/picker/intention_picker_view.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
@@ -136,8 +137,13 @@ void defineIntentionPickerSessionTests({
     expect(_position(tester, listKey).pixels, firstOffset);
     expect(
       tester
-          .widget<TextField>(find.byKey(ValueKey(filterKey)))
-          .controller!
+          .widget<EditableText>(
+            find.descendant(
+              of: find.byKey(ValueKey(filterKey)),
+              matching: find.byType(EditableText),
+            ),
+          )
+          .controller
           .text,
       'Первая',
     );
@@ -192,11 +198,19 @@ void defineIntentionPickerSessionTests({
   );
 }
 
-IntentionCatalogPurpose _purpose(WidgetTester tester) => tester
-    .widget<IntentionTagConditionsSection>(
-      find.byType(IntentionTagConditionsSection),
-    )
-    .purpose;
+/// Назначение верхнего поиска: поиски дневного выбора показывают экран
+/// выбора, поиск участника — прежний раздел условий.
+IntentionCatalogPurpose _purpose(WidgetTester tester) {
+  final picker = find.byType(IntentionPickerView);
+  if (picker.evaluate().isNotEmpty) {
+    return tester.widget<IntentionPickerView>(picker).purpose;
+  }
+  return tester
+      .widget<IntentionTagConditionsSection>(
+        find.byType(IntentionTagConditionsSection),
+      )
+      .purpose;
+}
 
 ScrollPosition _position(WidgetTester tester, String listKey) => tester
     .state<ScrollableState>(

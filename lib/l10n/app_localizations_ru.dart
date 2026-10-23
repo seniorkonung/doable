@@ -2269,9 +2269,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get participantPickerTitle => 'Выбор участника';
 
   @override
-  String get actionPickerTitle => 'Выбор действия';
-
-  @override
   String get actionPickerCancel => 'Отменить выбор действия';
 
   @override
@@ -2279,9 +2276,6 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get actionPickerEmpty => 'Доступных активных действий нет.';
-
-  @override
-  String get actionPickerNoMatches => 'Действий с таким названием не найдено.';
 
   @override
   String get actionPickerUnavailable =>
@@ -2296,55 +2290,10 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось загрузить действия из-за непредвиденной ошибки.';
 
   @override
-  String get actionPickerSelectHint =>
-      'Выбрать это действие для поиска основания';
-
-  @override
-  String get actionPickerOpenDetails => 'Открыть подробности действия';
-
-  @override
-  String actionPickerTotalCount(int count) {
-    return 'Всего действий: $count';
-  }
-
-  @override
-  String get sourcePickerTitle => 'Выбор основания';
-
-  @override
-  String get sourcePickerCancel => 'Отменить выбор основания';
-
-  @override
-  String get sourcePickerLoading => 'Загружаем намерения…';
+  String get sourcePickerCancel => 'Отменить выбор намерения';
 
   @override
   String get sourcePickerEmpty => 'Доступных активных намерений нет.';
-
-  @override
-  String get sourcePickerNoMatches => 'Намерений с таким названием не найдено.';
-
-  @override
-  String get sourcePickerUnavailable =>
-      'Не удалось загрузить намерения. Повторите попытку.';
-
-  @override
-  String get sourcePickerCorruption =>
-      'Сохранённые данные намерений повреждены и не могут быть показаны.';
-
-  @override
-  String get sourcePickerUnexpected =>
-      'Не удалось загрузить намерения из-за непредвиденной ошибки.';
-
-  @override
-  String get sourcePickerSelectHint =>
-      'Выбрать это намерение как новое основание';
-
-  @override
-  String get sourcePickerOpenDetails => 'Открыть подробности намерения';
-
-  @override
-  String sourcePickerTotalCount(int count) {
-    return 'Всего намерений: $count';
-  }
 
   @override
   String get intentionPickerKindAction => 'действие';

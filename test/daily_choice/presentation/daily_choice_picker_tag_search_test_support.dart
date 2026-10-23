@@ -1,15 +1,17 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
+import 'package:doable/src/design_system/components/catalog_header.dart';
+import 'package:doable/src/design_system/components/filter_button.dart';
+import 'package:doable/src/design_system/components/picker_row.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
     hide IntentionCatalogPage;
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_section.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
-import 'package:doable/src/intention/presentation/intention_summary_view.dart';
+import 'package:doable/src/intention/presentation/picker/intention_picker_view.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
@@ -21,7 +23,6 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../intention/presentation/catalog/catalog_reconciliation_test_support.dart';
 import '../../intention/presentation/catalog/catalog_test_support.dart';
 import '../../support/app_root_pages.dart';
-import '../../support/inline_text.dart';
 import '../../intention/presentation/catalog/intention_picker_session_test_support.dart';
 import '../../support/tag_positions.dart';
 import '../../support/tag_condition_cycles.dart';
@@ -37,8 +38,7 @@ final class DailyChoicePickerTagSearchCase {
     required this.keyPrefix,
     required this.readinessFilter,
     required this.rowReadiness,
-    required this.totalCountLabel,
-    required this.emptyScopeMessage,
+    required this.header,
     required this.unavailableMessage,
   });
 
@@ -50,10 +50,9 @@ final class DailyChoicePickerTagSearchCase {
 
   /// Готовность строк выдачи, допустимая ограничением страницы.
   final List<IntentionReadiness> rowReadiness;
-  final String Function(int count) totalCountLabel;
 
-  /// Сообщение о пустом допустимом охвате.
-  final String emptyScopeMessage;
+  /// Заголовок подтверждённой выдачи.
+  final String header;
 
   /// Сообщение устранимого отказа первой порции.
   final String unavailableMessage;
@@ -69,17 +68,17 @@ void defineDailyChoicePickerTagSearchTests(
     listKey: '${page.keyPrefix}-list',
     readinessFilter: page.readinessFilter,
   );
-  testWidgets('условие добавляется в панели тегов, переключается и '
-      'снимается, а отмена ничего не меняет', (tester) async {
+  testWidgets('кнопка фильтра открывает панель тегов, где условие '
+      'добавляется, переключается и снимается с ограничениями страницы, а '
+      'отмена ничего не меняет', (tester) async {
     final repository = ControlledCatalogRepository();
-    final health = _tag(1, 'Здоровье');
     final sport = _tag(2, 'Спорт');
-    repository.tagCatalogItems = [health, sport];
+    repository.tagCatalogItems = [_tag(1, 'Здоровье'), sport];
     final opened = await _openPicker(tester, repository, page);
     repository.complete(1, _firstPage(_summaries(page, const [], count: 3)));
     await tester.pumpAndSettle();
 
-    await tester.tap(_addCondition);
+    await tester.tap(_filterButton);
     await tester.pumpAndSettle();
     expect(find.text('Filter by tags'), findsOneWidget);
     // Первое нажатие требует тег, второе исключает его.
@@ -97,58 +96,32 @@ void defineDailyChoicePickerTagSearchTests(
       repository.queryAt(3),
       IntentionTagFilter(excludedTagIds: [sport.id]),
     );
-    repository.complete(3, _firstPage(_summaries(page, [health], count: 2)));
+    repository.complete(3, _firstPage(_summaries(page, const [], count: 2)));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Done'));
     await tester.pumpAndSettle();
 
     expect(opened.router.current.name, page.route.routeName);
-    expect(_shownConditions(tester), ['not Спорт']);
-    expect(findTextIgnoringInlineWidgets('Tags: Здоровье'), findsNWidgets(2));
+    expect(tester.widget<FilterButton>(_filterButton).count, 1);
+    expect(_rows, findsNWidgets(2));
 
-    await tester.tap(_conditionToggle(sport));
+    // Третье нажатие снимает условие.
+    await tester.tap(_filterButton);
+    await tester.pumpAndSettle();
+    await tester.tap(_panelRow(sport));
     await _pumpUntilQueries(tester, repository, 5);
-    _expectPickerQuery(
-      page,
-      repository.queryAt(4),
-      IntentionTagFilter(requiredTagIds: [sport.id]),
-    );
-    repository.complete(4, _firstPage(_summaries(page, [sport], count: 1)));
+    _expectPickerQuery(page, repository.queryAt(4), IntentionTagFilter.empty);
+    repository.complete(4, _firstPage(_summaries(page, const [], count: 3)));
     await tester.pumpAndSettle();
-    expect(_shownConditions(tester), ['Спорт']);
-    expect(findTextIgnoringInlineWidgets('Tags: Спорт'), findsOneWidget);
-
-    await tester.tap(_conditionRemove(sport));
-    await _pumpUntilQueries(tester, repository, 6);
-    _expectPickerQuery(page, repository.queryAt(5), IntentionTagFilter.empty);
-    repository.complete(5, _firstPage(_summaries(page, const [], count: 3)));
+    await tester.tap(find.text('Done'));
     await tester.pumpAndSettle();
-    expect(_shownConditions(tester), isEmpty);
-    expect(find.text('No tags'), findsNWidgets(3));
+    expect(tester.widget<FilterButton>(_filterButton).count, 0);
+    expect(_rows, findsNWidgets(3));
 
     await tester.tap(find.byKey(ValueKey('${page.keyPrefix}-cancel')));
     await tester.pumpAndSettle();
     expect(await opened.selection, isNull);
     _expectNoCommands(repository);
-  });
-
-  testWidgets('пустая выдача при условиях по тегам сообщает об отсутствии '
-      'совпадений по условиям, а не о пустом охвате', (tester) async {
-    final repository = ControlledCatalogRepository();
-    const byConditions = 'No intentions match the tag conditions.';
-    final byScope = page.emptyScopeMessage;
-    final opened = await _openPicker(tester, repository, page);
-    repository.complete(1, _firstPage(const []));
-    await tester.pumpAndSettle();
-    expect(find.text(byScope), findsOneWidget);
-    expect(find.text(byConditions), findsNothing);
-
-    await _applyConditions(tester, opened.container, repository, page, [
-      (_tag(1, 'Здоровье'), IntentionTagRequirement.mustBePresent),
-    ], _firstPage(const []));
-
-    expect(find.text(byConditions), findsOneWidget);
-    expect(find.text(byScope), findsNothing);
   });
 
   testWidgets('отказ новой выдачи после удаления исключённого тега показан '
@@ -184,9 +157,9 @@ void defineDailyChoicePickerTagSearchTests(
     await tester.pumpAndSettle();
 
     expect(find.text(page.unavailableMessage), findsOneWidget);
-    expect(find.byType(IntentionSummaryView), findsNothing);
+    expect(_rows, findsNothing);
 
-    await tester.tap(find.widgetWithText(FilledButton, 'Try again'));
+    await tester.tap(find.text('Try again'));
     await _pumpUntilQueries(tester, repository, restarted + 2);
     _expectPickerQuery(page, repository.queryAt(restarted + 1), remaining);
     repository.complete(
@@ -196,8 +169,16 @@ void defineDailyChoicePickerTagSearchTests(
     await tester.pumpAndSettle();
 
     expect(find.text(page.unavailableMessage), findsNothing);
-    expect(find.text(page.totalCountLabel(4)), findsOneWidget);
-    expect(find.byType(IntentionSummaryView), findsNWidgets(4));
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is CatalogHeader &&
+            widget.title == page.header &&
+            widget.count == 4,
+      ),
+      findsOneWidget,
+    );
+    expect(_rows, findsNWidgets(4));
     _expectNoCommands(repository, tagCommands: 1);
   });
 }
@@ -256,9 +237,7 @@ Future<void> _applyConditions(
   final model = container.read(
     intentionTagConditionsViewModelProvider(
       tester
-          .widget<IntentionTagConditionsSection>(
-            find.byType(IntentionTagConditionsSection),
-          )
+          .widget<IntentionPickerView>(find.byType(IntentionPickerView))
           .purpose,
     ).notifier,
   );
@@ -298,31 +277,12 @@ void _expectNoCommands(
   expect(repository.dailyChoiceCommands, isEmpty);
 }
 
-final _addCondition = find.byKey(
-  const ValueKey('intention-tag-conditions-add'),
-);
+final _filterButton = find.byType(FilterButton);
 
-Finder _conditionToggle(Tag tag) => find.byKey(
-  ValueKey('intention-tag-condition-toggle-${tag.id.toCanonicalString()}'),
-);
-
-Finder _conditionRemove(Tag tag) => find.byKey(
-  ValueKey('intention-tag-condition-remove-${tag.id.toCanonicalString()}'),
-);
+final _rows = find.byType(PickerRow);
 
 Finder _panelRow(Tag tag) =>
     find.byKey(ValueKey('tags-panel-row-${tag.id.toCanonicalString()}'));
-
-/// Тексты чипов раздела условий в порядке показа.
-List<String> _shownConditions(WidgetTester tester) => [
-  for (final text in tester.widgetList<Text>(
-    find.descendant(
-      of: find.byType(IntentionTagConditionsSection),
-      matching: find.byKey(const ValueKey('intention-tag-condition-label')),
-    ),
-  ))
-    textIgnoringInlineWidgets(text),
-];
 
 Result<IntentionCatalogFirstPage> _firstPage(
   List<IntentionSummary> items, {

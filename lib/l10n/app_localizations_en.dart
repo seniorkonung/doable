@@ -2245,9 +2245,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get participantPickerTitle => 'Select a participant';
 
   @override
-  String get actionPickerTitle => 'Select an action';
-
-  @override
   String get actionPickerCancel => 'Cancel action selection';
 
   @override
@@ -2255,9 +2252,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get actionPickerEmpty => 'No active actions are available.';
-
-  @override
-  String get actionPickerNoMatches => 'No actions match this title.';
 
   @override
   String get actionPickerUnavailable =>
@@ -2272,54 +2266,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Actions couldn’t be loaded because of an unexpected error.';
 
   @override
-  String get actionPickerSelectHint => 'Selects this action to find its reason';
-
-  @override
-  String get actionPickerOpenDetails => 'Open action details';
-
-  @override
-  String actionPickerTotalCount(int count) {
-    return 'Total actions: $count';
-  }
-
-  @override
-  String get sourcePickerTitle => 'Select a reason';
-
-  @override
-  String get sourcePickerCancel => 'Cancel reason selection';
-
-  @override
-  String get sourcePickerLoading => 'Loading intentions…';
+  String get sourcePickerCancel => 'Cancel intention selection';
 
   @override
   String get sourcePickerEmpty => 'No active intentions are available.';
-
-  @override
-  String get sourcePickerNoMatches => 'No intentions match this title.';
-
-  @override
-  String get sourcePickerUnavailable =>
-      'Intentions couldn’t be loaded. Try again.';
-
-  @override
-  String get sourcePickerCorruption =>
-      'Saved intention data is damaged and can’t be shown.';
-
-  @override
-  String get sourcePickerUnexpected =>
-      'Intentions couldn’t be loaded because of an unexpected error.';
-
-  @override
-  String get sourcePickerSelectHint =>
-      'Selects this intention as the new reason';
-
-  @override
-  String get sourcePickerOpenDetails => 'Open intention details';
-
-  @override
-  String sourcePickerTotalCount(int count) {
-    return 'Total intentions: $count';
-  }
 
   @override
   String get intentionPickerKindAction => 'action';

@@ -3496,12 +3496,6 @@ abstract class AppLocalizations {
   /// **'Select a participant'**
   String get participantPickerTitle;
 
-  /// Заголовок выбора действия для нижнего обхода
-  ///
-  /// In en, this message translates to:
-  /// **'Select an action'**
-  String get actionPickerTitle;
-
   /// Отмена выбора действия
   ///
   /// In en, this message translates to:
@@ -3519,12 +3513,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No active actions are available.'**
   String get actionPickerEmpty;
-
-  /// Пустой результат поиска действий по названию
-  ///
-  /// In en, this message translates to:
-  /// **'No actions match this title.'**
-  String get actionPickerNoMatches;
 
   /// Устранимый отказ чтения действий
   ///
@@ -3544,89 +3532,17 @@ abstract class AppLocalizations {
   /// **'Actions couldn’t be loaded because of an unexpected error.'**
   String get actionPickerUnexpected;
 
-  /// Семантическая подсказка выбора действия
+  /// Отмена выбора исходного намерения
   ///
   /// In en, this message translates to:
-  /// **'Selects this action to find its reason'**
-  String get actionPickerSelectHint;
-
-  /// Переход к подробностям действия
-  ///
-  /// In en, this message translates to:
-  /// **'Open action details'**
-  String get actionPickerOpenDetails;
-
-  /// Точное количество доступных действий
-  ///
-  /// In en, this message translates to:
-  /// **'Total actions: {count}'**
-  String actionPickerTotalCount(int count);
-
-  /// Заголовок выбора нового основания
-  ///
-  /// In en, this message translates to:
-  /// **'Select a reason'**
-  String get sourcePickerTitle;
-
-  /// Отмена выбора основания
-  ///
-  /// In en, this message translates to:
-  /// **'Cancel reason selection'**
+  /// **'Cancel intention selection'**
   String get sourcePickerCancel;
 
-  /// Чтение первой порции намерений
-  ///
-  /// In en, this message translates to:
-  /// **'Loading intentions…'**
-  String get sourcePickerLoading;
-
-  /// Пустой выбор активных оснований
+  /// Пустой выбор активных намерений
   ///
   /// In en, this message translates to:
   /// **'No active intentions are available.'**
   String get sourcePickerEmpty;
-
-  /// Пустой результат буквального фильтра
-  ///
-  /// In en, this message translates to:
-  /// **'No intentions match this title.'**
-  String get sourcePickerNoMatches;
-
-  /// Устранимый отказ чтения намерений
-  ///
-  /// In en, this message translates to:
-  /// **'Intentions couldn’t be loaded. Try again.'**
-  String get sourcePickerUnavailable;
-
-  /// Повреждённые данные намерений
-  ///
-  /// In en, this message translates to:
-  /// **'Saved intention data is damaged and can’t be shown.'**
-  String get sourcePickerCorruption;
-
-  /// Непредвиденный отказ чтения намерений
-  ///
-  /// In en, this message translates to:
-  /// **'Intentions couldn’t be loaded because of an unexpected error.'**
-  String get sourcePickerUnexpected;
-
-  /// Семантическая подсказка выбора основания
-  ///
-  /// In en, this message translates to:
-  /// **'Selects this intention as the new reason'**
-  String get sourcePickerSelectHint;
-
-  /// Переход к подробностям намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Open intention details'**
-  String get sourcePickerOpenDetails;
-
-  /// Число доступных активных намерений
-  ///
-  /// In en, this message translates to:
-  /// **'Total intentions: {count}'**
-  String sourcePickerTotalCount(int count);
 
   /// Вид намерения с готовностью к действию в доступном названии строки экрана выбора
   ///
