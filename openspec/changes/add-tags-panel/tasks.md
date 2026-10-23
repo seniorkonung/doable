@@ -707,11 +707,14 @@
     - `TagRow` по правилам компонента дизайн-системы получает отметки фильтра: «должен быть» — та же галочка 20 цвета `accent`, «исключён» — перечёркнутый круг 20 цвета `muted`, а название исключённого тега окрашено `muted`. Отметки различимы без опоры на цвет, а отметки выбора «нет» и «отмечен» не меняются.
     - Отметки выбора и фильтра различаются типом. Строка выбора по-прежнему объявляет отмеченное или неотмеченное состояние, а строка фильтра состояния отметки выбора не объявляет: надобность передаёт доступное название, которое задаёт потребитель по ADR-0030, поэтому диктор объявляет её один раз.
     - Иконка исключения переносится из исходного SVG `TagsPanel.dc.html` (отметка `row.no`), а таблица источников иконок дополняется.
+    - Задача сама переводит на новый тип отметки всех нынешних потребителей `TagRow.mark`: панель тегов, которая отмечает строки выбора, и помощники проверок, которые читают отметку строки. Отметки и поведение панели не меняются, и после задачи пакет компилируется без ошибок анализатора.
   - **Проверка:**
     - `mise exec --no-deps -- flutter test test/design_system/tag_row_test.dart`: размеры и цвета отметок фильтра и приглушённого названия по токенам в обеих темах; семантика строки фильтра без состояния отметки выбора, с надобностью в доступном названии; прежние отметки выбора и их семантика.
     - `mise exec --no-deps -- flutter test --update-goldens test/design_system/doable_icon_test.dart`, затем тот же набор без обновления эталона.
+    - `mise exec --no-deps -- flutter analyze`: ни один файл не ссылается на прежний тип отметки.
+    - `mise exec --no-deps -- flutter test test/tag/presentation/panel/tags_panel_test.dart test/app/tag_assignment_app_flow_test.dart`: прежние отметки выбора в панели и в сквозном назначении тегов.
   - **Зависимости:** нет.
-  - **Предполагаемые файлы:** `lib/src/design_system/components/tag_row.dart`, `lib/src/design_system/doable_icon.dart`, `lib/src/design_system/icons/assets/exclude.svg` (новый), `lib/src/design_system/icons/README.md`, `test/design_system/tag_row_test.dart`, `test/design_system/doable_icon_test.dart`, `test/design_system/goldens/doable_icons.png`.
+  - **Предполагаемые файлы:** `lib/src/design_system/components/tag_row.dart`, `lib/src/design_system/doable_icon.dart`, `lib/src/design_system/icons/assets/exclude.svg` (новый), `lib/src/design_system/icons/README.md`, `lib/src/tag/presentation/panel/tags_panel.dart`, `test/design_system/tag_row_test.dart`, `test/design_system/doable_icon_test.dart`, `test/design_system/goldens/doable_icons.png`; помощники чтения отметки `test/tag/presentation/panel/tags_panel_test.dart` и `test/app/tag_assignment_app_flow_test.dart`.
   - **Размер:** S.
 
 - [ ] 4.5 Добавить в раскрываемый лист модуля основ действие шапки, а в кнопку — вид text
