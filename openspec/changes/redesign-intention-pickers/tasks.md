@@ -318,7 +318,7 @@
     - механическая адаптация потоков: `test/daily_choice/presentation/daily_choice_creation_launcher_test.dart`, `test/daily_choice/presentation/daily_choice_path_replacement_flow_test.dart`, `test/app/creation_flows_test_support.dart`, `test/app/quick_creation/quick_creation_flow_scenarios.dart`, `test/app/quick_creation/quick_creation_launcher_test_support.dart`, `test/app/quick_creation/quick_creation_navigation_test.dart`, `test/app/navigation/app_shell_pages_above_test.dart`, `test/app/navigation/app_shell_page_matrix.dart`, `test/app/intention_tag_search_app_flow_test.dart`, `test/intention/presentation/intention_tag_search_accessibility_test.dart`.
   - **Размер:** M — две тонкие страницы; механическая адаптация проверок потоков входит в задачу, потому что страницы нельзя перевести по частям, не сломав эти проверки.
 
-- [ ] 2.12 Подтвердить готовность второй фазы: поиски действия и исходного намерения работают на экране выбора по спецификации
+- [x] 2.12 Подтвердить готовность второй фазы: поиски действия и исходного намерения работают на экране выбора по спецификации
   - **Критерии приёмки:**
     - Выполнено условие «Ready to advance» второй фазы:
       - поиски действия и исходного намерения выполняют требования экрана, строки и сброса фильтров из спецификации;
