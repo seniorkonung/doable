@@ -3628,6 +3628,30 @@ abstract class AppLocalizations {
   /// **'Total intentions: {count}'**
   String sourcePickerTotalCount(int count);
 
+  /// Вид намерения с готовностью к действию в доступном названии строки экрана выбора
+  ///
+  /// In en, this message translates to:
+  /// **'action'**
+  String get intentionPickerKindAction;
+
+  /// Вид намерения без готовности к действию в доступном названии строки экрана выбора
+  ///
+  /// In en, this message translates to:
+  /// **'intention'**
+  String get intentionPickerKindIntention;
+
+  /// Доступное название стрелки строки экрана выбора, которая открывает страницу действия
+  ///
+  /// In en, this message translates to:
+  /// **'Open the page of action {title}'**
+  String intentionPickerOpenActionPage(String title);
+
+  /// Доступное название стрелки строки экрана выбора, которая открывает страницу намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Open the page of intention {title}'**
+  String intentionPickerOpenIntentionPage(String title);
+
   /// Назначение отмены выбора участника
   ///
   /// In en, this message translates to:

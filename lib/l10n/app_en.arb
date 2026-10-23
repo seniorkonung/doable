@@ -1863,6 +1863,24 @@
     "description": "Число доступных активных намерений",
     "placeholders": {"count": {"type": "int"}}
   },
+  "intentionPickerKindAction": "action",
+  "@intentionPickerKindAction": {
+    "description": "Вид намерения с готовностью к действию в доступном названии строки экрана выбора"
+  },
+  "intentionPickerKindIntention": "intention",
+  "@intentionPickerKindIntention": {
+    "description": "Вид намерения без готовности к действию в доступном названии строки экрана выбора"
+  },
+  "intentionPickerOpenActionPage": "Open the page of action {title}",
+  "@intentionPickerOpenActionPage": {
+    "description": "Доступное название стрелки строки экрана выбора, которая открывает страницу действия",
+    "placeholders": {"title": {"type": "String"}}
+  },
+  "intentionPickerOpenIntentionPage": "Open the page of intention {title}",
+  "@intentionPickerOpenIntentionPage": {
+    "description": "Доступное название стрелки строки экрана выбора, которая открывает страницу намерения",
+    "placeholders": {"title": {"type": "String"}}
+  },
   "@participantPickerTitle": {
     "description": "Заголовок выбора участника долговременной связи"
   },

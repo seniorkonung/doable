@@ -2347,6 +2347,22 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
+  String get intentionPickerKindAction => 'действие';
+
+  @override
+  String get intentionPickerKindIntention => 'намерение';
+
+  @override
+  String intentionPickerOpenActionPage(String title) {
+    return 'Открыть страницу действия «$title»';
+  }
+
+  @override
+  String intentionPickerOpenIntentionPage(String title) {
+    return 'Открыть страницу намерения «$title»';
+  }
+
+  @override
   String get participantPickerCancel => 'Отменить выбор';
 
   @override

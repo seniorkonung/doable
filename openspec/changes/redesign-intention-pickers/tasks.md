@@ -209,7 +209,7 @@
   - **Предполагаемые файлы:** `lib/src/design_system/components/picker_row.dart`, `test/design_system/picker_row_test.dart`.
   - **Размер:** S.
 
-- [ ] 2.5 Сопоставить краткую сводку намерения строке экрана выбора: начало описания, молния, обязательные теги первыми и доступное название
+- [x] 2.5 Сопоставить краткую сводку намерения строке экрана выбора: начало описания, молния, обязательные теги первыми и доступное название
   - **Критерии приёмки:**
     - В `intention_catalog_purpose.dart` появляется sealed-подтип `IntentionPickerPurpose` с наследниками `SelectDailyChoiceAction` и `SelectDailyChoiceSource`. Вид выбираемого — действие или намерение — выводится его исчерпывающим разбором (решение 1 дизайна). `SelectRelationParticipant` остаётся прямым наследником `IntentionCatalogPurpose`, потому что поиск участника сохраняет прежний вид. Разборы модели каталога не меняются.
     - Адаптер `IntentionPickerRow` переводит `IntentionSummary` в `PickerRow` по решению 4 дизайна:

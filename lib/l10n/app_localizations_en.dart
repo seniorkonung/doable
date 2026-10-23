@@ -2322,6 +2322,22 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get intentionPickerKindAction => 'action';
+
+  @override
+  String get intentionPickerKindIntention => 'intention';
+
+  @override
+  String intentionPickerOpenActionPage(String title) {
+    return 'Open the page of action $title';
+  }
+
+  @override
+  String intentionPickerOpenIntentionPage(String title) {
+    return 'Open the page of intention $title';
+  }
+
+  @override
   String get participantPickerCancel => 'Cancel the selection';
 
   @override

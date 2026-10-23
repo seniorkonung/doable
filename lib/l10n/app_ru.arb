@@ -627,6 +627,16 @@
   "@sourcePickerTotalCount": {
     "placeholders": {"count": {"type": "int"}}
   },
+  "intentionPickerKindAction": "действие",
+  "intentionPickerKindIntention": "намерение",
+  "intentionPickerOpenActionPage": "Открыть страницу действия «{title}»",
+  "@intentionPickerOpenActionPage": {
+    "placeholders": {"title": {"type": "String"}}
+  },
+  "intentionPickerOpenIntentionPage": "Открыть страницу намерения «{title}»",
+  "@intentionPickerOpenIntentionPage": {
+    "placeholders": {"title": {"type": "String"}}
+  },
   "participantPickerCancel": "Отменить выбор",
   "participantPickerEmpty": "Других намерений для выбора нет.",
   "participantPickerSelectHint": "Выбирает это намерение участником связи",
