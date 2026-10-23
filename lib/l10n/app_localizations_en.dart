@@ -2338,6 +2338,21 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get intentionPickerActionsHeader => 'Actions';
+
+  @override
+  String get intentionPickerIntentionsHeader => 'Intentions';
+
+  @override
+  String get intentionPickerLoadingMoreActions => 'Loading more actions';
+
+  @override
+  String get intentionPickerLoadingMoreIntentions => 'Loading more intentions';
+
+  @override
+  String get intentionPickerEmptyScopeTitle => 'Nothing to choose from';
+
+  @override
   String get participantPickerCancel => 'Cancel the selection';
 
   @override

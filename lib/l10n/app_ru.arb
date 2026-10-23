@@ -637,6 +637,11 @@
   "@intentionPickerOpenIntentionPage": {
     "placeholders": {"title": {"type": "String"}}
   },
+  "intentionPickerActionsHeader": "Действия",
+  "intentionPickerIntentionsHeader": "Намерения",
+  "intentionPickerLoadingMoreActions": "Загружаем ещё действия",
+  "intentionPickerLoadingMoreIntentions": "Загружаем ещё намерения",
+  "intentionPickerEmptyScopeTitle": "Выбрать не из чего",
   "participantPickerCancel": "Отменить выбор",
   "participantPickerEmpty": "Других намерений для выбора нет.",
   "participantPickerSelectHint": "Выбирает это намерение участником связи",

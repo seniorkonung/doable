@@ -239,7 +239,7 @@
   - **Предполагаемые файлы:** `lib/src/design_system/components/catalog_header.dart`, `lib/src/design_system/components/empty_state.dart`, `lib/src/design_system/components/list_state.dart`, `test/design_system/catalog_header_test.dart`, `test/design_system/empty_state_test.dart`, `test/design_system/list_state_test.dart`.
   - **Размер:** M.
 
-- [ ] 2.7 Показать выдачу экрана выбора состояниями дизайн-системы: заголовок с количеством, строки, подгрузку, отказы и выбор с ревизией выдачи
+- [x] 2.7 Показать выдачу экрана выбора состояниями дизайн-системы: заголовок с количеством, строки, подгрузку, отказы и выбор с ревизией выдачи
   - **Критерии приёмки:**
     - `IntentionPickerResults` сопоставляет состояние модели каталога своего назначения по таблице решения 3 дизайна:
       - загрузка и пауза ввода — `ListState.loading`;

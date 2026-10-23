@@ -1881,6 +1881,26 @@
     "description": "Доступное название стрелки строки экрана выбора, которая открывает страницу намерения",
     "placeholders": {"title": {"type": "String"}}
   },
+  "intentionPickerActionsHeader": "Actions",
+  "@intentionPickerActionsHeader": {
+    "description": "Заголовок выдачи поиска действия на экране выбора"
+  },
+  "intentionPickerIntentionsHeader": "Intentions",
+  "@intentionPickerIntentionsHeader": {
+    "description": "Заголовок выдачи поиска намерения на экране выбора"
+  },
+  "intentionPickerLoadingMoreActions": "Loading more actions",
+  "@intentionPickerLoadingMoreActions": {
+    "description": "Доступное название подгрузки следующей порции в поиске действия"
+  },
+  "intentionPickerLoadingMoreIntentions": "Loading more intentions",
+  "@intentionPickerLoadingMoreIntentions": {
+    "description": "Доступное название подгрузки следующей порции в поиске намерения"
+  },
+  "intentionPickerEmptyScopeTitle": "Nothing to choose from",
+  "@intentionPickerEmptyScopeTitle": {
+    "description": "Заголовок пустой выдачи экрана выбора, когда допустимый охват пуст без фильтров"
+  },
   "@participantPickerTitle": {
     "description": "Заголовок выбора участника долговременной связи"
   },

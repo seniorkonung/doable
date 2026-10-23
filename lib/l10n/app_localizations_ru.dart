@@ -2363,6 +2363,21 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
+  String get intentionPickerActionsHeader => 'Действия';
+
+  @override
+  String get intentionPickerIntentionsHeader => 'Намерения';
+
+  @override
+  String get intentionPickerLoadingMoreActions => 'Загружаем ещё действия';
+
+  @override
+  String get intentionPickerLoadingMoreIntentions => 'Загружаем ещё намерения';
+
+  @override
+  String get intentionPickerEmptyScopeTitle => 'Выбрать не из чего';
+
+  @override
   String get participantPickerCancel => 'Отменить выбор';
 
   @override

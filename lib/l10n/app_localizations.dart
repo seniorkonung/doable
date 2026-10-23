@@ -3652,6 +3652,36 @@ abstract class AppLocalizations {
   /// **'Open the page of intention {title}'**
   String intentionPickerOpenIntentionPage(String title);
 
+  /// Заголовок выдачи поиска действия на экране выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Actions'**
+  String get intentionPickerActionsHeader;
+
+  /// Заголовок выдачи поиска намерения на экране выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Intentions'**
+  String get intentionPickerIntentionsHeader;
+
+  /// Доступное название подгрузки следующей порции в поиске действия
+  ///
+  /// In en, this message translates to:
+  /// **'Loading more actions'**
+  String get intentionPickerLoadingMoreActions;
+
+  /// Доступное название подгрузки следующей порции в поиске намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Loading more intentions'**
+  String get intentionPickerLoadingMoreIntentions;
+
+  /// Заголовок пустой выдачи экрана выбора, когда допустимый охват пуст без фильтров
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to choose from'**
+  String get intentionPickerEmptyScopeTitle;
+
   /// Назначение отмены выбора участника
   ///
   /// In en, this message translates to:
