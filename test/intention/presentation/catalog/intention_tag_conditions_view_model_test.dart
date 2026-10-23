@@ -26,6 +26,133 @@ const _present = IntentionTagRequirement.mustBePresent;
 const _absent = IntentionTagRequirement.mustBeAbsent;
 
 void main() {
+  test('три переключения тега требуют его, затем исключают и снимают '
+      'условие, каждый раз сразу применяя поиск', () {
+    final h = _Harness();
+    addTearDown(h.dispose);
+
+    h.cycle(_tag(1, 'Спорт', color: TagColor.green));
+    expect(h.shown, [(_id(1), _present, 'Спорт')]);
+    expect(h.colors, {_id(1): TagColor.green});
+    expect(h.appliedFilter, IntentionTagFilter(requiredTagIds: [_id(1)]));
+
+    h.cycle(_tag(1, 'Спорт', color: TagColor.green));
+    expect(h.shown, [(_id(1), _absent, 'Спорт')]);
+    expect(h.appliedFilter, IntentionTagFilter(excludedTagIds: [_id(1)]));
+
+    h.cycle(_tag(1, 'Спорт', color: TagColor.green));
+    expect(h.conditions, isEmpty);
+    expect(h.appliedFilter, IntentionTagFilter.empty);
+  });
+
+  test('смена надобности сохраняет место условия среди других, а новое '
+      'условие встаёт в конец', () {
+    final h = _Harness();
+    addTearDown(h.dispose);
+    h.cycle(_tag(1, 'Здоровье'));
+    h.cycle(_tag(2, 'Спорт'));
+    h.cycle(_tag(3, 'Отдых'));
+
+    h.cycle(_tag(2, 'Спорт'));
+    expect(h.shown, [
+      (_id(1), _present, 'Здоровье'),
+      (_id(2), _absent, 'Спорт'),
+      (_id(3), _present, 'Отдых'),
+    ]);
+
+    h.cycle(_tag(2, 'Спорт'));
+    h.cycle(_tag(2, 'Спорт'));
+    expect(h.shown, [
+      (_id(1), _present, 'Здоровье'),
+      (_id(3), _present, 'Отдых'),
+      (_id(2), _present, 'Спорт'),
+    ]);
+  });
+
+  test('переключение тегом из более раннего снимка не возвращает '
+      'подтверждённые название и цвет', () {
+    final h = _Harness();
+    addTearDown(h.dispose);
+    h.cycle(_tag(1, 'Здоровье'));
+    h.update(
+      2,
+      _tag(1, 'Здоровье'),
+      _tag(1, 'Самочувствие', color: TagColor.blue),
+    );
+
+    h.cycle(_tag(1, 'Здоровье'), revision: 1);
+
+    expect(h.shown, [(_id(1), _absent, 'Самочувствие')]);
+    expect(h.colors, {_id(1): TagColor.blue});
+  });
+
+  test('сброс снимает все условия одним чтением первой порции с сохранённой '
+      'подстрокой названия', () async {
+    final h = _Harness(filterDebounce: Duration.zero);
+    addTearDown(h.dispose);
+    h.catalog.changeTitleFilter('ходить');
+    await pumpEventQueue();
+    h.cycle(_tag(1, 'Здоровье'));
+    h.cycle(_tag(2, 'Спорт'));
+    h.cycle(_tag(2, 'Спорт'));
+    h.appliedFilter;
+    final queries = h.repository.queries.length;
+
+    h.model.clear();
+
+    expect(h.conditions, isEmpty);
+    expect(h.appliedFilter, IntentionTagFilter.empty);
+    expect(h.repository.queries, hasLength(queries + 1));
+    final query = h.repository.queries.last;
+    expect(query.titleFilter?.map((value) => value), 'ходить');
+    expect(query.cursor, isNull);
+  });
+
+  test('переключение тега, удаление которого модель уже получила, не меняет '
+      'условий и выдачи', () {
+    final h = _Harness();
+    addTearDown(h.dispose);
+    h.cycle(_tag(2, 'Спорт'));
+    h.delete(2, _id(1));
+    h.appliedFilter;
+    final queries = h.repository.queries.length;
+
+    h.cycle(_tag(1, 'Здоровье'), revision: 1);
+
+    expect(h.shown, [(_id(2), _present, 'Спорт')]);
+    expect(h.appliedFilter, IntentionTagFilter(requiredTagIds: [_id(2)]));
+    expect(h.repository.queries, hasLength(queries));
+  });
+
+  test('контракт условий публикует переключение, сброс и снятие условия при '
+      'удалении тега', () async {
+    final h = _Harness();
+    addTearDown(h.dispose);
+    final IntentionTagConditionSet conditionSet = h.model;
+    final published = <List<(TagId, IntentionTagRequirement, String)>>[];
+    final subscription = conditionSet.changes.listen(
+      (state) => published.add(_shown(state)),
+    );
+    addTearDown(subscription.cancel);
+
+    conditionSet.cycle(
+      _tag(1, 'Здоровье'),
+      snapshotRevision: const _Revision(1),
+    );
+    conditionSet.cycle(_tag(2, 'Спорт'), snapshotRevision: const _Revision(1));
+    h.delete(2, _id(1));
+    conditionSet.clear();
+    await pumpEventQueue();
+
+    expect(published, [
+      [(_id(1), _present, 'Здоровье')],
+      [(_id(1), _present, 'Здоровье'), (_id(2), _present, 'Спорт')],
+      [(_id(2), _present, 'Спорт')],
+      <(TagId, IntentionTagRequirement, String)>[],
+    ]);
+    expect(conditionSet.current.conditions, isEmpty);
+  });
+
   test('подтверждённое изменение только цвета обновляет условие без новой '
       'выдачи', () {
     final h = _Harness();
@@ -159,7 +286,7 @@ void main() {
 }
 
 final class _Harness {
-  _Harness() {
+  _Harness({Duration filterDebounce = const Duration(minutes: 1)}) {
     container = ProviderContainer(
       overrides: [
         personalGraphRepositoryProvider.overrideWithValue(repository),
@@ -167,7 +294,7 @@ final class _Harness {
           CatalogPagingPolicy(
             pageSize: 100,
             prefetchRemaining: 30,
-            filterDebounce: const Duration(minutes: 1),
+            filterDebounce: filterDebounce,
           ),
         ),
         intentionTagConditionsChangesProvider.overrideWithValue(changes.stream),
@@ -191,10 +318,7 @@ final class _Harness {
       container.read(provider.notifier);
   IntentionTagConditionsState get state => container.read(provider);
   List<IntentionTagCondition> get conditions => state.conditions;
-  List<(TagId, IntentionTagRequirement, String)> get shown => [
-    for (final condition in conditions)
-      (condition.tagId, condition.requirement, condition.name.value),
-  ];
+  List<(TagId, IntentionTagRequirement, String)> get shown => _shown(state);
 
   /// Предъявляемые цвета условий; `null` — «Без цвета».
   Map<TagId, TagColor?> get colors => {
@@ -225,6 +349,9 @@ final class _Harness {
       ),
     );
   }
+
+  void cycle(Tag tag, {int revision = 1}) =>
+      model.cycle(tag, snapshotRevision: _Revision(revision));
 
   void package(int revision, List<GraphChange> packageChanges) =>
       changes.add(_Package(_Revision(revision), packageChanges));
@@ -267,6 +394,13 @@ final class _Revision implements GraphRevision {
     _ => GraphRevisionOrder.differentEpoch,
   };
 }
+
+List<(TagId, IntentionTagRequirement, String)> _shown(
+  IntentionTagConditionsState state,
+) => [
+  for (final condition in state.conditions)
+    (condition.tagId, condition.requirement, condition.name.value),
+];
 
 TagId _id(int number) => (TagId.decode(
   '00000000-0000-4000-8000-${number.toString().padLeft(12, '0')}',

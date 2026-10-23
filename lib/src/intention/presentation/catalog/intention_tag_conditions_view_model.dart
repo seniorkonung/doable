@@ -104,6 +104,30 @@ final class IntentionTagConditionsState {
   ];
 }
 
+/// Узкий контракт условий по тегам одного поиска для панели тегов.
+///
+/// Предоставляет только наблюдаемые условия и их явные изменения: условия
+/// живут в сессии поиска, поэтому команды тегов, чтения графа и детали
+/// хранилища в контракт не входят.
+abstract interface class IntentionTagConditionSet {
+  IntentionTagConditionsState get current;
+
+  /// Изменения условий, в том числе снятие условия при удалении тега.
+  Stream<IntentionTagConditionsState> get changes;
+
+  /// Переключает условие по [tag] по кругу: без условия — «должен быть» в
+  /// конце порядка, «должен быть» — «должен отсутствовать» на прежнем месте,
+  /// «должен отсутствовать» — без условия.
+  ///
+  /// Название и цвет берутся из [tag] снимка на [snapshotRevision], если он
+  /// не старше уже подтверждённого предъявления условия. Тег, удаление
+  /// которого уже подтверждено, ни условий, ни выдачи не меняет.
+  void cycle(Tag tag, {required GraphRevision snapshotRevision});
+
+  /// Снимает все условия по тегам одним изменением фильтра поиска.
+  void clear();
+}
+
 /// Выбранные условия по тегам одного назначения поиска.
 ///
 /// Изменение условий сразу передаётся модели каталога того же назначения.
@@ -112,9 +136,12 @@ final class IntentionTagConditionsState {
 /// Условия живут, пока открыт их поиск, и между открытиями не сохраняются.
 @riverpod
 final class IntentionTagConditionsViewModel
-    extends _$IntentionTagConditionsViewModel {
+    extends _$IntentionTagConditionsViewModel
+    implements IntentionTagConditionSet {
   late IntentionCatalogPurpose _purpose;
   StreamSubscription<ConfirmedGraphChangePackage>? _changes;
+  final _conditionChanges =
+      StreamController<IntentionTagConditionsState>.broadcast();
   final _entries = <TagId, _ConditionEntry>{};
 
   /// Теги, удаление которых подтверждено в текущем поколении графа.
@@ -139,6 +166,7 @@ final class IntentionTagConditionsViewModel
         .watch(intentionTagConditionsChangesProvider)
         .listen(_onPackage);
     ref.onDispose(() => unawaited(_changes?.cancel()));
+    listenSelf((_, next) => _conditionChanges.add(next));
     // Модель каталога хранит применённый фильтр и живёт не меньше условий.
     ref.listen(intentionCatalogViewModelProvider(purpose), (_, _) {});
     return _snapshot();
@@ -156,6 +184,44 @@ final class IntentionTagConditionsViewModel
       :snapshotRevision,
     ) = selection;
     if (_deletedTagIds.contains(tag.id)) return;
+    _put(tag, requirement, snapshotRevision);
+    _publish();
+  }
+
+  @override
+  IntentionTagConditionsState get current => state;
+
+  @override
+  Stream<IntentionTagConditionsState> get changes => _conditionChanges.stream;
+
+  @override
+  void cycle(Tag tag, {required GraphRevision snapshotRevision}) {
+    if (_deletedTagIds.contains(tag.id)) return;
+    switch (_entries[tag.id]?.requirement) {
+      case null:
+        _put(tag, IntentionTagRequirement.mustBePresent, snapshotRevision);
+      case IntentionTagRequirement.mustBePresent:
+        _put(tag, IntentionTagRequirement.mustBeAbsent, snapshotRevision);
+      case IntentionTagRequirement.mustBeAbsent:
+        _entries.remove(tag.id);
+    }
+    _publish();
+  }
+
+  @override
+  void clear() {
+    if (_entries.isEmpty) return;
+    _entries.clear();
+    _publish();
+  }
+
+  /// Добавляет условие в конец порядка либо меняет надобность существующего
+  /// на прежнем месте.
+  void _put(
+    Tag tag,
+    IntentionTagRequirement requirement,
+    GraphRevision snapshotRevision,
+  ) {
     final existing = _entries[tag.id];
     if (existing == null) {
       _entries[tag.id] = _ConditionEntry(
@@ -164,18 +230,17 @@ final class IntentionTagConditionsViewModel
         color: tag.color,
         revision: snapshotRevision,
       );
-    } else {
-      existing.requirement = requirement;
-      // Более ранний снимок не возвращает уже подтверждённое предъявление.
-      if (snapshotRevision.compareTo(existing.revision) ==
-          GraphRevisionOrder.newer) {
-        existing
-          ..name = tag.name
-          ..color = tag.color
-          ..revision = snapshotRevision;
-      }
+      return;
     }
-    _publish();
+    existing.requirement = requirement;
+    // Более ранний снимок не возвращает уже подтверждённое предъявление.
+    if (snapshotRevision.compareTo(existing.revision) ==
+        GraphRevisionOrder.newer) {
+      existing
+        ..name = tag.name
+        ..color = tag.color
+        ..revision = snapshotRevision;
+    }
   }
 
   /// Переключает «должен быть ↔ должен отсутствовать» на прежнем месте.
