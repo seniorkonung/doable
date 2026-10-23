@@ -170,7 +170,7 @@
   - **Предполагаемые файлы:** четыре SVG в `lib/src/design_system/icons/assets/`, `lib/src/design_system/doable_icon.dart`, `lib/src/design_system/icons/README.md`, `test/design_system/doable_icon_test.dart`, `test/design_system/goldens/doable_icons.png`.
   - **Размер:** S.
 
-- [ ] 2.2 Добавить в дизайн-систему малый тег-чип и метку-значок для строки списка
+- [x] 2.2 Добавить в дизайн-систему малый тег-чип и метку-значок для строки списка
   - **Критерии приёмки:**
     - `TagChip.small` по разделу `sm` README `context/doable-design-system/components/TagChip/README.md`: точка 7 и название в стиле `caption` в одну строку на фоне `bg`; название `muted`, у выделенного тега — `ink`. Чип не является кнопкой.
     - `Badge.mark` по разделу «A mark» README `Badge`: плитка 22×20 на `bg` с иконкой 14 в тоне `ink`, без собственного узла экранного диктора.
