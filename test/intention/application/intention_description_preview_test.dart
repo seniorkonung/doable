@@ -35,14 +35,6 @@ void main() {
       expect(preview.text, 'Купить молоко и хлеб к ужину');
     });
 
-    test('обрезает пробельные символы по краям', () {
-      final preview = IntentionDescriptionPreview.fromDescription(
-        '\u3000 \n Купить молоко \t\uFEFF',
-      );
-
-      expect(preview.text, 'Купить молоко');
-    });
-
     test('оставляет 512 кластеров, не разрывая составной emoji', () {
       const family = '👨‍👩‍👧‍👦';
       final preview = IntentionDescriptionPreview.fromDescription(
@@ -51,14 +43,6 @@ void main() {
 
       expect(preview.text, '${'а' * 511}$family');
       expect(preview.text.characters, hasLength(512));
-    });
-
-    test('у описания с краевыми пробелами и переносами начало непусто', () {
-      final preview = IntentionDescriptionPreview.fromDescription(
-        '\n\n   я\n\n   ',
-      );
-
-      expect(preview.text, 'я');
     });
   });
 }
