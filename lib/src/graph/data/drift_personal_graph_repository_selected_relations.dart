@@ -270,8 +270,6 @@ extension _SelectedRelationsReading on DriftPersonalGraphRepository {
     final affectedParticipants = <IntentionId>{};
     for (final change in changes) {
       switch (change) {
-        case IntentionRelationCountsChanged(:final intentionId):
-          affectedParticipants.add(intentionId);
         case IntentionCatalogMutation(:final before, :final after):
           final beforeId = before?.summary.id;
           final afterId = after?.summary.id;

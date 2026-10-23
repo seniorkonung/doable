@@ -841,14 +841,6 @@ final class RelationNeighborhoodViewModel
   bool _changesAffectObservedState(Iterable<GraphChange> changes) {
     final current = state;
     final items = _itemsOfState(current);
-    final activeCounts = <IntentionId, int>{
-      if (current case RelationGroupConfirmedState(:final counts))
-        _intentionId: counts.active,
-      for (final item in items) ...{
-        item.source.id: item.source.activeRelationCount,
-        item.related.id: item.related.activeRelationCount,
-      },
-    };
     final loadedRelationIds = {for (final item in items) item.relation.id};
     final loadedDailyChoiceIds = <DailyChoiceId>{
       if (current case DailyChoiceGroupLoaded(:final items))
@@ -862,16 +854,11 @@ final class RelationNeighborhoodViewModel
               observedIntentionIds.contains(after?.summary.id)) {
             return true;
           }
-        case IntentionRelationCountsChanged(:final intentionId, :final counts):
-          if (intentionId == _intentionId) {
-            if (current is! RelationGroupConfirmedState ||
-                counts != current.counts) {
-              return true;
-            }
-          } else if (activeCounts[intentionId] case final int activeCount) {
-            if (activeCount != counts.active) {
-              return true;
-            }
+        case IntentionRelationCountsChanged(:final intentionId, :final counts)
+            when intentionId == _intentionId:
+          if (current is! RelationGroupConfirmedState ||
+              counts != current.counts) {
+            return true;
           }
         case DailyChoiceChange(
           :final intentionCounts,
@@ -902,12 +889,7 @@ final class RelationNeighborhoodViewModel
           }
         case LongTermRelationChange(:final id, :final before, :final after):
           if (loadedRelationIds.contains(id) ||
-              _relationChangeAffectsSelection(before: before, after: after) ||
-              _relationChangeAffectsParticipantCounts(
-                before: before,
-                after: after,
-                observedIntentionIds: activeCounts.keys,
-              )) {
+              _relationChangeAffectsSelection(before: before, after: after)) {
             return true;
           }
         case GraphChange():
@@ -950,27 +932,6 @@ final class RelationNeighborhoodViewModel
       scope: relation.scope,
     );
   }
-
-  bool _relationChangeAffectsParticipantCounts({
-    required LongTermRelation? before,
-    required LongTermRelation? after,
-    required Iterable<IntentionId> observedIntentionIds,
-  }) {
-    final beforeParticipants = _activeParticipants(before);
-    final afterParticipants = _activeParticipants(after);
-    for (final intentionId in observedIntentionIds) {
-      if (beforeParticipants.contains(intentionId) !=
-          afterParticipants.contains(intentionId)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  Set<IntentionId> _activeParticipants(LongTermRelation? relation) =>
-      relation == null || relation.scope != RelationScope.active
-      ? const {}
-      : {relation.sourceIntentionId, relation.relatedIntentionId};
 
   void _requestReconciliation(GraphRevision revision) {
     final current = state;
