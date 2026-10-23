@@ -162,6 +162,20 @@ void main() {
       expect(h.repository.queries, hasLength(3));
     });
 
+    testWidgets('кольцо подгрузки не строится, пока конец выдачи далеко '
+        'от экрана', (tester) async {
+      final h = await _open(tester, pageSize: 30);
+      h.repository.complete(0, _firstPage(_actions(30), totalCount: 60));
+      await _settle(tester);
+
+      // Иначе анимация кольца вне экрана требовала бы кадров непрерывно.
+      expect(_more, findsNothing);
+      await tester.pumpAndSettle();
+      h.position.jumpTo(h.position.maxScrollExtent);
+      await _settle(tester);
+      expect(_more, findsOneWidget);
+    });
+
     testWidgets('устранимый отказ продолжения стоит в конце списка и '
         'повторяет подгрузку', (tester) async {
       final h = await _open(tester, pageSize: 2);

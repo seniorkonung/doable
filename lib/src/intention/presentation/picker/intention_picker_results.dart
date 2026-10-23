@@ -107,16 +107,7 @@ final class _IntentionPickerResultsState
           ListState.loading(text: kind.loading(l10n)),
         ),
         IntentionCatalogInvalidFilter() => const SizedBox.shrink(),
-        final IntentionCatalogLoaded loaded => _list(kind, loaded, [
-          SliverList.separated(
-            itemCount: loaded.items.length,
-            separatorBuilder: (_, _) =>
-                const SizedBox(height: DoableMetrics.space2),
-            itemBuilder: (context, index) => _row(loaded, index),
-          ),
-          if (_continuation(l10n, kind, loaded) case final continuation?)
-            SliverToBoxAdapter(child: continuation),
-        ]),
+        final IntentionCatalogLoaded loaded => _loaded(l10n, kind, loaded),
         final IntentionCatalogEmpty empty => _list(kind, empty, [
           SliverFillRemaining(
             hasScrollBody: false,
@@ -142,6 +133,28 @@ final class _IntentionPickerResultsState
       error: (_, _) => _status(ListState.error(message: kind.unexpected(l10n))),
       loading: () => _status(ListState.loading(text: kind.loading(l10n))),
     );
+  }
+
+  Widget _loaded(
+    AppLocalizations l10n,
+    IntentionPickerKind kind,
+    IntentionCatalogLoaded loaded,
+  ) {
+    final rows = loaded.items.length;
+    final continuation = _continuation(l10n, kind, loaded);
+    return _list(kind, loaded, [
+      // Продолжение — последний элемент ленивого списка: кольцо подгрузки
+      // строится, только когда конец выдачи подходит к экрану, иначе его
+      // анимация требовала бы кадров непрерывно.
+      SliverList.separated(
+        itemCount: continuation == null ? rows : rows + 1,
+        separatorBuilder: (_, index) => index < rows - 1
+            ? const SizedBox(height: DoableMetrics.space2)
+            : const SizedBox.shrink(),
+        itemBuilder: (context, index) =>
+            index < rows ? _row(loaded, index) : continuation!,
+      ),
+    ]);
   }
 
   /// Причину пустой выдачи называет запрос, который её дал.
