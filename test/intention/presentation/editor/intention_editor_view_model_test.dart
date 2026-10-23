@@ -151,10 +151,7 @@ void main() {
       expect(state.draft.isChanged, isFalse);
       expect(state.selectedTags, isEmpty);
       expect(state.operation, isA<OperationIdle<Intention>>());
-      expect(
-        container.read(provider.notifier).draftTagSet.current.tagIds,
-        isEmpty,
-      );
+      expect(container.read(provider.notifier).draftTagSet.current, isEmpty);
       expect(repository.commands, isEmpty);
       expect(repository.tagCommands, isEmpty);
     });
@@ -238,22 +235,20 @@ void main() {
       final subscription = container.listen(provider, (_, _) {});
       addTearDown(subscription.close);
       final tagSet = container.read(provider.notifier).draftTagSet;
-      final published = <IntentionDraftTagSetSnapshot>[];
+      final published = <Set<TagId>>[];
       final changesSubscription = tagSet.changes.listen(published.add);
       addTearDown(changesSubscription.cancel);
 
-      final first = tagSet.add(_tag(1, 'Дом'));
-      final second = tagSet.add(_tag(2, 'Выходные'));
+      tagSet
+        ..add(_tag(1, 'Дом'))
+        ..add(_tag(2, 'Выходные'));
       await _deliverEvents(container);
 
-      expect(first, IntentionDraftTagAddition.added);
-      expect(second, IntentionDraftTagAddition.added);
       final state = container.read(provider);
       expect(state.draft.tagIds, [_tagId(1), _tagId(2)]);
       expect(_tagNames(state), {_tagId(1): 'Дом', _tagId(2): 'Выходные'});
-      expect(tagSet.current.tagIds, [_tagId(1), _tagId(2)]);
-      expect(tagSet.current.availability, IntentionDraftAvailability.editable);
-      expect(published.map((snapshot) => snapshot.tagIds), [
+      expect(tagSet.current, [_tagId(1), _tagId(2)]);
+      expect(published, [
         [_tagId(1)],
         [_tagId(1), _tagId(2)],
       ]);
@@ -273,16 +268,15 @@ void main() {
       final tagSet = container.read(provider.notifier).draftTagSet
         ..add(_tag(1, 'Дом'));
       await _deliverEvents(container);
-      final published = <IntentionDraftTagSetSnapshot>[];
+      final published = <Set<TagId>>[];
       final changesSubscription = tagSet.changes.listen(published.add);
       addTearDown(changesSubscription.cancel);
 
-      final repeated = tagSet.add(_tag(1, 'Дом'));
+      tagSet.add(_tag(1, 'Дом'));
       await _deliverEvents(container);
 
-      expect(repeated, IntentionDraftTagAddition.alreadyIncluded);
       expect(container.read(provider).draft.tagIds, [_tagId(1)]);
-      expect(tagSet.current.tagIds, [_tagId(1)]);
+      expect(tagSet.current, [_tagId(1)]);
       expect(published, isEmpty);
       expect(repository.commands, isEmpty);
       expect(repository.tagCommands, isEmpty);
@@ -304,7 +298,7 @@ void main() {
             ..add(_tag(1, 'Дом'))
             ..add(_tag(2, 'Выходные'));
       await _deliverEvents(container);
-      final published = <IntentionDraftTagSetSnapshot>[];
+      final published = <Set<TagId>>[];
       final changesSubscription = tagSet.changes.listen(published.add);
       addTearDown(changesSubscription.cancel);
 
@@ -316,7 +310,7 @@ void main() {
       expect(_tagNames(state), {_tagId(2): 'Выходные'});
       expect(state.draft.title, 'Намерение');
       expect(state.draft.readiness, IntentionReadiness.ready);
-      expect(published.map((snapshot) => snapshot.tagIds), [
+      expect(published, [
         [_tagId(2)],
       ]);
       expect(repository.commands, isEmpty);
@@ -336,7 +330,7 @@ void main() {
         final editor = container.read(provider.notifier);
         final tagSet = editor.draftTagSet..add(_tag(1, 'Дом'));
         final stateTags = container.read(provider).draft.tagIds;
-        final contractTags = tagSet.current.tagIds;
+        final contractTags = tagSet.current;
         final names = container.read(provider).selectedTags;
 
         expect(() => stateTags.add(_tagId(2)), throwsUnsupportedError);
@@ -383,48 +377,42 @@ void main() {
       expect(second.draft.tagIds, [_tagId(2)]);
       expect(second.draft.title, isEmpty);
       expect(second.draft.readiness, IntentionReadiness.notReady);
-      expect(
-        container.read(secondProvider.notifier).draftTagSet.current.tagIds,
-        [_tagId(2)],
-      );
+      expect(container.read(secondProvider.notifier).draftTagSet.current, [
+        _tagId(2),
+      ]);
     });
 
-    test(
-      'освобождённая сессия закрывает наблюдаемый набор и отвергает добавление',
-      () async {
-        final repository = ControlledCatalogRepository();
-        final container = _container(repository);
-        final provider = intentionEditorViewModelProvider(
-          IntentionCreationFormKey(),
-        );
-        final subscription = container.listen(provider, (_, _) {});
-        final tagSet = container.read(provider.notifier).draftTagSet
-          ..add(_tag(1, 'Дом'));
-        final published = <IntentionDraftTagSetSnapshot>[];
-        var isDone = false;
-        final changesSubscription = tagSet.changes.listen(
-          published.add,
-          onDone: () => isDone = true,
-        );
-        addTearDown(changesSubscription.cancel);
-        await _deliverEvents(container);
+    test('освобождённая сессия завершает поток набора, а включение и исключение его не меняют', () async {
+      final repository = ControlledCatalogRepository();
+      final container = _container(repository);
+      final provider = intentionEditorViewModelProvider(
+        IntentionCreationFormKey(),
+      );
+      final subscription = container.listen(provider, (_, _) {});
+      final tagSet = container.read(provider.notifier).draftTagSet
+        ..add(_tag(1, 'Дом'));
+      await _deliverEvents(container);
+      final published = <Set<TagId>>[];
+      var isDone = false;
+      final changesSubscription = tagSet.changes.listen(
+        published.add,
+        onDone: () => isDone = true,
+      );
+      addTearDown(changesSubscription.cancel);
 
-        subscription.close();
-        await _deliverEvents(container);
+      subscription.close();
+      await _deliverEvents(container);
+      tagSet
+        ..add(_tag(2, 'Выходные'))
+        ..remove(_tagId(1));
+      await _deliverEvents(container);
 
-        expect(isDone, isTrue);
-        expect(published.last.availability, IntentionDraftAvailability.closed);
-        expect(tagSet.current.availability, IntentionDraftAvailability.closed);
-        expect(tagSet.current.tagIds, [_tagId(1)]);
-        expect(
-          tagSet.add(_tag(2, 'Выходные')),
-          IntentionDraftTagAddition.sessionClosed,
-        );
-        expect(tagSet.current.tagIds, [_tagId(1)]);
-        expect(repository.commands, isEmpty);
-        expect(repository.tagCommands, isEmpty);
-      },
-    );
+      expect(isDone, isTrue);
+      expect(published, isEmpty);
+      expect(tagSet.current, [_tagId(1)]);
+      expect(repository.commands, isEmpty);
+      expect(repository.tagCommands, isEmpty);
+    });
 
     test(
       'завершённая успешным созданием сессия отвергает правки черновика',
@@ -439,7 +427,7 @@ void main() {
         final editor = container.read(provider.notifier)
           ..changeTitle('Намерение')
           ..submit();
-        final published = <IntentionDraftTagSetSnapshot>[];
+        final published = <Set<TagId>>[];
         var isDone = false;
         final changesSubscription = editor.draftTagSet.changes.listen(
           published.add,
@@ -452,24 +440,19 @@ void main() {
           container.read(provider).operation,
           isA<OperationSucceeded<Intention>>(),
         );
-        expect(published.map((snapshot) => snapshot.availability), [
-          IntentionDraftAvailability.closed,
-        ]);
         expect(isDone, isTrue);
 
-        final addition = editor.draftTagSet.add(_tag(1, 'Дом'));
+        editor.draftTagSet.add(_tag(1, 'Дом'));
         editor
           ..changeTitle('Поздняя правка')
           ..changeDescription('Поздняя правка')
           ..confirmReadiness()
           ..removeTag(_tagId(1));
 
-        expect(addition, IntentionDraftTagAddition.sessionClosed);
         expect(container.read(provider).draft.title, 'Намерение');
-        expect(
-          editor.draftTagSet.current.availability,
-          IntentionDraftAvailability.closed,
-        );
+        expect(container.read(provider).draft.tagIds, isEmpty);
+        expect(editor.draftTagSet.current, isEmpty);
+        expect(published, isEmpty);
         expect(repository.commands, hasLength(1));
       },
     );
@@ -491,14 +474,16 @@ void main() {
       // Общий выбор получил контракт набора до отправки и вызывает его позже.
       final tagSet = editor.draftTagSet..add(_tag(1, 'Дом'));
       await _deliverEvents(container);
-      final published = <IntentionDraftTagSetSnapshot>[];
+      final published = <Set<TagId>>[];
       final changesSubscription = tagSet.changes.listen(published.add);
       addTearDown(changesSubscription.cancel);
 
       editor.submit();
       final command = repository.commands.single as CreateIntention;
 
-      final lateAddition = tagSet.add(_tag(2, 'Выходные'));
+      tagSet
+        ..add(_tag(2, 'Выходные'))
+        ..remove(_tagId(1));
       editor
         ..changeTitle('Правка во время отправки')
         ..changeDescription('Правка во время отправки')
@@ -507,7 +492,6 @@ void main() {
         ..submit();
       await _deliverEvents(container);
 
-      expect(lateAddition, IntentionDraftTagAddition.submitting);
       final submitted = container.read(provider);
       expect(submitted.draft.title, 'Название');
       expect(submitted.draft.description, 'Описание');
@@ -517,14 +501,8 @@ void main() {
         submitted.draftAvailability,
         IntentionDraftAvailability.submitting,
       );
-      expect(tagSet.current.tagIds, [_tagId(1)]);
-      expect(
-        tagSet.current.availability,
-        IntentionDraftAvailability.submitting,
-      );
-      expect(published.map((snapshot) => snapshot.availability), [
-        IntentionDraftAvailability.submitting,
-      ]);
+      expect(tagSet.current, [_tagId(1)]);
+      expect(published, isEmpty);
       expect(repository.commands, hasLength(1));
       expect(command.title, 'Название');
       expect(command.description, 'Описание');
@@ -539,10 +517,13 @@ void main() {
       );
       await _deliverEvents(container);
 
-      expect(tagSet.current.availability, IntentionDraftAvailability.editable);
-      expect(published.last.availability, IntentionDraftAvailability.editable);
-      expect(tagSet.add(_tag(2, 'Выходные')), IntentionDraftTagAddition.added);
+      expect(published, isEmpty);
+      tagSet.add(_tag(2, 'Выходные'));
+      await _deliverEvents(container);
       expect(container.read(provider).draft.tagIds, [_tagId(1), _tagId(2)]);
+      expect(published, [
+        [_tagId(1), _tagId(2)],
+      ]);
       expect(command.tagIds, {_tagId(1)});
       expect(repository.commands, hasLength(1));
     });
@@ -766,7 +747,7 @@ void main() {
           IntentionDraftAvailability.editable,
           reason: name,
         );
-        expect(session.editor.draftTagSet.current.tagIds, tagIds, reason: name);
+        expect(session.editor.draftTagSet.current, tagIds, reason: name);
         expect(failed.failurePresentation, isNotNull, reason: name);
         expect(session.repository.commands, hasLength(1), reason: name);
         expect(session.repository.tagCommands, isEmpty, reason: name);
@@ -880,7 +861,7 @@ void main() {
       );
       expect(failed.failurePresentation, isNotNull);
       expect(failed.canSubmit, isTrue);
-      expect(editor.draftTagSet.current.tagIds, [_tagId(2)]);
+      expect(editor.draftTagSet.current, [_tagId(2)]);
       // Отказ не повторяет отправку сам.
       expect(session.repository.commands, hasLength(1));
 
@@ -999,7 +980,7 @@ void main() {
       expect(_tagNames(failed), {_tagId(1): 'Дом', _tagId(2): 'Выходные'});
       expect(failed.draftAvailability, IntentionDraftAvailability.editable);
       expect(failed.canSubmit, isFalse);
-      expect(editor.draftTagSet.current.tagIds, [_tagId(1), _tagId(2)]);
+      expect(editor.draftTagSet.current, [_tagId(1), _tagId(2)]);
       expect(coordinator.isKeyRunning(formKey), isFalse);
       expect(repository.commands, isEmpty);
       expect(repository.tagCommands, isEmpty);
@@ -1027,7 +1008,7 @@ void main() {
         ..changeTitle('  Второе  ');
       second.draftTagSet.add(_tag(2, 'Выходные'));
       await _deliverEvents(container);
-      final firstPublished = <IntentionDraftTagSetSnapshot>[];
+      final firstPublished = <Set<TagId>>[];
       final firstChanges = first.draftTagSet.changes.listen(firstPublished.add);
       addTearDown(firstChanges.cancel);
 
@@ -1035,14 +1016,8 @@ void main() {
       final firstCommand = repository.commands.single as CreateIntention;
 
       // Отправка первой сессии не фиксирует черновик второй.
-      expect(
-        second.draftTagSet.current.availability,
-        IntentionDraftAvailability.editable,
-      );
-      expect(
-        second.draftTagSet.add(_tag(1, 'Дом')),
-        IntentionDraftTagAddition.added,
-      );
+      second.draftTagSet.add(_tag(1, 'Дом'));
+      expect(second.draftTagSet.current, [_tagId(2), _tagId(1)]);
       second.submit();
       await _deliverEvents(container);
 
@@ -1071,10 +1046,6 @@ void main() {
       expect(secondRunning.operation, isA<OperationRunning<Intention>>());
       expect(secondRunning.draft.tagIds, [_tagId(2), _tagId(1)]);
       expect(secondRunning.failurePresentation, isNull);
-      expect(
-        second.draftTagSet.current.availability,
-        IntentionDraftAvailability.submitting,
-      );
 
       repository.completeCommand(1, _savedResult());
       await _deliverEvents(container);
@@ -1082,23 +1053,8 @@ void main() {
       final secondSucceeded = container.read(secondProvider);
       expect(secondSucceeded.operation, isA<OperationSucceeded<Intention>>());
       expect(secondSucceeded.event, isA<IntentionEditorCreated>());
-      expect(
-        second.draftTagSet.current.availability,
-        IntentionDraftAvailability.closed,
-      );
       expect(container.read(firstProvider).draft.tagIds, isEmpty);
-      expect(
-        first.draftTagSet.current.availability,
-        IntentionDraftAvailability.editable,
-      );
-      expect(firstPublished.map((snapshot) => snapshot.tagIds), [
-        [_tagId(1)],
-        isEmpty,
-      ]);
-      expect(firstPublished.map((snapshot) => snapshot.availability), [
-        IntentionDraftAvailability.submitting,
-        IntentionDraftAvailability.editable,
-      ]);
+      expect(firstPublished, [isEmpty]);
       expect(repository.commands, [
         isA<CreateIntention>().having(
           (command) => command.title,
@@ -1150,7 +1106,7 @@ void main() {
       expect(kept.draft.title, 'Намерение');
       expect(kept.draft.readiness, IntentionReadiness.ready);
       expect(kept.operation, isA<OperationIdle<Intention>>());
-      expect(editor.draftTagSet.current.tagIds, [_tagId(2)]);
+      expect(editor.draftTagSet.current, [_tagId(2)]);
       expect(deletedWatch.isReleased, isTrue);
       expect(watches.single(_tagId(2)).isReleased, isFalse);
 
@@ -1251,7 +1207,7 @@ void main() {
       expect(kept.draft.title, 'Намерение');
       expect(kept.draft.readiness, IntentionReadiness.ready);
       expect(kept.operation, isA<OperationIdle<Intention>>());
-      expect(editor.draftTagSet.current.tagIds, [_tagId(3)]);
+      expect(editor.draftTagSet.current, [_tagId(3)]);
       expect(watches.single(_tagId(3)).isReleased, isFalse);
 
       // Удаление, уже полученное наблюдением, пакет повторно не применяет.
@@ -1328,7 +1284,7 @@ void main() {
       final added = container.read(provider);
       expect(added.selectedTags.keys, [_tagId(1), _tagId(2), _tagId(3)]);
       expect(added.draft.tagIds, [_tagId(3), _tagId(1), _tagId(2)]);
-      final published = <IntentionDraftTagSetSnapshot>[];
+      final published = <Set<TagId>>[];
       final changesSubscription = tagSet.changes.listen(published.add);
       addTearDown(changesSubscription.cancel);
 
@@ -1516,7 +1472,7 @@ void main() {
       editor.removeTag(_tagId(1));
       await _deliverEvents(container);
       expect(firstWatch.isReleased, isTrue);
-      final published = <IntentionDraftTagSetSnapshot>[];
+      final published = <Set<TagId>>[];
       final changesSubscription = tagSet.changes.listen(published.add);
       addTearDown(changesSubscription.cancel);
 
@@ -1531,7 +1487,7 @@ void main() {
       expect(removed.draft.isChanged, isFalse);
       expect(published, isEmpty);
 
-      expect(tagSet.add(_tag(1, 'Дом')), IntentionDraftTagAddition.added);
+      tagSet.add(_tag(1, 'Дом'));
       firstWatch
         ..deliverLate(_tag(1, 'Поздний'), revision: 5)
         ..deliverLate(null, revision: 6)
@@ -1579,7 +1535,7 @@ void main() {
       final watch = watches.single(_tagId(1))
         ..observe(_tag(1, 'Дом', color: TagColor.blue), revision: 1);
       await _deliverEvents(container);
-      final published = <IntentionDraftTagSetSnapshot>[];
+      final published = <Set<TagId>>[];
       final changesSubscription = tagSet.changes.listen(published.add);
       addTearDown(changesSubscription.cancel);
 

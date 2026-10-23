@@ -80,7 +80,7 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
     const initial = IntentionEditorState.initial();
     final draftTagSet = _draftTagSet = _SessionDraftTagSet(
       this,
-      initial.draftTagSet,
+      initial.draft.tagIds,
     );
     _completions = _coordinator.completions.listen(_onCompletion);
     listenSelf((previous, next) {
@@ -91,9 +91,8 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
       switch (next.draftAvailability) {
         case IntentionDraftAvailability.editable ||
             IntentionDraftAvailability.submitting:
-          if (!identical(previous.draft.tagIds, next.draft.tagIds) ||
-              previous.draftAvailability != next.draftAvailability) {
-            draftTagSet._publish(next.draftTagSet);
+          if (!identical(previous.draft.tagIds, next.draft.tagIds)) {
+            draftTagSet._publish(next.draft.tagIds);
           }
           _releaseTagObservationsOutside(next.draft.tagIds);
         case IntentionDraftAvailability.closed:
@@ -369,22 +368,10 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
         IntentionDraftAvailability.closed => false,
       };
 
-  IntentionDraftTagAddition _addTag(Tag tag) {
-    if (!ref.mounted) {
-      return IntentionDraftTagAddition.sessionClosed;
-    }
-    switch (state.draftAvailability) {
-      case IntentionDraftAvailability.submitting:
-        return IntentionDraftTagAddition.submitting;
-      case IntentionDraftAvailability.closed:
-        return IntentionDraftTagAddition.sessionClosed;
-      case IntentionDraftAvailability.editable:
-        if (state.draft.tagIds.contains(tag.id)) {
-          return IntentionDraftTagAddition.alreadyIncluded;
-        }
-        state = state.withTag(tag);
-        _observeTag(tag.id);
-        return IntentionDraftTagAddition.added;
+  void _addTag(Tag tag) {
+    if (_acceptsDraftChanges && !state.draft.tagIds.contains(tag.id)) {
+      state = state.withTag(tag);
+      _observeTag(tag.id);
     }
   }
 
@@ -566,48 +553,48 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
 }
 
 /// Контракт набора тегов, связанный с одним построением сессии: публикует
-/// изменения набора и его доступности, а после закрытия сессии публикует
-/// закрытое состояние, завершает поток и отвергает изменения.
+/// только смену набора идентификаторов, а после закрытия сессии завершает
+/// поток и отвергает изменения, даже если сессия построена заново.
 final class _SessionDraftTagSet implements IntentionDraftTagSet {
   _SessionDraftTagSet(this._session, this._current);
 
   final IntentionEditorViewModel _session;
-  final _changes = StreamController<IntentionDraftTagSetSnapshot>.broadcast();
-  IntentionDraftTagSetSnapshot _current;
+  final _changes = StreamController<Set<TagId>>.broadcast();
+  Set<TagId> _current;
   bool _isClosed = false;
 
   @override
-  IntentionDraftTagSetSnapshot get current => _current;
+  Set<TagId> get current => _current;
 
   @override
-  Stream<IntentionDraftTagSetSnapshot> get changes => _changes.stream;
+  Stream<Set<TagId>> get changes => _changes.stream;
 
   @override
-  IntentionDraftTagAddition add(Tag tag) => _isClosed
-      ? IntentionDraftTagAddition.sessionClosed
-      : _session._addTag(tag);
+  void add(Tag tag) {
+    if (!_isClosed) {
+      _session._addTag(tag);
+    }
+  }
 
   @override
-  void remove(TagId tagId) => _session.removeTag(tagId);
+  void remove(TagId tagId) {
+    if (!_isClosed) {
+      _session.removeTag(tagId);
+    }
+  }
 
-  void _publish(IntentionDraftTagSetSnapshot snapshot) {
+  void _publish(Set<TagId> tagIds) {
     if (_isClosed) {
       return;
     }
-    _current = snapshot;
-    _changes.add(snapshot);
+    _current = tagIds;
+    _changes.add(tagIds);
   }
 
   void _close() {
     if (_isClosed) {
       return;
     }
-    _publish(
-      IntentionDraftTagSetSnapshot(
-        tagIds: _current.tagIds,
-        availability: IntentionDraftAvailability.closed,
-      ),
-    );
     _isClosed = true;
     unawaited(_changes.close());
   }

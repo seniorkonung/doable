@@ -11,10 +11,21 @@ import '../../domain/intention_id.dart';
 import '../../domain/intention_text.dart';
 import '../operation/operation_state.dart';
 import 'intention_creation_close.dart';
-import 'intention_draft_tag_set.dart';
 
 export 'intention_creation_close.dart';
 export 'intention_draft_tag_set.dart';
+
+/// Принимает ли сессия создания изменения своего черновика.
+enum IntentionDraftAvailability {
+  editable,
+
+  /// Принятая отправка выполняется: черновик зафиксирован до её результата.
+  submitting,
+
+  /// Сессия завершена успешным созданием, закрытием по запросу или
+  /// освобождена.
+  closed,
+}
 
 sealed class IntentionEditorEvent {
   const IntentionEditorEvent();
@@ -206,11 +217,6 @@ final class IntentionEditorState {
       OperationFailed<Intention>() => IntentionDraftAvailability.editable,
     },
   };
-
-  IntentionDraftTagSetSnapshot get draftTagSet => IntentionDraftTagSetSnapshot(
-    tagIds: draft.tagIds,
-    availability: draftAvailability,
-  );
 
   bool get canRetry => switch (operation) {
     OperationFailed<Intention>(failure: IntentionUnavailableFailure()) => true,

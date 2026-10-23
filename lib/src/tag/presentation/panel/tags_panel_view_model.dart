@@ -389,7 +389,7 @@ final class TagsPanelViewModel extends _$TagsPanelViewModel {
     for (final tag in tags)
       TagsPanelRow(
         tag: tag,
-        mark: tagSet.current.tagIds.contains(tag.id)
+        mark: tagSet.current.contains(tag.id)
             ? TagsPanelSelectionMark.marked
             : TagsPanelSelectionMark.unmarked,
       ),

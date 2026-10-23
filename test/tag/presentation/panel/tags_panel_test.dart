@@ -169,7 +169,7 @@ void main() {
       TagRowSelectionMark.checked,
       TagRowSelectionMark.none,
     ]);
-    expect(tagSet.current.tagIds, [_id(2)]);
+    expect(tagSet.current, [_id(2)]);
 
     tagSet.add(_tag(3, 'Сад'));
     await tester.pump();

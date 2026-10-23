@@ -898,12 +898,12 @@ void main() {
 
       expect(panel.model.toggle(_id(2)), isNull);
       await pumpEventQueue();
-      expect(draft.tagSet.current.tagIds, [_id(1), _id(2)]);
+      expect(draft.tagSet.current, [_id(1), _id(2)]);
       expect(_marks(panel), [true, true]);
 
       panel.model.toggle(_id(1));
       await pumpEventQueue();
-      expect(draft.tagSet.current.tagIds, [_id(2)]);
+      expect(draft.tagSet.current, [_id(2)]);
       expect(_marks(panel), [false, true]);
 
       // Второе нажатие раньше обновления отметки приходится на неотмеченную
@@ -912,7 +912,7 @@ void main() {
         ..toggle(_id(1))
         ..toggle(_id(1));
       await pumpEventQueue();
-      expect(draft.tagSet.current.tagIds, [_id(2), _id(1)]);
+      expect(draft.tagSet.current, [_id(2), _id(1)]);
       expect(_marks(panel), [true, true]);
       expect(h.repository.commands, isEmpty);
     });
@@ -932,7 +932,7 @@ void main() {
       panel.model.search('');
       await pumpEventQueue();
 
-      expect(draft.tagSet.current.tagIds, [_id(1)]);
+      expect(draft.tagSet.current, [_id(1)]);
       expect(_marks(panel), [true, false]);
     });
 
@@ -963,7 +963,7 @@ void main() {
       final row = panel.loaded.rowsMatching(panel.state.search.filter).single;
       expect((row.tag.name.value, row.tag.color), ('Для дома', TagColor.blue));
       expect(row.mark, TagsPanelSelectionMark.marked);
-      expect(draft.tagSet.current.tagIds, [_id(2)]);
+      expect(draft.tagSet.current, [_id(2)]);
     });
 
     test('созданный и продублированный тег включается в набор один раз, в том '
@@ -983,7 +983,7 @@ void main() {
       );
       await pumpEventQueue();
       expect(panel.state.search.filter.isEmpty, isTrue);
-      expect(draft.tagSet.current.tagIds, [_id(1)]);
+      expect(draft.tagSet.current, [_id(1)]);
       expect(_names(panel.loaded), ['парк', 'Дом']);
       expect(_marks(panel), [true, false]);
 
@@ -1009,7 +1009,7 @@ void main() {
       );
       await pumpEventQueue();
 
-      expect(draft.tagSet.current.tagIds, [_id(1), _id(2)]);
+      expect(draft.tagSet.current, [_id(1), _id(2)]);
       expect(_names(panel.loaded), ['парк', 'Дом', 'Дом 2']);
       expect(_marks(panel), [true, false, true]);
       expect(h.repository.commands, everyElement(isA<CreateTag>()));
@@ -1032,7 +1032,7 @@ void main() {
       );
       await pumpEventQueue();
 
-      expect(draft.tagSet.current.tagIds, isEmpty);
+      expect(draft.tagSet.current, isEmpty);
     });
 
     test('Удалённый тег уходит из черновика', () async {
@@ -1064,7 +1064,7 @@ void main() {
 
       expect(_names(panel.loaded), ['Работа']);
       expect(_marks(panel), [true]);
-      expect(draft.tagSet.current.tagIds, [_id(2)]);
+      expect(draft.tagSet.current, [_id(2)]);
       expect(h.repository.reads, hasLength(1));
     });
   });
