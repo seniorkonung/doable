@@ -4,45 +4,28 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('начало описания намерения', () {
-    // Набор решения 5 дизайна: Unicode White_Space и U+FEFF.
-    const whitespace = <String, String>{
-      'U+0009': '\u0009',
-      'U+000A': '\u000A',
-      'U+000B': '\u000B',
-      'U+000C': '\u000C',
-      'U+000D': '\u000D',
-      'U+0020': '\u0020',
-      'U+0085': '\u0085',
-      'U+00A0': '\u00A0',
-      'U+1680': '\u1680',
-      'U+2000': '\u2000',
-      'U+2001': '\u2001',
-      'U+2002': '\u2002',
-      'U+2003': '\u2003',
-      'U+2004': '\u2004',
-      'U+2005': '\u2005',
-      'U+2006': '\u2006',
-      'U+2007': '\u2007',
-      'U+2008': '\u2008',
-      'U+2009': '\u2009',
-      'U+200A': '\u200A',
-      'U+2028': '\u2028',
-      'U+2029': '\u2029',
-      'U+202F': '\u202F',
-      'U+205F': '\u205F',
-      'U+3000': '\u3000',
-      'U+FEFF': '\uFEFF',
-    };
+    test('сворачивает и обрезает ровно те кодовые единицы, что убирает trim', () {
+      // `String.trim` определяет пробельные символы по кодовым единицам UTF-16,
+      // поэтому перебор всех единиц полностью сверяет с ним набор свёртки.
+      final mismatches = <String>[];
+      for (var unit = 0; unit <= 0xFFFF; unit++) {
+        final char = String.fromCharCode(unit);
+        final description = '$char$charа$char$charб$char';
+        final expected = char.trim().isEmpty ? 'а б' : description;
 
-    for (final MapEntry(key: name, value: char) in whitespace.entries) {
-      test('сворачивает и обрезает $name', () {
         final preview = IntentionDescriptionPreview.fromDescription(
-          '$char$charКупить$char$charмолоко$char',
+          description,
         );
 
-        expect(preview.text, 'Купить молоко');
-      });
-    }
+        if (preview.text != expected) {
+          mismatches.add(
+            'U+${unit.toRadixString(16).toUpperCase().padLeft(4, '0')}',
+          );
+        }
+      }
+
+      expect(mismatches, isEmpty, reason: 'Набор свёртки расходится с trim');
+    });
 
     test('заменяет каждую серию пробельных символов одним пробелом', () {
       final preview = IntentionDescriptionPreview.fromDescription(
