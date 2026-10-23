@@ -281,7 +281,7 @@
       - сценарий «Поиск и фильтр остаются на месте при прокрутке»;
       - ошибка недопустимого фильтра строкой поля без выдачи;
       - при тексте масштаба 2 и открытой клавиатуре шапка, поле и первая строка видны, а список прокручивается;
-      - правила доступности Android для областей нажатия, их подписей и контраста текста.
+      - при пустом поле поиска области нажатия не меньше `tap-min` по `iOSTapTargetGuideline`, как в проверке панели тегов, а также `labeledTapTargetGuideline` и `textContrastGuideline`. Области нажатия компонентов из задач 2.4 и 2.8 и `SearchField` не увеличиваются.
     - `mise run codegen` и `mise exec --no-deps -- flutter analyze`.
   - **Зависимости:** 2.7 — выдача; 2.8 — шапка и кнопка фильтра.
   - **Предполагаемые файлы:** `lib/src/intention/presentation/picker/intention_picker_view.dart`, `lib/l10n/app_en.arb`, `lib/l10n/app_ru.arb` и генерируемые `lib/l10n/app_localizations*.dart`, `test/intention/presentation/picker/intention_picker_view_test.dart`.
