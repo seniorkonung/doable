@@ -325,8 +325,6 @@ void main() {
               relatedId: testIntentionId(4),
               sourceTitle: 'новый исходный участник',
               relatedTitle: 'новый связанный участник',
-              sourceActiveRelationCount: 7,
-              relatedActiveRelationCount: 8,
               priority: RelationPriority.p1,
               description: 'Новое описание',
             ),
@@ -346,11 +344,6 @@ void main() {
               (state) => state.details.source.title,
               'новый исходный участник',
               'новый исходный участник',
-            )
-            .having(
-              (state) => state.details.related.activeRelationCount,
-              'новое количество связанного участника',
-              8,
             )
             .having(
               (state) => state.refreshStatus,

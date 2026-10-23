@@ -99,10 +99,7 @@ extension _LongTermRelationDetailsReading on DriftPersonalGraphRepository {
         relation.sourceIntentionId,
         relation.relatedIntentionId,
       };
-      final participants = await _readRelationParticipants(
-        participantIds,
-        knownActiveCounts: const {},
-      );
+      final participants = await _readRelationParticipants(participantIds);
       registration.participantIds = Set.unmodifiable(participantIds);
       return GraphSnapshot(
         value: LongTermRelationDetails(

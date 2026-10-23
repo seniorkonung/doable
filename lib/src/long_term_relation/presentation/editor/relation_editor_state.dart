@@ -57,8 +57,6 @@ final class RelationCreationContext extends RelationEditorContext {
       other.participant.id == participant.id &&
       other.participant.title == participant.title &&
       other.participant.archiveState == participant.archiveState &&
-      other.participant.activeRelationCount ==
-          participant.activeRelationCount &&
       other.direction == direction;
 
   @override
@@ -66,7 +64,6 @@ final class RelationCreationContext extends RelationEditorContext {
     participant.id,
     participant.title,
     participant.archiveState,
-    participant.activeRelationCount,
     direction,
   );
 }

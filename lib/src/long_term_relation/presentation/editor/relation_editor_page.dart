@@ -431,7 +431,6 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage> {
               id: intention.id,
               title: intention.title,
               archiveState: intention.archiveState,
-              activeRelationCount: next.details.activeRelationCount,
             ),
             next.revision,
           );
@@ -486,7 +485,6 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage> {
                   id: intention.id,
                   title: intention.title,
                   archiveState: intention.archiveState,
-                  activeRelationCount: details.activeRelationCount,
                 ),
               ),
               expectedRevision,

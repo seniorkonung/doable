@@ -282,8 +282,6 @@ LongTermRelationDetails testRelationDetails({
   String relatedTitle = 'Связанное намерение',
   IntentionArchiveState sourceArchiveState = IntentionArchiveState.active,
   IntentionArchiveState relatedArchiveState = IntentionArchiveState.active,
-  int sourceActiveRelationCount = 1,
-  int relatedActiveRelationCount = 1,
   LongTermRelationType type = LongTermRelationType.need,
   RelationPriority priority = RelationPriority.p2,
   RelationScope scope = RelationScope.active,
@@ -305,13 +303,11 @@ LongTermRelationDetails testRelationDetails({
     sourceId,
     title: sourceTitle,
     archiveState: sourceArchiveState,
-    activeRelationCount: sourceActiveRelationCount,
   ),
   related: testParticipant(
     relatedId,
     title: relatedTitle,
     archiveState: relatedArchiveState,
-    activeRelationCount: relatedActiveRelationCount,
   ),
   description: description == null
       ? null

@@ -99,8 +99,8 @@ void main() {
       );
       expect(snapshot.value.entries[_missing], isA<SelectedRelationMissing>());
       final first = snapshot.value.entries[_first] as SelectedRelationPresent;
-      expect(first.details.source.activeRelationCount, 2);
-      expect(first.details.related.activeRelationCount, 2);
+      expect(first.details.source.title, 'Владелец');
+      expect(first.details.related.title, 'Сосед');
       expect(
         diagnostics.events.whereType<SelectedRelationsReadDiagnosticsEvent>(),
         hasLength(2),

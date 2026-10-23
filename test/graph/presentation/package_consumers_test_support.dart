@@ -443,12 +443,8 @@ Object _intentionContent(IntentionDetails? details) => switch (details) {
   ),
 };
 
-Object _participant(RelationParticipantSummary participant) => (
-  participant.id,
-  participant.title,
-  participant.archiveState,
-  participant.activeRelationCount,
-);
+Object _participant(RelationParticipantSummary participant) =>
+    (participant.id, participant.title, participant.archiveState);
 
 Object _relationContent(LongTermRelationDetails details) => (
   details.relation.id,

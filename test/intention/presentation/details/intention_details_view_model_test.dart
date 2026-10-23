@@ -802,13 +802,13 @@ void main() {
       expect(
         (container.read(
           firstProvider,
-        ) as IntentionDetailsLoaded).details.activeRelationCount,
+        ) as IntentionDetailsLoaded).details.relationCounts.active,
         1,
       );
       expect(
         (container.read(
           secondProvider,
-        ) as IntentionDetailsLoaded).details.activeRelationCount,
+        ) as IntentionDetailsLoaded).details.relationCounts.active,
         2,
       );
     },

@@ -209,7 +209,7 @@ void main() {
     await _settleRoute(tester);
     _completePage(repository, 1, [
       testSummary(index: 1, title: 'Быть здоровым'),
-      testSummary(index: 2, title: 'Много ходить', activeRelationCount: 7),
+      testSummary(index: 2, title: 'Много ходить'),
     ]);
     await tester.pumpAndSettle();
 
@@ -234,11 +234,6 @@ void main() {
             (snapshot) => snapshot.value.title,
             'название снимка',
             'Много ходить',
-          )
-          .having(
-            (snapshot) => snapshot.value.activeRelationCount,
-            'количество снимка',
-            7,
           ),
     );
   });

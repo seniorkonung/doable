@@ -385,12 +385,10 @@ RelationParticipantSummary testParticipant(
   IntentionId id, {
   String title = 'Намерение',
   IntentionArchiveState archiveState = IntentionArchiveState.active,
-  int activeRelationCount = 0,
 }) => RelationParticipantSummary(
   id: id,
   title: title,
   archiveState: archiveState,
-  activeRelationCount: activeRelationCount,
 );
 
 /// Строка выбранной группы намерения-владельца.

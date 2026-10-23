@@ -257,7 +257,6 @@ void main() {
         (result as ResultSuccess<GraphSnapshot<IntentionDetails?>>).value;
     expect(snapshot.value?.intention.title, 'Владелец');
     expect(snapshot.value?.relationCounts.activeNeedOutgoing, 1);
-    expect(snapshot.value?.activeRelationCount, 1);
   });
 
   test('не публикует частичный успех при повреждении соседства', () async {

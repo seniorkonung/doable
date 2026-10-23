@@ -132,8 +132,6 @@ void main() {
       expect(await events.moveNext(), isTrue);
       final details = _relationSnapshot(events.current).value!;
       expect(details.relation.scope, RelationScope.archived);
-      expect(details.source.activeRelationCount, 0);
-      expect(details.related.activeRelationCount, 0);
     },
   );
 

@@ -1231,13 +1231,11 @@ LongTermRelationSummary _relationSummary(Intention source, Intention related) =>
         id: source.id,
         title: source.title,
         archiveState: source.archiveState,
-        activeRelationCount: 1,
       ),
       related: RelationParticipantSummary(
         id: related.id,
         title: related.title,
         archiveState: related.archiveState,
-        activeRelationCount: 1,
       ),
       hasDescription: false,
     );

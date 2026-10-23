@@ -488,7 +488,6 @@ final class _LoadedDetails extends StatelessWidget {
                     id: intention.id,
                     title: intention.title,
                     archiveState: intention.archiveState,
-                    activeRelationCount: state.details.activeRelationCount,
                   ),
                   direction: direction,
                 ),

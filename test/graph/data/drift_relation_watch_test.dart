@@ -65,15 +65,6 @@ void main() {
   test(
     'возвращает связь, полное описание и актуальных участников одним снимком',
     () async {
-      final thirdId = _intentionId(_uuid(3));
-      await _insertIntention(database, thirdId, title: 'Третье намерение');
-      await _insertRelation(
-        database,
-        id: _relationId(_uuid(102)),
-        sourceId: sourceId,
-        relatedId: thirdId,
-      );
-
       final result = await repository.watchRelation(relationId).first;
       final snapshot = _snapshot(result);
       final details = snapshot.value!;
@@ -82,10 +73,8 @@ void main() {
       expect(details.description!.value, '  Полное описание\nс переносом  ');
       expect(details.source.id, sourceId);
       expect(details.source.title, 'Исходное намерение');
-      expect(details.source.activeRelationCount, 2);
       expect(details.related.id, relatedId);
       expect(details.related.title, 'Связанное намерение');
-      expect(details.related.activeRelationCount, 1);
       expect(
         diagnostics.events
             .whereType<LongTermRelationDetailReadDiagnosticsEvent>(),
@@ -304,8 +293,6 @@ void main() {
     expect(details.relation.scope, RelationScope.archived);
     expect(details.source.archiveState, IntentionArchiveState.archived);
     expect(details.related.archiveState, IntentionArchiveState.active);
-    expect(details.source.activeRelationCount, 0);
-    expect(details.related.activeRelationCount, 0);
   });
 
   test('отражает замену участников и жизненный цикл связи', () async {

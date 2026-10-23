@@ -262,13 +262,11 @@ LongTermRelationSummary _summary(
     id: _intention(1),
     title: 'Исходное',
     archiveState: IntentionArchiveState.active,
-    activeRelationCount: 4,
   );
   final related = RelationParticipantSummary(
     id: _intention(id + 1),
     title: 'Связанное',
     archiveState: IntentionArchiveState.active,
-    activeRelationCount: 0,
   );
   return LongTermRelationSummary(
     relation: LongTermRelation(

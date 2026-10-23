@@ -215,7 +215,7 @@ extension _ChoicePathContinuationReading on DriftPersonalGraphRepository {
         row.sourceIntentionId,
         row.relatedIntentionId,
       ],
-    }, knownActiveCounts: const {});
+    });
     final items = [
       for (final row in pageRows)
         LongTermRelationSummary(

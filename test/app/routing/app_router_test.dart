@@ -384,11 +384,7 @@ void main() {
             .widget<RelationEditorPage>(find.byType(RelationEditorPage))
             .editorContext,
         RelationCreationContext(
-          participant: testParticipant(
-            ownerId,
-            title: 'А',
-            activeRelationCount: 1,
-          ),
+          participant: testParticipant(ownerId, title: 'А'),
           direction: RelationDirection.outgoing,
         ),
       );
@@ -425,11 +421,7 @@ void main() {
             .widget<RelationEditorPage>(find.byType(RelationEditorPage))
             .editorContext,
         RelationCreationContext(
-          participant: testParticipant(
-            ownerId,
-            title: 'А',
-            activeRelationCount: 1,
-          ),
+          participant: testParticipant(ownerId, title: 'А'),
           direction: RelationDirection.incoming,
         ),
       );
@@ -524,12 +516,8 @@ LongTermRelationSummary _row({
     scope: RelationScope.active,
     creationSequence: RelationCreationSequence(1),
   ),
-  source: testParticipant(sourceId, title: sourceTitle, activeRelationCount: 1),
-  related: testParticipant(
-    relatedId,
-    title: relatedTitle,
-    activeRelationCount: 1,
-  ),
+  source: testParticipant(sourceId, title: sourceTitle),
+  related: testParticipant(relatedId, title: relatedTitle),
   hasDescription: false,
 );
 

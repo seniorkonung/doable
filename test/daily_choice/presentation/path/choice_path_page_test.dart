@@ -817,13 +817,11 @@ LongTermRelationSummary _edge(
     id: _intention(source),
     title: 'Намерение $source',
     archiveState: IntentionArchiveState.active,
-    activeRelationCount: 1,
   ),
   related: RelationParticipantSummary(
     id: _intention(related),
     title: 'Намерение $related',
     archiveState: IntentionArchiveState.active,
-    activeRelationCount: 0,
   ),
   hasDescription: false,
 );

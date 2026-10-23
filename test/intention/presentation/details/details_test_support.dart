@@ -526,13 +526,11 @@ LongTermRelationSummary testDetailsRelationRow({
       id: sourceId,
       title: isOutgoing ? 'Намерение-владелец' : 'Исходное $index',
       archiveState: IntentionArchiveState.active,
-      activeRelationCount: 0,
     ),
     related: RelationParticipantSummary(
       id: relatedId,
       title: isOutgoing ? 'Связанное $index' : 'Намерение-владелец',
       archiveState: IntentionArchiveState.active,
-      activeRelationCount: 0,
     ),
     hasDescription: false,
   );

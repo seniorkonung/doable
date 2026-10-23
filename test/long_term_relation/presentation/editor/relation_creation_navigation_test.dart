@@ -370,7 +370,6 @@ RelationParticipantSummary _participant(int index) {
     id: summary.id,
     title: summary.title,
     archiveState: summary.archiveState,
-    activeRelationCount: summary.activeRelationCount,
   );
 }
 

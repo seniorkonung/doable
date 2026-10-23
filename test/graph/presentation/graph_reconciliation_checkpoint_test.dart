@@ -904,12 +904,10 @@ void main() {
         relationNeighborhoodViewModelProvider(ids[1]),
       ) as RelationGroupLoaded;
       expect(neighborGroup.items.single.relation.id, untouchedNeighbor);
-      expect(neighborGroup.items.single.source.activeRelationCount, 1);
       expect(neighborGroup.counts.total, 1);
       final remainingDetails = container.read(
         relationDetailsViewModelProvider(untouchedNeighbor),
       ) as RelationDetailsLoaded;
-      expect(remainingDetails.details.source.activeRelationCount, 1);
       expect(remainingDetails.details.relation.id, untouchedNeighbor);
       final savedRelations = await database
           .customSelect('SELECT id FROM long_term_relations')
