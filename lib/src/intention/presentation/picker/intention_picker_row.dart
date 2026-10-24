@@ -12,7 +12,8 @@ import '../../domain/intention.dart';
 import '../catalog/intention_catalog_purpose.dart';
 
 /// Строка экрана выбора для найденного намерения: название, начало описания,
-/// молния у действия и теги, где обязательные для выдачи идут первыми.
+/// метка архива у архивированного намерения, молния у действия и теги, где
+/// обязательные для выдачи идут первыми.
 final class IntentionPickerRow extends StatelessWidget {
   const IntentionPickerRow({
     required this.purpose,
@@ -41,6 +42,11 @@ final class IntentionPickerRow extends StatelessWidget {
       IntentionReadiness.ready => true,
       IntentionReadiness.notReady => false,
     };
+    final archived = switch (summary.archiveState) {
+      IntentionArchiveState.active => false,
+      IntentionArchiveState.archived => true,
+    };
+    final markTone = archived ? BadgeTone.muted : BadgeTone.ink;
     // Внутри обеих групп сохраняется ручной порядок сводки.
     final tags = [
       ...summary.tags.where((tag) => requiredTagIds.contains(tag.id)),
@@ -56,20 +62,25 @@ final class IntentionPickerRow extends StatelessWidget {
     return PickerRow(
       name: summary.title,
       description: description,
+      archived: archived,
       marks: [
-        if (isAction)
-          const Badge.mark(icon: DoableIconData.bolt, tone: BadgeTone.ink),
+        if (archived)
+          const Badge.mark(icon: DoableIconData.archive, tone: BadgeTone.muted),
+        if (isAction) Badge.mark(icon: DoableIconData.bolt, tone: markTone),
       ],
       tags: [
         for (final tag in tags)
           TagChip.small(
             name: tag.name.value,
             color: tagColorPresentation(tag.color),
-            strong: requiredTagIds.contains(tag.id),
+            // В строке архивированного намерения обязательные теги не
+            // выделяются.
+            strong: !archived && requiredTagIds.contains(tag.id),
           ),
       ],
       label: [
         summary.title,
+        if (archived) l10n.intentionPickerArchived,
         if (namesKind)
           isAction
               ? l10n.intentionPickerKindAction

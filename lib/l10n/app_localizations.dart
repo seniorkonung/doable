@@ -3544,6 +3544,12 @@ abstract class AppLocalizations {
   /// **'No active intentions are available.'**
   String get sourcePickerEmpty;
 
+  /// Архивное состояние намерения в доступном названии строки экрана выбора
+  ///
+  /// In en, this message translates to:
+  /// **'archived'**
+  String get intentionPickerArchived;
+
   /// Вид намерения с готовностью к действию в доступном названии строки экрана выбора
   ///
   /// In en, this message translates to:

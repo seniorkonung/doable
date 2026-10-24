@@ -1829,6 +1829,10 @@
   "@sourcePickerCancel": {"description": "Отмена выбора исходного намерения"},
   "sourcePickerEmpty": "No active intentions are available.",
   "@sourcePickerEmpty": {"description": "Пустой выбор активных намерений"},
+  "intentionPickerArchived": "archived",
+  "@intentionPickerArchived": {
+    "description": "Архивное состояние намерения в доступном названии строки экрана выбора"
+  },
   "intentionPickerKindAction": "action",
   "@intentionPickerKindAction": {
     "description": "Вид намерения с готовностью к действию в доступном названии строки экрана выбора"

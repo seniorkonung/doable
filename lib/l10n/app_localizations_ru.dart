@@ -2296,6 +2296,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get sourcePickerEmpty => 'Доступных активных намерений нет.';
 
   @override
+  String get intentionPickerArchived => 'в архиве';
+
+  @override
   String get intentionPickerKindAction => 'действие';
 
   @override

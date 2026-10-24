@@ -607,6 +607,7 @@
   "actionPickerUnexpected": "Не удалось загрузить действия из-за непредвиденной ошибки.",
   "sourcePickerCancel": "Отменить выбор намерения",
   "sourcePickerEmpty": "Доступных активных намерений нет.",
+  "intentionPickerArchived": "в архиве",
   "intentionPickerKindAction": "действие",
   "intentionPickerKindIntention": "намерение",
   "intentionPickerOpenActionPage": "Открыть страницу действия «{title}»",

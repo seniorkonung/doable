@@ -1,5 +1,6 @@
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/design_system/components/badge.dart';
+import 'package:doable/src/design_system/components/picker_row.dart';
 import 'package:doable/src/design_system/components/tag_chip.dart';
 import 'package:doable/src/design_system/components/tag_dot.dart';
 import 'package:doable/src/design_system/components/tag_line.dart';
@@ -56,7 +57,8 @@ void main() {
 
       expect(find.text('Сделать силовую тренировку'), findsOneWidget);
       expect(find.text(preview), findsOneWidget);
-      expect(_marks(tester), [DoableIconData.bolt]);
+      expect(_marks(tester), [(DoableIconData.bolt, BadgeTone.ink)]);
+      expect(tester.widget<PickerRow>(find.byType(PickerRow)).archived, false);
       expect(find.byType(TagChip), findsNWidgets(6));
       expect(
         tester.renderObject<RenderTagLine>(find.byType(TagLine)).hiddenTagCount,
@@ -121,7 +123,7 @@ void main() {
             summary: _summary('Пройти пешком до парка'),
           ),
         );
-        expect(_marks(tester), [DoableIconData.bolt]);
+        expect(_marks(tester), [(DoableIconData.bolt, BadgeTone.ink)]);
         expect(find.bySemanticsLabel(action), findsOneWidget);
       }
       semantics.dispose();
@@ -159,6 +161,55 @@ void main() {
       find.bySemanticsLabel('Бегать по утрам, Теги: Здоровье, Утро, Спорт'),
       findsOneWidget,
     );
+    semantics.dispose();
+  });
+
+  testWidgets('архивированное действие в поиске участника архивированной '
+      'связи несёт метку архива, приглушено и называет архив на двух языках', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    final health = _tag(2, 'Здоровье', color: TagColor.blue);
+    final summary = _summary(
+      'Бегать по утрам',
+      archiveState: IntentionArchiveState.archived,
+      tags: [_tag(1, 'Утро'), health],
+    );
+
+    for (final (locale, label) in const [
+      (
+        Locale('ru'),
+        'Бегать по утрам, в архиве, действие, Теги: Здоровье, Утро',
+      ),
+      (Locale('en'), 'Бегать по утрам, archived, action, Tags: Здоровье, Утро'),
+    ]) {
+      await tester.pumpWidget(
+        _app(
+          locale: locale,
+          purpose: SelectRelationParticipant(
+            selectionContext:
+                RelationParticipantSelectionContext.archivedRelation,
+            session: IntentionSearchSession(),
+          ),
+          summary: summary,
+          requiredTagIds: {health.id},
+        ),
+      );
+
+      expect(_marks(tester), [
+        (DoableIconData.archive, BadgeTone.muted),
+        (DoableIconData.bolt, BadgeTone.muted),
+      ]);
+      expect(tester.widget<PickerRow>(find.byType(PickerRow)).archived, true);
+      expect(
+        [
+          for (final chip in tester.widgetList<TagChip>(find.byType(TagChip)))
+            (chip.name, chip.strong),
+        ],
+        [('Здоровье', false), ('Утро', false)],
+      );
+      expect(find.bySemanticsLabel(label), findsOneWidget);
+    }
     semantics.dispose();
   });
 
@@ -215,14 +266,16 @@ void main() {
   });
 }
 
-List<DoableIconData> _marks(WidgetTester tester) => [
-  for (final badge in tester.widgetList<Badge>(find.byType(Badge))) badge.icon,
+List<(DoableIconData, BadgeTone)> _marks(WidgetTester tester) => [
+  for (final badge in tester.widgetList<Badge>(find.byType(Badge)))
+    (badge.icon, badge.tone),
 ];
 
 IntentionSummary _summary(
   String title, {
   String? description,
   IntentionReadiness readiness = IntentionReadiness.ready,
+  IntentionArchiveState archiveState = IntentionArchiveState.active,
   List<Tag> tags = const [],
 }) => IntentionSummary(
   id: (IntentionId.decode(
@@ -231,7 +284,7 @@ IntentionSummary _summary(
   title: title,
   descriptionPreview: testDescriptionPreview(description),
   readiness: readiness,
-  archiveState: IntentionArchiveState.active,
+  archiveState: archiveState,
   createdAt: IntentionTimestamp(DateTime.utc(2026)),
   updatedAt: IntentionTimestamp(DateTime.utc(2026)),
   tags: tags,

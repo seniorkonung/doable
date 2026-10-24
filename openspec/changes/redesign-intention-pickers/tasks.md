@@ -384,7 +384,7 @@
   - **Предполагаемые файлы:** `lib/src/intention/presentation/catalog/intention_catalog_purpose.dart`, `lib/src/intention/presentation/picker/intention_picker_kind.dart`, `lib/src/intention/presentation/picker/intention_picker_row.dart`, `test/intention/presentation/picker/intention_picker_view_test.dart`, `test/intention/presentation/picker/intention_picker_row_test.dart`.
   - **Размер:** S — по одной ветке в разборах назначения.
 
-- [ ] 3.4 Показывать архивированное намерение в строке экрана выбора меткой архива, приглушёнными названием и молнией и словами «в архиве» в доступном названии
+- [x] 3.4 Показывать архивированное намерение в строке экрана выбора меткой архива, приглушёнными названием и молнией и словами «в архиве» в доступном названии
   - **Критерии приёмки:**
     - Адаптер `IntentionPickerRow` по решению 4 дизайна у архивированного намерения:
       - ставит метку архива в тоне `muted` перед молнией;

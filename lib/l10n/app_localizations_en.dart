@@ -2272,6 +2272,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sourcePickerEmpty => 'No active intentions are available.';
 
   @override
+  String get intentionPickerArchived => 'archived';
+
+  @override
   String get intentionPickerKindAction => 'action';
 
   @override
