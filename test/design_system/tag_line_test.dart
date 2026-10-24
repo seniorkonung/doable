@@ -66,7 +66,9 @@ void main() {
     await tester.pumpWidget(
       _app(
         width: 60,
-        marks: const [Badge.mark(icon: DoableIconData.bolt)],
+        marks: const [
+          Badge.mark(icon: DoableIconData.bolt, tone: BadgeTone.ink),
+        ],
         tags: const [TagChip.small(name: 'Дом', color: DoableTagColor.teal)],
       ),
     );
@@ -103,7 +105,9 @@ void main() {
       _app(
         width: 160,
         semanticsLabel: 'Прогулка',
-        marks: const [Badge.mark(icon: DoableIconData.bolt)],
+        marks: const [
+          Badge.mark(icon: DoableIconData.bolt, tone: BadgeTone.ink),
+        ],
         tags: _threeTags,
       ),
     );
@@ -142,7 +146,9 @@ void main() {
       _app(
         width: 290,
         textScale: 2,
-        marks: const [Badge.mark(icon: DoableIconData.bolt)],
+        marks: const [
+          Badge.mark(icon: DoableIconData.bolt, tone: BadgeTone.ink),
+        ],
         tags: _threeTags,
       ),
     );

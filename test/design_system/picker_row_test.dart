@@ -30,7 +30,9 @@ void main() {
           brightness: brightness,
           row: _row(
             description: 'Утро',
-            marks: const [Badge.mark(icon: DoableIconData.bolt)],
+            marks: const [
+              Badge.mark(icon: DoableIconData.bolt, tone: BadgeTone.ink),
+            ],
             tags: const [
               TagChip.small(name: 'Дом', color: DoableTagColor.teal),
             ],
@@ -79,6 +81,44 @@ void main() {
         Offset(row.right - 26, row.center.dy),
       );
       expect(tester.getSize(_arrowArea()), const Size(48, 95));
+    });
+
+    testWidgets('в $themeName теме у архивированной строки название цвета '
+        'muted, а описание, линия меток и тегов и стрелка прежние', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _app(
+          brightness: brightness,
+          row: _row(
+            description: 'Утро',
+            archived: true,
+            marks: const [
+              Badge.mark(icon: DoableIconData.archive, tone: BadgeTone.muted),
+            ],
+            tags: const [
+              TagChip.small(name: 'Дом', color: DoableTagColor.teal),
+            ],
+          ),
+        ),
+      );
+
+      final name = tester.widget<Text>(find.text('Бег')).style!;
+      expect(name.color, colors.muted);
+      expect(name.fontSize, DoableType.action.fontSize);
+      expect(name.fontWeight, DoableType.action.fontWeight);
+      final description = tester.widget<Text>(find.text('Утро')).style!;
+      expect(description.color, colors.muted);
+      expect(description.fontSize, DoableType.note.fontSize);
+      final row = tester.getRect(find.byType(PickerRow));
+      expect(row.size, const Size(300, 95));
+      expect(
+        tester.getTopLeft(find.byType(TagLine)),
+        row.topLeft + const Offset(16, 63),
+      );
+      final arrow = tester.widget<DoableIcon>(find.byType(DoableIcon).last);
+      expect(arrow.icon, DoableIconData.arrowUpRight);
+      expect(arrow.color, colors.muted);
     });
   }
 
@@ -138,7 +178,9 @@ void main() {
       _app(
         row: _row(
           description: 'Утро',
-          marks: const [Badge.mark(icon: DoableIconData.bolt)],
+          marks: const [
+            Badge.mark(icon: DoableIconData.bolt, tone: BadgeTone.ink),
+          ],
           tags: const [TagChip.small(name: 'Дом', color: DoableTagColor.teal)],
           onPick: () => picks++,
           onOpenPage: () => pageOpenings++,
@@ -196,6 +238,7 @@ const _pageLabel = 'Открыть страницу: Бег';
 PickerRow _row({
   String name = 'Бег',
   String? description,
+  bool archived = false,
   List<Badge> marks = const [],
   List<TagChip> tags = const [],
   VoidCallback? onPick,
@@ -203,6 +246,7 @@ PickerRow _row({
 }) => PickerRow(
   name: name,
   description: description,
+  archived: archived,
   marks: marks,
   tags: tags,
   label: _label,

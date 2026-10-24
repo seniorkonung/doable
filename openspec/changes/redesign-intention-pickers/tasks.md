@@ -359,7 +359,7 @@
   - **Предполагаемые файлы:** `lib/src/design_system/icons/assets/archive.svg`, `lib/src/design_system/doable_icon.dart`, `lib/src/design_system/icons/README.md`, `test/design_system/doable_icon_test.dart`, `test/design_system/goldens/doable_icons.png`.
   - **Размер:** S.
 
-- [ ] 3.2 Добавить в дизайн-систему приглушённый вид архивированного элемента у метки и строки выбора
+- [x] 3.2 Добавить в дизайн-систему приглушённый вид архивированного элемента у метки и строки выбора
   - **Критерии приёмки:**
     - `Badge.mark` по разделу «A mark» README `Badge` принимает тон иконки `muted` наряду с `ink`: так выглядят коробка архива и молния архивированного действия. Плитка 22×20 на `bg` и отсутствие узла экранного диктора прежние.
     - `PickerRow` по README `PickerRow` и `CatalogRow` получает признак архивированного элемента: название цвета `muted`, а описание, линия меток и тегов и стрелка не меняются.

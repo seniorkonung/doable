@@ -4,14 +4,19 @@ import '../doable_colors.dart';
 import '../doable_icon.dart';
 import '../doable_metrics.dart';
 
+/// Тон иконки метки: `muted` — у коробки архива и у молнии архивированного
+/// действия.
+enum BadgeTone { ink, muted }
+
 /// Метка рядом с названием, которая сообщает факт и не является кнопкой.
 final class Badge extends StatelessWidget {
   /// Метка-значок строки списка на заливке `fill`, поэтому её фон — `bg`.
   /// Узла экранного диктора у метки нет: факт называет доступное название
   /// строки.
-  const Badge.mark({required this.icon, super.key});
+  const Badge.mark({required this.icon, required this.tone, super.key});
 
   final DoableIconData icon;
+  final BadgeTone tone;
 
   @override
   Widget build(BuildContext context) {
@@ -25,7 +30,16 @@ final class Badge extends StatelessWidget {
           color: colors.bg,
           borderRadius: BorderRadius.circular(DoableMetrics.radiusXs),
         ),
-        child: Center(child: DoableIcon(icon, size: 14, color: colors.ink)),
+        child: Center(
+          child: DoableIcon(
+            icon,
+            size: 14,
+            color: switch (tone) {
+              BadgeTone.ink => colors.ink,
+              BadgeTone.muted => colors.muted,
+            },
+          ),
+        ),
       ),
     );
   }

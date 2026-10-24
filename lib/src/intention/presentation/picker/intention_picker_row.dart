@@ -56,7 +56,10 @@ final class IntentionPickerRow extends StatelessWidget {
     return PickerRow(
       name: summary.title,
       description: description,
-      marks: [if (isAction) const Badge.mark(icon: DoableIconData.bolt)],
+      marks: [
+        if (isAction)
+          const Badge.mark(icon: DoableIconData.bolt, tone: BadgeTone.ink),
+      ],
       tags: [
         for (final tag in tags)
           TagChip.small(

@@ -11,36 +11,42 @@ void main() {
     ('светлой', Brightness.light, DoableColors.light),
     ('тёмной', Brightness.dark, DoableColors.dark),
   ]) {
-    testWidgets('в $themeName теме метка — плитка 22×20 на bg с углами '
-        'radius-xs и иконкой 14 цвета ink по центру', (tester) async {
-      await tester.pumpWidget(
-        _app(
-          brightness: brightness,
-          child: const Badge.mark(icon: DoableIconData.bolt),
-        ),
-      );
+    for (final (tone, toneColor) in [
+      (BadgeTone.ink, colors.ink),
+      (BadgeTone.muted, colors.muted),
+    ]) {
+      testWidgets('в $themeName теме метка тона ${tone.name} — плитка 22×20 '
+          'на bg с углами radius-xs и иконкой 14 цвета ${tone.name} по '
+          'центру', (tester) async {
+        await tester.pumpWidget(
+          _app(
+            brightness: brightness,
+            child: Badge.mark(icon: DoableIconData.bolt, tone: tone),
+          ),
+        );
 
-      final mark = tester.getRect(find.byType(Badge));
-      expect(mark.size, const Size(22, 20));
-      final ground = tester.widget<DecoratedBox>(
-        find.descendant(
-          of: find.byType(Badge),
-          matching: find.byType(DecoratedBox),
-        ),
-      );
-      expect(
-        ground.decoration,
-        BoxDecoration(
-          color: colors.bg,
-          borderRadius: BorderRadius.circular(DoableMetrics.radiusXs),
-        ),
-      );
-      final icon = tester.widget<DoableIcon>(find.byType(DoableIcon));
-      expect(icon.icon, DoableIconData.bolt);
-      expect(icon.size, 14);
-      expect(icon.color, colors.ink);
-      expect(tester.getCenter(find.byType(DoableIcon)), mark.center);
-    });
+        final mark = tester.getRect(find.byType(Badge));
+        expect(mark.size, const Size(22, 20));
+        final ground = tester.widget<DecoratedBox>(
+          find.descendant(
+            of: find.byType(Badge),
+            matching: find.byType(DecoratedBox),
+          ),
+        );
+        expect(
+          ground.decoration,
+          BoxDecoration(
+            color: colors.bg,
+            borderRadius: BorderRadius.circular(DoableMetrics.radiusXs),
+          ),
+        );
+        final icon = tester.widget<DoableIcon>(find.byType(DoableIcon));
+        expect(icon.icon, DoableIconData.bolt);
+        expect(icon.size, 14);
+        expect(icon.color, toneColor);
+        expect(tester.getCenter(find.byType(DoableIcon)), mark.center);
+      });
+    }
   }
 
   testWidgets('метка не создаёт узла экранного диктора', (tester) async {
@@ -52,7 +58,10 @@ void main() {
           container: true,
           explicitChildNodes: true,
           label: 'Прогулка',
-          child: const Badge.mark(icon: DoableIconData.bolt),
+          child: const Badge.mark(
+            icon: DoableIconData.bolt,
+            tone: BadgeTone.ink,
+          ),
         ),
       ),
     );

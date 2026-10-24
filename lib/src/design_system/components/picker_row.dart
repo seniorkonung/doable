@@ -19,6 +19,7 @@ final class PickerRow extends StatelessWidget {
     required this.pageLabel,
     required this.onOpenPage,
     this.description,
+    this.archived = false,
     this.marks = const [],
     this.tags = const [],
     super.key,
@@ -29,6 +30,10 @@ final class PickerRow extends StatelessWidget {
 
   /// Описание под названием, не длиннее двух строк.
   final String? description;
+
+  /// Название архивированного элемента приглушено; метки строки передаёт
+  /// потребитель.
+  final bool archived;
 
   /// Метки и все теги в порядке показа; без них у строки нет линии меток и
   /// тегов.
@@ -71,7 +76,9 @@ final class PickerRow extends StatelessWidget {
                     children: [
                       Text(
                         name,
-                        style: DoableType.action.copyWith(color: colors.ink),
+                        style: DoableType.action.copyWith(
+                          color: archived ? colors.muted : colors.ink,
+                        ),
                       ),
                       if (description case final description?) ...[
                         const SizedBox(height: 2),
