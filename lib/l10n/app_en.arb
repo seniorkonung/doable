@@ -1812,7 +1812,6 @@
   "@relationDetailsOpenRelatedParticipantAction": {
     "description": "Переход к архивному связанному участнику, блокирующему восстановление связи"
   },
-  "participantPickerTitle": "Select a participant",
   "actionPickerCancel": "Cancel action selection",
   "@actionPickerCancel": {"description": "Отмена выбора действия"},
   "actionPickerLoading": "Loading actions…",
@@ -1928,20 +1927,13 @@
   "@intentionPickerResetFilters": {
     "description": "Действие пустой выдачи экрана выбора, которое снимает фильтр названия и все условия по тегам"
   },
-  "@participantPickerTitle": {
-    "description": "Заголовок выбора участника долговременной связи"
-  },
-  "participantPickerCancel": "Cancel the selection",
+  "participantPickerCancel": "Cancel intention selection",
   "@participantPickerCancel": {
-    "description": "Назначение отмены выбора участника"
+    "description": "Отмена выбора участника долговременной связи"
   },
   "participantPickerEmpty": "No other intentions are available to select.",
   "@participantPickerEmpty": {
     "description": "Отсутствие намерений, доступных для выбора участником"
-  },
-  "participantPickerSelectHint": "Selects this intention as a relation participant",
-  "@participantPickerSelectHint": {
-    "description": "Назначение выбора строки участником связи"
   },
   "participantPickerOpenDetails": "Open intention details",
   "@participantPickerOpenDetails": {

@@ -3490,12 +3490,6 @@ abstract class AppLocalizations {
   /// **'Open related intention'**
   String get relationDetailsOpenRelatedParticipantAction;
 
-  /// Заголовок выбора участника долговременной связи
-  ///
-  /// In en, this message translates to:
-  /// **'Select a participant'**
-  String get participantPickerTitle;
-
   /// Отмена выбора действия
   ///
   /// In en, this message translates to:
@@ -3688,10 +3682,10 @@ abstract class AppLocalizations {
   /// **'Reset filters'**
   String get intentionPickerResetFilters;
 
-  /// Назначение отмены выбора участника
+  /// Отмена выбора участника долговременной связи
   ///
   /// In en, this message translates to:
-  /// **'Cancel the selection'**
+  /// **'Cancel intention selection'**
   String get participantPickerCancel;
 
   /// Отсутствие намерений, доступных для выбора участником
@@ -3699,12 +3693,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No other intentions are available to select.'**
   String get participantPickerEmpty;
-
-  /// Назначение выбора строки участником связи
-  ///
-  /// In en, this message translates to:
-  /// **'Selects this intention as a relation participant'**
-  String get participantPickerSelectHint;
 
   /// Назначение перехода к подробным данным намерения из выбора
   ///

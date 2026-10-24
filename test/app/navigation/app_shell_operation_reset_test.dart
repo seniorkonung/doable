@@ -33,6 +33,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../intention/presentation/details/details_test_support.dart';
+import '../../intention/presentation/picker/intention_picker_test_support.dart';
 import '../../long_term_relation/presentation/details/relation_details_test_support.dart'
     show ControlledRelationWatch, testRelationDetails;
 import '../../long_term_relation/presentation/neighborhood/neighborhood_test_support.dart'
@@ -481,8 +482,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     final picker = find.byType(RelationParticipantPickerPage);
-    final l10n = AppLocalizations.of(tester.element(picker));
-    await tester.tap(find.byTooltip(l10n.participantPickerOpenDetails));
+    await tester.tap(intentionPickerArrow(intentionPickerRows.first));
     await tester.pump();
     await tester.pump();
     app.repository.detailRequests.single.add(ResultSuccess(app.intention));

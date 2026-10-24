@@ -211,7 +211,7 @@ void _registerQuickCreationFlowTests() {
             );
             for (final role in ['source', 'related']) {
               await _tap(tester, _key('relation-editor-select-$role'));
-              expect(find.byType(IntentionSummaryView), findsNothing);
+              expect(find.byType(PickerRow), findsNothing);
               expect(
                 find.text(app.l10n.participantPickerEmpty),
                 findsOneWidget,
@@ -272,7 +272,7 @@ void _registerNestedQuickCreationTests() {
       );
       final before = await tester.runAsync(() => durabilityState(app.database));
       final filterKey = switch (flow) {
-        _Flow.relation => 'participant-picker-filter-field',
+        _Flow.relation => 'participant-picker-filter',
         _Flow.topDown => 'daily-choice-source-filter',
         _Flow.bottomUp => 'daily-choice-action-filter',
         _Flow.intention => throw StateError(
@@ -294,18 +294,9 @@ void _registerNestedQuickCreationTests() {
         }
       }
 
-      // Поиск участника ещё показывает прежний вид с чипами условий, поиски
-      // дневного выбора — экран выбора с кнопкой фильтра.
-      final picker = flow != _Flow.relation;
-      IntentionCatalogPurpose purpose() => picker
-          ? tester
-                .widget<IntentionPickerView>(find.byType(IntentionPickerView))
-                .purpose
-          : tester
-                .widget<IntentionTagConditionsSection>(
-                  find.byType(IntentionTagConditionsSection),
-                )
-                .purpose;
+      IntentionPickerPurpose purpose() => tester
+          .widget<IntentionPickerView>(find.byType(IntentionPickerView))
+          .purpose;
       String filterText() => tester
           .widget<EditableText>(
             find.descendant(
@@ -315,9 +306,7 @@ void _registerNestedQuickCreationTests() {
           )
           .controller
           .text;
-      final openFilter = picker
-          ? find.byType(FilterButton)
-          : _key('intention-tag-conditions-add');
+      final openFilter = find.byType(FilterButton);
       IntentionCatalogLoaded loaded(IntentionCatalogPurpose purpose) =>
           app.container
                   .read(intentionCatalogViewModelProvider(purpose))
@@ -362,16 +351,14 @@ void _registerNestedQuickCreationTests() {
       final firstOffset = position().pixels;
       expect(firstOffset, greaterThan(0));
       final originalPickerHistory = List.of(app.router.stackData);
-      final details =
-          (picker
-                  ? find.byWidgetPredicate(
-                      (widget) =>
-                          widget is DoableIcon &&
-                          widget.icon == DoableIconData.arrowUpRight,
-                    )
-                  : find.byIcon(Icons.info_outline))
-              .hitTestable()
-              .first;
+      final details = find
+          .byWidgetPredicate(
+            (widget) =>
+                widget is DoableIcon &&
+                widget.icon == DoableIconData.arrowUpRight,
+          )
+          .hitTestable()
+          .first;
       await tester.tap(details);
       await tester.pumpAndSettle();
       expect(app.router.current.name, IntentionDetailsRoute.name);
@@ -418,18 +405,7 @@ void _registerNestedQuickCreationTests() {
       );
       expect(filterText(), 'Поиск');
       expect(position().pixels, firstOffset);
-      if (picker) {
-        expect(tester.widget<FilterButton>(openFilter).count, 2);
-      } else {
-        expect(
-          _key('intention-tag-condition-${durabilityUuid(900)}'),
-          findsOneWidget,
-        );
-        expect(
-          _key('intention-tag-condition-${durabilityUuid(901)}'),
-          findsOneWidget,
-        );
-      }
+      expect(tester.widget<FilterButton>(openFilter).count, 2);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       if (flow == _Flow.relation) {
@@ -445,7 +421,7 @@ void _registerNestedQuickCreationTests() {
   }
 }
 
-/// Открывает панель фильтра элементом [openFilter] и добавляет условие:
+/// Открывает панель фильтра кнопкой [openFilter] и добавляет условие:
 /// первое нажатие на тег требует его, второе исключает. Затем «назад»
 /// закрывает панель.
 Future<void> _addSearchTag(

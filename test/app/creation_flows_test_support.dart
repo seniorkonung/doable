@@ -118,7 +118,7 @@ enum _Flow {
           await _tap(tester, _key('relation-editor-select-$role'));
           await _tap(
             tester,
-            find.widgetWithText(IntentionSummaryView, 'Намерение $number'),
+            _key('participant-picker-${durabilityUuid(number)}'),
           );
         }
         await _tap(tester, _key('relation-editor-type-need'));

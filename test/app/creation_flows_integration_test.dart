@@ -24,8 +24,6 @@ import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_section.dart';
-import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/intention/presentation/picker/intention_picker_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';

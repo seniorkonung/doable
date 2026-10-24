@@ -285,8 +285,7 @@ final _announcedDestinations = find.semantics.byPredicate(
 );
 
 /// Строка выдачи намерений с названием [title] на странице [page]: в
-/// каталоге и поиске участника — прежняя, в поисках дневного выбора — строка
-/// экрана выбора.
+/// каталоге — строка каталога, в поисках выбора — строка экрана выбора.
 Finder _summary(Type page, String title) => find.descendant(
   of: find.byType(page),
   matching: find.byWidgetPredicate(

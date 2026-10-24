@@ -15,7 +15,7 @@ void main() {
       excludedIntentionId: excluded,
       selectionContext: context,
     ),
-    filterKey: 'participant-picker-filter-field',
+    filterKey: 'participant-picker-filter',
     listKey: 'participant-picker-list',
     scope: context.catalogScope,
     excludedIntentionId: excluded,

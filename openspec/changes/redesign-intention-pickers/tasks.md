@@ -400,7 +400,7 @@
   - **Предполагаемые файлы:** `lib/src/intention/presentation/picker/intention_picker_row.dart`, `lib/l10n/app_en.arb`, `lib/l10n/app_ru.arb` и генерируемые `lib/l10n/app_localizations*.dart`, `test/intention/presentation/picker/intention_picker_row_test.dart`.
   - **Размер:** S.
 
-- [ ] 3.5 Перевести поиск участника на экран выбора с прежними охватом и результатом-снимком, исключая второго участника только запросом
+- [x] 3.5 Перевести поиск участника на экран выбора с прежними охватом и результатом-снимком, исключая второго участника только запросом
   - **Критерии приёмки:**
     - `RelationParticipantPickerPage` показывает `IntentionPickerView` назначения `SelectRelationParticipant` с контекстом связи и исключением из параметров маршрута. Маршрут и его параметры прежние.
       - Подпись крестика `participantPickerCancel` — «Отменить выбор намерения» и "Cancel intention selection": подпись следует новому заголовку. Сообщение о пустом охвате — прежнее «Других намерений для выбора нет.».

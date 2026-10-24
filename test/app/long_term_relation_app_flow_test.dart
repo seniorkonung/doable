@@ -917,7 +917,7 @@ Future<void> _selectParticipant(
   await tester.tap(action);
   await _pumpUntilFound(
     tester,
-    find.byKey(const ValueKey('participant-picker-filter-field')),
+    find.byKey(const ValueKey('participant-picker-filter')),
   );
 
   final matchingTitles = find.text(title);

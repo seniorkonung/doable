@@ -2242,9 +2242,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Open related intention';
 
   @override
-  String get participantPickerTitle => 'Select a participant';
-
-  @override
   String get actionPickerCancel => 'Cancel action selection';
 
   @override
@@ -2361,15 +2358,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get intentionPickerResetFilters => 'Reset filters';
 
   @override
-  String get participantPickerCancel => 'Cancel the selection';
+  String get participantPickerCancel => 'Cancel intention selection';
 
   @override
   String get participantPickerEmpty =>
       'No other intentions are available to select.';
-
-  @override
-  String get participantPickerSelectHint =>
-      'Selects this intention as a relation participant';
 
   @override
   String get participantPickerOpenDetails => 'Open intention details';

@@ -2266,9 +2266,6 @@ class AppLocalizationsRu extends AppLocalizations {
       'Открыть связанное намерение';
 
   @override
-  String get participantPickerTitle => 'Выбор участника';
-
-  @override
   String get actionPickerCancel => 'Отменить выбор действия';
 
   @override
@@ -2387,14 +2384,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get intentionPickerResetFilters => 'Сбросить фильтры';
 
   @override
-  String get participantPickerCancel => 'Отменить выбор';
+  String get participantPickerCancel => 'Отменить выбор намерения';
 
   @override
   String get participantPickerEmpty => 'Других намерений для выбора нет.';
-
-  @override
-  String get participantPickerSelectHint =>
-      'Выбирает это намерение участником связи';
 
   @override
   String get participantPickerOpenDetails =>
