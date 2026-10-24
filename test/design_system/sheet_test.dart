@@ -216,6 +216,36 @@ void main() {
     expect(sheet.isClosed, isFalse);
   });
 
+  testWidgets('второй палец во время раскрытия не меняет размер листа '
+      'скачком', (tester) async {
+    await _openExpandableSheet(tester);
+    final compact = tester.getRect(find.byType(Sheet));
+    final first = await _SlowGesture.start(tester, _header);
+    await first.moveTo(-100);
+
+    final second = await tester.startGesture(
+      tester.getCenter(find.text('Готово')),
+    );
+    await tester.pump();
+    expect(
+      tester.getRect(find.byType(Sheet)).top,
+      closeTo(compact.top - 100, 1),
+    );
+
+    await second.moveBy(const Offset(0, -2));
+    await tester.pump();
+    expect(
+      tester.getRect(find.byType(Sheet)).top,
+      closeTo(compact.top - 102, 1),
+    );
+    expect(_sheetHeight(tester), closeTo(_compact + 102, 1));
+
+    await second.up();
+    await first.up();
+    await tester.pumpAndSettle();
+    expect(_sheetHeight(tester), _compact);
+  });
+
   for (final (segment, depth) in [('раскрытия', -100.0), ('сдвига', 100.0)]) {
     testWidgets('«назад» во время перетаскивания раскрываемого листа на '
         'отрезке $segment закрывает лист, после чего палец его не двигает, а '
@@ -634,6 +664,73 @@ void main() {
     await gesture.moveBy(Offset(0, compact.height * 0.8));
     await tester.pump();
     await gesture.cancel();
+    await tester.pumpAndSettle();
+
+    expect(tester.getRect(find.byType(Sheet)), compact);
+    expect(sheet.isClosed, isFalse);
+  });
+
+  testWidgets('второй палец, коснувшийся нижней кнопки, сдвигает лист по '
+      'содержимому только на своё движение, и после отпускания лист остаётся '
+      'открытым', (tester) async {
+    final sheet = await _openContentSheet(tester);
+    final compact = tester.getRect(find.byType(Sheet));
+    final first = await tester.startGesture(
+      tester.getCenter(find.text('Новый тег')),
+    );
+    await first.moveBy(
+      const Offset(0, 30),
+      timeStamp: const Duration(milliseconds: 100),
+    );
+    await tester.pump();
+
+    final second = await tester.startGesture(
+      tester.getCenter(find.text('Создать')),
+    );
+    await tester.pump();
+    expect(
+      tester.getRect(find.byType(Sheet)).top,
+      closeTo(compact.top + 30, 1),
+    );
+
+    await second.moveBy(
+      const Offset(0, 2),
+      timeStamp: const Duration(milliseconds: 200),
+    );
+    await tester.pump();
+    expect(
+      tester.getRect(find.byType(Sheet)).top,
+      closeTo(compact.top + 32, 1),
+    );
+
+    await second.up(timeStamp: const Duration(milliseconds: 300));
+    await first.up(timeStamp: const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+    expect(tester.getRect(find.byType(Sheet)), compact);
+    expect(sheet.isClosed, isFalse);
+  });
+
+  testWidgets('отменённый системой жест возвращает лист по содержимому, даже '
+      'когда после отмены листа касается другой палец', (tester) async {
+    final sheet = await _openContentSheet(tester);
+    final compact = tester.getRect(find.byType(Sheet));
+    final first = await tester.startGesture(
+      tester.getCenter(find.text('Новый тег')),
+    );
+    await first.moveBy(Offset(0, compact.height * 0.8));
+    await tester.pump();
+    final second = await tester.startGesture(
+      tester.getCenter(find.text('Новый тег')),
+    );
+    await tester.pump();
+
+    await first.cancel();
+    final third = await tester.startGesture(
+      tester.getCenter(find.text('Новый тег')),
+    );
+    await tester.pump();
+    await second.up();
+    await third.up();
     await tester.pumpAndSettle();
 
     expect(tester.getRect(find.byType(Sheet)), compact);

@@ -224,9 +224,16 @@ final class _SheetMotionState extends State<_SheetMotion> {
   static const _flingVelocity = 700.0;
   static const _closePosition = 0.5;
 
-  /// Касание, с которого начат текущий жест, сдвиг листа и его размер при
-  /// нём.
-  late ({double y, double offset, bool isFull}) _drag;
+  /// Сдвиг листа и его размер в начале текущего жеста.
+  late ({double offset, bool isFull}) _drag;
+
+  /// Сумма сдвигов вниз, которые распознаватель передал за текущий жест.
+  ///
+  /// Распознаватель передаёт сдвиги только отслеживаемого пальца и переходит
+  /// к другому без скачка, поэтому лист не сдвигается на расстояние между
+  /// пальцами:
+  /// https://api.flutter.dev/flutter/gestures/MultitouchDragStrategy.html#latestPointer
+  var _distance = 0.0;
   var _isPointerCanceled = false;
 
   _DoableSheetRoute<Object?> get _route => widget.route;
@@ -247,21 +254,21 @@ final class _SheetMotionState extends State<_SheetMotion> {
       : (widget.expansion?.controller.value ?? 0) * _growth;
 
   void _startDrag(DragStartDetails details) {
-    _drag = (
-      y: details.globalPosition.dy,
-      offset: _offset,
-      isFull: widget.expansion?.isFull ?? false,
-    );
+    _drag = (offset: _offset, isFull: widget.expansion?.isFull ?? false);
+    _distance = 0;
+    _isPointerCanceled = false;
   }
 
   void _updateDrag(DragUpdateDetails details) {
     // Закрывающийся маршрут доводит анимацию сам, а запись значения её
     // остановила бы.
     if (!_route.isCurrent) return;
-    // Положение вычисляется от начала жеста, а не накапливается из сдвигов,
-    // поэтому ошибка обратной функции кривой не накапливается.
+    _distance += details.delta.dy;
+    // Положение вычисляется от начала жеста, а не накапливается из
+    // приращений значения, поэтому ошибка обратной функции кривой не
+    // накапливается.
     final offset = clampDouble(
-      _drag.offset - (details.globalPosition.dy - _drag.y),
+      _drag.offset - _distance,
       -_compactExtent,
       _growth,
     );
@@ -312,7 +319,6 @@ final class _SheetMotionState extends State<_SheetMotion> {
 
   @override
   Widget build(BuildContext context) => Listener(
-    onPointerDown: (_) => _isPointerCanceled = false,
     onPointerCancel: (_) => _isPointerCanceled = true,
     child: GestureDetector(
       // Лист под пальцем стоит той точкой, которой его коснулись:
