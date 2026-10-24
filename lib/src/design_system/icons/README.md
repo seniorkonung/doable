@@ -47,6 +47,7 @@
 | [filter.svg](assets/filter.svg) | `ActionPicker.dc.html` | `section[aria-label="Filters"]` → кнопка `openFilter`, SVG |
 | [bolt.svg](assets/bolt.svg) | `ActionPicker.dc.html` | Строка `rows` → метка `row.isAct`, SVG |
 | [arrow_up_right.svg](assets/arrow_up_right.svg) | `ActionPicker.dc.html` | Строка `rows` → кнопка `row.info`, SVG |
+| [archive.svg](assets/archive.svg) | `ActionPicker.dc.html` | Строка `rows` → метка `row.archived`, SVG |
 
 Мини-значки имеют линию 2 при размере 14, значки меню — линию 1,75 при размере 22.
 Календарь навигации содержит отметки дней, календарь меню и мини-значок — нет.
