@@ -435,7 +435,7 @@
   - **Предполагаемые файлы:** `lib/src/intention/presentation/catalog/intention_search_results.dart`, `lib/src/intention/presentation/catalog/intention_search_layout.dart`, `lib/src/intention/presentation/catalog/intention_catalog_page.dart`, `test/intention/presentation/catalog/intention_search_results_test.dart`.
   - **Размер:** S.
 
-- [ ] 3.7 Подтвердить готовность третьей фазы и всего изменения: три поиска работают на одном экране выбора по спецификации
+- [x] 3.7 Подтвердить готовность третьей фазы и всего изменения: три поиска работают на одном экране выбора по спецификации
   - **Критерии приёмки:**
     - Выполнено условие «Ready to advance» третьей фазы:
       - поиски действия, исходного намерения и участника, в том числе участника архивированной связи, работают на одном экране выбора по спецификации;
