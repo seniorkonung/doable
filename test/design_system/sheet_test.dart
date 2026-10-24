@@ -1,8 +1,10 @@
 import 'package:doable/src/design_system/components/button.dart';
+import 'package:doable/src/design_system/components/search_field.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/design_system/doable_metrics.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -246,6 +248,68 @@ void main() {
     expect(_sheetHeight(tester), _compact);
   });
 
+  testWidgets('перетаскивание вверх, начатое на закреплённом поле, раскрывает '
+      'лист под пальцем', (tester) async {
+    await _openExpandableSheet(tester);
+    final compact = tester.getRect(find.byType(Sheet));
+    final gesture = await _SlowGesture.start(tester, find.byType(SearchField));
+
+    await gesture.moveTo(-_growth * 0.6);
+    expect(
+      tester.getRect(find.byType(Sheet)).top,
+      closeTo(compact.top - _growth * 0.6, 1),
+    );
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(_sheetHeight(tester), _full);
+  });
+
+  testWidgets('перетаскивание вниз, начатое на нижней кнопке, уводит лист '
+      'вместе с ней, и кнопка не срабатывает', (tester) async {
+    var presses = 0;
+    final sheet = await _openExpandableSheet(tester, onDone: () => presses++);
+    final compact = tester.getRect(find.byType(Sheet));
+    final done = find.widgetWithText(Button, 'Готово');
+    final footer = tester.getRect(done);
+    final gesture = await _SlowGesture.start(tester, done);
+
+    await gesture.moveTo(compact.height * 0.6);
+    expect(
+      tester.getRect(find.byType(Sheet)).top,
+      closeTo(compact.top + compact.height * 0.6, 1),
+    );
+    expect(
+      tester.getRect(done).top,
+      closeTo(footer.top + compact.height * 0.6, 1),
+    );
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(find.byType(Sheet), findsNothing);
+    expect(sheet.isClosed, isTrue);
+    expect(presses, 0);
+  });
+
+  testWidgets('нажатие нижней кнопки со сдвигом пальца в пределах допуска '
+      'срабатывает, а лист остаётся на месте', (tester) async {
+    var presses = 0;
+    await _openExpandableSheet(tester, onDone: () => presses++);
+    final compact = tester.getRect(find.byType(Sheet));
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.widgetWithText(Button, 'Готово')),
+    );
+
+    await gesture.moveBy(const Offset(0, kTouchSlop / 2));
+    await tester.pump();
+    expect(tester.getRect(find.byType(Sheet)), compact);
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(presses, 1);
+    expect(tester.getRect(find.byType(Sheet)), compact);
+  });
+
   for (final (segment, depth) in [('раскрытия', -100.0), ('сдвига', 100.0)]) {
     testWidgets('«назад» во время перетаскивания раскрываемого листа на '
         'отрезке $segment закрывает лист, после чего палец его не двигает, а '
@@ -466,20 +530,20 @@ void main() {
           String name,
           Future<void> Function(WidgetTester) open,
           String head,
-          String footer,
+          Finder footer,
         })
       >[
         (
           name: 'раскрываемый',
           open: (tester) => _openExpandableSheet(tester, hostsMessages: true),
           head: 'Поиск',
-          footer: 'Готово',
+          footer: find.widgetWithText(Button, 'Готово'),
         ),
         (
           name: 'по содержимому',
           open: (tester) => _openContentSheet(tester, hostsMessages: true),
           head: 'Новый тег',
-          footer: 'Создать',
+          footer: find.text('Создать'),
         ),
       ]) {
     testWidgets('${scenario.name} лист с сообщениями поверх при открытой '
@@ -503,10 +567,7 @@ void main() {
         greaterThan(sheet.top),
       );
       // Системный отступ под клавиатурой не поднимает нижнюю часть.
-      expect(
-        tester.getRect(find.text(scenario.footer)).bottom,
-        aboveKeyboard - 16,
-      );
+      expect(tester.getRect(scenario.footer).bottom, aboveKeyboard - 16);
       expect(tester.takeException(), isNull);
     });
   }
@@ -558,7 +619,7 @@ void main() {
       );
 
       // Верх области нажатия выше строки заголовка.
-      final area = tester.getRect(find.byType(Button));
+      final area = tester.getRect(find.widgetWithText(Button, 'Сбросить'));
       expect(area.height, greaterThanOrEqualTo(44), reason: size);
       expect(area.top, lessThan(title.top), reason: size);
       final before = presses;
@@ -587,7 +648,7 @@ void main() {
 
     await _openExpandableSheet(tester);
 
-    expect(find.byType(Button), findsNothing);
+    expect(find.widgetWithText(Button, 'Сбросить'), findsNothing);
     expect(tester.getCenter(find.text('Теги')), title);
     expect(tester.getRect(find.text('Выберите сколько нужно')), text);
     expect(tester.getRect(find.text('Поиск')), pinned);
@@ -832,7 +893,9 @@ final _header = find.text('Выберите сколько нужно');
 /// Радиус верхних углов листа.
 double _topRadius(WidgetTester tester) => tester
     .widget<Material>(
-      find.descendant(of: find.byType(Sheet), matching: find.byType(Material)),
+      find
+          .descendant(of: find.byType(Sheet), matching: find.byType(Material))
+          .first,
     )
     .borderRadius!
     .resolve(TextDirection.ltr)
@@ -907,19 +970,25 @@ Future<_OpenedSheet> _openExpandableSheet(
   WidgetTester tester, {
   bool hostsMessages = false,
   VoidCallback? onReset,
+  VoidCallback onDone = _ignore,
 }) => _openSheet(
   tester,
   (context) => _showExpandableSheet(
     context,
     hostsMessages: hostsMessages,
     onReset: onReset,
+    onDone: onDone,
   ),
 );
 
+void _ignore() {}
+
+/// Закреплённое поле и нижняя кнопка — те же элементы, что в панели тегов.
 Future<void> _showExpandableSheet(
   BuildContext context, {
   bool hostsMessages = false,
   VoidCallback? onReset,
+  VoidCallback onDone = _ignore,
 }) => showDoableSheet<void>(
   context: context,
   hostsMessages: hostsMessages,
@@ -937,15 +1006,41 @@ Future<void> _showExpandableSheet(
       ),
       null => null,
     },
-    pinned: const SizedBox(height: 44, child: Text('Поиск')),
+    pinned: const _Search(),
     body: ListView.builder(
       itemCount: 40,
       itemBuilder: (context, index) =>
           SizedBox(height: 48, child: Text('Тег $index')),
     ),
-    footer: const SizedBox(height: 44, child: Text('Готово')),
+    footer: Button.primary(label: 'Готово', onPressed: onDone),
   ),
 );
+
+final class _Search extends StatefulWidget {
+  const _Search();
+
+  @override
+  State<_Search> createState() => _SearchState();
+}
+
+final class _SearchState extends State<_Search> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => SearchField(
+    controller: _controller,
+    placeholder: 'Поиск',
+    label: 'Поиск тегов',
+    clearLabel: 'Очистить поиск',
+    onChanged: (_) {},
+  );
+}
 
 /// Без [settle] лист открыт одним кадром после нажатия.
 Future<_OpenedSheet> _openContentSheet(
