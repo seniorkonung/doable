@@ -76,8 +76,6 @@ final class _IntentionCatalogPageState
           ),
           emptyMessage: (empty) => _emptyMessage(localizations, empty.query),
           totalCountLabel: localizations.catalogTotalCount,
-          // Каталог сохраняет позицию по видимому намерению.
-          viewAnchor: IntentionSearchResultsViewAnchor.visibleIntention,
           itemBuilder: (context, results, summary) => _IntentionSummaryTile(
             summary: summary,
             showArchiveState: results.query.scope == IntentionScope.all,

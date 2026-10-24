@@ -421,7 +421,7 @@
     - механическая адаптация потоков: `test/long_term_relation/presentation/editor/relation_form_test_support.dart`, `test/long_term_relation/presentation/editor/relation_participant_selection_scenarios.dart`, `test/app/long_term_relation_app_flow_test.dart`, `test/app/quick_creation/quick_creation_flow_scenarios.dart`, `test/app/navigation/app_shell_operation_reset_test.dart`, `test/app/navigation/app_shell_pages_above_test.dart`, `test/intention/presentation/intention_tag_search_accessibility_test.dart`.
   - **Размер:** M — тонкая страница; механическая адаптация проверок потоков входит в задачу, потому что страницу нельзя перевести, не сломав эти проверки.
 
-- [ ] 3.6 Убрать из общих виджетов поиска каталога варианты, которые были нужны только поискам выбора
+- [x] 3.6 Убрать из общих виджетов поиска каталога варианты, которые были нужны только поискам выбора
   - **Критерии приёмки:**
     - По решению 3 дизайна `IntentionSearchResults` всегда удерживает позицию по видимому намерению: `IntentionSearchResultsViewAnchor` с вариантом смещения прокрутки удалён. Подпись количества `totalCountLabel` обязательна.
     - `IntentionSearchLayout.resultsExtent` обязателен: значением по умолчанию пользовались только поиски выбора, а каталог задаёт высоту выдачи явно.
