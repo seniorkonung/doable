@@ -72,36 +72,61 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('в поиске исходного намерения молния и доступное название '
-      'отличают действие от намерения', (tester) async {
-    final semantics = tester.ensureSemantics();
-    final purpose = SelectDailyChoiceSource(session: IntentionSearchSession());
-
-    await tester.pumpWidget(
-      _app(
-        purpose: purpose,
-        summary: _summary(
-          'Быть здоровым',
-          readiness: IntentionReadiness.notReady,
-        ),
+  for (final (search, purpose) in [
+    (
+      'исходного намерения',
+      SelectDailyChoiceSource(session: IntentionSearchSession()),
+    ),
+    (
+      'участника',
+      SelectRelationParticipant(
+        selectionContext: RelationParticipantSelectionContext.activeRelation,
+        session: IntentionSearchSession(),
       ),
-    );
-    expect(_marks(tester), isEmpty);
-    expect(
-      find.bySemanticsLabel('Быть здоровым, намерение, Без тегов'),
-      findsOneWidget,
-    );
+    ),
+  ]) {
+    testWidgets('в поиске $search молния и доступное название отличают '
+        'действие от намерения на двух языках', (tester) async {
+      final semantics = tester.ensureSemantics();
 
-    await tester.pumpWidget(
-      _app(purpose: purpose, summary: _summary('Пройти пешком до парка')),
-    );
-    expect(_marks(tester), [DoableIconData.bolt]);
-    expect(
-      find.bySemanticsLabel('Пройти пешком до парка, действие, Без тегов'),
-      findsOneWidget,
-    );
-    semantics.dispose();
-  });
+      for (final (locale, intention, action) in const [
+        (
+          Locale('ru'),
+          'Быть здоровым, намерение, Без тегов',
+          'Пройти пешком до парка, действие, Без тегов',
+        ),
+        (
+          Locale('en'),
+          'Быть здоровым, intention, No tags',
+          'Пройти пешком до парка, action, No tags',
+        ),
+      ]) {
+        await tester.pumpWidget(
+          _app(
+            locale: locale,
+            purpose: purpose,
+            summary: _summary(
+              'Быть здоровым',
+              readiness: IntentionReadiness.notReady,
+            ),
+          ),
+        );
+        expect(_marks(tester), isEmpty);
+        expect(find.bySemanticsLabel(intention), findsOneWidget);
+
+        await tester.pumpWidget(
+          _app(
+            locale: locale,
+            purpose: purpose,
+            summary: _summary('Пройти пешком до парка'),
+          ),
+        );
+        expect(_marks(tester), [DoableIconData.bolt]);
+        expect(find.bySemanticsLabel(action), findsOneWidget);
+      }
+      semantics.dispose();
+    });
+  }
 
   testWidgets('теги из фильтра стоят первыми и выделены, а цвет тега '
       'сохраняется', (tester) async {

@@ -10,7 +10,7 @@ enum IntentionPickerKind {
   static IntentionPickerKind of(IntentionPickerPurpose purpose) =>
       switch (purpose) {
         SelectDailyChoiceAction() => action,
-        SelectDailyChoiceSource() => intention,
+        SelectDailyChoiceSource() || SelectRelationParticipant() => intention,
       };
 
   String title(AppLocalizations l10n) => switch (this) {
@@ -65,4 +65,5 @@ String intentionPickerKeyPrefix(IntentionPickerPurpose purpose) =>
     switch (purpose) {
       SelectDailyChoiceAction() => 'daily-choice-action',
       SelectDailyChoiceSource() => 'daily-choice-source',
+      SelectRelationParticipant() => 'participant-picker',
     };

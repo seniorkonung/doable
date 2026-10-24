@@ -50,7 +50,7 @@ final class IntentionPickerRow extends StatelessWidget {
     // В поиске действия вид называть незачем: он выбирает только действия.
     final namesKind = switch (purpose) {
       SelectDailyChoiceAction() => false,
-      SelectDailyChoiceSource() => true,
+      SelectDailyChoiceSource() || SelectRelationParticipant() => true,
     };
 
     return PickerRow(

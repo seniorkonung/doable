@@ -79,7 +79,7 @@ final class SelectDailyChoiceSource extends IntentionPickerPurpose {
 /// запрещена, а одноимённые намерения остаются разными участниками. Контекст
 /// редактируемой связи задаёт допустимый архивный охват и не позволяет
 /// вызывающей стороне составить режим выбора только архивных намерений.
-final class SelectRelationParticipant extends IntentionCatalogPurpose {
+final class SelectRelationParticipant extends IntentionPickerPurpose {
   const SelectRelationParticipant({
     required this.selectionContext,
     required this.session,

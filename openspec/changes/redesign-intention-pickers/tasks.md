@@ -370,7 +370,7 @@
   - **Предполагаемые файлы:** `lib/src/design_system/components/badge.dart`, `lib/src/design_system/components/picker_row.dart`, `test/design_system/badge_test.dart`, `test/design_system/picker_row_test.dart`.
   - **Размер:** S.
 
-- [ ] 3.3 Подключить назначение поиска участника к экрану выбора с видом «намерение» и ключами `participant-picker`
+- [x] 3.3 Подключить назначение поиска участника к экрану выбора с видом «намерение» и ключами `participant-picker`
   - **Критерии приёмки:**
     - `SelectRelationParticipant` — наследник `IntentionPickerPurpose` по решению 1 дизайна. Разборы экрана выбора выводят для него:
       - вид «намерение»: заголовки «Выбор намерения» и «Намерения» и тексты выдачи о намерениях;

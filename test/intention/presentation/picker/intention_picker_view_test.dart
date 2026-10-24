@@ -49,6 +49,14 @@ void main() {
         intention,
         'daily-choice-source',
       ),
+      (
+        SelectRelationParticipant(
+          selectionContext: RelationParticipantSelectionContext.activeRelation,
+          session: IntentionSearchSession(),
+        ),
+        intention,
+        'participant-picker',
+      ),
     ]) {
       testWidgets('${locale.languageCode}: шапка «$title» с крестиком, '
           'который закрывает экран', (tester) async {
@@ -221,6 +229,7 @@ void main() {
         final prefix = switch (purpose) {
           SelectDailyChoiceAction() => 'daily-choice-action',
           SelectDailyChoiceSource() => 'daily-choice-source',
+          SelectRelationParticipant() => 'participant-picker',
         };
         await tester.enterText(find.byKey(ValueKey('$prefix-filter')), filter);
         if (required) {
