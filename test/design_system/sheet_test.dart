@@ -572,20 +572,199 @@ void main() {
     });
   }
 
-  testWidgets('прокрутка тела в обе стороны не меняет размер листа', (
-    tester,
-  ) async {
+  testWidgets('свайп вверх по списку раскрывает компактный лист вслед за '
+      'пальцем, «Готово» стоит на месте, а список начинает прокручиваться '
+      'только в полном размере', (tester) async {
     await _openExpandableSheet(tester);
+    final compact = tester.getRect(find.byType(Sheet));
+    final footer = tester.getRect(find.text('Готово'));
+    final body = _bodyPosition(tester);
+    final gesture = await _SlowGesture.start(tester, find.text('Тег 2'));
+    // Первое движение список тратит на принятие жеста.
+    await gesture.moveTo(-20);
 
-    await tester.drag(find.text('Тег 2'), const Offset(0, -300));
-    await tester.pumpAndSettle();
-    expect(find.text('Тег 0'), findsNothing);
-    expect(_sheetHeight(tester), _compact);
+    for (final rise in [100.0, _growth]) {
+      await gesture.moveTo(-20 - rise);
+      expect(
+        tester.getRect(find.byType(Sheet)).top,
+        closeTo(compact.top - rise, 1),
+        reason: 'подъём $rise',
+      );
+      expect(
+        tester.getRect(find.text('Готово')),
+        footer,
+        reason: 'подъём $rise',
+      );
+      expect(body.pixels, 0, reason: 'подъём $rise');
+    }
 
-    await tester.drag(find.text('Тег 8'), const Offset(0, 600));
+    await gesture.moveTo(-20 - _growth - 120);
+    expect(_sheetHeight(tester), _full);
+    expect(body.pixels, 120);
+    await gesture.up();
     await tester.pumpAndSettle();
-    expect(find.text('Тег 0'), findsOne);
+
+    expect(_sheetHeight(tester), _full);
+    expect(body.pixels, 120);
+    expect(_chevron, findsOne);
+  });
+
+  testWidgets('свайп вниз по списку, прокрученному до середины полного '
+      'листа, прокручивает его к началу, а затем сворачивает лист вслед за '
+      'пальцем', (tester) async {
+    final sheet = await _openExpandableSheet(tester);
+    await tester.tap(find.bySemanticsLabel(_expandLabel));
+    await tester.pumpAndSettle();
+    final full = tester.getRect(find.byType(Sheet));
+    final footer = tester.getRect(find.text('Готово'));
+    final body = _bodyPosition(tester);
+    body.jumpTo(200);
+    await tester.pump();
+    final gesture = await _SlowGesture.start(tester, find.text('Тег 8'));
+    await gesture.moveTo(20);
+
+    await gesture.moveTo(20 + 150);
+    expect(body.pixels, 50);
+    expect(tester.getRect(find.byType(Sheet)), full);
+
+    for (final depth in [100.0, _growth]) {
+      await gesture.moveTo(20 + 200 + depth);
+      expect(body.pixels, 0, reason: 'глубина $depth');
+      expect(
+        tester.getRect(find.byType(Sheet)).top,
+        closeTo(full.top + depth, 1),
+        reason: 'глубина $depth',
+      );
+      expect(
+        tester.getRect(find.text('Готово')),
+        footer,
+        reason: 'глубина $depth',
+      );
+    }
+    await gesture.moveTo(20 + 200 + _growth + 60);
+    expect(
+      tester.getRect(find.text('Готово')).top,
+      closeTo(footer.top + 60, 1),
+    );
+    await gesture.up();
+    await tester.pumpAndSettle();
+
     expect(_sheetHeight(tester), _compact);
+    expect(tester.getRect(find.byType(Sheet)).bottom, _screen.height);
+    expect(sheet.isClosed, isFalse);
+  });
+
+  testWidgets('когда клавиатура не оставляет места для роста, движение вверх '
+      'по списку компактного листа прокручивает список, а лист остаётся '
+      'компактным со скруглёнными углами и ручкой', (tester) async {
+    await _openExpandableSheet(tester);
+    tester.view.viewInsets = const FakeViewPadding(bottom: 400);
+    addTearDown(tester.view.resetViewInsets);
+    await tester.pumpAndSettle();
+    final compact = tester.getRect(find.byType(Sheet));
+    final body = _bodyPosition(tester);
+
+    final gesture = await _SlowGesture.start(tester, find.text('Тег 0'));
+    await gesture.moveTo(-20);
+    await gesture.moveTo(-20 - 60);
+    expect(body.pixels, 60);
+    expect(tester.getRect(find.byType(Sheet)), compact);
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(tester.getRect(find.byType(Sheet)), compact);
+    expect(_topRadius(tester), DoableMetrics.radiusXl);
+    expect(find.bySemanticsLabel(_expandLabel), findsOne);
+    expect(_chevron, findsNothing);
+  });
+
+  testWidgets('короткий быстрый бросок вверх по списку компактного листа '
+      'раскрывает лист, а список остаётся в начале', (tester) async {
+    await _openExpandableSheet(tester);
+    final body = _bodyPosition(tester);
+
+    await tester.fling(find.text('Тег 2'), const Offset(0, -60), 1000);
+    await tester.pumpAndSettle();
+
+    expect(_sheetHeight(tester), _full);
+    expect(body.pixels, 0);
+  });
+
+  testWidgets('список, который помещается только в полном размере, ведёт '
+      'лист вслед за пальцем до полного размера, а дальнейшее движение вверх '
+      'не вызывает эффекта края', (tester) async {
+    var overscrolls = 0;
+    await _openSheet(
+      tester,
+      (context) => showDoableSheet<void>(
+        context: context,
+        builder: (context, sheet) =>
+            NotificationListener<OverscrollNotification>(
+              onNotification: (_) {
+                overscrolls++;
+                return false;
+              },
+              child: Sheet.expandable(
+                sheet,
+                title: 'Теги',
+                text: 'Выберите сколько нужно',
+                expandLabel: _expandLabel,
+                collapseLabel: _collapseLabel,
+                pinned: const _Search(),
+                slivers: [
+                  SliverList.builder(
+                    itemCount: 10,
+                    itemBuilder: (context, index) =>
+                        SizedBox(height: 48, child: Text('Тег $index')),
+                  ),
+                ],
+                footer: Button.primary(label: 'Готово', onPressed: _ignore),
+              ),
+            ),
+      ),
+    );
+    final compact = tester.getRect(find.byType(Sheet));
+    final body = _bodyPosition(tester);
+    expect(body.maxScrollExtent, greaterThan(0));
+
+    final gesture = await _SlowGesture.start(tester, find.text('Тег 1'));
+    await gesture.moveTo(-20);
+    for (final rise in [60.0, 120.0]) {
+      await gesture.moveTo(-20 - rise);
+      expect(
+        tester.getRect(find.byType(Sheet)).top,
+        closeTo(compact.top - rise, 1),
+        reason: 'подъём $rise',
+      );
+    }
+    // Это движение доводит лист до полного размера, и его остаток список
+    // гасит.
+    await gesture.moveTo(-20 - _growth - 100);
+    expect(_sheetHeight(tester), _full);
+    expect(body.maxScrollExtent, 0);
+    expect(body.pixels, 0);
+    await gesture.moveTo(-20 - _growth - 200);
+    expect(body.pixels, 0);
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(_sheetHeight(tester), _full);
+    expect(overscrolls, 0);
+  });
+
+  testWidgets('scrollUp диктора над списком компактного листа прокручивает '
+      'список, а лист остаётся компактным', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await _openExpandableSheet(tester);
+    final compact = tester.getRect(find.byType(Sheet));
+    final body = _bodyPosition(tester);
+
+    tester.semantics.scrollUp(scrollable: find.semantics.scrollable());
+    await tester.pumpAndSettle();
+
+    expect(body.pixels, greaterThan(0));
+    expect(tester.getRect(find.byType(Sheet)), compact);
+    semantics.dispose();
   });
 
   testWidgets('действие шапки стоит справа на строке заголовка в компактном '
@@ -1165,7 +1344,12 @@ ScrollPosition _bodyPosition(WidgetTester tester) => tester
     .state<ScrollableState>(
       find.descendant(
         of: find.byType(Sheet),
-        matching: find.byType(Scrollable),
+        // Поле поиска прокручивается по горизонтали.
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is Scrollable &&
+              widget.axisDirection == AxisDirection.down,
+        ),
       ),
     )
     .position;

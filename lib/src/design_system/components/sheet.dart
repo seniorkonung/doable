@@ -267,6 +267,9 @@ final class _SheetMotionState extends State<_SheetMotion> {
 
   double get _position => _sheetCurve.transform(_route._animation.value);
 
+  /// Раскрытие листа: 0 — компактный размер, 1 — полный.
+  double get _expansion => widget.expansion?.controller.value ?? 0;
+
   /// Сдвиг верхнего края листа вверх от компактного положения: отрицательный
   /// на отрезке сдвига, положительный на отрезке раскрытия.
   double get _offset => _route._animation.value < 1
@@ -411,6 +414,15 @@ final class _SheetBodyPosition extends ScrollPositionWithSingleContext {
   /// Сдвинулся ли лист в текущем перетаскивании.
   var _hasSheetMoved = false;
 
+  /// Раскрытие листа при последней раскладке тела.
+  var _laidOutExpansion = 0.0;
+
+  @override
+  bool applyViewportDimension(double viewportDimension) {
+    _laidOutExpansion = _motion._expansion;
+    return super.applyViewportDimension(viewportDimension);
+  }
+
   @override
   Drag drag(DragStartDetails details, VoidCallback dragCancelCallback) {
     // Действия прокрутки диктора Flutter выполняет обработчиками
@@ -436,9 +448,12 @@ final class _SheetBodyPosition extends ScrollPositionWithSingleContext {
     if (moved != 0) _hasSheetMoved = true;
     // Остаток вниз бывает, только когда лист опущен до конца пути, и он
     // гасится. Остаток вверх тело, которое помещается целиком, гасит без
-    // эффекта края.
+    // эффекта края. Гасится он и тогда, когда тело ещё не разложено в
+    // новой высоте раскрытого листа: его предел прокрутки устарел.
     final rest = delta - scroll - moved;
-    if (rest < 0 && maxScrollExtent > minScrollExtent) {
+    if (rest < 0 &&
+        maxScrollExtent > minScrollExtent &&
+        _motion._expansion == _laidOutExpansion) {
       super.applyUserOffset(rest);
     }
   }
@@ -505,15 +520,17 @@ final class Sheet extends StatelessWidget {
 
   /// Лист компактной высоты, который раскрывается на весь экран.
   ///
-  /// Лист перетаскивается за шапку, [pinned] и [footer]: выше компактного
-  /// размера он растёт, а [footer] стоит на месте, ниже — уходит целиком.
-  /// После отпускания он раскрывается, сворачивается или закрывается по
-  /// положению и скорости; нажатие на ручку переключает размер. Касание
-  /// затемнения и «назад» закрывают лист средствами Material маршрута
-  /// [showDoableSheet].
+  /// Лист перетаскивается за шапку, [pinned], [footer] и список: выше
+  /// компактного размера он растёт, а [footer] стоит на месте, ниже — уходит
+  /// целиком. После отпускания он раскрывается, сворачивается или
+  /// закрывается по положению и скорости; нажатие на ручку переключает
+  /// размер. Касание затемнения и «назад» закрывают лист средствами Material
+  /// маршрута [showDoableSheet].
   /// [slivers] — срезы тела, из которых лист сам строит прокручиваемый
-  /// список между [pinned] и [footer]; его прокрутка не меняет размер листа.
-  /// Неподвижные части над списком передаются в [pinned].
+  /// список между [pinned] и [footer]. Список передаёт жест листу: в
+  /// компактном размере движение вверх сначала раскрывает лист, а движение
+  /// вниз прокручивает список к началу, а от начала сворачивает и опускает
+  /// лист. Неподвижные части над списком передаются в [pinned].
   /// [expandLabel] и [collapseLabel] — доступные названия ручки.
   /// [action] — текстовая кнопка размера sm справа на строке заголовка,
   /// например «Сбросить»; заголовок при ней остаётся по центру.
@@ -976,7 +993,7 @@ final class _ExpandableSheetState extends State<_ExpandableSheet>
             ],
           );
 
-    final content = _SheetLayout(
+    Widget content(ScrollController body) => _SheetLayout(
       minimum: const EdgeInsets.symmetric(horizontal: DoableMetrics.space3),
       head: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -992,7 +1009,14 @@ final class _ExpandableSheetState extends State<_ExpandableSheet>
             child: parts.pinned,
           ),
           const SizedBox(height: DoableMetrics.space2),
-          Expanded(child: CustomScrollView(slivers: parts.slivers)),
+          Expanded(
+            child: CustomScrollView(
+              controller: body,
+              // Список, который помещается целиком, тоже передаёт жест листу.
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: parts.slivers,
+            ),
+          ),
         ],
       ),
       footer: _Footer(child: parts.footer),
@@ -1013,7 +1037,7 @@ final class _ExpandableSheetState extends State<_ExpandableSheet>
             isFull: _isFull,
             resize: _resize,
           ),
-          builder: (_) => AnimatedBuilder(
+          builder: (body) => AnimatedBuilder(
             animation: _expansion,
             builder: (context, child) {
               final progress = _expansion.value;
@@ -1042,7 +1066,7 @@ final class _ExpandableSheetState extends State<_ExpandableSheet>
                 ),
               );
             },
-            child: content,
+            child: content(body),
           ),
         );
       },

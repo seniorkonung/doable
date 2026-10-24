@@ -588,8 +588,12 @@ void main() {
     final tags = [for (var i = 1; i <= 40; i++) _tag(i, 'Тег $i')];
     h.repository.complete(tags, assignedIds: {_id(15)});
     await tester.pump();
-    await tester.drag(find.byType(CustomScrollView), const Offset(0, -500));
-    await tester.pumpAndSettle();
+    // Первый жест вверх раскрывает компактную панель, второй прокручивает
+    // список.
+    for (var drags = 0; drags < 2; drags++) {
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, -500));
+      await tester.pumpAndSettle();
+    }
     final offset = _scrollOffset(tester);
     final shown = _rowNames(tester);
     expect(shown.first, isNot('Тег 1'));
