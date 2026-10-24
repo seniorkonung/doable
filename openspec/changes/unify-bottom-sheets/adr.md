@@ -12,7 +12,7 @@ accepted ADRs are immutable.
 
 ## Key ADRs for This Change
 
-- [ADR-0041](../../../docs/adr/0041-expand-design-system-sheets-by-header-drag.md) — proposed, originating change `add-tags-panel` (в архиве). Раскрываемый лист с порогом шапки и отдельной функцией показа. ADR-0044 пересматривает её порог, жест только на шапке и привязку варианта к функции. Размеры листа и неизменный размер при прокрутке тела остаются в силе.
+- [ADR-0041](../../../docs/adr/0041-expand-design-system-sheets-by-header-drag.md) — proposed, originating change `add-tags-panel` (в архиве). Раскрываемый лист с порогом шапки и отдельной функцией показа. ADR-0044 пересматривает её порог, жест только на шапке, неизменный размер листа при прокрутке тела и привязку варианта к функции. Размеры листа остаются в силе.
 - [ADR-0032](../../../docs/adr/0032-present-design-system-sheets-over-root-navigator.md) — proposed, originating change `redesign-navigation-bar` (в архиве). Показ листов функцией модуля основ через модальную нижнюю панель Material в корневом навигаторе. Это ограничение сохраняется для затемнения, «назад», фокуса и семантики; ADR-0044 пересматривает только перетаскивание.
 - [ADR-0042](../../../docs/adr/0042-show-shared-surface-messages-over-operating-sheets.md) — proposed, originating change `add-tags-panel` (в архиве). Собственный `Scaffold` листа для сообщений общей поверхности. Это ограничение: движение листа охватывает этот `Scaffold` и не меняет место сообщений.
 

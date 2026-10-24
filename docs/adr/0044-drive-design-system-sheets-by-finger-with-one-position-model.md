@@ -3,7 +3,7 @@
 - Status: proposed
 - Originating change: unify-bottom-sheets
 - Date: 2026-10-24
-- Supersedes: [ADR-0041](0041-expand-design-system-sheets-by-header-drag.md) в части порога жеста шапки, перетаскивания только за шапку и отдельной функции показа раскрываемого листа, связанной с вариантом типом; [ADR-0032](0032-present-design-system-sheets-over-root-navigator.md) в части перетаскивания листа модальной нижней панелью Material.
+- Supersedes: [ADR-0041](0041-expand-design-system-sheets-by-header-drag.md) в части порога жеста шапки, перетаскивания только за шапку, неизменного размера листа при прокрутке тела и отдельной функции показа раскрываемого листа, связанной с вариантом типом; [ADR-0032](0032-present-design-system-sheets-over-root-navigator.md) в части перетаскивания листа модальной нижней панелью Material.
 
 ## Контекст
 
