@@ -490,14 +490,18 @@ final class Sheet extends StatelessWidget {
   /// маршрута [showDoableSheet]. При нехватке высоты прокручивается только
   /// тело, а нижняя часть видна под ним. Тело передаёт жест листу: движение
   /// вниз прокручивает его к началу, а от начала опускает лист.
-  const Sheet(
+  ///
+  /// [text] — пояснение под заголовком; без него тело следует сразу за
+  /// заголовком. [footer] — основная кнопка листа на всю ширину, закреплённая
+  /// под телом вне его прокрутки; без неё лист заканчивается телом.
+  Sheet(
     this._presentation, {
     required this.title,
-    required this.child,
-    this.text,
-    this.footer,
+    required Widget child,
+    String? text,
+    Widget? footer,
     super.key,
-  }) : _expansion = null;
+  }) : _parts = _ContentParts(text: text, body: child, footer: footer);
 
   /// Лист компактной высоты, который раскрывается на весь экран.
   ///
@@ -507,28 +511,27 @@ final class Sheet extends StatelessWidget {
   /// положению и скорости; нажатие на ручку переключает размер. Касание
   /// затемнения и «назад» закрывают лист средствами Material маршрута
   /// [showDoableSheet].
-  /// [body] — собственный прокручиваемый список тела, который занимает место
-  /// между [pinned] и [footer]; его прокрутка не меняет размер листа.
+  /// [slivers] — срезы тела, из которых лист сам строит прокручиваемый
+  /// список между [pinned] и [footer]; его прокрутка не меняет размер листа.
+  /// Неподвижные части над списком передаются в [pinned].
   /// [expandLabel] и [collapseLabel] — доступные названия ручки.
   /// [action] — текстовая кнопка размера sm справа на строке заголовка,
   /// например «Сбросить»; заголовок при ней остаётся по центру.
-  const Sheet.expandable(
+  Sheet.expandable(
     this._presentation, {
     required this.title,
     required String text,
     required Widget pinned,
-    required Widget body,
+    required List<Widget> slivers,
     required Widget footer,
     required String expandLabel,
     required String collapseLabel,
     SheetAction? action,
     super.key,
-  }) : text = text,
-       child = body,
-       footer = footer,
-       _expansion = (
+  }) : _parts = _ExpandableParts(
          text: text,
          pinned: pinned,
+         slivers: slivers,
          footer: footer,
          expandLabel: expandLabel,
          collapseLabel: collapseLabel,
@@ -537,31 +540,22 @@ final class Sheet extends StatelessWidget {
 
   final String title;
 
-  /// Пояснение под заголовком; без него тело следует сразу за заголовком.
-  final String? text;
-
-  /// Тело листа.
-  final Widget child;
-
-  /// Основная кнопка листа на всю ширину, закреплённая под телом вне его
-  /// прокрутки; без неё лист заканчивается телом.
-  final Widget? footer;
-
   final SheetPresentation _presentation;
 
-  /// Части раскрываемого листа; без них лист — по содержимому.
-  final _Expansion? _expansion;
+  /// Части листа, которые определяют его вариант.
+  final _SheetParts _parts;
 
   @override
-  Widget build(BuildContext context) {
-    if (_expansion case final expansion?) {
-      return _ExpandableSheet(
-        route: _presentation._route,
-        title: title,
-        body: child,
-        expansion: expansion,
-      );
-    }
+  Widget build(BuildContext context) => switch (_parts) {
+    final _ContentParts parts => _buildContent(context, parts),
+    final _ExpandableParts parts => _ExpandableSheet(
+      route: _presentation._route,
+      title: title,
+      parts: parts,
+    ),
+  };
+
+  Widget _buildContent(BuildContext context, _ContentParts parts) {
     final theme = Theme.of(context);
     final colors = _colorsOf(theme);
     const borderRadius = BorderRadius.vertical(
@@ -593,7 +587,7 @@ final class Sheet extends StatelessWidget {
               children: [
                 Center(child: _Grip(color: colors.grip)),
                 const SizedBox(height: 14),
-                _TitleBlock(title: title, text: text, action: null),
+                _TitleBlock(title: title, text: parts.text, action: null),
                 const SizedBox(height: DoableMetrics.space3),
                 Flexible(
                   child: SingleChildScrollView(
@@ -601,12 +595,12 @@ final class Sheet extends StatelessWidget {
                     // Тело, которое помещается целиком, тоже передаёт жест
                     // листу.
                     physics: const AlwaysScrollableScrollPhysics(),
-                    child: child,
+                    child: parts.body,
                   ),
                 ),
               ],
             ),
-            footer: switch (footer) {
+            footer: switch (parts.footer) {
               final footer? => _Footer(child: footer),
               null => null,
             },
@@ -828,27 +822,57 @@ final class _RenderScaffoldFrame extends RenderProxyBox {
   }
 }
 
-typedef _Expansion = ({
-  String text,
-  Widget pinned,
-  Widget footer,
-  String expandLabel,
-  String collapseLabel,
-  SheetAction? action,
-});
+/// Части листа одного из двух вариантов.
+sealed class _SheetParts {
+  const _SheetParts();
+}
+
+/// Части листа по содержимому.
+final class _ContentParts extends _SheetParts {
+  const _ContentParts({
+    required this.text,
+    required this.body,
+    required this.footer,
+  });
+
+  final String? text;
+  final Widget body;
+  final Widget? footer;
+}
+
+/// Части раскрываемого листа.
+final class _ExpandableParts extends _SheetParts {
+  const _ExpandableParts({
+    required this.text,
+    required this.pinned,
+    required this.slivers,
+    required this.footer,
+    required this.expandLabel,
+    required this.collapseLabel,
+    required this.action,
+  });
+
+  final String text;
+  final Widget pinned;
+
+  /// Срезы прокручиваемого списка тела.
+  final List<Widget> slivers;
+  final Widget footer;
+  final String expandLabel;
+  final String collapseLabel;
+  final SheetAction? action;
+}
 
 final class _ExpandableSheet extends StatefulWidget {
   const _ExpandableSheet({
     required this.route,
     required this.title,
-    required this.body,
-    required this.expansion,
+    required this.parts,
   });
 
   final _DoableSheetRoute<Object?> route;
   final String title;
-  final Widget body;
-  final _Expansion expansion;
+  final _ExpandableParts parts;
 
   @override
   State<_ExpandableSheet> createState() => _ExpandableSheetState();
@@ -887,13 +911,13 @@ final class _ExpandableSheetState extends State<_ExpandableSheet>
     final theme = Theme.of(context);
     final colors = _colorsOf(theme);
     final shadows = _shadowsOf(theme);
-    final expansion = widget.expansion;
+    final parts = widget.parts;
 
     final handle = Semantics(
       container: true,
       button: true,
       expanded: _isFull,
-      label: _isFull ? expansion.collapseLabel : expansion.expandLabel,
+      label: _isFull ? parts.collapseLabel : parts.expandLabel,
       child: InkWell(
         onTap: () => _resize(full: !_isFull),
         borderRadius: BorderRadius.circular(DoableMetrics.radiusXs),
@@ -920,8 +944,8 @@ final class _ExpandableSheetState extends State<_ExpandableSheet>
     );
     final titleBlock = _TitleBlock(
       title: widget.title,
-      text: expansion.text,
-      action: switch (expansion.action) {
+      text: parts.text,
+      action: switch (parts.action) {
         final action? => Button.text(
           label: action.label,
           semanticLabel: action.semanticLabel,
@@ -965,13 +989,13 @@ final class _ExpandableSheetState extends State<_ExpandableSheet>
             padding: const EdgeInsets.symmetric(
               horizontal: DoableMetrics.space2,
             ),
-            child: expansion.pinned,
+            child: parts.pinned,
           ),
           const SizedBox(height: DoableMetrics.space2),
-          Expanded(child: widget.body),
+          Expanded(child: CustomScrollView(slivers: parts.slivers)),
         ],
       ),
-      footer: _Footer(child: expansion.footer),
+      footer: _Footer(child: parts.footer),
     );
 
     return LayoutBuilder(

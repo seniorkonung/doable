@@ -221,52 +221,78 @@ final class _TagsPanelState extends ConsumerState<_TagsPanel> {
         expandLabel: l10n.tagsPanelExpand,
         collapseLabel: l10n.tagsPanelCollapse,
         action: action,
-        pinned: SearchField(
-          controller: _searchController,
-          placeholder: l10n.tagsPanelSearchPlaceholder,
-          label: l10n.tagsPanelSearchLabel,
-          clearLabel: l10n.tagsPanelClearSearch,
-          onChanged: model.search,
-          error: state.search.inputIsInvalid
-              ? l10n.tagsPanelInvalidSearch
-              : null,
-        ),
-        body: switch (state.catalog) {
-          TagsPanelLoading() => _StatusBody(
-            ListState.loading(text: l10n.tagsPanelLoading),
-          ),
-          TagsPanelLoadFailure(:final failure, :final canRetry) => _StatusBody(
-            ListState.error(
-              message: _loadFailureMessage(l10n, failure),
-              retry: canRetry
-                  ? (label: l10n.commonRetry, onPressed: model.retryLoad)
+        pinned: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SearchField(
+              controller: _searchController,
+              placeholder: l10n.tagsPanelSearchPlaceholder,
+              label: l10n.tagsPanelSearchLabel,
+              clearLabel: l10n.tagsPanelClearSearch,
+              onChanged: model.search,
+              error: state.search.inputIsInvalid
+                  ? l10n.tagsPanelInvalidSearch
                   : null,
             ),
-          ),
-          TagsPanelIntentionMissing() => _StatusBody(
-            ListState.error(message: l10n.tagsPanelIntentionMissing),
-          ),
-          final TagsPanelLoaded loaded => _LoadedCatalog(
-            catalog: loaded,
-            filter: state.search.filter,
-            canReorder: state.canReorder,
-            model: model,
-            heldTagId: _heldTagId,
-            onCreate: (proposal) => _openCreation(proposal, loaded, model),
-            menuOf: (row, tag) => TagRowMenu(
-              holdHint: l10n.tagsPanelTagHoldHint,
-              onOpen: () => unawaited(_openMenu(row, tag)),
-              actions: [
-                for (final (action, label) in [
-                  (_TagAction.edit, l10n.tagsPanelEditTag),
-                  (_TagAction.duplicate, l10n.tagsPanelDuplicateTag),
-                  (_TagAction.delete, l10n.tagsPanelDeleteTag),
-                ])
-                  (label: label, onInvoke: () => _runAction(action, tag.id)),
-              ],
+            // Сообщение стоит вне прокрутки: оно видно при любом положении
+            // списка и не сдвигает прокрутку показанных строк.
+            if (state.catalog case TagsPanelLoaded(
+              refreshFailure: final failure?,
+              :final canRetryRefresh,
+            )) ...[
+              const SizedBox(height: DoableMetrics.space2),
+              Notice.content(
+                message: Semantics(
+                  container: true,
+                  liveRegion: true,
+                  child: Text(_refreshFailureMessage(l10n, failure)),
+                ),
+                action: canRetryRefresh
+                    ? (label: l10n.commonRetry, onPressed: model.retryRefresh)
+                    : null,
+              ),
+            ],
+          ],
+        ),
+        slivers: [
+          switch (state.catalog) {
+            TagsPanelLoading() => _StatusSliver(
+              ListState.loading(text: l10n.tagsPanelLoading),
             ),
-          ),
-        },
+            TagsPanelLoadFailure(:final failure, :final canRetry) =>
+              _StatusSliver(
+                ListState.error(
+                  message: _loadFailureMessage(l10n, failure),
+                  retry: canRetry
+                      ? (label: l10n.commonRetry, onPressed: model.retryLoad)
+                      : null,
+                ),
+              ),
+            TagsPanelIntentionMissing() => _StatusSliver(
+              ListState.error(message: l10n.tagsPanelIntentionMissing),
+            ),
+            final TagsPanelLoaded loaded => _LoadedCatalog(
+              catalog: loaded,
+              filter: state.search.filter,
+              canReorder: state.canReorder,
+              model: model,
+              heldTagId: _heldTagId,
+              onCreate: (proposal) => _openCreation(proposal, loaded, model),
+              menuOf: (row, tag) => TagRowMenu(
+                holdHint: l10n.tagsPanelTagHoldHint,
+                onOpen: () => unawaited(_openMenu(row, tag)),
+                actions: [
+                  for (final (action, label) in [
+                    (_TagAction.edit, l10n.tagsPanelEditTag),
+                    (_TagAction.duplicate, l10n.tagsPanelDuplicateTag),
+                    (_TagAction.delete, l10n.tagsPanelDeleteTag),
+                  ])
+                    (label: label, onInvoke: () => _runAction(action, tag.id)),
+                ],
+              ),
+            ),
+          },
+        ],
         footer: Button.primary(
           label: l10n.tagsPanelDone,
           onPressed: () => Navigator.pop(context),
@@ -277,14 +303,16 @@ final class _TagsPanelState extends ConsumerState<_TagsPanel> {
 }
 
 /// Состояние всего каталога на месте его строк.
-final class _StatusBody extends StatelessWidget {
-  const _StatusBody(this.state);
+final class _StatusSliver extends StatelessWidget {
+  const _StatusSliver(this.state);
 
   final ListState state;
 
   @override
-  Widget build(BuildContext context) =>
-      ListView(padding: _bodyPadding, children: [state]);
+  Widget build(BuildContext context) => SliverPadding(
+    padding: _bodyPadding,
+    sliver: SliverToBoxAdapter(child: state),
+  );
 }
 
 final class _LoadedCatalog extends StatelessWidget {
@@ -321,107 +349,67 @@ final class _LoadedCatalog extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final rows = catalog.rowsMatching(filter);
     final proposedName = catalog.proposedTagName(filter);
-    final refreshFailure = catalog.refreshFailure;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // Сообщение стоит вне прокрутки: оно видно при любом положении
-        // списка и не сдвигает прокрутку показанных строк.
-        if (refreshFailure != null)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              DoableMetrics.space2,
-              0,
-              DoableMetrics.space2,
-              DoableMetrics.space2,
-            ),
-            child: Notice.content(
-              message: Semantics(
-                container: true,
-                liveRegion: true,
-                child: Text(_refreshFailureMessage(l10n, refreshFailure)),
-              ),
-              action: catalog.canRetryRefresh
-                  ? (label: l10n.commonRetry, onPressed: model.retryRefresh)
-                  : null,
-            ),
-          ),
-        Expanded(
-          child: CustomScrollView(
-            slivers: [
-              if (catalog.isEmpty && filter.isEmpty)
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: EmptyState(
-                    title: l10n.tagsPanelEmptyTitle,
-                    text: l10n.tagsPanelEmptyText,
-                  ),
-                )
-              else
-                SliverPadding(
-                  padding: _bodyPadding,
-                  sliver: SliverMainAxisGroup(
-                    slivers: [
-                      if (proposedName != null)
-                        SliverToBoxAdapter(
-                          child: TagCreateRow(
-                            text: l10n.tagsPanelCreateTag(proposedName),
-                            label: l10n.tagsPanelCreateTag(proposedName),
-                            onPressed: () => onCreate(
-                              TagCreationProposal(
-                                name: proposedName,
-                                color: null,
-                                placement: TagPlacement.first,
-                              ),
-                            ),
-                          ),
-                        ),
-                      // Переставляется только полный список на актуальных
-                      // строках; список сам предлагает экранному диктору
-                      // команды перемещения каждой строки.
-                      if (filter.isEmpty && catalog.rowsAreCurrent)
-                        SliverReorderableList(
-                          itemCount: rows.length,
-                          onReorderItem: (from, to) =>
-                              model.move(rows[from].tag.id, to),
-                          proxyDecorator: (_, index, _) => _row(
-                            rows[index],
-                            handle: TagRowDragHandle(
-                              index: index,
-                              enabled: false,
-                            ),
-                            ground: TagRowGround.lifted,
-                            isCurrent: false,
-                          ),
-                          itemBuilder: (context, index) => _row(
-                            rows[index],
-                            handle: TagRowDragHandle(
-                              index: index,
-                              enabled: canReorder,
-                            ),
-                            isCurrent: true,
-                          ),
-                        )
-                      else
-                        SliverList.builder(
-                          itemCount: rows.length,
-                          itemBuilder: (context, index) => _row(
-                            rows[index],
-                            // Поиск скрывает ручки, а неактуальные строки
-                            // показывают их недоступными.
-                            handle: filter.isEmpty
-                                ? TagRowDragHandle(index: index, enabled: false)
-                                : const TagRowHiddenHandle(),
-                            isCurrent: catalog.rowsAreCurrent,
-                          ),
-                        ),
-                    ],
+    if (catalog.isEmpty && filter.isEmpty) {
+      return SliverFillRemaining(
+        hasScrollBody: false,
+        child: EmptyState(
+          title: l10n.tagsPanelEmptyTitle,
+          text: l10n.tagsPanelEmptyText,
+        ),
+      );
+    }
+    return SliverPadding(
+      padding: _bodyPadding,
+      sliver: SliverMainAxisGroup(
+        slivers: [
+          if (proposedName != null)
+            SliverToBoxAdapter(
+              child: TagCreateRow(
+                text: l10n.tagsPanelCreateTag(proposedName),
+                label: l10n.tagsPanelCreateTag(proposedName),
+                onPressed: () => onCreate(
+                  TagCreationProposal(
+                    name: proposedName,
+                    color: null,
+                    placement: TagPlacement.first,
                   ),
                 ),
-            ],
-          ),
-        ),
-      ],
+              ),
+            ),
+          // Переставляется только полный список на актуальных строках; список
+          // сам предлагает экранному диктору команды перемещения каждой
+          // строки.
+          if (filter.isEmpty && catalog.rowsAreCurrent)
+            SliverReorderableList(
+              itemCount: rows.length,
+              onReorderItem: (from, to) => model.move(rows[from].tag.id, to),
+              proxyDecorator: (_, index, _) => _row(
+                rows[index],
+                handle: TagRowDragHandle(index: index, enabled: false),
+                ground: TagRowGround.lifted,
+                isCurrent: false,
+              ),
+              itemBuilder: (context, index) => _row(
+                rows[index],
+                handle: TagRowDragHandle(index: index, enabled: canReorder),
+                isCurrent: true,
+              ),
+            )
+          else
+            SliverList.builder(
+              itemCount: rows.length,
+              itemBuilder: (context, index) => _row(
+                rows[index],
+                // Поиск скрывает ручки, а неактуальные строки показывают их
+                // недоступными.
+                handle: filter.isEmpty
+                    ? TagRowDragHandle(index: index, enabled: false)
+                    : const TagRowHiddenHandle(),
+                isCurrent: catalog.rowsAreCurrent,
+              ),
+            ),
+        ],
+      ),
     );
   }
 

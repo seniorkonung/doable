@@ -607,6 +607,13 @@ void main() {
       find.text('Не удалось обновить теги. Список может быть устаревшим.'),
       findsOne,
     );
+    final notice = tester.getRect(find.byType(Notice));
+    expect(notice.top, greaterThanOrEqualTo(tester.getRect(_search).bottom));
+    expect(
+      notice.bottom,
+      lessThanOrEqualTo(tester.getRect(find.byType(CustomScrollView)).top),
+      reason: 'уведомление стоит над первой показанной строкой списка',
+    );
     _expectSameRows(tester, shown);
     expect(_scrollOffset(tester), offset);
     expect(

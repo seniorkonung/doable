@@ -1275,11 +1275,13 @@ Future<void> _showExpandableSheet(
       null => null,
     },
     pinned: const _Search(),
-    body: ListView.builder(
-      itemCount: 40,
-      itemBuilder: (context, index) =>
-          SizedBox(height: 48, child: Text('Тег $index')),
-    ),
+    slivers: [
+      SliverList.builder(
+        itemCount: 40,
+        itemBuilder: (context, index) =>
+            SizedBox(height: 48, child: Text('Тег $index')),
+      ),
+    ],
     footer: Button.primary(label: 'Готово', onPressed: onDone),
   ),
 );
