@@ -1,5 +1,5 @@
 import 'dart:math' as math;
-import 'dart:ui' show lerpDouble;
+import 'dart:ui' show clampDouble, lerpDouble;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -14,10 +14,12 @@ import 'button.dart';
 
 /// Возможность построить лист по содержимому [Sheet.new].
 ///
-/// Её даёт построителю только [showDoableSheet]: маршрут этой функции
-/// перетаскивает лист целиком, что верно лишь для листа по содержимому.
+/// Её даёт построителю только [showDoableSheet]: она несёт маршрут этой
+/// функции, анимацию которого лист ведёт пальцем.
 final class ContentSheetCapability {
-  const ContentSheetCapability._();
+  const ContentSheetCapability._(this._route);
+
+  final _DoableSheetRoute<Object?> _route;
 }
 
 /// Возможность построить раскрываемый лист [Sheet.expandable].
@@ -33,9 +35,10 @@ final class ExpandableSheetCapability {
 ///
 /// [builder] строит [Sheet] или композицию на его основе с переданной
 /// возможностью. Потребитель закрывает лист через Navigator.pop с результатом
-/// типа [T]; закрытие без выбора даёт null. Перетаскивание листа, барьер,
-/// системное «назад» и семантика маршрута принадлежат Material:
-/// https://api.flutter.dev/flutter/material/showModalBottomSheet.html
+/// типа [T]; закрытие без выбора даёт null. Лист перетаскивает сам [Sheet],
+/// а затемнение, системное «назад», фокус и семантика маршрута принадлежат
+/// модальной нижней панели Material:
+/// https://api.flutter.dev/flutter/material/ModalBottomSheetRoute-class.html
 ///
 /// С [hostsMessages] лист содержит собственный прозрачный [Scaffold], и
 /// сообщения общего [ScaffoldMessenger] появляются над его нижней частью, а не
@@ -46,12 +49,43 @@ Future<T?> showDoableSheet<T>({
   required Widget Function(BuildContext context, ContentSheetCapability sheet)
   builder,
   bool hostsMessages = false,
-}) => _showSheet(
-  context: context,
-  enableDrag: true,
-  hostsMessages: hostsMessages,
-  builder: (context) => builder(context, const ContentSheetCapability._()),
-);
+}) {
+  final navigator = Navigator.of(context, rootNavigator: true);
+  final localizations = MaterialLocalizations.of(context);
+  // Без явного нуля маршрут лишь укоротил бы анимацию в 20 раз:
+  // https://api.flutter.dev/flutter/animation/AnimationBehavior.html
+  final duration = MediaQuery.disableAnimationsOf(context)
+      ? Duration.zero
+      : _sheetDuration;
+  late final _DoableSheetRoute<T> route;
+  route = _DoableSheetRoute<T>(
+    capturedThemes: InheritedTheme.capture(
+      from: context,
+      to: navigator.context,
+    ),
+    barrierLabel: localizations.scrimLabel,
+    barrierOnTapHint: localizations.scrimOnTapHint(
+      localizations.bottomSheetLabel,
+    ),
+    barrierColor: _colorsOf(Theme.of(context)).scrim,
+    // Готовый AnimationStyle.noAnimation не подходит: без его кривых
+    // Material ставит лист своей кривой, и лист уходит от пальца.
+    animationStyle: AnimationStyle(
+      curve: _sheetCurve,
+      reverseCurve: _sheetCurve,
+      duration: duration,
+      reverseDuration: duration,
+    ),
+    builder: (context) => _ExtentProbe(
+      onLayout: (height) => route._extent = height,
+      child: _SheetFrame(
+        hostsMessages: hostsMessages,
+        child: builder(context, ContentSheetCapability._(route)),
+      ),
+    ),
+  );
+  return navigator.push(route);
+}
 
 /// Показывает раскрываемый лист [Sheet.expandable] над корневым навигатором,
 /// перекрывая всю страницу и панель.
@@ -68,44 +102,200 @@ Future<T?> showDoableExpandableSheet<T>({
   )
   builder,
   bool hostsMessages = false,
-}) => _showSheet(
+}) => showModalBottomSheet<T>(
   context: context,
+  useRootNavigator: true,
+  useSafeArea: true,
+  isScrollControlled: true,
+  requestFocus: true,
+  barrierColor: _colorsOf(Theme.of(context)).scrim,
+  backgroundColor: Colors.transparent,
+  elevation: 0,
+  shape: const RoundedRectangleBorder(),
+  clipBehavior: Clip.none,
+  // Лист занимает всю доступную ширину, без ограничения Material 3 в 640 dp.
+  constraints: const BoxConstraints(maxWidth: double.infinity),
+  showDragHandle: false,
+  isDismissible: true,
   enableDrag: false,
-  hostsMessages: hostsMessages,
-  builder: (context) => builder(context, const ExpandableSheetCapability._()),
+  builder: (context) => _SheetFrame(
+    hostsMessages: hostsMessages,
+    child: builder(context, const ExpandableSheetCapability._()),
+  ),
 );
 
-Future<T?> _showSheet<T>({
-  required BuildContext context,
-  required bool enableDrag,
-  required bool hostsMessages,
-  required WidgetBuilder builder,
-}) {
-  final colors = _colorsOf(Theme.of(context));
+/// Длительность движения листа, которое не ведёт палец.
+const _sheetDuration = Duration(milliseconds: 180);
 
-  return showModalBottomSheet<T>(
-    context: context,
-    useRootNavigator: true,
-    useSafeArea: true,
-    isScrollControlled: true,
-    requestFocus: true,
-    barrierColor: colors.scrim,
-    backgroundColor: Colors.transparent,
-    elevation: 0,
-    shape: const RoundedRectangleBorder(),
-    clipBehavior: Clip.none,
-    // Лист занимает всю доступную ширину, без ограничения Material 3 в 640 dp.
-    constraints: const BoxConstraints(maxWidth: double.infinity),
-    showDragHandle: false,
-    isDismissible: true,
-    enableDrag: enableDrag,
-    builder: (context) => Padding(
-      // SafeArea учитывает системные панели, но не открытую клавиатуру.
-      // https://api.flutter.dev/flutter/widgets/MediaQueryData/viewInsets.html
-      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-      child: hostsMessages
-          ? _MessagesHost(child: builder(context))
-          : builder(context),
+/// Кривая маршрута листа в обе стороны.
+///
+/// Лист ставит значение маршрута через [_inverseSheetCurve], поэтому кривая
+/// одна и для открытия, и для закрытия.
+const _sheetCurve = Curves.easeOut;
+
+/// Значение маршрута, при котором [_sheetCurve] даёт положение [position].
+///
+/// Делением пополам находит параметр кривой Безье, при котором её ордината
+/// равна [position], и возвращает абсциссу при нём:
+/// https://api.flutter.dev/flutter/animation/Cubic-class.html
+double _inverseSheetCurve(double position) {
+  // Концы кривой ставятся точно, чтобы лист у края пути стоял ровно в
+  // компактном размере или в закрытом.
+  if (position <= 0 || position >= 1) return clampDouble(position, 0, 1);
+  const curve = _sheetCurve;
+  double evaluate(double first, double second, double m) =>
+      3 * first * (1 - m) * (1 - m) * m +
+      3 * second * (1 - m) * m * m +
+      m * m * m;
+  var low = 0.0;
+  var high = 1.0;
+  for (var step = 0; step < 32; step++) {
+    final middle = (low + high) / 2;
+    if (evaluate(curve.b, curve.d, middle) < position) {
+      low = middle;
+    } else {
+      high = middle;
+    }
+  }
+  return evaluate(curve.a, curve.c, (low + high) / 2);
+}
+
+/// Маршрут листа по содержимому: модальная нижняя панель Material без её
+/// перетаскивания, анимацию которой ведёт пальцем [_SheetMotion].
+final class _DoableSheetRoute<T> extends ModalBottomSheetRoute<T> {
+  _DoableSheetRoute({
+    required super.builder,
+    required super.capturedThemes,
+    required super.barrierLabel,
+    required super.barrierOnTapHint,
+    required Color barrierColor,
+    required AnimationStyle animationStyle,
+  }) : super(
+         modalBarrierColor: barrierColor,
+         sheetAnimationStyle: animationStyle,
+         useSafeArea: true,
+         isScrollControlled: true,
+         requestFocus: true,
+         backgroundColor: Colors.transparent,
+         elevation: 0,
+         shape: const RoundedRectangleBorder(),
+         clipBehavior: Clip.none,
+         // Лист занимает всю доступную ширину, без ограничения Material 3 в
+         // 640 dp.
+         constraints: const BoxConstraints(maxWidth: double.infinity),
+         showDragHandle: false,
+         isDismissible: true,
+         enableDrag: false,
+       );
+
+  /// Высота, на которую маршрут уводит лист при закрытии, при последней
+  /// раскладке: лист вместе с отступом клавиатуры под ним.
+  double _extent = 0;
+
+  /// Значение анимации маршрута: 0 — лист закрыт, 1 — в компактном размере.
+  AnimationController get _animation => controller!;
+}
+
+/// Отступ листа от открытой клавиатуры и, с [hostsMessages], отметка листа
+/// для собственного [Scaffold].
+final class _SheetFrame extends StatelessWidget {
+  const _SheetFrame({required this.hostsMessages, required this.child});
+
+  final bool hostsMessages;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    // SafeArea учитывает системные панели, но не открытую клавиатуру.
+    // https://api.flutter.dev/flutter/widgets/MediaQueryData/viewInsets.html
+    padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+    child: hostsMessages ? _MessagesHost(child: child) : child,
+  );
+}
+
+/// Ведёт лист пальцем между закрытым и компактным размером и после
+/// отпускания доводит его до компактного размера или закрывает.
+///
+/// Положение листа — доля видимой высоты, значение маршрута после
+/// [_sheetCurve]. Пороги скорости и положения — те же, что у перетаскивания
+/// модальной нижней панели Material.
+final class _SheetMotion extends StatefulWidget {
+  const _SheetMotion({required this.route, required this.child});
+
+  final _DoableSheetRoute<Object?> route;
+  final Widget child;
+
+  @override
+  State<_SheetMotion> createState() => _SheetMotionState();
+}
+
+final class _SheetMotionState extends State<_SheetMotion> {
+  static const _flingVelocity = 700.0;
+  static const _closePosition = 0.5;
+
+  /// Касание, с которого начат текущий жест, и положение листа при нём.
+  late ({double y, double position}) _drag;
+  var _isPointerCanceled = false;
+
+  _DoableSheetRoute<Object?> get _route => widget.route;
+
+  double get _position => _sheetCurve.transform(_route._animation.value);
+
+  void _startDrag(DragStartDetails details) {
+    _drag = (y: details.globalPosition.dy, position: _position);
+  }
+
+  void _updateDrag(DragUpdateDetails details) {
+    // Положение вычисляется от начала жеста, а не накапливается из сдвигов,
+    // поэтому ошибка обратной функции кривой не накапливается.
+    final distance = details.globalPosition.dy - _drag.y;
+    final position = clampDouble(
+      _drag.position - distance / _route._extent,
+      0,
+      1,
+    );
+    _route._animation.value = _inverseSheetCurve(position);
+  }
+
+  void _endDrag(DragEndDetails details) {
+    // Закрыв или перекрыв лист во время жеста, Navigator отменяет касания, и
+    // жест завершается здесь. Доводка тогда остановила бы закрытие, а
+    // Navigator.pop закрыл бы маршрут под листом.
+    if (!_route.isCurrent) return;
+    // Принятый жест Flutter завершает через onEnd даже при PointerCancelEvent:
+    // https://api.flutter.dev/flutter/gestures/DragGestureRecognizer/didStopTrackingLastPointer.html
+    if (_isPointerCanceled) {
+      _route._animation.forward();
+      return;
+    }
+    final velocity = details.velocity.pixelsPerSecond.dy;
+    final closes = switch (velocity) {
+      > _flingVelocity => true,
+      < -_flingVelocity => false,
+      _ => _position < _closePosition,
+    };
+    if (closes) {
+      Navigator.pop(context);
+    } else {
+      _route._animation.forward();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Listener(
+    onPointerDown: (_) => _isPointerCanceled = false,
+    onPointerCancel: (_) => _isPointerCanceled = true,
+    child: GestureDetector(
+      // Лист под пальцем стоит той точкой, которой его коснулись:
+      // https://api.flutter.dev/flutter/gestures/DragStartBehavior.html
+      dragStartBehavior: DragStartBehavior.down,
+      // Как у модальной нижней панели Material, перетаскивание не
+      // объявляется диктору прокруткой.
+      excludeFromSemantics: true,
+      onVerticalDragStart: _startDrag,
+      onVerticalDragUpdate: _updateDrag,
+      onVerticalDragEnd: _endDrag,
+      child: widget.child,
     ),
   );
 }
@@ -136,11 +326,13 @@ typedef SheetAction = ({
 final class Sheet extends StatelessWidget {
   /// Лист высотой по содержимому.
   ///
-  /// Закрывают его перетаскивание и средства Material маршрута
-  /// [showDoableSheet]. При нехватке высоты прокручивается только тело: шапка
-  /// остаётся доступной для свайпа, а нижняя часть — видна под телом.
+  /// Лист перетаскивается за шапку, нижнюю часть и тело, которое помещается
+  /// целиком, и закрывается жестом вниз; касание затемнения и «назад»
+  /// закрывают его средствами Material маршрута [showDoableSheet]. При
+  /// нехватке высоты прокручивается только тело: шапка остаётся доступной для
+  /// свайпа, а нижняя часть — видна под телом.
   const Sheet(
-    ContentSheetCapability _, {
+    ContentSheetCapability this._content, {
     required this.title,
     required this.child,
     this.text,
@@ -173,6 +365,7 @@ final class Sheet extends StatelessWidget {
   }) : text = text,
        child = body,
        footer = footer,
+       _content = null,
        _expansion = (
          text: text,
          pinned: pinned,
@@ -194,6 +387,9 @@ final class Sheet extends StatelessWidget {
   /// прокрутки; без неё лист заканчивается телом.
   final Widget? footer;
 
+  /// Возможность листа по содержимому; у раскрываемого листа её нет.
+  final ContentSheetCapability? _content;
+
   /// Части раскрываемого листа; без них лист — по содержимому.
   final _Expansion? _expansion;
 
@@ -208,37 +404,40 @@ final class Sheet extends StatelessWidget {
       top: Radius.circular(DoableMetrics.radiusXl),
     );
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: borderRadius,
-        boxShadow: _shadowsOf(theme).shadowFloat,
-      ),
-      child: Material(
-        color: colors.raised,
-        borderRadius: borderRadius,
-        clipBehavior: Clip.antiAlias,
-        child: _SheetLayout(
-          minimum: const EdgeInsets.fromLTRB(
-            DoableMetrics.space3,
-            DoableMetrics.space2,
-            DoableMetrics.space3,
-            0,
+    return _SheetMotion(
+      route: _content!._route,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: borderRadius,
+          boxShadow: _shadowsOf(theme).shadowFloat,
+        ),
+        child: Material(
+          color: colors.raised,
+          borderRadius: borderRadius,
+          clipBehavior: Clip.antiAlias,
+          child: _SheetLayout(
+            minimum: const EdgeInsets.fromLTRB(
+              DoableMetrics.space3,
+              DoableMetrics.space2,
+              DoableMetrics.space3,
+              0,
+            ),
+            head: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(child: _Grip(color: colors.grip)),
+                const SizedBox(height: 14),
+                _TitleBlock(title: title, text: text, action: null),
+                const SizedBox(height: DoableMetrics.space3),
+                Flexible(child: SingleChildScrollView(child: child)),
+              ],
+            ),
+            footer: switch (footer) {
+              final footer? => _Footer(child: footer),
+              null => null,
+            },
           ),
-          head: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Center(child: _Grip(color: colors.grip)),
-              const SizedBox(height: 14),
-              _TitleBlock(title: title, text: text, action: null),
-              const SizedBox(height: DoableMetrics.space3),
-              Flexible(child: SingleChildScrollView(child: child)),
-            ],
-          ),
-          footer: switch (footer) {
-            final footer? => _Footer(child: footer),
-            null => null,
-          },
         ),
       ),
     );
@@ -488,7 +687,7 @@ final class _ExpandableSheetState extends State<_ExpandableSheet>
   /// 0 — половинная высота, 1 — весь экран.
   late final _expansion = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 180),
+    duration: _sheetDuration,
   );
   var _isFull = false;
   double? _dragStartY;
@@ -648,7 +847,7 @@ final class _ExpandableSheetState extends State<_ExpandableSheet>
     return LayoutBuilder(
       builder: (context, constraints) {
         // Высота ограничена местом над клавиатурой: его отнимает
-        // showDoableExpandableSheet, а полный лист занимает всё оставшееся.
+        // _SheetFrame, а полный лист занимает всё оставшееся.
         final full = constraints.maxHeight;
         final half = math.min(_halfHeight, full);
         return AnimatedBuilder(
