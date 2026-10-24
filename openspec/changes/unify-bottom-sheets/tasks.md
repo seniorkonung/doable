@@ -1,0 +1,79 @@
+## Phase 1: Все листы движутся за пальцем одной моделью
+
+- [ ] 1.1 Рисовать неквадратную графику `DoableIcon` в её пропорциях внутри квадрата `size`, чтобы шеврон полного размера панели тегов стал 28×10
+  - **Критерии приёмки:**
+    - `DoableIcon` занимает квадрат `size`, а графика вписана в него с сохранением пропорций по решению 5 дизайна. Квадратные значки рисуются как прежде.
+    - Шеврон при `size: 28` рисуется 28×10.
+    - Эталонное изображение значков обновлено, и в нём изменился только шеврон.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/doable_icon_test.dart`:
+      - новая проверка размера неквадратного значка падает без изменения;
+      - эталон пересоздан с `--update-goldens` и просмотрен.
+    - `mise exec --no-deps -- flutter test test/design_system/sheet_test.dart` — шеврон полного размера по-прежнему находится и нажимается.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `lib/src/design_system/doable_icon.dart`, `test/design_system/doable_icon_test.dart`, `test/design_system/goldens/doable_icons.png`.
+  - **Размер:** XS.
+
+- [ ] 1.2 Вести лист по содержимому пальцем на собственном маршруте модуля основ и доводить его до состояния по положению и скорости
+  - **Критерии приёмки:**
+    - `showDoableSheet` показывает лист подклассом `ModalBottomSheetRoute` без перетаскивания Material. Лист получает контроллер анимации маршрута через возможность построителя. Кривая и длительность маршрута и обратная функция кривой — по решению 1 дизайна и ADR-0044.
+    - Перетаскивание поверхности листа держит его под пальцем вместе с нижней кнопкой и ослабляет затемнение; выше компактного размера лист не поднимается. Отпускание выбирает цель по таблице решения 2 дизайна, а закрытие — `Navigator.pop` от текущего положения. Отменённый системой жест возвращает лист. При уменьшении движения доводка и открытие происходят сразу.
+    - Резервные копии, экспорт данных, лист тега, меню режима «+» и выбор начала дневного выбора закрываются жестом, касанием затемнения и «назад» как прежде. Их код не меняется.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/sheet_test.dart` — новые проверки:
+      - лист под пальцем на нескольких глубинах, включая самую близкую к компактному положению;
+      - короткий быстрый бросок закрывает лист;
+      - медленное малое отклонение возвращает лист;
+      - отмена жеста системой;
+      - уменьшение движения.
+    - `mise exec --no-deps -- flutter test test/tag/presentation/editor/tag_sheet_test.dart test/app/quick_creation/quick_creation_mode_menu_test.dart test/app/quick_creation/quick_creation_daily_choice_start_sheet_test.dart test/app/quick_creation/quick_creation_button_test.dart test/data_transfer/presentation/backups_sheet_test.dart test/data_transfer/presentation/export_data_sheet_test.dart test/design_system/confirm_dialog_test.dart test/graph/presentation/graph_operation_presenter_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `lib/src/design_system/components/sheet.dart`, `test/design_system/sheet_test.dart`.
+  - **Размер:** M — маршрут, модель сдвига и выбор цели появляются вместе, потому что по отдельности лист не следует за пальцем.
+
+- [ ] 1.3 Показывать оба варианта листа одной функцией `showDoableSheet` с одним типом возможности `SheetPresentation`
+  - **Критерии приёмки:**
+    - `showDoableExpandableSheet`, `ContentSheetCapability` и `ExpandableSheetCapability` удалены. `Sheet` и `Sheet.expandable` принимают `SheetPresentation`, который создаёт только `showDoableSheet` (решение 4 дизайна).
+    - Панель тегов открывается через `showDoableSheet` и до задачи 1.4 раскрывается прежним жестом шапки. Пять листов по содержимому и `ActionSheet` получают новый тип без изменения поведения.
+    - Описание `GraphOperationPresenter` и вспомогательные листы проверок называют одну функцию показа.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter analyze` — ни одного обращения к удалённым функции и типам в `lib/` и `test/`.
+    - `mise exec --no-deps -- flutter test test/design_system/sheet_test.dart test/tag/presentation/panel/tags_panel_test.dart test/tag/presentation/editor/tag_sheet_test.dart test/graph/presentation/graph_operation_presenter_test.dart test/design_system/confirm_dialog_test.dart test/app/quick_creation/quick_creation_mode_menu_test.dart test/app/quick_creation/quick_creation_daily_choice_start_sheet_test.dart test/data_transfer/presentation/backups_sheet_test.dart test/data_transfer/presentation/export_data_sheet_test.dart`.
+  - **Зависимости:** 1.2.
+  - **Предполагаемые файлы:**
+    - модуль основ: `lib/src/design_system/components/sheet.dart`, `lib/src/design_system/components/action_sheet.dart`;
+    - потребители: `lib/src/tag/presentation/panel/tags_panel.dart`, `lib/src/tag/presentation/editor/tag_sheet.dart`, `lib/src/data_transfer/presentation/backups_sheet.dart`, `lib/src/data_transfer/presentation/export_data_sheet.dart`, `lib/src/app/quick_creation/quick_creation_mode_menu.dart`, `lib/src/app/quick_creation/quick_creation_daily_choice_start_sheet.dart`, `lib/src/graph/presentation/graph_operation_presenter.dart`;
+    - проверки: `test/graph/presentation/graph_operation_presenter_test.dart`, `test/design_system/sheet_test.dart`.
+  - **Размер:** M — механическая замена типа у потребителей входит в задачу, потому что тип нельзя заменить по частям.
+
+- [ ] 1.4 Вести панель тегов пальцем между полным, компактным и закрытым состоянием
+  - **Критерии приёмки:**
+    - Раскрываемый лист перетаскивается за поверхность вне тела:
+      - на отрезке раскрытия верхний край стоит под пальцем, «Готово» — на месте, а радиус углов и тень следуют положению;
+      - ниже компактного размера лист сдвигается вместе с маршрутом, как лист по содержимому;
+      - одно движение проходит от полного размера до закрытия.
+    - Отпускание и отмена жеста — по таблице решения 2 дизайна, включая бросок вниз из полного размера в компактный. Порог шапки в 48 пикселей удалён.
+    - Ручка и шеврон остаются кнопками с подписями и состоянием раскрытия. «Назад» закрывает лист из полного размера. При уменьшении движения раскрытие нажатием происходит сразу.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/sheet_test.dart`:
+      - проверки порога заменены проверками положения под пальцем, кнопки на месте, таблицы целей и отмены жеста;
+      - проверки ручки, шеврона, «назад», клавиатуры и сообщений поверх листа сохраняются.
+    - `mise exec --no-deps -- flutter test test/tag/presentation/panel/tags_panel_test.dart test/app/tag_app_flow_test.dart test/graph/presentation/graph_operation_presenter_test.dart`:
+      - закрытие свайпом проверяется броском или перетаскиванием дальше половины компактной высоты;
+      - перестановка тегов, поиск и лист тега поверх панели работают как прежде.
+  - **Зависимости:** 1.3.
+  - **Предполагаемые файлы:** `lib/src/design_system/components/sheet.dart`, `test/design_system/sheet_test.dart`, `test/tag/presentation/panel/tags_panel_test.dart`.
+  - **Размер:** M.
+
+- [ ] 1.5 Проверить готовность фазы: все существующие листы движутся за пальцем одной моделью
+  - **Критерии приёмки:**
+    - Для существующих листов выполняются требования `bottom-sheets` о размерах, перетаскивании поверхности, ручке и шевроне, закрытии и уменьшении движения.
+    - Сообщения поверх листов, клавиатура над поиском и лист тега поверх панели работают как прежде.
+  - **Проверка:**
+    - `mise run check`.
+    - `openspec validate unify-bottom-sheets --strict`.
+    - В отчёте сессии перечислены проверки на устройстве, которые остаются за пользователем: следование за пальцем, плавность доводки, заметность изменения длительности открытия меню.
+  - **Зависимости:** 1.1, 1.2, 1.3, 1.4.
+  - **Предполагаемые файлы:** нет (только проверка).
+  - **Размер:** XS.
