@@ -7,45 +7,26 @@ import '../domain/long_term_relation.dart';
 import '../domain/long_term_relation_description.dart';
 import 'long_term_relation_permissions.dart';
 
-enum RelationParticipantSummaryValidationFailure { negativeActiveRelationCount }
-
-final class RelationParticipantSummaryValidationException implements Exception {
-  const RelationParticipantSummaryValidationException(this.failure);
-
-  final RelationParticipantSummaryValidationFailure failure;
-}
-
 final class RelationParticipantSummary {
   factory RelationParticipantSummary({
     required IntentionId id,
     required String title,
     required IntentionArchiveState archiveState,
-    required int activeRelationCount,
-  }) {
-    if (activeRelationCount < 0) {
-      throw const RelationParticipantSummaryValidationException(
-        RelationParticipantSummaryValidationFailure.negativeActiveRelationCount,
-      );
-    }
-    return RelationParticipantSummary._(
-      id: id,
-      title: IntentionText.normalizeTitle(title),
-      archiveState: archiveState,
-      activeRelationCount: activeRelationCount,
-    );
-  }
+  }) => RelationParticipantSummary._(
+    id: id,
+    title: IntentionText.normalizeTitle(title),
+    archiveState: archiveState,
+  );
 
   const RelationParticipantSummary._({
     required this.id,
     required this.title,
     required this.archiveState,
-    required this.activeRelationCount,
   });
 
   final IntentionId id;
   final String title;
   final IntentionArchiveState archiveState;
-  final int activeRelationCount;
 }
 
 enum LongTermRelationProjectionValidationFailure { participantMismatch }

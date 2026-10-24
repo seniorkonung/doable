@@ -257,7 +257,6 @@ void main() {
         (result as ResultSuccess<GraphSnapshot<IntentionDetails?>>).value;
     expect(snapshot.value?.intention.title, 'Владелец');
     expect(snapshot.value?.relationCounts.activeNeedOutgoing, 1);
-    expect(snapshot.value?.activeRelationCount, 1);
   });
 
   test('не публикует частичный успех при повреждении соседства', () async {
@@ -277,14 +276,6 @@ void main() {
 
     final counts = await repository.getRelationCounts(owner);
     final details = await repository.watchIntention(owner).first;
-    final catalog = await repository.getCatalogPage(
-      IntentionCatalogQuery(
-        scope: IntentionScope.active,
-        titleFilter: 'Владелец',
-        order: IntentionCatalogOrder.createdAtAscending,
-        pageSize: 10,
-      ),
-    );
 
     expect(
       counts,
@@ -297,14 +288,6 @@ void main() {
     expect(
       details,
       isA<ResultFailure<GraphSnapshot<IntentionDetails?>>>().having(
-        (result) => result.failure,
-        'failure',
-        isA<IntentionCorruptionFailure>(),
-      ),
-    );
-    expect(
-      catalog,
-      isA<ResultFailure<IntentionCatalogPage>>().having(
         (result) => result.failure,
         'failure',
         isA<IntentionCorruptionFailure>(),
@@ -403,10 +386,6 @@ void main() {
     final result = await repository.execute(ArchiveIntention(owner));
 
     final confirmed = _confirmedCommand(result);
-    final success = confirmed.value as IntentionSaved;
-    final catalogMutation = success.catalogMutation as IntentionCatalogUpdated;
-    expect(catalogMutation.before.summary.activeRelationCount, 2);
-    expect(catalogMutation.after.summary.activeRelationCount, 0);
     final countChanges = {
       for (final change
           in confirmed.changes.whereType<IntentionRelationCountsChanged>())

@@ -24,7 +24,7 @@ final class IntentionSearchLayout extends StatefulWidget {
   const IntentionSearchLayout({
     required this.controls,
     required this.results,
-    this.resultsExtent = IntentionSearchResultsExtent.remainingWhenSufficient,
+    required this.resultsExtent,
     super.key,
   });
 

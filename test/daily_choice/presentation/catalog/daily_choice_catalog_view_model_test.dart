@@ -739,10 +739,9 @@ final class _IntentionEntry implements IntentionCatalogEntrySnapshot {
 IntentionSummary _summary(int id, String title) => IntentionSummary(
   id: _intentionId(id),
   title: title,
-  hasDescription: false,
+  descriptionPreview: null,
   readiness: IntentionReadiness.notReady,
   archiveState: IntentionArchiveState.active,
-  activeRelationCount: 0,
   createdAt: IntentionTimestamp(DateTime.utc(2026)),
   updatedAt: IntentionTimestamp(DateTime.utc(2026)),
 );

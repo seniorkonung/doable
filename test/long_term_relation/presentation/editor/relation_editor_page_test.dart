@@ -1524,18 +1524,12 @@ RelationParticipantSummary get _contextParticipant =>
 RelationParticipantSummary _participantSummary({
   required int index,
   required String title,
-  int activeRelationCount = 0,
 }) {
-  final summary = testSummary(
-    index: index,
-    title: title,
-    activeRelationCount: activeRelationCount,
-  );
+  final summary = testSummary(index: index, title: title);
   return RelationParticipantSummary(
     id: summary.id,
     title: summary.title,
     archiveState: summary.archiveState,
-    activeRelationCount: summary.activeRelationCount,
   );
 }
 

@@ -65,15 +65,6 @@ void main() {
   test(
     'возвращает связь, полное описание и актуальных участников одним снимком',
     () async {
-      final thirdId = _intentionId(_uuid(3));
-      await _insertIntention(database, thirdId, title: 'Третье намерение');
-      await _insertRelation(
-        database,
-        id: _relationId(_uuid(102)),
-        sourceId: sourceId,
-        relatedId: thirdId,
-      );
-
       final result = await repository.watchRelation(relationId).first;
       final snapshot = _snapshot(result);
       final details = snapshot.value!;
@@ -82,10 +73,8 @@ void main() {
       expect(details.description!.value, '  Полное описание\nс переносом  ');
       expect(details.source.id, sourceId);
       expect(details.source.title, 'Исходное намерение');
-      expect(details.source.activeRelationCount, 2);
       expect(details.related.id, relatedId);
       expect(details.related.title, 'Связанное намерение');
-      expect(details.related.activeRelationCount, 1);
       expect(
         diagnostics.events
             .whereType<LongTermRelationDetailReadDiagnosticsEvent>(),
@@ -304,50 +293,17 @@ void main() {
     expect(details.relation.scope, RelationScope.archived);
     expect(details.source.archiveState, IntentionArchiveState.archived);
     expect(details.related.archiveState, IntentionArchiveState.active);
-    expect(details.source.activeRelationCount, 0);
-    expect(details.related.activeRelationCount, 0);
   });
 
-  test(
-    'обновляет количество участника при изменении другого соседства',
-    () async {
-      final thirdId = _intentionId(_uuid(3));
-      await _insertIntention(database, thirdId, title: 'Третье намерение');
-      final events = StreamIterator(repository.watchRelation(relationId));
-      addTearDown(events.cancel);
-      expect(await events.moveNext(), isTrue);
-
-      await repository.execute(
-        CreateLongTermRelation(
-          sourceIntentionId: relatedId,
-          relatedIntentionId: thirdId,
-          type: LongTermRelationType.can,
-          priority: RelationPriority.p3,
-          description: null,
-        ),
-      );
-
-      expect(await events.moveNext(), isTrue);
-      final details = _snapshot(events.current).value!;
-      expect(details.relation.id, relationId);
-      expect(details.source.activeRelationCount, 1);
-      expect(details.related.activeRelationCount, 2);
-    },
-  );
-
-  test('согласует прежних, новых и сохраняющегося участников полного жизненного цикла', () async {
+  test('отражает замену участников и жизненный цикл связи', () async {
     final thirdId = _intentionId(_uuid(3));
     final fourthId = _intentionId(_uuid(4));
-    final fifthId = _intentionId(_uuid(5));
-    final sixthId = _intentionId(_uuid(6));
     final seventhId = _intentionId(_uuid(7));
     final eighthId = _intentionId(_uuid(8));
     final ninthId = _intentionId(_uuid(9));
     for (final entry in <(IntentionId, String)>[
       (thirdId, 'Новый исходный участник'),
       (fourthId, 'Первый новый связанный участник'),
-      (fifthId, 'Сосед прежнего исходного участника'),
-      (sixthId, 'Сосед прежнего связанного участника'),
       (seventhId, 'Второй новый связанный участник'),
       (eighthId, 'Посторонний исходный участник'),
       (ninthId, 'Посторонний связанный участник'),
@@ -355,35 +311,7 @@ void main() {
       await _insertIntention(database, entry.$1, title: entry.$2);
     }
 
-    final sourceWitnessId = _relationId(_uuid(102));
-    final relatedWitnessId = _relationId(_uuid(103));
-    final newSourceWitnessId = _relationId(_uuid(104));
-    final newRelatedWitnessId = _relationId(_uuid(105));
     final unrelatedRelationId = _relationId(_uuid(106));
-    await _insertRelation(
-      database,
-      id: sourceWitnessId,
-      sourceId: sourceId,
-      relatedId: fifthId,
-    );
-    await _insertRelation(
-      database,
-      id: relatedWitnessId,
-      sourceId: relatedId,
-      relatedId: sixthId,
-    );
-    await _insertRelation(
-      database,
-      id: newSourceWitnessId,
-      sourceId: thirdId,
-      relatedId: fifthId,
-    );
-    await _insertRelation(
-      database,
-      id: newRelatedWitnessId,
-      sourceId: seventhId,
-      relatedId: sixthId,
-    );
     await _insertRelation(
       database,
       id: unrelatedRelationId,
@@ -392,12 +320,6 @@ void main() {
     );
 
     final relationEvents = StreamIterator(repository.watchRelation(relationId));
-    final sourceEvents = StreamIterator(
-      repository.watchRelation(sourceWitnessId),
-    );
-    final relatedEvents = StreamIterator(
-      repository.watchRelation(relatedWitnessId),
-    );
     final unrelatedEvents = <LongTermRelationReadResult>[];
     final unrelatedCancelled = Completer<void>();
     late final StreamSubscription<LongTermRelationReadResult>
@@ -413,13 +335,7 @@ void main() {
           }
         });
     addTearDown(relationEvents.cancel);
-    addTearDown(sourceEvents.cancel);
-    addTearDown(relatedEvents.cancel);
-    await Future.wait([
-      _nextDetails(relationEvents),
-      _nextDetails(sourceEvents),
-      _nextDetails(relatedEvents),
-    ]);
+    await _nextDetails(relationEvents);
     await _waitFor(() => unrelatedEvents.length == 1);
 
     await repository.execute(
@@ -433,16 +349,10 @@ void main() {
     );
 
     final moved = (await _nextDetails(relationEvents))!;
-    final formerSource = (await _nextDetails(sourceEvents))!;
-    final formerRelated = (await _nextDetails(relatedEvents))!;
     expect(moved.source.id, thirdId);
     expect(moved.source.title, 'Новый исходный участник');
-    expect(moved.source.activeRelationCount, 2);
     expect(moved.related.id, fourthId);
     expect(moved.related.title, 'Первый новый связанный участник');
-    expect(moved.related.activeRelationCount, 1);
-    expect(formerSource.source.activeRelationCount, 1);
-    expect(formerRelated.source.activeRelationCount, 1);
 
     await repository.execute(
       UpdateLongTermRelation(
@@ -456,50 +366,19 @@ void main() {
     final movedAgain = (await _nextDetails(relationEvents))!;
     expect(movedAgain.source.id, thirdId);
     expect(movedAgain.source.title, 'Новый исходный участник');
-    expect(movedAgain.source.activeRelationCount, 2);
     expect(movedAgain.related.id, seventhId);
     expect(movedAgain.related.title, 'Второй новый связанный участник');
-    expect(movedAgain.related.activeRelationCount, 2);
-
-    final newSourceEvents = StreamIterator(
-      repository.watchRelation(newSourceWitnessId),
-    );
-    final newRelatedEvents = StreamIterator(
-      repository.watchRelation(newRelatedWitnessId),
-    );
-    addTearDown(newSourceEvents.cancel);
-    addTearDown(newRelatedEvents.cancel);
-    final [newSource, newRelated] = await Future.wait([
-      _nextDetails(newSourceEvents),
-      _nextDetails(newRelatedEvents),
-    ]);
-    expect(newSource!.source.activeRelationCount, 2);
-    expect(newRelated!.source.activeRelationCount, 2);
 
     await repository.execute(ArchiveLongTermRelation(relationId));
     final archived = (await _nextDetails(relationEvents))!;
-    final sourceAfterArchive = (await _nextDetails(newSourceEvents))!;
-    final relatedAfterArchive = (await _nextDetails(newRelatedEvents))!;
     expect(archived.relation.scope, RelationScope.archived);
-    expect(archived.source.activeRelationCount, 1);
-    expect(archived.related.activeRelationCount, 1);
-    expect(sourceAfterArchive.source.activeRelationCount, 1);
-    expect(relatedAfterArchive.source.activeRelationCount, 1);
 
     await repository.execute(RestoreLongTermRelation(relationId));
     final restored = (await _nextDetails(relationEvents))!;
-    await _nextDetails(newSourceEvents);
-    await _nextDetails(newRelatedEvents);
     expect(restored.relation.scope, RelationScope.active);
-    expect(restored.source.activeRelationCount, 2);
-    expect(restored.related.activeRelationCount, 2);
 
     await repository.execute(DeleteLongTermRelation(relationId));
     expect(await _nextDetails(relationEvents), isNull);
-    final sourceAfterDelete = (await _nextDetails(newSourceEvents))!;
-    final relatedAfterDelete = (await _nextDetails(newRelatedEvents))!;
-    expect(sourceAfterDelete.source.activeRelationCount, 1);
-    expect(relatedAfterDelete.source.activeRelationCount, 1);
     await Future<void>.delayed(Duration.zero);
     expect(unrelatedEvents, hasLength(1));
 

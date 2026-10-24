@@ -1313,10 +1313,9 @@ final class _TestCatalogEntrySnapshot implements IntentionCatalogEntrySnapshot {
   }) : summary = IntentionSummary(
          id: id,
          title: title,
-         hasDescription: false,
+         descriptionPreview: null,
          readiness: readiness,
          archiveState: IntentionArchiveState.active,
-         activeRelationCount: 0,
          createdAt: IntentionTimestamp(DateTime.utc(2026)),
          updatedAt: IntentionTimestamp(DateTime.utc(2026)),
          tags: tags,

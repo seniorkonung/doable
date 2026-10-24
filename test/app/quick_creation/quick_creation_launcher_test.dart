@@ -14,7 +14,6 @@ import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
-import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -161,7 +160,7 @@ void main() {
         final first = launcher.launch(sourceContext: source, mode: mode);
         await tester.pumpAndSettle();
         await _selectStart(tester, direction);
-        await _cancel(tester, mode);
+        await _cancelPicker(tester, direction);
         await first;
         expect(_history(router), history);
         final next = launcher.launch(sourceContext: source, mode: mode);
@@ -205,30 +204,14 @@ void main() {
         await tester.pumpAndSettle();
         await _selectStart(tester, direction);
         expect(router.current.matchId, isNot(firstPicker));
-        expect(
-          tester
-              .widget<TextField>(
-                _key('daily-choice-${_prefix(direction)}-filter'),
-              )
-              .controller!
-              .text,
-          isEmpty,
-        );
-        await _cancel(tester, mode);
+        expect(_filterText(tester, direction), isEmpty);
+        await _cancelPicker(tester, direction);
         await nested;
         await router.maybePop();
         await tester.pumpAndSettle();
         expect(router.current.matchId, firstPicker);
-        expect(
-          tester
-              .widget<TextField>(
-                _key('daily-choice-${_prefix(direction)}-filter'),
-              )
-              .controller!
-              .text,
-          'Намерение 3',
-        );
-        await _cancel(tester, mode);
+        expect(_filterText(tester, direction), 'Намерение 3');
+        await _cancelPicker(tester, direction);
         await first;
         expect(router.stackData, hasLength(1));
         expect(tester.takeException(), isNull);

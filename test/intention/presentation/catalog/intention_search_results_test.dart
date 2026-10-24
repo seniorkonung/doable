@@ -127,12 +127,10 @@ void main() {
     });
   });
 
-  group('отличия каталога заданы параметрами', () {
-    Future<_Harness> insertBeforeVisible(
-      WidgetTester tester,
-      IntentionSearchResultsViewAnchor viewAnchor,
-    ) async {
-      final h = await _open(tester, viewAnchor: viewAnchor);
+  group('согласование выдачи без смены параметров', () {
+    testWidgets('сохраняет экранное положение видимого намерения при строке, '
+        'добавленной перед ним', (tester) async {
+      final h = await _open(tester);
       await h.load(_summaries(first: 60, step: 2));
       h.position.jumpTo(300);
       await _settle(tester);
@@ -146,28 +144,8 @@ void main() {
       );
       await h.complete(command, result);
       expect((h.confirmed as IntentionCatalogLoaded).items, hasLength(31));
-      return h;
-    }
-
-    testWidgets('якорь видимого намерения сохраняет его экранное положение '
-        'при строке, добавленной перед ним', (tester) async {
-      final h = await insertBeforeVisible(
-        tester,
-        IntentionSearchResultsViewAnchor.visibleIntention,
-      );
 
       expect(h.position.pixels, 300 + _rowExtent);
-    });
-
-    testWidgets('без якоря согласование сохраняет смещение прокрутки', (
-      tester,
-    ) async {
-      final h = await insertBeforeVisible(
-        tester,
-        IntentionSearchResultsViewAnchor.scrollOffset,
-      );
-
-      expect(h.position.pixels, 300);
     });
   });
 
@@ -229,9 +207,7 @@ double _rowTop(WidgetTester tester, String title) =>
 /// Страница-образец: передаёт общему элементу выдачу своего назначения и
 /// построение своих строк.
 final class _Host extends ConsumerWidget {
-  const _Host({required this.viewAnchor});
-
-  final IntentionSearchResultsViewAnchor viewAnchor;
+  const _Host();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -256,7 +232,6 @@ final class _Host extends ConsumerWidget {
           children: [Expanded(child: Text(summary.title))],
         ),
       ),
-      viewAnchor: viewAnchor,
     );
   }
 }
@@ -343,8 +318,6 @@ final class _Harness {
 
 Future<_Harness> _open(
   WidgetTester tester, {
-  IntentionSearchResultsViewAnchor viewAnchor =
-      IntentionSearchResultsViewAnchor.scrollOffset,
   List<IntentionSummary>? loadedBeforeMount,
 }) async {
   final repository = ControlledCatalogRepository();
@@ -375,7 +348,7 @@ Future<_Harness> _open(
     );
     await harness.load(loadedBeforeMount);
   }
-  await pump(_Host(viewAnchor: viewAnchor));
+  await pump(const _Host());
   return harness;
 }
 

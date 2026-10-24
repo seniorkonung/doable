@@ -1065,13 +1065,11 @@ LongTermRelationSummary _step() => LongTermRelationSummary(
     id: _intention(1),
     title: 'Основание',
     archiveState: IntentionArchiveState.active,
-    activeRelationCount: 1,
   ),
   related: RelationParticipantSummary(
     id: _intention(2),
     title: 'Действие',
     archiveState: IntentionArchiveState.active,
-    activeRelationCount: 0,
   ),
   hasDescription: false,
 );

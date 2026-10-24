@@ -12,8 +12,8 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_section.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
+import 'package:doable/src/intention/presentation/picker/intention_picker_view.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
@@ -136,8 +136,13 @@ void defineIntentionPickerSessionTests({
     expect(_position(tester, listKey).pixels, firstOffset);
     expect(
       tester
-          .widget<TextField>(find.byKey(ValueKey(filterKey)))
-          .controller!
+          .widget<EditableText>(
+            find.descendant(
+              of: find.byKey(ValueKey(filterKey)),
+              matching: find.byType(EditableText),
+            ),
+          )
+          .controller
           .text,
       'Первая',
     );
@@ -192,10 +197,9 @@ void defineIntentionPickerSessionTests({
   );
 }
 
-IntentionCatalogPurpose _purpose(WidgetTester tester) => tester
-    .widget<IntentionTagConditionsSection>(
-      find.byType(IntentionTagConditionsSection),
-    )
+/// Назначение верхнего поиска.
+IntentionPickerPurpose _purpose(WidgetTester tester) => tester
+    .widget<IntentionPickerView>(find.byType(IntentionPickerView))
     .purpose;
 
 ScrollPosition _position(WidgetTester tester, String listKey) => tester

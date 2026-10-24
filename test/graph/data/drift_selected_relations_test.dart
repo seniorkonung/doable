@@ -99,8 +99,8 @@ void main() {
       );
       expect(snapshot.value.entries[_missing], isA<SelectedRelationMissing>());
       final first = snapshot.value.entries[_first] as SelectedRelationPresent;
-      expect(first.details.source.activeRelationCount, 2);
-      expect(first.details.related.activeRelationCount, 2);
+      expect(first.details.source.title, 'Владелец');
+      expect(first.details.related.title, 'Сосед');
       expect(
         diagnostics.events.whereType<SelectedRelationsReadDiagnosticsEvent>(),
         hasLength(2),
@@ -150,7 +150,7 @@ void main() {
     },
   );
 
-  test('наблюдает один набор при изменении участника и счётчика', () async {
+  test('наблюдает один набор при изменении участника', () async {
     final query = SelectedRelationsQuery(
       intentionId: _owner,
       relationIds: [_first, _second],
@@ -175,17 +175,6 @@ void main() {
           .related
           .title,
       'Новое имя',
-    );
-
-    await repository.execute(DeleteLongTermRelation(_foreign));
-    expect(await events.moveNext(), isTrue);
-    final recounted = (events.current as SelectedRelationsReadSuccess).value;
-    expect(
-      (recounted.value.entries[_first] as SelectedRelationPresent)
-          .details
-          .related
-          .activeRelationCount,
-      1,
     );
   });
 

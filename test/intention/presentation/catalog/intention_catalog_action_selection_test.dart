@@ -1,8 +1,11 @@
 import 'package:doable/src/graph/application/graph_change.dart';
+import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
@@ -159,7 +162,7 @@ void main() {
   });
 
   test(
-    'изменение только счётчика сохраняет принадлежность действия каталогу',
+    'пакет только с количествами связей продвигает ревизию и сохраняет выдачу',
     () async {
       final repository = ControlledCatalogRepository();
       final container = reconciliationCatalogContainer(repository);
@@ -171,6 +174,7 @@ void main() {
       );
       addTearDown(subscription.close);
       final action = testSummary(index: 1, readiness: IntentionReadiness.ready);
+      final neighbour = testSummary(index: 2);
       repository.complete(
         0,
         ResultSuccess(
@@ -184,33 +188,56 @@ void main() {
       );
       await container.read(intentionCatalogViewModelProvider(_action).future);
 
-      await completeCatalogCommand(
+      const revision = TestCatalogRevision(2);
+      final relation = testRelation(
+        sourceIntentionId: action.id,
+        relatedIntentionId: neighbour.id,
+      );
+      await completeRelationCommand(
         container,
         repository,
-        UpdateIntention(id: action.id, title: action.title, description: null),
-        IntentionSaved(
-          testIntention(index: 1),
-          catalogMutation: IntentionCatalogUnchanged(
-            revision: const TestCatalogRevision(2),
-            entry: TestCatalogEntrySnapshot(action),
+        CreateLongTermRelation(
+          sourceIntentionId: action.id,
+          relatedIntentionId: neighbour.id,
+          type: LongTermRelationType.need,
+          priority: RelationPriority.p2,
+          description: null,
+        ),
+        relationCreationSuccess(
+          revision: revision,
+          success: LongTermRelationCreated(
+            relation: relation,
+            description: null,
+            changes: [
+              IntentionRelationCountsChanged(
+                revision: revision,
+                intentionId: action.id,
+                counts: testRelationCounts(activeNeedOutgoing: 1),
+              ),
+              IntentionRelationCountsChanged(
+                revision: revision,
+                intentionId: neighbour.id,
+                counts: testRelationCounts(activeNeedIncoming: 1),
+              ),
+              LongTermRelationCreatedChange(
+                revision: revision,
+                relation: relation,
+              ),
+            ],
           ),
-          additionalChanges: [
-            IntentionRelationCountsChanged(
-              revision: const TestCatalogRevision(2),
-              intentionId: action.id,
-              counts: testRelationCounts(activeNeedOutgoing: 2),
-            ),
-          ],
         ),
       );
+
       final current =
           container
                   .read(intentionCatalogViewModelProvider(_action))
                   .requireValue
               as IntentionCatalogLoaded;
-      expect(current.items.single.id, action.id);
-      expect(current.items.single.activeRelationCount, 2);
+      expect(current.items.single, same(action));
       expect(current.totalCount, 1);
+      expect(current.nextCursor, isNull);
+      expect(current.revision.compareTo(revision), GraphRevisionOrder.same);
+      expect(repository.queries, hasLength(1));
     },
   );
 

@@ -794,30 +794,6 @@ abstract class AppLocalizations {
   /// **'No description'**
   String get catalogNoDescription;
 
-  /// Количество активных связей намерения в его представлении
-  ///
-  /// In en, this message translates to:
-  /// **'Active relations: {count}'**
-  String intentionActiveRelationCount(int count);
-
-  /// Ошибка обновления количества активных связей при сохранённом прежнем числе
-  ///
-  /// In en, this message translates to:
-  /// **'The active relation count couldn’t be refreshed.'**
-  String get intentionActiveRelationCountRefreshFailed;
-
-  /// Количество активных связей ещё не получено
-  ///
-  /// In en, this message translates to:
-  /// **'Loading the active relation count…'**
-  String get intentionActiveRelationCountLoading;
-
-  /// Количество активных связей неизвестно из-за ошибки получения
-  ///
-  /// In en, this message translates to:
-  /// **'The active relation count is unknown.'**
-  String get intentionActiveRelationCountUnknown;
-
   /// Строка собственных тегов намерения в результате поиска; названия перечислены через запятую
   ///
   /// In en, this message translates to:
@@ -3514,18 +3490,6 @@ abstract class AppLocalizations {
   /// **'Open related intention'**
   String get relationDetailsOpenRelatedParticipantAction;
 
-  /// Заголовок выбора участника долговременной связи
-  ///
-  /// In en, this message translates to:
-  /// **'Select a participant'**
-  String get participantPickerTitle;
-
-  /// Заголовок выбора действия для нижнего обхода
-  ///
-  /// In en, this message translates to:
-  /// **'Select an action'**
-  String get actionPickerTitle;
-
   /// Отмена выбора действия
   ///
   /// In en, this message translates to:
@@ -3543,12 +3507,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No active actions are available.'**
   String get actionPickerEmpty;
-
-  /// Пустой результат поиска действий по названию
-  ///
-  /// In en, this message translates to:
-  /// **'No actions match this title.'**
-  String get actionPickerNoMatches;
 
   /// Устранимый отказ чтения действий
   ///
@@ -3568,94 +3526,166 @@ abstract class AppLocalizations {
   /// **'Actions couldn’t be loaded because of an unexpected error.'**
   String get actionPickerUnexpected;
 
-  /// Семантическая подсказка выбора действия
+  /// Отмена выбора исходного намерения
   ///
   /// In en, this message translates to:
-  /// **'Selects this action to find its reason'**
-  String get actionPickerSelectHint;
-
-  /// Переход к подробностям действия
-  ///
-  /// In en, this message translates to:
-  /// **'Open action details'**
-  String get actionPickerOpenDetails;
-
-  /// Точное количество доступных действий
-  ///
-  /// In en, this message translates to:
-  /// **'Total actions: {count}'**
-  String actionPickerTotalCount(int count);
-
-  /// Заголовок выбора нового основания
-  ///
-  /// In en, this message translates to:
-  /// **'Select a reason'**
-  String get sourcePickerTitle;
-
-  /// Отмена выбора основания
-  ///
-  /// In en, this message translates to:
-  /// **'Cancel reason selection'**
+  /// **'Cancel intention selection'**
   String get sourcePickerCancel;
 
-  /// Чтение первой порции намерений
-  ///
-  /// In en, this message translates to:
-  /// **'Loading intentions…'**
-  String get sourcePickerLoading;
-
-  /// Пустой выбор активных оснований
+  /// Пустой выбор активных намерений
   ///
   /// In en, this message translates to:
   /// **'No active intentions are available.'**
   String get sourcePickerEmpty;
 
-  /// Пустой результат буквального фильтра
+  /// Архивное состояние намерения в доступном названии строки экрана выбора
   ///
   /// In en, this message translates to:
-  /// **'No intentions match this title.'**
-  String get sourcePickerNoMatches;
+  /// **'archived'**
+  String get intentionPickerArchived;
 
-  /// Устранимый отказ чтения намерений
+  /// Вид намерения с готовностью к действию в доступном названии строки экрана выбора
   ///
   /// In en, this message translates to:
-  /// **'Intentions couldn’t be loaded. Try again.'**
-  String get sourcePickerUnavailable;
+  /// **'action'**
+  String get intentionPickerKindAction;
 
-  /// Повреждённые данные намерений
+  /// Вид намерения без готовности к действию в доступном названии строки экрана выбора
   ///
   /// In en, this message translates to:
-  /// **'Saved intention data is damaged and can’t be shown.'**
-  String get sourcePickerCorruption;
+  /// **'intention'**
+  String get intentionPickerKindIntention;
 
-  /// Непредвиденный отказ чтения намерений
+  /// Доступное название стрелки строки экрана выбора, которая открывает страницу действия
   ///
   /// In en, this message translates to:
-  /// **'Intentions couldn’t be loaded because of an unexpected error.'**
-  String get sourcePickerUnexpected;
+  /// **'Open the page of action {title}'**
+  String intentionPickerOpenActionPage(String title);
 
-  /// Семантическая подсказка выбора основания
+  /// Доступное название стрелки строки экрана выбора, которая открывает страницу намерения
   ///
   /// In en, this message translates to:
-  /// **'Selects this intention as the new reason'**
-  String get sourcePickerSelectHint;
+  /// **'Open the page of intention {title}'**
+  String intentionPickerOpenIntentionPage(String title);
 
-  /// Переход к подробностям намерения
+  /// Заголовок выдачи поиска действия на экране выбора
   ///
   /// In en, this message translates to:
-  /// **'Open intention details'**
-  String get sourcePickerOpenDetails;
+  /// **'Actions'**
+  String get intentionPickerActionsHeader;
 
-  /// Число доступных активных намерений
+  /// Заголовок выдачи поиска намерения на экране выбора
   ///
   /// In en, this message translates to:
-  /// **'Total intentions: {count}'**
-  String sourcePickerTotalCount(int count);
+  /// **'Intentions'**
+  String get intentionPickerIntentionsHeader;
 
-  /// Назначение отмены выбора участника
+  /// Доступное название подгрузки следующей порции в поиске действия
   ///
   /// In en, this message translates to:
-  /// **'Cancel the selection'**
+  /// **'Loading more actions'**
+  String get intentionPickerLoadingMoreActions;
+
+  /// Доступное название подгрузки следующей порции в поиске намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Loading more intentions'**
+  String get intentionPickerLoadingMoreIntentions;
+
+  /// Заголовок пустой выдачи экрана выбора, когда допустимый охват пуст без фильтров
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to choose from'**
+  String get intentionPickerEmptyScopeTitle;
+
+  /// Заголовок шапки экрана выбора действия
+  ///
+  /// In en, this message translates to:
+  /// **'Choose an action'**
+  String get intentionPickerActionTitle;
+
+  /// Заголовок шапки экрана выбора намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Choose an intention'**
+  String get intentionPickerIntentionTitle;
+
+  /// Заполнитель и доступное название поля поиска по названию на экране выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Search by name'**
+  String get intentionPickerSearchPlaceholder;
+
+  /// Доступное название крестика очистки поля поиска на экране выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Clear the name'**
+  String get intentionPickerClearSearch;
+
+  /// Доступное название кнопки фильтра по тегам на экране выбора с числом условий
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{Filter by tags} =1{Filter by tags, 1 condition} other{Filter by tags, {count} conditions}}'**
+  String intentionPickerFilterLabel(int count);
+
+  /// Заголовок пустой выдачи выбора действия из-за фильтра названия
+  ///
+  /// In en, this message translates to:
+  /// **'No actions with this name'**
+  String get intentionPickerNoActionsByTitle;
+
+  /// Заголовок пустой выдачи выбора намерения из-за фильтра названия
+  ///
+  /// In en, this message translates to:
+  /// **'No intentions with this name'**
+  String get intentionPickerNoIntentionsByTitle;
+
+  /// Совет пустой выдачи экрана выбора из-за фильтра названия
+  ///
+  /// In en, this message translates to:
+  /// **'Try a shorter name.'**
+  String get intentionPickerTryShorterTitle;
+
+  /// Заголовок пустой выдачи выбора действия из-за условий по тегам
+  ///
+  /// In en, this message translates to:
+  /// **'No actions match these tags'**
+  String get intentionPickerNoActionsByTags;
+
+  /// Заголовок пустой выдачи выбора намерения из-за условий по тегам
+  ///
+  /// In en, this message translates to:
+  /// **'No intentions match these tags'**
+  String get intentionPickerNoIntentionsByTags;
+
+  /// Совет пустой выдачи экрана выбора из-за условий по тегам
+  ///
+  /// In en, this message translates to:
+  /// **'Change the tags in the filter or reset it.'**
+  String get intentionPickerChangeTags;
+
+  /// Заголовок пустой выдачи экрана выбора из-за фильтра названия и условий по тегам
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing found'**
+  String get intentionPickerNothingFound;
+
+  /// Совет пустой выдачи экрана выбора из-за фильтра названия и условий по тегам
+  ///
+  /// In en, this message translates to:
+  /// **'Change the name or the tag conditions.'**
+  String get intentionPickerChangeTitleOrTags;
+
+  /// Действие пустой выдачи экрана выбора, которое снимает фильтр названия и все условия по тегам
+  ///
+  /// In en, this message translates to:
+  /// **'Reset filters'**
+  String get intentionPickerResetFilters;
+
+  /// Отмена выбора участника долговременной связи
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel intention selection'**
   String get participantPickerCancel;
 
   /// Отсутствие намерений, доступных для выбора участником
@@ -3663,12 +3693,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No other intentions are available to select.'**
   String get participantPickerEmpty;
-
-  /// Назначение выбора строки участником связи
-  ///
-  /// In en, this message translates to:
-  /// **'Selects this intention as a relation participant'**
-  String get participantPickerSelectHint;
 
   /// Назначение перехода к подробным данным намерения из выбора
   ///

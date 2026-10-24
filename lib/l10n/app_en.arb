@@ -357,27 +357,6 @@
   "@catalogNoDescription": {
     "description": "Признак отсутствия описания намерения"
   },
-  "intentionActiveRelationCount": "Active relations: {count}",
-  "@intentionActiveRelationCount": {
-    "description": "Количество активных связей намерения в его представлении",
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "intentionActiveRelationCountRefreshFailed": "The active relation count couldn’t be refreshed.",
-  "@intentionActiveRelationCountRefreshFailed": {
-    "description": "Ошибка обновления количества активных связей при сохранённом прежнем числе"
-  },
-  "intentionActiveRelationCountLoading": "Loading the active relation count…",
-  "@intentionActiveRelationCountLoading": {
-    "description": "Количество активных связей ещё не получено"
-  },
-  "intentionActiveRelationCountUnknown": "The active relation count is unknown.",
-  "@intentionActiveRelationCountUnknown": {
-    "description": "Количество активных связей неизвестно из-за ошибки получения"
-  },
   "intentionSummaryTags": "Tags: {tags}",
   "@intentionSummaryTags": {
     "description": "Строка собственных тегов намерения в результате поиска; названия перечислены через запятую",
@@ -1833,71 +1812,128 @@
   "@relationDetailsOpenRelatedParticipantAction": {
     "description": "Переход к архивному связанному участнику, блокирующему восстановление связи"
   },
-  "participantPickerTitle": "Select a participant",
-  "actionPickerTitle": "Select an action",
-  "@actionPickerTitle": {"description": "Заголовок выбора действия для нижнего обхода"},
   "actionPickerCancel": "Cancel action selection",
   "@actionPickerCancel": {"description": "Отмена выбора действия"},
   "actionPickerLoading": "Loading actions…",
   "@actionPickerLoading": {"description": "Чтение первой порции действий"},
   "actionPickerEmpty": "No active actions are available.",
   "@actionPickerEmpty": {"description": "Пустой выбор активных действий"},
-  "actionPickerNoMatches": "No actions match this title.",
-  "@actionPickerNoMatches": {"description": "Пустой результат поиска действий по названию"},
   "actionPickerUnavailable": "Actions couldn’t be loaded. Try again.",
   "@actionPickerUnavailable": {"description": "Устранимый отказ чтения действий"},
   "actionPickerCorruption": "Saved action data is damaged and can’t be shown.",
   "@actionPickerCorruption": {"description": "Повреждённые данные действий"},
   "actionPickerUnexpected": "Actions couldn’t be loaded because of an unexpected error.",
   "@actionPickerUnexpected": {"description": "Непредвиденный отказ чтения действий"},
-  "actionPickerSelectHint": "Selects this action to find its reason",
-  "@actionPickerSelectHint": {"description": "Семантическая подсказка выбора действия"},
-  "actionPickerOpenDetails": "Open action details",
-  "@actionPickerOpenDetails": {"description": "Переход к подробностям действия"},
-  "actionPickerTotalCount": "Total actions: {count}",
-  "@actionPickerTotalCount": {
-    "description": "Точное количество доступных действий",
-    "placeholders": {"count": {"type": "int"}}
-  },
-  "sourcePickerTitle": "Select a reason",
-  "@sourcePickerTitle": {"description": "Заголовок выбора нового основания"},
-  "sourcePickerCancel": "Cancel reason selection",
-  "@sourcePickerCancel": {"description": "Отмена выбора основания"},
-  "sourcePickerLoading": "Loading intentions…",
-  "@sourcePickerLoading": {"description": "Чтение первой порции намерений"},
+  "sourcePickerCancel": "Cancel intention selection",
+  "@sourcePickerCancel": {"description": "Отмена выбора исходного намерения"},
   "sourcePickerEmpty": "No active intentions are available.",
-  "@sourcePickerEmpty": {"description": "Пустой выбор активных оснований"},
-  "sourcePickerNoMatches": "No intentions match this title.",
-  "@sourcePickerNoMatches": {"description": "Пустой результат буквального фильтра"},
-  "sourcePickerUnavailable": "Intentions couldn’t be loaded. Try again.",
-  "@sourcePickerUnavailable": {"description": "Устранимый отказ чтения намерений"},
-  "sourcePickerCorruption": "Saved intention data is damaged and can’t be shown.",
-  "@sourcePickerCorruption": {"description": "Повреждённые данные намерений"},
-  "sourcePickerUnexpected": "Intentions couldn’t be loaded because of an unexpected error.",
-  "@sourcePickerUnexpected": {"description": "Непредвиденный отказ чтения намерений"},
-  "sourcePickerSelectHint": "Selects this intention as the new reason",
-  "@sourcePickerSelectHint": {"description": "Семантическая подсказка выбора основания"},
-  "sourcePickerOpenDetails": "Open intention details",
-  "@sourcePickerOpenDetails": {"description": "Переход к подробностям намерения"},
-  "sourcePickerTotalCount": "Total intentions: {count}",
-  "@sourcePickerTotalCount": {
-    "description": "Число доступных активных намерений",
+  "@sourcePickerEmpty": {"description": "Пустой выбор активных намерений"},
+  "intentionPickerArchived": "archived",
+  "@intentionPickerArchived": {
+    "description": "Архивное состояние намерения в доступном названии строки экрана выбора"
+  },
+  "intentionPickerKindAction": "action",
+  "@intentionPickerKindAction": {
+    "description": "Вид намерения с готовностью к действию в доступном названии строки экрана выбора"
+  },
+  "intentionPickerKindIntention": "intention",
+  "@intentionPickerKindIntention": {
+    "description": "Вид намерения без готовности к действию в доступном названии строки экрана выбора"
+  },
+  "intentionPickerOpenActionPage": "Open the page of action {title}",
+  "@intentionPickerOpenActionPage": {
+    "description": "Доступное название стрелки строки экрана выбора, которая открывает страницу действия",
+    "placeholders": {"title": {"type": "String"}}
+  },
+  "intentionPickerOpenIntentionPage": "Open the page of intention {title}",
+  "@intentionPickerOpenIntentionPage": {
+    "description": "Доступное название стрелки строки экрана выбора, которая открывает страницу намерения",
+    "placeholders": {"title": {"type": "String"}}
+  },
+  "intentionPickerActionsHeader": "Actions",
+  "@intentionPickerActionsHeader": {
+    "description": "Заголовок выдачи поиска действия на экране выбора"
+  },
+  "intentionPickerIntentionsHeader": "Intentions",
+  "@intentionPickerIntentionsHeader": {
+    "description": "Заголовок выдачи поиска намерения на экране выбора"
+  },
+  "intentionPickerLoadingMoreActions": "Loading more actions",
+  "@intentionPickerLoadingMoreActions": {
+    "description": "Доступное название подгрузки следующей порции в поиске действия"
+  },
+  "intentionPickerLoadingMoreIntentions": "Loading more intentions",
+  "@intentionPickerLoadingMoreIntentions": {
+    "description": "Доступное название подгрузки следующей порции в поиске намерения"
+  },
+  "intentionPickerEmptyScopeTitle": "Nothing to choose from",
+  "@intentionPickerEmptyScopeTitle": {
+    "description": "Заголовок пустой выдачи экрана выбора, когда допустимый охват пуст без фильтров"
+  },
+  "intentionPickerActionTitle": "Choose an action",
+  "@intentionPickerActionTitle": {
+    "description": "Заголовок шапки экрана выбора действия"
+  },
+  "intentionPickerIntentionTitle": "Choose an intention",
+  "@intentionPickerIntentionTitle": {
+    "description": "Заголовок шапки экрана выбора намерения"
+  },
+  "intentionPickerSearchPlaceholder": "Search by name",
+  "@intentionPickerSearchPlaceholder": {
+    "description": "Заполнитель и доступное название поля поиска по названию на экране выбора"
+  },
+  "intentionPickerClearSearch": "Clear the name",
+  "@intentionPickerClearSearch": {
+    "description": "Доступное название крестика очистки поля поиска на экране выбора"
+  },
+  "intentionPickerFilterLabel": "{count, plural, =0{Filter by tags} =1{Filter by tags, 1 condition} other{Filter by tags, {count} conditions}}",
+  "@intentionPickerFilterLabel": {
+    "description": "Доступное название кнопки фильтра по тегам на экране выбора с числом условий",
     "placeholders": {"count": {"type": "int"}}
   },
-  "@participantPickerTitle": {
-    "description": "Заголовок выбора участника долговременной связи"
+  "intentionPickerNoActionsByTitle": "No actions with this name",
+  "@intentionPickerNoActionsByTitle": {
+    "description": "Заголовок пустой выдачи выбора действия из-за фильтра названия"
   },
-  "participantPickerCancel": "Cancel the selection",
+  "intentionPickerNoIntentionsByTitle": "No intentions with this name",
+  "@intentionPickerNoIntentionsByTitle": {
+    "description": "Заголовок пустой выдачи выбора намерения из-за фильтра названия"
+  },
+  "intentionPickerTryShorterTitle": "Try a shorter name.",
+  "@intentionPickerTryShorterTitle": {
+    "description": "Совет пустой выдачи экрана выбора из-за фильтра названия"
+  },
+  "intentionPickerNoActionsByTags": "No actions match these tags",
+  "@intentionPickerNoActionsByTags": {
+    "description": "Заголовок пустой выдачи выбора действия из-за условий по тегам"
+  },
+  "intentionPickerNoIntentionsByTags": "No intentions match these tags",
+  "@intentionPickerNoIntentionsByTags": {
+    "description": "Заголовок пустой выдачи выбора намерения из-за условий по тегам"
+  },
+  "intentionPickerChangeTags": "Change the tags in the filter or reset it.",
+  "@intentionPickerChangeTags": {
+    "description": "Совет пустой выдачи экрана выбора из-за условий по тегам"
+  },
+  "intentionPickerNothingFound": "Nothing found",
+  "@intentionPickerNothingFound": {
+    "description": "Заголовок пустой выдачи экрана выбора из-за фильтра названия и условий по тегам"
+  },
+  "intentionPickerChangeTitleOrTags": "Change the name or the tag conditions.",
+  "@intentionPickerChangeTitleOrTags": {
+    "description": "Совет пустой выдачи экрана выбора из-за фильтра названия и условий по тегам"
+  },
+  "intentionPickerResetFilters": "Reset filters",
+  "@intentionPickerResetFilters": {
+    "description": "Действие пустой выдачи экрана выбора, которое снимает фильтр названия и все условия по тегам"
+  },
+  "participantPickerCancel": "Cancel intention selection",
   "@participantPickerCancel": {
-    "description": "Назначение отмены выбора участника"
+    "description": "Отмена выбора участника долговременной связи"
   },
   "participantPickerEmpty": "No other intentions are available to select.",
   "@participantPickerEmpty": {
     "description": "Отсутствие намерений, доступных для выбора участником"
-  },
-  "participantPickerSelectHint": "Selects this intention as a relation participant",
-  "@participantPickerSelectHint": {
-    "description": "Назначение выбора строки участником связи"
   },
   "participantPickerOpenDetails": "Open intention details",
   "@participantPickerOpenDetails": {

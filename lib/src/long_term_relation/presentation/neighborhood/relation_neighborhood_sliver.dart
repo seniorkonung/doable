@@ -1256,9 +1256,6 @@ final class _Participant extends StatelessWidget {
       IntentionSummaryView(
         title: participant.title,
         archiveState: participant.archiveState,
-        activeRelationCount: ConfirmedActiveRelationCount(
-          participant.activeRelationCount,
-        ),
         showArchiveState: true,
       ),
     ],

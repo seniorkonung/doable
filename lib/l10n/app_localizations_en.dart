@@ -501,23 +501,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get catalogNoDescription => 'No description';
 
   @override
-  String intentionActiveRelationCount(int count) {
-    return 'Active relations: $count';
-  }
-
-  @override
-  String get intentionActiveRelationCountRefreshFailed =>
-      'The active relation count couldn’t be refreshed.';
-
-  @override
-  String get intentionActiveRelationCountLoading =>
-      'Loading the active relation count…';
-
-  @override
-  String get intentionActiveRelationCountUnknown =>
-      'The active relation count is unknown.';
-
-  @override
   String intentionSummaryTags(String tags) {
     return 'Tags: $tags';
   }
@@ -2259,12 +2242,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Open related intention';
 
   @override
-  String get participantPickerTitle => 'Select a participant';
-
-  @override
-  String get actionPickerTitle => 'Select an action';
-
-  @override
   String get actionPickerCancel => 'Cancel action selection';
 
   @override
@@ -2272,9 +2249,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get actionPickerEmpty => 'No active actions are available.';
-
-  @override
-  String get actionPickerNoMatches => 'No actions match this title.';
 
   @override
   String get actionPickerUnavailable =>
@@ -2289,65 +2263,106 @@ class AppLocalizationsEn extends AppLocalizations {
       'Actions couldn’t be loaded because of an unexpected error.';
 
   @override
-  String get actionPickerSelectHint => 'Selects this action to find its reason';
-
-  @override
-  String get actionPickerOpenDetails => 'Open action details';
-
-  @override
-  String actionPickerTotalCount(int count) {
-    return 'Total actions: $count';
-  }
-
-  @override
-  String get sourcePickerTitle => 'Select a reason';
-
-  @override
-  String get sourcePickerCancel => 'Cancel reason selection';
-
-  @override
-  String get sourcePickerLoading => 'Loading intentions…';
+  String get sourcePickerCancel => 'Cancel intention selection';
 
   @override
   String get sourcePickerEmpty => 'No active intentions are available.';
 
   @override
-  String get sourcePickerNoMatches => 'No intentions match this title.';
+  String get intentionPickerArchived => 'archived';
 
   @override
-  String get sourcePickerUnavailable =>
-      'Intentions couldn’t be loaded. Try again.';
+  String get intentionPickerKindAction => 'action';
 
   @override
-  String get sourcePickerCorruption =>
-      'Saved intention data is damaged and can’t be shown.';
+  String get intentionPickerKindIntention => 'intention';
 
   @override
-  String get sourcePickerUnexpected =>
-      'Intentions couldn’t be loaded because of an unexpected error.';
-
-  @override
-  String get sourcePickerSelectHint =>
-      'Selects this intention as the new reason';
-
-  @override
-  String get sourcePickerOpenDetails => 'Open intention details';
-
-  @override
-  String sourcePickerTotalCount(int count) {
-    return 'Total intentions: $count';
+  String intentionPickerOpenActionPage(String title) {
+    return 'Open the page of action $title';
   }
 
   @override
-  String get participantPickerCancel => 'Cancel the selection';
+  String intentionPickerOpenIntentionPage(String title) {
+    return 'Open the page of intention $title';
+  }
+
+  @override
+  String get intentionPickerActionsHeader => 'Actions';
+
+  @override
+  String get intentionPickerIntentionsHeader => 'Intentions';
+
+  @override
+  String get intentionPickerLoadingMoreActions => 'Loading more actions';
+
+  @override
+  String get intentionPickerLoadingMoreIntentions => 'Loading more intentions';
+
+  @override
+  String get intentionPickerEmptyScopeTitle => 'Nothing to choose from';
+
+  @override
+  String get intentionPickerActionTitle => 'Choose an action';
+
+  @override
+  String get intentionPickerIntentionTitle => 'Choose an intention';
+
+  @override
+  String get intentionPickerSearchPlaceholder => 'Search by name';
+
+  @override
+  String get intentionPickerClearSearch => 'Clear the name';
+
+  @override
+  String intentionPickerFilterLabel(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Filter by tags, $count conditions',
+      one: 'Filter by tags, 1 condition',
+      zero: 'Filter by tags',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get intentionPickerNoActionsByTitle => 'No actions with this name';
+
+  @override
+  String get intentionPickerNoIntentionsByTitle =>
+      'No intentions with this name';
+
+  @override
+  String get intentionPickerTryShorterTitle => 'Try a shorter name.';
+
+  @override
+  String get intentionPickerNoActionsByTags => 'No actions match these tags';
+
+  @override
+  String get intentionPickerNoIntentionsByTags =>
+      'No intentions match these tags';
+
+  @override
+  String get intentionPickerChangeTags =>
+      'Change the tags in the filter or reset it.';
+
+  @override
+  String get intentionPickerNothingFound => 'Nothing found';
+
+  @override
+  String get intentionPickerChangeTitleOrTags =>
+      'Change the name or the tag conditions.';
+
+  @override
+  String get intentionPickerResetFilters => 'Reset filters';
+
+  @override
+  String get participantPickerCancel => 'Cancel intention selection';
 
   @override
   String get participantPickerEmpty =>
       'No other intentions are available to select.';
-
-  @override
-  String get participantPickerSelectHint =>
-      'Selects this intention as a relation participant';
 
   @override
   String get participantPickerOpenDetails => 'Open intention details';

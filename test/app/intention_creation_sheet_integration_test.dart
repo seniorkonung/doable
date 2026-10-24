@@ -279,7 +279,7 @@ void main() {
         expect(_ids(catalog), [created, ..._ids(catalogBefore)]);
         final summary = catalog.items.first;
         expect(summary.title, _title);
-        expect(summary.hasDescription, isTrue);
+        expect(summary.descriptionPreview, isNotNull);
         expect(summary.readiness, IntentionReadiness.ready);
         expect(summary.archiveState, IntentionArchiveState.active);
         expect(summary.createdAt.value, summary.updatedAt.value);

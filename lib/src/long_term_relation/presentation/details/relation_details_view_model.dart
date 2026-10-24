@@ -339,8 +339,6 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
         : <IntentionId>{};
     final participantChanged = changes.any(
       (change) => switch (change) {
-        IntentionRelationCountsChanged(:final intentionId) =>
-          participantIds.contains(intentionId),
         IntentionCatalogMutation(:final before, :final after) =>
           participantIds.contains(before?.summary.id) ||
               participantIds.contains(after?.summary.id),

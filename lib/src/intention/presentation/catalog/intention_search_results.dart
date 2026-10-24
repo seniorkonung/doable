@@ -27,17 +27,6 @@ final class IntentionSearchResultsMessages {
   final String unexpected;
 }
 
-/// Что удерживает позицию просмотра при обновлении выдачи без смены
-/// параметров поиска.
-enum IntentionSearchResultsViewAnchor {
-  /// Сохраняется смещение прокрутки списка.
-  scrollOffset,
-
-  /// Сохраняется экранное положение видимого намерения; если оно исчезло из
-  /// выдачи, позиция переходит к ближайшему соседу.
-  visibleIntention,
-}
-
 /// Строит строку загруженного списка для намерения [summary] выдачи
 /// [results].
 typedef IntentionSearchResultBuilder = Widget Function(
@@ -49,7 +38,9 @@ typedef IntentionSearchResultBuilder = Widget Function(
 /// Выдача поиска намерений назначения [purpose].
 ///
 /// Элемент один владеет прокруткой списка и переходом к верхней позиции в
-/// начале новой выдачи. Страница передаёт состояние выдачи своего назначения
+/// начале новой выдачи. При обновлении выдачи без смены параметров поиска
+/// элемент сохраняет экранное положение видимого намерения, а если оно исчезло
+/// из выдачи — ближайшего соседа. Страница передаёт состояние выдачи своего назначения
 /// и построение своих строк; элемент не читает граф, не выполняет команд и
 /// не меняет условия поиска.
 final class IntentionSearchResults extends ConsumerStatefulWidget {
@@ -60,8 +51,7 @@ final class IntentionSearchResults extends ConsumerStatefulWidget {
     required this.messages,
     required this.emptyMessage,
     required this.itemBuilder,
-    this.totalCountLabel,
-    this.viewAnchor = IntentionSearchResultsViewAnchor.scrollOffset,
+    required this.totalCountLabel,
     super.key,
   });
 
@@ -81,11 +71,8 @@ final class IntentionSearchResults extends ConsumerStatefulWidget {
 
   final IntentionSearchResultBuilder itemBuilder;
 
-  /// Подпись точного количества совпадений над списком; без неё количество
-  /// не выводится.
-  final String Function(int totalCount)? totalCountLabel;
-
-  final IntentionSearchResultsViewAnchor viewAnchor;
+  /// Подпись точного количества совпадений над списком.
+  final String Function(int totalCount) totalCountLabel;
 
   /// Показывает ли выдача [catalog] загруженный список, а не состояние вместо
   /// него: загрузку, отказ или пустую выдачу.
@@ -215,27 +202,19 @@ final class _IntentionSearchResultsState
         }
         _requestNextPage(index);
         final summary = results.items[index];
-        final row = widget.itemBuilder(context, results, summary);
-        return switch (widget.viewAnchor) {
-          IntentionSearchResultsViewAnchor.scrollOffset => row,
-          IntentionSearchResultsViewAnchor.visibleIntention => KeyedSubtree(
-            key: _itemKeyFor(summary.id),
-            child: row,
-          ),
-        };
+        return KeyedSubtree(
+          key: _itemKeyFor(summary.id),
+          child: widget.itemBuilder(context, results, summary),
+        );
       },
     );
-    final totalCountLabel = widget.totalCountLabel;
-    if (totalCountLabel == null) {
-      return list;
-    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
           child: Text(
-            totalCountLabel(results.totalCount),
+            widget.totalCountLabel(results.totalCount),
             style: Theme.of(context).textTheme.titleMedium,
           ),
         ),
@@ -277,9 +256,7 @@ final class _IntentionSearchResultsState
 
     final previousState = previous?.value;
     final nextState = next.value;
-    if (widget.viewAnchor !=
-            IntentionSearchResultsViewAnchor.visibleIntention ||
-        nextState is! IntentionCatalogLoaded) {
+    if (nextState is! IntentionCatalogLoaded) {
       return;
     }
     if (_pendingVisualAnchor == null &&

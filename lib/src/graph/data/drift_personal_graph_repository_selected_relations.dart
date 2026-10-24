@@ -129,10 +129,7 @@ extension _SelectedRelationsReading on DriftPersonalGraphRepository {
         present[entry.key] = entry.value;
       }
     }
-    final participants = await _readRelationParticipants(
-      participantIds,
-      knownActiveCounts: const {},
-    );
+    final participants = await _readRelationParticipants(participantIds);
     for (final item in selectedChoices.values) {
       if (item.source.id == query.intentionId ||
           item.selected.id == query.intentionId) {
@@ -270,8 +267,6 @@ extension _SelectedRelationsReading on DriftPersonalGraphRepository {
     final affectedParticipants = <IntentionId>{};
     for (final change in changes) {
       switch (change) {
-        case IntentionRelationCountsChanged(:final intentionId):
-          affectedParticipants.add(intentionId);
         case IntentionCatalogMutation(:final before, :final after):
           final beforeId = before?.summary.id;
           final afterId = after?.summary.id;

@@ -11,18 +11,18 @@
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 
 import 'package:auto_route/auto_route.dart' as _i19;
-import 'package:collection/collection.dart' as _i26;
+import 'package:collection/collection.dart' as _i27;
 import 'package:doable/src/app/home/home_page.dart' as _i11;
 import 'package:doable/src/app/navigation/app_shell_page.dart' as _i1;
 import 'package:doable/src/app/settings/settings_page.dart' as _i18;
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart'
     as _i21;
 import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart'
-    as _i24;
+    as _i25;
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart'
-    as _i28;
-import 'package:doable/src/daily_choice/domain/calendar_date.dart' as _i25;
-import 'package:doable/src/daily_choice/domain/daily_choice_id.dart' as _i27;
+    as _i29;
+import 'package:doable/src/daily_choice/domain/calendar_date.dart' as _i26;
+import 'package:doable/src/daily_choice/domain/daily_choice_id.dart' as _i28;
 import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart'
     as _i3;
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart'
@@ -30,7 +30,7 @@ import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalo
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_date_catalog_page.dart'
     as _i7;
 import 'package:doable/src/daily_choice/presentation/daily_choice_creation_flow_session.dart'
-    as _i23;
+    as _i24;
 import 'package:doable/src/daily_choice/presentation/daily_choice_picker_context.dart'
     as _i4;
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart'
@@ -47,24 +47,25 @@ import 'package:doable/src/intention/domain/intention_id.dart' as _i20;
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart'
     as _i12;
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart'
-    as _i32;
+    as _i33;
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart'
     as _i13;
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart'
     as _i14;
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
-    as _i30;
+    as _i31;
 import 'package:doable/src/long_term_relation/presentation/details/relation_details_page.dart'
     as _i15;
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_page.dart'
     as _i16;
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_state.dart'
-    as _i31;
+    as _i32;
 import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart'
     as _i17;
 import 'package:doable/src/statistics/application/intention_statistics_target.dart'
-    as _i29;
+    as _i30;
 import 'package:flutter/material.dart' as _i22;
+import 'package:flutter/widgets.dart' as _i23;
 
 /// generated route for
 /// [_i1.AppShellPage]
@@ -154,7 +155,7 @@ class DailyChoiceActionPickerRoute
   DailyChoiceActionPickerRoute({
     _i4.DailyChoicePickerContext pickerContext =
         const _i4.AuxiliaryDailyChoicePickerContext(),
-    _i22.Key? key,
+    _i23.Key? key,
     List<_i19.PageRouteInfo>? children,
   }) : super(
          DailyChoiceActionPickerRoute.name,
@@ -189,7 +190,7 @@ class DailyChoiceActionPickerRouteArgs {
 
   final _i4.DailyChoicePickerContext pickerContext;
 
-  final _i22.Key? key;
+  final _i23.Key? key;
 
   @override
   String toString() {
@@ -228,10 +229,10 @@ class DailyChoiceCatalogRoute extends _i19.PageRouteInfo<void> {
 class DailyChoiceCreationRoute
     extends _i19.PageRouteInfo<DailyChoiceCreationRouteArgs> {
   DailyChoiceCreationRoute({
-    required _i23.DailyChoiceCreationFlowSession session,
-    required _i24.ConfirmedChoicePath path,
+    required _i24.DailyChoiceCreationFlowSession session,
+    required _i25.ConfirmedChoicePath path,
     required List<_i6.DailyChoiceCreationStep> steps,
-    required _i25.CalendarDate initialDate,
+    required _i26.CalendarDate initialDate,
     _i21.ChoicePathDraftDirection direction =
         _i21.ChoicePathDraftDirection.topDown,
     _i22.Key? key,
@@ -277,13 +278,13 @@ class DailyChoiceCreationRouteArgs {
     this.key,
   });
 
-  final _i23.DailyChoiceCreationFlowSession session;
+  final _i24.DailyChoiceCreationFlowSession session;
 
-  final _i24.ConfirmedChoicePath path;
+  final _i25.ConfirmedChoicePath path;
 
   final List<_i6.DailyChoiceCreationStep> steps;
 
-  final _i25.CalendarDate initialDate;
+  final _i26.CalendarDate initialDate;
 
   final _i21.ChoicePathDraftDirection direction;
 
@@ -300,7 +301,7 @@ class DailyChoiceCreationRouteArgs {
     if (other is! DailyChoiceCreationRouteArgs) return false;
     return session == other.session &&
         path == other.path &&
-        const _i26.ListEquality<_i6.DailyChoiceCreationStep>().equals(
+        const _i27.ListEquality<_i6.DailyChoiceCreationStep>().equals(
           steps,
           other.steps,
         ) &&
@@ -313,7 +314,7 @@ class DailyChoiceCreationRouteArgs {
   int get hashCode =>
       session.hashCode ^
       path.hashCode ^
-      const _i26.ListEquality<_i6.DailyChoiceCreationStep>().hash(steps) ^
+      const _i27.ListEquality<_i6.DailyChoiceCreationStep>().hash(steps) ^
       initialDate.hashCode ^
       direction.hashCode ^
       key.hashCode;
@@ -324,7 +325,7 @@ class DailyChoiceCreationRouteArgs {
 class DailyChoiceDateCatalogRoute
     extends _i19.PageRouteInfo<DailyChoiceDateCatalogRouteArgs> {
   DailyChoiceDateCatalogRoute({
-    required _i25.CalendarDate date,
+    required _i26.CalendarDate date,
     _i22.Key? key,
     List<_i19.PageRouteInfo>? children,
   }) : super(
@@ -347,7 +348,7 @@ class DailyChoiceDateCatalogRoute
 class DailyChoiceDateCatalogRouteArgs {
   const DailyChoiceDateCatalogRouteArgs({required this.date, this.key});
 
-  final _i25.CalendarDate date;
+  final _i26.CalendarDate date;
 
   final _i22.Key? key;
 
@@ -372,7 +373,7 @@ class DailyChoiceDateCatalogRouteArgs {
 class DailyChoiceDetailsRoute
     extends _i19.PageRouteInfo<DailyChoiceDetailsRouteArgs> {
   DailyChoiceDetailsRoute({
-    required _i27.DailyChoiceId choiceId,
+    required _i28.DailyChoiceId choiceId,
     _i22.Key? key,
     List<_i19.PageRouteInfo>? children,
   }) : super(
@@ -395,7 +396,7 @@ class DailyChoiceDetailsRoute
 class DailyChoiceDetailsRouteArgs {
   const DailyChoiceDetailsRouteArgs({required this.choiceId, this.key});
 
-  final _i27.DailyChoiceId choiceId;
+  final _i28.DailyChoiceId choiceId;
 
   final _i22.Key? key;
 
@@ -420,7 +421,7 @@ class DailyChoiceDetailsRouteArgs {
 class DailyChoiceEditRoute
     extends _i19.PageRouteInfo<DailyChoiceEditRouteArgs> {
   DailyChoiceEditRoute({
-    required _i28.DailyChoiceDetails details,
+    required _i29.DailyChoiceDetails details,
     _i22.Key? key,
     List<_i19.PageRouteInfo>? children,
   }) : super(
@@ -443,7 +444,7 @@ class DailyChoiceEditRoute
 class DailyChoiceEditRouteArgs {
   const DailyChoiceEditRouteArgs({required this.details, this.key});
 
-  final _i28.DailyChoiceDetails details;
+  final _i29.DailyChoiceDetails details;
 
   final _i22.Key? key;
 
@@ -470,7 +471,7 @@ class DailyChoiceSourcePickerRoute
   DailyChoiceSourcePickerRoute({
     _i4.DailyChoicePickerContext pickerContext =
         const _i4.AuxiliaryDailyChoicePickerContext(),
-    _i22.Key? key,
+    _i23.Key? key,
     List<_i19.PageRouteInfo>? children,
   }) : super(
          DailyChoiceSourcePickerRoute.name,
@@ -505,7 +506,7 @@ class DailyChoiceSourcePickerRouteArgs {
 
   final _i4.DailyChoicePickerContext pickerContext;
 
-  final _i22.Key? key;
+  final _i23.Key? key;
 
   @override
   String toString() {
@@ -561,7 +562,7 @@ class IntentionDetailsRoute
     extends _i19.PageRouteInfo<IntentionDetailsRouteArgs> {
   IntentionDetailsRoute({
     required _i20.IntentionId intentionId,
-    _i29.IntentionStatisticsTarget? statisticsTarget,
+    _i30.IntentionStatisticsTarget? statisticsTarget,
     _i22.Key? key,
     List<_i19.PageRouteInfo>? children,
   }) : super(
@@ -598,7 +599,7 @@ class IntentionDetailsRouteArgs {
 
   final _i20.IntentionId intentionId;
 
-  final _i29.IntentionStatisticsTarget? statisticsTarget;
+  final _i30.IntentionStatisticsTarget? statisticsTarget;
 
   final _i22.Key? key;
 
@@ -642,7 +643,7 @@ class IntentionEditorRoute extends _i19.PageRouteInfo<void> {
 class RelationDetailsRoute
     extends _i19.PageRouteInfo<RelationDetailsRouteArgs> {
   RelationDetailsRoute({
-    required _i30.LongTermRelationId relationId,
+    required _i31.LongTermRelationId relationId,
     _i22.Key? key,
     List<_i19.PageRouteInfo>? children,
   }) : super(
@@ -668,7 +669,7 @@ class RelationDetailsRoute
 class RelationDetailsRouteArgs {
   const RelationDetailsRouteArgs({required this.relationId, this.key});
 
-  final _i30.LongTermRelationId relationId;
+  final _i31.LongTermRelationId relationId;
 
   final _i22.Key? key;
 
@@ -692,7 +693,7 @@ class RelationDetailsRouteArgs {
 /// [_i16.RelationEditorPage]
 class RelationEditorRoute extends _i19.PageRouteInfo<RelationEditorRouteArgs> {
   RelationEditorRoute({
-    required _i31.RelationEditorContext editorContext,
+    required _i32.RelationEditorContext editorContext,
     _i22.Key? key,
     List<_i19.PageRouteInfo>? children,
   }) : super(
@@ -718,7 +719,7 @@ class RelationEditorRoute extends _i19.PageRouteInfo<RelationEditorRouteArgs> {
 class RelationEditorRouteArgs {
   const RelationEditorRouteArgs({required this.editorContext, this.key});
 
-  final _i31.RelationEditorContext editorContext;
+  final _i32.RelationEditorContext editorContext;
 
   final _i22.Key? key;
 
@@ -743,9 +744,9 @@ class RelationEditorRouteArgs {
 class RelationParticipantPickerRoute
     extends _i19.PageRouteInfo<RelationParticipantPickerRouteArgs> {
   RelationParticipantPickerRoute({
-    required _i32.RelationParticipantSelectionContext selectionContext,
+    required _i33.RelationParticipantSelectionContext selectionContext,
     _i20.IntentionId? excludedIntentionId,
-    _i22.Key? key,
+    _i23.Key? key,
     List<_i19.PageRouteInfo>? children,
   }) : super(
          RelationParticipantPickerRoute.name,
@@ -779,11 +780,11 @@ class RelationParticipantPickerRouteArgs {
     this.key,
   });
 
-  final _i32.RelationParticipantSelectionContext selectionContext;
+  final _i33.RelationParticipantSelectionContext selectionContext;
 
   final _i20.IntentionId? excludedIntentionId;
 
-  final _i22.Key? key;
+  final _i23.Key? key;
 
   @override
   String toString() {

@@ -506,23 +506,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get catalogNoDescription => 'Нет описания';
 
   @override
-  String intentionActiveRelationCount(int count) {
-    return 'Активных связей: $count';
-  }
-
-  @override
-  String get intentionActiveRelationCountRefreshFailed =>
-      'Не удалось обновить количество активных связей.';
-
-  @override
-  String get intentionActiveRelationCountLoading =>
-      'Загружаем количество активных связей…';
-
-  @override
-  String get intentionActiveRelationCountUnknown =>
-      'Количество активных связей неизвестно.';
-
-  @override
   String intentionSummaryTags(String tags) {
     return 'Теги: $tags';
   }
@@ -2283,12 +2266,6 @@ class AppLocalizationsRu extends AppLocalizations {
       'Открыть связанное намерение';
 
   @override
-  String get participantPickerTitle => 'Выбор участника';
-
-  @override
-  String get actionPickerTitle => 'Выбор действия';
-
-  @override
   String get actionPickerCancel => 'Отменить выбор действия';
 
   @override
@@ -2296,9 +2273,6 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get actionPickerEmpty => 'Доступных активных действий нет.';
-
-  @override
-  String get actionPickerNoMatches => 'Действий с таким названием не найдено.';
 
   @override
   String get actionPickerUnavailable =>
@@ -2313,65 +2287,107 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось загрузить действия из-за непредвиденной ошибки.';
 
   @override
-  String get actionPickerSelectHint =>
-      'Выбрать это действие для поиска основания';
-
-  @override
-  String get actionPickerOpenDetails => 'Открыть подробности действия';
-
-  @override
-  String actionPickerTotalCount(int count) {
-    return 'Всего действий: $count';
-  }
-
-  @override
-  String get sourcePickerTitle => 'Выбор основания';
-
-  @override
-  String get sourcePickerCancel => 'Отменить выбор основания';
-
-  @override
-  String get sourcePickerLoading => 'Загружаем намерения…';
+  String get sourcePickerCancel => 'Отменить выбор намерения';
 
   @override
   String get sourcePickerEmpty => 'Доступных активных намерений нет.';
 
   @override
-  String get sourcePickerNoMatches => 'Намерений с таким названием не найдено.';
+  String get intentionPickerArchived => 'в архиве';
 
   @override
-  String get sourcePickerUnavailable =>
-      'Не удалось загрузить намерения. Повторите попытку.';
+  String get intentionPickerKindAction => 'действие';
 
   @override
-  String get sourcePickerCorruption =>
-      'Сохранённые данные намерений повреждены и не могут быть показаны.';
+  String get intentionPickerKindIntention => 'намерение';
 
   @override
-  String get sourcePickerUnexpected =>
-      'Не удалось загрузить намерения из-за непредвиденной ошибки.';
-
-  @override
-  String get sourcePickerSelectHint =>
-      'Выбрать это намерение как новое основание';
-
-  @override
-  String get sourcePickerOpenDetails => 'Открыть подробности намерения';
-
-  @override
-  String sourcePickerTotalCount(int count) {
-    return 'Всего намерений: $count';
+  String intentionPickerOpenActionPage(String title) {
+    return 'Открыть страницу действия «$title»';
   }
 
   @override
-  String get participantPickerCancel => 'Отменить выбор';
+  String intentionPickerOpenIntentionPage(String title) {
+    return 'Открыть страницу намерения «$title»';
+  }
+
+  @override
+  String get intentionPickerActionsHeader => 'Действия';
+
+  @override
+  String get intentionPickerIntentionsHeader => 'Намерения';
+
+  @override
+  String get intentionPickerLoadingMoreActions => 'Загружаем ещё действия';
+
+  @override
+  String get intentionPickerLoadingMoreIntentions => 'Загружаем ещё намерения';
+
+  @override
+  String get intentionPickerEmptyScopeTitle => 'Выбрать не из чего';
+
+  @override
+  String get intentionPickerActionTitle => 'Выбор действия';
+
+  @override
+  String get intentionPickerIntentionTitle => 'Выбор намерения';
+
+  @override
+  String get intentionPickerSearchPlaceholder => 'Поиск по названию';
+
+  @override
+  String get intentionPickerClearSearch => 'Очистить название';
+
+  @override
+  String intentionPickerFilterLabel(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Фильтр по тегам, $count условия',
+      many: 'Фильтр по тегам, $count условий',
+      few: 'Фильтр по тегам, $count условия',
+      one: 'Фильтр по тегам, $count условие',
+      zero: 'Фильтр по тегам',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get intentionPickerNoActionsByTitle =>
+      'Нет действий с таким названием';
+
+  @override
+  String get intentionPickerNoIntentionsByTitle =>
+      'Нет намерений с таким названием';
+
+  @override
+  String get intentionPickerTryShorterTitle => 'Попробуйте название короче.';
+
+  @override
+  String get intentionPickerNoActionsByTags => 'Нет действий под эти теги';
+
+  @override
+  String get intentionPickerNoIntentionsByTags => 'Нет намерений под эти теги';
+
+  @override
+  String get intentionPickerChangeTags =>
+      'Измените теги в фильтре или сбросьте его.';
+
+  @override
+  String get intentionPickerNothingFound => 'Ничего не найдено';
+
+  @override
+  String get intentionPickerChangeTitleOrTags =>
+      'Измените название или условия по тегам.';
+
+  @override
+  String get intentionPickerResetFilters => 'Сбросить фильтры';
+
+  @override
+  String get participantPickerCancel => 'Отменить выбор намерения';
 
   @override
   String get participantPickerEmpty => 'Других намерений для выбора нет.';
-
-  @override
-  String get participantPickerSelectHint =>
-      'Выбирает это намерение участником связи';
 
   @override
   String get participantPickerOpenDetails =>

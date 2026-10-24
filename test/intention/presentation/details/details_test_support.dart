@@ -32,6 +32,7 @@ import 'package:doable/src/statistics/application/intention_statistics_read_cont
 
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/statistics_read_contract_test_fallback.dart';
+import '../../../support/intention_description_preview.dart';
 
 final class ControlledDetailRequest {
   ControlledDetailRequest({bool broadcast = false}) {
@@ -400,16 +401,12 @@ IntentionId testDetailsIntentionId(int index) {
   };
 }
 
-IntentionSummary testDetailsSummary(
-  Intention intention, {
-  int activeRelationCount = 0,
-}) => IntentionSummary(
+IntentionSummary testDetailsSummary(Intention intention) => IntentionSummary(
   id: intention.id,
   title: intention.title,
-  hasDescription: intention.description != null,
+  descriptionPreview: testDescriptionPreview(intention.description),
   readiness: intention.readiness,
   archiveState: intention.archiveState,
-  activeRelationCount: activeRelationCount,
   createdAt: intention.createdAt,
   updatedAt: intention.updatedAt,
 );
@@ -525,13 +522,11 @@ LongTermRelationSummary testDetailsRelationRow({
       id: sourceId,
       title: isOutgoing ? 'Намерение-владелец' : 'Исходное $index',
       archiveState: IntentionArchiveState.active,
-      activeRelationCount: 0,
     ),
     related: RelationParticipantSummary(
       id: relatedId,
       title: isOutgoing ? 'Связанное $index' : 'Намерение-владелец',
       archiveState: IntentionArchiveState.active,
-      activeRelationCount: 0,
     ),
     hasDescription: false,
   );

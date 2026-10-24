@@ -101,17 +101,6 @@ void main() {
               : summary.relation.relatedIntentionId,
           ownerId,
         );
-        final owner = direction == RelationDirection.outgoing
-            ? summary.source
-            : summary.related;
-        final participant = direction == RelationDirection.outgoing
-            ? summary.related
-            : summary.source;
-        expect(owner.activeRelationCount, 4);
-        expect(
-          participant.activeRelationCount,
-          scope == RelationScope.active ? 1 : 0,
-        );
       }
     },
   );

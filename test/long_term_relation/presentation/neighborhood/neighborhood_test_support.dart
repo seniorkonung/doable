@@ -28,6 +28,7 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
 
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/statistics_read_contract_test_fallback.dart';
+import '../../../support/intention_description_preview.dart';
 
 /// Управляемый граф: каждое чтение группы завершается тестом вручную.
 final class ControlledNeighborhoodRepository
@@ -384,12 +385,10 @@ RelationParticipantSummary testParticipant(
   IntentionId id, {
   String title = 'Намерение',
   IntentionArchiveState archiveState = IntentionArchiveState.active,
-  int activeRelationCount = 0,
 }) => RelationParticipantSummary(
   id: id,
   title: title,
   archiveState: archiveState,
-  activeRelationCount: activeRelationCount,
 );
 
 /// Строка выбранной группы намерения-владельца.
@@ -402,7 +401,6 @@ LongTermRelationSummary testGroupRow({
   RelationPriority priority = RelationPriority.p2,
   String ownerTitle = 'Намерение-владелец',
   String? neighborTitle,
-  int neighborActiveRelationCount = 0,
 }) {
   final neighborId = testIntentionId(1000 + index);
   final isOutgoing = direction == RelationDirection.outgoing;
@@ -421,12 +419,10 @@ LongTermRelationSummary testGroupRow({
     source: testParticipant(
       sourceId,
       title: isOutgoing ? ownerTitle : neighborTitle ?? 'Исходное $index',
-      activeRelationCount: isOutgoing ? 0 : neighborActiveRelationCount,
     ),
     related: testParticipant(
       relatedId,
       title: isOutgoing ? neighborTitle ?? 'Связанное $index' : ownerTitle,
-      activeRelationCount: isOutgoing ? neighborActiveRelationCount : 0,
     ),
     hasDescription: false,
   );
@@ -441,7 +437,6 @@ List<LongTermRelationSummary> testGroupRows({
   RelationScope scope = RelationScope.active,
   String ownerTitle = 'Намерение-владелец',
   Map<int, String> neighborTitles = const {},
-  Map<int, int> neighborActiveRelationCounts = const {},
 }) => [
   for (var offset = 0; offset < count; offset += 1)
     testGroupRow(
@@ -452,8 +447,6 @@ List<LongTermRelationSummary> testGroupRows({
       scope: scope,
       ownerTitle: ownerTitle,
       neighborTitle: neighborTitles[from + offset],
-      neighborActiveRelationCount:
-          neighborActiveRelationCounts[from + offset] ?? 0,
     ),
 ];
 
@@ -509,10 +502,9 @@ final class _NeighborhoodCatalogEntrySnapshot
     : summary = IntentionSummary(
         id: intention.id,
         title: intention.title,
-        hasDescription: intention.description != null,
+        descriptionPreview: testDescriptionPreview(intention.description),
         readiness: intention.readiness,
         archiveState: intention.archiveState,
-        activeRelationCount: 0,
         createdAt: intention.createdAt,
         updatedAt: intention.updatedAt,
       );

@@ -1010,7 +1010,6 @@ void main() {
         ['Семья'],
         <String>[],
       ]);
-      expect(page.items.first.activeRelationCount, 1);
       final assignments = (await repository.getTagAssignments(
         page.items.first.id,
       ) as TagAssignmentsSuccess).value;
@@ -1580,7 +1579,7 @@ void main() {
       'Молоко в запас',
       'Купить молоко',
     ]);
-    expect(page.items.last.hasDescription, isTrue);
+    expect(page.items.last.descriptionPreview?.text, 'В фермерском магазине');
   });
 
   test(
@@ -1639,8 +1638,8 @@ void main() {
     );
     expect(validPage.items, hasLength(2));
     expect(
-      validPage.items.map((summary) => summary.hasDescription),
-      everyElement(isTrue),
+      validPage.items.map((summary) => summary.descriptionPreview),
+      everyElement(isNotNull),
     );
 
     // Схема пропускает все три значения: описание она проверяет только на NUL

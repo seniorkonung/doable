@@ -14,105 +14,6 @@ import '../../support/inline_text.dart';
 import '../../support/tag_positions.dart';
 
 void main() {
-  testWidgets('показывает подтверждённое количество активных связей на двух '
-      'языках, не изменяя название', (tester) async {
-    await tester.pumpWidget(
-      _testApp(
-        view: IntentionSummaryView(
-          title: 'Позвонить врачу',
-          archiveState: IntentionArchiveState.active,
-          showArchiveState: false,
-          activeRelationCount: ConfirmedActiveRelationCount(3),
-        ),
-      ),
-    );
-
-    expect(find.text('Позвонить врачу'), findsOneWidget);
-    expect(find.text('Active relations: 3'), findsOneWidget);
-
-    await tester.pumpWidget(
-      _testApp(
-        locale: const Locale('ru'),
-        view: IntentionSummaryView(
-          title: 'Позвонить врачу',
-          archiveState: IntentionArchiveState.active,
-          showArchiveState: false,
-          activeRelationCount: ConfirmedActiveRelationCount(3),
-        ),
-      ),
-    );
-
-    expect(find.text('Позвонить врачу'), findsOneWidget);
-    expect(find.text('Активных связей: 3'), findsOneWidget);
-  });
-
-  testWidgets('показывает явный ноль активных связей', (tester) async {
-    await tester.pumpWidget(
-      _testApp(
-        locale: const Locale('ru'),
-        view: IntentionSummaryView(
-          title: 'Выбрать страховку',
-          archiveState: IntentionArchiveState.active,
-          showArchiveState: false,
-          activeRelationCount: ConfirmedActiveRelationCount(0),
-        ),
-      ),
-    );
-
-    expect(find.text('Активных связей: 0'), findsOneWidget);
-  });
-
-  testWidgets('сохраняет прежнее число при ошибке обновления', (tester) async {
-    await tester.pumpWidget(
-      _testApp(
-        locale: const Locale('ru'),
-        view: IntentionSummaryView(
-          title: 'Много ходить',
-          archiveState: IntentionArchiveState.active,
-          showArchiveState: false,
-          activeRelationCount: OutdatedActiveRelationCount(4),
-        ),
-      ),
-    );
-
-    expect(find.text('Активных связей: 4'), findsOneWidget);
-    expect(
-      find.text('Не удалось обновить количество активных связей.'),
-      findsOneWidget,
-    );
-  });
-
-  testWidgets('не изображает неизвестное количество нулём', (tester) async {
-    await tester.pumpWidget(
-      _testApp(
-        view: const IntentionSummaryView(
-          title: 'Иметь хорошую обувь',
-          archiveState: IntentionArchiveState.active,
-          showArchiveState: false,
-          activeRelationCount: LoadingActiveRelationCount(),
-        ),
-      ),
-    );
-
-    expect(find.text('Loading the active relation count…'), findsOneWidget);
-    expect(find.text('Active relations: 0'), findsNothing);
-
-    await tester.pumpWidget(
-      _testApp(
-        locale: const Locale('ru'),
-        view: const IntentionSummaryView(
-          title: 'Иметь хорошую обувь',
-          archiveState: IntentionArchiveState.active,
-          showArchiveState: false,
-          activeRelationCount: UnknownActiveRelationCount(),
-        ),
-      ),
-    );
-
-    expect(find.text('Количество активных связей неизвестно.'), findsOneWidget);
-    expect(find.text('Активных связей: 0'), findsNothing);
-  });
-
   testWidgets('представление участника сохраняет идентичность и явно '
       'показывает архив', (tester) async {
     await tester.pumpWidget(
@@ -122,19 +23,15 @@ void main() {
           title: 'Сходить в магазин',
           archiveState: IntentionArchiveState.archived,
           showArchiveState: true,
-          activeRelationCount: ConfirmedActiveRelationCount(0),
         ),
       ),
     );
 
     expect(find.text('Сходить в магазин'), findsOneWidget);
     expect(find.text('В архиве'), findsOneWidget);
-    expect(find.text('Активных связей: 0'), findsOneWidget);
   });
 
-  testWidgets('семантика сообщает название, состояние и активное количество', (
-    tester,
-  ) async {
+  testWidgets('семантика сообщает название и состояние', (tester) async {
     final semantics = tester.ensureSemantics();
     await tester.pumpWidget(
       _testApp(
@@ -144,7 +41,6 @@ void main() {
           archiveState: IntentionArchiveState.archived,
           showArchiveState: true,
           traits: const ['Готово к действию'],
-          activeRelationCount: ConfirmedActiveRelationCount(2),
           onTap: () {},
         ),
       ),
@@ -154,7 +50,6 @@ void main() {
     expect(node.label, contains('Быть здоровым'));
     expect(node.label, contains('Готово к действию'));
     expect(node.label, contains('В архиве'));
-    expect(node.label, contains('Активных связей: 2'));
     expect(node.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
 
     semantics.dispose();
@@ -170,7 +65,6 @@ void main() {
           archiveState: IntentionArchiveState.archived,
           showArchiveState: true,
           traits: const ['Готово к действию'],
-          activeRelationCount: OutdatedActiveRelationCount(7),
           onTap: () => opened++,
         ),
       ),
@@ -179,11 +73,6 @@ void main() {
     expect(find.text('Быть здоровым'), findsOneWidget);
     expect(find.text('Готово к действию'), findsOneWidget);
     expect(find.text('В архиве'), findsOneWidget);
-    expect(find.text('Активных связей: 7'), findsOneWidget);
-    expect(
-      find.text('Не удалось обновить количество активных связей.'),
-      findsOneWidget,
-    );
 
     await tester.tap(find.text('Быть здоровым'));
     await tester.pump();
@@ -201,7 +90,6 @@ void main() {
           title: 'Пройти пешком до парка',
           archiveState: IntentionArchiveState.active,
           showArchiveState: false,
-          activeRelationCount: ConfirmedActiveRelationCount(1),
           confirmedTags: tags,
         ),
       ),
@@ -223,7 +111,6 @@ void main() {
           title: 'Пройти пешком до парка',
           archiveState: IntentionArchiveState.active,
           showArchiveState: false,
-          activeRelationCount: ConfirmedActiveRelationCount(1),
           confirmedTags: tags.reversed.toList(),
         ),
       ),
@@ -244,7 +131,6 @@ void main() {
           title: 'Выбрать страховку',
           archiveState: IntentionArchiveState.active,
           showArchiveState: false,
-          activeRelationCount: ConfirmedActiveRelationCount(0),
           confirmedTags: const [],
         ),
       ),
@@ -260,7 +146,6 @@ void main() {
           title: 'Выбрать страховку',
           archiveState: IntentionArchiveState.active,
           showArchiveState: false,
-          activeRelationCount: ConfirmedActiveRelationCount(0),
           confirmedTags: const [],
         ),
       ),
@@ -280,7 +165,6 @@ void main() {
             title: 'Много ходить',
             archiveState: IntentionArchiveState.active,
             showArchiveState: false,
-            activeRelationCount: ConfirmedActiveRelationCount(2),
           ),
         ),
       );
@@ -306,7 +190,6 @@ void main() {
           title: 'Быть здоровым',
           archiveState: IntentionArchiveState.active,
           showArchiveState: false,
-          activeRelationCount: ConfirmedActiveRelationCount(0),
           confirmedTags: [
             for (final (index, name) in longNames.indexed)
               _tag(index + 1, name),
@@ -323,7 +206,7 @@ void main() {
     expect(paragraph.didExceedMaxLines, isFalse);
     expect(
       paragraph.size.height,
-      greaterThan(2 * tester.getSize(find.text('Активных связей: 0')).height),
+      greaterThan(2 * tester.getSize(find.text('Быть здоровым')).height),
     );
     expect(tester.takeException(), isNull);
   });
@@ -340,7 +223,6 @@ void main() {
           archiveState: IntentionArchiveState.archived,
           showArchiveState: true,
           traits: const ['Готово к действию'],
-          activeRelationCount: ConfirmedActiveRelationCount(2),
           confirmedTags: [
             _tag(1, 'Здоровье', color: TagColor.blue),
             _tag(2, 'Отдых'),
@@ -353,8 +235,7 @@ void main() {
     final node = tester.getSemantics(find.byType(IntentionSummaryView));
     expect(
       node.label,
-      'Быть здоровым\nТеги: Здоровье, Отдых\nГотово к действию\n'
-      'В архиве\nАктивных связей: 2',
+      'Быть здоровым\nТеги: Здоровье, Отдых\nГотово к действию\nВ архиве',
     );
     expect(node.childrenCount, 0);
     expect(node.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
@@ -380,7 +261,6 @@ void main() {
           title: 'Быть здоровым',
           archiveState: IntentionArchiveState.active,
           showArchiveState: false,
-          activeRelationCount: ConfirmedActiveRelationCount(2),
           confirmedTags: const [],
         ),
       ),
@@ -394,8 +274,7 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('длинное название не скрывает название, теги '
-      'и количество активных связей', (tester) async {
+  testWidgets('длинное название не скрывает название и теги', (tester) async {
     const longTitle =
         'Научиться хорошо плавать и перестать бояться глубины в открытой '
         'воде даже при сильном волнении и холодной погоде';
@@ -406,7 +285,6 @@ void main() {
           title: longTitle,
           archiveState: IntentionArchiveState.active,
           showArchiveState: false,
-          activeRelationCount: ConfirmedActiveRelationCount(5),
           confirmedTags: [_tag(1, 'Здоровье'), _tag(2, 'Отдых')],
         ),
       ),
@@ -417,14 +295,12 @@ void main() {
     final titleFinder = find.text(longTitle);
     final titleParagraph = tester.renderObject<RenderParagraph>(titleFinder);
     expect(titleParagraph.didExceedMaxLines, isFalse);
-    for (final text in const ['Теги: Здоровье, Отдых', 'Активных связей: 5']) {
-      final line = findTextIgnoringInlineWidgets(text);
-      final paragraph = tester.renderObject<RenderParagraph>(
-        find.descendant(of: line, matching: find.byType(RichText)),
-      );
-      expect(paragraph.didExceedMaxLines, isFalse);
-      expect(rowRect.contains(tester.getRect(line).bottomRight), isTrue);
-    }
+    final line = findTextIgnoringInlineWidgets('Теги: Здоровье, Отдых');
+    final paragraph = tester.renderObject<RenderParagraph>(
+      find.descendant(of: line, matching: find.byType(RichText)),
+    );
+    expect(paragraph.didExceedMaxLines, isFalse);
+    expect(rowRect.contains(tester.getRect(line).bottomRight), isTrue);
   });
 }
 

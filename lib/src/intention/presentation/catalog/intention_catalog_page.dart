@@ -76,8 +76,6 @@ final class _IntentionCatalogPageState
           ),
           emptyMessage: (empty) => _emptyMessage(localizations, empty.query),
           totalCountLabel: localizations.catalogTotalCount,
-          // Каталог сохраняет позицию по видимому намерению.
-          viewAnchor: IntentionSearchResultsViewAnchor.visibleIntention,
           itemBuilder: (context, results, summary) => _IntentionSummaryTile(
             summary: summary,
             showArchiveState: results.query.scope == IntentionScope.all,
@@ -260,7 +258,7 @@ final class _IntentionSummaryTile extends StatelessWidget {
       IntentionReadiness.ready => localizations.catalogReady,
       IntentionReadiness.notReady => localizations.catalogNotReady,
     };
-    final description = summary.hasDescription
+    final description = summary.descriptionPreview != null
         ? localizations.catalogHasDescription
         : localizations.catalogNoDescription;
     return IntentionSummaryView(
@@ -269,9 +267,6 @@ final class _IntentionSummaryTile extends StatelessWidget {
       showArchiveState: showArchiveState,
       traits: [readiness, description],
       confirmedTags: summary.tags,
-      activeRelationCount: ConfirmedActiveRelationCount(
-        summary.activeRelationCount,
-      ),
       onTap: onTap,
     );
   }

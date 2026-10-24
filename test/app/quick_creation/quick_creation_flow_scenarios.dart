@@ -211,7 +211,7 @@ void _registerQuickCreationFlowTests() {
             );
             for (final role in ['source', 'related']) {
               await _tap(tester, _key('relation-editor-select-$role'));
-              expect(find.byType(IntentionSummaryView), findsNothing);
+              expect(find.byType(PickerRow), findsNothing);
               expect(
                 find.text(app.l10n.participantPickerEmpty),
                 findsOneWidget,
@@ -221,7 +221,7 @@ void _registerQuickCreationFlowTests() {
             }
             await _tap(tester, find.text(app.l10n.creationCancelAction));
           case _Flow.topDown || _Flow.bottomUp:
-            expect(find.byType(IntentionSummaryView), findsNothing);
+            expect(find.byType(PickerRow), findsNothing);
             expect(
               find.text(
                 flow == _Flow.topDown
@@ -230,7 +230,14 @@ void _registerQuickCreationFlowTests() {
               ),
               findsOneWidget,
             );
-            await _tap(tester, find.text(app.l10n.creationCancelAction));
+            await _tap(
+              tester,
+              _key(
+                flow == _Flow.topDown
+                    ? 'daily-choice-source-cancel'
+                    : 'daily-choice-action-cancel',
+              ),
+            );
         }
         history.expectRestored(tester, app.router);
         for (final table in [
@@ -265,7 +272,7 @@ void _registerNestedQuickCreationTests() {
       );
       final before = await tester.runAsync(() => durabilityState(app.database));
       final filterKey = switch (flow) {
-        _Flow.relation => 'participant-picker-filter-field',
+        _Flow.relation => 'participant-picker-filter',
         _Flow.topDown => 'daily-choice-source-filter',
         _Flow.bottomUp => 'daily-choice-action-filter',
         _Flow.intention => throw StateError(
@@ -287,11 +294,19 @@ void _registerNestedQuickCreationTests() {
         }
       }
 
-      IntentionCatalogPurpose purpose() => tester
-          .widget<IntentionTagConditionsSection>(
-            find.byType(IntentionTagConditionsSection),
-          )
+      IntentionPickerPurpose purpose() => tester
+          .widget<IntentionPickerView>(find.byType(IntentionPickerView))
           .purpose;
+      String filterText() => tester
+          .widget<EditableText>(
+            find.descendant(
+              of: _key(filterKey),
+              matching: find.byType(EditableText),
+            ),
+          )
+          .controller
+          .text;
+      final openFilter = find.byType(FilterButton);
       IntentionCatalogLoaded loaded(IntentionCatalogPurpose purpose) =>
           app.container
                   .read(intentionCatalogViewModelProvider(purpose))
@@ -309,8 +324,8 @@ void _registerNestedQuickCreationTests() {
       final first = purpose();
       await tester.enterText(_key(filterKey), 'Поиск');
       await tester.pumpAndSettle();
-      await _addSearchTag(tester, 900, present: true);
-      await _addSearchTag(tester, 901, present: false);
+      await _addSearchTag(tester, openFilter, 900, present: true);
+      await _addSearchTag(tester, openFilter, 901, present: false);
       expect(loaded(first).totalCount, 80);
       // Реальные жесты прокручивают выдачу, загруженную больше одной порции.
       for (var i = 0; i < 12; i++) {
@@ -336,7 +351,14 @@ void _registerNestedQuickCreationTests() {
       final firstOffset = position().pixels;
       expect(firstOffset, greaterThan(0));
       final originalPickerHistory = List.of(app.router.stackData);
-      final details = find.byIcon(Icons.info_outline).hitTestable().first;
+      final details = find
+          .byWidgetPredicate(
+            (widget) =>
+                widget is DoableIcon &&
+                widget.icon == DoableIconData.arrowUpRight,
+          )
+          .hitTestable()
+          .first;
       await tester.tap(details);
       await tester.pumpAndSettle();
       expect(app.router.current.name, IntentionDetailsRoute.name);
@@ -344,16 +366,13 @@ void _registerNestedQuickCreationTests() {
       await openSearch();
       final second = purpose();
       expect(second, isNot(first));
-      expect(
-        tester.widget<TextField>(_key(filterKey)).controller!.text,
-        isEmpty,
-      );
+      expect(filterText(), isEmpty);
       expect(loaded(second).selection.tagFilter, IntentionTagFilter.empty);
       expect(position().pixels, 0);
       await tester.enterText(_key(filterKey), 'Поиск B');
       await tester.pumpAndSettle();
-      await _addSearchTag(tester, 901, present: true);
-      await _addSearchTag(tester, 900, present: false);
+      await _addSearchTag(tester, openFilter, 901, present: true);
+      await _addSearchTag(tester, openFilter, 900, present: false);
       expect(
         loaded(second).selection.tagFilter.requiredTagIds
             .map((id) => id.toCanonicalString()),
@@ -384,19 +403,9 @@ void _registerNestedQuickCreationTests() {
         [for (final route in app.router.stackData) route.matchId],
         [for (final route in originalPickerHistory) route.matchId],
       );
-      expect(
-        tester.widget<TextField>(_key(filterKey)).controller!.text,
-        'Поиск',
-      );
+      expect(filterText(), 'Поиск');
       expect(position().pixels, firstOffset);
-      expect(
-        _key('intention-tag-condition-${durabilityUuid(900)}'),
-        findsOneWidget,
-      );
-      expect(
-        _key('intention-tag-condition-${durabilityUuid(901)}'),
-        findsOneWidget,
-      );
+      expect(tester.widget<FilterButton>(openFilter).count, 2);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       if (flow == _Flow.relation) {
@@ -412,14 +421,16 @@ void _registerNestedQuickCreationTests() {
   }
 }
 
-/// Добавляет условие в панели фильтра: первое нажатие на тег требует его,
-/// второе исключает. Затем «назад» закрывает панель.
+/// Открывает панель фильтра кнопкой [openFilter] и добавляет условие:
+/// первое нажатие на тег требует его, второе исключает. Затем «назад»
+/// закрывает панель.
 Future<void> _addSearchTag(
   WidgetTester tester,
+  Finder openFilter,
   int number, {
   required bool present,
 }) async {
-  await _tap(tester, _key('intention-tag-conditions-add'));
+  await _tap(tester, openFilter);
   final row = _key('tags-panel-row-${durabilityUuid(number)}');
   await _until(tester, () => row.evaluate().isNotEmpty);
   await _tap(tester, row);

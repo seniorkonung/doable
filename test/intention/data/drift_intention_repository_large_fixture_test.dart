@@ -403,15 +403,15 @@ int _selectedRows(_SelectTrace trace) =>
     trace.rowCounts.fold(0, (sum, rows) => sum + rows);
 
 /// Предел строк, которые запрос может прочитать для порции [items]:
-/// количество (только первая порция), сама порция, сводки связей и теги
-/// именно этих намерений.
+/// количество (только первая порция), сама порция и теги именно этих
+/// намерений.
 int _readVolumeLimit(
   List<IntentionSummary> items, {
   required bool isFirst,
   required int portionRows,
 }) {
   final tagRows = items.fold(0, (sum, item) => sum + item.tags.length);
-  return (isFirst ? 1 : 0) + portionRows + items.length + tagRows;
+  return (isFirst ? 1 : 0) + portionRows + tagRows;
 }
 
 /// Запрос порции не читает строк сверх порции и её данных, как бы ни были

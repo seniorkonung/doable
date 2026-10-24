@@ -99,10 +99,7 @@ extension _LongTermRelationDetailsReading on DriftPersonalGraphRepository {
         relation.sourceIntentionId,
         relation.relatedIntentionId,
       };
-      final participants = await _readRelationParticipants(
-        participantIds,
-        knownActiveCounts: const {},
-      );
+      final participants = await _readRelationParticipants(participantIds);
       registration.participantIds = Set.unmodifiable(participantIds);
       return GraphSnapshot(
         value: LongTermRelationDetails(
@@ -134,25 +131,13 @@ extension _LongTermRelationDetailsReading on DriftPersonalGraphRepository {
     final affectedIntentionIds = <IntentionId>{};
     for (final change in changes) {
       switch (change) {
-        case IntentionRelationCountsChanged(:final intentionId):
-          affectedIntentionIds.add(intentionId);
         case IntentionCatalogMutation(:final before, :final after):
           final beforeId = before?.summary.id;
           final afterId = after?.summary.id;
           if (beforeId != null) affectedIntentionIds.add(beforeId);
           if (afterId != null) affectedIntentionIds.add(afterId);
-        case LongTermRelationChange(:final id, :final before, :final after):
+        case LongTermRelationChange(:final id):
           affectedRelationIds.add(id);
-          if (before != null) {
-            affectedIntentionIds
-              ..add(before.sourceIntentionId)
-              ..add(before.relatedIntentionId);
-          }
-          if (after != null) {
-            affectedIntentionIds
-              ..add(after.sourceIntentionId)
-              ..add(after.relatedIntentionId);
-          }
         case DailyChoiceChange(
           :final releasedRelationIds,
           :final occupiedRelationIds,

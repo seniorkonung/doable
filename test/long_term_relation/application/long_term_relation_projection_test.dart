@@ -1,9 +1,7 @@
-import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_permissions.dart';
-import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_description.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
@@ -18,28 +16,6 @@ void main() {
       expect(permissions.canChangeMeaning, isFalse);
       expect(permissions.canEditDescriptionAndPriority, isFalse);
     });
-    test('краткие данные участника отклоняют отрицательное количество', () {
-      expect(
-        () => RelationParticipantSummary(
-          id: _intentionId('0f8fad5b-d9cb-469f-a165-70867728950e'),
-          title: 'Быть здоровым',
-          archiveState: IntentionArchiveState.active,
-          activeRelationCount: -1,
-        ),
-        throwsA(isA<RelationParticipantSummaryValidationException>()),
-      );
-    });
-
-    test('подробная проекция намерения содержит полную сводку', () {
-      final counts = _counts(activeNeedOutgoing: 2, archivedCanIncoming: 4);
-      final details = IntentionDetails(
-        intention: _intention(),
-        relationCounts: counts,
-      );
-
-      expect(details.activeRelationCount, 2);
-    });
-
     test('подробная связь передаёт полный проверенный текст описания', () {
       const text = '  Пояснение\nс переносом  ';
       final description = LongTermRelationDescription.fromInput(text)!;
@@ -84,26 +60,11 @@ void main() {
   });
 }
 
-RelationCounts _counts({
-  int activeNeedOutgoing = 0,
-  int archivedCanIncoming = 0,
-}) => RelationCounts(
-  activeNeedIncoming: 0,
-  activeNeedOutgoing: activeNeedOutgoing,
-  activeCanIncoming: 0,
-  activeCanOutgoing: 0,
-  archivedNeedIncoming: 0,
-  archivedNeedOutgoing: 0,
-  archivedCanIncoming: archivedCanIncoming,
-  archivedCanOutgoing: 0,
-);
-
 RelationParticipantSummary _participant(String id, String title) =>
     RelationParticipantSummary(
       id: _intentionId(id),
       title: title,
       archiveState: IntentionArchiveState.active,
-      activeRelationCount: 1,
     );
 
 LongTermRelation _relation() => LongTermRelation(
@@ -114,16 +75,6 @@ LongTermRelation _relation() => LongTermRelation(
   priority: RelationPriority.p2,
   scope: RelationScope.active,
   creationSequence: RelationCreationSequence(1),
-);
-
-Intention _intention() => Intention(
-  id: _intentionId('0f8fad5b-d9cb-469f-a165-70867728950e'),
-  title: 'Быть здоровым',
-  description: null,
-  readiness: IntentionReadiness.notReady,
-  archiveState: IntentionArchiveState.active,
-  createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 19)),
-  updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 19)),
 );
 
 LongTermRelationId _relationId(String value) =>

@@ -9,6 +9,4 @@ final class IntentionDetails {
 
   final Intention intention;
   final RelationCounts relationCounts;
-
-  int get activeRelationCount => relationCounts.active;
 }

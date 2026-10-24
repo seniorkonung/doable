@@ -16,15 +16,14 @@ import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/presentation/operation_failure_presentation.dart';
-import 'package:doable/src/intention/application/intention_catalog.dart'
-    hide IntentionCatalogPage;
+import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
+import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/presentation/details/relation_details_page.dart';
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_page.dart';
@@ -34,6 +33,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../intention/presentation/details/details_test_support.dart';
+import '../../intention/presentation/picker/intention_picker_test_support.dart';
 import '../../long_term_relation/presentation/details/relation_details_test_support.dart'
     show ControlledRelationWatch, testRelationDetails;
 import '../../long_term_relation/presentation/neighborhood/neighborhood_test_support.dart'
@@ -107,11 +107,12 @@ void main() {
 
   testWidgets('позднее удаление связи после сброса к другому пункту '
       'сохраняет повторно открытый просмотр той же связи', (tester) async {
-    final app = await _ControlledApp.start(tester, activeRelationCount: 1);
+    final app = await _ControlledApp.start(tester);
     await app.openRelationDetails(tester);
     await app.deleteRelation(tester);
 
     await _select(tester, destination, settle: false);
+    await app.openRelationSourceDetails(tester);
     unawaited(
       app.router.push(
         RelationDetailsRoute(relationId: app.relationDetails.relation.id),
@@ -130,6 +131,7 @@ void main() {
     expect(find.byType(RelationDetailsPage), findsOneWidget);
     expect(app.router.stack.map((page) => page.name), [
       AppShellRoute.name,
+      IntentionDetailsRoute.name,
       RelationDetailsRoute.name,
     ]);
     final l10n = AppLocalizations.of(
@@ -148,19 +150,22 @@ void main() {
     expect(app.repository.commands, isEmpty);
     unawaited(app.router.maybePop());
     await tester.pumpAndSettle();
+    await _expectSourceActiveRelationCount(tester, 0);
+    unawaited(app.router.maybePop());
+    await tester.pumpAndSettle();
     _expectRoot(tester, app.router, destination);
-    await _expectCatalogRelationCount(tester, 0);
   });
 
   testWidgets('позднее удаление связи после сброса к другому пункту '
       'сохраняет новую форму и её ввод до освобождения прежней страницы', (
     tester,
   ) async {
-    final app = await _ControlledApp.start(tester, activeRelationCount: 1);
+    final app = await _ControlledApp.start(tester);
     await app.openRelationDetails(tester);
     await app.deleteRelation(tester);
 
     await _select(tester, destination, settle: false);
+    await app.openRelationSourceDetails(tester);
     unawaited(
       app.router.push(
         RelationEditorRoute(
@@ -169,7 +174,6 @@ void main() {
               id: testDetailsIntentionId(3),
               title: 'Независимый участник',
               archiveState: IntentionArchiveState.active,
-              activeRelationCount: 0,
             ),
             direction: RelationDirection.outgoing,
           ),
@@ -192,6 +196,7 @@ void main() {
     expect(find.text(text), findsOneWidget);
     expect(app.router.stack.map((page) => page.name), [
       AppShellRoute.name,
+      IntentionDetailsRoute.name,
       RelationEditorRoute.name,
     ]);
     expect(find.text(_relationDeleteSuccess), findsOneWidget);
@@ -204,9 +209,11 @@ void main() {
 
     unawaited(app.router.maybePop());
     await tester.pumpAndSettle();
-    _expectRoot(tester, app.router, destination);
     expect(find.byType(RelationDetailsPage, skipOffstage: false), findsNothing);
-    await _expectCatalogRelationCount(tester, 0);
+    await _expectSourceActiveRelationCount(tester, 0);
+    unawaited(app.router.maybePop());
+    await tester.pumpAndSettle();
+    _expectRoot(tester, app.router, destination);
   });
   testWidgets(
     'позднее удаление намерения после сброса к другому пункту '
@@ -225,7 +232,6 @@ void main() {
                 id: testDetailsIntentionId(2),
                 title: 'Независимый участник',
                 archiveState: IntentionArchiveState.active,
-                activeRelationCount: 0,
               ),
               direction: RelationDirection.outgoing,
             ),
@@ -267,7 +273,7 @@ void main() {
 
   testWidgets('удаление связи с актуальной верхней страницы закрывает только '
       'её просмотр и один раз предъявляет результат', (tester) async {
-    final app = await _ControlledApp.start(tester, activeRelationCount: 1);
+    final app = await _ControlledApp.start(tester);
     await app.openDetails(tester);
     await app.openRelationDetails(tester);
     await app.deleteRelation(tester);
@@ -464,7 +470,6 @@ void main() {
               id: testDetailsIntentionId(2),
               title: 'Исходное намерение',
               archiveState: IntentionArchiveState.active,
-              activeRelationCount: 0,
             ),
             direction: RelationDirection.outgoing,
           ),
@@ -477,8 +482,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     final picker = find.byType(RelationParticipantPickerPage);
-    final l10n = AppLocalizations.of(tester.element(picker));
-    await tester.tap(find.byTooltip(l10n.participantPickerOpenDetails));
+    await tester.tap(intentionPickerArrow(intentionPickerRows.first));
     await tester.pump();
     await tester.pump();
     app.repository.detailRequests.single.add(ResultSuccess(app.intention));
@@ -529,13 +533,30 @@ void _expectSelected(WidgetTester tester, AppDestination destination) {
   );
 }
 
-/// В каталоге намерений видно подтверждённое число активных связей [count].
-Future<void> _expectCatalogRelationCount(WidgetTester tester, int count) async {
-  await _select(tester, AppDestination.intentionGraph);
-  final l10n = AppLocalizations.of(
-    tester.element(find.byType(IntentionCatalogPage)),
+/// Сводка связей на странице исходного намерения подтверждает [count]
+/// активных связей.
+Future<void> _expectSourceActiveRelationCount(
+  WidgetTester tester,
+  int count,
+) async {
+  final summary = find.byKey(
+    const ValueKey('relation-neighborhood-summary-numbers'),
   );
-  expect(find.text(l10n.intentionActiveRelationCount(count)), findsOneWidget);
+  await tester.scrollUntilVisible(
+    summary,
+    300,
+    scrollable: find
+        .descendant(
+          of: find.byType(IntentionDetailsPage),
+          matching: find.byType(Scrollable),
+        )
+        .first,
+  );
+  final l10n = AppLocalizations.of(tester.element(summary));
+  expect(
+    tester.getSemantics(summary).label,
+    contains(l10n.relationNeighborhoodActiveTotal(count)),
+  );
 }
 
 Future<void> _expireMessages(WidgetTester tester) async {
@@ -571,12 +592,10 @@ final class _ControlledApp {
   );
   var completedCommands = 0;
   var completedRelationCommands = 0;
+  var _relationDeleted = false;
   GraphCommandCoordinator get coordinator => runtime.commandCoordinator;
 
-  static Future<_ControlledApp> start(
-    WidgetTester tester, {
-    int activeRelationCount = 0,
-  }) async {
+  static Future<_ControlledApp> start(WidgetTester tester) async {
     tester.view.physicalSize = const Size(1000, 1800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -585,12 +604,7 @@ final class _ControlledApp {
     final repository = ControlledDetailsRepository()
       ..catalogResult = ResultSuccess(
         IntentionCatalogFirstPage(
-          items: [
-            testDetailsSummary(
-              testDetailsIntention(description: null),
-              activeRelationCount: activeRelationCount,
-            ),
-          ],
+          items: [testDetailsSummary(testDetailsIntention(description: null))],
           totalCount: 1,
           nextCursor: null,
           revision: const TestDetailsRevision(0),
@@ -640,6 +654,29 @@ final class _ControlledApp {
     tester,
     testDetailsIntention(index: 2, title: 'Другое намерение'),
   );
+
+  /// Открывает страницу исходного намерения [relationDetails]: её сводка
+  /// подтверждает одну активную связь, пока удаление связи не завершено.
+  Future<void> openRelationSourceDetails(WidgetTester tester) async {
+    repository.onRelationGroupPage = (query) {
+      final counts = _relationDeleted
+          ? testRelationCounts()
+          : testRelationCounts(activeNeedOutgoing: 1);
+      return GraphResultSuccess(
+        RelationGroupFirstPage(
+          items: [
+            if (counts.forSelection(query.group) > 0)
+              testDetailsRelationRow(ownerId: intention.id, index: 1),
+          ],
+          counts: counts,
+          nextCursor: null,
+          revision: TestDetailsRevision(_relationDeleted ? 1 : 0),
+        ),
+      );
+    };
+    await _openDetails(tester, intention);
+    await _expectSourceActiveRelationCount(tester, 1);
+  }
 
   Future<void> _openDetails(WidgetTester tester, Intention shown) async {
     final requests = repository.detailRequests.length;
@@ -692,6 +729,7 @@ final class _ControlledApp {
 
   void completeRelationDelete() {
     const revision = TestDetailsRevision(1);
+    _relationDeleted = true;
     repository.completeRelationCommand(
       completedRelationCommands++,
       GraphCommandSucceeded(

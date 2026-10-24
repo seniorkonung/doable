@@ -287,7 +287,6 @@ void main() {
         ),
       );
       expect(catalogRow.label, contains('Беречь здоровье'));
-      expect(catalogRow.label, contains('Active relations: 0'));
 
       await _openIntention(tester, 'Беречь здоровье');
       await _createNeedRelation(
@@ -323,7 +322,6 @@ void main() {
         find.byKey(const ValueKey('relation-details-related-participant')),
       );
       expect(participant.label, contains('Много ходить'));
-      expect(participant.label, contains('Active relations: 1'));
       expect(
         participant.getSemanticsData().hasAction(SemanticsAction.tap),
         isTrue,
@@ -919,7 +917,7 @@ Future<void> _selectParticipant(
   await tester.tap(action);
   await _pumpUntilFound(
     tester,
-    find.byKey(const ValueKey('participant-picker-filter-field')),
+    find.byKey(const ValueKey('participant-picker-filter')),
   );
 
   final matchingTitles = find.text(title);

@@ -12,15 +12,16 @@ import 'package:doable/src/daily_choice/presentation/daily_choice_picker_context
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/design_system/components/top_bar.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
-import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../intention/presentation/picker/intention_picker_test_support.dart';
 import '../../support/daily_choice_durability_fixture.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
@@ -49,7 +50,7 @@ void main() {
         router.current.argsAs<DailyChoiceActionPickerRouteArgs>().pickerContext,
         isA<InitialDailyChoicePickerContext>(),
       );
-      await tester.tap(find.text('Отменить создание'));
+      await _cancelPicker(tester, ChoicePathDraftDirection.bottomUp);
       await tester.pumpAndSettle();
       expect(router.stackData.map((route) => route.matchId), history);
       expect(tester.takeException(), isNull);
@@ -57,11 +58,9 @@ void main() {
   );
 
   for (final direction in ChoicePathDraftDirection.values) {
-    // Направление и способ отмены независимы: диагональ покрывает оба значения.
-    final closeIcon = direction == ChoicePathDraftDirection.bottomUp;
     testWidgets(
-      '${_directionName(direction)}: ${closeIcon ? 'крестик' : 'текстовая отмена'} '
-      'при клавиатуре сохраняет глубокую историю и запрещает поздний путь',
+      '${_directionName(direction)}: крестик при клавиатуре сохраняет '
+      'глубокую историю и запрещает поздний путь',
       (tester) async {
         final router = await _openApp(tester);
         final source = await _sourceContext(tester, router, deep: true);
@@ -72,11 +71,10 @@ void main() {
           direction: direction,
         );
         await tester.pumpAndSettle();
-        final lateSelection = tester
-            .widget<IntentionSummaryView>(
-              find.byType(IntentionSummaryView).first,
-            )
-            .onTap!;
+        final lateSelection = intentionPickerPick(
+          tester,
+          intentionPickerRows.first,
+        );
         final prefix = direction == ChoicePathDraftDirection.topDown
             ? 'source'
             : 'action';
@@ -86,9 +84,7 @@ void main() {
         tester.view.viewInsets = const FakeViewPadding(bottom: 260);
 
         await tester.pumpAndSettle();
-        final action = closeIcon
-            ? find.byKey(ValueKey('daily-choice-$prefix-cancel'))
-            : find.widgetWithText(TextButton, 'Отменить создание');
+        final action = find.byKey(ValueKey('daily-choice-$prefix-cancel'));
         expect(action.hitTestable(), findsOneWidget);
         expect(tester.getRect(action).bottom, lessThanOrEqualTo(540));
         await tester.tap(action);
@@ -103,7 +99,7 @@ void main() {
           direction: direction,
         );
         await tester.pumpAndSettle();
-        expect(tester.widget<TextField>(filter).controller!.text, isEmpty);
+        expect(_fieldText(tester, filter), isEmpty);
         await tester.tap(find.byKey(ValueKey('daily-choice-$prefix-cancel')));
         await tester.pumpAndSettle();
         await next;
@@ -141,7 +137,10 @@ void main() {
         await tester.pumpAndSettle();
         expect(router.stackData, hasLength(history.length + 1));
         expect(router.current.name, _pickerName(direction));
-        expect(find.text('Отменить создание'), findsOneWidget);
+        expect(
+          tester.widget<TopBar>(find.byType(TopBar)).closeLabel,
+          'Отменить создание',
+        );
         if (direction == ChoicePathDraftDirection.bottomUp) {
           expect(find.text('Намерение 1'), findsNothing);
         }
@@ -186,8 +185,7 @@ void main() {
           direction: direction,
         );
         await tester.pumpAndSettle();
-        await tester.tap(find.text('Отменить создание'));
-        await tester.pumpAndSettle();
+        await _cancelPicker(tester, direction);
         await next;
         expect(router.stackData.map((route) => route.matchId), history);
         if (deep) {
@@ -225,8 +223,7 @@ void main() {
           ),
           findsOneWidget,
         );
-        await tester.tap(find.text('Отменить создание'));
-        await tester.pumpAndSettle();
+        await _cancelPicker(tester, direction);
         await running;
         expect(router.stackData, hasLength(1));
         expect(tester.takeException(), isNull);
@@ -251,12 +248,9 @@ void main() {
           'Намерение 3',
         );
         await tester.pumpAndSettle();
-        final l10n = AppLocalizations.of(source);
         await tester.tap(
-          find.byTooltip(
-            direction == ChoicePathDraftDirection.topDown
-                ? l10n.sourcePickerOpenDetails
-                : l10n.actionPickerOpenDetails,
+          intentionPickerArrow(
+            find.byKey(ValueKey('daily-choice-$prefix-${durabilityUuid(3)}')),
           ),
         );
         await tester.pumpAndSettle();
@@ -282,12 +276,10 @@ void main() {
         await tester.pumpAndSettle();
         expect(router.current.matchId, firstId);
         expect(
-          tester
-              .widget<TextField>(
-                find.byKey(ValueKey('daily-choice-$prefix-filter')),
-              )
-              .controller!
-              .text,
+          _fieldText(
+            tester,
+            find.byKey(ValueKey('daily-choice-$prefix-filter')),
+          ),
           'Намерение 3',
         );
         await _choose(tester, direction, 3);
@@ -329,8 +321,7 @@ void main() {
         await first;
         await tester.pumpAndSettle();
         expect(router.current.matchId, nextId);
-        await tester.tap(find.text('Отменить создание'));
-        await tester.pumpAndSettle();
+        await _cancelPicker(tester, direction);
         await next;
         expect(router.stackData, hasLength(1));
         expect(tester.takeException(), isNull);
@@ -397,8 +388,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(router.current.name, DailyChoiceSourcePickerRoute.name);
-      await tester.tap(find.text('Отменить создание'));
-      await tester.pumpAndSettle();
+      await _cancelPicker(tester, ChoicePathDraftDirection.topDown);
       await next;
       expect(router.stackData, hasLength(1));
       expect(tester.takeException(), isNull);
@@ -551,11 +541,28 @@ Future<void> _choose(
   final row = find.byKey(
     ValueKey('daily-choice-$prefix-${durabilityUuid(number)}'),
   );
-  await tester.tap(
-    find.descendant(of: row, matching: find.byType(IntentionSummaryView)),
-  );
+  await tester.tap(row);
   await tester.pumpAndSettle();
 }
+
+/// Закрывает начальный поиск крестиком, который отменяет создание.
+Future<void> _cancelPicker(
+  WidgetTester tester,
+  ChoicePathDraftDirection direction,
+) async {
+  final prefix = direction == ChoicePathDraftDirection.topDown
+      ? 'source'
+      : 'action';
+  await tester.tap(find.byKey(ValueKey('daily-choice-$prefix-cancel')));
+  await tester.pumpAndSettle();
+}
+
+String _fieldText(WidgetTester tester, Finder field) => tester
+    .widget<EditableText>(
+      find.descendant(of: field, matching: find.byType(EditableText)),
+    )
+    .controller
+    .text;
 
 Future<void> _tapKey(WidgetTester tester, String key) async {
   final finder = find.byKey(ValueKey(key));

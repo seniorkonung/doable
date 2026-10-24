@@ -535,7 +535,6 @@ void main() {
               currentIndex,
               title: 'Обновлённое намерение $currentIndex',
               archiveState: IntentionArchiveState.archived,
-              activeRelationCount: 7,
               revision: 2,
             ),
           );
@@ -552,7 +551,6 @@ void main() {
             updatedParticipant?.archiveState,
             IntentionArchiveState.archived,
           );
-          expect(updatedParticipant?.activeRelationCount, 7);
           expect(
             harness.state.operation,
             isA<RelationEditorFailed>().having(

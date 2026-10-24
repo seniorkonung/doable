@@ -26,10 +26,9 @@ final class _TagAssignmentCatalogEntry
     : summary = IntentionSummary(
         id: id,
         title: 'Намерение',
-        hasDescription: false,
+        descriptionPreview: null,
         readiness: IntentionReadiness.notReady,
         archiveState: IntentionArchiveState.active,
-        activeRelationCount: 0,
         createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 2)),
         tags: const [],

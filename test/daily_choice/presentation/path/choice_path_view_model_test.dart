@@ -616,13 +616,11 @@ LongTermRelationSummary _edge(
     id: _intention(source),
     title: 'Исходное',
     archiveState: IntentionArchiveState.active,
-    activeRelationCount: 1,
   ),
   related: RelationParticipantSummary(
     id: _intention(related),
     title: 'Связанное',
     archiveState: IntentionArchiveState.active,
-    activeRelationCount: 0,
   ),
   hasDescription: false,
 );

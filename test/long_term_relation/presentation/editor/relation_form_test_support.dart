@@ -109,20 +109,30 @@ final class ControlledRelationFormRepository
   );
 
   /// Отдаёт очередную порцию каталога выбора участника.
+  ///
+  /// Как и настоящий репозиторий, порция не содержит намерения, которое
+  /// исключает запрос.
   void completeCatalogPage(
     int index,
     List<IntentionSummary> items, {
     GraphRevision revision = const TestCatalogRevision(1),
-  }) => _catalogRequests[index].complete(
-    ResultSuccess(
-      IntentionCatalogFirstPage(
-        items: items,
-        totalCount: items.length,
-        nextCursor: null,
-        revision: revision,
+  }) {
+    final excluded = catalogQueries[index].excludedIntentionId;
+    final available = [
+      for (final item in items)
+        if (item.id != excluded) item,
+    ];
+    _catalogRequests[index].complete(
+      ResultSuccess(
+        IntentionCatalogFirstPage(
+          items: available,
+          totalCount: available.length,
+          nextCursor: null,
+          revision: revision,
+        ),
       ),
-    ),
-  );
+    );
+  }
 
   void failRelationCommand(int index, LongTermRelationCommandFailure failure) =>
       _relationRequests[index].complete(GraphCommandFailed(failure));

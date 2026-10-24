@@ -72,7 +72,6 @@ extension _RelationGroupPageReading on DriftPersonalGraphRepository {
       final items = await _rehydrateRelationGroupItems(
         rows.take(query.pageSize),
         query,
-        knownActiveCounts: {query.intentionId: counts.active},
       );
       final hasNextPage = rows.length > query.pageSize;
       final expectedCount = counts.forGroup(
@@ -95,7 +94,6 @@ extension _RelationGroupPageReading on DriftPersonalGraphRepository {
                 revision: revision,
                 expectedCount: expectedCount,
                 returnedCount: items.length,
-                ownerActiveRelationCount: counts.active,
               )
             : null,
         revision: revision,
@@ -112,7 +110,6 @@ extension _RelationGroupPageReading on DriftPersonalGraphRepository {
     final items = await _rehydrateRelationGroupItems(
       rows.take(query.pageSize),
       query,
-      knownActiveCounts: {query.intentionId: cursor.ownerActiveRelationCount},
     );
     final hasNextPage = rows.length > query.pageSize;
     final returnedCount = cursor.returnedCount + items.length;
@@ -129,7 +126,6 @@ extension _RelationGroupPageReading on DriftPersonalGraphRepository {
               revision: cursor.revision,
               expectedCount: cursor.expectedCount,
               returnedCount: returnedCount,
-              ownerActiveRelationCount: cursor.ownerActiveRelationCount,
             )
           : null,
       revision: cursor.revision,
@@ -328,9 +324,8 @@ extension _RelationGroupPageReading on DriftPersonalGraphRepository {
 
   Future<List<LongTermRelationSummary>> _rehydrateRelationGroupItems(
     Iterable<QueryRow> rawRows,
-    RelationGroupQuery query, {
-    required Map<IntentionId, int> knownActiveCounts,
-  }) async {
+    RelationGroupQuery query,
+  ) async {
     final rows = [
       for (final rawRow in rawRows) StoredLongTermRelation.decode(rawRow.data),
     ];
@@ -355,10 +350,7 @@ extension _RelationGroupPageReading on DriftPersonalGraphRepository {
         relation.relatedIntentionId,
       ],
     };
-    final participants = await _readRelationParticipants(
-      participantIds,
-      knownActiveCounts: knownActiveCounts,
-    );
+    final participants = await _readRelationParticipants(participantIds);
     return List.unmodifiable([
       for (var index = 0; index < relations.length; index++)
         LongTermRelationSummary(
@@ -375,10 +367,7 @@ extension _RelationGroupPageReading on DriftPersonalGraphRepository {
   }
 
   Future<Map<IntentionId, RelationParticipantSummary>>
-  _readRelationParticipants(
-    Set<IntentionId> ids, {
-    required Map<IntentionId, int> knownActiveCounts,
-  }) async {
+  _readRelationParticipants(Set<IntentionId> ids) async {
     if (ids.isEmpty) return const {};
     final orderedIds = ids.toList(growable: false);
     final participants = <domain.Intention>[];
@@ -409,22 +398,12 @@ extension _RelationGroupPageReading on DriftPersonalGraphRepository {
           decodeStoredIntention(row.rawData.data, 'intentions.'),
       ]);
     }
-    final idsWithoutKnownCount = ids.difference(knownActiveCounts.keys.toSet());
-    final counts = await _readVerifiedRelationCountsFor(idsWithoutKnownCount);
-    final activeCounts = <IntentionId, int>{
-      for (final entry in knownActiveCounts.entries)
-        if (ids.contains(entry.key)) entry.key: entry.value,
-      for (final entry in counts.entries) entry.key: entry.value.active,
-    };
     return Map.unmodifiable({
       for (final participant in participants)
         participant.id: RelationParticipantSummary(
           id: participant.id,
           title: participant.title,
           archiveState: participant.archiveState,
-          activeRelationCount:
-              activeCounts[participant.id] ??
-              (throw const StoredGraphCorruption()),
         ),
     });
   }
@@ -434,7 +413,6 @@ extension _RelationGroupPageReading on DriftPersonalGraphRepository {
     required GraphRevision revision,
     required int expectedCount,
     required int returnedCount,
-    required int ownerActiveRelationCount,
   }) => _DriftRelationGroupCursor(
     revision: revision,
     boundaryPriority: switch (boundary.priority) {
@@ -446,7 +424,6 @@ extension _RelationGroupPageReading on DriftPersonalGraphRepository {
     boundaryCreationSequence: boundary.creationSequence.value,
     expectedCount: expectedCount,
     returnedCount: returnedCount,
-    ownerActiveRelationCount: ownerActiveRelationCount,
   );
 }
 
@@ -468,7 +445,6 @@ final class _DriftRelationGroupCursor implements RelationGroupCursor {
     required this.boundaryCreationSequence,
     required this.expectedCount,
     required this.returnedCount,
-    required this.ownerActiveRelationCount,
   });
 
   final GraphRevision revision;
@@ -476,7 +452,6 @@ final class _DriftRelationGroupCursor implements RelationGroupCursor {
   final int boundaryCreationSequence;
   final int expectedCount;
   final int returnedCount;
-  final int ownerActiveRelationCount;
 }
 
 final class _DriftDailyChoiceGroupCursor implements RelationGroupCursor {

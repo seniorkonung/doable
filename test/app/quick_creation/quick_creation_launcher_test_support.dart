@@ -66,24 +66,32 @@ Future<void> _choose(
   ChoicePathDraftDirection direction,
 ) async {
   await tester.tap(
-    find.descendant(
-      of: _key(
-        'daily-choice-${_prefix(direction)}-${durabilityUuid(_candidate(direction))}',
-      ),
-      matching: find.byType(IntentionSummaryView),
+    _key(
+      'daily-choice-${_prefix(direction)}-${durabilityUuid(_candidate(direction))}',
     ),
   );
   await tester.pumpAndSettle();
 }
 
-Future<void> _cancel(WidgetTester tester, QuickCreationMode mode) async {
-  await tester.tap(
-    mode == QuickCreationMode.intention
-        ? _key('intention-editor-close')
-        : find.text('Отменить создание'),
-  );
+/// Закрывает начальный поиск крестиком, который отменяет создание.
+Future<void> _cancelPicker(
+  WidgetTester tester,
+  ChoicePathDraftDirection direction,
+) async {
+  await tester.tap(_key('daily-choice-${_prefix(direction)}-cancel'));
   await tester.pumpAndSettle();
 }
+
+String _filterText(WidgetTester tester, ChoicePathDraftDirection direction) =>
+    tester
+        .widget<EditableText>(
+          find.descendant(
+            of: _key('daily-choice-${_prefix(direction)}-filter'),
+            matching: find.byType(EditableText),
+          ),
+        )
+        .controller
+        .text;
 
 Future<BuildContext> _source(
   WidgetTester tester,

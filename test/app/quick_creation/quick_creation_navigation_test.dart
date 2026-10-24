@@ -48,26 +48,14 @@ void main() {
         openedPage: find.byType(DailyChoiceActionPickerPage),
       );
       expect(find.byType(DailyChoiceActionPickerPage), findsOneWidget);
-      expect(
-        tester
-            .widget<TextField>(_key('daily-choice-action-filter'))
-            .controller!
-            .text,
-        isEmpty,
-      );
-      await tester.tap(find.text('Отменить создание'));
+      expect(_filterText(tester), isEmpty);
+      await tester.tap(_key('daily-choice-action-cancel'));
       await tester.pumpAndSettle();
       await _selectMode(tester, QuickCreationMode.relation);
       await router.maybePop();
       await tester.pumpAndSettle();
-      expect(
-        tester
-            .widget<TextField>(_key('daily-choice-action-filter'))
-            .controller!
-            .text,
-        'Намерение 3',
-      );
-      await tester.tap(find.text('Отменить создание'));
+      expect(_filterText(tester), 'Намерение 3');
+      await tester.tap(_key('daily-choice-action-cancel'));
       await tester.pumpAndSettle();
       expectQuickCreationMode(tester, QuickCreationMode.relation);
       expect(tester.takeException(), isNull);
@@ -76,6 +64,16 @@ void main() {
 }
 
 Finder _key(String key) => find.byKey(ValueKey(key));
+
+String _filterText(WidgetTester tester) => tester
+    .widget<EditableText>(
+      find.descendant(
+        of: _key('daily-choice-action-filter'),
+        matching: find.byType(EditableText),
+      ),
+    )
+    .controller
+    .text;
 
 Future<void> _selectMode(WidgetTester tester, QuickCreationMode mode) async {
   final localizations = AppLocalizations.of(
