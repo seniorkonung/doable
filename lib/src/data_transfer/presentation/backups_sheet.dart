@@ -38,7 +38,7 @@ Future<GraphBackupEntry?> showBackupsSheet(BuildContext context) =>
 final class _BackupsSheet extends ConsumerStatefulWidget {
   const _BackupsSheet(this.sheet);
 
-  final ContentSheetCapability sheet;
+  final SheetPresentation sheet;
 
   @override
   ConsumerState<_BackupsSheet> createState() => _BackupsSheetState();

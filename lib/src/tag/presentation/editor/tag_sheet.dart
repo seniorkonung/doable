@@ -33,7 +33,7 @@ Future<void> showTagSheet(BuildContext context, TagEditorContext editing) =>
 final class _TagSheet extends ConsumerStatefulWidget {
   const _TagSheet(this.sheet, this.editing);
 
-  final ContentSheetCapability sheet;
+  final SheetPresentation sheet;
   final TagEditorContext editing;
 
   @override

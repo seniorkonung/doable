@@ -2014,7 +2014,7 @@ Future<void> _openContentMessagesSheet(BuildContext context) =>
     );
 
 Future<void> _openExpandableMessagesSheet(BuildContext context) =>
-    showDoableExpandableSheet<void>(
+    showDoableSheet<void>(
       context: context,
       hostsMessages: true,
       builder: (_, sheet) => Sheet.expandable(

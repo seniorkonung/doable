@@ -702,9 +702,20 @@ void main() {
   for (final (name, close) in <(String, Future<void> Function(WidgetTester))>[
     ('«Готово»', (tester) => tester.tap(find.text('Готово'))),
     (
-      'свайп вниз',
-      (tester) =>
-          tester.drag(find.text('Выберите сколько нужно'), const Offset(0, 80)),
+      'бросок вниз',
+      (tester) => tester.fling(
+        find.text('Выберите сколько нужно'),
+        const Offset(0, 80),
+        1000,
+      ),
+    ),
+    (
+      'свайп вниз дальше половины компактной высоты',
+      (tester) => tester.timedDrag(
+        find.text('Выберите сколько нужно'),
+        const Offset(0, 300),
+        const Duration(seconds: 2),
+      ),
     ),
     ('касание затемнения', (tester) => tester.tapAt(const Offset(195, 120))),
     ('«назад»', (tester) => tester.binding.handlePopRoute()),
@@ -760,6 +771,41 @@ void main() {
     await tester.pumpAndSettle();
     expectVisible();
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('ввод поиска при открытой клавиатуре не меняет высоту '
+      'компактной панели и место «Готово»', (tester) async {
+    final h = await _pumpApp(tester);
+    await h.open();
+    h.repository.complete([
+      for (var i = 1; i <= 10; i++) _tag(i, 'Тег $i'),
+    ], assignedIds: {});
+    await tester.pump();
+    await tester.showKeyboard(_search);
+    tester.view.viewInsets = const FakeViewPadding(bottom: 336);
+    addTearDown(tester.view.resetViewInsets);
+    await tester.pumpAndSettle();
+    final sheet = tester.getRect(find.byType(Sheet));
+    final done = tester.getRect(find.text('Готово'));
+    expect(
+      tester
+          .state<ScrollableState>(
+            find.descendant(
+              of: find.byType(CustomScrollView),
+              matching: find.byType(Scrollable),
+            ),
+          )
+          .position
+          .maxScrollExtent,
+      greaterThan(0),
+    );
+
+    await tester.enterText(_search, 'Тег 7');
+    await tester.pumpAndSettle();
+
+    expect(_rowNames(tester), ['Тег 7']);
+    expect(tester.getRect(find.byType(Sheet)), sheet);
+    expect(tester.getRect(find.text('Готово')), done);
   });
 
   for (final (locale, texts) in [

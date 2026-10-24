@@ -29,7 +29,7 @@ final class QuickCreationDailyChoiceStartSheet extends StatelessWidget {
     super.key,
   });
 
-  final ContentSheetCapability sheet;
+  final SheetPresentation sheet;
 
   final ValueChanged<ChoicePathDraftDirection> onSelected;
 
