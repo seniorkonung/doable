@@ -41,7 +41,7 @@ Future<void> showTagsPanel(
 ) {
   // Открытие создаётся один раз: маршрут может перестраивать содержимое.
   final opening = TagsPanelOpening(panelContext);
-  return showDoableExpandableSheet<void>(
+  return showDoableSheet<void>(
     context: context,
     hostsMessages: true,
     builder: (_, sheet) => _TagsPanel(sheet, opening),
@@ -51,7 +51,7 @@ Future<void> showTagsPanel(
 final class _TagsPanel extends ConsumerStatefulWidget {
   const _TagsPanel(this.sheet, this.opening);
 
-  final ExpandableSheetCapability sheet;
+  final SheetPresentation sheet;
   final TagsPanelOpening opening;
 
   @override

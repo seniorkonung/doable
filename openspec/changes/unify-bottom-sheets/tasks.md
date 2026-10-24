@@ -33,7 +33,7 @@
   - **Предполагаемые файлы:** `lib/src/design_system/components/sheet.dart`, `test/design_system/sheet_test.dart`.
   - **Размер:** M — маршрут, модель сдвига и выбор цели появляются вместе, потому что по отдельности лист не следует за пальцем.
 
-- [ ] 1.3 Показывать оба варианта листа одной функцией `showDoableSheet` с одним типом возможности `SheetPresentation`
+- [x] 1.3 Показывать оба варианта листа одной функцией `showDoableSheet` с одним типом возможности `SheetPresentation`
   - **Критерии приёмки:**
     - `showDoableExpandableSheet`, `ContentSheetCapability` и `ExpandableSheetCapability` удалены. `Sheet` и `Sheet.expandable` принимают `SheetPresentation`, который создаёт только `showDoableSheet` (решение 4 дизайна).
     - Панель тегов открывается через `showDoableSheet` и до задачи 1.4 раскрывается прежним жестом шапки. Пять листов по содержимому и `ActionSheet` получают новый тип без изменения поведения.

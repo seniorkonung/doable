@@ -581,7 +581,7 @@ Future<_OpenedSheet> _openExpandableSheet(
   VoidCallback? onReset,
 }) => _openSheet(
   tester,
-  (context) => showDoableExpandableSheet<void>(
+  (context) => showDoableSheet<void>(
     context: context,
     hostsMessages: hostsMessages,
     builder: (context, sheet) => Sheet.expandable(

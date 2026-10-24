@@ -23,7 +23,7 @@ Future<void> showQuickCreationModeMenu(BuildContext context) {
 final class _QuickCreationModeMenu extends ConsumerWidget {
   const _QuickCreationModeMenu(this.sheet);
 
-  final ContentSheetCapability sheet;
+  final SheetPresentation sheet;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

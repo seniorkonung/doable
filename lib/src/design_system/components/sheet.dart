@@ -12,32 +12,24 @@ import '../doable_shadows.dart';
 import '../doable_type.dart';
 import 'button.dart';
 
-/// Возможность построить лист по содержимому [Sheet.new].
+/// Возможность построить [Sheet] или [Sheet.expandable].
 ///
 /// Её даёт построителю только [showDoableSheet]: она несёт маршрут этой
 /// функции, анимацию которого лист ведёт пальцем.
-final class ContentSheetCapability {
-  const ContentSheetCapability._(this._route);
+final class SheetPresentation {
+  const SheetPresentation._(this._route);
 
   final _DoableSheetRoute<Object?> _route;
 }
 
-/// Возможность построить раскрываемый лист [Sheet.expandable].
+/// Показывает лист над корневым навигатором, перекрывая всю страницу и
+/// панель.
 ///
-/// Её даёт построителю только [showDoableExpandableSheet]: маршрут этой
-/// функции не перетаскивает лист, а жест шапки обрабатывает сам лист.
-final class ExpandableSheetCapability {
-  const ExpandableSheetCapability._();
-}
-
-/// Показывает лист высотой по содержимому над корневым навигатором,
-/// перекрывая всю страницу и панель.
-///
-/// [builder] строит [Sheet] или композицию на его основе с переданной
-/// возможностью. Потребитель закрывает лист через Navigator.pop с результатом
-/// типа [T]; закрытие без выбора даёт null. Лист перетаскивает сам [Sheet],
-/// а затемнение, системное «назад», фокус и семантика маршрута принадлежат
-/// модальной нижней панели Material:
+/// [builder] строит [Sheet], [Sheet.expandable] или композицию на их основе с
+/// переданной возможностью. Потребитель закрывает лист через Navigator.pop с
+/// результатом типа [T]; закрытие без выбора даёт null. Лист перетаскивает сам
+/// [Sheet], а затемнение, системное «назад», фокус и семантика маршрута
+/// принадлежат модальной нижней панели Material:
 /// https://api.flutter.dev/flutter/material/ModalBottomSheetRoute-class.html
 ///
 /// С [hostsMessages] лист содержит собственный прозрачный [Scaffold], и
@@ -46,7 +38,7 @@ final class ExpandableSheetCapability {
 /// результата начатой в нём операции.
 Future<T?> showDoableSheet<T>({
   required BuildContext context,
-  required Widget Function(BuildContext context, ContentSheetCapability sheet)
+  required Widget Function(BuildContext context, SheetPresentation sheet)
   builder,
   bool hostsMessages = false,
 }) {
@@ -80,49 +72,12 @@ Future<T?> showDoableSheet<T>({
       onLayout: (height) => route._extent = height,
       child: _SheetFrame(
         hostsMessages: hostsMessages,
-        child: builder(context, ContentSheetCapability._(route)),
+        child: builder(context, SheetPresentation._(route)),
       ),
     ),
   );
   return navigator.push(route);
 }
-
-/// Показывает раскрываемый лист [Sheet.expandable] над корневым навигатором,
-/// перекрывая всю страницу и панель.
-///
-/// Результат и [hostsMessages] — как у [showDoableSheet]. Перетаскивание
-/// листа Material здесь выключено: половинный лист жестом шапки закрывает сам
-/// [Sheet] через Navigator.pop, а барьер, системное «назад» и семантика
-/// маршрута по-прежнему принадлежат Material.
-Future<T?> showDoableExpandableSheet<T>({
-  required BuildContext context,
-  required Widget Function(
-    BuildContext context,
-    ExpandableSheetCapability sheet,
-  )
-  builder,
-  bool hostsMessages = false,
-}) => showModalBottomSheet<T>(
-  context: context,
-  useRootNavigator: true,
-  useSafeArea: true,
-  isScrollControlled: true,
-  requestFocus: true,
-  barrierColor: _colorsOf(Theme.of(context)).scrim,
-  backgroundColor: Colors.transparent,
-  elevation: 0,
-  shape: const RoundedRectangleBorder(),
-  clipBehavior: Clip.none,
-  // Лист занимает всю доступную ширину, без ограничения Material 3 в 640 dp.
-  constraints: const BoxConstraints(maxWidth: double.infinity),
-  showDragHandle: false,
-  isDismissible: true,
-  enableDrag: false,
-  builder: (context) => _SheetFrame(
-    hostsMessages: hostsMessages,
-    child: builder(context, const ExpandableSheetCapability._()),
-  ),
-);
 
 /// Длительность движения листа, которое не ведёт палец.
 const _sheetDuration = Duration(milliseconds: 180);
@@ -160,8 +115,8 @@ double _inverseSheetCurve(double position) {
   return evaluate(curve.a, curve.c, (low + high) / 2);
 }
 
-/// Маршрут листа по содержимому: модальная нижняя панель Material без её
-/// перетаскивания, анимацию которой ведёт пальцем [_SheetMotion].
+/// Маршрут листа: модальная нижняя панель Material без её перетаскивания,
+/// анимацию которой ведёт пальцем [_SheetMotion].
 final class _DoableSheetRoute<T> extends ModalBottomSheetRoute<T> {
   _DoableSheetRoute({
     required super.builder,
@@ -321,8 +276,8 @@ typedef SheetAction = ({
 
 /// Лист с ручкой, заголовком, пояснением, телом и нижней частью.
 ///
-/// Вариант листа строится только с возможностью, которую даёт построителю
-/// его функция показа: [showDoableSheet] или [showDoableExpandableSheet].
+/// Оба варианта листа строятся только с возможностью, которую даёт
+/// построителю [showDoableSheet].
 final class Sheet extends StatelessWidget {
   /// Лист высотой по содержимому.
   ///
@@ -332,7 +287,7 @@ final class Sheet extends StatelessWidget {
   /// нехватке высоты прокручивается только тело: шапка остаётся доступной для
   /// свайпа, а нижняя часть — видна под телом.
   const Sheet(
-    ContentSheetCapability this._content, {
+    this._presentation, {
     required this.title,
     required this.child,
     this.text,
@@ -345,14 +300,14 @@ final class Sheet extends StatelessWidget {
   /// Перетаскивание шапки на 48 вверх раскрывает лист, вниз — сворачивает
   /// полный или закрывает половинный через Navigator.pop; нажатие на ручку
   /// переключает размер. Касание затемнения и «назад» закрывают лист
-  /// средствами Material маршрута [showDoableExpandableSheet].
+  /// средствами Material маршрута [showDoableSheet].
   /// [body] — собственный прокручиваемый список тела, который занимает место
   /// между [pinned] и [footer]; его прокрутка не меняет размер листа.
   /// [expandLabel] и [collapseLabel] — доступные названия ручки.
   /// [action] — текстовая кнопка размера sm справа на строке заголовка,
   /// например «Сбросить»; заголовок при ней остаётся по центру.
   const Sheet.expandable(
-    ExpandableSheetCapability _, {
+    this._presentation, {
     required this.title,
     required String text,
     required Widget pinned,
@@ -365,7 +320,6 @@ final class Sheet extends StatelessWidget {
   }) : text = text,
        child = body,
        footer = footer,
-       _content = null,
        _expansion = (
          text: text,
          pinned: pinned,
@@ -387,8 +341,7 @@ final class Sheet extends StatelessWidget {
   /// прокрутки; без неё лист заканчивается телом.
   final Widget? footer;
 
-  /// Возможность листа по содержимому; у раскрываемого листа её нет.
-  final ContentSheetCapability? _content;
+  final SheetPresentation _presentation;
 
   /// Части раскрываемого листа; без них лист — по содержимому.
   final _Expansion? _expansion;
@@ -405,7 +358,7 @@ final class Sheet extends StatelessWidget {
     );
 
     return _SheetMotion(
-      route: _content!._route,
+      route: _presentation._route,
       child: DecoratedBox(
         decoration: BoxDecoration(
           borderRadius: borderRadius,
