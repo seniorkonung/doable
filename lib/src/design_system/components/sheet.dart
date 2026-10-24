@@ -203,18 +203,23 @@ enum _SheetState { closed, compact, full }
 /// это значение маршрута после [_sheetCurve], выше — раскрытие [expansion].
 /// Пороги скорости и положения — те же, что у перетаскивания модальной нижней
 /// панели Material.
+///
+/// Лист ведёт палец на его поверхности и на теле, которое [builder]
+/// подключает к переданному контроллеру прокрутки.
 final class _SheetMotion extends StatefulWidget {
   const _SheetMotion({
     required this.route,
     required this.expansion,
-    required this.child,
+    required this.builder,
   });
 
   final _DoableSheetRoute<Object?> route;
 
   /// Раскрытие листа; без него лист — по содержимому.
   final _SheetExpansion? expansion;
-  final Widget child;
+
+  /// Строит лист с контроллером прокрутки его тела.
+  final Widget Function(ScrollController body) builder;
 
   @override
   State<_SheetMotion> createState() => _SheetMotionState();
@@ -224,22 +229,32 @@ final class _SheetMotionState extends State<_SheetMotion> {
   static const _flingVelocity = 700.0;
   static const _closePosition = 0.5;
 
+  late final _body = _SheetBodyController(this);
+
   /// Сдвиг листа и его размер в начале текущего жеста.
   late ({double offset, bool isFull}) _drag;
 
-  /// Сумма сдвигов вниз, которые распознаватель передал за текущий жест.
+  /// Сумма сдвигов вниз, на которые лист прошёл за текущий жест.
   ///
-  /// После принятия жеста распознаватель передаёт сдвиги отслеживаемого
-  /// пальца и переходит к другому без скачка, поэтому лист не сдвигается на
-  /// расстояние между пальцами:
+  /// После принятия жеста распознаватель поверхности передаёт сдвиги
+  /// отслеживаемого пальца и переходит к другому без скачка, поэтому лист не
+  /// сдвигается на расстояние между пальцами:
   /// https://api.flutter.dev/flutter/gestures/MultitouchDragStrategy.html#latestPointer
   ///
   /// До принятия жеста палец ещё не выбран, и первое обновление несёт сумму
   /// сдвигов всех пальцев на листе. Если за касание соперничает другой
   /// элемент листа и два пальца двигались до принятия, лист один раз
   /// смещается и на сдвиг второго пальца.
+  ///
+  /// Тело добавляет только ту часть своего сдвига, которую лист принял.
   var _distance = 0.0;
   var _isPointerCanceled = false;
+
+  @override
+  void dispose() {
+    _body.dispose();
+    super.dispose();
+  }
 
   _DoableSheetRoute<Object?> get _route => widget.route;
 
@@ -258,7 +273,11 @@ final class _SheetMotionState extends State<_SheetMotion> {
       ? (_position - 1) * _compactExtent
       : (widget.expansion?.controller.value ?? 0) * _growth;
 
-  void _startDrag(DragStartDetails details) {
+  /// Сдвиг листа, на который его ставит текущий жест.
+  double get _dragOffset =>
+      clampDouble(_drag.offset - _distance, -_compactExtent, _growth);
+
+  void _startDrag() {
     _drag = (offset: _offset, isFull: widget.expansion?.isFull ?? false);
     _distance = 0;
     _isPointerCanceled = false;
@@ -269,14 +288,25 @@ final class _SheetMotionState extends State<_SheetMotion> {
     // остановила бы.
     if (!_route.isCurrent) return;
     _distance += details.delta.dy;
+    _place();
+  }
+
+  /// Сдвигает лист за пальцем на теле на [delta] вниз, насколько лист может
+  /// пройти, и возвращает пройденную часть.
+  double _follow(double delta) {
+    final offset = _dragOffset;
+    final target = clampDouble(offset - delta, -_compactExtent, _growth);
+    if (target == offset) return 0;
+    _distance = _drag.offset - target;
+    _place();
+    return offset - target;
+  }
+
+  void _place() {
     // Положение вычисляется от начала жеста, а не накапливается из
     // приращений значения, поэтому ошибка обратной функции кривой не
     // накапливается.
-    final offset = clampDouble(
-      _drag.offset - _distance,
-      -_compactExtent,
-      _growth,
-    );
+    final offset = _dragOffset;
     if (widget.expansion case final expansion? when _growth > 0) {
       expansion.controller.value = math.max(offset, 0) / _growth;
     }
@@ -285,16 +315,15 @@ final class _SheetMotionState extends State<_SheetMotion> {
     );
   }
 
-  void _endDrag(DragEndDetails details) {
+  /// Доводит лист после отпускания пальца со скоростью [velocity] вниз.
+  void _endDrag(double velocity) {
     // Закрыв или перекрыв лист во время жеста, Navigator отменяет касания, и
     // жест завершается здесь. Доводка тогда остановила бы закрытие, а
     // Navigator.pop закрыл бы маршрут под листом.
     if (!_route.isCurrent) return;
     // Принятый жест Flutter завершает через onEnd даже при PointerCancelEvent:
     // https://api.flutter.dev/flutter/gestures/DragGestureRecognizer/didStopTrackingLastPointer.html
-    final target = _isPointerCanceled
-        ? _startState
-        : _targetOf(details.velocity.pixelsPerSecond.dy);
+    final target = _isPointerCanceled ? _startState : _targetOf(velocity);
     switch (target) {
       case _SheetState.closed:
         Navigator.pop(context);
@@ -332,12 +361,102 @@ final class _SheetMotionState extends State<_SheetMotion> {
       // Как у модальной нижней панели Material, перетаскивание не
       // объявляется диктору прокруткой.
       excludeFromSemantics: true,
-      onVerticalDragStart: _startDrag,
+      onVerticalDragStart: (_) => _startDrag(),
       onVerticalDragUpdate: _updateDrag,
-      onVerticalDragEnd: _endDrag,
-      child: widget.child,
+      onVerticalDragEnd: (details) =>
+          _endDrag(details.velocity.pixelsPerSecond.dy),
+      child: widget.builder(_body),
     ),
   );
+}
+
+final class _SheetBodyController extends ScrollController {
+  _SheetBodyController(this._motion);
+
+  final _SheetMotionState _motion;
+
+  @override
+  ScrollPosition createScrollPosition(
+    ScrollPhysics physics,
+    ScrollContext context,
+    ScrollPosition? oldPosition,
+  ) => _SheetBodyPosition(
+    motion: _motion,
+    physics: physics,
+    context: context,
+    oldPosition: oldPosition,
+  );
+}
+
+/// Позиция прокрутки тела листа, которая до прокрутки предлагает листу
+/// каждый сдвиг пальца: вниз тело сначала прокручивается к своему началу, а
+/// остаток опускает лист; вверх сначала поднимается лист, насколько может, а
+/// остаток прокручивает тело.
+///
+/// Это схема позиции DraggableScrollableSheet:
+/// https://api.flutter.dev/flutter/widgets/DraggableScrollableSheet-class.html
+final class _SheetBodyPosition extends ScrollPositionWithSingleContext {
+  _SheetBodyPosition({
+    required this._motion,
+    required super.physics,
+    required super.context,
+    super.oldPosition,
+  });
+
+  final _SheetMotionState _motion;
+
+  /// Ведёт ли текущее перетаскивание палец.
+  var _isFingerDrag = false;
+
+  /// Сдвинулся ли лист в текущем перетаскивании.
+  var _hasSheetMoved = false;
+
+  @override
+  Drag drag(DragStartDetails details, VoidCallback dragCancelCallback) {
+    // Действия прокрутки диктора Flutter выполняет обработчиками
+    // перетаскивания списка, но без устройства ввода:
+    // https://api.flutter.dev/flutter/gestures/DragStartDetails/kind.html
+    _isFingerDrag = details.kind != null;
+    _hasSheetMoved = false;
+    if (_isFingerDrag) _motion._startDrag();
+    return super.drag(details, dragCancelCallback);
+  }
+
+  @override
+  void applyUserOffset(double delta) {
+    if (!_isFingerDrag) {
+      super.applyUserOffset(delta);
+      return;
+    }
+    final scroll = delta > 0
+        ? math.min(delta, math.max(pixels - minScrollExtent, 0.0))
+        : 0.0;
+    if (scroll > 0) super.applyUserOffset(scroll);
+    final moved = _motion._follow(delta - scroll);
+    if (moved != 0) _hasSheetMoved = true;
+    // Остаток вниз бывает, только когда лист опущен до конца пути, и он
+    // гасится. Остаток вверх тело, которое помещается целиком, гасит без
+    // эффекта края.
+    final rest = delta - scroll - moved;
+    if (rest < 0 && maxScrollExtent > minScrollExtent) {
+      super.applyUserOffset(rest);
+    }
+  }
+
+  @override
+  void goBallistic(double velocity) {
+    // Перетаскивание завершается здесь отпусканием или отменой.
+    final settlesSheet = _isFingerDrag && _hasSheetMoved;
+    _isFingerDrag = false;
+    if (!settlesSheet) {
+      super.goBallistic(velocity);
+      return;
+    }
+    // Скорость прокрутки направлена к концу тела, то есть вверх.
+    _motion._endDrag(-velocity);
+    // Тело не прокручивается по инерции, когда жест вёл лист.
+    super.goBallistic(0);
+  }
 }
 
 /// Отмечает лист, показанный с `hostsMessages`.
@@ -366,11 +485,11 @@ typedef SheetAction = ({
 final class Sheet extends StatelessWidget {
   /// Лист высотой по содержимому.
   ///
-  /// Лист перетаскивается за шапку, нижнюю часть и тело, которое помещается
-  /// целиком, и закрывается жестом вниз; касание затемнения и «назад»
-  /// закрывают его средствами Material маршрута [showDoableSheet]. При
-  /// нехватке высоты прокручивается только тело: шапка остаётся доступной для
-  /// свайпа, а нижняя часть — видна под телом.
+  /// Лист перетаскивается за шапку, нижнюю часть и тело и закрывается жестом
+  /// вниз; касание затемнения и «назад» закрывают его средствами Material
+  /// маршрута [showDoableSheet]. При нехватке высоты прокручивается только
+  /// тело, а нижняя часть видна под ним. Тело передаёт жест листу: движение
+  /// вниз прокручивает его к началу, а от начала опускает лист.
   const Sheet(
     this._presentation, {
     required this.title,
@@ -452,7 +571,7 @@ final class Sheet extends StatelessWidget {
     return _SheetMotion(
       route: _presentation._route,
       expansion: null,
-      child: DecoratedBox(
+      builder: (body) => DecoratedBox(
         decoration: BoxDecoration(
           borderRadius: borderRadius,
           boxShadow: _shadowsOf(theme).shadowFloat,
@@ -476,7 +595,15 @@ final class Sheet extends StatelessWidget {
                 const SizedBox(height: 14),
                 _TitleBlock(title: title, text: text, action: null),
                 const SizedBox(height: DoableMetrics.space3),
-                Flexible(child: SingleChildScrollView(child: child)),
+                Flexible(
+                  child: SingleChildScrollView(
+                    controller: body,
+                    // Тело, которое помещается целиком, тоже передаёт жест
+                    // листу.
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: child,
+                  ),
+                ),
               ],
             ),
             footer: switch (footer) {
@@ -862,7 +989,7 @@ final class _ExpandableSheetState extends State<_ExpandableSheet>
             isFull: _isFull,
             resize: _resize,
           ),
-          child: AnimatedBuilder(
+          builder: (_) => AnimatedBuilder(
             animation: _expansion,
             builder: (context, child) {
               final progress = _expansion.value;

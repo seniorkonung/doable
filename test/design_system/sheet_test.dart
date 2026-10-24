@@ -849,6 +849,255 @@ void main() {
     expect(lower.isClosed, isFalse);
   });
 
+  testWidgets('движение вниз по длинному телу листа по содержимому '
+      'прокручивает тело к началу, а затем в том же жесте опускает лист с '
+      'нижней кнопкой вслед за пальцем; движение обратно вверх сначала '
+      'возвращает лист в компактное положение, а затем прокручивает '
+      'тело', (tester) async {
+    final sheet = await _openContentSheet(tester, body: _longBody);
+    final compact = tester.getRect(find.byType(Sheet));
+    final footer = tester.getRect(find.text('Создать'));
+    final scrim = _scrimAlpha(tester);
+    final body = _bodyPosition(tester);
+    body.jumpTo(200);
+    await tester.pump();
+    final gesture = await _SlowGesture.start(tester, find.text('Строка 8'));
+    // Первое движение список тратит на принятие жеста.
+    await gesture.moveTo(20);
+
+    await gesture.moveTo(20 + 150);
+    expect(body.pixels, 50);
+    expect(tester.getRect(find.byType(Sheet)), compact);
+
+    for (final depth in [120.0, 40.0]) {
+      await gesture.moveTo(20 + 200 + depth);
+      expect(body.pixels, 0, reason: 'глубина $depth');
+      expect(
+        tester.getRect(find.byType(Sheet)).top,
+        closeTo(compact.top + depth, 1),
+        reason: 'глубина $depth',
+      );
+      expect(
+        tester.getRect(find.text('Создать')).top,
+        closeTo(footer.top + depth, 1),
+        reason: 'глубина $depth',
+      );
+      expect(_scrimAlpha(tester), lessThan(scrim), reason: 'глубина $depth');
+    }
+
+    await gesture.moveTo(20 + 200 - 60);
+    expect(tester.getRect(find.byType(Sheet)), compact);
+    expect(body.pixels, 60);
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(tester.getRect(find.byType(Sheet)), compact);
+    expect(body.pixels, 60);
+    expect(sheet.isClosed, isFalse);
+  });
+
+  testWidgets('короткий быстрый бросок вниз по длинному телу в начале '
+      'закрывает лист по содержимому, а медленное малое отклонение '
+      'возвращает его', (tester) async {
+    final sheet = await _openContentSheet(tester, body: _longBody);
+    final compact = tester.getRect(find.byType(Sheet));
+
+    final gesture = await _SlowGesture.start(tester, find.text('Строка 3'));
+    await gesture.moveTo(20);
+    await gesture.moveTo(20 + 40);
+    expect(
+      tester.getRect(find.byType(Sheet)).top,
+      closeTo(compact.top + 40, 1),
+    );
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(tester.getRect(find.byType(Sheet)), compact);
+    expect(sheet.isClosed, isFalse);
+
+    await tester.fling(find.text('Строка 3'), const Offset(0, 60), 1000);
+    await tester.pumpAndSettle();
+    expect(find.byType(Sheet), findsNothing);
+    expect(sheet.isClosed, isTrue);
+  });
+
+  testWidgets('быстрый бросок вверх после того, как жест по длинному телу '
+      'опустил лист по содержимому, возвращает лист, а тело остаётся в '
+      'начале; бросок вверх, при котором лист не двигался, прокручивает тело '
+      'по инерции', (tester) async {
+    final sheet = await _openContentSheet(tester, body: _longBody);
+    final compact = tester.getRect(find.byType(Sheet));
+    final body = _bodyPosition(tester);
+
+    final gesture = await _SlowGesture.start(tester, find.text('Строка 3'));
+    await gesture.moveTo(20);
+    // Медленное отпускание здесь закрыло бы лист.
+    await gesture.moveTo(20 + compact.height * 0.7);
+    await gesture.flingTo(20 + compact.height * 0.6);
+    await tester.pumpAndSettle();
+    expect(tester.getRect(find.byType(Sheet)), compact);
+    expect(body.pixels, 0);
+    expect(sheet.isClosed, isFalse);
+
+    await tester.fling(find.text('Строка 3'), const Offset(0, -200), 2000);
+    await tester.pumpAndSettle();
+    expect(body.pixels, greaterThan(200));
+    expect(tester.getRect(find.byType(Sheet)), compact);
+  });
+
+  testWidgets('быстрый бросок вниз по длинному телу, отпущенный до того, как '
+      'тело дошло до начала, прокручивает тело по инерции до начала, а лист '
+      'по содержимому остаётся открытым в компактном размере', (tester) async {
+    final sheet = await _openContentSheet(tester, body: _longBody);
+    final compact = tester.getRect(find.byType(Sheet));
+    final body = _bodyPosition(tester);
+    body.jumpTo(100);
+    await tester.pump();
+
+    await tester.fling(find.text('Строка 5'), const Offset(0, 60), 1000);
+    expect(body.pixels, greaterThan(0));
+    await tester.pumpAndSettle();
+
+    expect(body.pixels, 0);
+    expect(tester.getRect(find.byType(Sheet)), compact);
+    expect(sheet.isClosed, isFalse);
+  });
+
+  testWidgets('движение вниз по короткому телу опускает лист по содержимому, '
+      'а движение вверх не поднимает его выше компактного размера и не '
+      'вызывает эффекта края', (tester) async {
+    var overscrolls = 0;
+    await _openSheet(
+      tester,
+      (context) => showDoableSheet<void>(
+        context: context,
+        builder: (context, sheet) =>
+            NotificationListener<OverscrollNotification>(
+              onNotification: (_) {
+                overscrolls++;
+                return false;
+              },
+              child: Sheet(
+                sheet,
+                title: 'Новый тег',
+                footer: const SizedBox(height: 44, child: Text('Создать')),
+                child: const SizedBox(height: 120, child: Text('Название')),
+              ),
+            ),
+      ),
+    );
+    final compact = tester.getRect(find.byType(Sheet));
+    final footer = tester.getRect(find.text('Создать'));
+
+    final gesture = await _SlowGesture.start(tester, find.text('Название'));
+    await gesture.moveTo(20);
+    await gesture.moveTo(20 + 60);
+    expect(
+      tester.getRect(find.byType(Sheet)).top,
+      closeTo(compact.top + 60, 1),
+    );
+    expect(
+      tester.getRect(find.text('Создать')).top,
+      closeTo(footer.top + 60, 1),
+    );
+    await gesture.moveTo(20 - 100);
+    expect(tester.getRect(find.byType(Sheet)), compact);
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(tester.getRect(find.byType(Sheet)), compact);
+    expect(overscrolls, 0);
+  });
+
+  testWidgets('отменённый системой жест по длинному телу возвращает лист по '
+      'содержимому', (tester) async {
+    final sheet = await _openContentSheet(tester, body: _longBody);
+    final compact = tester.getRect(find.byType(Sheet));
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.text('Строка 3')),
+    );
+    await gesture.moveBy(const Offset(0, 20));
+    await gesture.moveBy(Offset(0, compact.height * 0.8));
+    await tester.pump();
+    expect(tester.getRect(find.byType(Sheet)).top, greaterThan(compact.top));
+    await gesture.cancel();
+    await tester.pumpAndSettle();
+
+    expect(tester.getRect(find.byType(Sheet)), compact);
+    expect(sheet.isClosed, isFalse);
+  });
+
+  testWidgets('«назад» во время перетаскивания верхнего листа за длинное тело '
+      'закрывает только его, а дальнейшее движение и отпускание пальца не '
+      'двигают и не закрывают нижний лист', (tester) async {
+    var isUpperClosed = false;
+    final lower = await _openContentSheet(
+      tester,
+      body: Builder(
+        builder: (context) => TextButton(
+          onPressed: () => showDoableSheet<void>(
+            context: context,
+            builder: (context, sheet) =>
+                Sheet(sheet, title: 'Верхний лист', child: _longBody),
+          ).whenComplete(() => isUpperClosed = true),
+          child: const Text('Ещё лист'),
+        ),
+      ),
+    );
+    final lowerRect = tester.getRect(find.byType(Sheet));
+    await tester.tap(find.text('Ещё лист'));
+    await tester.pumpAndSettle();
+
+    final upper = tester.getRect(find.byType(Sheet).last);
+    final gesture = await _SlowGesture.start(tester, find.text('Строка 3'));
+    await gesture.moveTo(20);
+    await gesture.moveTo(20 + 60);
+    expect(
+      tester.getRect(find.byType(Sheet).last).top,
+      closeTo(upper.top + 60, 1),
+    );
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+    // Отпускание в зоне закрытия, но не у самого края пути листа.
+    await gesture.moveTo(20 + upper.height * 0.7);
+    expect(tester.getRect(find.byType(Sheet).first), lowerRect);
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(isUpperClosed, isTrue);
+    expect(find.text('Верхний лист'), findsNothing);
+    expect(tester.getRect(find.byType(Sheet)), lowerRect);
+    expect(lower.isClosed, isFalse);
+  });
+
+  testWidgets('scrollUp и scrollDown диктора прокручивают длинное тело, а лист '
+      'по содержимому остаётся на месте, в том числе когда scrollDown доводит '
+      'тело до начала с запасом', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final sheet = await _openContentSheet(tester, body: _longBody);
+    final compact = tester.getRect(find.byType(Sheet));
+    final body = _bodyPosition(tester);
+
+    tester.semantics.scrollUp(scrollable: find.semantics.scrollable());
+    await tester.pump();
+    final scrolled = body.pixels;
+    expect(scrolled, greaterThan(0));
+    expect(tester.getRect(find.byType(Sheet)), compact);
+    await tester.pumpAndSettle();
+
+    body.jumpTo(scrolled / 2);
+    await tester.pump();
+    tester.semantics.scrollDown(scrollable: find.semantics.scrollable());
+    await tester.pump();
+    expect(body.pixels, 0);
+    expect(tester.getRect(find.byType(Sheet)), compact);
+    await tester.pumpAndSettle();
+
+    expect(tester.getRect(find.byType(Sheet)), compact);
+    expect(sheet.isClosed, isFalse);
+    semantics.dispose();
+  });
+
   testWidgets('при уменьшении движения лист по содержимому стоит под пальцем, '
       'а открытие, возврат после отпускания и закрытие происходят сразу', (
     tester,
@@ -901,6 +1150,25 @@ double _topRadius(WidgetTester tester) => tester
     .resolve(TextDirection.ltr)
     .topLeft
     .x;
+
+/// Тело листа по содержимому, которое не помещается в лист.
+final _longBody = Column(
+  mainAxisSize: MainAxisSize.min,
+  children: [
+    for (var index = 0; index < 40; index++)
+      SizedBox(height: 48, child: Text('Строка $index')),
+  ],
+);
+
+/// Позиция прокрутки тела единственного открытого листа.
+ScrollPosition _bodyPosition(WidgetTester tester) => tester
+    .state<ScrollableState>(
+      find.descendant(
+        of: find.byType(Sheet),
+        matching: find.byType(Scrollable),
+      ),
+    )
+    .position;
 
 double _sheetHeight(WidgetTester tester) =>
     tester.getSize(find.byType(Sheet)).height;
