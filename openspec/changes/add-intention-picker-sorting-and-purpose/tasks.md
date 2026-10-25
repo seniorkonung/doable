@@ -126,7 +126,7 @@
   - **Предполагаемые файлы:** `lib/src/shared/diagnostics/diagnostics_sink.dart`, `lib/src/shared/diagnostics/developer_diagnostics_sink.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `test/shared/diagnostics/diagnostics_sink_test.dart`, `test/intention/data/drift_intention_repository_fault_test.dart`, `benchmark/intention/intention_catalog_benchmark.dart`.
   - **Размер:** S.
 
-- [ ] 1.10 Подтвердить готовность первой фазы: каталог читает порядок по названию и тип намерения на схеме 6, а экраны не изменились
+- [x] 1.10 Подтвердить готовность первой фазы: каталог читает порядок по названию и тип намерения на схеме 6, а экраны не изменились
   - **Критерии приёмки:**
     - Выполнено условие «Ready to advance» первой фазы:
       - требования «Упорядочивание каталогов намерений» и «Тип намерения в поиске для выбора» и правила точного количества выполняются на уровне чтения и модели каталога;
