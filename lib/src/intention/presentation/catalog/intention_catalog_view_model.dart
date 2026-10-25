@@ -899,14 +899,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     IntentionCatalogQuery query,
     IntentionCatalogMutation mutation,
   ) {
-    final anyTypeQuery = IntentionCatalogQuery(
-      scope: query.scope,
-      titleFilter: query.titleFilter?.map((value) => value),
-      tagFilter: query.tagFilter,
-      excludedIntentionId: query.excludedIntentionId,
-      order: query.order,
-      pageSize: query.pageSize,
-    );
+    final anyTypeQuery = query.withAnyReadiness();
     var all = counts.all;
     var actions = counts.actions;
     void count(IntentionCatalogEntrySnapshot? snapshot, int delta) {

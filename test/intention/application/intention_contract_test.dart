@@ -363,6 +363,111 @@ void main() {
       }
     });
 
+    test('запрос без условия готовности допускает оба типа и сохраняет остальные условия', () {
+      final health = Tag(
+        id: _tagId('00000000-0000-4000-8000-000000000101'),
+        name: TagName.fromStored('Здоровье'),
+        color: null,
+        position: tagPositionAt(1002),
+      );
+      final sport = Tag(
+        id: _tagId('00000000-0000-4000-8000-000000000103'),
+        name: TagName.fromStored('Спорт'),
+        color: null,
+        position: tagPositionAt(1004),
+      );
+      const candidateId = '00000000-0000-4000-8000-000000000001';
+      final otherParticipant = _intentionId(
+        '00000000-0000-4000-8000-000000000002',
+      );
+      final anyReadinessQuery = IntentionCatalogQuery(
+        scope: IntentionScope.active,
+        readinessFilter: IntentionReadinessFilter.notReadyOnly,
+        titleFilter: 'ХОДИТЬ',
+        tagFilter: IntentionTagFilter(
+          requiredTagIds: [health.id],
+          excludedTagIds: [sport.id],
+        ),
+        excludedIntentionId: otherParticipant,
+        order: IntentionCatalogOrder.titleAscending,
+        pageSize: 1,
+        requestsTypeCounts: true,
+      ).withAnyReadiness();
+
+      expect(anyReadinessQuery.readinessFilter, IntentionReadinessFilter.all);
+      for (final (id, title, tags, readiness, archiveState, expected) in [
+        (
+          candidateId,
+          'Ходить в парк',
+          [health],
+          IntentionReadiness.ready,
+          IntentionArchiveState.active,
+          true,
+        ),
+        (
+          candidateId,
+          'Ходить в парк',
+          [health],
+          IntentionReadiness.notReady,
+          IntentionArchiveState.active,
+          true,
+        ),
+        (
+          candidateId,
+          'Ходить в парк',
+          [health],
+          IntentionReadiness.ready,
+          IntentionArchiveState.archived,
+          false,
+        ),
+        (
+          candidateId,
+          'Читать',
+          [health],
+          IntentionReadiness.ready,
+          IntentionArchiveState.active,
+          false,
+        ),
+        (
+          candidateId,
+          'Ходить в парк',
+          <Tag>[],
+          IntentionReadiness.ready,
+          IntentionArchiveState.active,
+          false,
+        ),
+        (
+          candidateId,
+          'Ходить в парк',
+          [health, sport],
+          IntentionReadiness.ready,
+          IntentionArchiveState.active,
+          false,
+        ),
+        (
+          otherParticipant.toCanonicalString(),
+          'Ходить в парк',
+          [health],
+          IntentionReadiness.ready,
+          IntentionArchiveState.active,
+          false,
+        ),
+      ]) {
+        expect(
+          anyReadinessQuery.includes(
+            _summary(
+              id: id,
+              title: title,
+              tags: tags,
+              readiness: readiness,
+              archiveState: archiveState,
+            ),
+          ),
+          expected,
+        );
+      }
+    });
+
     test('изменение только цвета тега заменяет его состояние в сводке', () {
       final firstId = _tagId('00000000-0000-4000-8000-000000000002');
       final secondId = _tagId('00000000-0000-4000-8000-000000000001');

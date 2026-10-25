@@ -186,6 +186,20 @@ final class IntentionCatalogQuery {
   /// Просит первую порцию нести [IntentionTypeCounts].
   final bool requestsTypeCounts;
 
+  /// Тот же запрос с условием готовности «все»: по нему считаются числа
+  /// обоих типов.
+  IntentionCatalogQuery withAnyReadiness() => IntentionCatalogQuery._(
+    scope: scope,
+    readinessFilter: IntentionReadinessFilter.all,
+    titleFilter: titleFilter,
+    tagFilter: tagFilter,
+    excludedIntentionId: excludedIntentionId,
+    order: order,
+    pageSize: pageSize,
+    cursor: cursor,
+    requestsTypeCounts: requestsTypeCounts,
+  );
+
   bool includes(IntentionSummary summary) {
     final matchesScope = switch (scope) {
       IntentionScope.active =>
