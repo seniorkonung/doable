@@ -1910,6 +1910,23 @@
   "@intentionPickerOrderTitleDescending": {
     "description": "Сводка сортировки в заголовке списка поиска для выбора"
   },
+  "intentionPickerHeaderLabel": "Show and sort. Type: {type}. Sorted by: {summary}.",
+  "@intentionPickerHeaderLabel": {
+    "description": "Доступное название кнопки заголовка поиска до подтверждения количества",
+    "placeholders": {
+      "type": {"type": "String"},
+      "summary": {"type": "String"}
+    }
+  },
+  "intentionPickerHeaderCountLabel": "Show and sort. Type: {type}, {count}. Sorted by: {summary}.",
+  "@intentionPickerHeaderCountLabel": {
+    "description": "Доступное название кнопки заголовка поиска с подтверждённым количеством",
+    "placeholders": {
+      "type": {"type": "String"},
+      "count": {"type": "int"},
+      "summary": {"type": "String"}
+    }
+  },
   "intentionPickerActionsHeader": "Actions",
   "@intentionPickerActionsHeader": {
     "description": "Заголовок выдачи поиска действия на экране выбора"

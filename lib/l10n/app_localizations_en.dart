@@ -2358,6 +2358,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get intentionPickerOrderTitleDescending => 'Name, Z to A';
 
   @override
+  String intentionPickerHeaderLabel(String type, String summary) {
+    return 'Show and sort. Type: $type. Sorted by: $summary.';
+  }
+
+  @override
+  String intentionPickerHeaderCountLabel(
+    String type,
+    int count,
+    String summary,
+  ) {
+    return 'Show and sort. Type: $type, $count. Sorted by: $summary.';
+  }
+
+  @override
   String get intentionPickerActionsHeader => 'Actions';
 
   @override

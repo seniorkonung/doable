@@ -3,6 +3,7 @@ import 'package:doable/src/design_system/components/catalog_header.dart';
 import 'package:doable/src/design_system/components/empty_state.dart';
 import 'package:doable/src/design_system/components/filter_button.dart';
 import 'package:doable/src/design_system/components/list_state.dart';
+import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/design_system/components/top_bar.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
@@ -60,6 +61,88 @@ void main() {
         'participant-picker',
       ),
     ]) {
+      testWidgets(
+        '${locale.languageCode}: $keyPrefix открывает показ и упорядочивание до выдачи, с числом, после отказа и при недопустимом фильтре',
+        (tester) async {
+          final semantics = tester.ensureSemantics();
+          final ru = locale.languageCode == 'ru';
+          final type = purpose is SelectDailyChoiceAction
+              ? (ru ? 'Действия' : 'Actions')
+              : (ru ? 'Все' : 'All');
+          final h = await _open(tester, locale: locale, purpose: purpose);
+          final header = find.byType(CatalogHeader);
+          final sheetTitle = ru ? 'Показать и упорядочить' : 'Show and sort';
+
+          Future<void> openAndClose(
+            String label, {
+            bool sortByName = false,
+          }) async {
+            expect(
+              tester.getSemantics(header),
+              isSemantics(
+                label: label,
+                isButton: true,
+                hasTapAction: true,
+                hasExpandedState: true,
+                isExpanded: false,
+              ),
+            );
+            await tester.tap(header);
+            // Ожидаем переход листа, пока индикатор выдачи ещё вращается.
+            await tester.pump();
+            await tester.pump(const Duration(milliseconds: 300));
+            expect(find.text(sheetTitle), findsOneWidget);
+            expect(tester.widget<CatalogHeader>(header).expanded, isTrue);
+            if (sortByName) {
+              await tester.tap(
+                find.descendant(
+                  of: find.byType(Sheet),
+                  matching: find.text(ru ? 'Название' : 'Name'),
+                ),
+              );
+              await tester.pump();
+            }
+            Navigator.of(tester.element(find.byType(Sheet))).pop();
+            await tester.pump();
+            await tester.pump(const Duration(milliseconds: 300));
+            expect(tester.getSemantics(header), isSemantics(isExpanded: false));
+          }
+
+          // Первая порция ещё не подтверждена: число не объявляется.
+          await openAndClose(
+            ru
+                ? 'Показать и упорядочить. Тип: $type. Сортировка: Создание, сначала новые.'
+                : 'Show and sort. Type: $type. Sorted by: Created, newest first.',
+          );
+          h.repository.complete(0, _firstPage(_actions(1)));
+          await tester.pumpAndSettle();
+          await openAndClose(
+            ru
+                ? 'Показать и упорядочить. Тип: $type, 1. Сортировка: Создание, сначала новые.'
+                : 'Show and sort. Type: $type, 1. Sorted by: Created, newest first.',
+            sortByName: true,
+          );
+
+          h.repository.complete(
+            h.repository.queries.length - 1,
+            const ResultFailure(IntentionUnavailableFailure()),
+          );
+          await tester.pumpAndSettle();
+          final withoutCount = ru
+              ? 'Показать и упорядочить. Тип: $type. Сортировка: Название, от А до Я.'
+              : 'Show and sort. Type: $type. Sorted by: Name, A to Z.';
+          await openAndClose(withoutCount);
+
+          await tester.enterText(
+            find.byKey(ValueKey('$keyPrefix-filter')),
+            'а' * 256,
+          );
+          await tester.pump();
+          await openAndClose(withoutCount);
+          semantics.dispose();
+        },
+      );
+
       testWidgets(
         '${locale.languageCode}: $keyPrefix показывает текущие тип и сортировку без прежнего числа до подтверждения новой выдачи',
         (tester) async {
@@ -502,18 +585,23 @@ void main() {
   });
 
   for (final brightness in Brightness.values) {
-    testWidgets('${brightness.name}: при пустом поле поиска цели касания не '
-        'меньше tap-min, подписаны и контрастны', (tester) async {
-      final semantics = tester.ensureSemantics();
-      final h = await _open(tester, brightness: brightness);
-      h.repository.complete(0, _firstPage(_actions(3)));
-      await tester.pumpAndSettle();
+    for (final locale in [const Locale('ru'), const Locale('en')]) {
+      testWidgets(
+        '${locale.languageCode}, ${brightness.name}: при пустом поле поиска цели касания не '
+        'меньше tap-min, подписаны и контрастны',
+        (tester) async {
+          final semantics = tester.ensureSemantics();
+          final h = await _open(tester, brightness: brightness, locale: locale);
+          h.repository.complete(0, _firstPage(_actions(3)));
+          await tester.pumpAndSettle();
 
-      await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
-      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
-      await expectLater(tester, meetsGuideline(textContrastGuideline));
-      semantics.dispose();
-    });
+          await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
+          await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+          await expectLater(tester, meetsGuideline(textContrastGuideline));
+          semantics.dispose();
+        },
+      );
+    }
   }
 }
 

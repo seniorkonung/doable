@@ -20,6 +20,7 @@ import '../catalog/intention_catalog_view_model.dart';
 import '../catalog/intention_tag_conditions_view_model.dart';
 import 'intention_picker_kind.dart';
 import 'intention_picker_results.dart';
+import 'intention_picker_show_and_sort_sheet.dart';
 
 /// Экран выбора намерения назначения [purpose]: крестик с заголовком, поле
 /// поиска, фильтр по тегам и заголовок списка закреплены над выдачей.
@@ -61,6 +62,13 @@ final class IntentionPickerView extends ConsumerStatefulWidget {
 final class _IntentionPickerViewState
     extends ConsumerState<IntentionPickerView> {
   final _titleController = TextEditingController();
+  bool _showAndSortExpanded = false;
+
+  Future<void> _openShowAndSort() async {
+    setState(() => _showAndSortExpanded = true);
+    await showIntentionPickerShowAndSortSheet(context, widget.purpose);
+    if (mounted) setState(() => _showAndSortExpanded = false);
+  }
 
   @override
   void dispose() {
@@ -77,6 +85,15 @@ final class _IntentionPickerViewState
     final catalog = ref.watch(catalogProvider);
     final notifier = ref.read(catalogProvider.notifier);
     final selection = notifier.selection;
+    final headerTitle = switch (selection.type) {
+      IntentionTypeOpen(selected: IntentionTypeChoice.all) ||
+      IntentionTypeNotOffered() => l10n.intentionPickerAllHeader,
+      IntentionTypeOpen(selected: IntentionTypeChoice.intentions) =>
+        l10n.intentionPickerIntentionsHeader,
+      IntentionTypeOpen(selected: IntentionTypeChoice.actions) ||
+      IntentionTypePinnedToActions() => l10n.intentionPickerActionsHeader,
+    };
+    final orderSummary = _orderSummary(l10n, selection.order);
     final count = switch (catalog) {
       AsyncData(
         isLoading: false,
@@ -155,17 +172,18 @@ final class _IntentionPickerViewState
                 DoableMetrics.space1,
               ),
               child: CatalogHeader(
-                title: switch (selection.type) {
-                  IntentionTypeOpen(selected: IntentionTypeChoice.all) ||
-                  IntentionTypeNotOffered() => l10n.intentionPickerAllHeader,
-                  IntentionTypeOpen(selected: IntentionTypeChoice.intentions) =>
-                    l10n.intentionPickerIntentionsHeader,
-                  IntentionTypeOpen(selected: IntentionTypeChoice.actions) ||
-                  IntentionTypePinnedToActions() =>
-                    l10n.intentionPickerActionsHeader,
-                },
+                title: headerTitle,
                 count: count,
-                summary: _orderSummary(l10n, selection.order),
+                summary: orderSummary,
+                label: count == null
+                    ? l10n.intentionPickerHeaderLabel(headerTitle, orderSummary)
+                    : l10n.intentionPickerHeaderCountLabel(
+                        headerTitle,
+                        count,
+                        orderSummary,
+                      ),
+                expanded: _showAndSortExpanded,
+                onOpen: () => unawaited(_openShowAndSort()),
               ),
             ),
             Expanded(

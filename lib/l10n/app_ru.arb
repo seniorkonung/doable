@@ -654,6 +654,8 @@
   "intentionPickerOrderUpdatedOldest": "Изменение, сначала старые",
   "intentionPickerOrderTitleAscending": "Название, от А до Я",
   "intentionPickerOrderTitleDescending": "Название, от Я до А",
+  "intentionPickerHeaderLabel": "Показать и упорядочить. Тип: {type}. Сортировка: {summary}.",
+  "intentionPickerHeaderCountLabel": "Показать и упорядочить. Тип: {type}, {count}. Сортировка: {summary}.",
   "intentionPickerActionsHeader": "Действия",
   "intentionPickerIntentionsHeader": "Намерения",
   "intentionPickerLoadingMoreActions": "Загружаем ещё действия",

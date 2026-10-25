@@ -3706,6 +3706,22 @@ abstract class AppLocalizations {
   /// **'Name, Z to A'**
   String get intentionPickerOrderTitleDescending;
 
+  /// Доступное название кнопки заголовка поиска до подтверждения количества
+  ///
+  /// In en, this message translates to:
+  /// **'Show and sort. Type: {type}. Sorted by: {summary}.'**
+  String intentionPickerHeaderLabel(String type, String summary);
+
+  /// Доступное название кнопки заголовка поиска с подтверждённым количеством
+  ///
+  /// In en, this message translates to:
+  /// **'Show and sort. Type: {type}, {count}. Sorted by: {summary}.'**
+  String intentionPickerHeaderCountLabel(
+    String type,
+    int count,
+    String summary,
+  );
+
   /// Заголовок выдачи поиска действия на экране выбора
   ///
   /// In en, this message translates to:

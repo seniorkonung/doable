@@ -2382,6 +2382,20 @@ class AppLocalizationsRu extends AppLocalizations {
   String get intentionPickerOrderTitleDescending => 'Название, от Я до А';
 
   @override
+  String intentionPickerHeaderLabel(String type, String summary) {
+    return 'Показать и упорядочить. Тип: $type. Сортировка: $summary.';
+  }
+
+  @override
+  String intentionPickerHeaderCountLabel(
+    String type,
+    int count,
+    String summary,
+  ) {
+    return 'Показать и упорядочить. Тип: $type, $count. Сортировка: $summary.';
+  }
+
+  @override
   String get intentionPickerActionsHeader => 'Действия';
 
   @override

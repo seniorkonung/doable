@@ -76,6 +76,57 @@ void main() {
         1,
       );
     });
+
+    testWidgets('в $themeName теме весь ряд — одна кнопка с названием '
+        'и признаком раскрытия потребителя', (tester) async {
+      final semantics = tester.ensureSemantics();
+      const label = 'Показать и упорядочить. Действия, 13. Сначала новые.';
+      var taps = 0;
+      for (final expanded in [false, true]) {
+        await tester.pumpWidget(
+          _app(
+            brightness: brightness,
+            header: CatalogHeader(
+              title: 'Действия',
+              count: 13,
+              summary: 'Создание, сначала новые',
+              label: label,
+              expanded: expanded,
+              onOpen: () => taps++,
+            ),
+          ),
+        );
+
+        final header = find.byType(CatalogHeader);
+        expect(find.semantics.byFlag(SemanticsFlag.isButton), findsOneWidget);
+        expect(
+          tester.getSemantics(header),
+          isSemantics(
+            label: label,
+            isButton: true,
+            hasTapAction: true,
+            hasExpandedState: true,
+            isExpanded: expanded,
+            children: const [],
+          ),
+        );
+        final rect = tester.getRect(header);
+        expect(rect.width, 360);
+        expect(rect.height, greaterThanOrEqualTo(DoableMetrics.tapMin));
+        for (final point in [
+          rect.topLeft + const Offset(1, 1),
+          tester.getCenter(find.text('Действия')),
+          rect.center,
+          tester.getCenter(find.text('Создание, сначала новые')),
+          rect.bottomRight - const Offset(1, 1),
+        ]) {
+          final before = taps;
+          await tester.tapAt(point);
+          expect(taps, before + 1);
+        }
+      }
+      semantics.dispose();
+    });
   }
 
   testWidgets('многозначное число расширяет плашку, не выходя за её края', (
@@ -129,10 +180,12 @@ void main() {
     await tester.pumpWidget(
       _app(
         textScale: 2,
-        header: const CatalogHeader(
+        header: CatalogHeader(
           title: 'Намерения',
           count: 13,
           summary: 'Изменение, сначала старые — длинная сводка сортировки',
+          label: 'Показать и упорядочить. Намерения, 13. Сначала старые.',
+          onOpen: () {},
         ),
       ),
     );
