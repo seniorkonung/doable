@@ -43,3 +43,24 @@
   - **Dependencies:** 1.1, 1.2, 1.3
   - **Files likely touched:** None (verification only)
   - **Estimated scope:** XS
+
+- [ ] 1.5 Нажатие ручки раскрываемого листа на Android сопровождается системным звуком касания, как у остальных кнопок, и по-прежнему ничего не подсвечивает
+  - **Acceptance criteria:**
+    - Касание, `Enter` или пробел при фокусе и действие диктора сначала вызывают `Feedback.forTap`, затем меняют размер листа (design, решение 2)
+    - На Android касание ручки проигрывает `SystemSoundType.click`; пиксели шапки во время удержания пальца по-прежнему не меняются
+  - **Verification:**
+    - `flutter test test/design_system/sheet_test.dart`
+  - **Dependencies:** 1.2
+  - **Files likely touched:** `lib/src/design_system/components/sheet.dart`, `test/design_system/sheet_test.dart`
+  - **Estimated scope:** XS
+
+- [ ] 1.6 После возврата звука касания изменённые требования `bottom-sheets` выполнены и общие проверки проекта проходят
+  - **Acceptance criteria:**
+    - Условие Ready to advance фазы 1 из `plan.md` выполнено после задачи 1.5
+    - Изменение проходит строгую проверку OpenSpec
+  - **Verification:**
+    - `mise run check`
+    - `openspec validate keep-sheet-grip-static --strict`
+  - **Dependencies:** 1.5
+  - **Files likely touched:** None (verification only)
+  - **Estimated scope:** XS
