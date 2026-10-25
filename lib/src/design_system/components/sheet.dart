@@ -872,17 +872,9 @@ enum SheetCompactHeight {
 /// места.
 const _compactLimit = 534.0;
 
-/// Отступ заголовка компактного раскрываемого листа от верхнего края: ручка
-/// стоит над началом заголовка.
-const _compactTitleTop = 26.0;
-
-/// На сколько шапка полного раскрываемого листа выше шапки компактного: над
-/// заголовком полного листа стоит шеврон с полями.
-const _fullHeaderRise =
-    DoableMetrics.space2 +
-    DoableMetrics.tapMin +
-    DoableMetrics.space1 -
-    _compactTitleTop;
+/// Отступ заголовка раскрываемого листа от верхнего края: ручка и шеврон
+/// стоят над началом заголовка.
+const _titleTop = 26.0;
 
 /// Части листа одного из двух вариантов.
 sealed class _SheetParts {
@@ -988,21 +980,7 @@ final class _ExpandableSheetState extends State<_ExpandableSheet>
         child: SizedBox(
           width: 88,
           height: DoableMetrics.tapMin,
-          child: _isFull
-              ? Center(
-                  child: DoableIcon(
-                    DoableIconData.chevronDown,
-                    size: 28,
-                    color: colors.grip,
-                  ),
-                )
-              : Align(
-                  alignment: Alignment.topCenter,
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: DoableMetrics.space2),
-                    child: _Grip(color: colors.grip),
-                  ),
-                ),
+          child: _SizeIcon(expansion: _expansion, color: colors.grip),
         ),
       ),
     );
@@ -1018,27 +996,18 @@ final class _ExpandableSheetState extends State<_ExpandableSheet>
         null => null,
       },
     );
-    // Ручка компактного листа стоит над началом заголовка, чтобы область
-    // нажатия была не меньше 44 при прежнем положении ручки и заголовка.
-    final header = _isFull
-        ? Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: DoableMetrics.space2),
-              Center(child: handle),
-              const SizedBox(height: DoableMetrics.space1),
-              titleBlock,
-            ],
-          )
-        : Stack(
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(top: _compactTitleTop),
-                child: titleBlock,
-              ),
-              Align(alignment: Alignment.topCenter, child: handle),
-            ],
-          );
+    // Ручка стоит над началом заголовка, чтобы область нажатия была не меньше
+    // 44 при прежнем положении ручки и заголовка. Шапка одна в обоих
+    // размерах, поэтому смена размера её не двигает.
+    final header = Stack(
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: _titleTop),
+          child: titleBlock,
+        ),
+        Align(alignment: Alignment.topCenter, child: handle),
+      ],
+    );
 
     final pinned = parts.pinned;
     final shrinkWrap = switch (parts.compactHeight) {
@@ -1056,28 +1025,25 @@ final class _ExpandableSheetState extends State<_ExpandableSheet>
       );
       return _SheetLayout(
         minimum: const EdgeInsets.symmetric(horizontal: DoableMetrics.space3),
-        head: _ExpandableHead(
-          fillsHeight: !shrinkWrap,
-          top: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+        head: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: DoableMetrics.space3),
+              child: header,
+            ),
+            if (pinned != null) ...[
               Padding(
-                padding: const EdgeInsets.only(bottom: DoableMetrics.space3),
-                child: header,
-              ),
-              if (pinned != null) ...[
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: DoableMetrics.space2,
-                  ),
-                  child: pinned,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: DoableMetrics.space2,
                 ),
-                const SizedBox(height: DoableMetrics.space2),
-              ],
+                child: pinned,
+              ),
+              const SizedBox(height: DoableMetrics.space2),
             ],
-          ),
-          list: list,
+            if (shrinkWrap) Flexible(child: list) else Expanded(child: list),
+          ],
         ),
         footer: _Footer(child: parts.footer),
       );
@@ -1103,7 +1069,6 @@ final class _ExpandableSheetState extends State<_ExpandableSheet>
           );
           return _ExpandableFrame(
             compactHeight: parts.compactHeight,
-            headerRise: _isFull ? _fullHeaderRise : 0,
             progress: progress,
             extents: _extents,
             child: DecoratedBox(
@@ -1141,12 +1106,11 @@ final class _ExpandableExtents {
 ///
 /// Полный лист занимает всё место над клавиатурой: его отнимает _SheetFrame.
 /// С [SheetCompactHeight.content] лист сначала раскладывается без строгой
-/// высоты в пределе, и занятая им высота без [headerRise] — компактная; затем,
-/// если его высота другая, — повторно в свою высоту.
+/// высоты в пределе, и занятая им высота — компактная; затем, если его высота
+/// другая, — повторно в свою высоту.
 final class _ExpandableFrame extends SingleChildRenderObjectWidget {
   const _ExpandableFrame({
     required this.compactHeight,
-    required this.headerRise,
     required this.progress,
     required this.extents,
     required super.child,
@@ -1154,16 +1118,13 @@ final class _ExpandableFrame extends SingleChildRenderObjectWidget {
 
   final SheetCompactHeight compactHeight;
 
-  /// На сколько шапка листа выше шапки компактного листа.
-  final double headerRise;
-
   /// 0 — компактный размер, 1 — полный.
   final double progress;
   final _ExpandableExtents extents;
 
   @override
   _RenderExpandableFrame createRenderObject(BuildContext context) =>
-      _RenderExpandableFrame(compactHeight, headerRise, progress, extents);
+      _RenderExpandableFrame(compactHeight, progress, extents);
 
   @override
   void updateRenderObject(
@@ -1171,18 +1132,12 @@ final class _ExpandableFrame extends SingleChildRenderObjectWidget {
     _RenderExpandableFrame renderObject,
   ) => renderObject
     ..compactHeight = compactHeight
-    ..headerRise = headerRise
     ..progress = progress
     ..extents = extents;
 }
 
 final class _RenderExpandableFrame extends RenderProxyBox {
-  _RenderExpandableFrame(
-    this._compactHeight,
-    this._headerRise,
-    this._progress,
-    this.extents,
-  );
+  _RenderExpandableFrame(this._compactHeight, this._progress, this.extents);
 
   _ExpandableExtents extents;
 
@@ -1191,14 +1146,6 @@ final class _RenderExpandableFrame extends RenderProxyBox {
   set compactHeight(SheetCompactHeight value) {
     if (value == _compactHeight) return;
     _compactHeight = value;
-    markNeedsLayout();
-  }
-
-  double _headerRise;
-
-  set headerRise(double value) {
-    if (value == _headerRise) return;
-    _headerRise = value;
     markNeedsLayout();
   }
 
@@ -1233,13 +1180,13 @@ final class _RenderExpandableFrame extends RenderProxyBox {
       case SheetCompactHeight.limit:
         compact = limit;
       case SheetCompactHeight.content:
-        // Компактная высота — высота листа с шапкой компактного размера,
-        // поэтому она не меняется, когда лист раскрыт или раскрывается.
+        // Шапка одна в обоих размерах, поэтому компактная высота не
+        // меняется, когда лист раскрыт или раскрывается.
         sheet.layout(
-          BoxConstraints(maxWidth: width, maxHeight: limit + _headerRise),
+          BoxConstraints(maxWidth: width, maxHeight: limit),
           parentUsesSize: true,
         );
-        compact = math.min(sheet.size.height - _headerRise, limit);
+        compact = sheet.size.height;
     }
     extents
       ..compact = compact
@@ -1256,144 +1203,67 @@ final class _RenderExpandableFrame extends RenderProxyBox {
   }
 }
 
-enum _HeadSlot { top, list }
-
-/// Шапка с закреплённой частью [top] над списком [list].
+/// Ручка компактного раскрываемого листа и шеврон полного на её месте.
 ///
-/// Список занимает место под [top], а с [fillsHeight] — всё это место. Когда
-/// места меньше, чем нужно [top], например в первых кадрах раскрытия листа с
-/// пустым списком, где шапка полного размера выше компактной, [top] стоит
-/// низом на месте списка и уходит верхом под край листа, а не переполняет его.
-final class _ExpandableHead
-    extends SlottedMultiChildRenderObjectWidget<_HeadSlot, RenderBox> {
-  const _ExpandableHead({
-    required this.fillsHeight,
-    required this.top,
-    required this.list,
-  });
+/// Значки перетекают друг в друга по раскрытию [expansion]: 0 — компактный
+/// размер, 1 — полный. В покое нарисован только значок текущего размера.
+final class _SizeIcon extends StatelessWidget {
+  const _SizeIcon({required this.expansion, required this.color});
 
-  final bool fillsHeight;
-  final Widget top;
-  final Widget list;
+  static const _gripTop = DoableMetrics.space2;
+  static const _chevronSize = 28.0;
+
+  final Animation<double> expansion;
+  final Color color;
 
   @override
-  Iterable<_HeadSlot> get slots => _HeadSlot.values;
-
-  @override
-  Widget childForSlot(_HeadSlot slot) => switch (slot) {
-    _HeadSlot.top => top,
-    _HeadSlot.list => list,
-  };
-
-  @override
-  _RenderExpandableHead createRenderObject(BuildContext context) =>
-      _RenderExpandableHead(fillsHeight);
-
-  @override
-  void updateRenderObject(
-    BuildContext context,
-    _RenderExpandableHead renderObject,
-  ) => renderObject.fillsHeight = fillsHeight;
-}
-
-final class _RenderExpandableHead extends RenderBox
-    with SlottedContainerRenderObjectMixin<_HeadSlot, RenderBox> {
-  _RenderExpandableHead(this._fillsHeight);
-
-  bool _fillsHeight;
-
-  set fillsHeight(bool value) {
-    if (value == _fillsHeight) return;
-    _fillsHeight = value;
-    markNeedsLayout();
-  }
-
-  /// Насколько [_HeadSlot.top] ушёл под верхний край при последней раскладке.
-  var _hidden = 0.0;
-
-  final _clip = LayerHandle<ClipRectLayer>();
-
-  @override
-  void performLayout() {
-    final width = constraints.maxWidth;
-    final top = childForSlot(_HeadSlot.top)!;
-    final list = childForSlot(_HeadSlot.list)!;
-
-    top.layout(BoxConstraints.tightFor(width: width), parentUsesSize: true);
-    final room = math.max(0.0, constraints.maxHeight - top.size.height);
-    list.layout(
-      _fillsHeight
-          ? BoxConstraints.tightFor(width: width, height: room)
-          : BoxConstraints(minWidth: width, maxWidth: width, maxHeight: room),
-      parentUsesSize: true,
-    );
-    final height = constraints.constrainHeight(
-      top.size.height + list.size.height,
-    );
-    _hidden = math.max(0, top.size.height + list.size.height - height);
-    _place(top, Offset(0, -_hidden));
-    _place(list, Offset(0, top.size.height - _hidden));
-    size = Size(width, height);
-  }
-
-  static void _place(RenderBox child, Offset offset) =>
-      (child.parentData! as BoxParentData).offset = offset;
-
-  @override
-  void paint(PaintingContext context, Offset offset) {
-    void paintChildren(PaintingContext context, Offset offset) {
-      for (final child in children) {
-        context.paintChild(
-          child,
-          offset + (child.parentData! as BoxParentData).offset,
-        );
-      }
-    }
-
-    if (_hidden == 0) {
-      _clip.layer = null;
-      paintChildren(context, offset);
-      return;
-    }
-    _clip.layer = context.pushClipRect(
-      needsCompositing,
-      offset,
-      Offset.zero & size,
-      paintChildren,
-      oldLayer: _clip.layer,
-    );
-  }
-
-  @override
-  void dispose() {
-    _clip.layer = null;
-    super.dispose();
-  }
-
-  @override
-  bool hitTestChildren(BoxHitTestResult result, {required Offset position}) {
-    for (final child in children) {
-      final isHit = result.addWithPaintOffset(
-        offset: (child.parentData! as BoxParentData).offset,
-        position: position,
-        hitTest: (result, transformed) =>
-            child.hitTest(result, position: transformed),
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: expansion,
+    builder: (context, _) {
+      final progress = expansion.value;
+      return Stack(
+        // Квадрат шеврона выше его графики и выходит за верх кнопки.
+        clipBehavior: Clip.none,
+        alignment: Alignment.topCenter,
+        children: [
+          if (progress < 1)
+            Positioned(
+              top: _gripTop,
+              child: Opacity(
+                opacity: 1 - progress,
+                child: _Grip(color: color),
+              ),
+            ),
+          if (progress > 0)
+            Positioned(
+              // Шеврон стоит серединой на середине ручки.
+              top: _gripTop + (_Grip.height - _chevronSize) / 2,
+              child: Opacity(
+                opacity: progress,
+                child: DoableIcon(
+                  DoableIconData.chevronDown,
+                  size: _chevronSize,
+                  color: color,
+                ),
+              ),
+            ),
+        ],
       );
-      if (isHit) return true;
-    }
-    return false;
-  }
+    },
+  );
 }
 
 final class _Grip extends StatelessWidget {
   const _Grip({required this.color});
+
+  static const height = 4.0;
 
   final Color color;
 
   @override
   Widget build(BuildContext context) => Container(
     width: 36,
-    height: 4,
+    height: height,
     decoration: BoxDecoration(
       color: color,
       borderRadius: BorderRadius.circular(DoableMetrics.radiusFull),

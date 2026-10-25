@@ -966,7 +966,7 @@ void main() {
   });
 
   testWidgets('компактная высота листа по содержимому с пустым списком — '
-      'высота его частей с шапкой компактного размера и их отступов, и её же '
+      'высота его частей и их отступов, и её же '
       'держит полный лист при перетаскивании вниз', (tester) async {
     final rows = ValueNotifier(0);
     addTearDown(rows.dispose);
@@ -1005,6 +1005,43 @@ void main() {
     await gesture.up();
     await tester.pumpAndSettle();
     expect(tester.getRect(find.byType(Sheet)), compact);
+  });
+
+  testWidgets('заголовок листа с компактной высотой по содержимому и пустым '
+      'списком стоит на одном расстоянии от верхнего края в компактном и '
+      'полном размере и при перетаскивании шапки вниз из полного размера до '
+      'компактного положения и ниже', (tester) async {
+    final rows = ValueNotifier(0);
+    addTearDown(rows.dispose);
+    await _openContentHeightSheet(tester, rows);
+    final compact = tester.getRect(find.byType(Sheet));
+    double titleTop() =>
+        tester.getRect(find.text('Копии')).top -
+        tester.getRect(find.byType(Sheet)).top;
+    final top = titleTop();
+
+    await tester.tap(find.bySemanticsLabel(_expandLabel));
+    await tester.pumpAndSettle();
+    expect(titleTop(), top);
+
+    final full = tester.getRect(find.byType(Sheet));
+    final gesture = await _SlowGesture.start(tester, _header);
+    for (final depth in [
+      (compact.top - full.top) / 2,
+      compact.top - full.top,
+      compact.top - full.top + 20,
+      compact.top - full.top + compact.height / 3,
+    ]) {
+      await gesture.moveTo(depth);
+      expect(titleTop(), closeTo(top, 0.01), reason: 'глубина $depth');
+      expect(
+        tester.getRect(_header).bottom,
+        lessThanOrEqualTo(tester.getRect(find.text('Готово')).top),
+        reason: 'глубина $depth',
+      );
+    }
+    await gesture.up();
+    await tester.pumpAndSettle();
   });
 
   testWidgets('свайп вверх по короткому списку листа с компактной высотой по '
