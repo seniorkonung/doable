@@ -145,3 +145,14 @@
   - **Зависимости:** 1.1–1.9.
   - **Предполагаемые файлы:** нет, только проверка и сборка.
   - **Размер:** XS.
+
+- [ ] 1.11 Определить в контракте запроса каталога производный запрос «тот же, но без условия готовности» и поправлять по нему числа типов в модели каталога
+  - **Критерии приёмки:**
+    - `IntentionCatalogQuery` возвращает производный запрос с условием готовности «все». Все остальные поля исходного запроса переходят в него без изменений. Запрос собирается через приватный конструктор, в котором все поля обязательны. Поэтому новое поле запроса не скомпилируется, пока его не перенесут в производный запрос.
+    - `IntentionCatalogViewModel._reconcileTypeCounts` проверяет принадлежность снимков по этому производному запросу и больше не собирает запрос по полям сам. Поведение чисел типов и выдачи не меняется.
+    - Тест контракта проверяет: производный запрос включает намерения обеих готовностей и сохраняет охват, фильтр названия, теги и исключённого участника, то есть исключает намерение, которое не проходит любое из этих условий.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/application/intention_contract_test.dart test/intention/presentation/catalog/intention_catalog_view_model_test.dart test/intention/presentation/catalog/intention_catalog_mutation_reconciliation_test.dart`.
+  - **Зависимости:** 1.7.
+  - **Предполагаемые файлы:** `lib/src/intention/application/intention_catalog.dart`, `lib/src/intention/presentation/catalog/intention_catalog_view_model.dart`, `test/intention/application/intention_contract_test.dart`.
+  - **Размер:** XS.
