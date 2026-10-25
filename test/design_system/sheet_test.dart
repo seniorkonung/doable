@@ -4,6 +4,7 @@ import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/design_system/doable_metrics.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -734,6 +735,7 @@ void main() {
                 text: 'Выберите сколько нужно',
                 expandLabel: _expandLabel,
                 collapseLabel: _collapseLabel,
+                compactHeight: SheetCompactHeight.limit,
                 pinned: const _Search(),
                 slivers: [
                   SliverList.builder(
@@ -774,6 +776,138 @@ void main() {
 
     expect(_sheetHeight(tester), _full);
     expect(overscrolls, 0);
+  });
+
+  testWidgets('лист с компактной высотой по содержимому без закреплённой '
+      'части следует за списком: короткий список даёт лист ниже предела без '
+      'пустого места, а добавленные строки поднимают его до предела, и он '
+      'остаётся компактным', (tester) async {
+    final rows = ValueNotifier(2);
+    addTearDown(rows.dispose);
+    await _openContentHeightSheet(tester, rows);
+
+    expect(
+      tester.getRect(find.text('Копия 0')).top,
+      tester.getRect(_header).bottom + DoableMetrics.space3,
+    );
+    expect(
+      tester.getRect(find.text('Готово')).top,
+      tester.getRect(find.text('Копия 1')).bottom + DoableMetrics.space3,
+    );
+    final short = _sheetHeight(tester);
+    expect(short, lessThan(_compact));
+    expect(tester.getRect(find.byType(Sheet)).bottom, _screen.height);
+
+    rows.value = 4;
+    await tester.pumpAndSettle();
+    expect(_sheetHeight(tester), short + 2 * 48);
+    expect(
+      tester.getRect(find.text('Готово')).top,
+      tester.getRect(find.text('Копия 3')).bottom + DoableMetrics.space3,
+    );
+
+    rows.value = 40;
+    await tester.pumpAndSettle();
+    expect(_sheetHeight(tester), _compact);
+    expect(
+      tester.getRect(find.text('Копия 0')).top,
+      tester.getRect(_header).bottom + DoableMetrics.space3,
+    );
+    expect(_bodyPosition(tester).maxScrollExtent, greaterThan(0));
+    expect(_topRadius(tester), DoableMetrics.radiusXl);
+    expect(find.bySemanticsLabel(_expandLabel), findsOne);
+    expect(_chevron, findsNothing);
+  });
+
+  testWidgets('лист с компактной высотой по содержимому раскрывается '
+      'перетаскиванием шапки вслед за пальцем при неподвижной нижней кнопке, '
+      'а вниз уходит вместе с ней', (tester) async {
+    final rows = ValueNotifier(2);
+    addTearDown(rows.dispose);
+    final sheet = await _openContentHeightSheet(tester, rows);
+    final compact = tester.getRect(find.byType(Sheet));
+    final footer = tester.getRect(find.text('Готово'));
+    final growth = _full - compact.height;
+
+    final up = await _SlowGesture.start(tester, _header);
+    for (final rise in [100.0, growth / 2, growth, growth + 60]) {
+      await up.moveTo(-rise);
+      expect(
+        tester.getRect(find.byType(Sheet)).top,
+        closeTo(compact.top - rise.clamp(0, growth), 1),
+        reason: 'подъём $rise',
+      );
+      expect(
+        tester.getRect(find.text('Готово')),
+        footer,
+        reason: 'подъём $rise',
+      );
+    }
+    await up.moveTo(-growth / 2 - 20);
+    await up.up();
+    await tester.pumpAndSettle();
+    expect(_sheetHeight(tester), _full);
+    expect(_chevron, findsOne);
+    expect(tester.getRect(find.text('Готово')), footer);
+
+    await tester.tap(find.bySemanticsLabel(_collapseLabel));
+    await tester.pumpAndSettle();
+    expect(tester.getRect(find.byType(Sheet)), compact);
+
+    final down = await _SlowGesture.start(tester, _header);
+    for (final depth in [60.0, compact.height * 0.8]) {
+      await down.moveTo(depth);
+      expect(
+        tester.getRect(find.byType(Sheet)).top,
+        closeTo(compact.top + depth, 1),
+        reason: 'глубина $depth',
+      );
+      expect(_sheetHeight(tester), compact.height, reason: 'глубина $depth');
+      expect(
+        tester.getRect(find.text('Готово')).top,
+        closeTo(footer.top + depth, 1),
+        reason: 'глубина $depth',
+      );
+    }
+    await down.up();
+    await tester.pumpAndSettle();
+    expect(find.byType(Sheet), findsNothing);
+    expect(sheet.isClosed, isTrue);
+  });
+
+  testWidgets('свайп вверх по короткому списку листа с компактной высотой по '
+      'содержимому раскрывает лист вслед за пальцем, а нижняя кнопка стоит '
+      'на месте', (tester) async {
+    final rows = ValueNotifier(2);
+    addTearDown(rows.dispose);
+    await _openContentHeightSheet(tester, rows);
+    final compact = tester.getRect(find.byType(Sheet));
+    final footer = tester.getRect(find.text('Готово'));
+    final growth = _full - compact.height;
+    final body = _bodyPosition(tester);
+
+    final gesture = await _SlowGesture.start(tester, find.text('Копия 1'));
+    // Первое движение список тратит на принятие жеста.
+    await gesture.moveTo(-20);
+    for (final rise in [100.0, growth]) {
+      await gesture.moveTo(-20 - rise);
+      expect(
+        tester.getRect(find.byType(Sheet)).top,
+        closeTo(compact.top - rise, 1),
+        reason: 'подъём $rise',
+      );
+      expect(
+        tester.getRect(find.text('Готово')),
+        footer,
+        reason: 'подъём $rise',
+      );
+      expect(body.pixels, 0, reason: 'подъём $rise');
+    }
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(_sheetHeight(tester), _full);
+    expect(tester.getRect(find.text('Готово')), footer);
   });
 
   testWidgets('scrollUp диктора над списком компактного листа прокручивает '
@@ -1474,6 +1608,7 @@ Future<void> _showExpandableSheet(
     text: 'Выберите сколько нужно',
     expandLabel: _expandLabel,
     collapseLabel: _collapseLabel,
+    compactHeight: SheetCompactHeight.limit,
     action: switch (onReset) {
       final onReset? => (
         label: 'Сбросить',
@@ -1491,6 +1626,37 @@ Future<void> _showExpandableSheet(
       ),
     ],
     footer: Button.primary(label: 'Готово', onPressed: onDone),
+  ),
+);
+
+/// Лист с компактной высотой по содержимому без закреплённой части, в
+/// списке которого [rows] строк.
+Future<_OpenedSheet> _openContentHeightSheet(
+  WidgetTester tester,
+  ValueListenable<int> rows,
+) => _openSheet(
+  tester,
+  (context) => showDoableSheet<void>(
+    context: context,
+    builder: (context, sheet) => ValueListenableBuilder(
+      valueListenable: rows,
+      builder: (context, count, _) => Sheet.expandable(
+        sheet,
+        title: 'Копии',
+        text: 'Выберите сколько нужно',
+        expandLabel: _expandLabel,
+        collapseLabel: _collapseLabel,
+        compactHeight: SheetCompactHeight.content,
+        slivers: [
+          SliverList.builder(
+            itemCount: count,
+            itemBuilder: (context, index) =>
+                SizedBox(height: 48, child: Text('Копия $index')),
+          ),
+        ],
+        footer: const SizedBox(height: 44, child: Text('Готово')),
+      ),
+    ),
   ),
 );
 

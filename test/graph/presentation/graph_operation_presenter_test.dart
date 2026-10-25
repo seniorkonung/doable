@@ -2026,6 +2026,7 @@ Future<void> _openExpandableMessagesSheet(BuildContext context) =>
         footer: const SizedBox(height: 44, child: Text('Готово')),
         expandLabel: 'Раскрыть',
         collapseLabel: 'Свернуть',
+        compactHeight: SheetCompactHeight.limit,
       ),
     );
 

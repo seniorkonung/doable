@@ -220,6 +220,7 @@ final class _TagsPanelState extends ConsumerState<_TagsPanel> {
         text: text,
         expandLabel: l10n.tagsPanelExpand,
         collapseLabel: l10n.tagsPanelCollapse,
+        compactHeight: SheetCompactHeight.limit,
         action: action,
         pinned: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,

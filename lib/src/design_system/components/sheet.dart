@@ -172,8 +172,8 @@ final class _SheetFrame extends StatelessWidget {
 final class _SheetExpansion {
   const _SheetExpansion({
     required this.controller,
-    required this.length,
-    required this.compactExtent,
+    required this.extents,
+    required this.inset,
     required this.isFull,
     required this.resize,
   });
@@ -181,11 +181,17 @@ final class _SheetExpansion {
   /// 0 — компактный размер, 1 — полный.
   final AnimationController controller;
 
+  /// Компактная и полная высота листа при последней раскладке.
+  final _ExpandableExtents extents;
+
+  /// Отступ открытой клавиатуры под листом.
+  final double inset;
+
   /// На сколько полный размер выше компактного; 0, когда листу некуда расти.
-  final double length;
+  double get length => extents.full - extents.compact;
 
   /// Высота, на которую маршрут уводит компактный лист при закрытии.
-  final double compactExtent;
+  double get compactExtent => extents.compact + inset;
 
   /// Размер, в котором лист стоит или к которому идёт.
   final bool isFull;
@@ -525,6 +531,9 @@ final class Sheet extends StatelessWidget {
 
   /// Лист компактной высоты, который раскрывается на весь экран.
   ///
+  /// [compactHeight] — компактная высота: весь предел или высота содержимого
+  /// в пределе. Рост содержимого лист не раскрывает: раскрывает его только
+  /// пользователь.
   /// Лист перетаскивается за шапку, [pinned], [footer] и список: выше
   /// компактного размера он растёт, а [footer] стоит на месте, ниже — уходит
   /// целиком. После отпускания он раскрывается, сворачивается или
@@ -532,10 +541,11 @@ final class Sheet extends StatelessWidget {
   /// размер. Касание затемнения и «назад» закрывают лист средствами Material
   /// маршрута [showDoableSheet].
   /// [slivers] — срезы тела, из которых лист сам строит прокручиваемый
-  /// список между [pinned] и [footer]. Список передаёт жест листу: в
+  /// список между шапкой и [footer]. Список передаёт жест листу: в
   /// компактном размере движение вверх сначала раскрывает лист, а движение
   /// вниз прокручивает список к началу, а от начала сворачивает и опускает
-  /// лист. Неподвижные части над списком передаются в [pinned].
+  /// лист. [pinned] — необязательные неподвижные части между шапкой и
+  /// списком; без них список следует сразу за шапкой.
   /// [expandLabel] и [collapseLabel] — доступные названия ручки.
   /// [action] — текстовая кнопка размера sm справа на строке заголовка,
   /// например «Сбросить»; заголовок при ней остаётся по центру.
@@ -543,15 +553,17 @@ final class Sheet extends StatelessWidget {
     this._presentation, {
     required this.title,
     required String text,
-    required Widget pinned,
+    required SheetCompactHeight compactHeight,
     required List<Widget> slivers,
     required Widget footer,
     required String expandLabel,
     required String collapseLabel,
+    Widget? pinned,
     SheetAction? action,
     super.key,
   }) : _parts = _ExpandableParts(
          text: text,
+         compactHeight: compactHeight,
          pinned: pinned,
          slivers: slivers,
          footer: footer,
@@ -663,6 +675,9 @@ final class _SheetLayout extends StatelessWidget {
         padding: _bottomPadding,
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          // Нижняя часть стоит внизу листа, даже когда содержимое над ней
+          // ниже его высоты.
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Flexible(child: head),
@@ -844,6 +859,19 @@ final class _RenderScaffoldFrame extends RenderProxyBox {
   }
 }
 
+/// Компактная высота раскрываемого листа.
+enum SheetCompactHeight {
+  /// Весь предел компактной высоты.
+  limit,
+
+  /// Высота содержимого листа, но не больше предела компактной высоты.
+  content,
+}
+
+/// Предел компактной высоты раскрываемого листа; лист не выше доступного
+/// места.
+const _compactLimit = 534.0;
+
 /// Части листа одного из двух вариантов.
 sealed class _SheetParts {
   const _SheetParts();
@@ -866,6 +894,7 @@ final class _ContentParts extends _SheetParts {
 final class _ExpandableParts extends _SheetParts {
   const _ExpandableParts({
     required this.text,
+    required this.compactHeight,
     required this.pinned,
     required this.slivers,
     required this.footer,
@@ -875,7 +904,8 @@ final class _ExpandableParts extends _SheetParts {
   });
 
   final String text;
-  final Widget pinned;
+  final SheetCompactHeight compactHeight;
+  final Widget? pinned;
 
   /// Срезы прокручиваемого списка тела.
   final List<Widget> slivers;
@@ -902,7 +932,7 @@ final class _ExpandableSheet extends StatefulWidget {
 
 final class _ExpandableSheetState extends State<_ExpandableSheet>
     with SingleTickerProviderStateMixin {
-  static const _compactLimit = 534.0;
+  final _extents = _ExpandableExtents();
 
   /// 0 — компактный размер, 1 — весь экран.
   late final _expansion = AnimationController(
@@ -998,84 +1028,194 @@ final class _ExpandableSheetState extends State<_ExpandableSheet>
             ],
           );
 
-    Widget content(ScrollController body) => _SheetLayout(
-      minimum: const EdgeInsets.symmetric(horizontal: DoableMetrics.space3),
-      head: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(bottom: DoableMetrics.space3),
-            child: header,
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: DoableMetrics.space2,
+    final pinned = parts.pinned;
+    final shrinkWrap = switch (parts.compactHeight) {
+      SheetCompactHeight.limit => false,
+      // Список высотой по содержимому даёт листу компактную высоту.
+      SheetCompactHeight.content => true,
+    };
+    Widget content(ScrollController body) {
+      final list = CustomScrollView(
+        controller: body,
+        // Список, который помещается целиком, тоже передаёт жест листу.
+        physics: const AlwaysScrollableScrollPhysics(),
+        shrinkWrap: shrinkWrap,
+        slivers: parts.slivers,
+      );
+      return _SheetLayout(
+        minimum: const EdgeInsets.symmetric(horizontal: DoableMetrics.space3),
+        head: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: DoableMetrics.space3),
+              child: header,
             ),
-            child: parts.pinned,
-          ),
-          const SizedBox(height: DoableMetrics.space2),
-          Expanded(
-            child: CustomScrollView(
-              controller: body,
-              // Список, который помещается целиком, тоже передаёт жест листу.
-              physics: const AlwaysScrollableScrollPhysics(),
-              slivers: parts.slivers,
-            ),
-          ),
-        ],
-      ),
-      footer: _Footer(child: parts.footer),
-    );
+            if (pinned != null) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: DoableMetrics.space2,
+                ),
+                child: pinned,
+              ),
+              const SizedBox(height: DoableMetrics.space2),
+            ],
+            if (shrinkWrap) Flexible(child: list) else Expanded(child: list),
+          ],
+        ),
+        footer: _Footer(child: parts.footer),
+      );
+    }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // Высота ограничена местом над клавиатурой: его отнимает
-        // _SheetFrame, а полный лист занимает всё оставшееся.
-        final full = constraints.maxHeight;
-        final compact = math.min(_compactLimit, full);
-        return _SheetMotion(
-          route: widget.route,
-          expansion: _SheetExpansion(
-            controller: _expansion,
-            length: full - compact,
-            compactExtent: compact + MediaQuery.viewInsetsOf(context).bottom,
-            isFull: _isFull,
-            resize: _resize,
-          ),
-          builder: (body) => AnimatedBuilder(
-            animation: _expansion,
-            builder: (context, child) {
-              final progress = _expansion.value;
-              final borderRadius = BorderRadius.vertical(
-                top: Radius.circular(
-                  lerpDouble(DoableMetrics.radiusXl, 0, progress)!,
+    return _SheetMotion(
+      route: widget.route,
+      expansion: _SheetExpansion(
+        controller: _expansion,
+        extents: _extents,
+        inset: MediaQuery.viewInsetsOf(context).bottom,
+        isFull: _isFull,
+        resize: _resize,
+      ),
+      builder: (body) => AnimatedBuilder(
+        animation: _expansion,
+        builder: (context, child) {
+          final progress = _expansion.value;
+          final borderRadius = BorderRadius.vertical(
+            top: Radius.circular(
+              lerpDouble(DoableMetrics.radiusXl, 0, progress)!,
+            ),
+          );
+          return _ExpandableFrame(
+            compactHeight: parts.compactHeight,
+            progress: progress,
+            extents: _extents,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: borderRadius,
+                boxShadow: BoxShadow.lerpList(
+                  shadows.shadowFloat,
+                  null,
+                  progress,
                 ),
-              );
-              return SizedBox(
-                height: lerpDouble(compact, full, progress),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    borderRadius: borderRadius,
-                    boxShadow: BoxShadow.lerpList(
-                      shadows.shadowFloat,
-                      null,
-                      progress,
-                    ),
-                  ),
-                  child: Material(
-                    color: colors.raised,
-                    borderRadius: borderRadius,
-                    clipBehavior: Clip.antiAlias,
-                    child: child,
-                  ),
-                ),
-              );
-            },
-            child: content(body),
-          ),
-        );
-      },
+              ),
+              child: Material(
+                color: colors.raised,
+                borderRadius: borderRadius,
+                clipBehavior: Clip.antiAlias,
+                child: child,
+              ),
+            ),
+          );
+        },
+        child: content(body),
+      ),
     );
+  }
+}
+
+/// Компактная и полная высота раскрываемого листа при последней раскладке.
+final class _ExpandableExtents {
+  var compact = 0.0;
+  var full = 0.0;
+}
+
+/// Ставит раскрываемый лист в высоту между компактной и полной по раскрытию
+/// [progress] и записывает обе высоты в [extents].
+///
+/// Полный лист занимает всё место над клавиатурой: его отнимает _SheetFrame.
+/// С [SheetCompactHeight.content] лист сначала раскладывается без строгой
+/// высоты в пределе, и занятая им высота — компактная; затем, если раскрыт,
+/// — повторно в свою высоту.
+final class _ExpandableFrame extends SingleChildRenderObjectWidget {
+  const _ExpandableFrame({
+    required this.compactHeight,
+    required this.progress,
+    required this.extents,
+    required super.child,
+  });
+
+  final SheetCompactHeight compactHeight;
+
+  /// 0 — компактный размер, 1 — полный.
+  final double progress;
+  final _ExpandableExtents extents;
+
+  @override
+  _RenderExpandableFrame createRenderObject(BuildContext context) =>
+      _RenderExpandableFrame(compactHeight, progress, extents);
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    _RenderExpandableFrame renderObject,
+  ) => renderObject
+    ..compactHeight = compactHeight
+    ..progress = progress
+    ..extents = extents;
+}
+
+final class _RenderExpandableFrame extends RenderProxyBox {
+  _RenderExpandableFrame(this._compactHeight, this._progress, this.extents);
+
+  _ExpandableExtents extents;
+
+  SheetCompactHeight _compactHeight;
+
+  set compactHeight(SheetCompactHeight value) {
+    if (value == _compactHeight) return;
+    _compactHeight = value;
+    markNeedsLayout();
+  }
+
+  double _progress;
+
+  set progress(double value) {
+    if (value == _progress) return;
+    _progress = value;
+    markNeedsLayout();
+  }
+
+  @override
+  Size computeDryLayout(BoxConstraints constraints) {
+    assert(
+      debugCannotComputeDryLayout(
+        reason: 'Компактная высота листа зависит от раскладки его содержимого.',
+      ),
+    );
+    return Size.zero;
+  }
+
+  @override
+  void performLayout() {
+    final sheet = child!;
+    final full = constraints.maxHeight;
+    final limit = math.min(_compactLimit, full);
+    // Ширина нестрогая, поэтому лист не становится границей раскладки, и
+    // изменение содержимого снова доходит до компактной высоты.
+    final width = constraints.maxWidth;
+    final double compact;
+    switch (_compactHeight) {
+      case SheetCompactHeight.limit:
+        compact = limit;
+      case SheetCompactHeight.content:
+        sheet.layout(
+          BoxConstraints(maxWidth: width, maxHeight: limit),
+          parentUsesSize: true,
+        );
+        compact = sheet.size.height;
+    }
+    extents
+      ..compact = compact
+      ..full = full;
+    final height = lerpDouble(compact, full, _progress)!;
+    if (_compactHeight == SheetCompactHeight.limit || height != compact) {
+      sheet.layout(
+        BoxConstraints(maxWidth: width, minHeight: height, maxHeight: height),
+        parentUsesSize: true,
+      );
+    }
+    size = constraints.constrain(sheet.size);
   }
 }
 
