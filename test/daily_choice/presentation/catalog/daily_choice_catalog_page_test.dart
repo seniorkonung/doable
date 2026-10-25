@@ -42,6 +42,7 @@ import 'daily_choice_catalog_page_test_support.dart';
 
 import '../../../support/in_memory_quick_creation_mode_store.dart';
 import '../../../support/quick_creation.dart';
+import '../../../support/intention_type_counts.dart';
 
 void main() {
   for (final onDate in [false, true]) {
@@ -1102,12 +1103,15 @@ final class _Repository
   @override
   Future<Result<IntentionCatalogPage>> getCatalogPage(
     IntentionCatalogQuery query,
-  ) async => ResultSuccess(
-    IntentionCatalogFirstPage(
-      items: const [],
-      totalCount: 0,
-      nextCursor: null,
-      revision: const _Revision(),
+  ) async => answerCatalogQuery(
+    query,
+    ResultSuccess(
+      IntentionCatalogFirstPage(
+        items: const [],
+        totalCount: 0,
+        nextCursor: null,
+        revision: const _Revision(),
+      ),
     ),
   );
 

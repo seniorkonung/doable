@@ -36,6 +36,7 @@ import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/statistics_read_contract_test_fallback.dart';
 import '../../../support/intention_description_preview.dart';
 import '../../../support/intention_title_order_key.dart';
+import '../../../support/intention_type_counts.dart';
 
 final class ControlledCatalogRepository
     with StatisticsReadContractTestFallback, TagReadContractTestFallback
@@ -118,7 +119,7 @@ final class ControlledCatalogRepository
   IntentionCatalogQuery queryAt(int index) => queries[index];
 
   void complete(int index, Result<IntentionCatalogPage> result) {
-    _requests[index].complete(result);
+    _requests[index].complete(answerCatalogQuery(queries[index], result));
   }
 
   void completeCommand(int index, Result<IntentionCommandSuccess> result) {
