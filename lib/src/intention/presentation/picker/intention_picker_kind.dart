@@ -18,11 +18,6 @@ enum IntentionPickerKind {
     intention => l10n.intentionPickerIntentionTitle,
   };
 
-  String header(AppLocalizations l10n) => switch (this) {
-    action => l10n.intentionPickerActionsHeader,
-    intention => l10n.intentionPickerIntentionsHeader,
-  };
-
   String loading(AppLocalizations l10n) => switch (this) {
     action => l10n.actionPickerLoading,
     intention => l10n.catalogLoading,

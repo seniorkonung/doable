@@ -2294,6 +2294,27 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get intentionPickerAllHeader => 'All';
+
+  @override
+  String get intentionPickerOrderCreatedNewest => 'Created, newest first';
+
+  @override
+  String get intentionPickerOrderCreatedOldest => 'Created, oldest first';
+
+  @override
+  String get intentionPickerOrderUpdatedNewest => 'Changed, newest first';
+
+  @override
+  String get intentionPickerOrderUpdatedOldest => 'Changed, oldest first';
+
+  @override
+  String get intentionPickerOrderTitleAscending => 'Name, A to Z';
+
+  @override
+  String get intentionPickerOrderTitleDescending => 'Name, Z to A';
+
+  @override
   String get intentionPickerActionsHeader => 'Actions';
 
   @override

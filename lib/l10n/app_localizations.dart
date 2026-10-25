@@ -3580,6 +3580,48 @@ abstract class AppLocalizations {
   /// **'Open the page of intention {title}'**
   String intentionPickerOpenIntentionPage(String title);
 
+  /// Показываемый тип без ограничения в заголовке списка поиска для выбора
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get intentionPickerAllHeader;
+
+  /// Сводка сортировки в заголовке списка поиска для выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Created, newest first'**
+  String get intentionPickerOrderCreatedNewest;
+
+  /// Сводка сортировки в заголовке списка поиска для выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Created, oldest first'**
+  String get intentionPickerOrderCreatedOldest;
+
+  /// Сводка сортировки в заголовке списка поиска для выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Changed, newest first'**
+  String get intentionPickerOrderUpdatedNewest;
+
+  /// Сводка сортировки в заголовке списка поиска для выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Changed, oldest first'**
+  String get intentionPickerOrderUpdatedOldest;
+
+  /// Сводка сортировки в заголовке списка поиска для выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Name, A to Z'**
+  String get intentionPickerOrderTitleAscending;
+
+  /// Сводка сортировки в заголовке списка поиска для выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Name, Z to A'**
+  String get intentionPickerOrderTitleDescending;
+
   /// Заголовок выдачи поиска действия на экране выбора
   ///
   /// In en, this message translates to:

@@ -459,7 +459,7 @@ void _defineTagSearchTests() {
       find.byWidgetPredicate(
         (widget) =>
             widget is CatalogHeader &&
-            widget.title == 'Intentions' &&
+            widget.title == 'All' &&
             widget.count == 4,
       ),
       findsOneWidget,

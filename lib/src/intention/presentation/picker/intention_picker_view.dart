@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
+import '../../../design_system/components/catalog_header.dart';
 import '../../../design_system/components/filter_button.dart';
 import '../../../design_system/components/search_field.dart';
 import '../../../design_system/components/top_bar.dart';
@@ -21,7 +22,7 @@ import 'intention_picker_kind.dart';
 import 'intention_picker_results.dart';
 
 /// Экран выбора намерения назначения [purpose]: крестик с заголовком, поле
-/// поиска по названию и кнопка фильтра по тегам закреплены над выдачей.
+/// поиска, фильтр по тегам и заголовок списка закреплены над выдачей.
 ///
 /// Экран не знает маршрутов, права запуска и типа результата: о закрытии,
 /// выборе и открытии подробностей страница узнаёт из обработчиков.
@@ -75,7 +76,15 @@ final class _IntentionPickerViewState
     final catalogProvider = intentionCatalogViewModelProvider(widget.purpose);
     final catalog = ref.watch(catalogProvider);
     final notifier = ref.read(catalogProvider.notifier);
-    final selection = catalog.value?.selection ?? notifier.selection;
+    final selection = notifier.selection;
+    final count = switch (catalog) {
+      AsyncData(
+        isLoading: false,
+        value: IntentionCatalogConfirmedState(:final totalCount),
+      ) =>
+        totalCount,
+      _ => null,
+    };
     final conditionsProvider = intentionTagConditionsViewModelProvider(
       widget.purpose,
     );
@@ -95,11 +104,11 @@ final class _IntentionPickerViewState
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              // Нижний отступ отделяет ряд от списка, который обрезается под
-              // ним.
-              padding: const EdgeInsets.symmetric(
-                horizontal: DoableMetrics.space5,
-                vertical: DoableMetrics.space2,
+              padding: const EdgeInsets.fromLTRB(
+                DoableMetrics.space5,
+                DoableMetrics.space2,
+                DoableMetrics.space5,
+                DoableMetrics.space1,
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -138,6 +147,27 @@ final class _IntentionPickerViewState
                 ],
               ),
             ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                DoableMetrics.space5,
+                0,
+                DoableMetrics.space5,
+                DoableMetrics.space1,
+              ),
+              child: CatalogHeader(
+                title: switch (selection.type) {
+                  IntentionTypeOpen(selected: IntentionTypeChoice.all) ||
+                  IntentionTypeNotOffered() => l10n.intentionPickerAllHeader,
+                  IntentionTypeOpen(selected: IntentionTypeChoice.intentions) =>
+                    l10n.intentionPickerIntentionsHeader,
+                  IntentionTypeOpen(selected: IntentionTypeChoice.actions) ||
+                  IntentionTypePinnedToActions() =>
+                    l10n.intentionPickerActionsHeader,
+                },
+                count: count,
+                summary: _orderSummary(l10n, selection.order),
+              ),
+            ),
             Expanded(
               child: IntentionPickerResults(
                 purpose: widget.purpose,
@@ -157,3 +187,33 @@ final class _IntentionPickerViewState
     );
   }
 }
+
+String _orderSummary(
+  AppLocalizations l10n,
+  IntentionCatalogOrder order,
+) => switch ((order.field, order.direction)) {
+  (
+    IntentionCatalogSortField.createdAt,
+    IntentionCatalogSortDirection.descending,
+  ) =>
+    l10n.intentionPickerOrderCreatedNewest,
+  (
+    IntentionCatalogSortField.createdAt,
+    IntentionCatalogSortDirection.ascending,
+  ) =>
+    l10n.intentionPickerOrderCreatedOldest,
+  (
+    IntentionCatalogSortField.updatedAt,
+    IntentionCatalogSortDirection.descending,
+  ) =>
+    l10n.intentionPickerOrderUpdatedNewest,
+  (
+    IntentionCatalogSortField.updatedAt,
+    IntentionCatalogSortDirection.ascending,
+  ) =>
+    l10n.intentionPickerOrderUpdatedOldest,
+  (IntentionCatalogSortField.title, IntentionCatalogSortDirection.ascending) =>
+    l10n.intentionPickerOrderTitleAscending,
+  (IntentionCatalogSortField.title, IntentionCatalogSortDirection.descending) =>
+    l10n.intentionPickerOrderTitleDescending,
+};

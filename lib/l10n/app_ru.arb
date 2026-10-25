@@ -619,6 +619,13 @@
   "@intentionPickerOpenIntentionPage": {
     "placeholders": {"title": {"type": "String"}}
   },
+  "intentionPickerAllHeader": "Все",
+  "intentionPickerOrderCreatedNewest": "Создание, сначала новые",
+  "intentionPickerOrderCreatedOldest": "Создание, сначала старые",
+  "intentionPickerOrderUpdatedNewest": "Изменение, сначала новые",
+  "intentionPickerOrderUpdatedOldest": "Изменение, сначала старые",
+  "intentionPickerOrderTitleAscending": "Название, от А до Я",
+  "intentionPickerOrderTitleDescending": "Название, от Я до А",
   "intentionPickerActionsHeader": "Действия",
   "intentionPickerIntentionsHeader": "Намерения",
   "intentionPickerLoadingMoreActions": "Загружаем ещё действия",

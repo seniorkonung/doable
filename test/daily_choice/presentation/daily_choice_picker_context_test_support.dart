@@ -88,7 +88,8 @@ void defineDailyChoicePickerContextTests({
           (widget) =>
               widget is CatalogHeader &&
               widget.title == ruTexts.header &&
-              widget.count == 13,
+              widget.count == 13 &&
+              widget.summary == 'Создание, сначала новые',
         ),
         findsOneWidget,
       );

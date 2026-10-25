@@ -9,6 +9,8 @@ import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import 'package:doable/src/intention/presentation/picker/intention_picker_view.dart';
 import 'package:doable/src/tag/domain/tag.dart';
@@ -58,6 +60,98 @@ void main() {
         'participant-picker',
       ),
     ]) {
+      testWidgets(
+        '${locale.languageCode}: $keyPrefix показывает текущие тип и сортировку без прежнего числа до подтверждения новой выдачи',
+        (tester) async {
+          final ru = locale.languageCode == 'ru';
+          final pinned = purpose is SelectDailyChoiceAction;
+          final initialTitle = pinned
+              ? (ru ? 'Действия' : 'Actions')
+              : (ru ? 'Все' : 'All');
+          final initialSummary = ru
+              ? 'Создание, сначала новые'
+              : 'Created, newest first';
+          final h = await _open(tester, locale: locale, purpose: purpose);
+          final notifier = h.container.read(
+            intentionCatalogViewModelProvider(purpose).notifier,
+          );
+
+          expect(_header(initialTitle, null), findsOneWidget);
+          expect(find.text(initialSummary), findsOneWidget);
+          h.repository.complete(0, _firstPage(_actions(3), totalCount: 13));
+          await tester.pump();
+          await tester.pump();
+          expect(_header(initialTitle, 13), findsOneWidget);
+
+          if (!pinned) {
+            notifier.changeType(IntentionTypeChoice.intentions);
+            await tester.pump();
+            expect(
+              _header(ru ? 'Намерения' : 'Intentions', null),
+              findsOneWidget,
+            );
+            expect(find.text(initialSummary), findsOneWidget);
+            h.repository.complete(
+              h.repository.queries.length - 1,
+              _firstPage(const []),
+            );
+            await tester.pumpAndSettle();
+            expect(_header(ru ? 'Намерения' : 'Intentions', 0), findsOneWidget);
+            notifier.changeType(IntentionTypeChoice.actions);
+            await tester.pump();
+            expect(_header(ru ? 'Действия' : 'Actions', null), findsOneWidget);
+            h.repository.complete(
+              h.repository.queries.length - 1,
+              _firstPage(_actions(2)),
+            );
+            await tester.pumpAndSettle();
+          }
+
+          for (final (order, ruSummary, enSummary) in [
+            (
+              IntentionCatalogOrder.createdAtAscending,
+              'Создание, сначала старые',
+              'Created, oldest first',
+            ),
+            (
+              IntentionCatalogOrder.updatedAtAscending,
+              'Изменение, сначала старые',
+              'Changed, oldest first',
+            ),
+            (
+              IntentionCatalogOrder.updatedAtDescending,
+              'Изменение, сначала новые',
+              'Changed, newest first',
+            ),
+            (
+              IntentionCatalogOrder.titleAscending,
+              'Название, от А до Я',
+              'Name, A to Z',
+            ),
+            (
+              IntentionCatalogOrder.titleDescending,
+              'Название, от Я до А',
+              'Name, Z to A',
+            ),
+          ]) {
+            notifier.changeOrder(order);
+            await tester.pump();
+            expect(_header(ru ? 'Действия' : 'Actions', null), findsOneWidget);
+            expect(find.text(ru ? ruSummary : enSummary), findsOneWidget);
+          }
+          h.repository.complete(
+            h.repository.queries.length - 1,
+            const ResultFailure(IntentionUnavailableFailure()),
+          );
+          await tester.pumpAndSettle();
+          expect(_header(ru ? 'Действия' : 'Actions', null), findsOneWidget);
+          expect(
+            find.text(ru ? 'Название, от Я до А' : 'Name, Z to A'),
+            findsOneWidget,
+          );
+        },
+      );
+
       testWidgets('${locale.languageCode}: шапка «$title» с крестиком, '
           'который закрывает экран', (tester) async {
         final semantics = tester.ensureSemantics();
@@ -150,7 +244,7 @@ void main() {
       const Locale('ru'),
       (
         actions: 'Действия',
-        intentions: 'Намерения',
+        intentions: 'Все',
         byTitle: (
           'Нет действий с таким названием',
           'Попробуйте название короче.',
@@ -171,7 +265,7 @@ void main() {
       const Locale('en'),
       (
         actions: 'Actions',
-        intentions: 'Intentions',
+        intentions: 'All',
         byTitle: ('No actions with this name', 'Try a shorter name.'),
         byTags: (
           'No actions match these tags',
@@ -307,28 +401,35 @@ void main() {
     });
   }
 
-  testWidgets('поле поиска и кнопка фильтра остаются на месте при прокрутке, '
-      'а заголовок выдачи уходит вверх вместе со строками', (tester) async {
-    final h = await _open(tester);
-    h.repository.complete(0, _firstPage(_actions(20)));
-    await tester.pumpAndSettle();
-    final field = tester.getRect(_actionField);
-    final button = tester.getRect(_filterButton);
-    final header = tester.getRect(find.byType(CatalogHeader));
-    final listTop = tester.getRect(_list).top;
-    expect(listTop, field.bottom + 8);
+  testWidgets(
+    'поле поиска, фильтр и заголовок исходного намерения остаются на месте при прокрутке',
+    (tester) async {
+      final h = await _open(
+        tester,
+        purpose: SelectDailyChoiceSource(session: IntentionSearchSession()),
+      );
+      h.repository.complete(0, _firstPage(_actions(20)));
+      await tester.pumpAndSettle();
+      final sourceField = find.byKey(
+        const ValueKey('daily-choice-source-filter'),
+      );
+      final sourceList = find.byKey(
+        const PageStorageKey<String>('daily-choice-source-list'),
+      );
+      final field = tester.getRect(sourceField);
+      final button = tester.getRect(_filterButton);
+      final header = tester.getRect(find.byType(CatalogHeader));
+      expect(header.top, field.bottom + 4);
+      expect(_header('Все', 20), findsOneWidget);
 
-    await tester.drag(_list, const Offset(0, -300));
-    await tester.pumpAndSettle();
+      await tester.drag(sourceList, const Offset(0, -300));
+      await tester.pumpAndSettle();
 
-    expect(tester.getRect(_actionField), field);
-    expect(tester.getRect(_filterButton), button);
-    expect(tester.getRect(_list).top, listTop);
-    expect(
-      tester.getRect(find.byType(CatalogHeader, skipOffstage: false)).top,
-      lessThan(header.top),
-    );
-  });
+      expect(tester.getRect(sourceField), field);
+      expect(tester.getRect(_filterButton), button);
+      expect(tester.getRect(find.byType(CatalogHeader)), header);
+    },
+  );
 
   for (final (locale, error) in [
     (const Locale('ru'), 'Используйте не более 255 символов.'),
@@ -341,6 +442,11 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.enterText(_actionField, 'а' * 256);
+      await tester.pump();
+      expect(
+        _header(locale.languageCode == 'ru' ? 'Действия' : 'Actions', null),
+        findsOneWidget,
+      );
       await tester.pump(const Duration(milliseconds: 300));
       await tester.pumpAndSettle();
 
@@ -348,7 +454,10 @@ void main() {
         find.descendant(of: _actionField, matching: find.text(error)),
         findsOneWidget,
       );
-      expect(find.byType(CatalogHeader), findsNothing);
+      expect(
+        _header(locale.languageCode == 'ru' ? 'Действия' : 'Actions', null),
+        findsOneWidget,
+      );
       expect(find.byWidgetPredicate((w) => w is ListState), findsNothing);
       expect(find.text('Действие 1'), findsNothing);
     });
@@ -411,7 +520,7 @@ void main() {
 Finder _title(String text) =>
     find.descendant(of: find.byType(TopBar), matching: find.text(text));
 
-Finder _header(String title, int count) => find.byWidgetPredicate(
+Finder _header(String title, int? count) => find.byWidgetPredicate(
   (widget) =>
       widget is CatalogHeader && widget.title == title && widget.count == count,
 );
@@ -437,15 +546,19 @@ List<IntentionSummary> _actions(int count) => [
   for (var index = count; index >= 1; index--) _action(index),
 ];
 
-Result<IntentionCatalogPage> _firstPage(List<IntentionSummary> items) =>
-    ResultSuccess(
-      IntentionCatalogFirstPage(
-        items: items,
-        totalCount: items.length,
-        nextCursor: null,
-        revision: const TestCatalogRevision(1),
-      ),
-    );
+Result<IntentionCatalogPage> _firstPage(
+  List<IntentionSummary> items, {
+  int? totalCount,
+}) => ResultSuccess(
+  IntentionCatalogFirstPage(
+    items: items,
+    totalCount: totalCount ?? items.length,
+    nextCursor: (totalCount ?? items.length) > items.length
+        ? const TestCatalogCursor()
+        : null,
+    revision: const TestCatalogRevision(1),
+  ),
+);
 
 Tag _tag(int number, String name) => Tag(
   id: (TagId.decode(

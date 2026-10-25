@@ -68,6 +68,16 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   );
 
   @override
+  bool updateShouldNotify(
+    AsyncValue<IntentionCatalogState> previous,
+    AsyncValue<IntentionCatalogState> next,
+  ) =>
+      // Во время повторной загрузки selection уже меняется, хотя AsyncValue
+      // ещё хранит ту же прежнюю выдачу.
+      previous.isLoading && next.isLoading ||
+      super.updateShouldNotify(previous, next);
+
+  @override
   Future<IntentionCatalogState> build(IntentionCatalogPurpose purpose) {
     _purpose = purpose;
     // Новое поколение графа открывает каталог с начальными параметрами, как

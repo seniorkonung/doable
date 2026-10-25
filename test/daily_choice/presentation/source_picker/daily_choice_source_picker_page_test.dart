@@ -31,7 +31,7 @@ void main() {
     readinessFilter: IntentionReadinessFilter.all,
     ruTexts: (
       title: 'Выбор намерения',
-      header: 'Намерения',
+      header: 'Все',
       auxiliaryCancel: 'Отменить выбор намерения',
     ),
     emptyMessage: 'No active intentions are available.',
@@ -46,7 +46,7 @@ void main() {
         IntentionReadiness.ready,
         IntentionReadiness.notReady,
       ],
-      header: 'Intentions',
+      header: 'All',
       unavailableMessage: 'Intentions couldn’t be loaded. Try again.',
     ),
   );

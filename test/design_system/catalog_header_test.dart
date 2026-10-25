@@ -1,5 +1,6 @@
 import 'package:doable/src/design_system/components/catalog_header.dart';
 import 'package:doable/src/design_system/doable_colors.dart';
+import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/design_system/doable_metrics.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/design_system/doable_type.dart';
@@ -18,7 +19,11 @@ void main() {
       await tester.pumpWidget(
         _app(
           brightness: brightness,
-          header: const CatalogHeader(title: 'Действия', count: 0),
+          header: const CatalogHeader(
+            title: 'Действия',
+            count: 0,
+            summary: 'Создание, сначала новые',
+          ),
         ),
       );
 
@@ -45,6 +50,31 @@ void main() {
           borderRadius: BorderRadius.circular(DoableMetrics.radiusSm),
         ),
       );
+
+      final pill = find.ancestor(
+        of: find.text('Создание, сначала новые'),
+        matching: find.byType(DecoratedBox),
+      );
+      expect(tester.getSize(pill).height, 32);
+      expect(
+        tester.getRect(pill).right,
+        tester.getRect(find.byType(CatalogHeader)).right,
+      );
+      expect(
+        (tester.widget<DecoratedBox>(pill).decoration as BoxDecoration).color,
+        colors.fill,
+      );
+      final icon = tester.widget<DoableIcon>(find.byType(DoableIcon));
+      expect(icon.icon, DoableIconData.sliders);
+      expect(icon.size, 16);
+      expect(icon.color, colors.muted);
+      final summaryStyle = _style(tester, 'Создание, сначала новые');
+      expect(summaryStyle.color, colors.ink);
+      expect(summaryStyle.fontSize, DoableType.caption.fontSize);
+      expect(
+        tester.widget<Text>(find.text('Создание, сначала новые')).maxLines,
+        1,
+      );
     });
   }
 
@@ -52,7 +82,13 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      _app(header: const CatalogHeader(title: 'Намерения', count: 1234)),
+      _app(
+        header: const CatalogHeader(
+          title: 'Намерения',
+          count: 1234,
+          summary: 'Название, от А до Я',
+        ),
+      ),
     );
 
     final chip = tester.getRect(_chip);
@@ -67,7 +103,13 @@ void main() {
       'него', (tester) async {
     final semantics = tester.ensureSemantics();
     await tester.pumpWidget(
-      _app(header: const CatalogHeader(title: 'Действия', count: 13)),
+      _app(
+        header: const CatalogHeader(
+          title: 'Действия',
+          count: 13,
+          summary: 'Создание, сначала новые',
+        ),
+      ),
     );
 
     expect(
@@ -87,7 +129,11 @@ void main() {
     await tester.pumpWidget(
       _app(
         textScale: 2,
-        header: const CatalogHeader(title: 'Намерения', count: 13),
+        header: const CatalogHeader(
+          title: 'Намерения',
+          count: 13,
+          summary: 'Изменение, сначала старые — длинная сводка сортировки',
+        ),
       ),
     );
 
@@ -97,10 +143,35 @@ void main() {
     expect(chip.height, greaterThanOrEqualTo(count.height));
     expect(chip.contains(count.topLeft) && chip.contains(count.center), isTrue);
   });
+
+  testWidgets(
+    'до подтверждения выдачи заголовок и сортировка видны без плашки числа',
+    (tester) async {
+      await tester.pumpWidget(
+        _app(
+          header: const CatalogHeader(
+            title: 'Все',
+            summary: 'Название, от А до Я',
+          ),
+        ),
+      );
+
+      expect(find.text('Все'), findsOneWidget);
+      expect(find.text('Название, от А до Я'), findsOneWidget);
+      expect(
+        tester
+            .renderObject<RenderParagraph>(find.text('Название, от А до Я'))
+            .didExceedMaxLines,
+        isFalse,
+      );
+      expect(_chip, findsNothing);
+      expect(find.text('0'), findsNothing);
+    },
+  );
 }
 
-final _chip = find.descendant(
-  of: find.byType(CatalogHeader),
+final _chip = find.ancestor(
+  of: find.textContaining(RegExp(r'^\d+$')),
   matching: find.byType(DecoratedBox),
 );
 

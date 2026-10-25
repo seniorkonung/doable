@@ -100,42 +100,9 @@ void main() {
       expect(_listState, findsNothing);
       expect(find.byType(CatalogHeader), findsNothing);
     });
-
-    testWidgets('поиск исходного намерения называет выдачу «Намерения»', (
-      tester,
-    ) async {
-      final h = await _open(
-        tester,
-        purpose: SelectDailyChoiceSource(session: IntentionSearchSession()),
-      );
-
-      h.repository.complete(0, _firstPage(const []));
-      await _settle(tester);
-
-      expect(_header('Намерения', 0), findsOneWidget);
-    });
   });
 
   group('загруженная выдача', () {
-    testWidgets('заголовок показывает точное количество совпадений, '
-        'а не число загруженных строк', (tester) async {
-      final h = await _open(tester, pageSize: 3);
-
-      h.repository.complete(0, _firstPage(_actions(3), totalCount: 13));
-      await _settle(tester);
-
-      expect(_header('Действия', 13), findsOneWidget);
-      expect(_list, findsOneWidget);
-      expect(
-        find.byKey(
-          ValueKey(
-            'daily-choice-action-${_actions(3).first.id.toCanonicalString()}',
-          ),
-        ),
-        findsOneWidget,
-      );
-    });
-
     testWidgets('построенные строки подгружают порции, а кольцо подгрузки '
         'стоит в конце, только пока есть следующая порция', (tester) async {
       final h = await _open(tester, pageSize: 2);
@@ -226,7 +193,6 @@ void main() {
       await _settle(tester);
 
       expect(h.position.pixels, 0);
-      expect(_header('Действия', 30), findsOneWidget);
     });
   });
 
@@ -301,11 +267,6 @@ final _listState = find.byWidgetPredicate((widget) => widget is ListState);
 
 Finder _loading(String text) =>
     find.descendant(of: _listState, matching: find.text(text));
-
-Finder _header(String title, int count) => find.byWidgetPredicate(
-  (widget) =>
-      widget is CatalogHeader && widget.title == title && widget.count == count,
-);
 
 /// Готовые к действию сводки в порядке выдачи: от новых к старым.
 List<IntentionSummary> _actions(int count) => [

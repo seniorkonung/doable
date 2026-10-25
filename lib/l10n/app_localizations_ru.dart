@@ -2318,6 +2318,27 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
+  String get intentionPickerAllHeader => 'Все';
+
+  @override
+  String get intentionPickerOrderCreatedNewest => 'Создание, сначала новые';
+
+  @override
+  String get intentionPickerOrderCreatedOldest => 'Создание, сначала старые';
+
+  @override
+  String get intentionPickerOrderUpdatedNewest => 'Изменение, сначала новые';
+
+  @override
+  String get intentionPickerOrderUpdatedOldest => 'Изменение, сначала старые';
+
+  @override
+  String get intentionPickerOrderTitleAscending => 'Название, от А до Я';
+
+  @override
+  String get intentionPickerOrderTitleDescending => 'Название, от Я до А';
+
+  @override
   String get intentionPickerActionsHeader => 'Действия';
 
   @override

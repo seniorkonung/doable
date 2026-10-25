@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
-import '../../../design_system/components/catalog_header.dart';
 import '../../../design_system/components/empty_state.dart';
 import '../../../design_system/components/list_state.dart';
 import '../../../design_system/doable_icon.dart';
@@ -18,8 +17,8 @@ import '../catalog/intention_catalog_view_model.dart';
 import 'intention_picker_kind.dart';
 import 'intention_picker_row.dart';
 
-/// Выдача экрана выбора назначения [purpose]: заголовок с количеством,
-/// строки, подгрузка следующей порции, пустая выдача и отказы.
+/// Выдача экрана выбора назначения [purpose]: строки, подгрузка следующей
+/// порции, пустая выдача и отказы.
 ///
 /// Пустая выдача из-за фильтра называет его причину и предлагает сбросить
 /// фильтры.
@@ -108,7 +107,7 @@ final class _IntentionPickerResultsState
         ),
         IntentionCatalogInvalidFilter() => const SizedBox.shrink(),
         final IntentionCatalogLoaded loaded => _loaded(l10n, kind, loaded),
-        final IntentionCatalogEmpty empty => _list(kind, empty, [
+        final IntentionCatalogEmpty empty => _list([
           SliverFillRemaining(
             hasScrollBody: false,
             child: _empty(l10n, kind, empty.query),
@@ -142,7 +141,7 @@ final class _IntentionPickerResultsState
   ) {
     final rows = loaded.items.length;
     final continuation = _continuation(l10n, kind, loaded);
-    return _list(kind, loaded, [
+    return _list([
       // Продолжение — последний элемент ленивого списка: кольцо подгрузки
       // строится, только когда конец выдачи подходит к экрану, иначе его
       // анимация требовала бы кадров непрерывно.
@@ -206,30 +205,12 @@ final class _IntentionPickerResultsState
   Widget _status(ListState state) =>
       ListView(padding: _sidePadding, children: [state]);
 
-  Widget _list(
-    IntentionPickerKind kind,
-    IntentionCatalogConfirmedState results,
-    List<Widget> slivers,
-  ) => CustomScrollView(
+  Widget _list(List<Widget> slivers) => CustomScrollView(
     key: PageStorageKey<String>(
       '${intentionPickerKeyPrefix(widget.purpose)}-list',
     ),
     controller: _scrollController,
     slivers: [
-      SliverPadding(
-        padding: _sidePadding,
-        sliver: SliverToBoxAdapter(
-          child: Container(
-            constraints: const BoxConstraints(minHeight: 32),
-            margin: const EdgeInsets.only(bottom: DoableMetrics.space1),
-            alignment: AlignmentDirectional.centerStart,
-            child: CatalogHeader(
-              title: kind.header(AppLocalizations.of(context)),
-              count: results.totalCount,
-            ),
-          ),
-        ),
-      ),
       SliverPadding(
         padding: _sidePadding.copyWith(bottom: DoableMetrics.space10),
         sliver: SliverMainAxisGroup(slivers: slivers),

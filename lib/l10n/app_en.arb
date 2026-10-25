@@ -1854,6 +1854,34 @@
     "description": "Доступное название стрелки строки экрана выбора, которая открывает страницу намерения",
     "placeholders": {"title": {"type": "String"}}
   },
+  "intentionPickerAllHeader": "All",
+  "@intentionPickerAllHeader": {
+    "description": "Показываемый тип без ограничения в заголовке списка поиска для выбора"
+  },
+  "intentionPickerOrderCreatedNewest": "Created, newest first",
+  "@intentionPickerOrderCreatedNewest": {
+    "description": "Сводка сортировки в заголовке списка поиска для выбора"
+  },
+  "intentionPickerOrderCreatedOldest": "Created, oldest first",
+  "@intentionPickerOrderCreatedOldest": {
+    "description": "Сводка сортировки в заголовке списка поиска для выбора"
+  },
+  "intentionPickerOrderUpdatedNewest": "Changed, newest first",
+  "@intentionPickerOrderUpdatedNewest": {
+    "description": "Сводка сортировки в заголовке списка поиска для выбора"
+  },
+  "intentionPickerOrderUpdatedOldest": "Changed, oldest first",
+  "@intentionPickerOrderUpdatedOldest": {
+    "description": "Сводка сортировки в заголовке списка поиска для выбора"
+  },
+  "intentionPickerOrderTitleAscending": "Name, A to Z",
+  "@intentionPickerOrderTitleAscending": {
+    "description": "Сводка сортировки в заголовке списка поиска для выбора"
+  },
+  "intentionPickerOrderTitleDescending": "Name, Z to A",
+  "@intentionPickerOrderTitleDescending": {
+    "description": "Сводка сортировки в заголовке списка поиска для выбора"
+  },
   "intentionPickerActionsHeader": "Actions",
   "@intentionPickerActionsHeader": {
     "description": "Заголовок выдачи поиска действия на экране выбора"
