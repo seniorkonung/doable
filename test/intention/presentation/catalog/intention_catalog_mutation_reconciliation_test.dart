@@ -284,234 +284,270 @@ void main() {
     },
   );
 
-  test(
-    'сохраняет глобальный порядок и границу во всех четырёх порядках',
-    () async {
-      final scenarios =
-          <
-            ({
-              IntentionCatalogOrder order,
-              int firstPosition,
-              int boundaryPosition,
-              int remainingPosition,
-              int insidePosition,
-              int outsidePosition,
-              int movedInsidePosition,
-              int movedOutsidePosition,
-            })
-          >[
-            (
-              order: IntentionCatalogOrder.createdAtAscending,
-              firstPosition: 1,
-              boundaryPosition: 2,
-              remainingPosition: 3,
-              insidePosition: 0,
-              outsidePosition: 4,
-              movedInsidePosition: -1,
-              movedOutsidePosition: 5,
-            ),
-            (
-              order: IntentionCatalogOrder.createdAtDescending,
-              firstPosition: 5,
-              boundaryPosition: 4,
-              remainingPosition: 3,
-              insidePosition: 6,
-              outsidePosition: 2,
-              movedInsidePosition: 7,
-              movedOutsidePosition: 1,
-            ),
-            (
-              order: IntentionCatalogOrder.updatedAtAscending,
-              firstPosition: 1,
-              boundaryPosition: 2,
-              remainingPosition: 3,
-              insidePosition: 0,
-              outsidePosition: 4,
-              movedInsidePosition: -1,
-              movedOutsidePosition: 5,
-            ),
-            (
-              order: IntentionCatalogOrder.updatedAtDescending,
-              firstPosition: 5,
-              boundaryPosition: 4,
-              remainingPosition: 3,
-              insidePosition: 6,
-              outsidePosition: 2,
-              movedInsidePosition: 7,
-              movedOutsidePosition: 1,
-            ),
-          ];
-
-      for (final scenario in scenarios) {
-        final repository = ControlledCatalogRepository();
-        final container = reconciliationCatalogContainer(
-          repository,
-          pageSize: 2,
-          prefetchRemaining: 1,
-        );
-        final subscription = container.listen(
-          intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
-          (_, _) {},
-          fireImmediately: true,
-        );
-        final notifier = container.read(
-          intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
-              .notifier,
-        );
-        if (scenario.order != IntentionCatalogOrder.createdAtDescending) {
-          notifier.changeOrder(scenario.order);
-          await waitForCatalogQueries(repository, 2);
-        }
-        final firstPageIndex = repository.queries.length - 1;
-        const cursor = TestCatalogCursor();
-        IntentionSummary atPosition(int index, int position) => testSummary(
-          index: index,
-          createdDay:
-              scenario.order.field == IntentionCatalogSortField.createdAt
-              ? position
-              : index,
-          updatedDay:
-              scenario.order.field == IntentionCatalogSortField.updatedAt
-              ? position
-              : index,
-        );
-
-        final first = atPosition(20, scenario.firstPosition);
-        final boundary = atPosition(21, scenario.boundaryPosition);
-        final remaining = atPosition(22, scenario.remainingPosition);
-        final inside = atPosition(23, scenario.insidePosition);
-        final outside = atPosition(24, scenario.outsidePosition);
-        repository.complete(
-          firstPageIndex,
-          ResultSuccess(
-            IntentionCatalogFirstPage(
-              items: [first, boundary],
-              totalCount: 3,
-              nextCursor: cursor,
-              revision: const TestCatalogRevision(1),
-            ),
+  test('сохраняет глобальный порядок и границу во всех порядках', () async {
+    final scenarios =
+        <
+          ({
+            IntentionCatalogOrder order,
+            int firstPosition,
+            int boundaryPosition,
+            int remainingPosition,
+            int insidePosition,
+            int outsidePosition,
+            int movedInsidePosition,
+            int movedOutsidePosition,
+          })
+        >[
+          (
+            order: IntentionCatalogOrder.createdAtAscending,
+            firstPosition: 1,
+            boundaryPosition: 2,
+            remainingPosition: 3,
+            insidePosition: 0,
+            outsidePosition: 4,
+            movedInsidePosition: -1,
+            movedOutsidePosition: 5,
           ),
-        );
-        await container.read(
-          intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
-              .future,
-        );
-
-        await completeCatalogCommand(
-          container,
-          repository,
-          const CreateIntention(title: 'Внутри', description: null),
-          IntentionSaved(
-            testIntention(index: 23, title: 'Внутри'),
-            catalogMutation: IntentionCatalogCreated(
-              revision: const TestCatalogRevision(2),
-              entry: TestCatalogEntrySnapshot(inside),
-            ),
+          (
+            order: IntentionCatalogOrder.createdAtDescending,
+            firstPosition: 5,
+            boundaryPosition: 4,
+            remainingPosition: 3,
+            insidePosition: 6,
+            outsidePosition: 2,
+            movedInsidePosition: 7,
+            movedOutsidePosition: 1,
           ),
-        );
-        await completeCatalogCommand(
-          container,
-          repository,
-          const CreateIntention(title: 'Снаружи', description: null),
-          IntentionSaved(
-            testIntention(index: 24, title: 'Снаружи'),
-            catalogMutation: IntentionCatalogCreated(
-              revision: const TestCatalogRevision(3),
-              entry: TestCatalogEntrySnapshot(outside),
-            ),
+          (
+            order: IntentionCatalogOrder.updatedAtAscending,
+            firstPosition: 1,
+            boundaryPosition: 2,
+            remainingPosition: 3,
+            insidePosition: 0,
+            outsidePosition: 4,
+            movedInsidePosition: -1,
+            movedOutsidePosition: 5,
           ),
-        );
-
-        final movedOutside = atPosition(20, scenario.movedOutsidePosition);
-        await completeCatalogCommand(
-          container,
-          repository,
-          UpdateIntention(id: first.id, title: first.title, description: null),
-          IntentionSaved(
-            testIntention(index: 20),
-            catalogMutation: IntentionCatalogUpdated(
-              revision: const TestCatalogRevision(4),
-              before: TestCatalogEntrySnapshot(first),
-              after: TestCatalogEntrySnapshot(movedOutside),
-            ),
+          (
+            order: IntentionCatalogOrder.updatedAtDescending,
+            firstPosition: 5,
+            boundaryPosition: 4,
+            remainingPosition: 3,
+            insidePosition: 6,
+            outsidePosition: 2,
+            movedInsidePosition: 7,
+            movedOutsidePosition: 1,
           ),
-        );
-        final movedInside = atPosition(22, scenario.movedInsidePosition);
-        await completeCatalogCommand(
-          container,
-          repository,
-          UpdateIntention(
-            id: remaining.id,
-            title: remaining.title,
-            description: null,
+          (
+            order: IntentionCatalogOrder.titleAscending,
+            firstPosition: 1,
+            boundaryPosition: 2,
+            remainingPosition: 3,
+            insidePosition: 0,
+            outsidePosition: 4,
+            movedInsidePosition: -1,
+            movedOutsidePosition: 5,
           ),
-          IntentionSaved(
-            testIntention(index: 22),
-            catalogMutation: IntentionCatalogUpdated(
-              revision: const TestCatalogRevision(5),
-              before: TestCatalogEntrySnapshot(remaining),
-              after: TestCatalogEntrySnapshot(movedInside),
-            ),
+          (
+            order: IntentionCatalogOrder.titleDescending,
+            firstPosition: 5,
+            boundaryPosition: 4,
+            remainingPosition: 3,
+            insidePosition: 6,
+            outsidePosition: 2,
+            movedInsidePosition: 7,
+            movedOutsidePosition: 1,
           ),
-        );
+        ];
+    // Названия по позициям -1…7. Регистр смешан так, что сравнение
+    // исходных строк разошлось бы с ключом порядка у границы в обоих
+    // направлениях.
+    const titlesByPosition = [
+      'абрикос',
+      'банан',
+      'вишня',
+      'груша',
+      'Дыня',
+      'Ежевика',
+      'Жимолость',
+      'Земляника',
+      'Инжир',
+    ];
 
-        final beforeContinuation =
-            container
-                    .read(
-                      intentionCatalogViewModelProvider(
-                        const BrowseIntentionCatalog(),
-                      ),
-                    )
-                    .requireValue
-                as IntentionCatalogLoaded;
-        expect(beforeContinuation.items.map((item) => item.id), [
-          movedInside.id,
-          inside.id,
-          boundary.id,
-        ], reason: '${scenario.order.field}/${scenario.order.direction}');
-        expect(beforeContinuation.totalCount, 5);
-        expect(beforeContinuation.nextCursor, same(cursor));
-
-        final continuationIndex = repository.queries.length;
-        final load = notifier.loadNextPageIfNeeded(visibleIndex: 1);
-        await waitForCatalogQueries(repository, continuationIndex + 1);
-        expect(repository.queryAt(continuationIndex).cursor, same(cursor));
-        repository.complete(
-          continuationIndex,
-          ResultSuccess(
-            IntentionCatalogContinuationPage(
-              items: [outside, movedOutside],
-              nextCursor: null,
-              revision: const TestCatalogRevision(5),
-            ),
-          ),
-        );
-        await load;
-
-        final completed =
-            container
-                    .read(
-                      intentionCatalogViewModelProvider(
-                        const BrowseIntentionCatalog(),
-                      ),
-                    )
-                    .requireValue
-                as IntentionCatalogLoaded;
-        expect(completed.items.map((item) => item.id), [
-          movedInside.id,
-          inside.id,
-          boundary.id,
-          outside.id,
-          movedOutside.id,
-        ], reason: '${scenario.order.field}/${scenario.order.direction}');
-        expect(completed.totalCount, 5);
-        expect(completed.nextCursor, isNull);
-
-        subscription.close();
-        container.dispose();
+    for (final scenario in scenarios) {
+      final repository = ControlledCatalogRepository();
+      final container = reconciliationCatalogContainer(
+        repository,
+        pageSize: 2,
+        prefetchRemaining: 1,
+      );
+      final subscription = container.listen(
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
+        (_, _) {},
+        fireImmediately: true,
+      );
+      final notifier = container.read(
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+            .notifier,
+      );
+      if (scenario.order != IntentionCatalogOrder.createdAtDescending) {
+        notifier.changeOrder(scenario.order);
+        await waitForCatalogQueries(repository, 2);
       }
-    },
-  );
+      final firstPageIndex = repository.queries.length - 1;
+      const cursor = TestCatalogCursor();
+      IntentionSummary atPosition(int index, int position) => testSummary(
+        index: index,
+        title: scenario.order.field == IntentionCatalogSortField.title
+            ? titlesByPosition[position + 1]
+            : 'Намерение',
+        createdDay: scenario.order.field == IntentionCatalogSortField.createdAt
+            ? position
+            : index,
+        updatedDay: scenario.order.field == IntentionCatalogSortField.updatedAt
+            ? position
+            : index,
+      );
+
+      final first = atPosition(20, scenario.firstPosition);
+      final boundary = atPosition(21, scenario.boundaryPosition);
+      final remaining = atPosition(22, scenario.remainingPosition);
+      final inside = atPosition(23, scenario.insidePosition);
+      final outside = atPosition(24, scenario.outsidePosition);
+      repository.complete(
+        firstPageIndex,
+        ResultSuccess(
+          IntentionCatalogFirstPage(
+            items: [first, boundary],
+            totalCount: 3,
+            nextCursor: cursor,
+            revision: const TestCatalogRevision(1),
+          ),
+        ),
+      );
+      await container.read(
+        intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+            .future,
+      );
+
+      await completeCatalogCommand(
+        container,
+        repository,
+        const CreateIntention(title: 'Внутри', description: null),
+        IntentionSaved(
+          testIntention(index: 23, title: 'Внутри'),
+          catalogMutation: IntentionCatalogCreated(
+            revision: const TestCatalogRevision(2),
+            entry: TestCatalogEntrySnapshot(inside),
+          ),
+        ),
+      );
+      await completeCatalogCommand(
+        container,
+        repository,
+        const CreateIntention(title: 'Снаружи', description: null),
+        IntentionSaved(
+          testIntention(index: 24, title: 'Снаружи'),
+          catalogMutation: IntentionCatalogCreated(
+            revision: const TestCatalogRevision(3),
+            entry: TestCatalogEntrySnapshot(outside),
+          ),
+        ),
+      );
+
+      final movedOutside = atPosition(20, scenario.movedOutsidePosition);
+      await completeCatalogCommand(
+        container,
+        repository,
+        UpdateIntention(
+          id: first.id,
+          title: movedOutside.title,
+          description: null,
+        ),
+        IntentionSaved(
+          testIntention(index: 20, title: movedOutside.title),
+          catalogMutation: IntentionCatalogUpdated(
+            revision: const TestCatalogRevision(4),
+            before: TestCatalogEntrySnapshot(first),
+            after: TestCatalogEntrySnapshot(movedOutside),
+          ),
+        ),
+      );
+      final movedInside = atPosition(22, scenario.movedInsidePosition);
+      await completeCatalogCommand(
+        container,
+        repository,
+        UpdateIntention(
+          id: remaining.id,
+          title: movedInside.title,
+          description: null,
+        ),
+        IntentionSaved(
+          testIntention(index: 22, title: movedInside.title),
+          catalogMutation: IntentionCatalogUpdated(
+            revision: const TestCatalogRevision(5),
+            before: TestCatalogEntrySnapshot(remaining),
+            after: TestCatalogEntrySnapshot(movedInside),
+          ),
+        ),
+      );
+
+      final beforeContinuation =
+          container
+                  .read(
+                    intentionCatalogViewModelProvider(
+                      const BrowseIntentionCatalog(),
+                    ),
+                  )
+                  .requireValue
+              as IntentionCatalogLoaded;
+      expect(beforeContinuation.items.map((item) => item.id), [
+        movedInside.id,
+        inside.id,
+        boundary.id,
+      ], reason: '${scenario.order.field}/${scenario.order.direction}');
+      expect(beforeContinuation.totalCount, 5);
+      expect(beforeContinuation.nextCursor, same(cursor));
+
+      final continuationIndex = repository.queries.length;
+      final load = notifier.loadNextPageIfNeeded(visibleIndex: 1);
+      await waitForCatalogQueries(repository, continuationIndex + 1);
+      expect(repository.queryAt(continuationIndex).cursor, same(cursor));
+      repository.complete(
+        continuationIndex,
+        ResultSuccess(
+          IntentionCatalogContinuationPage(
+            items: [outside, movedOutside],
+            nextCursor: null,
+            revision: const TestCatalogRevision(5),
+          ),
+        ),
+      );
+      await load;
+
+      final completed =
+          container
+                  .read(
+                    intentionCatalogViewModelProvider(
+                      const BrowseIntentionCatalog(),
+                    ),
+                  )
+                  .requireValue
+              as IntentionCatalogLoaded;
+      expect(completed.items.map((item) => item.id), [
+        movedInside.id,
+        inside.id,
+        boundary.id,
+        outside.id,
+        movedOutside.id,
+      ], reason: '${scenario.order.field}/${scenario.order.direction}');
+      expect(completed.totalCount, 5);
+      expect(completed.nextCursor, isNull);
+
+      subscription.close();
+      container.dispose();
+    }
+  });
 
   test(
     'использует точный historical membership вместо повторного folding',

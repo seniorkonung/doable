@@ -105,7 +105,7 @@
   - **Предполагаемые файлы:** `lib/src/intention/presentation/catalog/intention_catalog_view_model.dart`, `lib/src/intention/presentation/catalog/intention_catalog_state.dart`, `test/intention/presentation/catalog/catalog_test_support.dart`, `test/intention/presentation/catalog/intention_catalog_view_model_test.dart`, `test/intention/presentation/catalog/intention_catalog_mutation_reconciliation_test.dart`.
   - **Размер:** M.
 
-- [ ] 1.8 Согласовывать подтверждённые правки с загруженной частью каталога в порядке по названию
+- [x] 1.8 Согласовывать подтверждённые правки с загруженной частью каталога в порядке по названию
   - **Критерии приёмки:**
     - При порядке по названию переименование внутри загруженной границы перемещает строку на её место по ключу из снимка изменения. Переименование за границу исключает строку до загрузки порции с её позицией и не даёт повтора после подгрузки.
     - Граница курсора модели сравнивается тем же ключом порядка.
