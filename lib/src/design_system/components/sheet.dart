@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' show clampDouble, lerpDouble;
 
@@ -6,7 +7,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
 import '../doable_colors.dart';
-import '../doable_icon.dart';
 import '../doable_metrics.dart';
 import '../doable_shadows.dart';
 import '../doable_type.dart';
@@ -872,8 +872,8 @@ enum SheetCompactHeight {
 /// места.
 const _compactLimit = 534.0;
 
-/// Отступ заголовка раскрываемого листа от верхнего края: ручка и шеврон
-/// стоят над началом заголовка.
+/// Отступ заголовка раскрываемого листа от верхнего края: ручка стоит над
+/// началом заголовка.
 const _titleTop = 26.0;
 
 /// Части листа одного из двух вариантов.
@@ -969,20 +969,10 @@ final class _ExpandableSheetState extends State<_ExpandableSheet>
     final shadows = _shadowsOf(theme);
     final parts = widget.parts;
 
-    final handle = Semantics(
-      container: true,
-      button: true,
-      expanded: _isFull,
+    final handle = _SizeButton(
+      isFull: _isFull,
       label: _isFull ? parts.collapseLabel : parts.expandLabel,
-      child: InkWell(
-        onTap: () => _resize(full: !_isFull),
-        borderRadius: BorderRadius.circular(DoableMetrics.radiusXs),
-        child: SizedBox(
-          width: 88,
-          height: DoableMetrics.tapMin,
-          child: _SizeIcon(expansion: _expansion, color: colors.grip),
-        ),
-      ),
+      onTap: () => _resize(full: !_isFull),
     );
     final titleBlock = _TitleBlock(
       title: widget.title,
@@ -1203,67 +1193,107 @@ final class _RenderExpandableFrame extends RenderProxyBox {
   }
 }
 
-/// Ручка компактного раскрываемого листа и шеврон полного на её месте.
+/// Ручка раскрываемого листа — кнопка смены размера без подсветки касания.
 ///
-/// Значки перетекают друг в друга по раскрытию [expansion]: 0 — компактный
-/// размер, 1 — полный. В покое нарисован только значок текущего размера.
-final class _SizeIcon extends StatelessWidget {
-  const _SizeIcon({required this.expansion, required this.color});
+/// О нажатии говорит смена размера листа и системный отклик касания, как
+/// у остальных кнопок; рамка показывает только фокус с клавиатуры и не
+/// заходит на заголовок под областью нажатия.
+final class _SizeButton extends StatefulWidget {
+  const _SizeButton({
+    required this.isFull,
+    required this.label,
+    required this.onTap,
+  });
 
-  static const _gripTop = DoableMetrics.space2;
-  static const _chevronSize = 28.0;
-
-  final Animation<double> expansion;
-  final Color color;
+  final bool isFull;
+  final String label;
+  final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: expansion,
-    builder: (context, _) {
-      final progress = expansion.value;
-      return Stack(
-        // Квадрат шеврона выше его графики и выходит за верх кнопки.
-        clipBehavior: Clip.none,
-        alignment: Alignment.topCenter,
-        children: [
-          if (progress < 1)
-            Positioned(
-              top: _gripTop,
-              child: Opacity(
-                opacity: 1 - progress,
-                child: _Grip(color: color),
-              ),
-            ),
-          if (progress > 0)
-            Positioned(
-              // Шеврон стоит серединой на середине ручки.
-              top: _gripTop + (_Grip.height - _chevronSize) / 2,
-              child: Opacity(
-                opacity: progress,
-                child: DoableIcon(
-                  DoableIconData.chevronDown,
-                  size: _chevronSize,
-                  color: color,
+  State<_SizeButton> createState() => _SizeButtonState();
+}
+
+final class _SizeButtonState extends State<_SizeButton> {
+  var _showFocusHighlight = false;
+
+  // Системный звук касания на Android, как у `InkWell` с `enableFeedback`:
+  // https://api.flutter.dev/flutter/material/Feedback/forTap.html
+  void _activate() {
+    unawaited(Feedback.forTap(context));
+    widget.onTap();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = _colorsOf(Theme.of(context));
+    // Фокус и штатные команды клавиатуры не зависят от эффекта чернил:
+    // https://api.flutter.dev/flutter/widgets/FocusableActionDetector-class.html
+    return FocusableActionDetector(
+      mouseCursor: SystemMouseCursors.click,
+      onShowFocusHighlight: (value) =>
+          setState(() => _showFocusHighlight = value),
+      actions: {
+        ActivateIntent: CallbackAction<ActivateIntent>(
+          onInvoke: (_) {
+            _activate();
+            return null;
+          },
+        ),
+        ButtonActivateIntent: CallbackAction<ButtonActivateIntent>(
+          onInvoke: (_) {
+            _activate();
+            return null;
+          },
+        ),
+      },
+      // Состояние раскрытия доступно отдельно от названия команды:
+      // https://api.flutter.dev/flutter/semantics/SemanticsProperties/expanded.html
+      child: Semantics(
+        container: true,
+        excludeSemantics: true,
+        button: true,
+        expanded: widget.isFull,
+        label: widget.label,
+        onTap: _activate,
+        child: GestureDetector(
+          // Вся область нажатия принимает касание, включая пустое место:
+          // https://api.flutter.dev/flutter/widgets/GestureDetector/behavior.html
+          behavior: HitTestBehavior.opaque,
+          onTap: _activate,
+          child: SizedBox(
+            width: 88,
+            height: DoableMetrics.tapMin,
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  border: _showFocusHighlight
+                      ? Border.all(color: colors.ink, width: 2)
+                      : null,
+                  borderRadius: BorderRadius.circular(DoableMetrics.radiusXs),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(DoableMetrics.space2),
+                  child: _Grip(color: colors.grip),
                 ),
               ),
             ),
-        ],
-      );
-    },
-  );
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 final class _Grip extends StatelessWidget {
   const _Grip({required this.color});
-
-  static const height = 4.0;
 
   final Color color;
 
   @override
   Widget build(BuildContext context) => Container(
     width: 36,
-    height: height,
+    height: 4,
     decoration: BoxDecoration(
       color: color,
       borderRadius: BorderRadius.circular(DoableMetrics.radiusFull),

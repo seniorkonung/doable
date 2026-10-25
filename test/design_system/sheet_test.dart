@@ -1,12 +1,15 @@
+import 'dart:ui' show ImageByteFormat;
+
 import 'package:doable/src/design_system/components/button.dart';
 import 'package:doable/src/design_system/components/search_field.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
-import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/design_system/doable_metrics.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const _screen = Size(390, 844);
@@ -190,7 +193,6 @@ void main() {
         case final height?:
           expect(_sheetHeight(tester), height);
           expect(tester.getRect(find.byType(Sheet)).bottom, _screen.height);
-          expect(_chevron, height == _full ? findsOne : findsNothing);
           expect(sheet.isClosed, isFalse);
         case null:
           expect(find.byType(Sheet), findsNothing);
@@ -215,7 +217,6 @@ void main() {
     await _cancelHeaderDrag(tester, const Offset(0, _growth + 200));
     expect(tester.getRect(find.byType(Sheet)).bottom, _screen.height);
     expect(_sheetHeight(tester), _full);
-    expect(_chevron, findsOne);
     expect(sheet.isClosed, isFalse);
   });
 
@@ -369,13 +370,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.getRect(find.byType(Sheet)), compact);
     expect(_topRadius(tester), DoableMetrics.radiusXl);
-    expect(_chevron, findsNothing);
 
     await tester.tap(find.bySemanticsLabel(_expandLabel));
     await tester.pumpAndSettle();
     expect(tester.getRect(find.byType(Sheet)), compact);
     expect(_topRadius(tester), 0);
-    expect(_chevron, findsOne);
 
     await tester.fling(_header, const Offset(0, 60), 1000);
     await tester.pumpAndSettle();
@@ -383,8 +382,8 @@ void main() {
     expect(sheet.isClosed, isTrue);
   });
 
-  testWidgets('ручка — кнопка раскрытия, а в полном размере её заменяет '
-      'шеврон сворачивания', (tester) async {
+  testWidgets('ручка — кнопка раскрытия, а в полном размере — кнопка '
+      'сворачивания', (tester) async {
     final semantics = tester.ensureSemantics();
     await _openExpandableSheet(tester);
 
@@ -398,13 +397,11 @@ void main() {
         hasTapAction: true,
       ),
     );
-    expect(_chevron, findsNothing);
 
     await tester.tap(find.bySemanticsLabel(_expandLabel));
     await tester.pumpAndSettle();
 
     expect(_sheetHeight(tester), _full);
-    expect(_chevron, findsOne);
     expect(find.bySemanticsLabel(_expandLabel), findsNothing);
     expect(
       tester.getSemantics(find.bySemanticsLabel(_collapseLabel)),
@@ -421,9 +418,137 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(_sheetHeight(tester), _compact);
-    expect(_chevron, findsNothing);
     semantics.dispose();
   });
+
+  testWidgets('ручка остаётся той же линией в компактном размере, на полпути '
+      'раскрытия и в полном размере', (tester) async {
+    await _openExpandableSheet(tester);
+    final compact = await _pixels(
+      tester,
+      tester.getRect(find.bySemanticsLabel(_expandLabel)),
+    );
+
+    final gesture = await _SlowGesture.start(tester, _header);
+    await gesture.moveTo(-_growth / 2);
+    expect(
+      await _pixels(
+        tester,
+        tester.getRect(find.bySemanticsLabel(_expandLabel)),
+      ),
+      compact,
+    );
+    await gesture.moveTo(-_growth - 20);
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(_sheetHeight(tester), _full);
+    expect(
+      await _pixels(
+        tester,
+        tester.getRect(find.bySemanticsLabel(_collapseLabel)),
+      ),
+      compact,
+    );
+  });
+
+  testWidgets('касание ручки не подсвечивает ни её, ни заголовок, а рамка '
+      'видна только при фокусе с клавиатуры и только возле линии ручки', (
+    tester,
+  ) async {
+    await _openExpandableSheet(tester);
+    // Середина шапки под ручкой и заголовком одинакова в обоих размерах.
+    Rect header(String handleLabel) {
+      final handle = tester.getRect(find.bySemanticsLabel(handleLabel));
+      return Rect.fromLTRB(
+        handle.left,
+        handle.top,
+        handle.right,
+        tester.getRect(find.text('Теги')).bottom,
+      );
+    }
+
+    final rest = await _pixels(tester, header(_expandLabel));
+    final touch = await tester.startGesture(
+      header(_expandLabel).topCenter + const Offset(0, 40),
+    );
+    // Отклик Material начинается после задержки нажатия и проявляется
+    // следующим кадром.
+    await tester.pump(kPressTimeout);
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(await _pixels(tester, header(_expandLabel)), rest);
+    await touch.up();
+    await tester.pumpAndSettle();
+    expect(_sheetHeight(tester), _full);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pumpAndSettle();
+    final area = header(_collapseLabel);
+    final focused = await _pixels(tester, area);
+    final frame = Rect.fromLTWH(area.width / 2 - 26, 0, 52, 20);
+    final changed = [
+      for (var i = 0; i < rest.length; i++)
+        if (rest[i] != focused[i])
+          Offset(
+            (i % area.width.toInt()).toDouble(),
+            (i ~/ area.width.toInt()).toDouble(),
+          ),
+    ];
+    expect(changed, isNotEmpty, reason: 'Фокус должен быть виден');
+    expect(
+      changed.every(frame.contains),
+      isTrue,
+      reason: 'Рамка фокуса не должна заходить на заголовок',
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(_sheetHeight(tester), _compact);
+  });
+
+  testWidgets('на Android касание, Enter, пробел и действие диктора на ручке '
+      'щёлкают системным звуком касания и меняют размер листа', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await _openExpandableSheet(tester);
+    final sounds = <Object?>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'SystemSound.play') sounds.add(call.arguments);
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+
+    await tester.tap(find.bySemanticsLabel(_expandLabel));
+    await tester.pumpAndSettle();
+    expect(_sheetHeight(tester), _full);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(_sheetHeight(tester), _compact);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    await tester.pumpAndSettle();
+    expect(_sheetHeight(tester), _full);
+
+    tester.binding.renderViews.first.owner!.semanticsOwner!.performAction(
+      tester.getSemantics(find.bySemanticsLabel(_collapseLabel)).id,
+      SemanticsAction.tap,
+    );
+    await tester.pumpAndSettle();
+    expect(_sheetHeight(tester), _compact);
+
+    expect(sounds, List.filled(4, SystemSoundType.click.toString()));
+    semantics.dispose();
+  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 
   testWidgets('размер меняется плавно, а при уменьшенной анимации — сразу', (
     tester,
@@ -607,7 +732,6 @@ void main() {
 
     expect(_sheetHeight(tester), _full);
     expect(body.pixels, 120);
-    expect(_chevron, findsOne);
   });
 
   testWidgets('свайп вниз по списку, прокрученному до середины полного '
@@ -676,7 +800,6 @@ void main() {
     expect(tester.getRect(find.byType(Sheet)), compact);
     expect(_topRadius(tester), DoableMetrics.radiusXl);
     expect(find.bySemanticsLabel(_expandLabel), findsOne);
-    expect(_chevron, findsNothing);
   });
 
   testWidgets('когда клавиатура не оставляет места для роста, после нажатия '
@@ -816,7 +939,6 @@ void main() {
     expect(_bodyPosition(tester).maxScrollExtent, greaterThan(0));
     expect(_topRadius(tester), DoableMetrics.radiusXl);
     expect(find.bySemanticsLabel(_expandLabel), findsOne);
-    expect(_chevron, findsNothing);
   });
 
   testWidgets('лист с компактной высотой по содержимому раскрывается '
@@ -847,7 +969,6 @@ void main() {
     await up.up();
     await tester.pumpAndSettle();
     expect(_sheetHeight(tester), _full);
-    expect(_chevron, findsOne);
     expect(tester.getRect(find.text('Готово')), footer);
 
     await tester.tap(find.bySemanticsLabel(_collapseLabel));
@@ -924,8 +1045,8 @@ void main() {
   });
 
   testWidgets('лист с компактной высотой по содержимому и пустым списком '
-      'раскрывается ручкой и сворачивается шевроном без ошибки раскладки, а '
-      'нижняя кнопка стоит внизу экрана', (tester) async {
+      'раскрывается и сворачивается ручкой без ошибки раскладки, а нижняя '
+      'кнопка стоит внизу экрана', (tester) async {
     final rows = ValueNotifier(0);
     addTearDown(rows.dispose);
     await _openContentHeightSheet(tester, rows);
@@ -1639,11 +1760,24 @@ void main() {
   });
 }
 
-final _chevron = find.byWidgetPredicate(
-  (widget) => widget is DoableIcon && widget.icon == DoableIconData.chevronDown,
-);
-
 final _header = find.text('Выберите сколько нужно');
+
+/// Пиксели экрана в прямоугольнике [rect].
+Future<List<int>> _pixels(WidgetTester tester, Rect rect) async {
+  final layer = tester.binding.renderViews.single.debugLayer! as OffsetLayer;
+  return (await tester.runAsync(() async {
+    final image = await layer.toImage(rect);
+    try {
+      final bytes = (await image.toByteData(format: ImageByteFormat.rawRgba))!;
+      return bytes.buffer.asUint32List(
+        bytes.offsetInBytes,
+        bytes.lengthInBytes ~/ 4,
+      );
+    } finally {
+      image.dispose();
+    }
+  }))!;
+}
 
 /// Радиус верхних углов листа.
 double _topRadius(WidgetTester tester) => tester
