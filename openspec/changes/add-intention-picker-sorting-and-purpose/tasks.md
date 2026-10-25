@@ -71,7 +71,22 @@
   - **Предполагаемые файлы:** `lib/src/intention/application/intention_catalog.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `test/intention/data/drift_intention_catalog_test.dart`, `test/intention/application/intention_contract_test.dart`.
   - **Размер:** M.
 
-- [ ] 1.6 Вести в модели каталога тип намерения и точные числа обоих типов по назначению поиска
+- [ ] 1.6 Научить тестовые адаптеры, которые отдают первые порции поискам исходного намерения и участника, отвечать на запрошенные числа типов
+  - **Критерии приёмки:**
+    - Если запрос просит числа типов по решению 2 дизайна, первая порция тестового адаптера несёт числа «все» и «действия», согласованные с её общим количеством и готовностью намерений в наборе. Если не просит — чисел в порции нет, как сейчас.
+    - Модель каталога в этой задаче не меняется и чисел пока не просит, поэтому существующие проверки проходят без изменения ожиданий.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter analyze`.
+    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog test/intention/presentation/picker test/daily_choice/presentation/source_picker test/daily_choice/presentation/catalog test/long_term_relation/presentation/participant_picker test/long_term_relation/presentation/editor test/app/routing/app_router_test.dart test/app/navigation/app_shell_operation_reset_test.dart` — поиски работают как прежде.
+  - **Зависимости:** 1.5 — запрос умеет просить числа, а первая порция умеет их нести.
+  - **Предполагаемые файлы:** механическая адаптация 15 тестовых адаптеров и сборок первой порции:
+    - `test/daily_choice/presentation/daily_choice_picker_context_test_support.dart`, `test/daily_choice/presentation/daily_choice_picker_tag_search_test_support.dart`, `test/daily_choice/presentation/source_picker/daily_choice_source_picker_page_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`;
+    - `test/intention/presentation/catalog/intention_picker_session_test_support.dart`, `test/intention/presentation/catalog/intention_catalog_tag_filter_view_model_test.dart`, `test/intention/presentation/catalog/intention_catalog_tag_change_reconciliation_test.dart`, `test/intention/presentation/picker/intention_picker_view_test.dart`, `test/intention/presentation/picker/intention_picker_results_test.dart`, `test/intention/presentation/details/details_test_support.dart`;
+    - `test/long_term_relation/presentation/participant_picker/participant_picker_test_support.dart`, `test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart`, `test/long_term_relation/presentation/editor/relation_form_test_support.dart`;
+    - `test/app/routing/app_router_test.dart`, `test/app/navigation/app_shell_operation_reset_test.dart`.
+  - **Размер:** M — во всех адаптерах один механический приём. Адаптация вынесена из задачи 1.7, чтобы модель начала просить числа уже на готовых адаптерах.
+
+- [ ] 1.7 Вести в модели каталога тип намерения и точные числа обоих типов по назначению поиска
   - **Критерии приёмки:**
     - Доступность типа зависит от назначения и выражена sealed-значением по решению 2 дизайна:
       - поиски исходного намерения и участника — тип открыт и начинается с «все»;
@@ -83,12 +98,12 @@
     - Модель поправляет оба числа по снимкам до и после правки: создание, изменение, архивирование, удаление и смена готовности, которая переносит намерение между типами. Протокол ревизий и поздних порций не меняется.
   - **Проверка:**
     - `mise exec --no-deps -- flutter test test/intention/presentation/catalog/intention_catalog_view_model_test.dart test/intention/presentation/catalog/intention_catalog_mutation_reconciliation_test.dart` — доступность и смена типа; числа после правок, включая смену готовности.
-    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog test/daily_choice/presentation/action_picker test/daily_choice/presentation/source_picker test/long_term_relation/presentation/participant_picker` — существующие поиски и каталог работают как прежде.
-  - **Зависимости:** 1.5.
+    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog test/intention/presentation/picker test/daily_choice/presentation/action_picker test/daily_choice/presentation/source_picker test/daily_choice/presentation/catalog test/long_term_relation/presentation/participant_picker test/long_term_relation/presentation/editor test/app/routing/app_router_test.dart test/app/navigation/app_shell_operation_reset_test.dart` — существующие поиски и каталог работают как прежде, в том числе на тестовых адаптерах из задачи 1.6.
+  - **Зависимости:** 1.5, 1.6 — тестовые адаптеры уже отвечают на запрошенные числа.
   - **Предполагаемые файлы:** `lib/src/intention/presentation/catalog/intention_catalog_view_model.dart`, `lib/src/intention/presentation/catalog/intention_catalog_state.dart`, `test/intention/presentation/catalog/catalog_test_support.dart`, `test/intention/presentation/catalog/intention_catalog_view_model_test.dart`, `test/intention/presentation/catalog/intention_catalog_mutation_reconciliation_test.dart`.
   - **Размер:** M.
 
-- [ ] 1.7 Согласовывать подтверждённые правки с загруженной частью каталога в порядке по названию
+- [ ] 1.8 Согласовывать подтверждённые правки с загруженной частью каталога в порядке по названию
   - **Критерии приёмки:**
     - При порядке по названию переименование внутри загруженной границы перемещает строку на её место по ключу из снимка изменения. Переименование за границу исключает строку до загрузки порции с её позицией и не даёт повтора после подгрузки.
     - Граница курсора модели сравнивается тем же ключом порядка.
@@ -98,7 +113,7 @@
   - **Предполагаемые файлы:** `test/intention/presentation/catalog/intention_catalog_mutation_reconciliation_test.dart`; `lib/src/intention/presentation/catalog/intention_catalog_view_model.dart` — только если проверка найдёт расхождение.
   - **Размер:** S.
 
-- [ ] 1.8 Различать поле сортировки в диагностике чтения порции каталога и измерять порядок по названию бенчмарком
+- [ ] 1.9 Различать поле сортировки в диагностике чтения порции каталога и измерять порядок по названию бенчмарком
   - **Критерии приёмки:**
     - Событие чтения порции каталога в начале, при успехе и при отказе несёт поле сортировки: время создания, время изменения или название. Разработческий приёмник его выводит, пользовательского текста событие не несёт.
     - Бенчмарк каталога измеряет первую порцию и продолжение по названию на том же большом наборе, что и порядок по времени, и сравнивает их с бюджетами.
@@ -109,7 +124,7 @@
   - **Предполагаемые файлы:** `lib/src/shared/diagnostics/diagnostics_sink.dart`, `lib/src/shared/diagnostics/developer_diagnostics_sink.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `test/shared/diagnostics/diagnostics_sink_test.dart`, `test/intention/data/drift_intention_repository_fault_test.dart`, `benchmark/intention/intention_catalog_benchmark.dart`.
   - **Размер:** S.
 
-- [ ] 1.9 Подтвердить готовность первой фазы: каталог читает порядок по названию и тип намерения на схеме 6, а экраны не изменились
+- [ ] 1.10 Подтвердить готовность первой фазы: каталог читает порядок по названию и тип намерения на схеме 6, а экраны не изменились
   - **Критерии приёмки:**
     - Выполнено условие «Ready to advance» первой фазы:
       - требования «Упорядочивание каталогов намерений» и «Тип намерения в поиске для выбора» и правила точного количества выполняются на уровне чтения и модели каталога;
@@ -125,6 +140,6 @@
     - Сообщить оставшиеся ручные проверки:
       - перенос данных экспортом на прежней сборке, очисткой и импортом;
       - каталог и три поиска выглядят и работают как прежде.
-  - **Зависимости:** 1.1–1.8.
+  - **Зависимости:** 1.1–1.9.
   - **Предполагаемые файлы:** нет, только проверка и сборка.
   - **Размер:** XS.
