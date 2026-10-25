@@ -3752,6 +3752,24 @@ abstract class AppLocalizations {
   /// **'Nothing to choose from'**
   String get intentionPickerEmptyScopeTitle;
 
+  /// Заголовок пустого выбранного типа, когда в допустимом охвате есть намерения другого типа
+  ///
+  /// In en, this message translates to:
+  /// **'No intentions of this type'**
+  String get intentionPickerEmptyTypeTitle;
+
+  /// Совет показать оба типа при пустом выбранном типе
+  ///
+  /// In en, this message translates to:
+  /// **'Show both types to choose from the available intentions.'**
+  String get intentionPickerEmptyTypeText;
+
+  /// Действие пустого выбранного типа, которое выбирает тип «Все»
+  ///
+  /// In en, this message translates to:
+  /// **'Show both types'**
+  String get intentionPickerShowBothTypes;
+
   /// Заголовок шапки экрана выбора действия
   ///
   /// In en, this message translates to:
@@ -3818,11 +3836,17 @@ abstract class AppLocalizations {
   /// **'Change the tags in the filter or reset it.'**
   String get intentionPickerChangeTags;
 
-  /// Заголовок пустой выдачи экрана выбора из-за фильтра названия и условий по тегам
+  /// Заголовок пустой выдачи действий из-за фильтра названия и условий по тегам
   ///
   /// In en, this message translates to:
-  /// **'Nothing found'**
-  String get intentionPickerNothingFound;
+  /// **'No actions found'**
+  String get intentionPickerNoActionsFound;
+
+  /// Заголовок пустой выдачи намерений из-за фильтра названия и условий по тегам
+  ///
+  /// In en, this message translates to:
+  /// **'No intentions found'**
+  String get intentionPickerNoIntentionsFound;
 
   /// Совет пустой выдачи экрана выбора из-за фильтра названия и условий по тегам
   ///

@@ -20,8 +20,8 @@ import 'intention_picker_row.dart';
 /// Выдача экрана выбора назначения [purpose]: строки, подгрузка следующей
 /// порции, пустая выдача и отказы.
 ///
-/// Пустая выдача из-за фильтра называет его причину и предлагает сбросить
-/// фильтры.
+/// Пустая выдача называет выбранный тип и причину: фильтры можно сбросить,
+/// а пустой тип — расширить до обоих типов.
 ///
 /// Элемент один владеет прокруткой списка и возвращает его к началу, когда
 /// модель подтверждает выдачу нового запроса.
@@ -108,10 +108,7 @@ final class _IntentionPickerResultsState
         IntentionCatalogInvalidFilter() => const SizedBox.shrink(),
         final IntentionCatalogLoaded loaded => _loaded(l10n, kind, loaded),
         final IntentionCatalogEmpty empty => _list([
-          SliverFillRemaining(
-            hasScrollBody: false,
-            child: _empty(l10n, kind, empty.query),
-          ),
+          SliverFillRemaining(hasScrollBody: false, child: _empty(l10n, empty)),
         ]),
         IntentionCatalogUnavailable() => _status(
           ListState.error(
@@ -157,34 +154,50 @@ final class _IntentionPickerResultsState
   }
 
   /// Причину пустой выдачи называет запрос, который её дал.
-  EmptyState _empty(
-    AppLocalizations l10n,
-    IntentionPickerKind kind,
-    IntentionCatalogQuery query,
-  ) => switch ((
-    byTitle: query.titleFilter != null,
-    byTags: query.tagFilter != IntentionTagFilter.empty,
-  )) {
-    (byTitle: false, byTags: false) => EmptyState(
-      title: l10n.intentionPickerEmptyScopeTitle,
-      text: widget.emptyScopeMessage,
-    ),
-    (byTitle: true, byTags: false) => _filteredEmpty(
-      l10n,
-      title: kind.noMatchesByTitle(l10n),
-      text: l10n.intentionPickerTryShorterTitle,
-    ),
-    (byTitle: false, byTags: true) => _filteredEmpty(
-      l10n,
-      title: kind.noMatchesByTags(l10n),
-      text: l10n.intentionPickerChangeTags,
-    ),
-    (byTitle: true, byTags: true) => _filteredEmpty(
-      l10n,
-      title: l10n.intentionPickerNothingFound,
-      text: l10n.intentionPickerChangeTitleOrTags,
-    ),
-  };
+  EmptyState _empty(AppLocalizations l10n, IntentionCatalogEmpty empty) {
+    final query = empty.query;
+    final actionsOnly =
+        query.readinessFilter == IntentionReadinessFilter.readyOnly;
+    return switch ((
+      byTitle: query.titleFilter != null,
+      byTags: query.tagFilter != IntentionTagFilter.empty,
+    )) {
+      (byTitle: false, byTags: false) when (empty.typeCounts?.all ?? 0) > 0 =>
+        EmptyState(
+          title: l10n.intentionPickerEmptyTypeTitle,
+          text: l10n.intentionPickerEmptyTypeText,
+          action: (
+            label: l10n.intentionPickerShowBothTypes,
+            onPressed: () => _notifier.changeType(IntentionTypeChoice.all),
+          ),
+        ),
+      (byTitle: false, byTags: false) => EmptyState(
+        title: l10n.intentionPickerEmptyScopeTitle,
+        text: widget.emptyScopeMessage,
+      ),
+      (byTitle: true, byTags: false) => _filteredEmpty(
+        l10n,
+        title: actionsOnly
+            ? l10n.intentionPickerNoActionsByTitle
+            : l10n.intentionPickerNoIntentionsByTitle,
+        text: l10n.intentionPickerTryShorterTitle,
+      ),
+      (byTitle: false, byTags: true) => _filteredEmpty(
+        l10n,
+        title: actionsOnly
+            ? l10n.intentionPickerNoActionsByTags
+            : l10n.intentionPickerNoIntentionsByTags,
+        text: l10n.intentionPickerChangeTags,
+      ),
+      (byTitle: true, byTags: true) => _filteredEmpty(
+        l10n,
+        title: actionsOnly
+            ? l10n.intentionPickerNoActionsFound
+            : l10n.intentionPickerNoIntentionsFound,
+        text: l10n.intentionPickerChangeTitleOrTags,
+      ),
+    };
+  }
 
   EmptyState _filteredEmpty(
     AppLocalizations l10n, {

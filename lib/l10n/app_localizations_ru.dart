@@ -2411,6 +2411,16 @@ class AppLocalizationsRu extends AppLocalizations {
   String get intentionPickerEmptyScopeTitle => 'Выбрать не из чего';
 
   @override
+  String get intentionPickerEmptyTypeTitle => 'Намерений этого типа нет';
+
+  @override
+  String get intentionPickerEmptyTypeText =>
+      'Покажите оба типа, чтобы выбрать из доступных намерений.';
+
+  @override
+  String get intentionPickerShowBothTypes => 'Показать оба типа';
+
+  @override
   String get intentionPickerActionTitle => 'Выбор действия';
 
   @override
@@ -2458,7 +2468,10 @@ class AppLocalizationsRu extends AppLocalizations {
       'Измените теги в фильтре или сбросьте его.';
 
   @override
-  String get intentionPickerNothingFound => 'Ничего не найдено';
+  String get intentionPickerNoActionsFound => 'Действия не найдены';
+
+  @override
+  String get intentionPickerNoIntentionsFound => 'Намерения не найдены';
 
   @override
   String get intentionPickerChangeTitleOrTags =>

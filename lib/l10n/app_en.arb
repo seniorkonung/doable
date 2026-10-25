@@ -1947,6 +1947,18 @@
   "@intentionPickerEmptyScopeTitle": {
     "description": "Заголовок пустой выдачи экрана выбора, когда допустимый охват пуст без фильтров"
   },
+  "intentionPickerEmptyTypeTitle": "No intentions of this type",
+  "@intentionPickerEmptyTypeTitle": {
+    "description": "Заголовок пустого выбранного типа, когда в допустимом охвате есть намерения другого типа"
+  },
+  "intentionPickerEmptyTypeText": "Show both types to choose from the available intentions.",
+  "@intentionPickerEmptyTypeText": {
+    "description": "Совет показать оба типа при пустом выбранном типе"
+  },
+  "intentionPickerShowBothTypes": "Show both types",
+  "@intentionPickerShowBothTypes": {
+    "description": "Действие пустого выбранного типа, которое выбирает тип «Все»"
+  },
   "intentionPickerActionTitle": "Choose an action",
   "@intentionPickerActionTitle": {
     "description": "Заголовок шапки экрана выбора действия"
@@ -1992,9 +2004,13 @@
   "@intentionPickerChangeTags": {
     "description": "Совет пустой выдачи экрана выбора из-за условий по тегам"
   },
-  "intentionPickerNothingFound": "Nothing found",
-  "@intentionPickerNothingFound": {
-    "description": "Заголовок пустой выдачи экрана выбора из-за фильтра названия и условий по тегам"
+  "intentionPickerNoActionsFound": "No actions found",
+  "@intentionPickerNoActionsFound": {
+    "description": "Заголовок пустой выдачи действий из-за фильтра названия и условий по тегам"
+  },
+  "intentionPickerNoIntentionsFound": "No intentions found",
+  "@intentionPickerNoIntentionsFound": {
+    "description": "Заголовок пустой выдачи намерений из-за фильтра названия и условий по тегам"
   },
   "intentionPickerChangeTitleOrTags": "Change the name or the tag conditions.",
   "@intentionPickerChangeTitleOrTags": {

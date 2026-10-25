@@ -2387,6 +2387,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get intentionPickerEmptyScopeTitle => 'Nothing to choose from';
 
   @override
+  String get intentionPickerEmptyTypeTitle => 'No intentions of this type';
+
+  @override
+  String get intentionPickerEmptyTypeText =>
+      'Show both types to choose from the available intentions.';
+
+  @override
+  String get intentionPickerShowBothTypes => 'Show both types';
+
+  @override
   String get intentionPickerActionTitle => 'Choose an action';
 
   @override
@@ -2432,7 +2442,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Change the tags in the filter or reset it.';
 
   @override
-  String get intentionPickerNothingFound => 'Nothing found';
+  String get intentionPickerNoActionsFound => 'No actions found';
+
+  @override
+  String get intentionPickerNoIntentionsFound => 'No intentions found';
 
   @override
   String get intentionPickerChangeTitleOrTags =>
