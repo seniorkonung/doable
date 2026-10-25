@@ -2179,7 +2179,7 @@ abstract class AppLocalizations {
   /// **'Expand backups panel'**
   String get dataBackupsExpand;
 
-  /// Доступное название шеврона панели «Резервные копии» в полном размере
+  /// Доступное название ручки панели «Резервные копии» в полном размере
   ///
   /// In en, this message translates to:
   /// **'Collapse backups panel'**

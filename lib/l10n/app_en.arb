@@ -1199,7 +1199,7 @@
   "dataBackupsExpand": "Expand backups panel",
   "@dataBackupsExpand": {"description": "Доступное название ручки панели «Резервные копии» в компактном размере"},
   "dataBackupsCollapse": "Collapse backups panel",
-  "@dataBackupsCollapse": {"description": "Доступное название шеврона панели «Резервные копии» в полном размере"},
+  "@dataBackupsCollapse": {"description": "Доступное название ручки панели «Резервные копии» в полном размере"},
   "dataBackupsLastJustNow": "Last copy just now",
   "@dataBackupsLastJustNow": {"description": "Подпись строки «Резервные копии», когда последняя копия сделана меньше минуты назад"},
   "dataBackupsLastToday": "Last copy today at {time}",

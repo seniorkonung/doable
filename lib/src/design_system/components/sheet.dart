@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
 import '../doable_colors.dart';
-import '../doable_icon.dart';
 import '../doable_metrics.dart';
 import '../doable_shadows.dart';
 import '../doable_type.dart';
@@ -872,8 +871,8 @@ enum SheetCompactHeight {
 /// места.
 const _compactLimit = 534.0;
 
-/// Отступ заголовка раскрываемого листа от верхнего края: ручка и шеврон
-/// стоят над началом заголовка.
+/// Отступ заголовка раскрываемого листа от верхнего края: ручка стоит над
+/// началом заголовка.
 const _titleTop = 26.0;
 
 /// Части листа одного из двух вариантов.
@@ -980,7 +979,13 @@ final class _ExpandableSheetState extends State<_ExpandableSheet>
         child: SizedBox(
           width: 88,
           height: DoableMetrics.tapMin,
-          child: _SizeIcon(expansion: _expansion, color: colors.grip),
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: Padding(
+              padding: const EdgeInsets.only(top: DoableMetrics.space2),
+              child: _Grip(color: colors.grip),
+            ),
+          ),
         ),
       ),
     );
@@ -1203,67 +1208,15 @@ final class _RenderExpandableFrame extends RenderProxyBox {
   }
 }
 
-/// Ручка компактного раскрываемого листа и шеврон полного на её месте.
-///
-/// Значки перетекают друг в друга по раскрытию [expansion]: 0 — компактный
-/// размер, 1 — полный. В покое нарисован только значок текущего размера.
-final class _SizeIcon extends StatelessWidget {
-  const _SizeIcon({required this.expansion, required this.color});
-
-  static const _gripTop = DoableMetrics.space2;
-  static const _chevronSize = 28.0;
-
-  final Animation<double> expansion;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: expansion,
-    builder: (context, _) {
-      final progress = expansion.value;
-      return Stack(
-        // Квадрат шеврона выше его графики и выходит за верх кнопки.
-        clipBehavior: Clip.none,
-        alignment: Alignment.topCenter,
-        children: [
-          if (progress < 1)
-            Positioned(
-              top: _gripTop,
-              child: Opacity(
-                opacity: 1 - progress,
-                child: _Grip(color: color),
-              ),
-            ),
-          if (progress > 0)
-            Positioned(
-              // Шеврон стоит серединой на середине ручки.
-              top: _gripTop + (_Grip.height - _chevronSize) / 2,
-              child: Opacity(
-                opacity: progress,
-                child: DoableIcon(
-                  DoableIconData.chevronDown,
-                  size: _chevronSize,
-                  color: color,
-                ),
-              ),
-            ),
-        ],
-      );
-    },
-  );
-}
-
 final class _Grip extends StatelessWidget {
   const _Grip({required this.color});
-
-  static const height = 4.0;
 
   final Color color;
 
   @override
   Widget build(BuildContext context) => Container(
     width: 36,
-    height: height,
+    height: 4,
     decoration: BoxDecoration(
       color: color,
       borderRadius: BorderRadius.circular(DoableMetrics.radiusFull),

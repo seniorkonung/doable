@@ -399,8 +399,8 @@ void main() {
 
   testWidgets('сценарий «Панель раскрывается, даже когда содержимое '
       'помещается»: нажатие ручки при двух копиях раскрывает панель на весь '
-      'экран под строкой состояния с шевроном вместо ручки, а «Сделать копию '
-      'сейчас» остаётся внизу экрана', (tester) async {
+      'экран под строкой состояния, а «Сделать копию сейчас» остаётся внизу '
+      'экрана', (tester) async {
     final semantics = tester.ensureSemantics();
     _usePhone(tester);
     await _openListedSheet(
@@ -439,8 +439,8 @@ void main() {
     ('en', 'Expand backups panel', 'Collapse backups panel'),
   ]) {
     testWidgets('$language: сценарий «Экранный диктор сворачивает панель '
-        '«Резервные копии»»: шеврон раскрытой панели возвращает компактный '
-        'размер с ручкой в свёрнутом состоянии', (tester) async {
+        '«Резервные копии»»: ручка раскрытой панели возвращает компактный '
+        'размер, и ручка объявлена в свёрнутом состоянии', (tester) async {
       final semantics = tester.ensureSemantics();
       _usePhone(tester);
       await _openListedSheet(
@@ -451,9 +451,9 @@ void main() {
       final compactHeight = _sheetHeight(tester);
       await tester.tap(find.bySemanticsLabel(expand));
       await tester.pumpAndSettle();
-      final chevron = tester.getSemantics(find.bySemanticsLabel(collapse));
+      final handle = tester.getSemantics(find.bySemanticsLabel(collapse));
       expect(
-        chevron,
+        handle,
         isSemantics(
           label: collapse,
           isButton: true,
@@ -464,7 +464,7 @@ void main() {
       );
 
       tester.binding.renderViews.first.owner!.semanticsOwner!.performAction(
-        chevron.id,
+        handle.id,
         SemanticsAction.tap,
       );
       await tester.pumpAndSettle();
