@@ -33,7 +33,7 @@
   - **Files likely touched:** `lib/src/design_system/doable_icon.dart`, `lib/src/design_system/icons/assets/chevron_down.svg`, `lib/src/design_system/icons/README.md`, `test/design_system/doable_icon_test.dart`, `test/design_system/goldens/doable_icons.png`
   - **Estimated scope:** S
 
-- [ ] 1.4 Изменённые требования `bottom-sheets` выполнены, проверки листа и набора значков проходят, общие проверки проекта проходят
+- [x] 1.4 Изменённые требования `bottom-sheets` выполнены, проверки листа и набора значков проходят, общие проверки проекта проходят
   - **Acceptance criteria:**
     - Условие Ready to advance фазы 1 из `plan.md` выполнено
     - Изменение проходит строгую проверку OpenSpec
