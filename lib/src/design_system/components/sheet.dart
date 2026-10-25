@@ -1056,25 +1056,28 @@ final class _ExpandableSheetState extends State<_ExpandableSheet>
       );
       return _SheetLayout(
         minimum: const EdgeInsets.symmetric(horizontal: DoableMetrics.space3),
-        head: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(bottom: DoableMetrics.space3),
-              child: header,
-            ),
-            if (pinned != null) ...[
+        head: _ExpandableHead(
+          fillsHeight: !shrinkWrap,
+          top: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
               Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: DoableMetrics.space2,
-                ),
-                child: pinned,
+                padding: const EdgeInsets.only(bottom: DoableMetrics.space3),
+                child: header,
               ),
-              const SizedBox(height: DoableMetrics.space2),
+              if (pinned != null) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: DoableMetrics.space2,
+                  ),
+                  child: pinned,
+                ),
+                const SizedBox(height: DoableMetrics.space2),
+              ],
             ],
-            if (shrinkWrap) Flexible(child: list) else Expanded(child: list),
-          ],
+          ),
+          list: list,
         ),
         footer: _Footer(child: parts.footer),
       );
@@ -1250,6 +1253,135 @@ final class _RenderExpandableFrame extends RenderProxyBox {
       );
     }
     size = constraints.constrain(sheet.size);
+  }
+}
+
+enum _HeadSlot { top, list }
+
+/// Шапка с закреплённой частью [top] над списком [list].
+///
+/// Список занимает место под [top], а с [fillsHeight] — всё это место. Когда
+/// места меньше, чем нужно [top], например в первых кадрах раскрытия листа с
+/// пустым списком, где шапка полного размера выше компактной, [top] стоит
+/// низом на месте списка и уходит верхом под край листа, а не переполняет его.
+final class _ExpandableHead
+    extends SlottedMultiChildRenderObjectWidget<_HeadSlot, RenderBox> {
+  const _ExpandableHead({
+    required this.fillsHeight,
+    required this.top,
+    required this.list,
+  });
+
+  final bool fillsHeight;
+  final Widget top;
+  final Widget list;
+
+  @override
+  Iterable<_HeadSlot> get slots => _HeadSlot.values;
+
+  @override
+  Widget childForSlot(_HeadSlot slot) => switch (slot) {
+    _HeadSlot.top => top,
+    _HeadSlot.list => list,
+  };
+
+  @override
+  _RenderExpandableHead createRenderObject(BuildContext context) =>
+      _RenderExpandableHead(fillsHeight);
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    _RenderExpandableHead renderObject,
+  ) => renderObject.fillsHeight = fillsHeight;
+}
+
+final class _RenderExpandableHead extends RenderBox
+    with SlottedContainerRenderObjectMixin<_HeadSlot, RenderBox> {
+  _RenderExpandableHead(this._fillsHeight);
+
+  bool _fillsHeight;
+
+  set fillsHeight(bool value) {
+    if (value == _fillsHeight) return;
+    _fillsHeight = value;
+    markNeedsLayout();
+  }
+
+  /// Насколько [_HeadSlot.top] ушёл под верхний край при последней раскладке.
+  var _hidden = 0.0;
+
+  final _clip = LayerHandle<ClipRectLayer>();
+
+  @override
+  void performLayout() {
+    final width = constraints.maxWidth;
+    final top = childForSlot(_HeadSlot.top)!;
+    final list = childForSlot(_HeadSlot.list)!;
+
+    top.layout(BoxConstraints.tightFor(width: width), parentUsesSize: true);
+    final room = math.max(0.0, constraints.maxHeight - top.size.height);
+    list.layout(
+      _fillsHeight
+          ? BoxConstraints.tightFor(width: width, height: room)
+          : BoxConstraints(minWidth: width, maxWidth: width, maxHeight: room),
+      parentUsesSize: true,
+    );
+    final height = constraints.constrainHeight(
+      top.size.height + list.size.height,
+    );
+    _hidden = math.max(0, top.size.height + list.size.height - height);
+    _place(top, Offset(0, -_hidden));
+    _place(list, Offset(0, top.size.height - _hidden));
+    size = Size(width, height);
+  }
+
+  static void _place(RenderBox child, Offset offset) =>
+      (child.parentData! as BoxParentData).offset = offset;
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    void paintChildren(PaintingContext context, Offset offset) {
+      for (final child in children) {
+        context.paintChild(
+          child,
+          offset + (child.parentData! as BoxParentData).offset,
+        );
+      }
+    }
+
+    if (_hidden == 0) {
+      _clip.layer = null;
+      paintChildren(context, offset);
+      return;
+    }
+    _clip.layer = context.pushClipRect(
+      needsCompositing,
+      offset,
+      Offset.zero & size,
+      paintChildren,
+      oldLayer: _clip.layer,
+    );
+  }
+
+  @override
+  void dispose() {
+    _clip.layer = null;
+    super.dispose();
+  }
+
+  @override
+  bool hitTestChildren(BoxHitTestResult result, {required Offset position}) {
+    for (final child in children) {
+      final isHit = result.addWithPaintOffset(
+        offset: (child.parentData! as BoxParentData).offset,
+        position: position,
+        hitTest: (result, transformed) =>
+            child.hitTest(result, position: transformed),
+      );
+      if (isHit) return true;
+    }
+    return false;
   }
 }
 

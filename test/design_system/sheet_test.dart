@@ -923,6 +923,90 @@ void main() {
     expect(tester.getRect(find.byType(Sheet)), compact);
   });
 
+  testWidgets('лист с компактной высотой по содержимому и пустым списком '
+      'раскрывается ручкой и сворачивается шевроном без ошибки раскладки, а '
+      'нижняя кнопка стоит внизу экрана', (tester) async {
+    final rows = ValueNotifier(0);
+    addTearDown(rows.dispose);
+    await _openContentHeightSheet(tester, rows);
+    final footer = tester.getRect(find.text('Готово'));
+
+    for (final label in [_expandLabel, _collapseLabel]) {
+      await tester.tap(find.bySemanticsLabel(label));
+      do {
+        await tester.pump(const Duration(milliseconds: 16));
+        expect(tester.takeException(), isNull, reason: label);
+        expect(tester.getRect(find.text('Готово')), footer, reason: label);
+      } while (tester.binding.hasScheduledFrame);
+    }
+  });
+
+  testWidgets('лист с компактной высотой по содержимому и пустым списком, '
+      'отпущенный рядом с компактным положением при перетаскивании шапки вниз '
+      'из полного размера, приходит в компактный размер без ошибки '
+      'раскладки', (tester) async {
+    final rows = ValueNotifier(0);
+    addTearDown(rows.dispose);
+    await _openContentHeightSheet(tester, rows);
+    final compact = tester.getRect(find.byType(Sheet));
+    await tester.tap(find.bySemanticsLabel(_expandLabel));
+    await tester.pumpAndSettle();
+    final full = tester.getRect(find.byType(Sheet));
+
+    final gesture = await _SlowGesture.start(tester, _header);
+    // Палец на 10 выше компактного положения верхнего края.
+    await gesture.moveTo(compact.top - 10 - full.top);
+    expect(tester.takeException(), isNull);
+    await gesture.up();
+    do {
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(tester.takeException(), isNull);
+    } while (tester.binding.hasScheduledFrame);
+    expect(tester.getRect(find.byType(Sheet)), compact);
+  });
+
+  testWidgets('компактная высота листа по содержимому с пустым списком — '
+      'высота его частей с шапкой компактного размера и их отступов, и её же '
+      'держит полный лист при перетаскивании вниз', (tester) async {
+    final rows = ValueNotifier(0);
+    addTearDown(rows.dispose);
+    await _openContentHeightSheet(tester, rows);
+    final compact = tester.getRect(find.byType(Sheet));
+    final footer = tester.getRect(find.text('Готово'));
+
+    expect(tester.getRect(find.text('Копии')).top, compact.top + 26);
+    expect(
+      footer.top,
+      tester.getRect(_header).bottom +
+          DoableMetrics.space3 +
+          DoableMetrics.space3,
+    );
+    expect(compact.bottom, _screen.height);
+    expect(
+      footer.bottom,
+      compact.bottom - _homeIndicator - DoableMetrics.space4,
+    );
+
+    await tester.tap(find.bySemanticsLabel(_expandLabel));
+    await tester.pumpAndSettle();
+    final full = tester.getRect(find.byType(Sheet));
+    final gesture = await _SlowGesture.start(tester, _header);
+    // Палец на 20 ниже компактного положения верхнего края: лист уходит вниз
+    // вместе с кнопкой ровно на столько, сколько палец прошёл ниже него.
+    await gesture.moveTo(compact.top + 20 - full.top);
+    expect(
+      tester.getRect(find.byType(Sheet)).top,
+      closeTo(compact.top + 20, 1),
+    );
+    expect(
+      tester.getRect(find.text('Готово')).top,
+      closeTo(footer.top + 20, 1),
+    );
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(tester.getRect(find.byType(Sheet)), compact);
+  });
+
   testWidgets('свайп вверх по короткому списку листа с компактной высотой по '
       'содержимому раскрывает лист вслед за пальцем, а нижняя кнопка стоит '
       'на месте', (tester) async {
