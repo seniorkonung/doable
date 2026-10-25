@@ -195,7 +195,74 @@ void defineIntentionPickerSessionTests({
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets(
+    'тип и порядок независимы у вложенных поисков и начинаются заново после закрытия',
+    (tester) async {
+      final (container, repository, router) = await _openApp(tester);
+      unawaited(router.push<void>(route));
+      await _settleRoute(tester);
+      final first = _purpose(tester);
+      final firstModel = container.read(
+        intentionCatalogViewModelProvider(first).notifier,
+      );
+      firstModel.changeType(IntentionTypeChoice.actions);
+      firstModel.changeOrder(IntentionCatalogOrder.titleDescending);
+      await tester.pump();
+      repository.complete(repository.queries.length - 1, _singleActionPage());
+      await tester.pumpAndSettle();
+
+      unawaited(router.push<void>(route));
+      await _settleRoute(tester);
+      final second = _purpose(tester);
+      final initialQuery = repository.queries.last;
+      expect(initialQuery.order, IntentionCatalogOrder.createdAtDescending);
+      expect(initialQuery.readinessFilter, readinessFilter);
+      repository.complete(repository.queries.length - 1, _singleActionPage());
+      await tester.pumpAndSettle();
+      final secondModel = container.read(
+        intentionCatalogViewModelProvider(second).notifier,
+      );
+      secondModel.changeOrder(IntentionCatalogOrder.updatedAtAscending);
+      await tester.pump();
+      repository.complete(repository.queries.length - 1, _singleActionPage());
+      await tester.pumpAndSettle();
+
+      await router.maybePop();
+      await tester.pumpAndSettle();
+      expect(firstModel.selection.order, IntentionCatalogOrder.titleDescending);
+      switch (firstModel.selection.type) {
+        case IntentionTypeOpen(:final selected):
+          expect(selected, IntentionTypeChoice.actions);
+        case IntentionTypePinnedToActions():
+          expect(first, isA<SelectDailyChoiceAction>());
+        case IntentionTypeNotOffered():
+          fail('Поиск должен предлагать тип намерения.');
+      }
+
+      await router.maybePop();
+      await tester.pumpAndSettle();
+      unawaited(router.push<void>(route));
+      await _settleRoute(tester);
+      expect(
+        repository.queries.last.order,
+        IntentionCatalogOrder.createdAtDescending,
+      );
+      expect(repository.queries.last.readinessFilter, readinessFilter);
+      repository.complete(repository.queries.length - 1, _singleActionPage());
+      await tester.pumpAndSettle();
+    },
+  );
 }
+
+Result<IntentionCatalogFirstPage> _singleActionPage() => ResultSuccess(
+  IntentionCatalogFirstPage(
+    items: [testSummary(index: 1, readiness: IntentionReadiness.ready)],
+    totalCount: 1,
+    nextCursor: null,
+    revision: const TestCatalogRevision(1),
+  ),
+);
 
 /// Назначение верхнего поиска.
 IntentionPickerPurpose _purpose(WidgetTester tester) => tester

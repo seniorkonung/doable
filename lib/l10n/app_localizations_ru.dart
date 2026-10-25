@@ -2318,6 +2318,49 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
+  String get intentionPickerShowAndSortTitle => 'Показать и упорядочить';
+
+  @override
+  String get intentionPickerShowAndSortHint => 'Список меняется по мере выбора';
+
+  @override
+  String get intentionPickerShowAndSortReset => 'Сбросить';
+
+  @override
+  String get intentionPickerTypeCaption => 'Тип';
+
+  @override
+  String get intentionPickerActionTypeNote =>
+      'Конечным в дневном выборе может быть только действие';
+
+  @override
+  String get intentionPickerSortCaption => 'Сортировка';
+
+  @override
+  String get intentionPickerSortCreated => 'Создание';
+
+  @override
+  String get intentionPickerSortChanged => 'Изменение';
+
+  @override
+  String get intentionPickerSortName => 'Название';
+
+  @override
+  String get intentionPickerOrderCaption => 'Порядок';
+
+  @override
+  String get intentionPickerOrderNewest => 'Сначала новые';
+
+  @override
+  String get intentionPickerOrderOldest => 'Сначала старые';
+
+  @override
+  String get intentionPickerOrderAToZ => 'От А до Я';
+
+  @override
+  String get intentionPickerOrderZToA => 'От Я до А';
+
+  @override
   String get intentionPickerAllHeader => 'Все';
 
   @override

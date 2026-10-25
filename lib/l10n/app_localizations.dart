@@ -3580,6 +3580,90 @@ abstract class AppLocalizations {
   /// **'Open the page of intention {title}'**
   String intentionPickerOpenIntentionPage(String title);
 
+  /// Заголовок листа параметров показа поиска
+  ///
+  /// In en, this message translates to:
+  /// **'Show and sort'**
+  String get intentionPickerShowAndSortTitle;
+
+  /// Пояснение немедленного применения параметров поиска
+  ///
+  /// In en, this message translates to:
+  /// **'The list changes as you choose'**
+  String get intentionPickerShowAndSortHint;
+
+  /// Сброс типа и сортировки поиска к начальному показу
+  ///
+  /// In en, this message translates to:
+  /// **'Reset'**
+  String get intentionPickerShowAndSortReset;
+
+  /// Название группы типа намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get intentionPickerTypeCaption;
+
+  /// Причина закреплённого типа в поиске действия
+  ///
+  /// In en, this message translates to:
+  /// **'Only an action can be the final intention of a daily choice'**
+  String get intentionPickerActionTypeNote;
+
+  /// Название группы поля сортировки
+  ///
+  /// In en, this message translates to:
+  /// **'Sort by'**
+  String get intentionPickerSortCaption;
+
+  /// Сортировка по времени создания
+  ///
+  /// In en, this message translates to:
+  /// **'Created'**
+  String get intentionPickerSortCreated;
+
+  /// Сортировка по времени изменения
+  ///
+  /// In en, this message translates to:
+  /// **'Changed'**
+  String get intentionPickerSortChanged;
+
+  /// Сортировка по названию
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get intentionPickerSortName;
+
+  /// Название группы направления сортировки
+  ///
+  /// In en, this message translates to:
+  /// **'Order'**
+  String get intentionPickerOrderCaption;
+
+  /// Убывающий порядок по времени
+  ///
+  /// In en, this message translates to:
+  /// **'Newest first'**
+  String get intentionPickerOrderNewest;
+
+  /// Возрастающий порядок по времени
+  ///
+  /// In en, this message translates to:
+  /// **'Oldest first'**
+  String get intentionPickerOrderOldest;
+
+  /// Прямой порядок по названию
+  ///
+  /// In en, this message translates to:
+  /// **'A to Z'**
+  String get intentionPickerOrderAToZ;
+
+  /// Обратный порядок по названию
+  ///
+  /// In en, this message translates to:
+  /// **'Z to A'**
+  String get intentionPickerOrderZToA;
+
   /// Показываемый тип без ограничения в заголовке списка поиска для выбора
   ///
   /// In en, this message translates to:

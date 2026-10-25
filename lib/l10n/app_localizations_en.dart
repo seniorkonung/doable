@@ -2294,6 +2294,49 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get intentionPickerShowAndSortTitle => 'Show and sort';
+
+  @override
+  String get intentionPickerShowAndSortHint => 'The list changes as you choose';
+
+  @override
+  String get intentionPickerShowAndSortReset => 'Reset';
+
+  @override
+  String get intentionPickerTypeCaption => 'Type';
+
+  @override
+  String get intentionPickerActionTypeNote =>
+      'Only an action can be the final intention of a daily choice';
+
+  @override
+  String get intentionPickerSortCaption => 'Sort by';
+
+  @override
+  String get intentionPickerSortCreated => 'Created';
+
+  @override
+  String get intentionPickerSortChanged => 'Changed';
+
+  @override
+  String get intentionPickerSortName => 'Name';
+
+  @override
+  String get intentionPickerOrderCaption => 'Order';
+
+  @override
+  String get intentionPickerOrderNewest => 'Newest first';
+
+  @override
+  String get intentionPickerOrderOldest => 'Oldest first';
+
+  @override
+  String get intentionPickerOrderAToZ => 'A to Z';
+
+  @override
+  String get intentionPickerOrderZToA => 'Z to A';
+
+  @override
   String get intentionPickerAllHeader => 'All';
 
   @override
