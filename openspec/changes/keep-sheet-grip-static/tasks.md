@@ -54,7 +54,7 @@
   - **Files likely touched:** `lib/src/design_system/components/sheet.dart`, `test/design_system/sheet_test.dart`
   - **Estimated scope:** XS
 
-- [ ] 1.6 После возврата звука касания изменённые требования `bottom-sheets` выполнены и общие проверки проекта проходят
+- [x] 1.6 После возврата звука касания изменённые требования `bottom-sheets` выполнены и общие проверки проекта проходят
   - **Acceptance criteria:**
     - Условие Ready to advance фазы 1 из `plan.md` выполнено после задачи 1.5
     - Изменение проходит строгую проверку OpenSpec
