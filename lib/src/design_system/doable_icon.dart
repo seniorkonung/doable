@@ -22,7 +22,6 @@ enum DoableIconData {
   check('check'),
   exclude('exclude'),
   chevronRight('chevron_right'),
-  chevronDown('chevron_down'),
   search('search'),
   clear('clear'),
   grip('grip'),

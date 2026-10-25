@@ -2,7 +2,6 @@ import 'package:doable/src/design_system/doable_colors.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -48,30 +47,7 @@ void main() {
     },
   );
 
-  testWidgets(
-    'неквадратная графика занимает квадрат size и рисуется в своих пропорциях',
-    (tester) async {
-      await tester.pumpWidget(
-        const Directionality(
-          textDirection: TextDirection.ltr,
-          child: Center(
-            child: DoableIcon(
-              DoableIconData.chevronDown,
-              size: 28,
-              color: Color(0xff111114),
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(tester.takeException(), isNull);
-      expect(tester.getSize(find.byType(DoableIcon)), const Size.square(28));
-      expect(tester.getRect(find.byType(SvgPicture)).size, const Size(28, 10));
-    },
-  );
-
-  testWidgets('все 37 ресурсов сохраняют исходную графику в обеих темах', (
+  testWidgets('все 36 ресурсов сохраняют исходную графику в обеих темах', (
     tester,
   ) async {
     await (FontLoader('Inter')..addFont(
@@ -139,7 +115,6 @@ Widget _sampleRow(DoableIconData icon, DoableColors colors) {
     DoableIconData.exclude => (20.0, colors.muted, colors.raised),
     DoableIconData.plusSmall => (18.0, colors.accent, colors.raised),
     DoableIconData.chevronRight => (20.0, colors.muted, colors.bg),
-    DoableIconData.chevronDown => (28.0, colors.grip, colors.raised),
     DoableIconData.search => (20.0, colors.muted, colors.fill),
     DoableIconData.clear => (12.0, colors.fill, colors.grip),
     DoableIconData.grip => (16.0, colors.grip, colors.bg),
