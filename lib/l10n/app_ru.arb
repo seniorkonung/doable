@@ -370,6 +370,8 @@
   "dataBackupsExplanation": "Копия делается каждый день, если данные менялись, и хранится на этом устройстве. Остаются 7 последних ежедневных копий. Выберите копию, чтобы восстановить её.",
   "dataBackupsMakeNow": "Сделать копию сейчас",
   "dataBackupsReadFailed": "Не удалось загрузить копии",
+  "dataBackupsExpand": "Раскрыть панель резервных копий",
+  "dataBackupsCollapse": "Свернуть панель резервных копий",
   "dataBackupsLastJustNow": "Последняя копия только что",
   "dataBackupsLastToday": "Последняя копия сегодня в {time}",
   "dataBackupsLastYesterday": "Последняя копия вчера в {time}",

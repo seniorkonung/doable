@@ -1377,6 +1377,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dataBackupsReadFailed => 'Couldn’t load backups';
 
   @override
+  String get dataBackupsExpand => 'Expand backups panel';
+
+  @override
+  String get dataBackupsCollapse => 'Collapse backups panel';
+
+  @override
   String get dataBackupsLastJustNow => 'Last copy just now';
 
   @override

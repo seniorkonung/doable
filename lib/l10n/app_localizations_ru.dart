@@ -1391,6 +1391,12 @@ class AppLocalizationsRu extends AppLocalizations {
   String get dataBackupsReadFailed => 'Не удалось загрузить копии';
 
   @override
+  String get dataBackupsExpand => 'Раскрыть панель резервных копий';
+
+  @override
+  String get dataBackupsCollapse => 'Свернуть панель резервных копий';
+
+  @override
   String get dataBackupsLastJustNow => 'Последняя копия только что';
 
   @override

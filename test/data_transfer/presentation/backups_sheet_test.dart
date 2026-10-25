@@ -9,6 +9,7 @@ import 'package:doable/src/app/settings/settings_page.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/data/local/app_database.dart' hide GraphBackups;
 import 'package:doable/src/data_transfer/presentation/backups_sheet.dart';
+import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/design_system/doable_metrics.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -25,6 +26,7 @@ import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
@@ -315,30 +317,41 @@ void main() {
     expect(find.byType(SnackBar), findsNothing);
   });
 
-  testWidgets('когда копии не помещаются в панель, прокручивается только '
-      'список, а «Сделать копию сейчас» видна под ним над системным '
-      'отступом и нажимается без прокрутки', (tester) async {
-    tester.view.physicalSize = const Size(390, 640);
-    tester.view.devicePixelRatio = 1;
-    tester.view.padding = const FakeViewPadding(top: 24, bottom: 34);
-    addTearDown(tester.view.reset);
-    final app = await _BackupsApp.open(tester);
-    await app.createTag('Дом');
+  testWidgets('сценарий «Много копий не раскрывают панель»: панель '
+      'открыта в компактном размере со скруглёнными углами и ручкой, а копии '
+      'прокручиваются между пояснением и «Сделать копию сейчас»', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    _usePhone(tester);
+    await _openListedSheet(
+      tester,
+      backups: [
+        for (var day = 30; day > 10; day--)
+          _backup(DateTime(2026, 9, day, 9), _counts(0, 0, 0)),
+        _backup(DateTime(2026, 9, 10, 9), _counts(1, 0, 0)),
+      ],
+    );
+
+    expect(_sheetHeight(tester), 534);
+    expect(_topRadius(tester), DoableMetrics.radiusXl);
+    expect(find.bySemanticsLabel('Раскрыть панель резервных копий'), findsOne);
     final button = find
         .widgetWithText(FilledButton, 'Сделать копию сейчас')
         .hitTestable();
-
-    for (var copy = 0; copy < 7; copy++) {
-      await tester.tap(button);
-      await tester.pumpAndSettle();
-    }
-
-    expect(find.text('Нет изменений'), findsNWidgets(6));
     final buttonRect = tester.getRect(button);
-    expect(buttonRect.bottom, lessThanOrEqualTo(640 - 34));
+    expect(
+      buttonRect.bottom,
+      lessThanOrEqualTo(_phone.height - _homeIndicator),
+    );
+    expect(
+      tester.getRect(find.text('30 сентября, 09:00')).top,
+      greaterThan(tester.getRect(find.textContaining('Копия делается')).bottom),
+    );
     final oldest = find.text('1 добавлено');
     expect(oldest.hitTestable(), findsNothing);
 
+    // Жест по списку сначала раскрывает панель, а затем прокручивает копии.
     await tester.scrollUntilVisible(
       oldest,
       100,
@@ -352,14 +365,13 @@ void main() {
     expect(oldest.hitTestable(), findsOneWidget);
     expect(tester.getRect(oldest).bottom, lessThanOrEqualTo(buttonRect.top));
     expect(tester.getRect(button), buttonRect);
+    semantics.dispose();
   });
 
-  testWidgets('когда копии помещаются, панель высотой по содержимому, а '
-      '«Сделать копию сейчас» стоит сразу под списком', (tester) async {
-    tester.view.physicalSize = const Size(390, 640);
-    tester.view.devicePixelRatio = 1;
-    tester.view.padding = const FakeViewPadding(top: 24, bottom: 34);
-    addTearDown(tester.view.reset);
+  testWidgets('сценарий «Немногие копии дают низкую панель»: две копии дают '
+      'панель ниже компактной панели тегов, а «Сделать копию сейчас» стоит '
+      'сразу под последней копией', (tester) async {
+    _usePhone(tester);
 
     await _openListedSheet(
       tester,
@@ -369,7 +381,7 @@ void main() {
       ],
     );
 
-    expect(tester.getRect(find.byType(BottomSheet)).top, greaterThan(24));
+    expect(_sheetHeight(tester), lessThan(534));
     final oldestRow = find.ancestor(
       of: find.text('1 изменено'),
       matching: find.byType(InkWell),
@@ -384,6 +396,94 @@ void main() {
       DoableMetrics.space3,
     );
   });
+
+  testWidgets('сценарий «Панель раскрывается, даже когда содержимое '
+      'помещается»: нажатие ручки при двух копиях раскрывает панель на весь '
+      'экран под строкой состояния с шевроном вместо ручки, а «Сделать копию '
+      'сейчас» остаётся внизу экрана', (tester) async {
+    final semantics = tester.ensureSemantics();
+    _usePhone(tester);
+    await _openListedSheet(
+      tester,
+      backups: [
+        _backup(DateTime(2026, 10, 7, 8, 15), _counts(1, 0, 0)),
+        _backup(DateTime(2026, 10, 6, 21, 40), _counts(0, 1, 0)),
+      ],
+    );
+    final button = find.widgetWithText(FilledButton, 'Сделать копию сейчас');
+    final buttonRect = tester.getRect(button);
+
+    await tester.tap(find.bySemanticsLabel('Раскрыть панель резервных копий'));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.getRect(find.byType(Sheet)),
+      Rect.fromLTRB(0, _statusBar, _phone.width, _phone.height),
+    );
+    expect(_topRadius(tester), 0);
+    expect(
+      find.bySemanticsLabel('Раскрыть панель резервных копий'),
+      findsNothing,
+    );
+    expect(find.bySemanticsLabel('Свернуть панель резервных копий'), findsOne);
+    expect(tester.getRect(button), buttonRect);
+    semantics.dispose();
+  });
+
+  for (final (language, expand, collapse) in [
+    (
+      'ru',
+      'Раскрыть панель резервных копий',
+      'Свернуть панель резервных копий',
+    ),
+    ('en', 'Expand backups panel', 'Collapse backups panel'),
+  ]) {
+    testWidgets('$language: сценарий «Экранный диктор сворачивает панель '
+        '«Резервные копии»»: шеврон раскрытой панели возвращает компактный '
+        'размер с ручкой в свёрнутом состоянии', (tester) async {
+      final semantics = tester.ensureSemantics();
+      _usePhone(tester);
+      await _openListedSheet(
+        tester,
+        language: language,
+        backups: [_backup(DateTime(2026, 10, 7, 8, 15), _counts(1, 0, 0))],
+      );
+      final compactHeight = _sheetHeight(tester);
+      await tester.tap(find.bySemanticsLabel(expand));
+      await tester.pumpAndSettle();
+      final chevron = tester.getSemantics(find.bySemanticsLabel(collapse));
+      expect(
+        chevron,
+        isSemantics(
+          label: collapse,
+          isButton: true,
+          hasExpandedState: true,
+          isExpanded: true,
+          hasTapAction: true,
+        ),
+      );
+
+      tester.binding.renderViews.first.owner!.semanticsOwner!.performAction(
+        chevron.id,
+        SemanticsAction.tap,
+      );
+      await tester.pumpAndSettle();
+
+      expect(_sheetHeight(tester), compactHeight);
+      expect(find.bySemanticsLabel(collapse), findsNothing);
+      expect(
+        tester.getSemantics(find.bySemanticsLabel(expand)),
+        isSemantics(
+          label: expand,
+          isButton: true,
+          hasExpandedState: true,
+          isExpanded: false,
+          hasTapAction: true,
+        ),
+      );
+      semantics.dispose();
+    });
+  }
 
   testWidgets('отказ ручной копии оставляет список и кнопку прежними, а '
       '«Не удалось сделать копию» появляется только после закрытия панели', (
@@ -492,6 +592,35 @@ GraphBackupEntry _backup(DateTime madeAt, GraphChangeSummary summary) {
     summary: summary,
   );
 }
+
+/// Экран телефона 390×844 со строкой состояния [_statusBar] и полосой
+/// жестов [_homeIndicator].
+const _phone = Size(390, 844);
+const _statusBar = 47.0;
+const _homeIndicator = 34.0;
+
+void _usePhone(WidgetTester tester) {
+  tester.view
+    ..physicalSize = _phone
+    ..devicePixelRatio = 1
+    ..padding = const FakeViewPadding(top: _statusBar, bottom: _homeIndicator);
+  addTearDown(tester.view.reset);
+}
+
+double _sheetHeight(WidgetTester tester) =>
+    tester.getSize(find.byType(Sheet)).height;
+
+/// Радиус верхних углов панели.
+double _topRadius(WidgetTester tester) => tester
+    .widget<Material>(
+      find
+          .descendant(of: find.byType(Sheet), matching: find.byType(Material))
+          .first,
+    )
+    .borderRadius!
+    .resolve(TextDirection.ltr)
+    .topLeft
+    .x;
 
 /// Тексты открытой панели сверху вниз.
 List<String?> _sheetTexts(WidgetTester tester) => tester
