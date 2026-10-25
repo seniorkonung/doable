@@ -16,7 +16,7 @@ import '../support/benchmark.dart';
 const _intentions = 50000;
 
 void main() {
-  test('бенчмарк каталога намерений: короткие фильтры', () async {
+  test('бенчмарк каталога намерений: короткие фильтры и порядок по названию', () async {
     final harness = await LocalDatabaseHarness.fileBacked();
     addTearDown(harness.dispose);
     final database = await harness.openReadyDatabase();
@@ -72,5 +72,69 @@ void main() {
       }
       reportBenchmarkBudget(benchmarkCase, 'request', samples, 100);
     }
+    for (final order in [
+      IntentionCatalogOrder.titleAscending,
+      IntentionCatalogOrder.titleDescending,
+    ]) {
+      final firstQuery = IntentionCatalogQuery(
+        scope: IntentionScope.active,
+        order: order,
+        titleFilter: null,
+        pageSize: 100,
+      );
+      final firstCase =
+          'intentionCatalog/active/title/${order.direction.name}/firstPage';
+      if (benchmarkIncludes(firstCase)) {
+        final samples = <Duration>[];
+        for (
+          var sample = -benchmarkWarmups;
+          sample < benchmarkSamples;
+          sample++
+        ) {
+          final watch = Stopwatch()..start();
+          final result = await repository.getCatalogPage(firstQuery);
+          watch.stop();
+          final page = _successfulPage(result) as IntentionCatalogFirstPage;
+          expect(page.items, hasLength(100));
+          expect(page.totalCount, _intentions ~/ 2);
+          if (sample >= 0) samples.add(watch.elapsed);
+        }
+        reportBenchmarkBudget(firstCase, 'request', samples, 100);
+      }
+      final continuationCase =
+          'intentionCatalog/active/title/${order.direction.name}/continuation';
+      if (benchmarkIncludes(continuationCase)) {
+        final firstPage = _successfulPage(
+          await repository.getCatalogPage(firstQuery),
+        );
+        final continuationQuery = IntentionCatalogQuery(
+          scope: IntentionScope.active,
+          order: order,
+          titleFilter: null,
+          pageSize: 100,
+          cursor: firstPage.nextCursor,
+        );
+        final samples = <Duration>[];
+        for (
+          var sample = -benchmarkWarmups;
+          sample < benchmarkSamples;
+          sample++
+        ) {
+          final watch = Stopwatch()..start();
+          final result = await repository.getCatalogPage(continuationQuery);
+          watch.stop();
+          final page = _successfulPage(result);
+          expect(page, isA<IntentionCatalogContinuationPage>());
+          expect(page.items, hasLength(100));
+          if (sample >= 0) samples.add(watch.elapsed);
+        }
+        reportBenchmarkBudget(continuationCase, 'request', samples, 100);
+      }
+    }
   }, timeout: const Timeout(Duration(minutes: 3)));
+}
+
+IntentionCatalogPage _successfulPage(Result<IntentionCatalogPage> result) {
+  expect(result, isA<ResultSuccess<IntentionCatalogPage>>());
+  return (result as ResultSuccess<IntentionCatalogPage>).value;
 }

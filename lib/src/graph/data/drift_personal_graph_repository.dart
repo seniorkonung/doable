@@ -335,9 +335,18 @@ final class DriftPersonalGraphRepository
     IntentionCatalogQuery query,
   ) async {
     final stopwatch = Stopwatch()..start();
+    final sortField = switch (query.order.field) {
+      IntentionCatalogSortField.createdAt =>
+        CatalogPageReadDiagnosticsSortField.createdAt,
+      IntentionCatalogSortField.updatedAt =>
+        CatalogPageReadDiagnosticsSortField.updatedAt,
+      IntentionCatalogSortField.title =>
+        CatalogPageReadDiagnosticsSortField.title,
+    };
     _recordDiagnostics(
       CatalogPageReadDiagnosticsEvent(
         pageSize: query.pageSize,
+        sortField: sortField,
         status: const DiagnosticsStarted(),
       ),
     );
@@ -359,6 +368,7 @@ final class DriftPersonalGraphRepository
       _recordDiagnostics(
         CatalogPageReadDiagnosticsEvent(
           pageSize: query.pageSize,
+          sortField: sortField,
           status: DiagnosticsSucceeded(stopwatch.elapsed),
         ),
       );
@@ -368,6 +378,7 @@ final class DriftPersonalGraphRepository
       _recordDiagnostics(
         CatalogPageReadDiagnosticsEvent(
           pageSize: query.pageSize,
+          sortField: sortField,
           status: DiagnosticsFailed(
             duration: stopwatch.elapsed,
             code: _diagnosticsFailureCode(failure),

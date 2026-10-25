@@ -115,10 +115,11 @@ Map<String, Object> _encode(DiagnosticsEvent event) => switch (event) {
       'fromSchemaVersion': fromSchemaVersion,
       'toSchemaVersion': toSchemaVersion,
     },
-  CatalogPageReadDiagnosticsEvent(:final pageSize) => {
+  CatalogPageReadDiagnosticsEvent(:final pageSize, :final sortField) => {
     'operation': 'catalogPageRead',
     ..._encodeStatus(event.status),
     'pageSize': pageSize,
+    'sortField': sortField.name,
   },
   IntentionDetailReadDiagnosticsEvent() => {
     'operation': 'intentionDetailRead',
