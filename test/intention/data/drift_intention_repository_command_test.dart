@@ -1324,6 +1324,59 @@ void main() {
       );
     });
 
+    test('снимки смены готовности принадлежат условию готовности по своему состоянию', () async {
+      final id = _idForSequence(0x701);
+      await _insertIntention(
+        database,
+        id: id.toCanonicalString(),
+        title: 'Гулять',
+        createdAt: DateTime.utc(2026, 9, 2, 10),
+      );
+      clock = _DeterministicClock([
+        DateTime.utc(2026, 9, 3, 10),
+        DateTime.utc(2026, 9, 3, 11),
+      ]);
+      repository = DriftPersonalGraphRepository(
+        database,
+        idGenerator,
+        clock.call,
+        diagnostics,
+      );
+      IntentionCatalogQuery query(IntentionReadinessFilter filter) =>
+          IntentionCatalogQuery(
+            scope: IntentionScope.active,
+            readinessFilter: filter,
+            titleFilter: null,
+            order: IntentionCatalogOrder.createdAtDescending,
+            pageSize: 1,
+          );
+
+      for (final (command, readyBefore) in [
+        (EnableIntentionReadiness.new, false),
+        (DisableIntentionReadiness.new, true),
+      ]) {
+        final saved = _commandSuccess(
+          await repository.execute(command(id)),
+        ) as IntentionSaved;
+        final mutation = saved.catalogMutation as IntentionCatalogUpdated;
+
+        for (final (snapshot, isReady) in [
+          (mutation.before, readyBefore),
+          (mutation.after, !readyBefore),
+        ]) {
+          expect(snapshot.matches(query(IntentionReadinessFilter.all)), isTrue);
+          expect(
+            snapshot.matches(query(IntentionReadinessFilter.readyOnly)),
+            isReady,
+          );
+          expect(
+            snapshot.matches(query(IntentionReadinessFilter.notReadyOnly)),
+            !isReady,
+          );
+        }
+      }
+    });
+
     test(
       'возвращает not-found для каждого отсутствующего state transition',
       () async {

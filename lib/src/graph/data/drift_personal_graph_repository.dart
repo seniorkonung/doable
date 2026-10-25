@@ -1256,6 +1256,10 @@ final class DriftPersonalGraphRepository
       IntentionReadinessFilter.readyOnly => intentions.isActionReady.equals(
         true,
       ),
+
+      IntentionReadinessFilter.notReadyOnly => intentions.isActionReady.equals(
+        false,
+      ),
     };
     var condition = scopeCondition & readinessCondition;
     final excludedIntentionId = query.excludedIntentionId;
@@ -1493,6 +1497,9 @@ final class _DriftIntentionCatalogEntrySnapshot
       IntentionReadinessFilter.all => true,
       IntentionReadinessFilter.readyOnly =>
         summary.readiness == domain.IntentionReadiness.ready,
+
+      IntentionReadinessFilter.notReadyOnly =>
+        summary.readiness == domain.IntentionReadiness.notReady,
     };
     if (!matchesScope ||
         !matchesReadiness ||

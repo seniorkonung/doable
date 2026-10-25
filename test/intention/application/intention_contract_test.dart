@@ -310,6 +310,40 @@ void main() {
       expect(_query().excludedIntentionId, isNull);
     });
 
+    test('условие готовности допускает оба типа, только действия или только намерения без готовности', () {
+      for (final (filter, acceptsReady, acceptsNotReady) in [
+        (IntentionReadinessFilter.all, true, true),
+        (IntentionReadinessFilter.readyOnly, true, false),
+        (IntentionReadinessFilter.notReadyOnly, false, true),
+      ]) {
+        final query = IntentionCatalogQuery(
+          scope: IntentionScope.active,
+          readinessFilter: filter,
+          titleFilter: null,
+          order: IntentionCatalogOrder.createdAtAscending,
+          pageSize: 1,
+        );
+        expect(
+          query.includes(
+            _summary(
+              id: '00000000-0000-4000-8000-000000000001',
+              readiness: IntentionReadiness.ready,
+            ),
+          ),
+          acceptsReady,
+        );
+        expect(
+          query.includes(
+            _summary(
+              id: '00000000-0000-4000-8000-000000000001',
+              readiness: IntentionReadiness.notReady,
+            ),
+          ),
+          acceptsNotReady,
+        );
+      }
+    });
+
     test('изменение только цвета тега заменяет его состояние в сводке', () {
       final firstId = _tagId('00000000-0000-4000-8000-000000000002');
       final secondId = _tagId('00000000-0000-4000-8000-000000000001');

@@ -367,6 +367,9 @@ void main() {
         (IntentionScope.active, IntentionReadinessFilter.readyOnly, [1]),
         (IntentionScope.archived, IntentionReadinessFilter.readyOnly, [3]),
         (IntentionScope.all, IntentionReadinessFilter.readyOnly, [1, 3]),
+        (IntentionScope.active, IntentionReadinessFilter.notReadyOnly, [2]),
+        (IntentionScope.archived, IntentionReadinessFilter.notReadyOnly, [4]),
+        (IntentionScope.all, IntentionReadinessFilter.notReadyOnly, [2, 4]),
       ]) {
         IntentionCatalogQuery query(IntentionCatalogCursor? cursor) =>
             _tagQuery(

@@ -9,7 +9,7 @@ import 'title_search_key.dart';
 
 enum IntentionScope { active, archived, all }
 
-enum IntentionReadinessFilter { all, readyOnly }
+enum IntentionReadinessFilter { all, readyOnly, notReadyOnly }
 
 /// Неизменяемые условия наличия и отсутствия собственных тегов намерения.
 ///
@@ -182,6 +182,9 @@ final class IntentionCatalogQuery {
       IntentionReadinessFilter.all => true,
       IntentionReadinessFilter.readyOnly =>
         summary.readiness == IntentionReadiness.ready,
+
+      IntentionReadinessFilter.notReadyOnly =>
+        summary.readiness == IntentionReadiness.notReady,
     };
     if (!matchesScope ||
         !matchesReadiness ||
