@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' show clampDouble, lerpDouble;
 
@@ -1192,10 +1193,11 @@ final class _RenderExpandableFrame extends RenderProxyBox {
   }
 }
 
-/// Ручка раскрываемого листа — кнопка смены размера без отклика на касание.
+/// Ручка раскрываемого листа — кнопка смены размера без подсветки касания.
 ///
-/// О нажатии говорит смена размера листа; рамка показывает только фокус
-/// с клавиатуры и не заходит на заголовок под областью нажатия.
+/// О нажатии говорит смена размера листа и системный отклик касания, как
+/// у остальных кнопок; рамка показывает только фокус с клавиатуры и не
+/// заходит на заголовок под областью нажатия.
 final class _SizeButton extends StatefulWidget {
   const _SizeButton({
     required this.isFull,
@@ -1214,6 +1216,13 @@ final class _SizeButton extends StatefulWidget {
 final class _SizeButtonState extends State<_SizeButton> {
   var _showFocusHighlight = false;
 
+  // Системный звук касания на Android, как у `InkWell` с `enableFeedback`:
+  // https://api.flutter.dev/flutter/material/Feedback/forTap.html
+  void _activate() {
+    unawaited(Feedback.forTap(context));
+    widget.onTap();
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = _colorsOf(Theme.of(context));
@@ -1226,13 +1235,13 @@ final class _SizeButtonState extends State<_SizeButton> {
       actions: {
         ActivateIntent: CallbackAction<ActivateIntent>(
           onInvoke: (_) {
-            widget.onTap();
+            _activate();
             return null;
           },
         ),
         ButtonActivateIntent: CallbackAction<ButtonActivateIntent>(
           onInvoke: (_) {
-            widget.onTap();
+            _activate();
             return null;
           },
         ),
@@ -1245,12 +1254,12 @@ final class _SizeButtonState extends State<_SizeButton> {
         button: true,
         expanded: widget.isFull,
         label: widget.label,
-        onTap: widget.onTap,
+        onTap: _activate,
         child: GestureDetector(
           // Вся область нажатия принимает касание, включая пустое место:
           // https://api.flutter.dev/flutter/widgets/GestureDetector/behavior.html
           behavior: HitTestBehavior.opaque,
-          onTap: widget.onTap,
+          onTap: _activate,
           child: SizedBox(
             width: 88,
             height: DoableMetrics.tapMin,

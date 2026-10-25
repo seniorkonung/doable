@@ -506,6 +506,50 @@ void main() {
     expect(_sheetHeight(tester), _compact);
   });
 
+  testWidgets('на Android касание, Enter, пробел и действие диктора на ручке '
+      'щёлкают системным звуком касания и меняют размер листа', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await _openExpandableSheet(tester);
+    final sounds = <Object?>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'SystemSound.play') sounds.add(call.arguments);
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+
+    await tester.tap(find.bySemanticsLabel(_expandLabel));
+    await tester.pumpAndSettle();
+    expect(_sheetHeight(tester), _full);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(_sheetHeight(tester), _compact);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    await tester.pumpAndSettle();
+    expect(_sheetHeight(tester), _full);
+
+    tester.binding.renderViews.first.owner!.semanticsOwner!.performAction(
+      tester.getSemantics(find.bySemanticsLabel(_collapseLabel)).id,
+      SemanticsAction.tap,
+    );
+    await tester.pumpAndSettle();
+    expect(_sheetHeight(tester), _compact);
+
+    expect(sounds, List.filled(4, SystemSoundType.click.toString()));
+    semantics.dispose();
+  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+
   testWidgets('размер меняется плавно, а при уменьшенной анимации — сразу', (
     tester,
   ) async {
