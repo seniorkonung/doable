@@ -678,6 +678,30 @@ void main() {
     expect(_chevron, findsNothing);
   });
 
+  testWidgets('когда клавиатура не оставляет места для роста, после нажатия '
+      'ручки движение вверх по списку прокручивает его, а высота листа '
+      'прежняя', (tester) async {
+    await _openExpandableSheet(tester);
+    tester.view.viewInsets = const FakeViewPadding(bottom: 400);
+    addTearDown(tester.view.resetViewInsets);
+    await tester.pumpAndSettle();
+    await tester.tap(find.bySemanticsLabel(_expandLabel));
+    await tester.pumpAndSettle();
+    final height = _sheetHeight(tester);
+    final body = _bodyPosition(tester);
+
+    final gesture = await _SlowGesture.start(tester, find.text('Тег 0'));
+    await gesture.moveTo(-20);
+    await gesture.moveTo(-20 - 120);
+
+    expect(body.pixels, 120);
+    expect(_sheetHeight(tester), height);
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(_sheetHeight(tester), height);
+  });
+
   testWidgets('короткий быстрый бросок вверх по списку компактного листа '
       'раскрывает лист, а список остаётся в начале', (tester) async {
     await _openExpandableSheet(tester);

@@ -414,12 +414,17 @@ final class _SheetBodyPosition extends ScrollPositionWithSingleContext {
   /// Сдвинулся ли лист в текущем перетаскивании.
   var _hasSheetMoved = false;
 
-  /// Раскрытие листа при последней раскладке тела.
-  var _laidOutExpansion = 0.0;
+  /// Подъём раскрытого листа над компактным размером при последней
+  /// раскладке тела.
+  var _laidOutRise = 0.0;
+
+  /// Подъём раскрытого листа над компактным размером. Раскрытие без места для
+  /// роста его не меняет, и тело тогда заново не раскладывается.
+  double get _rise => _motion._expansion * _motion._growth;
 
   @override
   bool applyViewportDimension(double viewportDimension) {
-    _laidOutExpansion = _motion._expansion;
+    _laidOutRise = _rise;
     return super.applyViewportDimension(viewportDimension);
   }
 
@@ -453,7 +458,7 @@ final class _SheetBodyPosition extends ScrollPositionWithSingleContext {
     final rest = delta - scroll - moved;
     if (rest < 0 &&
         maxScrollExtent > minScrollExtent &&
-        _motion._expansion == _laidOutExpansion) {
+        _rise == _laidOutRise) {
       super.applyUserOffset(rest);
     }
   }
