@@ -1872,6 +1872,167 @@ void main() {
     },
   );
 
+  test('упорядочивает по названию все охваты в обоих направлениях с дополнительным ключом по ID', () async {
+    for (final (number, title, isArchived) in [
+      (0x131, 'Бег', false),
+      (0x132, 'бег', false),
+      (0x133, 'АЛЬПЫ', true),
+      (0x134, 'Альпы', true),
+      (0x135, 'Ведро', false),
+    ]) {
+      await _insertIntention(
+        database,
+        id: _uuid(number),
+        title: title,
+        isArchived: isArchived,
+        createdAt: DateTime.utc(2026, 9, 2, 10).add(Duration(minutes: number)),
+      );
+    }
+
+    final cases = <(IntentionScope, IntentionCatalogOrder, List<int>)>[
+      (
+        IntentionScope.active,
+        IntentionCatalogOrder.titleAscending,
+        [0x131, 0x132, 0x135],
+      ),
+      (
+        IntentionScope.active,
+        IntentionCatalogOrder.titleDescending,
+        [0x135, 0x131, 0x132],
+      ),
+      (
+        IntentionScope.archived,
+        IntentionCatalogOrder.titleAscending,
+        [0x133, 0x134],
+      ),
+      (
+        IntentionScope.archived,
+        IntentionCatalogOrder.titleDescending,
+        [0x133, 0x134],
+      ),
+      (
+        IntentionScope.all,
+        IntentionCatalogOrder.titleAscending,
+        [0x133, 0x134, 0x131, 0x132, 0x135],
+      ),
+      (
+        IntentionScope.all,
+        IntentionCatalogOrder.titleDescending,
+        [0x135, 0x131, 0x132, 0x133, 0x134],
+      ),
+    ];
+
+    for (final (scope, order, expectedNumbers) in cases) {
+      final page = _firstPage(
+        await repository.getCatalogPage(
+          IntentionCatalogQuery(
+            scope: scope,
+            titleFilter: null,
+            order: order,
+            pageSize: 100,
+          ),
+        ),
+      );
+
+      expect(page.totalCount, expectedNumbers.length);
+      expect(page.items.map((summary) => summary.id.toCanonicalString()), [
+        for (final number in expectedNumbers) _uuid(number),
+      ]);
+    }
+  });
+
+  test('продолжает порции по названию в порядке compare запроса без пропусков и повторов', () async {
+    // Поисковые проекции по кодовым точкам: apple < strassenbahn < strauss
+    // (трижды, различие только в регистре) < ель < яблоко < ёж < U+E000 <
+    // U+1F600. Сравнение единиц UTF-16 поставило бы U+1F600 перед U+E000.
+    final titles = [
+      '\u{1F600}',
+      'Strauss',
+      'Яблоко',
+      'STRAUSS',
+      'Straßenbahn',
+      'ёж',
+      '\u{E000}',
+      'strauss',
+      'Ель',
+      'Apple',
+    ];
+    for (var index = 0; index < titles.length; index++) {
+      await _insertIntention(
+        database,
+        id: _uuid(0x141 + index),
+        title: titles[index],
+        createdAt: DateTime.utc(2026, 9, 2, 10).add(Duration(hours: index)),
+      );
+    }
+    final expectedAscendingTitles = [
+      'Apple',
+      'Straßenbahn',
+      'Strauss',
+      'STRAUSS',
+      'strauss',
+      'Ель',
+      'Яблоко',
+      'ёж',
+      '\u{E000}',
+      '\u{1F600}',
+    ];
+
+    for (final order in [
+      IntentionCatalogOrder.titleAscending,
+      IntentionCatalogOrder.titleDescending,
+    ]) {
+      // Порция из двух строк кладёт границу курсора между равными ключами
+      // «strauss» в обоих направлениях.
+      final query = IntentionCatalogQuery(
+        scope: IntentionScope.active,
+        titleFilter: null,
+        order: order,
+        pageSize: 2,
+      );
+      final firstPage = _firstPage(await repository.getCatalogPage(query));
+      final traversed = [...firstPage.items];
+      var cursor = firstPage.nextCursor;
+      while (cursor != null) {
+        final continuation = _continuationPage(
+          await repository.getCatalogPage(
+            IntentionCatalogQuery(
+              scope: query.scope,
+              titleFilter: null,
+              order: order,
+              pageSize: query.pageSize,
+              cursor: cursor,
+            ),
+          ),
+        );
+        traversed.addAll(continuation.items);
+        cursor = continuation.nextCursor;
+      }
+
+      final ids = [for (final item in traversed) item.id];
+      expect(ids.toSet(), hasLength(titles.length));
+      expect(ids, [
+        for (final item in [...traversed]..sort(query.compare)) item.id,
+      ]);
+      final expectedTitles = switch (order.direction) {
+        IntentionCatalogSortDirection.ascending => expectedAscendingTitles,
+        IntentionCatalogSortDirection.descending => [
+          '\u{1F600}',
+          '\u{E000}',
+          'ёж',
+          'Яблоко',
+          'Ель',
+          'Strauss',
+          'STRAUSS',
+          'strauss',
+          'Straßenbahn',
+          'Apple',
+        ],
+      };
+      expect([for (final item in traversed) item.title], expectedTitles);
+    }
+  });
+
   test('продолжает независимые цепочки одного repository вперемешку', () async {
     for (final (id, title, createdAt) in [
       (

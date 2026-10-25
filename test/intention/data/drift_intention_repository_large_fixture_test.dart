@@ -698,6 +698,8 @@ const _catalogOrders = <IntentionCatalogOrder>[
     field: IntentionCatalogSortField.updatedAt,
     direction: IntentionCatalogSortDirection.descending,
   ),
+  IntentionCatalogOrder.titleAscending,
+  IntentionCatalogOrder.titleDescending,
 ];
 
 final class _SelectTrace extends LocalDatabaseConnectionObserver {

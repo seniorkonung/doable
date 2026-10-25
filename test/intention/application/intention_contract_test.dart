@@ -804,6 +804,49 @@ void main() {
       );
     });
 
+    test('порядок по названию сравнивает ключи сводок, при равенстве — идентификаторы', () {
+      final lower = _summary(
+        id: '00000000-0000-4000-8000-000000000002',
+        title: 'strauss',
+        createdAt: DateTime.utc(2026, 8, 30, 12),
+      );
+      final upperSameKey = _summary(
+        id: '00000000-0000-4000-8000-000000000001',
+        title: 'STRAUSS',
+        createdAt: DateTime.utc(2026, 8, 30, 14),
+      );
+      final folded = _summary(
+        id: '00000000-0000-4000-8000-000000000003',
+        title: 'Straßenbahn',
+        createdAt: DateTime.utc(2026, 8, 30, 10),
+      );
+      final privateUse = _summary(
+        id: '00000000-0000-4000-8000-000000000004',
+        title: '\u{E000}',
+      );
+      final astral = _summary(
+        id: '00000000-0000-4000-8000-000000000005',
+        title: '\u{1F600}',
+      );
+      final ascending = _order(
+        IntentionCatalogSortField.title,
+        IntentionCatalogSortDirection.ascending,
+      );
+      final descending = _order(
+        IntentionCatalogSortField.title,
+        IntentionCatalogSortDirection.descending,
+      );
+
+      expect(ascending.compare(folded, lower), isNegative);
+      expect(descending.compare(folded, lower), isPositive);
+      expect(ascending.compare(privateUse, astral), isNegative);
+      expect(descending.compare(privateUse, astral), isPositive);
+      // Равные ключи в обоих направлениях упорядочивает возрастающий идентификатор.
+      expect(ascending.compare(upperSameKey, lower), isNegative);
+      expect(descending.compare(upperSameKey, lower), isNegative);
+      expect(ascending.compare(lower, lower), isZero);
+    });
+
     test('первая страница отклоняет недопустимый total count в release', () {
       final summary = _summary(id: '00000000-0000-4000-8000-000000000001');
 

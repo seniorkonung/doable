@@ -56,7 +56,7 @@ final class IntentionTagFilter {
   );
 }
 
-enum IntentionCatalogSortField { createdAt, updatedAt }
+enum IntentionCatalogSortField { createdAt, updatedAt, title }
 
 enum IntentionCatalogSortDirection { ascending, descending }
 
@@ -80,6 +80,16 @@ final class IntentionCatalogOrder {
 
   static const updatedAtDescending = IntentionCatalogOrder(
     field: IntentionCatalogSortField.updatedAt,
+    direction: IntentionCatalogSortDirection.descending,
+  );
+
+  static const titleAscending = IntentionCatalogOrder(
+    field: IntentionCatalogSortField.title,
+    direction: IntentionCatalogSortDirection.ascending,
+  );
+
+  static const titleDescending = IntentionCatalogOrder(
+    field: IntentionCatalogSortField.title,
     direction: IntentionCatalogSortDirection.descending,
   );
 
@@ -195,23 +205,29 @@ final class IntentionCatalogQuery {
     return titleFilter?.matchesTitle(summary.title) ?? true;
   }
 
+  /// Порядок выдачи: значение поля в выбранном направлении, при равенстве —
+  /// возрастающий идентификатор. Название сравнивается ключами сохранённой
+  /// поисковой проекции, как его упорядочивает адаптер.
   int compare(IntentionSummary left, IntentionSummary right) {
-    final timestampComparison = _timestampOf(left).value
-        .compareTo(_timestampOf(right).value);
+    final fieldComparison = switch (order.field) {
+      IntentionCatalogSortField.createdAt => left.createdAt.value.compareTo(
+        right.createdAt.value,
+      ),
+      IntentionCatalogSortField.updatedAt => left.updatedAt.value.compareTo(
+        right.updatedAt.value,
+      ),
+      IntentionCatalogSortField.title => left.titleOrderKey.compareTo(
+        right.titleOrderKey,
+      ),
+    };
     final directionAdjusted = switch (order.direction) {
-      IntentionCatalogSortDirection.ascending => timestampComparison,
-      IntentionCatalogSortDirection.descending => -timestampComparison,
+      IntentionCatalogSortDirection.ascending => fieldComparison,
+      IntentionCatalogSortDirection.descending => -fieldComparison,
     };
     return directionAdjusted != 0
         ? directionAdjusted
         : left.id.compareTo(right.id);
   }
-
-  IntentionTimestamp _timestampOf(IntentionSummary summary) =>
-      switch (order.field) {
-        IntentionCatalogSortField.createdAt => summary.createdAt,
-        IntentionCatalogSortField.updatedAt => summary.updatedAt,
-      };
 
   static IntentionTitleFilter? _normalizeFilter(String? value) {
     if (value == null) {
