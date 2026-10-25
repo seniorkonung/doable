@@ -875,6 +875,54 @@ void main() {
     expect(sheet.isClosed, isTrue);
   });
 
+  testWidgets('нажатие ручки раскрывает лист с компактной высотой по '
+      'содержимому с его места без скачка верхнего края', (tester) async {
+    final rows = ValueNotifier(2);
+    addTearDown(rows.dispose);
+    await _openContentHeightSheet(tester, rows);
+    final compact = tester.getRect(find.byType(Sheet));
+
+    await tester.tap(find.bySemanticsLabel(_expandLabel));
+    await tester.pump();
+    expect(
+      tester.getRect(find.byType(Sheet)).top,
+      greaterThanOrEqualTo(compact.top),
+    );
+
+    await tester.pumpAndSettle();
+    expect(_sheetHeight(tester), _full);
+  });
+
+  testWidgets('при перетаскивании шапки вниз из полного размера лист с '
+      'компактной высотой по содержимому идёт за пальцем при неподвижной '
+      'нижней кнопке до компактного положения, а отпущенный рядом с ним '
+      'приходит в компактный размер, не опускаясь ниже', (tester) async {
+    final rows = ValueNotifier(2);
+    addTearDown(rows.dispose);
+    await _openContentHeightSheet(tester, rows);
+    final compact = tester.getRect(find.byType(Sheet));
+    await tester.tap(find.bySemanticsLabel(_expandLabel));
+    await tester.pumpAndSettle();
+    final footer = tester.getRect(find.text('Готово'));
+    final full = tester.getRect(find.byType(Sheet));
+
+    final gesture = await _SlowGesture.start(tester, _header);
+    // Палец на 10 выше компактного положения верхнего края.
+    await gesture.moveTo(compact.top - 10 - full.top);
+    expect(_sheetHeight(tester), closeTo(compact.height + 10, 1));
+    expect(tester.getRect(find.text('Готово')), footer);
+
+    await gesture.up();
+    do {
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(
+        tester.getRect(find.byType(Sheet)).top,
+        lessThanOrEqualTo(compact.top),
+      );
+    } while (tester.binding.hasScheduledFrame);
+    expect(tester.getRect(find.byType(Sheet)), compact);
+  });
+
   testWidgets('свайп вверх по короткому списку листа с компактной высотой по '
       'содержимому раскрывает лист вслед за пальцем, а нижняя кнопка стоит '
       'на месте', (tester) async {

@@ -872,6 +872,18 @@ enum SheetCompactHeight {
 /// места.
 const _compactLimit = 534.0;
 
+/// Отступ заголовка компактного раскрываемого листа от верхнего края: ручка
+/// стоит над началом заголовка.
+const _compactTitleTop = 26.0;
+
+/// На сколько шапка полного раскрываемого листа выше шапки компактного: над
+/// заголовком полного листа стоит шеврон с полями.
+const _fullHeaderRise =
+    DoableMetrics.space2 +
+    DoableMetrics.tapMin +
+    DoableMetrics.space1 -
+    _compactTitleTop;
+
 /// Части листа одного из двух вариантов.
 sealed class _SheetParts {
   const _SheetParts();
@@ -1021,7 +1033,7 @@ final class _ExpandableSheetState extends State<_ExpandableSheet>
         : Stack(
             children: [
               Padding(
-                padding: const EdgeInsets.only(top: 26),
+                padding: const EdgeInsets.only(top: _compactTitleTop),
                 child: titleBlock,
               ),
               Align(alignment: Alignment.topCenter, child: handle),
@@ -1088,6 +1100,7 @@ final class _ExpandableSheetState extends State<_ExpandableSheet>
           );
           return _ExpandableFrame(
             compactHeight: parts.compactHeight,
+            headerRise: _isFull ? _fullHeaderRise : 0,
             progress: progress,
             extents: _extents,
             child: DecoratedBox(
@@ -1125,11 +1138,12 @@ final class _ExpandableExtents {
 ///
 /// Полный лист занимает всё место над клавиатурой: его отнимает _SheetFrame.
 /// С [SheetCompactHeight.content] лист сначала раскладывается без строгой
-/// высоты в пределе, и занятая им высота — компактная; затем, если раскрыт,
-/// — повторно в свою высоту.
+/// высоты в пределе, и занятая им высота без [headerRise] — компактная; затем,
+/// если его высота другая, — повторно в свою высоту.
 final class _ExpandableFrame extends SingleChildRenderObjectWidget {
   const _ExpandableFrame({
     required this.compactHeight,
+    required this.headerRise,
     required this.progress,
     required this.extents,
     required super.child,
@@ -1137,13 +1151,16 @@ final class _ExpandableFrame extends SingleChildRenderObjectWidget {
 
   final SheetCompactHeight compactHeight;
 
+  /// На сколько шапка листа выше шапки компактного листа.
+  final double headerRise;
+
   /// 0 — компактный размер, 1 — полный.
   final double progress;
   final _ExpandableExtents extents;
 
   @override
   _RenderExpandableFrame createRenderObject(BuildContext context) =>
-      _RenderExpandableFrame(compactHeight, progress, extents);
+      _RenderExpandableFrame(compactHeight, headerRise, progress, extents);
 
   @override
   void updateRenderObject(
@@ -1151,12 +1168,18 @@ final class _ExpandableFrame extends SingleChildRenderObjectWidget {
     _RenderExpandableFrame renderObject,
   ) => renderObject
     ..compactHeight = compactHeight
+    ..headerRise = headerRise
     ..progress = progress
     ..extents = extents;
 }
 
 final class _RenderExpandableFrame extends RenderProxyBox {
-  _RenderExpandableFrame(this._compactHeight, this._progress, this.extents);
+  _RenderExpandableFrame(
+    this._compactHeight,
+    this._headerRise,
+    this._progress,
+    this.extents,
+  );
 
   _ExpandableExtents extents;
 
@@ -1165,6 +1188,14 @@ final class _RenderExpandableFrame extends RenderProxyBox {
   set compactHeight(SheetCompactHeight value) {
     if (value == _compactHeight) return;
     _compactHeight = value;
+    markNeedsLayout();
+  }
+
+  double _headerRise;
+
+  set headerRise(double value) {
+    if (value == _headerRise) return;
+    _headerRise = value;
     markNeedsLayout();
   }
 
@@ -1199,17 +1230,20 @@ final class _RenderExpandableFrame extends RenderProxyBox {
       case SheetCompactHeight.limit:
         compact = limit;
       case SheetCompactHeight.content:
+        // Компактная высота — высота листа с шапкой компактного размера,
+        // поэтому она не меняется, когда лист раскрыт или раскрывается.
         sheet.layout(
-          BoxConstraints(maxWidth: width, maxHeight: limit),
+          BoxConstraints(maxWidth: width, maxHeight: limit + _headerRise),
           parentUsesSize: true,
         );
-        compact = sheet.size.height;
+        compact = math.min(sheet.size.height - _headerRise, limit);
     }
     extents
       ..compact = compact
       ..full = full;
     final height = lerpDouble(compact, full, _progress)!;
-    if (_compactHeight == SheetCompactHeight.limit || height != compact) {
+    if (_compactHeight == SheetCompactHeight.limit ||
+        sheet.size.height != height) {
       sheet.layout(
         BoxConstraints(maxWidth: width, minHeight: height, maxHeight: height),
         parentUsesSize: true,
