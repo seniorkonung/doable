@@ -5866,6 +5866,30 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'intentions_all_updated_at_desc_id_asc',
     'CREATE INDEX intentions_all_updated_at_desc_id_asc ON intentions (updated_at DESC, id ASC)',
   );
+  late final Index intentionsActiveTitleSearchKeyAscIdAsc = Index(
+    'intentions_active_title_search_key_asc_id_asc',
+    'CREATE INDEX intentions_active_title_search_key_asc_id_asc ON intentions (title_search_key ASC, id ASC) WHERE is_archived = 0',
+  );
+  late final Index intentionsActiveTitleSearchKeyDescIdAsc = Index(
+    'intentions_active_title_search_key_desc_id_asc',
+    'CREATE INDEX intentions_active_title_search_key_desc_id_asc ON intentions (title_search_key DESC, id ASC) WHERE is_archived = 0',
+  );
+  late final Index intentionsArchivedTitleSearchKeyAscIdAsc = Index(
+    'intentions_archived_title_search_key_asc_id_asc',
+    'CREATE INDEX intentions_archived_title_search_key_asc_id_asc ON intentions (title_search_key ASC, id ASC) WHERE is_archived = 1',
+  );
+  late final Index intentionsArchivedTitleSearchKeyDescIdAsc = Index(
+    'intentions_archived_title_search_key_desc_id_asc',
+    'CREATE INDEX intentions_archived_title_search_key_desc_id_asc ON intentions (title_search_key DESC, id ASC) WHERE is_archived = 1',
+  );
+  late final Index intentionsAllTitleSearchKeyAscIdAsc = Index(
+    'intentions_all_title_search_key_asc_id_asc',
+    'CREATE INDEX intentions_all_title_search_key_asc_id_asc ON intentions (title_search_key ASC, id ASC)',
+  );
+  late final Index intentionsAllTitleSearchKeyDescIdAsc = Index(
+    'intentions_all_title_search_key_desc_id_asc',
+    'CREATE INDEX intentions_all_title_search_key_desc_id_asc ON intentions (title_search_key DESC, id ASC)',
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -5941,6 +5965,12 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     intentionsAllCreatedAtDescIdAsc,
     intentionsAllUpdatedAtAscIdAsc,
     intentionsAllUpdatedAtDescIdAsc,
+    intentionsActiveTitleSearchKeyAscIdAsc,
+    intentionsActiveTitleSearchKeyDescIdAsc,
+    intentionsArchivedTitleSearchKeyAscIdAsc,
+    intentionsArchivedTitleSearchKeyDescIdAsc,
+    intentionsAllTitleSearchKeyAscIdAsc,
+    intentionsAllTitleSearchKeyDescIdAsc,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([

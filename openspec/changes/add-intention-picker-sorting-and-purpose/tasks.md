@@ -44,7 +44,7 @@
   - **Предполагаемые файлы:** `lib/src/intention/application/intention_catalog.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `lib/src/intention/presentation/catalog/intention_catalog_page.dart`, `test/intention/data/drift_intention_catalog_test.dart`, `test/intention/application/intention_contract_test.dart`.
   - **Размер:** M.
 
-- [ ] 1.4 Сделать схему версии 6 с индексами порядка по названию новой базовой версией без пути обновления
+- [x] 1.4 Сделать схему версии 6 с индексами порядка по названию новой базовой версией без пути обновления
   - **Критерии приёмки:**
     - Схема получает шесть частичных индексов по решению 3 дизайна: сохранённая проекция названия по возрастанию и по убыванию с идентификатором по возрастанию, для активного, архивного и полного охвата.
     - Схема 6 — базовая, как в коммите `7729b064`:
