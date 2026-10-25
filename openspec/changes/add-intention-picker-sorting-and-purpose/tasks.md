@@ -156,3 +156,137 @@
   - **Зависимости:** 1.7.
   - **Предполагаемые файлы:** `lib/src/intention/application/intention_catalog.dart`, `lib/src/intention/presentation/catalog/intention_catalog_view_model.dart`, `test/intention/application/intention_contract_test.dart`.
   - **Размер:** XS.
+
+## Phase 2: Пользователь выбирает тип и сортировку в поисках
+
+- [ ] 2.1 Добавить значки ползунков сортировки и стрелок порядка из макета экрана выбора
+  - **Критерии приёмки:**
+    - Ползунки 16 из пилюли сортировки заголовка списка и стрелки вниз и вверх 16 из группы «Порядок» листа «Показать и упорядочить» перенесены из `context/doable-design/design/ActionPicker.dc.html` по правилам `lib/src/design_system/icons/README.md`. Таблица README называет макет и блок каждого ресурса.
+    - `DoableIconData` содержит три новых значения, а эталон всех иконок показывает их в обеих темах в размере 16 и цвете `muted`, как их покажут `CatalogHeader` и `OptionGroup`.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test --update-goldens test/design_system/doable_icon_test.dart`, сверка нового эталона с макетом, затем `mise exec --no-deps -- flutter test test/design_system/doable_icon_test.dart`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** три SVG в `lib/src/design_system/icons/assets/`, `lib/src/design_system/doable_icon.dart`, `lib/src/design_system/icons/README.md`, `test/design_system/doable_icon_test.dart`, `test/design_system/goldens/doable_icons.png`.
+  - **Размер:** S.
+
+- [ ] 2.2 Дать листу по содержимому действие в строке заголовка, как у раскрываемого листа
+  - **Критерии приёмки:**
+    - `Sheet` по содержимому принимает необязательное `SheetAction` по решению 4 дизайна и README `Sheet`: текстовая кнопка размера sm справа на строке заголовка, с областью нажатия 44 и подписью, которая кончается в `space-5` от края экрана. Заголовок остаётся по центру, а действие строится тем же путём, что у раскрываемого листа.
+    - Нажатие вызывает обработчик, и лист остаётся открытым. Без действия лист по содержимому выглядит и работает как прежде.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/sheet_test.dart` — положение подписи и заголовка; узел кнопки с доступным названием; нажатие у верха области; прежняя раскладка без действия; прежние проверки перетаскивания листа по содержимому.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `lib/src/design_system/components/sheet.dart`, `test/design_system/sheet_test.dart`.
+  - **Размер:** S.
+
+- [ ] 2.3 Добавить в дизайн-систему группу взаимоисключающих вариантов `OptionGroup` для листов
+  - **Критерии приёмки:**
+    - `OptionGroup` в варианте `lg` по README `OptionGroup` и решению 4 дизайна:
+      - подпись группы в стиле `caption` цвета `muted` стоит над пилюлями через `space-2`;
+      - пилюли высотой `tap-min` с углами `radius-full` стоят в равных колонках по числу вариантов через `space-2`, группа не переносится;
+      - выбранный вариант — плоскость `fill` и стиль `section`, остальные — внутреннее кольцо `hairline` 1 и стиль `row` с трекингом −0,01 em;
+      - необязательное число стоит через 6 после подписи варианта в стиле `label` цвета `muted` с табличными цифрами, необязательная иконка 16 цвета `muted` — перед подписью.
+    - Группа, значение которой закрепляет контекст, недоступна и всегда несёт пояснение. Её пилюли не нажимаются и не показывают чисел, выбранная сохраняет `fill` с подписью `muted`, остальные — `grip`. Пояснение в стиле `caption` цвета `muted` стоит через `space-2` под пилюлями.
+    - Экранный диктор слышит группу взаимоисключающих вариантов: название группы из подписи, выбранный вариант, а у недоступной группы — недоступность и пояснение. Нажатие варианта сообщает потребителю его выбор, тексты приходят готовыми (ADR-0030). Варианта `sm`, числа колонок и отдельных доступных названий группы и вариантов нет: их не использует ни один потребитель.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/option_group_test.dart` — обе темы и значения токенов; равные колонки трёх и двух вариантов; число и иконка; нажатие и выбранный вариант; недоступная группа с пояснением; узлы и состояния для экранного диктора; области нажатия не меньше `tap-min`; текст масштаба 2 без переполнения.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** новые `lib/src/design_system/components/option_group.dart` и `test/design_system/option_group_test.dart`.
+  - **Размер:** S.
+
+- [ ] 2.4 Закрепить под полем поиска всех трёх поисков заголовок списка: показываемый тип, число подтверждённой выдачи и сводку сортировки
+  - **Критерии приёмки:**
+    - `CatalogHeader` по README `CatalogHeader`: число необязательно — без него плашки числа нет, а пустой список показывает 0. У правого края стоит пилюля сортировки `fill` высотой 32 со значком ползунков 16 цвета `muted` и сводкой в стиле `caption` цвета `ink` в одну строку. Кнопкой заголовок пока не является: её добавляет задача 2.6.
+    - `IntentionPickerView` ставит заголовок под рядом поиска по README `CatalogHeader`, и при прокрутке он остаётся на месте. `IntentionPickerResults` рисует только строки, пустые состояния, подгрузку и отказы.
+      - Заголовок называет тип по доступности типа модели каталога (решение 2 дизайна): выбранный открытый тип или закреплённые «Действия».
+      - Сводка — поле, запятая и порядок: «Создание, сначала новые», «Название, от А до Я».
+      - Число берётся только из подтверждённой выдачи текущих параметров. Пока выдача получается, во время паузы ввода, после отказа и при недопустимом фильтре заголовок показывает тип и сводку без числа.
+    - Поиски исходного намерения и участника открываются с заголовком «Все». Проверки страниц ждут его и сводку «Создание, сначала новые», а строки и методы вида, потерявшие потребителя, удалены.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/catalog_header_test.dart` — обе темы; пилюля сортировки; заголовок без числа и с 0; длинная сводка и текст масштаба 2 без переполнения.
+    - `mise exec --no-deps -- flutter test test/intention/presentation/picker` в обоих языках:
+      - сценарий «Поиск и фильтр остаются на месте при прокрутке» в поиске исходного намерения;
+      - тип и сводка во всех трёх поисках;
+      - заголовок без числа до первой выдачи, пока получается выдача новых параметров, и при недопустимом фильтре.
+    - `mise run codegen`, `mise exec --no-deps -- flutter analyze` и `mise exec --no-deps -- flutter test test/app/localization/locale_resolution_test.dart`.
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation test/long_term_relation/presentation/participant_picker test/long_term_relation/presentation/editor test/app/creation_flows_integration_test.dart test/app/quick_creation test/app/intention_tag_search_app_flow_test.dart test/app/long_term_relation_app_flow_test.dart test/app/navigation/app_shell_operation_reset_test.dart` — сценарий «Поиск действия открывается экраном выбора» с количеством 13 и сортировкой «Создание, сначала новые»; потоки через три поиска.
+  - **Зависимости:** 2.1 — значок ползунков.
+  - **Предполагаемые файлы:**
+    - `lib/src/design_system/components/catalog_header.dart`, `lib/src/intention/presentation/picker/intention_picker_view.dart`, `lib/src/intention/presentation/picker/intention_picker_results.dart`, `lib/src/intention/presentation/picker/intention_picker_kind.dart`;
+    - `lib/l10n/app_en.arb`, `lib/l10n/app_ru.arb` и генерируемые `lib/l10n/app_localizations*.dart`;
+    - `test/design_system/catalog_header_test.dart`, `test/intention/presentation/picker/intention_picker_view_test.dart`, `test/intention/presentation/picker/intention_picker_results_test.dart`;
+    - механическая адаптация ожиданий заголовка: `test/daily_choice/presentation/daily_choice_picker_context_test_support.dart`, `test/daily_choice/presentation/source_picker/daily_choice_source_picker_page_test.dart`, `test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart`.
+  - **Размер:** M — заголовок нельзя перенести, не сломав ожиданий проверок страниц, поэтому их механическая адаптация входит в задачу.
+
+- [ ] 2.5 Добавить лист «Показать и упорядочить», который сразу применяет к поиску выбранные тип, сортировку и порядок
+  - **Критерии приёмки:**
+    - Лист — композиция модуля экрана выбора по решению 4 дизайна и разделу «The Show and sort sheet» README `OptionGroup`. Его показывает функция модуля через `showDoableSheet` над корневым навигатором (ADR-0032); заголовок списка подключается к ней в задаче 2.6.
+      - `Sheet` по содержимому «Показать и упорядочить» со строкой «Список меняется по мере выбора» и группами «Тип», «Сортировка» и «Порядок».
+      - Лист читает модель каталога своего назначения через её провайдер и перестраивается с каждым её состоянием, поэтому заголовок списка за листом следует выбору.
+      - Каждое нажатие сразу начинает через `changeType` или `changeOrder` новую выдачу с первой порции, и список возвращается к началу тем же путём, что при любом новом запросе.
+    - Правила групп:
+      - открытый тип — «Все», «Намерения» и «Действия» с числами, которые берутся так же, как число заголовка, из подтверждённой выдачи текущих параметров;
+      - в поиске действия группа «Тип» недоступна: выбраны «Действия», чисел нет, а пояснение говорит, что конечным в дневном выборе может быть только действие;
+      - переход между временем и названием выбирает первый порядок нового поля, переход между двумя временами сохраняет направление. Правило применяет лист, а модель получает готовый `IntentionCatalogOrder`. Порядок подписан по полю: первый вариант — со стрелкой вниз, второй — со стрелкой вверх;
+      - «Сбросить» стоит в строке заголовка, пока хотя бы одна изменяемая группа отличается от начального показа, и возвращает к нему все изменяемые группы.
+    - Тексты листа на обоих языках. Тип и порядок принадлежат странице поиска (ADR-0028): вложенный поиск их не разделяет, а новое открытие начинается с начального показа своего назначения.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/picker/intention_picker_show_and_sort_sheet_test.dart` в обоих языках, лист открывается его функцией над экраном выбора:
+      - сценарии «Выбор типа сразу меняет список, а количества учитывают поиск», «Переход от времени к названию выбирает прямой порядок», «Переход между временем создания и изменения сохраняет направление», «„Сбросить“ возвращает начальный показ» и «Тип закреплён в поиске действия»;
+      - открытый лист по `iOSTapTargetGuideline`, `labeledTapTargetGuideline` и `textContrastGuideline`.
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/action_picker test/daily_choice/presentation/source_picker test/long_term_relation/presentation/participant_picker` — проверки сессии трёх поисков: новое открытие с начальными типом и порядком, вложенные поиски со своими.
+    - `mise run codegen`, `mise exec --no-deps -- flutter analyze` и `mise exec --no-deps -- flutter test test/app/localization/locale_resolution_test.dart`.
+  - **Зависимости:** 2.1 — стрелки; 2.2 — действие листа; 2.3 — группа вариантов; 2.4 — названия типов и заголовок за листом.
+  - **Предполагаемые файлы:** новые `lib/src/intention/presentation/picker/intention_picker_show_and_sort_sheet.dart` и `test/intention/presentation/picker/intention_picker_show_and_sort_sheet_test.dart`; `lib/l10n/app_en.arb`, `lib/l10n/app_ru.arb` и генерируемые `lib/l10n/app_localizations*.dart`; `test/intention/presentation/catalog/intention_picker_session_test_support.dart`.
+  - **Размер:** M.
+
+- [ ] 2.6 Сделать заголовок списка одной кнопкой, которая открывает лист «Показать и упорядочить», в том числе до получения выдачи
+  - **Критерии приёмки:**
+    - `CatalogHeader` по README `CatalogHeader` и решению 4 дизайна — одна кнопка во всю ширину списка высотой не меньше `tap-min`: `InkWell` над рядом с пилюлей сортировки справа. Доступное название и признак раскрытого листа задаёт потребитель (ADR-0030), акцента у заголовка нет.
+    - Нажатие на заголовок открывает лист из задачи 2.5 во всех трёх поисках, в том числе пока выдача получается, после отказа и при недопустимом фильтре. Пока лист открыт, заголовок отмечен раскрытым.
+    - Доступное название на обоих языках сообщает, что заголовок открывает показ и упорядочивание, а также тип, количество, если оно известно, и сортировку.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/catalog_header_test.dart` — один узел-кнопка с названием потребителя и признаком раскрытия; нажатие в любой точке ряда; высота не меньше `tap-min`; обе темы; текст масштаба 2.
+    - `mise exec --no-deps -- flutter test test/intention/presentation/picker` в обоих языках — сценарий «Заголовок без числа до получения выдачи»; открытие листа во всех трёх поисках; доступное название с числом и без него; цели касания экрана по `iOSTapTargetGuideline`, `labeledTapTargetGuideline` и `textContrastGuideline`.
+    - `mise run codegen`, `mise exec --no-deps -- flutter analyze` и `mise exec --no-deps -- flutter test test/app/localization/locale_resolution_test.dart`.
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/action_picker test/daily_choice/presentation/source_picker test/long_term_relation/presentation/participant_picker` — страницы трёх поисков.
+  - **Зависимости:** 2.4 — заголовок под полем поиска; 2.5 — лист.
+  - **Предполагаемые файлы:** `lib/src/design_system/components/catalog_header.dart`, `lib/src/intention/presentation/picker/intention_picker_view.dart`, `lib/l10n/app_en.arb`, `lib/l10n/app_ru.arb` и генерируемые `lib/l10n/app_localizations*.dart`, `test/design_system/catalog_header_test.dart`, `test/intention/presentation/picker/intention_picker_view_test.dart`.
+  - **Размер:** M.
+
+- [ ] 2.7 Называть в пустой выдаче выбранный тип, предлагать «Показать оба типа» и сохранять тип и порядок при «Сбросить фильтры»
+  - **Критерии приёмки:**
+    - Сообщение пустой выдачи по фильтру названия, условиям по тегам или обоим называет искомое по выбранному типу: действия при типе «Действия», иначе намерения. Заголовок показывает тип и 0. «Сбросить фильтры» очищает название и условия по тегам, сохраняя тип, порядок и ограничения поиска.
+    - Если при открытом типе без названия и условий пуст выбранный тип «Намерения» или «Действия», а в допустимом охвате есть намерения другого типа, сообщение говорит, что намерений этого типа нет, и предлагает «Показать оба типа». Оно выбирает «Все» и начинает выдачу с начала. Пустой допустимый охват при любом типе показывает прежнее «Выбрать не из чего» с сообщением страницы, без «Сбросить фильтры» и «Показать оба типа».
+    - Тексты на обоих языках; строки и методы вида, потерявшие потребителя, удалены.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/picker/intention_picker_view_test.dart` в обоих языках:
+      - сценарии «Пустой тип предлагает показать оба типа», «Пустая выдача называет обе причины» и «Пустой охват без фильтров не предлагает сброс»;
+      - сценарий «„Сбросить фильтры“ снимает название и условия», в котором новый запрос сохраняет выбранные тип и порядок;
+      - сообщение по названию при типе «Действия» в поиске исходного намерения; пустой охват при открытом типе «Намерения».
+    - `mise run codegen`, `mise exec --no-deps -- flutter analyze` и `mise exec --no-deps -- flutter test test/app/localization/locale_resolution_test.dart`.
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/action_picker test/daily_choice/presentation/source_picker test/long_term_relation/presentation/participant_picker` — сообщения пустой выдачи на страницах.
+  - **Зависимости:** 2.4 — заголовок с типом; 2.5 — выбор типа в листе.
+  - **Предполагаемые файлы:** `lib/src/intention/presentation/picker/intention_picker_results.dart`, `lib/src/intention/presentation/picker/intention_picker_kind.dart`, `lib/l10n/app_en.arb`, `lib/l10n/app_ru.arb` и генерируемые `lib/l10n/app_localizations*.dart`, `test/intention/presentation/picker/intention_picker_view_test.dart`.
+  - **Размер:** M.
+
+- [ ] 2.8 Подтвердить готовность второй фазы: три поиска показывают закреплённый заголовок списка и применяют тип и сортировку из листа «Показать и упорядочить»
+  - **Критерии приёмки:**
+    - Выполнено условие «Ready to advance» второй фазы:
+      - требования «Экран поиска для выбора намерения», «Заголовок списка поиска для выбора», «Параметры показа в поиске для выбора» и «Сброс фильтров в пустой выдаче поиска для выбора» выполняются во всех трёх поисках на обоих языках;
+      - требование «Закреплённый тип поиска действия» выполняется.
+    - Пакет не добавляет подзаголовок назначения и лист «Что вы выбираете» и не меняет каталог графа намерений.
+    - Результаты проверок и путь к APK сообщены в сессии. Ручная проверка на устройстве остаётся за пользователем и не блокирует готовность фазы.
+  - **Проверка:**
+    - `mise run check` и `mise exec --no-deps -- openspec validate add-intention-picker-sorting-and-purpose --strict --no-interactive`; после фиксации изменений — `mise run codegen-check` на чистой рабочей копии.
+    - `mise exec --no-deps -- flutter build apk --release` с артефактом `build/app/outputs/flutter-apk/app-release.apk`. Если через DTD найдено запущенное приложение, выполнить hot restart и проверить `get_runtime_errors`; эмулятор и устройство не запускаются.
+    - Сообщить оставшиеся ручные проверки:
+      - вид заголовка списка и листа в трёх поисках в обеих темах против макета `ActionPicker.dc.html`;
+      - заголовок на месте при прокрутке и открытой клавиатуре;
+      - сразу применённый выбор в листе, правило порядка при смене поля, «Сбросить» и закреплённый тип поиска действия;
+      - пустой тип с «Показать оба типа» и «Сбросить фильтры» с прежними типом и порядком;
+      - начальный показ при новом открытии поиска;
+      - объявления TalkBack для заголовка и групп листа.
+  - **Зависимости:** 2.1–2.7.
+  - **Предполагаемые файлы:** нет, только проверка и сборка.
+  - **Размер:** XS.
