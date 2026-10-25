@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const _screen = Size(390, 844);
@@ -449,6 +450,60 @@ void main() {
       ),
       compact,
     );
+  });
+
+  testWidgets('касание ручки не подсвечивает ни её, ни заголовок, а рамка '
+      'видна только при фокусе с клавиатуры и только возле линии ручки', (
+    tester,
+  ) async {
+    await _openExpandableSheet(tester);
+    // Середина шапки под ручкой и заголовком одинакова в обоих размерах.
+    Rect header(String handleLabel) {
+      final handle = tester.getRect(find.bySemanticsLabel(handleLabel));
+      return Rect.fromLTRB(
+        handle.left,
+        handle.top,
+        handle.right,
+        tester.getRect(find.text('Теги')).bottom,
+      );
+    }
+
+    final rest = await _pixels(tester, header(_expandLabel));
+    final touch = await tester.startGesture(
+      header(_expandLabel).topCenter + const Offset(0, 40),
+    );
+    // Отклик Material начинается после задержки нажатия и проявляется
+    // следующим кадром.
+    await tester.pump(kPressTimeout);
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(await _pixels(tester, header(_expandLabel)), rest);
+    await touch.up();
+    await tester.pumpAndSettle();
+    expect(_sheetHeight(tester), _full);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pumpAndSettle();
+    final area = header(_collapseLabel);
+    final focused = await _pixels(tester, area);
+    final frame = Rect.fromLTWH(area.width / 2 - 26, 0, 52, 20);
+    final changed = [
+      for (var i = 0; i < rest.length; i++)
+        if (rest[i] != focused[i])
+          Offset(
+            (i % area.width.toInt()).toDouble(),
+            (i ~/ area.width.toInt()).toDouble(),
+          ),
+    ];
+    expect(changed, isNotEmpty, reason: 'Фокус должен быть виден');
+    expect(
+      changed.every(frame.contains),
+      isTrue,
+      reason: 'Рамка фокуса не должна заходить на заголовок',
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(_sheetHeight(tester), _compact);
   });
 
   testWidgets('размер меняется плавно, а при уменьшенной анимации — сразу', (

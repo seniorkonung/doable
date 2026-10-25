@@ -968,26 +968,10 @@ final class _ExpandableSheetState extends State<_ExpandableSheet>
     final shadows = _shadowsOf(theme);
     final parts = widget.parts;
 
-    final handle = Semantics(
-      container: true,
-      button: true,
-      expanded: _isFull,
+    final handle = _SizeButton(
+      isFull: _isFull,
       label: _isFull ? parts.collapseLabel : parts.expandLabel,
-      child: InkWell(
-        onTap: () => _resize(full: !_isFull),
-        borderRadius: BorderRadius.circular(DoableMetrics.radiusXs),
-        child: SizedBox(
-          width: 88,
-          height: DoableMetrics.tapMin,
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: Padding(
-              padding: const EdgeInsets.only(top: DoableMetrics.space2),
-              child: _Grip(color: colors.grip),
-            ),
-          ),
-        ),
-      ),
+      onTap: () => _resize(full: !_isFull),
     );
     final titleBlock = _TitleBlock(
       title: widget.title,
@@ -1205,6 +1189,90 @@ final class _RenderExpandableFrame extends RenderProxyBox {
       );
     }
     size = constraints.constrain(sheet.size);
+  }
+}
+
+/// Ручка раскрываемого листа — кнопка смены размера без отклика на касание.
+///
+/// О нажатии говорит смена размера листа; рамка показывает только фокус
+/// с клавиатуры и не заходит на заголовок под областью нажатия.
+final class _SizeButton extends StatefulWidget {
+  const _SizeButton({
+    required this.isFull,
+    required this.label,
+    required this.onTap,
+  });
+
+  final bool isFull;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  State<_SizeButton> createState() => _SizeButtonState();
+}
+
+final class _SizeButtonState extends State<_SizeButton> {
+  var _showFocusHighlight = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = _colorsOf(Theme.of(context));
+    // Фокус и штатные команды клавиатуры не зависят от эффекта чернил:
+    // https://api.flutter.dev/flutter/widgets/FocusableActionDetector-class.html
+    return FocusableActionDetector(
+      mouseCursor: SystemMouseCursors.click,
+      onShowFocusHighlight: (value) =>
+          setState(() => _showFocusHighlight = value),
+      actions: {
+        ActivateIntent: CallbackAction<ActivateIntent>(
+          onInvoke: (_) {
+            widget.onTap();
+            return null;
+          },
+        ),
+        ButtonActivateIntent: CallbackAction<ButtonActivateIntent>(
+          onInvoke: (_) {
+            widget.onTap();
+            return null;
+          },
+        ),
+      },
+      // Состояние раскрытия доступно отдельно от названия команды:
+      // https://api.flutter.dev/flutter/semantics/SemanticsProperties/expanded.html
+      child: Semantics(
+        container: true,
+        excludeSemantics: true,
+        button: true,
+        expanded: widget.isFull,
+        label: widget.label,
+        onTap: widget.onTap,
+        child: GestureDetector(
+          // Вся область нажатия принимает касание, включая пустое место:
+          // https://api.flutter.dev/flutter/widgets/GestureDetector/behavior.html
+          behavior: HitTestBehavior.opaque,
+          onTap: widget.onTap,
+          child: SizedBox(
+            width: 88,
+            height: DoableMetrics.tapMin,
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  border: _showFocusHighlight
+                      ? Border.all(color: colors.ink, width: 2)
+                      : null,
+                  borderRadius: BorderRadius.circular(DoableMetrics.radiusXs),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(DoableMetrics.space2),
+                  child: _Grip(color: colors.grip),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

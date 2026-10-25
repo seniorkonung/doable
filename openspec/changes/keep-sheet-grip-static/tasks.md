@@ -11,7 +11,7 @@
   - **Files likely touched:** `lib/src/design_system/components/sheet.dart`, `test/design_system/sheet_test.dart`, `test/data_transfer/presentation/backups_sheet_test.dart`
   - **Estimated scope:** S
 
-- [ ] 1.2 Касание и нажатие ручки раскрываемого листа ничего не подсвечивают, а рамка вокруг ручки видна только при фокусе с аппаратной клавиатуры
+- [x] 1.2 Касание и нажатие ручки раскрываемого листа ничего не подсвечивают, а рамка вокруг ручки видна только при фокусе с аппаратной клавиатуры
   - **Acceptance criteria:**
     - `InkWell` заменён связкой `FocusableActionDetector`, `Semantics` и `GestureDetector` по образцу `CalendarHandle` (design, решение 2); касание принимает вся прежняя область 88×44
     - Пока палец удерживается на ручке, пиксели шапки не меняются; после нажатия лист меняет размер, как прежде
