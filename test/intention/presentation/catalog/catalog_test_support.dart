@@ -122,6 +122,11 @@ final class ControlledCatalogRepository
     _requests[index].complete(answerCatalogQuery(queries[index], result));
   }
 
+  /// Отвечает порцией как есть, без чисел типов, которые просит запрос.
+  void completeVerbatim(int index, Result<IntentionCatalogPage> result) {
+    _requests[index].complete(result);
+  }
+
   void completeCommand(int index, Result<IntentionCommandSuccess> result) {
     _commandRequests[index].complete(switch (result) {
       ResultSuccess(:final value) => ResultSuccess(

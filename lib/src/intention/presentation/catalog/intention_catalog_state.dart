@@ -6,23 +6,62 @@ enum IntentionCatalogFilterValidationFailure {
   tooLong,
 }
 
+/// Тип намерения, которым поиск ограничивает выдачу.
+enum IntentionTypeChoice { all, intentions, actions }
+
+/// Доступность выбора типа намерения, которую задаёт назначение поиска.
+sealed class IntentionTypeAvailability {
+  const IntentionTypeAvailability();
+}
+
+/// Тип выбирается человеком; [selected] — выбранный тип.
+final class IntentionTypeOpen extends IntentionTypeAvailability {
+  const IntentionTypeOpen(this.selected);
+
+  final IntentionTypeChoice selected;
+
+  @override
+  bool operator ==(Object other) =>
+      other is IntentionTypeOpen && other.selected == selected;
+
+  @override
+  int get hashCode => Object.hash(IntentionTypeOpen, selected);
+}
+
+/// Назначение поиска закрепляет тип за действиями.
+final class IntentionTypePinnedToActions extends IntentionTypeAvailability {
+  const IntentionTypePinnedToActions();
+
+  @override
+  bool operator ==(Object other) => other is IntentionTypePinnedToActions;
+
+  @override
+  int get hashCode => (IntentionTypePinnedToActions).hashCode;
+}
+
+/// Назначение поиска выбор типа не предлагает.
+final class IntentionTypeNotOffered extends IntentionTypeAvailability {
+  const IntentionTypeNotOffered();
+
+  @override
+  bool operator ==(Object other) => other is IntentionTypeNotOffered;
+
+  @override
+  int get hashCode => (IntentionTypeNotOffered).hashCode;
+}
+
 final class IntentionCatalogSelection {
   const IntentionCatalogSelection({
     required this.scope,
+    required this.type,
     required this.titleFilterText,
     this.tagFilter = IntentionTagFilter.empty,
     required this.order,
     required this.filterValidationFailure,
   });
 
-  static const initial = IntentionCatalogSelection(
-    scope: IntentionScope.active,
-    titleFilterText: '',
-    order: IntentionCatalogOrder.createdAtDescending,
-    filterValidationFailure: null,
-  );
-
   final IntentionScope scope;
+  final IntentionTypeAvailability type;
   final String titleFilterText;
   final IntentionTagFilter tagFilter;
   final IntentionCatalogOrder order;
@@ -48,12 +87,17 @@ sealed class IntentionCatalogConfirmedState extends IntentionCatalogState {
     required super.selection,
     required this.query,
     required this.totalCount,
+    required this.typeCounts,
     required this.nextCursor,
     required this.revision,
   });
 
   final IntentionCatalogQuery query;
   final int totalCount;
+
+  /// Точные числа обоих типов при условиях выдачи без условия готовности.
+  /// Есть тогда и только тогда, когда тип в [selection] открыт.
+  final IntentionTypeCounts? typeCounts;
   final IntentionCatalogCursor? nextCursor;
   final GraphRevision revision;
 }
@@ -64,6 +108,7 @@ final class IntentionCatalogLoaded extends IntentionCatalogConfirmedState {
     required super.query,
     required List<IntentionSummary> items,
     required super.totalCount,
+    required super.typeCounts,
     required super.nextCursor,
     required super.revision,
     this.continuation = const IntentionCatalogContinuationIdle(),
@@ -106,6 +151,7 @@ final class IntentionCatalogEmpty extends IntentionCatalogConfirmedState {
   const IntentionCatalogEmpty({
     required super.selection,
     required super.query,
+    required super.typeCounts,
     required super.revision,
   }) : super(totalCount: 0, nextCursor: null);
 

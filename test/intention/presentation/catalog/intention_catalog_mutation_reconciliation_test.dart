@@ -822,6 +822,224 @@ void main() {
       });
     }
   });
+
+  group('числа типов', () {
+    test('поправляет оба числа при создании, смене готовности, архивировании '
+        'и удалении', () async {
+      final repository = ControlledCatalogRepository();
+      final container = reconciliationCatalogContainer(repository);
+      final provider = intentionCatalogViewModelProvider(
+        SelectDailyChoiceSource(session: IntentionSearchSession()),
+      );
+      final subscription = container.listen(
+        provider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      addTearDown(container.dispose);
+
+      final intention = testSummary(index: 1);
+      final action = testSummary(index: 2, readiness: IntentionReadiness.ready);
+      repository.complete(
+        0,
+        ResultSuccess(
+          IntentionCatalogFirstPage(
+            items: [action, intention],
+            totalCount: 2,
+            nextCursor: null,
+            revision: const TestCatalogRevision(1),
+          ),
+        ),
+      );
+      await container.read(provider.future);
+      IntentionCatalogConfirmedState current() =>
+          container.read(provider).requireValue
+              as IntentionCatalogConfirmedState;
+      void expectCounts({required int all, required int actions}) {
+        final state = current();
+        expect(state.typeCounts?.all, all);
+        expect(state.typeCounts?.actions, actions);
+        expect(state.totalCount, all);
+      }
+
+      expectCounts(all: 2, actions: 1);
+
+      final created = testSummary(
+        index: 3,
+        readiness: IntentionReadiness.ready,
+      );
+      await completeFullCreation(
+        container,
+        repository,
+        created,
+        revision: const TestCatalogRevision(2),
+      );
+      expectCounts(all: 3, actions: 2);
+
+      final intentionAsAction = testSummary(
+        index: 1,
+        readiness: IntentionReadiness.ready,
+      );
+      await completeCatalogCommand(
+        container,
+        repository,
+        EnableIntentionReadiness(intention.id),
+        IntentionSaved(
+          testIntention(index: 1),
+          catalogMutation: IntentionCatalogUpdated(
+            revision: const TestCatalogRevision(3),
+            before: TestCatalogEntrySnapshot(intention),
+            after: TestCatalogEntrySnapshot(intentionAsAction),
+          ),
+        ),
+      );
+      expectCounts(all: 3, actions: 3);
+
+      await completeCatalogCommand(
+        container,
+        repository,
+        ArchiveIntention(action.id),
+        IntentionSaved(
+          testIntention(index: 2),
+          catalogMutation: IntentionCatalogUpdated(
+            revision: const TestCatalogRevision(4),
+            before: TestCatalogEntrySnapshot(action),
+            after: TestCatalogEntrySnapshot(
+              testSummary(
+                index: 2,
+                readiness: IntentionReadiness.ready,
+                archiveState: IntentionArchiveState.archived,
+              ),
+            ),
+          ),
+        ),
+      );
+      expectCounts(all: 2, actions: 2);
+
+      await completeCatalogCommand(
+        container,
+        repository,
+        DeleteIntention(created.id),
+        IntentionDeleted(
+          created.id,
+          catalogMutation: IntentionCatalogDeleted(
+            revision: const TestCatalogRevision(5),
+            entry: TestCatalogEntrySnapshot(created),
+          ),
+        ),
+      );
+      expectCounts(all: 1, actions: 1);
+      expect(
+        (current() as IntentionCatalogLoaded).items.map((item) => item.id),
+        [intention.id],
+      );
+      expect(repository.queries, hasLength(1));
+    });
+
+    test(
+      'смена готовности переносит намерение между типами выбранного типа',
+      () async {
+        final repository = ControlledCatalogRepository();
+        final container = reconciliationCatalogContainer(repository);
+        final provider = intentionCatalogViewModelProvider(
+          SelectRelationParticipant(
+            selectionContext:
+                RelationParticipantSelectionContext.activeRelation,
+            session: IntentionSearchSession(),
+          ),
+        );
+        final subscription = container.listen(
+          provider,
+          (_, _) {},
+          fireImmediately: true,
+        );
+        addTearDown(subscription.close);
+        addTearDown(container.dispose);
+        repository.complete(
+          0,
+          ResultSuccess(
+            IntentionCatalogFirstPage(
+              items: const [],
+              totalCount: 0,
+              nextCursor: null,
+              revision: const TestCatalogRevision(1),
+            ),
+          ),
+        );
+        await container.read(provider.future);
+        container
+            .read(provider.notifier)
+            .changeType(IntentionTypeChoice.intentions);
+        await waitForCatalogQueries(repository, 2);
+
+        final intention = testSummary(index: 1);
+        final action = testSummary(
+          index: 2,
+          readiness: IntentionReadiness.ready,
+        );
+        repository.complete(
+          1,
+          ResultSuccess(
+            IntentionCatalogFirstPage(
+              items: [intention],
+              totalCount: 1,
+              typeCounts: IntentionTypeCounts(all: 2, actions: 1),
+              nextCursor: null,
+              revision: const TestCatalogRevision(1),
+            ),
+          ),
+        );
+        await container.read(provider.future);
+
+        await completeCatalogCommand(
+          container,
+          repository,
+          EnableIntentionReadiness(intention.id),
+          IntentionSaved(
+            testIntention(index: 1),
+            catalogMutation: IntentionCatalogUpdated(
+              revision: const TestCatalogRevision(2),
+              before: TestCatalogEntrySnapshot(intention),
+              after: TestCatalogEntrySnapshot(
+                testSummary(index: 1, readiness: IntentionReadiness.ready),
+              ),
+            ),
+          ),
+        );
+        expect(
+          container.read(provider).requireValue,
+          isA<IntentionCatalogEmpty>()
+              .having((state) => state.typeCounts?.all, 'все', 2)
+              .having((state) => state.typeCounts?.actions, 'действия', 2),
+        );
+
+        final actionAsIntention = testSummary(index: 2);
+        await completeCatalogCommand(
+          container,
+          repository,
+          DisableIntentionReadiness(action.id),
+          IntentionSaved(
+            testIntention(index: 2),
+            catalogMutation: IntentionCatalogUpdated(
+              revision: const TestCatalogRevision(3),
+              before: TestCatalogEntrySnapshot(action),
+              after: TestCatalogEntrySnapshot(actionAsIntention),
+            ),
+          ),
+        );
+        expect(
+          container.read(provider).requireValue,
+          isA<IntentionCatalogLoaded>()
+              .having((state) => state.items, 'строки', [actionAsIntention])
+              .having((state) => state.totalCount, 'количество', 1)
+              .having((state) => state.typeCounts?.all, 'все', 2)
+              .having((state) => state.typeCounts?.actions, 'действия', 1),
+        );
+        expect(repository.queries, hasLength(2));
+      },
+    );
+  });
 }
 
 IntentionCatalogLoaded _loaded(ProviderContainer container) =>

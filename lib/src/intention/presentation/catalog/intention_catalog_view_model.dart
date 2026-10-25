@@ -12,6 +12,7 @@ import '../../../tag/domain/tag.dart';
 import '../../../tag/domain/tag_id.dart';
 import '../../application/intention_catalog.dart';
 import '../../application/intention_result.dart';
+import '../../domain/intention.dart';
 import '../../domain/intention_id.dart';
 import 'catalog_paging_policy.dart';
 import 'intention_catalog_purpose.dart';
@@ -30,6 +31,9 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   /// Поколение графа, для которого заданы параметры просмотра.
   GraphGeneration? _graphGeneration;
   late IntentionScope _scope;
+
+  /// Выбранный тип; действует, только когда назначение открывает выбор типа.
+  late IntentionTypeChoice _type;
   late String _titleFilterText;
   late IntentionTagFilter _tagFilter;
   late IntentionCatalogOrder _order;
@@ -50,6 +54,12 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       SelectRelationParticipant(:final scope) => scope,
       SelectDailyChoiceAction() => IntentionScope.active,
       SelectDailyChoiceSource() => IntentionScope.active,
+    },
+    type: switch (_purpose) {
+      BrowseIntentionCatalog() => const IntentionTypeNotOffered(),
+      SelectDailyChoiceAction() => const IntentionTypePinnedToActions(),
+      SelectDailyChoiceSource() ||
+      SelectRelationParticipant() => IntentionTypeOpen(_type),
     },
     titleFilterText: _titleFilterText,
     tagFilter: _tagFilter,
@@ -87,15 +97,20 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     }
 
     final catalogScope = selection.scope;
+    final type = selection.type;
     late final IntentionCatalogQuery query;
     try {
       query = IntentionCatalogQuery(
         scope: catalogScope,
-        readinessFilter: switch (purpose) {
-          SelectDailyChoiceAction() => IntentionReadinessFilter.readyOnly,
-          BrowseIntentionCatalog() ||
-          SelectRelationParticipant() ||
-          SelectDailyChoiceSource() => IntentionReadinessFilter.all,
+        readinessFilter: switch (type) {
+          IntentionTypeNotOffered() => IntentionReadinessFilter.all,
+          IntentionTypePinnedToActions() => IntentionReadinessFilter.readyOnly,
+          IntentionTypeOpen(selected: IntentionTypeChoice.all) =>
+            IntentionReadinessFilter.all,
+          IntentionTypeOpen(selected: IntentionTypeChoice.intentions) =>
+            IntentionReadinessFilter.notReadyOnly,
+          IntentionTypeOpen(selected: IntentionTypeChoice.actions) =>
+            IntentionReadinessFilter.readyOnly,
         },
         titleFilter: _titleFilterText,
         tagFilter: _tagFilter,
@@ -108,6 +123,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
         },
         order: _order,
         pageSize: _policy.pageSize,
+        requestsTypeCounts: type is IntentionTypeOpen,
       );
     } on IntentionCatalogQueryValidationException catch (error) {
       _filterValidationFailure = switch (error.failure) {
@@ -137,6 +153,15 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       return;
     }
     _scope = scope;
+    _applyParametersImmediately();
+  }
+
+  /// Применяет выбор типа, только когда назначение открывает выбор типа.
+  void changeType(IntentionTypeChoice type) {
+    if (selection.type is! IntentionTypeOpen || _type == type) {
+      return;
+    }
+    _type = type;
     _applyParametersImmediately();
   }
 
@@ -278,6 +303,13 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
         page.items.length > query.pageSize) {
       return IntentionCatalogUnexpected(selection: selection, query: query);
     }
+    final typeCounts = query.requestsTypeCounts ? page.typeCounts : null;
+    if (query.requestsTypeCounts &&
+        (typeCounts == null ||
+            page.totalCount !=
+                _selectedTypeCount(query.readinessFilter, typeCounts))) {
+      return IntentionCatalogUnexpected(selection: selection, query: query);
+    }
     if (page.items.isEmpty) {
       if (page.totalCount != 0 || page.nextCursor != null) {
         return IntentionCatalogUnexpected(selection: selection, query: query);
@@ -285,6 +317,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       return IntentionCatalogEmpty(
         selection: selection,
         query: query,
+        typeCounts: typeCounts,
         revision: page.revision,
       );
     }
@@ -297,10 +330,21 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       query: query,
       items: page.items,
       totalCount: page.totalCount,
+      typeCounts: typeCounts,
       nextCursor: page.nextCursor,
       revision: page.revision,
     );
   }
+
+  /// Число того типа, который выбирает условие готовности выдачи.
+  static int _selectedTypeCount(
+    IntentionReadinessFilter readinessFilter,
+    IntentionTypeCounts typeCounts,
+  ) => switch (readinessFilter) {
+    IntentionReadinessFilter.all => typeCounts.all,
+    IntentionReadinessFilter.readyOnly => typeCounts.actions,
+    IntentionReadinessFilter.notReadyOnly => typeCounts.intentions,
+  };
 
   IntentionCatalogState _mapFailure(
     IntentionCatalogSelection selection,
@@ -431,6 +475,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       query: confirmed.query,
       items: combined,
       totalCount: confirmed.totalCount,
+      typeCounts: confirmed.typeCounts,
       nextCursor: page.nextCursor,
       revision: confirmed.revision,
     );
@@ -511,6 +556,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     query: confirmed.query,
     items: confirmed.items,
     totalCount: confirmed.totalCount,
+    typeCounts: confirmed.typeCounts,
     nextCursor: confirmed.nextCursor,
     revision: confirmed.revision,
     continuation: continuation,
@@ -527,12 +573,12 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   }
 
   void _resetParameters() {
-    const initial = IntentionCatalogSelection.initial;
-    _scope = initial.scope;
-    _titleFilterText = initial.titleFilterText;
-    _tagFilter = initial.tagFilter;
-    _order = initial.order;
-    _filterValidationFailure = initial.filterValidationFailure;
+    _scope = IntentionScope.active;
+    _type = IntentionTypeChoice.all;
+    _titleFilterText = '';
+    _tagFilter = IntentionTagFilter.empty;
+    _order = IntentionCatalogOrder.createdAtDescending;
+    _filterValidationFailure = null;
     _filterTimer?.cancel();
     _isDebouncingFilter = false;
   }
@@ -715,6 +761,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       query: confirmed.query,
       items: items,
       totalCount: confirmed.totalCount,
+      typeCounts: confirmed.typeCounts,
       nextCursor: confirmed.nextCursor,
       revision: confirmed.revision,
       continuation: confirmed.continuation,
@@ -746,6 +793,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       query: confirmed.query,
       items: items,
       totalCount: confirmed.totalCount,
+      typeCounts: confirmed.typeCounts,
       nextCursor: confirmed.nextCursor,
       revision: confirmed.revision,
       continuation: confirmed.continuation,
@@ -769,6 +817,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
           query: confirmed.query,
           items: items,
           totalCount: confirmed.totalCount,
+          typeCounts: confirmed.typeCounts,
           nextCursor: confirmed.nextCursor,
           revision: revision,
           continuation: continuation,
@@ -776,6 +825,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       IntentionCatalogEmpty() => IntentionCatalogEmpty(
         selection: confirmed.selection,
         query: confirmed.query,
+        typeCounts: confirmed.typeCounts,
         revision: revision,
       ),
     };
@@ -791,6 +841,16 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
         confirmed.totalCount + (afterMatches ? 1 : 0) - (beforeMatches ? 1 : 0);
     if (totalCount < 0) {
       return null;
+    }
+    final IntentionTypeCounts? typeCounts;
+    switch (confirmed.typeCounts) {
+      case null:
+        typeCounts = null;
+      case final counts:
+        typeCounts = _reconcileTypeCounts(counts, confirmed.query, mutation);
+        if (typeCounts == null) {
+          return null;
+        }
     }
 
     final items = switch (confirmed) {
@@ -812,6 +872,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       return IntentionCatalogEmpty(
         selection: confirmed.selection,
         query: confirmed.query,
+        typeCounts: typeCounts,
         revision: mutation.revision,
       );
     }
@@ -820,6 +881,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       query: confirmed.query,
       items: items,
       totalCount: totalCount,
+      typeCounts: typeCounts,
       nextCursor: confirmed.nextCursor,
       revision: mutation.revision,
       continuation: switch (confirmed) {
@@ -827,6 +889,42 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
         IntentionCatalogEmpty() => const IntentionCatalogContinuationIdle(),
       },
     );
+  }
+
+  /// Поправляет числа типов на разницу «после − до»: принадлежность
+  /// снимка — по выдаче без условия готовности, тип — по его готовности;
+  /// `null` — числа стали несогласуемыми.
+  IntentionTypeCounts? _reconcileTypeCounts(
+    IntentionTypeCounts counts,
+    IntentionCatalogQuery query,
+    IntentionCatalogMutation mutation,
+  ) {
+    final anyTypeQuery = IntentionCatalogQuery(
+      scope: query.scope,
+      titleFilter: query.titleFilter?.map((value) => value),
+      tagFilter: query.tagFilter,
+      excludedIntentionId: query.excludedIntentionId,
+      order: query.order,
+      pageSize: query.pageSize,
+    );
+    var all = counts.all;
+    var actions = counts.actions;
+    void count(IntentionCatalogEntrySnapshot? snapshot, int delta) {
+      if (snapshot == null || !snapshot.matches(anyTypeQuery)) {
+        return;
+      }
+      all += delta;
+      if (snapshot.summary.readiness == IntentionReadiness.ready) {
+        actions += delta;
+      }
+    }
+
+    count(mutation.before, -1);
+    count(mutation.after, 1);
+    if (actions < 0 || actions > all) {
+      return null;
+    }
+    return IntentionTypeCounts(all: all, actions: actions);
   }
 
   bool _belongsToLoadedPrefix(
