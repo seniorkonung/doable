@@ -14,6 +14,7 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/tag_positions.dart';
+import '../../support/intention_title_order_key.dart';
 
 import 'package:doable/src/intention/application/intention_description_preview.dart';
 
@@ -38,6 +39,24 @@ void main() {
         ).titleFilter!.matchesTitle('ışık'),
         isTrue,
       );
+    });
+  });
+
+  group('ключ порядка названия намерения', () {
+    IntentionTitleOrderKey key(String searchProjection) =>
+        IntentionTitleOrderKey.fromSearchProjection(searchProjection);
+
+    test('сравнивает ключи по кодовым точкам, а не по единицам UTF-16', () {
+      // В UTF-16 суррогатная пара U+1F600 начинается с 0xD83D < 0xE000.
+      expect(key('\u{E000}').compareTo(key('\u{1F600}')), isNegative);
+      expect(key('\u{1F600}').compareTo(key('\u{E000}')), isPositive);
+      expect(key('a\u{FFFD}').compareTo(key('a\u{10000}')), isNegative);
+    });
+
+    test('ставит ключ раньше его продолжения и равняет одинаковые', () {
+      expect(key('стр').compareTo(key('строка')), isNegative);
+      expect(key('строка').compareTo(key('стр')), isPositive);
+      expect(key('\u{1F600}я').compareTo(key('\u{1F600}я')), 0);
     });
   });
 
@@ -357,6 +376,7 @@ void main() {
         archiveState: IntentionArchiveState.archived,
         createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 2)),
+        titleOrderKey: testTitleOrderKey('Гулять'),
         tags: [
           Tag(
             id: firstId,
@@ -411,6 +431,7 @@ void main() {
         archiveState: IntentionArchiveState.archived,
         createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 2)),
+        titleOrderKey: testTitleOrderKey('Гулять'),
         tags: [
           Tag(
             id: firstId,
@@ -459,6 +480,7 @@ void main() {
         archiveState: IntentionArchiveState.active,
         createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
+        titleOrderKey: testTitleOrderKey('Гулять'),
         tags: [
           Tag(
             id: _tagId('00000000-0000-4000-8000-000000000001'),
@@ -497,6 +519,7 @@ void main() {
         archiveState: IntentionArchiveState.archived,
         createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 2)),
+        titleOrderKey: testTitleOrderKey('Гулять'),
         tags: [
           Tag(
             id: firstId,
@@ -536,6 +559,7 @@ void main() {
         archiveState: IntentionArchiveState.active,
         createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
+        titleOrderKey: testTitleOrderKey('Гулять'),
         tags: [
           Tag(
             id: _tagId('00000000-0000-4000-8000-000000000001'),
@@ -949,6 +973,7 @@ IntentionSummary _summary({
     archiveState: archiveState,
     createdAt: created,
     updatedAt: IntentionTimestamp(updatedAt ?? created.value),
+    titleOrderKey: testTitleOrderKey(title),
     tags: tags,
   );
 }

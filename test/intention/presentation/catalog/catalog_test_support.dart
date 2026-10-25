@@ -35,6 +35,7 @@ import 'package:doable/src/tag/domain/tag_id.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/statistics_read_contract_test_fallback.dart';
 import '../../../support/intention_description_preview.dart';
+import '../../../support/intention_title_order_key.dart';
 
 final class ControlledCatalogRepository
     with StatisticsReadContractTestFallback, TagReadContractTestFallback
@@ -308,6 +309,7 @@ IntentionSummary testSummary({
     archiveState: archiveState,
     createdAt: createdAt,
     updatedAt: updatedAt,
+    titleOrderKey: testTitleOrderKey(title),
     tags: tags,
   );
 }

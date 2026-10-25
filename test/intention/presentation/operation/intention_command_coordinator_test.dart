@@ -34,6 +34,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/statistics_read_contract_test_fallback.dart';
 import '../../../support/tag_positions.dart';
+import '../../../support/intention_title_order_key.dart';
 
 void main() {
   group('GraphCommandCoordinator', () {
@@ -1318,6 +1319,7 @@ final class _TestCatalogEntrySnapshot implements IntentionCatalogEntrySnapshot {
          archiveState: IntentionArchiveState.active,
          createdAt: IntentionTimestamp(DateTime.utc(2026)),
          updatedAt: IntentionTimestamp(DateTime.utc(2026)),
+         titleOrderKey: testTitleOrderKey(title),
          tags: tags,
        );
 

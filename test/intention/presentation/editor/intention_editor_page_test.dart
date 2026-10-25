@@ -42,6 +42,7 @@ import '../catalog/catalog_test_support.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
 import '../../../support/tag_positions.dart';
 import '../../../support/intention_description_preview.dart';
+import '../../../support/intention_title_order_key.dart';
 
 void main() {
   setUp(() {
@@ -2463,6 +2464,7 @@ ResultSuccess<IntentionSaved> _savedResult({required String title}) {
             archiveState: intention.archiveState,
             createdAt: intention.createdAt,
             updatedAt: intention.updatedAt,
+            titleOrderKey: testTitleOrderKey(intention.title),
           ),
         ),
       ),

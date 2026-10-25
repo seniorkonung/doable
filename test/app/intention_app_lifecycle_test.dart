@@ -46,6 +46,7 @@ import '../support/statistics_read_contract_test_fallback.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
 import '../support/quick_creation.dart';
 import '../support/intention_description_preview.dart';
+import '../support/intention_title_order_key.dart';
 
 void main() {
   testWidgets(
@@ -1204,6 +1205,7 @@ IntentionSummary _summary(Intention intention) => IntentionSummary(
   archiveState: intention.archiveState,
   createdAt: intention.createdAt,
   updatedAt: intention.updatedAt,
+  titleOrderKey: testTitleOrderKey(intention.title),
 );
 
 final _relationId = switch (LongTermRelationId.decode(

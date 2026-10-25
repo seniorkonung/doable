@@ -12,6 +12,7 @@ import 'package:doable/src/tag/domain/tag_assignment.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/tag_positions.dart';
+import '../../support/intention_title_order_key.dart';
 
 void main() {
   test('изменение тега сохраняет идентичность и допускает смену только '
@@ -236,6 +237,7 @@ IntentionCatalogEntrySnapshot _entry(IntentionId id, List<Tag> tags) => _Entry(
     archiveState: IntentionArchiveState.active,
     createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
     updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 2)),
+    titleOrderKey: testTitleOrderKey('Намерение'),
     tags: tags,
   ),
 );

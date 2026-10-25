@@ -200,9 +200,12 @@ IntentionTimestamp _decodeStoredIntentionTimestamp(
 }
 
 /// Ключ поиска из столбца `title_search_key`, который схема вычисляет из
-/// названия намерения.
-String decodeStoredTitleSearchKey(Map<String, Object?> data) {
-  final key = requiredStoredString(data, 'title_search_key');
+/// названия намерения. Имя столбца в строке начинается с [prefix].
+String decodeStoredTitleSearchKey(
+  Map<String, Object?> data, [
+  String prefix = '',
+]) {
+  final key = requiredStoredString(data, '${prefix}title_search_key');
   try {
     IntentionText.ensureValidUnicodeRepertoire(
       key,

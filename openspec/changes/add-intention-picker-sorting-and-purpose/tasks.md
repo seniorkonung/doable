@@ -12,7 +12,7 @@
   - **Предполагаемые файлы:** `lib/src/intention/application/intention_catalog.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `test/intention/application/intention_contract_test.dart`, `test/intention/data/drift_intention_catalog_test.dart`, `test/intention/data/drift_intention_repository_command_test.dart`.
   - **Размер:** S.
 
-- [ ] 1.2 Дать краткой сводке намерения непрозрачный ключ порядка названия, который адаптеры строят из сохранённой поисковой проекции
+- [x] 1.2 Дать краткой сводке намерения непрозрачный ключ порядка названия, который адаптеры строят из сохранённой поисковой проекции
   - **Критерии приёмки:**
     - Ключ по [ADR-0045](../../../docs/adr/0045-order-titles-by-opaque-key-of-stored-search-projection.md) — значение-тип, которое умеет только сравниваться с другим ключом по кодовым точкам. Содержимое наружу не выходит и как `String` не сравнивается; `U+E000` идёт раньше `U+1F600`.
     - Production-адаптер строит ключ только в сборке сводки: чтение порции из колонки сохранённой проекции, снимок команды — из уже прочитанного им ключа. Ключ из названия в Dart адаптер не вычисляет.

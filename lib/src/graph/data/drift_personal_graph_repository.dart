@@ -1188,6 +1188,7 @@ final class DriftPersonalGraphRepository
       ..addColumns([
         intentions.id,
         intentions.title,
+        intentions.titleSearchKey,
         intentions.description,
         intentions.isActionReady,
         intentions.isArchived,
@@ -1221,6 +1222,7 @@ final class DriftPersonalGraphRepository
       ..addColumns([
         intentions.id,
         intentions.title,
+        intentions.titleSearchKey,
         intentions.description,
         intentions.isActionReady,
         intentions.isArchived,
@@ -1337,15 +1339,22 @@ final class DriftPersonalGraphRepository
   ) async {
     final intentions = [
       for (final row in rows)
-        decodeStoredIntention(row.rawData.data, 'intentions.'),
+        (
+          intention: decodeStoredIntention(row.rawData.data, 'intentions.'),
+          titleSearchKey: decodeStoredTitleSearchKey(
+            row.rawData.data,
+            'intentions.',
+          ),
+        ),
     ];
     final itemRows = intentions.take(pageSize).toList(growable: false);
-    final intentionIds = [for (final intention in itemRows) intention.id];
+    final intentionIds = [for (final row in itemRows) row.intention.id];
     final tags = await _readIntentionTags(intentionIds);
     return [
       for (var index = 0; index < itemRows.length; index++)
         _rehydrateSummary(
-          itemRows[index],
+          itemRows[index].intention,
+          itemRows[index].titleSearchKey,
           tags[intentionIds[index]] ?? (throw const StoredGraphCorruption()),
         ),
     ];
@@ -1353,6 +1362,7 @@ final class DriftPersonalGraphRepository
 
   IntentionSummary _rehydrateSummary(
     domain.Intention intention,
+    String storedTitleSearchKey,
     List<tag_domain.Tag> tags,
   ) => IntentionSummary(
     id: intention.id,
@@ -1367,6 +1377,9 @@ final class DriftPersonalGraphRepository
     archiveState: intention.archiveState,
     createdAt: intention.createdAt,
     updatedAt: intention.updatedAt,
+    titleOrderKey: IntentionTitleOrderKey.fromSearchProjection(
+      storedTitleSearchKey,
+    ),
     tags: tags,
   );
 
@@ -1389,6 +1402,7 @@ final class DriftPersonalGraphRepository
     return _DriftIntentionCatalogEntrySnapshot(
       summary: _rehydrateSummary(
         intention,
+        stored.titleSearchKey,
         tags[intention.id] ?? (throw const StoredGraphCorruption()),
       ),
       storedTitleSearchKey: stored.titleSearchKey,

@@ -29,6 +29,7 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/statistics_read_contract_test_fallback.dart';
 import '../../../support/intention_description_preview.dart';
+import '../../../support/intention_title_order_key.dart';
 
 /// Управляемый граф: каждое чтение группы завершается тестом вручную.
 final class ControlledNeighborhoodRepository
@@ -507,6 +508,7 @@ final class _NeighborhoodCatalogEntrySnapshot
         archiveState: intention.archiveState,
         createdAt: intention.createdAt,
         updatedAt: intention.updatedAt,
+        titleOrderKey: testTitleOrderKey(intention.title),
       );
 
   @override

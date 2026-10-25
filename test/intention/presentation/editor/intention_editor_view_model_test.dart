@@ -28,6 +28,7 @@ import '../catalog/catalog_reconciliation_test_support.dart'
 import '../catalog/catalog_test_support.dart';
 import '../../../support/tag_positions.dart';
 import '../../../support/intention_description_preview.dart';
+import '../../../support/intention_title_order_key.dart';
 
 void main() {
   test(
@@ -2276,6 +2277,7 @@ Result<IntentionCommandSuccess> _savedResult({Intention? intention}) {
             archiveState: intention.archiveState,
             createdAt: intention.createdAt,
             updatedAt: intention.updatedAt,
+            titleOrderKey: testTitleOrderKey(intention.title),
           ),
         ),
       ),

@@ -19,6 +19,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/tag_positions.dart';
+import '../../../support/intention_title_order_key.dart';
 
 void main() {
   test('пустой снимок отличается от отсутствия намерения', () async {
@@ -566,6 +567,7 @@ final class _Entry extends Fake implements IntentionCatalogEntrySnapshot {
         archiveState: IntentionArchiveState.active,
         createdAt: IntentionTimestamp(DateTime.utc(2026)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026)),
+        titleOrderKey: testTitleOrderKey('Одинаковое намерение'),
         tags: tags,
       );
 

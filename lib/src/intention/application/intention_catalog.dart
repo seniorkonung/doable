@@ -261,6 +261,34 @@ final class IntentionTitleFilter {
 
 abstract interface class IntentionCatalogCursor {}
 
+/// Непрозрачный ключ порядка названия намерения (ADR-0045).
+///
+/// Ключ строят адаптеры репозитория из сохранённой поисковой проекции
+/// названия, по которой они упорядочивают порции. Содержимое ключа не
+/// раскрывается: его можно только сравнить с другим ключом по кодовым точкам,
+/// как SQLite сравнивает `TEXT` в `BINARY`.
+final class IntentionTitleOrderKey
+    implements Comparable<IntentionTitleOrderKey> {
+  const IntentionTitleOrderKey.fromSearchProjection(this._searchProjection);
+
+  final String _searchProjection;
+
+  @override
+  int compareTo(IntentionTitleOrderKey other) {
+    final left = _searchProjection.runes.iterator;
+    final right = other._searchProjection.runes.iterator;
+    while (true) {
+      final hasLeft = left.moveNext();
+      final hasRight = right.moveNext();
+      if (!hasLeft || !hasRight) {
+        return (hasLeft ? 1 : 0) - (hasRight ? 1 : 0);
+      }
+      final comparison = left.current.compareTo(right.current);
+      if (comparison != 0) return comparison;
+    }
+  }
+}
+
 final class IntentionSummary {
   IntentionSummary({
     required this.id,
@@ -270,6 +298,7 @@ final class IntentionSummary {
     required this.archiveState,
     required this.createdAt,
     required this.updatedAt,
+    required this.titleOrderKey,
     List<Tag> tags = const [],
   }) : title = IntentionText.normalizeTitle(title),
        tags = List.unmodifiable(tags);
@@ -283,6 +312,9 @@ final class IntentionSummary {
   final IntentionArchiveState archiveState;
   final IntentionTimestamp createdAt;
   final IntentionTimestamp updatedAt;
+
+  /// Ключ порядка по названию из сохранённой поисковой проекции [title].
+  final IntentionTitleOrderKey titleOrderKey;
 
   /// Полный подтверждённый состав собственных тегов в ручном порядке тегов.
   /// Пустой список означает проверенное отсутствие назначений.
@@ -306,6 +338,7 @@ final class IntentionSummary {
       archiveState: archiveState,
       createdAt: createdAt,
       updatedAt: updatedAt,
+      titleOrderKey: titleOrderKey,
       // Места уникальны, поэтому нестабильная сортировка однозначна.
       tags: [for (final tag in tags) tag.id == updated.id ? updated : tag]
         ..sort((a, b) => a.position.compareTo(b.position)),
@@ -328,6 +361,7 @@ final class IntentionSummary {
       archiveState: archiveState,
       createdAt: createdAt,
       updatedAt: updatedAt,
+      titleOrderKey: titleOrderKey,
       tags: [
         for (final tag in tags)
           if (tag.id != deletedTagId) tag,
