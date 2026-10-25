@@ -35,11 +35,13 @@
       - `compare` запроса сравнивает ключи сводок и при равенстве — идентификаторы.
     - На одном наборе порядок порций совпадает с порядком `compare`. Набор включает регистр, многосимвольную свёртку («Straßenbahn» перед «Strauss»), «ё» и «я», латиницу и кириллицу, `U+E000` и символ за пределами BMP.
     - Названия, различающиеся только регистром, проходят через несколько порций без пропусков и повторов в обоих направлениях. Существующие четыре порядка по времени не меняются.
+    - Порядок по названию не ограничен назначением, по решению 1 дизайна. Страница каталога графа подписывает исчерпывающе только собственный закрытый набор из четырёх порядков по времени: подписи порядка по названию и ветки с ошибкой во время выполнения на ней нет, вид каталога не меняется.
   - **Проверка:**
     - `mise exec --no-deps -- flutter test test/intention/data/drift_intention_catalog_test.dart` — шесть порядков на всех охватах с дополнительным ключом по идентификатору; совпадение с `compare`; продолжение через равные ключи.
     - `mise exec --no-deps -- flutter test test/intention/application/intention_contract_test.dart test/intention/data/drift_intention_repository_large_fixture_test.dart`.
+    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog` — каталог графа предлагает и подписывает прежние четыре порядка.
   - **Зависимости:** 1.2.
-  - **Предполагаемые файлы:** `lib/src/intention/application/intention_catalog.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `test/intention/data/drift_intention_catalog_test.dart`, `test/intention/application/intention_contract_test.dart`.
+  - **Предполагаемые файлы:** `lib/src/intention/application/intention_catalog.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `lib/src/intention/presentation/catalog/intention_catalog_page.dart`, `test/intention/data/drift_intention_catalog_test.dart`, `test/intention/application/intention_contract_test.dart`.
   - **Размер:** M.
 
 - [ ] 1.4 Сделать схему версии 6 с индексами порядка по названию новой базовой версией без пути обновления
