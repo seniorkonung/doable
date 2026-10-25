@@ -14,7 +14,7 @@ final class ActionSheet extends StatelessWidget {
     super.key,
   });
 
-  final ContentSheetCapability sheet;
+  final SheetPresentation sheet;
   final String title;
   final String text;
   final List<OptionRow> options;

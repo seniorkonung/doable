@@ -2014,7 +2014,7 @@ Future<void> _openContentMessagesSheet(BuildContext context) =>
     );
 
 Future<void> _openExpandableMessagesSheet(BuildContext context) =>
-    showDoableExpandableSheet<void>(
+    showDoableSheet<void>(
       context: context,
       hostsMessages: true,
       builder: (_, sheet) => Sheet.expandable(
@@ -2022,10 +2022,11 @@ Future<void> _openExpandableMessagesSheet(BuildContext context) =>
         title: 'Лист',
         text: 'Пояснение',
         pinned: const SizedBox(height: 44),
-        body: ListView(children: const [SizedBox(height: 120)]),
+        slivers: const [SliverToBoxAdapter(child: SizedBox(height: 120))],
         footer: const SizedBox(height: 44, child: Text('Готово')),
         expandLabel: 'Раскрыть',
         collapseLabel: 'Свернуть',
+        compactHeight: SheetCompactHeight.limit,
       ),
     );
 

@@ -2,6 +2,7 @@ import 'package:doable/src/design_system/doable_colors.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -44,6 +45,29 @@ void main() {
       );
       expect(button.childrenCount, 0);
       semantics.dispose();
+    },
+  );
+
+  testWidgets(
+    'неквадратная графика занимает квадрат size и рисуется в своих пропорциях',
+    (tester) async {
+      await tester.pumpWidget(
+        const Directionality(
+          textDirection: TextDirection.ltr,
+          child: Center(
+            child: DoableIcon(
+              DoableIconData.chevronDown,
+              size: 28,
+              color: Color(0xff111114),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(tester.getSize(find.byType(DoableIcon)), const Size.square(28));
+      expect(tester.getRect(find.byType(SvgPicture)).size, const Size(28, 10));
     },
   );
 

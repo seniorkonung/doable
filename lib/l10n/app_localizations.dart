@@ -2173,6 +2173,18 @@ abstract class AppLocalizations {
   /// **'Couldn’t load backups'**
   String get dataBackupsReadFailed;
 
+  /// Доступное название ручки панели «Резервные копии» в компактном размере
+  ///
+  /// In en, this message translates to:
+  /// **'Expand backups panel'**
+  String get dataBackupsExpand;
+
+  /// Доступное название шеврона панели «Резервные копии» в полном размере
+  ///
+  /// In en, this message translates to:
+  /// **'Collapse backups panel'**
+  String get dataBackupsCollapse;
+
   /// Подпись строки «Резервные копии», когда последняя копия сделана меньше минуты назад
   ///
   /// In en, this message translates to:

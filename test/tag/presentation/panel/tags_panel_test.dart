@@ -588,8 +588,12 @@ void main() {
     final tags = [for (var i = 1; i <= 40; i++) _tag(i, 'Тег $i')];
     h.repository.complete(tags, assignedIds: {_id(15)});
     await tester.pump();
-    await tester.drag(find.byType(CustomScrollView), const Offset(0, -500));
-    await tester.pumpAndSettle();
+    // Первый жест вверх раскрывает компактную панель, второй прокручивает
+    // список.
+    for (var drags = 0; drags < 2; drags++) {
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, -500));
+      await tester.pumpAndSettle();
+    }
     final offset = _scrollOffset(tester);
     final shown = _rowNames(tester);
     expect(shown.first, isNot('Тег 1'));
@@ -606,6 +610,13 @@ void main() {
     expect(
       find.text('Не удалось обновить теги. Список может быть устаревшим.'),
       findsOne,
+    );
+    final notice = tester.getRect(find.byType(Notice));
+    expect(notice.top, greaterThanOrEqualTo(tester.getRect(_search).bottom));
+    expect(
+      notice.bottom,
+      lessThanOrEqualTo(tester.getRect(find.byType(CustomScrollView)).top),
+      reason: 'уведомление стоит над первой показанной строкой списка',
     );
     _expectSameRows(tester, shown);
     expect(_scrollOffset(tester), offset);
@@ -702,9 +713,20 @@ void main() {
   for (final (name, close) in <(String, Future<void> Function(WidgetTester))>[
     ('«Готово»', (tester) => tester.tap(find.text('Готово'))),
     (
-      'свайп вниз',
-      (tester) =>
-          tester.drag(find.text('Выберите сколько нужно'), const Offset(0, 80)),
+      'бросок вниз',
+      (tester) => tester.fling(
+        find.text('Выберите сколько нужно'),
+        const Offset(0, 80),
+        1000,
+      ),
+    ),
+    (
+      'свайп вниз дальше половины компактной высоты',
+      (tester) => tester.timedDrag(
+        find.text('Выберите сколько нужно'),
+        const Offset(0, 300),
+        const Duration(seconds: 2),
+      ),
     ),
     ('касание затемнения', (tester) => tester.tapAt(const Offset(195, 120))),
     ('«назад»', (tester) => tester.binding.handlePopRoute()),
@@ -760,6 +782,41 @@ void main() {
     await tester.pumpAndSettle();
     expectVisible();
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('ввод поиска при открытой клавиатуре не меняет высоту '
+      'компактной панели и место «Готово»', (tester) async {
+    final h = await _pumpApp(tester);
+    await h.open();
+    h.repository.complete([
+      for (var i = 1; i <= 10; i++) _tag(i, 'Тег $i'),
+    ], assignedIds: {});
+    await tester.pump();
+    await tester.showKeyboard(_search);
+    tester.view.viewInsets = const FakeViewPadding(bottom: 336);
+    addTearDown(tester.view.resetViewInsets);
+    await tester.pumpAndSettle();
+    final sheet = tester.getRect(find.byType(Sheet));
+    final done = tester.getRect(find.text('Готово'));
+    expect(
+      tester
+          .state<ScrollableState>(
+            find.descendant(
+              of: find.byType(CustomScrollView),
+              matching: find.byType(Scrollable),
+            ),
+          )
+          .position
+          .maxScrollExtent,
+      greaterThan(0),
+    );
+
+    await tester.enterText(_search, 'Тег 7');
+    await tester.pumpAndSettle();
+
+    expect(_rowNames(tester), ['Тег 7']);
+    expect(tester.getRect(find.byType(Sheet)), sheet);
+    expect(tester.getRect(find.text('Готово')), done);
   });
 
   for (final (locale, texts) in [
@@ -1348,6 +1405,82 @@ void main() {
     expect(find.byType(SnackBar), findsNothing);
     await _dragByGrip(tester, _row(2), -100);
     expect(h.repository.commands, hasLength(2));
+  });
+
+  testWidgets('перетаскивание тега за ручку вверх в компактной панели '
+      'переставляет тег, а панель и «Готово» остаются на месте', (
+    tester,
+  ) async {
+    final h = await _pumpApp(tester);
+    await h.open();
+    h.repository.complete([
+      _tag(1, 'Работа'),
+      _tag(2, 'Дом'),
+      _tag(3, 'Спорт'),
+    ], assignedIds: {});
+    await tester.pump();
+    final sheet = tester.getRect(find.byType(Sheet));
+    final done = tester.getRect(find.text('Готово'));
+
+    final drag = await tester.startGesture(tester.getCenter(_gripOf(_row(3))));
+    for (var step = 0; step < 8; step++) {
+      await drag.moveBy(const Offset(0, -20));
+      await tester.pump();
+      expect(tester.getRect(find.byType(Sheet)), sheet);
+      expect(tester.getRect(find.text('Готово')), done);
+    }
+    await drag.up();
+    await tester.pumpAndSettle();
+
+    expect(_rowNames(tester), ['Спорт', 'Работа', 'Дом']);
+    expect(tester.getRect(find.byType(Sheet)), sheet);
+    expect(tester.getRect(find.text('Готово')), done);
+  });
+
+  testWidgets('у нижнего края списка перетаскиваемый за ручку тег сам '
+      'прокручивает список, а отпускание ставит тег туда, куда его довели, '
+      'не двигая компактную панель', (tester) async {
+    final h = await _pumpApp(tester);
+    await h.open();
+    final tags = [for (var i = 1; i <= 40; i++) _tag(i, 'Тег $i')];
+    h.repository.complete(tags, assignedIds: {});
+    await tester.pump();
+    final sheet = tester.getRect(find.byType(Sheet));
+    final done = tester.getRect(find.text('Готово'));
+    final list = tester.getRect(find.byType(CustomScrollView));
+    final shown = {
+      for (var i = 1; i <= tags.length; i++)
+        if (_row(i).evaluate().isNotEmpty &&
+            tester.getRect(_row(i)).top < list.bottom)
+          _id(i),
+    };
+    expect(shown, hasLength(lessThan(tags.length)), reason: 'каталог длиннее');
+
+    final start = tester.getCenter(_gripOf(_row(1)));
+    final edge = Offset(start.dx, list.bottom - 8);
+    final drag = await tester.startGesture(start);
+    for (var step = 1; step <= 10; step++) {
+      await drag.moveTo(Offset.lerp(start, edge, step / 10)!);
+      await tester.pump();
+    }
+    final reached = _scrollOffset(tester);
+    // Палец стоит у края, а список прокручивается сам.
+    for (var frame = 0; frame < 30; frame++) {
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(tester.getRect(find.byType(Sheet)), sheet);
+      expect(tester.getRect(find.text('Готово')), done);
+    }
+    expect(_scrollOffset(tester), greaterThan(reached));
+    await drag.up();
+    await tester.pumpAndSettle();
+
+    final move = h.repository.commands.single as MoveTag;
+    expect(move.tagId, _id(1));
+    final after = (move.placement as AfterTagPlacement).tagId;
+    expect(shown, isNot(contains(after)), reason: 'место за пределами экрана');
+    expect(tester.getRect(_row(1)).contains(edge), isTrue);
+    expect(tester.getRect(find.byType(Sheet)), sheet);
+    expect(tester.getRect(find.text('Готово')), done);
   });
 
   for (final (locale, moveActions) in [

@@ -230,10 +230,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(_tagsPanel(l10n), findsOneWidget);
         expect(router.current.name, IntentionEditorRoute.name);
-        expect(
-          _traversal(tester),
-          contains('${l10n.tagsPanelTitle}\n${l10n.tagsPanelAssignmentHint}'),
-        );
+        _expectTagsPanelHeader(tester, l10n);
         expect(_traversal(tester), isNot(contains(l10n.editorTitleLabel)));
         expect(_isFocusedIn(tester, find.byType(IntentionEditorPage)), isFalse);
         for (final tag in _tags) {
@@ -856,6 +853,34 @@ List<String> _traversal(WidgetTester tester) => [
       SemanticsData(:final tooltip) => tooltip,
     },
 ];
+
+/// Шапка панели тегов читается как шапка листа по содержимому: заголовок,
+/// который называет маршрут, и сразу за ним отдельное пояснение. Ни эти
+/// элементы, ни объемлющие их узлы не дают диктору действий прокрутки.
+void _expectTagsPanelHeader(WidgetTester tester, AppLocalizations l10n) {
+  final traversal = tester.semantics.simulatedAccessibilityTraversal().toList();
+  final title = traversal.indexWhere(
+    (node) => node.label == l10n.tagsPanelTitle,
+  );
+  expect(title, isNonNegative, reason: 'заголовок «${l10n.tagsPanelTitle}»');
+  expect(
+    traversal[title],
+    isSemantics(label: l10n.tagsPanelTitle, isHeader: true, namesRoute: true),
+  );
+  expect(
+    traversal[title + 1],
+    isSemantics(label: l10n.tagsPanelAssignmentHint),
+  );
+  for (final element in traversal.sublist(title, title + 2)) {
+    for (SemanticsNode? node = element; node != null; node = node.parent) {
+      expect(
+        node,
+        isSemantics(hasScrollUpAction: false, hasScrollDownAction: false),
+        reason: 'узел ${node.id} шапки «${element.label}»',
+      );
+    }
+  }
+}
 
 /// Старые действия отсутствуют в тексте, подсказках и всём семантическом
 /// дереве, включая названия и подсказки дополнительных действий диктора.

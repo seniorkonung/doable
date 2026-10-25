@@ -26,7 +26,7 @@ Future<void> showExportDataSheet(BuildContext context) => showDoableSheet<void>(
 final class _ExportDataSheet extends ConsumerWidget {
   const _ExportDataSheet(this.sheet);
 
-  final ContentSheetCapability sheet;
+  final SheetPresentation sheet;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

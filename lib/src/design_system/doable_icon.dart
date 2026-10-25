@@ -61,14 +61,18 @@ final class DoableIcon extends StatelessWidget {
   final Color color;
 
   @override
-  Widget build(BuildContext context) => SvgPicture.asset(
-    'lib/src/design_system/icons/assets/${icon._assetName}.svg',
-    width: size,
-    height: size,
-    fit: BoxFit.contain,
-    // Фильтр окрашивает и заливки, и линии, сохраняя прозрачные вырезы:
-    // https://pub.dev/packages/flutter_svg#-readme-tab-
-    colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
-    excludeFromSemantics: true,
+  Widget build(BuildContext context) => SizedBox.square(
+    dimension: size,
+    // Без жёсткого квадрата `vector_graphics` пересчитывает ширину
+    // неквадратной графики по высоте и выходит за `size`.
+    child: FittedBox(
+      child: SvgPicture.asset(
+        'lib/src/design_system/icons/assets/${icon._assetName}.svg',
+        // Фильтр окрашивает и заливки, и линии, сохраняя прозрачные вырезы:
+        // https://pub.dev/packages/flutter_svg#-readme-tab-
+        colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+        excludeFromSemantics: true,
+      ),
+    ),
   );
 }

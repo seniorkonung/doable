@@ -38,7 +38,7 @@ Future<GraphBackupEntry?> showBackupsSheet(BuildContext context) =>
 final class _BackupsSheet extends ConsumerStatefulWidget {
   const _BackupsSheet(this.sheet);
 
-  final ContentSheetCapability sheet;
+  final SheetPresentation sheet;
 
   @override
   ConsumerState<_BackupsSheet> createState() => _BackupsSheetState();
@@ -68,10 +68,13 @@ final class _BackupsSheetState extends ConsumerState<_BackupsSheet> {
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
     final now = ref.watch(graphBackupsClockProvider)();
-    return Sheet(
+    return Sheet.expandable(
       widget.sheet,
       title: localizations.dataBackupsTitle,
       text: localizations.dataBackupsExplanation,
+      compactHeight: SheetCompactHeight.content,
+      expandLabel: localizations.dataBackupsExpand,
+      collapseLabel: localizations.dataBackupsCollapse,
       footer: FilledButton(
         // Вторую копию, пока делается первая, координатор не принимает,
         // а исход копии предъявляет сам.
@@ -82,14 +85,12 @@ final class _BackupsSheetState extends ConsumerState<_BackupsSheet> {
             ),
         child: Text(localizations.dataBackupsMakeNow),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          ...switch (ref.watch(graphBackupListProvider).value) {
-            // Пока список не прочитан, панель показывает только кнопку.
-            null => const <Widget>[],
-            GraphBackupsReadSucceeded(:final backups) => [
+      slivers: [
+        switch (ref.watch(graphBackupListProvider).value) {
+          // Пока список не прочитан, панель показывает только кнопку.
+          null => const SliverToBoxAdapter(),
+          GraphBackupsReadSucceeded(:final backups) => SliverList.list(
+            children: [
               for (final backup in backups)
                 _BackupRow(
                   backup,
@@ -97,18 +98,18 @@ final class _BackupsSheetState extends ConsumerState<_BackupsSheet> {
                   onPressed: () => _confirmRestore(context, ref, backup),
                 ),
             ],
-            // Отказ чтения не означает, что копий нет.
-            GraphBackupsReadFailed() => [
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: DoableMetrics.space2,
-                ),
-                child: Notice(message: localizations.dataBackupsReadFailed),
-              ),
-            ],
-          },
-        ],
-      ),
+          ),
+          // Отказ чтения не означает, что копий нет.
+          GraphBackupsReadFailed() => SliverPadding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: DoableMetrics.space2,
+            ),
+            sliver: SliverToBoxAdapter(
+              child: Notice(message: localizations.dataBackupsReadFailed),
+            ),
+          ),
+        },
+      ],
     );
   }
 }
