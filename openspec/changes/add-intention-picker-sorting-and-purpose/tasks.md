@@ -1,0 +1,130 @@
+## Phase 1: Каталог читает порядок по названию и тип намерения
+
+- [ ] 1.1 Дать запросу каталога условие «только намерения без готовности к действию», которое одинаково применяют чтение порции и принадлежность снимка команды
+  - **Критерии приёмки:**
+    - Условие готовности запроса получает третий вариант по решению 2 дизайна. Проверка запроса, SQL-условие адаптера и принадлежность снимка команды обрабатывают его исчерпывающими ветками.
+    - Порция с этим условием содержит только намерения без готовности в пределах охвата запроса. Она учитывает название, условия по тегам и исключённого участника, а количество считает только совпадения.
+    - Снимок намерения, у которого включили или выключили готовность, отвечает о принадлежности такому запросу по своему состоянию после изменения.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/application/intention_contract_test.dart` — проверка запроса для трёх вариантов готовности.
+    - `mise exec --no-deps -- flutter test test/intention/data/drift_intention_catalog_test.dart test/intention/data/drift_intention_repository_command_test.dart` — порция и количество без действий при названии и тегах; принадлежность снимка после смены готовности.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `lib/src/intention/application/intention_catalog.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `test/intention/application/intention_contract_test.dart`, `test/intention/data/drift_intention_catalog_test.dart`, `test/intention/data/drift_intention_repository_command_test.dart`.
+  - **Размер:** S.
+
+- [ ] 1.2 Дать краткой сводке намерения непрозрачный ключ порядка названия, который адаптеры строят из сохранённой поисковой проекции
+  - **Критерии приёмки:**
+    - Ключ по [ADR-0045](../../../docs/adr/0045-order-titles-by-opaque-key-of-stored-search-projection.md) — значение-тип, которое умеет только сравниваться с другим ключом по кодовым точкам. Содержимое наружу не выходит и как `String` не сравнивается; `U+E000` идёт раньше `U+1F600`.
+    - Production-адаптер строит ключ только в сборке сводки: чтение порции из колонки сохранённой проекции, снимок команды — из уже прочитанного им ключа. Ключ из названия в Dart адаптер не вычисляет.
+    - Тестовые адаптеры и фикстуры строят ключ из поисковой проекции своего названия. Сырой поисковый ключ по-прежнему не пересекает границу репозитория графа (ADR-0009).
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/application/intention_contract_test.dart` — сравнение ключей по кодовым точкам, в том числе там, где порядок единиц UTF-16 другой.
+    - `mise exec --no-deps -- flutter test test/intention/data/drift_intention_catalog_test.dart test/intention/data/drift_intention_repository_command_test.dart` — ключ порции и ключ снимка изменения одного намерения сравниваются как равные.
+    - `mise exec --no-deps -- flutter analyze` — все места сборки сводки в `lib/` и `test/` компилируются с новым полем.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - `lib/src/intention/application/intention_catalog.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `lib/src/graph/data/stored_graph_rows.dart`;
+    - механическая адаптация сборки `IntentionSummary` в 13 проверках, в том числе `test/intention/presentation/catalog/catalog_test_support.dart`, `test/intention/presentation/details/details_test_support.dart`, `test/long_term_relation/presentation/neighborhood/neighborhood_test_support.dart`, `test/support/tag_assignment_changed.dart`.
+  - **Размер:** M — новое обязательное поле общей сводки. Механическая адаптация фикстур входит в задачу, потому что поле нельзя ввести по частям.
+
+- [ ] 1.3 Упорядочивать и продолжать порции каталога по названию в обоих направлениях так же, как сравнивает строки запрос
+  - **Критерии приёмки:**
+    - Поле порядка «название» по решению 1 дизайна:
+      - SQL сортирует по сохранённой проекции названия и идентификатору;
+      - курсор — пара «ключ и идентификатор» в обоих направлениях;
+      - `compare` запроса сравнивает ключи сводок и при равенстве — идентификаторы.
+    - На одном наборе порядок порций совпадает с порядком `compare`. Набор включает регистр, «ё» и «я», латиницу и кириллицу, `U+E000` и символ за пределами BMP.
+    - Названия, различающиеся только регистром, проходят через несколько порций без пропусков и повторов в обоих направлениях. Существующие четыре порядка по времени не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/data/drift_intention_catalog_test.dart` — шесть порядков на всех охватах с дополнительным ключом по идентификатору; совпадение с `compare`; продолжение через равные ключи.
+    - `mise exec --no-deps -- flutter test test/intention/application/intention_contract_test.dart test/intention/data/drift_intention_repository_large_fixture_test.dart`.
+  - **Зависимости:** 1.2.
+  - **Предполагаемые файлы:** `lib/src/intention/application/intention_catalog.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `test/intention/data/drift_intention_catalog_test.dart`, `test/intention/application/intention_contract_test.dart`.
+  - **Размер:** M.
+
+- [ ] 1.4 Сделать схему версии 6 с индексами порядка по названию новой базовой версией без пути обновления
+  - **Критерии приёмки:**
+    - Схема получает шесть частичных индексов по решению 3 дизайна: сохранённая проекция названия по возрастанию и по убыванию с идентификатором по возрастанию, для активного, архивного и полного охвата.
+    - Схема 6 — базовая, как в коммите `7729b064`:
+      - текущая версия равна 6;
+      - снимок `drift_schema_v6.json` заменяет `drift_schema_v5.json`;
+      - комментарий стратегии миграции называет базовой схему 6;
+      - README описывает ручную очистку данных схем 1–5 перед первым запуском и перед откатом.
+    - Новая установка создаётся схемой 6. Хранилище с маркером 5 bootstrap классифицирует как повреждение и не изменяет. Путь обновления не добавлен.
+  - **Проверка:**
+    - `mise run codegen` — снимок схемы пересоздан.
+    - `mise exec --no-deps -- flutter test test/data/local --exclude-tags=flutter_process` — схема, проверка снимка, bootstrap и тесты миграции с маркером 5.
+    - `mise exec --no-deps -- flutter test --concurrency=1 test/data/local/migrations/file_backed_migration_test.dart` — файловые процессные проверки миграции.
+  - **Зависимости:** 1.3 — индексы обслуживают порядок по названию.
+  - **Предполагаемые файлы:** `lib/src/data/local/schema/intention_schema.drift`, `lib/src/data/local/app_database.dart`, `lib/src/data/local/migrations/migration_strategy.dart`, `drift_schemas/drift_schema_v5.json` → `drift_schemas/drift_schema_v6.json`, `README.md`, `test/data/local/bootstrap/local_data_bootstrap_test.dart`.
+  - **Размер:** M.
+
+- [ ] 1.5 Отдавать в первой порции числа обоих типов намерения, когда их просит запрос
+  - **Критерии приёмки:**
+    - Запрос может попросить числа типов по решению 2 дизайна. Первая порция несёт их тогда и только тогда, когда запрос их попросил. Числа «все» и «действия» считаются без условия готовности, но со всеми остальными ограничениями: охват, исключённый участник, название, условия по тегам.
+    - Адаптер получает числа и общее количество одним запросом подсчёта. Общее количество по-прежнему соответствует условию готовности запроса.
+    - Первая порция отклоняет противоречивые числа: число действий больше всех, общее количество больше всех.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/data/drift_intention_catalog_test.dart` — числа при названии, тегах и исключении для трёх вариантов готовности; без просьбы чисел нет.
+    - `mise exec --no-deps -- flutter test test/intention/application/intention_contract_test.dart` — проверка согласованности чисел первой порции.
+  - **Зависимости:** 1.1.
+  - **Предполагаемые файлы:** `lib/src/intention/application/intention_catalog.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `test/intention/data/drift_intention_catalog_test.dart`, `test/intention/application/intention_contract_test.dart`.
+  - **Размер:** M.
+
+- [ ] 1.6 Вести в модели каталога тип намерения и точные числа обоих типов по назначению поиска
+  - **Критерии приёмки:**
+    - Доступность типа зависит от назначения и выражена sealed-значением по решению 2 дизайна:
+      - поиски исходного намерения и участника — тип открыт и начинается с «все»;
+      - поиск действия — тип закреплён за действиями;
+      - общий каталог — тип не предлагается.
+      
+      Условие готовности запроса выводится из назначения и типа. Смена открытого типа начинает новую выдачу с первой порции; для других назначений её нет.
+    - Числа типов модель просит только при открытом типе. Пропущенные или противоречивые числа она считает нарушением контракта порции.
+    - Модель поправляет оба числа по снимкам до и после правки: создание, изменение, архивирование, удаление и смена готовности, которая переносит намерение между типами. Протокол ревизий и поздних порций не меняется.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog/intention_catalog_view_model_test.dart test/intention/presentation/catalog/intention_catalog_mutation_reconciliation_test.dart` — доступность и смена типа; числа после правок, включая смену готовности.
+    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog test/daily_choice/presentation/action_picker test/daily_choice/presentation/source_picker test/long_term_relation/presentation/participant_picker` — существующие поиски и каталог работают как прежде.
+  - **Зависимости:** 1.5.
+  - **Предполагаемые файлы:** `lib/src/intention/presentation/catalog/intention_catalog_view_model.dart`, `lib/src/intention/presentation/catalog/intention_catalog_state.dart`, `test/intention/presentation/catalog/catalog_test_support.dart`, `test/intention/presentation/catalog/intention_catalog_view_model_test.dart`, `test/intention/presentation/catalog/intention_catalog_mutation_reconciliation_test.dart`.
+  - **Размер:** M.
+
+- [ ] 1.7 Согласовывать подтверждённые правки с загруженной частью каталога в порядке по названию
+  - **Критерии приёмки:**
+    - При порядке по названию переименование внутри загруженной границы перемещает строку на её место по ключу из снимка изменения. Переименование за границу исключает строку до загрузки порции с её позицией и не даёт повтора после подгрузки.
+    - Граница курсора модели сравнивается тем же ключом порядка.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog/intention_catalog_mutation_reconciliation_test.dart`.
+  - **Зависимости:** 1.3.
+  - **Предполагаемые файлы:** `test/intention/presentation/catalog/intention_catalog_mutation_reconciliation_test.dart`; `lib/src/intention/presentation/catalog/intention_catalog_view_model.dart` — только если проверка найдёт расхождение.
+  - **Размер:** S.
+
+- [ ] 1.8 Различать поле сортировки в диагностике чтения порции каталога и измерять порядок по названию бенчмарком
+  - **Критерии приёмки:**
+    - Событие чтения порции каталога в начале, при успехе и при отказе несёт поле сортировки: время создания, время изменения или название. Разработческий приёмник его выводит, пользовательского текста событие не несёт.
+    - Бенчмарк каталога измеряет первую порцию и продолжение по названию на том же большом наборе, что и порядок по времени, и сравнивает их с бюджетами.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/shared/diagnostics/diagnostics_sink_test.dart test/intention/data/drift_intention_repository_fault_test.dart`.
+    - `mise exec --no-deps -- flutter test --no-pub benchmark/intention/intention_catalog_benchmark.dart --concurrency=1 --reporter=expanded`.
+  - **Зависимости:** 1.3, 1.4.
+  - **Предполагаемые файлы:** `lib/src/shared/diagnostics/diagnostics_sink.dart`, `lib/src/shared/diagnostics/developer_diagnostics_sink.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `test/shared/diagnostics/diagnostics_sink_test.dart`, `test/intention/data/drift_intention_repository_fault_test.dart`, `benchmark/intention/intention_catalog_benchmark.dart`.
+  - **Размер:** S.
+
+- [ ] 1.9 Подтвердить готовность первой фазы: каталог читает порядок по названию и тип намерения на схеме 6, а экраны не изменились
+  - **Критерии приёмки:**
+    - Выполнено условие «Ready to advance» первой фазы:
+      - требования «Упорядочивание каталогов намерений» и «Тип намерения в поиске для выбора» и правила точного количества выполняются на уровне чтения и модели каталога;
+      - порядок адаптера и модели совпадает и на граничных символах;
+      - новая установка работает на схеме 6;
+      - существующие экраны не изменились.
+    - Пакет не содержит изменений вида и параметров поисков и каталога графа.
+    - Результаты проверок и путь к APK сообщены в сессии. Ручная проверка на устройстве остаётся за пользователем и не блокирует готовность фазы.
+  - **Проверка:**
+    - `mise run check` и `openspec validate add-intention-picker-sorting-and-purpose --strict --no-interactive`; после фиксации изменений — `mise run codegen-check` на чистой рабочей копии.
+    - `mise exec --no-deps -- flutter test --no-pub benchmark/intention/intention_catalog_benchmark.dart --concurrency=1 --reporter=expanded`.
+    - `mise exec --no-deps -- flutter build apk --release` с артефактом `build/app/outputs/flutter-apk/app-release.apk`. Если через DTD найдено запущенное приложение, выполнить hot restart и проверить `get_runtime_errors`; эмулятор и устройство не запускаются.
+    - Сообщить оставшиеся ручные проверки:
+      - перенос данных экспортом на прежней сборке, очисткой и импортом;
+      - каталог и три поиска выглядят и работают как прежде.
+  - **Зависимости:** 1.1–1.8.
+  - **Предполагаемые файлы:** нет, только проверка и сборка.
+  - **Размер:** XS.
