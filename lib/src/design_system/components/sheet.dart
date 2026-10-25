@@ -496,7 +496,7 @@ final class _MessagesHost extends InheritedWidget {
   bool updateShouldNotify(_MessagesHost oldWidget) => false;
 }
 
-/// Действие шапки раскрываемого листа: подпись, доступное название и
+/// Действие шапки листа: подпись, доступное название и
 /// обработчик нажатия.
 typedef SheetAction = ({
   String label,
@@ -520,14 +520,22 @@ final class Sheet extends StatelessWidget {
   /// [text] — пояснение под заголовком; без него тело следует сразу за
   /// заголовком. [footer] — основная кнопка листа на всю ширину, закреплённая
   /// под телом вне его прокрутки; без неё лист заканчивается телом.
+  /// [action] — текстовая кнопка размера sm справа на строке заголовка,
+  /// например «Сбросить»; заголовок при ней остаётся по центру.
   Sheet(
     this._presentation, {
     required this.title,
     required Widget child,
     String? text,
     Widget? footer,
+    SheetAction? action,
     super.key,
-  }) : _parts = _ContentParts(text: text, body: child, footer: footer);
+  }) : _parts = _ContentParts(
+         text: text,
+         body: child,
+         footer: footer,
+         action: action,
+       );
 
   /// Лист компактной высоты, который раскрывается на весь экран.
   ///
@@ -621,7 +629,11 @@ final class Sheet extends StatelessWidget {
               children: [
                 Center(child: _Grip(color: colors.grip)),
                 const SizedBox(height: 14),
-                _TitleBlock(title: title, text: parts.text, action: null),
+                _TitleBlock(
+                  title: title,
+                  text: parts.text,
+                  action: parts.action,
+                ),
                 const SizedBox(height: DoableMetrics.space3),
                 Flexible(
                   child: SingleChildScrollView(
@@ -887,11 +899,13 @@ final class _ContentParts extends _SheetParts {
     required this.text,
     required this.body,
     required this.footer,
+    required this.action,
   });
 
   final String? text;
   final Widget body;
   final Widget? footer;
+  final SheetAction? action;
 }
 
 /// Части раскрываемого листа.
@@ -977,14 +991,7 @@ final class _ExpandableSheetState extends State<_ExpandableSheet>
     final titleBlock = _TitleBlock(
       title: widget.title,
       text: parts.text,
-      action: switch (parts.action) {
-        final action? => Button.text(
-          label: action.label,
-          semanticLabel: action.semanticLabel,
-          onPressed: action.onPressed,
-        ),
-        null => null,
-      },
+      action: parts.action,
     );
     // Ручка стоит над началом заголовка, чтобы область нажатия была не меньше
     // 44 при прежнем положении ручки и заголовка. Шапка одна в обоих
@@ -1310,7 +1317,7 @@ final class _TitleBlock extends StatelessWidget {
 
   final String title;
   final String? text;
-  final Widget? action;
+  final SheetAction? action;
 
   @override
   Widget build(BuildContext context) {
@@ -1325,7 +1332,14 @@ final class _TitleBlock extends StatelessWidget {
           style: DoableType.title.copyWith(color: colors.ink),
         ),
       ),
-      action: action,
+      action: switch (action) {
+        final action? => Button.text(
+          label: action.label,
+          semanticLabel: action.semanticLabel,
+          onPressed: action.onPressed,
+        ),
+        null => null,
+      },
       text: switch (text) {
         final text? => Padding(
           padding: const EdgeInsets.symmetric(horizontal: DoableMetrics.space4),
