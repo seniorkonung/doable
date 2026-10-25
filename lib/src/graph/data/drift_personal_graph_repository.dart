@@ -1179,11 +1179,25 @@ final class DriftPersonalGraphRepository
   ) async {
     final intentions = _database.intentions;
     final condition = _catalogCondition(query);
-    final countExpression = countAll();
+    // Один подсчёт без условия готовности даёт и числа обоих типов, и общее
+    // количество по условию готовности запроса.
+    final allExpression = countAll();
+    final actionsExpression = countAll(
+      filter: intentions.isActionReady.equals(true),
+    );
     final countQuery = _database.selectOnly(intentions)
-      ..addColumns([countExpression])
-      ..where(condition);
-    final totalCount = (await countQuery.getSingle()).read(countExpression)!;
+      ..addColumns([allExpression, actionsExpression])
+      ..where(_catalogConditionExceptReadiness(query));
+    final countRow = await countQuery.getSingle();
+    final typeCounts = IntentionTypeCounts(
+      all: countRow.read(allExpression)!,
+      actions: countRow.read(actionsExpression)!,
+    );
+    final totalCount = switch (query.readinessFilter) {
+      IntentionReadinessFilter.all => typeCounts.all,
+      IntentionReadinessFilter.readyOnly => typeCounts.actions,
+      IntentionReadinessFilter.notReadyOnly => typeCounts.intentions,
+    };
     final rowsQuery = _database.selectOnly(intentions)
       ..addColumns([
         intentions.id,
@@ -1209,6 +1223,7 @@ final class DriftPersonalGraphRepository
     return IntentionCatalogFirstPage(
       items: items,
       totalCount: totalCount,
+      typeCounts: query.requestsTypeCounts ? typeCounts : null,
       nextCursor: nextCursor,
       revision: _currentRevision,
     );
@@ -1250,11 +1265,6 @@ final class DriftPersonalGraphRepository
 
   Expression<bool> _catalogCondition(IntentionCatalogQuery query) {
     final intentions = _database.intentions;
-    final scopeCondition = switch (query.scope) {
-      IntentionScope.active => intentions.isArchived.equals(false),
-      IntentionScope.archived => intentions.isArchived.equals(true),
-      IntentionScope.all => const Constant(true),
-    };
     final readinessCondition = switch (query.readinessFilter) {
       IntentionReadinessFilter.all => const Constant(true),
       IntentionReadinessFilter.readyOnly => intentions.isActionReady.equals(
@@ -1265,7 +1275,18 @@ final class DriftPersonalGraphRepository
         false,
       ),
     };
-    var condition = scopeCondition & readinessCondition;
+    return readinessCondition & _catalogConditionExceptReadiness(query);
+  }
+
+  Expression<bool> _catalogConditionExceptReadiness(
+    IntentionCatalogQuery query,
+  ) {
+    final intentions = _database.intentions;
+    var condition = switch (query.scope) {
+      IntentionScope.active => intentions.isArchived.equals(false),
+      IntentionScope.archived => intentions.isArchived.equals(true),
+      IntentionScope.all => const Constant<bool>(true),
+    };
     final excludedIntentionId = query.excludedIntentionId;
     if (excludedIntentionId != null) {
       condition =

@@ -869,6 +869,35 @@ void main() {
         throwsA(isA<IntentionCatalogPageValidationException>()),
       );
     });
+
+    test('первая страница отклоняет противоречивые числа типов', () {
+      const revision = _TestGraphRevision(epoch: 'первая', sequence: 0);
+
+      expect(
+        () => IntentionTypeCounts(all: 1, actions: 2),
+        throwsA(isA<IntentionCatalogPageValidationException>()),
+      );
+      expect(
+        () => IntentionCatalogFirstPage(
+          items: const [],
+          totalCount: 2,
+          typeCounts: IntentionTypeCounts(all: 1, actions: 1),
+          nextCursor: null,
+          revision: revision,
+        ),
+        throwsA(isA<IntentionCatalogPageValidationException>()),
+      );
+
+      final page = IntentionCatalogFirstPage(
+        items: const [],
+        totalCount: 2,
+        typeCounts: IntentionTypeCounts(all: 2, actions: 2),
+        nextCursor: null,
+        revision: revision,
+      );
+      expect(page.typeCounts?.actions, 2);
+      expect(page.typeCounts?.intentions, 0);
+    });
   });
 
   group('полное начальное состояние создания намерения', () {

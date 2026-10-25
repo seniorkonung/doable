@@ -410,6 +410,92 @@ void main() {
       expect(otherSameTitle.items.single.id, _id(_uuid(2)));
     });
 
+    test('первая порция отдаёт числа обоих типов по всем условиям, кроме готовности, только по просьбе', () async {
+      // Совпадают 1, 2 и 4. 3 — в архиве, 5 — исключённый участник,
+      // 6 — с запрещённым тегом, 7 — без обязательного тега, 8 — с другим
+      // названием.
+      for (final (number, title, isActionReady, isArchived) in [
+        (1, 'Гулять', true, false),
+        (2, 'Гулять', false, false),
+        (3, 'Гулять', true, true),
+        (4, 'Гулять', false, false),
+        (5, 'Гулять', true, false),
+        (6, 'Гулять', true, false),
+        (7, 'Гулять', false, false),
+        (8, 'Читать', true, false),
+      ]) {
+        await _insertIntention(
+          database,
+          id: _uuid(number),
+          title: title,
+          isActionReady: isActionReady,
+          isArchived: isArchived,
+          createdAt: DateTime.utc(2026, 9, 2, number),
+        );
+      }
+      seedRawGraph(raw, () {
+        for (final (number, name) in [(101, 'Здоровье'), (102, 'Спорт')]) {
+          raw.execute(
+            'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+            [_uuid(number), name, tagPositionKey(number)],
+          );
+        }
+        for (final number in [1, 2, 3, 4, 5, 6, 8]) {
+          raw.execute(
+            'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+            [_uuid(101), _uuid(number)],
+          );
+        }
+        raw.execute(
+          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+          [_uuid(102), _uuid(6)],
+        );
+      });
+      IntentionCatalogQuery query(
+        IntentionReadinessFilter readiness, {
+        required bool requestsTypeCounts,
+      }) => _tagQuery(
+        tagFilter: IntentionTagFilter(
+          requiredTagIds: [_tagId(101)],
+          excludedTagIds: [_tagId(102)],
+        ),
+        scope: IntentionScope.active,
+        readinessFilter: readiness,
+        excludedIntentionId: _id(_uuid(5)),
+        titleFilter: 'гулять',
+        requestsTypeCounts: requestsTypeCounts,
+      );
+
+      for (final (readiness, totalCount) in [
+        (IntentionReadinessFilter.all, 3),
+        (IntentionReadinessFilter.readyOnly, 1),
+        (IntentionReadinessFilter.notReadyOnly, 2),
+      ]) {
+        trace.measured.clear();
+        final withoutCounts = _firstPage(
+          await repository.getCatalogPage(
+            query(readiness, requestsTypeCounts: false),
+          ),
+        );
+        final readsWithoutCounts = trace.measured.length;
+        expect(withoutCounts.totalCount, totalCount);
+        expect(withoutCounts.typeCounts, isNull);
+
+        trace.measured.clear();
+        final withCounts = _firstPage(
+          await repository.getCatalogPage(
+            query(readiness, requestsTypeCounts: true),
+          ),
+        );
+        expect(withCounts.totalCount, totalCount);
+        expect(withCounts.typeCounts?.all, 3);
+        expect(withCounts.typeCounts?.actions, 1);
+        expect(withCounts.typeCounts?.intentions, 2);
+        // Числа типов приходят тем же подсчётом, что и общее количество.
+        expect(trace.measured, hasLength(readsWithoutCounts));
+      }
+    });
+
     test('принадлежность снимка команды учитывает собственные теги и исключённого участника', () async {
       seedTagStorageFixture(raw);
       final saved = await repository.execute(
@@ -2397,6 +2483,7 @@ IntentionCatalogQuery _tagQuery({
   IntentionId? excludedIntentionId,
   int pageSize = 1,
   IntentionCatalogCursor? cursor,
+  bool requestsTypeCounts = false,
 }) => IntentionCatalogQuery(
   scope: scope,
   readinessFilter: readinessFilter,
@@ -2406,6 +2493,7 @@ IntentionCatalogQuery _tagQuery({
   order: IntentionCatalogOrder.createdAtAscending,
   pageSize: pageSize,
   cursor: cursor,
+  requestsTypeCounts: requestsTypeCounts,
 );
 
 IntentionCatalogFirstPage _firstPage(Result<IntentionCatalogPage> result) {

@@ -134,6 +134,7 @@ final class IntentionCatalogQuery {
     required IntentionCatalogOrder order,
     required int pageSize,
     IntentionCatalogCursor? cursor,
+    bool requestsTypeCounts = false,
   }) {
     if (pageSize < minPageSize || pageSize > maxPageSize) {
       throw const IntentionCatalogQueryValidationException(
@@ -151,6 +152,7 @@ final class IntentionCatalogQuery {
       order: order,
       pageSize: pageSize,
       cursor: cursor,
+      requestsTypeCounts: requestsTypeCounts,
     );
   }
 
@@ -163,6 +165,7 @@ final class IntentionCatalogQuery {
     required this.order,
     required this.pageSize,
     required this.cursor,
+    required this.requestsTypeCounts,
   });
 
   static const minPageSize = 1;
@@ -179,6 +182,9 @@ final class IntentionCatalogQuery {
   final IntentionCatalogOrder order;
   final int pageSize;
   final IntentionCatalogCursor? cursor;
+
+  /// Просит первую порцию нести [IntentionTypeCounts].
+  final bool requestsTypeCounts;
 
   bool includes(IntentionSummary summary) {
     final matchesScope = switch (scope) {
@@ -522,18 +528,46 @@ final class IntentionCatalogFirstPage extends IntentionCatalogPage {
   IntentionCatalogFirstPage({
     required super.items,
     required int totalCount,
+    this.typeCounts,
     required super.nextCursor,
     required super.revision,
-  }) : totalCount = _requireTotalCount(totalCount, items.length);
+  }) : totalCount = _requireTotalCount(totalCount, items.length, typeCounts);
 
+  /// Количество совпадений со всеми условиями запроса, включая готовность.
   final int totalCount;
 
-  static int _requireTotalCount(int totalCount, int itemCount) {
-    if (totalCount < itemCount) {
+  /// Есть тогда и только тогда, когда их попросил запрос.
+  final IntentionTypeCounts? typeCounts;
+
+  static int _requireTotalCount(
+    int totalCount,
+    int itemCount,
+    IntentionTypeCounts? typeCounts,
+  ) {
+    if (totalCount < itemCount ||
+        (typeCounts != null && totalCount > typeCounts.all)) {
       throw const IntentionCatalogPageValidationException();
     }
     return totalCount;
   }
+}
+
+/// Точные числа обоих типов намерения при всех условиях запроса, кроме
+/// условия готовности.
+final class IntentionTypeCounts {
+  factory IntentionTypeCounts({required int all, required int actions}) {
+    if (actions < 0 || actions > all) {
+      throw const IntentionCatalogPageValidationException();
+    }
+    return IntentionTypeCounts._(all: all, actions: actions);
+  }
+
+  const IntentionTypeCounts._({required this.all, required this.actions});
+
+  final int all;
+  final int actions;
+
+  int get intentions => all - actions;
 }
 
 final class IntentionCatalogPageValidationException implements Exception {
