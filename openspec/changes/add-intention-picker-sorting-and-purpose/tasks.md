@@ -469,7 +469,7 @@
   - **Предполагаемые файлы:** `lib/src/design_system/components/top_bar.dart`, `lib/src/intention/presentation/picker/intention_picker_purpose_sheet.dart`, `lib/src/intention/presentation/picker/intention_picker_view.dart`, `test/design_system/top_bar_test.dart`, `test/intention/presentation/picker/intention_picker_purpose_sheet_test.dart`.
   - **Размер:** S.
 
-- [ ] 4.4 Добавить в дизайн-систему форму связи в режиме выбора `RelationForm.choosing`: только для чтения, на рейке пути
+- [x] 4.4 Добавить в дизайн-систему форму связи в режиме выбора `RelationForm.choosing`: только для чтения, на рейке пути
   - **Критерии приёмки:**
     - Форма по решению 6 дизайна, разделу «In What you are choosing» README `RelationForm` и листу «What you are choosing» для связи в макете `ActionPicker.dc.html` — три строки `PathRail` сверху вниз: поле исходного намерения с ромбом, строка вида с линией, поле связанного намерения с кольцом. Линия между полями — `RelationStroke` вида: нужно — сплошная `grip`, можно — пунктир `grip`, не выбран — `hairline`. Глиф выбираемого поля — пунктирный контур 14 цвета `accent`, пустого — пунктирный `grip`, заполненного — сплошной `grip`.
     - Состояние поля — sealed-значение: выбирается (с необязательным названием прежнего участника этой роли), заполнено (название и признак архива) или пусто. Поле — плоскость `fill` с `radius-lg`, не ниже 48, отступы 13 и 14, в 10 от рейки, без шеврона и нажатия:
