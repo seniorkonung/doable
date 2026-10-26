@@ -16,6 +16,41 @@ double tallestTextHeight(
   required Iterable<String> texts,
   required TextStyle? style,
   required double maxWidth,
+}) => _measure(
+  context,
+  texts: texts,
+  style: style,
+  maxWidth: math.max(0, maxWidth),
+  extent: (painter) => painter.height,
+);
+
+/// Наибольшая ширина, которую займёт виджет `Text` с одним из [texts] и стилем
+/// [style] в [context], когда ширина не ограничена и текст стоит в одну
+/// строку.
+///
+/// Текст измеряется по тем же правилам, что и в [tallestTextHeight]. Ширина
+/// округляется вверх до целого: в ширине, равной результату, текст не
+/// переносится из-за погрешности дробных метрик.
+///
+/// Нужна, когда ширину плоскости задаёт самый длинный текст до её раскладки.
+double widestTextWidth(
+  BuildContext context, {
+  required Iterable<String> texts,
+  required TextStyle? style,
+}) => _measure(
+  context,
+  texts: texts,
+  style: style,
+  maxWidth: double.infinity,
+  extent: (painter) => painter.maxIntrinsicWidth.ceilToDouble(),
+);
+
+double _measure(
+  BuildContext context, {
+  required Iterable<String> texts,
+  required TextStyle? style,
+  required double maxWidth,
+  required double Function(TextPainter painter) extent,
 }) {
   final defaultStyle = DefaultTextStyle.of(context);
   var effectiveStyle = defaultStyle.style.merge(style);
@@ -35,14 +70,14 @@ double tallestTextHeight(
     textWidthBasis: defaultStyle.textWidthBasis,
   );
   try {
-    var height = 0.0;
+    var result = 0.0;
     for (final text in texts) {
       painter
         ..text = TextSpan(text: text, style: effectiveStyle)
-        ..layout(maxWidth: math.max(0, maxWidth));
-      height = math.max(height, painter.height);
+        ..layout(maxWidth: maxWidth);
+      result = math.max(result, extent(painter));
     }
-    return height;
+    return result;
   } finally {
     painter.dispose();
   }
