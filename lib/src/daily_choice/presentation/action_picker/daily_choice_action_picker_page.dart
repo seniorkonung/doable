@@ -17,10 +17,7 @@ import '../daily_choice_picker_context.dart';
 /// его идентификатор, поэтому одноимённые действия не смешиваются.
 @RoutePage()
 final class DailyChoiceActionPickerPage extends StatefulWidget {
-  const DailyChoiceActionPickerPage({
-    this.pickerContext = const AuxiliaryDailyChoicePickerContext(),
-    super.key,
-  });
+  const DailyChoiceActionPickerPage({required this.pickerContext, super.key});
 
   final DailyChoicePickerContext pickerContext;
 
@@ -56,7 +53,7 @@ final class _DailyChoiceActionPickerPageState
         purpose: _purpose,
         closeLabel: switch (widget.pickerContext) {
           InitialDailyChoicePickerContext() => l10n.creationCancelAction,
-          AuxiliaryDailyChoicePickerContext() => l10n.actionPickerCancel,
+          PathReplacementDailyChoicePickerContext() => l10n.actionPickerCancel,
         },
         emptyScopeMessage: l10n.actionPickerEmpty,
         onClose: () => unawaited(_close()),

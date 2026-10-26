@@ -35,12 +35,12 @@ final class _DailyChoicePathReplacementFlowState
       final startingId = switch (direction) {
         ChoicePathDraftDirection.topDown => await router.push<IntentionId>(
           DailyChoiceSourcePickerRoute(
-            pickerContext: const AuxiliaryDailyChoicePickerContext(),
+            pickerContext: const PathReplacementDailyChoicePickerContext(),
           ),
         ),
         ChoicePathDraftDirection.bottomUp => await router.push<IntentionId>(
           DailyChoiceActionPickerRoute(
-            pickerContext: const AuxiliaryDailyChoicePickerContext(),
+            pickerContext: const PathReplacementDailyChoicePickerContext(),
           ),
         ),
       };

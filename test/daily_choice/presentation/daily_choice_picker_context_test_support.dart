@@ -29,12 +29,13 @@ import '../../intention/presentation/picker/intention_picker_test_support.dart';
 import '../../support/app_root_pages.dart';
 import '../../support/tag_positions.dart';
 
-/// Один контракт начального и вспомогательного поиска для обоих направлений.
+/// Один контракт поиска для создания и замены пути в обоих направлениях.
 void defineDailyChoicePickerContextTests({
   required PageRouteInfo Function(DailyChoicePickerContext) route,
   required String keyPrefix,
   required IntentionReadinessFilter readinessFilter,
-  required ({String title, String header, String auxiliaryCancel}) ruTexts,
+  required ({String title, String header, String pathReplacementCancel})
+  ruTexts,
   required String emptyMessage,
   required String noMatchesMessage,
 }) {
@@ -53,7 +54,10 @@ void defineDailyChoicePickerContextTests({
     ];
     for (final (index, (pickerContext, cancelLabel)) in [
       (InitialDailyChoicePickerContext(launch: _Launch()), 'Отменить создание'),
-      (const AuxiliaryDailyChoicePickerContext(), ruTexts.auxiliaryCancel),
+      (
+        const PathReplacementDailyChoicePickerContext(),
+        ruTexts.pathReplacementCancel,
+      ),
     ].indexed) {
       final selection = router.push<IntentionId>(route(pickerContext));
       await _settleRoute(tester);
@@ -109,7 +113,7 @@ void defineDailyChoicePickerContextTests({
     final (repository, router) = await _openApp(tester);
     var selected = false;
     final selection = router.push<IntentionId>(
-      route(const AuxiliaryDailyChoicePickerContext()),
+      route(const PathReplacementDailyChoicePickerContext()),
     );
     unawaited(selection.then((_) => selected = true));
     await _settleRoute(tester);
@@ -148,8 +152,8 @@ void defineDailyChoicePickerContextTests({
     addTearDown(tester.view.reset);
     final semantics = tester.ensureSemantics();
     final (repository, router) = await _openApp(tester, language: language);
-    final auxiliary = router.push<IntentionId>(
-      route(const AuxiliaryDailyChoicePickerContext()),
+    final replacement = router.push<IntentionId>(
+      route(const PathReplacementDailyChoicePickerContext()),
     );
     await _settleRoute(tester);
     repository.complete(1, _page());
@@ -182,7 +186,7 @@ void defineDailyChoicePickerContextTests({
     expect([for (final data in router.stackData) data.matchId], history);
     await router.maybePop();
     await tester.pumpAndSettle();
-    expect(await auxiliary, isNull);
+    expect(await replacement, isNull);
     semantics.dispose();
   });
 
@@ -304,7 +308,7 @@ void defineDailyChoicePickerContextTests({
     expectIntentionGraphRootPage(router);
   });
 
-  testWidgets('вспомогательный выбор над начальным поиском возвращает '
+  testWidgets('поиск замены пути над начальным поиском возвращает '
       'результат и не отменяет нижележащий запуск', (tester) async {
     final (repository, router) = await _openApp(tester);
     final launch = _Launch();
@@ -316,8 +320,8 @@ void defineDailyChoicePickerContextTests({
     await tester.pumpAndSettle();
     final initialId = router.current.matchId;
     for (final choose in [false, true]) {
-      final auxiliary = router.push<IntentionId>(
-        route(const AuxiliaryDailyChoicePickerContext()),
+      final replacement = router.push<IntentionId>(
+        route(const PathReplacementDailyChoicePickerContext()),
       );
       await _settleRoute(tester);
       repository.complete(choose ? 3 : 2, _page());
@@ -328,7 +332,7 @@ void defineDailyChoicePickerContextTests({
         await tester.tap(find.byKey(ValueKey('$keyPrefix-cancel')));
       }
       await tester.pumpAndSettle();
-      expect(await auxiliary, choose ? testSummary(index: 2).id : isNull);
+      expect(await replacement, choose ? testSummary(index: 2).id : isNull);
       expect(router.current.matchId, initialId);
       expect(launch.isActive, isTrue);
     }

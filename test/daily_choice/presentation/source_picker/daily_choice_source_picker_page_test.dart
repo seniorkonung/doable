@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/daily_choice/presentation/daily_choice_picker_context.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
@@ -32,14 +33,16 @@ void main() {
     ruTexts: (
       title: 'Выбор намерения',
       header: 'Все',
-      auxiliaryCancel: 'Отменить выбор намерения',
+      pathReplacementCancel: 'Отменить выбор намерения',
     ),
     emptyMessage: 'No active intentions are available.',
     noMatchesMessage: 'No intentions with this name',
   );
   defineDailyChoicePickerTagSearchTests(
     DailyChoicePickerTagSearchCase(
-      route: DailyChoiceSourcePickerRoute(),
+      route: DailyChoiceSourcePickerRoute(
+        pickerContext: const PathReplacementDailyChoicePickerContext(),
+      ),
       keyPrefix: 'daily-choice-source',
       readinessFilter: IntentionReadinessFilter.all,
       rowReadiness: const [
@@ -59,7 +62,13 @@ void main() {
     final router = await _pumpApp(tester, repository);
     addTearDown(router.dispose);
 
-    unawaited(router.push<IntentionId>(DailyChoiceSourcePickerRoute()));
+    unawaited(
+      router.push<IntentionId>(
+        DailyChoiceSourcePickerRoute(
+          pickerContext: const PathReplacementDailyChoicePickerContext(),
+        ),
+      ),
+    );
     await _settleRoute(tester);
     expect(find.text('Loading intentions…'), findsOneWidget);
     repository.complete(1, const ResultFailure(IntentionUnavailableFailure()));
@@ -84,7 +93,9 @@ void main() {
       final router = await _pumpApp(tester, repository);
       addTearDown(router.dispose);
       final selection = router.push<IntentionId>(
-        DailyChoiceSourcePickerRoute(),
+        DailyChoiceSourcePickerRoute(
+          pickerContext: const PathReplacementDailyChoicePickerContext(),
+        ),
       );
       await _settleRoute(tester);
       _completeFirst(repository, 1, [
