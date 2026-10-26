@@ -356,7 +356,7 @@
   - **Предполагаемые файлы:** новые `lib/src/intention/presentation/picker/intention_picker_purpose_sheet.dart` и `test/intention/presentation/picker/intention_picker_purpose_sheet_test.dart`; `lib/src/intention/presentation/picker/intention_picker_view.dart`; `lib/l10n/app_en.arb`, `lib/l10n/app_ru.arb` и генерируемые `lib/l10n/app_localizations*.dart`.
   - **Размер:** M.
 
-- [ ] 3.4 Добавить в дизайн-систему пронумерованные шаги потока `FlowSteps` с отметкой текущего шага
+- [x] 3.4 Добавить в дизайн-систему пронумерованные шаги потока `FlowSteps` с отметкой текущего шага
   - **Критерии приёмки:**
     - `FlowSteps` по решению 5 дизайна, разделу «The purpose line of a picker» README `TopBar` и листу «What you are choosing» макета `ActionPicker.dc.html`:
       - шаги идут сверху вниз; слева у каждого круг 28 с номером в стиле `label` с табличными цифрами: у текущего — плоскость `accent` и номер цвета `onAccent`, у остальных — внутреннее кольцо `hairline` 1,5 и номер цвета `muted`; круги соединяет линия 2 цвета `hairline`, после последнего шага линии нет;
