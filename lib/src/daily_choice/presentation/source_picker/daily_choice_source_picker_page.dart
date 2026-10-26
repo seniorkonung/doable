@@ -9,6 +9,7 @@ import '../../../intention/domain/intention_id.dart';
 import '../../../intention/presentation/catalog/intention_catalog_purpose.dart';
 import '../../../intention/presentation/picker/intention_picker_view.dart';
 import '../daily_choice_picker_context.dart';
+import '../daily_choice_picker_purpose.dart';
 
 /// Поиск исходного намерения для создания или замены пути дневного выбора.
 ///
@@ -51,6 +52,11 @@ final class _DailyChoiceSourcePickerPageState
       },
       child: IntentionPickerView(
         purpose: _purpose,
+        purposeDescription: dailyChoicePickerPurpose(
+          l10n,
+          pickerContext: widget.pickerContext,
+          start: DailyChoicePickerStart.source,
+        ),
         closeLabel: switch (widget.pickerContext) {
           InitialDailyChoicePickerContext() => l10n.creationCancelAction,
           PathReplacementDailyChoicePickerContext() => l10n.sourcePickerCancel,

@@ -35,6 +35,28 @@ void main() {
       header: 'Действия',
       pathReplacementCancel: 'Отменить выбор действия',
     ),
+    purposeTexts: {
+      'ru': (
+        title: 'Выбор действия',
+        creationSubtitle: 'Новый дневной выбор: конечное действие',
+        creationLine: 'Новый дневной выбор, от действия',
+        replacementSubtitle: 'Замена пути: конечное действие',
+        replacementLine: 'Замена пути, от действия',
+        startStep: 'Конечное действие',
+        pathStep: 'Путь вверх к исходному намерению',
+        pathNote: 'Нужен хотя бы один шаг',
+      ),
+      'en': (
+        title: 'Choose an action',
+        creationSubtitle: 'New daily choice: selected action',
+        creationLine: 'New daily choice, from an action',
+        replacementSubtitle: 'Path replacement: selected action',
+        replacementLine: 'Path replacement, from an action',
+        startStep: 'Selected action',
+        pathStep: 'Path up to the source intention',
+        pathNote: 'At least one step is needed',
+      ),
+    },
     emptyMessage: 'No active actions are available.',
     noMatchesMessage: 'No actions with this name',
   );

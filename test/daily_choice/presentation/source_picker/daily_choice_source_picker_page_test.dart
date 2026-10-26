@@ -35,6 +35,29 @@ void main() {
       header: 'Все',
       pathReplacementCancel: 'Отменить выбор намерения',
     ),
+    purposeTexts: {
+      'ru': (
+        title: 'Выбор намерения',
+        creationSubtitle: 'Новый дневной выбор: исходное намерение',
+        creationLine: 'Новый дневной выбор, от намерения',
+        replacementSubtitle: 'Замена пути: исходное намерение',
+        replacementLine: 'Замена пути, от намерения',
+        startStep: 'Исходное намерение',
+        pathStep: 'Путь вниз к действию',
+        pathNote:
+            'Каждый следующий шаг — то, что нужно или можно для предыдущего',
+      ),
+      'en': (
+        title: 'Choose an intention',
+        creationSubtitle: 'New daily choice: source intention',
+        creationLine: 'New daily choice, from an intention',
+        replacementSubtitle: 'Path replacement: source intention',
+        replacementLine: 'Path replacement, from an intention',
+        startStep: 'Source intention',
+        pathStep: 'Path down to an action',
+        pathNote: 'Each next step is what the previous one needs or can use',
+      ),
+    },
     emptyMessage: 'No active intentions are available.',
     noMatchesMessage: 'No intentions with this name',
   );

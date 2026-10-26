@@ -2299,6 +2299,71 @@ class AppLocalizationsRu extends AppLocalizations {
   String get sourcePickerEmpty => 'Доступных активных намерений нет.';
 
   @override
+  String get dailyChoicePickerPurposeCreationSource =>
+      'Новый дневной выбор: исходное намерение';
+
+  @override
+  String get dailyChoicePickerPurposeCreationAction =>
+      'Новый дневной выбор: конечное действие';
+
+  @override
+  String get dailyChoicePickerPurposeReplacementSource =>
+      'Замена пути: исходное намерение';
+
+  @override
+  String get dailyChoicePickerPurposeReplacementAction =>
+      'Замена пути: конечное действие';
+
+  @override
+  String get dailyChoicePickerFlowCreationFromSource =>
+      'Новый дневной выбор, от намерения';
+
+  @override
+  String get dailyChoicePickerFlowCreationFromAction =>
+      'Новый дневной выбор, от действия';
+
+  @override
+  String get dailyChoicePickerFlowReplacementFromSource =>
+      'Замена пути, от намерения';
+
+  @override
+  String get dailyChoicePickerFlowReplacementFromAction =>
+      'Замена пути, от действия';
+
+  @override
+  String get dailyChoicePickerStepCurrent => 'Вы здесь';
+
+  @override
+  String get dailyChoicePickerStepSource => 'Исходное намерение';
+
+  @override
+  String get dailyChoicePickerStepAction => 'Конечное действие';
+
+  @override
+  String get dailyChoicePickerStepPathDown => 'Путь вниз к действию';
+
+  @override
+  String get dailyChoicePickerStepPathDownNote =>
+      'Каждый следующий шаг — то, что нужно или можно для предыдущего';
+
+  @override
+  String get dailyChoicePickerStepPathUp => 'Путь вверх к исходному намерению';
+
+  @override
+  String get dailyChoicePickerStepPathUpNote => 'Нужен хотя бы один шаг';
+
+  @override
+  String get dailyChoicePickerStepDetails =>
+      'Дата, время, приоритет и описание';
+
+  @override
+  String get dailyChoicePickerStepReplacement => 'Подтверждение замены';
+
+  @override
+  String get dailyChoicePickerStepReplacementNote =>
+      'Дата, запланированное время, приоритет, описание и выполнение останутся прежними';
+
+  @override
   String get intentionPickerArchived => 'в архиве';
 
   @override

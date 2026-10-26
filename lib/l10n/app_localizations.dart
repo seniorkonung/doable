@@ -3550,6 +3550,114 @@ abstract class AppLocalizations {
   /// **'No active intentions are available.'**
   String get sourcePickerEmpty;
 
+  /// Подзаголовок поиска исходного намерения при создании дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'New daily choice: source intention'**
+  String get dailyChoicePickerPurposeCreationSource;
+
+  /// Подзаголовок поиска действия при создании дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'New daily choice: selected action'**
+  String get dailyChoicePickerPurposeCreationAction;
+
+  /// Подзаголовок поиска исходного намерения при замене пути
+  ///
+  /// In en, this message translates to:
+  /// **'Path replacement: source intention'**
+  String get dailyChoicePickerPurposeReplacementSource;
+
+  /// Подзаголовок поиска действия при замене пути
+  ///
+  /// In en, this message translates to:
+  /// **'Path replacement: selected action'**
+  String get dailyChoicePickerPurposeReplacementAction;
+
+  /// Строка листа назначения: создание дневного выбора от намерения
+  ///
+  /// In en, this message translates to:
+  /// **'New daily choice, from an intention'**
+  String get dailyChoicePickerFlowCreationFromSource;
+
+  /// Строка листа назначения: создание дневного выбора от действия
+  ///
+  /// In en, this message translates to:
+  /// **'New daily choice, from an action'**
+  String get dailyChoicePickerFlowCreationFromAction;
+
+  /// Строка листа назначения: замена пути от намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Path replacement, from an intention'**
+  String get dailyChoicePickerFlowReplacementFromSource;
+
+  /// Строка листа назначения: замена пути от действия
+  ///
+  /// In en, this message translates to:
+  /// **'Path replacement, from an action'**
+  String get dailyChoicePickerFlowReplacementFromAction;
+
+  /// Отметка текущего шага дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'You are here'**
+  String get dailyChoicePickerStepCurrent;
+
+  /// Шаг дневного выбора: исходное намерение
+  ///
+  /// In en, this message translates to:
+  /// **'Source intention'**
+  String get dailyChoicePickerStepSource;
+
+  /// Шаг дневного выбора: конечное действие
+  ///
+  /// In en, this message translates to:
+  /// **'Selected action'**
+  String get dailyChoicePickerStepAction;
+
+  /// Шаг дневного выбора от намерения: путь к действию
+  ///
+  /// In en, this message translates to:
+  /// **'Path down to an action'**
+  String get dailyChoicePickerStepPathDown;
+
+  /// Пояснение пути вниз к действию
+  ///
+  /// In en, this message translates to:
+  /// **'Each next step is what the previous one needs or can use'**
+  String get dailyChoicePickerStepPathDownNote;
+
+  /// Шаг дневного выбора от действия: путь к исходному намерению
+  ///
+  /// In en, this message translates to:
+  /// **'Path up to the source intention'**
+  String get dailyChoicePickerStepPathUp;
+
+  /// Пояснение пути вверх к исходному намерению
+  ///
+  /// In en, this message translates to:
+  /// **'At least one step is needed'**
+  String get dailyChoicePickerStepPathUpNote;
+
+  /// Последний шаг создания дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Date, time, priority, and description'**
+  String get dailyChoicePickerStepDetails;
+
+  /// Последний шаг замены пути
+  ///
+  /// In en, this message translates to:
+  /// **'Replacement confirmation'**
+  String get dailyChoicePickerStepReplacement;
+
+  /// Пояснение подтверждения замены пути
+  ///
+  /// In en, this message translates to:
+  /// **'The date, scheduled time, priority, description, and completion stay the same'**
+  String get dailyChoicePickerStepReplacementNote;
+
   /// Архивное состояние намерения в доступном названии строки экрана выбора
   ///
   /// In en, this message translates to:

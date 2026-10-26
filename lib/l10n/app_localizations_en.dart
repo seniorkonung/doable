@@ -2275,6 +2275,71 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sourcePickerEmpty => 'No active intentions are available.';
 
   @override
+  String get dailyChoicePickerPurposeCreationSource =>
+      'New daily choice: source intention';
+
+  @override
+  String get dailyChoicePickerPurposeCreationAction =>
+      'New daily choice: selected action';
+
+  @override
+  String get dailyChoicePickerPurposeReplacementSource =>
+      'Path replacement: source intention';
+
+  @override
+  String get dailyChoicePickerPurposeReplacementAction =>
+      'Path replacement: selected action';
+
+  @override
+  String get dailyChoicePickerFlowCreationFromSource =>
+      'New daily choice, from an intention';
+
+  @override
+  String get dailyChoicePickerFlowCreationFromAction =>
+      'New daily choice, from an action';
+
+  @override
+  String get dailyChoicePickerFlowReplacementFromSource =>
+      'Path replacement, from an intention';
+
+  @override
+  String get dailyChoicePickerFlowReplacementFromAction =>
+      'Path replacement, from an action';
+
+  @override
+  String get dailyChoicePickerStepCurrent => 'You are here';
+
+  @override
+  String get dailyChoicePickerStepSource => 'Source intention';
+
+  @override
+  String get dailyChoicePickerStepAction => 'Selected action';
+
+  @override
+  String get dailyChoicePickerStepPathDown => 'Path down to an action';
+
+  @override
+  String get dailyChoicePickerStepPathDownNote =>
+      'Each next step is what the previous one needs or can use';
+
+  @override
+  String get dailyChoicePickerStepPathUp => 'Path up to the source intention';
+
+  @override
+  String get dailyChoicePickerStepPathUpNote => 'At least one step is needed';
+
+  @override
+  String get dailyChoicePickerStepDetails =>
+      'Date, time, priority, and description';
+
+  @override
+  String get dailyChoicePickerStepReplacement => 'Replacement confirmation';
+
+  @override
+  String get dailyChoicePickerStepReplacementNote =>
+      'The date, scheduled time, priority, description, and completion stay the same';
+
+  @override
   String get intentionPickerArchived => 'archived';
 
   @override
