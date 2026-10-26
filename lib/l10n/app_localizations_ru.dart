@@ -2567,6 +2567,65 @@ class AppLocalizationsRu extends AppLocalizations {
       'Открыть подробные данные намерения';
 
   @override
+  String get participantPickerPurposeCreationSource =>
+      'Новая связь: исходное намерение';
+
+  @override
+  String get participantPickerPurposeCreationRelated =>
+      'Новая связь: связанное намерение';
+
+  @override
+  String get participantPickerPurposeChangeSource =>
+      'Изменение связи: исходное намерение';
+
+  @override
+  String get participantPickerPurposeChangeRelated =>
+      'Изменение связи: связанное намерение';
+
+  @override
+  String get participantPickerFlowCreation => 'Новая связь';
+
+  @override
+  String get participantPickerFlowChange => 'Изменение связи';
+
+  @override
+  String get participantPickerRoleSourceNote =>
+      'Исходное намерение — то, для чего нужно или можно связанное.';
+
+  @override
+  String get participantPickerRoleRelatedNeedNote =>
+      'Связанное намерение — то, что нужно для исходного.';
+
+  @override
+  String get participantPickerRoleRelatedCanNote =>
+      'Связанное намерение — то, что можно для исходного.';
+
+  @override
+  String get participantPickerRoleRelatedUndeterminedNote =>
+      'Связанное намерение — то, что нужно или можно для исходного.';
+
+  @override
+  String get participantPickerFieldChoosing => 'Сейчас выбирается';
+
+  @override
+  String get participantPickerFieldFromList => 'Из этого списка';
+
+  @override
+  String participantPickerFieldReplacing(String title) {
+    return 'Вместо: $title';
+  }
+
+  @override
+  String get participantPickerFieldNotChosen => 'Ещё не выбрано';
+
+  @override
+  String get participantPickerFieldArchived => 'В архиве';
+
+  @override
+  String get participantPickerKindUndetermined =>
+      'Нужно или можно: ещё не выбрано';
+
+  @override
   String get relationEditorTitle => 'Новая связь';
 
   @override

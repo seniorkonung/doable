@@ -12,6 +12,7 @@ import '../../application/long_term_relation_command.dart';
 import '../../application/long_term_relation_projection.dart';
 import '../../domain/long_term_relation.dart';
 import 'relation_participant_choice.dart';
+import 'relation_participant_picker_purpose.dart';
 
 /// Выбор существующего намерения участником долговременной связи.
 ///
@@ -20,7 +21,8 @@ import 'relation_participant_choice.dart';
 /// намерение пары исключает запрос каталога по идентификатору, поэтому
 /// одноимённые намерения остаются отдельными строками. Выбор возвращает
 /// снимок участника с ревизией выдачи, из которой выбрана строка. Закрытие
-/// не возвращает ничего и не создаёт намерений.
+/// не возвращает ничего и не создаёт намерений. Подзаголовок шапки
+/// напоминает связь, из формы которой открыт поиск.
 @RoutePage()
 final class RelationParticipantPickerPage extends StatefulWidget {
   const RelationParticipantPickerPage({required this.choice, super.key});
@@ -61,6 +63,7 @@ final class _RelationParticipantPickerPageState
     final l10n = AppLocalizations.of(context);
     return IntentionPickerView(
       purpose: _purpose,
+      purposeDescription: relationParticipantPickerPurpose(l10n, widget.choice),
       closeLabel: l10n.participantPickerCancel,
       emptyScopeMessage: l10n.participantPickerEmpty,
       onClose: () => unawaited(context.router.maybePop()),

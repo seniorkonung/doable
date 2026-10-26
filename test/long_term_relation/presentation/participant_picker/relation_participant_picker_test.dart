@@ -5,7 +5,10 @@ import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/design_system/components/catalog_header.dart';
 import 'package:doable/src/design_system/components/filter_button.dart';
+import 'package:doable/src/design_system/components/path_glyph.dart';
+import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/design_system/components/top_bar.dart';
+import 'package:doable/src/design_system/doable_colors.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
@@ -27,6 +30,7 @@ import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -43,6 +47,7 @@ import '../../../support/tag_condition_cycles.dart';
 
 void main() {
   _defineTagSearchTests();
+  _definePurposeTests();
 
   for (final (language, title, cancelLabel, emptyMessage) in const [
     (
@@ -723,4 +728,347 @@ Future<void> _pumpUntilQueries(
     }
   }
   fail('Не дождались $count запросов каталога.');
+}
+
+/// Назначение поиска участника на одном языке: подзаголовок с отметкой роли,
+/// строка листа, строка о выбираемой роли и узлы формы связи для диктора.
+typedef _PurposeCase = ({
+  String name,
+  RelationParticipantChoice choice,
+  Map<String, _PurposeTexts> texts,
+  PathGlyphShape mark,
+});
+
+typedef _PurposeTexts = ({
+  String subtitle,
+  String sheetLine,
+  String roleNote,
+  String sourceField,
+  String relatedField,
+  String kind,
+});
+
+const _longSource =
+    'Сохранить тело функциональным, чтобы в шестьдесят лет ходить в горы с '
+    'рюкзаком';
+
+RelationParticipantSummary _named(
+  int index,
+  String title, {
+  IntentionArchiveState archiveState = IntentionArchiveState.active,
+}) => RelationParticipantSummary(
+  id: _id(index),
+  title: title,
+  archiveState: archiveState,
+);
+
+final List<_PurposeCase> _purposeCases = [
+  (
+    name: 'лист показывает исходное намерение целиком',
+    choice: RelationParticipantChoice(
+      role: RelationParticipantRole.related,
+      flow: const RelationCreationChoiceFlow(),
+      type: LongTermRelationType.need,
+      source: _named(3, _longSource),
+      related: null,
+    ),
+    mark: PathGlyphShape.ring,
+    texts: {
+      'ru': (
+        subtitle: 'Новая связь: связанное намерение',
+        sheetLine: 'Новая связь',
+        roleNote: 'Связанное намерение — то, что нужно для исходного.',
+        sourceField: 'Исходное намерение\n$_longSource',
+        relatedField: 'Связанное намерение\nСейчас выбирается\nИз этого списка',
+        kind: 'Нужно',
+      ),
+      'en': (
+        subtitle: 'New relation: related intention',
+        sheetLine: 'New relation',
+        roleNote: 'The related intention is what the source intention needs.',
+        sourceField: 'Source intention\n$_longSource',
+        relatedField: 'Related intention\nChoosing now\nFrom this list',
+        kind: 'Need',
+      ),
+    },
+  ),
+  (
+    name: 'изменение связи показывает заменяемого участника',
+    choice: RelationParticipantChoice(
+      role: RelationParticipantRole.related,
+      flow: const RelationChangeChoiceFlow(relationScope: RelationScope.active),
+      type: LongTermRelationType.need,
+      source: _named(3, 'Быть здоровым'),
+      related: _named(4, 'много ходить'),
+    ),
+    mark: PathGlyphShape.ring,
+    texts: {
+      'ru': (
+        subtitle: 'Изменение связи: связанное намерение',
+        sheetLine: 'Изменение связи',
+        roleNote: 'Связанное намерение — то, что нужно для исходного.',
+        sourceField: 'Исходное намерение\nБыть здоровым',
+        relatedField:
+            'Связанное намерение\nСейчас выбирается\nВместо: много ходить',
+        kind: 'Нужно',
+      ),
+      'en': (
+        subtitle: 'Relation change: related intention',
+        sheetLine: 'Relation change',
+        roleNote: 'The related intention is what the source intention needs.',
+        sourceField: 'Source intention\nБыть здоровым',
+        relatedField:
+            'Related intention\nChoosing now\nInstead of: много ходить',
+        kind: 'Need',
+      ),
+    },
+  ),
+  (
+    name: 'выбор исходного при пустом связанном и невыбранном виде',
+    choice: const RelationParticipantChoice(
+      role: RelationParticipantRole.source,
+      flow: RelationCreationChoiceFlow(),
+      type: null,
+      source: null,
+      related: null,
+    ),
+    mark: PathGlyphShape.diamond,
+    texts: {
+      'ru': (
+        subtitle: 'Новая связь: исходное намерение',
+        sheetLine: 'Новая связь',
+        roleNote:
+            'Исходное намерение — то, для чего нужно или можно связанное.',
+        sourceField: 'Исходное намерение\nСейчас выбирается\nИз этого списка',
+        relatedField: 'Связанное намерение\nЕщё не выбрано',
+        kind: 'Нужно или можно: ещё не выбрано',
+      ),
+      'en': (
+        subtitle: 'New relation: source intention',
+        sheetLine: 'New relation',
+        roleNote:
+            'The source intention is what the related intention is needed '
+            'for or can be used for.',
+        sourceField: 'Source intention\nChoosing now\nFrom this list',
+        relatedField: 'Related intention\nNot chosen yet',
+        kind: 'Need or can: not chosen yet',
+      ),
+    },
+  ),
+  (
+    name: 'архивная изменяемая связь с архивным участником',
+    choice: RelationParticipantChoice(
+      role: RelationParticipantRole.source,
+      flow: const RelationChangeChoiceFlow(
+        relationScope: RelationScope.archived,
+      ),
+      type: LongTermRelationType.can,
+      source: _named(3, 'Гулять'),
+      related: _named(
+        _excludedIndex,
+        'Бегать',
+        archiveState: IntentionArchiveState.archived,
+      ),
+    ),
+    mark: PathGlyphShape.diamond,
+    texts: {
+      'ru': (
+        subtitle: 'Изменение связи: исходное намерение',
+        sheetLine: 'Изменение связи',
+        roleNote:
+            'Исходное намерение — то, для чего нужно или можно связанное.',
+        sourceField: 'Исходное намерение\nСейчас выбирается\nВместо: Гулять',
+        relatedField: 'Связанное намерение\nБегать\nВ архиве',
+        kind: 'Можно',
+      ),
+      'en': (
+        subtitle: 'Relation change: source intention',
+        sheetLine: 'Relation change',
+        roleNote:
+            'The source intention is what the related intention is needed '
+            'for or can be used for.',
+        sourceField: 'Source intention\nChoosing now\nInstead of: Гулять',
+        relatedField: 'Related intention\nБегать\nArchived',
+        kind: 'Can',
+      ),
+    },
+  ),
+];
+
+/// Подзаголовок и лист «Что вы выбираете» напоминают связь, из формы которой
+/// открыт поиск.
+void _definePurposeTests() {
+  for (final purposeCase in _purposeCases) {
+    for (final MapEntry(key: language, value: texts)
+        in purposeCase.texts.entries) {
+      final ru = language == 'ru';
+      testWidgets('$language: ${purposeCase.name} — «${texts.subtitle}» '
+          'открывает лист с формой связи только для чтения', (tester) async {
+        final semantics = tester.ensureSemantics();
+        final repository = ControlledParticipantPickerRepository();
+        addTearDown(repository.dispose);
+        final router = await _pumpAppWithCatalog(
+          tester,
+          repository,
+          locale: Locale(language),
+        );
+        addTearDown(router.dispose);
+
+        unawaited(_pushPicker(router, purposeCase.choice));
+        await _settleRoute(tester);
+        _completePage(repository, 1, const []);
+        await tester.pumpAndSettle();
+
+        final subtitle = find.descendant(
+          of: find.byType(TopBar),
+          matching: find.text(texts.subtitle),
+        );
+        expect(
+          tester.getSemantics(subtitle),
+          isSemantics(
+            label: ru
+                ? 'Выбор намерения. ${texts.subtitle}. Показать, что '
+                      'выбирается'
+                : 'Choose an intention. ${texts.subtitle}. Show what you are '
+                      'choosing',
+            isButton: true,
+            hasTapAction: true,
+            hasExpandedState: true,
+            isExpanded: false,
+          ),
+        );
+        final mark = find.descendant(
+          of: find.byType(TopBar),
+          matching: find.byType(PathGlyph),
+        );
+        expect(tester.widget<PathGlyph>(mark).shape, purposeCase.mark);
+
+        await tester.tap(subtitle);
+        await tester.pumpAndSettle();
+        final sheet = find.byType(Sheet);
+        Finder inSheet(String text) =>
+            find.descendant(of: sheet, matching: find.text(text));
+        for (final text in [
+          ru ? 'Что вы выбираете' : 'What you are choosing',
+          texts.sheetLine,
+          texts.roleNote,
+        ]) {
+          expect(inSheet(text), findsOneWidget);
+        }
+        // Узел каждого поля называет роль, состояние и участника словами;
+        // нажать его нельзя.
+        for (final label in [texts.sourceField, texts.relatedField]) {
+          expect(
+            tester.getSemantics(find.bySemanticsLabel(label)),
+            isSemantics(label: label, hasTapAction: false),
+          );
+        }
+        expect(
+          tester.getSemantics(inSheet(texts.kind)),
+          isSemantics(label: texts.kind, hasTapAction: false),
+        );
+        semantics.dispose();
+      });
+    }
+  }
+
+  testWidgets('название исходного участника в листе показано целиком', (
+    tester,
+  ) async {
+    final repository = ControlledParticipantPickerRepository();
+    addTearDown(repository.dispose);
+    final router = await _pumpAppWithCatalog(tester, repository);
+    addTearDown(router.dispose);
+
+    unawaited(_pushPicker(router, _purposeCases.first.choice));
+    await _settleRoute(tester);
+    _completePage(repository, 1, const []);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('New relation: related intention'));
+    await tester.pumpAndSettle();
+
+    final name = find.descendant(
+      of: find.byType(Sheet),
+      matching: find.text(_longSource),
+    );
+    expect(tester.renderObject<RenderParagraph>(name).didExceedMaxLines, false);
+  });
+
+  testWidgets('архивный участник приглушён, а запрос каталога сохраняет '
+      'полный охват и исключение', (tester) async {
+    final repository = ControlledParticipantPickerRepository();
+    addTearDown(repository.dispose);
+    final router = await _pumpAppWithCatalog(tester, repository);
+    addTearDown(router.dispose);
+
+    unawaited(_pushPicker(router, _purposeCases.last.choice));
+    await _settleRoute(tester);
+    final query = repository.queryAt(1);
+    expect(query.scope, IntentionScope.all);
+    expect(query.excludedIntentionId, _id(_excludedIndex));
+    _completePage(repository, 1, const []);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Relation change: source intention'));
+    await tester.pumpAndSettle();
+
+    final archived = find.descendant(
+      of: find.byType(Sheet),
+      matching: find.text('Бегать'),
+    );
+    final colors = Theme.of(tester.element(archived))
+        .extension<DoableColors>()!;
+    expect(tester.widget<Text>(archived).style?.color, colors.muted);
+  });
+
+  testWidgets('подробные данные намерения не показывают подзаголовок, а после '
+      'возврата он снова на месте', (tester) async {
+    final repository = ControlledParticipantPickerRepository();
+    addTearDown(repository.dispose);
+    final router = await _pumpAppWithCatalog(tester, repository);
+    addTearDown(router.dispose);
+
+    unawaited(_pushPicker(router, _activeRelation.choice));
+    await _settleRoute(tester);
+    final pickerId = router.current.matchId;
+    _completePage(repository, 1, [testSummary(index: 1, title: 'Позвонить')]);
+    await tester.pumpAndSettle();
+    final subtitle = find.text('New relation: related intention');
+    expect(subtitle, findsOneWidget);
+
+    await tester.tap(intentionPickerArrow(intentionPickerRows.first));
+    await _settleRoute(tester);
+    expect(find.byType(IntentionDetailsPage), findsOneWidget);
+    expect(subtitle, findsNothing);
+
+    await router.maybePop();
+    await _settleRoute(tester);
+    expect(router.current.matchId, pickerId);
+    expect(subtitle, findsOneWidget);
+  });
+
+  testWidgets('экран с подзаголовком и открытый лист назначения доступны '
+      'для нажатия и контрастны', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final repository = ControlledParticipantPickerRepository();
+    addTearDown(repository.dispose);
+    final router = await _pumpAppWithCatalog(tester, repository);
+    addTearDown(router.dispose);
+
+    unawaited(_pushPicker(router, _purposeCases.last.choice));
+    await _settleRoute(tester);
+    _completePage(repository, 1, const []);
+    await tester.pumpAndSettle();
+
+    for (final open in [false, true]) {
+      if (open) {
+        await tester.tap(find.text('Relation change: source intention'));
+        await tester.pumpAndSettle();
+        expect(find.byType(Sheet), findsOneWidget);
+      }
+      await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(textContrastGuideline));
+    }
+    semantics.dispose();
+  });
 }

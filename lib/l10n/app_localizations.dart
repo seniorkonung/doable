@@ -4004,6 +4004,102 @@ abstract class AppLocalizations {
   /// **'Open intention details'**
   String get participantPickerOpenDetails;
 
+  /// Подзаголовок поиска исходного намерения при создании связи
+  ///
+  /// In en, this message translates to:
+  /// **'New relation: source intention'**
+  String get participantPickerPurposeCreationSource;
+
+  /// Подзаголовок поиска связанного намерения при создании связи
+  ///
+  /// In en, this message translates to:
+  /// **'New relation: related intention'**
+  String get participantPickerPurposeCreationRelated;
+
+  /// Подзаголовок поиска исходного намерения при изменении связи
+  ///
+  /// In en, this message translates to:
+  /// **'Relation change: source intention'**
+  String get participantPickerPurposeChangeSource;
+
+  /// Подзаголовок поиска связанного намерения при изменении связи
+  ///
+  /// In en, this message translates to:
+  /// **'Relation change: related intention'**
+  String get participantPickerPurposeChangeRelated;
+
+  /// Строка листа назначения: создание связи
+  ///
+  /// In en, this message translates to:
+  /// **'New relation'**
+  String get participantPickerFlowCreation;
+
+  /// Строка листа назначения: изменение связи
+  ///
+  /// In en, this message translates to:
+  /// **'Relation change'**
+  String get participantPickerFlowChange;
+
+  /// Пояснение выбираемой роли исходного намерения в листе назначения
+  ///
+  /// In en, this message translates to:
+  /// **'The source intention is what the related intention is needed for or can be used for.'**
+  String get participantPickerRoleSourceNote;
+
+  /// Пояснение выбираемой роли связанного намерения при виде «нужно»
+  ///
+  /// In en, this message translates to:
+  /// **'The related intention is what the source intention needs.'**
+  String get participantPickerRoleRelatedNeedNote;
+
+  /// Пояснение выбираемой роли связанного намерения при виде «можно»
+  ///
+  /// In en, this message translates to:
+  /// **'The related intention is what the source intention can use.'**
+  String get participantPickerRoleRelatedCanNote;
+
+  /// Пояснение выбираемой роли связанного намерения до выбора вида
+  ///
+  /// In en, this message translates to:
+  /// **'The related intention is what the source intention needs or can use.'**
+  String get participantPickerRoleRelatedUndeterminedNote;
+
+  /// Подпись поля связи, участника которого выбирают сейчас
+  ///
+  /// In en, this message translates to:
+  /// **'Choosing now'**
+  String get participantPickerFieldChoosing;
+
+  /// Текст выбираемого поля связи без прежнего участника
+  ///
+  /// In en, this message translates to:
+  /// **'From this list'**
+  String get participantPickerFieldFromList;
+
+  /// Текст выбираемого поля связи с прежним участником этой роли
+  ///
+  /// In en, this message translates to:
+  /// **'Instead of: {title}'**
+  String participantPickerFieldReplacing(String title);
+
+  /// Текст пустого поля связи
+  ///
+  /// In en, this message translates to:
+  /// **'Not chosen yet'**
+  String get participantPickerFieldNotChosen;
+
+  /// Признак архивного участника связи для экранного диктора
+  ///
+  /// In en, this message translates to:
+  /// **'Archived'**
+  String get participantPickerFieldArchived;
+
+  /// Вид связи в листе назначения, пока он не выбран
+  ///
+  /// In en, this message translates to:
+  /// **'Need or can: not chosen yet'**
+  String get participantPickerKindUndetermined;
+
   /// Заголовок формы создания долговременной связи
   ///
   /// In en, this message translates to:

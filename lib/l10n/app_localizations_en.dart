@@ -2541,6 +2541,64 @@ class AppLocalizationsEn extends AppLocalizations {
   String get participantPickerOpenDetails => 'Open intention details';
 
   @override
+  String get participantPickerPurposeCreationSource =>
+      'New relation: source intention';
+
+  @override
+  String get participantPickerPurposeCreationRelated =>
+      'New relation: related intention';
+
+  @override
+  String get participantPickerPurposeChangeSource =>
+      'Relation change: source intention';
+
+  @override
+  String get participantPickerPurposeChangeRelated =>
+      'Relation change: related intention';
+
+  @override
+  String get participantPickerFlowCreation => 'New relation';
+
+  @override
+  String get participantPickerFlowChange => 'Relation change';
+
+  @override
+  String get participantPickerRoleSourceNote =>
+      'The source intention is what the related intention is needed for or can be used for.';
+
+  @override
+  String get participantPickerRoleRelatedNeedNote =>
+      'The related intention is what the source intention needs.';
+
+  @override
+  String get participantPickerRoleRelatedCanNote =>
+      'The related intention is what the source intention can use.';
+
+  @override
+  String get participantPickerRoleRelatedUndeterminedNote =>
+      'The related intention is what the source intention needs or can use.';
+
+  @override
+  String get participantPickerFieldChoosing => 'Choosing now';
+
+  @override
+  String get participantPickerFieldFromList => 'From this list';
+
+  @override
+  String participantPickerFieldReplacing(String title) {
+    return 'Instead of: $title';
+  }
+
+  @override
+  String get participantPickerFieldNotChosen => 'Not chosen yet';
+
+  @override
+  String get participantPickerFieldArchived => 'Archived';
+
+  @override
+  String get participantPickerKindUndetermined => 'Need or can: not chosen yet';
+
+  @override
   String get relationEditorTitle => 'New relation';
 
   @override
