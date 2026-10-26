@@ -40,8 +40,6 @@ enum DoableIconData {
   arrowUpRight('arrow_up_right'),
   archive('archive'),
   sliders('sliders'),
-  arrowDown('arrow_down'),
-  arrowUp('arrow_up'),
   chevronDown('chevron_down'),
   selector('selector'),
   sortAsc('sort_asc'),

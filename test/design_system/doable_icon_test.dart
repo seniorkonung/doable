@@ -133,9 +133,7 @@ Widget _sampleRow(DoableIconData icon, DoableColors colors) {
     DoableIconData.bolt => (14.0, colors.ink, colors.bg),
     DoableIconData.arrowUpRight => (20.0, colors.muted, colors.fill),
     DoableIconData.archive => (14.0, colors.muted, colors.bg),
-    DoableIconData.sliders ||
-    DoableIconData.arrowDown ||
-    DoableIconData.arrowUp => (16.0, colors.muted, colors.fill),
+    DoableIconData.sliders => (16.0, colors.muted, colors.fill),
     DoableIconData.chevronDown => (12.0, colors.muted, colors.bg),
     DoableIconData.selector => (16.0, colors.muted, colors.raised),
     DoableIconData.sortAsc ||
