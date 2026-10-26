@@ -5,15 +5,15 @@
 **Format version:** 1
 **Result:** No unresolved findings
 **Coverage status:** Complete
-**Summary:** Все три прохода завершены для U1–U3 и задач 2.1–2.8; активных замечаний нет. По решению владельца исправление восьми вызовов устаревшего API в тесте OptionGroup передано в незавершённую задачу 2.9. Это передача исправления в план: код ещё не исправлен, успешный `mise run check` и готовность фазы 2 не подтверждены. Сохраняется принятый риск AR1 об индексах архивного охвата; его исходное решение этим диапазоном не пересматривается.
+**Summary:** Все три прохода завершены для U1 и задачи 2.9 (ID 20); неустранённых замечаний нет. Замена восьми устаревших вызовов API сохраняет проверки семантики OptionGroup. Полный `mise run check`, проверка генерации и release-сборка прошли; автоматические проверки завершения фазы 2 подтверждены. Сохраняется принятый риск AR1 об индексах архивного охвата, перенесённый без повторного рассмотрения вне текущего диапазона.
 
 ## Review target
 
-- **Baseline ref:** c22842cad85e7d9ce19f9c9dfc1dd9d171123054
-- **Base commit:** c22842cad85e7d9ce19f9c9dfc1dd9d171123054
-- **Reviewed head:** f4b6d56847b6b24046a3ba3737428c3847ca5754
-- **Target commits:** ["f6723f5e3eaacd03da40a67515d7129b9c15ffc8", "9442540e24a40ee67f4387d3fb21ff1b6bb30e59", "88e9fcf7f8c821ed31d3375a2a2583951bae8113", "31d621813da422bb3f9809dc48bb6fe6abba2551", "dee7e025ec63312782dc5c558bec35b5a09ea62c", "e0fee6a332af5e41658f810800a12bad185176a9", "744bf9f397539db7c36a3ff0fc49d0fdd0d508f5", "f4b6d56847b6b24046a3ba3737428c3847ca5754"]
-- **Reviewable paths:** ["lib/l10n/app_en.arb", "lib/l10n/app_localizations.dart", "lib/l10n/app_localizations_en.dart", "lib/l10n/app_localizations_ru.dart", "lib/l10n/app_ru.arb", "lib/src/design_system/components/catalog_header.dart", "lib/src/design_system/components/option_group.dart", "lib/src/design_system/components/sheet.dart", "lib/src/design_system/doable_icon.dart", "lib/src/design_system/icons/README.md", "lib/src/design_system/icons/assets/arrow_down.svg", "lib/src/design_system/icons/assets/arrow_up.svg", "lib/src/design_system/icons/assets/sliders.svg", "lib/src/intention/presentation/catalog/intention_catalog_view_model.dart", "lib/src/intention/presentation/catalog/intention_catalog_view_model.g.dart", "lib/src/intention/presentation/picker/intention_picker_kind.dart", "lib/src/intention/presentation/picker/intention_picker_results.dart", "lib/src/intention/presentation/picker/intention_picker_show_and_sort_sheet.dart", "lib/src/intention/presentation/picker/intention_picker_view.dart", "openspec/changes/add-intention-picker-sorting-and-purpose/tasks.md", "test/daily_choice/presentation/daily_choice_picker_context_test_support.dart", "test/daily_choice/presentation/source_picker/daily_choice_source_picker_page_test.dart", "test/design_system/catalog_header_test.dart", "test/design_system/doable_icon_test.dart", "test/design_system/goldens/doable_icons.png", "test/design_system/option_group_test.dart", "test/design_system/sheet_test.dart", "test/intention/presentation/catalog/intention_picker_session_test_support.dart", "test/intention/presentation/picker/intention_picker_results_test.dart", "test/intention/presentation/picker/intention_picker_show_and_sort_sheet_test.dart", "test/intention/presentation/picker/intention_picker_view_test.dart", "test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart"]
+- **Baseline ref:** 3812ff32bc30fb17dfaf530bf864eee88a4bd9de
+- **Base commit:** 3812ff32bc30fb17dfaf530bf864eee88a4bd9de
+- **Reviewed head:** 3cc1a24d4cfc0330147d64c40d079990c4ef2066
+- **Target commits:** ["3cc1a24d4cfc0330147d64c40d079990c4ef2066"]
+- **Reviewable paths:** ["openspec/changes/add-intention-picker-sorting-and-purpose/tasks.md", "test/design_system/option_group_test.dart"]
 - **OpenSpec change:** add-intention-picker-sorting-and-purpose
 - **OpenSpec schema:** intent-driven
 - **Target scope:** User-requested bounded range
@@ -22,38 +22,22 @@
 
 ## Reviewed increment
 
-### U1 · Общие компоненты выбора параметров и графика сортировки
+### U1 · Проверки семантики группы вариантов используют поддерживаемый API Flutter
 
-- **Work items:** ["2.1", "2.2", "2.3"]
-- **Requirements and scenarios:** ["intention-management: Параметры показа в поиске для выбора", "design: решение 4; Sheet.action; OptionGroup lg"]
-- **Affected boundary:** Потребители дизайн-системы, цели касания и семантика экранного диктора.
-- **Implementation target:** ["lib/src/design_system/components/option_group.dart", "lib/src/design_system/components/sheet.dart", "lib/src/design_system/doable_icon.dart", "lib/src/design_system/icons/README.md", "lib/src/design_system/icons/assets/arrow_down.svg", "lib/src/design_system/icons/assets/arrow_up.svg", "lib/src/design_system/icons/assets/sliders.svg", "test/design_system/doable_icon_test.dart", "test/design_system/goldens/doable_icons.png", "test/design_system/option_group_test.dart", "test/design_system/sheet_test.dart"]
-- **Applicable constraints and non-goals:** Компоненты получают готовые тексты и типизированные значения, без предметных типов; недоступная группа сохраняет выбор и причину. Только нынешние значки и вариант группы lg. Действие листа использует общий механизм заголовка и не закрывает лист.
-
-### U2 · Закреплённый заголовок и немедленная настройка трёх поисков
-
-- **Work items:** ["2.4", "2.5", "2.6", "2.8"]
-- **Requirements and scenarios:** ["intention-management: Экран поиска для выбора намерения", "intention-management: Заголовок списка поиска для выбора", "intention-management: Параметры показа в поиске для выбора", "intention-management: Тип намерения в поиске для выбора", "daily-choice-management: Закреплённый тип поиска действия"]
-- **Affected boundary:** Общий экран выбора и страницы поиска действия, исходного намерения и участника долговременной связи; модель каталога и подтверждённые порции.
-- **Implementation target:** ["lib/l10n/app_en.arb", "lib/l10n/app_localizations.dart", "lib/l10n/app_localizations_en.dart", "lib/l10n/app_localizations_ru.dart", "lib/l10n/app_ru.arb", "lib/src/design_system/components/catalog_header.dart", "lib/src/intention/presentation/catalog/intention_catalog_view_model.dart", "lib/src/intention/presentation/catalog/intention_catalog_view_model.g.dart", "lib/src/intention/presentation/picker/intention_picker_kind.dart", "lib/src/intention/presentation/picker/intention_picker_results.dart", "lib/src/intention/presentation/picker/intention_picker_show_and_sort_sheet.dart", "lib/src/intention/presentation/picker/intention_picker_view.dart", "test/daily_choice/presentation/daily_choice_picker_context_test_support.dart", "test/daily_choice/presentation/source_picker/daily_choice_source_picker_page_test.dart", "test/design_system/catalog_header_test.dart", "test/intention/presentation/catalog/intention_picker_session_test_support.dart", "test/intention/presentation/picker/intention_picker_results_test.dart", "test/intention/presentation/picker/intention_picker_show_and_sort_sheet_test.dart", "test/intention/presentation/picker/intention_picker_view_test.dart", "test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart"]
-- **Applicable constraints and non-goals:** Заголовок и лист сразу отражают последний выбор, числа принадлежат только подтверждённым текущим параметрам. Тип и порядок принадлежат экземпляру страницы; сохраняются охват, исключение участника, порционность, выбор по идентификатору и закрытие маршрута. Обе локализации; лист над корневым навигатором.
-- **Excluded change scope:** Фазы 3–4: назначение поиска, подзаголовок, лист «Что вы выбираете», графический язык путей и форма связи. Каталог графа не получает новый интерфейс. Уже выполненная фаза 1 рассматривается только как контекст текущих потребителей.
-
-### U3 · Продолжение поиска из пустой выдачи выбранного типа
-
-- **Work items:** ["2.7", "2.8"]
-- **Requirements and scenarios:** ["intention-management: Сброс фильтров в пустой выдаче поиска для выбора", "Пустая выдача называет обе причины", "«Сбросить фильтры» снимает название и условия", "Пустой тип предлагает показать оба типа", "Пустой охват без фильтров не предлагает сброс"]
-- **Affected boundary:** Сообщения и действия пустой подтверждённой выдачи общего экрана выбора.
-- **Implementation target:** ["lib/l10n/app_en.arb", "lib/l10n/app_localizations.dart", "lib/l10n/app_localizations_en.dart", "lib/l10n/app_localizations_ru.dart", "lib/l10n/app_ru.arb", "lib/src/intention/presentation/picker/intention_picker_kind.dart", "lib/src/intention/presentation/picker/intention_picker_results.dart", "test/intention/presentation/picker/intention_picker_view_test.dart"]
-- **Applicable constraints and non-goals:** Сброс очищает название и условия по тегам, сохраняя тип, порядок и ограничения назначения. Показ обоих типов предлагается только при наличии другого типа без фильтров. Обе локализации. Общие механизмы загрузки и отказов не дублируются.
+- **Work items:** ["2.9"]
+- **Requirements and scenarios:** ["intention-management: Параметры показа в поиске для выбора — семантика взаимоисключающих вариантов", "daily-choice-management: Закреплённый тип поиска действия — недоступность группы с сохранением выбора и причины"]
+- **Affected boundary:** Автоматические проверки OptionGroup: выбранность после нажатия, явная недоступность группы и вариантов, взаимоисключение и сохранение выбранного варианта в обеих темах; статический анализ теста.
+- **Implementation target:** ["test/design_system/option_group_test.dart"]
+- **Applicable constraints and non-goals:** Сохранить существующие утверждения и защиту от регрессий без подавления диагностик, изменения анализатора, версий инструментов или поведения компонента.
+- **Excluded change scope:** Реализация задач 2.1–2.8 и фазы 1 служит контекстом; её повторное ревью не входит в диапазон. Назначение поисков, подзаголовки и лист «Что вы выбираете» относятся к будущим фазам 3–4. Полные проверки выполняются для завершения фазы 2.
 
 ## Pass coverage
 
 | Pass | Status | Evidence or limitation |
 |---|---|---|
-| Independent decision review | Complete | Свежий изолированный рецензент `/root/independent_decisions`, `gpt-6.1-sol`, high, по `implementation-decision-review`: No substantive findings, Coverage Complete. U1–U3 объединены из-за пересечений целых файлов локализации, результатов и тестов. Передан нейтральный бриф и точные 31 путь поставки; плановые артефакты, описания коммитов, прежний отчёт и находки не передавались. Неизменённый контекст проверен перед чтением. |
-| OpenSpec conformance | Complete | Артефакты прочитаны на сохранённой голове; задачи и сценарии сопоставлены с U1–U3. `mise exec --no-deps -- openspec validate add-intention-picker-sorting-and-purpose --strict --no-interactive --json`: exit 0, valid, issues []. `mise run check`: отказ статической части из-за восьми вызовов устаревшего API; исправление отслеживает задача 2.9. `mise run check:tests -- 0 1`: exit 0, все 3387 обычных тестов прошли. `mise run check:process-tests`: exit 0, все 18 процессных тестов прошли. `mise exec --no-deps -- flutter build apk --release`: exit 0, собран `build/app/outputs/flutter-apk/app-release.apk` (71,8 MB). `mise run codegen-check`: exit 0 на чистом дереве коммита `2bb759d2da7ccacc5b33dddcdc639f8496296dd1`; повторная генерация локализации, Riverpod/роутера и снимка Drift не изменила ни одного tracked-файла. Этот коммит отличается от сохранённой головы только отчётом; исходники и прочие входы проверок совпадают. |
-| Code quality | Complete | Все 31 путь поставки проверены по корректности, читаемости, архитектуре, безопасности и производительности из `code-review-and-quality`. Проверены изменённые участки и потребители: уведомления модели, устаревшие ответы, числа, порядок переключений, прокрутка, сессии страниц, общая раскладка и семантика листов. Вызванный устаревшим API отказ воспроизведён проектной CLI-проверкой; Dart LSP подтверждает deprecated-статус `SemanticsNode.hasFlag`. |
+| Independent decision review | Complete | Свежий изолированный рецензент `/root/option_group_decision_review`, `gpt-6.1-sol`, low, применил `implementation-decision-review` к U1: No substantive findings, Coverage Complete. Переданы нейтральное намерение, сохранённые границы и единственный путь `test/design_system/option_group_test.dart`. Плановые артефакты, сообщения коммитов, прежний отчёт и находки не передавались; неизменённые контекстные пути проверены перед чтением. |
+| OpenSpec conformance | Complete | Задача 2.9 и относящиеся к ней требования сопоставлены с U1 на сохранённой голове. Тест компонента: exit 0, 8 проверок. Анализ файла: exit 0, диагностик нет. Полный `mise run check`: exit 0, статические проверки, 3387 обычных и 18 процессных тестов прошли. OpenSpec validate в JSON и строгом режиме: exit 0, valid, issues []. `mise run codegen-check` и release-сборка: exit 0. Все команды и условия выполнения указаны ниже. |
+| Code quality | Complete | Полностью проверены единственный путь поставки и его diff по корректности, читаемости, архитектуре, безопасности и производительности с помощью `code-review-and-quality`. Соответствие новых состояний старым флагам сверено с локальными исходниками закреплённого Flutter 3.47.1. Новых зависимостей, путей обработки внешних данных, механизмов или фикстур нет; все прежние утверждения сохранены. |
 
 ## Findings
 
@@ -75,55 +59,33 @@ No unresolved findings remain in the implementation review.
 - **Decision record:** `docs/adr/0045-order-titles-by-opaque-key-of-stored-search-projection.md` («Последствия»); решение 3 и «Risks / Trade-offs» в `design.md`.
 - **Current target relation:** Carried forward; not re-reviewed
 
-
 ## Review coverage
 
-Проверены все восемь целевых коммитов, их изменённые пути и отметки выполнения; каждый относится к единице ниже. Единственный плановый путь в диапазоне — `tasks.md`: восемь отметок меняются на выполненные, описания и порядок задач сохраняются. Несопоставленных путей нет; точное множество поставки — все `Reviewable paths`, кроме `Planning evidence paths`.
+Единственный целевой коммит `3cc1a24d4cfc0330147d64c40d079990c4ef2066` рассмотрен полностью. Задача **2.9 (ID 20)** соответствует **U1**, её собственный диапазон совпадает с сохранённым диапазоном ревью. Точное множество путей поставки — `["test/design_system/option_group_test.dart"]`. Второй изменённый путь, `tasks.md:299`, является плановым свидетельством: меняется только отметка 2.9 на выполненную. Идентификаторы, номера, описания, порядок и прежние отметки задач сохранены. Несопоставленных путей нет, новых задач и исправлений в этом этапе не добавлено.
 
-Задача 2.1 (ID 12), коммит `f6723f5e3eaacd03da40a67515d7129b9c15ffc8`: U1.
+На сохранённой голове `test/design_system/option_group_test.dart:77` проверяет выбор после нажатия через `CheckedState.isTrue/isFalse`; строки 181–195 проверяют явное состояние недоступности группы и вариантов через `Tristate`, выбранность и взаимоисключение. Сохранены все 62 вызова `expect` и шесть объявлений `testWidgets`, разворачивающихся в восемь проверок с обеими темами. Все восемь вызовов `hasFlag` удалены; проверки роли, причины недоступности, отсутствия действия нажатия, оформления, размеров, масштаба текста и клавиатуры сохранены.
 
-Задача 2.2 (ID 13), коммит `9442540e24a40ee67f4387d3fb21ff1b6bb30e59`: U1.
+В закреплённом SDK `packages/flutter/lib/src/semantics/semantics.dart:3399` предоставляет `flagsCollection`; `hasFlag` на строках 3403–3408 помечен устаревшим с прямой рекомендацией этого API. Преобразование `_toBitMask` на строках 7150–7177 подтверждает соответствие `hasEnabledState` состоянию, отличному от `Tristate.none`, и прежних флагов выбранности и взаимоисключения новым полям. Проверка `CheckedState.isFalse` также исключает отсутствие состояния и смешанное состояние, поэтому защита от регрессии не ослаблена.
 
-Задача 2.3 (ID 14), коммит `88e9fcf7f8c821ed31d3375a2a2583951bae8113`: U1.
+Плановые источники `proposal.md`, три дельта-спецификации, `design.md`, `adr.md`, `plan.md` и `tasks.md` прочитаны из `3cc1a24d4cfc0330147d64c40d079990c4ef2066`; терминология взята из `CONTEXT.md`. Неизменённый компонент `lib/src/design_system/components/option_group.dart` и закрепление SDK в `mise.toml` проверены как контекст. Существующий отчёт прочитан после завершения независимого прохода: активных замечаний в нём не было; применимый AR1 сохранён с исходными свидетельствами и полномочиями принятия риска.
 
-Задача 2.4 (ID 15), коммит `31d621813da422bb3f9809dc48bb6fe6abba2551`: U2.
-
-Задача 2.5 (ID 16), коммит `dee7e025ec63312782dc5c558bec35b5a09ea62c`: U2.
-
-Задача 2.6 (ID 17), коммит `e0fee6a332af5e41658f810800a12bad185176a9`: U2.
-
-Задача 2.7 (ID 18), коммит `744bf9f397539db7c36a3ff0fc49d0fdd0d508f5`: U3.
-
-Задача 2.8 (ID 19), коммит `f4b6d56847b6b24046a3ba3737428c3847ca5754`: U2, U3; проверочный коммит меняет только отметку задачи.
+Проверки выполнены в `/home/seniorkonung/.paseo/worktrees/1id27gtb/modest-yak` на `3cc1a24d4cfc0330147d64c40d079990c4ef2066`, до изменения отчёта. Рабочее дерево было чистым до проверок и осталось чистым после генерации и сборки; незакоммиченные входы в проверяемый снимок не включались.
 
 
-**U1.** SVG геометрически сверены с `ActionPicker.dc.html`; golden на сохранённой голове просмотрен в обеих темах. `doable_icon_test.dart` проверяет ресурсы, `sheet_test.dart` — общее действие, положение, семантику и прежнюю раскладку без действия; `option_group_test.dart` — выбор, недоступность, числа, равные колонки, темы, масштаб текста 2 и клавиатурный фокус. Эти проверки защищают разные границы общего механизма. Задача 2.9 сохраняет все их утверждения при замене устаревшего API.
+Команда `mise exec --no-deps -- flutter test test/design_system/option_group_test.dart` — exit 0, все 8 тестов прошли.
 
-**U2.** `IntentionPickerView` отделяет закреплённый `CatalogHeader` от прокрутки результатов. Представления берут текущий выбор из модели; `AsyncData(isLoading: false, IntentionCatalogConfirmedState)` разрешает показ чисел. Дополнительное уведомление модели между состояниями загрузки поддерживает повторный выбор до ответа. Лист применяет переходы к последнему `model.selection.order`, а сброс — только к изменяемым параметрам. Существующая инвалидизация запросов отсекает устаревшие ответы; новый интерфейс не меняет SQL, охватов или способа выбора строки.
+Команда `mise exec --no-deps -- flutter analyze --no-pub test/design_system/option_group_test.dart` — exit 0, No issues found, включая отсутствие `deprecated_member_use`.
 
-Поиск действия с 13 результатами; закреплённый заголовок при прокрутке — `daily_choice_picker_context_test_support.dart`, `intention_picker_view_test.dart`.
+Команда `mise run check` — exit 0; форматирование 798 файлов без изменений, проверки инструментов CI и разбиения тестов, анализ всего проекта без диагностик, 3387 обычных и 18 процессных тестов.
 
-Заголовок до первой порции, после отказа, при недопустимом фильтре; доступное название с числом и без — `intention_picker_view_test.dart`: цикл трёх назначений и обеих локализаций.
+Команда `mise exec --no-deps -- openspec validate add-intention-picker-sorting-and-purpose --json` — exit 0, valid, issues [].
 
-Последний выбор типа и сортировки без прежних чисел до подтверждения — `intention_picker_view_test.dart`: управляемые ответы настоящей модели для трёх назначений.
+Команда `mise exec --no-deps -- openspec validate add-intention-picker-sorting-and-purpose --strict --no-interactive` — exit 0, change is valid.
 
-Выбор типа с точными числами при поиске — `intention_picker_show_and_sort_sheet_test.dart`: «выбор типа сразу меняет список, а количества учитывают поиск».
+Команда `mise run codegen-check` — exit 0 на чистой рабочей копии после коммита реализации; генерация локализации, build_runner и снимка Drift не изменила tracked-файлы.
 
-Дата ↔ название; дата ↔ дата; повторный выбор до ответа — `intention_picker_show_and_sort_sheet_test.dart`: «поле и направление меняются по последнему выбору до ответа новой порции».
+Команда `mise exec --no-deps -- flutter build apk --release` — exit 0; артефакт `build/app/outputs/flutter-apk/app-release.apk` (71,8 MB).
 
-Сброс исходного показа и позиции; закреплённый тип действия — `intention_picker_show_and_sort_sheet_test.dart`: два отдельных сценария сброса и закреплённого типа.
+Release APK: `/home/seniorkonung/.paseo/worktrees/1id27gtb/modest-yak/build/app/outputs/flutter-apk/app-release.apk`. DTD не обнаружил запущенного приложения; устройство и эмулятор не запускались. Ручные проверки остаются за пользователем: вид заголовка и листа в трёх поисках и обеих темах относительно макета, прокрутка с открытой клавиатурой, немедленное применение и сброс параметров, закреплённый тип, пустые состояния, новое открытие поиска и объявления TalkBack. Их отсутствие не блокирует завершение фазы и не доказывает исправление особенностей устройства.
 
-Независимость вложенных поисков и новое открытие — `intention_picker_session_test_support.dart`, используемый тремя наборами страниц.
-
-Доступность целей касания, подписей и контраста — `catalog_header_test.dart`, `option_group_test.dart`, `intention_picker_view_test.dart`, `intention_picker_show_and_sort_sheet_test.dart`.
-
-
-**U3.** `intention_picker_view_test.dart` на обоих языках покрывает пустоту по названию, тегам и обоим условиям, выбранные действия в поиске исходного намерения, пустой допустимый охват, оба направления пустого свободного типа и возврат ко всем типам. Проверка сброса также сохраняет порядок по названию, охват архивной связи и исключённого участника. Удалённые проверки заголовка из results перенесены на владеющий заголовком экран; устаревшие методы и строки удалены вместе с потребителями.
-
-Плановые источники: `proposal.md`, три дельта-спецификации, `design.md`, `adr.md`, `plan.md` и `tasks.md` прочитаны из `f4b6d56847b6b24046a3ba3737428c3847ca5754`; канонический словарь — `CONTEXT.md`, ограничения порядка — ADR-0045. Локальные дизайн-материалы `context/doable-design-system/components/{CatalogHeader,OptionGroup,Sheet}/README.md` и `context/doable-design/design/ActionPicker.dc.html` не входят в Git-снимок: они использованы только для дополнительной визуальной сверки; нормативное поведение сверено по сохранённым OpenSpec-артефактам. Конфликтов, требующих решения владельца, не установлено.
-
-Проверки реализации, перечисленные выше, выполнялись в рабочей папке `/home/seniorkonung/.paseo/worktrees/1id27gtb/modest-yak` на `f4b6d56847b6b24046a3ba3737428c3847ca5754`, кроме отдельно указанного `codegen-check`. Перед исходным ревью дерево было чистым; отчёт не является входом Flutter-проверок. На этапе передачи исправления в план тесты, сборки и проектные проверки повторно не запускались.
-
-По явному решению владельца от 26.10.2026 оставшуюся работу по API семантики `OptionGroup` принимает [задача 2.9](tasks.md) фазы 2: заменить восемь устаревших вызовов, сохранить все утверждения, не подавлять диагностики и не менять инструменты. Проверка задачи — существующий тест компонента и анализ его файла. Задача добавлена в конец; все прежние задачи и отметки выполнения сохранены. Требования, дизайн и `plan.md` остаются согласованными без изменений. Реализация ещё не исправлена; успешный полный `mise run check` и готовность фазы 2 должно подтвердить следующее ревью реализации после последней задачи. AR1 сохранён без изменений; новый остаточный риск не принимался.
-
-Release APK: `/home/seniorkonung/.paseo/worktrees/1id27gtb/modest-yak/build/app/outputs/flutter-apk/app-release.apk`, собран при исходном ревью из неизменённых исходников сохранённой головы. DTD тогда не обнаружил запущенного приложения; устройство и эмулятор не запускались. Ручные проверки пользователем остаются непроверенными: вид заголовка и листа в трёх поисках и обеих темах относительно макета, прокрутка с открытой клавиатурой, применение/сброс параметров и закреплённый тип, пустые состояния, новое открытие и объявления TalkBack. Это не препятствует завершению этапа ревью и не доказывает исправление особенностей устройства.
+Реализация задачи 2.9 проверена; автоматические условия завершения фазы 2 выполнены. Решений по исправлению или принятию новых рисков не требуется. AR1 остаётся принятым остаточным риском вне текущего диапазона; код, плановые артефакты и история задач в этом этапе не менялись.
