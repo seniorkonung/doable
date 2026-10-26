@@ -2431,9 +2431,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get intentionPickerSortName => 'Название';
 
   @override
-  String get intentionPickerOrderCaption => 'Порядок';
-
-  @override
   String get intentionPickerOrderNewest => 'Сначала новые';
 
   @override

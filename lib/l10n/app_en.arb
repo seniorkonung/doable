@@ -1926,8 +1926,6 @@
   "@intentionPickerSortChanged": {"description": "Сортировка по времени изменения"},
   "intentionPickerSortName": "Name",
   "@intentionPickerSortName": {"description": "Сортировка по названию"},
-  "intentionPickerOrderCaption": "Order",
-  "@intentionPickerOrderCaption": {"description": "Название группы направления сортировки"},
   "intentionPickerOrderNewest": "Newest first",
   "@intentionPickerOrderNewest": {"description": "Убывающий порядок по времени"},
   "intentionPickerOrderOldest": "Oldest first",

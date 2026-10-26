@@ -2407,9 +2407,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get intentionPickerSortName => 'Name';
 
   @override
-  String get intentionPickerOrderCaption => 'Order';
-
-  @override
   String get intentionPickerOrderNewest => 'Newest first';
 
   @override

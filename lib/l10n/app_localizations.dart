@@ -3778,12 +3778,6 @@ abstract class AppLocalizations {
   /// **'Name'**
   String get intentionPickerSortName;
 
-  /// Название группы направления сортировки
-  ///
-  /// In en, this message translates to:
-  /// **'Order'**
-  String get intentionPickerOrderCaption;
-
   /// Убывающий порядок по времени
   ///
   /// In en, this message translates to:
