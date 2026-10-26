@@ -41,7 +41,8 @@ enum DoableIconData {
   archive('archive'),
   sliders('sliders'),
   arrowDown('arrow_down'),
-  arrowUp('arrow_up');
+  arrowUp('arrow_up'),
+  chevronDown('chevron_down');
 
   const DoableIconData(this._assetName);
 

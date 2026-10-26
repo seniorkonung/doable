@@ -132,6 +132,7 @@ Widget _sampleRow(DoableIconData icon, DoableColors colors) {
     DoableIconData.sliders ||
     DoableIconData.arrowDown ||
     DoableIconData.arrowUp => (16.0, colors.muted, colors.fill),
+    DoableIconData.chevronDown => (12.0, colors.muted, colors.bg),
   };
 
   return SizedBox(
