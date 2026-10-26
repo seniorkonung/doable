@@ -1401,22 +1401,30 @@ final class _RenderTitleLayout extends RenderBox
     final text = childForSlot(_TitleSlot.text);
 
     action?.layout(BoxConstraints(maxWidth: width), parentUsesSize: true);
-    final inset = action?.size.width ?? 0;
+    var inset = action?.size.width ?? 0;
     title.layout(
       BoxConstraints.tightFor(width: math.max(0, width - 2 * inset)),
       parentUsesSize: true,
     );
-    _place(title, Offset(inset, 0));
+    var height = title.size.height;
+    if (action != null && title.size.height > action.size.height) {
+      // Длинное действие не сжимает заголовок до узкой колонки: заголовку
+      // остаётся хотя бы половина ширины, а подпись действия переносится.
+      action.layout(BoxConstraints(maxWidth: width / 4), parentUsesSize: true);
+      inset = action.size.width;
+      title.layout(
+        BoxConstraints.tightFor(width: width - 2 * inset),
+        parentUsesSize: true,
+      );
+      height = math.max(title.size.height, action.size.height);
+    }
+    _place(title, Offset(inset, (height - title.size.height) / 2));
     if (action != null) {
       _place(
         action,
-        Offset(
-          width - action.size.width,
-          (title.size.height - action.size.height) / 2,
-        ),
+        Offset(width - action.size.width, (height - action.size.height) / 2),
       );
     }
-    var height = title.size.height;
     if (text != null) {
       text.layout(BoxConstraints.tightFor(width: width), parentUsesSize: true);
       height += _textGap;

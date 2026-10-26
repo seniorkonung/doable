@@ -2,11 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
-import '../../../design_system/components/option_group.dart';
+import '../../../design_system/components/order_button.dart';
 import '../../../design_system/components/select_row.dart';
 import '../../../design_system/components/sheet.dart';
-import '../../../design_system/doable_icon.dart';
-import '../../../design_system/doable_metrics.dart';
 import '../../application/intention_catalog.dart';
 import '../catalog/intention_catalog_purpose.dart';
 import '../catalog/intention_catalog_state.dart';
@@ -34,6 +32,7 @@ final class _ShowAndSortSheet extends ConsumerStatefulWidget {
 
 final class _ShowAndSortSheetState extends ConsumerState<_ShowAndSortSheet> {
   final _typeMenu = MenuController();
+  final _sortMenu = MenuController();
 
   @override
   Widget build(BuildContext context) {
@@ -72,9 +71,23 @@ final class _ShowAndSortSheetState extends ConsumerState<_ShowAndSortSheet> {
     ];
     final order = selection.order;
     final byTitle = order.field == IntentionCatalogSortField.title;
-    final firstDirection = byTitle
-        ? IntentionCatalogSortDirection.ascending
-        : IntentionCatalogSortDirection.descending;
+    final nextDirection = switch (order.direction) {
+      IntentionCatalogSortDirection.ascending =>
+        IntentionCatalogSortDirection.descending,
+      IntentionCatalogSortDirection.descending =>
+        IntentionCatalogSortDirection.ascending,
+    };
+    String directionLabel(IntentionCatalogSortDirection direction) =>
+        switch ((byTitle, direction)) {
+          (true, IntentionCatalogSortDirection.ascending) =>
+            l10n.intentionPickerOrderAToZ,
+          (true, IntentionCatalogSortDirection.descending) =>
+            l10n.intentionPickerOrderZToA,
+          (false, IntentionCatalogSortDirection.ascending) =>
+            l10n.intentionPickerOrderOldest,
+          (false, IntentionCatalogSortDirection.descending) =>
+            l10n.intentionPickerOrderNewest,
+        };
     final canReset =
         order != IntentionCatalogOrder.createdAtDescending ||
         switch (selection.type) {
@@ -97,96 +110,88 @@ final class _ShowAndSortSheetState extends ConsumerState<_ShowAndSortSheet> {
               },
             )
           : null,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          DoableMetrics.space2,
-          0,
-          DoableMetrics.space2,
-          DoableMetrics.space1,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          spacing: DoableMetrics.space4,
-          children: [
-            if (selection.type case IntentionTypeOpen(:final selected))
-              SelectRow(
-                label: l10n.intentionPickerTypeCaption,
-                items: typeItems,
-                value: selected,
-                onChanged: model.changeType,
-                controller: _typeMenu,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (selection.type case IntentionTypeOpen(:final selected))
+            SelectRow(
+              label: l10n.intentionPickerTypeCaption,
+              items: typeItems,
+              value: selected,
+              onChanged: model.changeType,
+              controller: _typeMenu,
+              onOpen: _sortMenu.close,
+            ),
+          if (selection.type is IntentionTypePinnedToActions)
+            SelectRow<IntentionTypeChoice>.disabled(
+              label: l10n.intentionPickerTypeCaption,
+              value: l10n.intentionPickerTypeActionsOnly,
+              note: l10n.intentionPickerActionTypeNote,
+            ),
+          SelectRow(
+            label: l10n.intentionPickerSortCaption,
+            items: [
+              SelectRowItem(
+                value: IntentionCatalogSortField.createdAt,
+                label: l10n.intentionPickerSortCreated,
               ),
-            if (selection.type is IntentionTypePinnedToActions)
-              SelectRow<IntentionTypeChoice>.disabled(
-                label: l10n.intentionPickerTypeCaption,
-                value: l10n.intentionPickerTypeActionsOnly,
-                note: l10n.intentionPickerActionTypeNote,
+              SelectRowItem(
+                value: IntentionCatalogSortField.updatedAt,
+                label: l10n.intentionPickerSortChanged,
               ),
-            OptionGroup(
-              caption: l10n.intentionPickerSortCaption,
-              items: [
-                OptionGroupItem(
-                  value: IntentionCatalogSortField.createdAt,
-                  label: l10n.intentionPickerSortCreated,
+              SelectRowItem(
+                value: IntentionCatalogSortField.title,
+                label: l10n.intentionPickerSortName,
+              ),
+            ],
+            value: order.field,
+            controller: _sortMenu,
+            onOpen: _typeMenu.close,
+            onChanged: (field) {
+              final previous = model.selection.order;
+              final crossesTitle =
+                  (previous.field == IntentionCatalogSortField.title) !=
+                  (field == IntentionCatalogSortField.title);
+              model.changeOrder(
+                IntentionCatalogOrder(
+                  field: field,
+                  direction: crossesTitle
+                      ? (field == IntentionCatalogSortField.title
+                            ? IntentionCatalogSortDirection.ascending
+                            : IntentionCatalogSortDirection.descending)
+                      : previous.direction,
                 ),
-                OptionGroupItem(
-                  value: IntentionCatalogSortField.updatedAt,
-                  label: l10n.intentionPickerSortChanged,
-                ),
-                OptionGroupItem(
-                  value: IntentionCatalogSortField.title,
-                  label: l10n.intentionPickerSortName,
-                ),
-              ],
-              value: order.field,
-              onChanged: (field) {
-                final previous = model.selection.order;
-                final crossesTitle =
-                    (previous.field == IntentionCatalogSortField.title) !=
-                    (field == IntentionCatalogSortField.title);
+              );
+            },
+            trailing: OrderButton(
+              direction: switch (order.direction) {
+                IntentionCatalogSortDirection.ascending =>
+                  OrderDirection.ascending,
+                IntentionCatalogSortDirection.descending =>
+                  OrderDirection.descending,
+              },
+              label: l10n.intentionPickerOrderButtonSemantics(
+                directionLabel(order.direction),
+                directionLabel(nextDirection),
+              ),
+              onPressed: () {
+                final current = model.selection.order;
                 model.changeOrder(
                   IntentionCatalogOrder(
-                    field: field,
-                    direction: crossesTitle
-                        ? (field == IntentionCatalogSortField.title
-                              ? IntentionCatalogSortDirection.ascending
-                              : IntentionCatalogSortDirection.descending)
-                        : previous.direction,
+                    field: current.field,
+                    direction: switch (current.direction) {
+                      IntentionCatalogSortDirection.ascending =>
+                        IntentionCatalogSortDirection.descending,
+                      IntentionCatalogSortDirection.descending =>
+                        IntentionCatalogSortDirection.ascending,
+                    },
                   ),
                 );
               },
             ),
-            OptionGroup(
-              caption: l10n.intentionPickerOrderCaption,
-              items: [
-                OptionGroupItem(
-                  value: firstDirection,
-                  label: byTitle
-                      ? l10n.intentionPickerOrderAToZ
-                      : l10n.intentionPickerOrderNewest,
-                  icon: DoableIconData.arrowDown,
-                ),
-                OptionGroupItem(
-                  value: byTitle
-                      ? IntentionCatalogSortDirection.descending
-                      : IntentionCatalogSortDirection.ascending,
-                  label: byTitle
-                      ? l10n.intentionPickerOrderZToA
-                      : l10n.intentionPickerOrderOldest,
-                  icon: DoableIconData.arrowUp,
-                ),
-              ],
-              value: order.direction,
-              onChanged: (direction) => model.changeOrder(
-                IntentionCatalogOrder(
-                  field: model.selection.order.field,
-                  direction: direction,
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
