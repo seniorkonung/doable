@@ -1,3 +1,5 @@
+import 'dart:ui' show CheckedState, Tristate;
+
 import 'package:doable/src/design_system/components/option_group.dart';
 import 'package:doable/src/design_system/doable_colors.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
@@ -74,14 +76,12 @@ void main() {
     await tester.pumpAndSettle();
     expect(changes, [_Type.actions]);
     expect(
-      tester
-          .getSemantics(find.text('Действия'))
-          .hasFlag(SemanticsFlag.isChecked),
-      isTrue,
+      tester.getSemantics(find.text('Действия')).flagsCollection.isChecked,
+      CheckedState.isTrue,
     );
     expect(
-      tester.getSemantics(find.text('Все')).hasFlag(SemanticsFlag.isChecked),
-      isFalse,
+      tester.getSemantics(find.text('Все')).flagsCollection.isChecked,
+      CheckedState.isFalse,
     );
     await tester.tap(find.text('Действия'));
     await tester.pumpAndSettle();
@@ -178,17 +178,19 @@ void main() {
       final group = tester.getSemantics(find.bySemanticsLabel('Тип'));
       expect(group.getSemanticsData().role, SemanticsRole.radioGroup);
       expect(group.hint, note);
-      expect(group.hasFlag(SemanticsFlag.hasEnabledState), isTrue);
-      expect(group.hasFlag(SemanticsFlag.isEnabled), isFalse);
+      expect(group.flagsCollection.isEnabled, isNot(Tristate.none));
+      expect(group.flagsCollection.isEnabled, Tristate.isFalse);
       for (final item in _types) {
         final node = tester.getSemantics(find.text(item.label));
-        expect(node.hasFlag(SemanticsFlag.hasEnabledState), isTrue);
-        expect(node.hasFlag(SemanticsFlag.isEnabled), isFalse);
+        expect(node.flagsCollection.isEnabled, isNot(Tristate.none));
+        expect(node.flagsCollection.isEnabled, Tristate.isFalse);
         expect(
-          node.hasFlag(SemanticsFlag.isChecked),
-          item.value == _Type.actions,
+          node.flagsCollection.isChecked,
+          item.value == _Type.actions
+              ? CheckedState.isTrue
+              : CheckedState.isFalse,
         );
-        expect(node.hasFlag(SemanticsFlag.isInMutuallyExclusiveGroup), isTrue);
+        expect(node.flagsCollection.isInMutuallyExclusiveGroup, isTrue);
         expect(node.getSemanticsData().hasAction(SemanticsAction.tap), isFalse);
         expect(
           _style(tester, item.label).color,
