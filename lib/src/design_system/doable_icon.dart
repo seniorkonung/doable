@@ -42,7 +42,10 @@ enum DoableIconData {
   sliders('sliders'),
   arrowDown('arrow_down'),
   arrowUp('arrow_up'),
-  chevronDown('chevron_down');
+  chevronDown('chevron_down'),
+  selector('selector'),
+  sortAsc('sort_asc'),
+  sortDesc('sort_desc');
 
   const DoableIconData(this._assetName);
 
