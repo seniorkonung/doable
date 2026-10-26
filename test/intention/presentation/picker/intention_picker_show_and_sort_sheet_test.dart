@@ -127,8 +127,8 @@ void main() {
         await _show(tester, purpose);
 
         final all = ru ? 'Все' : 'All';
-        final created = ru ? 'Создание' : 'Created';
-        final changed = ru ? 'Изменение' : 'Changed';
+        final created = ru ? 'Дата создания' : 'Date created';
+        final changed = ru ? 'Дата изменения' : 'Date changed';
         final name = ru ? 'Название' : 'Name';
         final oldest = ru ? 'Сначала старые' : 'Oldest first';
         final newest = ru ? 'Сначала новые' : 'Newest first';
@@ -240,7 +240,7 @@ void main() {
         await tester.tap(_option(ru ? 'Сбросить' : 'Reset'));
         await tester.pump();
         _checked(tester, ru ? 'Все' : 'All');
-        _checked(tester, ru ? 'Создание' : 'Created');
+        _checked(tester, ru ? 'Дата создания' : 'Date created');
         _checked(tester, ru ? 'Сначала новые' : 'Newest first');
         expect(_option(ru ? 'Сбросить' : 'Reset'), findsNothing);
         expect(_option('10'), findsNothing);
@@ -319,7 +319,7 @@ void main() {
         await tester.tap(_option(ru ? 'Сбросить' : 'Reset'));
         await tester.pump();
         _checked(tester, actions);
-        _checked(tester, ru ? 'Создание' : 'Created');
+        _checked(tester, ru ? 'Дата создания' : 'Date created');
         _checked(tester, ru ? 'Сначала новые' : 'Newest first');
         expect(_option(ru ? 'Сбросить' : 'Reset'), findsNothing);
         expect(

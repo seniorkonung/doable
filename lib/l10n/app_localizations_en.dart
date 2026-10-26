@@ -2382,6 +2382,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get intentionPickerTypeCaption => 'Type';
 
   @override
+  String get intentionPickerTypeAll => 'All';
+
+  @override
+  String get intentionPickerTypeIntentionsOnly => 'Intentions only';
+
+  @override
+  String get intentionPickerTypeActionsOnly => 'Actions only';
+
+  @override
   String get intentionPickerActionTypeNote =>
       'Only an action can be the final intention of a daily choice';
 
@@ -2389,10 +2398,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get intentionPickerSortCaption => 'Sort by';
 
   @override
-  String get intentionPickerSortCreated => 'Created';
+  String get intentionPickerSortCreated => 'Date created';
 
   @override
-  String get intentionPickerSortChanged => 'Changed';
+  String get intentionPickerSortChanged => 'Date changed';
 
   @override
   String get intentionPickerSortName => 'Name';
@@ -2411,6 +2420,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get intentionPickerOrderZToA => 'Z to A';
+
+  @override
+  String intentionPickerOrderButtonSemantics(
+    String currentOrder,
+    String nextOrder,
+  ) {
+    return 'Current order: $currentOrder. Switch to: $nextOrder';
+  }
 
   @override
   String get intentionPickerAllHeader => 'All';
