@@ -492,12 +492,15 @@
   - **Проверка:**
     - `mise run codegen` — маршруты пересозданы; `mise exec --no-deps -- flutter analyze`.
     - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/participant_picker` — запрос каталога получает исключение участника другой роли и охват по архивному состоянию; без участника другой роли исключения нет; прежние проверки поиска проходят с описанием выбора.
-    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/editor test/app/navigation/app_shell_pages_above_test.dart test/app/navigation/app_shell_operation_reset_test.dart test/app/creation_flows_integration_test.dart` — выбор участников из формы новой и изменяемой связи, занятая пара и отмена работают как прежде.
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/editor test/app/navigation/app_shell_pages_above_test.dart test/app/navigation/app_shell_operation_reset_test.dart test/app/creation_flows_integration_test.dart`:
+      - открытая `RelationParticipantPickerPage` получает описание выбора из текущего черновика; сценарии редактора читают его полем страницы, как `app_shell_page_matrix.dart` читает `selectionContext`: роль; поток — создание для новой связи из пустой формы и из группы соседства, изменение для активной и архивной изменяемой связи; вид и оба участника черновика, в том числе после смены вида и замены участника в черновике до открытия поиска; архивное состояние — из основы редактирования;
+      - выбор участников из формы новой и изменяемой связи, занятая пара и отмена работают как прежде.
   - **Зависимости:** нет.
   - **Предполагаемые файлы:**
     - новый `lib/src/long_term_relation/presentation/participant_picker/relation_participant_choice.dart`; `lib/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart`, `lib/src/long_term_relation/presentation/editor/relation_editor_page.dart` и генерируемый `lib/src/app/routing/app_router.gr.dart`;
-    - механическая адаптация `test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart`, `test/long_term_relation/presentation/participant_picker/relation_participant_picker_session_test.dart`, `test/long_term_relation/presentation/editor/relation_participant_selection_scenarios.dart`, `test/long_term_relation/presentation/editor/relation_creation_navigation_test.dart`, `test/app/navigation/app_shell_page_matrix.dart`.
-  - **Размер:** M — одно значение вместо двух параметров маршрута и адаптация его сборок в проверках.
+    - механическая адаптация `test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart`, `test/long_term_relation/presentation/participant_picker/relation_participant_picker_session_test.dart`, `test/long_term_relation/presentation/editor/relation_participant_selection_scenarios.dart`, `test/long_term_relation/presentation/editor/relation_creation_navigation_test.dart`, `test/app/navigation/app_shell_page_matrix.dart`;
+    - сценарии описания выбора на границе редактора — `test/long_term_relation/presentation/editor/relation_participant_selection_scenarios.dart` и `test/long_term_relation/presentation/editor/relation_editor_page_test.dart`.
+  - **Размер:** M — одно значение вместо двух параметров маршрута, адаптация его сборок в проверках и сценарии описания выбора на границе редактора.
 
 - [ ] 4.6 Показывать в поиске участника назначение связи: подзаголовок с отметкой роли и лист с формой связи только для чтения
   - **Критерии приёмки:**
