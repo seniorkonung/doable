@@ -13,7 +13,6 @@ import '../../../graph/presentation/operation_failure_presentation.dart';
 import '../../../intention/application/intention_result.dart';
 import '../../../intention/domain/intention.dart';
 import '../../../intention/domain/intention_id.dart';
-import '../../../intention/presentation/catalog/intention_catalog_purpose.dart';
 import '../../../intention/presentation/details/intention_details_state.dart';
 import '../../../intention/presentation/details/intention_details_view_model.dart';
 import '../../../shared/presentation/creation_exit_action.dart';
@@ -25,6 +24,7 @@ import '../../domain/long_term_relation_description.dart';
 import '../../domain/long_term_relation_id.dart';
 import '../details/relation_details_state.dart';
 import '../details/relation_details_view_model.dart';
+import '../participant_picker/relation_participant_choice.dart';
 import 'relation_creation_completion.dart';
 import 'relation_editor_state.dart';
 import 'relation_editor_view_model.dart';
@@ -363,8 +363,8 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage> {
 
   /// Открывает выбор участника и применяет только явно выбранное намерение.
   ///
-  /// Исключается только участник другой роли; пока его нет, исключения нет.
-  /// Отмена оставляет черновик прежним.
+  /// Поиск получает описание выбора из черновика в момент открытия. Отмена
+  /// оставляет черновик прежним.
   Future<void> _selectParticipant(RelationParticipantRole role) async {
     if (!_canEdit) return;
     final provider = relationEditorViewModelProvider(
@@ -373,20 +373,23 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage> {
     );
     final notifier = ref.read(provider.notifier);
     final draft = ref.read(provider);
-    final excluded = switch (role) {
-      RelationParticipantRole.source => draft.relatedIntentionId,
-      RelationParticipantRole.related => draft.sourceIntentionId,
-    };
     final selected = await context.router
         .push<GraphSnapshot<RelationParticipantSummary>>(
           RelationParticipantPickerRoute(
-            excludedIntentionId: excluded,
-            selectionContext: switch (draft.editingBasis?.relation.scope) {
-              RelationScope.archived =>
-                RelationParticipantSelectionContext.archivedRelation,
-              RelationScope.active ||
-              null => RelationParticipantSelectionContext.activeRelation,
-            },
+            choice: RelationParticipantChoice(
+              role: role,
+              flow: switch (draft.context) {
+                RelationBlankCreationContext() ||
+                RelationCreationContext() => const RelationCreationChoiceFlow(),
+                RelationEditingContext(:final details) =>
+                  RelationChangeChoiceFlow(
+                    relationScope: details.relation.scope,
+                  ),
+              },
+              type: draft.type,
+              source: draft.sourceParticipant,
+              related: draft.relatedParticipant,
+            ),
           ),
         );
     if (!_canEdit || selected == null) {

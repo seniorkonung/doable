@@ -46,8 +46,6 @@ import 'package:doable/src/daily_choice/presentation/source_picker/daily_choice_
 import 'package:doable/src/intention/domain/intention_id.dart' as _i19;
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart'
     as _i11;
-import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart'
-    as _i33;
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart'
     as _i12;
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart'
@@ -60,6 +58,8 @@ import 'package:doable/src/long_term_relation/presentation/editor/relation_edito
     as _i15;
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_state.dart'
     as _i32;
+import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_choice.dart'
+    as _i33;
 import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart'
     as _i16;
 import 'package:doable/src/statistics/application/intention_statistics_target.dart'
@@ -738,17 +738,12 @@ class RelationEditorRouteArgs {
 class RelationParticipantPickerRoute
     extends _i18.PageRouteInfo<RelationParticipantPickerRouteArgs> {
   RelationParticipantPickerRoute({
-    required _i33.RelationParticipantSelectionContext selectionContext,
-    _i19.IntentionId? excludedIntentionId,
+    required _i33.RelationParticipantChoice choice,
     _i23.Key? key,
     List<_i18.PageRouteInfo>? children,
   }) : super(
          RelationParticipantPickerRoute.name,
-         args: RelationParticipantPickerRouteArgs(
-           selectionContext: selectionContext,
-           excludedIntentionId: excludedIntentionId,
-           key: key,
-         ),
+         args: RelationParticipantPickerRouteArgs(choice: choice, key: key),
          initialChildren: children,
        );
 
@@ -759,8 +754,7 @@ class RelationParticipantPickerRoute
     builder: (data) {
       final args = data.argsAs<RelationParticipantPickerRouteArgs>();
       return _i16.RelationParticipantPickerPage(
-        selectionContext: args.selectionContext,
-        excludedIntentionId: args.excludedIntentionId,
+        choice: args.choice,
         key: args.key,
       );
     },
@@ -768,35 +762,26 @@ class RelationParticipantPickerRoute
 }
 
 class RelationParticipantPickerRouteArgs {
-  const RelationParticipantPickerRouteArgs({
-    required this.selectionContext,
-    this.excludedIntentionId,
-    this.key,
-  });
+  const RelationParticipantPickerRouteArgs({required this.choice, this.key});
 
-  final _i33.RelationParticipantSelectionContext selectionContext;
-
-  final _i19.IntentionId? excludedIntentionId;
+  final _i33.RelationParticipantChoice choice;
 
   final _i23.Key? key;
 
   @override
   String toString() {
-    return 'RelationParticipantPickerRouteArgs{selectionContext: $selectionContext, excludedIntentionId: $excludedIntentionId, key: $key}';
+    return 'RelationParticipantPickerRouteArgs{choice: $choice, key: $key}';
   }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     if (other is! RelationParticipantPickerRouteArgs) return false;
-    return selectionContext == other.selectionContext &&
-        excludedIntentionId == other.excludedIntentionId &&
-        key == other.key;
+    return choice == other.choice && key == other.key;
   }
 
   @override
-  int get hashCode =>
-      selectionContext.hashCode ^ excludedIntentionId.hashCode ^ key.hashCode;
+  int get hashCode => choice.hashCode ^ key.hashCode;
 }
 
 /// generated route for

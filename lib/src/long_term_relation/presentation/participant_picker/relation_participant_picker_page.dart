@@ -6,31 +6,26 @@ import 'package:flutter/widgets.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
 import '../../../graph/application/graph_revision.dart';
-import '../../../intention/domain/intention_id.dart';
 import '../../../intention/presentation/catalog/intention_catalog_purpose.dart';
 import '../../../intention/presentation/picker/intention_picker_view.dart';
+import '../../application/long_term_relation_command.dart';
 import '../../application/long_term_relation_projection.dart';
+import '../../domain/long_term_relation.dart';
+import 'relation_participant_choice.dart';
 
 /// Выбор существующего намерения участником долговременной связи.
 ///
 /// Страница показывает экран выбора над отдельной сессией ограниченного
-/// каталога. Второе намерение пары исключает запрос каталога по
-/// идентификатору, поэтому одноимённые намерения остаются отдельными
-/// строками. Выбор возвращает снимок участника с ревизией выдачи, из которой
-/// выбрана строка. Закрытие не возвращает ничего и не создаёт намерений.
+/// каталога, ограничения которого выводит из описания выбора. Второе
+/// намерение пары исключает запрос каталога по идентификатору, поэтому
+/// одноимённые намерения остаются отдельными строками. Выбор возвращает
+/// снимок участника с ревизией выдачи, из которой выбрана строка. Закрытие
+/// не возвращает ничего и не создаёт намерений.
 @RoutePage()
 final class RelationParticipantPickerPage extends StatefulWidget {
-  const RelationParticipantPickerPage({
-    required this.selectionContext,
-    this.excludedIntentionId,
-    super.key,
-  });
+  const RelationParticipantPickerPage({required this.choice, super.key});
 
-  /// Намерение другой роли; пока она пуста, исключения нет.
-  final IntentionId? excludedIntentionId;
-
-  /// Архивное состояние редактируемой связи, выраженное допустимым охватом.
-  final RelationParticipantSelectionContext selectionContext;
+  final RelationParticipantChoice choice;
 
   @override
   State<RelationParticipantPickerPage> createState() =>
@@ -39,10 +34,26 @@ final class RelationParticipantPickerPage extends StatefulWidget {
 
 final class _RelationParticipantPickerPageState
     extends State<RelationParticipantPickerPage> {
-  late final _purpose = SelectRelationParticipant(
+  late final _purpose = _purposeFor(widget.choice);
+
+  /// Исключает участника другой роли, пока он выбран. Оба состояния
+  /// участников допускает только изменение архивной связи.
+  static SelectRelationParticipant _purposeFor(
+    RelationParticipantChoice choice,
+  ) => SelectRelationParticipant(
     session: IntentionSearchSession(),
-    excludedIntentionId: widget.excludedIntentionId,
-    selectionContext: widget.selectionContext,
+    excludedIntentionId: switch (choice.role) {
+      RelationParticipantRole.source => choice.related?.id,
+      RelationParticipantRole.related => choice.source?.id,
+    },
+    selectionContext: switch (choice.flow) {
+      RelationChangeChoiceFlow(relationScope: RelationScope.archived) =>
+        RelationParticipantSelectionContext.archivedRelation,
+      RelationCreationChoiceFlow() ||
+      RelationChangeChoiceFlow(
+        relationScope: RelationScope.active,
+      ) => RelationParticipantSelectionContext.activeRelation,
+    },
   );
 
   @override

@@ -15,11 +15,13 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/catalog_paging_policy.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/picker/intention_picker_view.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_choice.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
@@ -68,7 +70,7 @@ void main() {
       );
       addTearDown(router.dispose);
 
-      unawaited(_pushPicker(router, excludedIndex: 9));
+      unawaited(_pushPicker(router, _activeRelation.choice));
       await _settleRoute(tester);
       _completePage(repository, 1, const []);
       await tester.pumpAndSettle();
@@ -99,7 +101,7 @@ void main() {
       () => tester.tap(_cancel),
       () => tester.binding.handlePopRoute(),
     ].indexed) {
-      final selection = _pushPicker(router, excludedIndex: 9);
+      final selection = _pushPicker(router, _activeRelation.choice);
       await _settleRoute(tester);
       _completePage(repository, index + 1, [
         testSummary(index: 1, title: 'Ходить'),
@@ -121,7 +123,7 @@ void main() {
     addTearDown(router.dispose);
 
     var selectionCompleted = false;
-    final selection = _pushPicker(router, excludedIndex: 9)
+    final selection = _pushPicker(router, _activeRelation.choice)
       ..whenComplete(() => selectionCompleted = true);
     await _settleRoute(tester);
     final pickerId = router.current.matchId;
@@ -149,6 +151,49 @@ void main() {
     await tester.pumpAndSettle();
     expect((await selection)?.value.id, _id(1));
   });
+
+  // Заменяемый участник выбираемой роли не исключается.
+  for (final (name, choice, excluded) in [
+    (
+      'новой связи без участника другой роли',
+      RelationParticipantChoice(
+        role: RelationParticipantRole.source,
+        flow: const RelationCreationChoiceFlow(),
+        type: null,
+        source: _participant(3),
+        related: null,
+      ),
+      null,
+    ),
+    (
+      'активной изменяемой связи',
+      RelationParticipantChoice(
+        role: RelationParticipantRole.related,
+        flow: const RelationChangeChoiceFlow(
+          relationScope: RelationScope.active,
+        ),
+        type: LongTermRelationType.need,
+        source: _participant(3),
+        related: _participant(4),
+      ),
+      _id(3),
+    ),
+  ]) {
+    testWidgets('описание выбора $name задаёт активный охват и исключение '
+        'только другой роли', (tester) async {
+      final repository = ControlledParticipantPickerRepository();
+      addTearDown(repository.dispose);
+      final router = await _pumpAppWithCatalog(tester, repository);
+      addTearDown(router.dispose);
+
+      unawaited(_pushPicker(router, choice));
+      await _settleRoute(tester);
+
+      final query = repository.queryAt(1);
+      expect(query.scope, IntentionScope.active);
+      expect(query.excludedIntentionId, excluded);
+    });
+  }
 }
 
 /// Завершает переход к выбору участника, не ожидая подтверждённой порции.
@@ -164,13 +209,10 @@ Future<void> _settleRoute(WidgetTester tester) async {
 final _cancel = find.byKey(const ValueKey('participant-picker-cancel'));
 
 Future<GraphSnapshot<RelationParticipantSummary>?> _pushPicker(
-  AppRouter router, {
-  required int excludedIndex,
-}) => router.push<GraphSnapshot<RelationParticipantSummary>>(
-  RelationParticipantPickerRoute(
-    excludedIntentionId: _id(excludedIndex),
-    selectionContext: RelationParticipantSelectionContext.activeRelation,
-  ),
+  AppRouter router,
+  RelationParticipantChoice choice,
+) => router.push<GraphSnapshot<RelationParticipantSummary>>(
+  RelationParticipantPickerRoute(choice: choice),
 );
 
 void _completePage(
@@ -339,11 +381,11 @@ void _defineTagSearchTests() {
   testWidgets('кнопка фильтра открывает панель тегов, где условие '
       'добавляется, переключается и снимается с прежними охватом и '
       'исключением, а закрытие ничего не возвращает', (tester) async {
-    final purpose = _activeRelation;
+    final choiceCase = _activeRelation;
     final repository = ControlledCatalogRepository();
     final sport = _tag(2, 'Спорт');
     repository.tagCatalogItems = [_tag(1, 'Здоровье'), sport];
-    final opened = await _openTagSearchPicker(tester, repository, purpose);
+    final opened = await _openTagSearchPicker(tester, repository, choiceCase);
     repository.complete(1, _tagSearchPage(_summaries(const [], count: 3)));
     await tester.pumpAndSettle();
 
@@ -355,14 +397,14 @@ void _defineTagSearchTests() {
     await _pumpUntilQueries(tester, repository, 3);
     _expectParticipantQuery(
       repository.queryAt(2),
-      purpose,
+      choiceCase,
       IntentionTagFilter(requiredTagIds: [sport.id]),
     );
     await tester.tap(_panelRow(sport));
     await _pumpUntilQueries(tester, repository, 4);
     _expectParticipantQuery(
       repository.queryAt(3),
-      purpose,
+      choiceCase,
       IntentionTagFilter(excludedTagIds: [sport.id]),
     );
     repository.complete(3, _tagSearchPage(_summaries(const [], count: 2)));
@@ -381,7 +423,7 @@ void _defineTagSearchTests() {
     await _pumpUntilQueries(tester, repository, 5);
     _expectParticipantQuery(
       repository.queryAt(4),
-      purpose,
+      choiceCase,
       IntentionTagFilter.empty,
     );
     repository.complete(4, _tagSearchPage(_summaries(const [], count: 3)));
@@ -472,19 +514,51 @@ void _defineTagSearchTests() {
 /// Индекс намерения, уже занятого вторым участником связи.
 const _excludedIndex = 9;
 
-final _activeRelation = SelectRelationParticipant(
-  session: IntentionSearchSession(),
+/// Описание выбора и ограничения запроса каталога, которые из него следуют.
+typedef _ParticipantChoiceCase = ({
+  RelationParticipantChoice choice,
+  IntentionScope scope,
+  IntentionId? excludedIntentionId,
+});
+
+/// Новая связь: исходный участник уже выбран и исключается из поиска
+/// связанного.
+final _ParticipantChoiceCase _activeRelation = (
+  choice: RelationParticipantChoice(
+    role: RelationParticipantRole.related,
+    flow: const RelationCreationChoiceFlow(),
+    type: null,
+    source: _participant(_excludedIndex),
+    related: null,
+  ),
+  scope: IntentionScope.active,
   excludedIntentionId: _id(_excludedIndex),
-  selectionContext: RelationParticipantSelectionContext.activeRelation,
 );
 
-final _archivedRelation = SelectRelationParticipant(
-  session: IntentionSearchSession(),
+/// Изменение архивной связи: заменяемый исходный участник остаётся в выдаче,
+/// а связанный исключается.
+final _ParticipantChoiceCase _archivedRelation = (
+  choice: RelationParticipantChoice(
+    role: RelationParticipantRole.source,
+    flow: const RelationChangeChoiceFlow(relationScope: RelationScope.archived),
+    type: LongTermRelationType.can,
+    source: _participant(5),
+    related: _participant(_excludedIndex),
+  ),
+  scope: IntentionScope.all,
   excludedIntentionId: _id(_excludedIndex),
-  selectionContext: RelationParticipantSelectionContext.archivedRelation,
 );
 
 IntentionId _id(int index) => testSummary(index: index).id;
+
+RelationParticipantSummary _participant(int index) {
+  final summary = testSummary(index: index);
+  return RelationParticipantSummary(
+    id: summary.id,
+    title: summary.title,
+    archiveState: summary.archiveState,
+  );
+}
 
 typedef _OpenedTagSearchPicker = ({
   ProviderContainer container,
@@ -497,7 +571,7 @@ typedef _OpenedTagSearchPicker = ({
 Future<_OpenedTagSearchPicker> _openTagSearchPicker(
   WidgetTester tester,
   ControlledCatalogRepository repository,
-  SelectRelationParticipant purpose,
+  _ParticipantChoiceCase choiceCase,
 ) async {
   final container = reconciliationCatalogContainer(repository);
   final router = AppRouter();
@@ -520,10 +594,7 @@ Future<_OpenedTagSearchPicker> _openTagSearchPicker(
   repository.complete(0, _tagSearchPage(const []));
   await tester.pumpAndSettle();
   final selection = router.push<GraphSnapshot<RelationParticipantSummary>>(
-    RelationParticipantPickerRoute(
-      excludedIntentionId: purpose.excludedIntentionId,
-      selectionContext: purpose.selectionContext,
-    ),
+    RelationParticipantPickerRoute(choice: choiceCase.choice),
   );
   await _settleRoute(tester);
   return (container: container, router: router, selection: selection);
@@ -580,13 +651,13 @@ Future<void> _applyConditions(
 /// участника при любых условиях; готовность поиск не ограничивает.
 void _expectParticipantQuery(
   IntentionCatalogQuery query,
-  SelectRelationParticipant purpose,
+  _ParticipantChoiceCase expected,
   IntentionTagFilter tagFilter, {
   String? title,
 }) {
-  expect(query.scope, purpose.selectionContext.catalogScope);
+  expect(query.scope, expected.scope);
   expect(query.readinessFilter, IntentionReadinessFilter.all);
-  expect(query.excludedIntentionId, purpose.excludedIntentionId);
+  expect(query.excludedIntentionId, expected.excludedIntentionId);
   expect(query.titleFilter?.map((value) => value), title);
   expect(query.tagFilter, tagFilter);
   expect(query.cursor, isNull);

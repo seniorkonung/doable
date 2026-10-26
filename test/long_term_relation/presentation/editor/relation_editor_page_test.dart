@@ -816,8 +816,17 @@ void main() {
       catalogIndex: 1,
       title: 'Новое исходное',
       index: 3,
+      whilePickerOpen: () => expectOpenedParticipantChoice(
+        tester,
+        role: RelationParticipantRole.source,
+        flow: isRelationChangeFlow(RelationScope.archived),
+        type: LongTermRelationType.can,
+        sourceId: testSummary(index: 1).id,
+        relatedId: testSummary(index: 2).id,
+      ),
     );
     expect(repository.catalogQueries[1].scope, IntentionScope.all);
+    // Поиск второй роли получает уже заменённого в черновике участника.
     await _selectParticipant(
       tester,
       repository,
@@ -825,6 +834,14 @@ void main() {
       catalogIndex: 2,
       title: 'Новое связанное',
       index: 4,
+      whilePickerOpen: () => expectOpenedParticipantChoice(
+        tester,
+        role: RelationParticipantRole.related,
+        flow: isRelationChangeFlow(RelationScope.archived),
+        type: LongTermRelationType.can,
+        sourceId: testSummary(index: 3).id,
+        relatedId: testSummary(index: 2).id,
+      ),
     );
     await _selectType(tester, 'need');
     await _selectPriority(tester, 'p4');
@@ -928,6 +945,38 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Новое описание'), findsOneWidget);
+  });
+
+  testWidgets('поиск участника активной изменяемой связи получает описание '
+      'выбора из черновика', (tester) async {
+    final repository = ControlledRelationFormRepository();
+    addTearDown(repository.dispose);
+    final details = testRelationDetails(
+      relationId: testFormRelationId(91),
+      sourceId: testSummary(index: 1).id,
+      relatedId: testSummary(index: 2).id,
+      sourceTitle: 'Быть здоровым',
+      relatedTitle: 'Много ходить',
+    );
+    await _openDetailsForEditing(tester, repository, details);
+    await tester.tap(
+      find.byKey(const ValueKey('relation-details-edit-relation')),
+    );
+    await tester.pumpAndSettle();
+    await _selectType(tester, 'can');
+
+    await tester.tap(
+      find.byKey(const ValueKey('relation-editor-change-related')),
+    );
+    await _settlePicker(tester);
+    expectOpenedParticipantChoice(
+      tester,
+      role: RelationParticipantRole.related,
+      flow: isRelationChangeFlow(RelationScope.active),
+      type: LongTermRelationType.can,
+      sourceId: testSummary(index: 1).id,
+      relatedId: testSummary(index: 2).id,
+    );
   });
 
   testWidgets('отмена редактирования не отправляет команду', (tester) async {
@@ -1655,9 +1704,11 @@ Future<void> _selectParticipant(
   required int index,
   GraphRevision revision = const TestCatalogRevision(1),
   IntentionArchiveState archiveState = IntentionArchiveState.active,
+  void Function()? whilePickerOpen,
 }) async {
   await tester.tap(find.byKey(ValueKey(actionKey)));
   await _settlePicker(tester);
+  whilePickerOpen?.call();
   repository.completeCatalogPage(catalogIndex, [
     testSummary(index: index, title: title, archiveState: archiveState),
   ], revision: revision);
