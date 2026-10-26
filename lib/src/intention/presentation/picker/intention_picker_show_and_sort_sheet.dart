@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../../../design_system/components/option_group.dart';
+import '../../../design_system/components/select_row.dart';
 import '../../../design_system/components/sheet.dart';
 import '../../../design_system/doable_icon.dart';
 import '../../../design_system/doable_metrics.dart';
@@ -21,16 +22,23 @@ Future<void> showIntentionPickerShowAndSortSheet(
   builder: (_, sheet) => _ShowAndSortSheet(sheet, purpose),
 );
 
-final class _ShowAndSortSheet extends ConsumerWidget {
+final class _ShowAndSortSheet extends ConsumerStatefulWidget {
   const _ShowAndSortSheet(this.sheet, this.purpose);
 
   final SheetPresentation sheet;
   final IntentionPickerPurpose purpose;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_ShowAndSortSheet> createState() => _ShowAndSortSheetState();
+}
+
+final class _ShowAndSortSheetState extends ConsumerState<_ShowAndSortSheet> {
+  final _typeMenu = MenuController();
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final provider = intentionCatalogViewModelProvider(purpose);
+    final provider = intentionCatalogViewModelProvider(widget.purpose);
     // Подписка перестраивает лист, а текущий выбор берётся из модели:
     // AsyncValue при загрузке может сохранять прежнюю выдачу.
     // https://riverpod.dev/docs/concepts2/refs#refwatch
@@ -46,19 +54,19 @@ final class _ShowAndSortSheet extends ConsumerWidget {
       _ => null,
     };
     final typeItems = [
-      OptionGroupItem(
+      SelectRowItem(
         value: IntentionTypeChoice.all,
-        label: l10n.intentionPickerAllHeader,
+        label: l10n.intentionPickerTypeAll,
         count: counts?.all.toString(),
       ),
-      OptionGroupItem(
+      SelectRowItem(
         value: IntentionTypeChoice.intentions,
-        label: l10n.intentionPickerIntentionsHeader,
+        label: l10n.intentionPickerTypeIntentionsOnly,
         count: counts?.intentions.toString(),
       ),
-      OptionGroupItem(
+      SelectRowItem(
         value: IntentionTypeChoice.actions,
-        label: l10n.intentionPickerActionsHeader,
+        label: l10n.intentionPickerTypeActionsOnly,
         count: counts?.actions.toString(),
       ),
     ];
@@ -76,7 +84,7 @@ final class _ShowAndSortSheet extends ConsumerWidget {
         };
 
     return Sheet(
-      sheet,
+      widget.sheet,
       title: l10n.intentionPickerShowAndSortTitle,
       text: l10n.intentionPickerShowAndSortHint,
       action: canReset
@@ -102,17 +110,17 @@ final class _ShowAndSortSheet extends ConsumerWidget {
           spacing: DoableMetrics.space4,
           children: [
             if (selection.type case IntentionTypeOpen(:final selected))
-              OptionGroup(
-                caption: l10n.intentionPickerTypeCaption,
+              SelectRow(
+                label: l10n.intentionPickerTypeCaption,
                 items: typeItems,
                 value: selected,
                 onChanged: model.changeType,
+                controller: _typeMenu,
               ),
             if (selection.type is IntentionTypePinnedToActions)
-              OptionGroup.disabled(
-                caption: l10n.intentionPickerTypeCaption,
-                items: typeItems,
-                value: IntentionTypeChoice.actions,
+              SelectRow<IntentionTypeChoice>.disabled(
+                label: l10n.intentionPickerTypeCaption,
+                value: l10n.intentionPickerTypeActionsOnly,
                 note: l10n.intentionPickerActionTypeNote,
               ),
             OptionGroup(

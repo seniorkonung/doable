@@ -93,6 +93,18 @@ void main() {
             await tester.pump(const Duration(milliseconds: 300));
             expect(find.text(sheetTitle), findsOneWidget);
             expect(tester.widget<CatalogHeader>(header).expanded, isTrue);
+            final typeRow = tester.getSemantics(
+              find.descendant(
+                of: find.byType(Sheet),
+                matching: find.bySemanticsLabel(ru ? 'Тип' : 'Type'),
+              ),
+            );
+            expect(
+              typeRow.value,
+              purpose is SelectDailyChoiceAction
+                  ? (ru ? 'Только действия' : 'Actions only')
+                  : (ru ? 'Всё' : 'All'),
+            );
             if (sortByName) {
               await tester.tap(
                 find.descendant(
