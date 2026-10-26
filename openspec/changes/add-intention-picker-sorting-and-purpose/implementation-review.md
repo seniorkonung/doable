@@ -4,9 +4,8 @@
 
 **Format version:** 1
 **Result:** Changes needed
-**Coverage status:** Incomplete
-**Coverage limitations:** Осталась проверка воспроизводимости генерации `mise run codegen-check`, которую проект требует запускать после коммита на чистом дереве.
-**Summary:** Независимая проверка решений U1–U3 завершена без существенных замечаний. Подтверждено F5: новый тест OptionGroup останавливает обязательный `mise run check` восемью диагностиками устаревшего API. Сохраняется принятый риск AR1 об индексах архивного охвата; его исходное решение этим диапазоном не пересматривается.
+**Coverage status:** Complete
+**Summary:** Все три прохода завершены для U1–U3 и задач 2.1–2.8; независимая проверка решений не нашла существенных замечаний. Подтверждено F5: новый тест OptionGroup останавливает обязательный `mise run check` восемью диагностиками устаревшего API. Сохраняется принятый риск AR1 об индексах архивного охвата; его исходное решение этим диапазоном не пересматривается.
 
 ## Review target
 
@@ -53,7 +52,7 @@
 | Pass | Status | Evidence or limitation |
 |---|---|---|
 | Independent decision review | Complete | Свежий изолированный рецензент `/root/independent_decisions`, `gpt-6.1-sol`, high, по `implementation-decision-review`: No substantive findings, Coverage Complete. U1–U3 объединены из-за пересечений целых файлов локализации, результатов и тестов. Передан нейтральный бриф и точные 31 путь поставки; плановые артефакты, описания коммитов, прежний отчёт и находки не передавались. Неизменённый контекст проверен перед чтением. |
-| OpenSpec conformance | Incomplete | Артефакты прочитаны на сохранённой голове; задачи и сценарии сопоставлены с U1–U3. `mise exec --no-deps -- openspec validate add-intention-picker-sorting-and-purpose --strict --no-interactive --json`: exit 0, valid, issues []. `mise run check`: отказ статической части, F5. `mise run check:tests -- 0 1`: exit 0, все 3387 обычных тестов прошли. `mise run check:process-tests`: exit 0, все 18 процессных тестов прошли. `mise exec --no-deps -- flutter build apk --release`: exit 0, собран `build/app/outputs/flutter-apk/app-release.apk` (71,8 MB). Остался `mise run codegen-check` после фиксации отчёта на чистом дереве. |
+| OpenSpec conformance | Complete | Артефакты прочитаны на сохранённой голове; задачи и сценарии сопоставлены с U1–U3. `mise exec --no-deps -- openspec validate add-intention-picker-sorting-and-purpose --strict --no-interactive --json`: exit 0, valid, issues []. `mise run check`: отказ статической части, F5. `mise run check:tests -- 0 1`: exit 0, все 3387 обычных тестов прошли. `mise run check:process-tests`: exit 0, все 18 процессных тестов прошли. `mise exec --no-deps -- flutter build apk --release`: exit 0, собран `build/app/outputs/flutter-apk/app-release.apk` (71,8 MB). `mise run codegen-check`: exit 0 на чистом дереве коммита `2bb759d2da7ccacc5b33dddcdc639f8496296dd1`; повторная генерация локализации, Riverpod/роутера и снимка Drift не изменила ни одного tracked-файла. Этот коммит отличается от сохранённой головы только отчётом; исходники и прочие входы проверок совпадают. |
 | Code quality | Complete | Все 31 путь поставки проверены по корректности, читаемости, архитектуре, безопасности и производительности из `code-review-and-quality`. Проверены изменённые участки и потребители: уведомления модели, устаревшие ответы, числа, порядок переключений, прокрутка, сессии страниц, общая раскладка и семантика листов. F5 воспроизведено проектной CLI-проверкой; Dart LSP подтверждает deprecated-статус `SemanticsNode.hasFlag`. |
 
 ## Findings
@@ -62,7 +61,7 @@
 
 - **Evidence:** На голове `f4b6d56847b6b24046a3ba3737428c3847ca5754` файл `test/design_system/option_group_test.dart:79,83,181,182,185,186,188,191` вызывает устаревший `SemanticsNode.hasFlag`. `mise run check` выполняет `check:static` из `mise.toml:17` и завершается ненулевым кодом на `flutter analyze`: восемь `deprecated_member_use`, `8 issues found`, `[check:static] ERROR task failed`. Форматирование и обе shell-проверки до анализа проходят. Отдельное воспроизведение `mise exec --no-deps -- flutter analyze --no-pub test/design_system/option_group_test.dart` также завершилось с exit 1 и теми же восемью диагностиками. Файл целиком добавлен коммитом `88e9fcf7f8c821ed31d3375a2a2583951bae8113`; это регрессия рассматриваемого диапазона, а не прежний долг.
 - **Evidence revisions:** ["f4b6d56847b6b24046a3ba3737428c3847ca5754"]
-- **Impact:** Обязательная проверка готовности фазы 2 и соответствующая проверка CI не проходят. Отметка завершённой задачи 2.8 не подтверждает успешного выполнения обязательного `mise run check` на поставленной голове.
+- **Impact:** Обязательная проверка готовности фазы 2 и соответствующая проверка CI (`.github/workflows/ci.yml:73` запускает `check:static`) не проходят. Отметка завершённой задачи 2.8 не подтверждает успешного выполнения обязательного `mise run check` на поставленной голове.
 - **Required outcome:** Проверки семантики нового компонента сохраняют все нынешние утверждения и используют поддерживаемый API; обязательный `mise run check` проходит на закреплённом проектом toolchain без подавления диагностики и ослабления проверок.
 - **Earliest source of truth:** implementation/tests
 - **Affected artifacts:** ["test/design_system/option_group_test.dart", "tasks.md: 2.3 (ID 14)", "tasks.md: 2.8 (ID 19)"]
