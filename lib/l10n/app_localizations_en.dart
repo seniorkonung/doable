@@ -2275,6 +2275,71 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sourcePickerEmpty => 'No active intentions are available.';
 
   @override
+  String get dailyChoicePickerPurposeCreationSource =>
+      'New daily choice: source intention';
+
+  @override
+  String get dailyChoicePickerPurposeCreationAction =>
+      'New daily choice: selected action';
+
+  @override
+  String get dailyChoicePickerPurposeReplacementSource =>
+      'Path replacement: source intention';
+
+  @override
+  String get dailyChoicePickerPurposeReplacementAction =>
+      'Path replacement: selected action';
+
+  @override
+  String get dailyChoicePickerFlowCreationFromSource =>
+      'New daily choice, from an intention';
+
+  @override
+  String get dailyChoicePickerFlowCreationFromAction =>
+      'New daily choice, from an action';
+
+  @override
+  String get dailyChoicePickerFlowReplacementFromSource =>
+      'Path replacement, from an intention';
+
+  @override
+  String get dailyChoicePickerFlowReplacementFromAction =>
+      'Path replacement, from an action';
+
+  @override
+  String get dailyChoicePickerStepCurrent => 'You are here';
+
+  @override
+  String get dailyChoicePickerStepSource => 'Source intention';
+
+  @override
+  String get dailyChoicePickerStepAction => 'Selected action';
+
+  @override
+  String get dailyChoicePickerStepPathDown => 'Path down to an action';
+
+  @override
+  String get dailyChoicePickerStepPathDownNote =>
+      'Each next step is what the previous one needs or can use';
+
+  @override
+  String get dailyChoicePickerStepPathUp => 'Path up to the source intention';
+
+  @override
+  String get dailyChoicePickerStepPathUpNote => 'At least one step is needed';
+
+  @override
+  String get dailyChoicePickerStepDetails =>
+      'Date, time, priority, and description';
+
+  @override
+  String get dailyChoicePickerStepReplacement => 'Replacement confirmation';
+
+  @override
+  String get dailyChoicePickerStepReplacementNote =>
+      'The date, scheduled time, priority, description, and completion stay the same';
+
+  @override
   String get intentionPickerArchived => 'archived';
 
   @override
@@ -2294,6 +2359,95 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get intentionPickerShowAndSortTitle => 'Show and sort';
+
+  @override
+  String get intentionPickerShowAndSortHint => 'The list changes as you choose';
+
+  @override
+  String get intentionPickerShowAndSortReset => 'Reset';
+
+  @override
+  String intentionPickerPurposeLabel(String title, String subtitle) {
+    return '$title. $subtitle. Show what you are choosing';
+  }
+
+  @override
+  String get intentionPickerPurposeSheetTitle => 'What you are choosing';
+
+  @override
+  String get intentionPickerPurposeSheetBack => 'Back to the list';
+
+  @override
+  String get intentionPickerTypeCaption => 'Type';
+
+  @override
+  String get intentionPickerActionTypeNote =>
+      'Only an action can be the final intention of a daily choice';
+
+  @override
+  String get intentionPickerSortCaption => 'Sort by';
+
+  @override
+  String get intentionPickerSortCreated => 'Created';
+
+  @override
+  String get intentionPickerSortChanged => 'Changed';
+
+  @override
+  String get intentionPickerSortName => 'Name';
+
+  @override
+  String get intentionPickerOrderCaption => 'Order';
+
+  @override
+  String get intentionPickerOrderNewest => 'Newest first';
+
+  @override
+  String get intentionPickerOrderOldest => 'Oldest first';
+
+  @override
+  String get intentionPickerOrderAToZ => 'A to Z';
+
+  @override
+  String get intentionPickerOrderZToA => 'Z to A';
+
+  @override
+  String get intentionPickerAllHeader => 'All';
+
+  @override
+  String get intentionPickerOrderCreatedNewest => 'Created, newest first';
+
+  @override
+  String get intentionPickerOrderCreatedOldest => 'Created, oldest first';
+
+  @override
+  String get intentionPickerOrderUpdatedNewest => 'Changed, newest first';
+
+  @override
+  String get intentionPickerOrderUpdatedOldest => 'Changed, oldest first';
+
+  @override
+  String get intentionPickerOrderTitleAscending => 'Name, A to Z';
+
+  @override
+  String get intentionPickerOrderTitleDescending => 'Name, Z to A';
+
+  @override
+  String intentionPickerHeaderLabel(String type, String summary) {
+    return 'Show and sort. Type: $type. Sorted by: $summary.';
+  }
+
+  @override
+  String intentionPickerHeaderCountLabel(
+    String type,
+    int count,
+    String summary,
+  ) {
+    return 'Show and sort. Type: $type, $count. Sorted by: $summary.';
+  }
+
+  @override
   String get intentionPickerActionsHeader => 'Actions';
 
   @override
@@ -2307,6 +2461,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get intentionPickerEmptyScopeTitle => 'Nothing to choose from';
+
+  @override
+  String get intentionPickerEmptyTypeTitle => 'No intentions of this type';
+
+  @override
+  String get intentionPickerEmptyTypeText =>
+      'Show both types to choose from the available intentions.';
+
+  @override
+  String get intentionPickerShowBothTypes => 'Show both types';
 
   @override
   String get intentionPickerActionTitle => 'Choose an action';
@@ -2354,7 +2518,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Change the tags in the filter or reset it.';
 
   @override
-  String get intentionPickerNothingFound => 'Nothing found';
+  String get intentionPickerNoActionsFound => 'No actions found';
+
+  @override
+  String get intentionPickerNoIntentionsFound => 'No intentions found';
 
   @override
   String get intentionPickerChangeTitleOrTags =>
@@ -2372,6 +2539,64 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get participantPickerOpenDetails => 'Open intention details';
+
+  @override
+  String get participantPickerPurposeCreationSource =>
+      'New relation: source intention';
+
+  @override
+  String get participantPickerPurposeCreationRelated =>
+      'New relation: related intention';
+
+  @override
+  String get participantPickerPurposeChangeSource =>
+      'Relation change: source intention';
+
+  @override
+  String get participantPickerPurposeChangeRelated =>
+      'Relation change: related intention';
+
+  @override
+  String get participantPickerFlowCreation => 'New relation';
+
+  @override
+  String get participantPickerFlowChange => 'Relation change';
+
+  @override
+  String get participantPickerRoleSourceNote =>
+      'The source intention is what the related intention is needed for or can be used for.';
+
+  @override
+  String get participantPickerRoleRelatedNeedNote =>
+      'The related intention is what the source intention needs.';
+
+  @override
+  String get participantPickerRoleRelatedCanNote =>
+      'The related intention is what the source intention can use.';
+
+  @override
+  String get participantPickerRoleRelatedUndeterminedNote =>
+      'The related intention is what the source intention needs or can use.';
+
+  @override
+  String get participantPickerFieldChoosing => 'Choosing now';
+
+  @override
+  String get participantPickerFieldFromList => 'From this list';
+
+  @override
+  String participantPickerFieldReplacing(String title) {
+    return 'Instead of: $title';
+  }
+
+  @override
+  String get participantPickerFieldNotChosen => 'Not chosen yet';
+
+  @override
+  String get participantPickerFieldArchived => 'Archived';
+
+  @override
+  String get participantPickerKindUndetermined => 'Need or can: not chosen yet';
 
   @override
   String get relationEditorTitle => 'New relation';

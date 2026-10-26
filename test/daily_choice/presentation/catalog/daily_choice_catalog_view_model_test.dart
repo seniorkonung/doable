@@ -35,6 +35,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/daily_choice_local_date.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
+import '../../../support/intention_title_order_key.dart';
 
 part 'daily_choice_catalog_completion_scenarios.dart';
 
@@ -744,6 +745,7 @@ IntentionSummary _summary(int id, String title) => IntentionSummary(
   archiveState: IntentionArchiveState.active,
   createdAt: IntentionTimestamp(DateTime.utc(2026)),
   updatedAt: IntentionTimestamp(DateTime.utc(2026)),
+  titleOrderKey: testTitleOrderKey(title),
 );
 
 final class _Revision implements GraphRevision {

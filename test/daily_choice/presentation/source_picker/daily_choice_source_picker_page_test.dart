@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/daily_choice/presentation/daily_choice_picker_context.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
@@ -31,22 +32,47 @@ void main() {
     readinessFilter: IntentionReadinessFilter.all,
     ruTexts: (
       title: 'Выбор намерения',
-      header: 'Намерения',
-      auxiliaryCancel: 'Отменить выбор намерения',
+      header: 'Все',
+      pathReplacementCancel: 'Отменить выбор намерения',
     ),
+    purposeTexts: {
+      'ru': (
+        title: 'Выбор намерения',
+        creationSubtitle: 'Новый дневной выбор: исходное намерение',
+        creationLine: 'Новый дневной выбор, от намерения',
+        replacementSubtitle: 'Замена пути: исходное намерение',
+        replacementLine: 'Замена пути, от намерения',
+        startStep: 'Исходное намерение',
+        pathStep: 'Путь вниз к действию',
+        pathNote:
+            'Каждый следующий шаг — то, что нужно или можно для предыдущего',
+      ),
+      'en': (
+        title: 'Choose an intention',
+        creationSubtitle: 'New daily choice: source intention',
+        creationLine: 'New daily choice, from an intention',
+        replacementSubtitle: 'Path replacement: source intention',
+        replacementLine: 'Path replacement, from an intention',
+        startStep: 'Source intention',
+        pathStep: 'Path down to an action',
+        pathNote: 'Each next step is what the previous one needs or can use',
+      ),
+    },
     emptyMessage: 'No active intentions are available.',
     noMatchesMessage: 'No intentions with this name',
   );
   defineDailyChoicePickerTagSearchTests(
     DailyChoicePickerTagSearchCase(
-      route: DailyChoiceSourcePickerRoute(),
+      route: DailyChoiceSourcePickerRoute(
+        pickerContext: const PathReplacementDailyChoicePickerContext(),
+      ),
       keyPrefix: 'daily-choice-source',
       readinessFilter: IntentionReadinessFilter.all,
       rowReadiness: const [
         IntentionReadiness.ready,
         IntentionReadiness.notReady,
       ],
-      header: 'Intentions',
+      header: 'All',
       unavailableMessage: 'Intentions couldn’t be loaded. Try again.',
     ),
   );
@@ -59,7 +85,13 @@ void main() {
     final router = await _pumpApp(tester, repository);
     addTearDown(router.dispose);
 
-    unawaited(router.push<IntentionId>(DailyChoiceSourcePickerRoute()));
+    unawaited(
+      router.push<IntentionId>(
+        DailyChoiceSourcePickerRoute(
+          pickerContext: const PathReplacementDailyChoicePickerContext(),
+        ),
+      ),
+    );
     await _settleRoute(tester);
     expect(find.text('Loading intentions…'), findsOneWidget);
     repository.complete(1, const ResultFailure(IntentionUnavailableFailure()));
@@ -84,7 +116,9 @@ void main() {
       final router = await _pumpApp(tester, repository);
       addTearDown(router.dispose);
       final selection = router.push<IntentionId>(
-        DailyChoiceSourcePickerRoute(),
+        DailyChoiceSourcePickerRoute(
+          pickerContext: const PathReplacementDailyChoicePickerContext(),
+        ),
       );
       await _settleRoute(tester);
       _completeFirst(repository, 1, [

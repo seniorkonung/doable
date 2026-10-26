@@ -367,6 +367,9 @@ void main() {
         (IntentionScope.active, IntentionReadinessFilter.readyOnly, [1]),
         (IntentionScope.archived, IntentionReadinessFilter.readyOnly, [3]),
         (IntentionScope.all, IntentionReadinessFilter.readyOnly, [1, 3]),
+        (IntentionScope.active, IntentionReadinessFilter.notReadyOnly, [2]),
+        (IntentionScope.archived, IntentionReadinessFilter.notReadyOnly, [4]),
+        (IntentionScope.all, IntentionReadinessFilter.notReadyOnly, [2, 4]),
       ]) {
         IntentionCatalogQuery query(IntentionCatalogCursor? cursor) =>
             _tagQuery(
@@ -405,6 +408,92 @@ void main() {
       );
       expect(otherSameTitle.totalCount, 2);
       expect(otherSameTitle.items.single.id, _id(_uuid(2)));
+    });
+
+    test('первая порция отдаёт числа обоих типов по всем условиям, кроме готовности, только по просьбе', () async {
+      // Совпадают 1, 2 и 4. 3 — в архиве, 5 — исключённый участник,
+      // 6 — с запрещённым тегом, 7 — без обязательного тега, 8 — с другим
+      // названием.
+      for (final (number, title, isActionReady, isArchived) in [
+        (1, 'Гулять', true, false),
+        (2, 'Гулять', false, false),
+        (3, 'Гулять', true, true),
+        (4, 'Гулять', false, false),
+        (5, 'Гулять', true, false),
+        (6, 'Гулять', true, false),
+        (7, 'Гулять', false, false),
+        (8, 'Читать', true, false),
+      ]) {
+        await _insertIntention(
+          database,
+          id: _uuid(number),
+          title: title,
+          isActionReady: isActionReady,
+          isArchived: isArchived,
+          createdAt: DateTime.utc(2026, 9, 2, number),
+        );
+      }
+      seedRawGraph(raw, () {
+        for (final (number, name) in [(101, 'Здоровье'), (102, 'Спорт')]) {
+          raw.execute(
+            'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
+            [_uuid(number), name, tagPositionKey(number)],
+          );
+        }
+        for (final number in [1, 2, 3, 4, 5, 6, 8]) {
+          raw.execute(
+            'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+            [_uuid(101), _uuid(number)],
+          );
+        }
+        raw.execute(
+          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+          [_uuid(102), _uuid(6)],
+        );
+      });
+      IntentionCatalogQuery query(
+        IntentionReadinessFilter readiness, {
+        required bool requestsTypeCounts,
+      }) => _tagQuery(
+        tagFilter: IntentionTagFilter(
+          requiredTagIds: [_tagId(101)],
+          excludedTagIds: [_tagId(102)],
+        ),
+        scope: IntentionScope.active,
+        readinessFilter: readiness,
+        excludedIntentionId: _id(_uuid(5)),
+        titleFilter: 'гулять',
+        requestsTypeCounts: requestsTypeCounts,
+      );
+
+      for (final (readiness, totalCount) in [
+        (IntentionReadinessFilter.all, 3),
+        (IntentionReadinessFilter.readyOnly, 1),
+        (IntentionReadinessFilter.notReadyOnly, 2),
+      ]) {
+        trace.measured.clear();
+        final withoutCounts = _firstPage(
+          await repository.getCatalogPage(
+            query(readiness, requestsTypeCounts: false),
+          ),
+        );
+        final readsWithoutCounts = trace.measured.length;
+        expect(withoutCounts.totalCount, totalCount);
+        expect(withoutCounts.typeCounts, isNull);
+
+        trace.measured.clear();
+        final withCounts = _firstPage(
+          await repository.getCatalogPage(
+            query(readiness, requestsTypeCounts: true),
+          ),
+        );
+        expect(withCounts.totalCount, totalCount);
+        expect(withCounts.typeCounts?.all, 3);
+        expect(withCounts.typeCounts?.actions, 1);
+        expect(withCounts.typeCounts?.intentions, 2);
+        // Числа типов приходят тем же подсчётом, что и общее количество.
+        expect(trace.measured, hasLength(readsWithoutCounts));
+      }
     });
 
     test('принадлежность снимка команды учитывает собственные теги и исключённого участника', () async {
@@ -1869,6 +1958,167 @@ void main() {
     },
   );
 
+  test('упорядочивает по названию все охваты в обоих направлениях с дополнительным ключом по ID', () async {
+    for (final (number, title, isArchived) in [
+      (0x131, 'Бег', false),
+      (0x132, 'бег', false),
+      (0x133, 'АЛЬПЫ', true),
+      (0x134, 'Альпы', true),
+      (0x135, 'Ведро', false),
+    ]) {
+      await _insertIntention(
+        database,
+        id: _uuid(number),
+        title: title,
+        isArchived: isArchived,
+        createdAt: DateTime.utc(2026, 9, 2, 10).add(Duration(minutes: number)),
+      );
+    }
+
+    final cases = <(IntentionScope, IntentionCatalogOrder, List<int>)>[
+      (
+        IntentionScope.active,
+        IntentionCatalogOrder.titleAscending,
+        [0x131, 0x132, 0x135],
+      ),
+      (
+        IntentionScope.active,
+        IntentionCatalogOrder.titleDescending,
+        [0x135, 0x131, 0x132],
+      ),
+      (
+        IntentionScope.archived,
+        IntentionCatalogOrder.titleAscending,
+        [0x133, 0x134],
+      ),
+      (
+        IntentionScope.archived,
+        IntentionCatalogOrder.titleDescending,
+        [0x133, 0x134],
+      ),
+      (
+        IntentionScope.all,
+        IntentionCatalogOrder.titleAscending,
+        [0x133, 0x134, 0x131, 0x132, 0x135],
+      ),
+      (
+        IntentionScope.all,
+        IntentionCatalogOrder.titleDescending,
+        [0x135, 0x131, 0x132, 0x133, 0x134],
+      ),
+    ];
+
+    for (final (scope, order, expectedNumbers) in cases) {
+      final page = _firstPage(
+        await repository.getCatalogPage(
+          IntentionCatalogQuery(
+            scope: scope,
+            titleFilter: null,
+            order: order,
+            pageSize: 100,
+          ),
+        ),
+      );
+
+      expect(page.totalCount, expectedNumbers.length);
+      expect(page.items.map((summary) => summary.id.toCanonicalString()), [
+        for (final number in expectedNumbers) _uuid(number),
+      ]);
+    }
+  });
+
+  test('продолжает порции по названию в порядке compare запроса без пропусков и повторов', () async {
+    // Поисковые проекции по кодовым точкам: apple < strassenbahn < strauss
+    // (трижды, различие только в регистре) < ель < яблоко < ёж < U+E000 <
+    // U+1F600. Сравнение единиц UTF-16 поставило бы U+1F600 перед U+E000.
+    final titles = [
+      '\u{1F600}',
+      'Strauss',
+      'Яблоко',
+      'STRAUSS',
+      'Straßenbahn',
+      'ёж',
+      '\u{E000}',
+      'strauss',
+      'Ель',
+      'Apple',
+    ];
+    for (var index = 0; index < titles.length; index++) {
+      await _insertIntention(
+        database,
+        id: _uuid(0x141 + index),
+        title: titles[index],
+        createdAt: DateTime.utc(2026, 9, 2, 10).add(Duration(hours: index)),
+      );
+    }
+    final expectedAscendingTitles = [
+      'Apple',
+      'Straßenbahn',
+      'Strauss',
+      'STRAUSS',
+      'strauss',
+      'Ель',
+      'Яблоко',
+      'ёж',
+      '\u{E000}',
+      '\u{1F600}',
+    ];
+
+    for (final order in [
+      IntentionCatalogOrder.titleAscending,
+      IntentionCatalogOrder.titleDescending,
+    ]) {
+      // Порция из двух строк кладёт границу курсора между равными ключами
+      // «strauss» в обоих направлениях.
+      final query = IntentionCatalogQuery(
+        scope: IntentionScope.active,
+        titleFilter: null,
+        order: order,
+        pageSize: 2,
+      );
+      final firstPage = _firstPage(await repository.getCatalogPage(query));
+      final traversed = [...firstPage.items];
+      var cursor = firstPage.nextCursor;
+      while (cursor != null) {
+        final continuation = _continuationPage(
+          await repository.getCatalogPage(
+            IntentionCatalogQuery(
+              scope: query.scope,
+              titleFilter: null,
+              order: order,
+              pageSize: query.pageSize,
+              cursor: cursor,
+            ),
+          ),
+        );
+        traversed.addAll(continuation.items);
+        cursor = continuation.nextCursor;
+      }
+
+      final ids = [for (final item in traversed) item.id];
+      expect(ids.toSet(), hasLength(titles.length));
+      expect(ids, [
+        for (final item in [...traversed]..sort(query.compare)) item.id,
+      ]);
+      final expectedTitles = switch (order.direction) {
+        IntentionCatalogSortDirection.ascending => expectedAscendingTitles,
+        IntentionCatalogSortDirection.descending => [
+          '\u{1F600}',
+          '\u{E000}',
+          'ёж',
+          'Яблоко',
+          'Ель',
+          'Strauss',
+          'STRAUSS',
+          'strauss',
+          'Straßenbahn',
+          'Apple',
+        ],
+      };
+      expect([for (final item in traversed) item.title], expectedTitles);
+    }
+  });
+
   test('продолжает независимые цепочки одного repository вперемешку', () async {
     for (final (id, title, createdAt) in [
       (
@@ -2233,6 +2483,7 @@ IntentionCatalogQuery _tagQuery({
   IntentionId? excludedIntentionId,
   int pageSize = 1,
   IntentionCatalogCursor? cursor,
+  bool requestsTypeCounts = false,
 }) => IntentionCatalogQuery(
   scope: scope,
   readinessFilter: readinessFilter,
@@ -2242,6 +2493,7 @@ IntentionCatalogQuery _tagQuery({
   order: IntentionCatalogOrder.createdAtAscending,
   pageSize: pageSize,
   cursor: cursor,
+  requestsTypeCounts: requestsTypeCounts,
 );
 
 IntentionCatalogFirstPage _firstPage(Result<IntentionCatalogPage> result) {

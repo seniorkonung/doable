@@ -2299,6 +2299,71 @@ class AppLocalizationsRu extends AppLocalizations {
   String get sourcePickerEmpty => 'Доступных активных намерений нет.';
 
   @override
+  String get dailyChoicePickerPurposeCreationSource =>
+      'Новый дневной выбор: исходное намерение';
+
+  @override
+  String get dailyChoicePickerPurposeCreationAction =>
+      'Новый дневной выбор: конечное действие';
+
+  @override
+  String get dailyChoicePickerPurposeReplacementSource =>
+      'Замена пути: исходное намерение';
+
+  @override
+  String get dailyChoicePickerPurposeReplacementAction =>
+      'Замена пути: конечное действие';
+
+  @override
+  String get dailyChoicePickerFlowCreationFromSource =>
+      'Новый дневной выбор, от намерения';
+
+  @override
+  String get dailyChoicePickerFlowCreationFromAction =>
+      'Новый дневной выбор, от действия';
+
+  @override
+  String get dailyChoicePickerFlowReplacementFromSource =>
+      'Замена пути, от намерения';
+
+  @override
+  String get dailyChoicePickerFlowReplacementFromAction =>
+      'Замена пути, от действия';
+
+  @override
+  String get dailyChoicePickerStepCurrent => 'Вы здесь';
+
+  @override
+  String get dailyChoicePickerStepSource => 'Исходное намерение';
+
+  @override
+  String get dailyChoicePickerStepAction => 'Конечное действие';
+
+  @override
+  String get dailyChoicePickerStepPathDown => 'Путь вниз к действию';
+
+  @override
+  String get dailyChoicePickerStepPathDownNote =>
+      'Каждый следующий шаг — то, что нужно или можно для предыдущего';
+
+  @override
+  String get dailyChoicePickerStepPathUp => 'Путь вверх к исходному намерению';
+
+  @override
+  String get dailyChoicePickerStepPathUpNote => 'Нужен хотя бы один шаг';
+
+  @override
+  String get dailyChoicePickerStepDetails =>
+      'Дата, время, приоритет и описание';
+
+  @override
+  String get dailyChoicePickerStepReplacement => 'Подтверждение замены';
+
+  @override
+  String get dailyChoicePickerStepReplacementNote =>
+      'Дата, запланированное время, приоритет, описание и выполнение останутся прежними';
+
+  @override
   String get intentionPickerArchived => 'в архиве';
 
   @override
@@ -2318,6 +2383,95 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
+  String get intentionPickerShowAndSortTitle => 'Показать и упорядочить';
+
+  @override
+  String get intentionPickerShowAndSortHint => 'Список меняется по мере выбора';
+
+  @override
+  String get intentionPickerShowAndSortReset => 'Сбросить';
+
+  @override
+  String intentionPickerPurposeLabel(String title, String subtitle) {
+    return '$title. $subtitle. Показать, что выбирается';
+  }
+
+  @override
+  String get intentionPickerPurposeSheetTitle => 'Что вы выбираете';
+
+  @override
+  String get intentionPickerPurposeSheetBack => 'Вернуться к списку';
+
+  @override
+  String get intentionPickerTypeCaption => 'Тип';
+
+  @override
+  String get intentionPickerActionTypeNote =>
+      'Конечным в дневном выборе может быть только действие';
+
+  @override
+  String get intentionPickerSortCaption => 'Сортировка';
+
+  @override
+  String get intentionPickerSortCreated => 'Создание';
+
+  @override
+  String get intentionPickerSortChanged => 'Изменение';
+
+  @override
+  String get intentionPickerSortName => 'Название';
+
+  @override
+  String get intentionPickerOrderCaption => 'Порядок';
+
+  @override
+  String get intentionPickerOrderNewest => 'Сначала новые';
+
+  @override
+  String get intentionPickerOrderOldest => 'Сначала старые';
+
+  @override
+  String get intentionPickerOrderAToZ => 'От А до Я';
+
+  @override
+  String get intentionPickerOrderZToA => 'От Я до А';
+
+  @override
+  String get intentionPickerAllHeader => 'Все';
+
+  @override
+  String get intentionPickerOrderCreatedNewest => 'Создание, сначала новые';
+
+  @override
+  String get intentionPickerOrderCreatedOldest => 'Создание, сначала старые';
+
+  @override
+  String get intentionPickerOrderUpdatedNewest => 'Изменение, сначала новые';
+
+  @override
+  String get intentionPickerOrderUpdatedOldest => 'Изменение, сначала старые';
+
+  @override
+  String get intentionPickerOrderTitleAscending => 'Название, от А до Я';
+
+  @override
+  String get intentionPickerOrderTitleDescending => 'Название, от Я до А';
+
+  @override
+  String intentionPickerHeaderLabel(String type, String summary) {
+    return 'Показать и упорядочить. Тип: $type. Сортировка: $summary.';
+  }
+
+  @override
+  String intentionPickerHeaderCountLabel(
+    String type,
+    int count,
+    String summary,
+  ) {
+    return 'Показать и упорядочить. Тип: $type, $count. Сортировка: $summary.';
+  }
+
+  @override
   String get intentionPickerActionsHeader => 'Действия';
 
   @override
@@ -2331,6 +2485,16 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get intentionPickerEmptyScopeTitle => 'Выбрать не из чего';
+
+  @override
+  String get intentionPickerEmptyTypeTitle => 'Намерений этого типа нет';
+
+  @override
+  String get intentionPickerEmptyTypeText =>
+      'Покажите оба типа, чтобы выбрать из доступных намерений.';
+
+  @override
+  String get intentionPickerShowBothTypes => 'Показать оба типа';
 
   @override
   String get intentionPickerActionTitle => 'Выбор действия';
@@ -2380,7 +2544,10 @@ class AppLocalizationsRu extends AppLocalizations {
       'Измените теги в фильтре или сбросьте его.';
 
   @override
-  String get intentionPickerNothingFound => 'Ничего не найдено';
+  String get intentionPickerNoActionsFound => 'Действия не найдены';
+
+  @override
+  String get intentionPickerNoIntentionsFound => 'Намерения не найдены';
 
   @override
   String get intentionPickerChangeTitleOrTags =>
@@ -2398,6 +2565,65 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get participantPickerOpenDetails =>
       'Открыть подробные данные намерения';
+
+  @override
+  String get participantPickerPurposeCreationSource =>
+      'Новая связь: исходное намерение';
+
+  @override
+  String get participantPickerPurposeCreationRelated =>
+      'Новая связь: связанное намерение';
+
+  @override
+  String get participantPickerPurposeChangeSource =>
+      'Изменение связи: исходное намерение';
+
+  @override
+  String get participantPickerPurposeChangeRelated =>
+      'Изменение связи: связанное намерение';
+
+  @override
+  String get participantPickerFlowCreation => 'Новая связь';
+
+  @override
+  String get participantPickerFlowChange => 'Изменение связи';
+
+  @override
+  String get participantPickerRoleSourceNote =>
+      'Исходное намерение — то, для чего нужно или можно связанное.';
+
+  @override
+  String get participantPickerRoleRelatedNeedNote =>
+      'Связанное намерение — то, что нужно для исходного.';
+
+  @override
+  String get participantPickerRoleRelatedCanNote =>
+      'Связанное намерение — то, что можно для исходного.';
+
+  @override
+  String get participantPickerRoleRelatedUndeterminedNote =>
+      'Связанное намерение — то, что нужно или можно для исходного.';
+
+  @override
+  String get participantPickerFieldChoosing => 'Сейчас выбирается';
+
+  @override
+  String get participantPickerFieldFromList => 'Из этого списка';
+
+  @override
+  String participantPickerFieldReplacing(String title) {
+    return 'Вместо: $title';
+  }
+
+  @override
+  String get participantPickerFieldNotChosen => 'Ещё не выбрано';
+
+  @override
+  String get participantPickerFieldArchived => 'В архиве';
+
+  @override
+  String get participantPickerKindUndetermined =>
+      'Нужно или можно: ещё не выбрано';
 
   @override
   String get relationEditorTitle => 'Новая связь';

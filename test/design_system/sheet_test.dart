@@ -1291,6 +1291,63 @@ void main() {
     expect(sheet.isClosed, isTrue);
   });
 
+  testWidgets('действие листа по содержимому стоит справа на строке '
+      'заголовка, доступно диктору и нажимается у верха области, '
+      'не закрывая лист', (tester) async {
+    final semantics = tester.ensureSemantics();
+    var presses = 0;
+    final sheet = await _openContentSheet(tester, onReset: () => presses++);
+    final before = tester.getRect(find.byType(Sheet));
+    final title = tester.getRect(find.text('Новый тег'));
+    final label = tester.getRect(find.text('Сбросить'));
+
+    expect(label.right, _screen.width - DoableMetrics.space5);
+    expect(label.center.dy, closeTo(title.center.dy, 0.01));
+    expect(title.center.dx, _screen.width / 2);
+    expect(
+      tester.getSemantics(find.bySemanticsLabel(_resetLabel)),
+      isSemantics(
+        label: _resetLabel,
+        isButton: true,
+        hasEnabledState: true,
+        isEnabled: true,
+        isFocusable: true,
+        hasTapAction: true,
+        hasFocusAction: true,
+      ),
+    );
+
+    final area = tester.getRect(find.widgetWithText(Button, 'Сбросить'));
+    expect(area.height, greaterThanOrEqualTo(DoableMetrics.tapMin));
+    expect(area.top, lessThan(title.top));
+    await tester.tapAt(Offset(area.center.dx, area.top + 1));
+    await tester.pumpAndSettle();
+
+    expect(presses, 1);
+    expect(tester.getRect(find.byType(Sheet)), before);
+    expect(sheet.isClosed, isFalse);
+    semantics.dispose();
+  });
+
+  testWidgets('без действия лист по содержимому сохраняет положение '
+      'заголовка, тела и нижней кнопки', (tester) async {
+    await _openContentSheet(tester);
+    final sheet = tester.getRect(find.byType(Sheet));
+    final title = tester.getRect(find.text('Новый тег'));
+    final body = tester.getRect(find.text('Название'));
+    final footer = tester.getRect(find.text('Создать'));
+
+    expect(find.widgetWithText(Button, 'Сбросить'), findsNothing);
+    expect(title.top, sheet.top + DoableMetrics.space2 + 4 + 14);
+    expect(title.center.dx, _screen.width / 2);
+    expect(body.top, title.bottom + DoableMetrics.space3);
+    expect(footer.top, body.bottom + DoableMetrics.space3);
+    expect(
+      footer.bottom,
+      _screen.height - _homeIndicator - DoableMetrics.space4,
+    );
+  });
+
   testWidgets('лист по содержимому вместе с нижней кнопкой стоит под '
       'пальцем, не поднимается выше компактного размера, а после медленного '
       'малого отклонения возвращается', (tester) async {
@@ -1993,6 +2050,7 @@ final class _SearchState extends State<_Search> {
 Future<_OpenedSheet> _openContentSheet(
   WidgetTester tester, {
   bool hostsMessages = false,
+  VoidCallback? onReset,
   Widget body = const SizedBox(height: 120, child: Text('Название')),
   bool settle = true,
 }) => _openSheet(
@@ -2003,6 +2061,14 @@ Future<_OpenedSheet> _openContentSheet(
     builder: (context, sheet) => Sheet(
       sheet,
       title: 'Новый тег',
+      action: switch (onReset) {
+        final onReset? => (
+          label: 'Сбросить',
+          semanticLabel: _resetLabel,
+          onPressed: onReset,
+        ),
+        null => null,
+      },
       footer: const SizedBox(height: 44, child: Text('Создать')),
       child: body,
     ),

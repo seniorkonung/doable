@@ -1832,6 +1832,42 @@
   "@sourcePickerCancel": {"description": "Отмена выбора исходного намерения"},
   "sourcePickerEmpty": "No active intentions are available.",
   "@sourcePickerEmpty": {"description": "Пустой выбор активных намерений"},
+  "dailyChoicePickerPurposeCreationSource": "New daily choice: source intention",
+  "@dailyChoicePickerPurposeCreationSource": {"description": "Подзаголовок поиска исходного намерения при создании дневного выбора"},
+  "dailyChoicePickerPurposeCreationAction": "New daily choice: selected action",
+  "@dailyChoicePickerPurposeCreationAction": {"description": "Подзаголовок поиска действия при создании дневного выбора"},
+  "dailyChoicePickerPurposeReplacementSource": "Path replacement: source intention",
+  "@dailyChoicePickerPurposeReplacementSource": {"description": "Подзаголовок поиска исходного намерения при замене пути"},
+  "dailyChoicePickerPurposeReplacementAction": "Path replacement: selected action",
+  "@dailyChoicePickerPurposeReplacementAction": {"description": "Подзаголовок поиска действия при замене пути"},
+  "dailyChoicePickerFlowCreationFromSource": "New daily choice, from an intention",
+  "@dailyChoicePickerFlowCreationFromSource": {"description": "Строка листа назначения: создание дневного выбора от намерения"},
+  "dailyChoicePickerFlowCreationFromAction": "New daily choice, from an action",
+  "@dailyChoicePickerFlowCreationFromAction": {"description": "Строка листа назначения: создание дневного выбора от действия"},
+  "dailyChoicePickerFlowReplacementFromSource": "Path replacement, from an intention",
+  "@dailyChoicePickerFlowReplacementFromSource": {"description": "Строка листа назначения: замена пути от намерения"},
+  "dailyChoicePickerFlowReplacementFromAction": "Path replacement, from an action",
+  "@dailyChoicePickerFlowReplacementFromAction": {"description": "Строка листа назначения: замена пути от действия"},
+  "dailyChoicePickerStepCurrent": "You are here",
+  "@dailyChoicePickerStepCurrent": {"description": "Отметка текущего шага дневного выбора"},
+  "dailyChoicePickerStepSource": "Source intention",
+  "@dailyChoicePickerStepSource": {"description": "Шаг дневного выбора: исходное намерение"},
+  "dailyChoicePickerStepAction": "Selected action",
+  "@dailyChoicePickerStepAction": {"description": "Шаг дневного выбора: конечное действие"},
+  "dailyChoicePickerStepPathDown": "Path down to an action",
+  "@dailyChoicePickerStepPathDown": {"description": "Шаг дневного выбора от намерения: путь к действию"},
+  "dailyChoicePickerStepPathDownNote": "Each next step is what the previous one needs or can use",
+  "@dailyChoicePickerStepPathDownNote": {"description": "Пояснение пути вниз к действию"},
+  "dailyChoicePickerStepPathUp": "Path up to the source intention",
+  "@dailyChoicePickerStepPathUp": {"description": "Шаг дневного выбора от действия: путь к исходному намерению"},
+  "dailyChoicePickerStepPathUpNote": "At least one step is needed",
+  "@dailyChoicePickerStepPathUpNote": {"description": "Пояснение пути вверх к исходному намерению"},
+  "dailyChoicePickerStepDetails": "Date, time, priority, and description",
+  "@dailyChoicePickerStepDetails": {"description": "Последний шаг создания дневного выбора"},
+  "dailyChoicePickerStepReplacement": "Replacement confirmation",
+  "@dailyChoicePickerStepReplacement": {"description": "Последний шаг замены пути"},
+  "dailyChoicePickerStepReplacementNote": "The date, scheduled time, priority, description, and completion stay the same",
+  "@dailyChoicePickerStepReplacementNote": {"description": "Пояснение подтверждения замены пути"},
   "intentionPickerArchived": "archived",
   "@intentionPickerArchived": {
     "description": "Архивное состояние намерения в доступном названии строки экрана выбора"
@@ -1854,6 +1890,91 @@
     "description": "Доступное название стрелки строки экрана выбора, которая открывает страницу намерения",
     "placeholders": {"title": {"type": "String"}}
   },
+  "intentionPickerShowAndSortTitle": "Show and sort",
+  "@intentionPickerShowAndSortTitle": {"description": "Заголовок листа параметров показа поиска"},
+  "intentionPickerShowAndSortHint": "The list changes as you choose",
+  "@intentionPickerShowAndSortHint": {"description": "Пояснение немедленного применения параметров поиска"},
+  "intentionPickerShowAndSortReset": "Reset",
+  "@intentionPickerShowAndSortReset": {"description": "Сброс типа и сортировки поиска к начальному показу"},
+  "intentionPickerPurposeLabel": "{title}. {subtitle}. Show what you are choosing",
+  "@intentionPickerPurposeLabel": {
+    "description": "Доступное название кнопки заголовка и подзаголовка назначения экрана выбора",
+    "placeholders": {
+      "title": {"type": "String"},
+      "subtitle": {"type": "String"}
+    }
+  },
+  "intentionPickerPurposeSheetTitle": "What you are choosing",
+  "@intentionPickerPurposeSheetTitle": {"description": "Заголовок листа, который напоминает назначение экрана выбора"},
+  "intentionPickerPurposeSheetBack": "Back to the list",
+  "@intentionPickerPurposeSheetBack": {"description": "Кнопка, которая закрывает лист назначения и возвращает к выдаче поиска"},
+  "intentionPickerTypeCaption": "Type",
+  "@intentionPickerTypeCaption": {"description": "Название группы типа намерения"},
+  "intentionPickerActionTypeNote": "Only an action can be the final intention of a daily choice",
+  "@intentionPickerActionTypeNote": {"description": "Причина закреплённого типа в поиске действия"},
+  "intentionPickerSortCaption": "Sort by",
+  "@intentionPickerSortCaption": {"description": "Название группы поля сортировки"},
+  "intentionPickerSortCreated": "Created",
+  "@intentionPickerSortCreated": {"description": "Сортировка по времени создания"},
+  "intentionPickerSortChanged": "Changed",
+  "@intentionPickerSortChanged": {"description": "Сортировка по времени изменения"},
+  "intentionPickerSortName": "Name",
+  "@intentionPickerSortName": {"description": "Сортировка по названию"},
+  "intentionPickerOrderCaption": "Order",
+  "@intentionPickerOrderCaption": {"description": "Название группы направления сортировки"},
+  "intentionPickerOrderNewest": "Newest first",
+  "@intentionPickerOrderNewest": {"description": "Убывающий порядок по времени"},
+  "intentionPickerOrderOldest": "Oldest first",
+  "@intentionPickerOrderOldest": {"description": "Возрастающий порядок по времени"},
+  "intentionPickerOrderAToZ": "A to Z",
+  "@intentionPickerOrderAToZ": {"description": "Прямой порядок по названию"},
+  "intentionPickerOrderZToA": "Z to A",
+  "@intentionPickerOrderZToA": {"description": "Обратный порядок по названию"},
+  "intentionPickerAllHeader": "All",
+  "@intentionPickerAllHeader": {
+    "description": "Показываемый тип без ограничения в заголовке списка поиска для выбора"
+  },
+  "intentionPickerOrderCreatedNewest": "Created, newest first",
+  "@intentionPickerOrderCreatedNewest": {
+    "description": "Сводка сортировки в заголовке списка поиска для выбора"
+  },
+  "intentionPickerOrderCreatedOldest": "Created, oldest first",
+  "@intentionPickerOrderCreatedOldest": {
+    "description": "Сводка сортировки в заголовке списка поиска для выбора"
+  },
+  "intentionPickerOrderUpdatedNewest": "Changed, newest first",
+  "@intentionPickerOrderUpdatedNewest": {
+    "description": "Сводка сортировки в заголовке списка поиска для выбора"
+  },
+  "intentionPickerOrderUpdatedOldest": "Changed, oldest first",
+  "@intentionPickerOrderUpdatedOldest": {
+    "description": "Сводка сортировки в заголовке списка поиска для выбора"
+  },
+  "intentionPickerOrderTitleAscending": "Name, A to Z",
+  "@intentionPickerOrderTitleAscending": {
+    "description": "Сводка сортировки в заголовке списка поиска для выбора"
+  },
+  "intentionPickerOrderTitleDescending": "Name, Z to A",
+  "@intentionPickerOrderTitleDescending": {
+    "description": "Сводка сортировки в заголовке списка поиска для выбора"
+  },
+  "intentionPickerHeaderLabel": "Show and sort. Type: {type}. Sorted by: {summary}.",
+  "@intentionPickerHeaderLabel": {
+    "description": "Доступное название кнопки заголовка поиска до подтверждения количества",
+    "placeholders": {
+      "type": {"type": "String"},
+      "summary": {"type": "String"}
+    }
+  },
+  "intentionPickerHeaderCountLabel": "Show and sort. Type: {type}, {count}. Sorted by: {summary}.",
+  "@intentionPickerHeaderCountLabel": {
+    "description": "Доступное название кнопки заголовка поиска с подтверждённым количеством",
+    "placeholders": {
+      "type": {"type": "String"},
+      "count": {"type": "int"},
+      "summary": {"type": "String"}
+    }
+  },
   "intentionPickerActionsHeader": "Actions",
   "@intentionPickerActionsHeader": {
     "description": "Заголовок выдачи поиска действия на экране выбора"
@@ -1873,6 +1994,18 @@
   "intentionPickerEmptyScopeTitle": "Nothing to choose from",
   "@intentionPickerEmptyScopeTitle": {
     "description": "Заголовок пустой выдачи экрана выбора, когда допустимый охват пуст без фильтров"
+  },
+  "intentionPickerEmptyTypeTitle": "No intentions of this type",
+  "@intentionPickerEmptyTypeTitle": {
+    "description": "Заголовок пустого выбранного типа, когда в допустимом охвате есть намерения другого типа"
+  },
+  "intentionPickerEmptyTypeText": "Show both types to choose from the available intentions.",
+  "@intentionPickerEmptyTypeText": {
+    "description": "Совет показать оба типа при пустом выбранном типе"
+  },
+  "intentionPickerShowBothTypes": "Show both types",
+  "@intentionPickerShowBothTypes": {
+    "description": "Действие пустого выбранного типа, которое выбирает тип «Все»"
   },
   "intentionPickerActionTitle": "Choose an action",
   "@intentionPickerActionTitle": {
@@ -1919,9 +2052,13 @@
   "@intentionPickerChangeTags": {
     "description": "Совет пустой выдачи экрана выбора из-за условий по тегам"
   },
-  "intentionPickerNothingFound": "Nothing found",
-  "@intentionPickerNothingFound": {
-    "description": "Заголовок пустой выдачи экрана выбора из-за фильтра названия и условий по тегам"
+  "intentionPickerNoActionsFound": "No actions found",
+  "@intentionPickerNoActionsFound": {
+    "description": "Заголовок пустой выдачи действий из-за фильтра названия и условий по тегам"
+  },
+  "intentionPickerNoIntentionsFound": "No intentions found",
+  "@intentionPickerNoIntentionsFound": {
+    "description": "Заголовок пустой выдачи намерений из-за фильтра названия и условий по тегам"
   },
   "intentionPickerChangeTitleOrTags": "Change the name or the tag conditions.",
   "@intentionPickerChangeTitleOrTags": {
@@ -1943,6 +2080,41 @@
   "@participantPickerOpenDetails": {
     "description": "Назначение перехода к подробным данным намерения из выбора"
   },
+  "participantPickerPurposeCreationSource": "New relation: source intention",
+  "@participantPickerPurposeCreationSource": {"description": "Подзаголовок поиска исходного намерения при создании связи"},
+  "participantPickerPurposeCreationRelated": "New relation: related intention",
+  "@participantPickerPurposeCreationRelated": {"description": "Подзаголовок поиска связанного намерения при создании связи"},
+  "participantPickerPurposeChangeSource": "Relation change: source intention",
+  "@participantPickerPurposeChangeSource": {"description": "Подзаголовок поиска исходного намерения при изменении связи"},
+  "participantPickerPurposeChangeRelated": "Relation change: related intention",
+  "@participantPickerPurposeChangeRelated": {"description": "Подзаголовок поиска связанного намерения при изменении связи"},
+  "participantPickerFlowCreation": "New relation",
+  "@participantPickerFlowCreation": {"description": "Строка листа назначения: создание связи"},
+  "participantPickerFlowChange": "Relation change",
+  "@participantPickerFlowChange": {"description": "Строка листа назначения: изменение связи"},
+  "participantPickerRoleSourceNote": "The source intention is what the related intention is needed for or can be used for.",
+  "@participantPickerRoleSourceNote": {"description": "Пояснение выбираемой роли исходного намерения в листе назначения"},
+  "participantPickerRoleRelatedNeedNote": "The related intention is what the source intention needs.",
+  "@participantPickerRoleRelatedNeedNote": {"description": "Пояснение выбираемой роли связанного намерения при виде «нужно»"},
+  "participantPickerRoleRelatedCanNote": "The related intention is what the source intention can use.",
+  "@participantPickerRoleRelatedCanNote": {"description": "Пояснение выбираемой роли связанного намерения при виде «можно»"},
+  "participantPickerRoleRelatedUndeterminedNote": "The related intention is what the source intention needs or can use.",
+  "@participantPickerRoleRelatedUndeterminedNote": {"description": "Пояснение выбираемой роли связанного намерения до выбора вида"},
+  "participantPickerFieldChoosing": "Choosing now",
+  "@participantPickerFieldChoosing": {"description": "Подпись поля связи, участника которого выбирают сейчас"},
+  "participantPickerFieldFromList": "From this list",
+  "@participantPickerFieldFromList": {"description": "Текст выбираемого поля связи без прежнего участника"},
+  "participantPickerFieldReplacing": "Instead of: {title}",
+  "@participantPickerFieldReplacing": {
+    "description": "Текст выбираемого поля связи с прежним участником этой роли",
+    "placeholders": {"title": {"type": "String"}}
+  },
+  "participantPickerFieldNotChosen": "Not chosen yet",
+  "@participantPickerFieldNotChosen": {"description": "Текст пустого поля связи"},
+  "participantPickerFieldArchived": "Archived",
+  "@participantPickerFieldArchived": {"description": "Признак архивного участника связи для экранного диктора"},
+  "participantPickerKindUndetermined": "Need or can: not chosen yet",
+  "@participantPickerKindUndetermined": {"description": "Вид связи в листе назначения, пока он не выбран"},
   "relationEditorTitle": "New relation",
   "@relationEditorTitle": {
     "description": "Заголовок формы создания долговременной связи"

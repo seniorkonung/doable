@@ -22,6 +22,7 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
 
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/statistics_read_contract_test_fallback.dart';
+import '../../../support/intention_type_counts.dart';
 
 /// Репозиторий графа, управляемый тестом выбора участника.
 ///
@@ -77,7 +78,7 @@ final class ControlledParticipantPickerRepository
   IntentionCatalogQuery queryAt(int index) => queries[index];
 
   void complete(int index, Result<IntentionCatalogPage> result) {
-    _requests[index].complete(result);
+    _requests[index].complete(answerCatalogQuery(queries[index], result));
   }
 
   void dispose() {

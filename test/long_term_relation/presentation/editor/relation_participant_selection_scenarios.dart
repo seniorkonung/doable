@@ -2,7 +2,10 @@ import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
+import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_choice.dart';
+import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -70,6 +73,14 @@ void defineRelationBlankCreationTests({
       await _settlePicker(tester);
       expect(router.current.name, RelationParticipantPickerRoute.name);
       expect(repository.catalogQueries.last.excludedIntentionId, isNull);
+      expectOpenedParticipantChoice(
+        tester,
+        role: RelationParticipantRole.values.byName(firstRole),
+        flow: isRelationCreationFlow,
+        type: LongTermRelationType.need,
+        sourceId: null,
+        relatedId: null,
+      );
       await tester.tap(find.byKey(const ValueKey('participant-picker-cancel')));
       await tester.pumpAndSettle();
       expect(router.current.name, RelationEditorRoute.name);
@@ -97,6 +108,14 @@ void defineRelationBlankCreationTests({
       );
       await _settlePicker(tester);
       expect(repository.catalogQueries.last.excludedIntentionId, first.id);
+      expectOpenedParticipantChoice(
+        tester,
+        role: RelationParticipantRole.values.byName(secondRole),
+        flow: isRelationCreationFlow,
+        type: LongTermRelationType.need,
+        sourceId: firstRole == 'source' ? first.id : null,
+        relatedId: firstRole == 'source' ? null : first.id,
+      );
       repository.completeCatalogPage(3, [first, second]);
       await tester.pumpAndSettle();
       expect(find.text(first.title), findsNothing);
@@ -205,6 +224,15 @@ void defineRelationParticipantSelectionTests({
         await _settlePicker(tester);
         expect(router.current.name, RelationParticipantPickerRoute.name);
         expect(repository.catalogQueries[1].excludedIntentionId, isNull);
+        // Предвыбранное группой намерение — участник роли, которую заменяют.
+        expectOpenedParticipantChoice(
+          tester,
+          role: RelationParticipantRole.values.byName(firstRole),
+          flow: isRelationCreationFlow,
+          type: LongTermRelationType.can,
+          sourceId: firstRole == 'source' ? current.id : null,
+          relatedId: firstRole == 'source' ? null : current.id,
+        );
         repository.completeCatalogPage(1, [current, sameTitle]);
         await tester.pumpAndSettle();
         expect(find.text(title), findsNWidgets(2));
@@ -228,16 +256,38 @@ void defineRelationParticipantSelectionTests({
         );
         await _settlePicker(tester);
         expect(repository.catalogQueries[3].excludedIntentionId, sameTitle.id);
+        expectOpenedParticipantChoice(
+          tester,
+          role: RelationParticipantRole.values.byName(firstRole),
+          flow: isRelationCreationFlow,
+          type: LongTermRelationType.can,
+          sourceId: firstRole == 'source' ? current.id : sameTitle.id,
+          relatedId: firstRole == 'source' ? sameTitle.id : current.id,
+        );
         repository.completeCatalogPage(3, [current, sameTitle]);
         await tester.pumpAndSettle();
         expect(find.text(title), findsOneWidget);
         await tester.tap(find.text(title));
         await tester.pumpAndSettle();
 
+        // Поиск получает вид, выбранный в черновике непосредственно перед
+        // открытием.
+        await tester.tap(
+          find.byKey(const ValueKey('relation-editor-type-need')),
+        );
+        await tester.pumpAndSettle();
         await tester.tap(
           find.byKey(ValueKey('relation-editor-change-$secondRole')),
         );
         await _settlePicker(tester);
+        expectOpenedParticipantChoice(
+          tester,
+          role: RelationParticipantRole.values.byName(secondRole),
+          flow: isRelationCreationFlow,
+          type: LongTermRelationType.need,
+          sourceId: firstRole == 'source' ? current.id : sameTitle.id,
+          relatedId: firstRole == 'source' ? sameTitle.id : current.id,
+        );
         await tester.tap(
           find.byKey(const ValueKey('participant-picker-cancel')),
         );
@@ -261,13 +311,43 @@ void defineRelationParticipantSelectionTests({
           command.relatedIntentionId,
           direction == RelationDirection.outgoing ? sameTitle.id : current.id,
         );
-        expect(command.type, LongTermRelationType.can);
+        expect(command.type, LongTermRelationType.need);
         expect(command.priority, RelationPriority.p3);
         expect(command.description?.value, description);
         expect(tester.takeException(), isNull);
       },
     );
   }
+}
+
+final isRelationCreationFlow = isA<RelationCreationChoiceFlow>();
+
+Matcher isRelationChangeFlow(RelationScope relationScope) =>
+    isA<RelationChangeChoiceFlow>().having(
+      (flow) => flow.relationScope,
+      'архивное состояние изменяемой связи',
+      relationScope,
+    );
+
+/// Проверяет описание выбора, которое получила открытая страница поиска.
+void expectOpenedParticipantChoice(
+  WidgetTester tester, {
+  required RelationParticipantRole role,
+  required Matcher flow,
+  required LongTermRelationType? type,
+  required IntentionId? sourceId,
+  required IntentionId? relatedId,
+}) {
+  final choice = tester
+      .widget<RelationParticipantPickerPage>(
+        find.byType(RelationParticipantPickerPage),
+      )
+      .choice;
+  expect(choice.role, role);
+  expect(choice.flow, flow);
+  expect(choice.type, type);
+  expect(choice.source?.id, sourceId);
+  expect(choice.related?.id, relatedId);
 }
 
 Future<void> _settlePicker(WidgetTester tester) async {

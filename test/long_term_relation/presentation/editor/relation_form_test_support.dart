@@ -29,6 +29,7 @@ import '../../../intention/presentation/catalog/catalog_test_support.dart';
 import '../details/relation_details_test_support.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/statistics_read_contract_test_fallback.dart';
+import '../../../support/intention_type_counts.dart';
 
 /// Граф для страницы создания связи: команды, каталог выбора участника и
 /// подробный просмотр связи конфликтующей пары.
@@ -123,12 +124,15 @@ final class ControlledRelationFormRepository
         if (item.id != excluded) item,
     ];
     _catalogRequests[index].complete(
-      ResultSuccess(
-        IntentionCatalogFirstPage(
-          items: available,
-          totalCount: available.length,
-          nextCursor: null,
-          revision: revision,
+      answerCatalogQuery(
+        catalogQueries[index],
+        ResultSuccess(
+          IntentionCatalogFirstPage(
+            items: available,
+            totalCount: available.length,
+            nextCursor: null,
+            revision: revision,
+          ),
         ),
       ),
     );

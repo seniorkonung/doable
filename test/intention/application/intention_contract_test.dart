@@ -14,6 +14,7 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/tag_positions.dart';
+import '../../support/intention_title_order_key.dart';
 
 import 'package:doable/src/intention/application/intention_description_preview.dart';
 
@@ -38,6 +39,24 @@ void main() {
         ).titleFilter!.matchesTitle('ışık'),
         isTrue,
       );
+    });
+  });
+
+  group('ключ порядка названия намерения', () {
+    IntentionTitleOrderKey key(String searchProjection) =>
+        IntentionTitleOrderKey.fromSearchProjection(searchProjection);
+
+    test('сравнивает ключи по кодовым точкам, а не по единицам UTF-16', () {
+      // В UTF-16 суррогатная пара U+1F600 начинается с 0xD83D < 0xE000.
+      expect(key('\u{E000}').compareTo(key('\u{1F600}')), isNegative);
+      expect(key('\u{1F600}').compareTo(key('\u{E000}')), isPositive);
+      expect(key('a\u{FFFD}').compareTo(key('a\u{10000}')), isNegative);
+    });
+
+    test('ставит ключ раньше его продолжения и равняет одинаковые', () {
+      expect(key('стр').compareTo(key('строка')), isNegative);
+      expect(key('строка').compareTo(key('стр')), isPositive);
+      expect(key('\u{1F600}я').compareTo(key('\u{1F600}я')), 0);
     });
   });
 
@@ -310,6 +329,145 @@ void main() {
       expect(_query().excludedIntentionId, isNull);
     });
 
+    test('условие готовности допускает оба типа, только действия или только намерения без готовности', () {
+      for (final (filter, acceptsReady, acceptsNotReady) in [
+        (IntentionReadinessFilter.all, true, true),
+        (IntentionReadinessFilter.readyOnly, true, false),
+        (IntentionReadinessFilter.notReadyOnly, false, true),
+      ]) {
+        final query = IntentionCatalogQuery(
+          scope: IntentionScope.active,
+          readinessFilter: filter,
+          titleFilter: null,
+          order: IntentionCatalogOrder.createdAtAscending,
+          pageSize: 1,
+        );
+        expect(
+          query.includes(
+            _summary(
+              id: '00000000-0000-4000-8000-000000000001',
+              readiness: IntentionReadiness.ready,
+            ),
+          ),
+          acceptsReady,
+        );
+        expect(
+          query.includes(
+            _summary(
+              id: '00000000-0000-4000-8000-000000000001',
+              readiness: IntentionReadiness.notReady,
+            ),
+          ),
+          acceptsNotReady,
+        );
+      }
+    });
+
+    test('запрос без условия готовности допускает оба типа и сохраняет остальные условия', () {
+      final health = Tag(
+        id: _tagId('00000000-0000-4000-8000-000000000101'),
+        name: TagName.fromStored('Здоровье'),
+        color: null,
+        position: tagPositionAt(1002),
+      );
+      final sport = Tag(
+        id: _tagId('00000000-0000-4000-8000-000000000103'),
+        name: TagName.fromStored('Спорт'),
+        color: null,
+        position: tagPositionAt(1004),
+      );
+      const candidateId = '00000000-0000-4000-8000-000000000001';
+      final otherParticipant = _intentionId(
+        '00000000-0000-4000-8000-000000000002',
+      );
+      final anyReadinessQuery = IntentionCatalogQuery(
+        scope: IntentionScope.active,
+        readinessFilter: IntentionReadinessFilter.notReadyOnly,
+        titleFilter: 'ХОДИТЬ',
+        tagFilter: IntentionTagFilter(
+          requiredTagIds: [health.id],
+          excludedTagIds: [sport.id],
+        ),
+        excludedIntentionId: otherParticipant,
+        order: IntentionCatalogOrder.titleAscending,
+        pageSize: 1,
+        requestsTypeCounts: true,
+      ).withAnyReadiness();
+
+      expect(anyReadinessQuery.readinessFilter, IntentionReadinessFilter.all);
+      for (final (id, title, tags, readiness, archiveState, expected) in [
+        (
+          candidateId,
+          'Ходить в парк',
+          [health],
+          IntentionReadiness.ready,
+          IntentionArchiveState.active,
+          true,
+        ),
+        (
+          candidateId,
+          'Ходить в парк',
+          [health],
+          IntentionReadiness.notReady,
+          IntentionArchiveState.active,
+          true,
+        ),
+        (
+          candidateId,
+          'Ходить в парк',
+          [health],
+          IntentionReadiness.ready,
+          IntentionArchiveState.archived,
+          false,
+        ),
+        (
+          candidateId,
+          'Читать',
+          [health],
+          IntentionReadiness.ready,
+          IntentionArchiveState.active,
+          false,
+        ),
+        (
+          candidateId,
+          'Ходить в парк',
+          <Tag>[],
+          IntentionReadiness.ready,
+          IntentionArchiveState.active,
+          false,
+        ),
+        (
+          candidateId,
+          'Ходить в парк',
+          [health, sport],
+          IntentionReadiness.ready,
+          IntentionArchiveState.active,
+          false,
+        ),
+        (
+          otherParticipant.toCanonicalString(),
+          'Ходить в парк',
+          [health],
+          IntentionReadiness.ready,
+          IntentionArchiveState.active,
+          false,
+        ),
+      ]) {
+        expect(
+          anyReadinessQuery.includes(
+            _summary(
+              id: id,
+              title: title,
+              tags: tags,
+              readiness: readiness,
+              archiveState: archiveState,
+            ),
+          ),
+          expected,
+        );
+      }
+    });
+
     test('изменение только цвета тега заменяет его состояние в сводке', () {
       final firstId = _tagId('00000000-0000-4000-8000-000000000002');
       final secondId = _tagId('00000000-0000-4000-8000-000000000001');
@@ -323,6 +481,7 @@ void main() {
         archiveState: IntentionArchiveState.archived,
         createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 2)),
+        titleOrderKey: testTitleOrderKey('Гулять'),
         tags: [
           Tag(
             id: firstId,
@@ -377,6 +536,7 @@ void main() {
         archiveState: IntentionArchiveState.archived,
         createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 2)),
+        titleOrderKey: testTitleOrderKey('Гулять'),
         tags: [
           Tag(
             id: firstId,
@@ -425,6 +585,7 @@ void main() {
         archiveState: IntentionArchiveState.active,
         createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
+        titleOrderKey: testTitleOrderKey('Гулять'),
         tags: [
           Tag(
             id: _tagId('00000000-0000-4000-8000-000000000001'),
@@ -463,6 +624,7 @@ void main() {
         archiveState: IntentionArchiveState.archived,
         createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 2)),
+        titleOrderKey: testTitleOrderKey('Гулять'),
         tags: [
           Tag(
             id: firstId,
@@ -502,6 +664,7 @@ void main() {
         archiveState: IntentionArchiveState.active,
         createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
+        titleOrderKey: testTitleOrderKey('Гулять'),
         tags: [
           Tag(
             id: _tagId('00000000-0000-4000-8000-000000000001'),
@@ -746,6 +909,49 @@ void main() {
       );
     });
 
+    test('порядок по названию сравнивает ключи сводок, при равенстве — идентификаторы', () {
+      final lower = _summary(
+        id: '00000000-0000-4000-8000-000000000002',
+        title: 'strauss',
+        createdAt: DateTime.utc(2026, 8, 30, 12),
+      );
+      final upperSameKey = _summary(
+        id: '00000000-0000-4000-8000-000000000001',
+        title: 'STRAUSS',
+        createdAt: DateTime.utc(2026, 8, 30, 14),
+      );
+      final folded = _summary(
+        id: '00000000-0000-4000-8000-000000000003',
+        title: 'Straßenbahn',
+        createdAt: DateTime.utc(2026, 8, 30, 10),
+      );
+      final privateUse = _summary(
+        id: '00000000-0000-4000-8000-000000000004',
+        title: '\u{E000}',
+      );
+      final astral = _summary(
+        id: '00000000-0000-4000-8000-000000000005',
+        title: '\u{1F600}',
+      );
+      final ascending = _order(
+        IntentionCatalogSortField.title,
+        IntentionCatalogSortDirection.ascending,
+      );
+      final descending = _order(
+        IntentionCatalogSortField.title,
+        IntentionCatalogSortDirection.descending,
+      );
+
+      expect(ascending.compare(folded, lower), isNegative);
+      expect(descending.compare(folded, lower), isPositive);
+      expect(ascending.compare(privateUse, astral), isNegative);
+      expect(descending.compare(privateUse, astral), isPositive);
+      // Равные ключи в обоих направлениях упорядочивает возрастающий идентификатор.
+      expect(ascending.compare(upperSameKey, lower), isNegative);
+      expect(descending.compare(upperSameKey, lower), isNegative);
+      expect(ascending.compare(lower, lower), isZero);
+    });
+
     test('первая страница отклоняет недопустимый total count в release', () {
       final summary = _summary(id: '00000000-0000-4000-8000-000000000001');
 
@@ -767,6 +973,35 @@ void main() {
         ),
         throwsA(isA<IntentionCatalogPageValidationException>()),
       );
+    });
+
+    test('первая страница отклоняет противоречивые числа типов', () {
+      const revision = _TestGraphRevision(epoch: 'первая', sequence: 0);
+
+      expect(
+        () => IntentionTypeCounts(all: 1, actions: 2),
+        throwsA(isA<IntentionCatalogPageValidationException>()),
+      );
+      expect(
+        () => IntentionCatalogFirstPage(
+          items: const [],
+          totalCount: 2,
+          typeCounts: IntentionTypeCounts(all: 1, actions: 1),
+          nextCursor: null,
+          revision: revision,
+        ),
+        throwsA(isA<IntentionCatalogPageValidationException>()),
+      );
+
+      final page = IntentionCatalogFirstPage(
+        items: const [],
+        totalCount: 2,
+        typeCounts: IntentionTypeCounts(all: 2, actions: 2),
+        nextCursor: null,
+        revision: revision,
+      );
+      expect(page.typeCounts?.actions, 2);
+      expect(page.typeCounts?.intentions, 0);
     });
   });
 
@@ -915,6 +1150,7 @@ IntentionSummary _summary({
     archiveState: archiveState,
     createdAt: created,
     updatedAt: IntentionTimestamp(updatedAt ?? created.value),
+    titleOrderKey: testTitleOrderKey(title),
     tags: tags,
   );
 }

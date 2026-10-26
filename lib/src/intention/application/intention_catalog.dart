@@ -9,7 +9,7 @@ import 'title_search_key.dart';
 
 enum IntentionScope { active, archived, all }
 
-enum IntentionReadinessFilter { all, readyOnly }
+enum IntentionReadinessFilter { all, readyOnly, notReadyOnly }
 
 /// Неизменяемые условия наличия и отсутствия собственных тегов намерения.
 ///
@@ -56,7 +56,7 @@ final class IntentionTagFilter {
   );
 }
 
-enum IntentionCatalogSortField { createdAt, updatedAt }
+enum IntentionCatalogSortField { createdAt, updatedAt, title }
 
 enum IntentionCatalogSortDirection { ascending, descending }
 
@@ -80,6 +80,16 @@ final class IntentionCatalogOrder {
 
   static const updatedAtDescending = IntentionCatalogOrder(
     field: IntentionCatalogSortField.updatedAt,
+    direction: IntentionCatalogSortDirection.descending,
+  );
+
+  static const titleAscending = IntentionCatalogOrder(
+    field: IntentionCatalogSortField.title,
+    direction: IntentionCatalogSortDirection.ascending,
+  );
+
+  static const titleDescending = IntentionCatalogOrder(
+    field: IntentionCatalogSortField.title,
     direction: IntentionCatalogSortDirection.descending,
   );
 
@@ -124,6 +134,7 @@ final class IntentionCatalogQuery {
     required IntentionCatalogOrder order,
     required int pageSize,
     IntentionCatalogCursor? cursor,
+    bool requestsTypeCounts = false,
   }) {
     if (pageSize < minPageSize || pageSize > maxPageSize) {
       throw const IntentionCatalogQueryValidationException(
@@ -141,6 +152,7 @@ final class IntentionCatalogQuery {
       order: order,
       pageSize: pageSize,
       cursor: cursor,
+      requestsTypeCounts: requestsTypeCounts,
     );
   }
 
@@ -153,6 +165,7 @@ final class IntentionCatalogQuery {
     required this.order,
     required this.pageSize,
     required this.cursor,
+    required this.requestsTypeCounts,
   });
 
   static const minPageSize = 1;
@@ -170,6 +183,23 @@ final class IntentionCatalogQuery {
   final int pageSize;
   final IntentionCatalogCursor? cursor;
 
+  /// Просит первую порцию нести [IntentionTypeCounts].
+  final bool requestsTypeCounts;
+
+  /// Тот же запрос с условием готовности «все»: по нему считаются числа
+  /// обоих типов.
+  IntentionCatalogQuery withAnyReadiness() => IntentionCatalogQuery._(
+    scope: scope,
+    readinessFilter: IntentionReadinessFilter.all,
+    titleFilter: titleFilter,
+    tagFilter: tagFilter,
+    excludedIntentionId: excludedIntentionId,
+    order: order,
+    pageSize: pageSize,
+    cursor: cursor,
+    requestsTypeCounts: requestsTypeCounts,
+  );
+
   bool includes(IntentionSummary summary) {
     final matchesScope = switch (scope) {
       IntentionScope.active =>
@@ -182,6 +212,9 @@ final class IntentionCatalogQuery {
       IntentionReadinessFilter.all => true,
       IntentionReadinessFilter.readyOnly =>
         summary.readiness == IntentionReadiness.ready,
+
+      IntentionReadinessFilter.notReadyOnly =>
+        summary.readiness == IntentionReadiness.notReady,
     };
     if (!matchesScope ||
         !matchesReadiness ||
@@ -192,23 +225,29 @@ final class IntentionCatalogQuery {
     return titleFilter?.matchesTitle(summary.title) ?? true;
   }
 
+  /// Порядок выдачи: значение поля в выбранном направлении, при равенстве —
+  /// возрастающий идентификатор. Название сравнивается ключами сохранённой
+  /// поисковой проекции, как его упорядочивает адаптер.
   int compare(IntentionSummary left, IntentionSummary right) {
-    final timestampComparison = _timestampOf(left).value
-        .compareTo(_timestampOf(right).value);
+    final fieldComparison = switch (order.field) {
+      IntentionCatalogSortField.createdAt => left.createdAt.value.compareTo(
+        right.createdAt.value,
+      ),
+      IntentionCatalogSortField.updatedAt => left.updatedAt.value.compareTo(
+        right.updatedAt.value,
+      ),
+      IntentionCatalogSortField.title => left.titleOrderKey.compareTo(
+        right.titleOrderKey,
+      ),
+    };
     final directionAdjusted = switch (order.direction) {
-      IntentionCatalogSortDirection.ascending => timestampComparison,
-      IntentionCatalogSortDirection.descending => -timestampComparison,
+      IntentionCatalogSortDirection.ascending => fieldComparison,
+      IntentionCatalogSortDirection.descending => -fieldComparison,
     };
     return directionAdjusted != 0
         ? directionAdjusted
         : left.id.compareTo(right.id);
   }
-
-  IntentionTimestamp _timestampOf(IntentionSummary summary) =>
-      switch (order.field) {
-        IntentionCatalogSortField.createdAt => summary.createdAt,
-        IntentionCatalogSortField.updatedAt => summary.updatedAt,
-      };
 
   static IntentionTitleFilter? _normalizeFilter(String? value) {
     if (value == null) {
@@ -258,6 +297,34 @@ final class IntentionTitleFilter {
 
 abstract interface class IntentionCatalogCursor {}
 
+/// Непрозрачный ключ порядка названия намерения (ADR-0045).
+///
+/// Ключ строят адаптеры репозитория из сохранённой поисковой проекции
+/// названия, по которой они упорядочивают порции. Содержимое ключа не
+/// раскрывается: его можно только сравнить с другим ключом по кодовым точкам,
+/// как SQLite сравнивает `TEXT` в `BINARY`.
+final class IntentionTitleOrderKey
+    implements Comparable<IntentionTitleOrderKey> {
+  const IntentionTitleOrderKey.fromSearchProjection(this._searchProjection);
+
+  final String _searchProjection;
+
+  @override
+  int compareTo(IntentionTitleOrderKey other) {
+    final left = _searchProjection.runes.iterator;
+    final right = other._searchProjection.runes.iterator;
+    while (true) {
+      final hasLeft = left.moveNext();
+      final hasRight = right.moveNext();
+      if (!hasLeft || !hasRight) {
+        return (hasLeft ? 1 : 0) - (hasRight ? 1 : 0);
+      }
+      final comparison = left.current.compareTo(right.current);
+      if (comparison != 0) return comparison;
+    }
+  }
+}
+
 final class IntentionSummary {
   IntentionSummary({
     required this.id,
@@ -267,6 +334,7 @@ final class IntentionSummary {
     required this.archiveState,
     required this.createdAt,
     required this.updatedAt,
+    required this.titleOrderKey,
     List<Tag> tags = const [],
   }) : title = IntentionText.normalizeTitle(title),
        tags = List.unmodifiable(tags);
@@ -280,6 +348,9 @@ final class IntentionSummary {
   final IntentionArchiveState archiveState;
   final IntentionTimestamp createdAt;
   final IntentionTimestamp updatedAt;
+
+  /// Ключ порядка по названию из сохранённой поисковой проекции [title].
+  final IntentionTitleOrderKey titleOrderKey;
 
   /// Полный подтверждённый состав собственных тегов в ручном порядке тегов.
   /// Пустой список означает проверенное отсутствие назначений.
@@ -303,6 +374,7 @@ final class IntentionSummary {
       archiveState: archiveState,
       createdAt: createdAt,
       updatedAt: updatedAt,
+      titleOrderKey: titleOrderKey,
       // Места уникальны, поэтому нестабильная сортировка однозначна.
       tags: [for (final tag in tags) tag.id == updated.id ? updated : tag]
         ..sort((a, b) => a.position.compareTo(b.position)),
@@ -325,6 +397,7 @@ final class IntentionSummary {
       archiveState: archiveState,
       createdAt: createdAt,
       updatedAt: updatedAt,
+      titleOrderKey: titleOrderKey,
       tags: [
         for (final tag in tags)
           if (tag.id != deletedTagId) tag,
@@ -469,18 +542,46 @@ final class IntentionCatalogFirstPage extends IntentionCatalogPage {
   IntentionCatalogFirstPage({
     required super.items,
     required int totalCount,
+    this.typeCounts,
     required super.nextCursor,
     required super.revision,
-  }) : totalCount = _requireTotalCount(totalCount, items.length);
+  }) : totalCount = _requireTotalCount(totalCount, items.length, typeCounts);
 
+  /// Количество совпадений со всеми условиями запроса, включая готовность.
   final int totalCount;
 
-  static int _requireTotalCount(int totalCount, int itemCount) {
-    if (totalCount < itemCount) {
+  /// Есть тогда и только тогда, когда их попросил запрос.
+  final IntentionTypeCounts? typeCounts;
+
+  static int _requireTotalCount(
+    int totalCount,
+    int itemCount,
+    IntentionTypeCounts? typeCounts,
+  ) {
+    if (totalCount < itemCount ||
+        (typeCounts != null && totalCount > typeCounts.all)) {
       throw const IntentionCatalogPageValidationException();
     }
     return totalCount;
   }
+}
+
+/// Точные числа обоих типов намерения при всех условиях запроса, кроме
+/// условия готовности.
+final class IntentionTypeCounts {
+  factory IntentionTypeCounts({required int all, required int actions}) {
+    if (actions < 0 || actions > all) {
+      throw const IntentionCatalogPageValidationException();
+    }
+    return IntentionTypeCounts._(all: all, actions: actions);
+  }
+
+  const IntentionTypeCounts._({required this.all, required this.actions});
+
+  final int all;
+  final int actions;
+
+  int get intentions => all - actions;
 }
 
 final class IntentionCatalogPageValidationException implements Exception {

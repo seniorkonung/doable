@@ -17,14 +17,14 @@ sealed class DailyChoicePickerContext {
 
   bool get canContinue => switch (this) {
     InitialDailyChoicePickerContext(:final launch) => launch.isActive,
-    AuxiliaryDailyChoicePickerContext() => true,
+    PathReplacementDailyChoicePickerContext() => true,
   };
 
   void cancelLaunch() {
     switch (this) {
       case InitialDailyChoicePickerContext(:final launch):
         launch.cancel();
-      case AuxiliaryDailyChoicePickerContext():
+      case PathReplacementDailyChoicePickerContext():
         break;
     }
   }
@@ -37,7 +37,10 @@ final class InitialDailyChoicePickerContext extends DailyChoicePickerContext {
   final DailyChoicePickerLaunch launch;
 }
 
-/// Вспомогательный выбор возвращает ID или null вызвавшей странице.
-final class AuxiliaryDailyChoicePickerContext extends DailyChoicePickerContext {
-  const AuxiliaryDailyChoicePickerContext();
+/// Поиск начала нового пути при замене пути существующего дневного выбора.
+///
+/// Возвращает ID или null потоку замены, который его открыл.
+final class PathReplacementDailyChoicePickerContext
+    extends DailyChoicePickerContext {
+  const PathReplacementDailyChoicePickerContext();
 }

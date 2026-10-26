@@ -21,4 +21,14 @@ abstract final class DoableMetrics {
   static const double tapMin = 44;
   static const double navHeight = 61;
   static const double iconSize = 24;
+
+  /// Сплошная линия связи «нужно».
+  static const double strokeNeed = 2;
+
+  /// Пунктирная линия связи «можно».
+  static const double strokeCan = 1.5;
+
+  /// Штрих и промежуток пунктира линии «можно».
+  static const double strokeDash = 5;
+  static const double strokeGap = 5;
 }

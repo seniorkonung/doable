@@ -7,6 +7,7 @@ import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
 import 'package:doable/src/daily_choice/presentation/source_picker/daily_choice_source_picker_page.dart';
+import 'package:doable/src/daily_choice/presentation/daily_choice_picker_context.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
@@ -196,7 +197,13 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
       expect(find.byType(DailyChoiceCatalogPage), findsOneWidget);
 
-      unawaited(router.push<IntentionId>(DailyChoiceSourcePickerRoute()));
+      unawaited(
+        router.push<IntentionId>(
+          DailyChoiceSourcePickerRoute(
+            pickerContext: const PathReplacementDailyChoicePickerContext(),
+          ),
+        ),
+      );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
       expect(find.byType(DailyChoiceSourcePickerPage), findsOneWidget);

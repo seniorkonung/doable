@@ -9,6 +9,7 @@ import '../../../intention/domain/intention_id.dart';
 import '../../../intention/presentation/catalog/intention_catalog_purpose.dart';
 import '../../../intention/presentation/picker/intention_picker_view.dart';
 import '../daily_choice_picker_context.dart';
+import '../daily_choice_picker_purpose.dart';
 
 /// Поиск исходного намерения для создания или замены пути дневного выбора.
 ///
@@ -17,10 +18,7 @@ import '../daily_choice_picker_context.dart';
 /// его идентификатор, поэтому одноимённые намерения не смешиваются.
 @RoutePage()
 final class DailyChoiceSourcePickerPage extends StatefulWidget {
-  const DailyChoiceSourcePickerPage({
-    this.pickerContext = const AuxiliaryDailyChoicePickerContext(),
-    super.key,
-  });
+  const DailyChoiceSourcePickerPage({required this.pickerContext, super.key});
 
   final DailyChoicePickerContext pickerContext;
 
@@ -54,9 +52,14 @@ final class _DailyChoiceSourcePickerPageState
       },
       child: IntentionPickerView(
         purpose: _purpose,
+        purposeDescription: dailyChoicePickerPurpose(
+          l10n,
+          pickerContext: widget.pickerContext,
+          start: DailyChoicePickerStart.source,
+        ),
         closeLabel: switch (widget.pickerContext) {
           InitialDailyChoicePickerContext() => l10n.creationCancelAction,
-          AuxiliaryDailyChoicePickerContext() => l10n.sourcePickerCancel,
+          PathReplacementDailyChoicePickerContext() => l10n.sourcePickerCancel,
         },
         emptyScopeMessage: l10n.sourcePickerEmpty,
         onClose: () => unawaited(_close()),

@@ -1,0 +1,548 @@
+## Phase 1: Каталог читает порядок по названию и тип намерения
+
+- [x] 1.1 Дать запросу каталога условие «только намерения без готовности к действию», которое одинаково применяют чтение порции и принадлежность снимка команды
+  - **Критерии приёмки:**
+    - Условие готовности запроса получает третий вариант по решению 2 дизайна. Проверка запроса, SQL-условие адаптера и принадлежность снимка команды обрабатывают его исчерпывающими ветками.
+    - Порция с этим условием содержит только намерения без готовности в пределах охвата запроса. Она учитывает название, условия по тегам и исключённого участника, а количество считает только совпадения.
+    - Снимок намерения, у которого включили или выключили готовность, отвечает о принадлежности такому запросу по своему состоянию после изменения.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/application/intention_contract_test.dart` — проверка запроса для трёх вариантов готовности.
+    - `mise exec --no-deps -- flutter test test/intention/data/drift_intention_catalog_test.dart test/intention/data/drift_intention_repository_command_test.dart` — порция и количество без действий при названии и тегах; принадлежность снимка после смены готовности.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `lib/src/intention/application/intention_catalog.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `test/intention/application/intention_contract_test.dart`, `test/intention/data/drift_intention_catalog_test.dart`, `test/intention/data/drift_intention_repository_command_test.dart`.
+  - **Размер:** S.
+
+- [x] 1.2 Дать краткой сводке намерения непрозрачный ключ порядка названия, который адаптеры строят из сохранённой поисковой проекции
+  - **Критерии приёмки:**
+    - Ключ по [ADR-0045](../../../docs/adr/0045-order-titles-by-opaque-key-of-stored-search-projection.md) — значение-тип, которое умеет только сравниваться с другим ключом по кодовым точкам. Содержимое наружу не выходит и как `String` не сравнивается; `U+E000` идёт раньше `U+1F600`.
+    - Production-адаптер строит ключ только в сборке сводки: чтение порции из колонки сохранённой проекции, снимок команды — из уже прочитанного им ключа. Ключ из названия в Dart адаптер не вычисляет.
+    - Тестовые адаптеры и фикстуры строят ключ из поисковой проекции своего названия. Сырой поисковый ключ по-прежнему не пересекает границу репозитория графа (ADR-0009).
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/application/intention_contract_test.dart` — сравнение ключей по кодовым точкам, в том числе там, где порядок единиц UTF-16 другой.
+    - `mise exec --no-deps -- flutter test test/intention/data/drift_intention_catalog_test.dart test/intention/data/drift_intention_repository_command_test.dart` — ключ порции и ключ снимка изменения одного намерения сравниваются как равные.
+    - `mise exec --no-deps -- flutter analyze` — все места сборки сводки в `lib/` и `test/` компилируются с новым полем.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - `lib/src/intention/application/intention_catalog.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `lib/src/graph/data/stored_graph_rows.dart`;
+    - механическая адаптация сборки `IntentionSummary` в 13 проверках, в том числе `test/intention/presentation/catalog/catalog_test_support.dart`, `test/intention/presentation/details/details_test_support.dart`, `test/long_term_relation/presentation/neighborhood/neighborhood_test_support.dart`, `test/support/tag_assignment_changed.dart`.
+  - **Размер:** M — новое обязательное поле общей сводки. Механическая адаптация фикстур входит в задачу, потому что поле нельзя ввести по частям.
+
+- [x] 1.3 Упорядочивать и продолжать порции каталога по названию в обоих направлениях так же, как сравнивает строки запрос
+  - **Критерии приёмки:**
+    - Поле порядка «название» по решению 1 дизайна:
+      - SQL сортирует по сохранённой проекции названия и идентификатору;
+      - курсор — пара «ключ и идентификатор» в обоих направлениях;
+      - `compare` запроса сравнивает ключи сводок и при равенстве — идентификаторы.
+    - На одном наборе порядок порций совпадает с порядком `compare`. Набор включает регистр, многосимвольную свёртку («Straßenbahn» перед «Strauss»), «ё» и «я», латиницу и кириллицу, `U+E000` и символ за пределами BMP.
+    - Названия, различающиеся только регистром, проходят через несколько порций без пропусков и повторов в обоих направлениях. Существующие четыре порядка по времени не меняются.
+    - Порядок по названию не ограничен назначением, по решению 1 дизайна. Страница каталога графа подписывает исчерпывающе только собственный закрытый набор из четырёх порядков по времени: подписи порядка по названию и ветки с ошибкой во время выполнения на ней нет, вид каталога не меняется.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/data/drift_intention_catalog_test.dart` — шесть порядков на всех охватах с дополнительным ключом по идентификатору; совпадение с `compare`; продолжение через равные ключи.
+    - `mise exec --no-deps -- flutter test test/intention/application/intention_contract_test.dart test/intention/data/drift_intention_repository_large_fixture_test.dart`.
+    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog` — каталог графа предлагает и подписывает прежние четыре порядка.
+  - **Зависимости:** 1.2.
+  - **Предполагаемые файлы:** `lib/src/intention/application/intention_catalog.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `lib/src/intention/presentation/catalog/intention_catalog_page.dart`, `test/intention/data/drift_intention_catalog_test.dart`, `test/intention/application/intention_contract_test.dart`.
+  - **Размер:** M.
+
+- [x] 1.4 Сделать схему версии 6 с индексами порядка по названию новой базовой версией без пути обновления
+  - **Критерии приёмки:**
+    - Схема получает шесть частичных индексов по решению 3 дизайна: сохранённая проекция названия по возрастанию и по убыванию с идентификатором по возрастанию, для активного, архивного и полного охвата.
+    - Схема 6 — базовая, как в коммите `7729b064`:
+      - текущая версия равна 6;
+      - снимок `drift_schema_v6.json` заменяет `drift_schema_v5.json`;
+      - комментарий стратегии миграции называет базовой схему 6;
+      - README описывает ручную очистку данных схем 1–5 перед первым запуском и перед откатом.
+    - Новая установка создаётся схемой 6. Хранилище с маркером 5 bootstrap классифицирует как повреждение и не изменяет. Путь обновления не добавлен.
+  - **Проверка:**
+    - `mise run codegen` — снимок схемы пересоздан.
+    - `mise exec --no-deps -- flutter test test/data/local --exclude-tags=flutter_process` — схема, проверка снимка, bootstrap и тесты миграции с маркером 5.
+    - `mise exec --no-deps -- flutter test --concurrency=1 test/data/local/migrations/file_backed_migration_test.dart` — файловые процессные проверки миграции.
+  - **Зависимости:** 1.3 — индексы обслуживают порядок по названию.
+  - **Предполагаемые файлы:** `lib/src/data/local/schema/intention_schema.drift`, `lib/src/data/local/app_database.dart`, `lib/src/data/local/migrations/migration_strategy.dart`, `drift_schemas/drift_schema_v5.json` → `drift_schemas/drift_schema_v6.json`, `README.md`, `test/data/local/bootstrap/local_data_bootstrap_test.dart`.
+  - **Размер:** M.
+
+- [x] 1.5 Отдавать в первой порции числа обоих типов намерения, когда их просит запрос
+  - **Критерии приёмки:**
+    - Запрос может попросить числа типов по решению 2 дизайна. Первая порция несёт их тогда и только тогда, когда запрос их попросил. Числа «все» и «действия» считаются без условия готовности, но со всеми остальными ограничениями: охват, исключённый участник, название, условия по тегам.
+    - Адаптер получает числа и общее количество одним запросом подсчёта. Общее количество по-прежнему соответствует условию готовности запроса.
+    - Первая порция отклоняет противоречивые числа: число действий больше всех, общее количество больше всех.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/data/drift_intention_catalog_test.dart` — числа при названии, тегах и исключении для трёх вариантов готовности; без просьбы чисел нет.
+    - `mise exec --no-deps -- flutter test test/intention/application/intention_contract_test.dart` — проверка согласованности чисел первой порции.
+  - **Зависимости:** 1.1.
+  - **Предполагаемые файлы:** `lib/src/intention/application/intention_catalog.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `test/intention/data/drift_intention_catalog_test.dart`, `test/intention/application/intention_contract_test.dart`.
+  - **Размер:** M.
+
+- [x] 1.6 Научить тестовые адаптеры, которые отдают первые порции поискам исходного намерения и участника, отвечать на запрошенные числа типов
+  - **Критерии приёмки:**
+    - Если запрос просит числа типов по решению 2 дизайна, первая порция тестового адаптера несёт числа «все» и «действия», согласованные с её общим количеством и готовностью намерений в наборе. Если не просит — чисел в порции нет, как сейчас.
+    - Модель каталога в этой задаче не меняется и чисел пока не просит, поэтому существующие проверки проходят без изменения ожиданий.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter analyze`.
+    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog test/intention/presentation/picker test/daily_choice/presentation/source_picker test/daily_choice/presentation/catalog test/long_term_relation/presentation/participant_picker test/long_term_relation/presentation/editor test/app/routing/app_router_test.dart test/app/navigation/app_shell_operation_reset_test.dart` — поиски работают как прежде.
+  - **Зависимости:** 1.5 — запрос умеет просить числа, а первая порция умеет их нести.
+  - **Предполагаемые файлы:** механическая адаптация 15 тестовых адаптеров и сборок первой порции:
+    - `test/daily_choice/presentation/daily_choice_picker_context_test_support.dart`, `test/daily_choice/presentation/daily_choice_picker_tag_search_test_support.dart`, `test/daily_choice/presentation/source_picker/daily_choice_source_picker_page_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`;
+    - `test/intention/presentation/catalog/intention_picker_session_test_support.dart`, `test/intention/presentation/catalog/intention_catalog_tag_filter_view_model_test.dart`, `test/intention/presentation/catalog/intention_catalog_tag_change_reconciliation_test.dart`, `test/intention/presentation/picker/intention_picker_view_test.dart`, `test/intention/presentation/picker/intention_picker_results_test.dart`, `test/intention/presentation/details/details_test_support.dart`;
+    - `test/long_term_relation/presentation/participant_picker/participant_picker_test_support.dart`, `test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart`, `test/long_term_relation/presentation/editor/relation_form_test_support.dart`;
+    - `test/app/routing/app_router_test.dart`, `test/app/navigation/app_shell_operation_reset_test.dart`.
+  - **Размер:** M — во всех адаптерах один механический приём. Адаптация вынесена из задачи 1.7, чтобы модель начала просить числа уже на готовых адаптерах.
+
+- [x] 1.7 Вести в модели каталога тип намерения и точные числа обоих типов по назначению поиска
+  - **Критерии приёмки:**
+    - Доступность типа зависит от назначения и выражена sealed-значением по решению 2 дизайна:
+      - поиски исходного намерения и участника — тип открыт и начинается с «все»;
+      - поиск действия — тип закреплён за действиями;
+      - общий каталог — тип не предлагается.
+      
+      Условие готовности запроса выводится из назначения и типа. Смена открытого типа начинает новую выдачу с первой порции; для других назначений её нет.
+    - Числа типов модель просит только при открытом типе. Пропущенные или противоречивые числа она считает нарушением контракта порции.
+    - Модель поправляет оба числа по снимкам до и после правки: создание, изменение, архивирование, удаление и смена готовности, которая переносит намерение между типами. Протокол ревизий и поздних порций не меняется.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog/intention_catalog_view_model_test.dart test/intention/presentation/catalog/intention_catalog_mutation_reconciliation_test.dart` — доступность и смена типа; числа после правок, включая смену готовности.
+    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog test/intention/presentation/picker test/daily_choice/presentation/action_picker test/daily_choice/presentation/source_picker test/daily_choice/presentation/catalog test/long_term_relation/presentation/participant_picker test/long_term_relation/presentation/editor test/app/routing/app_router_test.dart test/app/navigation/app_shell_operation_reset_test.dart` — существующие поиски и каталог работают как прежде, в том числе на тестовых адаптерах из задачи 1.6.
+  - **Зависимости:** 1.5, 1.6 — тестовые адаптеры уже отвечают на запрошенные числа.
+  - **Предполагаемые файлы:** `lib/src/intention/presentation/catalog/intention_catalog_view_model.dart`, `lib/src/intention/presentation/catalog/intention_catalog_state.dart`, `test/intention/presentation/catalog/catalog_test_support.dart`, `test/intention/presentation/catalog/intention_catalog_view_model_test.dart`, `test/intention/presentation/catalog/intention_catalog_mutation_reconciliation_test.dart`.
+  - **Размер:** M.
+
+- [x] 1.8 Согласовывать подтверждённые правки с загруженной частью каталога в порядке по названию
+  - **Критерии приёмки:**
+    - При порядке по названию переименование внутри загруженной границы перемещает строку на её место по ключу из снимка изменения. Переименование за границу исключает строку до загрузки порции с её позицией и не даёт повтора после подгрузки.
+    - Граница курсора модели сравнивается тем же ключом порядка.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog/intention_catalog_mutation_reconciliation_test.dart`.
+  - **Зависимости:** 1.3.
+  - **Предполагаемые файлы:** `test/intention/presentation/catalog/intention_catalog_mutation_reconciliation_test.dart`; `lib/src/intention/presentation/catalog/intention_catalog_view_model.dart` — только если проверка найдёт расхождение.
+  - **Размер:** S.
+
+- [x] 1.9 Различать поле сортировки в диагностике чтения порции каталога и измерять порядок по названию бенчмарком
+  - **Критерии приёмки:**
+    - Событие чтения порции каталога в начале, при успехе и при отказе несёт поле сортировки: время создания, время изменения или название. Разработческий приёмник его выводит, пользовательского текста событие не несёт.
+    - Бенчмарк каталога измеряет первую порцию и продолжение по названию на том же большом наборе, что и порядок по времени, и сравнивает их с бюджетами.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/shared/diagnostics/diagnostics_sink_test.dart test/intention/data/drift_intention_repository_fault_test.dart`.
+    - `mise exec --no-deps -- flutter test --no-pub benchmark/intention/intention_catalog_benchmark.dart --concurrency=1 --reporter=expanded`.
+  - **Зависимости:** 1.3, 1.4.
+  - **Предполагаемые файлы:** `lib/src/shared/diagnostics/diagnostics_sink.dart`, `lib/src/shared/diagnostics/developer_diagnostics_sink.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `test/shared/diagnostics/diagnostics_sink_test.dart`, `test/intention/data/drift_intention_repository_fault_test.dart`, `benchmark/intention/intention_catalog_benchmark.dart`.
+  - **Размер:** S.
+
+- [x] 1.10 Подтвердить готовность первой фазы: каталог читает порядок по названию и тип намерения на схеме 6, а экраны не изменились
+  - **Критерии приёмки:**
+    - Выполнено условие «Ready to advance» первой фазы:
+      - требования «Упорядочивание каталогов намерений» и «Тип намерения в поиске для выбора» и правила точного количества выполняются на уровне чтения и модели каталога;
+      - порядок адаптера и модели совпадает и на граничных символах;
+      - новая установка работает на схеме 6;
+      - существующие экраны не изменились.
+    - Пакет не содержит изменений вида и параметров поисков и каталога графа.
+    - Результаты проверок и путь к APK сообщены в сессии. Ручная проверка на устройстве остаётся за пользователем и не блокирует готовность фазы.
+  - **Проверка:**
+    - `mise run check` и `openspec validate add-intention-picker-sorting-and-purpose --strict --no-interactive`; после фиксации изменений — `mise run codegen-check` на чистой рабочей копии.
+    - `mise exec --no-deps -- flutter test --no-pub benchmark/intention/intention_catalog_benchmark.dart --concurrency=1 --reporter=expanded`.
+    - `mise exec --no-deps -- flutter build apk --release` с артефактом `build/app/outputs/flutter-apk/app-release.apk`. Если через DTD найдено запущенное приложение, выполнить hot restart и проверить `get_runtime_errors`; эмулятор и устройство не запускаются.
+    - Сообщить оставшиеся ручные проверки:
+      - перенос данных экспортом на прежней сборке, очисткой и импортом;
+      - каталог и три поиска выглядят и работают как прежде.
+  - **Зависимости:** 1.1–1.9.
+  - **Предполагаемые файлы:** нет, только проверка и сборка.
+  - **Размер:** XS.
+
+- [x] 1.11 Определить в контракте запроса каталога производный запрос «тот же, но без условия готовности» и поправлять по нему числа типов в модели каталога
+  - **Критерии приёмки:**
+    - `IntentionCatalogQuery` возвращает производный запрос с условием готовности «все». Все остальные поля исходного запроса переходят в него без изменений. Запрос собирается через приватный конструктор, в котором все поля обязательны. Поэтому новое поле запроса не скомпилируется, пока его не перенесут в производный запрос.
+    - `IntentionCatalogViewModel._reconcileTypeCounts` проверяет принадлежность снимков по этому производному запросу и больше не собирает запрос по полям сам. Поведение чисел типов и выдачи не меняется.
+    - Тест контракта проверяет: производный запрос включает намерения обеих готовностей и сохраняет охват, фильтр названия, теги и исключённого участника, то есть исключает намерение, которое не проходит любое из этих условий.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/application/intention_contract_test.dart test/intention/presentation/catalog/intention_catalog_view_model_test.dart test/intention/presentation/catalog/intention_catalog_mutation_reconciliation_test.dart`.
+  - **Зависимости:** 1.7.
+  - **Предполагаемые файлы:** `lib/src/intention/application/intention_catalog.dart`, `lib/src/intention/presentation/catalog/intention_catalog_view_model.dart`, `test/intention/application/intention_contract_test.dart`.
+  - **Размер:** XS.
+
+## Phase 2: Пользователь выбирает тип и сортировку в поисках
+
+- [x] 2.1 Добавить значки ползунков сортировки и стрелок порядка из макета экрана выбора
+  - **Критерии приёмки:**
+    - Ползунки 16 из пилюли сортировки заголовка списка и стрелки вниз и вверх 16 из группы «Порядок» листа «Показать и упорядочить» перенесены из `context/doable-design/design/ActionPicker.dc.html` по правилам `lib/src/design_system/icons/README.md`. Таблица README называет макет и блок каждого ресурса.
+    - `DoableIconData` содержит три новых значения, а эталон всех иконок показывает их в обеих темах в размере 16 и цвете `muted`, как их покажут `CatalogHeader` и `OptionGroup`.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test --update-goldens test/design_system/doable_icon_test.dart`, сверка нового эталона с макетом, затем `mise exec --no-deps -- flutter test test/design_system/doable_icon_test.dart`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** три SVG в `lib/src/design_system/icons/assets/`, `lib/src/design_system/doable_icon.dart`, `lib/src/design_system/icons/README.md`, `test/design_system/doable_icon_test.dart`, `test/design_system/goldens/doable_icons.png`.
+  - **Размер:** S.
+
+- [x] 2.2 Дать листу по содержимому действие в строке заголовка, как у раскрываемого листа
+  - **Критерии приёмки:**
+    - `Sheet` по содержимому принимает необязательное `SheetAction` по решению 4 дизайна и README `Sheet`: текстовая кнопка размера sm справа на строке заголовка, с областью нажатия 44 и подписью, которая кончается в `space-5` от края экрана. Заголовок остаётся по центру, а действие строится тем же путём, что у раскрываемого листа.
+    - Нажатие вызывает обработчик, и лист остаётся открытым. Без действия лист по содержимому выглядит и работает как прежде.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/sheet_test.dart` — положение подписи и заголовка; узел кнопки с доступным названием; нажатие у верха области; прежняя раскладка без действия; прежние проверки перетаскивания листа по содержимому.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `lib/src/design_system/components/sheet.dart`, `test/design_system/sheet_test.dart`.
+  - **Размер:** S.
+
+- [x] 2.3 Добавить в дизайн-систему группу взаимоисключающих вариантов `OptionGroup` для листов
+  - **Критерии приёмки:**
+    - `OptionGroup` в варианте `lg` по README `OptionGroup` и решению 4 дизайна:
+      - подпись группы в стиле `caption` цвета `muted` стоит над пилюлями через `space-2`;
+      - пилюли высотой `tap-min` с углами `radius-full` стоят в равных колонках по числу вариантов через `space-2`, группа не переносится;
+      - выбранный вариант — плоскость `fill` и стиль `section`, остальные — внутреннее кольцо `hairline` 1 и стиль `row` с трекингом −0,01 em;
+      - необязательное число стоит через 6 после подписи варианта в стиле `label` цвета `muted` с табличными цифрами, необязательная иконка 16 цвета `muted` — перед подписью.
+    - Группа, значение которой закрепляет контекст, недоступна и всегда несёт пояснение. Её пилюли не нажимаются и не показывают чисел, выбранная сохраняет `fill` с подписью `muted`, остальные — `grip`. Пояснение в стиле `caption` цвета `muted` стоит через `space-2` под пилюлями.
+    - Экранный диктор слышит группу взаимоисключающих вариантов: название группы из подписи, выбранный вариант, а у недоступной группы — недоступность и пояснение. Нажатие варианта сообщает потребителю его выбор, тексты приходят готовыми (ADR-0030). Варианта `sm`, числа колонок и отдельных доступных названий группы и вариантов нет: их не использует ни один потребитель.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/option_group_test.dart` — обе темы и значения токенов; равные колонки трёх и двух вариантов; число и иконка; нажатие и выбранный вариант; недоступная группа с пояснением; узлы и состояния для экранного диктора; области нажатия не меньше `tap-min`; текст масштаба 2 без переполнения.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** новые `lib/src/design_system/components/option_group.dart` и `test/design_system/option_group_test.dart`.
+  - **Размер:** S.
+
+- [x] 2.4 Закрепить под полем поиска всех трёх поисков заголовок списка: показываемый тип, число подтверждённой выдачи и сводку сортировки
+  - **Критерии приёмки:**
+    - `CatalogHeader` по README `CatalogHeader`: число необязательно — без него плашки числа нет, а пустой список показывает 0. У правого края стоит пилюля сортировки `fill` высотой 32 со значком ползунков 16 цвета `muted` и сводкой в стиле `caption` цвета `ink` в одну строку. Кнопкой заголовок пока не является: её добавляет задача 2.6.
+    - `IntentionPickerView` ставит заголовок под рядом поиска по README `CatalogHeader`, и при прокрутке он остаётся на месте. `IntentionPickerResults` рисует только строки, пустые состояния, подгрузку и отказы.
+      - Заголовок называет тип по доступности типа модели каталога (решение 2 дизайна): выбранный открытый тип или закреплённые «Действия».
+      - Сводка — поле, запятая и порядок: «Создание, сначала новые», «Название, от А до Я».
+      - Тип и сводка отражают текущий `notifier.selection` сразу после смены параметров, до ответа первой порции новой выдачи. Сохранённый в `AsyncValue.value` прежний `selection` их не определяет.
+      - Число берётся только из подтверждённой выдачи текущих параметров. Пока выдача получается, во время паузы ввода, после отказа и при недопустимом фильтре заголовок показывает тип и сводку без числа.
+    - Поиски исходного намерения и участника открываются с заголовком «Все». Проверки страниц ждут его и сводку «Создание, сначала новые», а строки и методы вида, потерявшие потребителя, удалены.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/catalog_header_test.dart` — обе темы; пилюля сортировки; заголовок без числа и с 0; длинная сводка и текст масштаба 2 без переполнения.
+    - `mise exec --no-deps -- flutter test test/intention/presentation/picker` в обоих языках:
+      - сценарий «Поиск и фильтр остаются на месте при прокрутке» в поиске исходного намерения;
+      - тип и сводка во всех трёх поисках;
+      - заголовок без числа до первой выдачи, пока получается выдача новых параметров, и при недопустимом фильтре.
+      - На настоящей модели каталога сначала подтверждена исходная выдача, затем через `changeType` или `changeOrder` меняются параметры, а ответ новой первой порции удерживает тестовый репозиторий. До его завершения заголовок уже показывает новый тип или новую сводку без прежнего числа. В поиске действия меняется порядок, в поисках исходного намерения и участника — также тип. Проверка не зависит от листа, который появляется в задаче 2.5.
+    - `mise run codegen`, `mise exec --no-deps -- flutter analyze` и `mise exec --no-deps -- flutter test test/app/localization/locale_resolution_test.dart`.
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation test/long_term_relation/presentation/participant_picker test/long_term_relation/presentation/editor test/app/creation_flows_integration_test.dart test/app/quick_creation test/app/intention_tag_search_app_flow_test.dart test/app/long_term_relation_app_flow_test.dart test/app/navigation/app_shell_operation_reset_test.dart` — сценарий «Поиск действия открывается экраном выбора» с количеством 13 и сортировкой «Создание, сначала новые»; потоки через три поиска.
+  - **Зависимости:** 2.1 — значок ползунков.
+  - **Предполагаемые файлы:**
+    - `lib/src/design_system/components/catalog_header.dart`, `lib/src/intention/presentation/picker/intention_picker_view.dart`, `lib/src/intention/presentation/picker/intention_picker_results.dart`, `lib/src/intention/presentation/picker/intention_picker_kind.dart`;
+    - `lib/l10n/app_en.arb`, `lib/l10n/app_ru.arb` и генерируемые `lib/l10n/app_localizations*.dart`;
+    - `test/design_system/catalog_header_test.dart`, `test/intention/presentation/picker/intention_picker_view_test.dart`, `test/intention/presentation/picker/intention_picker_results_test.dart`;
+    - механическая адаптация ожиданий заголовка: `test/daily_choice/presentation/daily_choice_picker_context_test_support.dart`, `test/daily_choice/presentation/source_picker/daily_choice_source_picker_page_test.dart`, `test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart`.
+  - **Размер:** M — заголовок нельзя перенести, не сломав ожиданий проверок страниц, поэтому их механическая адаптация входит в задачу.
+
+- [x] 2.5 Добавить лист «Показать и упорядочить», который сразу применяет к поиску выбранные тип, сортировку и порядок
+  - **Критерии приёмки:**
+    - Лист — композиция модуля экрана выбора по решению 4 дизайна и разделу «The Show and sort sheet» README `OptionGroup`. Его показывает функция модуля через `showDoableSheet` над корневым навигатором (ADR-0032); заголовок списка подключается к ней в задаче 2.6.
+      - `Sheet` по содержимому «Показать и упорядочить» со строкой «Список меняется по мере выбора» и группами «Тип», «Сортировка» и «Порядок».
+      - Лист следит за моделью каталога своего назначения через её провайдер. Выбранные варианты всех групп, подписи группы «Порядок» и наличие «Сбросить» берутся из текущего `notifier.selection` и меняются после каждого нажатия, до ответа новой первой порции. Заголовок за листом сразу показывает те же тип и сводку без числа; прежний `selection` из `AsyncValue.value` не определяет показ или обработку следующего нажатия.
+      - Каждое нажатие сразу начинает через `changeType` или `changeOrder` новую выдачу с первой порции, и список возвращается к началу тем же путём, что при любом новом запросе.
+    - Правила групп:
+      - открытый тип — «Все», «Намерения» и «Действия» с числами, которые берутся так же, как число заголовка, из подтверждённой выдачи текущих параметров;
+      - в поиске действия группа «Тип» недоступна: выбраны «Действия», чисел нет, а пояснение говорит, что конечным в дневном выборе может быть только действие;
+      - переход между временем и названием выбирает первый порядок нового поля, переход между двумя временами сохраняет направление. Правило применяет лист к последнему выбору модели, в том числе когда ответ на предыдущий выбор ещё не получен, а модель получает готовый `IntentionCatalogOrder`. Порядок подписан по полю: первый вариант — со стрелкой вниз, второй — со стрелкой вверх;
+      - «Сбросить» стоит в строке заголовка, пока хотя бы одна изменяемая группа отличается от начального показа, и возвращает к нему все изменяемые группы. Оно появляется после изменения и исчезает после сброса сразу, до ответа новой первой порции.
+    - Тексты листа на обоих языках. Тип и порядок принадлежат странице поиска (ADR-0028): вложенный поиск их не разделяет, а новое открытие начинается с начального показа своего назначения.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/picker/intention_picker_show_and_sort_sheet_test.dart` в обоих языках, лист открывается его функцией над экраном выбора:
+      - сценарии «Выбор типа сразу меняет список, а количества учитывают поиск», «Переход от времени к названию выбирает прямой порядок», «Переход между временем создания и изменения сохраняет направление», «„Сбросить“ возвращает начальный показ» и «Тип закреплён в поиске действия»;
+      - На настоящей модели каталога исходная выдача уже подтверждена, а ответы первых порций после нажатий удерживает тестовый репозиторий. После каждого выбора типа, поля или направления и до ответа новой порции проверяются выбранные варианты, подписи группы «Порядок», наличие «Сбросить» и новый тип и сводка заголовка за листом без числа. Прежние числа типов также не показываются. Ожидание задаётся управляемым ответом, без измерений времени.
+      - Из подтверждённого «Создание, сначала старые» последовательно нажать «Название» и «Изменение», не завершая ни один новый ответ: после первого нажатия выбраны «Название» и «От А до Я», после второго — «Изменение» и «Сначала новые». После каждого нажатия лист и заголовок уже показывают этот выбор, а новый запрос несёт соответствующий порядок. Переход «Создание» → «Изменение» без промежуточного «Название» сохраняет «Сначала старые» также до ответа.
+      - После выбора, отличного от начального, «Сбросить» уже видно до ответа; нажатие сразу возвращает начальные варианты и заголовок без числа и убирает «Сбросить», пока ответ порции после сброса ещё удерживается.
+      - открытый лист по `iOSTapTargetGuideline`, `labeledTapTargetGuideline` и `textContrastGuideline`.
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/action_picker test/daily_choice/presentation/source_picker test/long_term_relation/presentation/participant_picker` — проверки сессии трёх поисков: новое открытие с начальными типом и порядком, вложенные поиски со своими.
+    - `mise run codegen`, `mise exec --no-deps -- flutter analyze` и `mise exec --no-deps -- flutter test test/app/localization/locale_resolution_test.dart`.
+  - **Зависимости:** 2.1 — стрелки; 2.2 — действие листа; 2.3 — группа вариантов; 2.4 — названия типов и заголовок за листом.
+  - **Предполагаемые файлы:** новые `lib/src/intention/presentation/picker/intention_picker_show_and_sort_sheet.dart` и `test/intention/presentation/picker/intention_picker_show_and_sort_sheet_test.dart`; `lib/l10n/app_en.arb`, `lib/l10n/app_ru.arb` и генерируемые `lib/l10n/app_localizations*.dart`; `test/intention/presentation/catalog/intention_picker_session_test_support.dart`.
+  - **Размер:** M.
+
+- [x] 2.6 Сделать заголовок списка одной кнопкой, которая открывает лист «Показать и упорядочить», в том числе до получения выдачи
+  - **Критерии приёмки:**
+    - `CatalogHeader` по README `CatalogHeader` и решению 4 дизайна — одна кнопка во всю ширину списка высотой не меньше `tap-min`: `InkWell` над рядом с пилюлей сортировки справа. Доступное название и признак раскрытого листа задаёт потребитель (ADR-0030), акцента у заголовка нет.
+    - Нажатие на заголовок открывает лист из задачи 2.5 во всех трёх поисках, в том числе пока выдача получается, после отказа и при недопустимом фильтре. Пока лист открыт, заголовок отмечен раскрытым.
+    - Доступное название на обоих языках сообщает, что заголовок открывает показ и упорядочивание, а также тип, количество, если оно известно, и сортировку.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/catalog_header_test.dart` — один узел-кнопка с названием потребителя и признаком раскрытия; нажатие в любой точке ряда; высота не меньше `tap-min`; обе темы; текст масштаба 2.
+    - `mise exec --no-deps -- flutter test test/intention/presentation/picker` в обоих языках — сценарий «Заголовок без числа до получения выдачи»; открытие листа во всех трёх поисках; доступное название с числом и без него; цели касания экрана по `iOSTapTargetGuideline`, `labeledTapTargetGuideline` и `textContrastGuideline`.
+    - `mise run codegen`, `mise exec --no-deps -- flutter analyze` и `mise exec --no-deps -- flutter test test/app/localization/locale_resolution_test.dart`.
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/action_picker test/daily_choice/presentation/source_picker test/long_term_relation/presentation/participant_picker` — страницы трёх поисков.
+  - **Зависимости:** 2.4 — заголовок под полем поиска; 2.5 — лист.
+  - **Предполагаемые файлы:** `lib/src/design_system/components/catalog_header.dart`, `lib/src/intention/presentation/picker/intention_picker_view.dart`, `lib/l10n/app_en.arb`, `lib/l10n/app_ru.arb` и генерируемые `lib/l10n/app_localizations*.dart`, `test/design_system/catalog_header_test.dart`, `test/intention/presentation/picker/intention_picker_view_test.dart`.
+  - **Размер:** M.
+
+- [x] 2.7 Называть в пустой выдаче выбранный тип, предлагать «Показать оба типа» и сохранять тип и порядок при «Сбросить фильтры»
+  - **Критерии приёмки:**
+    - Сообщение пустой выдачи по фильтру названия, условиям по тегам или обоим называет искомое по выбранному типу: действия при типе «Действия», иначе намерения. Заголовок показывает тип и 0. «Сбросить фильтры» очищает название и условия по тегам, сохраняя тип, порядок и ограничения поиска.
+    - Если при открытом типе без названия и условий пуст выбранный тип «Намерения» или «Действия», а в допустимом охвате есть намерения другого типа, сообщение говорит, что намерений этого типа нет, и предлагает «Показать оба типа». Оно выбирает «Все» и начинает выдачу с начала. Пустой допустимый охват при любом типе показывает прежнее «Выбрать не из чего» с сообщением страницы, без «Сбросить фильтры» и «Показать оба типа».
+    - Тексты на обоих языках; строки и методы вида, потерявшие потребителя, удалены.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/picker/intention_picker_view_test.dart` в обоих языках:
+      - сценарии «Пустой тип предлагает показать оба типа», «Пустая выдача называет обе причины» и «Пустой охват без фильтров не предлагает сброс»;
+      - сценарий «„Сбросить фильтры“ снимает название и условия», в котором новый запрос сохраняет выбранные тип и порядок;
+      - сообщение по названию при типе «Действия» в поиске исходного намерения; пустой охват при открытом типе «Намерения».
+    - `mise run codegen`, `mise exec --no-deps -- flutter analyze` и `mise exec --no-deps -- flutter test test/app/localization/locale_resolution_test.dart`.
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/action_picker test/daily_choice/presentation/source_picker test/long_term_relation/presentation/participant_picker` — сообщения пустой выдачи на страницах.
+  - **Зависимости:** 2.4 — заголовок с типом; 2.5 — выбор типа в листе.
+  - **Предполагаемые файлы:** `lib/src/intention/presentation/picker/intention_picker_results.dart`, `lib/src/intention/presentation/picker/intention_picker_kind.dart`, `lib/l10n/app_en.arb`, `lib/l10n/app_ru.arb` и генерируемые `lib/l10n/app_localizations*.dart`, `test/intention/presentation/picker/intention_picker_view_test.dart`.
+  - **Размер:** M.
+
+- [x] 2.8 Подтвердить готовность второй фазы: три поиска показывают закреплённый заголовок списка и применяют тип и сортировку из листа «Показать и упорядочить»
+  - **Критерии приёмки:**
+    - Выполнено условие «Ready to advance» второй фазы:
+      - требования «Экран поиска для выбора намерения», «Заголовок списка поиска для выбора», «Параметры показа в поиске для выбора» и «Сброс фильтров в пустой выдаче поиска для выбора» выполняются во всех трёх поисках на обоих языках;
+      - требование «Закреплённый тип поиска действия» выполняется.
+    - Пакет не добавляет подзаголовок назначения и лист «Что вы выбираете» и не меняет каталог графа намерений.
+    - Результаты проверок и путь к APK сообщены в сессии. Ручная проверка на устройстве остаётся за пользователем и не блокирует готовность фазы.
+  - **Проверка:**
+    - `mise run check` и `mise exec --no-deps -- openspec validate add-intention-picker-sorting-and-purpose --strict --no-interactive`; после фиксации изменений — `mise run codegen-check` на чистой рабочей копии.
+    - `mise exec --no-deps -- flutter build apk --release` с артефактом `build/app/outputs/flutter-apk/app-release.apk`. Если через DTD найдено запущенное приложение, выполнить hot restart и проверить `get_runtime_errors`; эмулятор и устройство не запускаются.
+    - Сообщить оставшиеся ручные проверки:
+      - вид заголовка списка и листа в трёх поисках в обеих темах против макета `ActionPicker.dc.html`;
+      - заголовок на месте при прокрутке и открытой клавиатуре;
+      - сразу применённый выбор в листе, правило порядка при смене поля, «Сбросить» и закреплённый тип поиска действия;
+      - пустой тип с «Показать оба типа» и «Сбросить фильтры» с прежними типом и порядком;
+      - начальный показ при новом открытии поиска;
+      - объявления TalkBack для заголовка и групп листа.
+  - **Зависимости:** 2.1–2.7.
+  - **Предполагаемые файлы:** нет, только проверка и сборка.
+  - **Размер:** XS.
+
+- [x] 2.9 Перевести проверки семантики `OptionGroup` на поддерживаемый API Flutter, сохранив все нынешние утверждения
+  - **Критерии приёмки:**
+    - Все восемь вызовов устаревшего `SemanticsNode.hasFlag` в `test/design_system/option_group_test.dart` заменены поддерживаемым API закреплённого в проекте Flutter. Анализ файла проходит без диагностик `deprecated_member_use`.
+    - Сохранены все нынешние утверждения тестов, включая выбранный вариант после нажатия, недоступность группы и вариантов и взаимоисключение в обеих темах. Проверки не ослаблены, диагностики не подавлены, настройки анализатора и версии инструментов не изменены.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/option_group_test.dart` — существующие проверки компонента проходят с прежними утверждениями.
+    - `mise exec --no-deps -- flutter analyze --no-pub test/design_system/option_group_test.dart` — exit 0, диагностик нет.
+    - Полный `mise run check` и готовность второй фазы проверяет следующее ревью реализации после последней задачи фазы.
+  - **Зависимости:** 2.3 — существующий компонент и его проверки.
+  - **Предполагаемые файлы:** `test/design_system/option_group_test.dart`.
+  - **Размер:** XS.
+
+## Phase 3: Поиски дневного выбора напоминают своё назначение
+
+- [x] 3.1 Добавить значок шеврона вниз, которым кончается строка назначения в шапке экрана выбора
+  - **Критерии приёмки:**
+    - Шеврон перенесён из `context/doable-design/design/ActionPicker.dc.html` по правилам `lib/src/design_system/icons/README.md`: блок `header` → кнопка `openReminder`, завершающий SVG. Таблица README называет макет и блок ресурса.
+    - `DoableIconData` содержит новое значение, а эталон всех иконок показывает его в обеих темах в размере 12 и цвете `muted` на плоскости `bg`, как его покажет `TopBar`.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test --update-goldens test/design_system/doable_icon_test.dart`, сверка нового эталона с макетом, затем `mise exec --no-deps -- flutter test test/design_system/doable_icon_test.dart`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** новый SVG в `lib/src/design_system/icons/assets/`, `lib/src/design_system/doable_icon.dart`, `lib/src/design_system/icons/README.md`, `test/design_system/doable_icon_test.dart`, `test/design_system/goldens/doable_icons.png`.
+  - **Размер:** XS.
+
+- [x] 3.2 Дать верхней панели строку назначения: подзаголовок, который вместе с заголовком образует одну кнопку
+  - **Критерии приёмки:**
+    - Строка по разделу «The purpose line of a picker» README `TopBar`, с уточнением высоты из решения 5 дизайна вместо фиксированных 44 при крупном тексте, без отметки роли — её добавит фаза 4 вместе с графическим языком:
+      - под заголовком стоит одна строка в стиле `hint` цвета `muted`, в её конце — шеврон 12 из задачи 3.1;
+      - заголовок и строка не переносятся: не поместившийся текст кончается многоточием, а шеврон остаётся видимым;
+      - заголовок и строка — одна кнопка высотой не меньше 44 dp шириной панели без 56 с каждой стороны. При стандартном масштабе высота панели и кнопки — 44 dp; при крупном системном тексте они растут по фактическим высотам обеих строк без обрезки по высоте и наложения. Обе строки сохраняют `TextScaler` окружения без ограничения или уменьшения масштаба. Крестик остаётся отдельной областью нажатия 44 × 44 dp по центру высоты панели;
+      - `TopBar` отвечает за расчёт высоты с учётом актуального `TextScaler` и его изменений: `preferredSize`, содержимое и общая кнопка имеют согласованную высоту. `Scaffold.appBar` выделяет эту высоту и отдельно системный отступ, поэтому тело экрана начинается под шапкой (решение 5 дизайна).
+    - Подзаголовок, доступное название кнопки, признак раскрытого листа и обработчик нажатия потребитель передаёт готовыми и вместе, одним необязательным значением (ADR-0030): подзаголовок без кнопки и кнопку без подзаголовка собрать нельзя. Без этого значения панель выглядит и работает как прежде.
+    - Экранный диктор слышит заголовок и подзаголовок одной кнопкой с названием и признаком раскрытия от потребителя, а маршрут экрана по-прежнему назван.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/top_bar_test.dart`:
+      - обе темы и значения токенов; положение и размеры кнопки, строки и шеврона;
+      - со шрифтом Inter при стандартном масштабе текста на ширинах 360 и 390 dp оба подзаголовка «Новый дневной выбор: исходное намерение» и «Новый дневной выбор: конечное действие» стоят в одну строку и фактически обрезаются многоточием, а шеврон остаётся видимым; проверка подтверждает обрезку при превышении доступной ширины, а не только заданные свойства текста; доступное название кнопки содержит полный подзаголовок;
+      - один узел-кнопка с названием потребителя и признаком раскрытия; нажатие в любой точке кнопки; названный маршрут;
+      - сценарий «Крупный системный текст увеличивает шапку» на уровне панели внутри настоящего `Scaffold` с системным отступом: при масштабе 2 высота панели и общей кнопки больше 44 dp и вмещает обе строки; их фактические высоты соответствуют стилям `title` и `hint` с `TextScaler` окружения, масштаб не ограничен и не уменьшен. Строки не обрезаны по высоте и не накладываются, шеврон и крестик видны, тело начинается под выросшей панелью с учётом отступа. Изменение `TextScaler` у уже показанной панели обновляет выделенную высоту;
+      - прежние проверки панели без подзаголовка.
+    - `mise exec --no-deps -- flutter test test/intention/presentation/picker` — экран выбора без подзаголовка работает как прежде.
+  - **Зависимости:** 3.1 — шеврон.
+  - **Предполагаемые файлы:** `lib/src/design_system/components/top_bar.dart`, `test/design_system/top_bar_test.dart`.
+  - **Размер:** S.
+
+- [x] 3.3 Показывать на экране выбора назначение, которое передаёт страница: подзаголовок шапки открывает лист «Что вы выбираете», который возвращает поиск без изменений
+  - **Критерии приёмки:**
+    - Страница может передать экрану выбора описание назначения по решению 5 дизайна. Это значение модуля экрана выбора без предметных типов дневного выбора и связей, отдельное от назначения каталога `IntentionPickerPurpose`: подзаголовок, строка листа и построитель тела листа. Отметку роли описание получит в фазе 4. Поиск участника описания не передаёт и до фазы 4 выглядит как прежде (ограничение плана «Переходный вид поиска участника»).
+    - С описанием шапка показывает строку назначения из задачи 3.2. Нажатие на неё открывает лист по содержимому «Что вы выбираете», который функция модуля показывает над корневым навигатором (ADR-0032): строка листа под заголовком, построенное тело и внизу основная кнопка «Вернуться к списку», которая закрывает лист. Пока лист открыт, кнопка шапки отмечена раскрытой. Её доступное название сообщает заголовок, подзаголовок и то, что кнопка показывает, что выбирается. Тексты на обоих языках.
+    - Лист ничего не меняет: закрытие любым способом возвращает поиск с теми же фильтром названия, условиями по тегам, типом и порядком, той же выдачей без нового запроса и той же позицией прокрутки.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/picker/intention_picker_purpose_sheet_test.dart` в обоих языках на экране выбора с тестовым описанием назначения:
+      - сценарий «Лист напоминает назначение и не меняет поиск» на уровне экрана: подстрока «бег», выдача прокручена до середины, открыт лист; после «Вернуться к списку» поле показывает «бег», репозиторий не получил нового запроса, а позиция прокрутки прежняя;
+      - подзаголовок под заголовком; доступное название и признак раскрытия кнопки до открытия, при открытом листе и после закрытия; строка листа, построенное тело и «Вернуться к списку».
+    - `mise exec --no-deps -- flutter test test/intention/presentation/picker test/daily_choice/presentation/action_picker test/daily_choice/presentation/source_picker test/long_term_relation/presentation/participant_picker` — экран и три поиска без описания работают как прежде.
+    - `mise run codegen`, `mise exec --no-deps -- flutter analyze` и `mise exec --no-deps -- flutter test test/app/localization/locale_resolution_test.dart`.
+  - **Зависимости:** 3.2 — строка назначения панели.
+  - **Предполагаемые файлы:** новые `lib/src/intention/presentation/picker/intention_picker_purpose_sheet.dart` и `test/intention/presentation/picker/intention_picker_purpose_sheet_test.dart`; `lib/src/intention/presentation/picker/intention_picker_view.dart`; `lib/l10n/app_en.arb`, `lib/l10n/app_ru.arb` и генерируемые `lib/l10n/app_localizations*.dart`.
+  - **Размер:** M.
+
+- [x] 3.4 Добавить в дизайн-систему пронумерованные шаги потока `FlowSteps` с отметкой текущего шага
+  - **Критерии приёмки:**
+    - `FlowSteps` по решению 5 дизайна, разделу «The purpose line of a picker» README `TopBar` и листу «What you are choosing» макета `ActionPicker.dc.html`:
+      - шаги идут сверху вниз; слева у каждого круг 28 с номером в стиле `label` с табличными цифрами: у текущего — плоскость `accent` и номер цвета `onAccent`, у остальных — внутреннее кольцо `hairline` 1,5 и номер цвета `muted`; круги соединяет линия 2 цвета `hairline`, после последнего шага линии нет;
+      - название стоит через `space-3` от круга, его первая строка — по центру круга: у текущего шага стиль `section`, у остальных — `row` с трекингом −0,01 em, цвет `ink`. Под названием текущего шага — отметка в стиле `label` цвета `accent`, необязательное пояснение — в стиле `hint` цвета `muted`. Названия и пояснения переносятся и не обрезаются.
+    - Названия, пояснения, текст отметки и текущий шаг потребитель передаёт готовыми, без предметных типов (ADR-0030).
+    - Экранный диктор слышит каждый шаг одним узлом без действия нажатия: номер, название, отметку текущего шага и пояснение.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/flow_steps_test.dart` — обе темы и значения токенов; текущий шаг и остальные; линия между шагами и её отсутствие после последнего; перенос длинных названия и пояснения на ширине тела листа и текст масштаба 2 без переполнения; узлы шагов для экранного диктора.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** новые `lib/src/design_system/components/flow_steps.dart` и `test/design_system/flow_steps_test.dart`.
+  - **Размер:** S.
+
+- [x] 3.5 Открывать поиски дневного выбора только с явно названным потоком — созданием или заменой пути
+  - **Критерии приёмки:**
+    - Вспомогательный контекст поиска переименован в контекст замены пути по решению 5 дизайна: его передаёт только `DailyChoicePathReplacementFlow`, а подзаголовок задачи 3.6 зависит от этого смысла. Название типа и его документация говорят о замене пути.
+    - У маршрутов поисков исходного намерения и действия нет контекста по умолчанию: поиск нельзя открыть, не назвав создание или замену пути. Проверки, которые открывали поиск без контекста, называют его явно.
+    - Право запуска, подписи крестика, закрытие и выбор по идентификатору не меняются.
+  - **Проверка:**
+    - `mise run codegen` — маршруты пересозданы; `mise exec --no-deps -- flutter analyze`.
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation test/app/routing/app_router_test.dart`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - `lib/src/daily_choice/presentation/daily_choice_picker_context.dart`, `lib/src/daily_choice/presentation/source_picker/daily_choice_source_picker_page.dart`, `lib/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart`, `lib/src/daily_choice/presentation/editor/daily_choice_path_replacement_flow.dart` и генерируемый `lib/src/app/routing/app_router.gr.dart`;
+    - механическая адаптация `test/daily_choice/presentation/daily_choice_picker_context_test_support.dart`, `test/daily_choice/presentation/action_picker/daily_choice_action_picker_page_test.dart`, `test/daily_choice/presentation/source_picker/daily_choice_source_picker_page_test.dart`, `test/app/routing/app_router_test.dart`.
+  - **Размер:** S — переименование и явные контексты без изменения поведения.
+
+- [x] 3.6 Показывать в поисках исходного намерения и действия назначение каждого из четырёх потоков дневного выбора
+  - **Критерии приёмки:**
+    - Страница поиска строит описание назначения из задачи 3.3 (ADR-0022) по требованию «Назначение поисков дневного выбора». Поток она выводит из контекста, направление — из своего вида: поиск исходного намерения — от намерения, поиск действия — от действия. Подзаголовок и строка листа:
+      - создание от намерения — «Новый дневной выбор: исходное намерение» и «Новый дневной выбор, от намерения»;
+      - создание от действия — «Новый дневной выбор: конечное действие» и «Новый дневной выбор, от действия»;
+      - замена пути от намерения — «Замена пути: исходное намерение» и «Замена пути, от намерения»;
+      - замена пути от действия — «Замена пути: конечное действие» и «Замена пути, от действия».
+    - Тело листа — три шага `FlowSteps`; первый отмечен «Вы здесь», и ни один не назван необязательным:
+      - первый — «Исходное намерение» или «Конечное действие»;
+      - второй — «Путь вниз к действию» с пояснением, что каждый следующий шаг — то, что нужно или можно для предыдущего, либо «Путь вверх к исходному намерению» с пояснением, что нужен хотя бы один шаг;
+      - третий — при создании «Дата, время, приоритет и описание», при замене «Подтверждение замены» с пояснением, что дата, запланированное время, приоритет, описание и выполнение остаются прежними.
+    - Тексты на обоих языках; английские строки следуют словарю ролей английской локализации, а не фразам макета. Право запуска, крестик, системное «назад» и выбор по идентификатору не меняются. Подробные данные намерения, открытые стрелкой из строки, подзаголовка не показывают, а после возврата к поиску он снова на месте.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/action_picker test/daily_choice/presentation/source_picker` в обоих языках:
+      - в каждом поиске при создании и при замене пути — подзаголовок, доступное название кнопки шапки, строка листа и три шага с отметкой и пояснениями;
+      - сценарии «Шаги дневного выбора от действия требуют пути вверх» и «Замена пути называет замену»;
+      - подробные данные без подзаголовка и подзаголовок после возврата к поиску;
+      - экран с подзаголовком и открытый лист по `iOSTapTargetGuideline`, `labeledTapTargetGuideline` и `textContrastGuideline`.
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation test/app/creation_flows_integration_test.dart test/app/quick_creation test/app/daily_choice_app_lifecycle_test.dart test/app/intention_tag_search_app_flow_test.dart test/app/routing/app_router_test.dart test/app/navigation/app_shell_test.dart test/app/navigation/app_shell_layout_test.dart test/app/navigation/app_shell_pages_above_test.dart` — потоки через оба поиска, право запуска и закрытие работают как прежде.
+    - `mise run codegen`, `mise exec --no-deps -- flutter analyze` и `mise exec --no-deps -- flutter test test/app/localization/locale_resolution_test.dart`.
+  - **Зависимости:** 3.3 — описание назначения и лист; 3.4 — шаги; 3.5 — поток в контексте.
+  - **Предполагаемые файлы:**
+    - `lib/src/daily_choice/presentation/daily_choice_picker_context.dart` или новый файл рядом с ним — описание по потоку и направлению; `lib/src/daily_choice/presentation/source_picker/daily_choice_source_picker_page.dart`, `lib/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart`;
+    - `lib/l10n/app_en.arb`, `lib/l10n/app_ru.arb` и генерируемые `lib/l10n/app_localizations*.dart`;
+    - `test/daily_choice/presentation/daily_choice_picker_context_test_support.dart`, `test/daily_choice/presentation/action_picker/daily_choice_action_picker_page_test.dart`, `test/daily_choice/presentation/source_picker/daily_choice_source_picker_page_test.dart`.
+  - **Размер:** M — обе страницы строят описание одним правилом по потоку и направлению.
+
+- [x] 3.7 Подтвердить готовность третьей фазы: поиски исходного намерения и действия напоминают назначение во всех четырёх потоках дневного выбора
+  - **Критерии приёмки:**
+    - Выполнено условие «Ready to advance» третьей фазы:
+      - требования «Назначение поиска для выбора» и «Назначение поисков дневного выбора» выполняются во всех четырёх потоках на обоих языках;
+      - при стандартном масштабе текста на ширинах 360 и 390 dp оба подзаголовка создания дневного выбора ожидаемо обрезаются многоточием в одной строке с видимым шевроном; доступное название кнопки содержит полный подзаголовок, а первый шаг листа — полную роль;
+      - при крупном системном тексте шапка с подзаголовком растёт, сохраняет масштаб обеих строк и не обрезает их по высоте, содержимое поиска начинается под шапкой (решение 5 дизайна и проверка задачи 3.2);
+      - право запуска и закрытие поисков дневного выбора не изменились.
+    - Пакет не добавляет подзаголовок и лист поиску участника связи, не строит графический язык путей и связей и форму связи.
+    - Результаты проверок и путь к APK сообщены в сессии. Ручная проверка на устройстве остаётся за пользователем и не блокирует готовность фазы.
+  - **Проверка:**
+    - `mise run check` и `mise exec --no-deps -- openspec validate add-intention-picker-sorting-and-purpose --strict --no-interactive`; после фиксации изменений — `mise run codegen-check` на чистой рабочей копии.
+    - `mise exec --no-deps -- flutter build apk --release` с артефактом `build/app/outputs/flutter-apk/app-release.apk`. Если через DTD найдено запущенное приложение, выполнить hot restart и проверить `get_runtime_errors`; эмулятор и устройство не запускаются.
+    - Сообщить оставшиеся ручные проверки:
+      - вид строки назначения и листа «Что вы выбираете» в обоих поисках и обеих темах против макета `ActionPicker.dc.html`;
+      - подзаголовки «Новый дневной выбор: исходное намерение» и «Новый дневной выбор: конечное действие» на ширинах 360 и 390 dp при стандартном масштабе текста: одна строка с многоточием и видимый шеврон; полное размещение текстов не ожидается;
+      - при крупном системном шрифте шапка с подзаголовком увеличивается по высоте, обе строки сохраняют выбранный масштаб без обрезки по высоте и наложения на поле поиска, шеврон и крестик видны;
+      - закрытие листа кнопкой «Вернуться к списку», жестом, касанием затемнения и системным «назад» с прежними параметрами, выдачей и позицией прокрутки;
+      - создание от намерения и от действия и замена пути в обоих направлениях: тексты и шаги своего потока, прежние право запуска и закрытие;
+      - объявления TalkBack для кнопки шапки и шагов листа.
+  - **Зависимости:** 3.1–3.6.
+  - **Предполагаемые файлы:** нет, только проверка и сборка.
+  - **Размер:** XS.
+
+## Phase 4: Поиск участника напоминает связь целиком
+
+- [x] 4.1 Заложить токены линий и примитивы графического языка путей и связей: глиф пути, линию связи и отметку вида
+  - **Критерии приёмки:**
+    - Токены линий по решению 6 дизайна и `tokens.json` дизайн-системы стоят в `DoableMetrics` рядом с прочими размерами: `stroke-need` 2, `stroke-can` 1,5, штрих и промежуток пунктира 5 и 5.
+    - Глиф пути `PathGlyph` по разделу «Priority, need and can» общих правил дизайн-системы и README `RelationForm`: форма — ромб или кольцо, контур — сплошной или пунктирный, размер и цвет передаёт потребитель. Рисует `CustomPainter` по листу «What you are choosing» для связи в макете `ActionPicker.dc.html` и `topbarMark` бандла дизайн-системы, на сетке 14 с масштабированием под размер: пунктирный контур — обводка 1,5, у ромба штрихи 2,4/2 со скруглёнными углами, у кольца радиус 5,25 и штрихи 2,2/2,2; сплошной — заполненный квадрат 9,5 со скруглением 1,5, повёрнутый на 45°, либо кольцо 10 с обводкой 1,5.
+    - Линия связи `RelationStroke`: вид — нужно, можно или не выбран; ось — вертикальная для рейки или горизонтальная для отметки вида `RelationKindMark` 15 × 2 у слова. Нужно — сплошная `stroke-need`; можно — пунктир `stroke-can` со штрихом 5/5 на рейке и 3/3 у отметки, как в макете; не выбран — сплошная 2 цвета `hairline` темы. Цвет линии выбранного вида передаёт потребитель; тон приоритета не строится (граница proposal).
+    - Пунктир строит один помощник по длине штриха и промежутка. Перечисления содержат только нынешние варианты: круг действия и точечная линия места шага не добавляются, а их появление потребует новых веток исчерпывающих `switch`. Глифы и линии исключены из семантики.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/path_glyph_test.dart test/design_system/relation_stroke_test.dart` — обе темы: геометрия и цвет сплошных и пунктирных ромба и кольца на размерах 12 и 14; сплошная, пунктирная и `hairline` линии по обеим осям с шириной из токенов; длины штрихов помощника; отсутствие узлов семантики.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `lib/src/design_system/doable_metrics.dart`; новые `lib/src/design_system/components/path_glyph.dart`, `lib/src/design_system/components/relation_stroke.dart`, `test/design_system/path_glyph_test.dart`, `test/design_system/relation_stroke_test.dart`.
+  - **Размер:** S.
+
+- [x] 4.2 Добавить рейку пути `PathRail`: колонку 22 с глифом и линиями над и под ним рядом с содержимым строки
+  - **Критерии приёмки:**
+    - `PathRail` по решению 6 дизайна и README `RelationForm` — строка `IntrinsicHeight`: слева колонка шириной 22, справа содержимое, которое задаёт высоту строки. В колонке по центру ширины стоит глиф из задачи 4.1 либо, в строке без глифа, одна линия на всю высоту. Над глифом и под ним — линии связи, каждая необязательна: у первой строки формы нет линии сверху, у последней — снизу. По макету верхний сегмент занимает 17, глиф 14, нижний — остаток высоты, поэтому глиф стоит против первой строки текста поля.
+    - Зазор между колонкой и содержимым задаёт содержимое: у поля 10, у строки вида 24 (README `RelationForm` и макет). Колонка исключена из семантики, содержимое сохраняет свою.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/path_rail_test.dart` — ширина колонки, положение глифа и сегментов, их отсутствие по краям, строка без глифа, высота по содержимому, текст масштаба 2 без переполнения, семантика только содержимого.
+  - **Зависимости:** 4.1.
+  - **Предполагаемые файлы:** новые `lib/src/design_system/components/path_rail.dart`, `test/design_system/path_rail_test.dart`.
+  - **Размер:** S.
+
+- [x] 4.3 Показывать перед строкой назначения шапки пунктирную отметку роли: ромб исходного или кольцо связанного поля
+  - **Критерии приёмки:**
+    - `TopBarPurpose` получает необязательную отметку — исходное или связанное поле — по разделу «The purpose line of a picker» README `TopBar` и макету `ReminderRelHeader.dc.html`: пунктирный `PathGlyph` 12 цвета `muted` (ромб у исходного, кольцо у связанного) стоит в 5 перед текстом подзаголовка и всегда виден; текст по-прежнему кончается многоточием, шеврон виден. Отметка не выше строки `hint`: высота панели и правило её роста из задачи 3.2 не меняются. Отметка не озвучивается отдельно: роль уже названа словами в подзаголовке и доступном названии. Без отметки панель выглядит и работает как прежде.
+    - `IntentionPickerPurposeDescription` получает отметку подзаголовка по решению 5 дизайна — нет, исходное поле или связанное поле — без предметных типов связей, а `IntentionPickerView` передаёт её в `TopBarPurpose`. Описание дневного выбора отметки не имеет и не меняется.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/top_bar_test.dart` — обе темы: ромб и кольцо 12 цвета `muted` в 5 перед текстом; длинный подзаголовок с отметкой обрезан многоточием, отметка и шеврон видны, высота 44; прежние проверки без отметки.
+    - `mise exec --no-deps -- flutter test test/intention/presentation/picker/intention_picker_purpose_sheet_test.dart` — отметка описания доходит до панели.
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/source_picker test/daily_choice/presentation/action_picker` — поиски дневного выбора без отметки работают как прежде.
+  - **Зависимости:** 4.1 — глиф.
+  - **Предполагаемые файлы:** `lib/src/design_system/components/top_bar.dart`, `lib/src/intention/presentation/picker/intention_picker_purpose_sheet.dart`, `lib/src/intention/presentation/picker/intention_picker_view.dart`, `test/design_system/top_bar_test.dart`, `test/intention/presentation/picker/intention_picker_purpose_sheet_test.dart`.
+  - **Размер:** S.
+
+- [x] 4.4 Добавить в дизайн-систему форму связи в режиме выбора `RelationForm.choosing`: только для чтения, на рейке пути
+  - **Критерии приёмки:**
+    - Форма по решению 6 дизайна, разделу «In What you are choosing» README `RelationForm` и листу «What you are choosing» для связи в макете `ActionPicker.dc.html` — три строки `PathRail` сверху вниз: поле исходного намерения с ромбом, строка вида с линией, поле связанного намерения с кольцом. Линия между полями — `RelationStroke` вида: нужно — сплошная `grip`, можно — пунктир `grip`, не выбран — `hairline`. Глиф выбираемого поля — пунктирный контур 14 цвета `accent`, пустого — пунктирный `grip`, заполненного — сплошной `grip`.
+    - Состояние поля — sealed-значение: выбирается (с необязательным названием прежнего участника этой роли), заполнено (название и признак архива) или пусто. Поле — плоскость `fill` с `radius-lg`, не ниже 48, отступы 13 и 14, в 10 от рейки, без шеврона и нажатия:
+      - выбираемое — плоскость `accent-soft` с внутренним кольцом 1,5 `accent`; над текстом подпись в стиле `label` цвета `accent` («Сейчас выбирается»), текст в стиле `action` начертания 400 цвета `muted` («Из этого списка» либо «Вместо: …»);
+      - заполненное — название в стиле `action` начертания 500 цвета `ink`, переносится и не обрезается; у архивного участника — `muted`;
+      - пустое — текст в стиле `action` начертания 400 цвета `muted` («Ещё не выбрано»).
+    - Строка вида высотой 52: отметка вида 15 × 2 из задачи 4.1 и слово в стиле `section` в 24 от рейки; у выбранного вида слово `ink`, отметка `grip`; без вида — слово `muted`, отметка `hairline`.
+    - Все тексты потребитель передаёт готовыми (ADR-0030): названия ролей и состояний для диктора, подписи выбираемого, пустого и архивного поля, слово вида. Семантика: каждое поле — один узел без действия, который называет роль, состояние и название участника или его отсутствие, а у архивного — архивность; строка вида — один узел со словом вида. Рейка исключена.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/relation_form_test.dart` — обе темы и значения токенов; три состояния каждого поля и три вида; длинное название заполненного поля переносится без обрезки на ширине тела листа; текст масштаба 2 без переполнения; узлы диктора без действий нажатия; в форме нет кнопок.
+  - **Зависимости:** 4.1, 4.2.
+  - **Предполагаемые файлы:** новые `lib/src/design_system/components/relation_form.dart`, `test/design_system/relation_form_test.dart`.
+  - **Размер:** M.
+
+- [x] 4.5 Передавать поиску участника одно описание выбора от формы связи, из которого выводятся исключение и допустимый охват
+  - **Критерии приёмки:**
+    - Модуль связей получает описание выбора участника по решению 5 дизайна: роль (`RelationParticipantRole`), поток — создание или изменение, вид связи или его отсутствие, снимки исходного и связанного участников (`RelationParticipantSummary`, каждый необязателен) и архивное состояние изменяемой связи. Маршрут `RelationParticipantPickerRoute` принимает только его; параметры `excludedIntentionId` и `selectionContext` из маршрута уходят, поэтому исключение чужого участника или архивный охват у создаваемой связи собрать нельзя.
+    - `RelationParticipantPickerPage` выводит из описания `SelectRelationParticipant`: исключение — участник другой роли, если он выбран; охват — `archivedRelation` только для архивной изменяемой связи, иначе `activeRelation`. `RelationParticipantSelectionContext` остаётся частью назначения каталога. Охват, исключение по идентификатору, выбор со снимком и ревизией, закрытие без результата и подробные данные работают как прежде.
+    - `RelationEditorPage` строит описание в момент открытия поиска из черновика и `editorContext`: поток — создание для контекстов создания и изменение для редактирования; архивное состояние — из основы редактирования; участники и вид — из черновика. Отмена выбора по-прежнему оставляет черновик прежним.
+  - **Проверка:**
+    - `mise run codegen` — маршруты пересозданы; `mise exec --no-deps -- flutter analyze`.
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/participant_picker` — запрос каталога получает исключение участника другой роли и охват по архивному состоянию; без участника другой роли исключения нет; прежние проверки поиска проходят с описанием выбора.
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/editor test/app/navigation/app_shell_pages_above_test.dart test/app/navigation/app_shell_operation_reset_test.dart test/app/creation_flows_integration_test.dart`:
+      - открытая `RelationParticipantPickerPage` получает описание выбора из текущего черновика; сценарии редактора читают его полем страницы, как `app_shell_page_matrix.dart` читает `selectionContext`: роль; поток — создание для новой связи из пустой формы и из группы соседства, изменение для активной и архивной изменяемой связи; вид и оба участника черновика, в том числе после смены вида и замены участника в черновике до открытия поиска; архивное состояние — из основы редактирования;
+      - выбор участников из формы новой и изменяемой связи, занятая пара и отмена работают как прежде.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - новый `lib/src/long_term_relation/presentation/participant_picker/relation_participant_choice.dart`; `lib/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart`, `lib/src/long_term_relation/presentation/editor/relation_editor_page.dart` и генерируемый `lib/src/app/routing/app_router.gr.dart`;
+    - механическая адаптация `test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart`, `test/long_term_relation/presentation/participant_picker/relation_participant_picker_session_test.dart`, `test/long_term_relation/presentation/editor/relation_participant_selection_scenarios.dart`, `test/long_term_relation/presentation/editor/relation_creation_navigation_test.dart`, `test/app/navigation/app_shell_page_matrix.dart`;
+    - сценарии описания выбора на границе редактора — `test/long_term_relation/presentation/editor/relation_participant_selection_scenarios.dart` и `test/long_term_relation/presentation/editor/relation_editor_page_test.dart`.
+  - **Размер:** M — одно значение вместо двух параметров маршрута, адаптация его сборок в проверках и сценарии описания выбора на границе редактора.
+
+- [x] 4.6 Показывать в поиске участника назначение связи: подзаголовок с отметкой роли и лист с формой связи только для чтения
+  - **Критерии приёмки:**
+    - Страница поиска участника строит описание назначения из задачи 3.3 по описанию выбора из задачи 4.5 (ADR-0022) и требованию «Назначение поиска участника связи», как `dailyChoicePickerPurpose`. Подзаголовок — «Новая связь: исходное намерение», «Новая связь: связанное намерение», «Изменение связи: исходное намерение» или «Изменение связи: связанное намерение»; отметка — исходное поле (ромб) или связанное (кольцо); строка листа — «Новая связь» или «Изменение связи».
+    - Тело листа — одна строка цвета `muted` о выбираемой роли и под ней `RelationForm.choosing` из задачи 4.4. Для исходного намерения строка объясняет, что это то, для чего нужно или можно связанное; для связанного — что это то, что нужно, можно либо нужно или можно для исходного, по виду связи. В форме выбираемое поле показывает «Сейчас выбирается» и «Из этого списка» либо «Вместо: <название участника этой роли>»; другое поле — название своего участника целиком либо «Ещё не выбрано», архивный участник приглушён; вид — «Нужно», «Можно» или «Нужно или можно: ещё не выбрано». Форма показывает снимок на момент открытия поиска; экранный диктор слышит роль каждого поля, его состояние и вид словами.
+    - Тексты на обоих языках; английские строки следуют словарю ролей локализации («Source intention», «Related intention»), а не фразам макета. Право запуска, крестик, системное «назад», выбор по идентификатору и исключение не меняются. Подробные данные намерения, открытые стрелкой из строки, подзаголовка не показывают, а после возврата он снова на месте.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/participant_picker` в обоих языках:
+      - сценарий «Лист показывает исходное намерение целиком»: создание, выбирается связанное, исходное с длинным названием и вид «нужно» — подзаголовок с кольцом, название целиком, «Нужно», «Сейчас выбирается» и «Из этого списка»;
+      - сценарий «Изменение связи показывает заменяемого участника»: «Изменение связи: связанное намерение», исходное «Быть здоровым», «Нужно», «Вместо: много ходить»;
+      - выбор исходного при пустом связанном и невыбранном виде: подзаголовок с ромбом, строка об исходной роли, «Ещё не выбрано», «Нужно или можно: ещё не выбрано»;
+      - архивная изменяемая связь: архивный участник приглушён, запрос каталога по-прежнему с полным охватом и исключением;
+      - семантика открытого листа в этих сценариях, по образцу проверок `isSemantics` в `test/daily_choice/presentation/daily_choice_picker_context_test_support.dart`: узел каждого поля без действия нажатия называет словами свою роль — исходное или связанное намерение — и состояние: «Сейчас выбирается», название участника или «Ещё не выбрано»; узел архивного участника называет и его архивность; узел строки вида называет слово вида;
+      - доступное название кнопки шапки, строка листа, подробные данные без подзаголовка и подзаголовок после возврата; экран с подзаголовком и открытый лист по `iOSTapTargetGuideline`, `labeledTapTargetGuideline` и `textContrastGuideline`.
+
+      Возврат поиска без изменений после закрытия листа проверен в фазе 3 на общем экране и здесь не повторяется.
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation test/app/navigation/app_shell_pages_above_test.dart test/app/navigation/app_shell_operation_reset_test.dart test/app/creation_flows_integration_test.dart` — создание и изменение связи через поиск работают как прежде.
+    - `mise run codegen`, `mise exec --no-deps -- flutter analyze` и `mise exec --no-deps -- flutter test test/app/localization/locale_resolution_test.dart`.
+  - **Зависимости:** 4.3 — отметка; 4.4 — форма; 4.5 — описание выбора.
+  - **Предполагаемые файлы:**
+    - новый `lib/src/long_term_relation/presentation/participant_picker/relation_participant_picker_purpose.dart`; `lib/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart`;
+    - `lib/l10n/app_en.arb`, `lib/l10n/app_ru.arb` и генерируемые `lib/l10n/app_localizations*.dart`;
+    - `test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart`, `test/long_term_relation/presentation/participant_picker/participant_picker_test_support.dart`.
+  - **Размер:** M.
+
+- [x] 4.7 Подтвердить готовность четвёртой фазы и изменения целиком: поиск участника напоминает связь при создании и изменении, включая архивную
+  - **Критерии приёмки:**
+    - Выполнено условие «Ready to advance» четвёртой фазы:
+      - требование «Назначение поиска участника связи» выполняется при создании и изменении связи, включая архивную;
+      - поиск участника сохраняет охват, исключение по идентификатору и выбор;
+      - изменение соответствует спецификациям, дизайну и ADR-0045 целиком.
+    - Все восемь контекстов экрана выбора показывают подзаголовок и лист: четыре потока дневного выбора из фазы 3 и четыре контекста связи.
+    - Пакет не делает форму связи интерактивной, не перерисовывает форму и подробности связи, не добавляет компонентов путей и вариантов графического языка без потребителя; каталог графа намерений не изменён.
+    - Результаты проверок и путь к APK сообщены в сессии. Ручная проверка на устройстве остаётся за пользователем и не блокирует готовность фазы.
+  - **Проверка:**
+    - `mise run check` и `mise exec --no-deps -- openspec validate add-intention-picker-sorting-and-purpose --strict --no-interactive`; после фиксации изменений — `mise run codegen-check` на чистой рабочей копии.
+    - `mise exec --no-deps -- flutter build apk --release` с артефактом `build/app/outputs/flutter-apk/app-release.apk`. Если через DTD найдено запущенное приложение, выполнить hot restart и проверить `get_runtime_errors`; эмулятор и устройство не запускаются.
+    - Сообщить оставшиеся ручные проверки:
+      - отметка роли в шапке и форма связи в листе в обеих темах против макетов `ReminderRelHeader.dc.html`, `ReminderRelFirst.dc.html`, `ReminderRelSecond.dc.html` и `ReminderRelReverse.dc.html`;
+      - четыре контекста связи: выбор исходного и связанного при создании и при изменении, в том числе архивной связи с архивным участником;
+      - закрытие листа кнопкой «Вернуться к списку», жестом, затемнением и системным «назад» с прежними параметрами, выдачей и позицией прокрутки; выбор участника и исключение другого участника как прежде;
+      - объявления TalkBack для кнопки шапки, полей формы и строки вида.
+  - **Зависимости:** 4.1–4.6.
+  - **Предполагаемые файлы:** нет, только проверка и сборка.
+  - **Размер:** XS.

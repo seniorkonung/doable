@@ -116,7 +116,7 @@ void main() {
           IntentionCatalogQuery(
             scope: IntentionScope.all,
             titleFilter: null,
-            order: IntentionCatalogOrder.createdAtAscending,
+            order: IntentionCatalogOrder.titleAscending,
             pageSize: 1,
           ),
         );
@@ -129,18 +129,38 @@ void main() {
             expected,
           ),
         );
-        expect(
-          diagnostics.events.last,
-          isA<CatalogPageReadDiagnosticsEvent>().having(
-            (event) => event.status,
-            'исход',
-            isA<DiagnosticsFailed>().having(
-              (status) => status.code,
-              'категория',
-              code,
-            ),
-          ),
-        );
+        final readEvents = diagnostics.events
+            .whereType<CatalogPageReadDiagnosticsEvent>()
+            .toList();
+        expect(readEvents.reversed.take(2), [
+          isA<CatalogPageReadDiagnosticsEvent>()
+              .having(
+                (event) => event.sortField,
+                'поле сортировки',
+                CatalogPageReadDiagnosticsSortField.title,
+              )
+              .having(
+                (event) => event.status,
+                'исход',
+                isA<DiagnosticsFailed>().having(
+                  (status) => status.code,
+                  'категория',
+                  code,
+                ),
+              ),
+          isA<CatalogPageReadDiagnosticsEvent>()
+              .having(
+                (event) => event.sortField,
+                'поле сортировки',
+                CatalogPageReadDiagnosticsSortField.title,
+              )
+              .having(
+                (event) => event.status,
+                'исход',
+                isA<DiagnosticsStarted>(),
+              ),
+        ]);
+        expect(diagnostics.events.last, same(readEvents.last));
         expect(diagnostics.events.toString(), isNot(contains('CANARY')));
       }
     });

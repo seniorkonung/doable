@@ -1324,6 +1324,131 @@ void main() {
       );
     });
 
+    test('снимки смены готовности принадлежат условию готовности по своему состоянию', () async {
+      final id = _idForSequence(0x701);
+      await _insertIntention(
+        database,
+        id: id.toCanonicalString(),
+        title: 'Гулять',
+        createdAt: DateTime.utc(2026, 9, 2, 10),
+      );
+      clock = _DeterministicClock([
+        DateTime.utc(2026, 9, 3, 10),
+        DateTime.utc(2026, 9, 3, 11),
+      ]);
+      repository = DriftPersonalGraphRepository(
+        database,
+        idGenerator,
+        clock.call,
+        diagnostics,
+      );
+      IntentionCatalogQuery query(IntentionReadinessFilter filter) =>
+          IntentionCatalogQuery(
+            scope: IntentionScope.active,
+            readinessFilter: filter,
+            titleFilter: null,
+            order: IntentionCatalogOrder.createdAtDescending,
+            pageSize: 1,
+          );
+
+      for (final (command, readyBefore) in [
+        (EnableIntentionReadiness.new, false),
+        (DisableIntentionReadiness.new, true),
+      ]) {
+        final saved = _commandSuccess(
+          await repository.execute(command(id)),
+        ) as IntentionSaved;
+        final mutation = saved.catalogMutation as IntentionCatalogUpdated;
+
+        for (final (snapshot, isReady) in [
+          (mutation.before, readyBefore),
+          (mutation.after, !readyBefore),
+        ]) {
+          expect(snapshot.matches(query(IntentionReadinessFilter.all)), isTrue);
+          expect(
+            snapshot.matches(query(IntentionReadinessFilter.readyOnly)),
+            isReady,
+          );
+          expect(
+            snapshot.matches(query(IntentionReadinessFilter.notReadyOnly)),
+            !isReady,
+          );
+        }
+      }
+    });
+
+    test('ключ порядка названия в порции и снимках команды берётся из сохранённой проекции', () async {
+      final walkId = _idForSequence(0x711);
+      final readId = _idForSequence(0x712);
+      await _insertIntention(
+        database,
+        id: walkId.toCanonicalString(),
+        title: 'Гулять',
+        createdAt: DateTime.utc(2026, 9, 2, 10),
+      );
+      await _insertIntention(
+        database,
+        id: readId.toCanonicalString(),
+        title: 'Читать',
+        createdAt: DateTime.utc(2026, 9, 2, 11),
+      );
+      clock = _DeterministicClock([
+        DateTime.utc(2026, 9, 3, 10),
+        DateTime.utc(2026, 9, 3, 11),
+      ]);
+      repository = DriftPersonalGraphRepository(
+        database,
+        idGenerator,
+        clock.call,
+        diagnostics,
+      );
+      final page = _firstCatalogPage(
+        await repository.getCatalogPage(
+          IntentionCatalogQuery(
+            scope: IntentionScope.all,
+            titleFilter: null,
+            order: IntentionCatalogOrder.createdAtAscending,
+            pageSize: 10,
+          ),
+        ),
+      );
+      final [walkKey, readKey] = [
+        for (final item in page.items) item.titleOrderKey,
+      ];
+      expect(walkKey.compareTo(readKey), isNegative);
+
+      final enabled = _commandSuccess(
+        await repository.execute(EnableIntentionReadiness(walkId)),
+      ) as IntentionSaved;
+      final enabledMutation =
+          enabled.catalogMutation as IntentionCatalogUpdated;
+      expect(
+        enabledMutation.before.summary.titleOrderKey.compareTo(walkKey),
+        0,
+      );
+      expect(enabledMutation.after.summary.titleOrderKey.compareTo(walkKey), 0);
+
+      // Сохранённая проекция расходится с названием, как после обновления
+      // данных Unicode без пересчёта: ключ следует проекции.
+      rawOverride.overrideSelect(const {
+        'title_search_key': 'читать',
+      }, column: 'title_search_key');
+      final disabled = _commandSuccess(
+        await repository.execute(DisableIntentionReadiness(walkId)),
+      ) as IntentionSaved;
+      final disabledMutation =
+          disabled.catalogMutation as IntentionCatalogUpdated;
+      expect(disabledMutation.before.summary.title, 'Гулять');
+      expect(
+        disabledMutation.before.summary.titleOrderKey.compareTo(readKey),
+        0,
+      );
+      expect(
+        disabledMutation.after.summary.titleOrderKey.compareTo(walkKey),
+        0,
+      );
+    });
+
     test(
       'возвращает not-found для каждого отсутствующего state transition',
       () async {

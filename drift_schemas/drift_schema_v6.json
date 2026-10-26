@@ -2021,6 +2021,90 @@
         "unique": false,
         "columns": []
       }
+    },
+    {
+      "id": 68,
+      "references": [
+        14
+      ],
+      "type": "index",
+      "data": {
+        "on": 14,
+        "name": "intentions_active_title_search_key_asc_id_asc",
+        "sql": "CREATE INDEX intentions_active_title_search_key_asc_id_asc\n  ON intentions (title_search_key ASC, id ASC)\n  WHERE is_archived = 0;",
+        "unique": false,
+        "columns": []
+      }
+    },
+    {
+      "id": 69,
+      "references": [
+        14
+      ],
+      "type": "index",
+      "data": {
+        "on": 14,
+        "name": "intentions_active_title_search_key_desc_id_asc",
+        "sql": "CREATE INDEX intentions_active_title_search_key_desc_id_asc\n  ON intentions (title_search_key DESC, id ASC)\n  WHERE is_archived = 0;",
+        "unique": false,
+        "columns": []
+      }
+    },
+    {
+      "id": 70,
+      "references": [
+        14
+      ],
+      "type": "index",
+      "data": {
+        "on": 14,
+        "name": "intentions_archived_title_search_key_asc_id_asc",
+        "sql": "CREATE INDEX intentions_archived_title_search_key_asc_id_asc\n  ON intentions (title_search_key ASC, id ASC)\n  WHERE is_archived = 1;",
+        "unique": false,
+        "columns": []
+      }
+    },
+    {
+      "id": 71,
+      "references": [
+        14
+      ],
+      "type": "index",
+      "data": {
+        "on": 14,
+        "name": "intentions_archived_title_search_key_desc_id_asc",
+        "sql": "CREATE INDEX intentions_archived_title_search_key_desc_id_asc\n  ON intentions (title_search_key DESC, id ASC)\n  WHERE is_archived = 1;",
+        "unique": false,
+        "columns": []
+      }
+    },
+    {
+      "id": 72,
+      "references": [
+        14
+      ],
+      "type": "index",
+      "data": {
+        "on": 14,
+        "name": "intentions_all_title_search_key_asc_id_asc",
+        "sql": "CREATE INDEX intentions_all_title_search_key_asc_id_asc\n  ON intentions (title_search_key ASC, id ASC);",
+        "unique": false,
+        "columns": []
+      }
+    },
+    {
+      "id": 73,
+      "references": [
+        14
+      ],
+      "type": "index",
+      "data": {
+        "on": 14,
+        "name": "intentions_all_title_search_key_desc_id_asc",
+        "sql": "CREATE INDEX intentions_all_title_search_key_desc_id_asc\n  ON intentions (title_search_key DESC, id ASC);",
+        "unique": false,
+        "columns": []
+      }
     }
   ],
   "fixed_sql": [
@@ -2633,6 +2717,60 @@
         {
           "dialect": "sqlite",
           "sql": "CREATE INDEX intentions_all_updated_at_desc_id_asc ON intentions (updated_at DESC, id ASC)"
+        }
+      ]
+    },
+    {
+      "name": "intentions_active_title_search_key_asc_id_asc",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX intentions_active_title_search_key_asc_id_asc ON intentions (title_search_key ASC, id ASC) WHERE is_archived = 0"
+        }
+      ]
+    },
+    {
+      "name": "intentions_active_title_search_key_desc_id_asc",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX intentions_active_title_search_key_desc_id_asc ON intentions (title_search_key DESC, id ASC) WHERE is_archived = 0"
+        }
+      ]
+    },
+    {
+      "name": "intentions_archived_title_search_key_asc_id_asc",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX intentions_archived_title_search_key_asc_id_asc ON intentions (title_search_key ASC, id ASC) WHERE is_archived = 1"
+        }
+      ]
+    },
+    {
+      "name": "intentions_archived_title_search_key_desc_id_asc",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX intentions_archived_title_search_key_desc_id_asc ON intentions (title_search_key DESC, id ASC) WHERE is_archived = 1"
+        }
+      ]
+    },
+    {
+      "name": "intentions_all_title_search_key_asc_id_asc",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX intentions_all_title_search_key_asc_id_asc ON intentions (title_search_key ASC, id ASC)"
+        }
+      ]
+    },
+    {
+      "name": "intentions_all_title_search_key_desc_id_asc",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX intentions_all_title_search_key_desc_id_asc ON intentions (title_search_key DESC, id ASC)"
         }
       ]
     }

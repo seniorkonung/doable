@@ -54,6 +54,28 @@ void main() {
       });
     });
 
+    test('успех чтения порции каталога кодируется с полем сортировки', () {
+      final messages = <String>[];
+      final sink = DeveloperDiagnosticsSink(messages.add);
+
+      recordDiagnosticsSafely(
+        sink,
+        const CatalogPageReadDiagnosticsEvent(
+          pageSize: 100,
+          sortField: CatalogPageReadDiagnosticsSortField.title,
+          status: DiagnosticsSucceeded(Duration(microseconds: 4321)),
+        ),
+      );
+
+      expect(jsonDecode(messages.single), {
+        'operation': 'catalogPageRead',
+        'outcome': 'succeeded',
+        'durationMicros': 4321,
+        'pageSize': 100,
+        'sortField': 'title',
+      });
+    });
+
     test('начало чтения состояний дней кодируется без данных запроса', () {
       final messages = <String>[];
       final sink = DeveloperDiagnosticsSink(messages.add);

@@ -100,3 +100,25 @@ CREATE INDEX intentions_all_updated_at_asc_id_asc
 
 CREATE INDEX intentions_all_updated_at_desc_id_asc
   ON intentions (updated_at DESC, id ASC);
+
+CREATE INDEX intentions_active_title_search_key_asc_id_asc
+  ON intentions (title_search_key ASC, id ASC)
+  WHERE is_archived = 0;
+
+CREATE INDEX intentions_active_title_search_key_desc_id_asc
+  ON intentions (title_search_key DESC, id ASC)
+  WHERE is_archived = 0;
+
+CREATE INDEX intentions_archived_title_search_key_asc_id_asc
+  ON intentions (title_search_key ASC, id ASC)
+  WHERE is_archived = 1;
+
+CREATE INDEX intentions_archived_title_search_key_desc_id_asc
+  ON intentions (title_search_key DESC, id ASC)
+  WHERE is_archived = 1;
+
+CREATE INDEX intentions_all_title_search_key_asc_id_asc
+  ON intentions (title_search_key ASC, id ASC);
+
+CREATE INDEX intentions_all_title_search_key_desc_id_asc
+  ON intentions (title_search_key DESC, id ASC);

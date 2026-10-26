@@ -1,8 +1,8 @@
 import '../../../../l10n/app_localizations.dart';
 import '../catalog/intention_catalog_purpose.dart';
 
-/// Что выбирает экран выбора: от этого зависят его заголовки и тексты
-/// выдачи.
+/// Что выбирает экран выбора: от этого зависят заголовок шапки и тексты
+/// загрузки и отказов.
 enum IntentionPickerKind {
   action,
   intention;
@@ -18,24 +18,9 @@ enum IntentionPickerKind {
     intention => l10n.intentionPickerIntentionTitle,
   };
 
-  String header(AppLocalizations l10n) => switch (this) {
-    action => l10n.intentionPickerActionsHeader,
-    intention => l10n.intentionPickerIntentionsHeader,
-  };
-
   String loading(AppLocalizations l10n) => switch (this) {
     action => l10n.actionPickerLoading,
     intention => l10n.catalogLoading,
-  };
-
-  String noMatchesByTitle(AppLocalizations l10n) => switch (this) {
-    action => l10n.intentionPickerNoActionsByTitle,
-    intention => l10n.intentionPickerNoIntentionsByTitle,
-  };
-
-  String noMatchesByTags(AppLocalizations l10n) => switch (this) {
-    action => l10n.intentionPickerNoActionsByTags,
-    intention => l10n.intentionPickerNoIntentionsByTags,
   };
 
   String loadingMore(AppLocalizations l10n) => switch (this) {

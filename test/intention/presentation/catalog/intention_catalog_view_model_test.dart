@@ -854,6 +854,224 @@ void main() {
     },
   );
 
+  group('тип намерения', () {
+    test(
+      'назначение задаёт доступность типа, готовность запроса и просьбу чисел',
+      () async {
+        final repository = ControlledCatalogRepository();
+        final container = _catalogContainer(repository);
+        addTearDown(container.dispose);
+        final cases =
+            <
+              (
+                IntentionCatalogPurpose,
+                IntentionTypeAvailability,
+                IntentionReadinessFilter,
+              )
+            >[
+              (
+                const BrowseIntentionCatalog(),
+                const IntentionTypeNotOffered(),
+                IntentionReadinessFilter.all,
+              ),
+              (
+                SelectDailyChoiceAction(session: IntentionSearchSession()),
+                const IntentionTypePinnedToActions(),
+                IntentionReadinessFilter.readyOnly,
+              ),
+              (
+                SelectDailyChoiceSource(session: IntentionSearchSession()),
+                const IntentionTypeOpen(IntentionTypeChoice.all),
+                IntentionReadinessFilter.all,
+              ),
+              (
+                SelectRelationParticipant(
+                  selectionContext:
+                      RelationParticipantSelectionContext.activeRelation,
+                  session: IntentionSearchSession(),
+                ),
+                const IntentionTypeOpen(IntentionTypeChoice.all),
+                IntentionReadinessFilter.all,
+              ),
+            ];
+
+        for (final (index, (purpose, type, readiness)) in cases.indexed) {
+          final provider = intentionCatalogViewModelProvider(purpose);
+          final subscription = container.listen(
+            provider,
+            (_, _) {},
+            fireImmediately: true,
+          );
+          addTearDown(subscription.close);
+          final isOpen = type is IntentionTypeOpen;
+
+          expect(container.read(provider.notifier).selection.type, type);
+          final query = repository.queryAt(index);
+          expect(query.readinessFilter, readiness);
+          expect(query.requestsTypeCounts, isOpen);
+
+          repository.complete(
+            index,
+            ResultSuccess(
+              IntentionCatalogFirstPage(
+                items: [testSummary(index: index + 1)],
+                totalCount: 1,
+                nextCursor: null,
+                revision: const TestCatalogRevision(1),
+              ),
+            ),
+          );
+          final state = await container.read(provider.future);
+          expect(
+            state,
+            isA<IntentionCatalogLoaded>().having(
+              (value) => value.typeCounts,
+              'числа типов',
+              isOpen ? isNotNull : isNull,
+            ),
+          );
+        }
+      },
+    );
+
+    test(
+      'смена открытого типа начинает новую выдачу с первой порции',
+      () async {
+        final repository = ControlledCatalogRepository();
+        final container = _catalogContainer(repository);
+        final provider = intentionCatalogViewModelProvider(
+          SelectDailyChoiceSource(session: IntentionSearchSession()),
+        );
+        final subscription = container.listen(
+          provider,
+          (_, _) {},
+          fireImmediately: true,
+        );
+        addTearDown(subscription.close);
+        addTearDown(container.dispose);
+        repository.complete(
+          0,
+          ResultSuccess(
+            IntentionCatalogFirstPage(
+              items: [testSummary(index: 1)],
+              totalCount: 3,
+              nextCursor: const TestCatalogCursor(),
+              revision: const TestCatalogRevision(1),
+            ),
+          ),
+        );
+        await container.read(provider.future);
+        final notifier = container.read(provider.notifier);
+
+        for (final (index, (type, readiness)) in [
+          (
+            IntentionTypeChoice.intentions,
+            IntentionReadinessFilter.notReadyOnly,
+          ),
+          (IntentionTypeChoice.actions, IntentionReadinessFilter.readyOnly),
+          (IntentionTypeChoice.all, IntentionReadinessFilter.all),
+        ].indexed) {
+          notifier.changeType(type);
+          await _waitForQueries(repository, index + 2);
+
+          expect(notifier.selection.type, IntentionTypeOpen(type));
+          final query = repository.queryAt(index + 1);
+          expect(query.readinessFilter, readiness);
+          expect(query.requestsTypeCounts, isTrue);
+          expect(query.cursor, isNull);
+        }
+
+        notifier.changeType(IntentionTypeChoice.all);
+        await Future<void>.delayed(Duration.zero);
+        expect(repository.queries, hasLength(4));
+      },
+    );
+
+    test('без открытого типа смена типа не начинает новую выдачу', () async {
+      final repository = ControlledCatalogRepository();
+      final container = _catalogContainer(repository);
+      addTearDown(container.dispose);
+      final purposes = <IntentionCatalogPurpose>[
+        const BrowseIntentionCatalog(),
+        SelectDailyChoiceAction(session: IntentionSearchSession()),
+      ];
+
+      for (final (index, purpose) in purposes.indexed) {
+        final provider = intentionCatalogViewModelProvider(purpose);
+        final subscription = container.listen(
+          provider,
+          (_, _) {},
+          fireImmediately: true,
+        );
+        addTearDown(subscription.close);
+        repository.complete(
+          index,
+          ResultSuccess(
+            IntentionCatalogFirstPage(
+              items: const [],
+              totalCount: 0,
+              nextCursor: null,
+              revision: const TestCatalogRevision(1),
+            ),
+          ),
+        );
+        await container.read(provider.future);
+        final notifier = container.read(provider.notifier);
+        final type = notifier.selection.type;
+
+        notifier.changeType(IntentionTypeChoice.intentions);
+        await Future<void>.delayed(Duration.zero);
+
+        expect(notifier.selection.type, type);
+        expect(repository.queries, hasLength(index + 1));
+      }
+    });
+
+    test(
+      'пропущенные или противоречивые числа типов нарушают контракт порции',
+      () async {
+        final repository = ControlledCatalogRepository();
+        final container = _catalogContainer(repository);
+        addTearDown(container.dispose);
+        final pages = [
+          // Запрошенных чисел нет.
+          IntentionCatalogFirstPage(
+            items: [testSummary(index: 1)],
+            totalCount: 1,
+            nextCursor: null,
+            revision: const TestCatalogRevision(1),
+          ),
+          // Общее количество типа «Все» расходится с числом всех.
+          IntentionCatalogFirstPage(
+            items: [testSummary(index: 1), testSummary(index: 2)],
+            totalCount: 2,
+            typeCounts: IntentionTypeCounts(all: 3, actions: 1),
+            nextCursor: null,
+            revision: const TestCatalogRevision(1),
+          ),
+        ];
+
+        for (final (index, page) in pages.indexed) {
+          final provider = intentionCatalogViewModelProvider(
+            SelectDailyChoiceSource(session: IntentionSearchSession()),
+          );
+          final subscription = container.listen(
+            provider,
+            (_, _) {},
+            fireImmediately: true,
+          );
+          addTearDown(subscription.close);
+          repository.completeVerbatim(index, ResultSuccess(page));
+
+          expect(
+            await container.read(provider.future),
+            isA<IntentionCatalogUnexpected>(),
+          );
+        }
+      },
+    );
+  });
+
   test('не забирает у оболочки право предъявить completion', () async {
     final intention = testIntention(index: 90, title: 'Изменённое намерение');
     final repository = ControlledCatalogRepository();

@@ -3550,6 +3550,114 @@ abstract class AppLocalizations {
   /// **'No active intentions are available.'**
   String get sourcePickerEmpty;
 
+  /// Подзаголовок поиска исходного намерения при создании дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'New daily choice: source intention'**
+  String get dailyChoicePickerPurposeCreationSource;
+
+  /// Подзаголовок поиска действия при создании дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'New daily choice: selected action'**
+  String get dailyChoicePickerPurposeCreationAction;
+
+  /// Подзаголовок поиска исходного намерения при замене пути
+  ///
+  /// In en, this message translates to:
+  /// **'Path replacement: source intention'**
+  String get dailyChoicePickerPurposeReplacementSource;
+
+  /// Подзаголовок поиска действия при замене пути
+  ///
+  /// In en, this message translates to:
+  /// **'Path replacement: selected action'**
+  String get dailyChoicePickerPurposeReplacementAction;
+
+  /// Строка листа назначения: создание дневного выбора от намерения
+  ///
+  /// In en, this message translates to:
+  /// **'New daily choice, from an intention'**
+  String get dailyChoicePickerFlowCreationFromSource;
+
+  /// Строка листа назначения: создание дневного выбора от действия
+  ///
+  /// In en, this message translates to:
+  /// **'New daily choice, from an action'**
+  String get dailyChoicePickerFlowCreationFromAction;
+
+  /// Строка листа назначения: замена пути от намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Path replacement, from an intention'**
+  String get dailyChoicePickerFlowReplacementFromSource;
+
+  /// Строка листа назначения: замена пути от действия
+  ///
+  /// In en, this message translates to:
+  /// **'Path replacement, from an action'**
+  String get dailyChoicePickerFlowReplacementFromAction;
+
+  /// Отметка текущего шага дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'You are here'**
+  String get dailyChoicePickerStepCurrent;
+
+  /// Шаг дневного выбора: исходное намерение
+  ///
+  /// In en, this message translates to:
+  /// **'Source intention'**
+  String get dailyChoicePickerStepSource;
+
+  /// Шаг дневного выбора: конечное действие
+  ///
+  /// In en, this message translates to:
+  /// **'Selected action'**
+  String get dailyChoicePickerStepAction;
+
+  /// Шаг дневного выбора от намерения: путь к действию
+  ///
+  /// In en, this message translates to:
+  /// **'Path down to an action'**
+  String get dailyChoicePickerStepPathDown;
+
+  /// Пояснение пути вниз к действию
+  ///
+  /// In en, this message translates to:
+  /// **'Each next step is what the previous one needs or can use'**
+  String get dailyChoicePickerStepPathDownNote;
+
+  /// Шаг дневного выбора от действия: путь к исходному намерению
+  ///
+  /// In en, this message translates to:
+  /// **'Path up to the source intention'**
+  String get dailyChoicePickerStepPathUp;
+
+  /// Пояснение пути вверх к исходному намерению
+  ///
+  /// In en, this message translates to:
+  /// **'At least one step is needed'**
+  String get dailyChoicePickerStepPathUpNote;
+
+  /// Последний шаг создания дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Date, time, priority, and description'**
+  String get dailyChoicePickerStepDetails;
+
+  /// Последний шаг замены пути
+  ///
+  /// In en, this message translates to:
+  /// **'Replacement confirmation'**
+  String get dailyChoicePickerStepReplacement;
+
+  /// Пояснение подтверждения замены пути
+  ///
+  /// In en, this message translates to:
+  /// **'The date, scheduled time, priority, description, and completion stay the same'**
+  String get dailyChoicePickerStepReplacementNote;
+
   /// Архивное состояние намерения в доступном названии строки экрана выбора
   ///
   /// In en, this message translates to:
@@ -3580,6 +3688,166 @@ abstract class AppLocalizations {
   /// **'Open the page of intention {title}'**
   String intentionPickerOpenIntentionPage(String title);
 
+  /// Заголовок листа параметров показа поиска
+  ///
+  /// In en, this message translates to:
+  /// **'Show and sort'**
+  String get intentionPickerShowAndSortTitle;
+
+  /// Пояснение немедленного применения параметров поиска
+  ///
+  /// In en, this message translates to:
+  /// **'The list changes as you choose'**
+  String get intentionPickerShowAndSortHint;
+
+  /// Сброс типа и сортировки поиска к начальному показу
+  ///
+  /// In en, this message translates to:
+  /// **'Reset'**
+  String get intentionPickerShowAndSortReset;
+
+  /// Доступное название кнопки заголовка и подзаголовка назначения экрана выбора
+  ///
+  /// In en, this message translates to:
+  /// **'{title}. {subtitle}. Show what you are choosing'**
+  String intentionPickerPurposeLabel(String title, String subtitle);
+
+  /// Заголовок листа, который напоминает назначение экрана выбора
+  ///
+  /// In en, this message translates to:
+  /// **'What you are choosing'**
+  String get intentionPickerPurposeSheetTitle;
+
+  /// Кнопка, которая закрывает лист назначения и возвращает к выдаче поиска
+  ///
+  /// In en, this message translates to:
+  /// **'Back to the list'**
+  String get intentionPickerPurposeSheetBack;
+
+  /// Название группы типа намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get intentionPickerTypeCaption;
+
+  /// Причина закреплённого типа в поиске действия
+  ///
+  /// In en, this message translates to:
+  /// **'Only an action can be the final intention of a daily choice'**
+  String get intentionPickerActionTypeNote;
+
+  /// Название группы поля сортировки
+  ///
+  /// In en, this message translates to:
+  /// **'Sort by'**
+  String get intentionPickerSortCaption;
+
+  /// Сортировка по времени создания
+  ///
+  /// In en, this message translates to:
+  /// **'Created'**
+  String get intentionPickerSortCreated;
+
+  /// Сортировка по времени изменения
+  ///
+  /// In en, this message translates to:
+  /// **'Changed'**
+  String get intentionPickerSortChanged;
+
+  /// Сортировка по названию
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get intentionPickerSortName;
+
+  /// Название группы направления сортировки
+  ///
+  /// In en, this message translates to:
+  /// **'Order'**
+  String get intentionPickerOrderCaption;
+
+  /// Убывающий порядок по времени
+  ///
+  /// In en, this message translates to:
+  /// **'Newest first'**
+  String get intentionPickerOrderNewest;
+
+  /// Возрастающий порядок по времени
+  ///
+  /// In en, this message translates to:
+  /// **'Oldest first'**
+  String get intentionPickerOrderOldest;
+
+  /// Прямой порядок по названию
+  ///
+  /// In en, this message translates to:
+  /// **'A to Z'**
+  String get intentionPickerOrderAToZ;
+
+  /// Обратный порядок по названию
+  ///
+  /// In en, this message translates to:
+  /// **'Z to A'**
+  String get intentionPickerOrderZToA;
+
+  /// Показываемый тип без ограничения в заголовке списка поиска для выбора
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get intentionPickerAllHeader;
+
+  /// Сводка сортировки в заголовке списка поиска для выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Created, newest first'**
+  String get intentionPickerOrderCreatedNewest;
+
+  /// Сводка сортировки в заголовке списка поиска для выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Created, oldest first'**
+  String get intentionPickerOrderCreatedOldest;
+
+  /// Сводка сортировки в заголовке списка поиска для выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Changed, newest first'**
+  String get intentionPickerOrderUpdatedNewest;
+
+  /// Сводка сортировки в заголовке списка поиска для выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Changed, oldest first'**
+  String get intentionPickerOrderUpdatedOldest;
+
+  /// Сводка сортировки в заголовке списка поиска для выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Name, A to Z'**
+  String get intentionPickerOrderTitleAscending;
+
+  /// Сводка сортировки в заголовке списка поиска для выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Name, Z to A'**
+  String get intentionPickerOrderTitleDescending;
+
+  /// Доступное название кнопки заголовка поиска до подтверждения количества
+  ///
+  /// In en, this message translates to:
+  /// **'Show and sort. Type: {type}. Sorted by: {summary}.'**
+  String intentionPickerHeaderLabel(String type, String summary);
+
+  /// Доступное название кнопки заголовка поиска с подтверждённым количеством
+  ///
+  /// In en, this message translates to:
+  /// **'Show and sort. Type: {type}, {count}. Sorted by: {summary}.'**
+  String intentionPickerHeaderCountLabel(
+    String type,
+    int count,
+    String summary,
+  );
+
   /// Заголовок выдачи поиска действия на экране выбора
   ///
   /// In en, this message translates to:
@@ -3609,6 +3877,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Nothing to choose from'**
   String get intentionPickerEmptyScopeTitle;
+
+  /// Заголовок пустого выбранного типа, когда в допустимом охвате есть намерения другого типа
+  ///
+  /// In en, this message translates to:
+  /// **'No intentions of this type'**
+  String get intentionPickerEmptyTypeTitle;
+
+  /// Совет показать оба типа при пустом выбранном типе
+  ///
+  /// In en, this message translates to:
+  /// **'Show both types to choose from the available intentions.'**
+  String get intentionPickerEmptyTypeText;
+
+  /// Действие пустого выбранного типа, которое выбирает тип «Все»
+  ///
+  /// In en, this message translates to:
+  /// **'Show both types'**
+  String get intentionPickerShowBothTypes;
 
   /// Заголовок шапки экрана выбора действия
   ///
@@ -3676,11 +3962,17 @@ abstract class AppLocalizations {
   /// **'Change the tags in the filter or reset it.'**
   String get intentionPickerChangeTags;
 
-  /// Заголовок пустой выдачи экрана выбора из-за фильтра названия и условий по тегам
+  /// Заголовок пустой выдачи действий из-за фильтра названия и условий по тегам
   ///
   /// In en, this message translates to:
-  /// **'Nothing found'**
-  String get intentionPickerNothingFound;
+  /// **'No actions found'**
+  String get intentionPickerNoActionsFound;
+
+  /// Заголовок пустой выдачи намерений из-за фильтра названия и условий по тегам
+  ///
+  /// In en, this message translates to:
+  /// **'No intentions found'**
+  String get intentionPickerNoIntentionsFound;
 
   /// Совет пустой выдачи экрана выбора из-за фильтра названия и условий по тегам
   ///
@@ -3711,6 +4003,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open intention details'**
   String get participantPickerOpenDetails;
+
+  /// Подзаголовок поиска исходного намерения при создании связи
+  ///
+  /// In en, this message translates to:
+  /// **'New relation: source intention'**
+  String get participantPickerPurposeCreationSource;
+
+  /// Подзаголовок поиска связанного намерения при создании связи
+  ///
+  /// In en, this message translates to:
+  /// **'New relation: related intention'**
+  String get participantPickerPurposeCreationRelated;
+
+  /// Подзаголовок поиска исходного намерения при изменении связи
+  ///
+  /// In en, this message translates to:
+  /// **'Relation change: source intention'**
+  String get participantPickerPurposeChangeSource;
+
+  /// Подзаголовок поиска связанного намерения при изменении связи
+  ///
+  /// In en, this message translates to:
+  /// **'Relation change: related intention'**
+  String get participantPickerPurposeChangeRelated;
+
+  /// Строка листа назначения: создание связи
+  ///
+  /// In en, this message translates to:
+  /// **'New relation'**
+  String get participantPickerFlowCreation;
+
+  /// Строка листа назначения: изменение связи
+  ///
+  /// In en, this message translates to:
+  /// **'Relation change'**
+  String get participantPickerFlowChange;
+
+  /// Пояснение выбираемой роли исходного намерения в листе назначения
+  ///
+  /// In en, this message translates to:
+  /// **'The source intention is what the related intention is needed for or can be used for.'**
+  String get participantPickerRoleSourceNote;
+
+  /// Пояснение выбираемой роли связанного намерения при виде «нужно»
+  ///
+  /// In en, this message translates to:
+  /// **'The related intention is what the source intention needs.'**
+  String get participantPickerRoleRelatedNeedNote;
+
+  /// Пояснение выбираемой роли связанного намерения при виде «можно»
+  ///
+  /// In en, this message translates to:
+  /// **'The related intention is what the source intention can use.'**
+  String get participantPickerRoleRelatedCanNote;
+
+  /// Пояснение выбираемой роли связанного намерения до выбора вида
+  ///
+  /// In en, this message translates to:
+  /// **'The related intention is what the source intention needs or can use.'**
+  String get participantPickerRoleRelatedUndeterminedNote;
+
+  /// Подпись поля связи, участника которого выбирают сейчас
+  ///
+  /// In en, this message translates to:
+  /// **'Choosing now'**
+  String get participantPickerFieldChoosing;
+
+  /// Текст выбираемого поля связи без прежнего участника
+  ///
+  /// In en, this message translates to:
+  /// **'From this list'**
+  String get participantPickerFieldFromList;
+
+  /// Текст выбираемого поля связи с прежним участником этой роли
+  ///
+  /// In en, this message translates to:
+  /// **'Instead of: {title}'**
+  String participantPickerFieldReplacing(String title);
+
+  /// Текст пустого поля связи
+  ///
+  /// In en, this message translates to:
+  /// **'Not chosen yet'**
+  String get participantPickerFieldNotChosen;
+
+  /// Признак архивного участника связи для экранного диктора
+  ///
+  /// In en, this message translates to:
+  /// **'Archived'**
+  String get participantPickerFieldArchived;
+
+  /// Вид связи в листе назначения, пока он не выбран
+  ///
+  /// In en, this message translates to:
+  /// **'Need or can: not chosen yet'**
+  String get participantPickerKindUndetermined;
 
   /// Заголовок формы создания долговременной связи
   ///

@@ -2,6 +2,8 @@
 
 Источник: макеты `context/doable-design/design/*.dc.html`, экспорт холста
 «Doable · Design» версии `1791926592-bd5b` от **14.10.2026**.
+Ползунки сортировки, стрелки порядка и шеврон вниз — из обновлённого макета
+`ActionPicker.dc.html` от **25.10.2026**.
 Приватный экспорт нужен для сверки при обновлении; SVG в `assets/` самостоятельны.
 
 Сохранены размеры, `viewBox`, геометрия, заливки, `fill-rule`, ширина, окончания
@@ -47,6 +49,10 @@
 | [bolt.svg](assets/bolt.svg) | `ActionPicker.dc.html` | Строка `rows` → метка `row.isAct`, SVG |
 | [arrow_up_right.svg](assets/arrow_up_right.svg) | `ActionPicker.dc.html` | Строка `rows` → кнопка `row.info`, SVG |
 | [archive.svg](assets/archive.svg) | `ActionPicker.dc.html` | Строка `rows` → метка `row.archived`, SVG |
+| [sliders.svg](assets/sliders.svg) | `ActionPicker.dc.html` | Кнопка `openSheet` → пилюля с `sortSummary`, SVG |
+| [arrow_down.svg](assets/arrow_down.svg) | `ActionPicker.dc.html` | Лист «Show and sort» → группа «Order» → кнопка `dirA.pick`, SVG |
+| [arrow_up.svg](assets/arrow_up.svg) | `ActionPicker.dc.html` | Лист «Show and sort» → группа «Order» → кнопка `dirB.pick`, SVG |
+| [chevron_down.svg](assets/chevron_down.svg) | `ActionPicker.dc.html` | `header` → кнопка `openReminder`, завершающий SVG |
 
 Мини-значки имеют линию 2 при размере 14, значки меню — линию 1,75 при размере 22.
 Календарь навигации содержит отметки дней, календарь меню и мини-значок — нет.

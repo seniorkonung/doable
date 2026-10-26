@@ -335,9 +335,18 @@ final class DriftPersonalGraphRepository
     IntentionCatalogQuery query,
   ) async {
     final stopwatch = Stopwatch()..start();
+    final sortField = switch (query.order.field) {
+      IntentionCatalogSortField.createdAt =>
+        CatalogPageReadDiagnosticsSortField.createdAt,
+      IntentionCatalogSortField.updatedAt =>
+        CatalogPageReadDiagnosticsSortField.updatedAt,
+      IntentionCatalogSortField.title =>
+        CatalogPageReadDiagnosticsSortField.title,
+    };
     _recordDiagnostics(
       CatalogPageReadDiagnosticsEvent(
         pageSize: query.pageSize,
+        sortField: sortField,
         status: const DiagnosticsStarted(),
       ),
     );
@@ -359,6 +368,7 @@ final class DriftPersonalGraphRepository
       _recordDiagnostics(
         CatalogPageReadDiagnosticsEvent(
           pageSize: query.pageSize,
+          sortField: sortField,
           status: DiagnosticsSucceeded(stopwatch.elapsed),
         ),
       );
@@ -368,6 +378,7 @@ final class DriftPersonalGraphRepository
       _recordDiagnostics(
         CatalogPageReadDiagnosticsEvent(
           pageSize: query.pageSize,
+          sortField: sortField,
           status: DiagnosticsFailed(
             duration: stopwatch.elapsed,
             code: _diagnosticsFailureCode(failure),
@@ -1179,15 +1190,30 @@ final class DriftPersonalGraphRepository
   ) async {
     final intentions = _database.intentions;
     final condition = _catalogCondition(query);
-    final countExpression = countAll();
+    // Один подсчёт без условия готовности даёт и числа обоих типов, и общее
+    // количество по условию готовности запроса.
+    final allExpression = countAll();
+    final actionsExpression = countAll(
+      filter: intentions.isActionReady.equals(true),
+    );
     final countQuery = _database.selectOnly(intentions)
-      ..addColumns([countExpression])
-      ..where(condition);
-    final totalCount = (await countQuery.getSingle()).read(countExpression)!;
+      ..addColumns([allExpression, actionsExpression])
+      ..where(_catalogConditionExceptReadiness(query));
+    final countRow = await countQuery.getSingle();
+    final typeCounts = IntentionTypeCounts(
+      all: countRow.read(allExpression)!,
+      actions: countRow.read(actionsExpression)!,
+    );
+    final totalCount = switch (query.readinessFilter) {
+      IntentionReadinessFilter.all => typeCounts.all,
+      IntentionReadinessFilter.readyOnly => typeCounts.actions,
+      IntentionReadinessFilter.notReadyOnly => typeCounts.intentions,
+    };
     final rowsQuery = _database.selectOnly(intentions)
       ..addColumns([
         intentions.id,
         intentions.title,
+        intentions.titleSearchKey,
         intentions.description,
         intentions.isActionReady,
         intentions.isArchived,
@@ -1200,14 +1226,16 @@ final class DriftPersonalGraphRepository
         OrderingTerm.asc(intentions.id),
       ])
       ..limit(query.pageSize + 1);
-    final rows = await rowsQuery.get();
-    final items = await _readCatalogItems(rows, query.pageSize);
-    final hasNextPage = rows.length > query.pageSize;
+    final (items, nextCursor) = await _readCatalogPortion(
+      await rowsQuery.get(),
+      query,
+    );
 
     return IntentionCatalogFirstPage(
       items: items,
       totalCount: totalCount,
-      nextCursor: hasNextPage ? _cursorAt(query, items.last) : null,
+      typeCounts: query.requestsTypeCounts ? typeCounts : null,
+      nextCursor: nextCursor,
       revision: _currentRevision,
     );
   }
@@ -1221,6 +1249,7 @@ final class DriftPersonalGraphRepository
       ..addColumns([
         intentions.id,
         intentions.title,
+        intentions.titleSearchKey,
         intentions.description,
         intentions.isActionReady,
         intentions.isArchived,
@@ -1233,31 +1262,42 @@ final class DriftPersonalGraphRepository
         OrderingTerm.asc(intentions.id),
       ])
       ..limit(query.pageSize + 1);
-    final rows = await rowsQuery.get();
-    final items = await _readCatalogItems(rows, query.pageSize);
-    final hasNextPage = rows.length > query.pageSize;
+    final (items, nextCursor) = await _readCatalogPortion(
+      await rowsQuery.get(),
+      query,
+    );
 
     return IntentionCatalogContinuationPage(
       items: items,
-      nextCursor: hasNextPage ? _cursorAt(query, items.last) : null,
+      nextCursor: nextCursor,
       revision: _currentRevision,
     );
   }
 
   Expression<bool> _catalogCondition(IntentionCatalogQuery query) {
     final intentions = _database.intentions;
-    final scopeCondition = switch (query.scope) {
-      IntentionScope.active => intentions.isArchived.equals(false),
-      IntentionScope.archived => intentions.isArchived.equals(true),
-      IntentionScope.all => const Constant(true),
-    };
     final readinessCondition = switch (query.readinessFilter) {
       IntentionReadinessFilter.all => const Constant(true),
       IntentionReadinessFilter.readyOnly => intentions.isActionReady.equals(
         true,
       ),
+
+      IntentionReadinessFilter.notReadyOnly => intentions.isActionReady.equals(
+        false,
+      ),
     };
-    var condition = scopeCondition & readinessCondition;
+    return readinessCondition & _catalogConditionExceptReadiness(query);
+  }
+
+  Expression<bool> _catalogConditionExceptReadiness(
+    IntentionCatalogQuery query,
+  ) {
+    final intentions = _database.intentions;
+    var condition = switch (query.scope) {
+      IntentionScope.active => intentions.isArchived.equals(false),
+      IntentionScope.archived => intentions.isArchived.equals(true),
+      IntentionScope.all => const Constant<bool>(true),
+    };
     final excludedIntentionId = query.excludedIntentionId;
     if (excludedIntentionId != null) {
       condition =
@@ -1282,73 +1322,123 @@ final class DriftPersonalGraphRepository
     local.Intentions intentions,
     IntentionCatalogOrder order,
   ) {
-    final timestamp = _primaryOrderingColumn(intentions, order);
+    final column = switch (order.field) {
+      IntentionCatalogSortField.createdAt => intentions.createdAt,
+      IntentionCatalogSortField.updatedAt => intentions.updatedAt,
+      IntentionCatalogSortField.title => intentions.titleSearchKey,
+    };
     return switch (order.direction) {
-      IntentionCatalogSortDirection.ascending => OrderingTerm.asc(timestamp),
-      IntentionCatalogSortDirection.descending => OrderingTerm.desc(timestamp),
+      IntentionCatalogSortDirection.ascending => OrderingTerm.asc(column),
+      IntentionCatalogSortDirection.descending => OrderingTerm.desc(column),
     };
   }
 
-  GeneratedColumn<int> _primaryOrderingColumn(
-    local.Intentions intentions,
-    IntentionCatalogOrder order,
-  ) => switch (order.field) {
-    IntentionCatalogSortField.createdAt => intentions.createdAt,
-    IntentionCatalogSortField.updatedAt => intentions.updatedAt,
-  };
-
   /// Строка следует за курсором в действующем порядке. Отдельное сравнение
-  /// временной метки ограничивает диапазон обхода индекса порядка.
+  /// значения поля ограничивает диапазон обхода индекса порядка.
   Expression<bool> _keysetCondition(
     IntentionCatalogQuery query,
     _DriftIntentionCatalogCursor cursor,
   ) {
     final intentions = _database.intentions;
-    final timestamp = _primaryOrderingColumn(intentions, query.order);
-    final boundaryTimestamp =
-        cursor.boundaryTimestamp.value.microsecondsSinceEpoch;
-    final (
-      notBeforeTimestamp,
-      afterTimestamp,
-    ) = switch (query.order.direction) {
-      IntentionCatalogSortDirection.ascending => (
-        timestamp.isBiggerOrEqualValue(boundaryTimestamp),
-        timestamp.isBiggerThanValue(boundaryTimestamp),
-      ),
-      IntentionCatalogSortDirection.descending => (
-        timestamp.isSmallerOrEqualValue(boundaryTimestamp),
-        timestamp.isSmallerThanValue(boundaryTimestamp),
-      ),
+    final direction = query.order.direction;
+    final (notBefore, after) = switch ((query.order.field, cursor.boundary)) {
+      (
+        IntentionCatalogSortField.createdAt,
+        _CatalogTimestampBoundary(:final timestamp),
+      ) =>
+        _boundaryConditions(intentions.createdAt, timestamp, direction),
+      (
+        IntentionCatalogSortField.updatedAt,
+        _CatalogTimestampBoundary(:final timestamp),
+      ) =>
+        _boundaryConditions(intentions.updatedAt, timestamp, direction),
+      (
+        IntentionCatalogSortField.title,
+        _CatalogTitleBoundary(:final storedTitleSearchKey),
+      ) =>
+        _boundaryConditions(
+          intentions.titleSearchKey,
+          storedTitleSearchKey,
+          direction,
+        ),
+      _ => throw StateError('Недопустимый cursor каталога.'),
     };
-    return notBeforeTimestamp &
-        (afterTimestamp |
+    return notBefore &
+        (after |
             intentions.id.isBiggerThanValue(
               cursor.boundaryId.toCanonicalString(),
             ));
   }
 
-  Future<List<IntentionSummary>> _readCatalogItems(
+  /// Условия «не раньше границы» и «строго после границы» по значению поля.
+  (Expression<bool>, Expression<bool>)
+  _boundaryConditions<T extends Comparable<Object>>(
+    Expression<T> column,
+    T boundary,
+    IntentionCatalogSortDirection direction,
+  ) => switch (direction) {
+    IntentionCatalogSortDirection.ascending => (
+      column.isBiggerOrEqualValue(boundary),
+      column.isBiggerThanValue(boundary),
+    ),
+    IntentionCatalogSortDirection.descending => (
+      column.isSmallerOrEqualValue(boundary),
+      column.isSmallerThanValue(boundary),
+    ),
+  };
+
+  /// Сводки первых `pageSize` строк и курсор после последней из них, если
+  /// выборка нашла строку за пределами порции.
+  Future<(List<IntentionSummary>, _DriftIntentionCatalogCursor?)>
+  _readCatalogPortion(
     List<TypedResult> rows,
-    int pageSize,
+    IntentionCatalogQuery query,
   ) async {
-    final intentions = [
+    final storedRows = [
       for (final row in rows)
-        decodeStoredIntention(row.rawData.data, 'intentions.'),
+        (
+          intention: decodeStoredIntention(row.rawData.data, 'intentions.'),
+          titleSearchKey: decodeStoredTitleSearchKey(
+            row.rawData.data,
+            'intentions.',
+          ),
+        ),
     ];
-    final itemRows = intentions.take(pageSize).toList(growable: false);
-    final intentionIds = [for (final intention in itemRows) intention.id];
+    final itemRows = storedRows.take(query.pageSize).toList(growable: false);
+    final intentionIds = [for (final row in itemRows) row.intention.id];
     final tags = await _readIntentionTags(intentionIds);
-    return [
+    final items = [
       for (var index = 0; index < itemRows.length; index++)
         _rehydrateSummary(
-          itemRows[index],
+          itemRows[index].intention,
+          itemRows[index].titleSearchKey,
           tags[intentionIds[index]] ?? (throw const StoredGraphCorruption()),
         ),
     ];
+    if (rows.length <= query.pageSize) return (items, null);
+    final boundary = itemRows.last;
+    return (
+      items,
+      _DriftIntentionCatalogCursor(
+        boundary: switch (query.order.field) {
+          IntentionCatalogSortField.createdAt => _CatalogTimestampBoundary(
+            boundary.intention.createdAt.value.microsecondsSinceEpoch,
+          ),
+          IntentionCatalogSortField.updatedAt => _CatalogTimestampBoundary(
+            boundary.intention.updatedAt.value.microsecondsSinceEpoch,
+          ),
+          IntentionCatalogSortField.title => _CatalogTitleBoundary(
+            boundary.titleSearchKey,
+          ),
+        },
+        boundaryId: boundary.intention.id,
+      ),
+    );
   }
 
   IntentionSummary _rehydrateSummary(
     domain.Intention intention,
+    String storedTitleSearchKey,
     List<tag_domain.Tag> tags,
   ) => IntentionSummary(
     id: intention.id,
@@ -1363,18 +1453,10 @@ final class DriftPersonalGraphRepository
     archiveState: intention.archiveState,
     createdAt: intention.createdAt,
     updatedAt: intention.updatedAt,
+    titleOrderKey: IntentionTitleOrderKey.fromSearchProjection(
+      storedTitleSearchKey,
+    ),
     tags: tags,
-  );
-
-  _DriftIntentionCatalogCursor _cursorAt(
-    IntentionCatalogQuery query,
-    IntentionSummary boundary,
-  ) => _DriftIntentionCatalogCursor(
-    boundaryTimestamp: switch (query.order.field) {
-      IntentionCatalogSortField.createdAt => boundary.createdAt,
-      IntentionCatalogSortField.updatedAt => boundary.updatedAt,
-    },
-    boundaryId: boundary.id,
   );
 
   Future<IntentionCatalogEntrySnapshot> _catalogEntrySnapshot(
@@ -1385,6 +1467,7 @@ final class DriftPersonalGraphRepository
     return _DriftIntentionCatalogEntrySnapshot(
       summary: _rehydrateSummary(
         intention,
+        stored.titleSearchKey,
         tags[intention.id] ?? (throw const StoredGraphCorruption()),
       ),
       storedTitleSearchKey: stored.titleSearchKey,
@@ -1493,6 +1576,9 @@ final class _DriftIntentionCatalogEntrySnapshot
       IntentionReadinessFilter.all => true,
       IntentionReadinessFilter.readyOnly =>
         summary.readiness == domain.IntentionReadiness.ready,
+
+      IntentionReadinessFilter.notReadyOnly =>
+        summary.readiness == domain.IntentionReadiness.notReady,
     };
     if (!matchesScope ||
         !matchesReadiness ||
@@ -1716,12 +1802,30 @@ final class _ExcludedCatalogTagsExpression extends Expression<bool> {
 
 final class _DriftIntentionCatalogCursor implements IntentionCatalogCursor {
   const _DriftIntentionCatalogCursor({
-    required this.boundaryTimestamp,
+    required this.boundary,
     required this.boundaryId,
   });
 
-  final domain.IntentionTimestamp boundaryTimestamp;
+  final _CatalogCursorBoundary boundary;
   final IntentionId boundaryId;
+}
+
+/// Сохранённое значение поля порядка у последней строки порции.
+sealed class _CatalogCursorBoundary {
+  const _CatalogCursorBoundary();
+}
+
+final class _CatalogTimestampBoundary extends _CatalogCursorBoundary {
+  const _CatalogTimestampBoundary(this.timestamp);
+
+  /// Микросекунды эпохи, как хранит колонка временной метки.
+  final int timestamp;
+}
+
+final class _CatalogTitleBoundary extends _CatalogCursorBoundary {
+  const _CatalogTitleBoundary(this.storedTitleSearchKey);
+
+  final String storedTitleSearchKey;
 }
 
 IntentionFailure _classifyDetailReadFailure(Object error) {

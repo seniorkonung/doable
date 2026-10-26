@@ -165,15 +165,15 @@ final class _CatalogControls extends StatelessWidget {
             child: IntentionTagConditionsSection(purpose: _purpose),
           ),
           const SizedBox(height: 12),
-          DropdownButtonFormField<IntentionCatalogOrder>(
+          DropdownButtonFormField<_OfferedCatalogOrder>(
             key: const ValueKey('catalog-order-control'),
             isExpanded: true,
-            initialValue: selection.order,
+            initialValue: _OfferedCatalogOrder.of(selection.order),
             decoration: InputDecoration(
               labelText: localizations.catalogOrderLabel,
             ),
             items: [
-              for (final order in _orders)
+              for (final order in _OfferedCatalogOrder.values)
                 DropdownMenuItem(
                   value: order,
                   child: Text(_orderLabel(localizations, order)),
@@ -181,7 +181,7 @@ final class _CatalogControls extends StatelessWidget {
             ],
             onChanged: (order) {
               if (order != null) {
-                onOrderChanged(order);
+                onOrderChanged(order.order);
               }
             },
           ),
@@ -199,13 +199,6 @@ final class _CatalogControls extends StatelessWidget {
         null => null,
       };
 
-  static const _orders = [
-    IntentionCatalogOrder.createdAtDescending,
-    IntentionCatalogOrder.createdAtAscending,
-    IntentionCatalogOrder.updatedAtDescending,
-    IntentionCatalogOrder.updatedAtAscending,
-  ];
-
   String _scopeLabel(AppLocalizations localizations, IntentionScope scope) =>
       switch (scope) {
         IntentionScope.active => localizations.catalogScopeActive,
@@ -215,29 +208,39 @@ final class _CatalogControls extends StatelessWidget {
 
   String _orderLabel(
     AppLocalizations localizations,
-    IntentionCatalogOrder order,
-  ) => switch ((order.field, order.direction)) {
-    (
-      IntentionCatalogSortField.createdAt,
-      IntentionCatalogSortDirection.descending,
-    ) =>
+    _OfferedCatalogOrder order,
+  ) => switch (order) {
+    _OfferedCatalogOrder.createdNewest =>
       localizations.catalogOrderCreatedNewest,
-    (
-      IntentionCatalogSortField.createdAt,
-      IntentionCatalogSortDirection.ascending,
-    ) =>
+    _OfferedCatalogOrder.createdOldest =>
       localizations.catalogOrderCreatedOldest,
-    (
-      IntentionCatalogSortField.updatedAt,
-      IntentionCatalogSortDirection.descending,
-    ) =>
+    _OfferedCatalogOrder.updatedNewest =>
       localizations.catalogOrderUpdatedNewest,
-    (
-      IntentionCatalogSortField.updatedAt,
-      IntentionCatalogSortDirection.ascending,
-    ) =>
+    _OfferedCatalogOrder.updatedOldest =>
       localizations.catalogOrderUpdatedOldest,
   };
+}
+
+/// Порядки, которые предлагает каталог намерений, в порядке показа.
+///
+/// Порядок по названию допустим в запросе, но каталог его не предлагает.
+enum _OfferedCatalogOrder {
+  createdNewest(IntentionCatalogOrder.createdAtDescending),
+  createdOldest(IntentionCatalogOrder.createdAtAscending),
+  updatedNewest(IntentionCatalogOrder.updatedAtDescending),
+  updatedOldest(IntentionCatalogOrder.updatedAtAscending);
+
+  const _OfferedCatalogOrder(this.order);
+
+  final IntentionCatalogOrder order;
+
+  /// Предлагаемый вариант выбранного порядка, если каталог его предлагает.
+  static _OfferedCatalogOrder? of(IntentionCatalogOrder order) {
+    for (final offered in values) {
+      if (offered.order == order) return offered;
+    }
+    return null;
+  }
 }
 
 final class _IntentionSummaryTile extends StatelessWidget {

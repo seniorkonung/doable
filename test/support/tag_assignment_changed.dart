@@ -4,6 +4,8 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 
+import 'intention_title_order_key.dart';
+
 /// Собирает исход изменения назначения с каталожной мутацией того же
 /// намерения и той же ревизии, как в пакете реальной команды тега.
 TagAssignmentChanged testTagAssignmentChanged(
@@ -31,6 +33,7 @@ final class _TagAssignmentCatalogEntry
         archiveState: IntentionArchiveState.active,
         createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 2)),
+        titleOrderKey: testTitleOrderKey('Намерение'),
         tags: const [],
       );
 

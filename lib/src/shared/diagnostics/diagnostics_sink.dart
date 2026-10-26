@@ -294,13 +294,18 @@ final class MigrationDiagnosticsEvent extends DiagnosticsEvent {
   final int toSchemaVersion;
 }
 
+/// Поле, по которому упорядочена читаемая порция каталога намерений.
+enum CatalogPageReadDiagnosticsSortField { createdAt, updatedAt, title }
+
 final class CatalogPageReadDiagnosticsEvent extends DiagnosticsEvent {
   const CatalogPageReadDiagnosticsEvent({
     required this.pageSize,
+    required this.sortField,
     required DiagnosticsStatus status,
   }) : super(status);
 
   final int pageSize;
+  final CatalogPageReadDiagnosticsSortField sortField;
 }
 
 final class IntentionDetailReadDiagnosticsEvent extends DiagnosticsEvent {

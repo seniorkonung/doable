@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/daily_choice/presentation/daily_choice_picker_context.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
@@ -32,14 +33,38 @@ void main() {
     ruTexts: (
       title: 'Выбор действия',
       header: 'Действия',
-      auxiliaryCancel: 'Отменить выбор действия',
+      pathReplacementCancel: 'Отменить выбор действия',
     ),
+    purposeTexts: {
+      'ru': (
+        title: 'Выбор действия',
+        creationSubtitle: 'Новый дневной выбор: конечное действие',
+        creationLine: 'Новый дневной выбор, от действия',
+        replacementSubtitle: 'Замена пути: конечное действие',
+        replacementLine: 'Замена пути, от действия',
+        startStep: 'Конечное действие',
+        pathStep: 'Путь вверх к исходному намерению',
+        pathNote: 'Нужен хотя бы один шаг',
+      ),
+      'en': (
+        title: 'Choose an action',
+        creationSubtitle: 'New daily choice: selected action',
+        creationLine: 'New daily choice, from an action',
+        replacementSubtitle: 'Path replacement: selected action',
+        replacementLine: 'Path replacement, from an action',
+        startStep: 'Selected action',
+        pathStep: 'Path up to the source intention',
+        pathNote: 'At least one step is needed',
+      ),
+    },
     emptyMessage: 'No active actions are available.',
     noMatchesMessage: 'No actions with this name',
   );
   defineDailyChoicePickerTagSearchTests(
     DailyChoicePickerTagSearchCase(
-      route: DailyChoiceActionPickerRoute(),
+      route: DailyChoiceActionPickerRoute(
+        pickerContext: const PathReplacementDailyChoicePickerContext(),
+      ),
       keyPrefix: 'daily-choice-action',
       readinessFilter: IntentionReadinessFilter.readyOnly,
       rowReadiness: const [IntentionReadiness.ready],
@@ -56,7 +81,13 @@ void main() {
     final router = await _pumpApp(tester, repository);
     addTearDown(router.dispose);
 
-    unawaited(router.push<IntentionId>(DailyChoiceActionPickerRoute()));
+    unawaited(
+      router.push<IntentionId>(
+        DailyChoiceActionPickerRoute(
+          pickerContext: const PathReplacementDailyChoicePickerContext(),
+        ),
+      ),
+    );
     await _settleRoute(tester);
     expect(find.text('Loading actions…'), findsOneWidget);
     repository.complete(1, const ResultFailure(IntentionUnavailableFailure()));
@@ -78,7 +109,9 @@ void main() {
       final router = await _pumpApp(tester, repository);
       addTearDown(router.dispose);
       final selection = router.push<IntentionId>(
-        DailyChoiceActionPickerRoute(),
+        DailyChoiceActionPickerRoute(
+          pickerContext: const PathReplacementDailyChoicePickerContext(),
+        ),
       );
       await _settleRoute(tester);
       _completeFirst(repository, 1, [
