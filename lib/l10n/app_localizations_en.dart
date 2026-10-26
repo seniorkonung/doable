@@ -2303,6 +2303,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get intentionPickerShowAndSortReset => 'Reset';
 
   @override
+  String intentionPickerPurposeLabel(String title, String subtitle) {
+    return '$title. $subtitle. Show what you are choosing';
+  }
+
+  @override
+  String get intentionPickerPurposeSheetTitle => 'What you are choosing';
+
+  @override
+  String get intentionPickerPurposeSheetBack => 'Back to the list';
+
+  @override
   String get intentionPickerTypeCaption => 'Type';
 
   @override

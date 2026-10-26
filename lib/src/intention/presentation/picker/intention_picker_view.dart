@@ -19,11 +19,14 @@ import '../catalog/intention_catalog_state.dart';
 import '../catalog/intention_catalog_view_model.dart';
 import '../catalog/intention_tag_conditions_view_model.dart';
 import 'intention_picker_kind.dart';
+import 'intention_picker_purpose_sheet.dart';
 import 'intention_picker_results.dart';
 import 'intention_picker_show_and_sort_sheet.dart';
 
 /// Экран выбора намерения назначения [purpose]: крестик с заголовком, поле
 /// поиска, фильтр по тегам и заголовок списка закреплены над выдачей.
+/// С [purposeDescription] под заголовком стоит строка назначения, которая
+/// открывает лист «Что вы выбираете».
 ///
 /// Экран не знает маршрутов, права запуска и типа результата: о закрытии,
 /// выборе и открытии подробностей страница узнаёт из обработчиков.
@@ -35,10 +38,15 @@ final class IntentionPickerView extends ConsumerStatefulWidget {
     required this.onClose,
     required this.onPick,
     required this.onOpenDetails,
+    this.purposeDescription,
     super.key,
   });
 
   final IntentionPickerPurpose purpose;
+
+  /// Назначение, которое страница напоминает пользователю; без него шапка
+  /// показывает только заголовок.
+  final IntentionPickerPurposeDescription? purposeDescription;
 
   /// Доступное название крестика: его смысл для вызвавшего потока знает
   /// страница.
@@ -63,11 +71,20 @@ final class _IntentionPickerViewState
     extends ConsumerState<IntentionPickerView> {
   final _titleController = TextEditingController();
   bool _showAndSortExpanded = false;
+  bool _purposeExpanded = false;
 
   Future<void> _openShowAndSort() async {
     setState(() => _showAndSortExpanded = true);
     await showIntentionPickerShowAndSortSheet(context, widget.purpose);
     if (mounted) setState(() => _showAndSortExpanded = false);
+  }
+
+  Future<void> _openPurpose(
+    IntentionPickerPurposeDescription description,
+  ) async {
+    setState(() => _purposeExpanded = true);
+    await showIntentionPickerPurposeSheet(context, description);
+    if (mounted) setState(() => _purposeExpanded = false);
   }
 
   @override
@@ -108,13 +125,32 @@ final class _IntentionPickerViewState
     final conditionCount = ref.watch(
       conditionsProvider.select((state) => state.conditions.length),
     );
+    final title = kind.title(l10n);
+    final purposeDescription = widget.purposeDescription;
     return Scaffold(
-      appBar: TopBar(
-        closeKey: ValueKey('$keyPrefix-cancel'),
-        title: kind.title(l10n),
-        closeLabel: widget.closeLabel,
-        onClose: widget.onClose,
-      ),
+      appBar: purposeDescription == null
+          ? TopBar(
+              closeKey: ValueKey('$keyPrefix-cancel'),
+              title: title,
+              closeLabel: widget.closeLabel,
+              onClose: widget.onClose,
+            )
+          : TopBar.withPurpose(
+              context,
+              closeKey: ValueKey('$keyPrefix-cancel'),
+              title: title,
+              closeLabel: widget.closeLabel,
+              onClose: widget.onClose,
+              purpose: TopBarPurpose(
+                subtitle: purposeDescription.subtitle,
+                label: l10n.intentionPickerPurposeLabel(
+                  title,
+                  purposeDescription.subtitle,
+                ),
+                expanded: _purposeExpanded,
+                onOpen: () => unawaited(_openPurpose(purposeDescription)),
+              ),
+            ),
       body: SafeArea(
         top: false,
         child: Column(

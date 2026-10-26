@@ -1860,6 +1860,18 @@
   "@intentionPickerShowAndSortHint": {"description": "Пояснение немедленного применения параметров поиска"},
   "intentionPickerShowAndSortReset": "Reset",
   "@intentionPickerShowAndSortReset": {"description": "Сброс типа и сортировки поиска к начальному показу"},
+  "intentionPickerPurposeLabel": "{title}. {subtitle}. Show what you are choosing",
+  "@intentionPickerPurposeLabel": {
+    "description": "Доступное название кнопки заголовка и подзаголовка назначения экрана выбора",
+    "placeholders": {
+      "title": {"type": "String"},
+      "subtitle": {"type": "String"}
+    }
+  },
+  "intentionPickerPurposeSheetTitle": "What you are choosing",
+  "@intentionPickerPurposeSheetTitle": {"description": "Заголовок листа, который напоминает назначение экрана выбора"},
+  "intentionPickerPurposeSheetBack": "Back to the list",
+  "@intentionPickerPurposeSheetBack": {"description": "Кнопка, которая закрывает лист назначения и возвращает к выдаче поиска"},
   "intentionPickerTypeCaption": "Type",
   "@intentionPickerTypeCaption": {"description": "Название группы типа намерения"},
   "intentionPickerActionTypeNote": "Only an action can be the final intention of a daily choice",

@@ -3598,6 +3598,24 @@ abstract class AppLocalizations {
   /// **'Reset'**
   String get intentionPickerShowAndSortReset;
 
+  /// Доступное название кнопки заголовка и подзаголовка назначения экрана выбора
+  ///
+  /// In en, this message translates to:
+  /// **'{title}. {subtitle}. Show what you are choosing'**
+  String intentionPickerPurposeLabel(String title, String subtitle);
+
+  /// Заголовок листа, который напоминает назначение экрана выбора
+  ///
+  /// In en, this message translates to:
+  /// **'What you are choosing'**
+  String get intentionPickerPurposeSheetTitle;
+
+  /// Кнопка, которая закрывает лист назначения и возвращает к выдаче поиска
+  ///
+  /// In en, this message translates to:
+  /// **'Back to the list'**
+  String get intentionPickerPurposeSheetBack;
+
   /// Название группы типа намерения
   ///
   /// In en, this message translates to:
