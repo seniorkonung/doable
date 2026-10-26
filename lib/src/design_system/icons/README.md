@@ -4,6 +4,9 @@
 «Doable · Design» версии `1791926592-bd5b` от **14.10.2026**.
 Ползунки сортировки, стрелки порядка и шеврон вниз — из обновлённого макета
 `ActionPicker.dc.html` от **25.10.2026**.
+Селектор строки и направления сортировки — из `ActionPicker.dc.html` от
+**26.10.2026**; те же значки `selector`, `sort-asc` и `sort-desc` описаны в
+дизайн-системе `context/doable-design-system/`.
 Приватный экспорт нужен для сверки при обновлении; SVG в `assets/` самостоятельны.
 
 Сохранены размеры, `viewBox`, геометрия, заливки, `fill-rule`, ширина, окончания
@@ -53,6 +56,9 @@
 | [arrow_down.svg](assets/arrow_down.svg) | `ActionPicker.dc.html` | Лист «Show and sort» → группа «Order» → кнопка `dirA.pick`, SVG |
 | [arrow_up.svg](assets/arrow_up.svg) | `ActionPicker.dc.html` | Лист «Show and sort» → группа «Order» → кнопка `dirB.pick`, SVG |
 | [chevron_down.svg](assets/chevron_down.svg) | `ActionPicker.dc.html` | `header` → кнопка `openReminder`, завершающий SVG |
+| [selector.svg](assets/selector.svg) | `ActionPicker.dc.html` | Лист «Show and sort» → строка «Type» с `mType.toggle`, завершающий SVG; тот же значок у строки «Sort by» |
+| [sort_desc.svg](assets/sort_desc.svg) | `ActionPicker.dc.html` | Лист «Show and sort» → кнопка `dirFlip.pick`, SVG при `dirFlip.down` |
+| [sort_asc.svg](assets/sort_asc.svg) | `ActionPicker.dc.html` | Лист «Show and sort» → кнопка `dirFlip.pick`, SVG при `dirFlip.up` |
 
 Мини-значки имеют линию 2 при размере 14, значки меню — линию 1,75 при размере 22.
 Календарь навигации содержит отметки дней, календарь меню и мини-значок — нет.
