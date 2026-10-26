@@ -1,3 +1,4 @@
+import 'package:doable/src/design_system/components/path_glyph.dart';
 import 'package:doable/src/design_system/components/top_bar.dart';
 import 'package:doable/src/design_system/doable_colors.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
@@ -88,7 +89,45 @@ void main() {
       expect(chevronRect.left - subtitleRect.right, 5);
       expect(chevronRect.center.dy, subtitleRect.center.dy);
       expect((subtitleRect.left + chevronRect.right) / 2, 195);
+      expect(find.byType(PathGlyph), findsNothing);
     });
+
+    for (final (mark, shape) in [
+      (TopBarPurposeMark.sourceField, PathGlyphShape.diamond),
+      (TopBarPurposeMark.relatedField, PathGlyphShape.ring),
+    ]) {
+      testWidgets('в $themeName теме отметка ${mark.name} — пунктирный '
+          '${shape.name} 12 цвета muted в 5 перед подзаголовком, а высота '
+          'панели и кнопки остаётся 44', (tester) async {
+        await _pump(
+          tester,
+          _app(
+            brightness: brightness,
+            bar: _purposeBar(subtitle: 'Для чего', mark: mark),
+          ),
+        );
+
+        final glyph = tester.widget<PathGlyph>(find.byType(PathGlyph));
+        expect(glyph.shape, shape);
+        expect(glyph.outline, PathGlyphOutline.dashed);
+        expect(glyph.size, 12);
+        expect(glyph.color, colors.muted);
+
+        expect(tester.getTopLeft(find.byKey(_body)).dy, 54 + 44);
+        expect(
+          tester.getRect(_purposeButton()),
+          const Rect.fromLTWH(56, 54, 278, 44),
+        );
+        final glyphRect = tester.getRect(find.byType(PathGlyph));
+        final subtitleRect = tester.getRect(find.text('Для чего'));
+        final chevronRect = tester.getRect(_chevron());
+        expect(glyphRect.size, const Size.square(12));
+        expect(subtitleRect.left - glyphRect.right, 5);
+        expect(glyphRect.center.dy, subtitleRect.center.dy);
+        expect(chevronRect.left - subtitleRect.right, 5);
+        expect((glyphRect.left + chevronRect.right) / 2, 195);
+      });
+    }
   }
 
   testWidgets('длинный заголовок занимает одну строку не шире панели без 64 '
@@ -148,6 +187,52 @@ void main() {
       });
     }
   }
+
+  testWidgets('длинный подзаголовок с отметкой обрезается многоточием, '
+      'отметка и шеврон видны внутри кнопки высотой 44, а отметка не '
+      'озвучивается отдельно', (tester) async {
+    final semantics = tester.ensureSemantics();
+    const subtitle = 'Изменение связи: связанное намерение';
+
+    await _pump(
+      tester,
+      _app(
+        bar: _purposeBar(
+          title: 'Выбор намерения',
+          subtitle: subtitle,
+          label: 'Выбор намерения. $subtitle',
+          mark: TopBarPurposeMark.relatedField,
+        ),
+      ),
+      width: 360,
+    );
+
+    final paragraph = tester.renderObject<RenderParagraph>(find.text(subtitle));
+    expect(paragraph.didExceedMaxLines, isTrue);
+    final button = tester.getRect(_purposeButton());
+    expect(button.height, 44);
+    final glyph = tester.getRect(find.byType(PathGlyph));
+    final line = tester.getRect(find.text(subtitle));
+    final chevron = tester.getRect(_chevron());
+    expect(glyph.size, const Size.square(12));
+    expect(glyph.left, greaterThanOrEqualTo(button.left));
+    expect(line.left - glyph.right, 5);
+    expect(chevron.left - line.right, 5);
+    expect(chevron.size, const Size.square(12));
+    expect(chevron.right, lessThanOrEqualTo(button.right));
+    expect(
+      tester.getSemantics(_purposeButton()),
+      isSemantics(
+        label: 'Выбор намерения. $subtitle',
+        isButton: true,
+        hasTapAction: true,
+        hasExpandedState: true,
+        namesRoute: true,
+        children: const [],
+      ),
+    );
+    semantics.dispose();
+  });
 
   testWidgets('крестик — кнопка с названием от потребителя и вызывает его '
       'обработчик, а заголовок объявляется заголовком и называет маршрут', (
@@ -312,6 +397,7 @@ TopBar Function(BuildContext) _purposeBar({
   String label = 'Выбор. Для чего. Показать, что выбирается',
   bool expanded = false,
   VoidCallback? onOpen,
+  TopBarPurposeMark? mark,
 }) =>
     (context) => TopBar.withPurpose(
       context,
@@ -323,6 +409,7 @@ TopBar Function(BuildContext) _purposeBar({
         label: label,
         expanded: expanded,
         onOpen: onOpen ?? () {},
+        mark: mark,
       ),
     );
 

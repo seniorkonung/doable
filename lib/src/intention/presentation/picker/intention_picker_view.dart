@@ -143,6 +143,7 @@ final class _IntentionPickerViewState
               onClose: widget.onClose,
               purpose: TopBarPurpose(
                 subtitle: purposeDescription.subtitle,
+                mark: purposeDescription.subtitleMark,
                 label: l10n.intentionPickerPurposeLabel(
                   title,
                   purposeDescription.subtitle,

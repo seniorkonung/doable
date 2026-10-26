@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../design_system/components/button.dart';
 import '../../../design_system/components/sheet.dart';
+import '../../../design_system/components/top_bar.dart';
 import '../../../design_system/doable_metrics.dart';
 
 /// Назначение экрана выбора, которое строит открывшая его страница: поток,
@@ -14,10 +15,14 @@ final class IntentionPickerPurposeDescription {
     required this.subtitle,
     required this.sheetLine,
     required this.buildSheetBody,
+    this.subtitleMark,
   });
 
   /// Строка под заголовком шапки: поток и выбираемая роль.
   final String subtitle;
+
+  /// Отметка перед строкой шапки, когда выбирается поле связи.
+  final TopBarPurposeMark? subtitleMark;
 
   /// Строка под заголовком листа «Что вы выбираете»: поток.
   final String sheetLine;

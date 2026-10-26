@@ -6,6 +6,10 @@ import '../doable_colors.dart';
 import '../doable_icon.dart';
 import '../doable_metrics.dart';
 import '../doable_type.dart';
+import 'path_glyph.dart';
+
+/// Отметка перед строкой назначения: какое поле связи выбирается.
+enum TopBarPurposeMark { sourceField, relatedField }
 
 /// Строка назначения под заголовком панели: зачем открыт экран. Вместе с
 /// заголовком она — одна кнопка, которая показывает это назначение целиком.
@@ -15,10 +19,15 @@ final class TopBarPurpose {
     required this.label,
     required this.expanded,
     required this.onOpen,
+    this.mark,
   });
 
   /// Одна строка; не поместившийся текст кончается многоточием.
   final String subtitle;
+
+  /// Пунктирный глиф поля перед строкой. Диктор его не слышит: роль уже
+  /// названа словами в строке и в [label].
+  final TopBarPurposeMark? mark;
 
   /// Доступное название общей кнопки заголовка и строки.
   final String label;
@@ -42,6 +51,8 @@ final class TopBar extends StatelessWidget implements PreferredSizeWidget {
   static const double _purposeInset = 56;
   static const double _chevronSize = 12;
   static const double _chevronGap = 5;
+  static const double _markSize = 12;
+  static const double _markGap = 5;
 
   const TopBar({
     required this.title,
@@ -223,6 +234,18 @@ final class TopBar extends StatelessWidget implements PreferredSizeWidget {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  if (purpose.mark case final mark?) ...[
+                    PathGlyph(
+                      shape: switch (mark) {
+                        TopBarPurposeMark.sourceField => PathGlyphShape.diamond,
+                        TopBarPurposeMark.relatedField => PathGlyphShape.ring,
+                      },
+                      outline: PathGlyphOutline.dashed,
+                      size: _markSize,
+                      color: colors.muted,
+                    ),
+                    const SizedBox(width: _markGap),
+                  ],
                   Flexible(
                     child: Text(
                       purpose.subtitle,
