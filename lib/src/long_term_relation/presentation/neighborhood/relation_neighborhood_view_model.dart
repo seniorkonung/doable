@@ -21,6 +21,7 @@ import '../../application/long_term_relation_projection.dart';
 import '../../application/relation_group_page.dart';
 import '../../domain/long_term_relation.dart';
 import '../../domain/long_term_relation_id.dart';
+import '../relation_group_paging.dart';
 import 'relation_neighborhood_paging_policy.dart';
 import 'relation_neighborhood_state.dart';
 
@@ -34,8 +35,7 @@ part 'relation_neighborhood_view_model.g.dart';
 @riverpod
 final class RelationNeighborhoodViewModel
     extends _$RelationNeighborhoodViewModel {
-  /// Непрерывно меняющийся граф не удерживает список в обновлении навсегда.
-  static const _maxRefreshAttempts = 8;
+  final _paging = RelationGroupPaging();
 
   late IntentionId _intentionId;
   late PersonalGraphRepository _repository;
@@ -54,10 +54,6 @@ final class RelationNeighborhoodViewModel
     direction: RelationDirection.outgoing,
     scope: RelationScope.active,
   );
-  var _generation = 0;
-  var _invalidation = 0;
-  Object? _activeRequest;
-  GraphRevision? _requiredRevision;
   LongTermRelationId? _visibleRelationId;
   var _isTerminated = false;
 
@@ -70,10 +66,11 @@ final class RelationNeighborhoodViewModel
     _isTerminated = false;
     _subscribeToGraphChanges();
     ref.onDispose(() {
+      _paging.nextGeneration();
       unawaited(_intentionSubscription?.cancel());
       unawaited(_completionSubscription?.cancel());
     });
-    final generation = _nextGeneration();
+    final generation = _paging.nextGeneration();
     unawaited(_loadFirstPage(generation));
     return RelationGroupInitialLoad(
       intentionId: intentionId,
@@ -133,7 +130,7 @@ final class RelationNeighborhoodViewModel
     if (current is! RelationGroupInitialFailure || !current.canRetry) {
       return Future.value();
     }
-    final generation = _nextGeneration();
+    final generation = _paging.nextGeneration();
     state = RelationGroupInitialLoad(
       intentionId: _intentionId,
       selection: current.selection,
@@ -262,7 +259,7 @@ final class RelationNeighborhoodViewModel
   void _restartGroup(RelationGroup group) {
     _group = group;
     _visibleRelationId = null;
-    final generation = _nextGeneration();
+    final generation = _paging.nextGeneration();
     state = RelationGroupInitialLoad(
       intentionId: _intentionId,
       selection: _selection,
@@ -272,437 +269,279 @@ final class RelationNeighborhoodViewModel
   }
 
   Future<void> _loadFirstPage(int generation) async {
-    final request = Object();
-    _activeRequest = request;
+    final request = _paging.startRequest(generation);
     final selection = _selection;
     final group = _group;
-
-    final result = await _readPage(group);
-    if (!_owns(request, generation)) {
-      return;
-    }
-    _activeRequest = null;
+    final result = await switch (group) {
+      final LongTermRelationGroup longTerm => _mapPagingResult(
+        _paging.readFirst(_longTermSource(longTerm), request),
+        (data) => _longTermState(longTerm, data),
+      ),
+      final DailyChoiceRelationGroup daily => _mapPagingResult(
+        _paging.readFirst(_dailySource(daily), request),
+        (data) => _dailyState(daily, data),
+      ),
+    };
+    if (!ref.mounted || !_paging.owns(request)) return;
+    _paging.finishRequest(request);
     switch (result) {
       case GraphResultSuccess(:final value):
-        if (_pagePrecedesRequiredRevision(value.revision)) {
+        if (_paging.precedesRequiredRevision(value.revision)) {
           unawaited(_loadFirstPage(generation));
           return;
         }
-        state = _stateFromFirstPage(group, value);
+        state = value;
       case GraphResultFailure(failure: RelationGroupIntentionNotFoundFailure()):
         _finishIntentionContext();
-      // Первая порция запрашивается без продолжения: устаревший снимок здесь
-      // не является ответом на заданный вопрос.
-      case GraphResultFailure(failure: RelationGroupSnapshotExpired()):
-        state = _initialFailure(
-          selection,
-          group,
-          const RelationGroupUnexpectedFailure(),
-        );
       case GraphResultFailure(:final failure):
         state = _initialFailure(selection, group, failure);
+      case null:
+        break;
     }
   }
 
   Future<void> _loadMore(RelationGroupConfirmedState confirmed) async {
-    final cursor = _cursorOf(confirmed);
-    if (_activeRequest != null || cursor == null) {
-      return;
-    }
-    if (_pagePrecedesRequiredRevision(confirmed.revision)) {
+    if (_paging.hasActiveRequest || _cursorOf(confirmed) == null) return;
+    if (_paging.precedesRequiredRevision(confirmed.revision)) {
       return _refresh(confirmed, includeRequestedPage: true);
     }
-    final request = Object();
-    final generation = _generation;
-    final invalidation = _invalidation;
-    _activeRequest = request;
+    final request = _paging.startRequest(_paging.generation);
     state = _withProgress(confirmed, const RelationGroupLoadingMore());
-
-    final result = await _readPage(confirmed.group, cursor: cursor);
-    if (!_owns(request, generation)) {
-      return;
-    }
-    _activeRequest = null;
-    if (invalidation != _invalidation) {
-      unawaited(_refresh(confirmed, includeRequestedPage: true));
-      return;
-    }
+    final result = await switch (confirmed) {
+      RelationGroupLoaded() => _mapPagingResult(
+        _paging.loadMore(
+          _longTermSource(confirmed.group as LongTermRelationGroup),
+          _pagingData(confirmed, confirmed.items),
+          request,
+        ),
+        (data) => _longTermState(
+          confirmed.group as LongTermRelationGroup,
+          data,
+          scrollAnchor: confirmed.scrollAnchor,
+        ),
+      ),
+      DailyChoiceGroupLoaded() => _mapPagingResult(
+        _paging.loadMore(
+          _dailySource(confirmed.group as DailyChoiceRelationGroup),
+          _pagingData(confirmed, confirmed.items),
+          request,
+        ),
+        (data) =>
+            _dailyState(confirmed.group as DailyChoiceRelationGroup, data),
+      ),
+      RelationGroupEmpty() => null,
+    };
+    if (!ref.mounted || !_paging.owns(request)) return;
+    _paging.finishRequest(request);
     final current = state;
-    if (current is! RelationGroupLoaded && current is! DailyChoiceGroupLoaded) {
+    if (current is! RelationGroupConfirmedState ||
+        current is RelationGroupEmpty) {
       return;
     }
-
     switch (result) {
       case GraphResultSuccess(:final value):
-        final appended = _appendContinuation(
-          current as RelationGroupConfirmedState,
-          value,
-        );
-        if (appended == null) {
+        if (_paging.precedesRequiredRevision(value.revision)) {
           unawaited(_refresh(current, includeRequestedPage: true));
           return;
         }
-        state = appended;
-      // Продолжение относится к недоступному снимку: нужна новая основа.
-      case GraphResultFailure(failure: RelationGroupSnapshotExpired()):
-        unawaited(
-          _refresh(
-            current as RelationGroupConfirmedState,
-            includeRequestedPage: true,
-          ),
-        );
+        state = _withSummaryStatus(value, current.summaryStatus);
       case GraphResultFailure(failure: RelationGroupIntentionNotFoundFailure()):
         _finishIntentionContext();
       case GraphResultFailure(:final failure):
-        state = _withProgress(
-          current as RelationGroupConfirmedState,
-          RelationGroupLoadMoreFailure(failure),
-        );
+        state = _withProgress(current, RelationGroupLoadMoreFailure(failure));
+      case null:
+        unawaited(_refresh(current, includeRequestedPage: true));
     }
   }
 
-  /// Получает новую основу вместо непригодного продолжения.
-  ///
-  /// Прежняя подтверждённая часть группы и её количества остаются доступными
-  /// с состоянием обновления до атомарной публикации согласованной замены.
+  /// Прежняя подтверждённая пара остаётся видимой, пока ядро собирает замену.
   Future<void> _refresh(
     RelationGroupConfirmedState confirmed, {
     required bool includeRequestedPage,
   }) async {
-    if (_activeRequest != null) {
-      return;
-    }
-    final request = Object();
-    final generation = _generation;
+    if (_paging.hasActiveRequest) return;
+    final request = _paging.startRequest(_paging.generation);
     final refreshBase = _withProgress(confirmed, const RelationGroupIdle());
-    _activeRequest = request;
     state = _withSummaryStatus(refreshBase, const RelationSummaryRefreshing());
-
     try {
-      for (var attempt = 0; attempt < _maxRefreshAttempts; attempt += 1) {
-        final invalidation = _invalidation;
-        final assembly = await _assembleGroup(
-          refreshBase,
-          request,
-          generation,
-          invalidation,
-          includeRequestedPage: includeRequestedPage,
-        );
-        if (!_owns(request, generation)) {
-          return;
-        }
-        switch (assembly) {
-          case _AssembledGroup(:final replacement):
-            if (invalidation != _invalidation) {
-              continue;
-            }
+      while (_paging.owns(request)) {
+        final result = await switch (confirmed.group) {
+          final LongTermRelationGroup group => _mapPagingResult(
+            _paging.refresh(
+              _longTermSource(group),
+              request,
+              loadedCount: _itemsOf(confirmed).length,
+              includeRequestedPage: includeRequestedPage,
+            ),
+            (data) => _longTermState(group, data),
+          ),
+          final DailyChoiceRelationGroup group => _mapPagingResult(
+            _paging.refresh(
+              _dailySource(group),
+              request,
+              loadedCount: _dailyItemsOf(confirmed).length,
+              includeRequestedPage: includeRequestedPage,
+            ),
+            (data) => _dailyState(group, data),
+          ),
+        };
+        if (!ref.mounted || !_paging.owns(request)) return;
+        switch (result) {
+          case GraphResultSuccess(:final value):
+            if (_paging.precedesRequiredRevision(value.revision)) continue;
             state = _withScrollAnchor(
               previous: refreshBase,
-              replacement: replacement,
+              replacement: value,
             );
             return;
-          case _AssemblyFailed(:final failure):
-            if (failure is RelationGroupIntentionNotFoundFailure) {
-              _finishIntentionContext();
-              return;
-            }
+          case GraphResultFailure(
+            failure: RelationGroupIntentionNotFoundFailure(),
+          ):
+            _finishIntentionContext();
+            return;
+          case GraphResultFailure(:final failure):
             state = _withSummaryStatus(
               refreshBase,
               RelationSummaryRefreshFailure(failure),
             );
             return;
-          case _AssemblyInterrupted():
-            continue;
+          case null:
+            return;
         }
       }
-      state = _withSummaryStatus(
-        refreshBase,
-        const RelationSummaryRefreshFailure(RelationGroupUnavailableFailure()),
-      );
     } finally {
-      if (identical(_activeRequest, request)) {
-        _activeRequest = null;
-      }
+      _paging.finishRequest(request);
     }
   }
 
-  /// Собирает замену с первой порции на одной ревизии.
-  ///
-  /// Предел сборки — прежняя загруженная часть и одна запрошенная порция:
-  /// незагруженный остаток группы и другие группы не читаются.
-  Future<_GroupAssembly> _assembleGroup(
+  Future<GraphResult<RelationGroupConfirmedState, RelationGroupReadFailure>?>
+  _mapPagingResult<Row>(
+    Future<RelationPagingResult<Row>?> result,
+    RelationGroupConfirmedState Function(RelationPagingData<Row>) toState,
+  ) async => switch (await result) {
+    GraphResultSuccess(:final value) => GraphResultSuccess(toState(value)),
+    GraphResultFailure(:final failure) => GraphResultFailure(failure),
+    null => null,
+  };
+
+  RelationPagingData<Row> _pagingData<Row>(
     RelationGroupConfirmedState confirmed,
-    Object request,
-    int generation,
-    int invalidation, {
-    required bool includeRequestedPage,
-  }) async {
-    if (confirmed.group case final DailyChoiceRelationGroup dailyGroup) {
-      return _assembleDailyGroup(
-        confirmed,
-        dailyGroup,
-        request,
-        generation,
-        invalidation,
-        includeRequestedPage: includeRequestedPage,
-      );
-    }
-    final selection = confirmed.selection;
-    final limit =
-        _itemsOf(confirmed).length +
-        (includeRequestedPage ? _policy.pageSize : 0);
+    List<Row> items,
+  ) => RelationPagingData(
+    items: items,
+    counts: confirmed.counts,
+    totalCount: confirmed.totalCount,
+    revision: confirmed.revision,
+    nextCursor: _cursorOf(confirmed),
+  );
 
-    final firstResult = await _readPage(confirmed.group);
-    if (!_assemblyIsCurrent(request, generation, invalidation)) {
-      return const _AssemblyInterrupted();
-    }
-    final RelationGroupFirstPage firstPage;
-    switch (firstResult) {
-      case GraphResultSuccess(value: final RelationGroupFirstPage page):
-        firstPage = page;
-      case GraphResultSuccess():
-        return const _AssemblyFailed(RelationGroupUnexpectedFailure());
-      case GraphResultFailure(failure: RelationGroupSnapshotExpired()):
-        return const _AssemblyFailed(RelationGroupUnexpectedFailure());
-      case GraphResultFailure(:final failure):
-        return _AssemblyFailed(failure);
-    }
+  RelationPagingSource<LongTermRelationSummary, LongTermRelationId>
+  _longTermSource(LongTermRelationGroup group) => RelationPagingSource(
+    pageSize: _policy.pageSize,
+    identify: (item) => _belongsToGroup(item, group) ? item.relation.id : null,
+    readPage: (cursor) async =>
+        switch (await _readPage(group, cursor: cursor)) {
+          GraphResultSuccess(value: final RelationGroupFirstPage page) =>
+            GraphResultSuccess(
+              RelationPagingFirstPage(
+                items: page.items,
+                counts: page.counts,
+                totalCount: page.counts.forSelection(group),
+                revision: page.revision,
+                nextCursor: page.nextCursor,
+              ),
+            ),
+          GraphResultSuccess(value: final RelationGroupContinuationPage page) =>
+            GraphResultSuccess(
+              RelationPagingContinuationPage(
+                items: page.items,
+                revision: page.revision,
+                nextCursor: page.nextCursor,
+              ),
+            ),
+          GraphResultSuccess() => const GraphResultFailure(
+            RelationGroupUnexpectedFailure(),
+          ),
+          GraphResultFailure(:final failure) => GraphResultFailure(failure),
+        },
+  );
 
-    final counts = firstPage.counts;
-    final revision = firstPage.revision;
-    if (_pagePrecedesRequiredRevision(revision)) {
-      return const _AssemblyInterrupted();
-    }
-    final totalCount = counts.forSelection(confirmed.group);
-    final firstItems = _combine(const [], firstPage.items, selection);
-    var cursor = firstPage.nextCursor;
-    if (firstItems == null ||
-        !_hasConsistentTotal(firstItems.length, cursor, totalCount)) {
-      return const _AssemblyFailed(RelationGroupUnexpectedFailure());
-    }
-    var items = firstItems;
-
-    while (cursor != null && items.length < limit) {
-      final result = await _readPage(confirmed.group, cursor: cursor);
-      if (!_assemblyIsCurrent(request, generation, invalidation)) {
-        return const _AssemblyInterrupted();
-      }
-      switch (result) {
-        case GraphResultSuccess(
-          value: final RelationGroupContinuationPage page,
-        ):
-          if (page.revision.compareTo(revision) != GraphRevisionOrder.same) {
-            return const _AssemblyInterrupted();
-          }
-          final combined = _combine(items, page.items, selection);
-          cursor = page.nextCursor;
-          if (combined == null ||
-              !_hasConsistentTotal(combined.length, cursor, totalCount)) {
-            return const _AssemblyFailed(RelationGroupUnexpectedFailure());
-          }
-          items = combined;
-        case GraphResultSuccess():
-          return const _AssemblyFailed(RelationGroupUnexpectedFailure());
-        case GraphResultFailure(failure: RelationGroupSnapshotExpired()):
-          return const _AssemblyInterrupted();
-        case GraphResultFailure(:final failure):
-          return _AssemblyFailed(failure);
-      }
-    }
-
-    if (items.isEmpty) {
-      return _AssembledGroup(
-        RelationGroupEmpty(
-          intentionId: _intentionId,
-          selection: selection,
-          group: confirmed.group,
-          counts: counts,
-          revision: revision,
-        ),
-      );
-    }
-    return _AssembledGroup(
-      RelationGroupLoaded(
-        intentionId: _intentionId,
-        selection: selection,
-        group: confirmed.group,
-        counts: counts,
-        revision: revision,
-        items: items,
-        nextCursor: cursor,
-      ),
-    );
-  }
-
-  Future<_GroupAssembly> _assembleDailyGroup(
-    RelationGroupConfirmedState confirmed,
+  RelationPagingSource<DailyChoiceCatalogItem, DailyChoiceId> _dailySource(
     DailyChoiceRelationGroup group,
-    Object request,
-    int generation,
-    int invalidation, {
-    required bool includeRequestedPage,
-  }) async {
-    final limit =
-        _dailyItemsOf(confirmed).length +
-        (includeRequestedPage ? _policy.pageSize : 0);
-    final firstResult = await _readPage(group);
-    if (!_assemblyIsCurrent(request, generation, invalidation)) {
-      return const _AssemblyInterrupted();
-    }
-    final DailyChoiceGroupFirstPage firstPage;
-    switch (firstResult) {
-      case GraphResultSuccess(value: final DailyChoiceGroupFirstPage page):
-        firstPage = page;
-      case GraphResultSuccess() ||
-          GraphResultFailure(failure: RelationGroupSnapshotExpired()):
-        return const _AssemblyFailed(RelationGroupUnexpectedFailure());
-      case GraphResultFailure(:final failure):
-        return _AssemblyFailed(failure);
-    }
-    final counts = firstPage.counts;
-    final revision = firstPage.revision;
-    if (_pagePrecedesRequiredRevision(revision)) {
-      return const _AssemblyInterrupted();
-    }
-    final totalCount = counts.forSelection(group);
-    final firstItems = _combineDaily(const [], firstPage.items, group);
-    var cursor = firstPage.nextCursor;
-    if (firstItems == null ||
-        !_hasConsistentTotal(firstItems.length, cursor, totalCount)) {
-      return const _AssemblyFailed(RelationGroupUnexpectedFailure());
-    }
-    var items = firstItems;
-    while (cursor != null && items.length < limit) {
-      final result = await _readPage(group, cursor: cursor);
-      if (!_assemblyIsCurrent(request, generation, invalidation)) {
-        return const _AssemblyInterrupted();
-      }
-      switch (result) {
-        case GraphResultSuccess(
-          value: final DailyChoiceGroupContinuationPage page,
-        ):
-          if (page.revision.compareTo(revision) != GraphRevisionOrder.same) {
-            return const _AssemblyInterrupted();
-          }
-          final combined = _combineDaily(items, page.items, group);
-          cursor = page.nextCursor;
-          if (combined == null ||
-              !_hasConsistentTotal(combined.length, cursor, totalCount)) {
-            return const _AssemblyFailed(RelationGroupUnexpectedFailure());
-          }
-          items = combined;
-        case GraphResultSuccess():
-          return const _AssemblyFailed(RelationGroupUnexpectedFailure());
-        case GraphResultFailure(failure: RelationGroupSnapshotExpired()):
-          return const _AssemblyInterrupted();
-        case GraphResultFailure(:final failure):
-          return _AssemblyFailed(failure);
-      }
-    }
-    if (items.isEmpty) {
-      return _AssembledGroup(
-        RelationGroupEmpty(
-          intentionId: _intentionId,
-          selection: confirmed.selection,
-          group: group,
-          counts: counts,
-          revision: revision,
+  ) => RelationPagingSource(
+    pageSize: _policy.pageSize,
+    identify: (item) => _dailyItemBelongsToGroup(item, group) ? item.id : null,
+    readPage: (cursor) async => switch (await _readPage(
+      group,
+      cursor: cursor,
+    )) {
+      GraphResultSuccess(value: final DailyChoiceGroupFirstPage page) =>
+        GraphResultSuccess(
+          RelationPagingFirstPage(
+            items: page.items,
+            counts: page.counts,
+            totalCount: page.counts.forSelection(group),
+            revision: page.revision,
+            nextCursor: page.nextCursor,
+          ),
         ),
-      );
-    }
-    return _AssembledGroup(
-      DailyChoiceGroupLoaded(
-        intentionId: _intentionId,
-        selection: confirmed.selection,
-        group: group,
-        counts: counts,
-        revision: revision,
-        items: items,
-        nextCursor: cursor,
+      GraphResultSuccess(value: final DailyChoiceGroupContinuationPage page) =>
+        GraphResultSuccess(
+          RelationPagingContinuationPage(
+            items: page.items,
+            revision: page.revision,
+            nextCursor: page.nextCursor,
+          ),
+        ),
+      GraphResultSuccess() => const GraphResultFailure(
+        RelationGroupUnexpectedFailure(),
       ),
-    );
-  }
+      GraphResultFailure(:final failure) => GraphResultFailure(failure),
+    },
+  );
 
-  /// Присоединяет порцию продолжения к подтверждённой части группы.
-  ///
-  /// `null` означает порцию несовместимого состояния графа: её строки не
-  /// смешиваются с загруженной частью, а список получает новую основу.
-  RelationGroupConfirmedState? _appendContinuation(
-    RelationGroupConfirmedState confirmed,
-    RelationGroupPage page,
-  ) {
-    if (confirmed is DailyChoiceGroupLoaded) {
-      if (page is! DailyChoiceGroupContinuationPage) {
-        return confirmed.withProgress(
-          const RelationGroupLoadMoreFailure(RelationGroupUnexpectedFailure()),
+  RelationGroupConfirmedState _longTermState(
+    LongTermRelationGroup group,
+    RelationPagingData<LongTermRelationSummary> data, {
+    RelationGroupScrollAnchor? scrollAnchor,
+  }) => data.items.isEmpty
+      ? _emptyState(group, data)
+      : RelationGroupLoaded(
+          intentionId: _intentionId,
+          selection: _selection,
+          group: group,
+          counts: data.counts,
+          revision: data.revision,
+          items: data.items,
+          nextCursor: data.nextCursor,
+          scrollAnchor: scrollAnchor,
         );
-      }
-      if (page.revision.compareTo(confirmed.revision) !=
-          GraphRevisionOrder.same) {
-        return null;
-      }
-      final combined = _combineDaily(
-        confirmed.items,
-        page.items,
-        confirmed.group as DailyChoiceRelationGroup,
-      );
-      if (combined == null ||
-          !_hasConsistentTotal(
-            combined.length,
-            page.nextCursor,
-            confirmed.totalCount,
-          )) {
-        return confirmed.withProgress(
-          const RelationGroupLoadMoreFailure(RelationGroupUnexpectedFailure()),
-        );
-      }
-      return DailyChoiceGroupLoaded(
-        intentionId: confirmed.intentionId,
-        selection: confirmed.selection,
-        group: confirmed.group as DailyChoiceRelationGroup,
-        counts: confirmed.counts,
-        revision: confirmed.revision,
-        summaryStatus: confirmed.summaryStatus,
-        items: combined,
-        nextCursor: page.nextCursor,
-      );
-    }
-    if (confirmed is! RelationGroupLoaded) {
-      return null;
-    }
-    if (page is! RelationGroupContinuationPage) {
-      return confirmed.withProgress(
-        const RelationGroupLoadMoreFailure(RelationGroupUnexpectedFailure()),
-      );
-    }
-    if (page.revision.compareTo(confirmed.revision) !=
-        GraphRevisionOrder.same) {
-      return null;
-    }
 
-    final combined = _combine(confirmed.items, page.items, confirmed.selection);
-    if (combined == null ||
-        !_hasConsistentTotal(
-          combined.length,
-          page.nextCursor,
-          confirmed.totalCount,
-        )) {
-      return confirmed.withProgress(
-        const RelationGroupLoadMoreFailure(RelationGroupUnexpectedFailure()),
-      );
-    }
-    return RelationGroupLoaded(
-      intentionId: confirmed.intentionId,
-      selection: confirmed.selection,
-      group: confirmed.group,
-      counts: confirmed.counts,
-      revision: confirmed.revision,
-      summaryStatus: confirmed.summaryStatus,
-      items: combined,
-      nextCursor: page.nextCursor,
-      scrollAnchor: confirmed.scrollAnchor,
-    );
-  }
+  RelationGroupConfirmedState _dailyState(
+    DailyChoiceRelationGroup group,
+    RelationPagingData<DailyChoiceCatalogItem> data,
+  ) => data.items.isEmpty
+      ? _emptyState(group, data)
+      : DailyChoiceGroupLoaded(
+          intentionId: _intentionId,
+          selection: _selection,
+          group: group,
+          counts: data.counts,
+          revision: data.revision,
+          items: data.items,
+          nextCursor: data.nextCursor,
+        );
+
+  RelationGroupEmpty _emptyState<Row>(
+    RelationGroup group,
+    RelationPagingData<Row> data,
+  ) => RelationGroupEmpty(
+    intentionId: _intentionId,
+    selection: _selection,
+    group: group,
+    counts: data.counts,
+    revision: data.revision,
+  );
 
   void _subscribeToGraphChanges() {
     try {
@@ -749,7 +588,7 @@ final class RelationNeighborhoodViewModel
         if (_observationPrecedesKnownRevision(revision)) {
           return;
         }
-        _requiredRevision = revision;
+        _paging.requireRevision(revision);
         _finishIntentionContext();
       case GraphResultSuccess(
         value: GraphSnapshot(
@@ -784,7 +623,7 @@ final class RelationNeighborhoodViewModel
     if (confirmedChange.changes.whereType<IntentionCatalogDeleted>().any(
       (change) => change.before.summary.id == _intentionId,
     )) {
-      _requiredRevision = confirmedChange.revision;
+      _paging.requireRevision(confirmedChange.revision);
       _finishIntentionContext();
       return;
     }
@@ -804,7 +643,7 @@ final class RelationNeighborhoodViewModel
         return;
       }
     }
-    final required = _requiredRevision;
+    final required = _paging.requiredRevision;
     if (required != null) {
       final order = revision.compareTo(required);
       if (order == GraphRevisionOrder.older ||
@@ -812,11 +651,10 @@ final class RelationNeighborhoodViewModel
         return;
       }
     }
-    _requiredRevision = revision;
-    _invalidation += 1;
+    _paging.requireRevision(revision);
     if (current is RelationGroupConfirmedState &&
         current.progress is RelationGroupLoadingMore) {
-      _activeRequest = null;
+      _paging.cancelRequest();
       unawaited(_refresh(current, includeRequestedPage: true));
     }
   }
@@ -935,7 +773,7 @@ final class RelationNeighborhoodViewModel
         return;
       }
     }
-    final required = _requiredRevision;
+    final required = _paging.requiredRevision;
     if (required != null) {
       final order = revision.compareTo(required);
       if (order == GraphRevisionOrder.older ||
@@ -943,17 +781,16 @@ final class RelationNeighborhoodViewModel
         return;
       }
     }
-    _requiredRevision = revision;
-    _invalidation += 1;
+    _paging.requireRevision(revision);
     if (current is RelationGroupConfirmedState) {
       if ((current is RelationGroupLoaded ||
               current is DailyChoiceGroupLoaded) &&
           current.progress is RelationGroupLoadingMore) {
         // Продолжение прежней ревизии может задержаться или не завершиться.
         // Новую основу читаем сразу, сохраняя предел запрошенной порции.
-        _activeRequest = null;
+        _paging.cancelRequest();
         unawaited(_refresh(current, includeRequestedPage: true));
-      } else if (_activeRequest == null) {
+      } else if (!_paging.hasActiveRequest) {
         unawaited(_refresh(current, includeRequestedPage: false));
       }
     }
@@ -980,7 +817,7 @@ final class RelationNeighborhoodViewModel
       return;
     }
     _isTerminated = true;
-    _nextGeneration();
+    _paging.nextGeneration();
     state = RelationNeighborhoodIntentionNotFound(
       intentionId: _intentionId,
       selection: _selection,
@@ -990,137 +827,17 @@ final class RelationNeighborhoodViewModel
     unawaited(_completionSubscription?.cancel());
   }
 
-  RelationNeighborhoodState _stateFromFirstPage(
-    RelationGroup group,
-    RelationGroupPage page,
-  ) {
-    final selection = _selection;
-    if (group case final DailyChoiceRelationGroup dailyGroup) {
-      if (page is! DailyChoiceGroupFirstPage) {
-        return _initialFailure(
-          selection,
-          group,
-          const RelationGroupUnexpectedFailure(),
-        );
-      }
-      final items = _combineDaily(const [], page.items, dailyGroup);
-      if (items == null ||
-          !_hasConsistentTotal(
-            items.length,
-            page.nextCursor,
-            page.counts.forSelection(group),
-          )) {
-        return _initialFailure(
-          selection,
-          group,
-          const RelationGroupUnexpectedFailure(),
-        );
-      }
-      if (items.isEmpty) {
-        return RelationGroupEmpty(
-          intentionId: _intentionId,
-          selection: selection,
-          group: group,
-          counts: page.counts,
-          revision: page.revision,
-        );
-      }
-      return DailyChoiceGroupLoaded(
-        intentionId: _intentionId,
-        selection: selection,
-        group: dailyGroup,
-        counts: page.counts,
-        revision: page.revision,
-        items: items,
-        nextCursor: page.nextCursor,
-      );
-    }
-    if (page is! RelationGroupFirstPage) {
-      return _initialFailure(
-        selection,
-        group,
-        const RelationGroupUnexpectedFailure(),
-      );
-    }
-    final totalCount = page.counts.forSelection(group);
-    final items = _combine(const [], page.items, selection);
-    if (items == null ||
-        !_hasConsistentTotal(items.length, page.nextCursor, totalCount)) {
-      return _initialFailure(
-        selection,
-        group,
-        const RelationGroupUnexpectedFailure(),
-      );
-    }
-    if (items.isEmpty) {
-      return RelationGroupEmpty(
-        intentionId: _intentionId,
-        selection: selection,
-        group: group,
-        counts: page.counts,
-        revision: page.revision,
-      );
-    }
-    return RelationGroupLoaded(
-      intentionId: _intentionId,
-      selection: selection,
-      group: group,
-      counts: page.counts,
-      revision: page.revision,
-      items: items,
-      nextCursor: page.nextCursor,
-    );
-  }
-
-  /// Проверяет строки порции и присоединяет их без повторов.
-  ///
-  /// `null` означает строку вне выбранной группы или порцию сверх
-  /// запрошенного размера: частичный успех такой порции не публикуется.
-  List<LongTermRelationSummary>? _combine(
-    List<LongTermRelationSummary> loaded,
-    List<LongTermRelationSummary> page,
-    RelationGroupSelection selection,
-  ) {
-    if (page.length > _policy.pageSize) {
-      return null;
-    }
-    final knownIds = <LongTermRelationId>{
-      for (final item in loaded) item.relation.id,
-    };
-    final combined = [...loaded];
-    for (final item in page) {
-      if (!_belongsToGroup(item, selection)) {
-        return null;
-      }
-      if (knownIds.add(item.relation.id)) {
-        combined.add(item);
-      }
-    }
-    return combined;
-  }
-
-  List<DailyChoiceCatalogItem>? _combineDaily(
-    List<DailyChoiceCatalogItem> loaded,
-    List<DailyChoiceCatalogItem> page,
+  bool _dailyItemBelongsToGroup(
+    DailyChoiceCatalogItem item,
     DailyChoiceRelationGroup group,
-  ) {
-    if (page.length > _policy.pageSize) return null;
-    final knownIds = <DailyChoiceId>{for (final item in loaded) item.id};
-    final combined = [...loaded];
-    for (final item in page) {
-      final owner = switch (group.role) {
-        DailyChoiceRelationRole.source => item.source.id,
-        DailyChoiceRelationRole.selected => item.selected.id,
-      };
-      if (owner != _intentionId) return null;
-      if (knownIds.add(item.id)) combined.add(item);
-    }
-    return combined;
-  }
+  ) => switch (group.role) {
+    DailyChoiceRelationRole.source => item.source.id == _intentionId,
+    DailyChoiceRelationRole.selected => item.selected.id == _intentionId,
+  };
 
   bool _belongsToGroup(
     LongTermRelationSummary item,
-    RelationGroupSelection selection,
+    LongTermRelationGroup selection,
   ) {
     final relation = item.relation;
     if (relation.type != selection.type || relation.scope != selection.scope) {
@@ -1131,14 +848,6 @@ final class RelationNeighborhoodViewModel
       RelationDirection.incoming => relation.relatedIntentionId == _intentionId,
     };
   }
-
-  /// Проверяет полноту выдачи: конец списка объявляет только полная группа.
-  bool _hasConsistentTotal(
-    int loadedCount,
-    RelationGroupCursor? nextCursor,
-    int totalCount,
-  ) =>
-      nextCursor == null ? loadedCount == totalCount : loadedCount < totalCount;
 
   List<LongTermRelationSummary> _itemsOf(
     RelationGroupConfirmedState confirmed,
@@ -1201,63 +910,14 @@ final class RelationNeighborhoodViewModel
         previous is DailyChoiceGroupLoaded) {
       return replacement;
     }
-    final visibleId = _visibleRelationId;
-    final previousItems = _itemsOf(previous);
-    final replacementItems = _itemsOf(replacement);
-    if (visibleId == null ||
-        previousItems.isEmpty ||
-        replacementItems.isEmpty) {
-      _visibleRelationId = null;
-      return replacement;
-    }
-
-    final previousIndex = previousItems.indexWhere(
-      (item) => item.relation.id == visibleId,
+    final anchor = _paging.chooseAnchor(
+      previous: _itemsOf(previous),
+      replacement: _itemsOf(replacement),
+      visibleId: _visibleRelationId,
+      identify: (item) => item.relation.id,
     );
-    if (previousIndex < 0) {
-      _visibleRelationId = null;
-      return replacement;
-    }
-    final replacementIndexes = <LongTermRelationId, int>{
-      for (var index = 0; index < replacementItems.length; index += 1)
-        replacementItems[index].relation.id: index,
-    };
-    var targetId = visibleId;
-    var targetIndex = replacementIndexes[visibleId];
-    for (
-      var distance = 1;
-      targetIndex == null && distance < previousItems.length;
-      distance += 1
-    ) {
-      final after = previousIndex + distance;
-      final before = previousIndex - distance;
-      if (after < previousItems.length) {
-        final candidate = previousItems[after].relation.id;
-        final candidateIndex = replacementIndexes[candidate];
-        if (candidateIndex != null) {
-          targetId = candidate;
-          targetIndex = candidateIndex;
-          break;
-        }
-      }
-      if (before >= 0) {
-        final candidate = previousItems[before].relation.id;
-        final candidateIndex = replacementIndexes[candidate];
-        if (candidateIndex != null) {
-          targetId = candidate;
-          targetIndex = candidateIndex;
-        }
-      }
-    }
-    if (targetIndex == null) {
-      targetIndex = previousIndex.clamp(0, replacementItems.length - 1);
-      targetId = replacementItems[targetIndex].relation.id;
-    }
-    final anchor = RelationGroupScrollAnchor(
-      relationId: targetId,
-      index: targetIndex,
-    );
-    _visibleRelationId = targetId;
+    _visibleRelationId = anchor?.id;
+    if (anchor == null) return replacement;
     return switch (replacement) {
       RelationGroupEmpty() => replacement,
       RelationGroupLoaded() => RelationGroupLoaded(
@@ -1270,35 +930,24 @@ final class RelationNeighborhoodViewModel
         items: replacement.items,
         nextCursor: replacement.nextCursor,
         progress: replacement.progress,
-        scrollAnchor: anchor,
+        scrollAnchor: RelationGroupScrollAnchor(
+          relationId: anchor.id,
+          index: anchor.index,
+        ),
       ),
       DailyChoiceGroupLoaded() => replacement,
     };
   }
 
-  bool _assemblyIsCurrent(Object request, int generation, int invalidation) =>
-      _owns(request, generation) && invalidation == _invalidation;
-
-  bool _pagePrecedesRequiredRevision(GraphRevision revision) {
-    final required = _requiredRevision;
-    return required != null && _precedes(revision, required);
-  }
-
   bool _observationPrecedesKnownRevision(GraphRevision revision) {
     final current = state;
     if (current is RelationGroupConfirmedState &&
-        _precedes(revision, current.revision)) {
+        _paging.precedes(revision, current.revision)) {
       return true;
     }
-    final required = _requiredRevision;
-    return required != null && _precedes(revision, required);
+    final required = _paging.requiredRevision;
+    return required != null && _paging.precedes(revision, required);
   }
-
-  bool _precedes(GraphRevision revision, GraphRevision known) =>
-      switch (revision.compareTo(known)) {
-        GraphRevisionOrder.older || GraphRevisionOrder.differentEpoch => true,
-        GraphRevisionOrder.same || GraphRevisionOrder.newer => false,
-      };
 
   RelationGroupInitialFailure _initialFailure(
     RelationGroupSelection selection,
@@ -1338,39 +987,4 @@ final class RelationNeighborhoodViewModel
       return const GraphResultFailure(RelationGroupUnexpectedFailure());
     }
   }
-
-  bool _owns(Object request, int generation) =>
-      ref.mounted &&
-      _generation == generation &&
-      identical(_activeRequest, request);
-
-  int _nextGeneration() {
-    _generation += 1;
-    _activeRequest = null;
-    return _generation;
-  }
-}
-
-/// Результат сборки новой основы выбранной группы.
-sealed class _GroupAssembly {
-  const _GroupAssembly();
-}
-
-/// Согласованная замена собрана целиком и готова к публикации.
-final class _AssembledGroup extends _GroupAssembly {
-  const _AssembledGroup(this.replacement);
-
-  final RelationGroupConfirmedState replacement;
-}
-
-/// Граф изменился во время сборки: нужна новая попытка с первой порции.
-final class _AssemblyInterrupted extends _GroupAssembly {
-  const _AssemblyInterrupted();
-}
-
-/// Сборка остановлена отказом чтения: прежняя пара остаётся подтверждённой.
-final class _AssemblyFailed extends _GroupAssembly {
-  const _AssemblyFailed(this.failure);
-
-  final RelationGroupReadFailure failure;
 }
