@@ -1,0 +1,143 @@
+## Phase 1: Основа связей без массового удаления
+
+- [ ] 1.1 Убрать со страницы намерения переход к блокирующим связям и режим их выбора в соседстве, сохранив прежний текст отказа удаления намерения
+  - **Критерии приёмки:**
+    - Отказ удаления намерения с блокирующими связями показывает на странице прежний текст. Кнопки «Показать блокирующие связи» нет, страница не переключает соседство на первую непустую группу и не прокручивается к нему.
+    - В соседстве нет режима выбора: отметок выбора у строк, просмотра выбранного и подтверждения массового удаления. Модель выбора, подтверждение, `RelationNeighborhoodViewModel.showBlockingRelations` и строки локализации этих частей удалены на обоих языках.
+    - Выбор групп, подгрузка и согласование соседства работают как прежде. Проверки выбора и подтверждения удалены вместе с ними, как и сквозные сценарии, которые проходили через массовое удаление.
+  - **Проверка:**
+    - `mise run codegen` — локализация и провайдеры пересозданы без удалённых частей.
+    - `mise exec --no-deps -- flutter test test/intention/presentation/details test/long_term_relation/presentation/neighborhood test/app/intention_app_lifecycle_test.dart test/app/daily_choice_app_lifecycle_test.dart test/app/long_term_relation_app_flow_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - `lib/src/intention/presentation/details/intention_details_page.dart`, `lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_sliver.dart`, `lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` и сгенерированная локализация;
+    - удаляются `lib/src/long_term_relation/presentation/neighborhood/blocking_relations_confirmation.dart`, `blocking_relations_selection_state.dart`, `blocking_relations_selection_view_model.dart` с `.g.dart`;
+    - проверки: `test/intention/presentation/details/intention_details_delete_test.dart`, `test/intention/presentation/details/intention_details_page_test.dart`, `test/long_term_relation/presentation/neighborhood/relation_neighborhood_widget_test.dart`, `test/app/intention_app_lifecycle_test.dart`, `test/app/daily_choice_app_lifecycle_test.dart`, `test/app/long_term_relation_app_flow_test.dart`; удаляются `test/long_term_relation/presentation/neighborhood/blocking_relations_confirmation_test.dart` и `blocking_relations_selection_test.dart`.
+  - **Размер:** M — в основном удаление.
+
+- [ ] 1.2 Убрать из координатора команд и презентера графа приём, завершение и предъявление массового удаления блокирующих связей
+  - **Критерии приёмки:**
+    - У `GraphCommandCoordinator` нет `acceptBlockingRelationsDelete`, токена, старта и завершения массового удаления. У `GraphOperationPresenter` нет их ветви и текстов, а строки локализации, которые использовала только она, удалены на обоих языках.
+    - Если в проверке массовое удаление через координатор было лишь способом получить подтверждённое удаление связи, она использует одиночное удаление связи с тем же изменением графа и сохраняет свои ожидания. Это касается согласования соседства, занятости намерения и контрольной точки согласования. Проверки приёма и предъявления самого массового удаления удалены.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/graph/application test/graph/presentation test/long_term_relation/presentation/neighborhood`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.1 — у приёма команды больше нет потребителя в представлении.
+  - **Предполагаемые файлы:**
+    - `lib/src/graph/application/graph_command_coordinator.dart`, `lib/src/graph/presentation/graph_operation_presenter.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` и сгенерированная локализация;
+    - проверки: удаляется `test/graph/application/graph_command_coordinator_blocking_relations_test.dart`; меняются `test/graph/application/graph_command_coordinator_tag_test.dart`, `test/graph/presentation/graph_operation_presenter_test.dart`, `test/graph/presentation/graph_reconciliation_checkpoint_test.dart`, `test/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model_test.dart`.
+  - **Размер:** M.
+
+- [ ] 1.3 Убрать из хранилища графа команду массового удаления блокирующих связей вместе с её исполнением и диагностическим событием
+  - **Критерии приёмки:**
+    - В приложении нет `DeleteBlockingRelations` с её исходом и отказами. Нет и её исполнения в `DriftPersonalGraphRepository`, а также события `BlockingRelationsDeleteDiagnosticsEvent` и его вывода в разработческий приёмник.
+    - Если в проверке хранилища массовая команда была лишь способом удалить связь или дневной выбор, проверка использует одиночные команды удаления и сохраняет свои ожидания. Случаи, достижимые только массовой командой, удалены вместе с проверками самой команды по решению 13 дизайна. Это удаление связи и дневного выбора одной транзакцией и конфликт выбранного набора.
+    - Тестовые адаптеры репозитория не исполняют массовую команду.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph test/intention/presentation/details test/long_term_relation/presentation/neighborhood test/app/intention_app_lifecycle_test.dart --exclude-tags=flutter_process`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.2.
+  - **Предполагаемые файлы:**
+    - удаляются `lib/src/graph/application/delete_blocking_relations.dart` и `lib/src/graph/data/drift_personal_graph_repository_blocking_relations.dart`; меняются `lib/src/graph/data/drift_personal_graph_repository.dart`, `lib/src/shared/diagnostics/diagnostics_sink.dart`, `lib/src/shared/diagnostics/developer_diagnostics_sink.dart`;
+    - проверки: удаляются `test/graph/application/delete_blocking_relations_test.dart`, `test/graph/data/drift_blocking_relations_delete_test.dart`, `test/support/large_blocking_relations_fixture.dart`; меняются `test/graph/data/drift_graph_fact_log_completeness_test.dart`, `test/graph/data/drift_graph_fact_log_write_test.dart`, `test/graph/data/drift_daily_path_protection_test.dart`, `test/graph/data/drift_statistics_relation_snapshot_test.dart`, `test/support/daily_choice_durability_fixture.dart`, `test/graph/presentation/graph_reconciliation_checkpoint_test.dart`;
+    - ветви тестовых адаптеров в `test/intention/presentation/details/details_test_support.dart`, `test/long_term_relation/presentation/neighborhood/neighborhood_test_support.dart`, `test/app/intention_app_lifecycle_test.dart`.
+  - **Размер:** M — в основном удаление.
+
+- [ ] 1.4 Убрать из границы графа чтение и наблюдение явно выбранных связей вместе со ссылками на блокирующие связи
+  - **Критерии приёмки:**
+    - В `PersonalGraphRepository` нет `getSelectedRelations` и `watchSelectedRelations`. Удалены также:
+      - типы выбранных связей и `BlockingRelationReference`;
+      - их часть адаптера Drift;
+      - наблюдатели выбранных связей и их оповещение при замене графа;
+      - событие `SelectedRelationsReadDiagnosticsEvent`.
+    - Тестовые адаптеры репозитория не реализуют удалённые методы. Проверки самих чтений удалены, в том числе их случаи в проверках большого набора групп и замены графа. Остальные ожидания этих файлов не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter analyze` — все тестовые адаптеры компилируются без удалённых методов.
+    - `mise exec --no-deps -- flutter test test/graph --exclude-tags=flutter_process`.
+    - `mise exec --no-deps -- flutter test --concurrency=1 --tags=flutter_process test/graph/data` — замена графа на файловом хранилище.
+  - **Зависимости:** 1.1 — модель выбора была единственным потребителем чтений; 1.3 — команда использовала ссылки на блокирующие связи.
+  - **Предполагаемые файлы:**
+    - удаляются `lib/src/graph/application/selected_relations.dart`, `lib/src/graph/application/blocking_relation_reference.dart`, `lib/src/graph/data/drift_personal_graph_repository_selected_relations.dart`;
+    - меняются `lib/src/graph/application/personal_graph_repository.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `lib/src/graph/data/drift_personal_graph_repository_replacement.dart`, `lib/src/shared/diagnostics/diagnostics_sink.dart`, `lib/src/shared/diagnostics/developer_diagnostics_sink.dart`;
+    - проверки: удаляются `test/graph/application/selected_relations_test.dart` и `test/graph/data/drift_selected_relations_test.dart`; меняются `test/graph/data/drift_relation_group_large_fixture_test.dart` и `test/graph/data/drift_graph_replacement_test.dart`;
+    - механическое удаление переопределений во всех тестовых адаптерах `PersonalGraphRepository`, например `test/intention/presentation/details/details_test_support.dart`, `test/long_term_relation/presentation/neighborhood/neighborhood_test_support.dart`, `test/app/navigation/app_shell_state_test.dart`.
+  - **Размер:** M — метод интерфейса нельзя убрать по частям, поэтому механическая адаптация тестовых адаптеров входит в задачу.
+
+- [ ] 1.5 Перевести проверки, которые сверяют количества связей или ревизию самостоятельным чтением сводки, на сводку наблюдения намерения
+  - **Критерии приёмки:**
+    - Такие проверки берут количества из `IntentionDetails.relationCounts`, а ревизию — из снимка `watchIntention`, и сохраняют свои ожидания по ADR-0047. Отличие отсутствующего намерения от намерения без связей проверяется по пустому снимку наблюдения.
+    - `getRelationCounts` вызывают только проверки самого этого чтения и делегирующие тестовые адаптеры.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph/data test/graph/presentation/graph_reconciliation_checkpoint_test.dart test/intention/data --exclude-tags=flutter_process`.
+    - `mise exec --no-deps -- flutter test --concurrency=1 --tags=flutter_process test/graph/data/file_backed_graph_durability_test.dart`.
+    - `grep -rn 'getRelationCounts(' test` находит только проверки самого чтения в `test/intention/data/drift_intention_relation_counts_test.dart` и тестовые адаптеры.
+  - **Зависимости:** 1.3 — файл проверок массового удаления, который тоже читал сводку, уже удалён.
+  - **Предполагаемые файлы:** `test/graph/data/drift_relation_delete_test.dart`, `test/graph/data/drift_relation_archive_restore_test.dart`, `test/graph/data/drift_relation_update_test.dart`, `test/graph/data/drift_relation_watch_test.dart`, `test/graph/data/drift_personal_graph_repository_create_relation_test.dart`, `test/graph/data/file_backed_graph_durability_test.dart`, `test/graph/data/file_backed_daily_choice_durability_test.dart`, `test/graph/presentation/graph_reconciliation_checkpoint_test.dart`, `test/intention/data/drift_intention_repository_fault_test.dart`, `test/intention/data/drift_intention_relation_counts_test.dart`.
+  - **Размер:** M — механическая замена способа чтения в десяти файлах проверок.
+
+- [ ] 1.6 Убрать из границы графа самостоятельное чтение сводки связей `getRelationCounts` вместе с его диагностическим событием
+  - **Критерии приёмки:**
+    - В `PersonalGraphRepository` и адаптере Drift нет `getRelationCounts`. Нет и события `RelationCountsReadDiagnosticsEvent` с его выводом в разработческий приёмник. Сводка связей читается только вместе с наблюдением намерения и первыми порциями групп.
+    - Тестовые адаптеры не реализуют удалённый метод, проверки самого чтения удалены. Проверки, переведённые в 1.5, проходят без изменений.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter analyze` — все тестовые адаптеры компилируются без удалённого метода.
+    - `mise exec --no-deps -- flutter test test/intention/data test/graph/data --exclude-tags=flutter_process`.
+  - **Зависимости:** 1.1 — модель выбора была единственным потребителем чтения в приложении; 1.5.
+  - **Предполагаемые файлы:** `lib/src/graph/application/personal_graph_repository.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `lib/src/shared/diagnostics/diagnostics_sink.dart`, `lib/src/shared/diagnostics/developer_diagnostics_sink.dart`, `test/intention/data/drift_intention_relation_counts_test.dart` и механическое удаление переопределений в тестовых адаптерах `PersonalGraphRepository`.
+  - **Размер:** M — метод интерфейса нельзя убрать по частям, поэтому механическая адаптация тестовых адаптеров входит в задачу.
+
+- [ ] 1.7 Вынести механику порций и согласования ревизий соседства в общее ядро `RelationGroupPaging`, не меняя поведения соседства
+  - **Критерии приёмки:**
+    - По решению 6 дизайна ядро отвечает за:
+      - проверку первой порции и полноты количества;
+      - приём продолжения только на его ревизии;
+      - поколения запросов;
+      - сборку «загруженная часть плюс порция» на одной ревизии с ограничением повторов;
+      - выбор ближайшего сохранившегося якоря.
+
+      Ядро обобщено по строке и её идентификатору: долговременные и дневные группы соседства собираются одной реализацией вместо двух копий.
+    - От потребителя ядро получает только чтение порции его группы, размер порции и проверку принадлежности строки. Провайдеров, групп и состояний соседства ядро не знает. Фильтр завершений координатора, наблюдение намерения, выбор группы и публикуемое состояние остаются у `RelationNeighborhoodViewModel`.
+    - Проверки соседства проходят, а их файлы в этой задаче не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/neighborhood test/intention/presentation/details test/app/long_term_relation_app_flow_test.dart`.
+    - Перед фиксацией задачи `git diff --exit-code HEAD -- test/long_term_relation/presentation/neighborhood` подтверждает, что файлы проверок соседства не менялись.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.1, 1.2 — проверки соседства больше не используют показ блокирующих связей и массовое удаление.
+  - **Предполагаемые файлы:** `lib/src/long_term_relation/presentation/relation_group_paging.dart` (новый), `lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart`, `lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_state.dart`.
+  - **Размер:** M.
+
+- [ ] 1.8 Перенести проверки механики порций из проверок модели соседства в проверки общего ядра порций
+  - **Критерии приёмки:**
+    - Каждая обязанность ядра из решения 6 дизайна проверяется на уровне ядра, без провайдеров и модели:
+      - несогласованные первая порция и полное количество;
+      - порция больше размера, чужая или повторная строка;
+      - продолжение другой ревизии;
+      - поздний ответ прежнего поколения;
+      - прерывание сборки при смене ревизии и исчерпание повторов;
+      - выбор ближайшего сохранившегося якоря.
+    - Проверки модели соседства, которые проверяли только эти механизмы, перенесены, а не продублированы. У модели остаются проверки её собственных решений: выбора группы, отбора завершений и наблюдений, публикуемых состояний прогресса, обновления и отказа.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/relation_group_paging_test.dart test/long_term_relation/presentation/neighborhood`.
+  - **Зависимости:** 1.7.
+  - **Предполагаемые файлы:** `test/long_term_relation/presentation/relation_group_paging_test.dart` (новый), `test/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model_test.dart`.
+  - **Размер:** M.
+
+- [ ] 1.9 Подтвердить готовность первой фазы: массового удаления и самостоятельного чтения сводки в приложении нет, а соседство работает поверх общего ядра порций
+  - **Критерии приёмки:**
+    - Выполнено условие «Ready to advance» первой фазы:
+      - изменённые требования о физическом удалении и о согласованности счётчиков выполняются без массовой операции. Блокирующие ссылки проверяются атомарно с удалением, отказ удаления намерения показывает прежний текст без перехода к выбору связей, а счётчики согласуются после одиночных операций;
+      - поведение соседства подтверждено прежними проверками, переведёнными на общее ядро.
+    - В `lib/`, `test/` и `benchmark/` нет следов массового удаления, чтения выбранных связей и самостоятельного чтения сводки.
+    - Результаты проверок и путь к APK сообщены в сессии. Ручная проверка на устройстве остаётся за пользователем и не блокирует готовность фазы.
+  - **Проверка:**
+    - `grep -rnE 'DeleteBlockingRelations|BlockingRelationsDelete|BlockingRelationReference|SelectedRelations|blockingRelations|[sS]howBlockingRelations|relationNeighborhood(AddTo|RemoveFrom)Selection|getRelationCounts|RelationCountsRead' lib test benchmark` ничего не находит.
+    - `mise run check` и `mise exec --no-deps -- openspec validate redesign-intention-page --strict --no-interactive`; после фиксации изменений — `mise run codegen-check` на чистой рабочей копии.
+    - `mise exec --no-deps -- flutter build apk --release` с артефактом `build/app/outputs/flutter-apk/app-release.apk`. Если через DTD найдено запущенное приложение, выполнить hot restart и проверить `get_runtime_errors`. Эмулятор и устройство не запускаются.
+    - Сообщить оставшиеся ручные проверки:
+      - отказ удаления намерения со связями показывает прежний текст без кнопки перехода к связям;
+      - соседство переключает группы, подгружает длинную группу и обновляется после архивирования и удаления связи как прежде.
+  - **Зависимости:** 1.1–1.8.
+  - **Предполагаемые файлы:** нет, только проверка и сборка.
+  - **Размер:** XS.
