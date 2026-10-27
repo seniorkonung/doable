@@ -214,11 +214,6 @@ final class ControlledRelationDetailsRepository
   ) => throw UnsupportedError('Каталог не используется в этом тесте.');
 
   @override
-  Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
-    IntentionId intentionId,
-  ) => throw UnsupportedError('Отдельная сводка не читается этим тестом.');
-
-  @override
   Future<GraphCommandResult<TSuccess, TFailure>> execute<
     TSuccess extends GraphCommandOutcome,
     TFailure extends GraphCommandFailure

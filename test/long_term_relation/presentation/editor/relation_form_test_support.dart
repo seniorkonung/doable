@@ -222,11 +222,6 @@ final class ControlledRelationFormRepository
   }
 
   @override
-  Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
-    IntentionId intentionId,
-  ) => throw UnsupportedError('Сводка не читается формой создания связи.');
-
-  @override
   Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
     DailyChoiceCatalogQuery query,
   ) => throw UnsupportedError(

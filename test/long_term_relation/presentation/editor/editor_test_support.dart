@@ -19,7 +19,6 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_permissions.dart';
-import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_description.dart';
@@ -178,11 +177,6 @@ final class ControlledRelationEditorRepository
   Future<Result<IntentionCatalogPage>> getCatalogPage(
     IntentionCatalogQuery query,
   ) => throw UnsupportedError('Каталог читает страница выбора участника.');
-
-  @override
-  Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
-    IntentionId intentionId,
-  ) => throw UnsupportedError('Сводка не читается черновиком формы.');
 
   @override
   Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(

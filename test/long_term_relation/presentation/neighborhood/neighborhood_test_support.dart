@@ -65,7 +65,6 @@ final class ControlledNeighborhoodRepository
   final relationCommands = <LongTermRelationCommand>[];
   final dailyChoiceCommands = <DailyChoiceCommand>[];
   final _relationRows = <LongTermRelationId, LongTermRelationSummary>{};
-  RelationCounts? _latestCounts;
   GraphRevision? _latestRevision;
   final _intentionController =
       StreamController<Result<GraphSnapshot<IntentionDetails?>>>.broadcast(
@@ -98,11 +97,6 @@ final class ControlledNeighborhoodRepository
       _relationRows[row.relation.id] = row;
     }
     if (page is RelationGroupFirstPage || page is DailyChoiceGroupFirstPage) {
-      _latestCounts = switch (page) {
-        RelationGroupFirstPage(:final counts) ||
-        DailyChoiceGroupFirstPage(:final counts) => counts,
-        _ => throw StateError('Ожидалась первая порция.'),
-      };
       _latestRevision = page.revision;
     }
     complete(index, GraphResultSuccess(page));
@@ -189,15 +183,6 @@ final class ControlledNeighborhoodRepository
   Future<Result<IntentionCatalogPage>> getCatalogPage(
     IntentionCatalogQuery query,
   ) => throw UnsupportedError('Каталог не используется в тесте соседства.');
-
-  @override
-  Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
-    IntentionId intentionId,
-  ) async => switch ((_latestCounts, _latestRevision)) {
-    (final RelationCounts counts, final GraphRevision revision) =>
-      ResultSuccess(GraphSnapshot(value: counts, revision: revision)),
-    _ => const ResultFailure(IntentionUnexpectedFailure()),
-  };
 
   @override
   Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) =>

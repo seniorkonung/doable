@@ -168,18 +168,6 @@ final class ControlledDetailsRepository
   }
 
   @override
-  Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
-    IntentionId intentionId,
-  ) => Future.value(
-    ResultSuccess(
-      GraphSnapshot(
-        value: testRelationCounts(),
-        revision: const TestDetailsRevision(0),
-      ),
-    ),
-  );
-
-  @override
   Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
     DailyChoiceCatalogQuery query,
   ) => throw UnsupportedError(

@@ -313,11 +313,6 @@ final class IntentionDetailReadDiagnosticsEvent extends DiagnosticsEvent {
     : super(status);
 }
 
-final class RelationCountsReadDiagnosticsEvent extends DiagnosticsEvent {
-  const RelationCountsReadDiagnosticsEvent({required DiagnosticsStatus status})
-    : super(status);
-}
-
 final class RelationGroupPageReadDiagnosticsEvent extends DiagnosticsEvent {
   const RelationGroupPageReadDiagnosticsEvent({
     required this.pageSize,

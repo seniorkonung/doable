@@ -1929,13 +1929,6 @@ final class _CheckpointGraphRepository
   }
 
   @override
-  Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
-    IntentionId intentionId,
-  ) => throw UnsupportedError(
-    'Отдельная сводка не читается контрольной точкой.',
-  );
-
-  @override
   Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) =>
       throw UnsupportedError('Подробные данные связи не наблюдаются здесь.');
 

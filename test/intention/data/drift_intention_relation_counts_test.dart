@@ -9,7 +9,6 @@ import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -34,49 +33,6 @@ void main() {
   });
 
   tearDown(() => database.close());
-
-  test(
-    'возвращает самостоятельную точную сводку существующего намерения',
-    () async {
-      final owner = _id(_uuid(1));
-      final neighbors = [
-        for (var index = 2; index <= 9; index++) _id(_uuid(index)),
-      ];
-      for (final id in [owner, ...neighbors]) {
-        await _insertIntention(database, id);
-      }
-      await _insertAllGroups(database, owner, neighbors);
-
-      final result = await repository.getRelationCounts(owner);
-
-      expect(result, isA<ResultSuccess<GraphSnapshot<RelationCounts>>>());
-      final snapshot =
-          (result as ResultSuccess<GraphSnapshot<RelationCounts>>).value;
-      expect(snapshot.value.total, 8);
-      expect([
-        snapshot.value.activeNeedIncoming,
-        snapshot.value.activeNeedOutgoing,
-        snapshot.value.activeCanIncoming,
-        snapshot.value.activeCanOutgoing,
-        snapshot.value.archivedNeedIncoming,
-        snapshot.value.archivedNeedOutgoing,
-        snapshot.value.archivedCanIncoming,
-        snapshot.value.archivedCanOutgoing,
-      ], everyElement(1));
-      expect(diagnostics.events, [
-        isA<RelationCountsReadDiagnosticsEvent>().having(
-          (event) => event.status,
-          'status',
-          isA<DiagnosticsStarted>(),
-        ),
-        isA<RelationCountsReadDiagnosticsEvent>().having(
-          (event) => event.status,
-          'status',
-          isA<DiagnosticsSucceeded>(),
-        ),
-      ]);
-    },
-  );
 
   test('отличает отсутствующее намерение от подтверждённого нуля', () async {
     final existing = _id(_uuid(20));
@@ -265,17 +221,8 @@ void main() {
       isArchived: false,
     );
 
-    final counts = await repository.getRelationCounts(owner);
     final details = await repository.watchIntention(owner).first;
 
-    expect(
-      counts,
-      isA<ResultFailure<GraphSnapshot<RelationCounts>>>().having(
-        (result) => result.failure,
-        'failure',
-        isA<IntentionCorruptionFailure>(),
-      ),
-    );
     expect(
       details,
       isA<ResultFailure<GraphSnapshot<IntentionDetails?>>>().having(
@@ -562,34 +509,6 @@ void main() {
       expect(published(), [4, 2, 1, 1]);
     },
   );
-}
-
-Future<void> _insertAllGroups(
-  AppDatabase database,
-  IntentionId owner,
-  List<IntentionId> neighbors,
-) async {
-  final groups = [
-    (incoming: true, type: 'need', archived: false),
-    (incoming: false, type: 'need', archived: false),
-    (incoming: true, type: 'can', archived: false),
-    (incoming: false, type: 'can', archived: false),
-    (incoming: true, type: 'need', archived: true),
-    (incoming: false, type: 'need', archived: true),
-    (incoming: true, type: 'can', archived: true),
-    (incoming: false, type: 'can', archived: true),
-  ];
-  for (var index = 0; index < groups.length; index++) {
-    final group = groups[index];
-    await _insertRelation(
-      database,
-      id: _uuid(100 + index),
-      sourceId: group.incoming ? neighbors[index] : owner,
-      relatedId: group.incoming ? owner : neighbors[index],
-      type: group.type,
-      isArchived: group.archived,
-    );
-  }
 }
 
 Future<void> _insertIntention(

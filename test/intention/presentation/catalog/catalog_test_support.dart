@@ -150,11 +150,6 @@ final class ControlledCatalogRepository
   }
 
   @override
-  Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
-    IntentionId intentionId,
-  ) => throw UnsupportedError('Сводка не используется в тесте каталога.');
-
-  @override
   Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
     DailyChoiceCatalogQuery query,
   ) => throw UnsupportedError(

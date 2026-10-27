@@ -125,10 +125,6 @@ Map<String, Object> _encode(DiagnosticsEvent event) => switch (event) {
     'operation': 'intentionDetailRead',
     ..._encodeStatus(event.status),
   },
-  RelationCountsReadDiagnosticsEvent() => {
-    'operation': 'relationCountsRead',
-    ..._encodeStatus(event.status),
-  },
   RelationGroupPageReadDiagnosticsEvent(
     :final pageSize,
     :final isContinuation,

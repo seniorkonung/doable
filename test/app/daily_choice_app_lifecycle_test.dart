@@ -34,7 +34,6 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_id_generator.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
-import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/statistics/application/statistics_read_contract.dart';
@@ -973,11 +972,6 @@ final class _ObservedRepository implements PersonalGraphRepository {
   Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(
     IntentionId id,
   ) => _delegate.watchIntention(id);
-
-  @override
-  Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
-    IntentionId intentionId,
-  ) => _delegate.getRelationCounts(intentionId);
 
   @override
   Future<RelationGroupPageResult> getRelationGroupPage(

@@ -20,7 +20,6 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
-import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
@@ -282,11 +281,6 @@ final class _ControlledPersonalGraphRepository
   Future<Result<IntentionCatalogPage>> getCatalogPage(
     IntentionCatalogQuery query,
   ) => throw UnsupportedError('Каталог не используется в этих тестах.');
-
-  @override
-  Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
-    IntentionId intentionId,
-  ) => throw UnsupportedError('Сводка не используется в этих тестах.');
 
   @override
   Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(

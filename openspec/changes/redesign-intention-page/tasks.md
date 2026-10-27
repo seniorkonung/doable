@@ -77,7 +77,7 @@
   - **Предполагаемые файлы:** `test/graph/data/drift_relation_delete_test.dart`, `test/graph/data/drift_relation_archive_restore_test.dart`, `test/graph/data/drift_relation_update_test.dart`, `test/graph/data/drift_relation_watch_test.dart`, `test/graph/data/drift_personal_graph_repository_create_relation_test.dart`, `test/graph/data/file_backed_graph_durability_test.dart`, `test/graph/data/file_backed_daily_choice_durability_test.dart`, `test/graph/presentation/graph_reconciliation_checkpoint_test.dart`, `test/intention/data/drift_intention_repository_fault_test.dart`, `test/intention/data/drift_intention_relation_counts_test.dart`.
   - **Размер:** M — механическая замена способа чтения в десяти файлах проверок.
 
-- [ ] 1.6 Убрать из границы графа самостоятельное чтение сводки связей `getRelationCounts` вместе с его диагностическим событием
+- [x] 1.6 Убрать из границы графа самостоятельное чтение сводки связей `getRelationCounts` вместе с его диагностическим событием
   - **Критерии приёмки:**
     - В `PersonalGraphRepository` и адаптере Drift нет `getRelationCounts`. Нет и события `RelationCountsReadDiagnosticsEvent` с его выводом в разработческий приёмник. Сводка связей читается только вместе с наблюдением намерения и первыми порциями групп.
     - Тестовые адаптеры не реализуют удалённый метод, проверки самого чтения удалены. Проверки, переведённые в 1.5, проходят без изменений.

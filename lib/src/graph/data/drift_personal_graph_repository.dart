@@ -383,52 +383,6 @@ final class DriftPersonalGraphRepository
   }
 
   @override
-  Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
-    IntentionId intentionId,
-  ) async {
-    final stopwatch = Stopwatch()..start();
-    _recordDiagnostics(
-      const RelationCountsReadDiagnosticsEvent(status: DiagnosticsStarted()),
-    );
-
-    try {
-      final snapshot = await _sequencer.run(
-        () => _database.transaction(() async {
-          final exists = await _database
-              .customSelect(
-                'SELECT 1 FROM intentions WHERE id = ?',
-                variables: [Variable<String>(intentionId.toCanonicalString())],
-                readsFrom: {_database.intentions},
-              )
-              .getSingleOrNull();
-          if (exists == null) throw const _IntentionNotFound();
-          return GraphSnapshot(
-            value: await _readVerifiedRelationCounts(intentionId),
-            revision: _currentRevision,
-          );
-        }),
-      );
-      _recordDiagnostics(
-        RelationCountsReadDiagnosticsEvent(
-          status: DiagnosticsSucceeded(stopwatch.elapsed),
-        ),
-      );
-      return ResultSuccess(snapshot);
-    } on Object catch (error) {
-      final failure = _classifyRelationCountsReadFailure(error);
-      _recordDiagnostics(
-        RelationCountsReadDiagnosticsEvent(
-          status: DiagnosticsFailed(
-            duration: stopwatch.elapsed,
-            code: _diagnosticsFailureCode(failure),
-          ),
-        ),
-      );
-      return ResultFailure(failure);
-    }
-  }
-
-  @override
   Future<RelationGroupPageResult> getRelationGroupPage(
     RelationGroupPageQuery query,
   ) => _readRelationGroupPage(query);
@@ -1823,13 +1777,6 @@ IntentionFailure _classifyDetailReadFailure(Object error) {
 
 IntentionFailure _classifyCatalogReadFailure(Object error) =>
     _classifyDetailReadFailure(error);
-
-IntentionFailure _classifyRelationCountsReadFailure(Object error) {
-  if (error is _IntentionNotFound) {
-    return const IntentionNotFoundFailure();
-  }
-  return _classifyDetailReadFailure(error);
-}
 
 IntentionFailure _classifyCommandFailure(
   Object error,

@@ -14,7 +14,6 @@ import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
@@ -91,11 +90,6 @@ final class ControlledParticipantPickerRepository
     _intentionStreams.add(controller);
     return controller.stream;
   }
-
-  @override
-  Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
-    IntentionId intentionId,
-  ) => Completer<Result<GraphSnapshot<RelationCounts>>>().future;
 
   @override
   Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(

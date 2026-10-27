@@ -837,18 +837,6 @@ final class _DelayedPersonalGraphRepository
   }
 
   @override
-  Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
-    IntentionId intentionId,
-  ) => Future.value(
-    ResultSuccess(
-      GraphSnapshot(
-        value: _countsFor(intentionId),
-        revision: _Revision(_revisions[intentionId] ?? 0),
-      ),
-    ),
-  );
-
-  @override
   Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
     DailyChoiceCatalogQuery query,
   ) => throw UnsupportedError(
