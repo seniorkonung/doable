@@ -157,7 +157,7 @@
   - **Предполагаемые файлы:** `lib/src/design_system/components/top_bar.dart`, `lib/src/design_system/doable_icon.dart`, новый SVG стрелки в `lib/src/design_system/icons/assets/`, `lib/src/design_system/icons/README.md`, `test/design_system/top_bar_test.dart`, `test/design_system/doable_icon_test.dart`, `test/design_system/goldens/doable_icons.png`.
   - **Размер:** M.
 
-- [ ] 2.2 Добавить в дизайн-систему шапку `PageHead` с названием целиком и полосу вкладок `Tabs` с числом, значком и закреплённым состоянием
+- [x] 2.2 Добавить в дизайн-систему шапку `PageHead` с названием целиком и полосу вкладок `Tabs` с числом, значком и закреплённым состоянием
   - **Критерии приёмки:**
     - `PageHead` по README показывает переданное название стилем `page-title` цвета `ink` с переносом и без обрезки при любой длине. Название — второй заголовок экрана, поля шапки соответствуют README. Нажатие на название, метка, строка пояснения и кнопка под названием не добавляются: их потребители появляются в фазах 3 и 4.
     - `Tabs` по README — полоса пилюль со смыслом вкладок:
