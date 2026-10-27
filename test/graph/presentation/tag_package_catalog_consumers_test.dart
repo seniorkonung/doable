@@ -4,7 +4,6 @@ import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
-import 'package:doable/src/graph/application/selected_relations.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
@@ -102,20 +101,6 @@ void main() {
       ..watchDailyChoice(choice, observes: true)
       ..watchRelation(observedRelation, observes: true)
       ..watchRelation(unobservedRelation, observes: false)
-      ..watchSelectedRelations(
-        SelectedRelationsQuery(
-          intentionId: durabilityIntention(2),
-          relationIds: [observedRelation],
-        ),
-        observes: true,
-      )
-      ..watchSelectedRelations(
-        SelectedRelationsQuery(
-          intentionId: durabilityIntention(1),
-          relationIds: [unobservedRelation],
-        ),
-        observes: false,
-      )
       ..intentionDetails(observed, observes: true)
       ..intentionDetails(durabilityIntention(5), observes: false)
       ..neighborhood(observed, observes: true)

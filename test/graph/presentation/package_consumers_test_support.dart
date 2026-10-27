@@ -10,7 +10,6 @@ import 'package:doable/src/daily_choice/presentation/details/daily_choice_detail
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_view_model.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
-import 'package:doable/src/graph/application/selected_relations.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
@@ -139,31 +138,6 @@ final class PackageConsumerProbes {
               ..revision = value.revision
               ..content = () => _relationContent(value.value!);
           case GraphResultSuccess() || GraphResultFailure():
-            probe.forbiddenStates.add(result);
-        }
-      }),
-    );
-  }
-
-  void watchSelectedRelations(
-    SelectedRelationsQuery query, {
-    required bool observes,
-  }) {
-    final probe = _add(
-      'выбранные связи ${_label(query.intentionId.toCanonicalString())}',
-      observes: observes,
-    );
-    _subscriptions.add(
-      _repository.watchSelectedRelations(query).listen((result) {
-        probe
-          ..updates += 1
-          ..loaded = true;
-        switch (result) {
-          case SelectedRelationsReadSuccess(:final value):
-            probe
-              ..revision = value.revision
-              ..content = () => _selectedContent(value.value);
-          default:
             probe.forbiddenStates.add(result);
         }
       }),
@@ -496,21 +470,6 @@ Object _dailyCatalogContent(DailyChoiceCatalogLoaded state) => [
   [for (final item in state.items) _dailyItem(item)],
   state.totalCount,
   state.incomplete.nextCursor == null && state.completed.nextCursor == null,
-];
-
-Object _selectedContent(SelectedRelationsSnapshot snapshot) => [
-  for (final MapEntry(:key, :value) in snapshot.entriesByReference.entries)
-    (
-      key,
-      switch (value) {
-        SelectedRelationPresent(:final details) => _relationContent(details),
-        SelectedDailyChoicePresent(:final item) => _dailyItem(item),
-        SelectedRelationMissing() ||
-        SelectedRelationNoLongerBlocking() ||
-        SelectedDailyChoiceMissing() ||
-        SelectedDailyChoiceNoLongerBlocking() => value.runtimeType,
-      },
-    ),
 ];
 
 Object _neighborhoodContent(RelationGroupConfirmedState state) => [

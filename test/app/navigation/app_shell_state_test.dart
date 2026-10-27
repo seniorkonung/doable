@@ -26,7 +26,6 @@ import 'package:doable/src/design_system/components/day_mark.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
-import 'package:doable/src/graph/application/selected_relations.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
@@ -1572,16 +1571,6 @@ final class _ObservedRepository implements PersonalGraphRepository {
   @override
   Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) =>
       _delegate.watchRelation(id);
-
-  @override
-  Future<SelectedRelationsReadResult> getSelectedRelations(
-    SelectedRelationsQuery query,
-  ) => _delegate.getSelectedRelations(query);
-
-  @override
-  Stream<SelectedRelationsReadResult> watchSelectedRelations(
-    SelectedRelationsQuery query,
-  ) => _delegate.watchSelectedRelations(query);
 
   @override
   Future<ChoicePathContinuationResult> getChoicePathContinuations(

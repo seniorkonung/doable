@@ -1,6 +1,5 @@
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
-import 'package:doable/src/graph/application/selected_relations.dart';
 
 import 'dart:async';
 
@@ -90,20 +89,6 @@ final class ControlledRelationDetailsRepository
       throw UnsupportedError(
         'Наблюдение дневного выбора не используется этим тестом.',
       );
-
-  @override
-  Future<SelectedRelationsReadResult> getSelectedRelations(
-    SelectedRelationsQuery query,
-  ) => throw UnsupportedError(
-    'Чтение выбранных связей не используется в этом тесте.',
-  );
-
-  @override
-  Stream<SelectedRelationsReadResult> watchSelectedRelations(
-    SelectedRelationsQuery query,
-  ) => throw UnsupportedError(
-    'Наблюдение выбранных связей не используется в этом тесте.',
-  );
 
   final relationWatches = <ControlledRelationWatch>[];
   final watchedIntentionIds = <IntentionId>[];

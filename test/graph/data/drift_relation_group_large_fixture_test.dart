@@ -1,7 +1,6 @@
 import 'package:doable/src/data/local/app_database.dart' hide Tags;
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
-import 'package:doable/src/graph/application/selected_relations.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
@@ -12,7 +11,6 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sqlite3/sqlite3.dart';
 
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
@@ -170,67 +168,6 @@ void main() {
       ),
     );
   });
-
-  test(
-    'читает 401 и более 999 явно выбранных связей пакетно на одной ревизии',
-    () async {
-      final harness = await LocalDatabaseHarness.fileBacked();
-      addTearDown(harness.dispose);
-      final trace = _RelationReadTrace();
-      final database = await harness.openReadyDatabase(observer: trace);
-      final repository = _repository(database);
-      await _populateLargeFixture(database);
-
-      final selected401 = [
-        for (var index = 0; index < 201; index++) _decodedRelationId(index),
-        for (var index = 250; index < 450; index++) _decodedRelationId(index),
-      ];
-      final first = await repository.getSelectedRelations(
-        SelectedRelationsQuery(intentionId: _ownerId, relationIds: selected401),
-      );
-      expect(first, isA<SelectedRelationsReadSuccess>());
-      final firstSnapshot = (first as SelectedRelationsReadSuccess).value;
-      expect(firstSnapshot.value.entries.keys.toSet(), selected401.toSet());
-      expect(
-        firstSnapshot.value.entries.values,
-        everyElement(isA<SelectedRelationPresent>()),
-      );
-
-      final selected1100 = [
-        for (var index = 0; index < 1100; index++) _decodedRelationId(index),
-      ];
-      final second = await repository.getSelectedRelations(
-        SelectedRelationsQuery(
-          intentionId: _ownerId,
-          relationIds: selected1100,
-        ),
-      );
-      expect(second, isA<SelectedRelationsReadSuccess>());
-      final secondSnapshot = (second as SelectedRelationsReadSuccess).value;
-      expect(
-        secondSnapshot.revision.compareTo(firstSnapshot.revision),
-        GraphRevisionOrder.same,
-      );
-      expect(secondSnapshot.value.entries.keys.toSet(), selected1100.toSet());
-      expect(
-        secondSnapshot.value.entries.values,
-        everyElement(isA<SelectedRelationPresent>()),
-      );
-
-      trace.failSelectedReadAt(2);
-      final interrupted = await repository.getSelectedRelations(
-        SelectedRelationsQuery(intentionId: _ownerId, relationIds: selected401),
-      );
-      expect(
-        interrupted,
-        isA<SelectedRelationsReadError>().having(
-          (error) => error.failure,
-          'отказ второй SQL-порции',
-          isA<SelectedRelationsReadUnavailableFailure>(),
-        ),
-      );
-    },
-  );
 }
 
 Future<void> _populateLargeFixture(AppDatabase database) => seedGraph(
@@ -427,34 +364,11 @@ LongTermRelationId _decodedRelationId(int index) => (LongTermRelationId.decode(
   _relationId(index),
 ) as LongTermRelationIdDecodingSuccess).id;
 
-/// Запоминает число строк каждого чтения и однократно отказывает на заданной
-/// порции чтения выбранных связей.
+/// Запоминает число строк каждого чтения.
 final class _RelationReadTrace extends LocalDatabaseConnectionObserver {
   final rowCounts = <int>[];
-  int? _selectedReadFailureCountdown;
 
   void clear() => rowCounts.clear();
-
-  void failSelectedReadAt(int selectNumber) {
-    _selectedReadFailureCountdown = selectNumber;
-  }
-
-  @override
-  void beforeStatement(LocalDatabaseSqlStatement statement) {
-    if (statement.operation != LocalDatabaseSqlOperation.select) return;
-    final remaining = _selectedReadFailureCountdown;
-    if (statement.statements.single.contains('WHERE id IN (') &&
-        remaining != null) {
-      if (remaining == 1) {
-        _selectedReadFailureCountdown = null;
-        throw SqliteException(
-          extendedResultCode: SqlError.SQLITE_BUSY,
-          message: 'Временная недоступность',
-        );
-      }
-      _selectedReadFailureCountdown = remaining - 1;
-    }
-  }
 
   @override
   List<Map<String, Object?>> afterSelect(

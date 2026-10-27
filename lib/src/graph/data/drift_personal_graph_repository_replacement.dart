@@ -153,9 +153,6 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
         registration.invalidations.add(null);
       }
     }
-    for (final registration in List.of(_selectedRelationsWatchers)) {
-      registration.invalidations.add(null);
-    }
     _confirmedPositions.add(resetPosition);
     if (addedBackup) _backupsChanged.add(null);
     return ConfirmedGraphReplacement(_currentRevision);

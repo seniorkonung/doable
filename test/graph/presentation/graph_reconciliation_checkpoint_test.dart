@@ -22,7 +22,6 @@ import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
-import 'package:doable/src/graph/application/selected_relations.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
@@ -1830,20 +1829,6 @@ final class _CheckpointGraphRepository
       throw UnsupportedError(
         'Наблюдение дневного выбора не используется этим тестом.',
       );
-
-  @override
-  Future<SelectedRelationsReadResult> getSelectedRelations(
-    SelectedRelationsQuery query,
-  ) => throw UnsupportedError(
-    'Чтение выбранных связей не используется в этом тесте.',
-  );
-
-  @override
-  Stream<SelectedRelationsReadResult> watchSelectedRelations(
-    SelectedRelationsQuery query,
-  ) => throw UnsupportedError(
-    'Наблюдение выбранных связей не используется в этом тесте.',
-  );
 
   final catalogQueries = <IntentionCatalogQuery>[];
   final _catalogRequests = <Completer<Result<IntentionCatalogPage>>>[];

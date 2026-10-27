@@ -81,12 +81,10 @@ import '../../tag/domain/tag.dart' as tag_domain;
 import '../../tag/domain/tag_assignment.dart';
 import '../../tag/domain/tag_id.dart';
 import '../../tag/domain/tag_position.dart';
-import '../application/blocking_relation_reference.dart';
 import '../application/graph_change.dart';
 import '../application/graph_command_result.dart';
 import '../application/graph_revision.dart';
 import '../application/personal_graph_repository.dart';
-import '../application/selected_relations.dart';
 import 'drift_relation_count_aggregates.dart';
 import 'contribution_reachability.dart';
 import 'graph_fact_capture.dart';
@@ -105,7 +103,6 @@ part 'drift_personal_graph_repository_daily_choice_commands.dart';
 part 'drift_personal_graph_repository_relation_commands.dart';
 part 'drift_personal_graph_repository_relation_details.dart';
 part 'drift_personal_graph_repository_relation_groups.dart';
-part 'drift_personal_graph_repository_selected_relations.dart';
 part 'drift_personal_graph_repository_choice_path_reads.dart';
 part 'drift_personal_graph_repository_tag_reads.dart';
 part 'drift_personal_graph_repository_tag_commands.dart';
@@ -166,8 +163,6 @@ final class DriftPersonalGraphRepository
   _dailyChoiceWatchers = {};
   final Map<LongTermRelationId, Set<_RelationWatchRegistration>>
   _relationWatchers = {};
-  final Set<_SelectedRelationsWatchRegistration> _selectedRelationsWatchers =
-      {};
   var _mutationSequence = 0;
   var _lastRelationChangeSequence = 0;
   ContributionRelationGraph? _statisticsRelationSnapshot;
@@ -441,16 +436,6 @@ final class DriftPersonalGraphRepository
   @override
   Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) =>
       _watchRelation(id);
-
-  @override
-  Future<SelectedRelationsReadResult> getSelectedRelations(
-    SelectedRelationsQuery query,
-  ) => _readSelectedRelations(query);
-
-  @override
-  Stream<SelectedRelationsReadResult> watchSelectedRelations(
-    SelectedRelationsQuery query,
-  ) => _watchSelectedRelations(query);
 
   @override
   Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(
@@ -781,7 +766,6 @@ final class DriftPersonalGraphRepository
     _notifyIntentionWatchersFor(stableChanges);
     _notifyDailyChoiceWatchersFor(stableChanges);
     _notifyRelationWatchersFor(stableChanges);
-    _notifySelectedRelationsWatchersFor(stableChanges);
   }
 
   /// Создаёт намерение вместе с полным начальным состоянием команды.

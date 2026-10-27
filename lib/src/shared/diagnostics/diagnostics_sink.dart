@@ -351,12 +351,6 @@ final class LongTermRelationDetailReadDiagnosticsEvent
   }) : super(status);
 }
 
-final class SelectedRelationsReadDiagnosticsEvent extends DiagnosticsEvent {
-  const SelectedRelationsReadDiagnosticsEvent({
-    required DiagnosticsStatus status,
-  }) : super(status);
-}
-
 /// Команда намерения.
 ///
 /// Событие несёт только вид команды, этап, исход, длительность и безопасную

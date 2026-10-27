@@ -45,7 +45,7 @@
     - ветви тестовых адаптеров в `test/intention/presentation/details/details_test_support.dart`, `test/long_term_relation/presentation/neighborhood/neighborhood_test_support.dart`, `test/app/intention_app_lifecycle_test.dart`.
   - **Размер:** M — в основном удаление.
 
-- [ ] 1.4 Убрать из границы графа чтение и наблюдение явно выбранных связей вместе со ссылками на блокирующие связи
+- [x] 1.4 Убрать из границы графа чтение и наблюдение явно выбранных связей вместе со ссылками на блокирующие связи
   - **Критерии приёмки:**
     - В `PersonalGraphRepository` нет `getSelectedRelations` и `watchSelectedRelations`. Удалены также:
       - типы выбранных связей и `BlockingRelationReference`;

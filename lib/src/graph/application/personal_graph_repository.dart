@@ -15,7 +15,6 @@ import '../../statistics/application/statistics_read_contract.dart';
 import '../../tag/application/tag_read_result.dart';
 import 'graph_command_result.dart';
 import 'graph_revision.dart';
-import 'selected_relations.dart';
 
 abstract interface class GraphCommandRepository {
   Future<GraphCommandResult<TSuccess, TFailure>> execute<
@@ -78,17 +77,6 @@ abstract interface class PersonalGraphRepository
   );
 
   Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id);
-
-  /// Возвращает ровно явно выбранные ссылки обоих видов на одном снимке.
-  /// Отсутствие и утрата прямой принадлежности остаются отдельными записями.
-  Future<SelectedRelationsReadResult> getSelectedRelations(
-    SelectedRelationsQuery query,
-  );
-
-  /// Наблюдает тот же полный набор до отдельного подтверждения удаления.
-  Stream<SelectedRelationsReadResult> watchSelectedRelations(
-    SelectedRelationsQuery query,
-  );
 
   Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(
     IntentionId id,
