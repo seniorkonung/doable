@@ -3,12 +3,12 @@ import 'dart:async';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
-import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
+import 'package:doable/src/intention/application/intention_catalog.dart';
+import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
@@ -163,49 +163,47 @@ void main() {
     await coordinator.shutdown();
   });
 
-  test('снятие назначения намерению конфликтует с массовым удалением в обоих порядках', () async {
-    final repository = _ControlledRepository();
-    final coordinator = _coordinator(repository);
-    final command = RemoveTagAssignment(
-      tagId: _tagId,
-      intentionId: _intentionId,
-    );
-    final massDelete = DeleteBlockingRelations.longTerm(
-      intentionId: _intentionId,
-      relationIds: {_relationId},
-    );
-    final assignment =
-        coordinator.acceptTagRemoveAssignment(command) as TagCommandAccepted;
-    expect(coordinator.isTagRunning(_tagId), isTrue);
-    expect(coordinator.isRunning(_intentionId), isTrue);
-    expect(
-      coordinator.acceptBlockingRelationsDelete(
-        massDelete,
-        presentationTitle: 'Намерение',
-      ),
-      isA<BlockingRelationsDeleteAlreadyRunning>(),
-    );
-    expect(coordinator.isRelationRunning(_relationId), isFalse);
-    repository.complete(0, const TagCommandFailed(TagUnavailableFailure()));
-    await assignment.future;
+  test(
+    'снятие назначения намерению конфликтует с его удалением в обоих порядках',
+    () async {
+      final repository = _ControlledRepository();
+      final coordinator = _coordinator(repository);
+      final command = RemoveTagAssignment(
+        tagId: _tagId,
+        intentionId: _intentionId,
+      );
+      final delete = DeleteIntention(_intentionId);
+      final assignment =
+          coordinator.acceptTagRemoveAssignment(command) as TagCommandAccepted;
+      expect(coordinator.isTagRunning(_tagId), isTrue);
+      expect(coordinator.isRunning(_intentionId), isTrue);
+      expect(
+        coordinator.acceptExisting(delete, presentationTitle: 'Намерение'),
+        isA<IntentionCommandAlreadyRunning>(),
+      );
+      repository.complete(0, const TagCommandFailed(TagUnavailableFailure()));
+      await assignment.future;
 
-    final deletion = coordinator.acceptBlockingRelationsDelete(
-      massDelete,
-      presentationTitle: 'Намерение',
-    ) as BlockingRelationsDeleteAccepted;
-    expect(
-      coordinator.acceptTagRemoveAssignment(command),
-      isA<TagCommandAlreadyRunning>(),
-    );
-    expect(coordinator.isTagRunning(_tagId), isFalse);
-    expect(repository.commands, [same(command), same(massDelete)]);
-    repository.complete(
-      1,
-      const GraphCommandFailed(DeleteBlockingRelationsUnavailableFailure()),
-    );
-    await deletion.future;
-    await coordinator.shutdown();
-  });
+      final deletion = coordinator.acceptExisting(
+        delete,
+        presentationTitle: 'Намерение',
+      ) as IntentionCommandAccepted;
+      expect(
+        coordinator.acceptTagRemoveAssignment(command),
+        isA<TagCommandAlreadyRunning>(),
+      );
+      expect(coordinator.isTagRunning(_tagId), isFalse);
+      expect(repository.commands, [same(command), same(delete)]);
+      repository.complete(
+        1,
+        const ResultFailure<ConfirmedGraphResult<IntentionCommandSuccess>>(
+          IntentionUnavailableFailure(),
+        ),
+      );
+      await deletion.future;
+      await coordinator.shutdown();
+    },
+  );
 
   for (final kind in TagCommandKind.values) {
     test('успех операции «${kind.name}» публикуется для согласования без права '
@@ -311,9 +309,6 @@ final _intentionId = (IntentionId.decode(
 final _otherIntentionId = (IntentionId.decode(
   '018f47c2-6b7d-7abc-8def-0123456789a2',
 ) as IntentionIdDecodingSuccess).id;
-final _relationId = (LongTermRelationId.decode(
-  '018f47c2-6b7d-7abc-8def-0123456789b1',
-) as LongTermRelationIdDecodingSuccess).id;
 const _revision = _Revision();
 final _deletedSuccess = TagCommandSucceeded(
   ConfirmedGraphResult(

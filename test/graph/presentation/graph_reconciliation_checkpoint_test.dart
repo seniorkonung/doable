@@ -16,7 +16,6 @@ import 'package:doable/src/daily_choice/presentation/details/daily_choice_detail
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/data/local/app_database.dart'
     hide Intention, LongTermRelation, TagAssignment;
-import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -652,7 +651,7 @@ void main() {
   });
 
   test(
-    'массовое удаление Drift согласует все открытые представления',
+    'одиночные удаления связей Drift согласуют все открытые представления',
     () async {
       final database = AppDatabase(openInMemoryLocalDatabase());
       await database.open();
@@ -823,23 +822,25 @@ void main() {
       final coordinator = container.read(
         graphCommandCoordinatorProvider.notifier,
       );
-      final command = DeleteBlockingRelations.longTerm(
-        intentionId: ids[0],
-        relationIds: [selectedActive, selectedArchived],
-      );
-      final start = coordinator.acceptBlockingRelationsDelete(
-        command,
-        presentationTitle: 'Намерение 1',
-      ) as BlockingRelationsDeleteAccepted;
-      final completion = await start.future;
-      final confirmed = (completion.result as GraphCommandSucceeded).value;
-      expect(confirmed.value, isA<BlockingRelationsDeleted>());
-      expect(
-        (confirmed.value as BlockingRelationsDeleted).deletedRelations
-            .map((relation) => relation.id)
-            .toSet(),
-        {selectedActive, selectedArchived},
-      );
+      late ConfirmedGraphResult<LongTermRelationCommandSuccess> confirmed;
+      for (final relationId in [selectedActive, selectedArchived]) {
+        final start = coordinator.acceptRelationDelete(
+          DeleteLongTermRelation(relationId),
+        ) as LongTermRelationCommandAccepted;
+        final completion = await start.future;
+        confirmed =
+            (completion.confirmedResult
+                    as GraphCommandSucceeded<
+                      LongTermRelationCommandSuccess,
+                      LongTermRelationCommandFailure
+                    >)
+                .value;
+        expect(confirmed.value, isA<LongTermRelationDeleted>());
+        expect(
+          (confirmed.value as LongTermRelationDeleted).relation.id,
+          relationId,
+        );
+      }
       await _settleUntil(
         () =>
             container.read(relationDetailsViewModelProvider(selectedActive))

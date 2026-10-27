@@ -15,8 +15,6 @@ import '../../long_term_relation/domain/long_term_relation_id.dart';
 import '../../tag/application/tag_command.dart';
 import '../../tag/application/tag_result.dart';
 import '../../tag/domain/tag_id.dart';
-import 'blocking_relation_reference.dart';
-import 'delete_blocking_relations.dart';
 import 'graph_change.dart';
 import 'graph_command_result.dart';
 import 'graph_revision.dart';
@@ -123,13 +121,6 @@ final class LongTermRelationOperationToken extends GraphOperationToken {
 
   @override
   String toString() => 'LongTermRelationOperationToken';
-}
-
-final class BlockingRelationsDeleteOperationToken extends GraphOperationToken {
-  BlockingRelationsDeleteOperationToken._();
-
-  @override
-  String toString() => 'BlockingRelationsDeleteOperationToken';
 }
 
 final class DailyChoiceOperationToken extends GraphOperationToken {
@@ -270,34 +261,6 @@ final class LongTermRelationCommandCompletion
 
   @override
   bool get isFailure => switch (confirmedResult) {
-    GraphResultSuccess() => false,
-    GraphResultFailure() => true,
-  };
-}
-
-final class BlockingRelationsDeleteCompletion
-    extends GraphPresentableCompletion {
-  const BlockingRelationsDeleteCompletion._({
-    required this.token,
-    required this.intentionId,
-    required this.presentationTitle,
-    required this.result,
-  });
-
-  @override
-  final BlockingRelationsDeleteOperationToken token;
-  final IntentionId intentionId;
-  final String presentationTitle;
-  final DeleteBlockingRelationsResult result;
-
-  @override
-  ConfirmedGraphChangePackage? get confirmedChange => switch (result) {
-    GraphResultSuccess(:final value) => value,
-    GraphResultFailure() => null,
-  };
-
-  @override
-  bool get isFailure => switch (result) {
     GraphResultSuccess() => false,
     GraphResultFailure() => true,
   };
@@ -700,10 +663,6 @@ final class LongTermRelationCommandAlreadyRunning
   const LongTermRelationCommandAlreadyRunning();
 }
 
-sealed class BlockingRelationsDeleteStart {
-  const BlockingRelationsDeleteStart();
-}
-
 sealed class DailyChoiceCommandStart {
   const DailyChoiceCommandStart();
 }
@@ -732,22 +691,6 @@ final class TagCommandAccepted extends TagCommandStart {
 
 final class TagCommandAlreadyRunning extends TagCommandStart {
   const TagCommandAlreadyRunning();
-}
-
-final class BlockingRelationsDeleteAccepted
-    extends BlockingRelationsDeleteStart {
-  const BlockingRelationsDeleteAccepted({
-    required this.token,
-    required this.future,
-  });
-
-  final BlockingRelationsDeleteOperationToken token;
-  final Future<BlockingRelationsDeleteCompletion> future;
-}
-
-final class BlockingRelationsDeleteAlreadyRunning
-    extends BlockingRelationsDeleteStart {
-  const BlockingRelationsDeleteAlreadyRunning();
 }
 
 sealed class GraphExportStart {
@@ -819,7 +762,6 @@ final class GraphManualBackupAlreadyRunning extends GraphManualBackupStart {
 final class GraphCommandCoordinatorDraining extends IntentionCommandStart
     implements
         LongTermRelationCommandStart,
-        BlockingRelationsDeleteStart,
         DailyChoiceCommandStart,
         TagCommandStart,
         GraphExportStart,
@@ -1130,43 +1072,6 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
         ),
       ),
       _GraphCommandAlreadyRunning() => const DailyChoiceCommandAlreadyRunning(),
-      _GraphCommandDraining() => const GraphCommandCoordinatorDraining(),
-    };
-  }
-
-  BlockingRelationsDeleteStart acceptBlockingRelationsDelete(
-    DeleteBlockingRelations command, {
-    required String presentationTitle,
-  }) {
-    final token = BlockingRelationsDeleteOperationToken._();
-    final acceptance = _acceptOperation(
-      keys: {
-        ExistingIntentionKey(command.intentionId),
-        for (final reference in command.references)
-          switch (reference) {
-            LongTermBlockingRelationReference(:final id) =>
-              ExistingLongTermRelationKey(id),
-            DailyChoiceBlockingRelationReference(:final id) =>
-              ExistingDailyChoiceKey(id),
-          },
-      },
-      entry: _PresentationEntry(token),
-      execute: () async => BlockingRelationsDeleteCompletion._(
-        token: token,
-        intentionId: command.intentionId,
-        presentationTitle: presentationTitle,
-        result: await _executeBlockingRelationsDelete(command),
-      ),
-    );
-    return switch (acceptance) {
-      _GraphCommandAccepted(:final future) => BlockingRelationsDeleteAccepted(
-        token: token,
-        future: future.then(
-          (completion) => completion as BlockingRelationsDeleteCompletion,
-        ),
-      ),
-      _GraphCommandAlreadyRunning() =>
-        const BlockingRelationsDeleteAlreadyRunning(),
       _GraphCommandDraining() => const GraphCommandCoordinatorDraining(),
     };
   }
@@ -1765,19 +1670,6 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
         LongTermRelationCommandSuccess,
         LongTermRelationCommandFailure
       >(LongTermRelationUnexpectedFailure());
-    }
-  }
-
-  Future<DeleteBlockingRelationsResult> _executeBlockingRelationsDelete(
-    DeleteBlockingRelations command,
-  ) async {
-    try {
-      return await _repository.execute(command);
-    } on Object {
-      return const GraphCommandFailed<
-        BlockingRelationsDeleted,
-        DeleteBlockingRelationsFailure
-      >(DeleteBlockingRelationsUnexpectedFailure());
     }
   }
 

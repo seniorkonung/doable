@@ -7,7 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../daily_choice/presentation/daily_choice_command_failure_message.dart';
 import '../../data_transfer/presentation/graph_import_failure_message.dart';
-import '../application/delete_blocking_relations.dart';
 import '../../intention/application/intention_catalog.dart';
 import '../../intention/application/intention_result.dart';
 import '../../long_term_relation/application/long_term_relation_command.dart';
@@ -313,9 +312,6 @@ GraphOperationMessage _messageFor(
   LongTermRelationCommandCompletion() => GraphOperationMessage(
     _relationMessage(localizations, completion),
   ),
-  BlockingRelationsDeleteCompletion() => GraphOperationMessage(
-    _blockingRelationsDeleteMessage(localizations, completion),
-  ),
   DailyChoiceCommandCompletion() => GraphOperationMessage(
     _dailyChoiceMessage(localizations, completion),
   ),
@@ -425,29 +421,6 @@ String _dailyChoiceMessage(
       localizations,
       failure,
     ),
-  },
-);
-
-String _blockingRelationsDeleteMessage(
-  AppLocalizations localizations,
-  BlockingRelationsDeleteCompletion completion,
-) => localizations.graphOperationMessage(
-  localizations.graphOperationDeleteBlockingRelations,
-  completion.presentationTitle,
-  switch (completion.result) {
-    GraphResultSuccess() => localizations.blockingRelationsDeleted,
-    GraphResultFailure(:final failure) => switch (failure) {
-      DeleteBlockingRelationsIntentionNotFoundFailure() =>
-        localizations.blockingRelationsDeleteIntentionNotFound,
-      DeleteBlockingRelationsSelectionConflictFailure() =>
-        localizations.blockingRelationsDeleteConflict,
-      DeleteBlockingRelationsUnavailableFailure() =>
-        localizations.blockingRelationsDeleteUnavailable,
-      DeleteBlockingRelationsCorruptionFailure() =>
-        localizations.blockingRelationsDeleteCorruption,
-      DeleteBlockingRelationsUnexpectedFailure() =>
-        localizations.blockingRelationsDeleteUnexpected,
-    },
   },
 );
 
