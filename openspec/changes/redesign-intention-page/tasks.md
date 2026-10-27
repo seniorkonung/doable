@@ -108,7 +108,7 @@
   - **Предполагаемые файлы:** `lib/src/long_term_relation/presentation/relation_group_paging.dart` (новый), `lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart`, `lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_state.dart`.
   - **Размер:** M.
 
-- [ ] 1.8 Перенести проверки механики порций из проверок модели соседства в проверки общего ядра порций
+- [x] 1.8 Перенести проверки механики порций из проверок модели соседства в проверки общего ядра порций
   - **Критерии приёмки:**
     - Каждая обязанность ядра из решения 6 дизайна проверяется на уровне ядра, без провайдеров и модели:
       - несогласованные первая порция и полное количество;
