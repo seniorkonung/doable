@@ -128,7 +128,8 @@ Widget _sampleRow(DoableIconData icon, DoableColors colors) {
     DoableIconData.settings => (22.0, colors.ink, colors.bg),
     DoableIconData.lockOpen => (20.0, colors.muted, colors.fill),
     DoableIconData.warning => (20.0, colors.accent, colors.fill),
-    DoableIconData.close => (24.0, colors.ink, colors.bg),
+    DoableIconData.close ||
+    DoableIconData.back => (24.0, colors.ink, colors.bg),
     DoableIconData.filter => (20.0, colors.muted, colors.fill),
     DoableIconData.bolt => (14.0, colors.ink, colors.bg),
     DoableIconData.arrowUpRight => (20.0, colors.muted, colors.fill),

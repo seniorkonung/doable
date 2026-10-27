@@ -8,6 +8,7 @@
 **26.10.2026**; те же значки `selector`, `sort-asc` и `sort-desc` описаны в
 дизайн-системе `context/doable-design-system/`.
 Приватный экспорт нужен для сверки при обновлении; SVG в `assets/` самостоятельны.
+Стрелка «назад» — из `IntentionPage.dc.html`, добавлена **28.10.2026**.
 
 Сохранены размеры, `viewBox`, геометрия, заливки, `fill-rule`, ширина, окончания
 и соединения линий, а также `currentColor`. Добавлено пространство имён SVG;
@@ -57,6 +58,7 @@
 | [selector.svg](assets/selector.svg) | `ActionPicker.dc.html` | Лист «Show and sort» → строка «Type» с `mType.toggle`, завершающий SVG; тот же значок у строки «Sort by» |
 | [sort_desc.svg](assets/sort_desc.svg) | `ActionPicker.dc.html` | Лист «Show and sort» → кнопка `dirFlip.pick`, SVG при `dirFlip.down` |
 | [sort_asc.svg](assets/sort_asc.svg) | `ActionPicker.dc.html` | Лист «Show and sort» → кнопка `dirFlip.pick`, SVG при `dirFlip.up` |
+| [back.svg](assets/back.svg) | `IntentionPage.dc.html` | `header` → ссылка с `backLabel` и кнопка с `backTap`, SVG |
 
 Мини-значки имеют линию 2 при размере 14, значки меню — линию 1,75 при размере 22.
 Календарь навигации содержит отметки дней, календарь меню и мини-значок — нет.

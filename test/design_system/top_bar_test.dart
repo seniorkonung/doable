@@ -23,6 +23,157 @@ void main() {
     ('светлой', Brightness.light, DoableColors.light),
     ('тёмной', Brightness.dark, DoableColors.dark),
   ]) {
+    testWidgets(
+      'в $themeName теме стрелка назад 24 цвета ink стоит в области '
+      '44 в space-2 от края, названа потребителем и вызывает его обработчик; '
+      'заголовок со значком 16 цвета muted и промежутком 6 называет маршрут',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        var returns = 0;
+
+        await _pump(
+          tester,
+          _app(
+            brightness: brightness,
+            bar: (_) => TopBar.back(
+              title: 'Намерение',
+              titleIcon: DoableIconData.intention,
+              backLabel: 'Назад к каталогу',
+              onBack: () => returns++,
+            ),
+          ),
+        );
+
+        expect(tester.getTopLeft(find.byKey(_body)).dy, 54 + 44);
+        final arrow = _icon(DoableIconData.back);
+        final icon = _icon(DoableIconData.intention);
+        expect(tester.widget<DoableIcon>(arrow).size, 24);
+        expect(tester.widget<DoableIcon>(arrow).color, colors.ink);
+        expect(tester.getRect(_backArea()), const Rect.fromLTWH(8, 54, 44, 44));
+        expect(tester.getCenter(arrow), const Offset(30, 76));
+        expect(tester.widget<DoableIcon>(icon).size, 16);
+        expect(tester.widget<DoableIcon>(icon).color, colors.muted);
+        final iconRect = tester.getRect(icon);
+        final titleRect = tester.getRect(find.text('Намерение'));
+        expect(titleRect.left - iconRect.right, 6);
+        expect(iconRect.center.dy, titleRect.center.dy);
+        expect((iconRect.left + titleRect.right) / 2, 195);
+        expect(_style(tester, 'Намерение').color, colors.ink);
+        expect(
+          tester.getSemantics(find.text('Намерение')),
+          isSemantics(
+            label: 'Намерение',
+            isHeader: true,
+            namesRoute: true,
+            children: const [],
+          ),
+        );
+        expect(
+          tester.getSemantics(find.bySemanticsLabel('Назад к каталогу')),
+          isSemantics(
+            label: 'Назад к каталогу',
+            isButton: true,
+            hasTapAction: true,
+            children: const [],
+          ),
+        );
+
+        await tester.tap(_backArea());
+        expect(returns, 1);
+        semantics.dispose();
+      },
+    );
+
+    testWidgets('в $themeName теме длинный приглушённый заголовок с и без '
+        'значка ограничен полями 64, обрезается многоточием, а диктор слышит '
+        'название целиком', (tester) async {
+      final semantics = tester.ensureSemantics();
+      const title = 'Поддерживать здоровье и хорошее самочувствие каждый день';
+
+      for (final titleIcon in [null, DoableIconData.intention]) {
+        await _pump(
+          tester,
+          _app(
+            brightness: brightness,
+            bar: (_) => TopBar.back(
+              title: title,
+              titleIcon: titleIcon,
+              muted: true,
+              backLabel: 'Назад',
+              onBack: () {},
+            ),
+          ),
+        );
+
+        final paragraph = tester.renderObject<RenderParagraph>(
+          find.text(title),
+        );
+        expect(paragraph.maxLines, 1);
+        expect(paragraph.overflow, TextOverflow.ellipsis);
+        expect(paragraph.didExceedMaxLines, isTrue);
+        expect(_style(tester, title).color, colors.muted);
+        final titleRect = tester.getRect(find.text(title));
+        expect(titleRect.left, titleIcon == null ? 64 : 64 + 16 + 6);
+        expect(titleRect.right, 390 - 64);
+        expect(
+          tester.getSemantics(find.text(title)),
+          isSemantics(
+            label: title,
+            isHeader: true,
+            namesRoute: true,
+            children: const [],
+          ),
+        );
+        expect(tester.takeException(), isNull);
+      }
+      semantics.dispose();
+    });
+
+    testWidgets('в $themeName теме панель без видимого заголовка сообщает '
+        'переданное имя маршрута без семантического заголовка и сохраняет '
+        'доступную стрелку назад', (tester) async {
+      final semantics = tester.ensureSemantics();
+      var returns = 0;
+
+      await _pump(
+        tester,
+        _app(
+          brightness: brightness,
+          bar: (_) => TopBar.withoutTitle(
+            routeName: 'Подробности намерения',
+            backLabel: 'Назад к каталогу',
+            onBack: () => returns++,
+          ),
+        ),
+      );
+
+      expect(find.byType(Text), findsNothing);
+      expect(find.semantics.byFlag(SemanticsFlag.isHeader), findsNothing);
+      expect(
+        tester.getSemantics(find.bySemanticsLabel('Подробности намерения')),
+        isSemantics(
+          label: 'Подробности намерения',
+          namesRoute: true,
+          children: const [],
+        ),
+      );
+      expect(
+        tester.getSemantics(find.bySemanticsLabel('Назад к каталогу')),
+        isSemantics(
+          label: 'Назад к каталогу',
+          isButton: true,
+          hasTapAction: true,
+          children: const [],
+        ),
+      );
+      expect(tester.getRect(_backArea()), const Rect.fromLTWH(8, 54, 44, 44));
+      expect(tester.getTopLeft(find.byKey(_body)).dy, 54 + 44);
+
+      await tester.tap(_backArea());
+      expect(returns, 1);
+      semantics.dispose();
+    });
+
     testWidgets('в $themeName теме панель высотой 44 стоит под системным '
         'отступом: крестик 24 цвета ink по центру области 44 в space-2 от '
         'края и заголовок title цвета ink по центру панели', (tester) async {
@@ -419,6 +570,15 @@ Finder _crossArea() => find.ancestor(
   of: find.byWidgetPredicate(
     (widget) => widget is DoableIcon && widget.icon == DoableIconData.close,
   ),
+  matching: find.byType(InkResponse),
+);
+
+Finder _icon(DoableIconData icon) => find.byWidgetPredicate(
+  (widget) => widget is DoableIcon && widget.icon == icon,
+);
+
+Finder _backArea() => find.ancestor(
+  of: _icon(DoableIconData.back),
   matching: find.byType(InkResponse),
 );
 

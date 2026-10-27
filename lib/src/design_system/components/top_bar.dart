@@ -37,9 +37,8 @@ final class TopBarPurpose {
   final VoidCallback onOpen;
 }
 
-/// Верхняя панель экрана, который отменяется целиком, например экрана выбора:
-/// крестик слева и заголовок по центру. Стоит в `Scaffold.appBar` прямо под
-/// системным отступом, без фона, линии и тени.
+/// Верхняя панель со стрелкой назад или крестиком слева и заголовком по центру.
+/// Стоит в `Scaffold.appBar` прямо под системным отступом, без фона, линии и тени.
 final class TopBar extends StatelessWidget implements PreferredSizeWidget {
   static const double _minHeight = DoableMetrics.tapMin;
 
@@ -53,14 +52,65 @@ final class TopBar extends StatelessWidget implements PreferredSizeWidget {
   static const double _chevronGap = 5;
   static const double _markSize = 12;
   static const double _markGap = 5;
+  static const double _titleIconSize = 16;
+  static const double _titleIconGap = 6;
 
+  /// Панель экрана, который отменяется целиком, с крестиком слева.
   const TopBar({
-    required this.title,
-    required this.closeLabel,
-    required this.onClose,
-    this.closeKey,
+    required String title,
+    required String closeLabel,
+    required VoidCallback onClose,
+    Key? closeKey,
     super.key,
-  }) : _purpose = null,
+  }) : title = title,
+       titleIcon = null,
+       muted = false,
+       routeName = title,
+       _leading = (
+         icon: DoableIconData.close,
+         label: closeLabel,
+         onTap: onClose,
+         key: closeKey,
+       ),
+       _purpose = null,
+       preferredSize = const Size.fromHeight(_minHeight);
+
+  /// Панель страницы со стрелкой назад и видимым заголовком маршрута.
+  const TopBar.back({
+    required String title,
+    required String backLabel,
+    required VoidCallback onBack,
+    this.titleIcon,
+    this.muted = false,
+    super.key,
+  }) : title = title,
+       routeName = title,
+       _leading = (
+         icon: DoableIconData.back,
+         label: backLabel,
+         onTap: onBack,
+         key: null,
+       ),
+       _purpose = null,
+       preferredSize = const Size.fromHeight(_minHeight);
+
+  /// Панель только со стрелкой: [routeName] называет маршрут для диктора,
+  /// не создавая видимого или пустого семантического заголовка.
+  const TopBar.withoutTitle({
+    required this.routeName,
+    required String backLabel,
+    required VoidCallback onBack,
+    super.key,
+  }) : title = null,
+       titleIcon = null,
+       muted = false,
+       _leading = (
+         icon: DoableIconData.back,
+         label: backLabel,
+         onTap: onBack,
+         key: null,
+       ),
+       _purpose = null,
        preferredSize = const Size.fromHeight(_minHeight);
 
   /// Панель со строкой назначения под заголовком.
@@ -71,13 +121,24 @@ final class TopBar extends StatelessWidget implements PreferredSizeWidget {
   /// высоту, которую выделяет `Scaffold`.
   TopBar.withPurpose(
     BuildContext context, {
-    required this.title,
-    required this.closeLabel,
-    required this.onClose,
+    required String title,
+    required String closeLabel,
+    required VoidCallback onClose,
     required TopBarPurpose purpose,
-    this.closeKey,
+    Key? closeKey,
     super.key,
-  }) : _purpose = (
+  }) : title = title,
+       titleIcon = null,
+       muted = false,
+       routeName = title,
+       _leading = (
+         icon: DoableIconData.close,
+         label: closeLabel,
+         onTap: onClose,
+         key: closeKey,
+       ),
+       _purpose = (
+         title: title,
          purpose: purpose,
          textScaler: MediaQuery.textScalerOf(context),
        ),
@@ -89,17 +150,32 @@ final class TopBar extends StatelessWidget implements PreferredSizeWidget {
          ),
        );
 
-  /// Одна строка; длинный заголовок кончается многоточием.
-  final String title;
+  /// Одна строка; длинный заголовок кончается многоточием. Отсутствует только
+  /// в явном варианте [TopBar.withoutTitle].
+  final String? title;
 
-  /// Доступное название крестика.
-  final String closeLabel;
-  final VoidCallback onClose;
+  /// Декоративный значок перед заголовком, цвета muted.
+  final DoableIconData? titleIcon;
+
+  /// Приглушённый заголовок, например название архивированного намерения.
+  final bool muted;
+
+  /// Имя маршрута для диктора, в том числе при отсутствии видимого заголовка.
+  final String routeName;
+
+  /// Доступное название кнопки слева.
+  String get closeLabel => _leading.label;
+
+  /// Обработчик кнопки слева.
+  VoidCallback get onClose => _leading.onTap;
 
   /// Ключ крестика, по которому его находят сценарии экрана.
-  final Key? closeKey;
+  Key? get closeKey => _leading.key;
 
-  final ({TopBarPurpose purpose, TextScaler textScaler})? _purpose;
+  final ({DoableIconData icon, String label, VoidCallback onTap, Key? key})
+  _leading;
+  final ({String title, TopBarPurpose purpose, TextScaler textScaler})?
+  _purpose;
 
   @override
   final Size preferredSize;
@@ -137,6 +213,7 @@ final class TopBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).extension<DoableColors>()!;
     final purpose = _purpose;
+    final title = this.title;
 
     return SafeArea(
       bottom: false,
@@ -145,19 +222,42 @@ final class TopBar extends StatelessWidget implements PreferredSizeWidget {
         child: Stack(
           children: [
             if (purpose == null)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: _titleInset),
-                child: Center(
-                  child: Semantics(
-                    container: true,
-                    header: true,
-                    namesRoute: true,
-                    child: Text(
-                      title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: DoableType.title.copyWith(color: colors.ink),
-                    ),
+              Semantics(
+                container: true,
+                header: title != null,
+                // Имя маршрута не требует видимого заголовка:
+                // https://api.flutter.dev/flutter/semantics/SemanticsProperties/namesRoute.html
+                namesRoute: true,
+                label: routeName,
+                excludeSemantics: true,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: _titleInset),
+                  child: Center(
+                    child: title == null
+                        ? null
+                        : Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (titleIcon case final icon?) ...[
+                                DoableIcon(
+                                  icon,
+                                  size: _titleIconSize,
+                                  color: colors.muted,
+                                ),
+                                const SizedBox(width: _titleIconGap),
+                              ],
+                              Flexible(
+                                child: Text(
+                                  title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: DoableType.title.copyWith(
+                                    color: muted ? colors.muted : colors.ink,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                   ),
                 ),
               )
@@ -169,6 +269,7 @@ final class TopBar extends StatelessWidget implements PreferredSizeWidget {
                 bottom: 0,
                 child: _purposeButton(
                   colors,
+                  purpose.title,
                   purpose.purpose,
                   purpose.textScaler,
                 ),
@@ -181,16 +282,16 @@ final class TopBar extends StatelessWidget implements PreferredSizeWidget {
                 child: MergeSemantics(
                   child: Semantics(
                     button: true,
-                    label: closeLabel,
+                    label: _leading.label,
                     child: InkResponse(
-                      key: closeKey,
-                      onTap: onClose,
+                      key: _leading.key,
+                      onTap: _leading.onTap,
                       radius: DoableMetrics.tapMin / 2,
                       child: SizedBox.square(
                         dimension: DoableMetrics.tapMin,
                         child: Center(
                           child: DoableIcon(
-                            DoableIconData.close,
+                            _leading.icon,
                             size: DoableMetrics.iconSize,
                             color: colors.ink,
                           ),
@@ -210,6 +311,7 @@ final class TopBar extends StatelessWidget implements PreferredSizeWidget {
   /// Строки показываются в том же масштабе, по которому рассчитана высота.
   Widget _purposeButton(
     DoableColors colors,
+    String title,
     TopBarPurpose purpose,
     TextScaler textScaler,
   ) => MergeSemantics(
