@@ -841,12 +841,13 @@ void main() {
         untouchedOwner.toCanonicalString(),
         untouchedNeighbor.toCanonicalString(),
       });
-      final persistedCounts = (await repository.getRelationCounts(
-        ids[0],
-      ) as ResultSuccess<GraphSnapshot<RelationCounts>>).value;
-      expect(persistedCounts.value.total, 1);
+      final persistedIntention =
+          (await repository.watchIntention(ids[0]).first
+                  as ResultSuccess<GraphSnapshot<IntentionDetails?>>)
+              .value;
+      expect(persistedIntention.value!.relationCounts.total, 1);
       expect(
-        persistedCounts.revision.compareTo(confirmed.revision),
+        persistedIntention.revision.compareTo(confirmed.revision),
         GraphRevisionOrder.same,
       );
     },

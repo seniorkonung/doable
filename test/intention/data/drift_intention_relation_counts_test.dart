@@ -82,24 +82,15 @@ void main() {
     final existing = _id(_uuid(20));
     await _insertIntention(database, existing);
 
-    final existingResult = await repository.getRelationCounts(existing);
-    final missingResult = await repository.getRelationCounts(_id(_uuid(21)));
+    final existingSnapshot = _successfulSnapshot(
+      await repository.watchIntention(existing).first,
+    );
+    final missingSnapshot = _successfulSnapshot(
+      await repository.watchIntention(_id(_uuid(21))).first,
+    );
 
-    expect(
-      (existingResult as ResultSuccess<GraphSnapshot<RelationCounts>>)
-          .value
-          .value
-          .total,
-      0,
-    );
-    expect(
-      missingResult,
-      isA<ResultFailure<GraphSnapshot<RelationCounts>>>().having(
-        (result) => result.failure,
-        'failure',
-        isA<IntentionNotFoundFailure>(),
-      ),
-    );
+    expect(existingSnapshot.value!.relationCounts.total, 0);
+    expect(missingSnapshot.value, isNull);
   });
 
   test('блокирует удаление связью любой группы и сохраняет ревизию', () async {
@@ -125,8 +116,8 @@ void main() {
         type: group.type,
         isArchived: group.archived,
       );
-      final revisionBefore = _successfulCountsSnapshot(
-        await repository.getRelationCounts(owner),
+      final revisionBefore = _successfulSnapshot(
+        await repository.watchIntention(owner).first,
       ).revision;
 
       final result = await repository.execute(DeleteIntention(owner));
@@ -144,8 +135,8 @@ void main() {
               ),
             ),
       );
-      final revisionAfter = _successfulCountsSnapshot(
-        await repository.getRelationCounts(owner),
+      final revisionAfter = _successfulSnapshot(
+        await repository.watchIntention(owner).first,
       ).revision;
       expect(revisionBefore.compareTo(revisionAfter), GraphRevisionOrder.same);
       expect(
@@ -185,10 +176,10 @@ void main() {
       for (final neighbor in neighbors) {
         await _insertIntention(database, neighbor);
       }
-      final emptySnapshot = _successfulCountsSnapshot(
-        await repository.getRelationCounts(owner),
+      final emptySnapshot = _successfulSnapshot(
+        await repository.watchIntention(owner).first,
       );
-      expect(emptySnapshot.value.total, 0);
+      expect(emptySnapshot.value!.relationCounts.total, 0);
       for (var index = 0; index < neighbors.length; index++) {
         await _insertRelation(
           database,
@@ -215,11 +206,11 @@ void main() {
               ),
             ),
       );
-      final currentSnapshot = _successfulCountsSnapshot(
-        await repository.getRelationCounts(owner),
+      final currentSnapshot = _successfulSnapshot(
+        await repository.watchIntention(owner).first,
       );
-      expect(currentSnapshot.value.activeNeedOutgoing, 0);
-      expect(currentSnapshot.value.archivedCanIncoming, 51);
+      expect(currentSnapshot.value!.relationCounts.activeNeedOutgoing, 0);
+      expect(currentSnapshot.value!.relationCounts.archivedCanIncoming, 51);
       expect(
         emptySnapshot.revision.compareTo(currentSnapshot.revision),
         GraphRevisionOrder.same,
@@ -671,13 +662,6 @@ GraphSnapshot<IntentionDetails?> _successfulSnapshot(
 ) {
   expect(result, isA<ResultSuccess<GraphSnapshot<IntentionDetails?>>>());
   return (result as ResultSuccess<GraphSnapshot<IntentionDetails?>>).value;
-}
-
-GraphSnapshot<RelationCounts> _successfulCountsSnapshot(
-  Result<GraphSnapshot<RelationCounts>> result,
-) {
-  expect(result, isA<ResultSuccess<GraphSnapshot<RelationCounts>>>());
-  return (result as ResultSuccess<GraphSnapshot<RelationCounts>>).value;
 }
 
 Future<Map<String, bool>> _relationArchiveStates(AppDatabase database) async =>

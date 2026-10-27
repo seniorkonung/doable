@@ -7,9 +7,9 @@ import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
+import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
-import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/daily_choice_durability_fixture.dart';
@@ -210,9 +210,10 @@ Future<void> _expectIntegrity(AppDatabase database) async {
 }
 
 Future<int> _sourceChoiceCount(DriftPersonalGraphRepository repository) async {
-  final result = await repository.getRelationCounts(durabilityIntention(1));
-  return (result as ResultSuccess<GraphSnapshot<RelationCounts>>)
+  final result = await repository.watchIntention(durabilityIntention(1)).first;
+  return (result as ResultSuccess<GraphSnapshot<IntentionDetails?>>)
       .value
-      .value
+      .value!
+      .relationCounts
       .dailySource;
 }

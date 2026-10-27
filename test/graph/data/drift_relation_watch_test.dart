@@ -11,6 +11,7 @@ import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
+import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
@@ -21,7 +22,6 @@ import 'package:doable/src/long_term_relation/application/long_term_relation_per
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_description.dart';
-import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:drift/drift.dart' hide isNull;
 import 'package:flutter_test/flutter_test.dart';
@@ -142,19 +142,21 @@ void main() {
     );
     expect(snapshot.value!.permissions.canDelete, isFalse);
 
-    final sourceCounts = await repository.getRelationCounts(sourceId);
-    final selectedCounts = await repository.getRelationCounts(relatedId);
+    final sourceDetails = await repository.watchIntention(sourceId).first;
+    final selectedDetails = await repository.watchIntention(relatedId).first;
     expect(
-      (sourceCounts as ResultSuccess<GraphSnapshot<RelationCounts>>)
+      (sourceDetails as ResultSuccess<GraphSnapshot<IntentionDetails?>>)
           .value
-          .value
+          .value!
+          .relationCounts
           .dailySource,
       1,
     );
     expect(
-      (selectedCounts as ResultSuccess<GraphSnapshot<RelationCounts>>)
+      (selectedDetails as ResultSuccess<GraphSnapshot<IntentionDetails?>>)
           .value
-          .value
+          .value!
+          .relationCounts
           .dailySelected,
       1,
     );

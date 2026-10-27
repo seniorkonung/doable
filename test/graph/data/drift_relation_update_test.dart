@@ -13,7 +13,6 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_id_generator.dart';
-import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_description.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
@@ -511,9 +510,11 @@ LongTermRelationCommandFailure _failure(LongTermRelationCommandResult result) {
 Future<GraphRevision> _revision(
   DriftPersonalGraphRepository repository,
   IntentionId intentionId,
-) async => (await repository.getRelationCounts(
-  intentionId,
-) as ResultSuccess<GraphSnapshot<RelationCounts>>).value.revision;
+) async =>
+    (await repository.watchIntention(intentionId).first
+            as ResultSuccess<GraphSnapshot<IntentionDetails?>>)
+        .value
+        .revision;
 
 DriftPersonalGraphRepository _repository(
   AppDatabase database,

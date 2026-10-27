@@ -12,7 +12,6 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/application/title_search_key.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
@@ -253,9 +252,9 @@ void main() {
           sourceId: owner,
           relatedId: neighbor,
         );
-        final revisionBefore = _countsRevision(
-          await repository.getRelationCounts(owner),
-        );
+        final revisionBefore = _readValue(
+          await repository.watchIntention(owner).first,
+        ).revision;
         final ownerSnapshots = <Object>[];
         final neighborSnapshots = <Object>[];
         final subscriptions = [
@@ -287,9 +286,9 @@ void main() {
           createdAt: createdAt,
         );
         expect(await _relationIsArchived(database, _relationUuid), isFalse);
-        final revisionAfter = _countsRevision(
-          await repository.getRelationCounts(owner),
-        );
+        final revisionAfter = _readValue(
+          await repository.watchIntention(owner).first,
+        ).revision;
         expect(
           revisionBefore.compareTo(revisionAfter),
           GraphRevisionOrder.same,
@@ -860,13 +859,6 @@ Future<bool> _relationIsArchived(AppDatabase database, String id) async {
       )
       .getSingle();
   return row.read<int>('is_archived') == 1;
-}
-
-GraphRevision _countsRevision(Result<GraphSnapshot<RelationCounts>> result) {
-  expect(result, isA<ResultSuccess<GraphSnapshot<RelationCounts>>>());
-  return (result as ResultSuccess<GraphSnapshot<RelationCounts>>)
-      .value
-      .revision;
 }
 
 Future<List<IntentionId>> _matchingIds(
