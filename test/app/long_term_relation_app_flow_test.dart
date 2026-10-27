@@ -1,213 +1,26 @@
-import 'dart:ui' show CheckedState, Tristate;
+import 'dart:ui' show Tristate;
 
 import 'package:auto_route/auto_route.dart';
 
 import 'package:doable/main.dart';
-import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/data/local/app_database.dart';
-import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart'
     as catalog_page;
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:drift/drift.dart' show Value;
 
 import '../support/app_root_pages.dart';
-import '../support/graph_seed.dart';
 import '../support/quick_creation.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
 
 void main() {
-  testWidgets(
-    'отдельно подтверждает удаление освобождённого архивного намерения',
-    (tester) async {
-      await _prepareAppSurface(tester);
-      tester.binding.platformDispatcher.localesTestValue = [
-        const Locale('ru', 'RU'),
-      ];
-
-      final semantics = tester.ensureSemantics();
-      final database = (await tester.runAsync(
-        LocalDatabaseHarness.fileBacked,
-      ))!;
-      await _seedBlockingFlow(database);
-      final runtimes = <AppRuntime>[];
-      final runtime = _fileRuntime(
-        database,
-        diagnostics: InMemoryDiagnosticsSink(),
-      )..also(runtimes.add);
-      addTearDown(() async {
-        await tester.pumpWidget(const SizedBox.shrink());
-        for (final activeRuntime in runtimes.reversed) {
-          await activeRuntime.shutdown();
-        }
-        await database.dispose();
-      });
-      await tester.pumpWidget(MainApp(runtime: runtime));
-      await openIntentionGraph(tester, waitFor: _pumpUntilFound);
-      await _pumpUntilFound(
-        tester,
-        find.byKey(const ValueKey('catalog-scope-control')),
-      );
-      final loc = AppLocalizations.of(
-        tester.element(find.byKey(const ValueKey('catalog-scope-control'))),
-      );
-      await tester.tap(find.byKey(const ValueKey('catalog-scope-control')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text(loc.catalogScopeArchived).last);
-      await _pumpUntilFound(tester, find.text(_blockingOwnerTitle));
-      await _openIntention(tester, _blockingOwnerTitle);
-      expect(find.text(loc.relationNeighborhoodArchivedTotal(2)), findsWidgets);
-
-      await _deleteCurrentIntention(tester);
-      final showBlocking = find.byKey(
-        const ValueKey('intention-details-show-blocking-relations'),
-      );
-      await _pumpUntilFound(tester, showBlocking);
-      await _ensureVisible(tester, showBlocking);
-      await tester.tap(showBlocking);
-      await _selectBlockingRelation(tester, 100);
-      await _scrollDetailsToTop(tester);
-      expect(
-        find.text(loc.relationNeighborhoodSelectedCount(1)),
-        findsOneWidget,
-      );
-      await _reviewBlockingSelection(tester);
-      expect(
-        find.text(loc.blockingRelationsConfirmationCount(1)),
-        findsOneWidget,
-      );
-      final confirm = find.byKey(
-        const ValueKey('blocking-relations-confirm-delete'),
-      );
-      await tester.scrollUntilVisible(
-        confirm,
-        300,
-        scrollable: find.byType(Scrollable).last,
-      );
-      expect(tester.getSemantics(confirm).label, isNotEmpty);
-      await tester.tap(confirm);
-      await _pumpUntilFound(
-        tester,
-        find.textContaining(loc.blockingRelationsDeleted),
-      );
-      expect(
-        find.byKey(const ValueKey('intention-details-title')),
-        findsOneWidget,
-      );
-      await _dismissOperationMessage(tester);
-      await _scrollDetailsToTop(tester);
-      expect(
-        find.text(loc.relationNeighborhoodSelectedCount(0)),
-        findsOneWidget,
-      );
-      expect(find.text(loc.relationNeighborhoodArchivedTotal(1)), findsWidgets);
-      final can = find.byKey(const ValueKey('relation-neighborhood-type-can'));
-      await _ensureVisible(tester, can);
-      await tester.tap(can);
-      final incoming = find.byKey(
-        const ValueKey('relation-neighborhood-direction-incoming'),
-      );
-      await _ensureVisible(tester, incoming);
-      await tester.tap(incoming);
-      await _selectBlockingRelation(tester, 200);
-      final secondSelect = find.byKey(
-        ValueKey(
-          'relation-neighborhood-select-${_blockingRelationId(200).toCanonicalString()}',
-        ),
-      );
-      expect(
-        tester.getSemantics(secondSelect).flagsCollection.isChecked,
-        CheckedState.isTrue,
-      );
-      await _scrollDetailsToTop(tester);
-      expect(
-        find.text(loc.relationNeighborhoodSelectedCount(1)),
-        findsOneWidget,
-      );
-      await _reviewBlockingSelection(tester);
-      expect(
-        find.text(loc.blockingRelationsConfirmationCount(1)),
-        findsOneWidget,
-      );
-      await tester.scrollUntilVisible(
-        confirm,
-        300,
-        scrollable: find.byType(Scrollable).last,
-      );
-      await tester.tap(confirm);
-      await _pumpUntilFound(
-        tester,
-        find.textContaining(loc.blockingRelationsDeleted),
-      );
-      await _dismissOperationMessage(tester);
-      await _scrollDetailsToTop(tester);
-      expect(
-        find.text(loc.relationNeighborhoodSelectedCount(0)),
-        findsOneWidget,
-      );
-
-      final delete = find.byKey(const ValueKey('intention-details-delete'));
-      await _ensureVisible(tester, delete);
-      await tester.tap(delete);
-      final confirmIntention = find.byKey(
-        const ValueKey('intention-details-confirm-delete'),
-      );
-      await _pumpUntilFound(tester, confirmIntention);
-      await tester.tap(
-        find.descendant(
-          of: find.byType(AlertDialog),
-          matching: find.text(loc.detailsCancelEditAction),
-        ),
-      );
-      await tester.pumpAndSettle();
-      expect(
-        find.byKey(const ValueKey('intention-details-title')),
-        findsOneWidget,
-      );
-      await _deleteCurrentIntention(tester);
-      await _pumpUntilFound(
-        tester,
-        find.byType(catalog_page.IntentionCatalogPage),
-      );
-      expect(find.text(_blockingOwnerTitle), findsNothing);
-      semantics.dispose();
-
-      await tester.pumpWidget(const SizedBox.shrink());
-      await runtime.shutdown();
-      runtimes.remove(runtime);
-      final persisted = await database.openReadyDatabase();
-      final intentions = (await persisted.select(persisted.intentions).get())
-          .map((row) => row.id)
-          .toSet();
-      expect(
-        intentions,
-        isNot(contains(_blockingIntentionId(1).toCanonicalString())),
-      );
-      expect(
-        intentions,
-        contains(_blockingIntentionId(100).toCanonicalString()),
-      );
-      expect(
-        intentions,
-        contains(_blockingIntentionId(200).toCanonicalString()),
-      );
-      expect(
-        await persisted.select(persisted.longTermRelations).get(),
-        isEmpty,
-      );
-      await database.closePersistenceObjectGraph();
-    },
-  );
-
   testWidgets(
     'создаёт связь, согласует соседство и сохраняет поток после открытия файла',
     (tester) async {
@@ -528,11 +341,12 @@ void main() {
         find.textContaining('relations still block deletion'),
         findsOneWidget,
       );
-      final showBlocking = find.byKey(
-        const ValueKey('intention-details-show-blocking-relations'),
+      expect(find.text('Show blocking relations'), findsNothing);
+      final canGroup = find.byKey(
+        const ValueKey('relation-neighborhood-group-active-can-outgoing'),
       );
-      await _ensureVisible(tester, showBlocking);
-      await tester.tap(showBlocking);
+      await _ensureVisible(tester, canGroup);
+      await tester.tap(canGroup);
       await _tapWhenFound(tester, find.text(lifecyclePhrase));
       await _pumpUntilFound(
         tester,
@@ -581,128 +395,6 @@ void main() {
       semantics.dispose();
     },
   );
-}
-
-const _blockingOwnerTitle = 'Освободить намерение';
-
-Future<void> _seedBlockingFlow(LocalDatabaseHarness harness) async {
-  final database = await harness.openReadyDatabase();
-  final owner = _blockingIntentionId(1).toCanonicalString();
-  await seedGraph(
-    database,
-    () => database.batch((batch) {
-      batch.insert(
-        database.intentions,
-        IntentionsCompanion.insert(
-          id: owner,
-          title: _blockingOwnerTitle,
-          createdAt: 3000000,
-          updatedAt: 3000000,
-          isArchived: const Value(true),
-        ),
-      );
-      final neighbor = _blockingIntentionId(100).toCanonicalString();
-      batch.insert(
-        database.intentions,
-        IntentionsCompanion.insert(
-          id: neighbor,
-          title: 'Сосед 100',
-          createdAt: 1000100,
-          updatedAt: 1000100,
-        ),
-      );
-      batch.insert(
-        database.longTermRelations,
-        LongTermRelationsCompanion.insert(
-          id: _blockingRelationId(100).toCanonicalString(),
-          sourceIntentionId: owner,
-          relatedIntentionId: neighbor,
-          type: 'need',
-          priority: 2,
-          isArchived: const Value(true),
-        ),
-      );
-      final incoming = _blockingIntentionId(200).toCanonicalString();
-      batch.insert(
-        database.intentions,
-        IntentionsCompanion.insert(
-          id: incoming,
-          title: 'Встречный сосед',
-          createdAt: 1000200,
-          updatedAt: 1000200,
-        ),
-      );
-      batch.insert(
-        database.longTermRelations,
-        LongTermRelationsCompanion.insert(
-          id: _blockingRelationId(200).toCanonicalString(),
-          sourceIntentionId: incoming,
-          relatedIntentionId: owner,
-          type: 'can',
-          priority: 2,
-          isArchived: const Value(true),
-        ),
-      );
-    }),
-  );
-  await harness.closePersistenceObjectGraph();
-}
-
-IntentionId _blockingIntentionId(int number) =>
-    switch (IntentionId.decode(_blockingUuid(number))) {
-      IntentionIdDecodingSuccess(:final id) => id,
-      InvalidIntentionIdDecoding() => throw StateError('Недопустимый ID.'),
-    };
-
-LongTermRelationId _blockingRelationId(int number) =>
-    switch (LongTermRelationId.decode(_blockingUuid(1000 + number))) {
-      LongTermRelationIdDecodingSuccess(:final id) => id,
-      InvalidLongTermRelationIdDecoding() => throw StateError(
-        'Недопустимый ID.',
-      ),
-    };
-
-String _blockingUuid(int number) =>
-    '018f0b5d-6b2e-7c80-8000-${number.toString().padLeft(12, '0')}';
-
-Future<void> _selectBlockingRelation(WidgetTester tester, int number) async {
-  final select = find.byKey(
-    ValueKey(
-      'relation-neighborhood-select-${_blockingRelationId(number).toCanonicalString()}',
-    ),
-  );
-  for (var attempt = 0; attempt < 100 && select.evaluate().isEmpty; attempt++) {
-    await tester.drag(find.byType(CustomScrollView), const Offset(0, -1200));
-    await tester.pumpAndSettle(const Duration(milliseconds: 1));
-  }
-  await _pumpUntilFound(tester, select);
-  await _ensureVisible(tester, select);
-  await tester.tap(select);
-  await tester.pumpAndSettle(const Duration(milliseconds: 1));
-}
-
-Future<void> _reviewBlockingSelection(WidgetTester tester) async {
-  final review = find.byKey(const ValueKey('blocking-relations-review'));
-  await _ensureVisible(tester, review);
-  await tester.tap(review);
-  await _pumpUntilFound(
-    tester,
-    find.byKey(const ValueKey('blocking-relations-confirm-list')),
-  );
-}
-
-Future<void> _scrollDetailsToTop(WidgetTester tester) async {
-  await tester.drag(find.byType(CustomScrollView), const Offset(0, 20000));
-  await tester.pumpAndSettle(const Duration(milliseconds: 1));
-}
-
-Future<void> _prepareAppSurface(WidgetTester tester) async {
-  tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-  tester.binding.platformDispatcher.localesTestValue = const [Locale('en')];
-  addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
-  tester.view.physicalSize = const Size(1200, 6000);
-  tester.view.devicePixelRatio = 1;
-  addTearDown(tester.view.reset);
 }
 
 AppRuntime _fileRuntime(

@@ -49,13 +49,11 @@ final class IntentionDetailsPage extends ConsumerStatefulWidget {
 
 final class _IntentionDetailsPageState
     extends ConsumerState<IntentionDetailsPage> {
-  final _neighborhoodKey = GlobalKey();
   final _statisticsKey = GlobalKey();
   var _statisticsPageKey = Object();
   late final DailyChoiceLocalDayObserver _localDay;
   var _visible = false;
   var _statisticsOpeningScheduled = false;
-  var _selectionMode = false;
 
   IntentionStatisticsViewModelProvider get _statisticsProvider =>
       intentionStatisticsViewModelProvider(
@@ -102,7 +100,6 @@ final class _IntentionDetailsPageState
   void didUpdateWidget(covariant IntentionDetailsPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.intentionId != widget.intentionId) {
-      _selectionMode = false;
       _statisticsPageKey = Object();
       _statisticsOpeningScheduled = false;
       _syncStatisticsVisibility();
@@ -128,23 +125,6 @@ final class _IntentionDetailsPageState
       // Цель применяется единожды, после размещения загруженной страницы.
       // https://api.flutter.dev/flutter/widgets/Scrollable/ensureVisible.html
       unawaited(Scrollable.ensureVisible(sectionContext));
-    });
-  }
-
-  void _showBlockingRelations() {
-    ref
-        .read(
-          relationNeighborhoodViewModelProvider(widget.intentionId).notifier,
-        )
-        .showBlockingRelations();
-    setState(() => _selectionMode = true);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final neighborhoodContext = _neighborhoodKey.currentContext;
-      if (mounted && neighborhoodContext != null) {
-        unawaited(
-          Scrollable.ensureVisible(neighborhoodContext, alignment: 0.05),
-        );
-      }
     });
   }
 
@@ -190,13 +170,10 @@ final class _IntentionDetailsPageState
               child: _DetailsContent(
                 intentionId: intentionId,
                 state: details,
-                selectionMode: _selectionMode,
-                neighborhoodKey: _neighborhoodKey,
                 statisticsSection: IntentionStatisticsSectionSliver(
                   key: _statisticsKey,
                   provider: _statisticsProvider,
                 ),
-                onShowBlockingRelations: _showBlockingRelations,
                 onDelete: _delete,
               ),
             ),
@@ -237,19 +214,13 @@ final class _DetailsContent extends ConsumerWidget {
   const _DetailsContent({
     required this.intentionId,
     required this.state,
-    required this.selectionMode,
-    required this.neighborhoodKey,
     required this.statisticsSection,
-    required this.onShowBlockingRelations,
     required this.onDelete,
   });
 
   final IntentionId intentionId;
   final IntentionDetailsState state;
-  final bool selectionMode;
-  final GlobalKey neighborhoodKey;
   final Widget statisticsSection;
-  final VoidCallback onShowBlockingRelations;
   final VoidCallback onDelete;
 
   @override
@@ -262,8 +233,6 @@ final class _DetailsContent extends ConsumerWidget {
       ),
       final IntentionDetailsLoaded loaded => _LoadedDetails(
         state: loaded,
-        selectionMode: selectionMode,
-        neighborhoodKey: neighborhoodKey,
         statisticsSection: statisticsSection,
         onBeginEditing: ref
             .read(intentionDetailsViewModelProvider(intentionId).notifier)
@@ -304,7 +273,6 @@ final class _DetailsContent extends ConsumerWidget {
             ref.read(provider.notifier).retryStateChange();
           }
         },
-        onShowBlockingRelations: onShowBlockingRelations,
         onShowArchivedRelations: ref
             .read(relationNeighborhoodViewModelProvider(intentionId).notifier)
             .showArchivedRelations,
@@ -335,8 +303,6 @@ final class _DetailsContent extends ConsumerWidget {
 final class _LoadedDetails extends StatelessWidget {
   const _LoadedDetails({
     required this.state,
-    required this.selectionMode,
-    required this.neighborhoodKey,
     required this.statisticsSection,
     required this.onBeginEditing,
     required this.onCancelEditing,
@@ -349,13 +315,10 @@ final class _LoadedDetails extends StatelessWidget {
     required this.onRestore,
     required this.onDelete,
     required this.onRetryStateChange,
-    required this.onShowBlockingRelations,
     required this.onShowArchivedRelations,
   });
 
   final IntentionDetailsLoaded state;
-  final bool selectionMode;
-  final GlobalKey neighborhoodKey;
   final Widget statisticsSection;
   final VoidCallback onBeginEditing;
   final VoidCallback onCancelEditing;
@@ -368,7 +331,6 @@ final class _LoadedDetails extends StatelessWidget {
   final VoidCallback onRestore;
   final VoidCallback onDelete;
   final VoidCallback onRetryStateChange;
-  final VoidCallback onShowBlockingRelations;
   final VoidCallback onShowArchivedRelations;
 
   @override
@@ -441,7 +403,6 @@ final class _LoadedDetails extends StatelessWidget {
                 onRestore: onRestore,
                 onDelete: onDelete,
                 onRetryStateChange: onRetryStateChange,
-                onShowBlockingRelations: onShowBlockingRelations,
                 onShowArchivedRelations: onShowArchivedRelations,
                 onChoosePath: () => unawaited(
                   context.router.push(
@@ -470,10 +431,7 @@ final class _LoadedDetails extends StatelessWidget {
         ),
         statisticsSection,
         RelationNeighborhoodSliver(
-          key: neighborhoodKey,
           intentionId: intention.id,
-          intentionTitle: intention.title,
-          selectionMode: selectionMode,
           onOpenRelation: (relationId) => unawaited(
             context.router.push(RelationDetailsRoute(relationId: relationId)),
           ),
@@ -511,7 +469,6 @@ final class _DetailsActions extends StatelessWidget {
     required this.onRestore,
     required this.onDelete,
     required this.onRetryStateChange,
-    required this.onShowBlockingRelations,
     required this.onShowArchivedRelations,
     required this.onChoosePath,
   });
@@ -524,7 +481,6 @@ final class _DetailsActions extends StatelessWidget {
   final VoidCallback onRestore;
   final VoidCallback onDelete;
   final VoidCallback onRetryStateChange;
-  final VoidCallback onShowBlockingRelations;
   final VoidCallback onShowArchivedRelations;
   final VoidCallback onChoosePath;
 
@@ -554,22 +510,6 @@ final class _DetailsActions extends StatelessWidget {
                 key: const ValueKey('intention-details-state-change-retry'),
                 onPressed: controlsEnabled ? onRetryStateChange : null,
                 child: Text(localizations.commonRetry),
-              ),
-            ),
-          ],
-          // Блокирующие связи показываются в актуальном соседстве: удаление
-          // остаётся запрещённым и для архивных, и для незагруженных связей.
-          if (_isBlockedByRelations) ...[
-            const SizedBox(height: 12),
-            Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: OutlinedButton.icon(
-                key: const ValueKey(
-                  'intention-details-show-blocking-relations',
-                ),
-                onPressed: onShowBlockingRelations,
-                icon: const Icon(Icons.link_off_outlined),
-                label: Text(localizations.detailsShowBlockingRelationsAction),
               ),
             ),
           ],
@@ -662,18 +602,6 @@ final class _DetailsActions extends StatelessWidget {
         ),
       ],
     );
-  }
-
-  /// Отказ удаления вызван связями намерения, а не иным конфликтом.
-  bool get _isBlockedByRelations {
-    final stateChange = state.stateChange;
-    if (stateChange == null ||
-        stateChange.kind != IntentionDetailsStateChangeKind.delete) {
-      return false;
-    }
-    return stateChange.operation is OperationFailed<Intention> &&
-        (stateChange.operation as OperationFailed<Intention>).failure
-            is IntentionHasBlockingRelationsFailure;
   }
 
   Future<void> _confirmReadiness(BuildContext context) async {

@@ -242,101 +242,88 @@ void main() {
       expect(find.text(intention.title), findsNothing);
     },
   );
-  testWidgets(
-    'конфликт удаления сохраняет намерение и открывает блокирующие группы',
-    (tester) async {
-      final repository = ControlledDetailsRepository();
-      final intention = testDetailsIntention(index: 160);
-      // Свободных активных связей нет: удаление блокирует только архив.
-      final counts = testRelationCounts(archivedCanIncoming: 1);
-      repository.onRelationGroupPage = (query) => GraphResultSuccess(
-        RelationGroupFirstPage(
-          items: query.scope == RelationScope.archived
-              ? [
-                  testDetailsRelationRow(
-                    ownerId: intention.id,
-                    index: 1,
-                    type: LongTermRelationType.can,
-                    direction: RelationDirection.incoming,
-                    scope: RelationScope.archived,
-                  ),
-                ]
-              : const [],
-          counts: counts,
-          nextCursor: null,
-          revision: const TestDetailsRevision(0),
-        ),
-      );
-      await _pumpDetailsPage(tester, repository, intention.id);
-      await waitForDetailRequests(repository, 1);
-      repository.detailRequests[0].add(
-        ResultSuccess(intention),
-        relationCounts: counts,
-      );
-      await tester.pumpAndSettle();
+  testWidgets('конфликт удаления сохраняет текст отказа без перехода к связям', (
+    tester,
+  ) async {
+    final repository = ControlledDetailsRepository();
+    final intention = testDetailsIntention(index: 160);
+    // Свободных активных связей нет: удаление блокирует только архив.
+    final counts = testRelationCounts(archivedCanIncoming: 1);
+    repository.onRelationGroupPage = (query) => GraphResultSuccess(
+      RelationGroupFirstPage(
+        items: query.scope == RelationScope.archived
+            ? [
+                testDetailsRelationRow(
+                  ownerId: intention.id,
+                  index: 1,
+                  type: LongTermRelationType.can,
+                  direction: RelationDirection.incoming,
+                  scope: RelationScope.archived,
+                ),
+              ]
+            : const [],
+        counts: counts,
+        nextCursor: null,
+        revision: const TestDetailsRevision(0),
+      ),
+    );
+    await _pumpDetailsPage(tester, repository, intention.id);
+    await waitForDetailRequests(repository, 1);
+    repository.detailRequests[0].add(
+      ResultSuccess(intention),
+      relationCounts: counts,
+    );
+    await tester.pumpAndSettle();
 
-      final delete = find.byKey(const ValueKey('intention-details-delete'));
-      await tester.ensureVisible(delete);
-      await tester.pump();
-      await tester.tap(delete);
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const ValueKey('intention-details-confirm-delete')),
-      );
-      await tester.pump();
-      repository.completeCommand(
-        0,
-        ResultFailure(IntentionHasBlockingRelationsFailure(intention.id)),
-      );
-      await tester.pumpAndSettle();
+    final delete = find.byKey(const ValueKey('intention-details-delete'));
+    await tester.ensureVisible(delete);
+    await tester.pump();
+    await tester.tap(delete);
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('intention-details-confirm-delete')),
+    );
+    await tester.pump();
+    tester.state<ScrollableState>(find.byType(Scrollable)).position.jumpTo(0);
+    await tester.pump();
+    expect(find.text(intention.title).hitTestable(), findsOneWidget);
+    repository.completeCommand(
+      0,
+      ResultFailure(IntentionHasBlockingRelationsFailure(intention.id)),
+    );
+    await tester.pumpAndSettle();
 
-      expect(
-        find.text(
-          'The intention wasn’t deleted: its relations still block deletion. '
-          'Archived relations and relations that aren’t loaded yet block it too.',
-        ),
-        findsOneWidget,
-      );
-      expect(find.text(intention.title, skipOffstage: false), findsOneWidget);
-      expect(
-        find.byKey(const ValueKey('intention-details-state-change-retry')),
-        findsNothing,
-      );
-      // Ноль активных связей не объявляет намерение свободным от зависимостей.
-      expect(
-        find.text('Active relations: 0', skipOffstage: false),
-        findsWidgets,
-      );
-      expect(
-        find.text('Total relations: 1', skipOffstage: false),
-        findsOneWidget,
-      );
+    expect(
+      find.text(
+        'The intention wasn’t deleted: its relations still block deletion. '
+        'Archived relations and relations that aren’t loaded yet block it too.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text(intention.title, skipOffstage: false), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('intention-details-state-change-retry')),
+      findsNothing,
+    );
+    // Ноль активных связей не объявляет намерение свободным от зависимостей.
+    expect(find.text('Active relations: 0', skipOffstage: false), findsWidgets);
+    expect(
+      find.text('Total relations: 1', skipOffstage: false),
+      findsOneWidget,
+    );
 
-      final showBlocking = find.byKey(
-        const ValueKey('intention-details-show-blocking-relations'),
-      );
-      await tester.ensureVisible(showBlocking);
-      await tester.drag(find.byType(CustomScrollView), const Offset(0, 100));
-      await tester.pumpAndSettle();
-      await tester.tap(showBlocking);
-      await tester.pumpAndSettle();
-
-      final reveal = repository.relationGroupQueries.last;
-      expect(reveal.scope, RelationScope.archived);
-      expect(reveal.type, LongTermRelationType.can);
-      expect(reveal.direction, RelationDirection.incoming);
-      expect(reveal.cursor, isNull);
-      await tester.drag(find.byType(CustomScrollView), const Offset(0, -2000));
-      await tester.pumpAndSettle();
-      expect(
-        find.text(
-          'To Исходное 1, you can Намерение-владелец',
-          skipOffstage: false,
-        ),
-        findsOneWidget,
-      );
-    },
-  );
+    expect(find.text('Show blocking relations'), findsNothing);
+    expect(find.text(intention.title).hitTestable(), findsOneWidget);
+    expect(
+      repository.relationGroupQueries.every(
+        (query) =>
+            query.scope == RelationScope.active &&
+            query.type == LongTermRelationType.need &&
+            query.direction == RelationDirection.outgoing,
+      ),
+      isTrue,
+    );
+  });
 
   testWidgets(
     'незагруженные связи и отказ их чтения не снимают блокировку удаления',
@@ -421,28 +408,6 @@ void main() {
         findsOneWidget,
       );
       expect(find.text(intention.title, skipOffstage: false), findsOneWidget);
-
-      final showBlocking = find.byKey(
-        const ValueKey('intention-details-show-blocking-relations'),
-      );
-      await tester.ensureVisible(showBlocking);
-      await tester.drag(find.byType(CustomScrollView), const Offset(0, 100));
-      await tester.pumpAndSettle();
-      await tester.tap(showBlocking);
-      await tester.pumpAndSettle();
-
-      expect(
-        find.text('In the whole selected group: 250', skipOffstage: false),
-        findsOneWidget,
-      );
-      expect(
-        find.text(
-          'The intention wasn’t deleted: its relations still block deletion. '
-          'Archived relations and relations that aren’t loaded yet block it too.',
-          skipOffstage: false,
-        ),
-        findsOneWidget,
-      );
     },
   );
 }

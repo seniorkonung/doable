@@ -512,108 +512,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get relationNeighborhoodTitle => 'Relations';
 
   @override
-  String relationNeighborhoodSelectedCount(int count) {
-    return 'Selected relations: $count';
-  }
-
-  @override
-  String get relationNeighborhoodAddToSelection => 'Add to selection';
-
-  @override
-  String get relationNeighborhoodRemoveFromSelection => 'Remove from selection';
-
-  @override
-  String get blockingRelationsReviewAction => 'Review selected relations';
-
-  @override
-  String get blockingRelationsConfirmationTitle =>
-      'Delete selected relations permanently?';
-
-  @override
-  String get blockingRelationsConfirmationWarning =>
-      'Review each selected relation. Only the selected relations will be deleted. Selected daily choices will be deleted with all their path steps. This cannot be undone. The intention will remain; deleting it requires a separate confirmation.';
-
-  @override
-  String get blockingRelationsConfirmationPreservedTags =>
-      'The reusable tags and all their assignments to intentions will remain.';
-
-  @override
-  String blockingRelationsConfirmationCount(int count) {
-    return 'To delete: $count';
-  }
-
-  @override
-  String blockingRelationsParticipantId(String id) {
-    return 'Identifier: $id';
-  }
-
-  @override
-  String get blockingRelationsDeleting => 'Deleting selected relations…';
-
-  @override
-  String get blockingRelationsBusy =>
-      'Another change to these relations or the intention is already running.';
-
-  @override
-  String get blockingRelationsDraining =>
-      'The app is closing. The change was not accepted.';
-
-  @override
-  String get blockingRelationsEditSelectionAction => 'Return to selection';
-
-  @override
-  String get blockingRelationsRefreshSelectionAction => 'Refresh selection';
-
-  @override
-  String get blockingRelationsRefreshingSelection =>
-      'Checking selected relations…';
-
-  @override
-  String blockingRelationsInvalidSelectedRelationId(String id) {
-    return 'Relation: $id';
-  }
-
-  @override
-  String get blockingRelationsInvalidMissing =>
-      'This relation no longer exists. Remove it from the selection and confirm the remaining set again.';
-
-  @override
-  String get blockingRelationsInvalidMoved =>
-      'This relation no longer belongs to this intention. Remove it from the selection and confirm the remaining set again.';
-
-  @override
-  String get blockingRelationsInvalidProtected =>
-      'This relation is used in a saved daily path. First delete the daily choice separately, then select and confirm deletion of the freed long-term relation again. The entire selected set remains unchanged.';
-
-  @override
-  String get blockingRelationsRefreshIntentionNotFound =>
-      'This intention no longer exists. Its relations cannot be deleted here.';
-
-  @override
-  String get blockingRelationsRefreshUnavailable =>
-      'Selected relations could not be checked. Your selection is unchanged; try checking again.';
-
-  @override
-  String get blockingRelationsRefreshCorruption =>
-      'Selected relations could not be checked because the data is damaged. Deletion was not started.';
-
-  @override
-  String get blockingRelationsRefreshUnexpected =>
-      'Selected relations could not be checked. Deletion was not started.';
-
-  @override
-  String get blockingRelationsDeleteMissing =>
-      'A selected relation no longer exists. Refresh the selection and confirm it again.';
-
-  @override
-  String get blockingRelationsDeleteMoved =>
-      'A selected relation no longer belongs to this intention. Refresh the selection and confirm it again.';
-
-  @override
-  String get blockingRelationsDeleteProhibited =>
-      'A selected relation is now used in a saved daily path. The entire set remains unchanged. First delete the daily choice separately, then select and confirm deletion of the freed long-term relation again.';
-
-  @override
   String get relationNeighborhoodSummaryLoading =>
       'Loading relations and summary…';
 
@@ -927,9 +825,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get detailsDeleteBlockedByRelations =>
       'The intention wasn’t deleted: its relations still block deletion. Archived relations and relations that aren’t loaded yet block it too.';
-
-  @override
-  String get detailsShowBlockingRelationsAction => 'Show blocking relations';
 
   @override
   String get detailsArchiveCascadeExplanation =>

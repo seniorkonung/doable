@@ -517,108 +517,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get relationNeighborhoodTitle => 'Связи';
 
   @override
-  String relationNeighborhoodSelectedCount(int count) {
-    return 'Выбрано связей: $count';
-  }
-
-  @override
-  String get relationNeighborhoodAddToSelection => 'Добавить в выбор';
-
-  @override
-  String get relationNeighborhoodRemoveFromSelection => 'Убрать из выбора';
-
-  @override
-  String get blockingRelationsReviewAction => 'Просмотреть выбранные связи';
-
-  @override
-  String get blockingRelationsConfirmationTitle =>
-      'Удалить выбранные связи навсегда?';
-
-  @override
-  String get blockingRelationsConfirmationWarning =>
-      'Проверьте каждую выбранную связь. Удаляются только выбранные связи. Вместе с выбранными дневными выборами удаляются все принадлежащие им шаги пути. Удаление нельзя отменить. Само намерение останется; для его удаления понадобится отдельное подтверждение.';
-
-  @override
-  String get blockingRelationsConfirmationPreservedTags =>
-      'Переиспользуемые теги и все их назначения намерениям сохранятся.';
-
-  @override
-  String blockingRelationsConfirmationCount(int count) {
-    return 'К удалению: $count';
-  }
-
-  @override
-  String blockingRelationsParticipantId(String id) {
-    return 'Идентификатор: $id';
-  }
-
-  @override
-  String get blockingRelationsDeleting => 'Удаляем выбранные связи…';
-
-  @override
-  String get blockingRelationsBusy =>
-      'Другое изменение этих связей или намерения уже выполняется.';
-
-  @override
-  String get blockingRelationsDraining =>
-      'Приложение завершает работу. Изменение не принято.';
-
-  @override
-  String get blockingRelationsEditSelectionAction => 'Вернуться к выбору';
-
-  @override
-  String get blockingRelationsRefreshSelectionAction => 'Актуализировать выбор';
-
-  @override
-  String get blockingRelationsRefreshingSelection =>
-      'Проверяем выбранные связи…';
-
-  @override
-  String blockingRelationsInvalidSelectedRelationId(String id) {
-    return 'Связь: $id';
-  }
-
-  @override
-  String get blockingRelationsInvalidMissing =>
-      'Связь больше не существует. Уберите её из выбора и подтвердите оставшийся набор заново.';
-
-  @override
-  String get blockingRelationsInvalidMoved =>
-      'Связь больше не принадлежит этому намерению. Уберите её из выбора и подтвердите оставшийся набор заново.';
-
-  @override
-  String get blockingRelationsInvalidProtected =>
-      'Связь используется в сохранённом дневном пути. Сначала отдельно удалите дневной выбор, затем заново выберите и подтвердите удаление освободившейся долговременной связи. Весь выбранный набор пока не удаляется.';
-
-  @override
-  String get blockingRelationsRefreshIntentionNotFound =>
-      'Намерение больше не существует. Удаление связей недоступно.';
-
-  @override
-  String get blockingRelationsRefreshUnavailable =>
-      'Не удалось проверить выбранные связи. Сохранённый выбор не изменён; повторите проверку.';
-
-  @override
-  String get blockingRelationsRefreshCorruption =>
-      'Не удалось проверить выбранные связи из-за повреждённых данных. Удаление не запущено.';
-
-  @override
-  String get blockingRelationsRefreshUnexpected =>
-      'Не удалось проверить выбранные связи. Удаление не запущено.';
-
-  @override
-  String get blockingRelationsDeleteMissing =>
-      'Одна выбранная связь больше не существует. Актуализируйте выбор и подтвердите его заново.';
-
-  @override
-  String get blockingRelationsDeleteMoved =>
-      'Одна выбранная связь больше не принадлежит этому намерению. Актуализируйте выбор и подтвердите его заново.';
-
-  @override
-  String get blockingRelationsDeleteProhibited =>
-      'Одна выбранная связь теперь используется в сохранённом дневном пути. Весь набор сохранён. Сначала отдельно удалите дневной выбор, затем заново выберите и подтвердите удаление освободившейся долговременной связи.';
-
-  @override
   String get relationNeighborhoodSummaryLoading => 'Загружаем связи и сводку…';
 
   @override
@@ -932,9 +830,6 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get detailsDeleteBlockedByRelations =>
       'Намерение не удалено: его связи блокируют удаление. Архивные и ещё не загруженные связи тоже блокируют.';
-
-  @override
-  String get detailsShowBlockingRelationsAction => 'Показать блокирующие связи';
 
   @override
   String get detailsArchiveCascadeExplanation =>

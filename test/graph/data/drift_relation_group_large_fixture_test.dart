@@ -1,8 +1,6 @@
 import 'package:doable/src/data/local/app_database.dart' hide Tags;
-import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
-import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/application/selected_relations.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
@@ -12,10 +10,7 @@ import 'package:doable/src/long_term_relation/application/long_term_relation_pro
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
-import 'package:doable/src/long_term_relation/presentation/neighborhood/blocking_relations_selection_state.dart';
-import 'package:doable/src/long_term_relation/presentation/neighborhood/blocking_relations_selection_view_model.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
@@ -234,111 +229,6 @@ void main() {
           isA<SelectedRelationsReadUnavailableFailure>(),
         ),
       );
-    },
-  );
-
-  test(
-    'массовый выбор читает только посещённые порции и выбранные связи',
-    () async {
-      final harness = await LocalDatabaseHarness.fileBacked();
-      addTearDown(harness.dispose);
-      final trace = _RelationReadTrace();
-      final database = await harness.openReadyDatabase(observer: trace);
-      final repository = _repository(database);
-      await _populateLargeFixture(database);
-      trace.clear();
-
-      final activeRows = <LongTermRelationSummary>[];
-      RelationGroupCursor? cursor;
-      do {
-        final page = _page(
-          await repository.getRelationGroupPage(
-            _query(RelationScope.active, cursor: cursor),
-          ),
-        );
-        activeRows.addAll(_longTermItems(page));
-        cursor = page.nextCursor;
-      } while (cursor != null);
-      expect(activeRows.map((row) => row.relation.id).toSet(), hasLength(250));
-
-      final archivedRows = <LongTermRelationSummary>[];
-      cursor = null;
-      for (var pageIndex = 0; pageIndex < 4; pageIndex++) {
-        final page = _page(
-          await repository.getRelationGroupPage(
-            _query(RelationScope.archived, cursor: cursor),
-          ),
-        );
-        archivedRows.addAll(_longTermItems(page));
-        cursor = page.nextCursor;
-        expect(cursor, isNotNull);
-      }
-      expect(
-        archivedRows.map((row) => row.relation.id).toSet(),
-        hasLength(200),
-      );
-      // Просмотр порций группы не читает остальные строки архива.
-      expect(trace.rowCounts, everyElement(lessThanOrEqualTo(_pageSize + 1)));
-
-      final container = ProviderContainer(
-        overrides: [
-          personalGraphRepositoryProvider.overrideWithValue(repository),
-        ],
-      );
-      addTearDown(container.dispose);
-      final provider = blockingRelationsSelectionViewModelProvider(_ownerId);
-      final subscription = container.listen(provider, (_, _) {});
-      addTearDown(subscription.close);
-      final selection = container.read(provider.notifier);
-      final chosenRows = [...activeRows.take(201), ...archivedRows];
-      for (final row in chosenRows) {
-        expect(selection.select(row), isTrue);
-      }
-      final chosenIds = chosenRows.map((row) => row.relation.id).toSet();
-      expect(chosenIds, hasLength(401));
-      expect(container.read(provider).selected.keys.toSet(), chosenIds);
-      expect(container.read(provider).selected.length, greaterThan(_pageSize));
-
-      trace.clear();
-      expect(await selection.refreshSelection(), isTrue);
-      expect(selection.prepare(), isTrue);
-      final prepared =
-          container.read(provider) as BlockingRelationsSelectionPrepared;
-      expect(
-        prepared.snapshot.rows.map((row) => row.relation.id).toSet(),
-        chosenIds,
-      );
-      expect(prepared.snapshot.command.relationIds, chosenIds);
-      // Обновление выбора читает только выбранные связи, а не всю группу.
-      expect(
-        trace.rowCounts,
-        everyElement(lessThanOrEqualTo(chosenIds.length)),
-      );
-
-      trace.clear();
-      final result = await repository.execute(prepared.snapshot.command);
-      expect(result, isA<GraphCommandSucceeded>());
-      final deleted =
-          (result as GraphCommandSucceeded).value.value
-              as BlockingRelationsDeleted;
-      expect(
-        deleted.deletedRelations.map((relation) => relation.id).toSet(),
-        chosenIds,
-      );
-
-      trace.clear();
-      final activeAfter = _page(
-        await repository.getRelationGroupPage(_query(RelationScope.active)),
-      ) as RelationGroupFirstPage;
-      expect(activeAfter.counts.activeNeedOutgoing, 49);
-      expect(activeAfter.counts.archivedNeedOutgoing, 4800);
-      expect(activeAfter.items, hasLength(49));
-      expect(activeAfter.nextCursor, isNull);
-      expect(
-        activeAfter.items.map((row) => row.relation.id).toSet(),
-        activeRows.skip(201).map((row) => row.relation.id).toSet(),
-      );
-      expect(trace.rowCounts, everyElement(lessThanOrEqualTo(_pageSize + 1)));
     },
   );
 }
