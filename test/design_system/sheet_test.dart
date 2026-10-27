@@ -1329,6 +1329,65 @@ void main() {
     semantics.dispose();
   });
 
+  testWidgets('длинные заголовок и действие шапки при крупном тексте '
+      'переносятся без вытеснения тела и наложения на пояснение', (
+    tester,
+  ) async {
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    const title = 'Показать и упорядочить';
+    const hint = 'Список меняется по мере выбора';
+    await _openSheet(
+      tester,
+      (context) => showDoableSheet<void>(
+        context: context,
+        builder: (_, sheet) => Sheet(
+          sheet,
+          title: title,
+          text: hint,
+          action: (
+            label: 'Сбросить',
+            semanticLabel: _resetLabel,
+            onPressed: () {},
+          ),
+          child: const Text('Параметры поиска'),
+        ),
+      ),
+    );
+    tester.view.physicalSize = const Size(320, 844);
+    await tester.pumpAndSettle();
+
+    final bounds = tester.getRect(find.byType(Sheet));
+    final heading = tester.getRect(find.text(title));
+    final reset = tester.getRect(find.text('Сбросить'));
+    final note = tester.getRect(find.text(hint));
+    expect(heading.center.dx, 160);
+    expect(heading.right, lessThan(reset.left));
+    expect(heading.bottom, lessThan(note.top));
+    expect(reset.bottom, lessThan(note.top));
+    expect(
+      note.bottom,
+      lessThan(tester.getRect(find.text('Параметры поиска')).top),
+    );
+    for (final label in [title, 'Сбросить', hint, 'Параметры поиска']) {
+      final finder = find.text(label);
+      final rect = tester.getRect(finder);
+      expect(bounds.contains(rect.topLeft), isTrue);
+      expect(bounds.contains(rect.bottomRight), isTrue);
+      final paragraph = tester.renderObject<RenderParagraph>(
+        find.descendant(of: finder, matching: find.byType(RichText)),
+      );
+      expect(paragraph.didExceedMaxLines, isFalse);
+      final painter = TextPainter(
+        text: paragraph.text,
+        textDirection: paragraph.textDirection,
+        textScaler: paragraph.textScaler,
+      )..layout(maxWidth: paragraph.size.width);
+      expect(rect.height, closeTo(painter.height, 0.01));
+      painter.dispose();
+    }
+  });
+
   testWidgets('без действия лист по содержимому сохраняет положение '
       'заголовка, тела и нижней кнопки', (tester) async {
     await _openContentSheet(tester);

@@ -93,13 +93,31 @@ void main() {
             await tester.pump(const Duration(milliseconds: 300));
             expect(find.text(sheetTitle), findsOneWidget);
             expect(tester.widget<CatalogHeader>(header).expanded, isTrue);
+            final typeRow = tester.getSemantics(
+              find.descendant(
+                of: find.byType(Sheet),
+                matching: find.bySemanticsLabel(ru ? 'Тип' : 'Type'),
+              ),
+            );
+            expect(
+              typeRow.value,
+              purpose is SelectDailyChoiceAction
+                  ? (ru ? 'Только действия' : 'Actions only')
+                  : (ru ? 'Всё' : 'All'),
+            );
             if (sortByName) {
               await tester.tap(
                 find.descendant(
                   of: find.byType(Sheet),
-                  matching: find.text(ru ? 'Название' : 'Name'),
+                  matching: find.text(ru ? 'Сортировка' : 'Sort by'),
                 ),
               );
+              await tester.pump();
+              await tester.pump(const Duration(milliseconds: 300));
+              await tester.tap(
+                find.widgetWithText(MenuItemButton, ru ? 'Название' : 'Name'),
+              );
+              await tester.pump();
               await tester.pump();
             }
             Navigator.of(tester.element(find.byType(Sheet))).pop();

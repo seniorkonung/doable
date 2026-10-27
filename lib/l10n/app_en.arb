@@ -1910,18 +1910,22 @@
   "@intentionPickerPurposeSheetBack": {"description": "Кнопка, которая закрывает лист назначения и возвращает к выдаче поиска"},
   "intentionPickerTypeCaption": "Type",
   "@intentionPickerTypeCaption": {"description": "Название группы типа намерения"},
+  "intentionPickerTypeAll": "All",
+  "@intentionPickerTypeAll": {"description": "Вариант без ограничения по типу в строке и меню листа параметров поиска"},
+  "intentionPickerTypeIntentionsOnly": "Intentions only",
+  "@intentionPickerTypeIntentionsOnly": {"description": "Вариант намерений без готовности к действию в строке и меню листа параметров поиска"},
+  "intentionPickerTypeActionsOnly": "Actions only",
+  "@intentionPickerTypeActionsOnly": {"description": "Вариант действий в строке и меню листа параметров поиска"},
   "intentionPickerActionTypeNote": "Only an action can be the final intention of a daily choice",
   "@intentionPickerActionTypeNote": {"description": "Причина закреплённого типа в поиске действия"},
   "intentionPickerSortCaption": "Sort by",
   "@intentionPickerSortCaption": {"description": "Название группы поля сортировки"},
-  "intentionPickerSortCreated": "Created",
+  "intentionPickerSortCreated": "Date created",
   "@intentionPickerSortCreated": {"description": "Сортировка по времени создания"},
-  "intentionPickerSortChanged": "Changed",
+  "intentionPickerSortChanged": "Date changed",
   "@intentionPickerSortChanged": {"description": "Сортировка по времени изменения"},
   "intentionPickerSortName": "Name",
   "@intentionPickerSortName": {"description": "Сортировка по названию"},
-  "intentionPickerOrderCaption": "Order",
-  "@intentionPickerOrderCaption": {"description": "Название группы направления сортировки"},
   "intentionPickerOrderNewest": "Newest first",
   "@intentionPickerOrderNewest": {"description": "Убывающий порядок по времени"},
   "intentionPickerOrderOldest": "Oldest first",
@@ -1930,6 +1934,14 @@
   "@intentionPickerOrderAToZ": {"description": "Прямой порядок по названию"},
   "intentionPickerOrderZToA": "Z to A",
   "@intentionPickerOrderZToA": {"description": "Обратный порядок по названию"},
+  "intentionPickerOrderButtonSemantics": "Current order: {currentOrder}. Switch to: {nextOrder}",
+  "@intentionPickerOrderButtonSemantics": {
+    "description": "Доступное название кнопки направления сортировки в листе параметров поиска: текущий порядок и результат нажатия",
+    "placeholders": {
+      "currentOrder": {"type": "String", "description": "Локализованное название текущего порядка"},
+      "nextOrder": {"type": "String", "description": "Локализованное название порядка после нажатия"}
+    }
+  },
   "intentionPickerAllHeader": "All",
   "@intentionPickerAllHeader": {
     "description": "Показываемый тип без ограничения в заголовке списка поиска для выбора"

@@ -3730,6 +3730,24 @@ abstract class AppLocalizations {
   /// **'Type'**
   String get intentionPickerTypeCaption;
 
+  /// Вариант без ограничения по типу в строке и меню листа параметров поиска
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get intentionPickerTypeAll;
+
+  /// Вариант намерений без готовности к действию в строке и меню листа параметров поиска
+  ///
+  /// In en, this message translates to:
+  /// **'Intentions only'**
+  String get intentionPickerTypeIntentionsOnly;
+
+  /// Вариант действий в строке и меню листа параметров поиска
+  ///
+  /// In en, this message translates to:
+  /// **'Actions only'**
+  String get intentionPickerTypeActionsOnly;
+
   /// Причина закреплённого типа в поиске действия
   ///
   /// In en, this message translates to:
@@ -3745,13 +3763,13 @@ abstract class AppLocalizations {
   /// Сортировка по времени создания
   ///
   /// In en, this message translates to:
-  /// **'Created'**
+  /// **'Date created'**
   String get intentionPickerSortCreated;
 
   /// Сортировка по времени изменения
   ///
   /// In en, this message translates to:
-  /// **'Changed'**
+  /// **'Date changed'**
   String get intentionPickerSortChanged;
 
   /// Сортировка по названию
@@ -3759,12 +3777,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Name'**
   String get intentionPickerSortName;
-
-  /// Название группы направления сортировки
-  ///
-  /// In en, this message translates to:
-  /// **'Order'**
-  String get intentionPickerOrderCaption;
 
   /// Убывающий порядок по времени
   ///
@@ -3789,6 +3801,15 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Z to A'**
   String get intentionPickerOrderZToA;
+
+  /// Доступное название кнопки направления сортировки в листе параметров поиска: текущий порядок и результат нажатия
+  ///
+  /// In en, this message translates to:
+  /// **'Current order: {currentOrder}. Switch to: {nextOrder}'**
+  String intentionPickerOrderButtonSemantics(
+    String currentOrder,
+    String nextOrder,
+  );
 
   /// Показываемый тип без ограничения в заголовке списка поиска для выбора
   ///

@@ -54,7 +54,9 @@ void main() {
           rootBundle.load('lib/src/design_system/fonts/InterVariable.ttf'),
         ))
         .load();
-    await tester.binding.setSurfaceSize(const Size(560, 1280));
+    await tester.binding.setSurfaceSize(
+      Size(560, DoableIconData.values.length * _rowHeight),
+    );
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
     await tester.pumpWidget(
@@ -90,6 +92,8 @@ void main() {
     );
   });
 }
+
+const _rowHeight = 32.0;
 
 Widget _sampleRow(DoableIconData icon, DoableColors colors) {
   final (size, color, background) = switch (icon) {
@@ -129,14 +133,15 @@ Widget _sampleRow(DoableIconData icon, DoableColors colors) {
     DoableIconData.bolt => (14.0, colors.ink, colors.bg),
     DoableIconData.arrowUpRight => (20.0, colors.muted, colors.fill),
     DoableIconData.archive => (14.0, colors.muted, colors.bg),
-    DoableIconData.sliders ||
-    DoableIconData.arrowDown ||
-    DoableIconData.arrowUp => (16.0, colors.muted, colors.fill),
+    DoableIconData.sliders => (16.0, colors.muted, colors.fill),
     DoableIconData.chevronDown => (12.0, colors.muted, colors.bg),
+    DoableIconData.selector => (16.0, colors.muted, colors.raised),
+    DoableIconData.sortAsc ||
+    DoableIconData.sortDesc => (20.0, colors.ink, colors.fill),
   };
 
   return SizedBox(
-    height: 32,
+    height: _rowHeight,
     child: Row(
       children: [
         const SizedBox(width: 8),

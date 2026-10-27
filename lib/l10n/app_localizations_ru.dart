@@ -2406,6 +2406,15 @@ class AppLocalizationsRu extends AppLocalizations {
   String get intentionPickerTypeCaption => 'Тип';
 
   @override
+  String get intentionPickerTypeAll => 'Всё';
+
+  @override
+  String get intentionPickerTypeIntentionsOnly => 'Только намерения';
+
+  @override
+  String get intentionPickerTypeActionsOnly => 'Только действия';
+
+  @override
   String get intentionPickerActionTypeNote =>
       'Конечным в дневном выборе может быть только действие';
 
@@ -2413,16 +2422,13 @@ class AppLocalizationsRu extends AppLocalizations {
   String get intentionPickerSortCaption => 'Сортировка';
 
   @override
-  String get intentionPickerSortCreated => 'Создание';
+  String get intentionPickerSortCreated => 'Дата создания';
 
   @override
-  String get intentionPickerSortChanged => 'Изменение';
+  String get intentionPickerSortChanged => 'Дата изменения';
 
   @override
   String get intentionPickerSortName => 'Название';
-
-  @override
-  String get intentionPickerOrderCaption => 'Порядок';
 
   @override
   String get intentionPickerOrderNewest => 'Сначала новые';
@@ -2435,6 +2441,14 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get intentionPickerOrderZToA => 'От Я до А';
+
+  @override
+  String intentionPickerOrderButtonSemantics(
+    String currentOrder,
+    String nextOrder,
+  ) {
+    return 'Текущий порядок: $currentOrder. Переключить на: $nextOrder';
+  }
 
   @override
   String get intentionPickerAllHeader => 'Все';
