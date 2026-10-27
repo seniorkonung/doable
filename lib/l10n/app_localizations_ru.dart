@@ -686,6 +686,12 @@ class AppLocalizationsRu extends AppLocalizations {
   String get detailsTitle => 'Подробности намерения';
 
   @override
+  String get detailsTypeIntention => 'Намерение';
+
+  @override
+  String get detailsTypeAction => 'Действие';
+
+  @override
   String get detailsLoading => 'Загрузка намерения…';
 
   @override

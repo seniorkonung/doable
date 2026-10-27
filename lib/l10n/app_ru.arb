@@ -180,6 +180,8 @@
   "relationNeighborhoodNeedPhrase": "Чтобы {source}, нужно {related}",
   "relationNeighborhoodCanPhrase": "Чтобы {source}, можно {related}",
   "detailsTitle": "Подробности намерения",
+  "detailsTypeIntention": "Намерение",
+  "detailsTypeAction": "Действие",
   "detailsLoading": "Загрузка намерения…",
   "detailsNotFound": "Намерение не найдено.",
   "detailsUnavailable": "Не удалось загрузить намерение. Повторите попытку.",

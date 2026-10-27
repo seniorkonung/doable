@@ -45,6 +45,7 @@ import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_state.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_view_model.dart';
 import 'package:flutter/foundation.dart';
+import 'package:doable/src/design_system/components/page_head.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -968,8 +969,8 @@ Future<void> _expectCreatedPage(
   expect(assignments.freshness, TagAssignmentsFreshness.current);
   expect(
     tester
-        .widget<Text>(find.byKey(const ValueKey('intention-details-title')))
-        .data,
+        .widget<PageHead>(find.byKey(const ValueKey('intention-details-title')))
+        .name,
     title,
   );
   expect(
@@ -1040,7 +1041,11 @@ Future<void> _closeCreatedPage(
       tester,
       find.descendant(
         of: find.byType(IntentionDetailsPage),
-        matching: find.byType(BackButton),
+        matching: find.bySemanticsLabel(
+          MaterialLocalizations.of(
+            tester.element(find.byType(IntentionDetailsPage)),
+          ).backButtonTooltip,
+        ),
       ),
     );
   }

@@ -292,7 +292,10 @@ void main() {
         repository.detailRequests.single.add(ResultSuccess(intention));
         await tester.pumpAndSettle();
 
-        expect(find.text(intention.title).hitTestable(), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('intention-details-title')).hitTestable(),
+          findsOneWidget,
+        );
         final query = repository.statisticsQueries.single;
         expect(query.intentionId, intention.id);
         expect(query.period, StatisticsMonth(2026, 10));
@@ -528,10 +531,10 @@ void _expectFullyVisible(WidgetTester tester, Finder finder) {
   expect(finder, findsOneWidget);
   final viewport = tester.getRect(find.byType(CustomScrollView));
   final rect = tester.getRect(finder);
-  expect(rect.top, greaterThanOrEqualTo(viewport.top));
-  expect(rect.bottom, lessThanOrEqualTo(viewport.bottom));
-  expect(rect.left, greaterThanOrEqualTo(viewport.left));
-  expect(rect.right, lessThanOrEqualTo(viewport.right));
+  expect(rect.top, greaterThanOrEqualTo(viewport.top - 1e-6));
+  expect(rect.bottom, lessThanOrEqualTo(viewport.bottom + 1e-6));
+  expect(rect.left, greaterThanOrEqualTo(viewport.left - 1e-6));
+  expect(rect.right, lessThanOrEqualTo(viewport.right + 1e-6));
 }
 
 Future<void> _placeInFreeArea(

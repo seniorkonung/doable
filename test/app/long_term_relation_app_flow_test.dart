@@ -6,6 +6,7 @@ import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/design_system/components/page_head.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart'
     as catalog_page;
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
@@ -463,7 +464,7 @@ Future<void> _pumpUntilDetailsTitle(
   for (var attempt = 0; attempt < 1000; attempt += 1) {
     final hasExpectedTitle = titleFinder.evaluate().any((element) {
       final widget = element.widget;
-      return widget is Text && widget.data == title;
+      return widget is PageHead && widget.name == title;
     });
     if (hasExpectedTitle) {
       if (settle) {
@@ -546,7 +547,7 @@ Future<void> _createNeedRelation(
   );
   expect(find.text(description), findsOneWidget);
   // Созданная связь заменяет форму; возврат ведёт к исходному намерению.
-  await tester.pageBack();
+  await tester.tap(find.bySemanticsLabel('Back'));
   await _pumpUntilFound(
     tester,
     find.byKey(const ValueKey('relation-neighborhood-summary')),
@@ -713,7 +714,7 @@ Future<void> _returnToCatalog(WidgetTester tester) async {
     if (catalog.evaluate().isNotEmpty) {
       return;
     }
-    await tester.pageBack();
+    await tester.tap(find.bySemanticsLabel('Back'));
     await tester.pumpAndSettle(const Duration(milliseconds: 1));
   }
   fail('App-level поток не вернулся в каталог после удаления намерения.');

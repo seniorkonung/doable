@@ -14,6 +14,7 @@ import 'package:doable/src/intention/presentation/details/intention_details_page
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_paging_policy.dart';
+import 'package:doable/src/design_system/components/page_head.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -70,7 +71,10 @@ void main() {
         await tester.pump();
 
         expect(repository.commands.single, isA<DeleteIntention>());
-        expect(find.text(intention.title, skipOffstage: false), findsOneWidget);
+        expect(
+          find.widgetWithText(PageHead, intention.title, skipOffstage: false),
+          findsOneWidget,
+        );
         expect(find.text('Saving changes…'), findsOneWidget);
 
         repository.completeCommand(
@@ -140,7 +144,10 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.text(message), findsOneWidget);
-        expect(find.text(intention.title, skipOffstage: false), findsOneWidget);
+        expect(
+          find.widgetWithText(PageHead, intention.title, skipOffstage: false),
+          findsOneWidget,
+        );
         final retry = find.byKey(
           const ValueKey('intention-details-state-change-retry'),
         );
@@ -219,7 +226,7 @@ void main() {
       );
       await tester.pump();
 
-      await tester.tap(find.byTooltip('Back'));
+      await tester.tap(find.bySemanticsLabel('Back'));
       await tester.pumpAndSettle();
       repository.catalogResult = ResultSuccess(
         IntentionCatalogFirstPage(
@@ -300,7 +307,10 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.text(intention.title, skipOffstage: false), findsOneWidget);
+    expect(
+      find.widgetWithText(PageHead, intention.title, skipOffstage: false),
+      findsOneWidget,
+    );
     expect(
       find.byKey(const ValueKey('intention-details-state-change-retry')),
       findsNothing,
@@ -407,7 +417,10 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.text(intention.title, skipOffstage: false), findsOneWidget);
+      expect(
+        find.widgetWithText(PageHead, intention.title, skipOffstage: false),
+        findsOneWidget,
+      );
     },
   );
 }

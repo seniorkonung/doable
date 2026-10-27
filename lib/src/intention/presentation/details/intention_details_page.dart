@@ -10,6 +10,10 @@ import '../../../app/routing/app_router.gr.dart';
 import '../../../daily_choice/application/choice_path_draft.dart';
 import '../../../daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import '../../../daily_choice/presentation/catalog/daily_choice_local_day_observer.dart';
+import '../../../design_system/components/page_head.dart';
+import '../../../design_system/components/top_bar.dart';
+import '../../../design_system/doable_icon.dart';
+import '../../../design_system/doable_metrics.dart';
 import '../../../graph/presentation/operation_failure_presentation.dart';
 import '../../application/intention_result.dart';
 import '../../domain/intention.dart';
@@ -50,6 +54,11 @@ final class IntentionDetailsPage extends ConsumerStatefulWidget {
 final class _IntentionDetailsPageState
     extends ConsumerState<IntentionDetailsPage> {
   final _statisticsKey = GlobalKey();
+  final _headKey = GlobalKey();
+  final _scrollController = ScrollController();
+  final _headHidden = ValueNotifier(false);
+  double? _headExtent;
+  var _headMeasurementScheduled = false;
   var _statisticsPageKey = Object();
   late final DailyChoiceLocalDayObserver _localDay;
   var _visible = false;
@@ -65,6 +74,7 @@ final class _IntentionDetailsPageState
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_syncHeadHidden);
     _localDay = DailyChoiceLocalDayObserver(
       readLocalDay: ref.read(dailyChoiceLocalDateSourceProvider),
       onTodayChanged: () =>
@@ -93,7 +103,50 @@ final class _IntentionDetailsPageState
   @override
   void dispose() {
     _localDay.dispose();
+    _scrollController.dispose();
+    _headHidden.dispose();
     super.dispose();
+  }
+
+  void _syncHeadHidden() {
+    final extent = _headExtent;
+    _headHidden.value =
+        extent != null &&
+        _scrollController.hasClients &&
+        _scrollController.offset >= extent;
+  }
+
+  void _scheduleHeadMeasurement() {
+    if (_headMeasurementScheduled) return;
+    _headMeasurementScheduled = true;
+    // Первую высоту и изменения размера читаем после завершения раскладки:
+    // https://api.flutter.dev/flutter/widgets/SizeChangedLayoutNotifier-class.html
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _headMeasurementScheduled = false;
+      if (!mounted) return;
+      _headExtent = _headKey.currentContext?.size?.height;
+      _syncHeadHidden();
+    });
+  }
+
+  Widget _buildHead(String name) {
+    _scheduleHeadMeasurement();
+    return NotificationListener<SizeChangedLayoutNotification>(
+      onNotification: (_) {
+        _scheduleHeadMeasurement();
+        return false;
+      },
+      child: SizeChangedLayoutNotifier(
+        key: _headKey,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: DoableMetrics.space5),
+          child: PageHead(
+            key: const ValueKey('intention-details-title'),
+            name: name,
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -102,6 +155,8 @@ final class _IntentionDetailsPageState
     if (oldWidget.intentionId != widget.intentionId) {
       _statisticsPageKey = Object();
       _statisticsOpeningScheduled = false;
+      _headExtent = null;
+      _headHidden.value = false;
       _syncStatisticsVisibility();
     }
   }
@@ -161,7 +216,46 @@ final class _IntentionDetailsPageState
     // подробных данных намерения.
     ref.watch(relationNeighborhoodViewModelProvider(intentionId));
     return OrdinaryPageScaffold(
-      appBar: AppBar(title: Text(localizations.detailsTitle)),
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(DoableMetrics.tapMin),
+        // Флаг прокрутки перестраивает только панель, сохраняя тело страницы:
+        // https://api.flutter.dev/flutter/widgets/ValueListenableBuilder-class.html
+        child: ValueListenableBuilder(
+          valueListenable: _headHidden,
+          builder: (context, headHidden, _) {
+            final backLabel = MaterialLocalizations.of(context)
+                .backButtonTooltip;
+            void onBack() => context.router.pop();
+            if (details is! IntentionDetailsLoaded) {
+              return TopBar.withoutTitle(
+                routeName: localizations.detailsTitle,
+                backLabel: backLabel,
+                onBack: onBack,
+              );
+            }
+            final intention = details.intention;
+            final (type, typeIcon) = switch (intention.readiness) {
+              IntentionReadiness.ready => (
+                localizations.detailsTypeAction,
+                DoableIconData.bolt,
+              ),
+              IntentionReadiness.notReady => (
+                localizations.detailsTypeIntention,
+                DoableIconData.intention,
+              ),
+            };
+            return TopBar.back(
+              title: headHidden ? intention.title : type,
+              titleIcon: headHidden ? null : typeIcon,
+              muted:
+                  headHidden &&
+                  intention.archiveState == IntentionArchiveState.archived,
+              backLabel: backLabel,
+              onBack: onBack,
+            );
+          },
+        ),
+      ),
       body: SafeArea(
         child: Column(
           children: [
@@ -170,6 +264,8 @@ final class _IntentionDetailsPageState
               child: _DetailsContent(
                 intentionId: intentionId,
                 state: details,
+                scrollController: _scrollController,
+                buildHead: _buildHead,
                 statisticsSection: IntentionStatisticsSectionSliver(
                   key: _statisticsKey,
                   provider: _statisticsProvider,
@@ -214,12 +310,16 @@ final class _DetailsContent extends ConsumerWidget {
   const _DetailsContent({
     required this.intentionId,
     required this.state,
+    required this.scrollController,
+    required this.buildHead,
     required this.statisticsSection,
     required this.onDelete,
   });
 
   final IntentionId intentionId;
   final IntentionDetailsState state;
+  final ScrollController scrollController;
+  final Widget Function(String name) buildHead;
   final Widget statisticsSection;
   final VoidCallback onDelete;
 
@@ -233,6 +333,8 @@ final class _DetailsContent extends ConsumerWidget {
       ),
       final IntentionDetailsLoaded loaded => _LoadedDetails(
         state: loaded,
+        scrollController: scrollController,
+        pageHead: buildHead(loaded.intention.title),
         statisticsSection: statisticsSection,
         onBeginEditing: ref
             .read(intentionDetailsViewModelProvider(intentionId).notifier)
@@ -303,6 +405,8 @@ final class _DetailsContent extends ConsumerWidget {
 final class _LoadedDetails extends StatelessWidget {
   const _LoadedDetails({
     required this.state,
+    required this.scrollController,
+    required this.pageHead,
     required this.statisticsSection,
     required this.onBeginEditing,
     required this.onCancelEditing,
@@ -319,6 +423,8 @@ final class _LoadedDetails extends StatelessWidget {
   });
 
   final IntentionDetailsLoaded state;
+  final ScrollController scrollController;
+  final Widget pageHead;
   final Widget statisticsSection;
   final VoidCallback onBeginEditing;
   final VoidCallback onCancelEditing;
@@ -346,22 +452,15 @@ final class _LoadedDetails extends StatelessWidget {
       IntentionArchiveState.archived => localizations.detailsArchived,
     };
     return CustomScrollView(
+      controller: scrollController,
       slivers: [
+        SliverToBoxAdapter(child: pageHead),
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
           sliver: SliverToBoxAdapter(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Semantics(
-                  header: true,
-                  child: Text(
-                    intention.title,
-                    key: const ValueKey('intention-details-title'),
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                ),
-                const SizedBox(height: 24),
                 _DetailsField(
                   label: localizations.detailsDescriptionLabel,
                   value:

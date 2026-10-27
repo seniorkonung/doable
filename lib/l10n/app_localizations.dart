@@ -1076,11 +1076,23 @@ abstract class AppLocalizations {
   /// **'To {source}, you can {related}'**
   String relationNeighborhoodCanPhrase(String source, String related);
 
-  /// Заголовок подробного просмотра намерения
+  /// Доступное имя страницы намерения при загрузке и отказе чтения
   ///
   /// In en, this message translates to:
   /// **'Intention details'**
   String get detailsTitle;
+
+  /// Тип неготового намерения в верхней панели его страницы
+  ///
+  /// In en, this message translates to:
+  /// **'Intention'**
+  String get detailsTypeIntention;
+
+  /// Тип готового к действию намерения в верхней панели его страницы
+  ///
+  /// In en, this message translates to:
+  /// **'Action'**
+  String get detailsTypeAction;
 
   /// Начальная загрузка подробных данных намерения
   ///

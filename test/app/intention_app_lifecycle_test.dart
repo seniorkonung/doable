@@ -32,6 +32,7 @@ import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/design_system/components/page_head.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -173,8 +174,10 @@ void main() {
       await _scrollCurrentPageToTop(tester);
       expect(
         tester
-            .widget<Text>(find.byKey(const ValueKey('intention-details-title')))
-            .data,
+            .widget<PageHead>(
+              find.byKey(const ValueKey('intention-details-title')),
+            )
+            .name,
         created.title,
       );
       expect(find.text(updated.title), findsNothing);
@@ -235,7 +238,7 @@ void main() {
       expect(find.text('Archived'), findsOneWidget);
       await _closeOperationMessage(tester);
 
-      await tester.pageBack();
+      await tester.tap(find.bySemanticsLabel('Back'));
       await tester.pumpAndSettle();
       expect(find.text('No active intentions yet.'), findsOneWidget);
       await _selectScope(tester, 'Archived');
@@ -277,7 +280,7 @@ void main() {
       expect(find.text('Active'), findsOneWidget);
       await _closeOperationMessage(tester);
 
-      await tester.pageBack();
+      await tester.tap(find.bySemanticsLabel('Back'));
       await tester.pumpAndSettle();
       expect(find.text('No archived intentions yet.'), findsOneWidget);
       await _selectScope(tester, 'Active');
@@ -309,7 +312,7 @@ void main() {
       await tester.pump();
       expect(repository.commands.last, isA<DeleteIntention>());
 
-      await tester.pageBack();
+      await tester.tap(find.bySemanticsLabel('Back'));
       await tester.pumpAndSettle();
       expect(find.byType(catalog_page.IntentionCatalogPage), findsOneWidget);
       repository.completeCommand(5, _deleted(restored, revision: 6));

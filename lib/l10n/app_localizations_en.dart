@@ -683,6 +683,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get detailsTitle => 'Intention details';
 
   @override
+  String get detailsTypeIntention => 'Intention';
+
+  @override
+  String get detailsTypeAction => 'Action';
+
+  @override
   String get detailsLoading => 'Loading intention…';
 
   @override

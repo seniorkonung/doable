@@ -44,6 +44,7 @@ import 'package:doable/src/long_term_relation/presentation/editor/relation_edito
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_state.dart';
 import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_choice.dart';
 import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart';
+import 'package:doable/src/design_system/components/page_head.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -224,8 +225,10 @@ void main() {
       );
       expect(
         tester
-            .widget<Text>(find.byKey(const ValueKey('intention-details-title')))
-            .data,
+            .widget<PageHead>(
+              find.byKey(const ValueKey('intention-details-title')),
+            )
+            .name,
         'Читать',
       );
       expect(find.text('Несохранённое название'), findsNothing);

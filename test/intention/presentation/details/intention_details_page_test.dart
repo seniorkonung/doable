@@ -26,6 +26,7 @@ import 'package:doable/src/intention/presentation/details/intention_details_page
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:doable/src/design_system/components/page_head.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -849,7 +850,7 @@ void main() {
             ),
       );
       expect(
-        find.text('Прежнее название', skipOffstage: false),
+        find.widgetWithText(PageHead, 'Прежнее название', skipOffstage: false),
         findsOneWidget,
       );
       expect(find.text('Saving changes…'), findsNWidgets(2));
@@ -1120,7 +1121,10 @@ void main() {
     await _tapEditSubmit(tester);
     await tester.pump();
 
-    expect(find.text('До изменения', skipOffstage: false), findsOneWidget);
+    expect(
+      find.widgetWithText(PageHead, 'До изменения', skipOffstage: false),
+      findsOneWidget,
+    );
     expect(find.text('После изменения'), findsOneWidget);
     repository.completeCommand(
       0,
@@ -1207,7 +1211,7 @@ void main() {
       await tester.pump();
       expect(find.text('Saving changes…'), findsNWidgets(2));
 
-      await tester.tap(find.byTooltip('Back'));
+      await tester.tap(find.bySemanticsLabel('Back'));
       await tester.pumpAndSettle();
       expectIntentionGraphRootPage(router);
 
@@ -1551,7 +1555,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text(inlineFailure), findsOneWidget);
 
-      await tester.tap(find.byTooltip('Back'));
+      await tester.tap(find.bySemanticsLabel('Back'));
       await tester.pumpAndSettle();
       expectIntentionGraphRootPage(router);
       expect(find.textContaining(inlineFailure), findsNothing);
