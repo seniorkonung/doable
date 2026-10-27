@@ -30,7 +30,7 @@
     - проверки: удаляется `test/graph/application/graph_command_coordinator_blocking_relations_test.dart`; меняются `test/graph/application/graph_command_coordinator_tag_test.dart`, `test/graph/presentation/graph_operation_presenter_test.dart`, `test/graph/presentation/graph_reconciliation_checkpoint_test.dart`, `test/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model_test.dart`.
   - **Размер:** M.
 
-- [ ] 1.3 Убрать из хранилища графа команду массового удаления блокирующих связей вместе с её исполнением и диагностическим событием
+- [x] 1.3 Убрать из хранилища графа команду массового удаления блокирующих связей вместе с её исполнением и диагностическим событием
   - **Критерии приёмки:**
     - В приложении нет `DeleteBlockingRelations` с её исходом и отказами. Нет и её исполнения в `DriftPersonalGraphRepository`, а также события `BlockingRelationsDeleteDiagnosticsEvent` и его вывода в разработческий приёмник.
     - Если в проверке хранилища массовая команда была лишь способом удалить связь или дневной выбор, проверка использует одиночные команды удаления и сохраняет свои ожидания. Случаи, достижимые только массовой командой, удалены вместе с проверками самой команды по решению 13 дизайна. Это удаление связи и дневного выбора одной транзакцией и конфликт выбранного набора.

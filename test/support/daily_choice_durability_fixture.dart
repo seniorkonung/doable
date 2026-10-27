@@ -10,8 +10,6 @@ import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/data/local/app_database.dart';
-import 'package:doable/src/graph/application/blocking_relation_reference.dart';
-import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
@@ -152,15 +150,6 @@ CreateDailyChoice durabilityCreate({
   schedule: schedule,
   priority: priority,
 );
-
-DeleteBlockingRelations durabilityMixedDelete(int choiceNumber) =>
-    DeleteBlockingRelations(
-      intentionId: durabilityIntention(1),
-      references: [
-        DailyChoiceBlockingRelationReference(durabilityChoice(choiceNumber)),
-        LongTermBlockingRelationReference(durabilityRelation(104)),
-      ],
-    );
 
 Future<List<Map<String, Object?>>> durabilityRows(
   AppDatabase database,

@@ -10,7 +10,6 @@ import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
-import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -132,14 +131,11 @@ final class ControlledDetailsRepository
   final catalogQueries = <IntentionCatalogQuery>[];
   final commands = <IntentionCommand>[];
   final relationCommands = <LongTermRelationCommand>[];
-  final blockingRelationsCommands = <DeleteBlockingRelations>[];
   final dailyChoiceCommands = <DailyChoiceCommand>[];
   final tagCommands = <TagCommand>[];
   final _commandRequests =
       <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
   final _relationCommandRequests = <Completer<LongTermRelationCommandResult>>[];
-  final _blockingRelationsCommandRequests =
-      <Completer<DeleteBlockingRelationsResult>>[];
   final _dailyChoiceCommandRequests = <Completer<DailyChoiceCommandResult>>[];
   final _tagCommandRequests = <Completer<TagCommandResult>>[];
   var _watchCallCount = 0;
@@ -270,8 +266,6 @@ final class ControlledDetailsRepository
       final LongTermRelationCommand relation => await _executeRelation(
         relation,
       ),
-      final DeleteBlockingRelations deletion =>
-        await _executeBlockingRelationsDelete(deletion),
       final DailyChoiceCommand choice => await _executeDailyChoice(choice),
       final TagCommand tag => await _executeTag(tag),
       _ => throw UnsupportedError('Неизвестная команда графа в тесте.'),
@@ -312,20 +306,6 @@ final class ControlledDetailsRepository
 
   void failTagCommand(int index, Object error) =>
       _tagCommandRequests[index].completeError(error);
-
-  Future<DeleteBlockingRelationsResult> _executeBlockingRelationsDelete(
-    DeleteBlockingRelations command,
-  ) {
-    blockingRelationsCommands.add(command);
-    final request = Completer<DeleteBlockingRelationsResult>();
-    _blockingRelationsCommandRequests.add(request);
-    return request.future;
-  }
-
-  void completeBlockingRelationsCommand(
-    int index,
-    DeleteBlockingRelationsResult result,
-  ) => _blockingRelationsCommandRequests[index].complete(result);
 
   Future<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>
   _executeIntention(IntentionCommand command) {

@@ -15,7 +15,6 @@ import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openInMemoryLocalDatabase;
-import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -847,12 +846,9 @@ final class _DelayedPersonalGraphRepository
   final detailRequests =
       <StreamController<Result<GraphSnapshot<IntentionDetails?>>>>[];
   final commands = <IntentionCommand>[];
-  final blockingRelationsCommands = <DeleteBlockingRelations>[];
   final _pages = <Completer<Result<IntentionCatalogPage>>>[];
   final _commands =
       <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
-  final _blockingRelationsRequests =
-      <Completer<DeleteBlockingRelationsResult>>[];
   final _revisions = <IntentionId, int>{};
 
   @override
@@ -922,12 +918,6 @@ final class _DelayedPersonalGraphRepository
     TSuccess extends GraphCommandOutcome,
     TFailure extends GraphCommandFailure
   >(GraphCommand<TSuccess, TFailure> command) async {
-    if (command is DeleteBlockingRelations) {
-      blockingRelationsCommands.add(command as DeleteBlockingRelations);
-      final request = Completer<DeleteBlockingRelationsResult>();
-      _blockingRelationsRequests.add(request);
-      return await request.future as GraphCommandResult<TSuccess, TFailure>;
-    }
     if (command is! IntentionCommand) {
       throw UnsupportedError('Команды связей не используются в этих тестах.');
     }
@@ -977,11 +967,6 @@ final class _DelayedPersonalGraphRepository
   ) {
     _commands[index].complete(result);
   }
-
-  void completeBlockingRelationsCommand(
-    int index,
-    DeleteBlockingRelationsResult result,
-  ) => _blockingRelationsRequests[index].complete(result);
 
   Future<void> close() async {
     for (final request in detailRequests) {

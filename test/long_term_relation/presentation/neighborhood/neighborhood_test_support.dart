@@ -9,7 +9,6 @@ import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
-import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/selected_relations.dart';
@@ -104,7 +103,6 @@ final class ControlledNeighborhoodRepository
   final intentionIds = <IntentionId>[];
   final intentionCommands = <IntentionCommand>[];
   final relationCommands = <LongTermRelationCommand>[];
-  final blockingCommands = <DeleteBlockingRelations>[];
   final dailyChoiceCommands = <DailyChoiceCommand>[];
   final _relationRows = <LongTermRelationId, LongTermRelationSummary>{};
   RelationCounts? _latestCounts;
@@ -116,7 +114,6 @@ final class ControlledNeighborhoodRepository
   final _commandRequests =
       <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
   final _relationCommandRequests = <Completer<LongTermRelationCommandResult>>[];
-  final _blockingRequests = <Completer<DeleteBlockingRelationsResult>>[];
   final _dailyChoiceRequests = <Completer<DailyChoiceCommandResult>>[];
 
   int get requestCount => _requests.length;
@@ -206,13 +203,6 @@ final class ControlledNeighborhoodRepository
     _relationCommandRequests[index].complete(result);
   }
 
-  void completeBlockingCommand(
-    int index,
-    DeleteBlockingRelationsResult result,
-  ) {
-    _blockingRequests[index].complete(result);
-  }
-
   void completeDailyChoiceCommand(int index, DailyChoiceCommandResult result) {
     _dailyChoiceRequests[index].complete(result);
   }
@@ -287,8 +277,6 @@ final class ControlledNeighborhoodRepository
       ),
       final LongTermRelationCommand relationCommand =>
         await _executeLongTermRelation(relationCommand),
-      final DeleteBlockingRelations blockingCommand =>
-        await _executeBlockingRelationsDelete(blockingCommand),
       final DailyChoiceCommand choiceCommand => await _executeDailyChoice(
         choiceCommand,
       ),
@@ -312,15 +300,6 @@ final class ControlledNeighborhoodRepository
     relationCommands.add(command);
     final request = Completer<LongTermRelationCommandResult>();
     _relationCommandRequests.add(request);
-    return request.future;
-  }
-
-  Future<DeleteBlockingRelationsResult> _executeBlockingRelationsDelete(
-    DeleteBlockingRelations command,
-  ) {
-    blockingCommands.add(command);
-    final request = Completer<DeleteBlockingRelationsResult>();
-    _blockingRequests.add(request);
     return request.future;
   }
 

@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/data/local/app_database.dart';
-import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -121,18 +120,15 @@ void main() {
     expect(probe.reads, greaterThan(reads));
   });
 
-  test('массовое удаление связей требует новой загрузки', () async {
+  test('удаление связей требует новой загрузки', () async {
     await repository.loadStatisticsRelationSnapshot();
     final reads = probe.reads;
-    expect(
-      await repository.execute(
-        DeleteBlockingRelations.longTerm(
-          intentionId: durabilityIntention(1),
-          relationIds: [durabilityRelation(101), durabilityRelation(103)],
-        ),
-      ),
-      isA<GraphCommandSucceeded>(),
-    );
+    for (final id in [durabilityRelation(101), durabilityRelation(103)]) {
+      expect(
+        await repository.execute(DeleteLongTermRelation(id)),
+        isA<GraphCommandSucceeded>(),
+      );
+    }
     expect(_edges(await repository.loadStatisticsRelationSnapshot()), {
       (2, 3),
       (1, 5),

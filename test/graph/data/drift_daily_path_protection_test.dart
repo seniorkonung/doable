@@ -2,7 +2,6 @@ import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/data/local/app_database.dart';
-import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
@@ -164,27 +163,6 @@ void main() {
       expectAssignments();
     },
   );
-
-  test('массовое удаление отклоняет весь набор до первой записи', () async {
-    addChoice(201);
-    final command = DeleteBlockingRelations.longTerm(
-      intentionId: _intention(1),
-      relationIds: [_relation(103), _relation(101)],
-    );
-
-    final result = await repository.execute(command);
-
-    expect(result, isA<GraphCommandFailed>());
-    final failure = (result as GraphCommandFailed).failure;
-    expect(failure, isA<DeleteBlockingRelationsSelectionConflictFailure>());
-    expect(
-      (failure as DeleteBlockingRelationsSelectionConflictFailure).reason,
-      BlockingRelationConflictReason.deletionProhibited,
-    );
-    expect(count('long_term_relations'), 3);
-    expect(count('daily_choice_path_steps'), 2);
-    expectAssignments();
-  });
 
   test('составная смена типа или участника отклоняет все поля', () async {
     addChoice(201);

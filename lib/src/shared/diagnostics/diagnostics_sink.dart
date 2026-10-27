@@ -409,12 +409,6 @@ final class LongTermRelationCommandDiagnosticsEvent extends DiagnosticsEvent {
   final LongTermRelationCommandDiagnosticsType commandType;
 }
 
-final class BlockingRelationsDeleteDiagnosticsEvent extends DiagnosticsEvent {
-  const BlockingRelationsDeleteDiagnosticsEvent({
-    required DiagnosticsStatus status,
-  }) : super(status);
-}
-
 /// Этап записи снимка графа.
 enum GraphSnapshotWriteDiagnosticsStage {
   /// Сборка состояния из прежнего снимка и пакетов фактов после него.

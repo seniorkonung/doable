@@ -82,7 +82,6 @@ import '../../tag/domain/tag_assignment.dart';
 import '../../tag/domain/tag_id.dart';
 import '../../tag/domain/tag_position.dart';
 import '../application/blocking_relation_reference.dart';
-import '../application/delete_blocking_relations.dart';
 import '../application/graph_change.dart';
 import '../application/graph_command_result.dart';
 import '../application/graph_revision.dart';
@@ -104,7 +103,6 @@ part 'drift_personal_graph_repository_daily_choice_catalog.dart';
 part 'drift_personal_graph_repository_daily_choice_day_statuses.dart';
 part 'drift_personal_graph_repository_daily_choice_commands.dart';
 part 'drift_personal_graph_repository_relation_commands.dart';
-part 'drift_personal_graph_repository_blocking_relations.dart';
 part 'drift_personal_graph_repository_relation_details.dart';
 part 'drift_personal_graph_repository_relation_groups.dart';
 part 'drift_personal_graph_repository_selected_relations.dart';
@@ -591,8 +589,6 @@ final class DriftPersonalGraphRepository
       ),
       final LongTermRelationCommand relationCommand =>
         await _executeLongTermRelation(relationCommand),
-      final DeleteBlockingRelations deleteCommand =>
-        await _executeDeleteBlockingRelations(deleteCommand),
       final DailyChoiceCommand dailyChoiceCommand => await _executeDailyChoice(
         dailyChoiceCommand,
       ),

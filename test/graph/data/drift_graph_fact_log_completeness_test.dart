@@ -8,8 +8,6 @@ import 'package:doable/src/daily_choice/domain/daily_choice_description.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/data/local/app_database.dart' show AppDatabase;
-import 'package:doable/src/graph/application/blocking_relation_reference.dart';
-import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
@@ -360,48 +358,6 @@ void main() {
       ),
     );
     await confirm(DeleteDailyChoice(choice.id));
-  });
-
-  test('удаление блокирующих связей удаляет дневные выборы вместе с шагами '
-      'и долговременные связи', () async {
-    final health = await createIntention('Здоровье');
-    final running = await createIntention(
-      'Бегать',
-      readiness: IntentionReadiness.ready,
-    );
-    final swimming = await createIntention('Плавать');
-    final needRunning = await relate(health, running);
-    final canSwim = await relate(
-      health,
-      swimming,
-      type: LongTermRelationType.can,
-    );
-    final choice = (await confirm<DailyChoiceCreated>(
-      CreateDailyChoice(
-        sourceIntentionId: health.id,
-        selectedIntentionId: running.id,
-        path: _path([needRunning]),
-        date: CalendarDate.fromParts(2026, 10, 17),
-        description: null,
-        isCompleted: true,
-      ),
-    )).choice;
-
-    await confirm(
-      DeleteBlockingRelations(
-        intentionId: health.id,
-        references: [
-          DailyChoiceBlockingRelationReference(choice.id),
-          LongTermBlockingRelationReference(canSwim.id),
-        ],
-      ),
-    );
-    await confirm(
-      DeleteBlockingRelations.longTerm(
-        intentionId: health.id,
-        relationIds: [needRunning.id],
-      ),
-    );
   });
 }
 

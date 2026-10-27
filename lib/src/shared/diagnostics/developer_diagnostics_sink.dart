@@ -174,10 +174,6 @@ Map<String, Object> _encode(DiagnosticsEvent event) => switch (event) {
     ..._encodeStatus(event.status),
     'commandType': commandType.name,
   },
-  BlockingRelationsDeleteDiagnosticsEvent() => {
-    'operation': 'blockingRelationsDelete',
-    ..._encodeStatus(event.status),
-  },
   GraphSnapshotWriteDiagnosticsEvent(:final stage) => {
     'operation': 'graphSnapshotWrite',
     'stage': ?stage?.name,
