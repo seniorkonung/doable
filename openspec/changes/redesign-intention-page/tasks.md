@@ -935,7 +935,7 @@
   - **Предполагаемые файлы:** `lib/src/intention/presentation/details/intention_details_page.dart`, `lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` и сгенерированная локализация, `test/intention/presentation/details/intention_details_page_test.dart`.
   - **Размер:** S — в основном удаление.
 
-- [ ] 4.23 Подтвердить готовность четвёртой фазы: «Обзор», шапка и параметры намерения работают по дизайну
+- [x] 4.23 Подтвердить готовность четвёртой фазы: «Обзор», шапка и параметры намерения работают по дизайну
   - **Критерии приёмки:**
     - Выполнено условие «Ready to advance» четвёртой фазы:
       - требования Обзора, параметров, выбора готовности, физического удаления и предъявления результатов выполняются на странице;
