@@ -89,7 +89,7 @@ void main() {
   );
 
   testWidgets(
-    'безопасно показывает отказы удаления и повторяет только недоступный',
+    'отдаёт отказы удаления общей поверхности, а повтор — новое удаление',
     (tester) async {
       final scenarios = <(IntentionFailure Function(IntentionId), String, bool)>[
         (
@@ -139,27 +139,28 @@ void main() {
         );
         await tester.pump();
 
-        final (failureFor, message, canRetry) = scenarios[index];
+        final (failureFor, message, retries) = scenarios[index];
         repository.completeCommand(0, ResultFailure(failureFor(intention.id)));
         await tester.pumpAndSettle();
 
-        expect(find.text(message), findsOneWidget);
+        expect(find.textContaining(message), findsOneWidget);
+        expect(
+          find.text('Delete — “${intention.title}”: $message'),
+          findsOneWidget,
+        );
         expect(
           find.widgetWithText(PageHead, intention.title, skipOffstage: false),
           findsOneWidget,
         );
-        final retry = find.byKey(
-          const ValueKey('intention-details-state-change-retry'),
-        );
-        expect(retry, canRetry ? findsOneWidget : findsNothing);
-        if (canRetry) {
-          await tester.ensureVisible(retry);
-          await tester.drag(
-            find.byType(Scrollable).first,
-            const Offset(0, 100),
-          );
+        if (retries) {
+          await _closeOperationMessage(tester);
+          await tester.ensureVisible(delete);
+          await tester.pump();
+          await tester.tap(delete);
           await tester.pumpAndSettle();
-          await tester.tap(retry);
+          await tester.tap(
+            find.byKey(const ValueKey('intention-details-confirm-delete')),
+          );
           await tester.pump();
           expect(repository.commands, hasLength(2));
           expect(repository.commands.last, isA<DeleteIntention>());
@@ -307,7 +308,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.text(
+      find.textContaining(
         'The intention wasn’t deleted: its relations still block deletion. '
         'Archived relations and relations that aren’t loaded yet block it too.',
       ),
@@ -316,10 +317,6 @@ void main() {
     expect(
       find.widgetWithText(PageHead, intention.title, skipOffstage: false),
       findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey('intention-details-state-change-retry')),
-      findsNothing,
     );
     // На обзоре числа доступны без создания соседства.
     expect(find.text('0'), findsOneWidget);
@@ -414,7 +411,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.text(
+        find.textContaining(
           'The intention wasn’t deleted: its relations still block deletion. '
           'Archived relations and relations that aren’t loaded yet block it too.',
         ),
@@ -462,8 +459,17 @@ ProviderContainer _detailsContainer(ControlledDetailsRepository repository) =>
       retry: (retryCount, error) => null,
     );
 
-Widget _localizedApp(Widget home) =>
-    OrdinaryPageTestApp(locale: const Locale('en'), home: home);
+Widget _localizedApp(Widget home) => OrdinaryPageTestApp(
+  locale: const Locale('en'),
+  builder: (context, child) =>
+      GraphOperationPresenter(child: child ?? const SizedBox.shrink()),
+  home: home,
+);
+
+Future<void> _closeOperationMessage(WidgetTester tester) async {
+  await tester.pump(const Duration(seconds: 5));
+  await tester.pumpAndSettle();
+}
 
 final class _DeleteTestRevision implements GraphRevision {
   const _DeleteTestRevision();

@@ -1,9 +1,6 @@
-import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_revision.dart';
 import '../../application/intention_details.dart' as application;
-import '../../application/intention_result.dart';
 import '../../domain/intention.dart';
-import '../operation/operation_state.dart';
 
 sealed class IntentionDetailsState {
   const IntentionDetailsState({required this.isOperationRunning});
@@ -20,14 +17,12 @@ final class IntentionDetailsLoaded extends IntentionDetailsState {
     required this.details,
     required this.revision,
     required super.isOperationRunning,
-    this.stateChange,
     this.isAwaitingConfirmedSnapshot = false,
   });
 
   final application.IntentionDetails details;
   final GraphRevision revision;
   Intention get intention => details.intention;
-  final IntentionDetailsStateChange? stateChange;
 
   /// Подтверждённое изменение этого намерения уже опубликовано, а снимок с
   /// ним ещё не принят: показанные поля старше последнего подтверждённого
@@ -38,51 +33,14 @@ final class IntentionDetailsLoaded extends IntentionDetailsState {
     application.IntentionDetails? details,
     GraphRevision? revision,
     bool? isOperationRunning,
-    IntentionDetailsStateChange? stateChange,
-    bool clearStateChange = false,
     bool? isAwaitingConfirmedSnapshot,
   }) => IntentionDetailsLoaded(
     details: details ?? this.details,
     revision: revision ?? this.revision,
     isOperationRunning: isOperationRunning ?? this.isOperationRunning,
-    stateChange: clearStateChange ? null : stateChange ?? this.stateChange,
     isAwaitingConfirmedSnapshot:
         isAwaitingConfirmedSnapshot ?? this.isAwaitingConfirmedSnapshot,
   );
-}
-
-enum IntentionDetailsStateChangeKind {
-  enableReadiness,
-  disableReadiness,
-  archive,
-  restore,
-  delete,
-}
-
-final class IntentionDetailsStateChange {
-  const IntentionDetailsStateChange.running(this.kind)
-    : operation = const OperationRunning<Intention>(),
-      failurePresentation = null;
-
-  IntentionDetailsStateChange.failed(
-    this.kind,
-    IntentionFailure failure, {
-    this.failurePresentation,
-  }) : operation = OperationFailed<Intention>(failure);
-
-  final IntentionDetailsStateChangeKind kind;
-  final OperationState<Intention> operation;
-
-  /// Право открытого просмотра предъявить ошибку перехода по видимому кадру.
-  final GraphInitiatorPresentationClaim? failurePresentation;
-
-  bool get canRetry => switch (operation) {
-    OperationFailed<Intention>(failure: IntentionUnavailableFailure()) => true,
-    OperationIdle<Intention>() ||
-    OperationRunning<Intention>() ||
-    OperationSucceeded<Intention>() ||
-    OperationFailed<Intention>() => false,
-  };
 }
 
 final class IntentionDetailsNotFound extends IntentionDetailsState {

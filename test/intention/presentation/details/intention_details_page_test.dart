@@ -428,7 +428,7 @@ void main() {
   );
 
   testWidgets(
-    'безопасно показывает отказы перехода и повторяет только недоступный',
+    'отдаёт отказы перехода общей поверхности, а повтор — новое нажатие',
     (tester) async {
       final scenarios = <(IntentionFailure, String, bool)>[
         (
@@ -466,26 +466,24 @@ void main() {
         await tester.tap(archive);
         await tester.pump();
 
-        final (failure, message, canRetry) = scenarios[index];
+        final (failure, message, retries) = scenarios[index];
         repository.completeCommand(0, ResultFailure(failure));
         await tester.pumpAndSettle();
 
-        expect(find.text(message), findsOneWidget);
-        expect(find.text('Active', skipOffstage: false), findsOneWidget);
-        final retry = find.byKey(
-          const ValueKey('intention-details-state-change-retry'),
+        expect(find.textContaining(message), findsOneWidget);
+        expect(
+          find.text('Archive — “${intention.title}”: $message'),
+          findsOneWidget,
         );
-        expect(retry, canRetry ? findsOneWidget : findsNothing);
-        if (canRetry) {
-          await tester.ensureVisible(retry);
-          await tester.drag(
-            find.byType(Scrollable).first,
-            const Offset(0, 100),
-          );
-          await tester.pumpAndSettle();
-          await tester.tap(retry);
+        expect(find.text('Active', skipOffstage: false), findsOneWidget);
+        if (retries) {
+          await _closeOperationMessage(tester);
+          await tester.ensureVisible(archive);
+          await tester.pump();
+          await tester.tap(archive);
           await tester.pump();
           expect(repository.commands, hasLength(2));
+          expect(repository.commands.last, isA<ArchiveIntention>());
           repository.completeCommand(
             1,
             const ResultFailure(IntentionUnexpectedFailure()),
@@ -808,75 +806,6 @@ void main() {
     await tester.pump();
   });
 
-  testWidgets(
-    'отказ чтения или отсутствие намерения до кадра с отказом изменения передают его общей поверхности',
-    (tester) async {
-      final scenarios = <Result<Intention?>>[
-        const ResultSuccess(null),
-        const ResultFailure(IntentionUnavailableFailure()),
-      ];
-
-      for (var index = 0; index < scenarios.length; index += 1) {
-        final repository = ControlledDetailsRepository();
-        final intention = testDetailsIntention(
-          index: 67 + index,
-          title: 'Наблюдаемое $index',
-        );
-        await _pumpDetailsPage(tester, repository, intention.id);
-        await waitForDetailRequests(repository, 1);
-        repository.detailRequests[0].add(ResultSuccess(intention));
-        await tester.pumpAndSettle();
-        final archive = find.byKey(const ValueKey('intention-details-archive'));
-        await tester.ensureVisible(archive);
-        await tester.pump();
-        await tester.tap(archive);
-        await tester.pump();
-
-        tester.binding.handleAppLifecycleStateChanged(
-          AppLifecycleState.inactive,
-        );
-        repository.completeCommand(
-          0,
-          const ResultFailure(IntentionUnavailableFailure()),
-        );
-        await tester.pumpAndSettle();
-        expect(
-          find.text('The intention state couldn’t be changed. Try again.'),
-          findsOneWidget,
-        );
-
-        repository.detailRequests[0].add(scenarios[index]);
-        await tester.pumpAndSettle();
-        expect(
-          find.text('The intention state couldn’t be changed. Try again.'),
-          findsNothing,
-        );
-        if (scenarios[index] is ResultFailure<Intention?>) {
-          await tester.tap(find.widgetWithText(FilledButton, 'Try again'));
-          await tester.pump();
-          await waitForDetailRequests(repository, 2);
-        }
-
-        tester.binding.handleAppLifecycleStateChanged(
-          AppLifecycleState.resumed,
-        );
-        await tester.pump();
-        await tester.pump();
-        expect(
-          find.text(
-            'Archive — “Наблюдаемое $index”: '
-            'The intention state couldn’t be changed. Try again.',
-          ),
-          findsOneWidget,
-        );
-        expect(repository.commands, hasLength(1));
-
-        await tester.pumpWidget(const SizedBox.shrink());
-        await tester.pump();
-      }
-    },
-  );
-
   testWidgets('строка каталога открывает подробности намерения', (
     tester,
   ) async {
@@ -1144,77 +1073,6 @@ void main() {
       );
       await _closeOperationMessage(tester);
       expect(find.textContaining('Intention deleted.'), findsNothing);
-    },
-  );
-
-  testWidgets(
-    'ошибка перехода без фокуса передаётся оболочке при уходе до кадра',
-    (tester) async {
-      const inlineFailure =
-          'The intention state couldn’t be changed. Try again.';
-      final repository = ControlledDetailsRepository();
-      final intention = testDetailsIntention(index: 94, title: 'Архивируемое');
-      repository.catalogResult = ResultSuccess(
-        IntentionCatalogFirstPage(
-          items: [testDetailsSummary(intention)],
-          totalCount: 1,
-          nextCursor: null,
-          revision: const _DetailsTestRevision(),
-        ),
-      );
-      final router = AppRouter();
-      final container = _detailsContainer(repository);
-      addTearDown(router.dispose);
-      addTearDown(container.dispose);
-      await tester.pumpWidget(
-        UncontrolledProviderScope(
-          container: container,
-          child: MaterialApp.router(
-            theme: doableTheme(Brightness.light),
-            locale: const Locale('en'),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
-            supportedLocales: AppLocalizations.supportedLocales,
-            routerConfig: router.config(),
-            builder: (context, child) => GraphOperationPresenter(
-              child: child ?? const SizedBox.shrink(),
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      await openIntentionGraph(tester, content: find.text(intention.title));
-      await tester.tap(find.text(intention.title));
-      await tester.pump();
-      await waitForDetailRequests(repository, 1);
-      repository.detailRequests[0].add(ResultSuccess(intention));
-      await tester.pumpAndSettle();
-
-      final archive = find.byKey(const ValueKey('intention-details-archive'));
-      await tester.ensureVisible(archive);
-      await tester.pump();
-      await tester.tap(archive);
-      await tester.pump();
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-      repository.completeCommand(
-        0,
-        const ResultFailure(IntentionUnavailableFailure()),
-      );
-      await tester.pumpAndSettle();
-      expect(find.text(inlineFailure), findsOneWidget);
-
-      await tester.tap(find.bySemanticsLabel('Back'));
-      await tester.pumpAndSettle();
-      expectIntentionGraphRootPage(router);
-      expect(find.textContaining(inlineFailure), findsNothing);
-
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-      await tester.pumpAndSettle();
-      expect(
-        find.text('Archive — “Архивируемое”: $inlineFailure'),
-        findsOneWidget,
-      );
-      await _closeOperationMessage(tester);
-      expect(find.textContaining(inlineFailure), findsNothing);
     },
   );
 

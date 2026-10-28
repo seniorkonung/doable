@@ -812,6 +812,185 @@ void main() {
       );
     },
   );
+
+  test(
+    'отказ перехода с открытой страницы сразу принадлежит общей поверхности',
+    () async {
+      final scenarios =
+          <
+            (
+              Intention,
+              void Function(IntentionDetailsViewModel),
+              IntentionCommandKind,
+            )
+          >[
+            (
+              testDetailsIntention(index: 110),
+              (model) => model.enableReadiness(),
+              IntentionCommandKind.enableReadiness,
+            ),
+            (
+              testDetailsIntention(
+                index: 111,
+                readiness: IntentionReadiness.ready,
+              ),
+              (model) => model.disableReadiness(),
+              IntentionCommandKind.disableReadiness,
+            ),
+            (
+              testDetailsIntention(index: 112),
+              (model) => model.archive(),
+              IntentionCommandKind.archive,
+            ),
+            (
+              testDetailsIntention(
+                index: 113,
+                archiveState: IntentionArchiveState.archived,
+              ),
+              (model) => model.restore(),
+              IntentionCommandKind.restore,
+            ),
+            (
+              testDetailsIntention(index: 114),
+              (model) => model.delete(),
+              IntentionCommandKind.delete,
+            ),
+          ];
+
+      for (final (intention, start, kind) in scenarios) {
+        final repository = ControlledDetailsRepository();
+        final container = _detailsContainer(repository);
+        addTearDown(container.dispose);
+        final provider = intentionDetailsViewModelProvider(intention.id);
+        final subscription = container.listen(
+          provider,
+          (_, _) {},
+          fireImmediately: true,
+        );
+        addTearDown(subscription.close);
+        await waitForDetailRequests(repository, 1);
+        repository.detailRequests[0].add(ResultSuccess(intention));
+        await pumpEventQueue();
+        final presenter = container
+            .read(graphCommandCoordinatorProvider.notifier)
+            .registerAppPresentation();
+        GraphAppPresentationClaim? claim;
+        presenter.nextClaim().then((value) => claim = value);
+
+        start(container.read(provider.notifier));
+        expect(
+          (container.read(
+            provider,
+          ) as IntentionDetailsLoaded).isOperationRunning,
+          isTrue,
+        );
+        repository.completeCommand(
+          0,
+          const ResultFailure(IntentionUnavailableFailure()),
+        );
+        await pumpEventQueue();
+
+        // Страница открыта, но права на отказ у неё нет: его получает оболочка.
+        expect(
+          claim?.completions.single,
+          isA<IntentionPresentableCompletion>()
+              .having((completion) => completion.kind, 'вид', kind)
+              .having(
+                (completion) => completion.result,
+                'результат',
+                isA<ResultFailure<IntentionCommandSuccess>>(),
+              ),
+        );
+        expect(
+          container.read(provider),
+          isA<IntentionDetailsLoaded>()
+              .having((state) => state.intention, 'намерение', intention)
+              .having(
+                (state) => state.isOperationRunning,
+                'занятость',
+                isFalse,
+              ),
+        );
+      }
+    },
+  );
+
+  test(
+    'ответ AlreadyRunning делает модель занятой без новой команды',
+    () async {
+      final repository = ControlledDetailsRepository();
+      final container = _detailsContainer(repository);
+      addTearDown(container.dispose);
+      final intention = testDetailsIntention(index: 115);
+      final provider = intentionDetailsViewModelProvider(intention.id);
+      final subscription = container.listen(
+        provider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      await waitForDetailRequests(repository, 1);
+      repository.detailRequests[0].add(ResultSuccess(intention));
+      await pumpEventQueue();
+
+      // Координатор не сообщает странице о принятии чужой команды.
+      container
+          .read(graphCommandCoordinatorProvider.notifier)
+          .acceptExisting(
+            ArchiveIntention(intention.id),
+            presentationTitle: intention.title,
+          );
+      expect(
+        (container.read(provider) as IntentionDetailsLoaded).isOperationRunning,
+        isFalse,
+      );
+
+      container.read(provider.notifier).enableReadiness();
+
+      expect(repository.commands.single, isA<ArchiveIntention>());
+      expect(
+        (container.read(provider) as IntentionDetailsLoaded).isOperationRunning,
+        isTrue,
+      );
+      repository.completeCommand(
+        0,
+        const ResultFailure(IntentionUnavailableFailure()),
+      );
+      await pumpEventQueue();
+    },
+  );
+
+  test(
+    'ответ Draining ничего не начинает и не меняет состояние страницы',
+    () async {
+      final repository = ControlledDetailsRepository();
+      final container = _detailsContainer(repository);
+      addTearDown(container.dispose);
+      final intention = testDetailsIntention(index: 116);
+      final provider = intentionDetailsViewModelProvider(intention.id);
+      final subscription = container.listen(
+        provider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      await waitForDetailRequests(repository, 1);
+      repository.detailRequests[0].add(ResultSuccess(intention));
+      await pumpEventQueue();
+      final before = container.read(provider);
+
+      final shutdown = container
+          .read(graphCommandCoordinatorProvider.notifier)
+          .shutdown();
+      container.read(provider.notifier).archive();
+      final deleted = container.read(provider.notifier).delete();
+
+      expect(repository.commands, isEmpty);
+      expect(container.read(provider), same(before));
+      expect(await deleted, isFalse);
+      await shutdown;
+    },
+  );
 }
 
 ProviderContainer _detailsContainer(ControlledDetailsRepository repository) {

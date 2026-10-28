@@ -46,6 +46,8 @@ const _archive = ValueKey('intention-details-archive');
 const _failure =
     'Архивирование — «Намерение»: Не удалось изменить состояние намерения. Повторите попытку.';
 const _deleteSuccess = 'Удаление — «Намерение»: Намерение удалено.';
+const _deleteFailure =
+    'Удаление — «Намерение»: Не удалось удалить намерение. Повторите попытку.';
 const _relationDeleteSuccess = 'Удаление — «связь»: Связь удалена.';
 const _description = ValueKey('relation-editor-description');
 
@@ -369,16 +371,12 @@ void main() {
     await _until(tester, () => !app.coordinator.isRunning(app.intention.id));
     await tester.pumpAndSettle();
     expect(find.byType(IntentionDetailsPage), findsOneWidget);
+    expect(find.text(_deleteFailure), findsOneWidget);
+    await _expireMessages(tester);
 
-    final retry = find.byKey(
-      const ValueKey('intention-details-state-change-retry'),
-    );
-    await tester.ensureVisible(retry);
-    await tester.drag(find.byType(CustomScrollView), const Offset(0, 100));
-    await tester.pumpAndSettle();
-    await tester.tap(retry);
-    await tester.pump();
-    expect(app.repository.commands.last, isA<DeleteIntention>());
+    // Повтор — новое удаление с новым токеном.
+    await app.delete(tester);
+    expect(app.repository.commands, hasLength(2));
     app.complete(
       testDetailsDeletedResult(
         app.intention,
@@ -440,17 +438,19 @@ void main() {
     expect(app.repository.commands, hasLength(1));
   });
 
-  testWidgets('сброс после пригодного кадра не предъявляет уже показанную '
-      'инлайн-ошибку повторно', (tester) async {
+  testWidgets('ошибка архивирования на открытой странице показана общей '
+      'поверхностью один раз и не повторяется после сброса', (tester) async {
     final app = await _ControlledApp.start(tester);
     await app.openDetails(tester);
     await app.archive(tester);
     app.complete(const ResultFailure(IntentionUnavailableFailure()));
     await _until(tester, () => !app.coordinator.isRunning(app.intention.id));
     await tester.pumpAndSettle();
+    expect(find.byType(IntentionDetailsPage), findsOneWidget);
+    expect(find.text(_failure), findsOneWidget);
     expect(
-      find.byType(OperationFailurePresentation).hitTestable(),
-      findsOneWidget,
+      find.byType(OperationFailurePresentation, skipOffstage: false),
+      findsNothing,
     );
 
     await _select(tester, AppDestination.home);
@@ -779,7 +779,7 @@ final class _ControlledApp {
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
-    expect(repository.commands.single, isA<DeleteIntention>());
+    expect(repository.commands.last, isA<DeleteIntention>());
     expect(coordinator.isRunning(intention.id), isTrue);
   }
 

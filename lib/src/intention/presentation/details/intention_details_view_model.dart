@@ -17,6 +17,14 @@ import 'intention_details_state.dart';
 
 part 'intention_details_view_model.g.dart';
 
+enum _StateChangeKind {
+  enableReadiness,
+  disableReadiness,
+  archive,
+  restore,
+  delete,
+}
+
 final class _DetailObservationGeneration {
   const _DetailObservationGeneration(this.value);
 
@@ -53,7 +61,6 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     AsyncValue<Result<GraphSnapshot<application.IntentionDetails?>>>
   >?
   _observationSubscription;
-  IntentionOperationToken? _activeToken;
   GraphRevision? _acceptedRevision;
   var _preserveAuthoritativeStateWhileLoading = false;
   var _isDeleted = false;
@@ -68,10 +75,6 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
       _handleCompletion,
     );
     ref.onDispose(() {
-      final token = _activeToken;
-      if (token != null) {
-        _coordinator.releaseInitiatorPresentation(token);
-      }
       _observationSubscription?.close();
       unawaited(_completionSubscription.cancel());
     });
@@ -101,38 +104,24 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     }
   }
 
-  void enableReadiness() =>
-      _startStateChange(IntentionDetailsStateChangeKind.enableReadiness);
+  void enableReadiness() => _startStateChange(_StateChangeKind.enableReadiness);
 
   void disableReadiness() =>
-      _startStateChange(IntentionDetailsStateChangeKind.disableReadiness);
+      _startStateChange(_StateChangeKind.disableReadiness);
 
-  void archive() => _startStateChange(IntentionDetailsStateChangeKind.archive);
+  void archive() => _startStateChange(_StateChangeKind.archive);
 
-  void restore() => _startStateChange(IntentionDetailsStateChangeKind.restore);
+  void restore() => _startStateChange(_StateChangeKind.restore);
 
   /// Возвращает успех только собственной принятой команды удаления.
   /// Общее состояние данных по ID не передаёт право закрытия другим страницам.
   Future<bool> delete() async {
     final intentionId = _intentionId;
-    final completion = await _startStateChange(
-      IntentionDetailsStateChangeKind.delete,
-    );
+    final completion = await _startStateChange(_StateChangeKind.delete);
     return switch (completion?.result) {
       ResultSuccess(value: IntentionDeleted(:final id)) => id == intentionId,
       _ => false,
     };
-  }
-
-  void retryStateChange() {
-    final current = state;
-    final stateChange = current is IntentionDetailsLoaded
-        ? current.stateChange
-        : null;
-    if (stateChange == null || !stateChange.canRetry) {
-      return;
-    }
-    _startStateChange(stateChange.kind);
   }
 
   AsyncValue<Result<GraphSnapshot<application.IntentionDetails?>>>
@@ -168,8 +157,6 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
         >) {
       _preserveAuthoritativeStateWhileLoading = false;
     }
-    final current = state;
-    final loaded = current is IntentionDetailsLoaded ? current : null;
     final snapshot = switch (observation) {
       AsyncData(value: ResultSuccess(:final value)) => value,
       AsyncLoading() || AsyncError() || AsyncData() => null,
@@ -177,7 +164,7 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     if (snapshot != null && !_acceptSnapshotRevision(snapshot.revision)) {
       return;
     }
-    state = _stateFromObservation(observation, previousLoaded: loaded);
+    state = _stateFromObservation(observation);
   }
 
   void _handleCompletion(GraphCommandCompletion completion) {
@@ -232,12 +219,11 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     }
   }
 
-  Future<IntentionCommandCompletion>? _startStateChange(
-    IntentionDetailsStateChangeKind kind,
-  ) {
+  /// Отказ перехода предъявляет общая поверхность: страница не держит его
+  /// renderer и освобождает право инициатора сразу при принятии команды.
+  Future<IntentionCommandCompletion>? _startStateChange(_StateChangeKind kind) {
     final current = state;
     if (current is! IntentionDetailsLoaded ||
-        _isOperationRunning ||
         !_isStateChangeApplicable(current, kind)) {
       return null;
     }
@@ -248,127 +234,47 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     );
     switch (start) {
       case IntentionCommandAccepted(:final token, :final future):
-        _activeToken = token;
-        state = current.copyWith(
-          isOperationRunning: true,
-          stateChange: IntentionDetailsStateChange.running(kind),
-        );
-        unawaited(_finishStateChange(kind, future));
+        _coordinator.releaseInitiatorPresentation(token);
+        state = current.copyWith(isOperationRunning: true);
         return future;
       case IntentionCommandAlreadyRunning():
         state = current.copyWith(isOperationRunning: true);
       case GraphCommandCoordinatorDraining():
-        state = current.copyWith(
-          stateChange: IntentionDetailsStateChange.failed(
-            kind,
-            const IntentionUnexpectedFailure(),
-          ),
-        );
+        // Замена графа ничего не начинает; повтор — новое действие.
+        break;
     }
     return null;
   }
 
-  Future<void> _finishStateChange(
-    IntentionDetailsStateChangeKind kind,
-    Future<IntentionCommandCompletion> future,
-  ) async {
-    try {
-      final completion = await future;
-      if (!ref.mounted || !identical(_activeToken, completion.token)) {
-        return;
-      }
-
-      _activeToken = null;
-      final current = state;
-      // Успех предъявляет оболочка; данные удаления согласуются отдельно
-      // от права вызывающей страницы закрыть собственный маршрут.
-      switch (completion.result) {
-        case ResultSuccess(value: IntentionSaved(:final intention))
-            when intention.id == _intentionId &&
-                kind != IntentionDetailsStateChangeKind.delete:
-          if (current is IntentionDetailsLoaded) {
-            state = current.copyWith(clearStateChange: true);
-          }
-        case ResultSuccess(value: IntentionDeleted(:final id))
-            when id == _intentionId &&
-                kind == IntentionDetailsStateChangeKind.delete:
-          break;
-        case ResultSuccess(value: IntentionSaved() || IntentionDeleted()):
-          _failStateChangeUnexpectedly(kind);
-        case ResultFailure(:final failure):
-          if (current is IntentionDetailsLoaded) {
-            state = current.copyWith(
-              stateChange: IntentionDetailsStateChange.failed(
-                kind,
-                failure,
-                failurePresentation: _claimFailure(completion.token),
-              ),
-            );
-          } else {
-            // Ошибку негде показать в этой сессии: право сразу у оболочки.
-            _coordinator.releaseInitiatorPresentation(completion.token);
-          }
-      }
-      _scheduleGateRefresh();
-    } on Object {
-      if (!ref.mounted) {
-        return;
-      }
-      final token = _activeToken;
-      _activeToken = null;
-      if (token != null) {
-        _coordinator.releaseInitiatorPresentation(token);
-      }
-      _failStateChangeUnexpectedly(kind);
-      _scheduleGateRefresh();
-    }
-  }
-
-  ExistingIntentionCommand _commandForStateChange(
-    IntentionDetailsStateChangeKind kind,
-  ) => switch (kind) {
-    IntentionDetailsStateChangeKind.enableReadiness => EnableIntentionReadiness(
-      _intentionId,
-    ),
-    IntentionDetailsStateChangeKind.disableReadiness =>
-      DisableIntentionReadiness(_intentionId),
-    IntentionDetailsStateChangeKind.archive => ArchiveIntention(_intentionId),
-    IntentionDetailsStateChangeKind.restore => RestoreIntention(_intentionId),
-    IntentionDetailsStateChangeKind.delete => DeleteIntention(_intentionId),
-  };
+  ExistingIntentionCommand _commandForStateChange(_StateChangeKind kind) =>
+      switch (kind) {
+        _StateChangeKind.enableReadiness => EnableIntentionReadiness(
+          _intentionId,
+        ),
+        _StateChangeKind.disableReadiness => DisableIntentionReadiness(
+          _intentionId,
+        ),
+        _StateChangeKind.archive => ArchiveIntention(_intentionId),
+        _StateChangeKind.restore => RestoreIntention(_intentionId),
+        _StateChangeKind.delete => DeleteIntention(_intentionId),
+      };
 
   bool _isStateChangeApplicable(
     IntentionDetailsLoaded loaded,
-    IntentionDetailsStateChangeKind kind,
+    _StateChangeKind kind,
   ) {
     final details = loaded.details;
     return switch (kind) {
-      IntentionDetailsStateChangeKind.enableReadiness =>
+      _StateChangeKind.enableReadiness =>
         details.intention.readiness == IntentionReadiness.notReady,
-      IntentionDetailsStateChangeKind.disableReadiness =>
+      _StateChangeKind.disableReadiness =>
         details.intention.readiness == IntentionReadiness.ready,
-      IntentionDetailsStateChangeKind.archive =>
+      _StateChangeKind.archive =>
         details.intention.archiveState == IntentionArchiveState.active,
-      IntentionDetailsStateChangeKind.restore =>
+      _StateChangeKind.restore =>
         details.intention.archiveState == IntentionArchiveState.archived,
-      IntentionDetailsStateChangeKind.delete => true,
+      _StateChangeKind.delete => true,
     };
-  }
-
-  GraphInitiatorPresentationClaim? _claimFailure(
-    IntentionOperationToken token,
-  ) => _coordinator.claimInitiatorFailure(token);
-
-  void _failStateChangeUnexpectedly(IntentionDetailsStateChangeKind kind) {
-    final current = state;
-    if (current is IntentionDetailsLoaded) {
-      state = current.copyWith(
-        stateChange: IntentionDetailsStateChange.failed(
-          kind,
-          const IntentionUnexpectedFailure(),
-        ),
-      );
-    }
   }
 
   void _scheduleGateRefresh() {
@@ -395,14 +301,9 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
 
   IntentionDetailsState _stateFromObservation(
     AsyncValue<Result<GraphSnapshot<application.IntentionDetails?>>>
-    observation, {
-    IntentionDetailsLoaded? previousLoaded,
-  }) => observation.when(
-    data: (result) => _stateFromResult(
-      result,
-      _isOperationRunning,
-      previousLoaded: previousLoaded,
-    ),
+    observation,
+  ) => observation.when(
+    data: (result) => _stateFromResult(result, _isOperationRunning),
     error: (_, _) =>
         IntentionDetailsUnexpected(isOperationRunning: _isOperationRunning),
     loading: () =>
@@ -411,9 +312,8 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
 
   IntentionDetailsState _stateFromResult(
     Result<GraphSnapshot<application.IntentionDetails?>> result,
-    bool isOperationRunning, {
-    IntentionDetailsLoaded? previousLoaded,
-  }) => switch (result) {
+    bool isOperationRunning,
+  ) => switch (result) {
     ResultSuccess(
       value: GraphSnapshot(
         value: final application.IntentionDetails details,
@@ -424,7 +324,6 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
         details: details,
         revision: revision,
         isOperationRunning: isOperationRunning,
-        stateChange: previousLoaded?.stateChange,
       ),
     ResultSuccess(value: GraphSnapshot(value: null)) =>
       IntentionDetailsNotFound(isOperationRunning: isOperationRunning),

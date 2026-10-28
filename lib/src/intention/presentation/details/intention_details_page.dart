@@ -16,8 +16,6 @@ import '../../../design_system/components/top_bar.dart';
 import '../../../design_system/doable_icon.dart';
 import '../../../design_system/doable_metrics.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
-import '../../../graph/presentation/operation_failure_presentation.dart';
-import '../../application/intention_result.dart';
 import '../../domain/intention.dart';
 import '../../domain/intention_id.dart';
 import '../../../long_term_relation/application/long_term_relation_projection.dart';
@@ -30,7 +28,6 @@ import '../../../tag/presentation/panel/tags_panel.dart';
 import '../../../tag/presentation/panel/tags_panel_context.dart';
 import '../../../statistics/presentation/intention_statistics_section.dart';
 import '../../../statistics/presentation/intention_statistics_view_model.dart';
-import '../operation/operation_state.dart';
 import 'intention_details_state.dart';
 import 'intention_details_view_model.dart';
 import 'intention_details_tabs.dart';
@@ -427,17 +424,6 @@ final class _DetailsContent extends ConsumerWidget {
             .read(intentionDetailsViewModelProvider(intentionId).notifier)
             .restore,
         onDelete: onDelete,
-        onRetryStateChange: () {
-          final provider = intentionDetailsViewModelProvider(intentionId);
-          final current = ref.read(provider);
-          if (current is IntentionDetailsLoaded &&
-              current.stateChange?.kind ==
-                  IntentionDetailsStateChangeKind.delete) {
-            if (current.stateChange!.canRetry) onDelete();
-          } else {
-            ref.read(provider.notifier).retryStateChange();
-          }
-        },
         onShowArchivedRelations: onShowArchivedRelations,
       ),
       IntentionDetailsNotFound() => _DetailsStatus(
@@ -477,7 +463,6 @@ final class _LoadedDetails extends StatelessWidget {
     required this.onArchive,
     required this.onRestore,
     required this.onDelete,
-    required this.onRetryStateChange,
     required this.onShowArchivedRelations,
   });
 
@@ -493,7 +478,6 @@ final class _LoadedDetails extends StatelessWidget {
   final VoidCallback onArchive;
   final VoidCallback onRestore;
   final VoidCallback onDelete;
-  final VoidCallback onRetryStateChange;
   final VoidCallback onShowArchivedRelations;
 
   @override
@@ -557,7 +541,6 @@ final class _LoadedDetails extends StatelessWidget {
                     onArchive: onArchive,
                     onRestore: onRestore,
                     onDelete: onDelete,
-                    onRetryStateChange: onRetryStateChange,
                     onShowArchivedRelations: onShowArchivedRelations,
                     onChoosePath: () => unawaited(
                       context.router.push(
@@ -633,7 +616,6 @@ final class _DetailsActions extends StatelessWidget {
     required this.onArchive,
     required this.onRestore,
     required this.onDelete,
-    required this.onRetryStateChange,
     required this.onShowArchivedRelations,
     required this.onChoosePath,
   });
@@ -644,7 +626,6 @@ final class _DetailsActions extends StatelessWidget {
   final VoidCallback onArchive;
   final VoidCallback onRestore;
   final VoidCallback onDelete;
-  final VoidCallback onRetryStateChange;
   final VoidCallback onShowArchivedRelations;
   final VoidCallback onChoosePath;
 
@@ -652,33 +633,11 @@ final class _DetailsActions extends StatelessWidget {
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
     final controlsEnabled = !state.isOperationRunning;
-    final failure = _failureMessage(localizations);
     final isArchived =
         state.intention.archiveState == IntentionArchiveState.archived;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (failure != null) ...[
-          OperationFailurePresentation(
-            claim: state.stateChange?.failurePresentation,
-            message: failure,
-            messageKey: const ValueKey(
-              'intention-details-state-change-failure',
-            ),
-          ),
-          if (state.stateChange?.canRetry ?? false) ...[
-            const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: FilledButton(
-                key: const ValueKey('intention-details-state-change-retry'),
-                onPressed: controlsEnabled ? onRetryStateChange : null,
-                child: Text(localizations.commonRetry),
-              ),
-            ),
-          ],
-          const SizedBox(height: 16),
-        ],
         // Переход состояния объясняется до его запуска: архивирование
         // каскадно архивирует связи, а восстановление их не возвращает.
         if (isArchived)
@@ -822,63 +781,6 @@ final class _DetailsActions extends StatelessWidget {
       onDelete();
     }
   }
-
-  String? _failureMessage(AppLocalizations localizations) {
-    final stateChange = state.stateChange;
-    if (stateChange == null) {
-      return null;
-    }
-    if (stateChange.operation case OperationFailed<Intention>(:final failure)) {
-      return switch (stateChange.kind) {
-        IntentionDetailsStateChangeKind.delete => _deleteFailureMessage(
-          localizations,
-          failure,
-        ),
-        IntentionDetailsStateChangeKind.enableReadiness ||
-        IntentionDetailsStateChangeKind.disableReadiness ||
-        IntentionDetailsStateChangeKind.archive ||
-        IntentionDetailsStateChangeKind.restore => _stateChangeFailureMessage(
-          localizations,
-          failure,
-        ),
-      };
-    }
-    return null;
-  }
-
-  String _deleteFailureMessage(
-    AppLocalizations localizations,
-    IntentionFailure failure,
-  ) => switch (failure) {
-    IntentionGenericValidationFailure() ||
-    IntentionTextInputValidationFailure() ||
-    IntentionCreationTagsMissingFailure() => localizations.detailsDeleteInvalid,
-    IntentionNotFoundFailure() => localizations.detailsDeleteNotFound,
-    IntentionConflictFailure() => localizations.detailsDeleteConflict,
-    IntentionHasBlockingRelationsFailure() =>
-      localizations.detailsDeleteBlockedByRelations,
-    IntentionUnavailableFailure() => localizations.detailsDeleteUnavailable,
-    IntentionCorruptionFailure() => localizations.detailsDeleteCorruption,
-    IntentionUnexpectedFailure() => localizations.detailsDeleteUnexpected,
-  };
-
-  String _stateChangeFailureMessage(
-    AppLocalizations localizations,
-    IntentionFailure failure,
-  ) => switch (failure) {
-    IntentionGenericValidationFailure() ||
-    IntentionTextInputValidationFailure() ||
-    IntentionCreationTagsMissingFailure() =>
-      localizations.detailsStateChangeInvalid,
-    IntentionNotFoundFailure() => localizations.detailsStateChangeNotFound,
-    IntentionConflictFailure() => localizations.detailsStateChangeConflict,
-    IntentionHasBlockingRelationsFailure() =>
-      localizations.detailsStateChangeUnexpected,
-    IntentionUnavailableFailure() =>
-      localizations.detailsStateChangeUnavailable,
-    IntentionCorruptionFailure() => localizations.detailsStateChangeCorruption,
-    IntentionUnexpectedFailure() => localizations.detailsStateChangeUnexpected,
-  };
 }
 
 final class _DetailsField extends StatelessWidget {

@@ -343,15 +343,13 @@ void main() {
       await _pumpUntilDetailsTitle(tester, sameTitle);
 
       await _deleteCurrentIntention(tester);
-      await _pumpUntilFound(
-        tester,
-        find.byKey(const ValueKey('intention-details-state-change-failure')),
+      final blockedDeletion = find.textContaining(
+        'relations still block deletion',
       );
-      expect(
-        find.textContaining('relations still block deletion'),
-        findsOneWidget,
-      );
+      await _pumpUntilFound(tester, blockedDeletion);
+      expect(blockedDeletion, findsOneWidget);
       expect(find.text('Show blocking relations'), findsNothing);
+      await _dismissOperationMessage(tester);
       await _chooseDetailsTab(tester, 'Relations');
       final canGroup = find.byKey(
         const ValueKey('relation-neighborhood-group-active-can-outgoing'),
