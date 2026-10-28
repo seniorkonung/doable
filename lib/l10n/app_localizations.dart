@@ -1136,6 +1136,24 @@ abstract class AppLocalizations {
   /// **'Doable within one day, and clear what to do.'**
   String get detailsTypeActionHint;
 
+  /// Метка архива после названия в шапке страницы архивированного намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Archived'**
+  String get detailsArchivedBadge;
+
+  /// Строка о смысле архива под названием в шапке страницы архивированного намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Archived intentions stay in saved paths and are not offered in new ones.'**
+  String get detailsArchivedNote;
+
+  /// Кнопка восстановления намерения из архива в шапке его страницы
+  ///
+  /// In en, this message translates to:
+  /// **'Restore from archive'**
+  String get detailsRestoreFromArchiveAction;
+
   /// Доступное название кнопки-названия в шапке страницы намерения, которая открывает экран изменения; название намерения не переводится
   ///
   /// In en, this message translates to:
@@ -1201,12 +1219,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Saving changes…'**
   String get detailsOperationRunning;
-
-  /// Подпись архивного состояния в подробных данных
-  ///
-  /// In en, this message translates to:
-  /// **'State'**
-  String get detailsArchiveStateLabel;
 
   /// Активное состояние намерения в подробных данных
   ///

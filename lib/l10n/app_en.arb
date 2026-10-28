@@ -580,6 +580,18 @@
   "@detailsTypeActionHint": {
     "description": "Оба критерия действия на плитке готового намерения на обзоре"
   },
+  "detailsArchivedBadge": "Archived",
+  "@detailsArchivedBadge": {
+    "description": "Метка архива после названия в шапке страницы архивированного намерения"
+  },
+  "detailsArchivedNote": "Archived intentions stay in saved paths and are not offered in new ones.",
+  "@detailsArchivedNote": {
+    "description": "Строка о смысле архива под названием в шапке страницы архивированного намерения"
+  },
+  "detailsRestoreFromArchiveAction": "Restore from archive",
+  "@detailsRestoreFromArchiveAction": {
+    "description": "Кнопка восстановления намерения из архива в шапке его страницы"
+  },
   "detailsEditTitleLabel": "Edit the name: {title}",
   "@detailsEditTitleLabel": {
     "description": "Доступное название кнопки-названия в шапке страницы намерения, которая открывает экран изменения; название намерения не переводится",
@@ -625,10 +637,6 @@
   "detailsOperationRunning": "Saving changes…",
   "@detailsOperationRunning": {
     "description": "Сохраняющаяся между экранами выполняющаяся операция намерения"
-  },
-  "detailsArchiveStateLabel": "State",
-  "@detailsArchiveStateLabel": {
-    "description": "Подпись архивного состояния в подробных данных"
   },
   "detailsActive": "Active",
   "@detailsActive": {

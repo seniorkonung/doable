@@ -257,7 +257,10 @@ void main() {
       repository.emitDetail(4, archived);
       await tester.pumpAndSettle();
       await tester.ensureVisible(
-        find.byKey(const ValueKey('intention-details-restore')),
+        find.byKey(
+          const ValueKey('intention-details-restore'),
+          skipOffstage: false,
+        ),
       );
       await tester.pump();
       await tester.tap(find.byKey(const ValueKey('intention-details-restore')));
@@ -275,7 +278,7 @@ void main() {
       repository.emitDetail(5, restored);
       await tester.pumpAndSettle();
       await _scrollCurrentPageToTop(tester);
-      expect(find.text('Active'), findsOneWidget);
+      expect(find.text('Archived'), findsNothing);
       await _closeOperationMessage(tester);
 
       await tester.tap(find.bySemanticsLabel('Back'));

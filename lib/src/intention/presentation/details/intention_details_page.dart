@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart' hide TextField;
+import 'package:flutter/material.dart' hide Badge, TextField;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
@@ -12,6 +12,8 @@ import '../../../daily_choice/application/choice_path_draft.dart';
 import '../../../daily_choice/domain/calendar_date.dart';
 import '../../../daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import '../../../daily_choice/presentation/catalog/daily_choice_local_day_observer.dart';
+import '../../../design_system/components/badge.dart';
+import '../../../design_system/components/button.dart';
 import '../../../design_system/components/option_tiles.dart';
 import '../../../design_system/components/page_head.dart';
 import '../../../design_system/components/text_field.dart';
@@ -223,7 +225,10 @@ final class _IntentionDetailsPageState
   bool _canOpenEdit(IntentionDetailsLoaded loaded) =>
       !loaded.isOperationRunning && !loaded.isAwaitingConfirmedSnapshot;
   Widget _buildHead(IntentionDetailsLoaded loaded) {
+    final localizations = AppLocalizations.of(context);
     final name = loaded.intention.title;
+    final archived =
+        loaded.intention.archiveState == IntentionArchiveState.archived;
     _scheduleHeadMeasurement();
     return NotificationListener<SizeChangedLayoutNotification>(
       onNotification: (_) {
@@ -237,9 +242,29 @@ final class _IntentionDetailsPageState
           child: PageHead(
             key: const ValueKey('intention-details-title'),
             name: name,
-            editLabel: AppLocalizations.of(context).detailsEditTitleLabel(name),
+            editLabel: localizations.detailsEditTitleLabel(name),
             onEdit: _canOpenEdit(loaded)
                 ? () => _openEdit(IntentionEditFocus.title)
+                : null,
+            muted: archived,
+            badge: archived
+                ? Badge.archived(word: localizations.detailsArchivedBadge)
+                : null,
+            note: archived ? localizations.detailsArchivedNote : null,
+            button: archived
+                ? Button.quietBlock(
+                    key: const ValueKey('intention-details-head-restore'),
+                    label: localizations.detailsRestoreFromArchiveAction,
+                    onPressed: loaded.isOperationRunning
+                        ? null
+                        : ref
+                              .read(
+                                intentionDetailsViewModelProvider(
+                                  widget.intentionId,
+                                ).notifier,
+                              )
+                              .restore,
+                  )
                 : null,
           ),
         ),
@@ -512,10 +537,6 @@ final class _LoadedDetails extends StatelessWidget {
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
     final intention = state.intention;
-    final archiveState = switch (intention.archiveState) {
-      IntentionArchiveState.active => localizations.detailsActive,
-      IntentionArchiveState.archived => localizations.detailsArchived,
-    };
     return CustomScrollView(
       controller: scrollController,
       slivers: [
@@ -618,20 +639,6 @@ final class _LoadedDetails extends StatelessWidget {
                     createdAt: intention.createdAt,
                     updatedAt: intention.updatedAt,
                     today: today,
-                  ),
-                ),
-              ),
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                sliver: SliverToBoxAdapter(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _DetailsField(
-                        label: localizations.detailsArchiveStateLabel,
-                        value: archiveState,
-                      ),
-                    ],
                   ),
                 ),
               ),
@@ -813,25 +820,6 @@ final class _DetailsActions extends StatelessWidget {
     if (confirmed ?? false) {
       onDelete();
     }
-  }
-}
-
-final class _DetailsField extends StatelessWidget {
-  const _DetailsField({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: Theme.of(context).textTheme.labelLarge),
-        const SizedBox(height: 4),
-        Text(value),
-      ],
-    );
   }
 }
 

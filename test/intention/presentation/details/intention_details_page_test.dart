@@ -216,7 +216,7 @@ void main() {
     expect(find.text('Сохранить русский заголовок'), findsOneWidget);
     expect(find.text('  Описание\nбез преобразования  '), findsOneWidget);
     expect(_selectedType(tester), IntentionReadiness.ready);
-    expect(find.text('Active'), findsOneWidget);
+    expect(find.text('Archived'), findsNothing);
     _expectNavigation(tester);
   });
 
@@ -337,6 +337,7 @@ void main() {
 
       final restore = find.byKey(const ValueKey('intention-details-restore'));
       await tester.ensureVisible(restore);
+      await tester.pump();
       await tester.tap(restore);
       await tester.pump();
       expect(repository.commands[2], isA<RestoreIntention>());
@@ -349,7 +350,7 @@ void main() {
       repository.detailRequests[3].add(ResultSuccess(restored));
       await tester.pumpAndSettle();
       expect(find.byType(SnackBar), findsNothing);
-      expect(find.text('Active', skipOffstage: false), findsOneWidget);
+      expect(find.text('Archived', skipOffstage: false), findsNothing);
     },
   );
 
@@ -401,7 +402,7 @@ void main() {
           find.text('Archive — “${intention.title}”: $message'),
           findsOneWidget,
         );
-        expect(find.text('Active', skipOffstage: false), findsOneWidget);
+        expect(find.text('Archived', skipOffstage: false), findsNothing);
         if (retries) {
           await _closeOperationMessage(tester);
           await tester.ensureVisible(archive);
@@ -581,7 +582,9 @@ void main() {
 
       const explanationKey = ValueKey('intention-details-restore-explanation');
       // Скрытое за краем экрана объяснение диктор не читает.
-      await tester.ensureVisible(find.byKey(explanationKey));
+      await tester.ensureVisible(
+        find.byKey(explanationKey, skipOffstage: false),
+      );
       await tester.pumpAndSettle();
       expect(
         tester.getSemantics(find.byKey(explanationKey)),

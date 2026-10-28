@@ -1,11 +1,13 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/design_system/components/button.dart';
 import 'package:doable/src/design_system/components/page_head.dart';
 import 'package:doable/src/design_system/components/top_bar.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
+import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
@@ -108,6 +110,105 @@ void main() {
       semantics.dispose();
     });
   }
+
+  for (final (locale, badge, note, restore) in [
+    (
+      const Locale('ru'),
+      'Архив',
+      'Архивированные намерения остаются в сохранённых путях и не '
+          'предлагаются в новых.',
+      'Восстановить из архива',
+    ),
+    (
+      const Locale('en'),
+      'Archived',
+      'Archived intentions stay in saved paths and are not offered in new '
+          'ones.',
+      'Restore from archive',
+    ),
+  ]) {
+    testWidgets('шапка архивированного намерения показывает приглушённое '
+        'название, метку, пояснение и восстановление, а у активного их нет: '
+        '${locale.languageCode}', (tester) async {
+      for (final archiveState in IntentionArchiveState.values) {
+        final repository = ControlledDetailsRepository();
+        final intention = testDetailsIntention(
+          title: 'Бегать',
+          archiveState: archiveState,
+        );
+        await _pumpPage(tester, repository, intention, locale: locale);
+        await waitForDetailRequests(repository, 1);
+        repository.detailRequests.single.add(ResultSuccess(intention));
+        await tester.pumpAndSettle();
+
+        final archived = archiveState == IntentionArchiveState.archived;
+        final head = tester.widget<PageHead>(find.byType(PageHead));
+        expect(head.name, 'Бегать');
+        expect(head.muted, archived);
+        expect(head.badge?.word, archived ? badge : null);
+        expect(head.note, archived ? note : null);
+        expect(head.button?.label, archived ? restore : null);
+        final headPart = find.descendant(
+          of: find.byType(PageHead),
+          matching: find.text(restore),
+        );
+        expect(headPart, archived ? findsOneWidget : findsNothing);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+      }
+    });
+  }
+
+  testWidgets('«Восстановить из архива» сразу восстанавливает намерение, '
+      'недоступно во время операции и возвращает шапку активного без '
+      'сообщения', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final repository = ControlledDetailsRepository();
+    final archived = testDetailsIntention(
+      title: 'Бегать',
+      archiveState: IntentionArchiveState.archived,
+    );
+    final restored = testDetailsIntention(title: 'Бегать');
+    await _pumpPage(tester, repository, archived);
+    await waitForDetailRequests(repository, 1);
+    repository.detailRequests.single.add(ResultSuccess(archived));
+    await tester.pumpAndSettle();
+
+    await tester.tap(_headRestore);
+    await tester.pump();
+    expect(repository.commands.single, isA<RestoreIntention>());
+    expect(find.byType(Dialog), findsNothing);
+    expect(tester.widget<Button>(_headRestore).onPressed, isNull);
+    expect(
+      tester.getSemantics(find.bySemanticsLabel('Восстановить из архива')),
+      isSemantics(
+        label: 'Восстановить из архива',
+        isButton: true,
+        hasEnabledState: true,
+        isEnabled: false,
+      ),
+    );
+    await tester.tap(_headRestore, warnIfMissed: false);
+    await tester.pump();
+    expect(repository.commands, hasLength(1));
+
+    repository.completeCommand(
+      0,
+      testDetailsSavedResult(restored, before: archived),
+    );
+    await tester.pump();
+    await waitForDetailRequests(repository, 2);
+    repository.detailRequests[1].add(ResultSuccess(restored));
+    await tester.pumpAndSettle();
+
+    final head = tester.widget<PageHead>(find.byType(PageHead));
+    expect(head.muted, isFalse);
+    expect(head.badge, isNull);
+    expect(head.note, isNull);
+    expect(head.button, isNull);
+    expect(find.byType(SnackBar), findsNothing);
+    semantics.dispose();
+  });
 
   for (final (locale, editLabel) in [
     (const Locale('ru'), 'Изменить название: Бегать'),
@@ -278,6 +379,10 @@ void main() {
   });
 }
 
+final _headRestore = find.byKey(
+  const ValueKey('intention-details-head-restore'),
+);
+
 final _barText = find.descendant(
   of: find.byType(TopBar),
   matching: find.byType(Text),
@@ -314,15 +419,19 @@ Future<void> _pumpPage(
       child: OrdinaryPageTestApp(
         locale: locale,
         routes: [AutoRoute(page: IntentionEditRoute.page)],
-        builder: scale == null
-            ? null
-            : (context, child) => ValueListenableBuilder(
-                valueListenable: scale,
-                builder: (context, value, _) => MediaQuery(
-                  data: MediaQuery.of(context).copyWith(textScaler: value),
-                  child: child!,
-                ),
-              ),
+        builder: (context, child) {
+          final presented = GraphOperationPresenter(
+            child: child ?? const SizedBox.shrink(),
+          );
+          if (scale == null) return presented;
+          return ValueListenableBuilder(
+            valueListenable: scale,
+            builder: (context, value, _) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(textScaler: value),
+              child: presented,
+            ),
+          );
+        },
         home: IntentionDetailsPage(intentionId: intention.id),
       ),
     ),

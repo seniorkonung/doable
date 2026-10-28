@@ -717,6 +717,16 @@ class AppLocalizationsRu extends AppLocalizations {
       'Выполнимо за один день, и понятно, что делать.';
 
   @override
+  String get detailsArchivedBadge => 'Архив';
+
+  @override
+  String get detailsArchivedNote =>
+      'Архивированные намерения остаются в сохранённых путях и не предлагаются в новых.';
+
+  @override
+  String get detailsRestoreFromArchiveAction => 'Восстановить из архива';
+
+  @override
   String detailsEditTitleLabel(String title) {
     return 'Изменить название: $title';
   }
@@ -755,9 +765,6 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get detailsOperationRunning => 'Сохранение изменений…';
-
-  @override
-  String get detailsArchiveStateLabel => 'Состояние';
 
   @override
   String get detailsActive => 'Активно';

@@ -714,6 +714,16 @@ class AppLocalizationsEn extends AppLocalizations {
       'Doable within one day, and clear what to do.';
 
   @override
+  String get detailsArchivedBadge => 'Archived';
+
+  @override
+  String get detailsArchivedNote =>
+      'Archived intentions stay in saved paths and are not offered in new ones.';
+
+  @override
+  String get detailsRestoreFromArchiveAction => 'Restore from archive';
+
+  @override
   String detailsEditTitleLabel(String title) {
     return 'Edit the name: $title';
   }
@@ -752,9 +762,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get detailsOperationRunning => 'Saving changes…';
-
-  @override
-  String get detailsArchiveStateLabel => 'State';
 
   @override
   String get detailsActive => 'Active';

@@ -47,7 +47,13 @@ void main() {
         await tester.pumpAndSettle();
 
         final delete = find.byKey(const ValueKey('intention-details-delete'));
-        await tester.ensureVisible(delete);
+        // У архивированного намерения кнопка лежит за пределами экрана.
+        await tester.ensureVisible(
+          find.byKey(
+            const ValueKey('intention-details-delete'),
+            skipOffstage: false,
+          ),
+        );
         await tester.pump();
         await tester.tap(delete);
         await tester.pumpAndSettle();
