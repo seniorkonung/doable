@@ -601,7 +601,9 @@
 
       Создание и удаление сохраняют политику по умолчанию, изменение названия и описания — «успех без сообщения».
     - У `GraphOperationPresenter` нет текстов успеха этих операций: строки `detailsReadinessEnabled`, `detailsReadinessDisabled`, `detailsArchivedSuccess` и `detailsRestoredSuccess` удалены на обоих языках. Тексты отказов сохраняются. Модель подробных данных освобождает право инициатора при принятии только у удаления: у остальных её команд этого права нет.
-    - Проверки координатора закрепляют политику для каждой из четырёх операций: успех не выдаётся ни инициатору, ни оболочке и не оставляет непредъявленной записи, а отказ оболочка предъявляет один раз при открытой странице. Сценарии, ожидавшие сообщение об успехе этих операций, подтверждают его отсутствие и сохраняют остальные ожидания.
+    - Проверки координатора закрепляют политику для каждой из четырёх операций: успех не выдаётся ни инициатору, ни оболочке и не оставляет непредъявленной записи, а отказ оболочка предъявляет один раз при открытой странице. Сценарии, где успех этих операций служил видимым сообщением, делятся по предмету проверки:
+      - если предмет — успех одной из четырёх операций, сценарий подтверждает отсутствие сообщения и сохраняет остальные ожидания;
+      - если успех лишь занимает или показывает общую поверхность, как в проверках положения и очереди сообщений над панелью и создания при занятой поверхности, сценарий переходит на операцию, успех которой по-прежнему объявляется, и сохраняет все ожидания об общей поверхности.
   - **Проверка:**
     - `mise run codegen` — локализация пересоздана без удалённых строк.
     - `mise exec --no-deps -- flutter test test/intention test/graph/application test/graph/presentation test/app --exclude-tags=flutter_process`.
@@ -609,7 +611,7 @@
   - **Зависимости:** 4.1 — страница больше не забирает отказ себе.
   - **Предполагаемые файлы:**
     - `lib/src/graph/application/graph_command_coordinator.dart`, `lib/src/graph/presentation/graph_operation_presenter.dart`, `lib/src/intention/presentation/details/intention_details_view_model.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` и сгенерированная локализация;
-    - проверки: `test/intention/presentation/operation/intention_command_coordinator_test.dart`, `test/graph/presentation/graph_operation_presenter_test.dart`, `test/app/navigation/app_shell_state_test.dart`, `test/app/creation_flows_integration_test.dart`.
+    - проверки: `test/intention/presentation/operation/intention_command_coordinator_test.dart`, `test/graph/presentation/graph_operation_presenter_test.dart`, `test/app/navigation/app_shell_state_test.dart`, `test/app/navigation/app_shell_layout_test.dart`, `test/app/creation_flows_integration_test.dart`.
   - **Размер:** M.
 
 - [ ] 4.3 Расширить `TextField` режимом сохранённого текста, который показывает текст целиком и открывает его правку
