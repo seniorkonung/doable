@@ -237,6 +237,32 @@ void main() {
     expect(_controller(tester, _titleField).text, 'Бегать по утрам');
   });
 
+  testWidgets('клавиша ввода в названии оставляет его прежним и переводит '
+      'фокус в описание', (tester) async {
+    final intention = testDetailsIntention(title: 'Бегать');
+    await _openEditPage(tester, ControlledDetailsRepository(), intention);
+
+    // Клавиша ввода экранной клавиатуры выполняет действие, которое поле
+    // объявило подключению ввода.
+    final keyboardAction = tester.testTextInput.setClientArgs!['inputAction'];
+    await tester.testTextInput.receiveAction(
+      TextInputAction.values.firstWhere(
+        (action) => action.toString() == keyboardAction,
+      ),
+    );
+    await tester.pump();
+
+    expect(_controller(tester, _titleField).text, 'Бегать');
+    expect(_saveButton(tester).onPressed, isNull);
+    final description = tester.widget<EditableText>(
+      find.descendant(
+        of: _descriptionField,
+        matching: find.byType(EditableText),
+      ),
+    );
+    expect(description.focusNode.hasFocus, isTrue);
+  });
+
   testWidgets('описание растёт до тринадцати строк и дальше прокручивается '
       'внутри поля', (tester) async {
     final intention = testDetailsIntention(description: null);

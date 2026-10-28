@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
+import '../../../design_system/components/text_field.dart'
+    show lineBreakToSpaceFormatter;
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/presentation/operation_failure_presentation.dart';
 import '../../../tag/presentation/panel/tags_panel.dart';
@@ -179,6 +181,7 @@ final class _IntentionEditorPageState
                   // относительно закреплённых действий панели.
                   // https://api.flutter.dev/flutter/material/TextField/onSubmitted.html
                   onSubmitted: (_) => _descriptionFocus.requestFocus(),
+                  inputFormatters: [lineBreakToSpaceFormatter],
                   decoration: InputDecoration(
                     labelText: localizations.editorTitleLabel,
                     error: titleFailure == null

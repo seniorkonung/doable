@@ -1,11 +1,20 @@
 import 'package:flutter/material.dart' hide TextField;
 import 'package:flutter/material.dart' as material show TextField;
+import 'package:flutter/services.dart';
 
 import '../doable_colors.dart';
 import '../doable_metrics.dart';
 import '../doable_type.dart';
 
 enum TextFieldKind { name, text }
+
+/// Заменяет каждый перенос строки во введённом или вставленном тексте одним
+/// пробелом: название не принимает переносов, но переносится по ширине поля.
+final TextInputFormatter lineBreakToSpaceFormatter =
+    FilteringTextInputFormatter.deny(
+      RegExp(r'\r\n|[\r\n]'),
+      replacementString: ' ',
+    );
 
 /// Поле ввода: плоскость `fill` без рамки и кольца фокуса,
 /// где фокус показывает курсор. Текст хранит [controller] потребителя.
@@ -31,6 +40,8 @@ final class TextField extends StatelessWidget {
 
   /// Растущее поле без метки перед текстом. Без [maxLines] текст
   /// переносится целиком; после предела прокручивается внутри поля.
+  /// Название не принимает переносов строк: клавиша ввода переводит фокус
+  /// к следующему полю.
   /// https://api.flutter.dev/flutter/material/TextField/minLines.html
   const TextField.multiline({
     required this.controller,
@@ -90,6 +101,7 @@ final class TextField extends StatelessWidget {
     };
     final verticalPadding = kind == TextFieldKind.name ? 13.0 : 11.0;
     final startPadding = _multiline ? DoableMetrics.space3 : _startPadding;
+    final isSingleParagraph = _multiline && kind == TextFieldKind.name;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -103,6 +115,14 @@ final class TextField extends StatelessWidget {
             maxLines: maxLines,
             autofocus: autofocus,
             readOnly: readOnly,
+            // Растущее поле по умолчанию берёт многострочную клавиатуру с
+            // клавишей переноса:
+            // https://api.flutter.dev/flutter/material/TextField/keyboardType.html
+            keyboardType: isSingleParagraph ? TextInputType.text : null,
+            textInputAction: isSingleParagraph ? TextInputAction.next : null,
+            inputFormatters: isSingleParagraph
+                ? [lineBreakToSpaceFormatter]
+                : null,
             style: style.copyWith(color: colors.ink),
             decoration: InputDecoration(
               hintText: placeholder,

@@ -216,6 +216,38 @@ void main() {
     });
   }
 
+  testWidgets(
+    'растущее название заменяет перенос строки пробелом и не предлагает его '
+    'на клавиатуре',
+    (tester) async {
+      final controller = TextEditingController();
+      addTearDown(controller.dispose);
+      final changes = <String>[];
+      await tester.pumpWidget(
+        _app(
+          controller: controller,
+          onChanged: changes.add,
+          multiline: true,
+          kind: TextFieldKind.name,
+        ),
+      );
+
+      final editable = tester.widget<EditableText>(find.byType(EditableText));
+      expect(editable.keyboardType, TextInputType.text);
+      expect(editable.textInputAction, TextInputAction.next);
+      for (final lineBreak in ['\n', '\r\n', '\r']) {
+        await tester.enterText(
+          find.byType(EditableText),
+          'Бегать$lineBreakпо утрам',
+        );
+        await tester.pump();
+
+        expect(controller.text, 'Бегать по утрам');
+        expect(changes.last, 'Бегать по утрам');
+      }
+    },
+  );
+
   testWidgets('заполнитель пустого поля приглушён и написан обычным весом', (
     tester,
   ) async {
