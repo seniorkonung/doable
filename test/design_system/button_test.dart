@@ -74,6 +74,19 @@ void main() {
             14.0,
           ),
           (
+            'основная',
+            'плашка ink с текстом bg размера md',
+            'Продолжить правку',
+            (VoidCallback? onPressed) => Button.primaryCompact(
+              label: 'Продолжить правку',
+              onPressed: onPressed,
+            ),
+            colors.ink,
+            colors.bg,
+            DoableMetrics.controlHeight,
+            DoableMetrics.space4,
+          ),
+          (
             'тихая',
             'плашка fill с текстом ink',
             'Отмена',
@@ -157,84 +170,99 @@ void main() {
       Brightness.dark => DoableColors.dark,
     };
 
-    testWidgets('в $theme теме текстовая кнопка — текст accent без плашки '
-        'размера sm с областью нажатия не меньше tap-min', (tester) async {
-      final semantics = tester.ensureSemantics();
-      await tester.pumpWidget(
-        _app(
-          brightness: brightness,
-          button: Button.text(
-            label: 'Сбросить',
-            semanticLabel: 'Сбросить условия',
-            onPressed: () {},
+    for (final (size, label, semanticLabel, build, height, sidePadding) in [
+      (
+        'sm',
+        'Сбросить',
+        'Сбросить условия',
+        (VoidCallback? onPressed) => Button.text(
+          label: 'Сбросить',
+          semanticLabel: 'Сбросить условия',
+          onPressed: onPressed,
+        ),
+        DoableMetrics.controlHeightSm,
+        DoableMetrics.space2,
+      ),
+      (
+        'md',
+        'Отменить',
+        'Отменить',
+        (VoidCallback? onPressed) =>
+            Button.textMedium(label: 'Отменить', onPressed: onPressed),
+        DoableMetrics.controlHeight,
+        14.0,
+      ),
+    ]) {
+      testWidgets('в $theme теме текстовая кнопка размера $size — текст '
+          'accent без плашки с областью нажатия не меньше tap-min', (
+        tester,
+      ) async {
+        final semantics = tester.ensureSemantics();
+        await tester.pumpWidget(
+          _app(brightness: brightness, button: build(() {}), block: false),
+        );
+
+        final pill = tester.getRect(_plane);
+        final text = tester.getRect(find.text(label));
+        expect(pill.height, height);
+        expect(pill.width, text.width + 2 * sidePadding);
+        expect(_planeMaterial(tester).color, Colors.transparent);
+        expect(
+          tester.getSize(find.byType(Button)).height,
+          greaterThanOrEqualTo(DoableMetrics.tapMin),
+          reason: 'область нажатия выше подписи',
+        );
+
+        final style = _labelStyle(tester, label);
+        expect(style.color, colors.accent);
+        expect(style.fontSize, DoableType.section.fontSize);
+        expect(style.fontWeight, DoableType.section.fontWeight);
+        expect(tester.getCenter(find.text(label)), pill.center);
+        expect(
+          tester.getSemantics(find.byType(Button)),
+          matchesSemantics(
+            label: semanticLabel,
+            isButton: true,
+            hasEnabledState: true,
+            isEnabled: true,
+            isFocusable: true,
+            hasTapAction: true,
+            hasFocusAction: true,
           ),
-          block: false,
-        ),
-      );
+        );
+        semantics.dispose();
+      });
 
-      final pill = tester.getRect(_plane);
-      final text = tester.getRect(find.text('Сбросить'));
-      expect(pill.height, DoableMetrics.controlHeightSm);
-      expect(pill.width, text.width + 2 * DoableMetrics.space2);
-      expect(_planeMaterial(tester).color, Colors.transparent);
-      expect(
-        tester.getSize(find.byType(Button)).height,
-        greaterThanOrEqualTo(DoableMetrics.tapMin),
-        reason: 'область нажатия выше подписи',
-      );
+      testWidgets('в $theme теме выключенная текстовая кнопка размера $size '
+          'остаётся на месте с текстом grip и объявляется недоступной', (
+        tester,
+      ) async {
+        final semantics = tester.ensureSemantics();
+        await tester.pumpWidget(
+          _app(brightness: brightness, button: build(() {}), block: false),
+        );
+        final enabledPill = tester.getRect(_plane);
 
-      final style = _labelStyle(tester, 'Сбросить');
-      expect(style.color, colors.accent);
-      expect(style.fontSize, DoableType.section.fontSize);
-      expect(style.fontWeight, DoableType.section.fontWeight);
-      expect(tester.getCenter(find.text('Сбросить')), pill.center);
-      expect(
-        tester.getSemantics(find.byType(Button)),
-        matchesSemantics(
-          label: 'Сбросить условия',
-          isButton: true,
-          hasEnabledState: true,
-          isEnabled: true,
-          isFocusable: true,
-          hasTapAction: true,
-          hasFocusAction: true,
-        ),
-      );
-      semantics.dispose();
-    });
+        await tester.pumpWidget(
+          _app(brightness: brightness, button: build(null), block: false),
+        );
+        // Material меняет цвета кнопки с анимацией.
+        await tester.pumpAndSettle();
 
-    testWidgets('в $theme теме выключенная текстовая кнопка остаётся на месте '
-        'с текстом grip и объявляется недоступной', (tester) async {
-      final semantics = tester.ensureSemantics();
-      Button build(VoidCallback? onPressed) => Button.text(
-        label: 'Сбросить',
-        semanticLabel: 'Сбросить условия',
-        onPressed: onPressed,
-      );
-      await tester.pumpWidget(
-        _app(brightness: brightness, button: build(() {}), block: false),
-      );
-      final enabledPill = tester.getRect(_plane);
-
-      await tester.pumpWidget(
-        _app(brightness: brightness, button: build(null), block: false),
-      );
-      // Material меняет цвета кнопки с анимацией.
-      await tester.pumpAndSettle();
-
-      expect(tester.getRect(_plane), enabledPill);
-      expect(_planeMaterial(tester).color, Colors.transparent);
-      expect(_labelStyle(tester, 'Сбросить').color, colors.grip);
-      expect(
-        tester.getSemantics(find.byType(Button)),
-        matchesSemantics(
-          label: 'Сбросить условия',
-          isButton: true,
-          hasEnabledState: true,
-        ),
-      );
-      semantics.dispose();
-    });
+        expect(tester.getRect(_plane), enabledPill);
+        expect(_planeMaterial(tester).color, Colors.transparent);
+        expect(_labelStyle(tester, label).color, colors.grip);
+        expect(
+          tester.getSemantics(find.byType(Button)),
+          matchesSemantics(
+            label: semanticLabel,
+            isButton: true,
+            hasEnabledState: true,
+          ),
+        );
+        semantics.dispose();
+      });
+    }
   }
 
   testWidgets('нажатие по области выше плашки передаётся потребителю', (

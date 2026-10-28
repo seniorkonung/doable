@@ -26,6 +26,16 @@ final class Button extends StatelessWidget {
   }) : _kind = _ButtonKind.primarySmall,
        semanticLabel = null;
 
+  /// Безопасный ответ диалога отмены изменений, который сохраняет работу,
+  /// например «Продолжить правку»: плашка `ink` с текстом `bg` размера md
+  /// шириной по подписи.
+  const Button.primaryCompact({
+    required this.label,
+    required this.onPressed,
+    super.key,
+  }) : _kind = _ButtonKind.primaryCompact,
+       semanticLabel = null;
+
   /// Второстепенное действие диалога подтверждения, например «Отмена»:
   /// плашка `fill` с текстом `ink` шириной по подписи.
   const Button.quiet({required this.label, required this.onPressed, super.key})
@@ -47,6 +57,15 @@ final class Button extends StatelessWidget {
     required this.onPressed,
     super.key,
   }) : _kind = _ButtonKind.text;
+
+  /// Выход рядом с основной кнопкой, например «Отменить» в диалоге отмены
+  /// изменений: текст `accent` без плашки размера md шириной по подписи.
+  const Button.textMedium({
+    required this.label,
+    required this.onPressed,
+    super.key,
+  }) : _kind = _ButtonKind.textMedium,
+       semanticLabel = null;
 
   final String label;
 
@@ -111,6 +130,13 @@ final class Button extends StatelessWidget {
           vertical: _smallVerticalPadding,
         ),
       ),
+      _ButtonKind.primaryCompact => _filled(
+        colors,
+        label,
+        background: colors.ink,
+        foreground: colors.bg,
+        minimumSize: compact,
+      ),
       _ButtonKind.quiet => _filled(
         colors,
         label,
@@ -125,25 +151,44 @@ final class Button extends StatelessWidget {
         foreground: colors.onAccent,
         minimumSize: compact,
       ),
-      _ButtonKind.text => TextButton(
-        onPressed: onPressed,
-        style: TextButton.styleFrom(
-          foregroundColor: colors.accent,
-          disabledForegroundColor: colors.grip,
-          // Строка подписи 20 и отступы по 8 дают высоту control-height-sm.
-          minimumSize: const Size(0, DoableMetrics.controlHeightSm),
-          padding: const EdgeInsets.symmetric(
-            horizontal: DoableMetrics.space2,
-            vertical: _smallVerticalPadding,
-          ),
-          shape: const StadiumBorder(),
-          textStyle: DoableType.section,
-          tapTargetSize: MaterialTapTargetSize.padded,
+      _ButtonKind.textMedium => _text(
+        colors,
+        label,
+        minimumSize: compact,
+        // Строка подписи 20 и отступы по 10 дают высоту control-height.
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      ),
+      _ButtonKind.text => _text(
+        colors,
+        label,
+        // Строка подписи 20 и отступы по 8 дают высоту control-height-sm.
+        minimumSize: const Size(0, DoableMetrics.controlHeightSm),
+        padding: const EdgeInsets.symmetric(
+          horizontal: DoableMetrics.space2,
+          vertical: _smallVerticalPadding,
         ),
-        child: label,
       ),
     };
   }
+
+  Widget _text(
+    DoableColors colors,
+    Widget label, {
+    required Size minimumSize,
+    required EdgeInsetsGeometry padding,
+  }) => TextButton(
+    onPressed: onPressed,
+    style: TextButton.styleFrom(
+      foregroundColor: colors.accent,
+      disabledForegroundColor: colors.grip,
+      minimumSize: minimumSize,
+      padding: padding,
+      shape: const StadiumBorder(),
+      textStyle: DoableType.section,
+      tapTargetSize: MaterialTapTargetSize.padded,
+    ),
+    child: label,
+  );
 
   Widget _filled(
     DoableColors colors,
@@ -176,4 +221,12 @@ final class Button extends StatelessWidget {
   );
 }
 
-enum _ButtonKind { primary, primarySmall, quiet, danger, text }
+enum _ButtonKind {
+  primary,
+  primarySmall,
+  primaryCompact,
+  quiet,
+  danger,
+  textMedium,
+  text,
+}

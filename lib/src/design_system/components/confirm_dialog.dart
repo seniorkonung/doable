@@ -39,48 +39,159 @@ Future<bool> showConfirmDialog({
   required ConfirmDialogText text,
   required String cancelLabel,
   required String actionLabel,
+}) => _showDialog(
+  context: context,
+  title: title,
+  barrierLabel: cancelLabel,
+  variant: _Confirm(
+    text: text,
+    cancelLabel: cancelLabel,
+    actionLabel: actionLabel,
+  ),
+);
+
+/// Показывает над корневым навигатором диалог перед уходом с несохранённой
+/// работой и возвращает, отменена ли она.
+///
+/// [title] — вопрос, например «Отменить изменения?»; он же — название
+/// маршрута для экранного диктора. [text] — что не сохранится.
+/// [discardLabel] — подпись текстовой кнопки, которая отменяет работу,
+/// [keepLabel] — подпись основной кнопки, которая её сохраняет, и доступное
+/// название затемнения.
+///
+/// Отмену даёт только текстовая кнопка. Безопасный ответ — сохранить работу:
+/// основная кнопка, касание затемнения и системное «назад» дают false.
+Future<bool> showDiscardDialog({
+  required BuildContext context,
+  required String title,
+  required String text,
+  required String discardLabel,
+  required String keepLabel,
+}) => _showDialog(
+  context: context,
+  title: title,
+  barrierLabel: keepLabel,
+  variant: _Discard(
+    text: text,
+    discardLabel: discardLabel,
+    keepLabel: keepLabel,
+  ),
+);
+
+Future<bool> _showDialog({
+  required BuildContext context,
+  required String title,
+  required String barrierLabel,
+  required _Variant variant,
 }) async {
   final colors = Theme.of(context).extension<DoableColors>()!;
-  final confirmed = await showDialog<bool>(
+  final accepted = await showDialog<bool>(
     context: context,
     useRootNavigator: true,
     barrierColor: colors.scrim,
-    barrierLabel: cancelLabel,
-    builder: (context) => _ConfirmDialog(
-      title: title,
-      text: text,
-      cancelLabel: cancelLabel,
-      actionLabel: actionLabel,
-    ),
+    barrierLabel: barrierLabel,
+    builder: (context) => _ConfirmDialog(title: title, variant: variant),
   );
-  return confirmed ?? false;
+  return accepted ?? false;
 }
 
-final class _ConfirmDialog extends StatelessWidget {
-  const _ConfirmDialog({
-    required this.title,
+/// Вариант диалога: его первый абзац, действия и их место.
+sealed class _Variant {
+  const _Variant();
+}
+
+/// Вопрос перед необратимым действием: quiet-кнопка отмены и
+/// danger-кнопка действия в space-2 друг от друга.
+final class _Confirm extends _Variant {
+  const _Confirm({
     required this.text,
     required this.cancelLabel,
     required this.actionLabel,
   });
 
-  /// Область нажатия кнопок Material выше строки действий макета в 44,
-  /// поэтому поля вокруг строки меньше на половину разницы, и плашки стоят
-  /// на месте макета.
-  static const double _actionsInset =
-      DoableMetrics.space4 -
-      (kMinInteractiveDimension - DoableMetrics.tapMin) / 2;
-
-  final String title;
   final ConfirmDialogText text;
   final String cancelLabel;
   final String actionLabel;
+}
+
+/// Вопрос перед уходом с несохранённой работой: текстовая кнопка отмены
+/// работы и в space-1 за ней основная кнопка, которая её сохраняет.
+final class _Discard extends _Variant {
+  const _Discard({
+    required this.text,
+    required this.discardLabel,
+    required this.keepLabel,
+  });
+
+  final String text;
+  final String discardLabel;
+  final String keepLabel;
+}
+
+final class _ConfirmDialog extends StatelessWidget {
+  const _ConfirmDialog({required this.title, required this.variant});
+
+  /// Поле макета вокруг строки действий высотой 44 за вычетом половины
+  /// разницы с областью нажатия кнопок Material, чтобы плашки стояли на
+  /// месте макета.
+  static double _actionsInset(double gap) =>
+      gap - (kMinInteractiveDimension - DoableMetrics.tapMin) / 2;
+
+  final String title;
+  final _Variant variant;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.extension<DoableColors>()!;
     final shadows = theme.extension<DoableShadows>()!;
+
+    final (paragraph, gap, spacing, outset, actions) = switch (variant) {
+      _Confirm(:final text, :final cancelLabel, :final actionLabel) => (
+        TextSpan(
+          children: [
+            TextSpan(text: text.before),
+            TextSpan(
+              text: text.name,
+              style: TextStyle(color: colors.ink),
+            ),
+            TextSpan(text: text.after),
+          ],
+        ),
+        DoableMetrics.space4,
+        DoableMetrics.space2,
+        0.0,
+        [
+          Button.quiet(
+            label: cancelLabel,
+            onPressed: () => Navigator.pop(context, false),
+          ),
+          Button.danger(
+            label: actionLabel,
+            onPressed: () => Navigator.pop(context, true),
+          ),
+        ],
+      ),
+      // Строка действий выходит на 8 правее текста, к краю подписи
+      // текстовой кнопки без плашки.
+      _Discard(:final text, :final discardLabel, :final keepLabel) => (
+        TextSpan(text: text),
+        14.0,
+        DoableMetrics.space1,
+        8.0,
+        [
+          Button.textMedium(
+            label: discardLabel,
+            onPressed: () => Navigator.pop(context, true),
+          ),
+          Button.primaryCompact(
+            label: keepLabel,
+            onPressed: () => Navigator.pop(context, false),
+          ),
+        ],
+      ),
+    };
+    final actionsInset = _actionsInset(gap);
 
     return Dialog(
       // Плоскость с тенью `shadow-float` рисует сам диалог: поверхность
@@ -109,11 +220,11 @@ final class _ConfirmDialog extends StatelessWidget {
           // оставляют диалогу меньше высоты, чем занимает содержимое:
           // текст и действия прокручиваются вместе и остаются доступны.
           child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(
+            padding: EdgeInsetsDirectional.fromSTEB(
               DoableMetrics.space6,
               22,
-              DoableMetrics.space6,
-              _actionsInset,
+              DoableMetrics.space6 - outset,
+              actionsInset,
             ),
             child: SizedBox(
               width: double.infinity,
@@ -121,41 +232,32 @@ final class _ConfirmDialog extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    title,
-                    style: DoableType.title.copyWith(color: colors.ink),
-                  ),
-                  const SizedBox(height: 6),
-                  Text.rich(
-                    TextSpan(
+                  Padding(
+                    padding: EdgeInsetsDirectional.only(end: outset),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        TextSpan(text: text.before),
-                        TextSpan(
-                          text: text.name,
-                          style: TextStyle(color: colors.ink),
+                        Text(
+                          title,
+                          style: DoableType.title.copyWith(color: colors.ink),
                         ),
-                        TextSpan(text: text.after),
+                        const SizedBox(height: 6),
+                        Text.rich(
+                          paragraph,
+                          style: DoableType.body.copyWith(color: colors.muted),
+                        ),
                       ],
                     ),
-                    style: DoableType.body.copyWith(color: colors.muted),
                   ),
-                  const SizedBox(height: _actionsInset),
+                  SizedBox(height: actionsInset),
                   Align(
                     alignment: AlignmentDirectional.centerEnd,
                     child: OverflowBar(
-                      spacing: DoableMetrics.space2,
-                      overflowSpacing: DoableMetrics.space2,
+                      spacing: spacing,
+                      overflowSpacing: spacing,
                       overflowAlignment: OverflowBarAlignment.end,
-                      children: [
-                        Button.quiet(
-                          label: cancelLabel,
-                          onPressed: () => Navigator.pop(context, false),
-                        ),
-                        Button.danger(
-                          label: actionLabel,
-                          onPressed: () => Navigator.pop(context, true),
-                        ),
-                      ],
+                      children: actions,
                     ),
                   ),
                 ],
