@@ -3,17 +3,17 @@
 ## Assessment
 
 **Format version:** 1
-**Result:** No unresolved findings
+**Result:** Changes needed
 **Coverage status:** Complete
-**Summary:** Все восемь целевых коммитов и задачи 2.1–2.8 проверены: каркас страницы, закреплённые вкладки, типизированная цель открытия и независимое состояние статистики соответствуют границам фазы 2. Независимая оценка решений, сверка с OpenSpec и проверка качества завершены без существенных неразрешённых находок. Сохранён ранее принятый планировочный риск AR1 об оформлении замены требований. Полные проверки проекта, повторная генерация и release-сборка прошли. Фазы 3–6 остаются последующей работой.
+**Summary:** Все тринадцать целевых коммитов и задачи 3.1–3.13 проверены. Экран изменения, политика «успех без сообщения», занятость после возвращения и удаление встроенной правки в основном соответствуют фазе 3, полная проверка проекта проходит. Остаются три находки Medium. После сохранения названия правка снова открывается со старым текстом, пока подробные данные перечитываются (F5). В поле названия можно ввести перенос строки (F6). Заголовок панели экрана перекрывается кнопкой «Сохранить» (F7). Ещё две находки Low: область нажатия названия в шапке меньше `tap-min` (F8), а отказ сохранения может появиться вне видимой части экрана (F9). Ранее принятый планировочный риск AR1 сохранён.
 
 ## Review target
 
-- **Baseline ref:** a05e50bfb3270aa2c5a3191552a0ed8f579f0ae4
-- **Base commit:** a05e50bfb3270aa2c5a3191552a0ed8f579f0ae4
-- **Reviewed head:** 2cc7519fceb33cf44c279cb4c59057af398a62d7
-- **Target commits:** ["ae685ae21b2469401c4154b0683e9893b695ad11", "03021d0f1b34801b029bf8da3c603a40d6b67d1d", "d0b7d0c940b930050da8da43c44dfc659fd3e033", "5976e9fffe8b906d5951337b18dee78e2d0c5e8a", "0ee783e489e20929f8707184f6bae906c4af9e08", "13db381894c8efbf5ee0fbdacd51c3929421b433", "4288f5d5150ca9e7e2e7f6c9fa053b7635f22344", "2cc7519fceb33cf44c279cb4c59057af398a62d7"]
-- **Reviewable paths:** ["lib/l10n/app_en.arb", "lib/l10n/app_localizations.dart", "lib/l10n/app_localizations_en.dart", "lib/l10n/app_localizations_ru.dart", "lib/l10n/app_ru.arb", "lib/src/app/home/home_page.dart", "lib/src/app/routing/app_router.gr.dart", "lib/src/design_system/components/page_head.dart", "lib/src/design_system/components/tabs.dart", "lib/src/design_system/components/top_bar.dart", "lib/src/design_system/doable_icon.dart", "lib/src/design_system/icons/README.md", "lib/src/design_system/icons/assets/back.svg", "lib/src/intention/presentation/details/intention_details_page.dart", "lib/src/intention/presentation/details/intention_details_tabs.dart", "lib/src/intention/presentation/details/intention_page_target.dart", "lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_sliver.dart", "lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart", "lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.g.dart", "lib/src/statistics/presentation/intention_statistics_section.dart", "lib/src/statistics/presentation/intention_statistics_view_model.dart", "lib/src/statistics/presentation/intention_statistics_view_model.g.dart", "openspec/changes/redesign-intention-page/tasks.md", "test/app/intention_app_lifecycle_test.dart", "test/app/intention_creation_sheet_integration_test.dart", "test/app/intention_statistics_app_flow_test.dart", "test/app/intention_statistics_catalog_scenarios.dart", "test/app/intention_statistics_navigation_test.dart", "test/app/long_term_relation_app_flow_test.dart", "test/app/navigation/app_navigation_accessibility_test.dart", "test/app/navigation/app_shell_back_test.dart", "test/app/navigation/app_shell_operation_reset_test.dart", "test/app/navigation/app_shell_page_matrix.dart", "test/app/navigation/app_shell_pages_above_test.dart", "test/app/navigation/app_shell_state_test.dart", "test/app/navigation/ordinary_page_layout_scenarios.dart", "test/app/routing/app_router_test.dart", "test/daily_choice/presentation/daily_choice_creation_completion_test.dart", "test/daily_choice/presentation/daily_choice_creation_exit_test.dart", "test/daily_choice/presentation/daily_choice_creation_route_scenarios.dart", "test/design_system/doable_icon_test.dart", "test/design_system/goldens/doable_icons.png", "test/design_system/page_head_test.dart", "test/design_system/tabs_test.dart", "test/design_system/top_bar_test.dart", "test/intention/presentation/details/details_test_support.dart", "test/intention/presentation/details/intention_details_delete_test.dart", "test/intention/presentation/details/intention_details_head_test.dart", "test/intention/presentation/details/intention_details_page_test.dart", "test/intention/presentation/details/intention_details_statistics_test.dart", "test/intention/presentation/details/intention_details_tabs_test.dart", "test/long_term_relation/presentation/neighborhood/neighborhood_test_support.dart", "test/long_term_relation/presentation/neighborhood/relation_neighborhood_widget_test.dart", "test/statistics/presentation/intention_statistics_test_support.dart", "test/support/ordinary_page_test_app.dart"]
+- **Baseline ref:** 9c608971ba1c46949a1c57f40ca8856695585e0e
+- **Base commit:** 9c608971ba1c46949a1c57f40ca8856695585e0e
+- **Reviewed head:** 5eb233b2cefcafbe15b3a217be50b3a5bdbddc7c
+- **Target commits:** ["ab45934a550b21123321ac02d41ca2fe03e21e99", "d28af0af17dd71871845c8a9c95c05403a70641c", "8fd95c31bf1ffc6d50848b48c928fcbb257fcc09", "9d7b39e0b7492d64331bf17065deacc86a5b41fb", "2eea27e6dd34088ec43bdb07b2358bd35737051a", "6901c5c01bbb1859be6dc95f4cc7b64e4aa0c73c", "2bb02491a6c74e5c57252df6c68cdab988325ebc", "1b10ade707bc7050925cfa2d8de6ebd5caa0998b", "a380ac313b93eb9386f2b5b05c81929f7283c3cd", "e8e2119d3c2030e5678a40f18fe4f6b93c3a9ff5", "e9bb34fb6110b4d9454c699b9bd933129470d71a", "dbc2621192471829d5fc2cd70687b4188f115a09", "5eb233b2cefcafbe15b3a217be50b3a5bdbddc7c"]
+- **Reviewable paths:** ["lib/l10n/app_en.arb", "lib/l10n/app_localizations.dart", "lib/l10n/app_localizations_en.dart", "lib/l10n/app_localizations_ru.dart", "lib/l10n/app_ru.arb", "lib/src/app/routing/app_router.dart", "lib/src/app/routing/app_router.gr.dart", "lib/src/design_system/components/button.dart", "lib/src/design_system/components/confirm_dialog.dart", "lib/src/design_system/components/page_head.dart", "lib/src/design_system/components/text_field.dart", "lib/src/design_system/components/top_bar.dart", "lib/src/graph/application/graph_command_coordinator.dart", "lib/src/graph/application/graph_command_coordinator.g.dart", "lib/src/graph/presentation/graph_operation_presenter.dart", "lib/src/intention/domain/intention_text.dart", "lib/src/intention/presentation/details/intention_details_page.dart", "lib/src/intention/presentation/details/intention_details_state.dart", "lib/src/intention/presentation/details/intention_details_view_model.dart", "lib/src/intention/presentation/details/intention_details_view_model.g.dart", "lib/src/intention/presentation/edit/intention_edit_failure_message.dart", "lib/src/intention/presentation/edit/intention_edit_page.dart", "lib/src/intention/presentation/edit/intention_edit_state.dart", "lib/src/intention/presentation/edit/intention_edit_view_model.dart", "lib/src/intention/presentation/edit/intention_edit_view_model.g.dart", "lib/src/tag/presentation/editor/tag_sheet.dart", "openspec/changes/redesign-intention-page/tasks.md", "test/app/intention_app_lifecycle_test.dart", "test/app/intention_statistics_app_flow_test.dart", "test/app/long_term_relation_app_flow_test.dart", "test/app/navigation/app_shell_page_matrix.dart", "test/app/navigation/app_shell_pages_above_test.dart", "test/app/navigation/app_shell_state_test.dart", "test/app/navigation/app_shell_unnamed_page_scenarios.dart", "test/app/navigation/ordinary_page_layout_scenarios.dart", "test/app/quick_creation/quick_creation_launcher_test.dart", "test/app/quick_creation/quick_creation_launcher_test_support.dart", "test/design_system/button_test.dart", "test/design_system/confirm_dialog_test.dart", "test/design_system/page_head_test.dart", "test/design_system/text_field_test.dart", "test/design_system/top_bar_test.dart", "test/graph/presentation/graph_operation_message_plan_test.dart", "test/graph/presentation/package_consumers_test_support.dart", "test/graph/presentation/tag_package_catalog_consumers_test.dart", "test/intention/presentation/details/intention_details_head_test.dart", "test/intention/presentation/details/intention_details_page_test.dart", "test/intention/presentation/details/intention_details_tags_test.dart", "test/intention/presentation/details/intention_details_view_model_test.dart", "test/intention/presentation/edit/intention_edit_page_test.dart", "test/intention/presentation/edit/intention_edit_view_model_test.dart", "test/intention/presentation/operation/intention_command_coordinator_test.dart", "test/support/intention_creation_origin.dart", "test/support/intention_edit_screen.dart", "test/support/ordinary_page_test_app.dart"]
 - **OpenSpec change:** redesign-intention-page
 - **OpenSpec schema:** intent-driven
 - **Target scope:** User-requested bounded range
@@ -22,44 +22,94 @@
 
 ## Reviewed increment
 
-### U1 · Доступные компоненты панели, шапки и вкладок
+### U1 · Успех изменения названия и описания без сообщения
 
-- **Work items:** ["2.1", "2.2", "2.8"]
-- **Requirements and scenarios:** ["intention-management: Страница намерения и её вкладки — тип, полное название, локализованное имя при отсутствии подробностей и закрепление вкладок", "design: решения 1, 11, 12 и 14 — компоненты и проверки текущего каркаса", "tasks: критерии 2.1 и 2.2 — геометрия, темы, крупный текст, семантика, фокус и каталог иконок"]
-- **Affected boundary:** Пользователь страницы, включая пользователя экранного диктора и клавиатуры; потребители представлений дизайн-системы.
-- **Implementation target:** ["lib/src/design_system/components/page_head.dart", "lib/src/design_system/components/tabs.dart", "lib/src/design_system/components/top_bar.dart", "lib/src/design_system/doable_icon.dart", "lib/src/design_system/icons/README.md", "lib/src/design_system/icons/assets/back.svg", "test/design_system/doable_icon_test.dart", "test/design_system/goldens/doable_icons.png", "test/design_system/page_head_test.dart", "test/design_system/tabs_test.dart", "test/design_system/top_bar_test.dart"]
-- **Applicable constraints and non-goals:** Существующие варианты панели с крестиком и строкой назначения сохраняются. Компоненты получают готовые строки, доступные названия и обработчики, используют токены обеих тем и не зависят от предметных моделей или маршрутизации. Полное название переносится, заголовок панели ограничен одной строкой, выбранная вкладка доступна при увеличенном тексте. Эталон каталога иконок проверяет рисунок новой стрелки.
-- **Excluded change scope:** Действие справа, удержание стрелки, редактирование названия через шапку, метка архива и варианты вкладок без текущего потребителя относятся к последующим частям изменения.
+- **Work items:** ["3.1"]
+- **Requirements and scenarios:** ["intention-management: Независимость принятой изменяющей операции от экрана", "ADR-0046"]
+- **Affected boundary:** Координатор команд графа и общая поверхность сообщений результатов
+- **Implementation target:** ["lib/src/graph/application/graph_command_coordinator.dart", "lib/src/graph/application/graph_command_coordinator.g.dart", "lib/src/graph/presentation/graph_operation_presenter.dart", "test/graph/presentation/graph_operation_message_plan_test.dart", "test/intention/presentation/operation/intention_command_coordinator_test.dart"]
+- **Applicable constraints and non-goals:** Протокол ADR-0012 для отказа сохраняется; создание и удаление сохраняют политику по умолчанию; готовность, архивирование и восстановление не меняются до фазы 4.
 
-### U2 · Страница с закреплёнными вкладками и сохранением навигации
+### U2 · Компоненты дизайн-системы для экрана изменения и шапки
 
-- **Work items:** ["2.3", "2.4", "2.5", "2.8"]
-- **Requirements and scenarios:** ["intention-management: Страница намерения и её вкладки — Страница действия открывается на обзоре; Страница ненайденного намерения сохраняет доступное имя; Длинное название переходит в панель при прокрутке; «Назад» не возвращает к прежней вкладке", "intention-management: Счётчики групп на странице намерения — число активных и отметка архива на вкладке", "app-navigation: Панель на обычных страницах; Сброс истории выбором пункта", "plan: Phase 2 — прежние содержимое и общее состояние соседства", "tasks: 2.5 — положение при смене вкладки и отсутствие повторного применения прежнего якоря"]
-- **Affected boundary:** Страница намерения, общая прокрутка, соседство связей, оболочка обычных страниц и существующие потоки создания, изменения и удаления.
-- **Implementation target:** ["lib/l10n/app_en.arb", "lib/l10n/app_localizations.dart", "lib/l10n/app_localizations_en.dart", "lib/l10n/app_localizations_ru.dart", "lib/l10n/app_ru.arb", "lib/src/intention/presentation/details/intention_details_page.dart", "lib/src/intention/presentation/details/intention_details_tabs.dart", "lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_sliver.dart", "lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart", "lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.g.dart", "test/app/intention_app_lifecycle_test.dart", "test/app/intention_creation_sheet_integration_test.dart", "test/app/long_term_relation_app_flow_test.dart", "test/app/navigation/app_navigation_accessibility_test.dart", "test/app/navigation/app_shell_back_test.dart", "test/app/navigation/app_shell_operation_reset_test.dart", "test/app/navigation/app_shell_page_matrix.dart", "test/app/navigation/app_shell_pages_above_test.dart", "test/app/navigation/app_shell_state_test.dart", "test/app/navigation/ordinary_page_layout_scenarios.dart", "test/app/routing/app_router_test.dart", "test/daily_choice/presentation/daily_choice_creation_completion_test.dart", "test/daily_choice/presentation/daily_choice_creation_exit_test.dart", "test/daily_choice/presentation/daily_choice_creation_route_scenarios.dart", "test/intention/presentation/details/details_test_support.dart", "test/intention/presentation/details/intention_details_delete_test.dart", "test/intention/presentation/details/intention_details_head_test.dart", "test/intention/presentation/details/intention_details_page_test.dart", "test/intention/presentation/details/intention_details_tabs_test.dart", "test/long_term_relation/presentation/neighborhood/neighborhood_test_support.dart", "test/long_term_relation/presentation/neighborhood/relation_neighborhood_widget_test.dart", "test/support/ordinary_page_test_app.dart"]
-- **Applicable constraints and non-goals:** Обзор содержит прежние данные, действия, встроенную правку и теги; Связи — прежнее соседство. Переключение не создаёт маршрут и сохраняет вкладку при возврате сверху. При скрытой шапке новое тело начинается под закреплёнными вкладками; при видимой сохраняется смещение. До первого показа Связей чтения групп нет, затем соседство удерживается до закрытия страницы. Число на вкладке берётся из сводки подробных данных; дневные роли в него не входят. Схема хранения и правила команд не меняются.
-- **Excluded change scope:** Вкладка Выборы, новый вид Обзора и Связей, отдельный экран правки, параметры, новая политика сообщений и состояние связей экземпляра страницы принадлежат фазам 3–6. Освобождение порций соседства при каждом переключении пока не является обязанностью этой фазы.
+- **Work items:** ["3.2", "3.3", "3.4", "3.8"]
+- **Requirements and scenarios:** ["design: решение 11", "intention-management: Экран изменения намерения"]
+- **Affected boundary:** Потребители компонентов дизайн-системы и пользователи экранного диктора в обеих темах и при увеличенном тексте
+- **Implementation target:** ["lib/src/design_system/components/text_field.dart", "lib/src/design_system/components/button.dart", "lib/src/design_system/components/top_bar.dart", "lib/src/design_system/components/confirm_dialog.dart", "lib/src/design_system/components/page_head.dart", "lib/src/tag/presentation/editor/tag_sheet.dart", "test/design_system/text_field_test.dart", "test/design_system/button_test.dart", "test/design_system/top_bar_test.dart", "test/design_system/confirm_dialog_test.dart", "test/design_system/page_head_test.dart"]
+- **Applicable constraints and non-goals:** Компоненты остаются представлением по ADR-0029/0030 и следуют README в `context/doable-design-system/components/`; варианты добавляются только с потребителем. Режим сохранённого текста поля, кнопка-иконка справа в панели и слоты архива в шапке не входят.
 
-### U3 · Цель открытия и статистика видимого экземпляра страницы
+### U3 · Экран изменения намерения и вход в него со страницы
 
-- **Work items:** ["2.6", "2.7", "2.8"]
-- **Requirements and scenarios:** ["intention-management: Цель открытия страницы намерения — выбор доступной вкладки и независимость состояния экземпляров", "intention-management: Раздел статистики на странице намерения — Страница открывается на разделе статистики", "contribution-statistics: Переходы из статистики — Элемент Главной открывает тот же вид; Элемент разбивки открывает соответствующий вид; День открывает каталог на эту дату", "contribution-statistics: Согласование статистики с изменениями; Состояния получения статистики", "design: решения 2 и 9; ADR-0027; ADR-0028"]
-- **Affected boundary:** Вызывающие страницу Главная и разбивки статистики, экземпляр страницы, модель статистики и видимость маршрута.
-- **Implementation target:** ["lib/src/app/home/home_page.dart", "lib/src/app/routing/app_router.gr.dart", "lib/src/intention/presentation/details/intention_details_page.dart", "lib/src/intention/presentation/details/intention_page_target.dart", "lib/src/statistics/presentation/intention_statistics_section.dart", "lib/src/statistics/presentation/intention_statistics_view_model.dart", "lib/src/statistics/presentation/intention_statistics_view_model.g.dart", "test/app/intention_statistics_app_flow_test.dart", "test/app/intention_statistics_catalog_scenarios.dart", "test/app/intention_statistics_navigation_test.dart", "test/intention/presentation/details/intention_details_statistics_test.dart", "test/intention/presentation/details/intention_details_tabs_test.dart", "test/statistics/presentation/intention_statistics_test_support.dart"]
-- **Applicable constraints and non-goals:** Начальная цель применяется один раз и допускает только доступные вкладки. Период, вид и загруженные порции статистики сохраняются при смене вкладки и независимы у разных страниц одного намерения. Смена идентификатора у виджета создаёт новый экземпляр. Чтения разрешены только текущему маршруту с выбранной Статистикой; накопленные изменения вызывают одно обновление при показе. Уведомление об обновлении остаётся ниже полосы вкладок. Обычные вызовы без цели открывают Обзор.
-- **Excluded change scope:** Группа связей в цели появится в фазе 6, цель Выборов — в фазе 5. Формулы статистики и её оформление не меняются.
+- **Work items:** ["3.5", "3.6", "3.7", "3.8", "3.9", "3.12"]
+- **Requirements and scenarios:** ["intention-management: Экран изменения намерения", "intention-management: Независимость принятой изменяющей операции от экрана", "app-navigation: Панель на обычных страницах", "app-appearance: Светлое и тёмное оформление по системной настройке", "design: решения 3 и 5"]
+- **Affected boundary:** Пользователь страницы намерения и экрана «Изменить намерение»; модель подробных данных и сессия экрана изменения
+- **Implementation target:** ["lib/l10n/app_en.arb", "lib/l10n/app_localizations.dart", "lib/l10n/app_localizations_en.dart", "lib/l10n/app_localizations_ru.dart", "lib/l10n/app_ru.arb", "lib/src/app/routing/app_router.dart", "lib/src/app/routing/app_router.gr.dart", "lib/src/intention/domain/intention_text.dart", "lib/src/intention/presentation/details/intention_details_page.dart", "lib/src/intention/presentation/details/intention_details_state.dart", "lib/src/intention/presentation/details/intention_details_view_model.dart", "lib/src/intention/presentation/details/intention_details_view_model.g.dart", "lib/src/intention/presentation/edit/intention_edit_failure_message.dart", "lib/src/intention/presentation/edit/intention_edit_page.dart", "lib/src/intention/presentation/edit/intention_edit_state.dart", "lib/src/intention/presentation/edit/intention_edit_view_model.dart", "lib/src/intention/presentation/edit/intention_edit_view_model.g.dart", "test/intention/presentation/details/intention_details_head_test.dart", "test/intention/presentation/details/intention_details_page_test.dart", "test/intention/presentation/details/intention_details_tags_test.dart", "test/intention/presentation/details/intention_details_view_model_test.dart", "test/intention/presentation/edit/intention_edit_page_test.dart", "test/intention/presentation/edit/intention_edit_view_model_test.dart", "test/support/ordinary_page_test_app.dart"]
+- **Applicable constraints and non-goals:** Экран-задача без нижней панели по ADR-0020; отказ проверки поля у поля, остальные на экране, затем оболочке по ADR-0012; вход недоступен при занятости намерения. Вход из описания и параметров, Обзор и меню относятся к фазе 4.
+- **Excluded change scope:** Переходы готовности, архивирования, восстановления и удаления сохраняют прежнее предъявление до фазы 4.
+
+### U4 · Сквозные сценарии и навигация после переноса правки
+
+- **Work items:** ["3.10", "3.11", "3.12", "3.13"]
+- **Requirements and scenarios:** ["app-navigation: Панель на обычных страницах", "app-navigation: Сброс истории выбором пункта", "quick-creation: Запуск режима поверх текущей страницы", "intention-management: Экран изменения намерения"]
+- **Affected boundary:** Сквозные сценарии приложения, матрица страниц навигации, быстрое создание и пакеты тегов
+- **Implementation target:** ["test/app/intention_app_lifecycle_test.dart", "test/app/intention_statistics_app_flow_test.dart", "test/app/long_term_relation_app_flow_test.dart", "test/app/navigation/app_shell_page_matrix.dart", "test/app/navigation/app_shell_pages_above_test.dart", "test/app/navigation/app_shell_state_test.dart", "test/app/navigation/app_shell_unnamed_page_scenarios.dart", "test/app/navigation/ordinary_page_layout_scenarios.dart", "test/app/quick_creation/quick_creation_launcher_test.dart", "test/app/quick_creation/quick_creation_launcher_test_support.dart", "test/graph/presentation/package_consumers_test_support.dart", "test/graph/presentation/tag_package_catalog_consumers_test.dart", "test/support/intention_creation_origin.dart", "test/support/intention_edit_screen.dart"]
+- **Applicable constraints and non-goals:** Сценарии сохраняют прежние ожидания согласования каталога, соседства и параметров; ручная проверка на устройстве за пользователем.
 
 ## Pass coverage
 
 | Pass | Status | Evidence or limitation |
 |---|---|---|
-| Independent decision review | Complete | Два свежих рецензента без истории диалога, gpt-6.1-sol/high: `/root/decision_components` проверил все 11 путей U1; `/root/decision_page` — объединение всех 43 путей U2/U3. U2 и U3 объединены из-за общих изменённых файлов, U1 не пересекается с ними. Переданы только нейтральные цели, ограничения, точные base/head и границы путей; планирование, отчёты и прежние риски не передавались. Оба результата — No substantive findings, Coverage: Complete. |
-| OpenSpec conformance | Complete | Сопоставлены все задачи, коммиты, применимые требования и сценарии. Артефакты прочитаны из записанного head. Строгая проверка OpenSpec, полный `mise run check`, `mise run codegen-check` и release-сборка завершились с кодом 0 в корне репозитория на записанном head; свидетельства ниже. |
-| Code quality | Complete | По `code-review-and-quality` проверены все 54 пути реализации, локализаций, сгенерированного кода, ресурсов и тестов: корректность, читаемость, архитектура, безопасность и производительность. Прослежены существующие потребители, наблюдение деталей, видимость статистики, якоря и ограниченные порции соседства. Существенных дефектов и необоснованного расширения текущего этапа не установлено. |
+| Independent decision review | Complete | Два свежих изолированных рецензента по `implementation-decision-review` с нейтральными брифами, без артефактов планирования и истории. Первый проверил U2: 11 путей компонентов и их проверок, полностью прочитанных на head. Второй проверил U1, U3 и U4 вместе, потому что у них общие файлы локализации и проверок: 43 пути. Оба сообщили полное покрытие своих границ, код они не запускали. |
+| OpenSpec conformance | Complete | Сверены задачи 3.1–3.13, решения 3, 4, 5, 10, 11 и 14 design, ADR-0046 и сценарии требований «Экран изменения намерения», «Независимость принятой изменяющей операции от экрана», навигации, быстрого создания и оформления. `rg -nw 'beginEditing&#124;cancelEditing&#124;saveChanges&#124;IntentionDetailsEdit&#124;detailsSaved' lib test` и `rg -n 'intention-details-edit' lib test` ничего не нашли. `mise exec --no-deps -- openspec validate redesign-intention-page --strict --no-interactive --json` дал valid. `mise run check` прошёл в рабочей копии на 5eb233b2cefcafbe15b3a217be50b3a5bdbddc7c, совпадающей с HEAD и чистой: format, проверки скриптов, `flutter analyze` без замечаний, 3540 обычных тестов и 18 процессных. Сборка APK и ручная проверка на устройстве в этом обзоре не выполнялись. |
+| Code quality | Complete | В контексте координатора применены пять линз `code-review-and-quality` к модели и странице экрана изменения, сообщениям отказа, модели и странице подробных данных, координатору и презентеру, нормализации названия и компонентам. Перекрытие в `TopBar` измерено временным тестом со шрифтом Inter на 360 и 390 при масштабе 1 и 1,3; тест удалён, рабочая копия чистая. |
 
 ## Findings
 
-No unresolved findings remain in the implementation review.
+### F5 · Medium — После сохранения правка открывается со старым текстом, пока подробные данные перечитываются
+
+- **Evidence:** Координатор снимает гейт намерения до публикации завершения: `lib/src/graph/application/graph_command_coordinator.dart:1208-1214`. На это завершение модель подробных данных перезапускает наблюдение с `_preserveAuthoritativeStateWhileLoading = true` и оставляет прежний `IntentionDetailsLoaded` со старыми названием и описанием до асинхронного перечитывания: `lib/src/intention/presentation/details/intention_details_view_model.dart:183-227`. Вход в правку смотрит только на занятость (`lib/src/intention/presentation/details/intention_details_page.dart:201-211, 229`), а она уже снята. Сессия экрана берёт снимок из этого состояния одним `ref.read` (`lib/src/intention/presentation/edit/intention_edit_view_model.dart:46-59`). Сквозной сценарий подтверждает это окно: после закрытия экрана шапка показывает прежнее название до `emitDetail(2, updated)` (`test/app/intention_app_lifecycle_test.dart:158-177`). Проверки страницы проверяют доступность входа только после нового снимка.
+- **Evidence revisions:** ["5eb233b2cefcafbe15b3a217be50b3a5bdbddc7c"]
+- **Impact:** Пользователь сохраняет новое название, сразу снова нажимает на название и меняет только описание. «Сохранить» отправит `UpdateIntention` со старым названием, и только что сохранённое название молча откатится. Требование «Экран изменения намерения» обязывает открывать экран с последними подтверждёнными названием и описанием.
+- **Required outcome:** Новая сессия экрана изменения не может начаться или отправить изменение по тексту старше последнего подтверждённого изменения этого намерения. Проверка страницы закрепляет поведение в промежутке между завершением сохранения и приходом нового снимка.
+- **Earliest source of truth:** implementation/tests
+- **Affected artifacts:** ["lib/src/intention/presentation/details/intention_details_page.dart", "lib/src/intention/presentation/details/intention_details_view_model.dart", "lib/src/intention/presentation/edit/intention_edit_view_model.dart", "test/intention/presentation/details/intention_details_page_test.dart"]
+
+### F6 · Medium — В поле названия экрана изменения можно ввести перенос строки
+
+- **Evidence:** `TextField.multiline` по умолчанию передаёт `maxLines: null` и не задаёт `keyboardType`, `textInputAction` или фильтр ввода (`lib/src/design_system/components/text_field.dart:35-50, 99-105`). Поэтому Flutter выбирает многострочную клавиатуру с клавишей перевода строки для любого вида, и `kind` меняет только стиль. Экран изменения строит название именно так (`lib/src/intention/presentation/edit/intention_edit_page.dart:143-160`). Нормализация названия обрезает только края (`lib/src/intention/domain/intention_text.dart:42-57`), поэтому внутренний `\n` сохраняется. Прежняя встроенная форма была однострочной. Растущее поле названия в панели создания явно задаёт `TextInputType.text` и `TextInputAction.next` (`lib/src/intention/presentation/editor/intention_editor_page.dart:165-172`).
+- **Evidence revisions:** ["5eb233b2cefcafbe15b3a217be50b3a5bdbddc7c"]
+- **Impact:** Ввод на экранной клавиатуре или вставка многострочного текста сохраняет название с переносами. Такое название невозможно получить через панель создания, и оно ломает однострочные строки каталога, поисков и панели. Это регрессия по сравнению со встроенной правкой.
+- **Required outcome:** В названии на экране изменения жёсткий перенос нельзя ввести ни набором, ни вставкой. Название при этом переносится визуально и растёт. Описание сохраняет ввод переносов. Проверка закрепляет это для названия.
+- **Earliest source of truth:** implementation/tests
+- **Affected artifacts:** ["lib/src/design_system/components/text_field.dart", "lib/src/intention/presentation/edit/intention_edit_page.dart", "test/design_system/text_field_test.dart", "test/intention/presentation/edit/intention_edit_page_test.dart"]
+
+### F7 · Medium — Заголовок панели экрана изменения перекрывается кнопкой «Сохранить»
+
+- **Evidence:** `TopBar.withButton` центрирует заголовок с постоянным отступом 64 с каждой стороны (`lib/src/design_system/components/top_bar.dart:49, 276-278`) и рисует поверх него кнопку `sm` справа в `space-3` от края (`top_bar.dart:348-358`). Ширина кнопки зависит от подписи и масштаба. Временный тест со шрифтом Inter для «Изменить намерение» и «Сохранить» показал перекрытие плашки и заголовка. На ширине 360 при масштабе 1: заголовок 90–270, плашка 240–348. На 390 при масштабе 1: заголовок до 284,6, плашка от 270,5. При масштабе 1,3 перекрытие достигает 52–66 px. `test/design_system/top_bar_test.dart:379-401` закрепляет прямоугольник заголовка 64–326 рядом с плашкой, а проверка при масштабе 2 перекрытие не проверяет. Отступ 64 взят из README `TopBar` и критерия задачи 3.3.
+- **Evidence revisions:** ["5eb233b2cefcafbe15b3a217be50b3a5bdbddc7c"]
+- **Impact:** На обычных телефонах на русском языке заголовок экрана «Изменить намерение» частично закрыт кнопкой «Сохранить», а при увеличенном тексте закрыт сильнее. Видимый заголовок маршрута теряет читаемость.
+- **Required outcome:** Заголовок панели с кнопкой справа не пересекается с ней при любой подписи и масштабе текста и обрезается многоточием до её края. Компонентные проверки закрепляют отсутствие пересечения.
+- **Earliest source of truth:** task/verification
+- **Affected artifacts:** ["tasks.md 3.3", "lib/src/design_system/components/top_bar.dart", "test/design_system/top_bar_test.dart"]
+- **Decision needed:** Правило README «по центру, не шире панели без 64 с каждой стороны» нельзя выполнить без перекрытия. Нужно выбрать раскладку: симметричный отступ по ширине кнопки, сохраняющий центр, или смещение заголовка от кнопки.
+
+### F8 · Low — Область нажатия названия в шапке ниже `tap-min`
+
+- **Evidence:** `PageHead` оборачивает в `InkWell` только `Text` названия (`lib/src/design_system/components/page_head.dart:26-45`). Поля 2 и 6 стоят снаружи, поэтому однострочное название `page-title` даёт область высотой 30. `test/design_system/page_head_test.dart:41-46` это закрепляет. README основ требует у кнопки область нажатия не меньше `tap-min` при любой видимой высоте (`context/doable-design-system/README.md:76`), а README `PageHead` называет название кнопкой.
+- **Evidence revisions:** ["5eb233b2cefcafbe15b3a217be50b3a5bdbddc7c"]
+- **Impact:** Единственный вход в правку в фазе 3 — цель высотой 30 вместо 44. В неё труднее попасть, особенно пользователям с нарушениями моторики.
+- **Required outcome:** Область нажатия названия не ниже `tap-min`, при этом видимые поля шапки и перенос названия не меняются. Компонентная проверка это закрепляет.
+- **Earliest source of truth:** implementation/tests
+- **Affected artifacts:** ["lib/src/design_system/components/page_head.dart", "test/design_system/page_head_test.dart"]
+
+### F9 · Low — Отказ сохранения может появиться вне видимой части экрана изменения
+
+- **Evidence:** Общий отказ вставляется как `Notice` в начало `SingleChildScrollView` (`lib/src/intention/presentation/edit/intention_edit_page.dart:117-142`). Отказ названия рисуется под первым полем. «Сохранить» стоит в неподвижной верхней панели, поэтому её можно нажать из любой позиции прокрутки. Проверка раскладки при масштабе 2 с открытой клавиатурой показывает, что поле описания выше видимой части (`test/intention/presentation/edit/intention_edit_page_test.dart:260-290`). При вводе описания прокрутка уводит начало экрана. Свидетельство кадра подтверждает предъявление только в видимой области, поэтому право остаётся у экрана, пока пользователь не прокрутит вверх.
+- **Evidence revisions:** ["5eb233b2cefcafbe15b3a217be50b3a5bdbddc7c"]
+- **Impact:** При увеличенном тексте или длинном описании отказ хранилища или проверки названия не виден и не объявляется. Пользователь видит только снова доступную «Сохранить». Если он затем выберет «Отменить», сообщение придёт уже после ухода.
+- **Required outcome:** Отказ, пришедший при открытом экране изменения, становится видимым и доступным диктору без ручной прокрутки. Проверка закрепляет это для прокрученного экрана.
+- **Earliest source of truth:** implementation/tests
+- **Affected artifacts:** ["lib/src/intention/presentation/edit/intention_edit_page.dart", "test/intention/presentation/edit/intention_edit_page_test.dart"]
 
 ## Accepted risks
 
@@ -76,78 +126,13 @@ No unresolved findings remain in the implementation review.
 - **Acceptance lifetime:** Change-scoped
 - **Current target relation:** Carried forward; not re-reviewed
 
+
 ## Review coverage
 
-Проверка выполнена в `/home/seniorkonung/.paseo/worktrees/1id27gtb/real-fireant` на `2cc7519fceb33cf44c279cb4c59057af398a62d7`. Исходная рабочая копия чистая, HEAD совпадал с Reviewed head; исключённых незакоммиченных изменений нет. Все 55 путей записанного diff учтены: 54 пути входят в U1–U3, `tasks.md` служит свидетельством планирования. Это также точное подмножество путей реализации для проверки качества. Несопоставленных и посторонних путей нет. Неизменённые зависимости изучались только как контекст.
+Независимые проверки решений. Брифы содержали только проблему, результат, границу, обязательные ограничения и пути. Рецензенты проследили приём команд, гейт, порядок публикации и выдачу права в координаторе. Они проверили уход во время сохранения, успех без сообщения и защиту `_closeRoute` от позднего результата. Также проверены геометрия и доступность компонентов, исходы ответов диалога отмены и сохранение вида ошибки в листе тега.
 
-Proposal, все шесть delta-спецификаций, design, ADR-манифест, plan и tasks прочитаны из записанного head. Дополнительно сверены каноническая спецификация contribution-statistics, ADR-0027, ADR-0028 и термины CONTEXT.md. Статус и `instructions apply` использованы только для определения графа артефактов и прогресса. Внешние README компонентов из `context/doable-design-system/components/` не версионируются этим репозиторием и использованы как вспомогательный контекст; обязательства текущего этапа закреплены в committed tasks и design. Неподтверждённые внешние материалы не использованы для оправдания реализации.
+Сверка с OpenSpec. Для каждой задачи 3.1–3.13 найдены реализация и проверки. Экран-задача входит в матрицу навигации с `panel: false`. Сценарии быстрого создания и сброса истории очищены от встроенной правки, тексты добавлены на обоих языках. Строки встроенной правки удалены, `detailsCancelEditAction` и `detailsOperationRunning` остаются у других потребителей. Блок тегов читает занятость у координатора при перестройке, поэтому `tag_assignments_section.dart` не требовал изменений по 3.9. Будущие фазы 4–6 не считались обязательствами диапазона.
 
-AR1 перенесён из предыдущего отчёта с исходной ревизией свидетельства и явным указанием, что он не переоценивался в текущем диапазоне. Условие его принятия сохраняется в неизменённых delta-спецификациях и `review.md`; его сохранение не означает нового принятия риска. Планировочный AR2 о трёх колонках CountTiles остаётся в `review.md` и ADR-0048, относится к фазе 6 и реализацией этого этапа не затронут.
+Качество. Сила типов: закрытые варианты `IntentionCommandCompletion` разделяют предъявляемое завершение и успех изменения. Ветвь `(update, _)` в `_successFor` презентера недостижима по типу завершения. Выполняющийся токен и опубликованное право освобождаются при уходе. Безопасности, данных и миграций диапазон не касается.
 
-Каждый целевой коммит сопоставлен со своей задачей:
-
-taskId 10, задача 2.1, коммит `ae685ae21b2469401c4154b0683e9893b695ad11`. U1: варианты TopBar, стрелка, доступное имя без видимого заголовка, ресурс и эталон иконок.
-
-taskId 11, задача 2.2, коммит `03021d0f1b34801b029bf8da3c603a40d6b67d1d`. U1: PageHead и Tabs, семантика, горизонтальная прокрутка, крупный текст и фокус.
-
-taskId 12, задача 2.3, коммит `d0b7d0c940b930050da8da43c44dfc659fd3e033`. U2: панель типа, измеряемая шапка, переход названия при прокрутке; состояния чтения и прежние вызовы возврата.
-
-taskId 13, задача 2.4, коммит `5976e9fffe8b906d5951337b18dee78e2d0c5e8a`. U2: вкладки, перенос прежнего содержимого, отложенный старт и удержание соседства, числа и переход к архиву; адаптация потребителей.
-
-taskId 14, задача 2.5, коммит `0ee783e489e20929f8707184f6bae906c4af9e08`. U2: смещение при смене вкладки, минимальная высота тела, линия закрепления и восстановление только новых якорей.
-
-taskId 15, задача 2.6, коммит `13db381894c8efbf5ee0fbdacd51c3929421b433`. U3: единая синхронизация видимости по маршруту и вкладке, отложенное чтение и сохранение порций.
-
-taskId 16, задача 2.7, коммит `4288f5d5150ca9e7e2e7f6c9fa053b7635f22344`. U3: закрытый тип цели, ключ экземпляра, маршруты, провайдеры и оба вызывающих со статистикой.
-
-taskId 17, задача 2.8, коммит `2cc7519fceb33cf44c279cb4c59057af398a62d7`. U1–U3: корректировка сквозных проверок под вкладки и подтверждение готовности свежими проверками и сборкой этой сессии.
-
-Проверены также все восемь последовательных taskCommitRanges из workflow. В каждом коммите `tasks.md` меняет только ожидаемую отметку своей задачи с незавершённой на завершённую: номера, описания, порядок и остальные отметки сохранены. Все задачи 2.1–2.8 остаются завершёнными; задачи и план в review не редактировались.
-
-Ключевые сценарии проверены по следующим свидетельствам записанного head:
-
-Тип, полное название, стрелка и доступное имя без заголовка во время загрузки, отсутствия намерения или отказа. `intention_details_page.dart:243`, `intention_details_head_test.dart:20` и `:60`; варианты панели проверены на обоих языках, компонент — в обеих темах.
-
-Длинное название заменяет тип и возвращает его; архивное название приглушено, масштаб текста меняет порог. `intention_details_page.dart:165`, `intention_details_head_test.dart:107` и `:146`; геометрия и отсутствие усечения PageHead — `page_head_test.dart:50`.
-
-Выбор вкладок, число активных связей и архив в семантике; прокрутка и фокус без изменения вертикального положения. `intention_details_tabs.dart:29`, `intention_details_tabs_test.dart:199`; `tabs_test.dart:48`, `:196`, `:251` и `:283`.
-
-Первое открытие Обзора без чтения групп, отложенное открытие Связей и переход к архивной группе. `intention_details_page.dart:100`, `intention_details_tabs_test.dart:38`, `:133` и `:199`; архив выбирается по подтверждённой сводке страницы.
-
-Вкладки остаются под панелью; смена вкладки сохраняет видимую шапку или начинает тело под закреплёнными вкладками. `intention_details_page.dart:111`, `intention_details_tabs.dart:101`; `intention_details_tabs_test.dart:60` и `:96`, включая короткое тело и высокий viewport.
-
-Прежний якорь не сдвигает повторно показанные Связи; новое согласование видимого списка сохраняет строку. `relation_neighborhood_sliver.dart:84` и `:310`; новые проверки `relation_neighborhood_widget_test.dart:698` для обоих положений шапки, сохранённая проверка согласования `:612`.
-
-«Назад» закрывает страницу после смены вкладок; возврат сверху сохраняет вкладку, группу и позицию. `intention_details_tabs_test.dart:254`; изменённые app/navigation и routing тесты сохраняют нижнюю панель, сброс истории и отсутствие поздней навигации закрытого маршрута.
-
-Статистика не читается под другим маршрутом и на других вкладках, обновляется один раз при показе, сохраняет условия. `intention_details_page.dart:146`; `intention_details_statistics_test.dart:323` и `:671`, существующие проверки модели в `test/statistics/presentation/`.
-
-Уведомление обновления и повтор остаются под вкладками в обеих ориентациях и локалях. `intention_statistics_section.dart:37`; `intention_details_statistics_test.dart:50` проверяет уведомление над обзором и обеими разбивками.
-
-Начальная цель применяется один раз, смена намерения создаёт новый экземпляр; две страницы одного намерения независимы. `intention_page_target.dart:4` и `:24`, `intention_details_page.dart:90` и `:207`; `intention_details_statistics_test.dart:434` и `:539`.
-
-Главная и все разбивки передают правильные вид и период; возврат сохраняет условия, порции и прокрутку. `home_page.dart:104`, `intention_statistics_section.dart:99`; `intention_statistics_navigation_test.dart:35`, `:75` и `:119`, дополнительно сквозные сценарии статистики.
-
-Прежние правка, теги, создание связей и дневных выборов, архивирование и удаление доступны на своих вкладках. Сохранённые ожидания в details, long_term_relation, daily_choice и app тестах; изменения выбирают нужную вкладку и новый элемент возврата. Проверки данных и результатов операций не заменены ожиданием одного лишь открытия вкладки.
-
-Во всех ссылках без каталога используются файлы из перечисленных Implementation target. Компоненты остаются представлениями; выбранная вкладка и статистика принадлежат экземпляру, данные намерения и временно удерживаемое соседство — идентичности намерения по границам фазы. Поздние ответы защищены существующими поколениями моделей. Новых внешних интеграций, зависимостей, SQL, миграций, диагностических событий или обрабатываемых пользовательских данных нет. Локализации ru/en и сгенерированные маршруты/провайдеры сверены с исходниками и повторной генерацией. Новые проверки охраняют договорённости компонентов, границы видимости и состояния; необоснованных вариантов или сценариев вне текущего этапа не установлено.
-
-Свежая проверка в этой сессии на записанном head, до изменения файла отчёта:
-
-Команда `mise run check`. Код 0: форматирование 808 файлов без изменений, обе shell-проверки, `flutter analyze` без замечаний, 3474 обычных теста и 18 тестов `flutter_process` прошли.
-
-Команда `mise exec --no-deps -- openspec validate redesign-intention-page --strict --no-interactive --json`. Код 0; `valid: true`, список issues пуст.
-
-Команда `mise run codegen-check`. Код 0 на чистой рабочей копии; повторная генерация локализации, провайдеров, маршрутов и схемы не изменила файлы.
-
-Команда `mise exec --no-deps -- flutter build apk --release`. Код 0; `build/app/outputs/flutter-apk/app-release.apk`, 71.9 MB. SHA-256: `fde08cfec6f637bebf4f68e7a9f8dcb35c5f469cdf5dd9ffb750fa55cc412447`.
-
-Команда `git diff --check a05e50bfb3270aa2c5a3191552a0ed8f579f0ae4 2cc7519fceb33cf44c279cb4c59057af398a62d7`. Код 0, ошибок пробелов нет.
-
-Поиск в `lib/` и `test/` на записанном head. `statisticsTarget` отсутствует; в файле страницы нет AppBar, единственное использование `detailsTitle` — `routeName` панели без видимого заголовка, строка 259.
-
-Dart MCP: roots add, затем DTD listDtdUris. Запущенных debug-приложений и DTD нет; hot restart и runtime errors неприменимы. Использованы CLI-проверки; устройство и эмулятор не запускались.
-
-APK для пользователя: [app-release.apk](../../../build/app/outputs/flutter-apk/app-release.apk). На устройстве остаются неподтверждёнными: тип и значок панели, перенос длинного названия в панель и обратно, приглушение архивного названия; закреплённые вкладки с линией и прокруткой при крупном шрифте, число и архив на Связях; открытие Статистики с Главной и из разбивки с нужными видом и периодом; возврат после переключения вкладок. Эти ручные проверки не блокируют завершение фазы по правилам репозитория и не объявлены выполненными.
-
-Код, тесты и плановые артефакты в review не исправлялись; проверка не выявила работы, требующей новых задач или передачи на ремедиацию. Незавершённых решений нет. Сохранённый AR1 остаётся принятым планировочным риском, без нового принятия. Отчёт фиксирует свидетельства проверки; переходом к следующим фазам и публикацией управляет оркестратор.
+Не выполнено: сборка APK, сравнение с макетом и ручные проверки на устройстве из 3.13: курсор, рост описания, клавиатура, вопрос об отмене и смена темы. Они остаются за пользователем.
