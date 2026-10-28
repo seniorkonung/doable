@@ -9,6 +9,7 @@ import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart'
     as catalog_page;
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
+import 'package:doable/src/intention/presentation/edit/intention_edit_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter/material.dart';
@@ -20,6 +21,7 @@ import '../support/quick_creation.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
+import '../support/intention_edit_screen.dart';
 
 void main() {
   testWidgets(
@@ -166,6 +168,7 @@ void main() {
       await _pumpUntilDetailsTitle(tester, 'Беречь здоровье');
 
       await _renameCurrentIntention(tester, 'Укреплять здоровье');
+      await _chooseDetailsTab(tester, 'Relations');
       const renamedPhrase = 'To Укреплять здоровье, you need Много ходить';
       await _pumpUntilFound(tester, find.text(renamedPhrase));
 
@@ -731,24 +734,14 @@ Future<void> _returnToCatalog(WidgetTester tester) async {
 }
 
 Future<void> _renameCurrentIntention(WidgetTester tester, String title) async {
-  await _chooseDetailsTab(tester, 'Overview');
-  final edit = find.byKey(const ValueKey('intention-details-edit'));
-  await _ensureVisible(tester, edit);
-  await tester.tap(edit);
-  await _pumpUntilFound(
-    tester,
-    find.byKey(const ValueKey('intention-details-edit-title')),
-  );
-  await tester.enterText(
-    find.byKey(const ValueKey('intention-details-edit-title')),
-    title,
-  );
-  final submit = find.byKey(const ValueKey('intention-details-edit-submit'));
-  await _ensureVisible(tester, submit);
-  await tester.tap(submit);
+  await _ensureVisible(tester, intentionHeadTitle);
+  await tester.tap(intentionHeadTitle);
+  await tester.pumpAndSettle(const Duration(milliseconds: 1));
+  await tester.enterText(intentionEditTitleField, title);
+  await tester.pump();
+  await tester.tap(intentionEditSave);
+  await _pumpUntilAbsent(tester, find.byType(IntentionEditPage));
   await _pumpUntilDetailsTitle(tester, title);
-  await _dismissOperationMessage(tester);
-  await _chooseDetailsTab(tester, 'Relations');
 }
 
 Future<void> _ensureVisible(WidgetTester tester, Finder finder) async {

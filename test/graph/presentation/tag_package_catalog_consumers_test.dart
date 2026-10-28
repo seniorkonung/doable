@@ -11,7 +11,6 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
-import 'package:doable/src/intention/presentation/details/intention_details_view_model.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag_color.dart';
@@ -114,9 +113,7 @@ void main() {
       diagnostics: probes.describe,
     );
     // Незавершённая форма и выбор фильтров не должны пострадать от пакета.
-    container.read(intentionDetailsViewModelProvider(observed).notifier)
-      ..beginEditing()
-      ..changeTitle('Черновик названия');
+    probes.openIntentionEdit(observed).changeTitle('Черновик названия');
     container.read(probes.dailyCatalogProvider.notifier)
       ..selectDate(durabilityChoiceDate)
       ..toggleSection(false)
@@ -155,8 +152,8 @@ void main() {
   test('назначение и снятие тега не меняют форму, выбор и содержимое '
       'потребителей', () async {
     final contentBefore = probes.visibleContent();
-    final formBefore = probes.intentionDetailsEdit(observed);
-    expect(formBefore?.$1, 'Черновик названия');
+    final formBefore = probes.intentionEditDraft(observed);
+    expect(formBefore.$1, 'Черновик названия');
     final selectionBefore = probes.dailyCatalogSelection;
     final neighborhoodSelectionBefore = probes.neighborhoodSelection(observed);
 
@@ -180,7 +177,7 @@ void main() {
         );
       }
       expect(probes.visibleContent(), contentBefore);
-      expect(probes.intentionDetailsEdit(observed), formBefore);
+      expect(probes.intentionEditDraft(observed), formBefore);
       expect(probes.dailyCatalogSelection, selectionBefore);
       expect(
         probes.neighborhoodSelection(observed),
@@ -193,7 +190,7 @@ void main() {
     'пакет тега ненаблюдаемого намерения не затрагивает потребителей',
     () async {
       final contentBefore = probes.visibleContent();
-      final formBefore = probes.intentionDetailsEdit(observed);
+      final formBefore = probes.intentionEditDraft(observed);
 
       probes.reset();
       await run(AssignTag(tagId: tagId, intentionId: isolated));
@@ -203,7 +200,7 @@ void main() {
         expect(probe.forbiddenStates, isEmpty, reason: probe.name);
       }
       expect(probes.visibleContent(), contentBefore);
-      expect(probes.intentionDetailsEdit(observed), formBefore);
+      expect(probes.intentionEditDraft(observed), formBefore);
     },
   );
 
@@ -211,7 +208,7 @@ void main() {
     'создание с начальными назначениями не затрагивает потребителей',
     () async {
       final contentBefore = probes.visibleContent();
-      final formBefore = probes.intentionDetailsEdit(observed);
+      final formBefore = probes.intentionEditDraft(observed);
 
       probes.reset();
       final completion = await (coordinator.acceptCreation(
@@ -230,7 +227,7 @@ void main() {
         expect(probe.forbiddenStates, isEmpty, reason: probe.name);
       }
       expect(probes.visibleContent(), contentBefore);
-      expect(probes.intentionDetailsEdit(observed), formBefore);
+      expect(probes.intentionEditDraft(observed), formBefore);
     },
   );
 
@@ -257,7 +254,7 @@ void main() {
     expect(observedTags(), [(tagId, 'Здоровье', null)]);
     final searchBefore = search()!;
     final contentBefore = probes.visibleContent();
-    final formBefore = probes.intentionDetailsEdit(observed);
+    final formBefore = probes.intentionEditDraft(observed);
     final selectionBefore = probes.dailyCatalogSelection;
 
     probes.reset();
@@ -286,7 +283,7 @@ void main() {
       expect(probe.forbiddenStates, isEmpty, reason: probe.name);
     }
     expect(probes.visibleContent(), contentBefore);
-    expect(probes.intentionDetailsEdit(observed), formBefore);
+    expect(probes.intentionEditDraft(observed), formBefore);
     expect(probes.dailyCatalogSelection, selectionBefore);
   });
 
@@ -345,7 +342,7 @@ void main() {
     expect(assignmentOrders.last, ['Здоровье', 'Спорт']);
     final searchBefore = search()!;
     final contentBefore = probes.visibleContent();
-    final formBefore = probes.intentionDetailsEdit(observed);
+    final formBefore = probes.intentionEditDraft(observed);
     final selectionBefore = probes.dailyCatalogSelection;
 
     probes.reset();
@@ -376,7 +373,7 @@ void main() {
       expect(probe.forbiddenStates, isEmpty, reason: probe.name);
     }
     expect(probes.visibleContent(), contentBefore);
-    expect(probes.intentionDetailsEdit(observed), formBefore);
+    expect(probes.intentionEditDraft(observed), formBefore);
     expect(probes.dailyCatalogSelection, selectionBefore);
   });
 }

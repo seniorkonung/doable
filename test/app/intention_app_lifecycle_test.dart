@@ -27,6 +27,7 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart'
     as catalog_page;
+import 'package:doable/src/intention/presentation/edit/intention_edit_page.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
@@ -44,6 +45,7 @@ import '../support/statistics_read_contract_test_fallback.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
 import '../support/quick_creation.dart';
 import '../support/intention_description_preview.dart';
+import '../support/intention_edit_screen.dart';
 import '../support/intention_title_order_key.dart';
 
 void main() {
@@ -136,26 +138,12 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text(created.description!), findsOneWidget);
 
-      await tester.ensureVisible(
-        find.byKey(const ValueKey('intention-details-edit')),
-      );
-      await tester.tap(find.byKey(const ValueKey('intention-details-edit')));
-      await tester.pump();
-      await tester.enterText(
-        find.byKey(const ValueKey('intention-details-edit-title')),
-        'Укреплять здоровье',
-      );
-      await tester.enterText(
-        find.byKey(const ValueKey('intention-details-edit-description')),
-        'Новое описание',
-      );
-      await tester.ensureVisible(
-        find.byKey(const ValueKey('intention-details-edit-submit')),
-      );
+      await tester.tap(intentionHeadTitle);
       await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const ValueKey('intention-details-edit-submit')),
-      );
+      await tester.enterText(intentionEditTitleField, 'Укреплять здоровье');
+      await tester.enterText(intentionEditDescriptionField, 'Новое описание');
+      await tester.pump();
+      await tester.tap(intentionEditSave);
       await tester.pump();
       final updated = _copyIntention(
         created,
@@ -168,6 +156,11 @@ void main() {
         _saved(updated, before: created, revision: 2),
       );
       await _pumpUntil(tester, () => repository.detailRequests.length == 2);
+      // Успешное сохранение закрывает экран изменения без сообщения.
+      await _pumpUntil(
+        tester,
+        () => find.byType(IntentionEditPage).evaluate().isEmpty,
+      );
 
       repository.emitDetail(0, created);
       await tester.pump();

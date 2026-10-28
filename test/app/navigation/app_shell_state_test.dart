@@ -39,6 +39,7 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_purp
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
+import 'package:doable/src/intention/presentation/edit/intention_edit_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_id_generator.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
@@ -65,6 +66,7 @@ import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 import '../../support/inline_text.dart';
+import '../../support/intention_edit_screen.dart';
 import '../../support/tag_positions.dart';
 
 /// Активные намерения «Намерение 01» … «Намерение 40»: выдача каталога
@@ -363,16 +365,20 @@ void main() {
         find.byKey(const ValueKey('daily-choice-intention-2')),
         IntentionDetailsPage,
       );
-      await _tap(tester, find.byKey(const ValueKey('intention-details-edit')));
-      await tester.enterText(
-        find.byKey(const ValueKey('intention-details-edit-title')),
-        newTitle,
-      );
-      await _tap(
+      await _open(tester, intentionHeadTitle, IntentionEditPage);
+      await tester.enterText(intentionEditTitleField, newTitle);
+      await _tap(tester, intentionEditSave);
+      await _waitFor(
         tester,
-        find.byKey(const ValueKey('intention-details-edit-submit')),
+        () => find.byType(IntentionEditPage).evaluate().isEmpty,
       );
-      await _until(tester, find.text(newTitle));
+      await _until(
+        tester,
+        find.descendant(
+          of: find.byType(IntentionDetailsPage),
+          matching: find.text(newTitle),
+        ),
+      );
       await _select(tester, AppDestination.intentionGraph);
 
       expect(_catalogRow(newTitle), findsOneWidget);

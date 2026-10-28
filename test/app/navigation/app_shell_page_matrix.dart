@@ -11,6 +11,7 @@ typedef _PageCase = ({
 
 enum _MatrixEntry {
   intention,
+  editIntention,
   dailyChoice,
   creation,
   condition,
@@ -35,6 +36,7 @@ enum _MatrixEntry {
 
   Finder get finder => switch (this) {
     _MatrixEntry.intention => _summary(IntentionCatalogPage, 'Читать'),
+    _MatrixEntry.editIntention => intentionHeadTitle,
     _MatrixEntry.dailyChoice => find.byKey(
       const ValueKey('daily-choice-row-1'),
     ),
@@ -282,6 +284,12 @@ void _registerPageMatrixTests() {
       entries: [read],
     ),
     (
+      name: 'изменение намерения',
+      page: IntentionEditPage,
+      panel: false,
+      entries: [read, _MatrixEntry.editIntention],
+    ),
+    (
       name: 'долговременная связь',
       page: RelationDetailsPage,
       panel: true,
@@ -456,6 +464,11 @@ void _registerPageMatrixTests() {
           destination,
           expectedPanel: row.panel,
         );
+      }
+      if (row.page == IntentionEditPage) {
+        // Страница намерения под закрытым экраном изменения снова с панелью.
+        await _close(tester, IntentionEditPage);
+        _expectAboveShell(tester, IntentionDetailsPage, destination);
       }
       expect(tester.takeException(), isNull);
     });

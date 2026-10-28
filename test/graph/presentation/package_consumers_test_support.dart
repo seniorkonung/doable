@@ -17,6 +17,8 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_state.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_view_model.dart';
+import 'package:doable/src/intention/presentation/edit/intention_edit_state.dart';
+import 'package:doable/src/intention/presentation/edit/intention_edit_view_model.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/long_term_relation/presentation/details/relation_details_state.dart';
@@ -73,6 +75,7 @@ final class PackageConsumerProbes {
   final _subscriptions = <StreamSubscription<Object?>>[];
   final _providerSubscriptions = <ProviderSubscription<Object?>>[];
   final _notifiers = <ChangeNotifier>[];
+  final _intentionEdits = <IntentionId, IntentionEditViewModelProvider>{};
 
   PackageConsumerProbe _add(String name, {required bool observes}) {
     final probe = PackageConsumerProbe(name, observes: observes);
@@ -354,12 +357,19 @@ final class PackageConsumerProbes {
     return (state.selection, state.group);
   }
 
-  (String, String, Object)? intentionDetailsEdit(IntentionId id) {
-    final state = _container.read(intentionDetailsViewModelProvider(id));
-    if (state is! IntentionDetailsLoaded) return null;
-    final edit = state.edit;
-    if (edit == null) return null;
-    return (edit.title, edit.description, edit.operation.runtimeType);
+  /// Открывает над полученными подробными данными сессию экрана изменения
+  /// намерения и удерживает её до [dispose].
+  IntentionEditViewModel openIntentionEdit(IntentionId id) {
+    final provider = intentionEditViewModelProvider(IntentionEditFormKey(), id);
+    _intentionEdits[id] = provider;
+    _providerSubscriptions.add(_container.listen(provider, (_, _) {}));
+    return _container.read(provider.notifier);
+  }
+
+  /// Черновик и состояние операции сессии, открытой [openIntentionEdit].
+  (String, String, Object) intentionEditDraft(IntentionId id) {
+    final state = _container.read(_intentionEdits[id]!);
+    return (state.title, state.description, state.operation.runtimeType);
   }
 
   bool observingSettledAt(GraphRevision revision) => all
