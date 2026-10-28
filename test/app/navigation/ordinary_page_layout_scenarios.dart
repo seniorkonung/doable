@@ -9,59 +9,6 @@ void _registerOrdinaryLayoutTests() {
   const screen = _screen;
   for (final insets in [_safeArea, _keyboardOpen]) {
     final conditions = '${locale.languageCode}, ${insets.name}';
-    testWidgets('правка намерения при тексте 2×, $conditions: поля и '
-        'действия доступны над клавиатурой и панелью', (tester) async {
-      final app = await _start(
-        tester,
-        locale: locale,
-        screen: screen,
-        insets: insets,
-      );
-      final l10n = lookupAppLocalizations(locale);
-      unawaited(
-        app.router.push(
-          IntentionDetailsRoute(intentionId: _layoutIntentionId(1)),
-        ),
-      );
-      await _until(
-        tester,
-        find.byKey(const ValueKey('intention-details-title')),
-      );
-      await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(
-        find.text(l10n.detailsEditAction),
-        200,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await tester.pumpAndSettle();
-      expect(find.text(l10n.detailsEditAction).hitTestable(), findsOneWidget);
-      await tester.tap(find.text(l10n.detailsEditAction));
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-
-      for (final field in ['title', 'description']) {
-        final input = find.byKey(ValueKey('intention-details-edit-$field'));
-        await tester.enterText(input, 'Изменённое $field');
-        await tester.ensureVisible(input);
-        await tester.pumpAndSettle();
-        _expectFullyVisible(tester, input, insets);
-        expect(input.hitTestable(), findsOneWidget);
-      }
-      for (final action in ['cancel', 'submit']) {
-        final button = find.byKey(ValueKey('intention-details-edit-$action'));
-        await tester.ensureVisible(button);
-        await tester.pumpAndSettle();
-        _expectFullyVisible(tester, button, insets);
-        expect(button.hitTestable(), findsOneWidget);
-      }
-      await tester.tap(
-        find.byKey(const ValueKey('intention-details-edit-submit')),
-      );
-      await _until(tester, find.text('Изменённое title'));
-      await _waitFor(tester, () => find.byType(TextField).evaluate().isEmpty);
-      expect(tester.takeException(), isNull);
-    });
-
     testWidgets('быстрое создание из каталогов при тексте 2×, $conditions: '
         'кнопка помещается в панели и запускает оба режима', (tester) async {
       final semantics = tester.ensureSemantics();

@@ -146,7 +146,7 @@ void _registerUnnamedPageTests() {
     expect(_destinations.hitTestable(), findsNothing);
     expect(_announcedDestinations, findsNothing);
     expect(
-      find.byKey(const ValueKey('intention-details-edit')).hitTestable(),
+      find.byKey(const ValueKey('intention-details-delete')).hitTestable(),
       findsNothing,
     );
     expect(

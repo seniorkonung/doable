@@ -144,7 +144,7 @@ void main() {
   const destination = AppDestination.dailyChoices;
   testWidgets(
     'выбор пункта ${destination.index + 1} со страницы участника удаляет '
-    'незавершённую форму связи и правку намерения без сохранения',
+    'незавершённую форму связи без сохранения',
     (tester) async {
       final router = await _start(tester);
       await _select(tester, AppDestination.intentionGraph);
@@ -188,22 +188,6 @@ void main() {
         IntentionDetailsPage,
         AppDestination.intentionGraph,
       );
-      await _tap(tester, find.byKey(const ValueKey('intention-details-edit')));
-      await tester.enterText(
-        find.byKey(const ValueKey('intention-details-edit-title')),
-        'Несохранённое название',
-      );
-      await tester.enterText(
-        find.byKey(const ValueKey('intention-details-edit-description')),
-        'Несохранённое описание',
-      );
-      tester.testTextInput.hide();
-      await tester.pumpAndSettle();
-      _expectAboveShell(
-        tester,
-        IntentionDetailsPage,
-        AppDestination.intentionGraph,
-      );
 
       await _select(tester, destination);
 
@@ -234,8 +218,6 @@ void main() {
             .name,
         'Читать',
       );
-      expect(find.text('Несохранённое название'), findsNothing);
-      expect(find.text('Несохранённое описание'), findsNothing);
       await _tap(tester, find.text('Relations').first);
       await _open(
         tester,

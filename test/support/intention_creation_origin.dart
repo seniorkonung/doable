@@ -16,7 +16,10 @@ enum IntentionCreationOrigin {
   home('Главной', AppDestination.home),
   dailyChoices('каталогом дневных выборов', AppDestination.dailyChoices),
   graph('каталогом намерений', AppDestination.intentionGraph),
-  deep('правкой намерения над черновиком связи', AppDestination.intentionGraph);
+  deep(
+    'страницей намерения над черновиком связи',
+    AppDestination.intentionGraph,
+  );
 
   const IntentionCreationOrigin(this.description, this.destination);
   final String description;
@@ -62,14 +65,9 @@ enum IntentionCreationOrigin {
       unawaited(
         router.push<void>(IntentionDetailsRoute(intentionId: participantId)),
       );
-      final edit = find.byKey(const ValueKey('intention-details-edit'));
-      await waitFor(tester, edit);
-      await tester.pumpAndSettle();
-      await tester.tap(edit);
-      await tester.pumpAndSettle();
-      await tester.enterText(
-        find.byKey(const ValueKey('intention-details-edit-title')),
-        IntentionCreationHistory.intentionDraft,
+      await waitFor(
+        tester,
+        find.byKey(const ValueKey('intention-details-title')),
       );
       await tester.pumpAndSettle();
     }
@@ -83,7 +81,6 @@ final class IntentionCreationHistory {
   final IntentionCreationOrigin origin;
   final List<RouteData> routes;
   static const relationDraft = 'Несохранённое описание связи';
-  static const intentionDraft = 'Несохранённое название исходной страницы';
 
   void expectPrefix(StackRouter router) => expect(
     router.stackData.take(routes.length),
@@ -97,17 +94,6 @@ final class IntentionCreationHistory {
       tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected,
       origin.destination,
     );
-    if (origin == IntentionCreationOrigin.deep) {
-      expect(
-        tester
-            .widget<TextField>(
-              find.byKey(const ValueKey('intention-details-edit-title')),
-            )
-            .controller!
-            .text,
-        intentionDraft,
-      );
-    }
   }
 
   Future<void> expectUnderlyingDraft(
