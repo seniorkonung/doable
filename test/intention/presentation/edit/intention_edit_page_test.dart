@@ -74,6 +74,56 @@ void main() {
     });
   }
 
+  testWidgets('цель описания открывает экран с курсором в конце описания и '
+      'недоступной «Сохранить»', (tester) async {
+    final intention = testDetailsIntention(
+      title: 'Бегать',
+      description: 'Утром в парке',
+    );
+    await _openEditPage(
+      tester,
+      ControlledDetailsRepository(),
+      intention,
+      focus: IntentionEditFocus.description,
+    );
+
+    final description = tester.widget<EditableText>(
+      find.descendant(
+        of: _descriptionField,
+        matching: find.byType(EditableText),
+      ),
+    );
+    expect(description.focusNode.hasFocus, isTrue);
+    expect(
+      description.controller.selection,
+      const TextSelection.collapsed(offset: 'Утром в парке'.length),
+    );
+    expect(_saveButton(tester).onPressed, isNull);
+  });
+
+  testWidgets('цель описания без сохранённого описания ставит курсор в пустое '
+      'поле описания', (tester) async {
+    final intention = testDetailsIntention(description: null);
+    await _openEditPage(
+      tester,
+      ControlledDetailsRepository(),
+      intention,
+      focus: IntentionEditFocus.description,
+    );
+
+    final description = tester.widget<EditableText>(
+      find.descendant(
+        of: _descriptionField,
+        matching: find.byType(EditableText),
+      ),
+    );
+    expect(description.focusNode.hasFocus, isTrue);
+    expect(
+      description.controller.selection,
+      const TextSelection.collapsed(offset: 0),
+    );
+  });
+
   testWidgets('отсутствующее описание открывается пустым полем', (
     tester,
   ) async {
@@ -627,6 +677,7 @@ Future<void> _openEditPage(
   Intention intention, {
   Locale locale = const Locale('ru'),
   double textScale = 1,
+  IntentionEditFocus? focus,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
@@ -656,7 +707,12 @@ Future<void> _openEditPage(
     tester
         .element(find.byType(IntentionDetailsPage))
         .router
-        .push(IntentionEditRoute(intentionId: intention.id)),
+        .push(
+          focus == null
+              // Без явной цели, как при нажатии на название в шапке.
+              ? IntentionEditRoute(intentionId: intention.id)
+              : IntentionEditRoute(intentionId: intention.id, focus: focus),
+        ),
   );
   await tester.pumpAndSettle();
 }

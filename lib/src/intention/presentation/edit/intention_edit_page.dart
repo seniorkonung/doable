@@ -19,6 +19,9 @@ import 'intention_edit_failure_message.dart';
 import 'intention_edit_state.dart';
 import 'intention_edit_view_model.dart';
 
+/// Поле экрана изменения, в конце которого стоит курсор при открытии.
+enum IntentionEditFocus { title, description }
+
 /// Страница-задача «Изменить намерение» с названием и описанием.
 ///
 /// Страница открывается над полученными подробными данными намерения и
@@ -30,9 +33,16 @@ import 'intention_edit_view_model.dart';
 /// сессия, а изменённый текст отменяется только ответом на вопрос.
 @RoutePage()
 final class IntentionEditPage extends ConsumerStatefulWidget {
-  const IntentionEditPage({required this.intentionId, super.key});
+  const IntentionEditPage({
+    required this.intentionId,
+    this.focus = IntentionEditFocus.title,
+    super.key,
+  });
 
   final IntentionId intentionId;
+
+  /// Поле, в конце которого стоит курсор при открытии.
+  final IntentionEditFocus focus;
 
   @override
   ConsumerState<IntentionEditPage> createState() => _IntentionEditPageState();
@@ -59,15 +69,17 @@ final class _IntentionEditPageState extends ConsumerState<IntentionEditPage> {
   void initState() {
     super.initState();
     final opened = ref.read(_provider);
-    // Курсор стоит в конце названия.
-    _titleController = TextEditingController.fromValue(
-      TextEditingValue(
-        text: opened.title,
-        selection: TextSelection.collapsed(offset: opened.title.length),
-      ),
-    );
-    _descriptionController = TextEditingController(text: opened.description);
+    _titleController = _controllerWithCursorAtEnd(opened.title);
+    _descriptionController = _controllerWithCursorAtEnd(opened.description);
   }
+
+  static TextEditingController _controllerWithCursorAtEnd(String text) =>
+      TextEditingController.fromValue(
+        TextEditingValue(
+          text: text,
+          selection: TextSelection.collapsed(offset: text.length),
+        ),
+      );
 
   @override
   void dispose() {
@@ -129,8 +141,8 @@ final class _IntentionEditPageState extends ConsumerState<IntentionEditPage> {
         ),
         body: SafeArea(
           top: false,
-          // Поля не перестраиваются при прокрутке: автофокус названия
-          // срабатывает только при открытии.
+          // Поля не перестраиваются при прокрутке: автофокус поля из
+          // focus срабатывает только при открытии.
           child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(
               DoableMetrics.space5,
@@ -160,7 +172,7 @@ final class _IntentionEditPageState extends ConsumerState<IntentionEditPage> {
                   placeholder: localizations.intentionEditNameLabel,
                   label: localizations.intentionEditNameLabel,
                   kind: TextFieldKind.name,
-                  autofocus: true,
+                  autofocus: widget.focus == IntentionEditFocus.title,
                   readOnly: isDraftFixed,
                   onChanged: model.changeTitle,
                   error: titleFailure == null
@@ -182,6 +194,7 @@ final class _IntentionEditPageState extends ConsumerState<IntentionEditPage> {
                   label: localizations.intentionEditDescriptionLabel,
                   minLines: _descriptionMinLines,
                   maxLines: _descriptionMaxLines,
+                  autofocus: widget.focus == IntentionEditFocus.description,
                   readOnly: isDraftFixed,
                   onChanged: model.changeDescription,
                   error: descriptionFailure == null

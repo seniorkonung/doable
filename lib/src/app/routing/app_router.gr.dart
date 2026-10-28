@@ -623,11 +623,16 @@ class IntentionDetailsRouteArgs {
 class IntentionEditRoute extends _i20.PageRouteInfo<IntentionEditRouteArgs> {
   IntentionEditRoute({
     required _i21.IntentionId intentionId,
+    _i14.IntentionEditFocus focus = _i14.IntentionEditFocus.title,
     _i23.Key? key,
     List<_i20.PageRouteInfo>? children,
   }) : super(
          IntentionEditRoute.name,
-         args: IntentionEditRouteArgs(intentionId: intentionId, key: key),
+         args: IntentionEditRouteArgs(
+           intentionId: intentionId,
+           focus: focus,
+           key: key,
+         ),
          initialChildren: children,
        );
 
@@ -639,6 +644,7 @@ class IntentionEditRoute extends _i20.PageRouteInfo<IntentionEditRouteArgs> {
       final args = data.argsAs<IntentionEditRouteArgs>();
       return _i14.IntentionEditPage(
         intentionId: args.intentionId,
+        focus: args.focus,
         key: args.key,
       );
     },
@@ -646,26 +652,34 @@ class IntentionEditRoute extends _i20.PageRouteInfo<IntentionEditRouteArgs> {
 }
 
 class IntentionEditRouteArgs {
-  const IntentionEditRouteArgs({required this.intentionId, this.key});
+  const IntentionEditRouteArgs({
+    required this.intentionId,
+    this.focus = _i14.IntentionEditFocus.title,
+    this.key,
+  });
 
   final _i21.IntentionId intentionId;
+
+  final _i14.IntentionEditFocus focus;
 
   final _i23.Key? key;
 
   @override
   String toString() {
-    return 'IntentionEditRouteArgs{intentionId: $intentionId, key: $key}';
+    return 'IntentionEditRouteArgs{intentionId: $intentionId, focus: $focus, key: $key}';
   }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     if (other is! IntentionEditRouteArgs) return false;
-    return intentionId == other.intentionId && key == other.key;
+    return intentionId == other.intentionId &&
+        focus == other.focus &&
+        key == other.key;
   }
 
   @override
-  int get hashCode => intentionId.hashCode ^ key.hashCode;
+  int get hashCode => intentionId.hashCode ^ focus.hashCode ^ key.hashCode;
 }
 
 /// generated route for
