@@ -146,7 +146,7 @@ void main() {
       ]) {
         if (breakdown == StatisticsBreakdown.relations) {
           await tester.ensureVisible(
-            find.text('Статистика', skipOffstage: false),
+            find.text('Статистика', skipOffstage: false).last,
           );
           await _tap(tester, find.text(app.texts.statisticsThroughRelations));
           await _wait(
@@ -260,7 +260,7 @@ void main() {
       expect(topState.selection.period, StatisticsMonth(2025, 8));
       tester.binding.platformDispatcher.localesTestValue = const [Locale('en')];
       await tester.pumpAndSettle();
-      expect(find.text('Statistics'), findsOneWidget);
+      expect(find.text('Statistics').first, findsOneWidget);
       expect(app.container.read(second).selection, same(topState.selection));
       expect(app.container.read(first).selection, same(original.selection));
       final depth = app.router.stack.length;
@@ -414,7 +414,7 @@ Future<void> _expectSection(
   final section = app.container.read(provider);
   expect(section.selection.view, view);
   expect(section.selection.period, period);
-  expect(find.text('Статистика').hitTestable(), findsOneWidget);
+  expect(find.text('Статистика').first.hitTestable(), findsOneWidget);
 }
 
 ScrollableState _scroll(WidgetTester tester, Finder page) =>

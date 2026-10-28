@@ -145,6 +145,7 @@ void main() {
         find.byKey(const ValueKey('relation-details-related-participant')),
       );
       await _pumpUntilDetailsTitle(tester, 'Много ходить');
+      await _chooseDetailsTab(tester, 'Relations');
       await _ensureVisible(
         tester,
         find.byKey(const ValueKey('relation-neighborhood-direction-incoming')),
@@ -168,6 +169,7 @@ void main() {
       const renamedPhrase = 'To Укреплять здоровье, you need Много ходить';
       await _pumpUntilFound(tester, find.text(renamedPhrase));
 
+      await _chooseDetailsTab(tester, 'Overview');
       await _ensureVisible(
         tester,
         find.byKey(const ValueKey('intention-details-archive')),
@@ -179,6 +181,7 @@ void main() {
       );
       await _dismissOperationMessage(tester);
 
+      await _chooseDetailsTab(tester, 'Relations');
       await _ensureVisible(
         tester,
         find.byKey(const ValueKey('relation-neighborhood-scope-archived')),
@@ -188,6 +191,7 @@ void main() {
       );
       await _pumpUntilFound(tester, find.text(renamedPhrase));
 
+      await _chooseDetailsTab(tester, 'Overview');
       await _ensureVisible(
         tester,
         find.byKey(const ValueKey('intention-details-restore')),
@@ -198,6 +202,7 @@ void main() {
         find.byKey(const ValueKey('intention-details-archive')),
       );
       await _dismissOperationMessage(tester);
+      await _chooseDetailsTab(tester, 'Relations');
       expect(find.text(renamedPhrase), findsOneWidget);
       expect(find.text('Archived relations: 1'), findsWidgets);
 
@@ -213,6 +218,7 @@ void main() {
       expect(find.text('Много ходить'), findsOneWidget);
 
       await _openIntention(tester, 'Укреплять здоровье');
+      await _chooseDetailsTab(tester, 'Relations');
       await _ensureVisible(
         tester,
         find.byKey(const ValueKey('relation-neighborhood-scope-archived')),
@@ -343,6 +349,7 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Show blocking relations'), findsNothing);
+      await _chooseDetailsTab(tester, 'Relations');
       final canGroup = find.byKey(
         const ValueKey('relation-neighborhood-group-active-can-outgoing'),
       );
@@ -355,6 +362,7 @@ void main() {
       );
 
       await _deleteCurrentRelation(tester);
+      await _chooseDetailsTab(tester, 'Overview');
       await _pumpUntilFound(
         tester,
         find.byKey(const ValueKey('intention-details-delete')),
@@ -487,6 +495,7 @@ Future<void> _createNeedRelation(
   bool waitForTerminalOutcome = true,
   bool verifyFormSemantics = false,
 }) async {
+  await _chooseDetailsTab(tester, 'Relations');
   final create = find.byKey(
     const ValueKey('relation-neighborhood-create-relation'),
   );
@@ -651,6 +660,7 @@ Future<void> _openArchivedCanRelation(
   required String phrase,
 }) async {
   await _openIntention(tester, participantTitle);
+  await _chooseDetailsTab(tester, 'Relations');
   final archived = find.byKey(
     const ValueKey('relation-neighborhood-scope-archived'),
   );
@@ -696,6 +706,7 @@ Future<void> _deleteCurrentRelation(WidgetTester tester) async {
 }
 
 Future<void> _deleteCurrentIntention(WidgetTester tester) async {
+  await _chooseDetailsTab(tester, 'Overview');
   final delete = find.byKey(const ValueKey('intention-details-delete'));
   await _ensureVisible(tester, delete);
   await tester.tap(delete);
@@ -721,6 +732,7 @@ Future<void> _returnToCatalog(WidgetTester tester) async {
 }
 
 Future<void> _renameCurrentIntention(WidgetTester tester, String title) async {
+  await _chooseDetailsTab(tester, 'Overview');
   final edit = find.byKey(const ValueKey('intention-details-edit'));
   await _ensureVisible(tester, edit);
   await tester.tap(edit);
@@ -737,6 +749,7 @@ Future<void> _renameCurrentIntention(WidgetTester tester, String title) async {
   await tester.tap(submit);
   await _pumpUntilDetailsTitle(tester, title);
   await _dismissOperationMessage(tester);
+  await _chooseDetailsTab(tester, 'Relations');
 }
 
 Future<void> _ensureVisible(WidgetTester tester, Finder finder) async {
@@ -810,4 +823,12 @@ extension<T> on T {
     action(this);
     return this;
   }
+}
+
+Future<void> _chooseDetailsTab(WidgetTester tester, String label) async {
+  final tab = find.text(label).first;
+  await _pumpUntilFound(tester, tab);
+  await _ensureVisible(tester, tab);
+  await tester.tap(tab);
+  await tester.pump();
 }

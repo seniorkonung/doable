@@ -226,7 +226,8 @@ void main() {
       );
       await _scrollTo(tester, _text('Новое название действия'));
       expect(_text('Новое название действия').hitTestable(), findsWidgets);
-      await _scrollTo(tester, _text(app.texts.relationNeighborhoodTitle));
+      await tester.tap(_text(app.texts.detailsRelationsTab).first);
+      await tester.pumpAndSettle();
       await _scrollTo(
         tester,
         _text(app.texts.relationNeighborhoodSelectedGroupCount(119)),
@@ -237,6 +238,8 @@ void main() {
         findsOneWidget,
       );
       _scroll(tester).position.jumpTo(0);
+      await tester.pumpAndSettle();
+      await tester.tap(_text(app.texts.detailsOverviewTab).first);
       await tester.pumpAndSettle();
       expect(_text(app.texts.detailsEditAction).hitTestable(), findsOneWidget);
       expect(tester.takeException(), isNull);

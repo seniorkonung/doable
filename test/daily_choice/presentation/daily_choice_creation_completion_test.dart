@@ -209,6 +209,8 @@ Future<_App> _launch(
     router.push(IntentionDetailsRoute(intentionId: durabilityIntention(1))),
   );
   await tester.pumpAndSettle();
+  await tester.tap(find.text('Связи'));
+  await tester.pumpAndSettle();
   await tester.ensureVisible(
     find.byKey(const ValueKey('relation-neighborhood-create-relation')).first,
   );

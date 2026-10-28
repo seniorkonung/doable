@@ -151,6 +151,7 @@ void main() {
         _summary(IntentionCatalogPage, 'Читать'),
         IntentionDetailsPage,
       );
+      await _tap(tester, find.text('Relations').first);
       await _open(
         tester,
         find.byKey(const ValueKey('relation-neighborhood-create-relation')),
@@ -233,6 +234,7 @@ void main() {
       );
       expect(find.text('Несохранённое название'), findsNothing);
       expect(find.text('Несохранённое описание'), findsNothing);
+      await _tap(tester, find.text('Relations').first);
       await _open(
         tester,
         find.byKey(const ValueKey('relation-neighborhood-create-relation')),

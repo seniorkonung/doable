@@ -131,7 +131,7 @@ void main() {
       );
 
       await tester.tap(find.text(created.title));
-      await _pumpUntil(tester, () => repository.detailRequests.length == 2);
+      await _pumpUntil(tester, () => repository.detailRequests.length == 1);
       repository.emitDetail(0, created);
       await tester.pumpAndSettle();
       expect(find.text(created.description!), findsOneWidget);
@@ -167,7 +167,7 @@ void main() {
         1,
         _saved(updated, before: created, revision: 2),
       );
-      await _pumpUntil(tester, () => repository.detailRequests.length == 3);
+      await _pumpUntil(tester, () => repository.detailRequests.length == 2);
 
       repository.emitDetail(0, created);
       await tester.pump();
@@ -210,7 +210,7 @@ void main() {
         2,
         _saved(ready, before: updated, revision: 3),
       );
-      await _pumpUntil(tester, () => repository.detailRequests.length == 4);
+      await _pumpUntil(tester, () => repository.detailRequests.length == 3);
       repository.emitDetail(3, ready);
       await tester.pumpAndSettle();
       await _scrollCurrentPageToTop(tester);
@@ -231,7 +231,7 @@ void main() {
         3,
         _saved(archived, before: ready, revision: 4),
       );
-      await _pumpUntil(tester, () => repository.detailRequests.length == 5);
+      await _pumpUntil(tester, () => repository.detailRequests.length == 4);
       repository.emitDetail(4, archived);
       await tester.pumpAndSettle();
       await _scrollCurrentPageToTop(tester);
@@ -256,7 +256,7 @@ void main() {
       expect(find.text(archived.title), findsOneWidget);
 
       await tester.tap(find.text(archived.title));
-      await _pumpUntil(tester, () => repository.detailRequests.length == 7);
+      await _pumpUntil(tester, () => repository.detailRequests.length == 5);
       repository.emitDetail(4, archived);
       await tester.pumpAndSettle();
       await tester.ensureVisible(
@@ -273,7 +273,7 @@ void main() {
         4,
         _saved(restored, before: archived, revision: 5),
       );
-      await _pumpUntil(tester, () => repository.detailRequests.length == 8);
+      await _pumpUntil(tester, () => repository.detailRequests.length == 6);
       repository.emitDetail(5, restored);
       await tester.pumpAndSettle();
       await _scrollCurrentPageToTop(tester);
@@ -297,7 +297,7 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.tap(find.text(restored.title));
-      await _pumpUntil(tester, () => repository.detailRequests.length == 10);
+      await _pumpUntil(tester, () => repository.detailRequests.length == 7);
       repository.emitDetail(6, restored);
       await tester.pumpAndSettle();
       await tester.ensureVisible(
@@ -724,7 +724,9 @@ Future<void> _selectScope(WidgetTester tester, String label) async {
 }
 
 Future<void> _scrollCurrentPageToTop(WidgetTester tester) async {
-  final scrollable = tester.state<ScrollableState>(find.byType(Scrollable));
+  final scrollable = tester.state<ScrollableState>(
+    find.byType(Scrollable).first,
+  );
   scrollable.position.jumpTo(scrollable.position.minScrollExtent);
   await tester.pump();
 }

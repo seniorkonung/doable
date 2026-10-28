@@ -680,6 +680,20 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get detailsTabsLabel => 'Intention sections';
+
+  @override
+  String get detailsOverviewTab => 'Overview';
+
+  @override
+  String get detailsRelationsTab => 'Relations';
+
+  @override
+  String detailsRelationsTabSemantic(int active, int archived) {
+    return 'Relations: $active active, $archived archived';
+  }
+
+  @override
   String get detailsTitle => 'Intention details';
 
   @override

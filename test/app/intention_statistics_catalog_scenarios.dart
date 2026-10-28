@@ -163,6 +163,11 @@ void _catalogNavigationScenarios() {
       await tester.tap(participant);
       await _wait(
         tester,
+        () => find.text(app.texts.statisticsSectionTitle).evaluate().isNotEmpty,
+      );
+      await tester.tap(find.text(app.texts.statisticsSectionTitle).first);
+      await _wait(
+        tester,
         () =>
             find.byType(IntentionStatisticsSectionSliver).evaluate().isNotEmpty,
       );

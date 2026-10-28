@@ -36,6 +36,7 @@ void _registerCreationRouteScenarios() {
           content: find.text('Основание'),
         );
         await _tap(tester, find.text('Основание').first);
+        await _tap(tester, find.text('Связи'));
         final createRelation = find.byKey(
           const ValueKey('relation-neighborhood-create-relation'),
         );

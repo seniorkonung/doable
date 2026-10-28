@@ -168,6 +168,7 @@ void main() {
       ),
       IntentionDetailsPage,
     );
+    await _tap(tester, find.text('Relations').first);
     await _open(
       tester,
       find.byKey(

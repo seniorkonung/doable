@@ -18,6 +18,7 @@ import '../../../intention/application/intention_result.dart'
 import '../../../intention/domain/intention_id.dart';
 import '../../../tag/application/tag_change.dart';
 import '../../application/long_term_relation_projection.dart';
+import '../../application/relation_counts.dart';
 import '../../application/relation_group_page.dart';
 import '../../domain/long_term_relation.dart';
 import '../../domain/long_term_relation_id.dart';
@@ -121,8 +122,8 @@ final class RelationNeighborhoodViewModel
   ///
   /// Архивные связи остаются архивированными сами по себе, поэтому просмотр
   /// начинается с первой непустой архивной группы.
-  void showArchivedRelations() =>
-      _restart(_firstNonEmptyGroup(scope: RelationScope.archived));
+  void showArchivedRelations(RelationCounts counts) =>
+      _restart(_firstNonEmptyGroup(counts, scope: RelationScope.archived));
 
   /// Повторяет первое чтение выбранной группы после устранимого отказа.
   Future<void> retryFirstPage() {
@@ -202,15 +203,12 @@ final class RelationNeighborhoodViewModel
 
   /// Выбирает группу с подтверждённым содержимым в границах охвата.
   ///
-  /// Пока сводка не подтверждена, выбор остаётся прежним: пустая группа не
-  /// объявляет остальные группы пустыми.
-  RelationGroupSelection _firstNonEmptyGroup({RelationScope? scope}) {
+  /// Сводка страницы доступна и до первого чтения соседства.
+  RelationGroupSelection _firstNonEmptyGroup(
+    RelationCounts counts, {
+    RelationScope? scope,
+  }) {
     final fallback = scope == null ? _selection : _selection.withScope(scope);
-    final current = state;
-    if (current is! RelationGroupConfirmedState) {
-      return fallback;
-    }
-    final counts = current.counts;
     for (final candidate in _groupOrder(scope)) {
       if (counts.forGroup(
             scope: candidate.scope,

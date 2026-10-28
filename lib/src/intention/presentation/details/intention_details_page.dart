@@ -22,10 +22,9 @@ import '../../domain/intention_text.dart';
 import '../../../long_term_relation/application/long_term_relation_projection.dart';
 import '../../../long_term_relation/presentation/editor/relation_editor_state.dart';
 import '../../../long_term_relation/presentation/neighborhood/relation_neighborhood_sliver.dart';
+import '../../../long_term_relation/presentation/neighborhood/relation_neighborhood_state.dart';
 import '../../../long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart';
 import '../../../tag/presentation/assignments/tag_assignments_section.dart';
-import '../../../tag/presentation/assignments/tag_assignments_state.dart';
-import '../../../tag/presentation/assignments/tag_assignments_view_model.dart';
 import '../../../tag/presentation/panel/tags_panel.dart';
 import '../../../tag/presentation/panel/tags_panel_context.dart';
 import '../../../statistics/application/intention_statistics_target.dart';
@@ -34,6 +33,7 @@ import '../../../statistics/presentation/intention_statistics_view_model.dart';
 import '../operation/operation_state.dart';
 import 'intention_details_state.dart';
 import 'intention_details_view_model.dart';
+import 'intention_details_tabs.dart';
 
 @RoutePage()
 final class IntentionDetailsPage extends ConsumerStatefulWidget {
@@ -53,7 +53,6 @@ final class IntentionDetailsPage extends ConsumerStatefulWidget {
 
 final class _IntentionDetailsPageState
     extends ConsumerState<IntentionDetailsPage> {
-  final _statisticsKey = GlobalKey();
   final _headKey = GlobalKey();
   final _scrollController = ScrollController();
   final _headHidden = ValueNotifier(false);
@@ -62,7 +61,8 @@ final class _IntentionDetailsPageState
   var _statisticsPageKey = Object();
   late final DailyChoiceLocalDayObserver _localDay;
   var _visible = false;
-  var _statisticsOpeningScheduled = false;
+  late IntentionDetailsTab _selectedTab;
+  ProviderSubscription<RelationNeighborhoodState>? _neighborhoodSubscription;
 
   IntentionStatisticsViewModelProvider get _statisticsProvider =>
       intentionStatisticsViewModelProvider(
@@ -74,12 +74,44 @@ final class _IntentionDetailsPageState
   @override
   void initState() {
     super.initState();
+    _selectedTab = _initialTab;
     _scrollController.addListener(_syncHeadHidden);
     _localDay = DailyChoiceLocalDayObserver(
       readLocalDay: ref.read(dailyChoiceLocalDateSourceProvider),
       onTodayChanged: () =>
           ref.read(_statisticsProvider.notifier).setLocalDate(_localDay.today),
     );
+  }
+
+  IntentionDetailsTab get _initialTab => widget.statisticsTarget == null
+      ? IntentionDetailsTab.overview
+      : IntentionDetailsTab.statistics;
+
+  void _selectTab(IntentionDetailsTab tab) {
+    if (tab == IntentionDetailsTab.relations) {
+      // Подписка удерживает соседство с первого показа до закрытия страницы.
+      // https://pub.dev/documentation/flutter_riverpod/latest/flutter_riverpod/WidgetRef/listenManual.html
+      _neighborhoodSubscription ??= ref.listenManual(
+        relationNeighborhoodViewModelProvider(widget.intentionId),
+        (_, _) {},
+      );
+    }
+    setState(() {
+      _selectedTab = tab;
+    });
+  }
+
+  void _showArchivedRelations() {
+    final details = ref.read(
+      intentionDetailsViewModelProvider(widget.intentionId),
+    );
+    if (details is! IntentionDetailsLoaded) return;
+    _selectTab(IntentionDetailsTab.relations);
+    ref
+        .read(
+          relationNeighborhoodViewModelProvider(widget.intentionId).notifier,
+        )
+        .showArchivedRelations(details.details.relationCounts);
   }
 
   @override
@@ -154,33 +186,13 @@ final class _IntentionDetailsPageState
     super.didUpdateWidget(oldWidget);
     if (oldWidget.intentionId != widget.intentionId) {
       _statisticsPageKey = Object();
-      _statisticsOpeningScheduled = false;
+      _selectedTab = _initialTab;
+      _neighborhoodSubscription?.close();
+      _neighborhoodSubscription = null;
       _headExtent = null;
       _headHidden.value = false;
       _syncStatisticsVisibility();
     }
-  }
-
-  void _openStatisticsAfterLoad(IntentionDetailsState details) {
-    if (widget.statisticsTarget == null ||
-        _statisticsOpeningScheduled ||
-        details is! IntentionDetailsLoaded) {
-      return;
-    }
-    // Высота тегов над разделом меняется после начальной загрузки.
-    if (ref.watch(tagAssignmentsViewModelProvider(widget.intentionId))
-        is TagAssignmentsInitialLoading) {
-      return;
-    }
-    _statisticsOpeningScheduled = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final sectionContext = _statisticsKey.currentContext;
-      if (sectionContext == null) return;
-      // Цель применяется единожды, после размещения загруженной страницы.
-      // https://api.flutter.dev/flutter/widgets/Scrollable/ensureVisible.html
-      unawaited(Scrollable.ensureVisible(sectionContext));
-    });
   }
 
   Future<void> _delete() async {
@@ -210,11 +222,6 @@ final class _IntentionDetailsPageState
     final details = ref.watch(provider);
     // Подписка принадлежит странице, в том числе пока её данные загружаются.
     ref.watch(_statisticsProvider);
-    _openStatisticsAfterLoad(details);
-    // Открытие страницы одновременно начинает только начальную группу
-    // соседства; сам sliver переиспользует это состояние после загрузки
-    // подробных данных намерения.
-    ref.watch(relationNeighborhoodViewModelProvider(intentionId));
     return OrdinaryPageScaffold(
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(DoableMetrics.tapMin),
@@ -266,11 +273,13 @@ final class _IntentionDetailsPageState
                 state: details,
                 scrollController: _scrollController,
                 buildHead: _buildHead,
+                selectedTab: _selectedTab,
+                onSelectTab: _selectTab,
                 statisticsSection: IntentionStatisticsSectionSliver(
-                  key: _statisticsKey,
                   provider: _statisticsProvider,
                 ),
                 onDelete: _delete,
+                onShowArchivedRelations: _showArchivedRelations,
               ),
             ),
           ],
@@ -312,16 +321,22 @@ final class _DetailsContent extends ConsumerWidget {
     required this.state,
     required this.scrollController,
     required this.buildHead,
+    required this.selectedTab,
+    required this.onSelectTab,
     required this.statisticsSection,
     required this.onDelete,
+    required this.onShowArchivedRelations,
   });
 
   final IntentionId intentionId;
   final IntentionDetailsState state;
   final ScrollController scrollController;
   final Widget Function(String name) buildHead;
+  final IntentionDetailsTab selectedTab;
+  final ValueChanged<IntentionDetailsTab> onSelectTab;
   final Widget statisticsSection;
   final VoidCallback onDelete;
+  final VoidCallback onShowArchivedRelations;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -335,6 +350,8 @@ final class _DetailsContent extends ConsumerWidget {
         state: loaded,
         scrollController: scrollController,
         pageHead: buildHead(loaded.intention.title),
+        selectedTab: selectedTab,
+        onSelectTab: onSelectTab,
         statisticsSection: statisticsSection,
         onBeginEditing: ref
             .read(intentionDetailsViewModelProvider(intentionId).notifier)
@@ -375,9 +392,7 @@ final class _DetailsContent extends ConsumerWidget {
             ref.read(provider.notifier).retryStateChange();
           }
         },
-        onShowArchivedRelations: ref
-            .read(relationNeighborhoodViewModelProvider(intentionId).notifier)
-            .showArchivedRelations,
+        onShowArchivedRelations: onShowArchivedRelations,
       ),
       IntentionDetailsNotFound() => _DetailsStatus(
         message: localizations.detailsNotFound,
@@ -407,6 +422,8 @@ final class _LoadedDetails extends StatelessWidget {
     required this.state,
     required this.scrollController,
     required this.pageHead,
+    required this.selectedTab,
+    required this.onSelectTab,
     required this.statisticsSection,
     required this.onBeginEditing,
     required this.onCancelEditing,
@@ -425,6 +442,8 @@ final class _LoadedDetails extends StatelessWidget {
   final IntentionDetailsLoaded state;
   final ScrollController scrollController;
   final Widget pageHead;
+  final IntentionDetailsTab selectedTab;
+  final ValueChanged<IntentionDetailsTab> onSelectTab;
   final Widget statisticsSection;
   final VoidCallback onBeginEditing;
   final VoidCallback onCancelEditing;
@@ -455,103 +474,114 @@ final class _LoadedDetails extends StatelessWidget {
       controller: scrollController,
       slivers: [
         SliverToBoxAdapter(child: pageHead),
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-          sliver: SliverToBoxAdapter(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _DetailsField(
-                  label: localizations.detailsDescriptionLabel,
-                  value:
-                      intention.description ??
-                      localizations.detailsNoDescription,
-                ),
-                const SizedBox(height: 16),
-                _DetailsField(
-                  label: localizations.detailsReadinessLabel,
-                  value: readiness,
-                ),
-                const SizedBox(height: 16),
-                _DetailsField(
-                  label: localizations.detailsArchiveStateLabel,
-                  value: archiveState,
-                ),
-              ],
+        IntentionDetailsTabs(
+          value: selectedTab,
+          onChange: onSelectTab,
+          counts: state.details.relationCounts,
+        ),
+        if (selectedTab == IntentionDetailsTab.overview) ...[
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            sliver: SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _DetailsField(
+                    label: localizations.detailsDescriptionLabel,
+                    value:
+                        intention.description ??
+                        localizations.detailsNoDescription,
+                  ),
+                  const SizedBox(height: 16),
+                  _DetailsField(
+                    label: localizations.detailsReadinessLabel,
+                    value: readiness,
+                  ),
+                  const SizedBox(height: 16),
+                  _DetailsField(
+                    label: localizations.detailsArchiveStateLabel,
+                    value: archiveState,
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
-          sliver: SliverToBoxAdapter(
-            child: switch (state.edit) {
-              final edit? => _DetailsEditForm(
-                edit: edit,
-                isOperationRunning: state.isOperationRunning,
-                onCancel: onCancelEditing,
-                onTitleChanged: onTitleChanged,
-                onDescriptionChanged: onDescriptionChanged,
-                onSave: onSave,
-              ),
-              null => _DetailsActions(
-                state: state,
-                onBeginEditing: onBeginEditing,
-                onEnableReadiness: onEnableReadiness,
-                onDisableReadiness: onDisableReadiness,
-                onArchive: onArchive,
-                onRestore: onRestore,
-                onDelete: onDelete,
-                onRetryStateChange: onRetryStateChange,
-                onShowArchivedRelations: onShowArchivedRelations,
-                onChoosePath: () => unawaited(
-                  context.router.push(
-                    ChoicePathRoute(
-                      sourceIntentionId: intention.id,
-                      direction: ChoicePathDraftDirection.topDown,
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+            sliver: SliverToBoxAdapter(
+              child: switch (state.edit) {
+                final edit? => _DetailsEditForm(
+                  edit: edit,
+                  isOperationRunning: state.isOperationRunning,
+                  onCancel: onCancelEditing,
+                  onTitleChanged: onTitleChanged,
+                  onDescriptionChanged: onDescriptionChanged,
+                  onSave: onSave,
+                ),
+                null => _DetailsActions(
+                  state: state,
+                  onBeginEditing: onBeginEditing,
+                  onEnableReadiness: onEnableReadiness,
+                  onDisableReadiness: onDisableReadiness,
+                  onArchive: onArchive,
+                  onRestore: onRestore,
+                  onDelete: onDelete,
+                  onRetryStateChange: onRetryStateChange,
+                  onShowArchivedRelations: onShowArchivedRelations,
+                  onChoosePath: () => unawaited(
+                    context.router.push(
+                      ChoicePathRoute(
+                        sourceIntentionId: intention.id,
+                        direction: ChoicePathDraftDirection.topDown,
+                      ),
                     ),
                   ),
                 ),
-              ),
-            },
-          ),
-        ),
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
-          sliver: SliverToBoxAdapter(
-            child: TagAssignmentsSection(
-              intentionId: intention.id,
-              isArchived:
-                  intention.archiveState == IntentionArchiveState.archived,
-              onChooseTag: (intentionId) => unawaited(
-                showTagsPanel(context, TagsPanelAssignmentContext(intentionId)),
-              ),
+              },
             ),
           ),
-        ),
-        statisticsSection,
-        RelationNeighborhoodSliver(
-          intentionId: intention.id,
-          onOpenRelation: (relationId) => unawaited(
-            context.router.push(RelationDetailsRoute(relationId: relationId)),
-          ),
-          onOpenDailyChoice: (choiceId) => unawaited(
-            context.router.push(DailyChoiceDetailsRoute(choiceId: choiceId)),
-          ),
-          onCreateRelation: (direction) => unawaited(
-            context.router.push(
-              RelationEditorRoute(
-                editorContext: RelationCreationContext(
-                  participant: RelationParticipantSummary(
-                    id: intention.id,
-                    title: intention.title,
-                    archiveState: intention.archiveState,
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+            sliver: SliverToBoxAdapter(
+              child: TagAssignmentsSection(
+                intentionId: intention.id,
+                isArchived:
+                    intention.archiveState == IntentionArchiveState.archived,
+                onChooseTag: (intentionId) => unawaited(
+                  showTagsPanel(
+                    context,
+                    TagsPanelAssignmentContext(intentionId),
                   ),
-                  direction: direction,
                 ),
               ),
             ),
           ),
-        ),
+        ],
+        if (selectedTab == IntentionDetailsTab.statistics) statisticsSection,
+        if (selectedTab == IntentionDetailsTab.relations)
+          RelationNeighborhoodSliver(
+            intentionId: intention.id,
+            onOpenRelation: (relationId) => unawaited(
+              context.router.push(RelationDetailsRoute(relationId: relationId)),
+            ),
+            onOpenDailyChoice: (choiceId) => unawaited(
+              context.router.push(DailyChoiceDetailsRoute(choiceId: choiceId)),
+            ),
+            onCreateRelation: (direction) => unawaited(
+              context.router.push(
+                RelationEditorRoute(
+                  editorContext: RelationCreationContext(
+                    participant: RelationParticipantSummary(
+                      id: intention.id,
+                      title: intention.title,
+                      archiveState: intention.archiveState,
+                    ),
+                    direction: direction,
+                  ),
+                ),
+              ),
+            ),
+          ),
         const SliverToBoxAdapter(child: SizedBox(height: 24)),
       ],
     );

@@ -154,7 +154,10 @@ void main() {
         expect(retry, canRetry ? findsOneWidget : findsNothing);
         if (canRetry) {
           await tester.ensureVisible(retry);
-          await tester.drag(find.byType(Scrollable), const Offset(0, 100));
+          await tester.drag(
+            find.byType(Scrollable).first,
+            const Offset(0, 100),
+          );
           await tester.pumpAndSettle();
           await tester.tap(retry);
           await tester.pump();
@@ -291,7 +294,10 @@ void main() {
       find.byKey(const ValueKey('intention-details-confirm-delete')),
     );
     await tester.pump();
-    tester.state<ScrollableState>(find.byType(Scrollable)).position.jumpTo(0);
+    tester
+        .state<ScrollableState>(find.byType(Scrollable).first)
+        .position
+        .jumpTo(0);
     await tester.pump();
     expect(find.text(intention.title).hitTestable(), findsOneWidget);
     repository.completeCommand(
@@ -315,24 +321,16 @@ void main() {
       find.byKey(const ValueKey('intention-details-state-change-retry')),
       findsNothing,
     );
-    // Ноль активных связей не объявляет намерение свободным от зависимостей.
-    expect(find.text('Active relations: 0', skipOffstage: false), findsWidgets);
+    // На обзоре числа доступны без создания соседства.
+    expect(find.text('0'), findsOneWidget);
     expect(
-      find.text('Total relations: 1', skipOffstage: false),
+      find.bySemanticsLabel('Relations: 0 active, 1 archived'),
       findsOneWidget,
     );
 
     expect(find.text('Show blocking relations'), findsNothing);
     expect(find.text(intention.title).hitTestable(), findsOneWidget);
-    expect(
-      repository.relationGroupQueries.every(
-        (query) =>
-            query.scope == RelationScope.active &&
-            query.type == LongTermRelationType.need &&
-            query.direction == RelationDirection.outgoing,
-      ),
-      isTrue,
-    );
+    expect(repository.relationGroupQueries, isEmpty);
   });
 
   testWidgets(
@@ -375,6 +373,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await tester.tap(find.text('Relations'));
+      await tester.pumpAndSettle();
+
       // Полное количество группы не подменяется числом загруженных строк.
       expect(
         find.text('In the whole selected group: 250', skipOffstage: false),
@@ -394,6 +395,8 @@ void main() {
       );
 
       await tester.drag(find.byType(CustomScrollView), const Offset(0, 2000));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Overview'));
       await tester.pumpAndSettle();
       final delete = find.byKey(const ValueKey('intention-details-delete'));
       await tester.ensureVisible(delete);

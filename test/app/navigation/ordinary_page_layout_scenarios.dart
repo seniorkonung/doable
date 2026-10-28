@@ -28,7 +28,11 @@ void _registerOrdinaryLayoutTests() {
         find.byKey(const ValueKey('intention-details-title')),
       );
       await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(find.text(l10n.detailsEditAction), 200);
+      await tester.scrollUntilVisible(
+        find.text(l10n.detailsEditAction),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
       await tester.pumpAndSettle();
       expect(find.text(l10n.detailsEditAction).hitTestable(), findsOneWidget);
       await tester.tap(find.text(l10n.detailsEditAction));
@@ -256,6 +260,8 @@ void _registerOrdinaryPaginationTests() {
         tester,
         find.byKey(const ValueKey('intention-details-title')),
       );
+      await _settle(tester);
+      await tester.tap(find.text(l10n.detailsRelationsTab).first);
       await _settle(tester);
       faults.isFailing = true;
       await _scrollToEnd(tester, find.byType(IntentionDetailsPage));

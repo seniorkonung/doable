@@ -683,6 +683,20 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
+  String get detailsTabsLabel => 'Разделы намерения';
+
+  @override
+  String get detailsOverviewTab => 'Обзор';
+
+  @override
+  String get detailsRelationsTab => 'Связи';
+
+  @override
+  String detailsRelationsTabSemantic(int active, int archived) {
+    return 'Связи: активных — $active, архивированных — $archived';
+  }
+
+  @override
   String get detailsTitle => 'Подробности намерения';
 
   @override

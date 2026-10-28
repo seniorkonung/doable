@@ -107,7 +107,7 @@ final class ControlledDetailsRepository
         'Наблюдение дневного выбора не используется этим тестом.',
       );
 
-  ControlledDetailsRepository({this.shareSecondWatch = true});
+  ControlledDetailsRepository({this.shareSecondWatch = false});
 
   /// Страница подробностей и соседство наблюдают одно намерение параллельно.
   bool shareSecondWatch;

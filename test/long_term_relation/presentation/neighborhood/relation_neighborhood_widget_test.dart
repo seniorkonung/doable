@@ -292,8 +292,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await _scrollTo(tester, find.text('Relations'));
-      expect(find.text('Relations'), findsOneWidget);
+      await _scrollTo(tester, find.text('Relations').last);
+      expect(find.text('Relations'), findsNWidgets(2));
       expect(find.text('Total relations: 36'), findsOneWidget);
       expect(find.text('Active relations: 10'), findsNWidgets(2));
       expect(find.text('Archived relations: 26'), findsNWidgets(2));
@@ -520,7 +520,7 @@ void main() {
       repository.failRead(1, const RelationGroupUnavailableFailure());
       await tester.pump();
       await tester.fling(
-        find.byType(Scrollable),
+        find.byType(Scrollable).first,
         const Offset(0, 10000),
         10000,
       );
@@ -685,7 +685,7 @@ void main() {
       final anchoredRow = _rowFinder(9);
       expect(anchoredRow, findsOneWidget);
       final rowRect = tester.getRect(anchoredRow);
-      final viewportRect = tester.getRect(find.byType(Scrollable));
+      final viewportRect = tester.getRect(find.byType(Scrollable).first);
       expect(rowRect.bottom, greaterThan(viewportRect.top));
       expect(rowRect.top, lessThan(viewportRect.bottom));
     },
@@ -789,8 +789,16 @@ void main() {
         find.text('Чтобы Build продукт, нужно Ship без перевода'),
         findsOneWidget,
       );
+      await Scrollable.ensureVisible(
+        tester.element(
+          find.byKey(const ValueKey('relation-neighborhood-create-relation')),
+        ),
+        alignment: 0.5,
+      );
+      await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
-      await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+      // Контракт дизайн-системы задаёт область нажатия 44.
+      await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
       await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
       await expectLater(tester, meetsGuideline(textContrastGuideline));
       semantics.dispose();
@@ -886,7 +894,7 @@ Future<void> _scrollTo(
   await tester.scrollUntilVisible(
     finder,
     300,
-    scrollable: find.byType(Scrollable),
+    scrollable: find.byType(Scrollable).first,
   );
   if (settle) {
     await tester.pumpAndSettle();
@@ -906,7 +914,7 @@ Future<void> _scrollUntilBuiltAndVisible(
       await _scrollTo(tester, finder, settle: settle);
       return;
     }
-    await tester.drag(find.byType(Scrollable), const Offset(0, -400));
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -400));
     await tester.pump();
   }
   throw StateError('Строка соседства не была построена при прокрутке.');
@@ -1007,6 +1015,17 @@ Future<void> _pumpDetailsPage(
       ),
     ),
   );
+  await tester.pump();
+  repository.emitIntention(
+    testNeighborhoodIntention(id: ownerId),
+    counts: testRelationCounts(),
+    revision: const TestGraphRevision(0),
+  );
+  await tester.pumpAndSettle();
+  final texts = AppLocalizations.of(
+    tester.element(find.byType(IntentionDetailsPage)),
+  );
+  await tester.tap(find.text(texts.detailsRelationsTab));
   await tester.pump();
   for (var attempt = 0; attempt < 100; attempt += 1) {
     if (repository.intentionIds.length >= 2 && repository.requestCount >= 1) {

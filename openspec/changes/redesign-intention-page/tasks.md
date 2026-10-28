@@ -192,7 +192,7 @@
     - проверки: `test/intention/presentation/details/intention_details_page_test.dart`, `test/app/navigation/app_navigation_accessibility_test.dart`, `test/app/intention_app_lifecycle_test.dart`, `test/app/intention_creation_sheet_integration_test.dart`, `test/app/long_term_relation_app_flow_test.dart`, `test/app/routing/app_router_test.dart`.
   - **Размер:** M — проверки в основном меняются механически: способ возврата и поиск заголовка.
 
-- [ ] 2.4 Разложить прежнее содержимое страницы намерения по закреплённым вкладкам «Обзор», «Связи» и «Статистика», которые переключаются без шагов в истории
+- [x] 2.4 Разложить прежнее содержимое страницы намерения по закреплённым вкладкам «Обзор», «Связи» и «Статистика», которые переключаются без шагов в истории
   - **Критерии приёмки:**
     - По решению 1 дизайна сразу под шапкой стоит закреплённая полоса `Tabs`:
       - «Обзор» показывает прежние поля, действия, правку и теги;

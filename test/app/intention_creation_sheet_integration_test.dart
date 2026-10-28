@@ -998,7 +998,9 @@ Future<void> _expectCreatedPage(
     await tester.scrollUntilVisible(
       row,
       200,
-      scrollable: find.descendant(of: page, matching: find.byType(Scrollable)),
+      scrollable: find
+          .descendant(of: page, matching: find.byType(Scrollable))
+          .first,
     );
     await tester.pumpAndSettle();
     expect(

@@ -154,6 +154,8 @@ void main() {
       relationCounts: counts,
     );
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Связи'));
+    await tester.pumpAndSettle();
     final dailyGroup = find.byKey(
       const ValueKey('relation-neighborhood-daily-source'),
     );
@@ -250,7 +252,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+    // Контракт дизайн-системы задаёт область нажатия 44.
+    await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
     await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
     await expectLater(tester, meetsGuideline(textContrastGuideline));
     semantics.dispose();
@@ -464,7 +467,10 @@ void main() {
         expect(retry, canRetry ? findsOneWidget : findsNothing);
         if (canRetry) {
           await tester.ensureVisible(retry);
-          await tester.drag(find.byType(Scrollable), const Offset(0, 100));
+          await tester.drag(
+            find.byType(Scrollable).first,
+            const Offset(0, 100),
+          );
           await tester.pumpAndSettle();
           await tester.tap(retry);
           await tester.pump();

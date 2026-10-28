@@ -183,6 +183,7 @@ void main() {
     await tester.pump();
     await tester.pump();
     const text = 'Несохранённое описание после сброса просмотра связи';
+    await tester.pump();
     await tester.enterText(find.byKey(_description), text);
     expect(find.text(text), findsOneWidget);
 
@@ -539,6 +540,8 @@ Future<void> _expectSourceActiveRelationCount(
   WidgetTester tester,
   int count,
 ) async {
+  await tester.tap(find.text('Связи').first);
+  await tester.pumpAndSettle();
   final summary = find.byKey(
     const ValueKey('relation-neighborhood-summary-numbers'),
   );

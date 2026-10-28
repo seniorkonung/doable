@@ -411,6 +411,7 @@ void main() {
       await _select(tester, AppDestination.intentionGraph);
       await _enterTitleFilter(tester, app, _activeTitle(1), total: 1);
       await _open(tester, _catalogRow(_activeTitle(1)), IntentionDetailsPage);
+      await _tap(tester, find.text('Relations').first);
       await _tap(
         tester,
         find.byKey(
@@ -443,6 +444,7 @@ void main() {
         find.byKey(const ValueKey('daily-choice-edit-open')),
       );
       await _closeTop(tester, DailyChoiceDetailsPage);
+      await _tap(tester, find.text(app.l10n.statisticsSectionTitle).first);
       // Флажок доступен в другом каталоге; корневой остаётся скрытым.
       final dayLabel = app.l10n.statisticsCalendarDaySemantics(
         DateTime.utc(_choiceDate.year, _choiceDate.month, _choiceDate.day),

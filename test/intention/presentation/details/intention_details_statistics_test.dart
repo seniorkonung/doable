@@ -11,7 +11,6 @@ import 'package:doable/src/graph/application/personal_graph_repository_provider.
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/statistics/application/contribution_counts.dart';
 import 'package:doable/src/statistics/application/intention_statistics_breakdown.dart';
 import 'package:doable/src/statistics/application/intention_statistics_calendar.dart';
@@ -242,20 +241,10 @@ void main() {
         date = CalendarDate.fromParts(2026, 10, 14);
         await tester.pump(const Duration(hours: 1));
         await tester.pumpAndSettle();
-        final relations = find.text(texts.relationNeighborhoodTitle);
-        await tester.scrollUntilVisible(
-          relations,
-          150,
-          scrollable: scrollable,
-          maxScrolls: 500,
-        );
-        position.jumpTo(
-          position.pixels +
-              tester.getTopLeft(relations).dy -
-              tester.getRect(scrollView).top,
-        );
-        await tester.pumpAndSettle();
+        final relations = find.text(texts.detailsRelationsTab).first;
         await tester.ensureVisible(relations);
+        await tester.pumpAndSettle();
+        await tester.tap(relations);
         await tester.pumpAndSettle();
         expect(relations.hitTestable(), findsOneWidget);
         expect(updating.hitTestable(), findsNothing);
@@ -264,7 +253,7 @@ void main() {
     );
   }
   testWidgets(
-    'обычное открытие показывает статистику между тегами и связями для обоих состояний намерения',
+    'обычное открытие показывает обзор, статистика доступна на своей вкладке для обоих состояний намерения',
     (tester) async {
       for (final archiveState in IntentionArchiveState.values) {
         final repository = ControlledDetailsRepository()
@@ -301,26 +290,15 @@ void main() {
         expect(query.period, StatisticsMonth(2026, 10));
         expect(query.view, StatisticsView.throughRelations);
         expect(query.localDate, CalendarDate.fromParts(2026, 10, 12));
-        final initialGroup = repository.relationGroupQueries.single;
-        expect(initialGroup.direction, RelationDirection.outgoing);
-        expect(initialGroup.type, LongTermRelationType.need);
-        expect(initialGroup.scope, RelationScope.active);
-
-        final tags = find.byType(TagAssignmentsSection, skipOffstage: false);
-        final statistics = find.text('Статистика', skipOffstage: false);
-        expect(statistics, findsOneWidget);
+        expect(repository.relationGroupQueries, isEmpty);
         expect(
-          tester.getTopLeft(tags).dy,
-          lessThan(tester.getTopLeft(statistics).dy),
+          find.byType(TagAssignmentsSection, skipOffstage: false),
+          findsOneWidget,
         );
-        expect(
-          tester.getTopLeft(statistics).dy,
-          lessThan(
-            tester.getTopLeft(find.text('Связи', skipOffstage: false)).dy,
-          ),
-        );
-        await tester.ensureVisible(statistics);
+        final statistics = find.text('Статистика').first;
+        await tester.tap(statistics);
         await tester.pumpAndSettle();
+        expect(find.byType(TagAssignmentsSection), findsNothing);
         expect(statistics.hitTestable(), findsOneWidget);
         expect(find.textContaining('октябрь 2026'), findsOneWidget);
         await tester.pumpWidget(const SizedBox.shrink());
@@ -330,7 +308,7 @@ void main() {
   );
 
   testWidgets(
-    'цель маршрута применяется до чтения и прокручивает раздел только при первом получении намерения',
+    'цель маршрута выбирает статистику при открытии и не применяется повторно',
     (tester) async {
       final repository = ControlledDetailsRepository()
         ..onStatisticsSection = _emptySection;
@@ -384,9 +362,9 @@ void main() {
       );
       repository.detailRequests.single.add(ResultSuccess(intention));
       await tester.pumpAndSettle();
-      expect(find.text('Статистика').hitTestable(), findsOneWidget);
+      expect(find.text('Статистика').first.hitTestable(), findsOneWidget);
       expect(find.text('2025'), findsOneWidget);
-      expect(repository.relationGroupQueries, hasLength(1));
+      expect(repository.relationGroupQueries, isEmpty);
 
       await tester.tap(find.text('Месяц'));
       await tester.pumpAndSettle();
@@ -433,7 +411,9 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Новое название').hitTestable(), findsOneWidget);
       expect(repository.statisticsQueries, hasLength(4));
-      await tester.ensureVisible(find.text('Statistics', skipOffstage: false));
+      await tester.ensureVisible(
+        find.text('Statistics', skipOffstage: false).first,
+      );
       await tester.pumpAndSettle();
       expect(find.textContaining('October 2026'), findsOneWidget);
       expect(repository.statisticsQueries.last.period, StatisticsYear(2019));
@@ -467,6 +447,8 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
       repository.detailRequests.single.add(ResultSuccess(intention));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Статистика'));
       await tester.pumpAndSettle();
       date = CalendarDate.fromParts(2026, 10, 13);
       await tester.pump(const Duration(hours: 1));

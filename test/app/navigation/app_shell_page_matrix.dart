@@ -416,6 +416,11 @@ void _registerPageMatrixTests() {
               wait: _until,
             );
           default:
+            if (entry == _MatrixEntry.relation ||
+                entry == _MatrixEntry.createRelation ||
+                entry == _MatrixEntry.incomingRelations) {
+              await _tap(tester, find.text('Relations').first);
+            }
             await _tap(tester, entry.finder);
         }
         await tester.pumpAndSettle();

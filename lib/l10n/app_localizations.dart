@@ -1076,6 +1076,30 @@ abstract class AppLocalizations {
   /// **'To {source}, you can {related}'**
   String relationNeighborhoodCanPhrase(String source, String related);
 
+  /// Доступное название полосы вкладок страницы намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Intention sections'**
+  String get detailsTabsLabel;
+
+  /// Вкладка прежних данных и действий намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Overview'**
+  String get detailsOverviewTab;
+
+  /// Вкладка соседства намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Relations'**
+  String get detailsRelationsTab;
+
+  /// Числа долговременных связей на вкладке для диктора
+  ///
+  /// In en, this message translates to:
+  /// **'Relations: {active} active, {archived} archived'**
+  String detailsRelationsTabSemantic(int active, int archived);
+
   /// Доступное имя страницы намерения при загрузке и отказе чтения
   ///
   /// In en, this message translates to:
