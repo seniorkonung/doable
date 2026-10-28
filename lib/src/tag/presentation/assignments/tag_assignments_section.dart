@@ -4,7 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
-import '../../../design_system/components/tag_dot.dart';
+import '../../../design_system/components/list_state.dart';
+import '../../../design_system/components/notice.dart';
+import '../../../design_system/components/tag_chip.dart';
+import '../../../design_system/components/tags_section.dart';
+import '../../../design_system/doable_metrics.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/presentation/operation_failure_presentation.dart';
 import '../../../intention/domain/intention_id.dart';
@@ -12,7 +16,6 @@ import '../../application/tag_assignments.dart';
 import '../../application/tag_command.dart';
 import '../../application/tag_result.dart';
 import '../../domain/tag.dart';
-import '../../domain/tag_id.dart';
 import '../tag_color_presentation.dart';
 import '../tag_failure_message.dart';
 import 'tag_assignments_state.dart';
@@ -147,7 +150,6 @@ final class _TagAssignmentsSectionState
     final model = ref.read(
       tagAssignmentsViewModelProvider(intentionId).notifier,
     );
-    final intentionKind = l10n.tagAssignmentsIntention;
     final archiveState = widget.isArchived
         ? l10n.tagAssignmentsArchived
         : l10n.tagAssignmentsActive;
@@ -155,191 +157,117 @@ final class _TagAssignmentsSectionState
         state is TagAssignmentsLoaded &&
         state.canUseCurrentItems &&
         !_intentionBusy;
+    final tags = switch (state) {
+      TagAssignmentsLoaded(:final items) => items,
+      _ => const <Tag>[],
+    };
 
     return Semantics(
       container: true,
       explicitChildNodes: true,
-      label: l10n.tagAssignmentsContext(intentionKind, archiveState),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            l10n.tagAssignmentsTitle,
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          Tooltip(
-            message: l10n.tagAssignmentsChooseSemantic(
-              intentionKind,
-              archiveState,
-            ),
-            child: TextButton.icon(
-              key: const ValueKey('tag-assignments-choose'),
-              onPressed: canChoose ? () => _choose(intentionId) : null,
-              icon: const Icon(Icons.add),
-              label: Text(l10n.tagAssignmentsChoose),
-            ),
-          ),
-          if (_activeRemoveToken != null)
-            _AssignmentStatus(
-              message: l10n.tagAssignmentsRemoving,
-              loading: true,
-            ),
-          if (_commandBusy)
-            _AssignmentStatus(message: l10n.tagAssignmentAlreadyRunning),
-          if (_removeFailure case final failure?)
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: OperationFailurePresentation(
-                claim: null,
-                message: tagAssignmentFailureMessage(l10n, failure),
-                messageKey: const ValueKey('tag-assignments-remove-failure'),
-              ),
-            ),
-          switch (state) {
-            TagAssignmentsInitialLoading() => _AssignmentStatus(
-              message: l10n.tagAssignmentsLoading,
-              loading: true,
-            ),
-            TagAssignmentsIntentionMissing() => _AssignmentStatus(
-              message: l10n.tagAssignmentIntentionNotFound,
-            ),
-            TagAssignmentsInitialFailure(:final failure, :final canRetry) =>
-              _AssignmentStatus(
-                message: _readFailure(l10n, failure),
-                onAction: canRetry ? model.retryInitialLoad : null,
-                actionLabel: l10n.commonRetry,
-              ),
-            TagAssignmentsLoaded loaded => _LoadedAssignments(
-              state: loaded,
-              model: model,
-              canRemove: !_intentionBusy,
-              isTagBusy: _coordinator.isTagRunning,
-              onRemove: (tag) => _remove(intentionId, tag),
-            ),
-          },
-        ],
+      label: l10n.tagAssignmentsContext(
+        l10n.tagAssignmentsIntention,
+        archiveState,
       ),
-    );
-  }
-}
-
-final class _LoadedAssignments extends StatelessWidget {
-  const _LoadedAssignments({
-    required this.state,
-    required this.model,
-    required this.canRemove,
-    required this.isTagBusy,
-    required this.onRemove,
-  });
-
-  final TagAssignmentsLoaded state;
-  final TagAssignmentsViewModel model;
-  final bool canRemove;
-  final bool Function(TagId) isTagBusy;
-  final ValueChanged<Tag> onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (state.freshness == TagAssignmentsFreshness.refreshing)
-          _AssignmentStatus(
-            message: l10n.tagAssignmentsRefreshing,
-            loading: true,
-          ),
-        if (state.freshness == TagAssignmentsFreshness.stale)
-          _AssignmentStatus(
-            message: _readFailure(l10n, state.refreshFailure!),
-            onAction: state.refreshFailure is TagAssignmentsUnavailableFailure
-                ? model.retryRefresh
-                : null,
-            actionLabel: l10n.commonRetry,
-          ),
-        if (state.isEmpty && state.canUseCurrentItems)
-          _AssignmentStatus(message: l10n.tagAssignmentsEmpty),
-        for (final tag in state.items)
-          Semantics(
-            key: ValueKey('tag-assignment-row-${tag.id.toCanonicalString()}'),
-            container: true,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      TagDot(
-                        color: tagColorPresentation(tag.color),
-                        size: TagDotSize.medium,
-                      ),
-                      const SizedBox(width: 8),
-                      Flexible(child: Text(tag.name.value)),
-                    ],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TagsSection(
+            title: l10n.tagAssignmentsTitle,
+            addText: l10n.tagAssignmentsAdd,
+            addLabel: tags.isEmpty
+                ? l10n.tagAssignmentsAddEmptyLabel
+                : l10n.tagAssignmentsAddLabel(
+                    tags.map((tag) => tag.name.value).join(', '),
                   ),
-                  Tooltip(
-                    message: l10n.tagAssignmentsRemoveNamed(tag.name.value),
-                    child: TextButton.icon(
-                      key: ValueKey(
-                        'tag-assignment-remove-${tag.id.toCanonicalString()}',
-                      ),
-                      onPressed:
-                          state.canUseCurrentItems &&
-                              canRemove &&
-                              !isTagBusy(tag.id) &&
-                              model.canActOn(tag.id)
-                          ? () => onRemove(tag)
-                          : null,
-                      icon: const Icon(Icons.remove_circle_outline),
-                      label: Text(l10n.tagAssignmentsRemove),
+            onAdd: canChoose ? () => _choose(intentionId) : null,
+            addKey: const ValueKey('tag-assignments-choose'),
+            chips: [
+              if (state case final TagAssignmentsLoaded loaded)
+                for (final tag in loaded.items)
+                  TagChip.medium(
+                    key: ValueKey(
+                      'tag-assignment-row-${tag.id.toCanonicalString()}',
                     ),
+                    name: tag.name.value,
+                    color: tagColorPresentation(tag.color),
+                    removeLabel: l10n.tagAssignmentsRemoveNamed(tag.name.value),
+                    removeKey: ValueKey(
+                      'tag-assignment-remove-${tag.id.toCanonicalString()}',
+                    ),
+                    onRemove:
+                        loaded.canUseCurrentItems &&
+                            !_intentionBusy &&
+                            !_coordinator.isTagRunning(tag.id) &&
+                            model.canActOn(tag.id)
+                        ? () => _remove(intentionId, tag)
+                        : null,
                   ),
-                ],
-              ),
-            ),
+            ],
           ),
-      ],
-    );
-  }
-}
-
-final class _AssignmentStatus extends StatelessWidget {
-  const _AssignmentStatus({
-    required this.message,
-    this.loading = false,
-    this.onAction,
-    this.actionLabel,
-  });
-
-  final String message;
-  final bool loading;
-  final VoidCallback? onAction;
-  final String? actionLabel;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.all(16),
-    child: Semantics(
-      container: true,
-      liveRegion: true,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (loading) ...[
-            const CircularProgressIndicator(),
-            const SizedBox(height: 12),
-          ],
-          Text(message),
-          if (onAction case final action?) ...[
-            const SizedBox(height: 12),
-            OutlinedButton(onPressed: action, child: Text(actionLabel!)),
-          ],
+          for (final status in [
+            if (_activeRemoveToken != null)
+              ListState.loading(text: l10n.tagAssignmentsRemoving),
+            if (_commandBusy) Notice(message: l10n.tagAssignmentAlreadyRunning),
+            if (_removeFailure case final failure?)
+              Notice.content(
+                message: OperationFailurePresentation(
+                  claim: null,
+                  message: tagAssignmentFailureMessage(l10n, failure),
+                  messageKey: const ValueKey('tag-assignments-remove-failure'),
+                  inheritsColor: true,
+                ),
+              ),
+            ...switch (state) {
+              TagAssignmentsInitialLoading() => [
+                ListState.loading(text: l10n.tagAssignmentsLoading),
+              ],
+              TagAssignmentsIntentionMissing() => [
+                ListState.error(message: l10n.tagAssignmentIntentionNotFound),
+              ],
+              TagAssignmentsInitialFailure(:final failure, :final canRetry) => [
+                ListState.error(
+                  message: _readFailure(l10n, failure),
+                  retry: canRetry
+                      ? (
+                          label: l10n.commonRetry,
+                          onPressed: model.retryInitialLoad,
+                        )
+                      : null,
+                ),
+              ],
+              TagAssignmentsLoaded(:final freshness, :final refreshFailure) =>
+                switch (freshness) {
+                  TagAssignmentsFreshness.refreshing => [
+                    ListState.loading(text: l10n.tagAssignmentsRefreshing),
+                  ],
+                  TagAssignmentsFreshness.stale => [
+                    Notice.content(
+                      message: Semantics(
+                        container: true,
+                        liveRegion: true,
+                        child: Text(_readFailure(l10n, refreshFailure!)),
+                      ),
+                      action: refreshFailure is TagAssignmentsUnavailableFailure
+                          ? (
+                              label: l10n.commonRetry,
+                              onPressed: model.retryRefresh,
+                            )
+                          : null,
+                    ),
+                  ],
+                  TagAssignmentsFreshness.current => const <Widget>[],
+                },
+            },
+          ])
+            Padding(
+              padding: const EdgeInsets.only(top: DoableMetrics.space2),
+              child: status,
+            ),
         ],
       ),
-    ),
-  );
+    );
+  }
 }
 
 String _readFailure(AppLocalizations l10n, TagAssignmentsReadFailure failure) =>

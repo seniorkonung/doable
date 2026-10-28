@@ -216,6 +216,7 @@ void main() {
       await tester.ensureVisible(
         find.byKey(const ValueKey('intention-details-archive')),
       );
+      await tester.pump();
       await tester.tap(find.byKey(const ValueKey('intention-details-archive')));
       await tester.pump();
       final archived = _copyIntention(
@@ -258,6 +259,7 @@ void main() {
       await tester.ensureVisible(
         find.byKey(const ValueKey('intention-details-restore')),
       );
+      await tester.pump();
       await tester.tap(find.byKey(const ValueKey('intention-details-restore')));
       await tester.pump();
       final restored = _copyIntention(

@@ -569,6 +569,28 @@ final class _LoadedDetails extends StatelessWidget {
                 ),
               ),
               SliverPadding(
+                padding: const EdgeInsets.fromLTRB(
+                  DoableMetrics.space5,
+                  DoableMetrics.space2,
+                  DoableMetrics.space5,
+                  0,
+                ),
+                sliver: SliverToBoxAdapter(
+                  child: TagAssignmentsSection(
+                    intentionId: intention.id,
+                    isArchived:
+                        intention.archiveState ==
+                        IntentionArchiveState.archived,
+                    onChooseTag: (intentionId) => unawaited(
+                      showTagsPanel(
+                        context,
+                        TagsPanelAssignmentContext(intentionId),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              SliverPadding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                 sliver: SliverToBoxAdapter(
                   child: Column(
@@ -597,23 +619,6 @@ final class _LoadedDetails extends StatelessWidget {
                           sourceIntentionId: intention.id,
                           direction: ChoicePathDraftDirection.topDown,
                         ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
-                sliver: SliverToBoxAdapter(
-                  child: TagAssignmentsSection(
-                    intentionId: intention.id,
-                    isArchived:
-                        intention.archiveState ==
-                        IntentionArchiveState.archived,
-                    onChooseTag: (intentionId) => unawaited(
-                      showTagsPanel(
-                        context,
-                        TagsPanelAssignmentContext(intentionId),
                       ),
                     ),
                   ),

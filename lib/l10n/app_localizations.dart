@@ -2635,10 +2635,10 @@ abstract class AppLocalizations {
   /// **'The tag assignment operation failed because of an unexpected error.'**
   String get tagAssignmentUnexpected;
 
-  /// Заголовок блока назначений
+  /// Заголовок блока тегов намерения
   ///
   /// In en, this message translates to:
-  /// **'Assigned tags'**
+  /// **'Tags'**
   String get tagAssignmentsTitle;
 
   /// Вид получателя: намерение
@@ -2671,12 +2671,6 @@ abstract class AppLocalizations {
   /// **'Loading assignments…'**
   String get tagAssignmentsLoading;
 
-  /// Существующий получатель без назначений
-  ///
-  /// In en, this message translates to:
-  /// **'No tags assigned yet.'**
-  String get tagAssignmentsEmpty;
-
   /// Актуализация открытых назначений
   ///
   /// In en, this message translates to:
@@ -2701,28 +2695,28 @@ abstract class AppLocalizations {
   /// **'Could not load assignments because of an unexpected error.'**
   String get tagAssignmentsUnexpected;
 
-  /// Переход к выбору тега
+  /// Видимая подпись открытия панели тегов намерения
   ///
   /// In en, this message translates to:
-  /// **'Choose a tag'**
-  String get tagAssignmentsChoose;
+  /// **'Add'**
+  String get tagAssignmentsAdd;
 
-  /// Доступная подпись перехода к выбору
+  /// Доступная подпись «Добавить» с перечнем назначенных тегов
   ///
   /// In en, this message translates to:
-  /// **'Choose a tag for the {archiveState} {targetKind}'**
-  String tagAssignmentsChooseSemantic(String targetKind, String archiveState);
+  /// **'Tags: {tagNames}. Add or remove'**
+  String tagAssignmentsAddLabel(String tagNames);
 
-  /// Снятие одной пары назначения
+  /// Доступная подпись «Добавить» у намерения без тегов
   ///
   /// In en, this message translates to:
-  /// **'Remove assignment'**
-  String get tagAssignmentsRemove;
+  /// **'Add tags'**
+  String get tagAssignmentsAddEmptyLabel;
 
-  /// Доступная подпись снятия назначения конкретного тега
+  /// Доступная подпись крестика, который снимает тег с намерения
   ///
   /// In en, this message translates to:
-  /// **'Remove assignment: {tagName}'**
+  /// **'Remove the tag: {tagName}'**
   String tagAssignmentsRemoveNamed(String tagName);
 
   /// Ожидание подтверждения снятия

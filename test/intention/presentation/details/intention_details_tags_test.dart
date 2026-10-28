@@ -4,12 +4,16 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/design_system/components/option_tiles.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
+import 'package:doable/src/design_system/components/tag_chip.dart';
+import 'package:doable/src/design_system/components/tags_section.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_state.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_view_model.dart';
 import 'package:flutter/material.dart';
@@ -89,7 +93,18 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(choose, findsOneWidget);
-        expect(find.text('Дом'), findsOneWidget);
+        // Блок тегов стоит в 8 под плитками типа, а тег нарисован чипом.
+        expect(
+          tester.getTopLeft(find.byType(TagsSection)).dy,
+          tester
+                  .getBottomLeft(find.byType(OptionTiles<IntentionReadiness>))
+                  .dy +
+              8,
+        );
+        expect(
+          find.ancestor(of: find.text('Дом'), matching: find.byType(TagChip)),
+          findsOneWidget,
+        );
         await Scrollable.ensureVisible(tester.element(choose), alignment: 0.3);
         await tester.pumpAndSettle();
         await tester.tap(choose);
@@ -97,7 +112,10 @@ void main() {
         // Панель открыта над страницей намерения, а не отдельной страницей.
         expect(router.current.name, IntentionDetailsRoute.name);
         expect(find.byType(Sheet), findsOneWidget);
-        expect(find.text('Теги'), findsOneWidget);
+        expect(
+          find.descendant(of: find.byType(Sheet), matching: find.text('Теги')),
+          findsOneWidget,
+        );
 
         // Нажатие на существующий тег сразу назначает его этому намерению
         // без восстановления архивного и без изменения остальных данных.
@@ -208,7 +226,7 @@ void main() {
         final delete = find.byKey(const ValueKey('intention-details-delete'));
         await tester.scrollUntilVisible(
           delete,
-          -200,
+          200,
           scrollable: find.byType(Scrollable).first,
         );
         await tester.pumpAndSettle();

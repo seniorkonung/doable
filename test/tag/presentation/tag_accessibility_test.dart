@@ -157,31 +157,33 @@ void _registerAssignmentScenarios() {
           tester.getSemantics(find.byType(TagAssignmentsSection)).label,
           contains(l10n.tagAssignmentsContext(kind, archiveState)),
         );
-        expect(
-          find.byTooltip(l10n.tagAssignmentsChooseSemantic(kind, archiveState)),
-          findsOneWidget,
-        );
-        expect(
-          _semanticTooltips(tester),
-          contains(l10n.tagAssignmentsChooseSemantic(kind, archiveState)),
-        );
+        // «Добавить» перечисляет назначенные теги в их ручном порядке.
+        final assignedNames = [
+          for (final row in raw.select(
+            'SELECT tags.name FROM tags '
+            'JOIN tag_assignments ON tag_assignments.tag_id = tags.id '
+            'WHERE tag_assignments.intention_id = ? ORDER BY tags.position',
+            [tagFixtureId(number)],
+          ))
+            row['name'] as String,
+        ];
+        final addLabel = l10n.tagAssignmentsAddLabel(assignedNames.join(', '));
+        expect(tester.getSemantics(choose).label, addLabel);
         _expectAction(tester.getSemantics(choose));
         final removeHome = find.byKey(
           ValueKey('tag-assignment-remove-${tagFixtureId(firstTagNumber)}'),
         );
         await tester.ensureVisible(removeHome);
         expect(
-          find.byTooltip(l10n.tagAssignmentsRemoveNamed('Дом')),
-          findsOneWidget,
-        );
-        expect(
-          _semanticTooltips(tester),
-          contains(l10n.tagAssignmentsRemoveNamed('Дом')),
+          tester.getSemantics(removeHome).label,
+          l10n.tagAssignmentsRemoveNamed('Дом'),
         );
         _expectAction(tester.getSemantics(removeHome));
         expect(
-          _traversalIndex(tester, l10n.tagAssignmentsChoose),
-          lessThan(_traversalIndex(tester, l10n.tagAssignmentsRemove)),
+          _traversalIndex(tester, addLabel),
+          lessThan(
+            _traversalIndex(tester, l10n.tagAssignmentsRemoveNamed('Дом')),
+          ),
         );
 
         await _tap(tester, choose);
@@ -337,8 +339,8 @@ void _registerAssignmentScenarios() {
         );
         await tester.ensureVisible(removeNew);
         expect(
-          find.byTooltip(l10n.tagAssignmentsRemoveNamed(newName)),
-          findsOneWidget,
+          tester.getSemantics(removeNew).label,
+          l10n.tagAssignmentsRemoveNamed(newName),
         );
         await _tap(tester, removeNew);
         await _untilCondition(
@@ -355,10 +357,11 @@ void _registerAssignmentScenarios() {
         final recipientDelete = find.byKey(
           const ValueKey('intention-details-delete'),
         );
-        // Запас шагов позволяет прокрутить все пятьдесят назначений.
+        // Удаление стоит под блоком тегов; запас шагов позволяет прокрутить
+        // все пятьдесят назначений.
         await tester.scrollUntilVisible(
           recipientDelete,
-          -300,
+          300,
           scrollable: detailsScroll,
           maxScrolls: 100,
         );
@@ -570,21 +573,4 @@ int _traversalIndex(WidgetTester tester, String label) {
     reason: 'Нет в порядке семантического обхода: $label',
   );
   return index;
-}
-
-List<String> _semanticTooltips(WidgetTester tester) {
-  final tooltips = <String>[];
-  void walk(SemanticsNode node) {
-    if (node.tooltip.isNotEmpty) tooltips.add(node.tooltip);
-    for (final child in node.debugListChildrenInOrder(
-      DebugSemanticsDumpOrder.traversalOrder,
-    )) {
-      walk(child);
-    }
-  }
-
-  walk(
-    tester.binding.renderViews.first.owner!.semanticsOwner!.rootSemanticsNode!,
-  );
-  return tooltips;
 }

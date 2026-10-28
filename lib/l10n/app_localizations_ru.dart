@@ -1734,7 +1734,7 @@ class AppLocalizationsRu extends AppLocalizations {
       'Назначение тега не изменено из-за непредвиденной ошибки.';
 
   @override
-  String get tagAssignmentsTitle => 'Назначенные теги';
+  String get tagAssignmentsTitle => 'Теги';
 
   @override
   String get tagAssignmentsIntention => 'намерение';
@@ -1754,9 +1754,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get tagAssignmentsLoading => 'Загружаем назначения…';
 
   @override
-  String get tagAssignmentsEmpty => 'Назначений тегов пока нет.';
-
-  @override
   String get tagAssignmentsRefreshing => 'Обновляем назначения…';
 
   @override
@@ -1772,19 +1769,19 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось загрузить назначения из-за непредвиденной ошибки.';
 
   @override
-  String get tagAssignmentsChoose => 'Выбрать тег';
+  String get tagAssignmentsAdd => 'Добавить';
 
   @override
-  String tagAssignmentsChooseSemantic(String targetKind, String archiveState) {
-    return 'Выбрать тег для получателя: $targetKind, $archiveState';
+  String tagAssignmentsAddLabel(String tagNames) {
+    return 'Теги: $tagNames. Добавить или убрать';
   }
 
   @override
-  String get tagAssignmentsRemove => 'Снять назначение';
+  String get tagAssignmentsAddEmptyLabel => 'Добавить теги';
 
   @override
   String tagAssignmentsRemoveNamed(String tagName) {
-    return 'Снять назначение: $tagName';
+    return 'Убрать тег: $tagName';
   }
 
   @override

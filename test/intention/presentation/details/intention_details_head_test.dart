@@ -155,6 +155,7 @@ void main() {
 
     final archive = find.byKey(const ValueKey('intention-details-archive'));
     await tester.ensureVisible(archive);
+    await tester.pump();
     await tester.tap(archive);
     await tester.pump();
     final position = tester.state<ScrollableState>(_scrollable).position;

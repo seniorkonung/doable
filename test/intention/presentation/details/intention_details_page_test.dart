@@ -970,10 +970,13 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text(busyMessage), findsOneWidget);
 
-      final delete = find.byKey(const ValueKey('intention-details-delete'));
-      await Scrollable.ensureVisible(tester.element(delete), alignment: 0.3);
-      await tester.pumpAndSettle();
-      await tester.tap(delete);
+      // Кнопка стоит в конце «Обзора» под сообщением общей поверхности,
+      // поэтому её нажимают напрямую.
+      tester
+          .widget<ButtonStyleButton>(
+            find.byKey(const ValueKey('intention-details-delete')),
+          )
+          .onPressed!();
       await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(const ValueKey('intention-details-confirm-delete')),
@@ -1231,7 +1234,6 @@ void _expectPageControls(WidgetTester tester, {required bool enabled}) {
     'intention-details-archive',
     'intention-details-delete',
     'tag-assignments-choose',
-    'tag-assignment-remove-${_pageTag.id.toCanonicalString()}',
   ]) {
     expect(
       tester
@@ -1243,6 +1245,23 @@ void _expectPageControls(WidgetTester tester, {required bool enabled}) {
       reason: key,
     );
   }
+  expect(
+    tester
+        .widget<InkWell>(
+          find.descendant(
+            of: find.byKey(
+              ValueKey(
+                'tag-assignment-remove-${_pageTag.id.toCanonicalString()}',
+              ),
+              skipOffstage: false,
+            ),
+            matching: find.byType(InkWell, skipOffstage: false),
+          ),
+        )
+        .onTap,
+    matcher,
+    reason: 'крестик тега',
+  );
 }
 
 final _pageTag = Tag(

@@ -1714,7 +1714,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'The tag assignment operation failed because of an unexpected error.';
 
   @override
-  String get tagAssignmentsTitle => 'Assigned tags';
+  String get tagAssignmentsTitle => 'Tags';
 
   @override
   String get tagAssignmentsIntention => 'intention';
@@ -1734,9 +1734,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tagAssignmentsLoading => 'Loading assignments…';
 
   @override
-  String get tagAssignmentsEmpty => 'No tags assigned yet.';
-
-  @override
   String get tagAssignmentsRefreshing => 'Refreshing assignments…';
 
   @override
@@ -1752,19 +1749,19 @@ class AppLocalizationsEn extends AppLocalizations {
       'Could not load assignments because of an unexpected error.';
 
   @override
-  String get tagAssignmentsChoose => 'Choose a tag';
+  String get tagAssignmentsAdd => 'Add';
 
   @override
-  String tagAssignmentsChooseSemantic(String targetKind, String archiveState) {
-    return 'Choose a tag for the $archiveState $targetKind';
+  String tagAssignmentsAddLabel(String tagNames) {
+    return 'Tags: $tagNames. Add or remove';
   }
 
   @override
-  String get tagAssignmentsRemove => 'Remove assignment';
+  String get tagAssignmentsAddEmptyLabel => 'Add tags';
 
   @override
   String tagAssignmentsRemoveNamed(String tagName) {
-    return 'Remove assignment: $tagName';
+    return 'Remove the tag: $tagName';
   }
 
   @override
