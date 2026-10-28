@@ -758,7 +758,7 @@
     - проверки: `test/tag/presentation/assignments/tag_assignments_section_test.dart`, `test/tag/presentation/tag_accessibility_test.dart`, `test/intention/presentation/details/intention_details_tags_test.dart`.
   - **Размер:** M.
 
-- [ ] 4.12 Добавить в дизайн-систему строку дат `DatesLine`
+- [x] 4.12 Добавить в дизайн-систему строку дат `DatesLine`
   - **Критерии приёмки:**
     - По README `DatesLine` строка получает от потребителя готовые подписи и метки даты создания и, если она есть, даты изменения. Строка одна, стилем `hint` цвета `muted` с табличными цифрами, по левому краю. Две части разделены средней точкой, без даты изменения строка называет одну дату.
     - Форматирование дат и решение, показывать ли дату изменения, остаются у потребителя (ADR-0030).
