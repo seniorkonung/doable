@@ -836,25 +836,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get detailsCancelEditAction => 'Cancel';
 
   @override
-  String get detailsArchiveAction => 'Archive';
-
-  @override
-  String get detailsRestoreAction => 'Restore';
-
-  @override
-  String get detailsDeleteAction => 'Delete permanently';
-
-  @override
-  String get detailsDeleteConfirmationTitle => 'Delete intention permanently?';
-
-  @override
-  String get detailsDeleteConfirmationMessage =>
-      'This can’t be undone. The intention, its description, and all its tag assignments, including those not shown here, will be permanently deleted. The tags will remain.';
-
-  @override
-  String get detailsConfirmDeleteAction => 'Delete permanently';
-
-  @override
   String get detailsDeleted => 'Intention deleted.';
 
   @override
@@ -895,18 +876,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get detailsDeleteBlockedByRelations =>
       'The intention wasn’t deleted: its relations still block deletion. Archived relations and relations that aren’t loaded yet block it too.';
-
-  @override
-  String get detailsArchiveCascadeExplanation =>
-      'Archiving also archives the intention’s direct relations. Neighbouring intentions and their other relations stay unchanged.';
-
-  @override
-  String detailsRestoreRelationsExplanation(int count) {
-    return 'Restoring returns only the intention. Its relations stay archived: $count.';
-  }
-
-  @override
-  String get detailsShowArchivedRelationsAction => 'Show archived relations';
 
   @override
   String get detailsDeleteUnavailable =>

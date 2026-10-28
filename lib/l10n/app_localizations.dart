@@ -1352,42 +1352,6 @@ abstract class AppLocalizations {
   /// **'Cancel'**
   String get detailsCancelEditAction;
 
-  /// Явное действие архивирования намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Archive'**
-  String get detailsArchiveAction;
-
-  /// Явное действие восстановления намерения из архива
-  ///
-  /// In en, this message translates to:
-  /// **'Restore'**
-  String get detailsRestoreAction;
-
-  /// Действие начала физического удаления намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Delete permanently'**
-  String get detailsDeleteAction;
-
-  /// Заголовок подтверждения необратимого удаления намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Delete intention permanently?'**
-  String get detailsDeleteConfirmationTitle;
-
-  /// Объяснение необратимости физического удаления намерения
-  ///
-  /// In en, this message translates to:
-  /// **'This can’t be undone. The intention, its description, and all its tag assignments, including those not shown here, will be permanently deleted. The tags will remain.'**
-  String get detailsDeleteConfirmationMessage;
-
-  /// Явное подтверждение физического удаления намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Delete permanently'**
-  String get detailsConfirmDeleteAction;
-
   /// Подтверждение физического удаления намерения после ухода из подробного просмотра
   ///
   /// In en, this message translates to:
@@ -1453,24 +1417,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The intention wasn’t deleted: its relations still block deletion. Archived relations and relations that aren’t loaded yet block it too.'**
   String get detailsDeleteBlockedByRelations;
-
-  /// Объяснение каскада непосредственных связей перед архивированием
-  ///
-  /// In en, this message translates to:
-  /// **'Archiving also archives the intention’s direct relations. Neighbouring intentions and their other relations stay unchanged.'**
-  String get detailsArchiveCascadeExplanation;
-
-  /// Объяснение сохранённого архива связей перед восстановлением
-  ///
-  /// In en, this message translates to:
-  /// **'Restoring returns only the intention. Its relations stay archived: {count}.'**
-  String detailsRestoreRelationsExplanation(int count);
-
-  /// Переход к архивным группам связей намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Show archived relations'**
-  String get detailsShowArchivedRelationsAction;
 
   /// Устранимая недоступность физического удаления намерения
   ///

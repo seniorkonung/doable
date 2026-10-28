@@ -840,25 +840,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get detailsCancelEditAction => 'Отмена';
 
   @override
-  String get detailsArchiveAction => 'Архивировать';
-
-  @override
-  String get detailsRestoreAction => 'Восстановить';
-
-  @override
-  String get detailsDeleteAction => 'Удалить навсегда';
-
-  @override
-  String get detailsDeleteConfirmationTitle => 'Удалить намерение навсегда?';
-
-  @override
-  String get detailsDeleteConfirmationMessage =>
-      'Это действие нельзя отменить. Намерение, его описание и все назначения тегов, включая не показанные сейчас, будут удалены навсегда. Сами теги сохранятся.';
-
-  @override
-  String get detailsConfirmDeleteAction => 'Удалить навсегда';
-
-  @override
   String get detailsDeleted => 'Намерение удалено.';
 
   @override
@@ -899,18 +880,6 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get detailsDeleteBlockedByRelations =>
       'Намерение не удалено: его связи блокируют удаление. Архивные и ещё не загруженные связи тоже блокируют.';
-
-  @override
-  String get detailsArchiveCascadeExplanation =>
-      'Архивирование также архивирует непосредственные связи намерения. Соседние намерения и их остальные связи не изменяются.';
-
-  @override
-  String detailsRestoreRelationsExplanation(int count) {
-    return 'Восстановление возвращает только само намерение. Его связи остаются в архиве: $count.';
-  }
-
-  @override
-  String get detailsShowArchivedRelationsAction => 'Показать архив связей';
 
   @override
   String get detailsDeleteUnavailable =>

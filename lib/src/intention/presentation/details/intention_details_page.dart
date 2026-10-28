@@ -132,19 +132,6 @@ final class _IntentionDetailsPageState
     _syncStatisticsVisibility();
   }
 
-  void _showArchivedRelations() {
-    final details = ref.read(
-      intentionDetailsViewModelProvider(widget.intentionId),
-    );
-    if (details is! IntentionDetailsLoaded) return;
-    _selectTab(IntentionDetailsTab.relations);
-    ref
-        .read(
-          relationNeighborhoodViewModelProvider(widget.intentionId).notifier,
-        )
-        .showArchivedRelations(details.details.relationCounts);
-  }
-
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -426,8 +413,6 @@ final class _IntentionDetailsPageState
                 statisticsSection: IntentionStatisticsSectionSliver(
                   provider: _statisticsProvider,
                 ),
-                onDelete: _delete,
-                onShowArchivedRelations: _showArchivedRelations,
               ),
             ),
           ],
@@ -506,8 +491,6 @@ final class _DetailsContent extends ConsumerWidget {
     required this.selectedTab,
     required this.onSelectTab,
     required this.statisticsSection,
-    required this.onDelete,
-    required this.onShowArchivedRelations,
   });
 
   final IntentionId intentionId;
@@ -520,8 +503,6 @@ final class _DetailsContent extends ConsumerWidget {
   final IntentionDetailsTab selectedTab;
   final ValueChanged<IntentionDetailsTab> onSelectTab;
   final Widget statisticsSection;
-  final VoidCallback onDelete;
-  final VoidCallback onShowArchivedRelations;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -547,14 +528,6 @@ final class _DetailsContent extends ConsumerWidget {
         onDisableReadiness: ref
             .read(intentionDetailsViewModelProvider(intentionId).notifier)
             .disableReadiness,
-        onArchive: ref
-            .read(intentionDetailsViewModelProvider(intentionId).notifier)
-            .archive,
-        onRestore: ref
-            .read(intentionDetailsViewModelProvider(intentionId).notifier)
-            .restore,
-        onDelete: onDelete,
-        onShowArchivedRelations: onShowArchivedRelations,
       ),
       IntentionDetailsNotFound() => _DetailsStatus(
         message: localizations.detailsNotFound,
@@ -594,10 +567,6 @@ final class _LoadedDetails extends StatelessWidget {
     required this.statisticsSection,
     required this.onEnableReadiness,
     required this.onDisableReadiness,
-    required this.onArchive,
-    required this.onRestore,
-    required this.onDelete,
-    required this.onShowArchivedRelations,
   });
 
   final IntentionDetailsLoaded state;
@@ -611,10 +580,6 @@ final class _LoadedDetails extends StatelessWidget {
   final Widget statisticsSection;
   final VoidCallback onEnableReadiness;
   final VoidCallback onDisableReadiness;
-  final VoidCallback onArchive;
-  final VoidCallback onRestore;
-  final VoidCallback onDelete;
-  final VoidCallback onShowArchivedRelations;
 
   @override
   Widget build(BuildContext context) {
@@ -725,26 +690,30 @@ final class _LoadedDetails extends StatelessWidget {
                   ),
                 ),
               ),
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
-                sliver: SliverToBoxAdapter(
-                  child: _DetailsActions(
-                    state: state,
-                    onArchive: onArchive,
-                    onRestore: onRestore,
-                    onDelete: onDelete,
-                    onShowArchivedRelations: onShowArchivedRelations,
-                    onChoosePath: () => unawaited(
-                      context.router.push(
-                        ChoicePathRoute(
-                          sourceIntentionId: intention.id,
-                          direction: ChoicePathDraftDirection.topDown,
-                        ),
+              if (intention.archiveState == IntentionArchiveState.active)
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+                  sliver: SliverToBoxAdapter(
+                    child: Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: FilledButton.icon(
+                        key: const ValueKey('intention-details-choose-path'),
+                        onPressed: state.isOperationRunning
+                            ? null
+                            : () => unawaited(
+                                context.router.push(
+                                  ChoicePathRoute(
+                                    sourceIntentionId: intention.id,
+                                    direction: ChoicePathDraftDirection.topDown,
+                                  ),
+                                ),
+                              ),
+                        icon: const Icon(Icons.route_outlined),
+                        label: Text(localizations.detailsChoosePathAction),
                       ),
                     ),
                   ),
                 ),
-              ),
             ],
             if (selectedTab == IntentionDetailsTab.statistics)
               statisticsSection,
@@ -780,129 +749,6 @@ final class _LoadedDetails extends StatelessWidget {
         ),
       ],
     );
-  }
-}
-
-final class _DetailsActions extends StatelessWidget {
-  const _DetailsActions({
-    required this.state,
-    required this.onArchive,
-    required this.onRestore,
-    required this.onDelete,
-    required this.onShowArchivedRelations,
-    required this.onChoosePath,
-  });
-
-  final IntentionDetailsLoaded state;
-  final VoidCallback onArchive;
-  final VoidCallback onRestore;
-  final VoidCallback onDelete;
-  final VoidCallback onShowArchivedRelations;
-  final VoidCallback onChoosePath;
-
-  @override
-  Widget build(BuildContext context) {
-    final localizations = AppLocalizations.of(context);
-    final controlsEnabled = !state.isOperationRunning;
-    final isArchived =
-        state.intention.archiveState == IntentionArchiveState.archived;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // Переход состояния объясняется до его запуска: архивирование
-        // каскадно архивирует связи, а восстановление их не возвращает.
-        if (isArchived)
-          _RelationImpactExplanation(
-            explanationKey: const ValueKey(
-              'intention-details-restore-explanation',
-            ),
-            message: localizations.detailsRestoreRelationsExplanation(
-              state.details.relationCounts.archived,
-            ),
-            actionKey: const ValueKey(
-              'intention-details-show-archived-relations',
-            ),
-            actionLabel: localizations.detailsShowArchivedRelationsAction,
-            onAction: onShowArchivedRelations,
-          )
-        else
-          _RelationImpactExplanation(
-            explanationKey: const ValueKey(
-              'intention-details-archive-explanation',
-            ),
-            message: localizations.detailsArchiveCascadeExplanation,
-          ),
-        const SizedBox(height: 16),
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            if (!isArchived)
-              FilledButton.icon(
-                key: const ValueKey('intention-details-choose-path'),
-                onPressed: controlsEnabled ? onChoosePath : null,
-                icon: const Icon(Icons.route_outlined),
-                label: Text(localizations.detailsChoosePathAction),
-              ),
-            if (state.intention.archiveState == IntentionArchiveState.active)
-              OutlinedButton.icon(
-                key: const ValueKey('intention-details-archive'),
-                onPressed: controlsEnabled ? onArchive : null,
-                icon: const Icon(Icons.archive_outlined),
-                label: Text(localizations.detailsArchiveAction),
-              )
-            else
-              OutlinedButton.icon(
-                key: const ValueKey('intention-details-restore'),
-                onPressed: controlsEnabled ? onRestore : null,
-                icon: const Icon(Icons.unarchive_outlined),
-                label: Text(localizations.detailsRestoreAction),
-              ),
-            FilledButton.icon(
-              key: const ValueKey('intention-details-delete'),
-              onPressed: controlsEnabled
-                  ? () => unawaited(_confirmDeletion(context))
-                  : null,
-              style: FilledButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.error,
-                foregroundColor: Theme.of(context).colorScheme.onError,
-              ),
-              icon: const Icon(Icons.delete_forever_outlined),
-              label: Text(localizations.detailsDeleteAction),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Future<void> _confirmDeletion(BuildContext context) async {
-    final localizations = AppLocalizations.of(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(localizations.detailsDeleteConfirmationTitle),
-        content: Text(localizations.detailsDeleteConfirmationMessage),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text(localizations.detailsCancelEditAction),
-          ),
-          FilledButton(
-            key: const ValueKey('intention-details-confirm-delete'),
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(dialogContext).colorScheme.error,
-              foregroundColor: Theme.of(dialogContext).colorScheme.onError,
-            ),
-            child: Text(localizations.detailsConfirmDeleteAction),
-          ),
-        ],
-      ),
-    );
-    if (confirmed ?? false) {
-      onDelete();
-    }
   }
 }
 
@@ -945,46 +791,4 @@ final class _DetailsStatus extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Объяснение влияния связей на переход состояния намерения.
-///
-/// Объяснение доступно до запуска операции, а переход ведёт в существующее
-/// соседство того же намерения.
-final class _RelationImpactExplanation extends StatelessWidget {
-  const _RelationImpactExplanation({
-    required this.explanationKey,
-    required this.message,
-    this.actionKey,
-    this.actionLabel,
-    this.onAction,
-  }) : assert((actionLabel == null) == (onAction == null)),
-       assert((actionKey == null) == (onAction == null));
-
-  final Key explanationKey;
-  final String message;
-  final Key? actionKey;
-  final String? actionLabel;
-  final VoidCallback? onAction;
-
-  @override
-  Widget build(BuildContext context) => Semantics(
-    key: explanationKey,
-    container: true,
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(message),
-        if (onAction case final action?) ...[
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            key: actionKey,
-            onPressed: action,
-            icon: const Icon(Icons.inventory_2_outlined),
-            label: Text(actionLabel!),
-          ),
-        ],
-      ],
-    ),
-  );
 }

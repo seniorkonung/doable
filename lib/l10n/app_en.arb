@@ -726,30 +726,6 @@
   "@detailsCancelEditAction": {
     "description": "Действие отмены изменения намерения до отправки"
   },
-  "detailsArchiveAction": "Archive",
-  "@detailsArchiveAction": {
-    "description": "Явное действие архивирования намерения"
-  },
-  "detailsRestoreAction": "Restore",
-  "@detailsRestoreAction": {
-    "description": "Явное действие восстановления намерения из архива"
-  },
-  "detailsDeleteAction": "Delete permanently",
-  "@detailsDeleteAction": {
-    "description": "Действие начала физического удаления намерения"
-  },
-  "detailsDeleteConfirmationTitle": "Delete intention permanently?",
-  "@detailsDeleteConfirmationTitle": {
-    "description": "Заголовок подтверждения необратимого удаления намерения"
-  },
-  "detailsDeleteConfirmationMessage": "This can’t be undone. The intention, its description, and all its tag assignments, including those not shown here, will be permanently deleted. The tags will remain.",
-  "@detailsDeleteConfirmationMessage": {
-    "description": "Объяснение необратимости физического удаления намерения"
-  },
-  "detailsConfirmDeleteAction": "Delete permanently",
-  "@detailsConfirmDeleteAction": {
-    "description": "Явное подтверждение физического удаления намерения"
-  },
   "detailsDeleted": "Intention deleted.",
   "@detailsDeleted": {
     "description": "Подтверждение физического удаления намерения после ухода из подробного просмотра"
@@ -793,23 +769,6 @@
   "detailsDeleteBlockedByRelations": "The intention wasn’t deleted: its relations still block deletion. Archived relations and relations that aren’t loaded yet block it too.",
   "@detailsDeleteBlockedByRelations": {
     "description": "Объяснение блокировки удаления намерения его связями"
-  },
-  "detailsArchiveCascadeExplanation": "Archiving also archives the intention’s direct relations. Neighbouring intentions and their other relations stay unchanged.",
-  "@detailsArchiveCascadeExplanation": {
-    "description": "Объяснение каскада непосредственных связей перед архивированием"
-  },
-  "detailsRestoreRelationsExplanation": "Restoring returns only the intention. Its relations stay archived: {count}.",
-  "@detailsRestoreRelationsExplanation": {
-    "description": "Объяснение сохранённого архива связей перед восстановлением",
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "detailsShowArchivedRelationsAction": "Show archived relations",
-  "@detailsShowArchivedRelationsAction": {
-    "description": "Переход к архивным группам связей намерения"
   },
   "detailsDeleteUnavailable": "The intention couldn’t be deleted. Try again.",
   "@detailsDeleteUnavailable": {

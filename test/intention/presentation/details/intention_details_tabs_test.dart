@@ -11,14 +11,11 @@ import 'package:doable/src/design_system/components/tabs.dart';
 import 'package:doable/src/design_system/components/top_bar.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
-import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
-import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_tabs.dart';
 import 'package:doable/src/intention/presentation/details/intention_page_target.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
-import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/statistics/application/intention_statistics_target.dart';
 import 'package:doable/src/statistics/application/statistics_period.dart';
 import 'package:doable/src/statistics/application/statistics_read_contract.dart';
@@ -129,68 +126,6 @@ void main() {
       },
     );
   }
-
-  testWidgets(
-    'показ архива впервые открывает связи на первой непустой архивной группе',
-    (tester) async {
-      final repository = ControlledDetailsRepository();
-      final counts = testRelationCounts(archivedCanIncoming: 1);
-      repository.onRelationGroupPage = (query) => GraphResultSuccess(
-        RelationGroupFirstPage(
-          items:
-              query.scope == RelationScope.archived &&
-                  query.type == LongTermRelationType.can &&
-                  query.direction == RelationDirection.incoming
-              ? [
-                  testDetailsRelationRow(
-                    ownerId: testDetailsIntention().id,
-                    index: 1,
-                    type: LongTermRelationType.can,
-                    direction: RelationDirection.incoming,
-                    scope: RelationScope.archived,
-                  ),
-                ]
-              : const [],
-          counts: counts,
-          nextCursor: null,
-          revision: const TestDetailsRevision(0),
-        ),
-      );
-      await _openPage(tester, repository);
-      repository.detailRequests.single.add(
-        ResultSuccess(
-          testDetailsIntention(archiveState: IntentionArchiveState.archived),
-        ),
-        relationCounts: counts,
-      );
-      await tester.pumpAndSettle();
-      final showArchive = find.text('Show archived relations');
-      await tester.scrollUntilVisible(
-        showArchive,
-        200,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await Scrollable.ensureVisible(
-        tester.element(showArchive),
-        alignment: 0.3,
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(showArchive);
-      await tester.pumpAndSettle();
-
-      final query = repository.relationGroupQueries.last;
-      expect(query.scope, RelationScope.archived);
-      expect(query.type, LongTermRelationType.can);
-      expect(query.direction, RelationDirection.incoming);
-      expect(find.text('Show archived relations'), findsNothing);
-      await tester.drag(find.byType(CustomScrollView), const Offset(0, -1200));
-      await tester.pumpAndSettle();
-      expect(
-        find.text('To Исходное 1, you can Намерение-владелец'),
-        findsOneWidget,
-      );
-    },
-  );
 
   for (final (locale, overview, relations, label) in [
     ('ru', 'Обзор', 'Связи', 'Связи: активных — 5, архивированных — 3'),
