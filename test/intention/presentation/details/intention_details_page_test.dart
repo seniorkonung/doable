@@ -330,10 +330,7 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      expect(
-        find.textContaining('Marked as ready for action.'),
-        findsOneWidget,
-      );
+      expect(find.byType(SnackBar), findsNothing);
       expect(
         find.text('Ready for action', skipOffstage: false),
         findsOneWidget,
@@ -381,11 +378,11 @@ void main() {
       await waitForDetailRequests(repository, 2);
       repository.detailRequests[1].add(ResultSuccess(notReady));
       await tester.pumpAndSettle();
+      expect(find.byType(SnackBar), findsNothing);
       expect(
-        find.textContaining('Marked as not ready for action.'),
+        find.text('Not ready for action', skipOffstage: false),
         findsOneWidget,
       );
-      await _closeOperationMessage(tester);
 
       final archive = find.byKey(const ValueKey('intention-details-archive'));
       await tester.ensureVisible(archive);
@@ -401,13 +398,12 @@ void main() {
       await waitForDetailRequests(repository, 3);
       repository.detailRequests[2].add(ResultSuccess(archived));
       await tester.pumpAndSettle();
-      expect(find.textContaining('Intention archived.'), findsOneWidget);
+      expect(find.byType(SnackBar), findsNothing);
       expect(find.text('Archived', skipOffstage: false), findsOneWidget);
       expect(
         find.text('Not ready for action', skipOffstage: false),
         findsOneWidget,
       );
-      await _closeOperationMessage(tester);
 
       final restore = find.byKey(const ValueKey('intention-details-restore'));
       await tester.ensureVisible(restore);
@@ -422,7 +418,7 @@ void main() {
       await waitForDetailRequests(repository, 4);
       repository.detailRequests[3].add(ResultSuccess(restored));
       await tester.pumpAndSettle();
-      expect(find.textContaining('Intention restored.'), findsOneWidget);
+      expect(find.byType(SnackBar), findsNothing);
       expect(find.text('Active', skipOffstage: false), findsOneWidget);
     },
   );
@@ -977,17 +973,11 @@ void main() {
 
       expect(find.text('Archived', skipOffstage: false), findsOneWidget);
       expect(find.text(busyMessage), findsOneWidget);
-      expect(find.textContaining('Intention archived.'), findsNothing);
 
+      // Успех архивирования не объявляется и после закрытия чужого отказа.
       await _closeOperationMessage(tester);
       expect(find.text(busyMessage), findsNothing);
-      expect(
-        find.text('Archive — “Открытое”: Intention archived.'),
-        findsOneWidget,
-      );
-
-      await _closeOperationMessage(tester);
-      expect(find.textContaining('Intention archived.'), findsNothing);
+      expect(find.byType(SnackBar), findsNothing);
     },
   );
 

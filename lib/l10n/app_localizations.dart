@@ -1280,30 +1280,6 @@ abstract class AppLocalizations {
   /// **'Intention deleted.'**
   String get detailsDeleted;
 
-  /// Подтверждение включённой готовности к действию
-  ///
-  /// In en, this message translates to:
-  /// **'Marked as ready for action.'**
-  String get detailsReadinessEnabled;
-
-  /// Подтверждение выключенной готовности к действию
-  ///
-  /// In en, this message translates to:
-  /// **'Marked as not ready for action.'**
-  String get detailsReadinessDisabled;
-
-  /// Подтверждение архивирования намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Intention archived.'**
-  String get detailsArchivedSuccess;
-
-  /// Подтверждение восстановления намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Intention restored.'**
-  String get detailsRestoredSuccess;
-
   /// Безопасная ошибка недопустимого перехода состояния
   ///
   /// In en, this message translates to:

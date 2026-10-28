@@ -712,9 +712,9 @@ void main() {
     expect(current.totalCount, 1);
     final successClaim = await presenter.nextClaim();
     expect(successClaim, isNotNull);
+    // Успех готовности согласует данные, но не предъявляется.
     expect(successClaim!.completions.map((completion) => completion.token), [
       create.token,
-      readiness.token,
     ]);
     coordinator.confirmAppPresentation(
       successClaim,
@@ -728,7 +728,6 @@ void main() {
       ArchiveIntention(created.id),
       presentationTitle: created.title,
     ) as IntentionCommandAccepted;
-    coordinator.releaseInitiatorPresentation(failed.token);
     repository.completeCommand(
       2,
       const ResultFailure(IntentionUnavailableFailure()),

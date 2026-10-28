@@ -792,18 +792,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get detailsDeleted => 'Intention deleted.';
 
   @override
-  String get detailsReadinessEnabled => 'Marked as ready for action.';
-
-  @override
-  String get detailsReadinessDisabled => 'Marked as not ready for action.';
-
-  @override
-  String get detailsArchivedSuccess => 'Intention archived.';
-
-  @override
-  String get detailsRestoredSuccess => 'Intention restored.';
-
-  @override
   String get detailsStateChangeInvalid =>
       'The intention state couldn’t be changed.';
 

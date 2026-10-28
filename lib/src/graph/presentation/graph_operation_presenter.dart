@@ -548,29 +548,21 @@ String _successFor(
 ) => switch ((kind, success)) {
   (IntentionCommandKind.create, IntentionSaved()) =>
     localizations.editorCreated,
-  (IntentionCommandKind.update, _) => throw StateError(
-    'Успех изменения намерения не образует права предъявления.',
-  ),
-  (IntentionCommandKind.enableReadiness, IntentionSaved()) =>
-    localizations.detailsReadinessEnabled,
-  (IntentionCommandKind.disableReadiness, IntentionSaved()) =>
-    localizations.detailsReadinessDisabled,
-  (IntentionCommandKind.archive, IntentionSaved()) =>
-    localizations.detailsArchivedSuccess,
-  (IntentionCommandKind.restore, IntentionSaved()) =>
-    localizations.detailsRestoredSuccess,
+  (
+    IntentionCommandKind.update ||
+        IntentionCommandKind.enableReadiness ||
+        IntentionCommandKind.disableReadiness ||
+        IntentionCommandKind.archive ||
+        IntentionCommandKind.restore,
+    _,
+  ) =>
+    throw StateError(
+      'Успех этой операции намерения не образует права предъявления.',
+    ),
   (IntentionCommandKind.delete, IntentionDeleted()) =>
     localizations.detailsDeleted,
   (IntentionCommandKind.create, IntentionDeleted()) =>
     localizations.editorCreateUnexpected,
-  (
-    IntentionCommandKind.enableReadiness ||
-        IntentionCommandKind.disableReadiness ||
-        IntentionCommandKind.archive ||
-        IntentionCommandKind.restore,
-    IntentionDeleted(),
-  ) =>
-    localizations.detailsStateChangeUnexpected,
   (IntentionCommandKind.delete, IntentionSaved()) =>
     localizations.detailsDeleteUnexpected,
 };

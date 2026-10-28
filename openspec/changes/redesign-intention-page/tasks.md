@@ -593,7 +593,7 @@
     - проверки: `test/intention/presentation/details/intention_details_view_model_test.dart`, `test/intention/presentation/details/intention_details_page_test.dart`, `test/intention/presentation/details/intention_details_delete_test.dart`, `test/app/long_term_relation_app_flow_test.dart`, `test/app/navigation/app_shell_operation_reset_test.dart`.
   - **Размер:** M.
 
-- [ ] 4.2 Не объявлять сообщением успех изменения готовности, архивирования и восстановления, отдавая их отказ сразу общей поверхности по ADR-0016
+- [x] 4.2 Не объявлять сообщением успех изменения готовности, архивирования и восстановления, отдавая их отказ сразу общей поверхности по ADR-0016
   - **Критерии приёмки:**
     - По решению 4 дизайна `GraphCommandCoordinator` применяет к `EnableIntentionReadiness`, `DisableIntentionReadiness`, `ArchiveIntention` и `RestoreIntention` политику «только отказ». Политику задаёт вид операции в координаторе:
       - успех публикуется в канал завершений для согласования данных, но не образует права предъявления и не оставляет непредъявленной записи;

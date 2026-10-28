@@ -264,9 +264,9 @@ void main() {
         find.byType(IntentionDetailsPage, skipOffstage: false),
         findsNothing,
       );
-      expect(find.byKey(_message), findsOneWidget);
+      // Успех архивирования виден в согласованных корнях, а не в сообщении.
+      expect(_builtMessages, findsNothing);
       expect(app.repository.commands.single, isA<ArchiveIntention>());
-      await _closeMessage(tester);
 
       await _select(tester, AppDestination.intentionGraph);
       expect(
@@ -277,7 +277,6 @@ void main() {
       expect(_intentionCatalogParameters(tester, app), catalogBefore);
       await _select(tester, AppDestination.dailyChoices);
       expect(_dailyChoiceParameters(tester, app), dailyBefore);
-      await _closeMessage(tester);
       expect(_builtMessages, findsNothing);
       expect(tester.takeException(), isNull);
     });
@@ -772,7 +771,7 @@ void main() {
         fails
             ? 'отказ архивирования предъявляется один раз, а смена пункта не '
                   'повторяет и не откладывает операцию'
-            : 'архивирование завершается и предъявляется один раз, а смена пункта '
+            : 'архивирование завершается без сообщения, а смена пункта '
                   'не отменяет, не повторяет и не откладывает операцию',
         (tester) async {
           final app = await _start(tester);
@@ -804,40 +803,48 @@ void main() {
           expect(_builtMessages, findsNothing);
           expect(archiveState(), 0);
 
-          // Результат приходит, пока выбран другой пункт, и предъявляется
-          // сразу на его странице, а не при возвращении к началу перехода.
           app.repository.releaseCommand();
-          await _until(tester, find.byKey(_message));
-          await tester.pumpAndSettle();
+          if (fails) {
+            // Отказ приходит, пока выбран другой пункт, и предъявляется
+            // сразу на его странице, а не при возвращении к началу перехода.
+            await _until(tester, find.byKey(_message));
+            await tester.pumpAndSettle();
 
-          final message = find.text(
-            l10n.graphOperationMessage(
-              l10n.graphOperationArchive,
-              archived,
-              fails
-                  ? l10n.detailsStateChangeUnavailable
-                  : l10n.detailsArchivedSuccess,
-            ),
-          );
-          expect(find.byKey(_message), findsOneWidget);
-          expect(
-            find.descendant(
-              of: find.byType(daily_page.DailyChoiceCatalogPage),
-              matching: message,
-            ),
-            findsOneWidget,
-          );
+            final message = find.text(
+              l10n.graphOperationMessage(
+                l10n.graphOperationArchive,
+                archived,
+                l10n.detailsStateChangeUnavailable,
+              ),
+            );
+            expect(find.byKey(_message), findsOneWidget);
+            expect(
+              find.descendant(
+                of: find.byType(daily_page.DailyChoiceCatalogPage),
+                matching: message,
+              ),
+              findsOneWidget,
+            );
+            // Смена пункта не предъявляет отказ заново.
+            await _select(tester, AppDestination.home);
+            expect(find.byKey(_message), findsOneWidget);
+            expect(message, findsOneWidget);
+            await _select(tester, AppDestination.intentionGraph);
+            expect(find.byKey(_message), findsOneWidget);
+            expect(_catalogRow(archived), findsOneWidget);
+            await _closeMessage(tester);
+          } else {
+            // Успех виден в согласованных данных каталога, а не в сообщении.
+            await _select(tester, AppDestination.intentionGraph);
+            await _waitFor(
+              tester,
+              () => _catalogRow(archived).evaluate().isEmpty,
+            );
+            await tester.pumpAndSettle();
+            expect(_builtMessages, findsNothing);
+          }
           expect(app.repository.commands.single, isA<ArchiveIntention>());
-          expect(archiveState(), fails ? 0 : 1);
-          // Смена пункта не предъявляет результат заново.
-          await _select(tester, AppDestination.home);
-          expect(find.byKey(_message), findsOneWidget);
-          expect(message, findsOneWidget);
-          await _select(tester, AppDestination.intentionGraph);
-          expect(find.byKey(_message), findsOneWidget);
-          expect(_catalogRow(archived), fails ? findsOneWidget : findsNothing);
 
-          await _closeMessage(tester);
           for (final destination in AppDestination.values) {
             await _select(tester, destination);
             expect(_builtMessages, findsNothing, reason: destination.name);

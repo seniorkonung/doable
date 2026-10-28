@@ -795,20 +795,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get detailsDeleted => 'Намерение удалено.';
 
   @override
-  String get detailsReadinessEnabled =>
-      'Намерение отмечено готовым к действию.';
-
-  @override
-  String get detailsReadinessDisabled =>
-      'Намерение отмечено неготовым к действию.';
-
-  @override
-  String get detailsArchivedSuccess => 'Намерение архивировано.';
-
-  @override
-  String get detailsRestoredSuccess => 'Намерение восстановлено.';
-
-  @override
   String get detailsStateChangeInvalid =>
       'Не удалось изменить состояние намерения.';
 

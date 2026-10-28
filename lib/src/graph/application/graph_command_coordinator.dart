@@ -242,16 +242,21 @@ final class IntentionPresentableCompletion extends IntentionCommandCompletion
   }) : super._();
 }
 
-/// Успех изменения текста публикуется только для согласования данных.
-/// Отказ этой операции остаётся предъявляемым по ADR-0012.
-final class IntentionUpdateSucceededCompletion
+/// Успех операции, которая не объявляет его сообщением, публикуется только
+/// для согласования данных.
+///
+/// Так завершаются изменение текста с политикой «успех без сообщения» по
+/// ADR-0046, а также изменение готовности, архивирование и восстановление с
+/// политикой «только отказ» по ADR-0016.
+final class IntentionUnannouncedSuccessCompletion
     extends IntentionCommandCompletion {
-  const IntentionUpdateSucceededCompletion._({
+  const IntentionUnannouncedSuccessCompletion._({
     required super.token,
+    required super.kind,
     required super.target,
     required ResultSuccess<ConfirmedGraphResult<IntentionCommandSuccess>>
     result,
-  }) : super._(kind: IntentionCommandKind.update, confirmedResult: result);
+  }) : super._(confirmedResult: result);
 }
 
 enum LongTermRelationCommandKind { create, update, archive, restore, delete }
@@ -917,6 +922,11 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     CreateIntention command,
   ) => _accept(formKey, command, const CreatingIntentionOperationTarget());
 
+  /// Принимает команду существующего намерения.
+  ///
+  /// Политику предъявления задаёт вид команды: удаление следует ADR-0012,
+  /// изменение текста — ADR-0046, а изменение готовности, архивирование и
+  /// восстановление — политике «только отказ» по ADR-0016.
   IntentionCommandStart acceptExisting(
     ExistingIntentionCommand command, {
     required String presentationTitle,
@@ -1140,18 +1150,23 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
   ) {
     final token = IntentionOperationToken._();
     final kind = _kindOf(command);
+    final policy = _intentionPresentationPolicyOf(kind);
     final acceptance = _acceptOperation(
       keys: {key},
-      entry: _PresentationEntry(token),
+      // Права инициатора у операций «только отказ» нет: отказ сразу
+      // принадлежит оболочке.
+      entry: _PresentationEntry(token)
+        ..initiatorReleased = policy == _PresentationPolicy.failureOnly,
       execute: () async {
         final result = await _executeIntention(command);
-        if (kind == IntentionCommandKind.update &&
+        if (policy != _PresentationPolicy.standard &&
             result
                 is ResultSuccess<
                   ConfirmedGraphResult<IntentionCommandSuccess>
                 >) {
-          return IntentionUpdateSucceededCompletion._(
+          return IntentionUnannouncedSuccessCompletion._(
             token: token,
+            kind: kind,
             target: target,
             result: result,
           );
@@ -1785,6 +1800,30 @@ final class _GraphCommandAlreadyRunning extends _GraphCommandAcceptance {
 final class _GraphCommandDraining extends _GraphCommandAcceptance {
   const _GraphCommandDraining();
 }
+
+/// Политика предъявления результата, которую задаёт вид операции.
+enum _PresentationPolicy {
+  /// Протокол ADR-0012: успех принадлежит оболочке, отказ — сначала
+  /// инициатору.
+  standard,
+
+  /// ADR-0016: успех не предъявляется, отказ сразу принадлежит оболочке.
+  failureOnly,
+
+  /// ADR-0046: успех не предъявляется, отказ следует протоколу ADR-0012.
+  silentSuccess,
+}
+
+_PresentationPolicy _intentionPresentationPolicyOf(IntentionCommandKind kind) =>
+    switch (kind) {
+      IntentionCommandKind.create ||
+      IntentionCommandKind.delete => _PresentationPolicy.standard,
+      IntentionCommandKind.update => _PresentationPolicy.silentSuccess,
+      IntentionCommandKind.enableReadiness ||
+      IntentionCommandKind.disableReadiness ||
+      IntentionCommandKind.archive ||
+      IntentionCommandKind.restore => _PresentationPolicy.failureOnly,
+    };
 
 IntentionCommandKind _kindOf(IntentionCommand command) => switch (command) {
   CreateIntention() => IntentionCommandKind.create,

@@ -677,22 +677,6 @@
   "@detailsDeleted": {
     "description": "Подтверждение физического удаления намерения после ухода из подробного просмотра"
   },
-  "detailsReadinessEnabled": "Marked as ready for action.",
-  "@detailsReadinessEnabled": {
-    "description": "Подтверждение включённой готовности к действию"
-  },
-  "detailsReadinessDisabled": "Marked as not ready for action.",
-  "@detailsReadinessDisabled": {
-    "description": "Подтверждение выключенной готовности к действию"
-  },
-  "detailsArchivedSuccess": "Intention archived.",
-  "@detailsArchivedSuccess": {
-    "description": "Подтверждение архивирования намерения"
-  },
-  "detailsRestoredSuccess": "Intention restored.",
-  "@detailsRestoredSuccess": {
-    "description": "Подтверждение восстановления намерения"
-  },
   "detailsStateChangeInvalid": "The intention state couldn’t be changed.",
   "@detailsStateChangeInvalid": {
     "description": "Безопасная ошибка недопустимого перехода состояния"

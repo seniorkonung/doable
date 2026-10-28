@@ -608,6 +608,59 @@ void main() {
       },
     );
 
+    for (final (name, command) in [
+      ('включение готовности', EnableIntentionReadiness.new),
+      ('выключение готовности', DisableIntentionReadiness.new),
+      ('архивирование', ArchiveIntention.new),
+      ('восстановление', RestoreIntention.new),
+    ]) {
+      test('$name: успех не предъявляется никому, а отказ при открытой '
+          'странице сразу предъявляет оболочка один раз', () async {
+        final repository = _ControlledGraphRepository();
+        final coordinator = _graphCoordinator(repository);
+        final intention = testDetailsIntention(index: 1);
+        final completions = <GraphCommandCompletion>[];
+        final subscription = coordinator.completions.listen(completions.add);
+        final registration = coordinator.registerAppPresentation();
+        final claims = <GraphAppPresentationClaim?>[];
+        unawaited(registration.nextClaim().then(claims.add));
+
+        final succeeded = _acceptExisting(
+          coordinator,
+          command(intention.id),
+        ) as IntentionCommandAccepted;
+        repository.complete(0, testDetailsSavedResult(intention));
+        final success = await succeeded.future;
+        await pumpEventQueue();
+
+        expect(success.confirmedChange, isNotNull);
+        expect(completions, [same(success)]);
+        expect(success, isNot(isA<GraphPresentableCompletion>()));
+        expect(coordinator.claimInitiatorFailure(succeeded.token), isNull);
+        expect(claims, isEmpty);
+
+        // Страница остаётся открытой: право инициатора не освобождается.
+        final failed = _acceptExisting(
+          coordinator,
+          command(intention.id),
+        ) as IntentionCommandAccepted;
+        repository.complete(
+          1,
+          const ResultFailure(IntentionUnavailableFailure()),
+        );
+        final failure = await failed.future;
+        await pumpEventQueue();
+
+        expect(coordinator.claimInitiatorFailure(failed.token), isNull);
+        expect(claims.single!.completions, [same(failure)]);
+        coordinator.confirmAppPresentation(claims.single!, [failed.token]);
+        final remaining = registration.nextClaim();
+        await coordinator.shutdown();
+        expect(await remaining, isNull);
+        await subscription.cancel();
+      });
+    }
+
     test('failure открытой сессии принадлежит инициатору и не блокирует очередь оболочки', () async {
       final repository = _ControlledGraphRepository();
       final coordinator = _graphCoordinator(repository);
@@ -615,7 +668,7 @@ void main() {
 
       final failed = _acceptExisting(
         coordinator,
-        ArchiveIntention(_id(_firstUuid)),
+        DeleteIntention(_id(_firstUuid)),
       ) as IntentionCommandAccepted;
       final succeeded = _acceptExisting(
         coordinator,
@@ -663,7 +716,7 @@ void main() {
 
       final failed = _acceptExisting(
         coordinator,
-        ArchiveIntention(_id(_firstUuid)),
+        DeleteIntention(_id(_firstUuid)),
       ) as IntentionCommandAccepted;
       final firstSuccess = _acceptExisting(
         coordinator,

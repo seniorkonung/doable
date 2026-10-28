@@ -20,11 +20,11 @@ import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
     show IntentionCatalogOrder, IntentionTagFilter;
-import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
 import 'package:doable/src/intention/presentation/picker/intention_picker_view.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -77,16 +77,15 @@ void main() {
     final completions = <GraphCommandCompletion>[];
     final subscription = coordinator.completions.listen(completions.add);
     addTearDown(subscription.cancel);
-    coordinator.acceptExisting(
-      EnableIntentionReadiness(durabilityIntention(5)),
-      presentationTitle: 'Намерение 5',
+    coordinator.acceptRelationArchive(
+      ArchiveLongTermRelation(durabilityRelation(104)),
     );
     await _until(tester, () => completions.length == 1);
     await tester.pumpAndSettle();
     final first = app.l10n.graphOperationMessage(
-      app.l10n.graphOperationEnableReadiness,
-      'Намерение 5',
-      app.l10n.detailsReadinessEnabled,
+      app.l10n.graphOperationArchive,
+      app.l10n.graphOperationRelation,
+      app.l10n.relationArchived,
     );
     final createdMessage = app.l10n.graphOperationMessage(
       app.l10n.graphOperationCreate,

@@ -219,8 +219,9 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     }
   }
 
-  /// Отказ перехода предъявляет общая поверхность: страница не держит его
-  /// renderer и освобождает право инициатора сразу при принятии команды.
+  /// Отказ перехода предъявляет общая поверхность. У изменения готовности,
+  /// архивирования и восстановления права инициатора нет, а право удаления
+  /// страница освобождает сразу при принятии: renderer отказа она не держит.
   Future<IntentionCommandCompletion>? _startStateChange(_StateChangeKind kind) {
     final current = state;
     if (current is! IntentionDetailsLoaded ||
@@ -234,7 +235,9 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     );
     switch (start) {
       case IntentionCommandAccepted(:final token, :final future):
-        _coordinator.releaseInitiatorPresentation(token);
+        if (kind == _StateChangeKind.delete) {
+          _coordinator.releaseInitiatorPresentation(token);
+        }
         state = current.copyWith(isOperationRunning: true);
         return future;
       case IntentionCommandAlreadyRunning():

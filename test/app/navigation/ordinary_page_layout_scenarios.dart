@@ -123,8 +123,8 @@ void _registerOrdinaryLayoutTests() {
         screen: screen,
         insets: insets,
       );
-      _acceptArchive(app, intention: 2);
-      await _until(tester, _messageOf(2));
+      _acceptDelete(app, intention: 3);
+      await _until(tester, _messageOf(3));
       await tester.pumpAndSettle();
       unawaited(
         app.router.push(
@@ -135,11 +135,11 @@ void _registerOrdinaryLayoutTests() {
       await tester.pumpAndSettle();
       _expectLayoutMessage(tester, insets);
       await _closeMessage(tester);
-      _acceptArchive(app, intention: 3);
-      await _until(tester, _messageOf(3));
+      _acceptDelete(app, intention: 4);
+      await _until(tester, _messageOf(4));
       await tester.pumpAndSettle();
       _expectLayoutMessage(tester, insets);
-      expect(_messageOf(2), findsNothing);
+      expect(_messageOf(3), findsNothing);
       await _closeMessage(tester);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
