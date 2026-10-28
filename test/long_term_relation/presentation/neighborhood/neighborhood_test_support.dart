@@ -378,13 +378,14 @@ List<LongTermRelationSummary> testGroupRows({
 Intention testNeighborhoodIntention({
   required IntentionId id,
   String title = 'Намерение',
+  String? description,
   IntentionArchiveState archiveState = IntentionArchiveState.active,
 }) {
   final timestamp = IntentionTimestamp(DateTime.utc(2026, 9, 20));
   return Intention(
     id: id,
     title: title,
-    description: null,
+    description: description,
     readiness: IntentionReadiness.notReady,
     archiveState: archiveState,
     createdAt: timestamp,

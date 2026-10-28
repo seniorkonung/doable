@@ -50,7 +50,6 @@ final class _RelationNeighborhoodSliverState
     extends ConsumerState<RelationNeighborhoodSliver> {
   final _rowKeys = <LongTermRelationId, GlobalKey>{};
   ScrollPosition? _scrollPosition;
-  RelationGroupScrollAnchor? _restoredAnchor;
   var _captureScheduled = false;
   int? _scheduledLoadMoreIndex;
 
@@ -82,6 +81,10 @@ final class _RelationNeighborhoodSliverState
   Widget build(BuildContext context) {
     final provider = relationNeighborhoodViewModelProvider(widget.intentionId);
     final state = ref.watch(provider);
+    // При повторном показе вкладки позицию задаёт страница. Здесь нужны
+    // только новые якоря согласования уже открытого списка.
+    // https://pub.dev/documentation/flutter_riverpod/3.4.2/flutter_riverpod/WidgetRef/listen.html
+    ref.listen(provider, _scheduleAnchorRestoration);
     final viewModel = ref.read(provider.notifier);
     final summaryStatus = state is RelationGroupConfirmedState
         ? state.summaryStatus
@@ -91,7 +94,6 @@ final class _RelationNeighborhoodSliverState
         ? viewModel.retryRefresh
         : null;
     _retainRowKeys(state);
-    _scheduleAnchorRestoration(state);
     _scheduleVisibleRelationCapture();
 
     final bodyChildCount = _bodyChildCount(state);
@@ -305,17 +307,23 @@ final class _RelationNeighborhoodSliverState
     });
   }
 
-  void _scheduleAnchorRestoration(RelationNeighborhoodState state) {
+  void _scheduleAnchorRestoration(
+    RelationNeighborhoodState? previous,
+    RelationNeighborhoodState state,
+  ) {
     final anchor = switch (state) {
       RelationGroupConfirmedState(:final scrollAnchor) => scrollAnchor,
       RelationGroupInitialLoad() ||
       RelationGroupInitialFailure() ||
       RelationNeighborhoodIntentionNotFound() => null,
     };
-    if (anchor == null || identical(anchor, _restoredAnchor)) {
+    final previousAnchor = switch (previous) {
+      RelationGroupConfirmedState(:final scrollAnchor) => scrollAnchor,
+      _ => null,
+    };
+    if (anchor == null || identical(anchor, previousAnchor)) {
       return;
     }
-    _restoredAnchor = anchor;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;

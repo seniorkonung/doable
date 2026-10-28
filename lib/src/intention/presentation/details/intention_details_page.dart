@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -88,6 +89,11 @@ final class _IntentionDetailsPageState
       : IntentionDetailsTab.statistics;
 
   void _selectTab(IntentionDetailsTab tab) {
+    if (tab == _selectedTab) return;
+    if (_headHidden.value) {
+      // https://api.flutter.dev/flutter/widgets/ScrollController/jumpTo.html
+      _scrollController.jumpTo(_headExtent!);
+    }
     if (tab == IntentionDetailsTab.relations) {
       // Подписка удерживает соседство с первого показа до закрытия страницы.
       // https://pub.dev/documentation/flutter_riverpod/latest/flutter_riverpod/WidgetRef/listenManual.html
@@ -273,6 +279,7 @@ final class _IntentionDetailsPageState
                 state: details,
                 scrollController: _scrollController,
                 buildHead: _buildHead,
+                headHidden: _headHidden,
                 selectedTab: _selectedTab,
                 onSelectTab: _selectTab,
                 statisticsSection: IntentionStatisticsSectionSliver(
@@ -321,6 +328,7 @@ final class _DetailsContent extends ConsumerWidget {
     required this.state,
     required this.scrollController,
     required this.buildHead,
+    required this.headHidden,
     required this.selectedTab,
     required this.onSelectTab,
     required this.statisticsSection,
@@ -332,6 +340,7 @@ final class _DetailsContent extends ConsumerWidget {
   final IntentionDetailsState state;
   final ScrollController scrollController;
   final Widget Function(String name) buildHead;
+  final ValueListenable<bool> headHidden;
   final IntentionDetailsTab selectedTab;
   final ValueChanged<IntentionDetailsTab> onSelectTab;
   final Widget statisticsSection;
@@ -350,6 +359,7 @@ final class _DetailsContent extends ConsumerWidget {
         state: loaded,
         scrollController: scrollController,
         pageHead: buildHead(loaded.intention.title),
+        headHidden: headHidden,
         selectedTab: selectedTab,
         onSelectTab: onSelectTab,
         statisticsSection: statisticsSection,
@@ -422,6 +432,7 @@ final class _LoadedDetails extends StatelessWidget {
     required this.state,
     required this.scrollController,
     required this.pageHead,
+    required this.headHidden,
     required this.selectedTab,
     required this.onSelectTab,
     required this.statisticsSection,
@@ -442,6 +453,7 @@ final class _LoadedDetails extends StatelessWidget {
   final IntentionDetailsLoaded state;
   final ScrollController scrollController;
   final Widget pageHead;
+  final ValueListenable<bool> headHidden;
   final IntentionDetailsTab selectedTab;
   final ValueChanged<IntentionDetailsTab> onSelectTab;
   final Widget statisticsSection;
@@ -475,114 +487,124 @@ final class _LoadedDetails extends StatelessWidget {
       slivers: [
         SliverToBoxAdapter(child: pageHead),
         IntentionDetailsTabs(
+          headHidden: headHidden,
           value: selectedTab,
           onChange: onSelectTab,
           counts: state.details.relationCounts,
         ),
-        if (selectedTab == IntentionDetailsTab.overview) ...[
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-            sliver: SliverToBoxAdapter(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _DetailsField(
-                    label: localizations.detailsDescriptionLabel,
-                    value:
-                        intention.description ??
-                        localizations.detailsNoDescription,
+        IntentionDetailsTabBody(
+          slivers: [
+            if (selectedTab == IntentionDetailsTab.overview) ...[
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                sliver: SliverToBoxAdapter(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _DetailsField(
+                        label: localizations.detailsDescriptionLabel,
+                        value:
+                            intention.description ??
+                            localizations.detailsNoDescription,
+                      ),
+                      const SizedBox(height: 16),
+                      _DetailsField(
+                        label: localizations.detailsReadinessLabel,
+                        value: readiness,
+                      ),
+                      const SizedBox(height: 16),
+                      _DetailsField(
+                        label: localizations.detailsArchiveStateLabel,
+                        value: archiveState,
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 16),
-                  _DetailsField(
-                    label: localizations.detailsReadinessLabel,
-                    value: readiness,
-                  ),
-                  const SizedBox(height: 16),
-                  _DetailsField(
-                    label: localizations.detailsArchiveStateLabel,
-                    value: archiveState,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
-            sliver: SliverToBoxAdapter(
-              child: switch (state.edit) {
-                final edit? => _DetailsEditForm(
-                  edit: edit,
-                  isOperationRunning: state.isOperationRunning,
-                  onCancel: onCancelEditing,
-                  onTitleChanged: onTitleChanged,
-                  onDescriptionChanged: onDescriptionChanged,
-                  onSave: onSave,
                 ),
-                null => _DetailsActions(
-                  state: state,
-                  onBeginEditing: onBeginEditing,
-                  onEnableReadiness: onEnableReadiness,
-                  onDisableReadiness: onDisableReadiness,
-                  onArchive: onArchive,
-                  onRestore: onRestore,
-                  onDelete: onDelete,
-                  onRetryStateChange: onRetryStateChange,
-                  onShowArchivedRelations: onShowArchivedRelations,
-                  onChoosePath: () => unawaited(
-                    context.router.push(
-                      ChoicePathRoute(
-                        sourceIntentionId: intention.id,
-                        direction: ChoicePathDraftDirection.topDown,
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+                sliver: SliverToBoxAdapter(
+                  child: switch (state.edit) {
+                    final edit? => _DetailsEditForm(
+                      edit: edit,
+                      isOperationRunning: state.isOperationRunning,
+                      onCancel: onCancelEditing,
+                      onTitleChanged: onTitleChanged,
+                      onDescriptionChanged: onDescriptionChanged,
+                      onSave: onSave,
+                    ),
+                    null => _DetailsActions(
+                      state: state,
+                      onBeginEditing: onBeginEditing,
+                      onEnableReadiness: onEnableReadiness,
+                      onDisableReadiness: onDisableReadiness,
+                      onArchive: onArchive,
+                      onRestore: onRestore,
+                      onDelete: onDelete,
+                      onRetryStateChange: onRetryStateChange,
+                      onShowArchivedRelations: onShowArchivedRelations,
+                      onChoosePath: () => unawaited(
+                        context.router.push(
+                          ChoicePathRoute(
+                            sourceIntentionId: intention.id,
+                            direction: ChoicePathDraftDirection.topDown,
+                          ),
+                        ),
+                      ),
+                    ),
+                  },
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+                sliver: SliverToBoxAdapter(
+                  child: TagAssignmentsSection(
+                    intentionId: intention.id,
+                    isArchived:
+                        intention.archiveState ==
+                        IntentionArchiveState.archived,
+                    onChooseTag: (intentionId) => unawaited(
+                      showTagsPanel(
+                        context,
+                        TagsPanelAssignmentContext(intentionId),
                       ),
                     ),
                   ),
                 ),
-              },
-            ),
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
-            sliver: SliverToBoxAdapter(
-              child: TagAssignmentsSection(
+              ),
+            ],
+            if (selectedTab == IntentionDetailsTab.statistics)
+              statisticsSection,
+            if (selectedTab == IntentionDetailsTab.relations)
+              RelationNeighborhoodSliver(
                 intentionId: intention.id,
-                isArchived:
-                    intention.archiveState == IntentionArchiveState.archived,
-                onChooseTag: (intentionId) => unawaited(
-                  showTagsPanel(
-                    context,
-                    TagsPanelAssignmentContext(intentionId),
+                onOpenRelation: (relationId) => unawaited(
+                  context.router.push(
+                    RelationDetailsRoute(relationId: relationId),
                   ),
                 ),
-              ),
-            ),
-          ),
-        ],
-        if (selectedTab == IntentionDetailsTab.statistics) statisticsSection,
-        if (selectedTab == IntentionDetailsTab.relations)
-          RelationNeighborhoodSliver(
-            intentionId: intention.id,
-            onOpenRelation: (relationId) => unawaited(
-              context.router.push(RelationDetailsRoute(relationId: relationId)),
-            ),
-            onOpenDailyChoice: (choiceId) => unawaited(
-              context.router.push(DailyChoiceDetailsRoute(choiceId: choiceId)),
-            ),
-            onCreateRelation: (direction) => unawaited(
-              context.router.push(
-                RelationEditorRoute(
-                  editorContext: RelationCreationContext(
-                    participant: RelationParticipantSummary(
-                      id: intention.id,
-                      title: intention.title,
-                      archiveState: intention.archiveState,
+                onOpenDailyChoice: (choiceId) => unawaited(
+                  context.router.push(
+                    DailyChoiceDetailsRoute(choiceId: choiceId),
+                  ),
+                ),
+                onCreateRelation: (direction) => unawaited(
+                  context.router.push(
+                    RelationEditorRoute(
+                      editorContext: RelationCreationContext(
+                        participant: RelationParticipantSummary(
+                          id: intention.id,
+                          title: intention.title,
+                          archiveState: intention.archiveState,
+                        ),
+                        direction: direction,
+                      ),
                     ),
-                    direction: direction,
                   ),
                 ),
               ),
-            ),
-          ),
-        const SliverToBoxAdapter(child: SizedBox(height: 24)),
+          ],
+        ),
       ],
     );
   }

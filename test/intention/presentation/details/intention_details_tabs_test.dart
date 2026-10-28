@@ -6,6 +6,8 @@ import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
+import 'package:doable/src/design_system/components/page_head.dart';
+import 'package:doable/src/design_system/components/tabs.dart';
 import 'package:doable/src/design_system/components/top_bar.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
@@ -13,6 +15,7 @@ import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
+import 'package:doable/src/intention/presentation/details/intention_details_tabs.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/statistics/application/intention_statistics_target.dart';
@@ -40,8 +43,10 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    _expectTabsLine(tester, visible: false);
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -1200));
     await tester.pumpAndSettle();
+    _expectTabsLine(tester, visible: true);
 
     final overview = find.text('Overview');
     expect(overview.hitTestable(), findsOneWidget);
@@ -51,7 +56,52 @@ void main() {
       tester.getBottomLeft(overview).dy,
       lessThanOrEqualTo(barBottom + 52),
     );
+    _pagePosition(tester).jumpTo(0);
+    await tester.pumpAndSettle();
+    _expectTabsLine(tester, visible: false);
   });
+
+  for (final (headHidden, height) in [
+    (false, 600.0),
+    (true, 600.0),
+    (true, 1400.0),
+  ]) {
+    testWidgets(
+      'смена вкладки ${headHidden ? 'оставляет скрытую шапку за панелью и начинает тело' : 'сохраняет смещение видимой шапки'} при высоте $height',
+      (tester) async {
+        await tester.binding.setSurfaceSize(Size(800, height));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final repository = ControlledDetailsRepository();
+        await _openPage(tester, repository);
+        repository.detailRequests.single.add(
+          ResultSuccess(
+            testDetailsIntention(
+              title: 'Полное название намерения ' * 8,
+              description: List.filled(60, 'Строка описания').join('\n'),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final extent = tester.getSize(find.byType(PageHead)).height;
+        final offset = headHidden ? extent + 300 : extent / 2;
+        _pagePosition(tester).jumpTo(offset);
+        await tester.pumpAndSettle();
+        expect(_pagePosition(tester).pixels, offset);
+
+        await tester.tap(find.text('Relations'));
+        await tester.pumpAndSettle();
+
+        expect(_pagePosition(tester).pixels, headHidden ? extent : offset);
+        _expectTabsLine(tester, visible: headHidden);
+        final tabs = find.byType(Tabs<IntentionDetailsTab>);
+        final header = find.text('Relations').last;
+        expect(
+          tester.getTopLeft(header).dy,
+          closeTo(tester.getBottomLeft(tabs).dy + 24, 0.01),
+        );
+      },
+    );
+  }
 
   testWidgets(
     'показ архива впервые открывает связи на первой непустой архивной группе',
@@ -214,6 +264,10 @@ void main() {
       );
 
       final other = testDetailsIntention(index: 2);
+      _pagePosition(tester).jumpTo(100);
+      await tester.pumpAndSettle();
+      final offsetBeforeOpening = _pagePosition(tester).pixels;
+      expect(offsetBeforeOpening, greaterThan(0));
       unawaited(router.push(IntentionDetailsRoute(intentionId: other.id)));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
@@ -221,6 +275,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.bySemanticsLabel('Back'));
       await tester.pumpAndSettle();
+      expect(_pagePosition(tester).pixels, offsetBeforeOpening);
       expect(
         find.byKey(const ValueKey('relation-neighborhood-type-can')),
         findsOneWidget,
@@ -260,6 +315,33 @@ void main() {
     expect(query.period, StatisticsYear(2025));
     expect(find.text('Statistics').first.hitTestable(), findsOneWidget);
   });
+}
+
+ScrollPosition _pagePosition(WidgetTester tester) => tester
+    .state<ScrollableState>(
+      find
+          .descendant(
+            of: find.byType(CustomScrollView),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    )
+    .position;
+
+void _expectTabsLine(WidgetTester tester, {required bool visible}) {
+  final decoration =
+      tester
+              .widget<DecoratedBox>(
+                find
+                    .descendant(
+                      of: find.byType(Tabs<IntentionDetailsTab>),
+                      matching: find.byType(DecoratedBox),
+                    )
+                    .first,
+              )
+              .decoration
+          as BoxDecoration;
+  expect(decoration.border, visible ? isNotNull : isNull);
 }
 
 Future<AppRouter> _openPage(

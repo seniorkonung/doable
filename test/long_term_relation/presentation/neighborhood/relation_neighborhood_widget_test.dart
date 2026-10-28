@@ -4,10 +4,13 @@ import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
+import 'package:doable/src/design_system/components/page_head.dart';
+import 'package:doable/src/design_system/components/tabs.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
+import 'package:doable/src/intention/presentation/details/intention_details_tabs.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
@@ -690,6 +693,111 @@ void main() {
       expect(rowRect.top, lessThan(viewportRect.bottom));
     },
   );
+
+  for (final headHidden in [false, true]) {
+    testWidgets(
+      'возврат на связи после согласования ${headHidden ? 'начинает тело под закреплёнными вкладками' : 'сохраняет видимую шапку'} без старого якоря',
+      (tester) async {
+        await tester.binding.setSurfaceSize(const Size(800, 1400));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final repository = ControlledNeighborhoodRepository();
+        addTearDown(repository.dispose);
+        final ownerId = testIntentionId(1);
+        final intention = testNeighborhoodIntention(
+          id: ownerId,
+          description: List.filled(60, 'Строка описания').join('\n'),
+        );
+        final counts = testRelationCounts(activeNeedOutgoing: 4);
+        await _pumpDetailsPage(
+          tester,
+          repository,
+          ownerId,
+          pagingPolicy: RelationNeighborhoodPagingPolicy(
+            pageSize: 3,
+            prefetchRemaining: 1,
+          ),
+        );
+        repository.emitIntention(intention, counts: counts, revision: revision);
+        repository.completePage(
+          0,
+          RelationGroupFirstPage(
+            items: testGroupRows(ownerId: ownerId, from: 1, count: 3),
+            counts: counts,
+            nextCursor: const TestRelationGroupCursor(3),
+            revision: revision,
+          ),
+        );
+        await tester.pumpAndSettle();
+        final extent = tester.getSize(find.byType(PageHead)).height;
+        await _scrollTo(tester, _rowFinder(3), settle: false);
+        await _pumpUntilRequestCount(tester, repository, 2);
+        repository.completePage(
+          1,
+          RelationGroupContinuationPage(
+            items: testGroupRows(ownerId: ownerId, from: 4, count: 1),
+            nextCursor: null,
+            revision: revision,
+          ),
+        );
+        await tester.pumpAndSettle();
+        await _scrollTo(tester, _rowFinder(1));
+        repository.emitIntention(
+          intention,
+          counts: counts,
+          revision: const TestGraphRevision(2),
+        );
+        await _pumpUntilRequestCount(tester, repository, 3);
+        repository.completePage(
+          2,
+          RelationGroupFirstPage(
+            items: testGroupRows(ownerId: ownerId, from: 1, count: 3),
+            counts: counts,
+            nextCursor: const TestRelationGroupCursor(3),
+            revision: const TestGraphRevision(2),
+          ),
+        );
+        await _pumpUntilRequestCount(tester, repository, 4);
+        repository.completePage(
+          3,
+          RelationGroupContinuationPage(
+            items: testGroupRows(ownerId: ownerId, from: 4, count: 1),
+            nextCursor: null,
+            revision: const TestGraphRevision(2),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Overview'));
+        await tester.pumpAndSettle();
+        final position = tester
+            .state<ScrollableState>(
+              find
+                  .descendant(
+                    of: find.byType(CustomScrollView),
+                    matching: find.byType(Scrollable),
+                  )
+                  .first,
+            )
+            .position;
+        final offset = headHidden ? extent + 20 : extent / 2;
+        position.jumpTo(offset);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Relations'));
+        await tester.pumpAndSettle();
+
+        // Прежняя строка построена: ошибочное восстановление смогло бы
+        // прокрутить к ней и скрыть заголовок с выбором группы.
+        expect(_rowFinder(1), findsOneWidget);
+        expect(position.pixels, headHidden ? extent : offset);
+        final tabs = find.byType(Tabs<IntentionDetailsTab>);
+        expect(
+          tester.getTopLeft(find.text('Relations').last).dy,
+          closeTo(tester.getBottomLeft(tabs).dy + 24, 0.01),
+        );
+        expect(repository.requestCount, 4);
+      },
+    );
+  }
 
   testWidgets('связывает русское состояние обновления с числами', (
     tester,

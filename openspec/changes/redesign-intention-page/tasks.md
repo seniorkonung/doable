@@ -219,7 +219,7 @@
     - сценарии, открывающие соседство или статистику со страницы, например `test/app/navigation/app_shell_page_matrix.dart`, `test/app/navigation/app_shell_back_test.dart`, `test/app/navigation/ordinary_page_layout_scenarios.dart`, `test/app/routing/app_router_test.dart`, `test/app/long_term_relation_app_flow_test.dart`, `test/app/intention_statistics_app_flow_test.dart`, `test/daily_choice/presentation/daily_choice_creation_completion_test.dart`, `test/daily_choice/presentation/daily_choice_creation_exit_test.dart`, `test/daily_choice/presentation/daily_choice_creation_route_scenarios.dart`, `test/long_term_relation/presentation/neighborhood/relation_neighborhood_widget_test.dart`.
   - **Размер:** M — перенос соседства и статистики на вкладки требует механически добавить выбор вкладки в сценарии, которые открывают их со страницы намерения.
 
-- [ ] 2.5 Сохранять закреплённые вкладки у панели при смене вкладки и отмечать закреплённую полосу линией
+- [x] 2.5 Сохранять закреплённые вкладки у панели при смене вкладки и отмечать закреплённую полосу линией
   - **Критерии приёмки:**
     - По решению 1 дизайна смена вкладки при скрытой шапке переводит страницу к смещению высоты шапки: вкладки остаются под панелью, а тело новой вкладки начинается с начала. При видимой шапке смещение не меняется. Позиция прокрутки страницы сохраняется при возвращении с открытых над ней страниц.
       - При повторном показе «Связей» якорь прежнего согласования, сохранённый в удерживаемом соседстве, не меняет заданное страницей положение. Это не сбрасывает выбранную группу и загруженные порции, которые удерживаются по 2.4. Восстановление якоря при новом согласовании уже видимой вкладки сохраняется.
