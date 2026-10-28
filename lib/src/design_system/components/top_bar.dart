@@ -6,6 +6,7 @@ import '../doable_colors.dart';
 import '../doable_icon.dart';
 import '../doable_metrics.dart';
 import '../doable_type.dart';
+import 'button.dart';
 import 'path_glyph.dart';
 
 /// Отметка перед строкой назначения: какое поле связи выбирается.
@@ -37,7 +38,8 @@ final class TopBarPurpose {
   final VoidCallback onOpen;
 }
 
-/// Верхняя панель со стрелкой назад или крестиком слева и заголовком по центру.
+/// Верхняя панель со стрелкой назад или крестиком слева, заголовком по центру
+/// и, на экране правки, основной кнопкой справа.
 /// Стоит в `Scaffold.appBar` прямо под системным отступом, без фона, линии и тени.
 final class TopBar extends StatelessWidget implements PreferredSizeWidget {
   static const double _minHeight = DoableMetrics.tapMin;
@@ -73,6 +75,7 @@ final class TopBar extends StatelessWidget implements PreferredSizeWidget {
          key: closeKey,
        ),
        _purpose = null,
+       _button = null,
        preferredSize = const Size.fromHeight(_minHeight);
 
   /// Панель страницы со стрелкой назад и видимым заголовком маршрута.
@@ -92,6 +95,7 @@ final class TopBar extends StatelessWidget implements PreferredSizeWidget {
          key: null,
        ),
        _purpose = null,
+       _button = null,
        preferredSize = const Size.fromHeight(_minHeight);
 
   /// Панель только со стрелкой: [routeName] называет маршрут для диктора,
@@ -111,7 +115,42 @@ final class TopBar extends StatelessWidget implements PreferredSizeWidget {
          key: null,
        ),
        _purpose = null,
+       _button = null,
        preferredSize = const Size.fromHeight(_minHeight);
+
+  /// Панель экрана правки со стрелкой назад, заголовком и основной кнопкой
+  /// размера sm справа, например «Сохранить».
+  ///
+  /// [context] — место, где панель передаётся в `Scaffold.appBar`. С крупным
+  /// шрифтом кнопка растёт, и высота панели растёт вместе с ней;
+  /// потребитель перестраивается при смене масштаба и пересчитывает высоту,
+  /// которую выделяет `Scaffold`.
+  TopBar.withButton(
+    BuildContext context, {
+    required String title,
+    required String backLabel,
+    required VoidCallback onBack,
+    required String buttonLabel,
+    required VoidCallback? onButtonPressed,
+    super.key,
+  }) : title = title,
+       titleIcon = null,
+       muted = false,
+       routeName = title,
+       _leading = (
+         icon: DoableIconData.back,
+         label: backLabel,
+         onTap: onBack,
+         key: null,
+       ),
+       _purpose = null,
+       _button = (label: buttonLabel, onPressed: onButtonPressed),
+       preferredSize = Size.fromHeight(
+         math.max(
+           _minHeight,
+           Button.smallHeight(MediaQuery.textScalerOf(context)),
+         ),
+       );
 
   /// Панель со строкой назначения под заголовком.
   ///
@@ -142,6 +181,7 @@ final class TopBar extends StatelessWidget implements PreferredSizeWidget {
          purpose: purpose,
          textScaler: MediaQuery.textScalerOf(context),
        ),
+       _button = null,
        preferredSize = Size.fromHeight(
          _purposeHeight(
            title: title,
@@ -176,6 +216,9 @@ final class TopBar extends StatelessWidget implements PreferredSizeWidget {
   _leading;
   final ({String title, TopBarPurpose purpose, TextScaler textScaler})?
   _purpose;
+
+  /// Без обработчика кнопка справа выключена и остаётся на своём месте.
+  final ({String label, VoidCallback? onPressed})? _button;
 
   @override
   final Size preferredSize;
@@ -302,6 +345,18 @@ final class TopBar extends StatelessWidget implements PreferredSizeWidget {
                 ),
               ),
             ),
+            if (_button case final button?)
+              PositionedDirectional(
+                end: DoableMetrics.space3,
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: Button.primarySmall(
+                    label: button.label,
+                    onPressed: button.onPressed,
+                  ),
+                ),
+              ),
           ],
         ),
       ),

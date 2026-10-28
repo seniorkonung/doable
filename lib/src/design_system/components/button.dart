@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../doable_colors.dart';
@@ -13,6 +15,15 @@ final class Button extends StatelessWidget {
     required this.onPressed,
     super.key,
   }) : _kind = _ButtonKind.primary,
+       semanticLabel = null;
+
+  /// Основное действие экрана правки справа в верхней панели, например
+  /// «Сохранить»: плашка `ink` с текстом `bg` размера sm шириной по подписи.
+  const Button.primarySmall({
+    required this.label,
+    required this.onPressed,
+    super.key,
+  }) : _kind = _ButtonKind.primarySmall,
        semanticLabel = null;
 
   /// Второстепенное действие диалога подтверждения, например «Отмена»:
@@ -49,6 +60,28 @@ final class Button extends StatelessWidget {
 
   final _ButtonKind _kind;
 
+  static const double _smallVerticalPadding = 8;
+  static const double _smallHorizontalPadding = 14;
+
+  /// Высота плашки размера sm в масштабе [textScaler]: не ниже
+  /// `control-height-sm`, а с крупным шрифтом растёт вместе с подписью.
+  static double smallHeight(TextScaler textScaler) {
+    final painter = TextPainter(
+      text: TextSpan(text: ' ', style: DoableType.section),
+      textDirection: TextDirection.ltr,
+      textScaler: textScaler,
+      maxLines: 1,
+    )..layout();
+    try {
+      return math.max(
+        DoableMetrics.controlHeightSm,
+        painter.height + 2 * _smallVerticalPadding,
+      );
+    } finally {
+      painter.dispose();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).extension<DoableColors>()!;
@@ -65,6 +98,18 @@ final class Button extends StatelessWidget {
         background: colors.ink,
         foreground: colors.bg,
         minimumSize: const Size.fromHeight(DoableMetrics.controlHeight),
+      ),
+      _ButtonKind.primarySmall => _filled(
+        colors,
+        label,
+        background: colors.ink,
+        foreground: colors.bg,
+        // Строка подписи 20 и отступы по 8 дают высоту control-height-sm.
+        minimumSize: const Size(0, DoableMetrics.controlHeightSm),
+        padding: const EdgeInsets.symmetric(
+          horizontal: _smallHorizontalPadding,
+          vertical: _smallVerticalPadding,
+        ),
       ),
       _ButtonKind.quiet => _filled(
         colors,
@@ -89,7 +134,7 @@ final class Button extends StatelessWidget {
           minimumSize: const Size(0, DoableMetrics.controlHeightSm),
           padding: const EdgeInsets.symmetric(
             horizontal: DoableMetrics.space2,
-            vertical: DoableMetrics.space2,
+            vertical: _smallVerticalPadding,
           ),
           shape: const StadiumBorder(),
           textStyle: DoableType.section,
@@ -106,6 +151,10 @@ final class Button extends StatelessWidget {
     required Color background,
     required Color foreground,
     required Size minimumSize,
+    EdgeInsetsGeometry padding = const EdgeInsets.symmetric(
+      horizontal: DoableMetrics.space4,
+      vertical: 10,
+    ),
   }) => FilledButton(
     onPressed: onPressed,
     style: FilledButton.styleFrom(
@@ -116,10 +165,7 @@ final class Button extends StatelessWidget {
       // Строка подписи 20 и отступы по 10 дают высоту control-height,
       // а с крупным шрифтом плашка растёт вместе с текстом.
       minimumSize: minimumSize,
-      padding: const EdgeInsets.symmetric(
-        horizontal: DoableMetrics.space4,
-        vertical: 10,
-      ),
+      padding: padding,
       shape: const StadiumBorder(),
       textStyle: DoableType.section,
       // Область нажатия выше плашки, как требует tap-min:
@@ -130,4 +176,4 @@ final class Button extends StatelessWidget {
   );
 }
 
-enum _ButtonKind { primary, quiet, danger, text }
+enum _ButtonKind { primary, primarySmall, quiet, danger, text }

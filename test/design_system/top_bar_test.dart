@@ -1,7 +1,9 @@
+import 'package:doable/src/design_system/components/button.dart';
 import 'package:doable/src/design_system/components/path_glyph.dart';
 import 'package:doable/src/design_system/components/top_bar.dart';
 import 'package:doable/src/design_system/doable_colors.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
+import 'package:doable/src/design_system/doable_metrics.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/design_system/doable_type.dart';
 import 'package:flutter/material.dart';
@@ -280,6 +282,155 @@ void main() {
       });
     }
   }
+
+  testWidgets('панель экрана правки: компактная основная кнопка стоит в '
+      'space-3 от правого края по центру панели высотой 44, заголовок — по '
+      'центру панели, а стрелка и кнопка названы и вызывают обработчики', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    var returns = 0;
+    var saves = 0;
+
+    await _pump(
+      tester,
+      _app(
+        bar: _buttonBar(
+          onBack: () => returns++,
+          onButtonPressed: () => saves++,
+        ),
+      ),
+    );
+
+    expect(tester.getTopLeft(find.byKey(_body)).dy, 54 + 44);
+    final pill = tester.getRect(_pill());
+    expect(pill.height, DoableMetrics.controlHeightSm);
+    expect(pill.right, 390 - 12);
+    expect(pill.center.dy, 76);
+    expect(
+      tester.getSize(find.byType(Button)).height,
+      greaterThanOrEqualTo(DoableMetrics.tapMin),
+      reason: 'область нажатия выше плашки',
+    );
+    expect(tester.getCenter(find.text('Изменить')), const Offset(195, 76));
+    expect(tester.getRect(_backArea()), const Rect.fromLTWH(8, 54, 44, 44));
+    expect(
+      tester.getSemantics(find.text('Изменить')),
+      isSemantics(
+        label: 'Изменить',
+        isHeader: true,
+        namesRoute: true,
+        children: const [],
+      ),
+    );
+    expect(
+      tester.getSemantics(find.bySemanticsLabel('Назад к намерению')),
+      isSemantics(
+        label: 'Назад к намерению',
+        isButton: true,
+        hasTapAction: true,
+        children: const [],
+      ),
+    );
+    expect(
+      tester.getSemantics(find.byType(Button)),
+      isSemantics(
+        label: 'Сохранить',
+        isButton: true,
+        hasEnabledState: true,
+        isEnabled: true,
+        isFocusable: true,
+        hasTapAction: true,
+        hasFocusAction: true,
+      ),
+    );
+
+    await tester.tap(_backArea());
+    await tester.tap(find.byType(Button));
+    expect(returns, 1);
+    expect(saves, 1);
+    semantics.dispose();
+  });
+
+  testWidgets('выключенная кнопка панели остаётся на месте и объявляется '
+      'недоступной', (tester) async {
+    final semantics = tester.ensureSemantics();
+
+    await _pump(tester, _app(bar: _buttonBar(onButtonPressed: () {})));
+    final enabledPill = tester.getRect(_pill());
+
+    await _pump(tester, _app(bar: _buttonBar()));
+    // Material меняет цвета кнопки с анимацией.
+    await tester.pumpAndSettle();
+
+    expect(tester.getRect(_pill()), enabledPill);
+    expect(
+      tester.getSemantics(find.byType(Button)),
+      isSemantics(
+        label: 'Сохранить',
+        isButton: true,
+        hasEnabledState: true,
+        isEnabled: false,
+      ),
+    );
+    semantics.dispose();
+  });
+
+  testWidgets('длинный заголовок рядом с кнопкой остаётся по центру панели, '
+      'не шире её без 64 с каждой стороны и кончается многоточием', (
+    tester,
+  ) async {
+    const title = 'Изменить намерение с очень длинным заголовком экрана';
+
+    await _pump(
+      tester,
+      _app(
+        bar: _buttonBar(title: title, onButtonPressed: () {}),
+      ),
+    );
+
+    final paragraph = tester.renderObject<RenderParagraph>(find.text(title));
+    expect(paragraph.maxLines, 1);
+    expect(paragraph.overflow, TextOverflow.ellipsis);
+    expect(paragraph.didExceedMaxLines, isTrue);
+    expect(
+      tester.getRect(find.text(title)),
+      const Rect.fromLTWH(64, 65, 262, 22),
+    );
+    expect(tester.getRect(_pill()).right, 390 - 12);
+  });
+
+  testWidgets('при тексте масштаба 2 панель растёт вместе с кнопкой: плашка '
+      'вмещает подпись внутри панели, а тело начинается под панелью', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      _app(textScale: 2, bar: _buttonBar(onButtonPressed: () {})),
+    );
+
+    expect(tester.takeException(), isNull);
+    // Строка подписи 2 × 20 и отступы по 8.
+    const barHeight = 2.0 * 20 + 2 * 8;
+    expect(
+      tester.widget<TopBar>(find.byType(TopBar)).preferredSize.height,
+      barHeight,
+    );
+    expect(tester.getTopLeft(find.byKey(_body)).dy, 54 + barHeight);
+    expect(
+      tester.getRect(_pill()),
+      Rect.fromLTRB(tester.getRect(_pill()).left, 54, 390 - 12, 54 + barHeight),
+    );
+    final label = tester.getRect(find.text('Сохранить'));
+    expect(label.height, 2 * 20);
+    expect(label.top, 54 + 8);
+    expect(
+      tester.renderObject<RenderParagraph>(find.text('Сохранить')).size.height,
+      2 * 20,
+    );
+    expect(tester.getCenter(find.text('Изменить')).dy, 54 + barHeight / 2);
+    expect(tester.getCenter(_backArea()).dy, 54 + barHeight / 2);
+  });
 
   testWidgets('длинный заголовок занимает одну строку не шире панели без 64 '
       'с каждой стороны и кончается многоточием', (tester) async {
@@ -564,6 +715,20 @@ TopBar Function(BuildContext) _purposeBar({
       ),
     );
 
+TopBar Function(BuildContext) _buttonBar({
+  String title = 'Изменить',
+  VoidCallback? onBack,
+  VoidCallback? onButtonPressed,
+}) =>
+    (context) => TopBar.withButton(
+      context,
+      title: title,
+      backLabel: 'Назад к намерению',
+      onBack: onBack ?? () {},
+      buttonLabel: 'Сохранить',
+      onButtonPressed: onButtonPressed,
+    );
+
 const _body = Key('body');
 
 Finder _crossArea() => find.ancestor(
@@ -583,6 +748,9 @@ Finder _backArea() => find.ancestor(
 );
 
 Finder _purposeButton() => find.byType(InkWell);
+
+Finder _pill() =>
+    find.descendant(of: find.byType(Button), matching: find.byType(Material));
 
 Finder _chevron() => find.byWidgetPredicate(
   (widget) => widget is DoableIcon && widget.icon == DoableIconData.chevronDown,

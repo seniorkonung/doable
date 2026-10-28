@@ -51,26 +51,51 @@ void main() {
       Brightness.dark => DoableColors.dark,
     };
 
-    for (final (kind, look, label, build, background, foreground) in [
-      (
-        'тихая',
-        'плашка fill с текстом ink',
-        'Отмена',
-        (VoidCallback? onPressed) =>
-            Button.quiet(label: 'Отмена', onPressed: onPressed),
-        colors.fill,
-        colors.ink,
-      ),
-      (
-        'разрушительная',
-        'плашка accent с текстом on-accent',
-        'Удалить',
-        (VoidCallback? onPressed) =>
-            Button.danger(label: 'Удалить', onPressed: onPressed),
-        colors.accent,
-        colors.onAccent,
-      ),
-    ]) {
+    for (final (
+          kind,
+          look,
+          label,
+          build,
+          background,
+          foreground,
+          height,
+          sidePadding,
+        )
+        in [
+          (
+            'компактная основная',
+            'плашка ink с текстом bg размера sm',
+            'Сохранить',
+            (VoidCallback? onPressed) =>
+                Button.primarySmall(label: 'Сохранить', onPressed: onPressed),
+            colors.ink,
+            colors.bg,
+            DoableMetrics.controlHeightSm,
+            14.0,
+          ),
+          (
+            'тихая',
+            'плашка fill с текстом ink',
+            'Отмена',
+            (VoidCallback? onPressed) =>
+                Button.quiet(label: 'Отмена', onPressed: onPressed),
+            colors.fill,
+            colors.ink,
+            DoableMetrics.controlHeight,
+            DoableMetrics.space4,
+          ),
+          (
+            'разрушительная',
+            'плашка accent с текстом on-accent',
+            'Удалить',
+            (VoidCallback? onPressed) =>
+                Button.danger(label: 'Удалить', onPressed: onPressed),
+            colors.accent,
+            colors.onAccent,
+            DoableMetrics.controlHeight,
+            DoableMetrics.space4,
+          ),
+        ]) {
       testWidgets('в $theme теме $kind кнопка — $look шириной по подписи', (
         tester,
       ) async {
@@ -80,8 +105,8 @@ void main() {
 
         final plane = tester.getRect(_plane);
         final text = tester.getRect(find.text(label));
-        expect(plane.height, DoableMetrics.controlHeight);
-        expect(plane.width, text.width + 2 * DoableMetrics.space4);
+        expect(plane.height, height);
+        expect(plane.width, text.width + 2 * sidePadding);
         expect(_planeMaterial(tester).color, background);
         expect(_planeMaterial(tester).shape, const StadiumBorder());
         expect(
