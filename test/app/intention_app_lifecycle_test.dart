@@ -6,6 +6,7 @@ import 'package:doable/src/daily_choice/application/choice_path_continuations.da
 
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/design_system/components/option_tiles.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:auto_route/auto_route.dart';
@@ -178,17 +179,16 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(SnackBar), findsNothing);
 
-      final enableReadiness = find.byKey(
-        const ValueKey('intention-details-enable-readiness'),
+      final actionTile = find.descendant(
+        of: find.byType(OptionTiles<IntentionReadiness>),
+        matching: find.text('Action'),
       );
       await Scrollable.ensureVisible(
-        tester.element(enableReadiness),
+        tester.element(actionTile),
         alignment: 0.5,
       );
       await tester.pumpAndSettle();
-      await tester.tap(enableReadiness);
-      await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(FilledButton, 'Mark as ready'));
+      await tester.tap(actionTile);
       await tester.pump();
       final ready = _copyIntention(
         updated,
@@ -203,7 +203,14 @@ void main() {
       repository.emitDetail(3, ready);
       await tester.pumpAndSettle();
       await _scrollCurrentPageToTop(tester);
-      expect(find.text('Ready for action'), findsOneWidget);
+      expect(
+        tester
+            .widget<OptionTiles<IntentionReadiness>>(
+              find.byType(OptionTiles<IntentionReadiness>),
+            )
+            .value,
+        IntentionReadiness.ready,
+      );
       await _closeOperationMessage(tester);
 
       await tester.ensureVisible(

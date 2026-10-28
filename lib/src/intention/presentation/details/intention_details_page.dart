@@ -11,6 +11,7 @@ import '../../../app/routing/app_router.gr.dart';
 import '../../../daily_choice/application/choice_path_draft.dart';
 import '../../../daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import '../../../daily_choice/presentation/catalog/daily_choice_local_day_observer.dart';
+import '../../../design_system/components/option_tiles.dart';
 import '../../../design_system/components/page_head.dart';
 import '../../../design_system/components/text_field.dart';
 import '../../../design_system/components/top_bar.dart';
@@ -498,10 +499,6 @@ final class _LoadedDetails extends StatelessWidget {
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
     final intention = state.intention;
-    final readiness = switch (intention.readiness) {
-      IntentionReadiness.ready => localizations.catalogReady,
-      IntentionReadiness.notReady => localizations.catalogNotReady,
-    };
     final archiveState = switch (intention.archiveState) {
       IntentionArchiveState.active => localizations.detailsActive,
       IntentionArchiveState.archived => localizations.detailsArchived,
@@ -540,16 +537,43 @@ final class _LoadedDetails extends StatelessWidget {
                 ),
               ),
               SliverPadding(
+                padding: const EdgeInsets.fromLTRB(
+                  DoableMetrics.space5,
+                  DoableMetrics.space3,
+                  DoableMetrics.space5,
+                  0,
+                ),
+                sliver: SliverToBoxAdapter(
+                  child: OptionTiles<IntentionReadiness>(
+                    first: OptionTile(
+                      id: IntentionReadiness.notReady,
+                      icon: DoableIconData.intention,
+                      title: localizations.detailsTypeIntention,
+                      hint: localizations.detailsTypeIntentionHint,
+                    ),
+                    second: OptionTile(
+                      id: IntentionReadiness.ready,
+                      icon: DoableIconData.bolt,
+                      title: localizations.detailsTypeAction,
+                      hint: localizations.detailsTypeActionHint,
+                    ),
+                    value: intention.readiness,
+                    label: localizations.detailsTypeChoiceLabel,
+                    onChange: state.isOperationRunning
+                        ? null
+                        : (readiness) => switch (readiness) {
+                            IntentionReadiness.ready => onEnableReadiness(),
+                            IntentionReadiness.notReady => onDisableReadiness(),
+                          },
+                  ),
+                ),
+              ),
+              SliverPadding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                 sliver: SliverToBoxAdapter(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _DetailsField(
-                        label: localizations.detailsReadinessLabel,
-                        value: readiness,
-                      ),
-                      const SizedBox(height: 16),
                       _DetailsField(
                         label: localizations.detailsArchiveStateLabel,
                         value: archiveState,
@@ -563,8 +587,6 @@ final class _LoadedDetails extends StatelessWidget {
                 sliver: SliverToBoxAdapter(
                   child: _DetailsActions(
                     state: state,
-                    onEnableReadiness: onEnableReadiness,
-                    onDisableReadiness: onDisableReadiness,
                     onArchive: onArchive,
                     onRestore: onRestore,
                     onDelete: onDelete,
@@ -638,8 +660,6 @@ final class _LoadedDetails extends StatelessWidget {
 final class _DetailsActions extends StatelessWidget {
   const _DetailsActions({
     required this.state,
-    required this.onEnableReadiness,
-    required this.onDisableReadiness,
     required this.onArchive,
     required this.onRestore,
     required this.onDelete,
@@ -648,8 +668,6 @@ final class _DetailsActions extends StatelessWidget {
   });
 
   final IntentionDetailsLoaded state;
-  final VoidCallback onEnableReadiness;
-  final VoidCallback onDisableReadiness;
   final VoidCallback onArchive;
   final VoidCallback onRestore;
   final VoidCallback onDelete;
@@ -700,22 +718,6 @@ final class _DetailsActions extends StatelessWidget {
                 icon: const Icon(Icons.route_outlined),
                 label: Text(localizations.detailsChoosePathAction),
               ),
-            if (state.intention.readiness == IntentionReadiness.notReady)
-              OutlinedButton.icon(
-                key: const ValueKey('intention-details-enable-readiness'),
-                onPressed: controlsEnabled
-                    ? () => unawaited(_confirmReadiness(context))
-                    : null,
-                icon: const Icon(Icons.check_circle_outline),
-                label: Text(localizations.detailsEnableReadinessAction),
-              )
-            else
-              OutlinedButton.icon(
-                key: const ValueKey('intention-details-disable-readiness'),
-                onPressed: controlsEnabled ? onDisableReadiness : null,
-                icon: const Icon(Icons.remove_circle_outline),
-                label: Text(localizations.detailsDisableReadinessAction),
-              ),
             if (state.intention.archiveState == IntentionArchiveState.active)
               OutlinedButton.icon(
                 key: const ValueKey('intention-details-archive'),
@@ -746,38 +748,6 @@ final class _DetailsActions extends StatelessWidget {
         ),
       ],
     );
-  }
-
-  Future<void> _confirmReadiness(BuildContext context) async {
-    final localizations = AppLocalizations.of(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(localizations.detailsReadinessConfirmationTitle),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(localizations.detailsReadinessOneDayCriterion),
-            const SizedBox(height: 12),
-            Text(localizations.detailsReadinessClarityCriterion),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text(localizations.detailsCancelEditAction),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: Text(localizations.detailsConfirmReadinessAction),
-          ),
-        ],
-      ),
-    );
-    if (confirmed ?? false) {
-      onEnableReadiness();
-    }
   }
 
   Future<void> _confirmDeletion(BuildContext context) async {

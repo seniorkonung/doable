@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/src/design_system/components/button.dart';
+import 'package:doable/src/design_system/components/option_tiles.dart';
 import 'package:doable/src/design_system/components/top_bar.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/intention/presentation/edit/intention_edit_page.dart';
@@ -214,7 +215,7 @@ void main() {
 
     expect(find.text('Сохранить русский заголовок'), findsOneWidget);
     expect(find.text('  Описание\nбез преобразования  '), findsOneWidget);
-    expect(find.text('Ready for action'), findsOneWidget);
+    expect(_selectedType(tester), IntentionReadiness.ready);
     expect(find.text('Active'), findsOneWidget);
     _expectNavigation(tester);
   });
@@ -237,13 +238,17 @@ void main() {
 
     expect(find.text('Archived'), findsOneWidget);
     expect(find.text('Add a description'), findsOneWidget);
-    expect(find.text('Not ready for action'), findsOneWidget);
+    expect(_selectedType(tester), IntentionReadiness.notReady);
   });
 
   testWidgets('подробный просмотр проходит accessibility guidelines', (
     tester,
   ) async {
     final semantics = tester.ensureSemantics();
+    // Обзор целиком помещается под закреплёнными вкладками: срезанные ими
+    // элементы правило области нажатия считает слишком малыми.
+    await tester.binding.setSurfaceSize(const Size(800, 1200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
 
     final repository = ControlledDetailsRepository();
     final intention = testDetailsIntention(
@@ -256,12 +261,16 @@ void main() {
     await waitForDetailRequests(repository, 1);
     repository.detailRequests.single.add(ResultSuccess(intention));
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(
-      find.byKey(const ValueKey('intention-details-delete')),
-      200,
-      scrollable: _detailsScrollable,
-    );
+    // Шапка уходит под верхнюю панель, а весь обзор остаётся видимым.
+    tester
+        .state<ScrollableState>(_detailsScrollable)
+        .position
+        .jumpTo(tester.getSize(find.byType(PageHead)).height);
     await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('intention-details-delete')).hitTestable(),
+      findsOneWidget,
+    );
 
     // Контракт дизайн-системы задаёт область нажатия 44.
     await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
@@ -269,80 +278,6 @@ void main() {
     await expectLater(tester, meetsGuideline(textContrastGuideline));
     semantics.dispose();
   });
-
-  testWidgets(
-    'объясняет оба критерия готовности и не запускает команду после отмены',
-    (tester) async {
-      final repository = ControlledDetailsRepository();
-      final before = testDetailsIntention(index: 20);
-      final saved = testDetailsIntention(
-        index: 20,
-        readiness: IntentionReadiness.ready,
-      );
-      await _pumpDetailsPage(tester, repository, before.id);
-      await waitForDetailRequests(repository, 1);
-      repository.detailRequests[0].add(ResultSuccess(before));
-      await tester.pumpAndSettle();
-
-      final enableReadiness = find.byKey(
-        const ValueKey('intention-details-enable-readiness'),
-      );
-      await tester.ensureVisible(enableReadiness);
-      await tester.tap(enableReadiness);
-      await tester.pumpAndSettle();
-
-      expect(find.text('Ready for action?'), findsOneWidget);
-      expect(
-        find.text('It can be completed fully within one day.'),
-        findsOneWidget,
-      );
-      expect(
-        find.text('It is clear enough for a person to carry out.'),
-        findsOneWidget,
-      );
-      await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
-      await tester.pumpAndSettle();
-      expect(repository.commands, isEmpty);
-      expect(
-        find.text('Not ready for action', skipOffstage: false),
-        findsOneWidget,
-      );
-
-      await tester.tap(enableReadiness);
-      await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(FilledButton, 'Mark as ready'));
-      await tester.pump();
-
-      expect(repository.commands.single, isA<EnableIntentionReadiness>());
-      expect(
-        find.text('Not ready for action', skipOffstage: false),
-        findsOneWidget,
-      );
-      expect(find.text('Saving changes…'), findsOneWidget);
-
-      repository.completeCommand(
-        0,
-        testDetailsSavedResult(saved, before: before),
-      );
-      await tester.pump();
-      await waitForDetailRequests(repository, 2);
-      repository.detailRequests[1].add(ResultSuccess(saved));
-      await tester.pump();
-      await tester.pump();
-
-      expect(find.byType(SnackBar), findsNothing);
-      expect(
-        find.text('Ready for action', skipOffstage: false),
-        findsOneWidget,
-      );
-      repository.detailRequests[0].add(ResultSuccess(before));
-      await tester.pump();
-      expect(
-        find.text('Ready for action', skipOffstage: false),
-        findsOneWidget,
-      );
-    },
-  );
 
   testWidgets(
     'явно выключает готовность, архивирует и восстанавливает намерение',
@@ -363,11 +298,12 @@ void main() {
       repository.detailRequests[0].add(ResultSuccess(ready));
       await tester.pumpAndSettle();
 
-      final disableReadiness = find.byKey(
-        const ValueKey('intention-details-disable-readiness'),
+      final intentionTile = find.descendant(
+        of: find.byType(OptionTiles<IntentionReadiness>),
+        matching: find.text('Intention'),
       );
-      await tester.ensureVisible(disableReadiness);
-      await tester.tap(disableReadiness);
+      await tester.ensureVisible(intentionTile);
+      await tester.tap(intentionTile);
       await tester.pump();
       expect(repository.commands[0], isA<DisableIntentionReadiness>());
       repository.completeCommand(
@@ -379,10 +315,7 @@ void main() {
       repository.detailRequests[1].add(ResultSuccess(notReady));
       await tester.pumpAndSettle();
       expect(find.byType(SnackBar), findsNothing);
-      expect(
-        find.text('Not ready for action', skipOffstage: false),
-        findsOneWidget,
-      );
+      expect(_selectedType(tester), IntentionReadiness.notReady);
 
       final archive = find.byKey(const ValueKey('intention-details-archive'));
       await tester.ensureVisible(archive);
@@ -400,10 +333,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(SnackBar), findsNothing);
       expect(find.text('Archived', skipOffstage: false), findsOneWidget);
-      expect(
-        find.text('Not ready for action', skipOffstage: false),
-        findsOneWidget,
-      );
+      expect(_selectedType(tester), IntentionReadiness.notReady);
 
       final restore = find.byKey(const ValueKey('intention-details-restore'));
       await tester.ensureVisible(restore);
@@ -1278,13 +1208,26 @@ Future<void> _sendTitleAndLeave(WidgetTester tester, String title) async {
   expect(find.byType(IntentionEditPage), findsNothing);
 }
 
+IntentionReadiness _selectedType(WidgetTester tester) => tester
+    .widget<OptionTiles<IntentionReadiness>>(
+      find.byType(OptionTiles<IntentionReadiness>, skipOffstage: false),
+    )
+    .value;
+
 /// Доступность изменяющих действий страницы, тегов и входа в правку.
 void _expectPageControls(WidgetTester tester, {required bool enabled}) {
   final matcher = enabled ? isNotNull : isNull;
   expect(tester.widget<PageHead>(find.byType(PageHead)).onEdit, matcher);
+  expect(
+    tester
+        .widget<OptionTiles<IntentionReadiness>>(
+          find.byType(OptionTiles<IntentionReadiness>, skipOffstage: false),
+        )
+        .onChange,
+    matcher,
+  );
   for (final key in [
     'intention-details-choose-path',
-    'intention-details-enable-readiness',
     'intention-details-archive',
     'intention-details-delete',
     'tag-assignments-choose',

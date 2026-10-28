@@ -1118,6 +1118,24 @@ abstract class AppLocalizations {
   /// **'Action'**
   String get detailsTypeAction;
 
+  /// Доступное название пары плиток выбора готовности к действию на обзоре намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Intention or action'**
+  String get detailsTypeChoiceLabel;
+
+  /// Пояснение плитки неготового намерения на обзоре
+  ///
+  /// In en, this message translates to:
+  /// **'Any size. It may take more than a day.'**
+  String get detailsTypeIntentionHint;
+
+  /// Оба критерия действия на плитке готового намерения на обзоре
+  ///
+  /// In en, this message translates to:
+  /// **'Doable within one day, and clear what to do.'**
+  String get detailsTypeActionHint;
+
   /// Доступное название кнопки-названия в шапке страницы намерения, которая открывает экран изменения; название намерения не переводится
   ///
   /// In en, this message translates to:
@@ -1172,12 +1190,6 @@ abstract class AppLocalizations {
   /// **'Saving changes…'**
   String get detailsOperationRunning;
 
-  /// Подпись готовности к действию в подробных данных
-  ///
-  /// In en, this message translates to:
-  /// **'Readiness'**
-  String get detailsReadinessLabel;
-
   /// Подпись архивного состояния в подробных данных
   ///
   /// In en, this message translates to:
@@ -1201,42 +1213,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Cancel'**
   String get detailsCancelEditAction;
-
-  /// Действие начала явного включения готовности намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Mark as ready for action'**
-  String get detailsEnableReadinessAction;
-
-  /// Явное действие выключения готовности намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Mark as not ready for action'**
-  String get detailsDisableReadinessAction;
-
-  /// Заголовок объяснения критериев готовности к действию
-  ///
-  /// In en, this message translates to:
-  /// **'Ready for action?'**
-  String get detailsReadinessConfirmationTitle;
-
-  /// Критерий полной однодневной выполнимости действия
-  ///
-  /// In en, this message translates to:
-  /// **'It can be completed fully within one day.'**
-  String get detailsReadinessOneDayCriterion;
-
-  /// Критерий операционной понятности действия человеку
-  ///
-  /// In en, this message translates to:
-  /// **'It is clear enough for a person to carry out.'**
-  String get detailsReadinessClarityCriterion;
-
-  /// Подтверждение соответствия обоим критериям действия
-  ///
-  /// In en, this message translates to:
-  /// **'Mark as ready'**
-  String get detailsConfirmReadinessAction;
 
   /// Явное действие архивирования намерения
   ///

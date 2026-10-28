@@ -703,6 +703,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get detailsTypeAction => 'Action';
 
   @override
+  String get detailsTypeChoiceLabel => 'Intention or action';
+
+  @override
+  String get detailsTypeIntentionHint =>
+      'Any size. It may take more than a day.';
+
+  @override
+  String get detailsTypeActionHint =>
+      'Doable within one day, and clear what to do.';
+
+  @override
   String detailsEditTitleLabel(String title) {
     return 'Edit the name: $title';
   }
@@ -737,9 +748,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get detailsOperationRunning => 'Saving changes…';
 
   @override
-  String get detailsReadinessLabel => 'Readiness';
-
-  @override
   String get detailsArchiveStateLabel => 'State';
 
   @override
@@ -750,26 +758,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get detailsCancelEditAction => 'Cancel';
-
-  @override
-  String get detailsEnableReadinessAction => 'Mark as ready for action';
-
-  @override
-  String get detailsDisableReadinessAction => 'Mark as not ready for action';
-
-  @override
-  String get detailsReadinessConfirmationTitle => 'Ready for action?';
-
-  @override
-  String get detailsReadinessOneDayCriterion =>
-      'It can be completed fully within one day.';
-
-  @override
-  String get detailsReadinessClarityCriterion =>
-      'It is clear enough for a person to carry out.';
-
-  @override
-  String get detailsConfirmReadinessAction => 'Mark as ready';
 
   @override
   String get detailsArchiveAction => 'Archive';

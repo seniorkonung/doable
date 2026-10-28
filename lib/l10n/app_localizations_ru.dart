@@ -706,6 +706,17 @@ class AppLocalizationsRu extends AppLocalizations {
   String get detailsTypeAction => 'Действие';
 
   @override
+  String get detailsTypeChoiceLabel => 'Намерение или действие';
+
+  @override
+  String get detailsTypeIntentionHint =>
+      'Любого размера. Может занять больше дня.';
+
+  @override
+  String get detailsTypeActionHint =>
+      'Выполнимо за один день, и понятно, что делать.';
+
+  @override
   String detailsEditTitleLabel(String title) {
     return 'Изменить название: $title';
   }
@@ -740,9 +751,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get detailsOperationRunning => 'Сохранение изменений…';
 
   @override
-  String get detailsReadinessLabel => 'Готовность к действию';
-
-  @override
   String get detailsArchiveStateLabel => 'Состояние';
 
   @override
@@ -753,26 +761,6 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get detailsCancelEditAction => 'Отмена';
-
-  @override
-  String get detailsEnableReadinessAction => 'Отметить готовым к действию';
-
-  @override
-  String get detailsDisableReadinessAction => 'Отметить неготовым к действию';
-
-  @override
-  String get detailsReadinessConfirmationTitle => 'Готово к действию?';
-
-  @override
-  String get detailsReadinessOneDayCriterion =>
-      'Его можно полностью выполнить в течение одного дня.';
-
-  @override
-  String get detailsReadinessClarityCriterion =>
-      'Человеку достаточно понятно, что именно нужно сделать.';
-
-  @override
-  String get detailsConfirmReadinessAction => 'Отметить готовым';
 
   @override
   String get detailsArchiveAction => 'Архивировать';

@@ -12,6 +12,7 @@ import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openFileBackedLocalDatabase;
+import 'package:doable/src/design_system/components/option_tiles.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/design_system/components/tag_row.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
@@ -981,15 +982,15 @@ Future<void> _expectCreatedPage(
     findsOneWidget,
   );
   expect(
-    find.descendant(
-      of: page,
-      matching: find.text(
-        readiness == IntentionReadiness.ready
-            ? app.l10n.catalogReady
-            : app.l10n.catalogNotReady,
-      ),
-    ),
-    findsOneWidget,
+    tester
+        .widget<OptionTiles<IntentionReadiness>>(
+          find.descendant(
+            of: page,
+            matching: find.byType(OptionTiles<IntentionReadiness>),
+          ),
+        )
+        .value,
+    readiness,
   );
   for (final tag in assignments.items) {
     final row = find.byKey(

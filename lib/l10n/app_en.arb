@@ -568,6 +568,18 @@
   "@detailsTypeAction": {
     "description": "Тип готового к действию намерения в верхней панели его страницы"
   },
+  "detailsTypeChoiceLabel": "Intention or action",
+  "@detailsTypeChoiceLabel": {
+    "description": "Доступное название пары плиток выбора готовности к действию на обзоре намерения"
+  },
+  "detailsTypeIntentionHint": "Any size. It may take more than a day.",
+  "@detailsTypeIntentionHint": {
+    "description": "Пояснение плитки неготового намерения на обзоре"
+  },
+  "detailsTypeActionHint": "Doable within one day, and clear what to do.",
+  "@detailsTypeActionHint": {
+    "description": "Оба критерия действия на плитке готового намерения на обзоре"
+  },
   "detailsEditTitleLabel": "Edit the name: {title}",
   "@detailsEditTitleLabel": {
     "description": "Доступное название кнопки-названия в шапке страницы намерения, которая открывает экран изменения; название намерения не переводится",
@@ -606,10 +618,6 @@
   "@detailsOperationRunning": {
     "description": "Сохраняющаяся между экранами выполняющаяся операция намерения"
   },
-  "detailsReadinessLabel": "Readiness",
-  "@detailsReadinessLabel": {
-    "description": "Подпись готовности к действию в подробных данных"
-  },
   "detailsArchiveStateLabel": "State",
   "@detailsArchiveStateLabel": {
     "description": "Подпись архивного состояния в подробных данных"
@@ -625,30 +633,6 @@
   "detailsCancelEditAction": "Cancel",
   "@detailsCancelEditAction": {
     "description": "Действие отмены изменения намерения до отправки"
-  },
-  "detailsEnableReadinessAction": "Mark as ready for action",
-  "@detailsEnableReadinessAction": {
-    "description": "Действие начала явного включения готовности намерения"
-  },
-  "detailsDisableReadinessAction": "Mark as not ready for action",
-  "@detailsDisableReadinessAction": {
-    "description": "Явное действие выключения готовности намерения"
-  },
-  "detailsReadinessConfirmationTitle": "Ready for action?",
-  "@detailsReadinessConfirmationTitle": {
-    "description": "Заголовок объяснения критериев готовности к действию"
-  },
-  "detailsReadinessOneDayCriterion": "It can be completed fully within one day.",
-  "@detailsReadinessOneDayCriterion": {
-    "description": "Критерий полной однодневной выполнимости действия"
-  },
-  "detailsReadinessClarityCriterion": "It is clear enough for a person to carry out.",
-  "@detailsReadinessClarityCriterion": {
-    "description": "Критерий операционной понятности действия человеку"
-  },
-  "detailsConfirmReadinessAction": "Mark as ready",
-  "@detailsConfirmReadinessAction": {
-    "description": "Подтверждение соответствия обоим критериям действия"
   },
   "detailsArchiveAction": "Archive",
   "@detailsArchiveAction": {

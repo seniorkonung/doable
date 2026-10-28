@@ -1,8 +1,10 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/design_system/components/button.dart';
+import 'package:doable/src/design_system/components/option_tiles.dart';
 import 'package:doable/src/design_system/components/top_bar.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
+import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
@@ -151,7 +153,148 @@ void main() {
     expect(find.byType(IntentionEditPage), findsNothing);
     semantics.dispose();
   });
+  testWidgets('включение готовности плиткой сохраняется без отдельного '
+      'подтверждения и без сообщения об успехе', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final repository = ControlledDetailsRepository();
+    final before = testDetailsIntention(index: 30);
+    final saved = testDetailsIntention(
+      index: 30,
+      readiness: IntentionReadiness.ready,
+    );
+    await _pumpPage(tester, repository, before);
+    await waitForDetailRequests(repository, 1);
+    repository.detailRequests.single.add(ResultSuccess(before));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.getSemantics(_typeTile('Намерение')),
+      _typeTileSemantics(_intentionTileLabel, selected: true),
+    );
+    expect(
+      tester.getSemantics(_typeTile('Действие')),
+      _typeTileSemantics(_actionTileLabel, selected: false),
+    );
+    await tester.tap(_typeTile('Действие'));
+    await tester.pump();
+
+    expect(repository.commands.single, isA<EnableIntentionReadiness>());
+    expect(find.byType(Dialog), findsNothing);
+    repository.completeCommand(
+      0,
+      testDetailsSavedResult(saved, before: before),
+    );
+    await tester.pump();
+    await waitForDetailRequests(repository, 2);
+    repository.detailRequests[1].add(ResultSuccess(saved));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.getSemantics(_typeTile('Действие')),
+      _typeTileSemantics(_actionTileLabel, selected: true),
+    );
+    expect(
+      find.descendant(of: find.byType(TopBar), matching: find.text('Действие')),
+      findsOneWidget,
+    );
+    expect(find.byType(SnackBar), findsNothing);
+    semantics.dispose();
+  });
+
+  testWidgets('плитка «Намерение» обратимо выключает готовность', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    final repository = ControlledDetailsRepository();
+    final ready = testDetailsIntention(
+      index: 31,
+      readiness: IntentionReadiness.ready,
+    );
+    final notReady = testDetailsIntention(index: 31);
+    await _pumpPage(tester, repository, ready);
+    await waitForDetailRequests(repository, 1);
+    repository.detailRequests.single.add(ResultSuccess(ready));
+    await tester.pumpAndSettle();
+
+    await tester.tap(_typeTile('Намерение'));
+    await tester.pump();
+
+    expect(repository.commands.single, isA<DisableIntentionReadiness>());
+    repository.completeCommand(
+      0,
+      testDetailsSavedResult(notReady, before: ready),
+    );
+    await tester.pump();
+    await waitForDetailRequests(repository, 2);
+    repository.detailRequests[1].add(ResultSuccess(notReady));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.getSemantics(_typeTile('Намерение')),
+      _typeTileSemantics(_intentionTileLabel, selected: true),
+    );
+    semantics.dispose();
+  });
+
+  testWidgets('плитки доступны у архивированного намерения и недоступны, '
+      'пока выполняется команда', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final repository = ControlledDetailsRepository();
+    final intention = testDetailsIntention(
+      index: 32,
+      archiveState: IntentionArchiveState.archived,
+    );
+    await _pumpPage(tester, repository, intention);
+    await waitForDetailRequests(repository, 1);
+    repository.detailRequests.single.add(ResultSuccess(intention));
+    await tester.pumpAndSettle();
+
+    await tester.tap(_typeTile('Действие'));
+    await tester.pump();
+    expect(repository.commands.single, isA<EnableIntentionReadiness>());
+
+    expect(
+      tester.getSemantics(_typeTile('Намерение')),
+      isSemantics(
+        label: _intentionTileLabel,
+        isButton: true,
+        hasEnabledState: true,
+        isEnabled: false,
+        hasSelectedState: true,
+        isSelected: true,
+        isInMutuallyExclusiveGroup: true,
+        hasTapAction: false,
+      ),
+    );
+    await tester.tap(_typeTile('Действие'));
+    // Индикатор выполняющейся команды не даёт кадрам успокоиться.
+    await tester.pump(const Duration(seconds: 1));
+    expect(repository.commands, hasLength(1));
+    semantics.dispose();
+  });
 }
+
+const _intentionTileLabel =
+    'Намерение\nЛюбого размера. Может занять больше дня.';
+const _actionTileLabel =
+    'Действие\nВыполнимо за один день, и понятно, что делать.';
+
+Finder _typeTile(String title) => find.descendant(
+  of: find.byType(OptionTiles<IntentionReadiness>),
+  matching: find.text(title),
+);
+
+Matcher _typeTileSemantics(String label, {required bool selected}) =>
+    isSemantics(
+      label: label,
+      isButton: true,
+      hasEnabledState: true,
+      isEnabled: true,
+      hasSelectedState: true,
+      isSelected: selected,
+      isInMutuallyExclusiveGroup: true,
+      hasTapAction: true,
+    );
 
 final _editTitle = find.byKey(const ValueKey('intention-edit-title'));
 final _editDescription = find.byKey(
