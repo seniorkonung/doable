@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide TextField;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
@@ -12,12 +12,14 @@ import '../../../daily_choice/application/choice_path_draft.dart';
 import '../../../daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import '../../../daily_choice/presentation/catalog/daily_choice_local_day_observer.dart';
 import '../../../design_system/components/page_head.dart';
+import '../../../design_system/components/text_field.dart';
 import '../../../design_system/components/top_bar.dart';
 import '../../../design_system/doable_icon.dart';
 import '../../../design_system/doable_metrics.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../domain/intention.dart';
 import '../../domain/intention_id.dart';
+import '../edit/intention_edit_page.dart';
 import '../../../long_term_relation/application/long_term_relation_projection.dart';
 import '../../../long_term_relation/presentation/editor/relation_editor_state.dart';
 import '../../../long_term_relation/presentation/neighborhood/relation_neighborhood_sliver.dart';
@@ -195,7 +197,7 @@ final class _IntentionDetailsPageState
 
   /// Модель могла ещё не отразить команду, которую координатор принял не от
   /// этой страницы, поэтому перед открытием занятость читается у него.
-  void _openEdit() {
+  void _openEdit(IntentionEditFocus focus) {
     final intentionId = widget.intentionId;
     final details = ref.read(intentionDetailsViewModelProvider(intentionId));
     if (details is! IntentionDetailsLoaded ||
@@ -206,13 +208,14 @@ final class _IntentionDetailsPageState
       return;
     }
     unawaited(
-      context.router.push(IntentionEditRoute(intentionId: intentionId)),
+      context.router.push(
+        IntentionEditRoute(intentionId: intentionId, focus: focus),
+      ),
     );
   }
 
   bool _canOpenEdit(IntentionDetailsLoaded loaded) =>
       !loaded.isOperationRunning && !loaded.isAwaitingConfirmedSnapshot;
-
   Widget _buildHead(IntentionDetailsLoaded loaded) {
     final name = loaded.intention.title;
     _scheduleHeadMeasurement();
@@ -229,7 +232,9 @@ final class _IntentionDetailsPageState
             key: const ValueKey('intention-details-title'),
             name: name,
             editLabel: AppLocalizations.of(context).detailsEditTitleLabel(name),
-            onEdit: _canOpenEdit(loaded) ? _openEdit : null,
+            onEdit: _canOpenEdit(loaded)
+                ? () => _openEdit(IntentionEditFocus.title)
+                : null,
           ),
         ),
       ),
@@ -327,6 +332,10 @@ final class _IntentionDetailsPageState
                 state: details,
                 scrollController: _scrollController,
                 buildHead: _buildHead,
+                onEditDescription:
+                    details is IntentionDetailsLoaded && _canOpenEdit(details)
+                    ? () => _openEdit(IntentionEditFocus.description)
+                    : null,
                 headHidden: _headHidden,
                 selectedTab: _selectedTab,
                 onSelectTab: _selectTab,
@@ -376,6 +385,7 @@ final class _DetailsContent extends ConsumerWidget {
     required this.state,
     required this.scrollController,
     required this.buildHead,
+    required this.onEditDescription,
     required this.headHidden,
     required this.selectedTab,
     required this.onSelectTab,
@@ -388,6 +398,7 @@ final class _DetailsContent extends ConsumerWidget {
   final IntentionDetailsState state;
   final ScrollController scrollController;
   final Widget Function(IntentionDetailsLoaded loaded) buildHead;
+  final VoidCallback? onEditDescription;
   final ValueListenable<bool> headHidden;
   final IntentionDetailsTab selectedTab;
   final ValueChanged<IntentionDetailsTab> onSelectTab;
@@ -407,6 +418,7 @@ final class _DetailsContent extends ConsumerWidget {
         state: loaded,
         scrollController: scrollController,
         pageHead: buildHead(loaded),
+        onEditDescription: onEditDescription,
         headHidden: headHidden,
         selectedTab: selectedTab,
         onSelectTab: onSelectTab,
@@ -454,6 +466,7 @@ final class _LoadedDetails extends StatelessWidget {
     required this.state,
     required this.scrollController,
     required this.pageHead,
+    required this.onEditDescription,
     required this.headHidden,
     required this.selectedTab,
     required this.onSelectTab,
@@ -469,6 +482,7 @@ final class _LoadedDetails extends StatelessWidget {
   final IntentionDetailsLoaded state;
   final ScrollController scrollController;
   final Widget pageHead;
+  final VoidCallback? onEditDescription;
   final ValueListenable<bool> headHidden;
   final IntentionDetailsTab selectedTab;
   final ValueChanged<IntentionDetailsTab> onSelectTab;
@@ -506,18 +520,31 @@ final class _LoadedDetails extends StatelessWidget {
           slivers: [
             if (selectedTab == IntentionDetailsTab.overview) ...[
               SliverPadding(
+                padding: const EdgeInsets.fromLTRB(
+                  DoableMetrics.space5,
+                  DoableMetrics.space1,
+                  DoableMetrics.space5,
+                  0,
+                ),
+                sliver: SliverToBoxAdapter(
+                  child: TextField.saved(
+                    value: intention.description ?? '',
+                    placeholder: localizations.detailsAddDescription,
+                    label: switch (intention.description) {
+                      final description? =>
+                        localizations.detailsEditDescriptionLabel(description),
+                      null => localizations.detailsAddDescription,
+                    },
+                    onOpen: onEditDescription,
+                  ),
+                ),
+              ),
+              SliverPadding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                 sliver: SliverToBoxAdapter(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _DetailsField(
-                        label: localizations.detailsDescriptionLabel,
-                        value:
-                            intention.description ??
-                            localizations.detailsNoDescription,
-                      ),
-                      const SizedBox(height: 16),
                       _DetailsField(
                         label: localizations.detailsReadinessLabel,
                         value: readiness,

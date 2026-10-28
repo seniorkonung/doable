@@ -1124,6 +1124,18 @@ abstract class AppLocalizations {
   /// **'Edit the name: {title}'**
   String detailsEditTitleLabel(String title);
 
+  /// Доступное название описания на вкладке «Обзор», которое открывает экран изменения с курсором в описании; описание намерения не переводится
+  ///
+  /// In en, this message translates to:
+  /// **'Edit the description: {description}'**
+  String detailsEditDescriptionLabel(String description);
+
+  /// Приглашение добавить описание на вкладке «Обзор» намерения без описания; открывает экран изменения с курсором в описании
+  ///
+  /// In en, this message translates to:
+  /// **'Add a description'**
+  String get detailsAddDescription;
+
   /// Начальная загрузка подробных данных намерения
   ///
   /// In en, this message translates to:
@@ -1159,18 +1171,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Saving changes…'**
   String get detailsOperationRunning;
-
-  /// Подпись описания в подробных данных намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Description'**
-  String get detailsDescriptionLabel;
-
-  /// Отсутствующее описание в подробных данных намерения
-  ///
-  /// In en, this message translates to:
-  /// **'No description'**
-  String get detailsNoDescription;
 
   /// Подпись готовности к действию в подробных данных
   ///

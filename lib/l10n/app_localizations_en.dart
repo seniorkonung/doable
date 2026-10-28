@@ -708,6 +708,14 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String detailsEditDescriptionLabel(String description) {
+    return 'Edit the description: $description';
+  }
+
+  @override
+  String get detailsAddDescription => 'Add a description';
+
+  @override
   String get detailsLoading => 'Loading intention…';
 
   @override
@@ -727,12 +735,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get detailsOperationRunning => 'Saving changes…';
-
-  @override
-  String get detailsDescriptionLabel => 'Description';
-
-  @override
-  String get detailsNoDescription => 'No description';
 
   @override
   String get detailsReadinessLabel => 'Readiness';

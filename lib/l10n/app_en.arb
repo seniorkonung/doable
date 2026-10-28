@@ -573,6 +573,15 @@
     "description": "Доступное название кнопки-названия в шапке страницы намерения, которая открывает экран изменения; название намерения не переводится",
     "placeholders": {"title": {"type": "String"}}
   },
+  "detailsEditDescriptionLabel": "Edit the description: {description}",
+  "@detailsEditDescriptionLabel": {
+    "description": "Доступное название описания на вкладке «Обзор», которое открывает экран изменения с курсором в описании; описание намерения не переводится",
+    "placeholders": {"description": {"type": "String"}}
+  },
+  "detailsAddDescription": "Add a description",
+  "@detailsAddDescription": {
+    "description": "Приглашение добавить описание на вкладке «Обзор» намерения без описания; открывает экран изменения с курсором в описании"
+  },
   "detailsLoading": "Loading intention…",
   "@detailsLoading": {
     "description": "Начальная загрузка подробных данных намерения"
@@ -596,14 +605,6 @@
   "detailsOperationRunning": "Saving changes…",
   "@detailsOperationRunning": {
     "description": "Сохраняющаяся между экранами выполняющаяся операция намерения"
-  },
-  "detailsDescriptionLabel": "Description",
-  "@detailsDescriptionLabel": {
-    "description": "Подпись описания в подробных данных намерения"
-  },
-  "detailsNoDescription": "No description",
-  "@detailsNoDescription": {
-    "description": "Отсутствующее описание в подробных данных намерения"
   },
   "detailsReadinessLabel": "Readiness",
   "@detailsReadinessLabel": {

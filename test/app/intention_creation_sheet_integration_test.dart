@@ -976,7 +976,7 @@ Future<void> _expectCreatedPage(
   expect(
     find.descendant(
       of: page,
-      matching: find.text(description ?? app.l10n.detailsNoDescription),
+      matching: find.text(description ?? app.l10n.detailsAddDescription),
     ),
     findsOneWidget,
   );

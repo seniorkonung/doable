@@ -711,6 +711,14 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
+  String detailsEditDescriptionLabel(String description) {
+    return 'Изменить описание: $description';
+  }
+
+  @override
+  String get detailsAddDescription => 'Добавить описание';
+
+  @override
   String get detailsLoading => 'Загрузка намерения…';
 
   @override
@@ -730,12 +738,6 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get detailsOperationRunning => 'Сохранение изменений…';
-
-  @override
-  String get detailsDescriptionLabel => 'Описание';
-
-  @override
-  String get detailsNoDescription => 'Нет описания';
 
   @override
   String get detailsReadinessLabel => 'Готовность к действию';

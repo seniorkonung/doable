@@ -236,7 +236,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('Archived'), findsOneWidget);
-    expect(find.text('No description'), findsOneWidget);
+    expect(find.text('Add a description'), findsOneWidget);
     expect(find.text('Not ready for action'), findsOneWidget);
   });
 
