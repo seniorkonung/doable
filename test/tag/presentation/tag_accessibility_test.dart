@@ -17,6 +17,7 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
+import 'package:doable/src/intention/presentation/details/intention_options.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_section.dart';
 import 'package:doable/src/tag/presentation/panel/tags_panel.dart';
 import 'package:doable/src/tag/presentation/panel/tags_panel_context.dart';
@@ -31,6 +32,7 @@ import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
+import '../../support/intention_options.dart';
 import '../../support/tag_positions.dart';
 
 Future<void> _until(WidgetTester tester, Finder finder) async {
@@ -105,6 +107,12 @@ void _registerAssignmentScenarios() {
             (await tester.runAsync(runtime.bootstrap)) as AppRuntimeReady;
         seedTagStorageFixture(raw);
         seedRawGraph(raw, () {
+          // Удаление получателя доступно в параметрах только без связей и
+          // дневных выборов.
+          raw
+            ..execute('DELETE FROM daily_choice_path_steps')
+            ..execute('DELETE FROM daily_choices')
+            ..execute('DELETE FROM long_term_relations');
           for (var index = 0; index < 50; index++) {
             final id = tagFixtureId(10000 + index);
             raw.execute(
@@ -354,35 +362,23 @@ void _registerAssignmentScenarios() {
           hasLength(1),
         );
 
-        final recipientDelete = find.byKey(
-          const ValueKey('intention-details-delete'),
-        );
-        // Удаление стоит под блоком тегов; запас шагов позволяет прокрутить
-        // все пятьдесят назначений.
-        await tester.scrollUntilVisible(
-          recipientDelete,
-          300,
-          scrollable: detailsScroll,
-          maxScrolls: 100,
-        );
-        await _tap(tester, recipientDelete);
+        await _tap(tester, intentionOptionsButton);
+        await _tap(tester, intentionOption(IntentionOption.delete));
         await tester.pumpAndSettle();
-        final message = l10n.detailsDeleteConfirmationMessage;
+        final message =
+            '${l10n.detailsDeleteDialogTextBefore}Намерение $number'
+            '${l10n.detailsDeleteDialogTextAfter}';
         expect(
           tester.getSemantics(find.textContaining(message)).label,
           contains(message),
         );
-        final cancelRecipient = find.text(l10n.detailsCancelEditAction).last;
-        final confirmRecipient = find.byKey(
-          const ValueKey('intention-details-confirm-delete'),
-        );
-        _expectAction(tester.getSemantics(cancelRecipient));
-        _expectAction(tester.getSemantics(confirmRecipient));
+        _expectAction(tester.getSemantics(intentionDeletionCancel));
+        _expectAction(tester.getSemantics(intentionDeletionConfirm));
         expect(
-          _traversalIndex(tester, l10n.detailsCancelEditAction),
-          lessThan(_traversalIndex(tester, l10n.detailsConfirmDeleteAction)),
+          _traversalIndexOf(tester, intentionDeletionCancel),
+          lessThan(_traversalIndexOf(tester, intentionDeletionConfirm)),
         );
-        await tester.tap(cancelRecipient);
+        await tester.tap(intentionDeletionCancel);
         await tester.pumpAndSettle();
         expect(
           raw.select('SELECT id FROM tags WHERE id = ?', [newId]),
@@ -553,9 +549,33 @@ void _expectAction(SemanticsNode node) {
 }
 
 int _traversalIndex(WidgetTester tester, String label) {
-  final labels = <String>[];
+  final index = _traversal(tester)
+      .indexWhere((node) => node.label.contains(label));
+  expect(
+    index,
+    isNonNegative,
+    reason: 'Нет в порядке семантического обхода: $label',
+  );
+  return index;
+}
+
+/// Место узла [finder] в порядке обхода: подпись кнопки может повторяться в
+/// заголовке, поэтому узел сравнивается по идентификатору.
+int _traversalIndexOf(WidgetTester tester, Finder finder) {
+  final id = tester.getSemantics(finder).id;
+  final index = _traversal(tester).indexWhere((node) => node.id == id);
+  expect(
+    index,
+    isNonNegative,
+    reason: 'Нет в порядке семантического обхода: $finder',
+  );
+  return index;
+}
+
+List<SemanticsNode> _traversal(WidgetTester tester) {
+  final nodes = <SemanticsNode>[];
   void walk(SemanticsNode node) {
-    labels.add(node.label);
+    nodes.add(node);
     for (final child in node.debugListChildrenInOrder(
       DebugSemanticsDumpOrder.traversalOrder,
     )) {
@@ -566,11 +586,5 @@ int _traversalIndex(WidgetTester tester, String label) {
   walk(
     tester.binding.renderViews.first.owner!.semanticsOwner!.rootSemanticsNode!,
   );
-  final index = labels.indexWhere((value) => value.contains(label));
-  expect(
-    index,
-    isNonNegative,
-    reason: 'Нет в порядке семантического обхода: $label',
-  );
-  return index;
+  return nodes;
 }

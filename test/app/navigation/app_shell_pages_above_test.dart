@@ -34,6 +34,7 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_page
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_section.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
+import 'package:doable/src/intention/presentation/details/intention_options.dart';
 import 'package:doable/src/intention/presentation/edit/intention_edit_page.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
@@ -58,6 +59,7 @@ import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 import '../../support/intention_edit_screen.dart';
+import '../../support/intention_options.dart';
 import '../../support/quick_creation.dart';
 import '../../support/temporary_graph_files.dart';
 import '../../support/tag_positions.dart';
@@ -72,6 +74,10 @@ const _read = 1;
 /// Активное готовое намерение «Бегать»: связанный участник связи и выбранное
 /// действие дневного выбора.
 const _run = 2;
+
+/// Активное намерение «Гулять» без связей и дневных выборов: его удаление
+/// доступно в параметрах.
+const _walk = 3;
 
 /// Связь «Читать» → «Бегать» — единственный шаг пути дневного выбора.
 const _relation = 101;
@@ -430,11 +436,15 @@ Future<AppRouter> _start(
   return ready.container.read(appRouterProvider);
 }
 
-/// Два намерения, связь между ними, дневной выбор по этой связи и тег:
-/// каждая страница приложения получает свои данные.
+/// Два намерения, связь между ними, дневной выбор по этой связи, тег и
+/// свободное намерение: каждая страница приложения получает свои данные.
 void _seed(sqlite.Database database) {
   seedRawGraph(database, () {
-    for (final (number, title) in [(_read, 'Читать'), (_run, 'Бегать')]) {
+    for (final (number, title) in [
+      (_read, 'Читать'),
+      (_run, 'Бегать'),
+      (_walk, 'Гулять'),
+    ]) {
       database.execute(
         'INSERT INTO intentions (id, title, is_action_ready, is_archived, '
         'created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',

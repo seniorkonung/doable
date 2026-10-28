@@ -8,7 +8,10 @@ import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart'
     as catalog_page;
+import 'package:doable/src/design_system/components/option_row.dart';
+import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
+import 'package:doable/src/intention/presentation/details/intention_options.dart';
 import 'package:doable/src/intention/presentation/edit/intention_edit_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
@@ -22,6 +25,7 @@ import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
 import '../support/intention_edit_screen.dart';
+import '../support/intention_options.dart';
 
 void main() {
   testWidgets(
@@ -172,16 +176,8 @@ void main() {
       const renamedPhrase = 'To Укреплять здоровье, you need Много ходить';
       await _pumpUntilFound(tester, find.text(renamedPhrase));
 
-      await _chooseDetailsTab(tester, 'Overview');
-      await _ensureVisible(
-        tester,
-        find.byKey(const ValueKey('intention-details-archive')),
-      );
-      await tester.tap(find.byKey(const ValueKey('intention-details-archive')));
-      await _pumpUntilFound(
-        tester,
-        find.byKey(const ValueKey('intention-details-restore')),
-      );
+      await _chooseIntentionOption(tester, IntentionOption.archive);
+      await _pumpUntilFound(tester, intentionHeadRestore);
       await _dismissOperationMessage(tester);
 
       await _chooseDetailsTab(tester, 'Relations');
@@ -194,18 +190,9 @@ void main() {
       );
       await _pumpUntilFound(tester, find.text(renamedPhrase));
 
-      await _chooseDetailsTab(tester, 'Overview');
-      await _ensureVisible(
-        tester,
-        find.byKey(const ValueKey('intention-details-restore')),
-      );
-      await tester.tap(find.byKey(const ValueKey('intention-details-restore')));
-      await _pumpUntilFound(
-        tester,
-        find.byKey(const ValueKey('intention-details-archive')),
-      );
+      await _chooseIntentionOption(tester, IntentionOption.restore);
+      await _pumpUntilAbsent(tester, intentionHeadRestore);
       await _dismissOperationMessage(tester);
-      await _chooseDetailsTab(tester, 'Relations');
       expect(find.text(renamedPhrase), findsOneWidget);
       expect(find.text('Archived relations: 1'), findsWidgets);
 
@@ -342,14 +329,14 @@ void main() {
       );
       await _pumpUntilDetailsTitle(tester, sameTitle);
 
-      await _deleteCurrentIntention(tester);
-      final blockedDeletion = find.textContaining(
-        'relations still block deletion',
+      await _openIntentionOptions(tester);
+      final blockedDeletion = tester.widget<OptionRow>(
+        intentionOption(IntentionOption.delete),
       );
-      await _pumpUntilFound(tester, blockedDeletion);
-      expect(blockedDeletion, findsOneWidget);
-      expect(find.text('Show blocking relations'), findsNothing);
-      await _dismissOperationMessage(tester);
+      expect(blockedDeletion.onPressed, isNull);
+      expect(blockedDeletion.hint, 'Delete its relations first');
+      await tester.binding.handlePopRoute();
+      await _pumpUntilAbsent(tester, find.byType(Sheet));
       await _chooseDetailsTab(tester, 'Relations');
       final canGroup = find.byKey(
         const ValueKey('relation-neighborhood-group-active-can-outgoing'),
@@ -363,19 +350,12 @@ void main() {
       );
 
       await _deleteCurrentRelation(tester);
-      await _chooseDetailsTab(tester, 'Overview');
-      await _pumpUntilFound(
-        tester,
-        find.byKey(const ValueKey('intention-details-delete')),
-      );
+      await _pumpUntilFound(tester, intentionOptionsButton);
       await _dismissOperationMessage(tester);
       expect(find.text(lifecyclePhrase), findsNothing);
 
       await _deleteCurrentIntention(tester);
-      await _pumpUntilAbsent(
-        tester,
-        find.byKey(const ValueKey('intention-details-delete')),
-      );
+      await _pumpUntilAbsent(tester, find.byType(IntentionDetailsPage));
       await _dismissOperationMessage(tester);
       await _returnToCatalog(tester);
       await _pumpUntilFound(tester, find.text(sameTitle));
@@ -705,18 +685,34 @@ Future<void> _deleteCurrentRelation(WidgetTester tester) async {
   await _pumpUntilAbsent(tester, delete);
 }
 
+/// Удаление становится доступным, когда сводка страницы подтвердит
+/// отсутствие связей; открытый лист следит за ней.
 Future<void> _deleteCurrentIntention(WidgetTester tester) async {
-  await _chooseDetailsTab(tester, 'Overview');
-  final delete = find.byKey(const ValueKey('intention-details-delete'));
-  await _ensureVisible(tester, delete);
+  await _openIntentionOptions(tester);
+  final delete = intentionOption(IntentionOption.delete);
+  for (var attempt = 0; attempt < 1000; attempt += 1) {
+    if (tester.widget<OptionRow>(delete).onPressed != null) break;
+    await tester.pump(const Duration(milliseconds: 1));
+  }
+  expect(tester.widget<OptionRow>(delete).hint, 'Its tags stay');
   await tester.tap(delete);
-  await _pumpUntilFound(
-    tester,
-    find.byKey(const ValueKey('intention-details-confirm-delete')),
-  );
-  await tester.tap(
-    find.byKey(const ValueKey('intention-details-confirm-delete')),
-  );
+  await _tapWhenFound(tester, intentionDeletionConfirm);
+}
+
+Future<void> _openIntentionOptions(WidgetTester tester) async {
+  await _tapWhenFound(tester, intentionOptionsButton);
+  await _pumpUntilFound(tester, find.byType(Sheet));
+  await tester.pumpAndSettle(const Duration(milliseconds: 1));
+}
+
+/// Выбор закрывает лист и сразу начинает действие на странице.
+Future<void> _chooseIntentionOption(
+  WidgetTester tester,
+  IntentionOption option,
+) async {
+  await _openIntentionOptions(tester);
+  await tester.tap(intentionOption(option));
+  await _pumpUntilAbsent(tester, find.byType(Sheet));
 }
 
 Future<void> _returnToCatalog(WidgetTester tester) async {

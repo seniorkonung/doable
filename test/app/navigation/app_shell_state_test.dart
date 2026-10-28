@@ -39,6 +39,7 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_purp
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
+import 'package:doable/src/intention/presentation/details/intention_options.dart';
 import 'package:doable/src/intention/presentation/edit/intention_edit_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_id_generator.dart';
@@ -67,6 +68,7 @@ import '../../support/tag_storage_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 import '../../support/inline_text.dart';
 import '../../support/intention_edit_screen.dart';
+import '../../support/intention_options.dart';
 import '../../support/tag_positions.dart';
 
 /// Активные намерения «Намерение 01» … «Намерение 40»: выдача каталога
@@ -233,10 +235,7 @@ void main() {
       await _until(tester, find.byType(IntentionDetailsPage));
       await tester.pumpAndSettle();
       app.repository.holdNextCommand();
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('intention-details-archive')),
-      );
+      await _chooseIntentionOption(tester, IntentionOption.archive);
       await _waitFor(tester, () => app.repository.isHolding);
 
       await _select(tester, AppDestination.home);
@@ -788,10 +787,7 @@ void main() {
           await _open(tester, _catalogRow(archived), IntentionDetailsPage);
           app.repository.holdNextCommand();
           if (fails) app.faults.failNextArchiveWrite();
-          await _tap(
-            tester,
-            find.byKey(const ValueKey('intention-details-archive')),
-          );
+          await _chooseIntentionOption(tester, IntentionOption.archive);
           // Операция принята и дошла до хранилища до смены пункта.
           await _waitFor(tester, () => app.repository.isHolding);
           await _closeTop(tester, IntentionDetailsPage);
@@ -1457,6 +1453,14 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
   await tester.pumpAndSettle();
   await tester.tap(finder);
   await tester.pump();
+}
+
+Future<void> _chooseIntentionOption(
+  WidgetTester tester,
+  IntentionOption option,
+) async {
+  await _tap(tester, intentionOptionsButton);
+  await _tap(tester, intentionOption(option));
 }
 
 /// Отказывает ближайшей записи архивирования недоступностью хранилища:

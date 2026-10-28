@@ -21,6 +21,7 @@ import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
+import 'package:doable/src/intention/presentation/details/intention_options.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
@@ -41,8 +42,8 @@ import '../../long_term_relation/presentation/neighborhood/neighborhood_test_sup
 import '../../support/app_root_pages.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
+import '../../support/intention_options.dart';
 
-const _archive = ValueKey('intention-details-archive');
 const _failure =
     'Архивирование — «Намерение»: Не удалось изменить состояние намерения. Повторите попытку.';
 const _deleteSuccess = 'Удаление — «Намерение»: Намерение удалено.';
@@ -762,21 +763,15 @@ final class _ControlledApp {
   }
 
   Future<void> archive(WidgetTester tester) async {
-    await tester.ensureVisible(find.byKey(_archive));
-    await tester.tap(find.byKey(_archive));
-    await tester.pump();
+    await _chooseIntentionOption(tester, IntentionOption.archive);
     expect(repository.commands.last, isA<ArchiveIntention>());
     expect(coordinator.isRunning(intention.id), isTrue);
   }
 
   Future<void> delete(WidgetTester tester) async {
-    final delete = find.byKey(const ValueKey('intention-details-delete'));
-    await tester.ensureVisible(delete);
-    await tester.tap(delete);
+    await _chooseIntentionOption(tester, IntentionOption.delete);
     await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const ValueKey('intention-details-confirm-delete')),
-    );
+    await tester.tap(intentionDeletionConfirm);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     expect(repository.commands.last, isA<DeleteIntention>());
@@ -786,4 +781,14 @@ final class _ControlledApp {
   void complete(Result<IntentionCommandSuccess> result) {
     repository.completeCommand(completedCommands++, result);
   }
+}
+
+Future<void> _chooseIntentionOption(
+  WidgetTester tester,
+  IntentionOption option,
+) async {
+  await tester.tap(intentionOptionsButton);
+  await tester.pumpAndSettle();
+  await tester.tap(intentionOption(option));
+  await tester.pump();
 }

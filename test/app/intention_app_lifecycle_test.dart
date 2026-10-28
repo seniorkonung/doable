@@ -28,6 +28,7 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart'
     as catalog_page;
+import 'package:doable/src/intention/presentation/details/intention_options.dart';
 import 'package:doable/src/intention/presentation/edit/intention_edit_page.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
@@ -41,6 +42,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../support/app_root_pages.dart';
 import '../support/in_memory_diagnostics_sink.dart';
+import '../support/intention_options.dart';
 import '../support/tag_read_contract_test_fallback.dart';
 import '../support/statistics_read_contract_test_fallback.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
@@ -213,11 +215,9 @@ void main() {
       );
       await _closeOperationMessage(tester);
 
-      await tester.ensureVisible(
-        find.byKey(const ValueKey('intention-details-archive')),
-      );
-      await tester.pump();
-      await tester.tap(find.byKey(const ValueKey('intention-details-archive')));
+      await tester.tap(intentionOptionsButton);
+      await tester.pumpAndSettle();
+      await tester.tap(intentionOption(IntentionOption.archive));
       await tester.pump();
       final archived = _copyIntention(
         ready,
@@ -256,14 +256,7 @@ void main() {
       await _pumpUntil(tester, () => repository.detailRequests.length == 5);
       repository.emitDetail(4, archived);
       await tester.pumpAndSettle();
-      await tester.ensureVisible(
-        find.byKey(
-          const ValueKey('intention-details-restore'),
-          skipOffstage: false,
-        ),
-      );
-      await tester.pump();
-      await tester.tap(find.byKey(const ValueKey('intention-details-restore')));
+      await tester.tap(intentionHeadRestore);
       await tester.pump();
       final restored = _copyIntention(
         archived,
@@ -301,15 +294,11 @@ void main() {
       await _pumpUntil(tester, () => repository.detailRequests.length == 7);
       repository.emitDetail(6, restored);
       await tester.pumpAndSettle();
-      await tester.ensureVisible(
-        find.byKey(const ValueKey('intention-details-delete')),
-      );
+      await tester.tap(intentionOptionsButton);
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('intention-details-delete')));
+      await tester.tap(intentionOption(IntentionOption.delete));
       await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const ValueKey('intention-details-confirm-delete')),
-      );
+      await tester.tap(intentionDeletionConfirm);
       await tester.pump();
       expect(repository.commands.last, isA<DeleteIntention>());
 
