@@ -49,6 +49,8 @@ final class _IntentionEditPageState extends ConsumerState<IntentionEditPage> {
   final _failureKey = GlobalKey();
   late final TextEditingController _titleController;
   late final TextEditingController _descriptionController;
+  final _titleFocus = FocusNode();
+  final _descriptionFocus = FocusNode();
 
   IntentionEditViewModelProvider get _provider =>
       intentionEditViewModelProvider(_formKey, widget.intentionId);
@@ -71,6 +73,8 @@ final class _IntentionEditPageState extends ConsumerState<IntentionEditPage> {
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
+    _titleFocus.dispose();
+    _descriptionFocus.dispose();
     super.dispose();
   }
 
@@ -152,6 +156,7 @@ final class _IntentionEditPageState extends ConsumerState<IntentionEditPage> {
                 TextField.multiline(
                   key: const ValueKey('intention-edit-title'),
                   controller: _titleController,
+                  focusNode: _titleFocus,
                   placeholder: localizations.intentionEditNameLabel,
                   label: localizations.intentionEditNameLabel,
                   kind: TextFieldKind.name,
@@ -171,6 +176,7 @@ final class _IntentionEditPageState extends ConsumerState<IntentionEditPage> {
                 TextField.multiline(
                   key: const ValueKey('intention-edit-description'),
                   controller: _descriptionController,
+                  focusNode: _descriptionFocus,
                   placeholder:
                       localizations.intentionEditDescriptionPlaceholder,
                   label: localizations.intentionEditDescriptionLabel,
@@ -199,7 +205,13 @@ final class _IntentionEditPageState extends ConsumerState<IntentionEditPage> {
   /// «Сохранить» нажимается из любой позиции прокрутки, а места отказов
   /// стоят в начале содержимого. Пока сообщение вне видимой части, кадр не
   /// подтверждает его предъявление.
+  ///
+  /// Фокус с полей снимается до того, как они снова станут редактируемыми:
+  /// иначе вернувшаяся клавиатура прокрутит к каретке и уведёт уже
+  /// предъявленное сообщение из видимой части.
   void _revealFailure() {
+    _titleFocus.unfocus();
+    _descriptionFocus.unfocus();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final failure = _failureKey.currentContext;
       if (!mounted || failure == null) return;

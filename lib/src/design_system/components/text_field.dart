@@ -29,6 +29,7 @@ final class TextField extends StatelessWidget {
     required this.label,
     required this.onChanged,
     this.leading,
+    this.focusNode,
     this.autofocus = false,
     this.readOnly = false,
     this.error,
@@ -51,6 +52,7 @@ final class TextField extends StatelessWidget {
     this.kind = TextFieldKind.text,
     this.minLines = 1,
     this.maxLines,
+    this.focusNode,
     this.autofocus = false,
     this.readOnly = false,
     this.error,
@@ -75,6 +77,9 @@ final class TextField extends StatelessWidget {
   final TextFieldKind kind;
   final int minLines;
   final int? maxLines;
+
+  /// Фокус поля, если потребитель управляет им сам.
+  final FocusNode? focusNode;
 
   /// Запрашивает фокус при первом показе, если другое поле его не получило.
   final bool autofocus;
@@ -111,6 +116,7 @@ final class TextField extends StatelessWidget {
           child: material.TextField(
             controller: controller,
             onChanged: onChanged,
+            focusNode: focusNode,
             minLines: minLines,
             maxLines: maxLines,
             autofocus: autofocus,

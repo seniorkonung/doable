@@ -314,8 +314,10 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('отказ хранилища на прокрученном экране прокручивает к '
-      'сообщению над полями без общей поверхности', (tester) async {
+  testWidgets('отказ хранилища на прокрученном экране снимает фокус с полей '
+      'и прокручивает к сообщению над полями без общей поверхности', (
+    tester,
+  ) async {
     addTearDown(tester.view.reset);
     final semantics = tester.ensureSemantics();
     final repository = ControlledDetailsRepository();
@@ -325,12 +327,21 @@ void main() {
 
     await tester.tap(_save);
     await tester.pump();
+    // Поля только для чтения закрывают клавиатуру на время сохранения.
+    expect(tester.testTextInput.hasAnyClients, isFalse);
+    tester.view.resetViewInsets();
+    await tester.pumpAndSettle();
     repository.completeCommand(
       0,
       const ResultFailure(IntentionUnavailableFailure()),
     );
     await tester.pumpAndSettle();
 
+    // Без фокуса клавиатура не возвращается и не уводит сообщение.
+    for (final field in [_titleField, _descriptionField]) {
+      expect(_editable(tester, field).focusNode.hasFocus, isFalse);
+    }
+    expect(tester.testTextInput.hasAnyClients, isFalse);
     const message = 'Не удалось сохранить изменения. Повторите попытку.';
     expect(find.byType(Notice).hitTestable(), findsOneWidget);
     expect(find.bySemanticsLabel(message), findsOneWidget);
@@ -582,6 +593,11 @@ Button _saveButton(WidgetTester tester) => tester.widget<Button>(_save);
 
 TextEditingController _controller(WidgetTester tester, Finder field) =>
     tester.widget<TextField>(field).controller;
+
+EditableText _editable(WidgetTester tester, Finder field) =>
+    tester.widget<EditableText>(
+      find.descendant(of: field, matching: find.byType(EditableText)),
+    );
 
 ScrollPosition _descriptionScroll(WidgetTester tester) => tester
     .state<ScrollableState>(
