@@ -802,7 +802,7 @@
   - **Предполагаемые файлы:** `lib/src/design_system/components/badge.dart`, `lib/src/design_system/components/button.dart`, `test/design_system/badge_test.dart`, `test/design_system/button_test.dart`.
   - **Размер:** S.
 
-- [ ] 4.15 Расширить `PageHead` приглушённым названием, слотом метки, строкой пояснения и слотом кнопки
+- [x] 4.15 Расширить `PageHead` приглушённым названием, слотом метки, строкой пояснения и слотом кнопки
   - **Критерии приёмки:**
     - По README `PageHead`:
       - приглушённое название рисуется цветом `muted`;
