@@ -9,6 +9,7 @@ import '../../daily_choice/presentation/catalog/daily_choice_local_date_provider
 import '../../daily_choice/presentation/catalog/daily_choice_local_day_observer.dart';
 import '../../design_system/doable_colors.dart';
 import '../../design_system/doable_icon.dart';
+import '../../intention/presentation/details/intention_page_target.dart';
 import '../../statistics/application/intention_statistics_target.dart';
 import '../../statistics/presentation/home_statistics_content.dart';
 import '../../statistics/presentation/home_statistics_period_selector.dart';
@@ -103,9 +104,11 @@ final class _HomePageState extends ConsumerState<HomePage> {
           onOpenIntention: (id) => context.router.push(
             IntentionDetailsRoute(
               intentionId: id,
-              statisticsTarget: IntentionStatisticsTarget(
-                view: state.selection.view,
-                period: state.selection.period,
+              target: StatisticsTarget(
+                IntentionStatisticsTarget(
+                  view: state.selection.view,
+                  period: state.selection.period,
+                ),
               ),
             ),
           ),

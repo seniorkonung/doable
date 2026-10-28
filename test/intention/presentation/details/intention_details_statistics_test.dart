@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:ui' show SemanticsAction;
+import 'dart:ui' show SemanticsAction, Tristate;
 
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
@@ -14,6 +14,7 @@ import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
+import 'package:doable/src/intention/presentation/details/intention_page_target.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_tabs.dart';
 import 'package:doable/src/statistics/application/contribution_counts.dart';
 import 'package:doable/src/statistics/application/intention_statistics_breakdown.dart';
@@ -73,9 +74,11 @@ void main() {
               locale: Locale(locale),
               home: IntentionDetailsPage(
                 intentionId: intention.id,
-                statisticsTarget: IntentionStatisticsTarget(
-                  view: StatisticsView.throughRelations,
-                  period: period,
+                target: StatisticsTarget(
+                  IntentionStatisticsTarget(
+                    view: StatisticsView.throughRelations,
+                    period: period,
+                  ),
                 ),
               ),
             ),
@@ -340,9 +343,11 @@ void main() {
             locale: const Locale('ru'),
             home: IntentionDetailsPage(
               intentionId: intention.id,
-              statisticsTarget: IntentionStatisticsTarget(
-                view: StatisticsView.intermediateIntentions,
-                period: StatisticsYear(2025),
+              target: StatisticsTarget(
+                IntentionStatisticsTarget(
+                  view: StatisticsView.intermediateIntentions,
+                  period: StatisticsYear(2025),
+                ),
               ),
             ),
           ),
@@ -427,7 +432,112 @@ void main() {
   );
 
   testWidgets(
-    'цель маршрута выбирает статистику при открытии и не применяется повторно',
+    'обновление цели сохраняет выбор, смена намерения начинает новый экземпляр',
+    (tester) async {
+      final repository = ControlledDetailsRepository()
+        ..onStatisticsSection = _emptySection;
+      final first = testDetailsIntention();
+      final second = testDetailsIntention(index: 2);
+      final page = ValueNotifier(
+        IntentionDetailsPage(
+          intentionId: first.id,
+          target: StatisticsTarget(
+            IntentionStatisticsTarget(
+              view: StatisticsView.intermediateIntentions,
+              period: StatisticsYear(2025),
+            ),
+          ),
+        ),
+      );
+      addTearDown(page.dispose);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            personalGraphRepositoryProvider.overrideWithValue(repository),
+          ],
+          child: OrdinaryPageTestApp(
+            locale: const Locale('ru'),
+            home: ValueListenableBuilder(
+              valueListenable: page,
+              builder: (_, value, _) => value,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      repository.detailRequests.single.add(ResultSuccess(first));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Предыдущий год'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Обзор').first);
+      await tester.pumpAndSettle();
+
+      final nextTarget = StatisticsTarget(
+        IntentionStatisticsTarget(
+          view: StatisticsView.sourceIntentions,
+          period: StatisticsYear(2030),
+        ),
+      );
+      page.value = IntentionDetailsPage(
+        intentionId: first.id,
+        target: nextTarget,
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .getSemantics(find.bySemanticsLabel('Обзор'))
+            .getSemanticsData()
+            .flagsCollection
+            .isSelected,
+        Tristate.isTrue,
+      );
+      expect(repository.statisticsQueries, hasLength(2));
+      await tester.tap(find.text('Статистика').first);
+      await tester.pumpAndSettle();
+      expect(find.text('2024'), findsOneWidget);
+      expect(repository.statisticsQueries, hasLength(2));
+      expect(
+        repository.statisticsQueries.last.view,
+        StatisticsView.intermediateIntentions,
+      );
+
+      await tester.tap(find.text('Обзор').first);
+      await tester.pumpAndSettle();
+
+      page.value = IntentionDetailsPage(
+        intentionId: second.id,
+        target: nextTarget,
+      );
+      await tester.pump();
+      repository.detailRequests.last.add(ResultSuccess(second));
+      await tester.pumpAndSettle();
+      expect(find.text('2030'), findsOneWidget);
+      expect(repository.statisticsQueries, hasLength(3));
+      expect(repository.statisticsQueries.last.intentionId, second.id);
+      expect(
+        repository.statisticsQueries.last.view,
+        StatisticsView.sourceIntentions,
+      );
+      expect(
+        tester
+            .getSemantics(
+              find.descendant(
+                of: find.byType(Tabs<IntentionDetailsTab>),
+                matching: find.bySemanticsLabel('Статистика'),
+              ),
+            )
+            .getSemanticsData()
+            .flagsCollection
+            .isSelected,
+        Tristate.isTrue,
+      );
+      expect(repository.relationGroupQueries, isEmpty);
+    },
+  );
+
+  testWidgets(
+    'две страницы одного намерения сохраняют независимые вкладки и статистику',
     (tester) async {
       final repository = ControlledDetailsRepository()
         ..onStatisticsSection = _emptySection;
@@ -465,9 +575,11 @@ void main() {
         router.push(
           IntentionDetailsRoute(
             intentionId: intention.id,
-            statisticsTarget: IntentionStatisticsTarget(
-              view: StatisticsView.intermediateIntentions,
-              period: StatisticsYear(2025),
+            target: StatisticsTarget(
+              IntentionStatisticsTarget(
+                view: StatisticsView.intermediateIntentions,
+                period: StatisticsYear(2025),
+              ),
             ),
           ),
         ),
@@ -509,13 +621,18 @@ void main() {
         StatisticsMonth(2026, 10),
       );
 
+      await tester.tap(find.text('Overview').first);
+      await tester.pumpAndSettle();
+
       unawaited(
         router.push(
           IntentionDetailsRoute(
             intentionId: intention.id,
-            statisticsTarget: IntentionStatisticsTarget(
-              view: StatisticsView.sourceIntentions,
-              period: StatisticsYear(2020),
+            target: StatisticsTarget(
+              IntentionStatisticsTarget(
+                view: StatisticsView.sourceIntentions,
+                period: StatisticsYear(2020),
+              ),
             ),
           ),
         ),
@@ -526,7 +643,19 @@ void main() {
       await tester.tap(find.byTooltip('Previous year'));
       await tester.pumpAndSettle();
       expect(find.text('2019'), findsOneWidget);
+      await tester.tap(find.text('Relations').first);
+      await tester.pumpAndSettle();
       router.pop();
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .getSemantics(find.bySemanticsLabel('Overview'))
+            .getSemanticsData()
+            .flagsCollection
+            .isSelected,
+        Tristate.isTrue,
+      );
+      await tester.tap(find.text('Statistics').first);
       await tester.pumpAndSettle();
       expect(find.text('Новое название').hitTestable(), findsOneWidget);
       expect(repository.statisticsQueries, hasLength(4));

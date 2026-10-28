@@ -10,6 +10,7 @@ import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/intention/presentation/details/intention_page_target.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/statistics/application/contribution_counts.dart';
@@ -110,7 +111,11 @@ final class IntentionStatisticsTestPage {
   ) {
     provider = intentionStatisticsViewModelProvider(
       statisticsId(1),
-      Object(),
+      IntentionPageInstance(
+        target: target == null
+            ? const OverviewTarget()
+            : StatisticsTarget(target),
+      ),
       target: target,
     );
     subscription = container.listen(provider, (_, _) {});

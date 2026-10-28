@@ -31,6 +31,7 @@ import 'package:doable/src/long_term_relation/application/long_term_relation_com
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart'
     show RelationScope;
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
+import 'package:doable/src/intention/presentation/details/intention_page_target.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/statistics/application/intention_statistics_target.dart';
 import 'package:doable/src/statistics/application/intention_statistics_read_contract.dart';
@@ -478,9 +479,11 @@ final class _App {
           .push(
             IntentionDetailsRoute(
               intentionId: durabilityIntention(intention),
-              statisticsTarget: IntentionStatisticsTarget(
-                view: view,
-                period: period ?? StatisticsMonth(2026, 10),
+              target: StatisticsTarget(
+                IntentionStatisticsTarget(
+                  view: view,
+                  period: period ?? StatisticsMonth(2026, 10),
+                ),
               ),
             ),
           ),

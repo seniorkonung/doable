@@ -12,6 +12,7 @@ import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_date_c
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
+import 'package:doable/src/intention/presentation/details/intention_page_target.dart';
 import 'package:doable/src/statistics/application/intention_statistics_breakdown.dart';
 import 'package:doable/src/statistics/application/statistics_period.dart';
 import 'package:doable/src/statistics/application/statistics_read_contract.dart';
@@ -423,8 +424,12 @@ Future<void> _expectSection(
     find.byType(IntentionDetailsPage),
   );
   expect(page.intentionId, durabilityIntention(id));
-  expect(page.statisticsTarget!.view, view);
-  expect(page.statisticsTarget!.period, period);
+  expect(
+    page.target,
+    isA<StatisticsTarget>()
+        .having((target) => target.statistics.view, 'вид', view)
+        .having((target) => target.statistics.period, 'период', period),
+  );
   final section = app.container.read(provider);
   expect(section.selection.view, view);
   expect(section.selection.period, period);

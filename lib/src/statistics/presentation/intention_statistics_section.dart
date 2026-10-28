@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../app/routing/app_router.gr.dart';
+import '../../intention/presentation/details/intention_page_target.dart';
 import '../application/intention_statistics_target.dart';
 import '../application/statistics_read_contract.dart';
 import 'intention_statistics_breakdowns.dart';
@@ -98,11 +99,12 @@ final class IntentionStatisticsSectionSliver extends ConsumerWidget {
                       onOpenIntention: (id, breakdown) => context.router.push(
                         IntentionDetailsRoute(
                           intentionId: id,
-                          statisticsTarget:
-                              IntentionStatisticsTarget.forBreakdown(
-                                breakdown: breakdown,
-                                period: state.selection.period,
-                              ),
+                          target: StatisticsTarget(
+                            IntentionStatisticsTarget.forBreakdown(
+                              breakdown: breakdown,
+                              period: state.selection.period,
+                            ),
+                          ),
                         ),
                       ),
                       onLoadMoreIfNeeded: model.loadMoreIfNeeded,

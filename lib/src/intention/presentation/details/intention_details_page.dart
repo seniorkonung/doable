@@ -28,24 +28,24 @@ import '../../../long_term_relation/presentation/neighborhood/relation_neighborh
 import '../../../tag/presentation/assignments/tag_assignments_section.dart';
 import '../../../tag/presentation/panel/tags_panel.dart';
 import '../../../tag/presentation/panel/tags_panel_context.dart';
-import '../../../statistics/application/intention_statistics_target.dart';
 import '../../../statistics/presentation/intention_statistics_section.dart';
 import '../../../statistics/presentation/intention_statistics_view_model.dart';
 import '../operation/operation_state.dart';
 import 'intention_details_state.dart';
 import 'intention_details_view_model.dart';
 import 'intention_details_tabs.dart';
+import 'intention_page_target.dart';
 
 @RoutePage()
 final class IntentionDetailsPage extends ConsumerStatefulWidget {
   const IntentionDetailsPage({
     required this.intentionId,
-    this.statisticsTarget,
+    this.target = const OverviewTarget(),
     super.key,
   });
 
   final IntentionId intentionId;
-  final IntentionStatisticsTarget? statisticsTarget;
+  final IntentionPageTarget target;
 
   @override
   ConsumerState<IntentionDetailsPage> createState() =>
@@ -59,7 +59,7 @@ final class _IntentionDetailsPageState
   final _headHidden = ValueNotifier(false);
   double? _headExtent;
   var _headMeasurementScheduled = false;
-  var _statisticsPageKey = Object();
+  late IntentionPageInstance _pageInstance;
   late final DailyChoiceLocalDayObserver _localDay;
   var _routeIsCurrent = false;
   late IntentionDetailsTab _selectedTab;
@@ -68,14 +68,17 @@ final class _IntentionDetailsPageState
   IntentionStatisticsViewModelProvider get _statisticsProvider =>
       intentionStatisticsViewModelProvider(
         widget.intentionId,
-        _statisticsPageKey,
-        target: widget.statisticsTarget,
+        _pageInstance,
+        target: switch (_pageInstance.target) {
+          StatisticsTarget(:final statistics) => statistics,
+          OverviewTarget() || RelationsTarget() => null,
+        },
       );
 
   @override
   void initState() {
     super.initState();
-    _selectedTab = _initialTab;
+    _startPageInstance();
     _scrollController.addListener(_syncHeadHidden);
     _localDay = DailyChoiceLocalDayObserver(
       readLocalDay: ref.read(dailyChoiceLocalDateSourceProvider),
@@ -84,9 +87,24 @@ final class _IntentionDetailsPageState
     );
   }
 
-  IntentionDetailsTab get _initialTab => widget.statisticsTarget == null
-      ? IntentionDetailsTab.overview
-      : IntentionDetailsTab.statistics;
+  void _startPageInstance() {
+    _pageInstance = IntentionPageInstance(target: widget.target);
+    _selectedTab = switch (_pageInstance.target) {
+      OverviewTarget() => IntentionDetailsTab.overview,
+      RelationsTarget() => IntentionDetailsTab.relations,
+      StatisticsTarget() => IntentionDetailsTab.statistics,
+    };
+    if (_selectedTab == IntentionDetailsTab.relations) _retainNeighborhood();
+  }
+
+  void _retainNeighborhood() {
+    // Подписка удерживает соседство с первого показа до закрытия страницы.
+    // https://pub.dev/documentation/flutter_riverpod/latest/flutter_riverpod/WidgetRef/listenManual.html
+    _neighborhoodSubscription ??= ref.listenManual(
+      relationNeighborhoodViewModelProvider(widget.intentionId),
+      (_, _) {},
+    );
+  }
 
   void _selectTab(IntentionDetailsTab tab) {
     if (tab == _selectedTab) return;
@@ -95,12 +113,7 @@ final class _IntentionDetailsPageState
       _scrollController.jumpTo(_headExtent!);
     }
     if (tab == IntentionDetailsTab.relations) {
-      // Подписка удерживает соседство с первого показа до закрытия страницы.
-      // https://pub.dev/documentation/flutter_riverpod/latest/flutter_riverpod/WidgetRef/listenManual.html
-      _neighborhoodSubscription ??= ref.listenManual(
-        relationNeighborhoodViewModelProvider(widget.intentionId),
-        (_, _) {},
-      );
+      _retainNeighborhood();
     }
     setState(() {
       _selectedTab = tab;
@@ -194,10 +207,9 @@ final class _IntentionDetailsPageState
   void didUpdateWidget(covariant IntentionDetailsPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.intentionId != widget.intentionId) {
-      _statisticsPageKey = Object();
-      _selectedTab = _initialTab;
       _neighborhoodSubscription?.close();
       _neighborhoodSubscription = null;
+      _startPageInstance();
       _headExtent = null;
       _headHidden.value = false;
       _syncStatisticsVisibility();

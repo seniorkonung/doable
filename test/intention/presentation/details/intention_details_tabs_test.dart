@@ -16,6 +16,7 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_tabs.dart';
+import 'package:doable/src/intention/presentation/details/intention_page_target.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/statistics/application/intention_statistics_target.dart';
@@ -30,6 +31,32 @@ import '../../../support/in_memory_quick_creation_mode_store.dart';
 import 'details_test_support.dart';
 
 void main() {
+  for (final (target, name, label, readsGroups) in [
+    (const OverviewTarget(), 'Обзор', 'Overview', false),
+    (const RelationsTarget(), 'Связи', 'Relations: 0 active, 0 archived', true),
+  ]) {
+    testWidgets('цель «$name» открывает соответствующую вкладку', (
+      tester,
+    ) async {
+      final repository = ControlledDetailsRepository();
+      await _openPage(tester, repository, target: target);
+      for (final request in repository.detailRequests) {
+        request.add(ResultSuccess(testDetailsIntention()));
+      }
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .getSemantics(find.bySemanticsLabel(label))
+            .getSemanticsData()
+            .flagsCollection
+            .isSelected,
+        Tristate.isTrue,
+      );
+      expect(repository.relationGroupQueries, hasLength(readsGroups ? 1 : 0));
+      expect(repository.statisticsQueries, isEmpty);
+    });
+  }
+
   testWidgets('полоса вкладок остаётся под панелью после прокрутки обзора', (
     tester,
   ) async {
@@ -300,9 +327,11 @@ void main() {
     await _openPage(
       tester,
       repository,
-      target: IntentionStatisticsTarget(
-        view: StatisticsView.intermediateIntentions,
-        period: StatisticsYear(2025),
+      target: StatisticsTarget(
+        IntentionStatisticsTarget(
+          view: StatisticsView.intermediateIntentions,
+          period: StatisticsYear(2025),
+        ),
       ),
     );
     repository.detailRequests.single.add(ResultSuccess(testDetailsIntention()));
@@ -348,7 +377,7 @@ Future<AppRouter> _openPage(
   WidgetTester tester,
   ControlledDetailsRepository repository, {
   Locale locale = const Locale('en'),
-  IntentionStatisticsTarget? target,
+  IntentionPageTarget target = const OverviewTarget(),
 }) async {
   final router = AppRouter();
   addTearDown(router.dispose);
@@ -372,7 +401,7 @@ Future<AppRouter> _openPage(
     router.push(
       IntentionDetailsRoute(
         intentionId: testDetailsIntention().id,
-        statisticsTarget: target,
+        target: target,
       ),
     ),
   );
