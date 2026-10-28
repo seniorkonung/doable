@@ -705,7 +705,7 @@
     - проверки: `test/intention/presentation/details/intention_details_overview_test.dart`, `test/intention/presentation/details/intention_details_page_test.dart`, `test/app/intention_app_lifecycle_test.dart`, `test/app/intention_creation_sheet_integration_test.dart`.
   - **Размер:** M.
 
-- [ ] 4.8 Перенести из макетов значки «⋯», малого крестика и восстановления из архива
+- [x] 4.8 Перенести из макетов значки «⋯», малого крестика и восстановления из архива
   - **Критерии приёмки:**
     - По решению 11 дизайна значки переносятся из макетов `context/doable-design/design/` в `lib/src/design_system/icons/` по правилам его README: SVG, запись происхождения и значения `DoableIconData`. Их потребители в этой фазе — кнопка параметров в верхней панели, крестик чипа тега и пункт «Восстановить из архива» в параметрах.
     - Эталон каталога иконок пересоздан, и в нём добавлены только эти три значка.
