@@ -452,14 +452,14 @@
 - [ ] 3.10 Перевести сценарии, которые переименовывали намерение встроенной правкой, на экран изменения и добавить экран в матрицу страниц навигации
   - **Критерии приёмки:**
     - Сценарии жизненного цикла намерения, потока долговременных связей и сохранения состояния корневых страниц переименовывают намерение нажатием на название, экраном изменения и «Сохранить». Они сохраняют ожидания согласования каталога, соседства и параметров.
-    - Проверка пакетов тегов держит незавершённую правку в модели экрана изменения вместо модели подробных данных и подтверждает, что пакет не меняет черновик.
+    - Проверка пакетов тегов держит незавершённую правку в модели экрана изменения вместо модели подробных данных и подтверждает, что пакет не меняет черновик. В `test/graph/presentation/package_consumers_test_support.dart` проба черновика получает название, описание и состояние операции из модели экрана изменения той же сессии, которую использует `tag_package_catalog_consumers_test.dart`, без чтения `IntentionDetailsLoaded.edit`.
     - Матрица страниц навигации содержит экран изменения намерения, открытый нажатием на название, с `panel: false`: на экране панели нет, а после его закрытия страница намерения снова показывает панель.
     - Эти файлы не используют ключи и методы встроенной правки.
   - **Проверка:**
     - `mise exec --no-deps -- flutter test test/app/intention_app_lifecycle_test.dart test/app/long_term_relation_app_flow_test.dart test/app/navigation test/graph/presentation/tag_package_catalog_consumers_test.dart`.
     - `mise exec --no-deps -- flutter analyze`.
   - **Зависимости:** 3.8.
-  - **Предполагаемые файлы:** `test/app/intention_app_lifecycle_test.dart`, `test/app/long_term_relation_app_flow_test.dart`, `test/app/navigation/app_shell_state_test.dart`, `test/app/navigation/app_shell_page_matrix.dart`, `test/graph/presentation/tag_package_catalog_consumers_test.dart`.
+  - **Предполагаемые файлы:** `test/app/intention_app_lifecycle_test.dart`, `test/app/long_term_relation_app_flow_test.dart`, `test/app/navigation/app_shell_state_test.dart`, `test/app/navigation/app_shell_page_matrix.dart`, `test/graph/presentation/tag_package_catalog_consumers_test.dart`, `test/graph/presentation/package_consumers_test_support.dart`.
   - **Размер:** M — замена способа правки в сценариях механическая.
 
 - [ ] 3.11 Убрать из сценариев быстрого создания, сброса истории и раскладки проверки несохранённой встроенной правки на странице намерения
@@ -481,7 +481,7 @@
   - **Критерии приёмки:**
     - По решению 3 дизайна у `IntentionDetailsViewModel` нет `beginEditing`, `cancelEditing`, `changeTitle`, `changeDescription`, `saveChanges`, завершения изменения и охраны наблюдения на время правки. У `IntentionDetailsLoaded` нет поля правки, тип `IntentionDetailsEdit` удалён. Переходы готовности, архивирования, восстановления и удаления с их нынешним предъявлением отказов не меняются до фазы 4.
     - На странице нет кнопки «Изменить» и встроенной формы: правку открывает только нажатие на название. Строки, которые использовала только встроенная правка, удалены на обоих языках.
-    - Проверки встроенной правки удалены из проверок страницы и модели подробных данных: поведение правки на новом месте подтверждают проверки экрана изменения и его модели. Остальные проверки страницы и модели сохраняют ожидания.
+    - Проверки встроенной правки удалены из проверок страницы и модели подробных данных: поведение правки на новом месте подтверждают проверки экрана изменения и его модели. Остальные проверки страницы и модели сохраняют ожидания. В `test/app/intention_statistics_app_flow_test.dart` возвращение на «Обзор» подтверждается видимой меткой описания (`detailsDescriptionLabel`) вместо удаляемой кнопки `detailsEditAction`; остальные ожидания сценария статистики сохраняются.
   - **Проверка:**
     - `mise run codegen` — провайдеры и локализация пересозданы.
     - `mise exec --no-deps -- flutter test test/intention/presentation test/graph/presentation test/tag/presentation test/app --exclude-tags=flutter_process`.
@@ -490,7 +490,7 @@
   - **Зависимости:** 3.9 — занятость после возвращения показывается без встроенной правки; 3.10, 3.11 — сценарии больше не используют встроенную правку.
   - **Предполагаемые файлы:**
     - `lib/src/intention/presentation/details/intention_details_page.dart`, `lib/src/intention/presentation/details/intention_details_state.dart`, `lib/src/intention/presentation/details/intention_details_view_model.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` и сгенерированный код;
-    - проверки: `test/intention/presentation/details/intention_details_page_test.dart`, `test/intention/presentation/details/intention_details_view_model_test.dart`.
+    - проверки: `test/intention/presentation/details/intention_details_page_test.dart`, `test/intention/presentation/details/intention_details_view_model_test.dart`, `test/app/intention_statistics_app_flow_test.dart`.
   - **Размер:** M — в основном удаление.
 
 - [ ] 3.13 Подтвердить готовность третьей фазы: правка названия и описания идёт на отдельном экране без сообщения об успехе
