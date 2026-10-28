@@ -6,7 +6,6 @@ import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/design_system/components/button.dart';
 import 'package:doable/src/design_system/components/notice.dart';
 import 'package:doable/src/design_system/components/page_head.dart';
-import 'package:doable/src/design_system/components/text_field.dart';
 import 'package:doable/src/design_system/components/top_bar.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
@@ -17,7 +16,7 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_text.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/edit/intention_edit_page.dart';
-import 'package:flutter/material.dart' hide TextField;
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -592,7 +591,7 @@ final _operationMessage = find.byKey(const ValueKey('graph-operation-message'));
 Button _saveButton(WidgetTester tester) => tester.widget<Button>(_save);
 
 TextEditingController _controller(WidgetTester tester, Finder field) =>
-    tester.widget<TextField>(field).controller;
+    _editable(tester, field).controller;
 
 EditableText _editable(WidgetTester tester, Finder field) =>
     tester.widget<EditableText>(

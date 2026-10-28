@@ -5,6 +5,7 @@ import 'package:doable/src/design_system/doable_metrics.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/design_system/doable_type.dart';
 import 'package:flutter/material.dart' hide TextField;
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -214,6 +215,151 @@ void main() {
       await tester.pump();
       expect(controller.text, 'Новый текст');
     });
+
+    testWidgets('в ${brightness == Brightness.light ? 'светлой' : 'тёмной'} '
+        'теме сохранённый текст лежит на плоскости поля стилем field', (
+      tester,
+    ) async {
+      final colors = _colors(brightness);
+      await tester.pumpWidget(
+        _savedApp(brightness: brightness, value: 'Ноги и спина'),
+      );
+
+      final plane = tester.getRect(_savedPlane);
+      expect(plane.height, DoableMetrics.tapMin);
+      final decoration =
+          tester.widget<Ink>(_savedPlane).decoration! as BoxDecoration;
+      expect(decoration.color, colors.fill);
+      expect(
+        decoration.borderRadius,
+        const BorderRadius.all(Radius.circular(DoableMetrics.radiusSm)),
+      );
+      final text = tester.getRect(find.text('Ноги и спина'));
+      expect(text.left - plane.left, DoableMetrics.space3);
+      expect(text.top - plane.top, 11);
+      expect(plane.bottom - text.bottom, 11);
+      final style = _savedStyle(tester, 'Ноги и спина');
+      expect(style.fontSize, DoableType.field.fontSize);
+      expect(style.height, DoableType.field.height);
+      expect(style.fontWeight, DoableType.field.fontWeight);
+      expect(style.letterSpacing, DoableType.field.letterSpacing);
+      expect(style.color, colors.ink);
+    });
+
+    testWidgets('в ${brightness == Brightness.light ? 'светлой' : 'тёмной'} '
+        'теме сохранённый текст показан целиком с переносами строк', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(240, 600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final value = [
+        'Первая строка',
+        List.filled(4, 'длинныйтекстбезпробелов').join(),
+        'Последняя строка',
+      ].join('\n');
+      await tester.pumpWidget(_savedApp(brightness: brightness, value: value));
+
+      final paragraph = tester.renderObject<RenderParagraph>(find.text(value));
+      expect(paragraph.text.toPlainText(), value);
+      expect(paragraph.maxLines, isNull);
+      expect(paragraph.didExceedMaxLines, isFalse);
+      final text = tester.getRect(find.text(value));
+      expect(text.height, greaterThan(3 * 22));
+      final plane = tester.getRect(_savedPlane);
+      expect(plane.height, text.height + 2 * 11);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('в ${brightness == Brightness.light ? 'светлой' : 'тёмной'} '
+        'теме пустой сохранённый текст показывает приглашение в одну строку', (
+      tester,
+    ) async {
+      final colors = _colors(brightness);
+      await tester.pumpWidget(_savedApp(brightness: brightness, value: ''));
+
+      expect(tester.getSize(_savedPlane).height, DoableMetrics.tapMin);
+      expect(tester.getSize(find.text('Добавить заметку')).height, 22);
+      final style = _savedStyle(tester, 'Добавить заметку');
+      expect(style.fontSize, DoableType.field.fontSize);
+      expect(style.fontWeight, FontWeight.w400);
+      expect(style.color, colors.muted);
+    });
+
+    testWidgets('в ${brightness == Brightness.light ? 'светлой' : 'тёмной'} '
+        'теме сохранённый текст открывает правку только доступной кнопкой', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      var opens = 0;
+      await tester.pumpWidget(
+        _savedApp(
+          brightness: brightness,
+          value: 'Ноги и спина',
+          onOpen: () => opens++,
+        ),
+      );
+
+      expect(
+        tester.getSemantics(find.bySemanticsLabel(_savedLabel)),
+        isSemantics(
+          label: _savedLabel,
+          isButton: true,
+          hasEnabledState: true,
+          isEnabled: true,
+          hasTapAction: true,
+          children: const [],
+        ),
+      );
+      await tester.tap(find.text('Ноги и спина'));
+      expect(opens, 1);
+
+      await tester.pumpWidget(
+        _savedApp(brightness: brightness, value: 'Ноги и спина'),
+      );
+
+      expect(
+        tester.getSemantics(find.bySemanticsLabel(_savedLabel)),
+        isSemantics(
+          label: _savedLabel,
+          isButton: true,
+          hasEnabledState: true,
+          isEnabled: false,
+          hasTapAction: false,
+          children: const [],
+        ),
+      );
+      await tester.tap(find.text('Ноги и спина'), warnIfMissed: false);
+      expect(opens, 1);
+      semantics.dispose();
+    });
+
+    testWidgets('в ${brightness == Brightness.light ? 'светлой' : 'тёмной'} '
+        'теме сохранённый текст растёт без переполнения при крупном тексте', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(240, 600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        _savedApp(
+          brightness: brightness,
+          value: 'Ноги и спина, сорок пять минут',
+          textScale: 2,
+        ),
+      );
+
+      final text = tester.getRect(find.text('Ноги и спина, сорок пять минут'));
+      expect(text.height, greaterThan(2 * 22));
+      expect(tester.getSize(_savedPlane).height, text.height + 2 * 11);
+      expect(
+        tester
+            .renderObject<RenderParagraph>(
+              find.text('Ноги и спина, сорок пять минут'),
+            )
+            .didExceedMaxLines,
+        isFalse,
+      );
+      expect(tester.takeException(), isNull);
+    });
   }
 
   testWidgets(
@@ -320,7 +466,10 @@ void main() {
   testWidgets('без ошибки строки под полем нет', (tester) async {
     await tester.pumpWidget(_app(controller: TextEditingController()));
 
-    expect(tester.getSize(find.byType(TextField)).height, 48);
+    expect(
+      tester.getSize(find.byWidgetPredicate((w) => w is TextField)).height,
+      48,
+    );
   });
 }
 
@@ -369,6 +518,40 @@ Widget _app({
               onChanged: onChanged ?? (_) {},
               error: error,
             ),
+    ),
+  ),
+);
+
+const _savedLabel = 'Изменить заметку: Ноги и спина';
+
+final _savedPlane = find.descendant(
+  of: find.byWidgetPredicate((widget) => widget is TextField),
+  matching: find.byType(Ink),
+);
+
+TextStyle _savedStyle(WidgetTester tester, String text) =>
+    tester.renderObject<RenderParagraph>(find.text(text)).text.style!;
+
+Widget _savedApp({
+  required String value,
+  Brightness brightness = Brightness.light,
+  VoidCallback? onOpen,
+  double textScale = 1,
+}) => MaterialApp(
+  theme: doableTheme(brightness),
+  builder: (context, child) => MediaQuery(
+    data: MediaQuery.of(context)
+        .copyWith(textScaler: TextScaler.linear(textScale)),
+    child: child!,
+  ),
+  home: Scaffold(
+    body: SingleChildScrollView(
+      child: TextField.saved(
+        value: value,
+        placeholder: 'Добавить заметку',
+        label: _savedLabel,
+        onOpen: onOpen,
+      ),
     ),
   ),
 );

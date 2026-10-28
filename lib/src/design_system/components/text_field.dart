@@ -16,14 +16,67 @@ final TextInputFormatter lineBreakToSpaceFormatter =
       replacementString: ' ',
     );
 
-/// Поле ввода: плоскость `fill` без рамки и кольца фокуса,
-/// где фокус показывает курсор. Текст хранит [controller] потребителя.
-final class TextField extends StatelessWidget {
+/// Плоскость `fill` без рамки для текста: поле ввода или сохранённый текст,
+/// который открывает свою правку.
+sealed class TextField extends StatelessWidget {
+  const TextField._({super.key});
+
+  /// Однострочное поле ввода, где фокус показывает курсор. Текст хранит
+  /// `controller` потребителя.
+  const factory TextField({
+    required TextEditingController controller,
+    required String placeholder,
+    required String label,
+    required ValueChanged<String> onChanged,
+    Widget? leading,
+    FocusNode? focusNode,
+    bool autofocus,
+    bool readOnly,
+    Widget? error,
+    Key? key,
+  }) = _InputTextField;
+
+  /// Растущее поле без метки перед текстом. Без `maxLines` текст
+  /// переносится целиком; после предела прокручивается внутри поля.
+  /// Название не принимает переносов строк: клавиша ввода переводит фокус
+  /// к следующему полю.
+  /// https://api.flutter.dev/flutter/material/TextField/minLines.html
+  const factory TextField.multiline({
+    required TextEditingController controller,
+    required String placeholder,
+    required String label,
+    required ValueChanged<String> onChanged,
+    TextFieldKind kind,
+    int minLines,
+    int? maxLines,
+    FocusNode? focusNode,
+    bool autofocus,
+    bool readOnly,
+    Widget? error,
+    Key? key,
+  }) = _InputTextField.multiline;
+
+  /// Сохранённый текст там, где его читают: кнопка с видом поля, которая
+  /// показывает [value] целиком с переносами строк, а без текста —
+  /// заполнитель. Нажатие открывает правку текста.
+  ///
+  /// [label] называет действие нажатия. Пока [onOpen] не задан, кнопка
+  /// выключена.
+  const factory TextField.saved({
+    required String value,
+    required String placeholder,
+    required String label,
+    required VoidCallback? onOpen,
+    Key? key,
+  }) = _SavedTextField;
+}
+
+final class _InputTextField extends TextField {
   static const double _materialGap = 4;
   static const double _startPadding = 14;
   static const double _leadingGap = 10;
 
-  const TextField({
+  const _InputTextField({
     required this.controller,
     required this.placeholder,
     required this.label,
@@ -37,14 +90,10 @@ final class TextField extends StatelessWidget {
   }) : _multiline = false,
        kind = TextFieldKind.name,
        minLines = 1,
-       maxLines = 1;
+       maxLines = 1,
+       super._();
 
-  /// Растущее поле без метки перед текстом. Без [maxLines] текст
-  /// переносится целиком; после предела прокручивается внутри поля.
-  /// Название не принимает переносов строк: клавиша ввода переводит фокус
-  /// к следующему полю.
-  /// https://api.flutter.dev/flutter/material/TextField/minLines.html
-  const TextField.multiline({
+  const _InputTextField.multiline({
     required this.controller,
     required this.placeholder,
     required this.label,
@@ -60,7 +109,8 @@ final class TextField extends StatelessWidget {
   }) : assert(minLines > 0),
        assert(maxLines == null || maxLines >= minLines),
        _multiline = true,
-       leading = null;
+       leading = null,
+       super._();
 
   final TextEditingController controller;
 
@@ -178,6 +228,72 @@ final class TextField extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+final class _SavedTextField extends TextField {
+  static const _radius = BorderRadius.all(
+    Radius.circular(DoableMetrics.radiusSm),
+  );
+
+  const _SavedTextField({
+    required this.value,
+    required this.placeholder,
+    required this.label,
+    required this.onOpen,
+    super.key,
+  }) : super._();
+
+  final String value;
+  final String placeholder;
+  final String label;
+  final VoidCallback? onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<DoableColors>()!;
+    final isEmpty = value.isEmpty;
+    // Роль кнопки и готовое название принадлежат одному узлу:
+    // https://api.flutter.dev/flutter/widgets/Semantics-class.html
+    return Semantics(
+      container: true,
+      button: true,
+      enabled: onOpen != null,
+      label: label,
+      onTap: onOpen,
+      child: InkWell(
+        onTap: onOpen,
+        excludeFromSemantics: true,
+        mouseCursor: onOpen == null ? null : SystemMouseCursors.text,
+        borderRadius: _radius,
+        // Ink сохраняет отклик нажатия над fill:
+        // https://api.flutter.dev/flutter/material/InkWell-class.html
+        child: Ink(
+          decoration: BoxDecoration(color: colors.fill, borderRadius: _radius),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              minWidth: double.infinity,
+              minHeight: DoableMetrics.tapMin,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: DoableMetrics.space3,
+                vertical: 11,
+              ),
+              child: ExcludeSemantics(
+                child: Text(
+                  isEmpty ? placeholder : value,
+                  softWrap: true,
+                  style: DoableType.field.copyWith(
+                    color: isEmpty ? colors.muted : colors.ink,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

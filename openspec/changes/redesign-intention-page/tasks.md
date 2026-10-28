@@ -614,7 +614,7 @@
     - проверки: `test/intention/presentation/operation/intention_command_coordinator_test.dart`, `test/graph/presentation/graph_operation_presenter_test.dart`, `test/app/navigation/app_shell_state_test.dart`, `test/app/navigation/app_shell_layout_test.dart`, `test/app/creation_flows_integration_test.dart`.
   - **Размер:** M.
 
-- [ ] 4.3 Расширить `TextField` режимом сохранённого текста, который показывает текст целиком и открывает его правку
+- [x] 4.3 Расширить `TextField` режимом сохранённого текста, который показывает текст целиком и открывает его правку
   - **Критерии приёмки:**
     - По README `TextField` режим сохранённого текста — кнопка, а не поле:
       - плоскость `fill` высотой не меньше `tap-min` с полями 11 и `space-3`;
