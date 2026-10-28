@@ -51,6 +51,96 @@ void main() {
       Brightness.dark => DoableColors.dark,
     };
 
+    testWidgets('в $theme теме тихая кнопка на всю ширину — плашка fill '
+        'с текстом ink высотой control-height в строке tap-min', (
+      tester,
+    ) async {
+      var presses = 0;
+      await tester.pumpWidget(
+        _app(
+          brightness: brightness,
+          button: Button.quietBlock(
+            label: 'Восстановить из архива',
+            onPressed: () => presses++,
+          ),
+        ),
+      );
+
+      final plane = tester.getRect(_plane);
+      expect(plane.width, 360);
+      expect(plane.height, DoableMetrics.controlHeight);
+      expect(_planeMaterial(tester).color, colors.fill);
+      expect(_planeMaterial(tester).shape, const StadiumBorder());
+      final area = tester.getRect(find.byType(Button));
+      expect(
+        area.height,
+        greaterThanOrEqualTo(DoableMetrics.tapMin),
+        reason: 'область нажатия выше плашки',
+      );
+      expect(area.center, plane.center);
+
+      final style = _labelStyle(tester, 'Восстановить из архива');
+      expect(style.color, colors.ink);
+      expect(style.fontSize, DoableType.section.fontSize);
+      expect(style.fontWeight, DoableType.section.fontWeight);
+      expect(
+        tester.getCenter(find.text('Восстановить из архива')),
+        plane.center,
+      );
+
+      await tester.tapAt(Offset(area.center.dx, area.top + 1));
+      expect(presses, 1);
+    });
+
+    testWidgets('в $theme теме выключенная тихая кнопка на всю ширину '
+        'остаётся на месте плашкой fill с текстом grip и объявляется '
+        'недоступной', (tester) async {
+      final semantics = tester.ensureSemantics();
+      await tester.pumpWidget(
+        _app(
+          brightness: brightness,
+          button: Button.quietBlock(
+            label: 'Восстановить из архива',
+            onPressed: () {},
+          ),
+        ),
+      );
+      final enabledPlane = tester.getRect(_plane);
+
+      await tester.pumpWidget(
+        _app(
+          brightness: brightness,
+          button: const Button.quietBlock(
+            label: 'Восстановить из архива',
+            onPressed: null,
+          ),
+        ),
+      );
+      // Material меняет цвета кнопки с анимацией.
+      await tester.pumpAndSettle();
+
+      expect(tester.getRect(_plane), enabledPlane);
+      expect(_planeMaterial(tester).color, colors.fill);
+      expect(_labelStyle(tester, 'Восстановить из архива').color, colors.grip);
+      expect(
+        tester.getSemantics(find.text('Восстановить из архива')),
+        matchesSemantics(
+          label: 'Восстановить из архива',
+          isButton: true,
+          hasEnabledState: true,
+        ),
+      );
+      semantics.dispose();
+    });
+  }
+
+  for (final brightness in Brightness.values) {
+    final theme = brightness == Brightness.light ? 'светлой' : 'тёмной';
+    final colors = switch (brightness) {
+      Brightness.light => DoableColors.light,
+      Brightness.dark => DoableColors.dark,
+    };
+
     for (final (
           kind,
           look,
@@ -327,6 +417,33 @@ void main() {
     expect(plane.height, greaterThan(DoableMetrics.controlHeight));
     expect(plane.top, lessThan(label.top));
     expect(plane.bottom, greaterThan(label.bottom));
+  });
+
+  testWidgets('с крупным шрифтом длинная подпись тихой кнопки на всю ширину '
+      'переносится внутри плашки', (tester) async {
+    const label = 'Восстановить из архива вместе со всеми связями';
+    await tester.pumpWidget(
+      _app(
+        textScale: 2,
+        button: Button.quietBlock(label: label, onPressed: () {}),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    final plane = tester.getRect(_plane);
+    final text = tester.getRect(find.text(label));
+    expect(plane.width, 360);
+    expect(
+      text.height,
+      greaterThan(
+        DoableType.section.fontSize! * DoableType.section.height! * 2,
+      ),
+      reason: 'подпись занимает больше одной строки',
+    );
+    expect(plane.top, lessThan(text.top));
+    expect(plane.bottom, greaterThan(text.bottom));
+    expect(plane.left, lessThan(text.left));
+    expect(plane.right, greaterThan(text.right));
   });
 }
 

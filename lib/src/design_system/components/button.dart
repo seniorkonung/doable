@@ -42,6 +42,15 @@ final class Button extends StatelessWidget {
     : _kind = _ButtonKind.quiet,
       semanticLabel = null;
 
+  /// Второстепенное действие на всю ширину контейнера, например
+  /// «Восстановить из архива» в шапке страницы: плашка `fill` с текстом `ink`.
+  const Button.quietBlock({
+    required this.label,
+    required this.onPressed,
+    super.key,
+  }) : _kind = _ButtonKind.quietBlock,
+       semanticLabel = null;
+
   /// Действие диалога подтверждения, которое необратимо удаляет или
   /// перезаписывает данные: плашка `accent` с текстом `on-accent` шириной по
   /// подписи.
@@ -144,6 +153,13 @@ final class Button extends StatelessWidget {
         foreground: colors.ink,
         minimumSize: compact,
       ),
+      _ButtonKind.quietBlock => _filled(
+        colors,
+        label,
+        background: colors.fill,
+        foreground: colors.ink,
+        minimumSize: const Size.fromHeight(DoableMetrics.controlHeight),
+      ),
       _ButtonKind.danger => _filled(
         colors,
         label,
@@ -226,6 +242,7 @@ enum _ButtonKind {
   primarySmall,
   primaryCompact,
   quiet,
+  quietBlock,
   danger,
   textMedium,
   text,
