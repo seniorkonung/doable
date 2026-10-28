@@ -6,11 +6,15 @@ import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
+import 'package:doable/src/design_system/components/tabs.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
+import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
+import 'package:doable/src/intention/presentation/details/intention_details_tabs.dart';
 import 'package:doable/src/statistics/application/contribution_counts.dart';
 import 'package:doable/src/statistics/application/intention_statistics_breakdown.dart';
 import 'package:doable/src/statistics/application/intention_statistics_calendar.dart';
@@ -285,25 +289,140 @@ void main() {
           find.byKey(const ValueKey('intention-details-title')).hitTestable(),
           findsOneWidget,
         );
-        final query = repository.statisticsQueries.single;
-        expect(query.intentionId, intention.id);
-        expect(query.period, StatisticsMonth(2026, 10));
-        expect(query.view, StatisticsView.throughRelations);
-        expect(query.localDate, CalendarDate.fromParts(2026, 10, 12));
+        expect(repository.statisticsQueries, isEmpty);
         expect(repository.relationGroupQueries, isEmpty);
         expect(
           find.byType(TagAssignmentsSection, skipOffstage: false),
           findsOneWidget,
         );
+        await tester.tap(find.text('Связи').first);
+        await tester.pump();
+        repository.detailRequests.last.add(ResultSuccess(intention));
+        await tester.pumpAndSettle();
+        expect(repository.statisticsQueries, isEmpty);
         final statistics = find.text('Статистика').first;
         await tester.tap(statistics);
         await tester.pumpAndSettle();
+        final query = repository.statisticsQueries.single;
+        expect(query.intentionId, intention.id);
+        expect(query.period, StatisticsMonth(2026, 10));
+        expect(query.view, StatisticsView.throughRelations);
+        expect(query.localDate, CalendarDate.fromParts(2026, 10, 12));
         expect(find.byType(TagAssignmentsSection), findsNothing);
         expect(statistics.hitTestable(), findsOneWidget);
         expect(find.textContaining('октябрь 2026'), findsOneWidget);
         await tester.pumpWidget(const SizedBox.shrink());
         await tester.pump();
       }
+    },
+  );
+
+  testWidgets(
+    'скрытые изменения ждут вкладки статистики и объединяются в одно чтение',
+    (tester) async {
+      var revision = 0;
+      final repository = ControlledDetailsRepository()
+        ..onStatisticsSection = (query) =>
+            _emptySection(query, revision: revision);
+      final intention = testDetailsIntention();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            personalGraphRepositoryProvider.overrideWithValue(repository),
+            dailyChoiceLocalDateSourceProvider.overrideWithValue(
+              () => DailyChoiceLocalDay(
+                date: CalendarDate.fromParts(2026, 10, 12),
+                untilNextDate: const Duration(hours: 12),
+              ),
+            ),
+          ],
+          child: OrdinaryPageTestApp(
+            locale: const Locale('ru'),
+            home: IntentionDetailsPage(
+              intentionId: intention.id,
+              statisticsTarget: IntentionStatisticsTarget(
+                view: StatisticsView.intermediateIntentions,
+                period: StatisticsYear(2025),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      repository.detailRequests.single.add(ResultSuccess(intention));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Предыдущий год'));
+      await tester.pumpAndSettle();
+      expect(repository.statisticsQueries, hasLength(2));
+
+      final context = tester.element(find.byType(IntentionDetailsPage));
+      final coordinator = ProviderScope.containerOf(
+        context,
+        listen: false,
+      ).read(graphCommandCoordinatorProvider.notifier);
+      Future<void> change() async {
+        revision += 1;
+        final before = testDetailsIntention(index: revision + 1);
+        final after = testDetailsIntention(
+          index: revision + 1,
+          archiveState: IntentionArchiveState.archived,
+        );
+        final accepted = coordinator.acceptExisting(
+          ArchiveIntention(before.id),
+          presentationTitle: before.title,
+        ) as IntentionCommandAccepted;
+        repository.completeCommand(
+          revision - 1,
+          testDetailsSavedResult(
+            after,
+            before: before,
+            revision: TestDetailsRevision(revision),
+          ),
+        );
+        await accepted.future;
+        await tester.pumpAndSettle();
+      }
+
+      await tester.tap(find.text('Обзор').first);
+      await tester.pumpAndSettle();
+      await change();
+      await change();
+      expect(repository.statisticsQueries, hasLength(2));
+
+      unawaited(
+        Navigator.of(context).push<void>(
+          MaterialPageRoute(
+            builder: (context) => Scaffold(
+              body: TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Закрыть'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await change();
+      expect(repository.statisticsQueries, hasLength(2));
+      await tester.tap(find.text('Закрыть'));
+      await tester.pumpAndSettle();
+      expect(repository.statisticsQueries, hasLength(2));
+
+      await tester.tap(find.text('Статистика').first);
+      await tester.pumpAndSettle();
+      expect(repository.statisticsQueries, hasLength(3));
+      expect(repository.statisticsQueries.last.period, StatisticsYear(2024));
+      expect(
+        repository.statisticsQueries.last.view,
+        StatisticsView.intermediateIntentions,
+      );
+      expect(find.text('2024'), findsOneWidget);
+      await tester.tap(find.text('Обзор').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Статистика').first);
+      await tester.pumpAndSettle();
+      expect(repository.statisticsQueries, hasLength(3));
+      expect(find.text('2024'), findsOneWidget);
     },
   );
 
@@ -512,8 +631,9 @@ Finder _visibleRowCounts(WidgetTester tester, AppLocalizations texts) {
 void _expectFullyVisible(WidgetTester tester, Finder finder) {
   expect(finder, findsOneWidget);
   final viewport = tester.getRect(find.byType(CustomScrollView));
+  final tabs = tester.getRect(find.byType(Tabs<IntentionDetailsTab>));
   final rect = tester.getRect(finder);
-  expect(rect.top, greaterThanOrEqualTo(viewport.top - 1e-6));
+  expect(rect.top, greaterThanOrEqualTo(tabs.bottom - 1e-6));
   expect(rect.bottom, lessThanOrEqualTo(viewport.bottom + 1e-6));
   expect(rect.left, greaterThanOrEqualTo(viewport.left - 1e-6));
   expect(rect.right, lessThanOrEqualTo(viewport.right + 1e-6));
@@ -526,7 +646,7 @@ Future<void> _placeInFreeArea(
   Finder? notice,
 }) async {
   final top = notice == null
-      ? tester.getRect(find.byType(CustomScrollView)).top
+      ? tester.getRect(find.byType(Tabs<IntentionDetailsTab>)).bottom
       : tester.getRect(notice).bottom + 8;
   position.jumpTo(position.pixels + tester.getTopLeft(target).dy - top);
   await tester.pumpAndSettle();
@@ -534,7 +654,10 @@ Future<void> _placeInFreeArea(
   if (notice != null) _expectFullyVisible(tester, notice);
 }
 
-IntentionStatisticsSectionResult _emptySection(IntentionStatisticsQuery query) {
+IntentionStatisticsSectionResult _emptySection(
+  IntentionStatisticsQuery query, {
+  int revision = 0,
+}) {
   final zero = ContributionCounts(planned: 0, contribution: 0);
   final intentions = StatisticsBreakdownFirstPage<StatisticsItem>(
     items: const [],
@@ -545,7 +668,7 @@ IntentionStatisticsSectionResult _emptySection(IntentionStatisticsQuery query) {
   return IntentionStatisticsSectionSuccess(
     IntentionStatisticsSection(
       query: query,
-      revision: const TestDetailsRevision(0),
+      revision: TestDetailsRevision(revision),
       cards: IntentionStatisticsCards(
         sourceIntentions: zero,
         intermediateIntentions: zero,

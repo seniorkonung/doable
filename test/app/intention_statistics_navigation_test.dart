@@ -172,6 +172,20 @@ void main() {
           StatisticsBreakdown.relations =>
             data.breakdowns.relations!.items.length,
         }, 120);
+        await _tap(tester, find.text(app.texts.detailsOverviewTab).first);
+        await _tap(tester, find.text(app.texts.statisticsSectionTitle).first);
+        final retained = app.container.read(originalProvider);
+        expect(retained.selection.period, before.selection.period);
+        expect(retained.selection.view, before.selection.view);
+        final parts = (retained.read as IntentionStatisticsLoaded).breakdowns;
+        expect(switch (breakdown) {
+          StatisticsBreakdown.sourceIntentions =>
+            parts.sourceIntentions!.items.length,
+          StatisticsBreakdown.selectedActions =>
+            parts.selectedActions!.items.length,
+          StatisticsBreakdown.relations => parts.relations!.items.length,
+        }, 120);
+        await _scrollTo(tester, row, find.byType(IntentionDetailsPage));
         final offset = _scroll(
           tester,
           find.byType(IntentionDetailsPage),

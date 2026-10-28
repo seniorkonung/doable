@@ -61,7 +61,7 @@ final class _IntentionDetailsPageState
   var _headMeasurementScheduled = false;
   var _statisticsPageKey = Object();
   late final DailyChoiceLocalDayObserver _localDay;
-  var _visible = false;
+  var _routeIsCurrent = false;
   late IntentionDetailsTab _selectedTab;
   ProviderSubscription<RelationNeighborhoodState>? _neighborhoodSubscription;
 
@@ -105,6 +105,7 @@ final class _IntentionDetailsPageState
     setState(() {
       _selectedTab = tab;
     });
+    _syncStatisticsVisibility();
   }
 
   void _showArchivedRelations() {
@@ -125,7 +126,7 @@ final class _IntentionDetailsPageState
     super.didChangeDependencies();
     // Учитывает также диалоги и удаление маршрута до конца его анимации.
     // https://api.flutter.dev/flutter/widgets/ModalRoute/isCurrentOf.html
-    _visible = ModalRoute.isCurrentOf(context) == true;
+    _routeIsCurrent = ModalRoute.isCurrentOf(context) == true;
     _syncStatisticsVisibility();
   }
 
@@ -134,7 +135,9 @@ final class _IntentionDetailsPageState
       if (!mounted) return;
       final model = ref.read(_statisticsProvider.notifier);
       model.setLocalDate(_localDay.today);
-      model.setVisible(_visible);
+      model.setVisible(
+        _routeIsCurrent && _selectedTab == IntentionDetailsTab.statistics,
+      );
     });
   }
 
