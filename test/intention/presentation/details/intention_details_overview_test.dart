@@ -12,6 +12,7 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
+import 'package:doable/src/intention/presentation/details/intention_options.dart';
 import 'package:doable/src/intention/presentation/edit/intention_edit_page.dart';
 import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
@@ -22,6 +23,7 @@ import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/daily_choice_local_date.dart';
+import '../../../support/intention_options.dart';
 import '../../../support/ordinary_page_test_app.dart';
 import 'details_test_support.dart';
 
@@ -128,23 +130,7 @@ void main() {
     repository.detailRequests.single.add(ResultSuccess(intention));
     await tester.pumpAndSettle();
 
-    final archive = find.byKey(const ValueKey('intention-details-archive'));
-    await tester.ensureVisible(archive);
-    await tester.pump();
-    await tester.tap(archive);
-    await tester.pump();
-    tester
-        .state<ScrollableState>(
-          find
-              .descendant(
-                of: find.byType(CustomScrollView),
-                matching: find.byType(Scrollable),
-              )
-              .first,
-        )
-        .position
-        .jumpTo(0);
-    await tester.pump();
+    await chooseIntentionOption(tester, IntentionOption.archive);
 
     const label = 'Изменить описание: Утром в парке';
     expect(

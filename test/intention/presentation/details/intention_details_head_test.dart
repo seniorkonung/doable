@@ -12,12 +12,14 @@ import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
+import 'package:doable/src/intention/presentation/details/intention_options.dart';
 import 'package:doable/src/intention/presentation/edit/intention_edit_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/intention_options.dart';
 import '../../../support/ordinary_page_test_app.dart';
 import 'details_test_support.dart';
 
@@ -254,14 +256,7 @@ void main() {
     repository.detailRequests.single.add(ResultSuccess(intention));
     await tester.pumpAndSettle();
 
-    final archive = find.byKey(const ValueKey('intention-details-archive'));
-    await tester.ensureVisible(archive);
-    await tester.pump();
-    await tester.tap(archive);
-    await tester.pump();
-    final position = tester.state<ScrollableState>(_scrollable).position;
-    position.jumpTo(0);
-    await tester.pump();
+    await chooseIntentionOption(tester, IntentionOption.archive);
 
     final name = find.bySemanticsLabel('Изменить название: Бегать');
     expect(

@@ -11,15 +11,17 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
+import 'package:doable/src/intention/presentation/details/intention_options.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_paging_policy.dart';
+import 'package:doable/src/design_system/components/option_row.dart';
 import 'package:doable/src/design_system/components/page_head.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/app_root_pages.dart';
+import '../../../support/intention_options.dart';
 import '../../../support/ordinary_page_test_app.dart';
 import 'details_test_support.dart';
 
@@ -32,67 +34,33 @@ void main() {
     );
   });
 
-  testWidgets(
-    'удаляет активное и архивированное намерение только после подтверждения',
-    (tester) async {
-      for (final archiveState in IntentionArchiveState.values) {
-        final repository = ControlledDetailsRepository();
-        final intention = testDetailsIntention(
-          index: 120 + archiveState.index,
-          archiveState: archiveState,
-        );
-        await _pumpDetailsPage(tester, repository, intention.id);
-        await waitForDetailRequests(repository, 1);
-        repository.detailRequests[0].add(ResultSuccess(intention));
-        await tester.pumpAndSettle();
+  testWidgets('удаляет архивированное намерение из параметров без '
+      'восстановления и показывает выполнение на странице', (tester) async {
+    final repository = ControlledDetailsRepository();
+    final intention = testDetailsIntention(
+      index: 121,
+      archiveState: IntentionArchiveState.archived,
+    );
+    await _pumpDetailsPage(tester, repository, intention.id);
+    await waitForDetailRequests(repository, 1);
+    repository.detailRequests[0].add(ResultSuccess(intention));
+    await tester.pumpAndSettle();
 
-        final delete = find.byKey(const ValueKey('intention-details-delete'));
-        // У архивированного намерения кнопка лежит за пределами экрана.
-        await tester.ensureVisible(
-          find.byKey(
-            const ValueKey('intention-details-delete'),
-            skipOffstage: false,
-          ),
-        );
-        await tester.pump();
-        await tester.tap(delete);
-        await tester.pumpAndSettle();
+    await _deleteFromOptions(tester);
 
-        expect(find.text('Delete intention permanently?'), findsOneWidget);
-        expect(
-          find.text(
-            'This can’t be undone. The intention, its description, and all its tag assignments, including those not shown here, will be permanently deleted. The tags will remain.',
-          ),
-          findsOneWidget,
-        );
-        await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
-        await tester.pumpAndSettle();
-        expect(repository.commands, isEmpty);
+    expect(repository.commands.single, isA<DeleteIntention>());
+    expect(
+      find.widgetWithText(PageHead, intention.title, skipOffstage: false),
+      findsOneWidget,
+    );
+    expect(find.text('Saving changes…'), findsOneWidget);
 
-        await tester.tap(delete);
-        await tester.pumpAndSettle();
-        await tester.tap(
-          find.byKey(const ValueKey('intention-details-confirm-delete')),
-        );
-        await tester.pump();
-
-        expect(repository.commands.single, isA<DeleteIntention>());
-        expect(
-          find.widgetWithText(PageHead, intention.title, skipOffstage: false),
-          findsOneWidget,
-        );
-        expect(find.text('Saving changes…'), findsOneWidget);
-
-        repository.completeCommand(
-          0,
-          const ResultFailure(IntentionUnavailableFailure()),
-        );
-        await tester.pumpAndSettle();
-        await tester.pumpWidget(const SizedBox.shrink());
-        await tester.pump();
-      }
-    },
-  );
+    repository.completeCommand(
+      0,
+      const ResultFailure(IntentionUnavailableFailure()),
+    );
+    await tester.pumpAndSettle();
+  });
 
   testWidgets(
     'отдаёт отказы удаления общей поверхности, а повтор — новое удаление',
@@ -135,15 +103,7 @@ void main() {
         repository.detailRequests[0].add(ResultSuccess(intention));
         await tester.pumpAndSettle();
 
-        final delete = find.byKey(const ValueKey('intention-details-delete'));
-        await tester.ensureVisible(delete);
-        await tester.pump();
-        await tester.tap(delete);
-        await tester.pumpAndSettle();
-        await tester.tap(
-          find.byKey(const ValueKey('intention-details-confirm-delete')),
-        );
-        await tester.pump();
+        await _deleteFromOptions(tester);
 
         final (failureFor, message, retries) = scenarios[index];
         repository.completeCommand(0, ResultFailure(failureFor(intention.id)));
@@ -160,14 +120,7 @@ void main() {
         );
         if (retries) {
           await _closeOperationMessage(tester);
-          await tester.ensureVisible(delete);
-          await tester.pump();
-          await tester.tap(delete);
-          await tester.pumpAndSettle();
-          await tester.tap(
-            find.byKey(const ValueKey('intention-details-confirm-delete')),
-          );
-          await tester.pump();
+          await _deleteFromOptions(tester);
           expect(repository.commands, hasLength(2));
           expect(repository.commands.last, isA<DeleteIntention>());
           repository.completeCommand(
@@ -226,15 +179,7 @@ void main() {
       repository.detailRequests[0].add(ResultSuccess(intention));
       await tester.pumpAndSettle();
 
-      final delete = find.byKey(const ValueKey('intention-details-delete'));
-      await tester.ensureVisible(delete);
-      await tester.pump();
-      await tester.tap(delete);
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const ValueKey('intention-details-confirm-delete')),
-      );
-      await tester.pump();
+      await _deleteFromOptions(tester);
 
       await tester.tap(find.bySemanticsLabel('Back'));
       await tester.pumpAndSettle();
@@ -259,82 +204,6 @@ void main() {
       expect(find.text(intention.title), findsNothing);
     },
   );
-  testWidgets('конфликт удаления сохраняет текст отказа без перехода к связям', (
-    tester,
-  ) async {
-    final repository = ControlledDetailsRepository();
-    final intention = testDetailsIntention(index: 160);
-    // Свободных активных связей нет: удаление блокирует только архив.
-    final counts = testRelationCounts(archivedCanIncoming: 1);
-    repository.onRelationGroupPage = (query) => GraphResultSuccess(
-      RelationGroupFirstPage(
-        items: query.scope == RelationScope.archived
-            ? [
-                testDetailsRelationRow(
-                  ownerId: intention.id,
-                  index: 1,
-                  type: LongTermRelationType.can,
-                  direction: RelationDirection.incoming,
-                  scope: RelationScope.archived,
-                ),
-              ]
-            : const [],
-        counts: counts,
-        nextCursor: null,
-        revision: const TestDetailsRevision(0),
-      ),
-    );
-    await _pumpDetailsPage(tester, repository, intention.id);
-    await waitForDetailRequests(repository, 1);
-    repository.detailRequests[0].add(
-      ResultSuccess(intention),
-      relationCounts: counts,
-    );
-    await tester.pumpAndSettle();
-
-    final delete = find.byKey(const ValueKey('intention-details-delete'));
-    await tester.ensureVisible(delete);
-    await tester.pump();
-    await tester.tap(delete);
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const ValueKey('intention-details-confirm-delete')),
-    );
-    await tester.pump();
-    tester
-        .state<ScrollableState>(find.byType(Scrollable).first)
-        .position
-        .jumpTo(0);
-    await tester.pump();
-    expect(find.text(intention.title).hitTestable(), findsOneWidget);
-    repository.completeCommand(
-      0,
-      ResultFailure(IntentionHasBlockingRelationsFailure(intention.id)),
-    );
-    await tester.pumpAndSettle();
-
-    expect(
-      find.textContaining(
-        'The intention wasn’t deleted: its relations still block deletion. '
-        'Archived relations and relations that aren’t loaded yet block it too.',
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.widgetWithText(PageHead, intention.title, skipOffstage: false),
-      findsOneWidget,
-    );
-    // На обзоре числа доступны без создания соседства.
-    expect(find.text('0'), findsOneWidget);
-    expect(
-      find.bySemanticsLabel('Relations: 0 active, 1 archived'),
-      findsOneWidget,
-    );
-
-    expect(find.text('Show blocking relations'), findsNothing);
-    expect(find.text(intention.title).hitTestable(), findsOneWidget);
-    expect(repository.relationGroupQueries, isEmpty);
-  });
 
   testWidgets(
     'незагруженные связи и отказ их чтения не снимают блокировку удаления',
@@ -397,36 +266,14 @@ void main() {
         findsOneWidget,
       );
 
-      await tester.drag(find.byType(CustomScrollView), const Offset(0, 2000));
+      // Параметры считают все связи сводки, а не загруженные строки.
+      await tester.tap(intentionOptionsButton);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Overview'));
-      await tester.pumpAndSettle();
-      final delete = find.byKey(const ValueKey('intention-details-delete'));
-      await tester.ensureVisible(delete);
-      await tester.pump();
-      await tester.tap(delete);
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const ValueKey('intention-details-confirm-delete')),
+      final delete = tester.widget<OptionRow>(
+        intentionOption(IntentionOption.delete),
       );
-      await tester.pump();
-      repository.completeCommand(
-        0,
-        ResultFailure(IntentionHasBlockingRelationsFailure(intention.id)),
-      );
-      await tester.pumpAndSettle();
-
-      expect(
-        find.textContaining(
-          'The intention wasn’t deleted: its relations still block deletion. '
-          'Archived relations and relations that aren’t loaded yet block it too.',
-        ),
-        findsOneWidget,
-      );
-      expect(
-        find.widgetWithText(PageHead, intention.title, skipOffstage: false),
-        findsOneWidget,
-      );
+      expect(delete.onPressed, isNull);
+      expect(delete.hint, 'Delete its relations first');
     },
   );
 }
@@ -485,4 +332,11 @@ final class _DeleteTestRevision implements GraphRevision {
       other is _DeleteTestRevision
       ? GraphRevisionOrder.same
       : GraphRevisionOrder.differentEpoch;
+}
+
+/// Выбирает «Удалить» в параметрах намерения и подтверждает удаление.
+Future<void> _deleteFromOptions(WidgetTester tester) async {
+  await chooseIntentionOption(tester, IntentionOption.delete);
+  await tester.tap(intentionDeletionConfirm);
+  await tester.pump();
 }

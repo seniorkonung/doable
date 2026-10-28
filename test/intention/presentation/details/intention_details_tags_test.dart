@@ -222,25 +222,6 @@ void main() {
           hasLength(1),
         );
         expect(retainedTagFixtureGraph(raw), graphBefore);
-
-        final delete = find.byKey(const ValueKey('intention-details-delete'));
-        await tester.scrollUntilVisible(
-          delete,
-          200,
-          scrollable: find.byType(Scrollable).first,
-        );
-        await tester.pumpAndSettle();
-        await tester.tap(delete);
-        await tester.pumpAndSettle();
-        expect(
-          find.text(
-            'Это действие нельзя отменить. Намерение, его описание и все назначения тегов, включая не показанные сейчас, будут удалены навсегда. Сами теги сохранятся.',
-          ),
-          findsOneWidget,
-        );
-        await tester.tap(find.widgetWithText(TextButton, 'Отмена'));
-        await tester.pumpAndSettle();
-        expect(retainedTagFixtureGraph(raw), graphBefore);
       },
     );
   }

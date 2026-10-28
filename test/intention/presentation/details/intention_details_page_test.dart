@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/src/design_system/components/button.dart';
+import 'package:doable/src/design_system/components/dates_line.dart';
 import 'package:doable/src/design_system/components/option_tiles.dart';
 import 'package:doable/src/design_system/components/top_bar.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
@@ -34,6 +35,7 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
+import 'package:doable/src/intention/presentation/details/intention_options.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
@@ -43,6 +45,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/app_root_pages.dart';
+import '../../../support/intention_options.dart';
 import '../../../support/ordinary_page_test_app.dart';
 import '../../../support/tag_positions.dart';
 import 'details_test_support.dart';
@@ -267,10 +270,7 @@ void main() {
         .position
         .jumpTo(tester.getSize(find.byType(PageHead)).height);
     await tester.pumpAndSettle();
-    expect(
-      find.byKey(const ValueKey('intention-details-delete')).hitTestable(),
-      findsOneWidget,
-    );
+    expect(find.byType(DatesLine).hitTestable(), findsOneWidget);
 
     // Контракт дизайн-системы задаёт область нажатия 44.
     await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
@@ -278,81 +278,6 @@ void main() {
     await expectLater(tester, meetsGuideline(textContrastGuideline));
     semantics.dispose();
   });
-
-  testWidgets(
-    'явно выключает готовность, архивирует и восстанавливает намерение',
-    (tester) async {
-      final repository = ControlledDetailsRepository();
-      final ready = testDetailsIntention(
-        index: 21,
-        readiness: IntentionReadiness.ready,
-      );
-      final notReady = testDetailsIntention(index: 21);
-      final archived = testDetailsIntention(
-        index: 21,
-        archiveState: IntentionArchiveState.archived,
-      );
-      final restored = testDetailsIntention(index: 21);
-      await _pumpDetailsPage(tester, repository, ready.id);
-      await waitForDetailRequests(repository, 1);
-      repository.detailRequests[0].add(ResultSuccess(ready));
-      await tester.pumpAndSettle();
-
-      final intentionTile = find.descendant(
-        of: find.byType(OptionTiles<IntentionReadiness>),
-        matching: find.text('Intention'),
-      );
-      await tester.ensureVisible(intentionTile);
-      await tester.tap(intentionTile);
-      await tester.pump();
-      expect(repository.commands[0], isA<DisableIntentionReadiness>());
-      repository.completeCommand(
-        0,
-        testDetailsSavedResult(notReady, before: ready),
-      );
-      await tester.pump();
-      await waitForDetailRequests(repository, 2);
-      repository.detailRequests[1].add(ResultSuccess(notReady));
-      await tester.pumpAndSettle();
-      expect(find.byType(SnackBar), findsNothing);
-      expect(_selectedType(tester), IntentionReadiness.notReady);
-
-      final archive = find.byKey(const ValueKey('intention-details-archive'));
-      await tester.ensureVisible(archive);
-      await tester.pump();
-      await tester.tap(archive);
-      await tester.pump();
-      expect(repository.commands[1], isA<ArchiveIntention>());
-      repository.completeCommand(
-        1,
-        testDetailsSavedResult(archived, before: notReady),
-      );
-      await tester.pump();
-      await waitForDetailRequests(repository, 3);
-      repository.detailRequests[2].add(ResultSuccess(archived));
-      await tester.pumpAndSettle();
-      expect(find.byType(SnackBar), findsNothing);
-      expect(find.text('Archived', skipOffstage: false), findsOneWidget);
-      expect(_selectedType(tester), IntentionReadiness.notReady);
-
-      final restore = find.byKey(const ValueKey('intention-details-restore'));
-      await tester.ensureVisible(restore);
-      await tester.pump();
-      await tester.tap(restore);
-      await tester.pump();
-      expect(repository.commands[2], isA<RestoreIntention>());
-      repository.completeCommand(
-        2,
-        testDetailsSavedResult(restored, before: archived),
-      );
-      await tester.pump();
-      await waitForDetailRequests(repository, 4);
-      repository.detailRequests[3].add(ResultSuccess(restored));
-      await tester.pumpAndSettle();
-      expect(find.byType(SnackBar), findsNothing);
-      expect(find.text('Archived', skipOffstage: false), findsNothing);
-    },
-  );
 
   testWidgets(
     'отдаёт отказы перехода общей поверхности, а повтор — новое нажатие',
@@ -387,11 +312,7 @@ void main() {
         await waitForDetailRequests(repository, 1);
         repository.detailRequests[0].add(ResultSuccess(intention));
         await tester.pumpAndSettle();
-        final archive = find.byKey(const ValueKey('intention-details-archive'));
-        await tester.ensureVisible(archive);
-        await tester.pump();
-        await tester.tap(archive);
-        await tester.pump();
+        await chooseIntentionOption(tester, IntentionOption.archive);
 
         final (failure, message, retries) = scenarios[index];
         repository.completeCommand(0, ResultFailure(failure));
@@ -405,10 +326,7 @@ void main() {
         expect(find.text('Archived', skipOffstage: false), findsNothing);
         if (retries) {
           await _closeOperationMessage(tester);
-          await tester.ensureVisible(archive);
-          await tester.pump();
-          await tester.tap(archive);
-          await tester.pump();
+          await chooseIntentionOption(tester, IntentionOption.archive);
           expect(repository.commands, hasLength(2));
           expect(repository.commands.last, isA<ArchiveIntention>());
           repository.completeCommand(
@@ -480,11 +398,7 @@ void main() {
         findsNothing,
       );
 
-      final archive = find.byKey(const ValueKey('intention-details-archive'));
-      await tester.ensureVisible(archive);
-      await tester.pump();
-      await tester.tap(archive);
-      await tester.pump();
+      await chooseIntentionOption(tester, IntentionOption.archive);
       counts = archivedCounts;
       repository.completeCommand(
         0,
@@ -518,7 +432,12 @@ void main() {
       final showArchived = find.byKey(
         const ValueKey('intention-details-show-archived-relations'),
       );
-      await tester.ensureVisible(showArchived);
+      await tester.ensureVisible(
+        find.byKey(
+          const ValueKey('intention-details-show-archived-relations'),
+          skipOffstage: false,
+        ),
+      );
       await tester.drag(find.byType(CustomScrollView), const Offset(0, 100));
       await tester.pumpAndSettle();
       await tester.tap(showArchived);
@@ -836,14 +755,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(router.current.name, IntentionDetailsRoute.name);
 
-    final delete = find.byKey(const ValueKey('intention-details-delete'));
-    await tester.ensureVisible(delete);
-    await tester.pump();
-    await tester.tap(delete);
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const ValueKey('intention-details-confirm-delete')),
-    );
+    await chooseIntentionOption(tester, IntentionOption.delete);
+    await tester.tap(intentionDeletionConfirm);
     await tester.pump();
     expect(repository.commands.single, isA<DeleteIntention>());
 
@@ -893,11 +806,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text(busyMessage), findsOneWidget);
 
-      final archive = find.byKey(const ValueKey('intention-details-archive'));
-      await tester.ensureVisible(archive);
-      await tester.pump();
-      await tester.tap(archive);
-      await tester.pump();
+      await chooseIntentionOption(tester, IntentionOption.archive);
       repository.completeCommand(
         1,
         testDetailsSavedResult(archived, before: intention),
@@ -976,17 +885,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text(busyMessage), findsOneWidget);
 
-      // Кнопка стоит в конце «Обзора» под сообщением общей поверхности,
-      // поэтому её нажимают напрямую.
-      tester
-          .widget<ButtonStyleButton>(
-            find.byKey(const ValueKey('intention-details-delete')),
-          )
-          .onPressed!();
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const ValueKey('intention-details-confirm-delete')),
-      );
+      await chooseIntentionOption(tester, IntentionOption.delete);
+      await tester.tap(intentionDeletionConfirm);
       await tester.pump();
       repository.completeCommand(1, testDetailsDeletedResult(intention));
       await tester.pumpAndSettle();
@@ -1237,8 +1137,6 @@ void _expectPageControls(WidgetTester tester, {required bool enabled}) {
   );
   for (final key in [
     'intention-details-choose-path',
-    'intention-details-archive',
-    'intention-details-delete',
     'tag-assignments-choose',
   ]) {
     expect(

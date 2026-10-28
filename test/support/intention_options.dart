@@ -32,6 +32,21 @@ Finder intentionOption(IntentionOption option) => find.descendant(
   ),
 );
 
+/// Открывает параметры намерения и выбирает [option].
+///
+/// Лист закрывается до начала действия, а индикатор выполняющейся команды не
+/// даёт кадрам успокоиться, поэтому закрытие досматривается паузой.
+Future<void> chooseIntentionOption(
+  WidgetTester tester,
+  IntentionOption option,
+) async {
+  await tester.tap(intentionOptionsButton);
+  await tester.pumpAndSettle();
+  await tester.tap(intentionOption(option));
+  await tester.pump();
+  await tester.pump(const Duration(seconds: 1));
+}
+
 /// «Восстановить из архива» в шапке архивированного намерения.
 final intentionHeadRestore = find.byKey(
   const ValueKey('intention-details-head-restore'),
