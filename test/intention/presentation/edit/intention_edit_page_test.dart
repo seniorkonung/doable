@@ -402,7 +402,9 @@ void main() {
     await tester.pump();
 
     await tester.tap(_back);
-    await tester.pumpAndSettle();
+    await tester.pump();
+    // Страница показывает индикатор занятости, и кадры не успокаиваются.
+    await tester.pump(const Duration(seconds: 1));
     expect(_discardQuestion, findsNothing);
     expect(find.byType(IntentionEditPage), findsNothing);
     repository.completeCommand(
@@ -431,7 +433,9 @@ void main() {
     await tester.pump();
 
     await tester.tap(_back);
-    await tester.pumpAndSettle();
+    await tester.pump();
+    // Страница показывает индикатор занятости, и кадры не успокаиваются.
+    await tester.pump(const Duration(seconds: 1));
     expect(_discardQuestion, findsNothing);
     repository.completeCommand(
       0,

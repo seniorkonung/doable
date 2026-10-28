@@ -175,6 +175,18 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     }
   }
 
+  /// Координатор не сообщает о принятии чужой команды, поэтому страница
+  /// перечитывает занятость намерения, когда снова становится текущей.
+  void refreshOperationRunning() {
+    if (!ref.mounted || _isDeleted) {
+      return;
+    }
+    final isRunning = _isOperationRunning;
+    if (state.isOperationRunning != isRunning) {
+      state = _withOperationRunning(state, isRunning);
+    }
+  }
+
   void enableReadiness() =>
       _startStateChange(IntentionDetailsStateChangeKind.enableReadiness);
 
@@ -515,14 +527,7 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
 
   void _scheduleGateRefresh() {
     unawaited(
-      Future<void>.microtask(() {}).then((_) {
-        if (ref.mounted && !_isDeleted) {
-          final isRunning = _isOperationRunning;
-          if (state.isOperationRunning != isRunning) {
-            state = _withOperationRunning(state, isRunning);
-          }
-        }
-      }),
+      Future<void>.microtask(() {}).then((_) => refreshOperationRunning()),
     );
   }
 

@@ -1,5 +1,16 @@
 import 'dart:async';
 
+import 'package:auto_route/auto_route.dart';
+import 'package:doable/src/design_system/components/button.dart';
+import 'package:doable/src/design_system/components/top_bar.dart';
+import 'package:doable/src/design_system/doable_icon.dart';
+import 'package:doable/src/intention/presentation/edit/intention_edit_page.dart';
+import 'package:doable/src/tag/application/tag_assignments.dart';
+import 'package:doable/src/tag/application/tag_read_result.dart';
+import 'package:doable/src/tag/domain/tag.dart';
+import 'package:doable/src/tag/domain/tag_id.dart';
+import 'package:doable/src/tag/domain/tag_name.dart';
+import 'package:doable/src/tag/presentation/assignments/tag_assignments_view_model.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/l10n/app_localizations.dart';
@@ -33,6 +44,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/app_root_pages.dart';
 import '../../../support/ordinary_page_test_app.dart';
+import '../../../support/tag_positions.dart';
 import 'details_test_support.dart';
 
 import '../../../support/in_memory_quick_creation_mode_store.dart';
@@ -1576,6 +1588,75 @@ void main() {
       expect(find.textContaining(inlineFailure), findsNothing);
     },
   );
+
+  testWidgets('сохранение, начатое экраном изменения, закрывает действия, '
+      'теги и вход в правку после возвращения, а успех их открывает', (
+    tester,
+  ) async {
+    final repository = ControlledDetailsRepository();
+    final before = testDetailsIntention(index: 95, title: 'Бегать');
+    final saved = testDetailsIntention(index: 95, title: 'Бегать по утрам');
+    await _pumpEditablePage(tester, repository, before);
+
+    await _sendTitleAndLeave(tester, saved.title);
+    _expectPageControls(tester, enabled: false);
+    await tester.tap(_headName(before.title));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.byType(IntentionEditPage), findsNothing);
+
+    repository.completeCommand(
+      0,
+      testDetailsSavedResult(saved, before: before),
+    );
+    await tester.pump();
+    await waitForDetailRequests(repository, 2);
+    repository.detailRequests.last.add(ResultSuccess(saved));
+    await tester.pumpAndSettle();
+    _expectPageControls(tester, enabled: true);
+    expect(tester.widget<PageHead>(find.byType(PageHead)).name, saved.title);
+
+    await tester.tap(_headName(saved.title));
+    await tester.pumpAndSettle();
+    expect(_editText(tester, _editTitleField), saved.title);
+    await tester.enterText(_editDescriptionField, 'Новое описание');
+    await tester.pump();
+    await tester.tap(_editSave);
+    await tester.pump();
+    expect(
+      repository.commands.last,
+      isA<UpdateIntention>()
+          .having((command) => command.title, 'название', saved.title)
+          .having(
+            (command) => command.description,
+            'описание',
+            'Новое описание',
+          ),
+    );
+  });
+
+  testWidgets('после отказа сохранения, начатого экраном изменения, вход в '
+      'правку снова доступен с прежним подтверждённым текстом', (tester) async {
+    final repository = ControlledDetailsRepository();
+    final intention = testDetailsIntention(index: 96, title: 'Бегать');
+    await _pumpEditablePage(tester, repository, intention);
+
+    await _sendTitleAndLeave(tester, 'Бегать по утрам');
+    _expectPageControls(tester, enabled: false);
+    repository.completeCommand(
+      0,
+      const ResultFailure(IntentionUnavailableFailure()),
+    );
+    await tester.pump();
+    await _closeOperationMessage(tester);
+    _expectPageControls(tester, enabled: true);
+
+    await tester.tap(_headName(intention.title));
+    await tester.pumpAndSettle();
+    expect(find.byType(IntentionEditPage), findsOneWidget);
+    expect(_editText(tester, _editTitleField), intention.title);
+    expect(_editText(tester, _editDescriptionField), intention.description);
+  });
 }
 
 Future<void> _tapEditSubmit(WidgetTester tester) async {
@@ -1654,4 +1735,119 @@ final class _DetailsTestRevision implements GraphRevision {
       other is _DetailsTestRevision
       ? GraphRevisionOrder.same
       : GraphRevisionOrder.differentEpoch;
+}
+
+final _editTitleField = find.byKey(const ValueKey('intention-edit-title'));
+final _editDescriptionField = find.byKey(
+  const ValueKey('intention-edit-description'),
+);
+final _editSave = find.descendant(
+  of: find.byType(TopBar),
+  matching: find.byType(Button),
+);
+final _editBack = find.descendant(
+  of: find.byType(TopBar),
+  matching: find.byType(DoableIcon),
+);
+
+Finder _headName(String title) =>
+    find.descendant(of: find.byType(PageHead), matching: find.text(title));
+
+String _editText(WidgetTester tester, Finder field) => tester
+    .widget<EditableText>(
+      find.descendant(of: field, matching: find.byType(EditableText)),
+    )
+    .controller
+    .text;
+
+/// Открывает правку нажатием на название, отправляет новое название и уходит
+/// с экрана до результата сохранения.
+Future<void> _sendTitleAndLeave(WidgetTester tester, String title) async {
+  final name = tester.widget<PageHead>(find.byType(PageHead)).name;
+  await tester.tap(_headName(name));
+  await tester.pumpAndSettle();
+  await tester.enterText(_editTitleField, title);
+  await tester.pump();
+  await tester.tap(_editSave);
+  await tester.pump();
+  await tester.tap(_editBack);
+  await tester.pump();
+  // Индикатор выполняющейся команды не даёт кадрам успокоиться.
+  await tester.pump(const Duration(seconds: 1));
+  expect(find.byType(IntentionEditPage), findsNothing);
+}
+
+/// Доступность изменяющих действий страницы, тегов и входа в правку.
+void _expectPageControls(WidgetTester tester, {required bool enabled}) {
+  final matcher = enabled ? isNotNull : isNull;
+  expect(tester.widget<PageHead>(find.byType(PageHead)).onEdit, matcher);
+  for (final key in [
+    'intention-details-choose-path',
+    'intention-details-enable-readiness',
+    'intention-details-archive',
+    'intention-details-delete',
+    'tag-assignments-choose',
+    'tag-assignment-remove-${_pageTag.id.toCanonicalString()}',
+  ]) {
+    expect(
+      tester
+          .widget<ButtonStyleButton>(
+            find.byKey(ValueKey(key), skipOffstage: false),
+          )
+          .onPressed,
+      matcher,
+      reason: key,
+    );
+  }
+}
+
+final _pageTag = Tag(
+  id: (TagId.decode(
+    '018f0002-0000-7000-8000-000000000001',
+  ) as TagIdDecodingSuccess).id,
+  name: TagName.fromInput('Здоровье'),
+  color: null,
+  position: tagPositionAt(1),
+);
+
+/// Страница намерения с назначенным тегом и экраном изменения над ней.
+Future<void> _pumpEditablePage(
+  WidgetTester tester,
+  ControlledDetailsRepository repository,
+  Intention intention,
+) async {
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        inMemoryQuickCreationModeOverride,
+        personalGraphRepositoryProvider.overrideWithValue(repository),
+        tagAssignmentsReaderProvider.overrideWithValue(_PageTagReads()),
+      ],
+      retry: (retryCount, error) => null,
+      child: OrdinaryPageTestApp(
+        locale: const Locale('ru'),
+        routes: [AutoRoute(page: IntentionEditRoute.page)],
+        builder: (context, child) =>
+            GraphOperationPresenter(child: child ?? const SizedBox.shrink()),
+        home: IntentionDetailsPage(intentionId: intention.id),
+      ),
+    ),
+  );
+  await tester.pump();
+  await waitForDetailRequests(repository, 1);
+  repository.detailRequests.single.add(ResultSuccess(intention));
+  await tester.pumpAndSettle();
+}
+
+final class _PageTagReads extends Fake implements TagReadContract {
+  @override
+  Future<TagAssignmentsResult> getTagAssignments(
+    IntentionId intentionId,
+  ) async => TagAssignmentsSuccess(
+    TagAssignmentsSnapshot(
+      intentionId: intentionId,
+      items: [_pageTag],
+      revision: const TestDetailsRevision(0),
+    ),
+  );
 }

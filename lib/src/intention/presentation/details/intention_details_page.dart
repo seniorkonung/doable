@@ -143,6 +143,19 @@ final class _IntentionDetailsPageState
     // https://api.flutter.dev/flutter/widgets/ModalRoute/isCurrentOf.html
     _routeIsCurrent = ModalRoute.isCurrentOf(context) == true;
     _syncStatisticsVisibility();
+    if (_routeIsCurrent) _refreshOperationRunning();
+  }
+
+  /// Пока страница была скрыта, например экраном изменения, координатор мог
+  /// принять команду намерения не от её модели. Блок тегов перечитывает
+  /// занятость в перестройке, которую вызывает новое состояние модели.
+  void _refreshOperationRunning() {
+    scheduleMicrotask(() {
+      if (!mounted) return;
+      ref
+          .read(intentionDetailsViewModelProvider(widget.intentionId).notifier)
+          .refreshOperationRunning();
+    });
   }
 
   void _syncStatisticsVisibility() {
