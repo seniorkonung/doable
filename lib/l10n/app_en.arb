@@ -621,14 +621,6 @@
   "@detailsArchived": {
     "description": "Архивное состояние намерения в подробных данных"
   },
-  "detailsEditAction": "Edit",
-  "@detailsEditAction": {
-    "description": "Действие перехода к изменению намерения"
-  },
-  "detailsSaveAction": "Save changes",
-  "@detailsSaveAction": {
-    "description": "Действие сохранения изменённых данных намерения"
-  },
   "detailsCancelEditAction": "Cancel",
   "@detailsCancelEditAction": {
     "description": "Действие отмены изменения намерения до отправки"

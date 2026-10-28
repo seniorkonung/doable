@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
@@ -8,7 +6,6 @@ import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
-import 'package:doable/src/intention/domain/intention_text.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_state.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_view_model.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -252,154 +249,6 @@ void main() {
     },
   );
 
-  test('сохраняет поля и snapshot для всех failures изменения', () async {
-    // Любой отказ сохраняет форму одной ветвью; обычный повтор отличает
-    // только устранимую недоступность.
-    final scenarios = <(IntentionFailure, bool)>[
-      (
-        const IntentionTextInputValidationFailure(
-          IntentionTextValidationFailure(
-            field: IntentionTextField.title,
-            reason: IntentionTextValidationReason.empty,
-          ),
-        ),
-        false,
-      ),
-      (const IntentionUnavailableFailure(), true),
-    ];
-
-    for (var index = 0; index < scenarios.length; index += 1) {
-      final repository = ControlledDetailsRepository();
-      final container = _detailsContainer(repository);
-      final intention = testDetailsIntention(index: index + 70);
-      final provider = intentionDetailsViewModelProvider(intention.id);
-      final subscription = container.listen(
-        provider,
-        (_, _) {},
-        fireImmediately: true,
-      );
-      await waitForDetailRequests(repository, 1);
-      repository.detailRequests.single.add(ResultSuccess(intention));
-      await pumpEventQueue();
-      container.read(provider.notifier)
-        ..beginEditing()
-        ..changeTitle('Введённое название $index')
-        ..changeDescription('Введённое описание $index')
-        ..saveChanges();
-
-      final (failure, canRetry) = scenarios[index];
-      repository.completeCommand(0, ResultFailure(failure));
-      await pumpEventQueue();
-
-      expect(
-        container.read(provider),
-        isA<IntentionDetailsLoaded>()
-            .having(
-              (state) => state.intention.title,
-              'последний подтверждённый snapshot',
-              intention.title,
-            )
-            .having(
-              (state) => state.edit?.title,
-              'введённое название',
-              'Введённое название $index',
-            )
-            .having(
-              (state) => state.edit?.description,
-              'введённое описание',
-              'Введённое описание $index',
-            )
-            .having(
-              (state) => state.edit?.canRetry,
-              'доступность обычного повтора',
-              canRetry,
-            )
-            .having(
-              (state) => state.isOperationRunning,
-              'освобождённый gate',
-              isFalse,
-            ),
-      );
-
-      subscription.close();
-      container.dispose();
-    }
-  });
-
-  test(
-    'повтор изменения завершается без сообщения и не возвращает прежний отказ',
-    () async {
-      final repository = ControlledDetailsRepository();
-      final container = _detailsContainer(repository);
-      addTearDown(container.dispose);
-      final intention = testDetailsIntention(index: 82);
-      final provider = intentionDetailsViewModelProvider(intention.id);
-      final subscription = container.listen(
-        provider,
-        (_, _) {},
-        fireImmediately: true,
-      );
-      addTearDown(subscription.close);
-      await waitForDetailRequests(repository, 1);
-      repository.detailRequests[0].add(ResultSuccess(intention));
-      await pumpEventQueue();
-      final coordinator = container.read(
-        graphCommandCoordinatorProvider.notifier,
-      );
-      final presenter = coordinator.registerAppPresentation();
-
-      final details = container.read(provider.notifier)
-        ..beginEditing()
-        ..changeTitle('Исправленное намерение')
-        ..saveChanges();
-      repository.completeCommand(
-        0,
-        const ResultFailure(IntentionUnavailableFailure()),
-      );
-      await pumpEventQueue();
-      expect(
-        (container.read(provider) as IntentionDetailsLoaded).edit?.canRetry,
-        isTrue,
-      );
-      final shownFailure = (container.read(
-        provider,
-      ) as IntentionDetailsLoaded).edit!.failurePresentation;
-      expect(shownFailure, isNotNull);
-      coordinator.confirmPresentation(shownFailure!);
-
-      details.saveChanges();
-      final saved = testDetailsIntention(
-        index: 82,
-        title: 'Исправленное намерение',
-      );
-      repository.completeCommand(
-        1,
-        testDetailsSavedResult(saved, before: intention),
-      );
-      await waitForDetailRequests(repository, 2);
-      repository.detailRequests[1].add(ResultSuccess(saved));
-      await pumpEventQueue();
-
-      expect(
-        container.read(provider),
-        isA<IntentionDetailsLoaded>()
-            .having(
-              (state) => state.intention.title,
-              'сохранённое название',
-              saved.title,
-            )
-            .having((state) => state.edit, 'закрытая правка', isNull)
-            .having((state) => state.isOperationRunning, 'занятость', isFalse),
-      );
-      GraphAppPresentationClaim? unexpectedMessage;
-      unawaited(
-        presenter.nextClaim().then((claim) => unexpectedMessage = claim),
-      );
-      await pumpEventQueue();
-      expect(unexpectedMessage, isNull);
-    },
-  );
-
   test('барьер перехода переживает закрытие модели и не блокирует другое намерение', () async {
     final repository = ControlledDetailsRepository();
     final container = _detailsContainer(repository);
@@ -590,10 +439,7 @@ void main() {
       );
       await pumpEventQueue();
 
-      container.read(provider.notifier)
-        ..beginEditing()
-        ..changeTitle(saved.title)
-        ..saveChanges();
+      _acceptUpdate(container, before, saved.title);
       repository.completeCommand(
         0,
         testDetailsSavedResult(
@@ -647,10 +493,7 @@ void main() {
     );
     await pumpEventQueue();
 
-    container.read(provider.notifier)
-      ..beginEditing()
-      ..changeTitle(saved.title)
-      ..saveChanges();
+    _acceptUpdate(container, before, saved.title);
     repository.completeCommand(
       0,
       testDetailsSavedResult(
@@ -977,4 +820,22 @@ ProviderContainer _detailsContainer(ControlledDetailsRepository repository) {
     overrides: [personalGraphRepositoryProvider.overrideWithValue(repository)],
     retry: (retryCount, error) => null,
   );
+}
+
+void _acceptUpdate(
+  ProviderContainer container,
+  Intention before,
+  String title,
+) {
+  final start = container
+      .read(graphCommandCoordinatorProvider.notifier)
+      .acceptExisting(
+        UpdateIntention(
+          id: before.id,
+          title: title,
+          description: before.description,
+        ),
+        presentationTitle: before.title,
+      );
+  expect(start, isA<IntentionCommandAccepted>());
 }

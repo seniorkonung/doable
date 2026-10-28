@@ -1196,18 +1196,6 @@ abstract class AppLocalizations {
   /// **'Archived'**
   String get detailsArchived;
 
-  /// Действие перехода к изменению намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Edit'**
-  String get detailsEditAction;
-
-  /// Действие сохранения изменённых данных намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Save changes'**
-  String get detailsSaveAction;
-
   /// Действие отмены изменения намерения до отправки
   ///
   /// In en, this message translates to:

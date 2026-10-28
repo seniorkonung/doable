@@ -204,8 +204,6 @@
   "detailsArchiveStateLabel": "Состояние",
   "detailsActive": "Активно",
   "detailsArchived": "В архиве",
-  "detailsEditAction": "Изменить",
-  "detailsSaveAction": "Сохранить изменения",
   "detailsCancelEditAction": "Отмена",
   "detailsEnableReadinessAction": "Отметить готовым к действию",
   "detailsDisableReadinessAction": "Отметить неготовым к действию",

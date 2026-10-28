@@ -20,7 +20,6 @@ import '../../../graph/presentation/operation_failure_presentation.dart';
 import '../../application/intention_result.dart';
 import '../../domain/intention.dart';
 import '../../domain/intention_id.dart';
-import '../../domain/intention_text.dart';
 import '../../../long_term_relation/application/long_term_relation_projection.dart';
 import '../../../long_term_relation/presentation/editor/relation_editor_state.dart';
 import '../../../long_term_relation/presentation/neighborhood/relation_neighborhood_sliver.dart';
@@ -31,7 +30,6 @@ import '../../../tag/presentation/panel/tags_panel.dart';
 import '../../../tag/presentation/panel/tags_panel_context.dart';
 import '../../../statistics/presentation/intention_statistics_section.dart';
 import '../../../statistics/presentation/intention_statistics_view_model.dart';
-import '../edit/intention_edit_failure_message.dart';
 import '../operation/operation_state.dart';
 import 'intention_details_state.dart';
 import 'intention_details_view_model.dart';
@@ -410,21 +408,6 @@ final class _DetailsContent extends ConsumerWidget {
         selectedTab: selectedTab,
         onSelectTab: onSelectTab,
         statisticsSection: statisticsSection,
-        onBeginEditing: ref
-            .read(intentionDetailsViewModelProvider(intentionId).notifier)
-            .beginEditing,
-        onCancelEditing: ref
-            .read(intentionDetailsViewModelProvider(intentionId).notifier)
-            .cancelEditing,
-        onTitleChanged: ref
-            .read(intentionDetailsViewModelProvider(intentionId).notifier)
-            .changeTitle,
-        onDescriptionChanged: ref
-            .read(intentionDetailsViewModelProvider(intentionId).notifier)
-            .changeDescription,
-        onSave: ref
-            .read(intentionDetailsViewModelProvider(intentionId).notifier)
-            .saveChanges,
         onEnableReadiness: ref
             .read(intentionDetailsViewModelProvider(intentionId).notifier)
             .enableReadiness,
@@ -483,11 +466,6 @@ final class _LoadedDetails extends StatelessWidget {
     required this.selectedTab,
     required this.onSelectTab,
     required this.statisticsSection,
-    required this.onBeginEditing,
-    required this.onCancelEditing,
-    required this.onTitleChanged,
-    required this.onDescriptionChanged,
-    required this.onSave,
     required this.onEnableReadiness,
     required this.onDisableReadiness,
     required this.onArchive,
@@ -504,11 +482,6 @@ final class _LoadedDetails extends StatelessWidget {
   final IntentionDetailsTab selectedTab;
   final ValueChanged<IntentionDetailsTab> onSelectTab;
   final Widget statisticsSection;
-  final VoidCallback onBeginEditing;
-  final VoidCallback onCancelEditing;
-  final ValueChanged<String> onTitleChanged;
-  final ValueChanged<String> onDescriptionChanged;
-  final VoidCallback onSave;
   final VoidCallback onEnableReadiness;
   final VoidCallback onDisableReadiness;
   final VoidCallback onArchive;
@@ -571,35 +544,24 @@ final class _LoadedDetails extends StatelessWidget {
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
                 sliver: SliverToBoxAdapter(
-                  child: switch (state.edit) {
-                    final edit? => _DetailsEditForm(
-                      edit: edit,
-                      isOperationRunning: state.isOperationRunning,
-                      onCancel: onCancelEditing,
-                      onTitleChanged: onTitleChanged,
-                      onDescriptionChanged: onDescriptionChanged,
-                      onSave: onSave,
-                    ),
-                    null => _DetailsActions(
-                      state: state,
-                      onBeginEditing: onBeginEditing,
-                      onEnableReadiness: onEnableReadiness,
-                      onDisableReadiness: onDisableReadiness,
-                      onArchive: onArchive,
-                      onRestore: onRestore,
-                      onDelete: onDelete,
-                      onRetryStateChange: onRetryStateChange,
-                      onShowArchivedRelations: onShowArchivedRelations,
-                      onChoosePath: () => unawaited(
-                        context.router.push(
-                          ChoicePathRoute(
-                            sourceIntentionId: intention.id,
-                            direction: ChoicePathDraftDirection.topDown,
-                          ),
+                  child: _DetailsActions(
+                    state: state,
+                    onEnableReadiness: onEnableReadiness,
+                    onDisableReadiness: onDisableReadiness,
+                    onArchive: onArchive,
+                    onRestore: onRestore,
+                    onDelete: onDelete,
+                    onRetryStateChange: onRetryStateChange,
+                    onShowArchivedRelations: onShowArchivedRelations,
+                    onChoosePath: () => unawaited(
+                      context.router.push(
+                        ChoicePathRoute(
+                          sourceIntentionId: intention.id,
+                          direction: ChoicePathDraftDirection.topDown,
                         ),
                       ),
                     ),
-                  },
+                  ),
                 ),
               ),
               SliverPadding(
@@ -660,7 +622,6 @@ final class _LoadedDetails extends StatelessWidget {
 final class _DetailsActions extends StatelessWidget {
   const _DetailsActions({
     required this.state,
-    required this.onBeginEditing,
     required this.onEnableReadiness,
     required this.onDisableReadiness,
     required this.onArchive,
@@ -672,7 +633,6 @@ final class _DetailsActions extends StatelessWidget {
   });
 
   final IntentionDetailsLoaded state;
-  final VoidCallback onBeginEditing;
   final VoidCallback onEnableReadiness;
   final VoidCallback onDisableReadiness;
   final VoidCallback onArchive;
@@ -748,12 +708,6 @@ final class _DetailsActions extends StatelessWidget {
                 icon: const Icon(Icons.route_outlined),
                 label: Text(localizations.detailsChoosePathAction),
               ),
-            OutlinedButton.icon(
-              key: const ValueKey('intention-details-edit'),
-              onPressed: controlsEnabled ? onBeginEditing : null,
-              icon: const Icon(Icons.edit_outlined),
-              label: Text(localizations.detailsEditAction),
-            ),
             if (state.intention.readiness == IntentionReadiness.notReady)
               OutlinedButton.icon(
                 key: const ValueKey('intention-details-enable-readiness'),
@@ -918,153 +872,6 @@ final class _DetailsActions extends StatelessWidget {
       localizations.detailsStateChangeUnavailable,
     IntentionCorruptionFailure() => localizations.detailsStateChangeCorruption,
     IntentionUnexpectedFailure() => localizations.detailsStateChangeUnexpected,
-  };
-}
-
-final class _DetailsEditForm extends StatefulWidget {
-  const _DetailsEditForm({
-    required this.edit,
-    required this.isOperationRunning,
-    required this.onCancel,
-    required this.onTitleChanged,
-    required this.onDescriptionChanged,
-    required this.onSave,
-  });
-
-  final IntentionDetailsEdit edit;
-  final bool isOperationRunning;
-  final VoidCallback onCancel;
-  final ValueChanged<String> onTitleChanged;
-  final ValueChanged<String> onDescriptionChanged;
-  final VoidCallback onSave;
-
-  @override
-  State<_DetailsEditForm> createState() => _DetailsEditFormState();
-}
-
-final class _DetailsEditFormState extends State<_DetailsEditForm> {
-  late final TextEditingController _titleController;
-  late final TextEditingController _descriptionController;
-
-  @override
-  void initState() {
-    super.initState();
-    _titleController = TextEditingController(text: widget.edit.title);
-    _descriptionController = TextEditingController(
-      text: widget.edit.description,
-    );
-  }
-
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _descriptionController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final localizations = AppLocalizations.of(context);
-    final edit = widget.edit;
-    final controlsEnabled = !widget.isOperationRunning;
-    final generalFailure = intentionEditGeneralFailureMessage(
-      localizations,
-      edit.operation,
-    );
-    final titleFailure = intentionEditFieldFailureMessage(
-      localizations,
-      edit.operation,
-      IntentionTextField.title,
-    );
-    final descriptionFailure = intentionEditFieldFailureMessage(
-      localizations,
-      edit.operation,
-      IntentionTextField.description,
-    );
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        TextField(
-          key: const ValueKey('intention-details-edit-title'),
-          controller: _titleController,
-          enabled: controlsEnabled,
-          autofocus: true,
-          textInputAction: TextInputAction.next,
-          decoration: InputDecoration(
-            labelText: localizations.editorTitleLabel,
-            error: titleFailure == null
-                ? null
-                : OperationFailurePresentation(
-                    claim: edit.failurePresentation,
-                    message: titleFailure,
-                  ),
-          ),
-          onChanged: widget.onTitleChanged,
-        ),
-        const SizedBox(height: 16),
-        TextField(
-          key: const ValueKey('intention-details-edit-description'),
-          controller: _descriptionController,
-          enabled: controlsEnabled,
-          minLines: 4,
-          maxLines: null,
-          keyboardType: TextInputType.multiline,
-          decoration: InputDecoration(
-            labelText: localizations.editorDescriptionLabel,
-            alignLabelWithHint: true,
-            error: descriptionFailure == null
-                ? null
-                : OperationFailurePresentation(
-                    claim: edit.failurePresentation,
-                    message: descriptionFailure,
-                  ),
-          ),
-          onChanged: widget.onDescriptionChanged,
-        ),
-        if (generalFailure != null) ...[
-          const SizedBox(height: 16),
-          OperationFailurePresentation(
-            claim: edit.failurePresentation,
-            message: generalFailure,
-            messageKey: const ValueKey('intention-details-edit-failure'),
-          ),
-        ],
-        const SizedBox(height: 24),
-        // При увеличенном тексте действия переходят на следующие строки.
-        // https://api.flutter.dev/flutter/widgets/Wrap-class.html
-        Wrap(
-          alignment: WrapAlignment.end,
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            TextButton(
-              key: const ValueKey('intention-details-edit-cancel'),
-              onPressed: controlsEnabled ? widget.onCancel : null,
-              child: Text(localizations.detailsCancelEditAction),
-            ),
-            FilledButton(
-              key: const ValueKey('intention-details-edit-submit'),
-              onPressed: controlsEnabled && edit.canSubmit
-                  ? widget.onSave
-                  : null,
-              child: Text(_submitLabel(localizations, edit)),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  String _submitLabel(
-    AppLocalizations localizations,
-    IntentionDetailsEdit edit,
-  ) => switch (edit.operation) {
-    OperationRunning<Intention>() => localizations.detailsOperationRunning,
-    OperationFailed<Intention>(failure: IntentionUnavailableFailure()) =>
-      localizations.commonRetry,
-    OperationIdle<Intention>() ||
-    OperationSucceeded<Intention>() ||
-    OperationFailed<Intention>() => localizations.detailsSaveAction,
   };
 }
 

@@ -750,12 +750,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get detailsArchived => 'В архиве';
 
   @override
-  String get detailsEditAction => 'Изменить';
-
-  @override
-  String get detailsSaveAction => 'Сохранить изменения';
-
-  @override
   String get detailsCancelEditAction => 'Отмена';
 
   @override

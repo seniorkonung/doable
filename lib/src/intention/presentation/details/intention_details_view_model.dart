@@ -13,7 +13,6 @@ import '../../application/intention_details.dart' as application;
 import '../../application/intention_result.dart';
 import '../../domain/intention.dart';
 import '../../domain/intention_id.dart';
-import '../operation/operation_state.dart';
 import 'intention_details_state.dart';
 
 part 'intention_details_view_model.g.dart';
@@ -88,91 +87,6 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     _advanceGeneration();
     _preserveAuthoritativeStateWhileLoading = false;
     state = _stateFromObservation(_startObservation());
-  }
-
-  void beginEditing() {
-    final current = state;
-    if (current is! IntentionDetailsLoaded ||
-        current.edit != null ||
-        _isOperationRunning) {
-      return;
-    }
-    state = current.copyWith(
-      edit: IntentionDetailsEdit.fromIntention(current.intention),
-      clearStateChange: true,
-    );
-  }
-
-  void cancelEditing() {
-    final current = state;
-    if (current is! IntentionDetailsLoaded ||
-        current.edit == null ||
-        _isOperationRunning) {
-      return;
-    }
-    state = current.copyWith(clearEdit: true);
-  }
-
-  void changeTitle(String value) {
-    final current = state;
-    final edit = current is IntentionDetailsLoaded ? current.edit : null;
-    if (current is! IntentionDetailsLoaded ||
-        edit == null ||
-        edit.title == value ||
-        _isOperationRunning) {
-      return;
-    }
-    state = current.copyWith(edit: edit.withTitle(value));
-  }
-
-  void changeDescription(String value) {
-    final current = state;
-    final edit = current is IntentionDetailsLoaded ? current.edit : null;
-    if (current is! IntentionDetailsLoaded ||
-        edit == null ||
-        edit.description == value ||
-        _isOperationRunning) {
-      return;
-    }
-    state = current.copyWith(edit: edit.withDescription(value));
-  }
-
-  void saveChanges() {
-    final current = state;
-    final edit = current is IntentionDetailsLoaded ? current.edit : null;
-    if (current is! IntentionDetailsLoaded ||
-        edit == null ||
-        !edit.canSubmit ||
-        _isOperationRunning) {
-      return;
-    }
-
-    final description = edit.description;
-    final start = _coordinator.acceptExisting(
-      UpdateIntention(
-        id: _intentionId,
-        title: edit.title,
-        description: description.isEmpty ? null : description,
-      ),
-      presentationTitle: current.intention.title,
-    );
-    switch (start) {
-      case IntentionCommandAccepted(:final token, :final future):
-        _activeToken = token;
-        state = current.copyWith(
-          isOperationRunning: true,
-          edit: edit.withOperation(const OperationRunning<Intention>()),
-        );
-        unawaited(_finishUpdate(future));
-      case IntentionCommandAlreadyRunning():
-        state = current.copyWith(isOperationRunning: true);
-      case GraphCommandCoordinatorDraining():
-        state = current.copyWith(
-          edit: edit.withOperation(
-            const OperationFailed<Intention>(IntentionUnexpectedFailure()),
-          ),
-        );
-    }
   }
 
   /// Координатор не сообщает о принятии чужой команды, поэтому страница
@@ -256,20 +170,6 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     }
     final current = state;
     final loaded = current is IntentionDetailsLoaded ? current : null;
-    final hasNoConfirmedIntention = switch (observation) {
-      AsyncData(
-        value: ResultSuccess(
-          value: GraphSnapshot(value: application.IntentionDetails()),
-        ),
-      ) =>
-        false,
-      AsyncLoading<Result<GraphSnapshot<application.IntentionDetails?>>>() ||
-      AsyncError<Result<GraphSnapshot<application.IntentionDetails?>>>() ||
-      AsyncData<Result<GraphSnapshot<application.IntentionDetails?>>>() => true,
-    };
-    if (loaded?.edit != null && hasNoConfirmedIntention) {
-      return;
-    }
     final snapshot = switch (observation) {
       AsyncData(value: ResultSuccess(:final value)) => value,
       AsyncLoading() || AsyncError() || AsyncData() => null,
@@ -326,59 +226,11 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     _startObservation();
   }
 
-  Future<void> _finishUpdate(Future<IntentionCommandCompletion> future) async {
-    try {
-      final completion = await future;
-      if (!ref.mounted || !identical(_activeToken, completion.token)) {
-        return;
-      }
-
-      _activeToken = null;
-      final current = state;
-      final edit = current is IntentionDetailsLoaded ? current.edit : null;
-      // Успех завершает форму без сообщения.
-      switch (completion.result) {
-        case ResultSuccess(value: IntentionSaved(:final intention))
-            when intention.id == _intentionId:
-          if (current is IntentionDetailsLoaded && edit != null) {
-            state = current.copyWith(clearEdit: true);
-          }
-        case ResultSuccess(value: IntentionSaved() || IntentionDeleted()):
-          _failUpdateUnexpectedly();
-        case ResultFailure(:final failure):
-          if (current is IntentionDetailsLoaded && edit != null) {
-            state = current.copyWith(
-              edit: edit.withOperation(
-                OperationFailed<Intention>(failure),
-                failurePresentation: _claimFailure(completion.token),
-              ),
-            );
-          } else {
-            // Ошибку негде показать в этой сессии: право сразу у оболочки.
-            _coordinator.releaseInitiatorPresentation(completion.token);
-          }
-      }
-      _scheduleGateRefresh();
-    } on Object {
-      if (!ref.mounted) {
-        return;
-      }
-      final token = _activeToken;
-      _activeToken = null;
-      if (token != null) {
-        _coordinator.releaseInitiatorPresentation(token);
-      }
-      _failUpdateUnexpectedly();
-      _scheduleGateRefresh();
-    }
-  }
-
   Future<IntentionCommandCompletion>? _startStateChange(
     IntentionDetailsStateChangeKind kind,
   ) {
     final current = state;
     if (current is! IntentionDetailsLoaded ||
-        current.edit != null ||
         _isOperationRunning ||
         !_isStateChangeApplicable(current, kind)) {
       return null;
@@ -501,18 +353,6 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     IntentionOperationToken token,
   ) => _coordinator.claimInitiatorFailure(token);
 
-  void _failUpdateUnexpectedly() {
-    final current = state;
-    final edit = current is IntentionDetailsLoaded ? current.edit : null;
-    if (current is IntentionDetailsLoaded && edit != null) {
-      state = current.copyWith(
-        edit: edit.withOperation(
-          const OperationFailed<Intention>(IntentionUnexpectedFailure()),
-        ),
-      );
-    }
-  }
-
   void _failStateChangeUnexpectedly(IntentionDetailsStateChangeKind kind) {
     final current = state;
     if (current is IntentionDetailsLoaded) {
@@ -578,7 +418,6 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
         details: details,
         revision: revision,
         isOperationRunning: isOperationRunning,
-        edit: previousLoaded?.edit,
         stateChange: previousLoaded?.stateChange,
       ),
     ResultSuccess(value: GraphSnapshot(value: null)) =>

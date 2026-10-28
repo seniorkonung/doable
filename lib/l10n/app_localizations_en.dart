@@ -747,12 +747,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get detailsArchived => 'Archived';
 
   @override
-  String get detailsEditAction => 'Edit';
-
-  @override
-  String get detailsSaveAction => 'Save changes';
-
-  @override
   String get detailsCancelEditAction => 'Cancel';
 
   @override

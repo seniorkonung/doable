@@ -477,7 +477,7 @@
   - **Предполагаемые файлы:** `test/support/intention_creation_origin.dart`, `test/app/quick_creation/quick_creation_launcher_test.dart`, `test/app/quick_creation/quick_creation_launcher_test_support.dart`, `test/app/navigation/app_shell_pages_above_test.dart`, `test/app/navigation/ordinary_page_layout_scenarios.dart`, `test/app/navigation/app_shell_unnamed_page_scenarios.dart`.
   - **Размер:** M — в основном удаление.
 
-- [ ] 3.12 Убрать со страницы намерения кнопку правки и встроенную форму, а из модели подробных данных — правку и охрану наблюдения на её время
+- [x] 3.12 Убрать со страницы намерения кнопку правки и встроенную форму, а из модели подробных данных — правку и охрану наблюдения на её время
   - **Критерии приёмки:**
     - По решению 3 дизайна у `IntentionDetailsViewModel` нет `beginEditing`, `cancelEditing`, `changeTitle`, `changeDescription`, `saveChanges`, завершения изменения и охраны наблюдения на время правки. У `IntentionDetailsLoaded` нет поля правки, тип `IntentionDetailsEdit` удалён. Переходы готовности, архивирования, восстановления и удаления с их нынешним предъявлением отказов не меняются до фазы 4.
     - На странице нет кнопки «Изменить» и встроенной формы: правку открывает только нажатие на название. Строки, которые использовала только встроенная правка, удалены на обоих языках.

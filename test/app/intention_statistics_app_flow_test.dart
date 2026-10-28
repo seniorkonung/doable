@@ -242,7 +242,10 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(_text(app.texts.detailsOverviewTab).first);
       await tester.pumpAndSettle();
-      expect(_text(app.texts.detailsEditAction).hitTestable(), findsOneWidget);
+      expect(
+        _text(app.texts.detailsDescriptionLabel).hitTestable(),
+        findsOneWidget,
+      );
       expect(tester.takeException(), isNull);
     },
   );

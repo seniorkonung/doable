@@ -187,7 +187,6 @@ void main() {
           detailsAfter.details.relationCounts,
           detailsBefore.details.relationCounts,
         );
-        expect(detailsAfter.edit, isNull);
         expect(
           raw.select('SELECT * FROM tag_assignments WHERE tag_id = ?', [
             newTagId,
