@@ -6,9 +6,9 @@ import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/data/local/app_database.dart';
-import 'package:doable/src/design_system/components/page_head.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart'
     as catalog_page;
+import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter/material.dart';
@@ -468,13 +468,12 @@ Future<void> _pumpUntilDetailsTitle(
   String title, {
   bool settle = true,
 }) async {
-  final titleFinder = find.byKey(const ValueKey('intention-details-title'));
+  final titleFinder = find.descendant(
+    of: find.byType(IntentionDetailsPage),
+    matching: find.text(title),
+  );
   for (var attempt = 0; attempt < 1000; attempt += 1) {
-    final hasExpectedTitle = titleFinder.evaluate().any((element) {
-      final widget = element.widget;
-      return widget is PageHead && widget.name == title;
-    });
-    if (hasExpectedTitle) {
+    if (titleFinder.hitTestable().evaluate().isNotEmpty) {
       if (settle) {
         await tester.pumpAndSettle(const Duration(milliseconds: 1));
       } else {

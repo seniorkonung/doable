@@ -453,6 +453,7 @@ void main() {
       final statisticsDay = find.bySemanticsLabel(
         RegExp('^${RegExp.escape(dayLabel)}'),
       );
+      await _until(tester, statisticsDay);
       await tester.scrollUntilVisible(
         statisticsDay,
         -500,

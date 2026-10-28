@@ -273,7 +273,7 @@
     - проверки: `test/intention/presentation/details/intention_details_statistics_test.dart`, `test/intention/presentation/details/details_test_support.dart`, `test/statistics/presentation/intention_statistics_test_support.dart`, `test/app/intention_statistics_navigation_test.dart`, `test/app/intention_statistics_app_flow_test.dart`.
   - **Размер:** M.
 
-- [ ] 2.8 Подтвердить готовность второй фазы: страница намерения с панелью, шапкой и закреплёнными вкладками открывается по типизированной цели
+- [x] 2.8 Подтвердить готовность второй фазы: страница намерения с панелью, шапкой и закреплёнными вкладками открывается по типизированной цели
   - **Критерии приёмки:**
     - Выполнено условие «Ready to advance» второй фазы:
       - требования о странице с вкладками и разделе статистики выполняются для уже существующих частей страницы, а требование о цели открытия — в части выбора доступной вкладки и параметров статистики;
