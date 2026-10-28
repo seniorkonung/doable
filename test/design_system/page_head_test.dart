@@ -20,10 +20,14 @@ void main() {
     ('светлой', Brightness.light, DoableColors.light),
     ('тёмной', Brightness.dark, DoableColors.dark),
   ]) {
-    testWidgets('в $themeName теме шапка показывает второй заголовок '
-        'стилем page-title в ink с полями 2 сверху и 6 снизу', (tester) async {
+    testWidgets('в $themeName теме шапка показывает название стилем '
+        'page-title в ink с полями 2 сверху и 6 снизу, а нажатие на него '
+        'вызывает обработчик', (tester) async {
       final semantics = tester.ensureSemantics();
-      await tester.pumpWidget(_app(brightness, 'Быть здоровым'));
+      var edits = 0;
+      await tester.pumpWidget(
+        _app(brightness, 'Быть здоровым', onEdit: () => edits++),
+      );
 
       final text = find.text('Быть здоровым');
       final paragraph = tester.renderObject<RenderParagraph>(text);
@@ -40,10 +44,48 @@ void main() {
       expect(title.right, head.right);
       expect(title.top - head.top, 2);
       expect(head.bottom - title.bottom, 6);
-      final data = tester.getSemantics(text).getSemanticsData();
-      expect(data.label, 'Быть здоровым');
-      expect(data.headingLevel, 2);
-      expect(data.hasAction(SemanticsAction.tap), isFalse);
+      expect(
+        tester.getSemantics(find.bySemanticsLabel(_editLabel)),
+        isSemantics(
+          label: _editLabel,
+          isButton: true,
+          hasEnabledState: true,
+          isEnabled: true,
+          isFocusable: true,
+          hasTapAction: true,
+          hasFocusAction: true,
+          children: const [],
+        ),
+      );
+      expect(_headingLevel(tester), 2);
+
+      await tester.tap(text);
+      expect(edits, 1);
+      semantics.dispose();
+    });
+
+    testWidgets('в $themeName теме недоступное название остаётся заголовком '
+        'и выключенной кнопкой без действия нажатия', (tester) async {
+      final semantics = tester.ensureSemantics();
+      await tester.pumpWidget(_app(brightness, 'Быть здоровым'));
+
+      expect(
+        tester.getSemantics(find.bySemanticsLabel(_editLabel)),
+        isSemantics(
+          label: _editLabel,
+          isButton: true,
+          hasEnabledState: true,
+          isEnabled: false,
+          hasTapAction: false,
+          children: const [],
+        ),
+      );
+      expect(_headingLevel(tester), 2);
+      final style = tester
+          .renderObject<RenderParagraph>(find.text('Быть здоровым'))
+          .text
+          .style!;
+      expect(style.color, colors.ink);
       semantics.dispose();
     });
 
@@ -72,15 +114,29 @@ void main() {
   }
 }
 
-Widget _app(Brightness brightness, String name, {double textScale = 1}) =>
-    MaterialApp(
-      theme: doableTheme(brightness),
-      home: Scaffold(
-        body: MediaQuery(
-          data: MediaQueryData(textScaler: TextScaler.linear(textScale)),
-          child: SingleChildScrollView(
-            child: SizedBox(width: 320, child: PageHead(name: name)),
-          ),
+const _editLabel = 'Изменить название: Быть здоровым';
+
+int _headingLevel(WidgetTester tester) => tester
+    .getSemantics(find.bySemanticsLabel(_editLabel))
+    .getSemanticsData()
+    .headingLevel;
+
+Widget _app(
+  Brightness brightness,
+  String name, {
+  VoidCallback? onEdit,
+  double textScale = 1,
+}) => MaterialApp(
+  theme: doableTheme(brightness),
+  home: Scaffold(
+    body: MediaQuery(
+      data: MediaQueryData(textScaler: TextScaler.linear(textScale)),
+      child: SingleChildScrollView(
+        child: SizedBox(
+          width: 320,
+          child: PageHead(name: name, editLabel: _editLabel, onEdit: onEdit),
         ),
       ),
-    );
+    ),
+  ),
+);

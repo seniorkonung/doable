@@ -1118,6 +1118,12 @@ abstract class AppLocalizations {
   /// **'Action'**
   String get detailsTypeAction;
 
+  /// Доступное название кнопки-названия в шапке страницы намерения, которая открывает экран изменения; название намерения не переводится
+  ///
+  /// In en, this message translates to:
+  /// **'Edit the name: {title}'**
+  String detailsEditTitleLabel(String title);
+
   /// Начальная загрузка подробных данных намерения
   ///
   /// In en, this message translates to:

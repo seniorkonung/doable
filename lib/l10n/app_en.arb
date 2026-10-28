@@ -568,6 +568,11 @@
   "@detailsTypeAction": {
     "description": "Тип готового к действию намерения в верхней панели его страницы"
   },
+  "detailsEditTitleLabel": "Edit the name: {title}",
+  "@detailsEditTitleLabel": {
+    "description": "Доступное название кнопки-названия в шапке страницы намерения, которая открывает экран изменения; название намерения не переводится",
+    "placeholders": {"title": {"type": "String"}}
+  },
   "detailsLoading": "Loading intention…",
   "@detailsLoading": {
     "description": "Начальная загрузка подробных данных намерения"

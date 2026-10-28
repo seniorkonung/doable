@@ -703,6 +703,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get detailsTypeAction => 'Action';
 
   @override
+  String detailsEditTitleLabel(String title) {
+    return 'Edit the name: $title';
+  }
+
+  @override
   String get detailsLoading => 'Loading intention…';
 
   @override

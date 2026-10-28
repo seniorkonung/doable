@@ -706,6 +706,11 @@ class AppLocalizationsRu extends AppLocalizations {
   String get detailsTypeAction => 'Действие';
 
   @override
+  String detailsEditTitleLabel(String title) {
+    return 'Изменить название: $title';
+  }
+
+  @override
   String get detailsLoading => 'Загрузка намерения…';
 
   @override

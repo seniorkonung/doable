@@ -15,6 +15,7 @@ import '../../../design_system/components/page_head.dart';
 import '../../../design_system/components/top_bar.dart';
 import '../../../design_system/doable_icon.dart';
 import '../../../design_system/doable_metrics.dart';
+import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/presentation/operation_failure_presentation.dart';
 import '../../application/intention_result.dart';
 import '../../domain/intention.dart';
@@ -184,7 +185,22 @@ final class _IntentionDetailsPageState
     });
   }
 
-  Widget _buildHead(String name) {
+  /// Модель могла ещё не отразить команду, которую координатор принял не от
+  /// этой страницы, поэтому перед открытием занятость читается у него.
+  void _openEdit() {
+    final intentionId = widget.intentionId;
+    if (ref
+        .read(graphCommandCoordinatorProvider.notifier)
+        .isRunning(intentionId)) {
+      return;
+    }
+    unawaited(
+      context.router.push(IntentionEditRoute(intentionId: intentionId)),
+    );
+  }
+
+  Widget _buildHead(IntentionDetailsLoaded loaded) {
+    final name = loaded.intention.title;
     _scheduleHeadMeasurement();
     return NotificationListener<SizeChangedLayoutNotification>(
       onNotification: (_) {
@@ -198,6 +214,8 @@ final class _IntentionDetailsPageState
           child: PageHead(
             key: const ValueKey('intention-details-title'),
             name: name,
+            editLabel: AppLocalizations.of(context).detailsEditTitleLabel(name),
+            onEdit: loaded.isOperationRunning ? null : _openEdit,
           ),
         ),
       ),
@@ -355,7 +373,7 @@ final class _DetailsContent extends ConsumerWidget {
   final IntentionId intentionId;
   final IntentionDetailsState state;
   final ScrollController scrollController;
-  final Widget Function(String name) buildHead;
+  final Widget Function(IntentionDetailsLoaded loaded) buildHead;
   final ValueListenable<bool> headHidden;
   final IntentionDetailsTab selectedTab;
   final ValueChanged<IntentionDetailsTab> onSelectTab;
@@ -374,7 +392,7 @@ final class _DetailsContent extends ConsumerWidget {
       final IntentionDetailsLoaded loaded => _LoadedDetails(
         state: loaded,
         scrollController: scrollController,
-        pageHead: buildHead(loaded.intention.title),
+        pageHead: buildHead(loaded),
         headHidden: headHidden,
         selectedTab: selectedTab,
         onSelectTab: onSelectTab,

@@ -1,11 +1,16 @@
+import 'package:auto_route/auto_route.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
+import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/design_system/components/page_head.dart';
 import 'package:doable/src/design_system/components/top_bar.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
+import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
+import 'package:doable/src/intention/presentation/edit/intention_edit_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -104,6 +109,103 @@ void main() {
     });
   }
 
+  for (final (locale, editLabel) in [
+    (const Locale('ru'), 'Изменить название: Бегать'),
+    (const Locale('en'), 'Edit the name: Бегать'),
+  ]) {
+    testWidgets('нажатие на название с доступным названием открывает экран '
+        'изменения с этим названием: ${locale.languageCode}', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final repository = ControlledDetailsRepository();
+      final intention = testDetailsIntention(title: 'Бегать');
+      await _pumpPage(tester, repository, intention, locale: locale);
+      await waitForDetailRequests(repository, 1);
+      repository.detailRequests.single.add(ResultSuccess(intention));
+      await tester.pumpAndSettle();
+
+      final name = find.bySemanticsLabel(editLabel);
+      expect(
+        tester.getSemantics(name),
+        isSemantics(
+          label: editLabel,
+          isButton: true,
+          hasEnabledState: true,
+          isEnabled: true,
+          hasTapAction: true,
+        ),
+      );
+      await tester.tap(name);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(IntentionEditPage), findsOneWidget);
+      expect(_editTitle(tester), 'Бегать');
+      semantics.dispose();
+    });
+  }
+
+  testWidgets('название недоступно и не открывает экран изменения, пока '
+      'выполняется команда страницы', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final repository = ControlledDetailsRepository();
+    final intention = testDetailsIntention(title: 'Бегать');
+    await _pumpPage(tester, repository, intention);
+    await waitForDetailRequests(repository, 1);
+    repository.detailRequests.single.add(ResultSuccess(intention));
+    await tester.pumpAndSettle();
+
+    final archive = find.byKey(const ValueKey('intention-details-archive'));
+    await tester.ensureVisible(archive);
+    await tester.tap(archive);
+    await tester.pump();
+    final position = tester.state<ScrollableState>(_scrollable).position;
+    position.jumpTo(0);
+    await tester.pump();
+
+    final name = find.bySemanticsLabel('Изменить название: Бегать');
+    expect(
+      tester.getSemantics(name),
+      isSemantics(
+        label: 'Изменить название: Бегать',
+        isButton: true,
+        hasEnabledState: true,
+        isEnabled: false,
+        hasTapAction: false,
+      ),
+    );
+    await tester.tap(find.text('Бегать'));
+    // Индикатор выполняющейся команды не даёт кадрам успокоиться.
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.byType(IntentionEditPage), findsNothing);
+    semantics.dispose();
+  });
+
+  testWidgets('нажатие на название не открывает экран изменения, если '
+      'команду приняла не страница и она ещё не отразила занятость', (
+    tester,
+  ) async {
+    final repository = ControlledDetailsRepository();
+    final intention = testDetailsIntention(title: 'Бегать');
+    await _pumpPage(tester, repository, intention);
+    await waitForDetailRequests(repository, 1);
+    repository.detailRequests.single.add(ResultSuccess(intention));
+    await tester.pumpAndSettle();
+
+    final coordinator = ProviderScope.containerOf(
+      tester.element(find.byType(IntentionDetailsPage)),
+    ).read(graphCommandCoordinatorProvider.notifier);
+    final busy = coordinator.acceptExisting(
+      DeleteIntention(intention.id),
+      presentationTitle: intention.title,
+    ) as IntentionCommandAccepted;
+    coordinator.releaseInitiatorPresentation(busy.token);
+    await tester.pump();
+    expect(tester.widget<PageHead>(find.byType(PageHead)).onEdit, isNotNull);
+
+    await tester.tap(find.text('Бегать'));
+    await tester.pumpAndSettle();
+    expect(find.byType(IntentionEditPage), findsNothing);
+  });
+
   testWidgets('скрытая шапка переносит полное название в панель без значка, '
       'приглушает архивное и возвращает тип при прокрутке назад', (
     tester,
@@ -179,6 +281,16 @@ final _barText = find.descendant(
   of: find.byType(TopBar),
   matching: find.byType(Text),
 );
+String _editTitle(WidgetTester tester) => tester
+    .widget<EditableText>(
+      find.descendant(
+        of: find.byKey(const ValueKey('intention-edit-title')),
+        matching: find.byType(EditableText),
+      ),
+    )
+    .controller
+    .text;
+
 final _scrollable = find
     .descendant(
       of: find.byType(CustomScrollView),
@@ -200,6 +312,7 @@ Future<void> _pumpPage(
       ],
       child: OrdinaryPageTestApp(
         locale: locale,
+        routes: [AutoRoute(page: IntentionEditRoute.page)],
         builder: scale == null
             ? null
             : (context, child) => ValueListenableBuilder(

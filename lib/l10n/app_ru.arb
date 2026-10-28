@@ -190,6 +190,8 @@
   "detailsTitle": "Подробности намерения",
   "detailsTypeIntention": "Намерение",
   "detailsTypeAction": "Действие",
+  "detailsEditTitleLabel": "Изменить название: {title}",
+  "@detailsEditTitleLabel": {"placeholders": {"title": {"type": "String"}}},
   "detailsLoading": "Загрузка намерения…",
   "detailsNotFound": "Намерение не найдено.",
   "detailsUnavailable": "Не удалось загрузить намерение. Повторите попытку.",
