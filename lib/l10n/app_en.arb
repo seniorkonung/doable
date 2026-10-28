@@ -594,6 +594,14 @@
   "@detailsAddDescription": {
     "description": "Приглашение добавить описание на вкладке «Обзор» намерения без описания; открывает экран изменения с курсором в описании"
   },
+  "detailsCreatedLabel": "Created",
+  "@detailsCreatedLabel": {
+    "description": "Метка даты создания намерения в строке дат в конце вкладки «Обзор»"
+  },
+  "detailsChangedLabel": "Changed",
+  "@detailsChangedLabel": {
+    "description": "Метка даты последнего изменения намерения в строке дат в конце вкладки «Обзор»"
+  },
   "detailsLoading": "Loading intention…",
   "@detailsLoading": {
     "description": "Начальная загрузка подробных данных намерения"

@@ -730,6 +730,12 @@ class AppLocalizationsRu extends AppLocalizations {
   String get detailsAddDescription => 'Добавить описание';
 
   @override
+  String get detailsCreatedLabel => 'Создано';
+
+  @override
+  String get detailsChangedLabel => 'Изменено';
+
+  @override
   String get detailsLoading => 'Загрузка намерения…';
 
   @override

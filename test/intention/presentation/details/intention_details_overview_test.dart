@@ -1,18 +1,27 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/design_system/components/button.dart';
 import 'package:doable/src/design_system/components/option_tiles.dart';
+import 'package:doable/src/design_system/components/tag_chip.dart';
+import 'package:doable/src/design_system/components/tags_section.dart';
 import 'package:doable/src/design_system/components/top_bar.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
+import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/edit/intention_edit_page.dart';
+import 'package:doable/src/tag/application/tag_assignments.dart';
+import 'package:doable/src/tag/application/tag_read_result.dart';
+import 'package:doable/src/tag/presentation/assignments/tag_assignments_view_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/daily_choice_local_date.dart';
 import '../../../support/ordinary_page_test_app.dart';
 import 'details_test_support.dart';
 
@@ -273,6 +282,78 @@ void main() {
     expect(repository.commands, hasLength(1));
     semantics.dispose();
   });
+
+  testWidgets('обзор только что созданного намерения кончается одной '
+      'сегодняшней датой создания', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final repository = ControlledDetailsRepository();
+    final createdNow = IntentionTimestamp(DateTime(2026, 10, 29, 9, 30));
+    final intention = Intention(
+      id: testDetailsIntentionId(41),
+      title: 'Бегать',
+      description: null,
+      readiness: IntentionReadiness.notReady,
+      archiveState: IntentionArchiveState.active,
+      createdAt: createdNow,
+      updatedAt: createdNow,
+    );
+    await _pumpPage(
+      tester,
+      repository,
+      intention,
+      overrides: [
+        ControlledDailyChoiceLocalDate(CalendarDate.fromParts(2026, 10, 29))
+            .override,
+        tagAssignmentsReaderProvider.overrideWithValue(_NoTagReads()),
+      ],
+    );
+    await waitForDetailRequests(repository, 1);
+    repository.detailRequests.single.add(ResultSuccess(intention));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Добавить описание'), findsOneWidget);
+    expect(
+      tester.getSemantics(_typeTile('Намерение')),
+      _typeTileSemantics(_intentionTileLabel, selected: true),
+    );
+    final tags = find.byType(TagsSection);
+    expect(
+      find.descendant(of: tags, matching: find.text('Теги')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: tags, matching: find.text('Добавить')),
+      findsOneWidget,
+    );
+    expect(find.byType(TagChip), findsNothing);
+    final dates = find.text('Создано 29 окт.');
+    expect(dates, findsOneWidget);
+    expect(find.textContaining('Изменено'), findsNothing);
+    // Строка стоит в 10 под блоком тегов вровень со словом «Теги».
+    expect(
+      tester.getTopLeft(dates),
+      Offset(
+        tester
+            .getTopLeft(find.descendant(of: tags, matching: find.text('Теги')))
+            .dx,
+        tester.getBottomLeft(tags).dy + 10,
+      ),
+    );
+    semantics.dispose();
+  });
+}
+
+final class _NoTagReads extends Fake implements TagReadContract {
+  @override
+  Future<TagAssignmentsResult> getTagAssignments(
+    IntentionId intentionId,
+  ) async => TagAssignmentsSuccess(
+    TagAssignmentsSnapshot(
+      intentionId: intentionId,
+      items: const [],
+      revision: const TestDetailsRevision(0),
+    ),
+  );
 }
 
 const _intentionTileLabel =
@@ -312,11 +393,13 @@ Future<void> _pumpPage(
   ControlledDetailsRepository repository,
   Intention intention, {
   Locale locale = const Locale('ru'),
+  List<Override> overrides = const [],
 }) async {
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
         personalGraphRepositoryProvider.overrideWithValue(repository),
+        ...overrides,
       ],
       child: OrdinaryPageTestApp(
         locale: locale,

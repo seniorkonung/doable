@@ -198,6 +198,8 @@
   "detailsEditDescriptionLabel": "Изменить описание: {description}",
   "@detailsEditDescriptionLabel": {"placeholders": {"description": {"type": "String"}}},
   "detailsAddDescription": "Добавить описание",
+  "detailsCreatedLabel": "Создано",
+  "detailsChangedLabel": "Изменено",
   "detailsLoading": "Загрузка намерения…",
   "detailsNotFound": "Намерение не найдено.",
   "detailsUnavailable": "Не удалось загрузить намерение. Повторите попытку.",

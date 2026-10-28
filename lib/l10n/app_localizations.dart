@@ -1154,6 +1154,18 @@ abstract class AppLocalizations {
   /// **'Add a description'**
   String get detailsAddDescription;
 
+  /// Метка даты создания намерения в строке дат в конце вкладки «Обзор»
+  ///
+  /// In en, this message translates to:
+  /// **'Created'**
+  String get detailsCreatedLabel;
+
+  /// Метка даты последнего изменения намерения в строке дат в конце вкладки «Обзор»
+  ///
+  /// In en, this message translates to:
+  /// **'Changed'**
+  String get detailsChangedLabel;
+
   /// Начальная загрузка подробных данных намерения
   ///
   /// In en, this message translates to:

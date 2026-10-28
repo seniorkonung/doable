@@ -9,6 +9,7 @@ import '../../../../l10n/app_localizations.dart';
 import '../../../app/navigation/ordinary_page_scaffold.dart';
 import '../../../app/routing/app_router.gr.dart';
 import '../../../daily_choice/application/choice_path_draft.dart';
+import '../../../daily_choice/domain/calendar_date.dart';
 import '../../../daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import '../../../daily_choice/presentation/catalog/daily_choice_local_day_observer.dart';
 import '../../../design_system/components/option_tiles.dart';
@@ -31,6 +32,7 @@ import '../../../tag/presentation/panel/tags_panel.dart';
 import '../../../tag/presentation/panel/tags_panel_context.dart';
 import '../../../statistics/presentation/intention_statistics_section.dart';
 import '../../../statistics/presentation/intention_statistics_view_model.dart';
+import 'intention_dates.dart';
 import 'intention_details_state.dart';
 import 'intention_details_view_model.dart';
 import 'intention_details_tabs.dart';
@@ -82,8 +84,11 @@ final class _IntentionDetailsPageState
     _scrollController.addListener(_syncHeadHidden);
     _localDay = DailyChoiceLocalDayObserver(
       readLocalDay: ref.read(dailyChoiceLocalDateSourceProvider),
-      onTodayChanged: () =>
-          ref.read(_statisticsProvider.notifier).setLocalDate(_localDay.today),
+      onTodayChanged: () {
+        ref.read(_statisticsProvider.notifier).setLocalDate(_localDay.today);
+        // Строка дат «Обзора» называет год по сегодняшнему дню.
+        setState(() {});
+      },
     );
   }
 
@@ -338,6 +343,7 @@ final class _IntentionDetailsPageState
                     ? () => _openEdit(IntentionEditFocus.description)
                     : null,
                 headHidden: _headHidden,
+                today: _localDay.today,
                 selectedTab: _selectedTab,
                 onSelectTab: _selectTab,
                 statisticsSection: IntentionStatisticsSectionSliver(
@@ -388,6 +394,7 @@ final class _DetailsContent extends ConsumerWidget {
     required this.buildHead,
     required this.onEditDescription,
     required this.headHidden,
+    required this.today,
     required this.selectedTab,
     required this.onSelectTab,
     required this.statisticsSection,
@@ -401,6 +408,7 @@ final class _DetailsContent extends ConsumerWidget {
   final Widget Function(IntentionDetailsLoaded loaded) buildHead;
   final VoidCallback? onEditDescription;
   final ValueListenable<bool> headHidden;
+  final CalendarDate today;
   final IntentionDetailsTab selectedTab;
   final ValueChanged<IntentionDetailsTab> onSelectTab;
   final Widget statisticsSection;
@@ -421,6 +429,7 @@ final class _DetailsContent extends ConsumerWidget {
         pageHead: buildHead(loaded),
         onEditDescription: onEditDescription,
         headHidden: headHidden,
+        today: today,
         selectedTab: selectedTab,
         onSelectTab: onSelectTab,
         statisticsSection: statisticsSection,
@@ -463,12 +472,15 @@ final class _DetailsContent extends ConsumerWidget {
 }
 
 final class _LoadedDetails extends StatelessWidget {
+  static const double _datesGap = 10;
+
   const _LoadedDetails({
     required this.state,
     required this.scrollController,
     required this.pageHead,
     required this.onEditDescription,
     required this.headHidden,
+    required this.today,
     required this.selectedTab,
     required this.onSelectTab,
     required this.statisticsSection,
@@ -485,6 +497,7 @@ final class _LoadedDetails extends StatelessWidget {
   final Widget pageHead;
   final VoidCallback? onEditDescription;
   final ValueListenable<bool> headHidden;
+  final CalendarDate today;
   final IntentionDetailsTab selectedTab;
   final ValueChanged<IntentionDetailsTab> onSelectTab;
   final Widget statisticsSection;
@@ -587,6 +600,24 @@ final class _LoadedDetails extends StatelessWidget {
                         TagsPanelAssignmentContext(intentionId),
                       ),
                     ),
+                  ),
+                ),
+              ),
+              SliverPadding(
+                // Строка начинается вровень со словом «Теги».
+                padding: const EdgeInsets.fromLTRB(
+                  DoableMetrics.space5 + DoableMetrics.space1,
+                  _datesGap,
+                  DoableMetrics.space5 + DoableMetrics.space1,
+                  DoableMetrics.space4,
+                ),
+                sliver: SliverToBoxAdapter(
+                  child: intentionDatesLine(
+                    localizations: localizations,
+                    locale: Localizations.localeOf(context).toLanguageTag(),
+                    createdAt: intention.createdAt,
+                    updatedAt: intention.updatedAt,
+                    today: today,
                   ),
                 ),
               ),

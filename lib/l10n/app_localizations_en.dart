@@ -727,6 +727,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get detailsAddDescription => 'Add a description';
 
   @override
+  String get detailsCreatedLabel => 'Created';
+
+  @override
+  String get detailsChangedLabel => 'Changed';
+
+  @override
   String get detailsLoading => 'Loading intention…';
 
   @override

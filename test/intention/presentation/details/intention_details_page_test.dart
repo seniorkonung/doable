@@ -580,6 +580,9 @@ void main() {
       await tester.pumpAndSettle();
 
       const explanationKey = ValueKey('intention-details-restore-explanation');
+      // Скрытое за краем экрана объяснение диктор не читает.
+      await tester.ensureVisible(find.byKey(explanationKey));
+      await tester.pumpAndSettle();
       expect(
         tester.getSemantics(find.byKey(explanationKey)),
         matchesSemantics(
