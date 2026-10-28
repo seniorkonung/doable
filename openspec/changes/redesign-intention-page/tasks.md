@@ -543,7 +543,7 @@
   - **Предполагаемые файлы:** `lib/src/design_system/components/text_field.dart`, `lib/src/intention/presentation/edit/intention_edit_page.dart`, `lib/src/intention/presentation/editor/intention_editor_page.dart`, `test/design_system/text_field_test.dart`, `test/intention/presentation/edit/intention_edit_page_test.dart`, `test/intention/presentation/editor/intention_editor_page_test.dart`.
   - **Размер:** S.
 
-- [ ] 3.16 Прокручивать экран изменения к отказу сохранения, чтобы он был виден без ручной прокрутки
+- [x] 3.16 Прокручивать экран изменения к отказу сохранения, чтобы он был виден без ручной прокрутки
   - **Критерии приёмки:**
     - По требованию «Экран изменения намерения» и разделу «Как показываются отказы» решения 5 дизайна новый отказ на открытом экране становится видимым без ручной прокрутки. После кадра с отказом экран прокручивает содержимое к его сообщению: к `Notice` над полями для общего отказа или к ошибке под полем названия для отказа проверки поля.
     - Предъявление по-прежнему подтверждается свидетельством кадра `OperationFailurePresentation`. После прокрутки отказ получает экран, а не общая поверхность. Введённый текст и позиция курсора не меняются.

@@ -43,6 +43,10 @@ final class _IntentionEditPageState extends ConsumerState<IntentionEditPage> {
   static const _descriptionMaxLines = 13;
 
   final _formKey = IntentionEditFormKey();
+
+  /// Место текущего отказа: над полями или под полем, к которому он
+  /// относится. Отказ показывается только в одном месте.
+  final _failureKey = GlobalKey();
   late final TextEditingController _titleController;
   late final TextEditingController _descriptionController;
 
@@ -79,6 +83,10 @@ final class _IntentionEditPageState extends ConsumerState<IntentionEditPage> {
       if (previous?.operation is! OperationSucceeded<Intention> &&
           next.operation is OperationSucceeded<Intention>) {
         _closeRoute();
+      }
+      if (next.operation is OperationFailed<Intention> &&
+          !identical(previous?.operation, next.operation)) {
+        _revealFailure();
       }
     });
 
@@ -131,6 +139,7 @@ final class _IntentionEditPageState extends ConsumerState<IntentionEditPage> {
               children: [
                 if (generalFailure != null) ...[
                   Notice.content(
+                    key: _failureKey,
                     message: OperationFailurePresentation(
                       claim: edit.failurePresentation,
                       message: generalFailure,
@@ -152,6 +161,7 @@ final class _IntentionEditPageState extends ConsumerState<IntentionEditPage> {
                   error: titleFailure == null
                       ? null
                       : OperationFailurePresentation(
+                          key: _failureKey,
                           claim: edit.failurePresentation,
                           message: titleFailure,
                           inheritsColor: true,
@@ -171,6 +181,7 @@ final class _IntentionEditPageState extends ConsumerState<IntentionEditPage> {
                   error: descriptionFailure == null
                       ? null
                       : OperationFailurePresentation(
+                          key: _failureKey,
                           claim: edit.failurePresentation,
                           message: descriptionFailure,
                           inheritsColor: true,
@@ -182,6 +193,23 @@ final class _IntentionEditPageState extends ConsumerState<IntentionEditPage> {
         ),
       ),
     );
+  }
+
+  /// Прокручивает содержимое к месту нового отказа после его кадра:
+  /// «Сохранить» нажимается из любой позиции прокрутки, а места отказов
+  /// стоят в начале содержимого. Пока сообщение вне видимой части, кадр не
+  /// подтверждает его предъявление.
+  void _revealFailure() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final failure = _failureKey.currentContext;
+      if (!mounted || failure == null) return;
+      unawaited(
+        Scrollable.ensureVisible(
+          failure,
+          alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtStart,
+        ),
+      );
+    });
   }
 
   /// Закрывает экран по решению сессии; изменённый текст закрывается только

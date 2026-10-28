@@ -314,6 +314,72 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('отказ хранилища на прокрученном экране прокручивает к '
+      'сообщению над полями без общей поверхности', (tester) async {
+    addTearDown(tester.view.reset);
+    final semantics = tester.ensureSemantics();
+    final repository = ControlledDetailsRepository();
+    final intention = testDetailsIntention(title: 'Бегать');
+    await _openEditPage(tester, repository, intention, textScale: 2);
+    final description = await _scrollPastStartWithDescription(tester);
+
+    await tester.tap(_save);
+    await tester.pump();
+    repository.completeCommand(
+      0,
+      const ResultFailure(IntentionUnavailableFailure()),
+    );
+    await tester.pumpAndSettle();
+
+    const message = 'Не удалось сохранить изменения. Повторите попытку.';
+    expect(find.byType(Notice).hitTestable(), findsOneWidget);
+    expect(find.bySemanticsLabel(message), findsOneWidget);
+    semantics.dispose();
+    expect(_controller(tester, _titleField).text, 'Бегать');
+    expect(_controller(tester, _descriptionField).text, description);
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+    expect(_operationMessage, findsNothing);
+  });
+
+  testWidgets('отказ длины названия на прокрученном экране прокручивает к '
+      'объяснению под полем названия', (tester) async {
+    addTearDown(tester.view.reset);
+    final repository = ControlledDetailsRepository();
+    final intention = testDetailsIntention(title: 'Бегать');
+    await _openEditPage(tester, repository, intention, textScale: 2);
+    final entered = 'я' * 256;
+    await tester.enterText(_titleField, entered);
+    await tester.pump();
+    await _scrollPastStartWithDescription(tester);
+
+    await tester.tap(_save);
+    await tester.pump();
+    repository.completeCommand(
+      0,
+      const ResultFailure(
+        IntentionTextInputValidationFailure(
+          IntentionTextValidationFailure(
+            field: IntentionTextField.title,
+            reason: IntentionTextValidationReason.tooLong,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find
+          .descendant(
+            of: _titleField,
+            matching: find.text('Используйте не более 255 символов.'),
+          )
+          .hitTestable(),
+      findsOneWidget,
+    );
+    expect(_controller(tester, _titleField).text, entered);
+  });
+
   for (final (way, leave) in <(String, Future<void> Function(WidgetTester))>[
     ('стрелка', (tester) => tester.tap(_back)),
     ('системное «назад»', (tester) => tester.binding.handlePopRoute()),
@@ -522,6 +588,21 @@ ScrollPosition _descriptionScroll(WidgetTester tester) => tester
       find.descendant(of: _descriptionField, matching: find.byType(Scrollable)),
     )
     .position;
+
+/// Открывает клавиатуру и вводит длинное описание, после чего начало экрана
+/// уходит из видимой части. Возвращает введённое описание.
+Future<String> _scrollPastStartWithDescription(WidgetTester tester) async {
+  // Клавиатура занимает половину экрана.
+  tester.view.viewInsets = FakeViewPadding(
+    bottom: tester.view.physicalSize.height / 2,
+  );
+  await tester.pumpAndSettle();
+  final description = List.filled(20, 'длинная строка описания').join('\n');
+  await tester.enterText(_descriptionField, description);
+  await tester.pumpAndSettle();
+  expect(_titleField.hitTestable(at: Alignment.topCenter), findsNothing);
+  return description;
+}
 
 /// Открывает экран изменения над страницей намерения с полученными данными,
 /// как это делает вход в правку.
