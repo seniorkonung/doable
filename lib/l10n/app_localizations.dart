@@ -1472,6 +1472,30 @@ abstract class AppLocalizations {
   /// **'Add a description'**
   String get intentionEditDescriptionPlaceholder;
 
+  /// Вопрос перед уходом с экрана изменения намерения с несохранённым текстом
+  ///
+  /// In en, this message translates to:
+  /// **'Discard changes?'**
+  String get intentionEditDiscardTitle;
+
+  /// Объяснение, что несохранённые изменения намерения будут потеряны при уходе с экрана
+  ///
+  /// In en, this message translates to:
+  /// **'Your changes to the intention won’t be saved.'**
+  String get intentionEditDiscardMessage;
+
+  /// Действие вопроса об отмене изменений, закрывающее экран изменения намерения без сохранения
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get intentionEditDiscardAction;
+
+  /// Действие вопроса об отмене изменений, возвращающее к полям экрана изменения намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Keep editing'**
+  String get intentionEditContinueAction;
+
   /// Заголовок формы создания намерения
   ///
   /// In en, this message translates to:

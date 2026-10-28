@@ -906,6 +906,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get intentionEditDescriptionPlaceholder => 'Add a description';
 
   @override
+  String get intentionEditDiscardTitle => 'Discard changes?';
+
+  @override
+  String get intentionEditDiscardMessage =>
+      'Your changes to the intention won’t be saved.';
+
+  @override
+  String get intentionEditDiscardAction => 'Discard';
+
+  @override
+  String get intentionEditContinueAction => 'Keep editing';
+
+  @override
   String get editorTitle => 'Create intention';
 
   @override

@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart' hide TextField;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
+import '../../../design_system/components/confirm_dialog.dart';
 import '../../../design_system/components/notice.dart';
 import '../../../design_system/components/text_field.dart';
 import '../../../design_system/components/top_bar.dart';
@@ -22,6 +25,9 @@ import 'intention_edit_view_model.dart';
 /// держит ключ своей сессии: повторное открытие начинает новую сессию со
 /// снимком сохранённых текстов. Успешное сохранение закрывает страницу без
 /// сообщения, а отказ остаётся на ней вместе с введённым текстом.
+///
+/// Стрелка и системное «назад» не закрывают маршрут сами: уход решает
+/// сессия, а изменённый текст отменяется только ответом на вопрос.
 @RoutePage()
 final class IntentionEditPage extends ConsumerStatefulWidget {
   const IntentionEditPage({required this.intentionId, super.key});
@@ -92,80 +98,111 @@ final class _IntentionEditPageState extends ConsumerState<IntentionEditPage> {
       operation,
     );
     final isDraftFixed = !edit.acceptsDraftChanges;
-    return Scaffold(
-      appBar: TopBar.withButton(
-        context,
-        title: localizations.intentionEditTitle,
-        backLabel: MaterialLocalizations.of(context).backButtonTooltip,
-        onBack: () => context.router.maybePop(),
-        buttonLabel: localizations.intentionEditSaveAction,
-        onButtonPressed: edit.canSave ? model.save : null,
-      ),
-      body: SafeArea(
-        top: false,
-        // Поля не перестраиваются при прокрутке: автофокус названия
-        // срабатывает только при открытии.
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(
-            DoableMetrics.space5,
-            DoableMetrics.space2,
-            DoableMetrics.space5,
-            DoableMetrics.space5,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (generalFailure != null) ...[
-                Notice.content(
-                  message: OperationFailurePresentation(
-                    claim: edit.failurePresentation,
-                    message: generalFailure,
-                    messageKey: const ValueKey('intention-edit-failure'),
-                    inheritsColor: true,
+    return PopScope<Object?>(
+      // Маршрут не закрывается сам: решение принимает сессия.
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) {
+          unawaited(_requestClose());
+        }
+      },
+      child: Scaffold(
+        appBar: TopBar.withButton(
+          context,
+          title: localizations.intentionEditTitle,
+          backLabel: MaterialLocalizations.of(context).backButtonTooltip,
+          onBack: () => unawaited(_requestClose()),
+          buttonLabel: localizations.intentionEditSaveAction,
+          onButtonPressed: edit.canSave ? model.save : null,
+        ),
+        body: SafeArea(
+          top: false,
+          // Поля не перестраиваются при прокрутке: автофокус названия
+          // срабатывает только при открытии.
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(
+              DoableMetrics.space5,
+              DoableMetrics.space2,
+              DoableMetrics.space5,
+              DoableMetrics.space5,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (generalFailure != null) ...[
+                  Notice.content(
+                    message: OperationFailurePresentation(
+                      claim: edit.failurePresentation,
+                      message: generalFailure,
+                      messageKey: const ValueKey('intention-edit-failure'),
+                      inheritsColor: true,
+                    ),
                   ),
+                  const SizedBox(height: DoableMetrics.space3),
+                ],
+                TextField.multiline(
+                  key: const ValueKey('intention-edit-title'),
+                  controller: _titleController,
+                  placeholder: localizations.intentionEditNameLabel,
+                  label: localizations.intentionEditNameLabel,
+                  kind: TextFieldKind.name,
+                  autofocus: true,
+                  readOnly: isDraftFixed,
+                  onChanged: model.changeTitle,
+                  error: titleFailure == null
+                      ? null
+                      : OperationFailurePresentation(
+                          claim: edit.failurePresentation,
+                          message: titleFailure,
+                          inheritsColor: true,
+                        ),
                 ),
-                const SizedBox(height: DoableMetrics.space3),
+                const SizedBox(height: DoableMetrics.space2),
+                TextField.multiline(
+                  key: const ValueKey('intention-edit-description'),
+                  controller: _descriptionController,
+                  placeholder:
+                      localizations.intentionEditDescriptionPlaceholder,
+                  label: localizations.intentionEditDescriptionLabel,
+                  minLines: _descriptionMinLines,
+                  maxLines: _descriptionMaxLines,
+                  readOnly: isDraftFixed,
+                  onChanged: model.changeDescription,
+                  error: descriptionFailure == null
+                      ? null
+                      : OperationFailurePresentation(
+                          claim: edit.failurePresentation,
+                          message: descriptionFailure,
+                          inheritsColor: true,
+                        ),
+                ),
               ],
-              TextField.multiline(
-                key: const ValueKey('intention-edit-title'),
-                controller: _titleController,
-                placeholder: localizations.intentionEditNameLabel,
-                label: localizations.intentionEditNameLabel,
-                kind: TextFieldKind.name,
-                autofocus: true,
-                readOnly: isDraftFixed,
-                onChanged: model.changeTitle,
-                error: titleFailure == null
-                    ? null
-                    : OperationFailurePresentation(
-                        claim: edit.failurePresentation,
-                        message: titleFailure,
-                        inheritsColor: true,
-                      ),
-              ),
-              const SizedBox(height: DoableMetrics.space2),
-              TextField.multiline(
-                key: const ValueKey('intention-edit-description'),
-                controller: _descriptionController,
-                placeholder: localizations.intentionEditDescriptionPlaceholder,
-                label: localizations.intentionEditDescriptionLabel,
-                minLines: _descriptionMinLines,
-                maxLines: _descriptionMaxLines,
-                readOnly: isDraftFixed,
-                onChanged: model.changeDescription,
-                error: descriptionFailure == null
-                    ? null
-                    : OperationFailurePresentation(
-                        claim: edit.failurePresentation,
-                        message: descriptionFailure,
-                        inheritsColor: true,
-                      ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
     );
+  }
+
+  /// Закрывает экран по решению сессии; изменённый текст закрывается только
+  /// после ответа «Отменить».
+  Future<void> _requestClose() async {
+    switch (ref.read(_provider.notifier).requestClose()) {
+      case IntentionEditCloseDecision.close:
+        _closeRoute();
+      case IntentionEditCloseDecision.askDiscard:
+        final localizations = AppLocalizations.of(context);
+        final discarded = await showDiscardDialog(
+          context: context,
+          title: localizations.intentionEditDiscardTitle,
+          text: localizations.intentionEditDiscardMessage,
+          discardLabel: localizations.intentionEditDiscardAction,
+          keepLabel: localizations.intentionEditContinueAction,
+        );
+        if (discarded) {
+          _closeRoute();
+        }
+    }
   }
 
   /// Закрывает только маршрут этой страницы, если он ещё в истории.

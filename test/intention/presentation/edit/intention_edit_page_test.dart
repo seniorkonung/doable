@@ -8,6 +8,7 @@ import 'package:doable/src/design_system/components/notice.dart';
 import 'package:doable/src/design_system/components/page_head.dart';
 import 'package:doable/src/design_system/components/text_field.dart';
 import 'package:doable/src/design_system/components/top_bar.dart';
+import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
@@ -24,6 +25,13 @@ import '../../../support/ordinary_page_test_app.dart';
 import '../details/details_test_support.dart';
 
 void main() {
+  // Общая поверхность показывает сообщения только в активном приложении.
+  setUp(() {
+    WidgetsBinding.instance.handleAppLifecycleStateChanged(
+      AppLifecycleState.resumed,
+    );
+  });
+
   for (final (locale, texts) in [
     (const Locale('ru'), (title: 'Изменить намерение', save: 'Сохранить')),
     (const Locale('en'), (title: 'Edit intention', save: 'Save')),
@@ -280,6 +288,164 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final (way, leave) in <(String, Future<void> Function(WidgetTester))>[
+    ('стрелка', (tester) => tester.tap(_back)),
+    ('системное «назад»', (tester) => tester.binding.handlePopRoute()),
+  ]) {
+    testWidgets('$way закрывает экран без вопроса, пока текст не изменён', (
+      tester,
+    ) async {
+      final repository = ControlledDetailsRepository();
+      final intention = testDetailsIntention(title: 'Бегать');
+      await _openEditPage(tester, repository, intention);
+
+      await leave(tester);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(IntentionEditPage), findsNothing);
+      expect(find.byType(IntentionDetailsPage), findsOneWidget);
+      expect(_discardQuestion, findsNothing);
+      expect(repository.commands, isEmpty);
+    });
+  }
+
+  for (final (answer, respond)
+      in <(String, Future<void> Function(WidgetTester))>[
+        (
+          '«Продолжить правку»',
+          (tester) => tester.tap(find.text('Продолжить правку')),
+        ),
+        ('нажатие на подложку', (tester) => tester.tapAt(const Offset(5, 5))),
+        ('«назад» над вопросом', (tester) => tester.binding.handlePopRoute()),
+      ]) {
+    testWidgets('изменённый текст вызывает вопрос, а $answer возвращает к '
+        'полям с прежним текстом', (tester) async {
+      final repository = ControlledDetailsRepository();
+      final intention = testDetailsIntention(title: 'Бегать');
+      await _openEditPage(tester, repository, intention);
+      await tester.enterText(_titleField, 'Бегать по утрам');
+      await tester.pump();
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(_discardQuestion, findsOneWidget);
+      expect(find.text('Изменения намерения не сохранятся.'), findsOneWidget);
+      await respond(tester);
+      await tester.pumpAndSettle();
+
+      expect(_discardQuestion, findsNothing);
+      expect(find.byType(IntentionEditPage), findsOneWidget);
+      expect(_controller(tester, _titleField).text, 'Бегать по утрам');
+      expect(_saveButton(tester).onPressed, isNotNull);
+      expect(repository.commands, isEmpty);
+    });
+  }
+
+  testWidgets('вопрос об отмене изменений переведён на английский', (
+    tester,
+  ) async {
+    final intention = testDetailsIntention(title: 'Бегать');
+    await _openEditPage(
+      tester,
+      ControlledDetailsRepository(),
+      intention,
+      locale: const Locale('en'),
+    );
+    await tester.enterText(_titleField, 'Бегать по утрам');
+    await tester.pump();
+
+    await tester.tap(_back);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Discard changes?'), findsOneWidget);
+    expect(
+      find.text('Your changes to the intention won’t be saved.'),
+      findsOneWidget,
+    );
+    expect(find.text('Discard'), findsOneWidget);
+    expect(find.text('Keep editing'), findsOneWidget);
+  });
+
+  testWidgets('«Отменить» после изменения описания закрывает экран, а '
+      'страница показывает прежнее описание', (tester) async {
+    final repository = ControlledDetailsRepository();
+    final intention = testDetailsIntention(
+      title: 'Бегать',
+      description: 'Утром в парке',
+    );
+    await _openEditPage(tester, repository, intention);
+    await tester.enterText(_descriptionField, 'Вечером на стадионе');
+    await tester.pump();
+
+    await tester.tap(_back);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Отменить'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(IntentionEditPage), findsNothing);
+    expect(find.text('Утром в парке'), findsOneWidget);
+    expect(find.text('Вечером на стадионе'), findsNothing);
+    expect(repository.commands, isEmpty);
+  });
+
+  testWidgets('уход стрелкой во время сохранения закрывает экран без '
+      'вопроса, а успех даёт новые данные на странице без сообщения', (
+    tester,
+  ) async {
+    final repository = ControlledDetailsRepository();
+    final before = testDetailsIntention(title: 'Бегать');
+    final saved = testDetailsIntention(title: 'Бегать по утрам');
+    await _openEditPage(tester, repository, before);
+    await tester.enterText(_titleField, saved.title);
+    await tester.pump();
+    await tester.tap(_save);
+    await tester.pump();
+
+    await tester.tap(_back);
+    await tester.pumpAndSettle();
+    expect(_discardQuestion, findsNothing);
+    expect(find.byType(IntentionEditPage), findsNothing);
+    repository.completeCommand(
+      0,
+      testDetailsSavedResult(saved, before: before),
+    );
+    await tester.pump();
+    await waitForDetailRequests(repository, 2);
+    repository.detailRequests.last.add(ResultSuccess(saved));
+    await tester.pumpAndSettle();
+
+    expect(repository.commands, hasLength(1));
+    expect(find.byType(IntentionDetailsPage), findsOneWidget);
+    expect(tester.widget<PageHead>(find.byType(PageHead)).name, saved.title);
+    expect(_operationMessage, findsNothing);
+  });
+
+  testWidgets('отказ сохранения после ухода стрелкой показан одним '
+      'сообщением общей поверхности над страницей намерения', (tester) async {
+    final repository = ControlledDetailsRepository();
+    final intention = testDetailsIntention(title: 'Бегать');
+    await _openEditPage(tester, repository, intention);
+    await tester.enterText(_titleField, 'Бегать по утрам');
+    await tester.pump();
+    await tester.tap(_save);
+    await tester.pump();
+
+    await tester.tap(_back);
+    await tester.pumpAndSettle();
+    expect(_discardQuestion, findsNothing);
+    repository.completeCommand(
+      0,
+      const ResultFailure(IntentionUnavailableFailure()),
+    );
+    await tester.pumpAndSettle();
+
+    expect(repository.commands, hasLength(1));
+    expect(_operationMessage, findsOneWidget);
+    expect(find.byType(IntentionEditPage), findsNothing);
+    expect(find.byType(IntentionDetailsPage), findsOneWidget);
+    expect(tester.widget<PageHead>(find.byType(PageHead)).name, 'Бегать');
+  });
+
   testWidgets('смена системной темы сохраняет экран и начатое изменение', (
     tester,
   ) async {
@@ -309,6 +475,11 @@ final _save = find.descendant(
   of: find.byType(TopBar),
   matching: find.byType(Button),
 );
+final _back = find.descendant(
+  of: find.byType(TopBar),
+  matching: find.byType(DoableIcon),
+);
+final _discardQuestion = find.text('Отменить изменения?');
 final _operationMessage = find.byKey(const ValueKey('graph-operation-message'));
 
 Button _saveButton(WidgetTester tester) => tester.widget<Button>(_save);

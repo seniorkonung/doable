@@ -911,6 +911,19 @@ class AppLocalizationsRu extends AppLocalizations {
   String get intentionEditDescriptionPlaceholder => 'Добавить описание';
 
   @override
+  String get intentionEditDiscardTitle => 'Отменить изменения?';
+
+  @override
+  String get intentionEditDiscardMessage =>
+      'Изменения намерения не сохранятся.';
+
+  @override
+  String get intentionEditDiscardAction => 'Отменить';
+
+  @override
+  String get intentionEditContinueAction => 'Продолжить правку';
+
+  @override
   String get editorTitle => 'Создать намерение';
 
   @override

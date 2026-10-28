@@ -809,6 +809,22 @@
   "@intentionEditDescriptionPlaceholder": {
     "description": "Заполнитель пустого поля описания на экране изменения намерения"
   },
+  "intentionEditDiscardTitle": "Discard changes?",
+  "@intentionEditDiscardTitle": {
+    "description": "Вопрос перед уходом с экрана изменения намерения с несохранённым текстом"
+  },
+  "intentionEditDiscardMessage": "Your changes to the intention won’t be saved.",
+  "@intentionEditDiscardMessage": {
+    "description": "Объяснение, что несохранённые изменения намерения будут потеряны при уходе с экрана"
+  },
+  "intentionEditDiscardAction": "Discard",
+  "@intentionEditDiscardAction": {
+    "description": "Действие вопроса об отмене изменений, закрывающее экран изменения намерения без сохранения"
+  },
+  "intentionEditContinueAction": "Keep editing",
+  "@intentionEditContinueAction": {
+    "description": "Действие вопроса об отмене изменений, возвращающее к полям экрана изменения намерения"
+  },
   "editorTitle": "Create intention",
   "@editorTitle": {
     "description": "Заголовок формы создания намерения"
