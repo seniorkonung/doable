@@ -526,3 +526,19 @@
   - **Зависимости:** 3.9 — занятость после возвращения с экрана; 3.12 — модель подробных данных без встроенной правки.
   - **Предполагаемые файлы:** `lib/src/intention/presentation/details/intention_details_view_model.dart`, `lib/src/intention/presentation/details/intention_details_state.dart`, `lib/src/intention/presentation/details/intention_details_page.dart`, `test/intention/presentation/details/intention_details_page_test.dart`.
   - **Размер:** S.
+
+- [ ] 3.15 Не принимать перенос строки в названии на экране изменения и в панели создания намерения
+  - **Критерии приёмки:**
+    - По требованию «Ввод названия намерения без переносов строк» растущее поле вида `name` не принимает перенос строки. Клавиатура названия не предлагает перенос, клавиша ввода переводит фокус в следующее поле, а `\r\n`, `\r` и `\n` во вставленном тексте заменяются одним пробелом каждый. Название по-прежнему визуально переносится и растёт. Поле вида `text` принимает переносы строк, как прежде.
+    - На экране изменения клавиша ввода в названии переводит фокус в описание и не меняет название. В панели создания название тем же правилом заменяет вставленные переносы; переход клавишей ввода к описанию сохраняется. Правило замены задано в одном месте и используется обоими полями.
+    - Нормализация и проверка названия в домене, импорт и сохранённые данные не меняются: название с переносами, полученное другим путём, показывается как прежде.
+    - Проверки:
+      - компонентная — у растущего поля `name` вставка «Бегать\nпо утрам» и «Бегать\r\nпо утрам» даёт «Бегать по утрам», а у поля `text` перенос сохраняется;
+      - экрана изменения — клавиша ввода в названии оставляет название прежним и переводит фокус в описание;
+      - панели создания — вставка текста с переносом в название даёт название через пробел.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/text_field_test.dart test/intention/presentation/edit test/intention/presentation/editor`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 3.2 — растущее поле `name`; 3.6 — экран изменения.
+  - **Предполагаемые файлы:** `lib/src/design_system/components/text_field.dart`, `lib/src/intention/presentation/edit/intention_edit_page.dart`, `lib/src/intention/presentation/editor/intention_editor_page.dart`, `test/design_system/text_field_test.dart`, `test/intention/presentation/edit/intention_edit_page_test.dart`, `test/intention/presentation/editor/intention_editor_page_test.dart`.
+  - **Размер:** S.
