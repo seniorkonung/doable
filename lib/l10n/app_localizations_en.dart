@@ -724,6 +724,69 @@ class AppLocalizationsEn extends AppLocalizations {
   String get detailsRestoreFromArchiveAction => 'Restore from archive';
 
   @override
+  String get detailsOptionsLabel => 'Options of the intention';
+
+  @override
+  String get detailsOptionsTitle => 'Intention';
+
+  @override
+  String get detailsOptionEdit => 'Edit';
+
+  @override
+  String get detailsOptionArchive => 'Archive';
+
+  @override
+  String get detailsOptionDelete => 'Delete';
+
+  @override
+  String get detailsOptionArchiveWithRelations =>
+      'Its relations are archived with it';
+
+  @override
+  String get detailsOptionArchiveAlone =>
+      'It stays in saved paths, new ones will not use it';
+
+  @override
+  String get detailsOptionRestoreWithRelations =>
+      'Its relations stay archived until you restore them';
+
+  @override
+  String get detailsOptionRestoreAlone => 'New paths can use it again';
+
+  @override
+  String get detailsOptionDeleteKeepsTags => 'Its tags stay';
+
+  @override
+  String get detailsOptionDeleteRelationsFirst => 'Delete its relations first';
+
+  @override
+  String get detailsOptionDeleteDailyChoicesFirst =>
+      'Delete its daily choices first';
+
+  @override
+  String get detailsOptionDeleteRelationsAndDailyChoicesFirst =>
+      'Delete its relations and daily choices first';
+
+  @override
+  String get detailsOptionWait => 'Wait for the current change to finish';
+
+  @override
+  String get detailsDeleteDialogTitle => 'Delete intention?';
+
+  @override
+  String get detailsDeleteDialogTextBefore => 'This removes the intention ';
+
+  @override
+  String get detailsDeleteDialogTextAfter =>
+      ' with its description and cannot be undone. Its tags stay.';
+
+  @override
+  String get detailsDeleteDialogCancel => 'Cancel';
+
+  @override
+  String get detailsDeleteDialogConfirm => 'Delete';
+
+  @override
   String detailsEditTitleLabel(String title) {
     return 'Edit the name: $title';
   }

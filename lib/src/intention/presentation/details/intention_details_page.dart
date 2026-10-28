@@ -14,8 +14,11 @@ import '../../../daily_choice/presentation/catalog/daily_choice_local_date_provi
 import '../../../daily_choice/presentation/catalog/daily_choice_local_day_observer.dart';
 import '../../../design_system/components/badge.dart';
 import '../../../design_system/components/button.dart';
+import '../../../design_system/components/confirm_dialog.dart';
 import '../../../design_system/components/option_tiles.dart';
+import '../../../design_system/components/options_menu.dart';
 import '../../../design_system/components/page_head.dart';
+import '../../../design_system/components/sheet.dart';
 import '../../../design_system/components/text_field.dart';
 import '../../../design_system/components/top_bar.dart';
 import '../../../design_system/doable_icon.dart';
@@ -38,6 +41,7 @@ import 'intention_dates.dart';
 import 'intention_details_state.dart';
 import 'intention_details_view_model.dart';
 import 'intention_details_tabs.dart';
+import 'intention_options.dart';
 import 'intention_page_target.dart';
 
 @RoutePage()
@@ -304,6 +308,49 @@ final class _IntentionDetailsPageState
     }
   }
 
+  /// Лист закрывается до начала действия, поэтому оно начинается уже на
+  /// странице (ADR-0042).
+  Future<void> _openOptions() async {
+    final provider = intentionDetailsViewModelProvider(widget.intentionId);
+    final option = await showDoableSheet<IntentionOption>(
+      context: context,
+      builder: (context, sheet) =>
+          _IntentionOptionsSheet(sheet: sheet, provider: provider),
+    );
+    if (option == null || !mounted) return;
+    final model = ref.read(provider.notifier);
+    switch (option) {
+      case IntentionOption.edit:
+        _openEdit(IntentionEditFocus.title);
+      case IntentionOption.archive:
+        model.archive();
+      case IntentionOption.restore:
+        model.restore();
+      case IntentionOption.delete:
+        await _confirmDeletion();
+    }
+  }
+
+  Future<void> _confirmDeletion() async {
+    final details = ref.read(
+      intentionDetailsViewModelProvider(widget.intentionId),
+    );
+    if (details is! IntentionDetailsLoaded) return;
+    final localizations = AppLocalizations.of(context);
+    final confirmed = await showConfirmDialog(
+      context: context,
+      title: localizations.detailsDeleteDialogTitle,
+      text: ConfirmDialogText(
+        before: localizations.detailsDeleteDialogTextBefore,
+        name: details.intention.title,
+        after: localizations.detailsDeleteDialogTextAfter,
+      ),
+      cancelLabel: localizations.detailsDeleteDialogCancel,
+      actionLabel: localizations.detailsDeleteDialogConfirm,
+    );
+    if (confirmed) await _delete();
+  }
+
   @override
   Widget build(BuildContext context) {
     final intentionId = widget.intentionId;
@@ -349,6 +396,11 @@ final class _IntentionDetailsPageState
                   intention.archiveState == IntentionArchiveState.archived,
               backLabel: backLabel,
               onBack: onBack,
+              action: TopBarAction(
+                icon: DoableIconData.more,
+                label: localizations.detailsOptionsLabel,
+                onPressed: () => unawaited(_openOptions()),
+              ),
             );
           },
         ),
@@ -382,6 +434,37 @@ final class _IntentionDetailsPageState
         ),
       ),
     );
+  }
+}
+
+/// Лист «Намерение» следит за снимком страницы: операция, начатая или
+/// завершённая при открытом листе, сразу меняет доступность пунктов.
+final class _IntentionOptionsSheet extends ConsumerWidget {
+  const _IntentionOptionsSheet({required this.sheet, required this.provider});
+
+  final SheetPresentation sheet;
+  final IntentionDetailsViewModelProvider provider;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final route = ModalRoute.of(context);
+    ref.listen(provider, (_, next) {
+      // Без подробных данных параметрам не к чему относиться. Лист, который
+      // уже закрывается, не текущий, и страницу под ним это не закрывает.
+      if (next is! IntentionDetailsLoaded && (route?.isCurrent ?? false)) {
+        Navigator.of(context).pop();
+      }
+    });
+    final localizations = AppLocalizations.of(context);
+    return switch (ref.watch(provider)) {
+      final IntentionDetailsLoaded loaded => OptionsMenu<IntentionOption>(
+        sheet,
+        title: localizations.detailsOptionsTitle,
+        items: intentionOptions(localizations, loaded),
+      ),
+      // Лист уже закрывается вслед за утратой данных.
+      _ => const SizedBox.shrink(),
+    };
   }
 }
 

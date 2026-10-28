@@ -1154,6 +1154,120 @@ abstract class AppLocalizations {
   /// **'Restore from archive'**
   String get detailsRestoreFromArchiveAction;
 
+  /// Доступное название кнопки «⋯» в верхней панели страницы намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Options of the intention'**
+  String get detailsOptionsLabel;
+
+  /// Заголовок листа параметров намерения: вид предмета
+  ///
+  /// In en, this message translates to:
+  /// **'Intention'**
+  String get detailsOptionsTitle;
+
+  /// Пункт параметров намерения, открывающий экран изменения
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get detailsOptionEdit;
+
+  /// Пункт параметров активного намерения, архивирующий его
+  ///
+  /// In en, this message translates to:
+  /// **'Archive'**
+  String get detailsOptionArchive;
+
+  /// Опасный пункт параметров намерения, открывающий подтверждение удаления
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get detailsOptionDelete;
+
+  /// Пояснение архивирования намерения с активными связями
+  ///
+  /// In en, this message translates to:
+  /// **'Its relations are archived with it'**
+  String get detailsOptionArchiveWithRelations;
+
+  /// Пояснение архивирования намерения без активных связей
+  ///
+  /// In en, this message translates to:
+  /// **'It stays in saved paths, new ones will not use it'**
+  String get detailsOptionArchiveAlone;
+
+  /// Пояснение восстановления намерения, у которого есть связи
+  ///
+  /// In en, this message translates to:
+  /// **'Its relations stay archived until you restore them'**
+  String get detailsOptionRestoreWithRelations;
+
+  /// Пояснение восстановления намерения без связей
+  ///
+  /// In en, this message translates to:
+  /// **'New paths can use it again'**
+  String get detailsOptionRestoreAlone;
+
+  /// Пояснение доступного удаления намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Its tags stay'**
+  String get detailsOptionDeleteKeepsTags;
+
+  /// Причина выключенного удаления намерения с долговременными связями
+  ///
+  /// In en, this message translates to:
+  /// **'Delete its relations first'**
+  String get detailsOptionDeleteRelationsFirst;
+
+  /// Причина выключенного удаления намерения с дневными выборами
+  ///
+  /// In en, this message translates to:
+  /// **'Delete its daily choices first'**
+  String get detailsOptionDeleteDailyChoicesFirst;
+
+  /// Причина выключенного удаления намерения со связями и дневными выборами
+  ///
+  /// In en, this message translates to:
+  /// **'Delete its relations and daily choices first'**
+  String get detailsOptionDeleteRelationsAndDailyChoicesFirst;
+
+  /// Причина недоступности пунктов параметров во время изменяющей операции
+  ///
+  /// In en, this message translates to:
+  /// **'Wait for the current change to finish'**
+  String get detailsOptionWait;
+
+  /// Вопрос подтверждения удаления намерения из параметров
+  ///
+  /// In en, this message translates to:
+  /// **'Delete intention?'**
+  String get detailsDeleteDialogTitle;
+
+  /// Текст подтверждения удаления до выделенного названия намерения
+  ///
+  /// In en, this message translates to:
+  /// **'This removes the intention '**
+  String get detailsDeleteDialogTextBefore;
+
+  /// Текст подтверждения удаления после выделенного названия намерения
+  ///
+  /// In en, this message translates to:
+  /// **' with its description and cannot be undone. Its tags stay.'**
+  String get detailsDeleteDialogTextAfter;
+
+  /// Отмена удаления намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get detailsDeleteDialogCancel;
+
+  /// Подтверждение удаления намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get detailsDeleteDialogConfirm;
+
   /// Доступное название кнопки-названия в шапке страницы намерения, которая открывает экран изменения; название намерения не переводится
   ///
   /// In en, this message translates to:

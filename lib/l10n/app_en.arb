@@ -592,6 +592,82 @@
   "@detailsRestoreFromArchiveAction": {
     "description": "Кнопка восстановления намерения из архива в шапке его страницы"
   },
+  "detailsOptionsLabel": "Options of the intention",
+  "@detailsOptionsLabel": {
+    "description": "Доступное название кнопки «⋯» в верхней панели страницы намерения"
+  },
+  "detailsOptionsTitle": "Intention",
+  "@detailsOptionsTitle": {
+    "description": "Заголовок листа параметров намерения: вид предмета"
+  },
+  "detailsOptionEdit": "Edit",
+  "@detailsOptionEdit": {
+    "description": "Пункт параметров намерения, открывающий экран изменения"
+  },
+  "detailsOptionArchive": "Archive",
+  "@detailsOptionArchive": {
+    "description": "Пункт параметров активного намерения, архивирующий его"
+  },
+  "detailsOptionDelete": "Delete",
+  "@detailsOptionDelete": {
+    "description": "Опасный пункт параметров намерения, открывающий подтверждение удаления"
+  },
+  "detailsOptionArchiveWithRelations": "Its relations are archived with it",
+  "@detailsOptionArchiveWithRelations": {
+    "description": "Пояснение архивирования намерения с активными связями"
+  },
+  "detailsOptionArchiveAlone": "It stays in saved paths, new ones will not use it",
+  "@detailsOptionArchiveAlone": {
+    "description": "Пояснение архивирования намерения без активных связей"
+  },
+  "detailsOptionRestoreWithRelations": "Its relations stay archived until you restore them",
+  "@detailsOptionRestoreWithRelations": {
+    "description": "Пояснение восстановления намерения, у которого есть связи"
+  },
+  "detailsOptionRestoreAlone": "New paths can use it again",
+  "@detailsOptionRestoreAlone": {
+    "description": "Пояснение восстановления намерения без связей"
+  },
+  "detailsOptionDeleteKeepsTags": "Its tags stay",
+  "@detailsOptionDeleteKeepsTags": {
+    "description": "Пояснение доступного удаления намерения"
+  },
+  "detailsOptionDeleteRelationsFirst": "Delete its relations first",
+  "@detailsOptionDeleteRelationsFirst": {
+    "description": "Причина выключенного удаления намерения с долговременными связями"
+  },
+  "detailsOptionDeleteDailyChoicesFirst": "Delete its daily choices first",
+  "@detailsOptionDeleteDailyChoicesFirst": {
+    "description": "Причина выключенного удаления намерения с дневными выборами"
+  },
+  "detailsOptionDeleteRelationsAndDailyChoicesFirst": "Delete its relations and daily choices first",
+  "@detailsOptionDeleteRelationsAndDailyChoicesFirst": {
+    "description": "Причина выключенного удаления намерения со связями и дневными выборами"
+  },
+  "detailsOptionWait": "Wait for the current change to finish",
+  "@detailsOptionWait": {
+    "description": "Причина недоступности пунктов параметров во время изменяющей операции"
+  },
+  "detailsDeleteDialogTitle": "Delete intention?",
+  "@detailsDeleteDialogTitle": {
+    "description": "Вопрос подтверждения удаления намерения из параметров"
+  },
+  "detailsDeleteDialogTextBefore": "This removes the intention ",
+  "@detailsDeleteDialogTextBefore": {
+    "description": "Текст подтверждения удаления до выделенного названия намерения"
+  },
+  "detailsDeleteDialogTextAfter": " with its description and cannot be undone. Its tags stay.",
+  "@detailsDeleteDialogTextAfter": {
+    "description": "Текст подтверждения удаления после выделенного названия намерения"
+  },
+  "detailsDeleteDialogCancel": "Cancel",
+  "@detailsDeleteDialogCancel": {
+    "description": "Отмена удаления намерения"
+  },
+  "detailsDeleteDialogConfirm": "Delete",
+  "@detailsDeleteDialogConfirm": {
+    "description": "Подтверждение удаления намерения"
+  },
   "detailsEditTitleLabel": "Edit the name: {title}",
   "@detailsEditTitleLabel": {
     "description": "Доступное название кнопки-названия в шапке страницы намерения, которая открывает экран изменения; название намерения не переводится",

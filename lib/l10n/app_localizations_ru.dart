@@ -727,6 +727,70 @@ class AppLocalizationsRu extends AppLocalizations {
   String get detailsRestoreFromArchiveAction => 'Восстановить из архива';
 
   @override
+  String get detailsOptionsLabel => 'Параметры намерения';
+
+  @override
+  String get detailsOptionsTitle => 'Намерение';
+
+  @override
+  String get detailsOptionEdit => 'Изменить';
+
+  @override
+  String get detailsOptionArchive => 'Архивировать';
+
+  @override
+  String get detailsOptionDelete => 'Удалить';
+
+  @override
+  String get detailsOptionArchiveWithRelations =>
+      'Его связи архивируются вместе с ним';
+
+  @override
+  String get detailsOptionArchiveAlone =>
+      'Останется в сохранённых путях и не будет предлагаться в новых';
+
+  @override
+  String get detailsOptionRestoreWithRelations =>
+      'Его связи останутся в архиве, пока вы их не восстановите';
+
+  @override
+  String get detailsOptionRestoreAlone =>
+      'Новые пути снова смогут его использовать';
+
+  @override
+  String get detailsOptionDeleteKeepsTags => 'Его теги сохранятся';
+
+  @override
+  String get detailsOptionDeleteRelationsFirst => 'Сначала удалите его связи';
+
+  @override
+  String get detailsOptionDeleteDailyChoicesFirst =>
+      'Сначала удалите его дневные выборы';
+
+  @override
+  String get detailsOptionDeleteRelationsAndDailyChoicesFirst =>
+      'Сначала удалите его связи и дневные выборы';
+
+  @override
+  String get detailsOptionWait => 'Дождитесь окончания текущего изменения';
+
+  @override
+  String get detailsDeleteDialogTitle => 'Удалить намерение?';
+
+  @override
+  String get detailsDeleteDialogTextBefore => 'Намерение ';
+
+  @override
+  String get detailsDeleteDialogTextAfter =>
+      ' будет безвозвратно удалено вместе с описанием. Его теги сохранятся.';
+
+  @override
+  String get detailsDeleteDialogCancel => 'Отмена';
+
+  @override
+  String get detailsDeleteDialogConfirm => 'Удалить';
+
+  @override
   String detailsEditTitleLabel(String title) {
     return 'Изменить название: $title';
   }
