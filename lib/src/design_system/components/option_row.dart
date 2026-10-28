@@ -8,6 +8,9 @@ import '../doable_type.dart';
 /// Взаимоисключающие состояния конца строки варианта.
 enum OptionRowTrailing { none, selected, forward }
 
+/// Тон строки: обычный или опасный для разрушительного варианта.
+enum OptionRowTone { normal, danger }
+
 /// Ход операции, которую выполняет строка.
 final class OptionRowProgress {
   const OptionRowProgress({required this.share, required this.label});
@@ -28,6 +31,7 @@ final class OptionRow extends StatelessWidget {
     required this.onPressed,
     this.hint,
     this.trailing = OptionRowTrailing.none,
+    this.tone = OptionRowTone.normal,
     this.progress,
     this.autofocus = false,
     super.key,
@@ -44,6 +48,10 @@ final class OptionRow extends StatelessWidget {
   final VoidCallback? onPressed;
   final OptionRowTrailing trailing;
 
+  /// Опасный тон окрашивает плитку, значок и название доступной строки;
+  /// пояснение остаётся приглушённым и называет, что сохранится.
+  final OptionRowTone tone;
+
   /// Ход операции строки: кольцо вокруг значка, которое экранный диктор
   /// читает значением строки.
   final OptionRowProgress? progress;
@@ -59,7 +67,12 @@ final class OptionRow extends StatelessWidget {
           Brightness.dark => DoableColors.dark,
         };
     final selected = trailing == OptionRowTrailing.selected;
-    final ink = onPressed == null ? colors.grip : colors.ink;
+    final danger = tone == OptionRowTone.danger && onPressed != null;
+    final ink = onPressed == null
+        ? colors.grip
+        : danger
+        ? colors.danger
+        : colors.ink;
     final trailingIcon = switch (trailing) {
       OptionRowTrailing.none => null,
       OptionRowTrailing.selected => DoableIcon(
@@ -104,7 +117,11 @@ final class OptionRow extends StatelessWidget {
                       height: DoableMetrics.controlHeight,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: selected ? colors.accent : colors.fill,
+                        color: selected
+                            ? colors.accent
+                            : danger
+                            ? colors.dangerSoft
+                            : colors.fill,
                       ),
                       child: Stack(
                         alignment: Alignment.center,
