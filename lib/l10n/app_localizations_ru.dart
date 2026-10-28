@@ -754,9 +754,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get detailsCancelEditAction => 'Отмена';
 
   @override
-  String get detailsSaved => 'Изменения сохранены.';
-
-  @override
   String get detailsEnableReadinessAction => 'Отметить готовым к действию';
 
   @override

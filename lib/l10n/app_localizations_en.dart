@@ -751,9 +751,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get detailsCancelEditAction => 'Cancel';
 
   @override
-  String get detailsSaved => 'Changes saved.';
-
-  @override
   String get detailsEnableReadinessAction => 'Mark as ready for action';
 
   @override

@@ -183,11 +183,7 @@ void main() {
       expect(find.text(updated.title), findsNothing);
       repository.emitDetail(2, updated);
       await tester.pumpAndSettle();
-      expect(
-        find.text('Edit — “Укреплять здоровье”: Changes saved.'),
-        findsOneWidget,
-      );
-      await _closeOperationMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
 
       final enableReadiness = find.byKey(
         const ValueKey('intention-details-enable-readiness'),

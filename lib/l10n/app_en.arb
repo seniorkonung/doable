@@ -628,10 +628,6 @@
   "@detailsCancelEditAction": {
     "description": "Действие отмены изменения намерения до отправки"
   },
-  "detailsSaved": "Changes saved.",
-  "@detailsSaved": {
-    "description": "Подтверждение успешного изменения намерения"
-  },
   "detailsEnableReadinessAction": "Mark as ready for action",
   "@detailsEnableReadinessAction": {
     "description": "Действие начала явного включения готовности намерения"

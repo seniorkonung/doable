@@ -205,7 +205,6 @@
   "detailsEditAction": "Изменить",
   "detailsSaveAction": "Сохранить изменения",
   "detailsCancelEditAction": "Отмена",
-  "detailsSaved": "Изменения сохранены.",
   "detailsEnableReadinessAction": "Отметить готовым к действию",
   "detailsDisableReadinessAction": "Отметить неготовым к действию",
   "detailsReadinessConfirmationTitle": "Готово к действию?",

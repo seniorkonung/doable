@@ -1208,12 +1208,6 @@ abstract class AppLocalizations {
   /// **'Cancel'**
   String get detailsCancelEditAction;
 
-  /// Подтверждение успешного изменения намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Changes saved.'**
-  String get detailsSaved;
-
   /// Действие начала явного включения готовности намерения
   ///
   /// In en, this message translates to:

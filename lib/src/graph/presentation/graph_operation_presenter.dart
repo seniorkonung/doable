@@ -31,7 +31,8 @@ import 'graph_operation_message_plan.dart';
 /// с первого кадра, в котором сообщение видно.
 ///
 /// Что предъявлять, решает coordinator: ручная копия и операции тегов
-/// приходят сюда только отказом (ADR-0016).
+/// приходят сюда только отказом (ADR-0016), как и изменение текста намерения
+/// (ADR-0046).
 final class GraphOperationPresenter extends ConsumerStatefulWidget {
   const GraphOperationPresenter({required this.child, super.key});
 
@@ -306,7 +307,7 @@ GraphOperationMessage _messageFor(
   AppLocalizations localizations,
   GraphPresentableCompletion completion,
 ) => switch (completion) {
-  IntentionCommandCompletion() => GraphOperationMessage(
+  IntentionPresentableCompletion() => GraphOperationMessage(
     _intentionMessage(localizations, completion),
   ),
   LongTermRelationCommandCompletion() => GraphOperationMessage(
@@ -426,7 +427,7 @@ String _dailyChoiceMessage(
 
 String _intentionMessage(
   AppLocalizations localizations,
-  IntentionCommandCompletion completion,
+  IntentionPresentableCompletion completion,
 ) {
   final operation = switch (completion.kind) {
     IntentionCommandKind.create => localizations.graphOperationCreate,
@@ -526,7 +527,7 @@ String _relationOutcomeFor(
 
 String _intentionOutcomeFor(
   AppLocalizations localizations,
-  IntentionCommandCompletion completion,
+  IntentionPresentableCompletion completion,
 ) => switch (completion.result) {
   ResultSuccess(:final value) => _successFor(
     localizations,
@@ -547,7 +548,9 @@ String _successFor(
 ) => switch ((kind, success)) {
   (IntentionCommandKind.create, IntentionSaved()) =>
     localizations.editorCreated,
-  (IntentionCommandKind.update, IntentionSaved()) => localizations.detailsSaved,
+  (IntentionCommandKind.update, _) => throw StateError(
+    'Успех изменения намерения не образует права предъявления.',
+  ),
   (IntentionCommandKind.enableReadiness, IntentionSaved()) =>
     localizations.detailsReadinessEnabled,
   (IntentionCommandKind.disableReadiness, IntentionSaved()) =>
@@ -560,8 +563,6 @@ String _successFor(
     localizations.detailsDeleted,
   (IntentionCommandKind.create, IntentionDeleted()) =>
     localizations.editorCreateUnexpected,
-  (IntentionCommandKind.update, IntentionDeleted()) =>
-    localizations.detailsUpdateUnexpected,
   (
     IntentionCommandKind.enableReadiness ||
         IntentionCommandKind.disableReadiness ||

@@ -33,6 +33,8 @@ import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/statistics_read_contract_test_fallback.dart';
 import '../../../support/tag_positions.dart';
 import '../../../support/intention_title_order_key.dart';
+import '../details/details_test_support.dart'
+    show testDetailsIntention, testDetailsSavedResult;
 
 void main() {
   group('GraphCommandCoordinator', () {
@@ -498,6 +500,111 @@ void main() {
           claim.completions.map((completion) => completion.token),
         );
         await coordinator.shutdown();
+      },
+    );
+
+    for (final leaveBeforeCompletion in [false, true]) {
+      test('успех изменения публикуется без права предъявления '
+          'при уходе до результата: $leaveBeforeCompletion', () async {
+        final repository = _ControlledGraphRepository();
+        final coordinator = _graphCoordinator(repository);
+        final before = testDetailsIntention(index: 1, title: 'Прежнее');
+        final saved = testDetailsIntention(
+          index: 1,
+          title: 'Новое название',
+          description: 'Новое описание',
+        );
+        final completions = <GraphCommandCompletion>[];
+        final subscription = coordinator.completions.listen(completions.add);
+        final registration = coordinator.registerAppPresentation();
+        final claims = <GraphAppPresentationClaim?>[];
+        unawaited(registration.nextClaim().then(claims.add));
+
+        final accepted = _acceptExisting(
+          coordinator,
+          UpdateIntention(
+            id: before.id,
+            title: saved.title,
+            description: saved.description,
+          ),
+        ) as IntentionCommandAccepted;
+        if (leaveBeforeCompletion) {
+          coordinator.releaseInitiatorPresentation(accepted.token);
+        }
+        repository.complete(0, testDetailsSavedResult(saved, before: before));
+        final completion = await accepted.future;
+        await pumpEventQueue();
+
+        expect(
+          completion.result,
+          isA<ResultSuccess<IntentionCommandSuccess>>(),
+        );
+        expect(completion.confirmedChange, isNotNull);
+        expect(completions, [same(completion)]);
+        expect(completion, isNot(isA<GraphPresentableCompletion>()));
+        expect(coordinator.claimInitiatorFailure(accepted.token), isNull);
+        expect(claims, isEmpty);
+
+        coordinator.releaseInitiatorPresentation(accepted.token);
+        final failed = _acceptExisting(
+          coordinator,
+          UpdateIntention(id: before.id, title: 'Повтор', description: null),
+        ) as IntentionCommandAccepted;
+        coordinator.releaseInitiatorPresentation(failed.token);
+        repository.complete(
+          1,
+          const ResultFailure(IntentionUnavailableFailure()),
+        );
+        final failure = await failed.future;
+        await pumpEventQueue();
+
+        expect(claims.single!.completions, [same(failure)]);
+        coordinator.confirmAppPresentation(claims.single!, [failed.token]);
+        final remaining = registration.nextClaim();
+        await coordinator.shutdown();
+        expect(await remaining, isNull);
+        await subscription.cancel();
+      });
+    }
+
+    test(
+      'отказ изменения принадлежит экрану и передаётся оболочке один раз',
+      () async {
+        final repository = _ControlledGraphRepository();
+        final coordinator = _graphCoordinator(repository);
+        final registration = coordinator.registerAppPresentation();
+        final claims = <GraphAppPresentationClaim?>[];
+        unawaited(registration.nextClaim().then(claims.add));
+        final accepted = _acceptExisting(
+          coordinator,
+          UpdateIntention(
+            id: _id(_firstUuid),
+            title: 'Правка',
+            description: null,
+          ),
+        ) as IntentionCommandAccepted;
+        repository.complete(
+          0,
+          const ResultFailure(IntentionUnavailableFailure()),
+        );
+        final completion = await accepted.future;
+        final initiatorClaim = coordinator.claimInitiatorFailure(
+          accepted.token,
+        );
+        expect(initiatorClaim, isNotNull);
+        await pumpEventQueue();
+        expect(claims, isEmpty);
+
+        coordinator.releaseInitiatorClaim(initiatorClaim!);
+        await pumpEventQueue();
+        expect(claims.single!.completions, [same(completion)]);
+        expect(coordinator.claimInitiatorFailure(accepted.token), isNull);
+        coordinator.confirmPresentation(initiatorClaim);
+        coordinator.confirmAppPresentation(claims.single!, [accepted.token]);
+        coordinator.releaseInitiatorPresentation(accepted.token);
+        final remaining = registration.nextClaim();
+        await coordinator.shutdown();
+        expect(await remaining, isNull);
       },
     );
 

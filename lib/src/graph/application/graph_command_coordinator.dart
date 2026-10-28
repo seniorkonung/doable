@@ -184,12 +184,14 @@ sealed class GraphCommandCompletion {
 /// Политику предъявления задаёт вид завершения. По умолчанию действует
 /// протокол ADR-0012: успех сразу принадлежит оболочке, а отказ — открытой
 /// экранной сессии инициатора. У операции с политикой «только отказ» по
-/// ADR-0016 предъявляемо только завершение отказа.
+/// ADR-0016 отказ сразу принадлежит оболочке. У политики «успех без сообщения»
+/// по ADR-0046 отказ сохраняет протокол ADR-0012. Обе политики исключают
+/// успешное завершение из этого типа.
 sealed class GraphPresentableCompletion extends GraphCommandCompletion {
   const GraphPresentableCompletion();
 }
 
-final class IntentionCommandCompletion extends GraphPresentableCompletion {
+sealed class IntentionCommandCompletion extends GraphCommandCompletion {
   const IntentionCommandCompletion._({
     required this.token,
     required this.kind,
@@ -228,6 +230,28 @@ final class IntentionCommandCompletion extends GraphPresentableCompletion {
       CreatingIntentionOperationTarget() => null,
     },
   };
+}
+
+final class IntentionPresentableCompletion extends IntentionCommandCompletion
+    implements GraphPresentableCompletion {
+  const IntentionPresentableCompletion._({
+    required super.token,
+    required super.kind,
+    required super.target,
+    required super.confirmedResult,
+  }) : super._();
+}
+
+/// Успех изменения текста публикуется только для согласования данных.
+/// Отказ этой операции остаётся предъявляемым по ADR-0012.
+final class IntentionUpdateSucceededCompletion
+    extends IntentionCommandCompletion {
+  const IntentionUpdateSucceededCompletion._({
+    required super.token,
+    required super.target,
+    required ResultSuccess<ConfirmedGraphResult<IntentionCommandSuccess>>
+    result,
+  }) : super._(kind: IntentionCommandKind.update, confirmedResult: result);
 }
 
 enum LongTermRelationCommandKind { create, update, archive, restore, delete }
@@ -1121,7 +1145,18 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
       entry: _PresentationEntry(token),
       execute: () async {
         final result = await _executeIntention(command);
-        return IntentionCommandCompletion._(
+        if (kind == IntentionCommandKind.update &&
+            result
+                is ResultSuccess<
+                  ConfirmedGraphResult<IntentionCommandSuccess>
+                >) {
+          return IntentionUpdateSucceededCompletion._(
+            token: token,
+            target: target,
+            result: result,
+          );
+        }
+        return IntentionPresentableCompletion._(
           token: token,
           kind: kind,
           target: target,
@@ -1167,8 +1202,8 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
       if (completion is GraphPresentableCompletion) {
         _placeAtPublication(entry, completion);
       } else {
-        // Успех операции с политикой «только отказ» права предъявления не
-        // образует.
+        // Успех политик «только отказ» и «успех без сообщения» не оставляет
+        // непредъявленной записи.
         _discardEntry(entry);
       }
       for (final key in keys) {
@@ -1447,8 +1482,8 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
 
   /// Выдаёт открытой экранной сессии право предъявить её failure.
   ///
-  /// Success инициатору не выдаётся: он сразу принадлежит оболочке. После
-  /// освобождения сессии или выдачи права оболочке возвращает `null`.
+  /// Успех инициатору не выдаётся. После освобождения сессии или выдачи
+  /// права оболочке возвращает `null`.
   GraphInitiatorPresentationClaim? claimInitiatorFailure(
     GraphOperationToken token,
   ) {

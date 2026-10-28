@@ -1108,7 +1108,7 @@ void main() {
     },
   );
 
-  testWidgets('показывает confirmed success только после completion', (
+  testWidgets('показывает сохранённую правку после завершения без сообщения', (
     tester,
   ) async {
     final repository = ControlledDetailsRepository();
@@ -1149,7 +1149,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('Changes saved.'), findsOneWidget);
+    expect(find.byType(SnackBar), findsNothing);
     expect(
       find.byKey(const ValueKey('intention-details-edit-title')),
       findsNothing,

@@ -324,7 +324,7 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
       _activeToken = null;
       final current = state;
       final edit = current is IntentionDetailsLoaded ? current.edit : null;
-      // Success предъявляет оболочка; просмотр только завершает форму.
+      // Успех завершает форму без сообщения.
       switch (completion.result) {
         case ResultSuccess(value: IntentionSaved(:final intention))
             when intention.id == _intentionId:

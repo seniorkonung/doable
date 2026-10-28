@@ -326,73 +326,79 @@ void main() {
     }
   });
 
-  test('retry изменения не предъявляет прежний отказ повторно', () async {
-    final repository = ControlledDetailsRepository();
-    final container = _detailsContainer(repository);
-    addTearDown(container.dispose);
-    final intention = testDetailsIntention(index: 82);
-    final provider = intentionDetailsViewModelProvider(intention.id);
-    final subscription = container.listen(
-      provider,
-      (_, _) {},
-      fireImmediately: true,
-    );
-    addTearDown(subscription.close);
-    await waitForDetailRequests(repository, 1);
-    repository.detailRequests[0].add(ResultSuccess(intention));
-    await pumpEventQueue();
-    final coordinator = container.read(
-      graphCommandCoordinatorProvider.notifier,
-    );
-    final presenter = coordinator.registerAppPresentation();
+  test(
+    'повтор изменения завершается без сообщения и не возвращает прежний отказ',
+    () async {
+      final repository = ControlledDetailsRepository();
+      final container = _detailsContainer(repository);
+      addTearDown(container.dispose);
+      final intention = testDetailsIntention(index: 82);
+      final provider = intentionDetailsViewModelProvider(intention.id);
+      final subscription = container.listen(
+        provider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      await waitForDetailRequests(repository, 1);
+      repository.detailRequests[0].add(ResultSuccess(intention));
+      await pumpEventQueue();
+      final coordinator = container.read(
+        graphCommandCoordinatorProvider.notifier,
+      );
+      final presenter = coordinator.registerAppPresentation();
 
-    final details = container.read(provider.notifier)
-      ..beginEditing()
-      ..changeTitle('Исправленное намерение')
-      ..saveChanges();
-    repository.completeCommand(
-      0,
-      const ResultFailure(IntentionUnavailableFailure()),
-    );
-    await pumpEventQueue();
-    expect(
-      (container.read(provider) as IntentionDetailsLoaded).edit?.canRetry,
-      isTrue,
-    );
-    final shownFailure = (container.read(
-      provider,
-    ) as IntentionDetailsLoaded).edit!.failurePresentation;
-    expect(shownFailure, isNotNull);
-    coordinator.confirmPresentation(shownFailure!);
+      final details = container.read(provider.notifier)
+        ..beginEditing()
+        ..changeTitle('Исправленное намерение')
+        ..saveChanges();
+      repository.completeCommand(
+        0,
+        const ResultFailure(IntentionUnavailableFailure()),
+      );
+      await pumpEventQueue();
+      expect(
+        (container.read(provider) as IntentionDetailsLoaded).edit?.canRetry,
+        isTrue,
+      );
+      final shownFailure = (container.read(
+        provider,
+      ) as IntentionDetailsLoaded).edit!.failurePresentation;
+      expect(shownFailure, isNotNull);
+      coordinator.confirmPresentation(shownFailure!);
 
-    details.saveChanges();
-    repository.completeCommand(
-      1,
-      testDetailsSavedResult(
-        testDetailsIntention(index: 82, title: 'Исправленное намерение'),
-        before: intention,
-      ),
-    );
-    await waitForDetailRequests(repository, 2);
+      details.saveChanges();
+      final saved = testDetailsIntention(
+        index: 82,
+        title: 'Исправленное намерение',
+      );
+      repository.completeCommand(
+        1,
+        testDetailsSavedResult(saved, before: intention),
+      );
+      await waitForDetailRequests(repository, 2);
+      repository.detailRequests[1].add(ResultSuccess(saved));
+      await pumpEventQueue();
 
-    final successClaim = await presenter.nextClaim();
-    expect(
-      successClaim!.completions.single,
-      isA<IntentionCommandCompletion>().having(
-        (completion) => completion.result,
-        'результат повтора',
-        isA<ResultSuccess<IntentionCommandSuccess>>(),
-      ),
-    );
-    coordinator.confirmAppPresentation(
-      successClaim,
-      successClaim.completions.map((completion) => completion.token),
-    );
-    GraphAppPresentationClaim? staleFailure;
-    unawaited(presenter.nextClaim().then((claim) => staleFailure = claim));
-    await pumpEventQueue();
-    expect(staleFailure, isNull);
-  });
+      expect(
+        container.read(provider),
+        isA<IntentionDetailsLoaded>()
+            .having(
+              (state) => state.intention.title,
+              'сохранённое название',
+              saved.title,
+            )
+            .having((state) => state.edit, 'закрытая правка', isNull)
+            .having((state) => state.isOperationRunning, 'занятость', isFalse),
+      );
+      GraphAppPresentationClaim? unexpectedMessage;
+      unawaited(
+        presenter.nextClaim().then((claim) => unexpectedMessage = claim),
+      );
+      await pumpEventQueue();
+      expect(unexpectedMessage, isNull);
+    },
+  );
 
   test('барьер перехода переживает закрытие модели и не блокирует другое намерение', () async {
     final repository = ControlledDetailsRepository();
