@@ -891,6 +891,21 @@ class AppLocalizationsEn extends AppLocalizations {
       'The changes couldn’t be saved because of an unexpected error.';
 
   @override
+  String get intentionEditTitle => 'Edit intention';
+
+  @override
+  String get intentionEditSaveAction => 'Save';
+
+  @override
+  String get intentionEditNameLabel => 'Name';
+
+  @override
+  String get intentionEditDescriptionLabel => 'Description';
+
+  @override
+  String get intentionEditDescriptionPlaceholder => 'Add a description';
+
+  @override
   String get editorTitle => 'Create intention';
 
   @override

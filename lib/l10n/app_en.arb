@@ -789,6 +789,26 @@
   "@detailsUpdateUnexpected": {
     "description": "Терминальная непредвиденная ошибка изменения намерения"
   },
+  "intentionEditTitle": "Edit intention",
+  "@intentionEditTitle": {
+    "description": "Заголовок экрана изменения названия и описания намерения"
+  },
+  "intentionEditSaveAction": "Save",
+  "@intentionEditSaveAction": {
+    "description": "Действие сохранения в верхней панели экрана изменения намерения"
+  },
+  "intentionEditNameLabel": "Name",
+  "@intentionEditNameLabel": {
+    "description": "Заполнитель и доступное название поля названия на экране изменения намерения"
+  },
+  "intentionEditDescriptionLabel": "Description",
+  "@intentionEditDescriptionLabel": {
+    "description": "Доступное название поля описания на экране изменения намерения"
+  },
+  "intentionEditDescriptionPlaceholder": "Add a description",
+  "@intentionEditDescriptionPlaceholder": {
+    "description": "Заполнитель пустого поля описания на экране изменения намерения"
+  },
   "editorTitle": "Create intention",
   "@editorTitle": {
     "description": "Заголовок формы создания намерения"

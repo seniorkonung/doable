@@ -241,6 +241,25 @@ void main() {
     expect(controller.text, 'Дом');
   });
 
+  testWidgets('поле только для чтения не меняет текст вводом', (tester) async {
+    final controller = TextEditingController(text: 'Дом');
+    final changes = <String>[];
+    await tester.pumpWidget(
+      _app(
+        controller: controller,
+        onChanged: changes.add,
+        multiline: true,
+        readOnly: true,
+      ),
+    );
+
+    await tester.enterText(find.byType(EditableText), 'Сад');
+    await tester.pump();
+
+    expect(changes, isEmpty);
+    expect(controller.text, 'Дом');
+  });
+
   testWidgets('поле названо для экранного диктора, а ошибка объявляется', (
     tester,
   ) async {
@@ -283,6 +302,7 @@ Widget _app({
   int? maxLines,
   TextFieldKind kind = TextFieldKind.text,
   bool autofocus = false,
+  bool readOnly = false,
   double textScale = 1,
 }) => MaterialApp(
   theme: doableTheme(brightness),
@@ -302,6 +322,7 @@ Widget _app({
               maxLines: maxLines,
               kind: kind,
               autofocus: autofocus,
+              readOnly: readOnly,
               onChanged: onChanged ?? (_) {},
               error: error,
             )

@@ -17,12 +17,16 @@ final class OrdinaryPageTestApp extends StatefulWidget {
     required this.home,
     this.locale = const Locale('en'),
     this.builder,
+    this.routes = const [],
     super.key,
   });
 
   final Widget home;
   final Locale locale;
   final TransitionBuilder? builder;
+
+  /// Маршруты, которые проверяемая страница открывает поверх себя.
+  final List<AutoRoute> routes;
 
   @override
   State<OrdinaryPageTestApp> createState() => _OrdinaryPageTestAppState();
@@ -44,6 +48,7 @@ final class _OrdinaryPageTestAppState extends State<OrdinaryPageTestApp> {
         ],
       ),
       NamedRouteDef(name: 'TestOrdinaryRoute', builder: (_, _) => widget.home),
+      ...widget.routes,
     ],
   );
 

@@ -30,6 +30,7 @@ import '../../../tag/presentation/panel/tags_panel.dart';
 import '../../../tag/presentation/panel/tags_panel_context.dart';
 import '../../../statistics/presentation/intention_statistics_section.dart';
 import '../../../statistics/presentation/intention_statistics_view_model.dart';
+import '../edit/intention_edit_failure_message.dart';
 import '../operation/operation_state.dart';
 import 'intention_details_state.dart';
 import 'intention_details_view_model.dart';
@@ -935,13 +936,16 @@ final class _DetailsEditFormState extends State<_DetailsEditForm> {
     final localizations = AppLocalizations.of(context);
     final edit = widget.edit;
     final controlsEnabled = !widget.isOperationRunning;
-    final generalFailure = _generalFailure(localizations, edit.operation);
-    final titleFailure = _fieldFailure(
+    final generalFailure = intentionEditGeneralFailureMessage(
+      localizations,
+      edit.operation,
+    );
+    final titleFailure = intentionEditFieldFailureMessage(
       localizations,
       edit.operation,
       IntentionTextField.title,
     );
-    final descriptionFailure = _fieldFailure(
+    final descriptionFailure = intentionEditFieldFailureMessage(
       localizations,
       edit.operation,
       IntentionTextField.description,
@@ -1030,72 +1034,6 @@ final class _DetailsEditFormState extends State<_DetailsEditForm> {
     OperationIdle<Intention>() ||
     OperationSucceeded<Intention>() ||
     OperationFailed<Intention>() => localizations.detailsSaveAction,
-  };
-
-  String? _fieldFailure(
-    AppLocalizations localizations,
-    OperationState<Intention> operation,
-    IntentionTextField field,
-  ) {
-    if (operation
-        case OperationFailed<Intention>(
-          failure: IntentionTextInputValidationFailure(:final textFailure),
-        )
-        when textFailure.field == field) {
-      return switch ((field, textFailure.reason)) {
-        (IntentionTextField.title, IntentionTextValidationReason.empty) =>
-          localizations.editorTitleEmpty,
-        (IntentionTextField.title, IntentionTextValidationReason.tooLong) =>
-          localizations.editorTitleTooLong,
-        (
-          IntentionTextField.title,
-          IntentionTextValidationReason.invalidUnicodeRepertoire,
-        ) =>
-          localizations.editorTitleInvalidUnicode,
-        (
-          IntentionTextField.description,
-          IntentionTextValidationReason.tooLong,
-        ) =>
-          localizations.editorDescriptionTooLong,
-        (
-          IntentionTextField.description,
-          IntentionTextValidationReason.invalidUnicodeRepertoire,
-        ) =>
-          localizations.editorDescriptionInvalidUnicode,
-        (IntentionTextField.description, IntentionTextValidationReason.empty) ||
-        (
-          IntentionTextField.titleFilter,
-          _,
-        ) => localizations.detailsUpdateInvalidInput,
-      };
-    }
-    return null;
-  }
-
-  String? _generalFailure(
-    AppLocalizations localizations,
-    OperationState<Intention> operation,
-  ) => switch (operation) {
-    OperationIdle<Intention>() ||
-    OperationRunning<Intention>() ||
-    OperationSucceeded<Intention>() => null,
-    OperationFailed<Intention>(:final failure) => switch (failure) {
-      IntentionTextInputValidationFailure(:final textFailure)
-          when textFailure.field == IntentionTextField.title ||
-              textFailure.field == IntentionTextField.description =>
-        null,
-      IntentionGenericValidationFailure() ||
-      IntentionTextInputValidationFailure() ||
-      IntentionCreationTagsMissingFailure() =>
-        localizations.detailsUpdateInvalidInput,
-      IntentionNotFoundFailure() => localizations.detailsUpdateNotFound,
-      IntentionConflictFailure() => localizations.detailsUpdateConflict,
-      IntentionHasBlockingRelationsFailure() =>
-        localizations.detailsUpdateUnexpected,
-      IntentionUnavailableFailure() => localizations.detailsUpdateUnavailable,
-      IntentionCorruptionFailure() => localizations.detailsUpdateCorruption,
-      IntentionUnexpectedFailure() => localizations.detailsUpdateUnexpected,
-    },
   };
 }
 

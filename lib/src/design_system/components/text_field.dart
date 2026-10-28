@@ -21,6 +21,7 @@ final class TextField extends StatelessWidget {
     required this.onChanged,
     this.leading,
     this.autofocus = false,
+    this.readOnly = false,
     this.error,
     super.key,
   }) : _multiline = false,
@@ -40,6 +41,7 @@ final class TextField extends StatelessWidget {
     this.minLines = 1,
     this.maxLines,
     this.autofocus = false,
+    this.readOnly = false,
     this.error,
     super.key,
   }) : assert(minLines > 0),
@@ -65,6 +67,10 @@ final class TextField extends StatelessWidget {
 
   /// Запрашивает фокус при первом показе, если другое поле его не получило.
   final bool autofocus;
+
+  /// Текст не меняется вводом, например пока отправлен черновик: поле не
+  /// показывает текст, которого нет в принятой команде.
+  final bool readOnly;
 
   final bool _multiline;
 
@@ -96,6 +102,7 @@ final class TextField extends StatelessWidget {
             minLines: minLines,
             maxLines: maxLines,
             autofocus: autofocus,
+            readOnly: readOnly,
             style: style.copyWith(color: colors.ink),
             decoration: InputDecoration(
               hintText: placeholder,

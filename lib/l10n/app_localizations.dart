@@ -1442,6 +1442,36 @@ abstract class AppLocalizations {
   /// **'The changes couldn’t be saved because of an unexpected error.'**
   String get detailsUpdateUnexpected;
 
+  /// Заголовок экрана изменения названия и описания намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Edit intention'**
+  String get intentionEditTitle;
+
+  /// Действие сохранения в верхней панели экрана изменения намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get intentionEditSaveAction;
+
+  /// Заполнитель и доступное название поля названия на экране изменения намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get intentionEditNameLabel;
+
+  /// Доступное название поля описания на экране изменения намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get intentionEditDescriptionLabel;
+
+  /// Заполнитель пустого поля описания на экране изменения намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Add a description'**
+  String get intentionEditDescriptionPlaceholder;
+
   /// Заголовок формы создания намерения
   ///
   /// In en, this message translates to:

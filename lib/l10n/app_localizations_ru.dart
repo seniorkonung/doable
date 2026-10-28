@@ -896,6 +896,21 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось сохранить изменения из-за непредвиденной ошибки.';
 
   @override
+  String get intentionEditTitle => 'Изменить намерение';
+
+  @override
+  String get intentionEditSaveAction => 'Сохранить';
+
+  @override
+  String get intentionEditNameLabel => 'Название';
+
+  @override
+  String get intentionEditDescriptionLabel => 'Описание';
+
+  @override
+  String get intentionEditDescriptionPlaceholder => 'Добавить описание';
+
+  @override
   String get editorTitle => 'Создать намерение';
 
   @override
