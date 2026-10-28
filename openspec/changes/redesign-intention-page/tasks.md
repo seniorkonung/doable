@@ -314,7 +314,7 @@
     - проверки: `test/intention/presentation/operation/intention_command_coordinator_test.dart`, `test/graph/presentation/graph_operation_presenter_test.dart`, `test/intention/presentation/details/intention_details_page_test.dart`, `test/app/intention_app_lifecycle_test.dart`.
   - **Размер:** M.
 
-- [ ] 3.2 Расширить `TextField` растущим многострочным полем с пределами строк, видами названия и текста, автофокусом и слотом виджета ошибки вместо строки
+- [x] 3.2 Расширить `TextField` растущим многострочным полем с пределами строк, видами названия и текста, автофокусом и слотом виджета ошибки вместо строки
   - **Критерии приёмки:**
     - По README `TextField` и решению 11 дизайна поле может расти вместе с текстом:
       - вид `name` пишется стилем `action`, вид `text` — стилем `field`; боковые поля растущего поля — `space-3`, сверху и снизу 13 у `name` и 11 у `text`;

@@ -5,7 +5,9 @@ import '../doable_colors.dart';
 import '../doable_metrics.dart';
 import '../doable_type.dart';
 
-/// Однострочное поле названия: плоскость `fill` без рамки и кольца фокуса,
+enum TextFieldKind { name, text }
+
+/// Поле ввода: плоскость `fill` без рамки и кольца фокуса,
 /// где фокус показывает курсор. Текст хранит [controller] потребителя.
 final class TextField extends StatelessWidget {
   static const double _materialGap = 4;
@@ -16,11 +18,34 @@ final class TextField extends StatelessWidget {
     required this.controller,
     required this.placeholder,
     required this.label,
-    required this.leading,
     required this.onChanged,
+    this.leading,
+    this.autofocus = false,
     this.error,
     super.key,
-  });
+  }) : _multiline = false,
+       kind = TextFieldKind.name,
+       minLines = 1,
+       maxLines = 1;
+
+  /// Растущее поле без метки перед текстом. Без [maxLines] текст
+  /// переносится целиком; после предела прокручивается внутри поля.
+  /// https://api.flutter.dev/flutter/material/TextField/minLines.html
+  const TextField.multiline({
+    required this.controller,
+    required this.placeholder,
+    required this.label,
+    required this.onChanged,
+    this.kind = TextFieldKind.text,
+    this.minLines = 1,
+    this.maxLines,
+    this.autofocus = false,
+    this.error,
+    super.key,
+  }) : assert(minLines > 0),
+       assert(maxLines == null || maxLines >= minLines),
+       _multiline = true,
+       leading = null;
 
   final TextEditingController controller;
 
@@ -32,17 +57,33 @@ final class TextField extends StatelessWidget {
 
   /// Небольшая метка перед текстом, например точка цвета тега. Узла экранного
   /// диктора у неё быть не должно: поле называет [label].
-  final Widget leading;
+  final Widget? leading;
+
+  final TextFieldKind kind;
+  final int minLines;
+  final int? maxLines;
+
+  /// Запрашивает фокус при первом показе, если другое поле его не получило.
+  final bool autofocus;
+
+  final bool _multiline;
 
   final ValueChanged<String> onChanged;
 
-  /// Ошибка ввода под полем; без неё строки ошибки нет.
-  final String? error;
+  /// Ошибка под полем, наследующая `hint` и `danger` и объявляемая диктором.
+  /// Потребитель может передать собственный renderer предъявления отказа.
+  final Widget? error;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).extension<DoableColors>()!;
     final error = this.error;
+    final style = switch (kind) {
+      TextFieldKind.name => DoableType.action,
+      TextFieldKind.text => DoableType.field,
+    };
+    final verticalPadding = kind == TextFieldKind.name ? 13.0 : 11.0;
+    final startPadding = _multiline ? DoableMetrics.space3 : _startPadding;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -52,10 +93,13 @@ final class TextField extends StatelessWidget {
           child: material.TextField(
             controller: controller,
             onChanged: onChanged,
-            style: DoableType.action.copyWith(color: colors.ink),
+            minLines: minLines,
+            maxLines: maxLines,
+            autofocus: autofocus,
+            style: style.copyWith(color: colors.ink),
             decoration: InputDecoration(
               hintText: placeholder,
-              hintStyle: DoableType.action.copyWith(
+              hintStyle: style.copyWith(
                 fontWeight: FontWeight.w400,
                 color: colors.muted,
               ),
@@ -63,21 +107,23 @@ final class TextField extends StatelessWidget {
               // `action` высотой 22 с отступами по 13 даёт 48, а с крупным
               // шрифтом поле растёт.
               isDense: true,
-              // Material 3 сам ставит 4 между меткой и текстом и ещё 4 у
-              // конца заполненного поля, поэтому оба отступа добирают до
-              // макета своими значениями.
-              contentPadding: const EdgeInsetsDirectional.only(
-                top: 13,
-                bottom: 13,
+              // Material 3 добавляет inputGap=4 с обеих сторон текста,
+              // в том числе без метки. Вычитаем его из отступов макета.
+              contentPadding: EdgeInsetsDirectional.only(
+                start: leading == null ? startPadding - _materialGap : 0,
+                top: verticalPadding,
+                bottom: verticalPadding,
                 end: DoableMetrics.space3 - _materialGap,
               ),
-              prefixIcon: Padding(
-                padding: const EdgeInsetsDirectional.only(
-                  start: _startPadding,
-                  end: _leadingGap - _materialGap,
-                ),
-                child: leading,
-              ),
+              prefixIcon: leading == null
+                  ? null
+                  : Padding(
+                      padding: const EdgeInsetsDirectional.only(
+                        start: _startPadding,
+                        end: _leadingGap - _materialGap,
+                      ),
+                      child: leading,
+                    ),
               prefixIconConstraints: const BoxConstraints(),
             ),
           ),
@@ -92,9 +138,9 @@ final class TextField extends StatelessWidget {
             ),
             child: Semantics(
               liveRegion: true,
-              child: Text(
-                error,
+              child: DefaultTextStyle.merge(
                 style: DoableType.hint.copyWith(color: colors.danger),
+                child: error,
               ),
             ),
           ),
