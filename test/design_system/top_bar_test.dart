@@ -86,6 +86,97 @@ void main() {
       },
     );
 
+    testWidgets('в $themeName теме кнопка-иконка справа: значок 24 цвета ink '
+        'по центру области 44 в space-2 от правого края, названа потребителем '
+        'и вызывает его обработчик, а заголовок со значком остаётся по центру '
+        'панели', (tester) async {
+      final semantics = tester.ensureSemantics();
+      var opens = 0;
+
+      await _pump(
+        tester,
+        _app(
+          brightness: brightness,
+          bar: (_) => TopBar.back(
+            title: 'Намерение',
+            titleIcon: DoableIconData.intention,
+            backLabel: 'Назад к каталогу',
+            onBack: () {},
+            action: TopBarAction(
+              icon: DoableIconData.more,
+              label: 'Параметры намерения',
+              onPressed: () => opens++,
+            ),
+          ),
+        ),
+      );
+
+      expect(tester.getTopLeft(find.byKey(_body)).dy, 54 + 44);
+      final more = _icon(DoableIconData.more);
+      expect(tester.widget<DoableIcon>(more).size, 24);
+      expect(tester.widget<DoableIcon>(more).color, colors.ink);
+      expect(
+        tester.getRect(_actionArea()),
+        const Rect.fromLTWH(390 - 8 - 44, 54, 44, 44),
+      );
+      expect(tester.getCenter(more), const Offset(390 - 30, 76));
+      expect(tester.getRect(_backArea()), const Rect.fromLTWH(8, 54, 44, 44));
+      final iconRect = tester.getRect(_icon(DoableIconData.intention));
+      final titleRect = tester.getRect(find.text('Намерение'));
+      expect((iconRect.left + titleRect.right) / 2, 195);
+      expect(titleRect.center.dy, 76);
+      expect(
+        tester.getSemantics(find.bySemanticsLabel('Параметры намерения')),
+        isSemantics(
+          label: 'Параметры намерения',
+          isButton: true,
+          hasTapAction: true,
+          children: const [],
+        ),
+      );
+
+      await tester.tap(_actionArea());
+      expect(opens, 1);
+      semantics.dispose();
+    });
+
+    testWidgets('в $themeName теме длинный заголовок рядом с кнопкой-иконкой '
+        'остаётся по центру панели, не шире её без 64 с каждой стороны и '
+        'кончается многоточием', (tester) async {
+      const title = 'Поддерживать здоровье и хорошее самочувствие каждый день';
+
+      await _pump(
+        tester,
+        _app(
+          brightness: brightness,
+          bar: (_) => TopBar.back(
+            title: title,
+            backLabel: 'Назад',
+            onBack: () {},
+            action: TopBarAction(
+              icon: DoableIconData.more,
+              label: 'Параметры намерения',
+              onPressed: () {},
+            ),
+          ),
+        ),
+      );
+
+      final paragraph = tester.renderObject<RenderParagraph>(find.text(title));
+      expect(paragraph.maxLines, 1);
+      expect(paragraph.overflow, TextOverflow.ellipsis);
+      expect(paragraph.didExceedMaxLines, isTrue);
+      expect(
+        tester.getRect(find.text(title)),
+        const Rect.fromLTWH(64, 65, 262, 22),
+      );
+      expect(
+        tester.getRect(_actionArea()),
+        const Rect.fromLTWH(390 - 8 - 44, 54, 44, 44),
+      );
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('в $themeName теме длинный приглушённый заголовок с и без '
         'значка ограничен полями 64, обрезается многоточием, а диктор слышит '
         'название целиком', (tester) async {
@@ -744,6 +835,11 @@ Finder _icon(DoableIconData icon) => find.byWidgetPredicate(
 
 Finder _backArea() => find.ancestor(
   of: _icon(DoableIconData.back),
+  matching: find.byType(InkResponse),
+);
+
+Finder _actionArea() => find.ancestor(
+  of: _icon(DoableIconData.more),
   matching: find.byType(InkResponse),
 );
 

@@ -38,8 +38,24 @@ final class TopBarPurpose {
   final VoidCallback onOpen;
 }
 
+/// Кнопка-иконка справа на панели страницы, например «⋯» параметров.
+final class TopBarAction {
+  const TopBarAction({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+  });
+
+  final DoableIconData icon;
+
+  /// Доступное название кнопки.
+  final String label;
+  final VoidCallback onPressed;
+}
+
 /// Верхняя панель со стрелкой назад или крестиком слева, заголовком по центру
-/// и, на экране правки, основной кнопкой справа.
+/// и, на странице, кнопкой-иконкой справа, а на экране правки — основной
+/// кнопкой справа.
 /// Стоит в `Scaffold.appBar` прямо под системным отступом, без фона, линии и тени.
 final class TopBar extends StatelessWidget implements PreferredSizeWidget {
   static const double _minHeight = DoableMetrics.tapMin;
@@ -76,15 +92,18 @@ final class TopBar extends StatelessWidget implements PreferredSizeWidget {
        ),
        _purpose = null,
        _button = null,
+       action = null,
        preferredSize = const Size.fromHeight(_minHeight);
 
-  /// Панель страницы со стрелкой назад и видимым заголовком маршрута.
+  /// Панель страницы со стрелкой назад, видимым заголовком маршрута и
+  /// необязательной кнопкой-иконкой [action] справа.
   const TopBar.back({
     required String title,
     required String backLabel,
     required VoidCallback onBack,
     this.titleIcon,
     this.muted = false,
+    this.action,
     super.key,
   }) : title = title,
        routeName = title,
@@ -116,6 +135,7 @@ final class TopBar extends StatelessWidget implements PreferredSizeWidget {
        ),
        _purpose = null,
        _button = null,
+       action = null,
        preferredSize = const Size.fromHeight(_minHeight);
 
   /// Панель экрана правки со стрелкой назад, заголовком и основной кнопкой
@@ -145,6 +165,7 @@ final class TopBar extends StatelessWidget implements PreferredSizeWidget {
        ),
        _purpose = null,
        _button = (label: buttonLabel, onPressed: onButtonPressed),
+       action = null,
        preferredSize = Size.fromHeight(
          math.max(
            _minHeight,
@@ -182,6 +203,7 @@ final class TopBar extends StatelessWidget implements PreferredSizeWidget {
          textScaler: MediaQuery.textScalerOf(context),
        ),
        _button = null,
+       action = null,
        preferredSize = Size.fromHeight(
          _purposeHeight(
            title: title,
@@ -219,6 +241,9 @@ final class TopBar extends StatelessWidget implements PreferredSizeWidget {
 
   /// Без обработчика кнопка справа выключена и остаётся на своём месте.
   final ({String label, VoidCallback? onPressed})? _button;
+
+  /// Кнопка-иконка справа; есть только у [TopBar.back].
+  final TopBarAction? action;
 
   @override
   final Size preferredSize;
@@ -321,30 +346,26 @@ final class TopBar extends StatelessWidget implements PreferredSizeWidget {
               start: DoableMetrics.space2,
               top: 0,
               bottom: 0,
-              child: Center(
-                child: MergeSemantics(
-                  child: Semantics(
-                    button: true,
-                    label: _leading.label,
-                    child: InkResponse(
-                      key: _leading.key,
-                      onTap: _leading.onTap,
-                      radius: DoableMetrics.tapMin / 2,
-                      child: SizedBox.square(
-                        dimension: DoableMetrics.tapMin,
-                        child: Center(
-                          child: DoableIcon(
-                            _leading.icon,
-                            size: DoableMetrics.iconSize,
-                            color: colors.ink,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
+              child: _iconButton(
+                colors,
+                icon: _leading.icon,
+                label: _leading.label,
+                onTap: _leading.onTap,
+                key: _leading.key,
               ),
             ),
+            if (action case final action?)
+              PositionedDirectional(
+                end: DoableMetrics.space2,
+                top: 0,
+                bottom: 0,
+                child: _iconButton(
+                  colors,
+                  icon: action.icon,
+                  label: action.label,
+                  onTap: action.onPressed,
+                ),
+              ),
             if (_button case final button?)
               PositionedDirectional(
                 end: DoableMetrics.space3,
@@ -362,6 +383,37 @@ final class TopBar extends StatelessWidget implements PreferredSizeWidget {
       ),
     );
   }
+
+  /// Область нажатия 44 со значком 24 цвета ink по центру панели.
+  Widget _iconButton(
+    DoableColors colors, {
+    required DoableIconData icon,
+    required String label,
+    required VoidCallback onTap,
+    Key? key,
+  }) => Center(
+    child: MergeSemantics(
+      child: Semantics(
+        button: true,
+        label: label,
+        child: InkResponse(
+          key: key,
+          onTap: onTap,
+          radius: DoableMetrics.tapMin / 2,
+          child: SizedBox.square(
+            dimension: DoableMetrics.tapMin,
+            child: Center(
+              child: DoableIcon(
+                icon,
+                size: DoableMetrics.iconSize,
+                color: colors.ink,
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
 
   /// Строки показываются в том же масштабе, по которому рассчитана высота.
   Widget _purposeButton(
