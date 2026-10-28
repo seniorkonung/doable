@@ -542,3 +542,17 @@
   - **Зависимости:** 3.2 — растущее поле `name`; 3.6 — экран изменения.
   - **Предполагаемые файлы:** `lib/src/design_system/components/text_field.dart`, `lib/src/intention/presentation/edit/intention_edit_page.dart`, `lib/src/intention/presentation/editor/intention_editor_page.dart`, `test/design_system/text_field_test.dart`, `test/intention/presentation/edit/intention_edit_page_test.dart`, `test/intention/presentation/editor/intention_editor_page_test.dart`.
   - **Размер:** S.
+
+- [ ] 3.16 Прокручивать экран изменения к отказу сохранения, чтобы он был виден без ручной прокрутки
+  - **Критерии приёмки:**
+    - По требованию «Экран изменения намерения» и разделу «Как показываются отказы» решения 5 дизайна новый отказ на открытом экране становится видимым без ручной прокрутки. После кадра с отказом экран прокручивает содержимое к его сообщению: к `Notice` над полями для общего отказа или к ошибке под полем названия для отказа проверки поля.
+    - Предъявление по-прежнему подтверждается свидетельством кадра `OperationFailurePresentation`. После прокрутки отказ получает экран, а не общая поверхность. Введённый текст и позиция курсора не меняются.
+    - Проверки экрана при тексте 2× и открытой клавиатуре, после ввода длинного описания, когда начало экрана вне видимой части:
+      - отказ хранилища после «Сохранить» — `Notice` попадает в видимую часть, его текст есть в дереве семантики, общая поверхность сообщения не показывает, введённый текст сохранён;
+      - название из 256 символов — объяснение длины под полем названия попадает в видимую часть без ручной прокрутки.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/edit`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 3.6 — экран изменения с местами отказов.
+  - **Предполагаемые файлы:** `lib/src/intention/presentation/edit/intention_edit_page.dart`, `test/intention/presentation/edit/intention_edit_page_test.dart`.
+  - **Размер:** S.
