@@ -21,6 +21,7 @@ final class IntentionDetailsLoaded extends IntentionDetailsState {
     required this.revision,
     required super.isOperationRunning,
     this.stateChange,
+    this.isAwaitingConfirmedSnapshot = false,
   });
 
   final application.IntentionDetails details;
@@ -28,17 +29,25 @@ final class IntentionDetailsLoaded extends IntentionDetailsState {
   Intention get intention => details.intention;
   final IntentionDetailsStateChange? stateChange;
 
+  /// Подтверждённое изменение этого намерения уже опубликовано, а снимок с
+  /// ним ещё не принят: показанные поля старше последнего подтверждённого
+  /// текста, и правка по ним открываться не должна.
+  final bool isAwaitingConfirmedSnapshot;
+
   IntentionDetailsLoaded copyWith({
     application.IntentionDetails? details,
     GraphRevision? revision,
     bool? isOperationRunning,
     IntentionDetailsStateChange? stateChange,
     bool clearStateChange = false,
+    bool? isAwaitingConfirmedSnapshot,
   }) => IntentionDetailsLoaded(
     details: details ?? this.details,
     revision: revision ?? this.revision,
     isOperationRunning: isOperationRunning ?? this.isOperationRunning,
     stateChange: clearStateChange ? null : stateChange ?? this.stateChange,
+    isAwaitingConfirmedSnapshot:
+        isAwaitingConfirmedSnapshot ?? this.isAwaitingConfirmedSnapshot,
   );
 }
 

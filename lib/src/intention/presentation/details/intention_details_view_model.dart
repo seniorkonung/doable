@@ -224,6 +224,12 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     _preserveAuthoritativeStateWhileLoading = true;
     // Пакет задаёт барьер; поля и сводка публикуются цельным снимком.
     _startObservation();
+    // Координатор уже снял занятость, а прежний снимок остаётся на экране
+    // до перечитывания: правка не должна начаться с устаревшего текста.
+    final current = state;
+    if (current is IntentionDetailsLoaded) {
+      state = current.copyWith(isAwaitingConfirmedSnapshot: true);
+    }
   }
 
   Future<IntentionCommandCompletion>? _startStateChange(

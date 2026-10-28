@@ -1244,7 +1244,39 @@ void main() {
     await tester.pumpAndSettle();
     _expectPageControls(tester, enabled: true);
     expect(tester.widget<PageHead>(find.byType(PageHead)).name, saved.title);
+  });
 
+  testWidgets('после сохранения с экрана изменения вход в правку недоступен, '
+      'пока страница не получит снимок с сохранённым текстом', (tester) async {
+    final repository = ControlledDetailsRepository();
+    final before = testDetailsIntention(index: 97, title: 'Бегать');
+    final saved = testDetailsIntention(index: 97, title: 'Бегать по утрам');
+    await _pumpEditablePage(tester, repository, before);
+
+    await tester.tap(_headName(before.title));
+    await tester.pumpAndSettle();
+    await tester.enterText(_editTitleField, saved.title);
+    await tester.pump();
+    await tester.tap(_editSave);
+    await tester.pump();
+    repository.completeCommand(
+      0,
+      testDetailsSavedResult(saved, before: before),
+    );
+    await tester.pump();
+    await waitForDetailRequests(repository, 2);
+    await tester.pumpAndSettle();
+    expect(find.byType(IntentionEditPage), findsNothing);
+    final staleHead = tester.widget<PageHead>(find.byType(PageHead));
+    expect(staleHead.name, before.title);
+    expect(staleHead.onEdit, isNull);
+
+    await tester.tap(_headName(before.title));
+    await tester.pumpAndSettle();
+    expect(find.byType(IntentionEditPage), findsNothing);
+
+    repository.detailRequests.last.add(ResultSuccess(saved));
+    await tester.pumpAndSettle();
     await tester.tap(_headName(saved.title));
     await tester.pumpAndSettle();
     expect(_editText(tester, _editTitleField), saved.title);

@@ -200,15 +200,21 @@ final class _IntentionDetailsPageState
   /// этой страницы, поэтому перед открытием занятость читается у него.
   void _openEdit() {
     final intentionId = widget.intentionId;
-    if (ref
-        .read(graphCommandCoordinatorProvider.notifier)
-        .isRunning(intentionId)) {
+    final details = ref.read(intentionDetailsViewModelProvider(intentionId));
+    if (details is! IntentionDetailsLoaded ||
+        !_canOpenEdit(details) ||
+        ref
+            .read(graphCommandCoordinatorProvider.notifier)
+            .isRunning(intentionId)) {
       return;
     }
     unawaited(
       context.router.push(IntentionEditRoute(intentionId: intentionId)),
     );
   }
+
+  bool _canOpenEdit(IntentionDetailsLoaded loaded) =>
+      !loaded.isOperationRunning && !loaded.isAwaitingConfirmedSnapshot;
 
   Widget _buildHead(IntentionDetailsLoaded loaded) {
     final name = loaded.intention.title;
@@ -226,7 +232,7 @@ final class _IntentionDetailsPageState
             key: const ValueKey('intention-details-title'),
             name: name,
             editLabel: AppLocalizations.of(context).detailsEditTitleLabel(name),
-            onEdit: loaded.isOperationRunning ? null : _openEdit,
+            onEdit: _canOpenEdit(loaded) ? _openEdit : null,
           ),
         ),
       ),
