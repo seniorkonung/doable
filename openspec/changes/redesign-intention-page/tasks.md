@@ -493,7 +493,7 @@
     - проверки: `test/intention/presentation/details/intention_details_page_test.dart`, `test/intention/presentation/details/intention_details_view_model_test.dart`, `test/app/intention_statistics_app_flow_test.dart`.
   - **Размер:** M — в основном удаление.
 
-- [ ] 3.13 Подтвердить готовность третьей фазы: правка названия и описания идёт на отдельном экране без сообщения об успехе
+- [x] 3.13 Подтвердить готовность третьей фазы: правка названия и описания идёт на отдельном экране без сообщения об успехе
   - **Критерии приёмки:**
     - Выполнено условие «Ready to advance» третьей фазы:
       - требования экрана изменения и предъявления результата правки выполняются;
