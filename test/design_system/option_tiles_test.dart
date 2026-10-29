@@ -1,3 +1,5 @@
+import 'dart:ui' show ImageByteFormat;
+
 import 'package:doable/src/design_system/components/option_tiles.dart';
 import 'package:doable/src/design_system/doable_colors.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
@@ -254,6 +256,54 @@ void main() {
       expect(changes, [_Kind.action]);
     });
   }
+
+  testWidgets(
+    'плитки, частично прокрученные за верх области прокрутки, не закрашивают '
+    'прозрачную панель над ней',
+    (tester) async {
+      final boundary = GlobalKey();
+      final controller = ScrollController(initialScrollOffset: 30);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: doableTheme(Brightness.light),
+          home: RepaintBoundary(
+            key: boundary,
+            child: Scaffold(
+              body: Column(
+                children: [
+                  const SizedBox(height: 44),
+                  Expanded(
+                    child: CustomScrollView(
+                      controller: controller,
+                      slivers: [
+                        SliverToBoxAdapter(
+                          child: OptionTiles(
+                            first: _intention,
+                            second: _action,
+                            value: _Kind.intention,
+                            label: 'Намерение или действие',
+                            onChange: (_) {},
+                          ),
+                        ),
+                        const SliverToBoxAdapter(child: SizedBox(height: 1000)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(tester.getRect(_tile('Намерение')).top, 14);
+      expect(
+        await _pixel(tester, boundary, const Offset(50, 30)),
+        isSameColorAs(DoableColors.light.bg),
+      );
+    },
+  );
 }
 
 Matcher _tileSemantics(String label, {required bool selected}) =>
@@ -295,10 +345,15 @@ DoableIcon _icon(WidgetTester tester, String title, DoableIconData icon) =>
     );
 BoxDecoration _plane(WidgetTester tester, String title) =>
     tester
-            .widget<Ink>(
-              find.ancestor(of: find.text(title), matching: find.byType(Ink)),
+            .widget<DecoratedBox>(
+              find
+                  .ancestor(
+                    of: _tile(title),
+                    matching: find.byType(DecoratedBox),
+                  )
+                  .first,
             )
-            .decoration!
+            .decoration
         as BoxDecoration;
 TextStyle _style(WidgetTester tester, String text) =>
     tester.renderObject<RenderParagraph>(find.text(text)).text.style!;
@@ -310,6 +365,32 @@ void _expectStyle(TextStyle actual, TextStyle expected) {
   expect(actual.fontWeight, expected.fontWeight);
   expect(actual.height, expected.height);
   expect(actual.letterSpacing, expected.letterSpacing);
+}
+
+/// Цвет пикселя [point] в логических координатах границы [boundary].
+Future<Color> _pixel(
+  WidgetTester tester,
+  GlobalKey boundary,
+  Offset point,
+) async {
+  final render = tester.renderObject<RenderRepaintBoundary>(
+    find.byKey(boundary),
+  );
+  return (await tester.runAsync(() async {
+    final image = await render.toImage();
+    try {
+      final bytes = (await image.toByteData(format: ImageByteFormat.rawRgba))!;
+      final index = (point.dy.toInt() * image.width + point.dx.toInt()) * 4;
+      return Color.fromARGB(
+        bytes.getUint8(index + 3),
+        bytes.getUint8(index),
+        bytes.getUint8(index + 1),
+        bytes.getUint8(index + 2),
+      );
+    } finally {
+      image.dispose();
+    }
+  }))!;
 }
 
 Widget _app(

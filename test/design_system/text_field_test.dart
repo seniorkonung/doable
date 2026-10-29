@@ -1,3 +1,5 @@
+import 'dart:ui' show ImageByteFormat;
+
 import 'package:doable/src/design_system/components/tag_dot.dart';
 import 'package:doable/src/design_system/components/text_field.dart';
 import 'package:doable/src/design_system/doable_colors.dart';
@@ -228,7 +230,7 @@ void main() {
       final plane = tester.getRect(_savedPlane);
       expect(plane.height, DoableMetrics.tapMin);
       final decoration =
-          tester.widget<Ink>(_savedPlane).decoration! as BoxDecoration;
+          tester.widget<DecoratedBox>(_savedPlane).decoration as BoxDecoration;
       expect(decoration.color, colors.fill);
       expect(
         decoration.borderRadius,
@@ -394,6 +396,53 @@ void main() {
     },
   );
 
+  testWidgets(
+    'сохранённый текст, частично прокрученный за верх области прокрутки, '
+    'не закрашивает прозрачную панель над ней',
+    (tester) async {
+      final boundary = GlobalKey();
+      final controller = ScrollController(initialScrollOffset: 30);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: doableTheme(Brightness.light),
+          home: RepaintBoundary(
+            key: boundary,
+            child: Scaffold(
+              body: Column(
+                children: [
+                  const SizedBox(height: 44),
+                  Expanded(
+                    child: CustomScrollView(
+                      controller: controller,
+                      slivers: [
+                        SliverToBoxAdapter(
+                          child: TextField.saved(
+                            value: 'Ноги и спина',
+                            placeholder: 'Добавить заметку',
+                            label: _savedLabel,
+                            onOpen: () {},
+                          ),
+                        ),
+                        const SliverToBoxAdapter(child: SizedBox(height: 1000)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(tester.getRect(_savedPlane).top, 14);
+      expect(
+        await _pixel(tester, boundary, const Offset(50, 30)),
+        isSameColorAs(DoableColors.light.bg),
+      );
+    },
+  );
+
   testWidgets('заполнитель пустого поля приглушён и написан обычным весом', (
     tester,
   ) async {
@@ -526,7 +575,7 @@ const _savedLabel = 'Изменить заметку: Ноги и спина';
 
 final _savedPlane = find.descendant(
   of: find.byWidgetPredicate((widget) => widget is TextField),
-  matching: find.byType(Ink),
+  matching: find.byType(DecoratedBox),
 );
 
 TextStyle _savedStyle(WidgetTester tester, String text) =>
@@ -555,6 +604,32 @@ Widget _savedApp({
     ),
   ),
 );
+
+/// Цвет пикселя [point] в логических координатах границы [boundary].
+Future<Color> _pixel(
+  WidgetTester tester,
+  GlobalKey boundary,
+  Offset point,
+) async {
+  final render = tester.renderObject<RenderRepaintBoundary>(
+    find.byKey(boundary),
+  );
+  return (await tester.runAsync(() async {
+    final image = await render.toImage();
+    try {
+      final bytes = (await image.toByteData(format: ImageByteFormat.rawRgba))!;
+      final index = (point.dy.toInt() * image.width + point.dx.toInt()) * 4;
+      return Color.fromARGB(
+        bytes.getUint8(index + 3),
+        bytes.getUint8(index),
+        bytes.getUint8(index + 1),
+        bytes.getUint8(index + 2),
+      );
+    } finally {
+      image.dispose();
+    }
+  }))!;
+}
 
 DoableColors _colors(Brightness brightness) => switch (brightness) {
   Brightness.light => DoableColors.light,

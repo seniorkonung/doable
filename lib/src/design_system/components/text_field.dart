@@ -262,31 +262,36 @@ final class _SavedTextField extends TextField {
       enabled: onOpen != null,
       label: label,
       onTap: onOpen,
-      child: InkWell(
-        onTap: onOpen,
-        excludeFromSemantics: true,
-        mouseCursor: onOpen == null ? null : SystemMouseCursors.text,
-        borderRadius: _radius,
-        // Ink сохраняет отклик нажатия над fill:
-        // https://api.flutter.dev/flutter/material/InkWell-class.html
-        child: Ink(
-          decoration: BoxDecoration(color: colors.fill, borderRadius: _radius),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              minWidth: double.infinity,
-              minHeight: DoableMetrics.tapMin,
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: DoableMetrics.space3,
-                vertical: 11,
+      // Плоскость и отклик нажатия рисуются в порядке потомков, поэтому
+      // область прокрутки их обрезает. На Material предка они рисовались бы
+      // под всем его содержимым и без этой обрезки:
+      // https://api.flutter.dev/flutter/material/InkWell-class.html
+      child: DecoratedBox(
+        decoration: BoxDecoration(color: colors.fill, borderRadius: _radius),
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            onTap: onOpen,
+            excludeFromSemantics: true,
+            mouseCursor: onOpen == null ? null : SystemMouseCursors.text,
+            borderRadius: _radius,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                minWidth: double.infinity,
+                minHeight: DoableMetrics.tapMin,
               ),
-              child: ExcludeSemantics(
-                child: Text(
-                  isEmpty ? placeholder : value,
-                  softWrap: true,
-                  style: DoableType.field.copyWith(
-                    color: isEmpty ? colors.muted : colors.ink,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: DoableMetrics.space3,
+                  vertical: 11,
+                ),
+                child: ExcludeSemantics(
+                  child: Text(
+                    isEmpty ? placeholder : value,
+                    softWrap: true,
+                    style: DoableType.field.copyWith(
+                      color: isEmpty ? colors.muted : colors.ink,
+                    ),
                   ),
                 ),
               ),

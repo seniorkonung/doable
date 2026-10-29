@@ -121,77 +121,92 @@ final class _TileState<T extends Object> extends State<_Tile<T>> {
         _focused &&
         FocusManager.instance.highlightMode == FocusHighlightMode.traditional;
 
+    final decoration = BoxDecoration(
+      color: selected ? colors.fill : null,
+      border: selected ? null : Border.all(color: colors.hairline),
+      borderRadius: radius,
+      boxShadow: showsFocus
+          ? [
+              BoxShadow(color: colors.accent, spreadRadius: 4),
+              BoxShadow(color: colors.bg, spreadRadius: 2),
+            ]
+          : null,
+    );
+
     return MergeSemantics(
       child: Semantics(
         button: true,
         enabled: onChange != null,
         selected: selected,
         inMutuallyExclusiveGroup: true,
-        child: InkWell(
-          onTap: switch (onChange) {
-            null => null,
-            final onChange => () {
-              if (!selected) onChange(tile.id);
-            },
-          },
-          borderRadius: radius,
-          focusColor: Colors.transparent,
-          onFocusChange: (focused) => setState(() => _focused = focused),
-          // Ink сохраняет отклик нажатия над fill:
-          // https://api.flutter.dev/flutter/material/InkWell-class.html
-          child: Ink(
-            decoration: BoxDecoration(
-              color: selected ? colors.fill : null,
-              border: selected ? null : Border.all(color: colors.hairline),
+        // Плоскость, кольца и отклик нажатия рисуются в порядке потомков,
+        // поэтому область прокрутки их обрезает. На Material предка они
+        // рисовались бы под всем его содержимым и без этой обрезки:
+        // https://api.flutter.dev/flutter/material/InkWell-class.html
+        child: DecoratedBox(
+          decoration: decoration,
+          child: Material(
+            type: MaterialType.transparency,
+            child: InkWell(
+              onTap: switch (onChange) {
+                null => null,
+                final onChange => () {
+                  if (!selected) onChange(tile.id);
+                },
+              },
               borderRadius: radius,
-              boxShadow: showsFocus
-                  ? [
-                      BoxShadow(color: colors.accent, spreadRadius: 4),
-                      BoxShadow(color: colors.bg, spreadRadius: 2),
-                    ]
-                  : null,
-            ),
-            padding: const EdgeInsets.all(DoableMetrics.space3),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              spacing: 6,
-              children: [
-                Row(
-                  spacing: DoableMetrics.space2,
+              focusColor: Colors.transparent,
+              onFocusChange: (focused) => setState(() => _focused = focused),
+              // Рамка лежит внутри плитки и сдвигает содержимое на свою
+              // толщину.
+              child: Padding(
+                padding: decoration.padding.add(
+                  const EdgeInsets.all(DoableMetrics.space3),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  spacing: 6,
                   children: [
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: selected ? colors.accent : colors.fill,
-                      ),
-                      alignment: Alignment.center,
-                      child: DoableIcon(
-                        tile.icon,
-                        size: 20,
-                        color: selected ? colors.onAccent : colors.ink,
-                      ),
+                    Row(
+                      spacing: DoableMetrics.space2,
+                      children: [
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: selected ? colors.accent : colors.fill,
+                          ),
+                          alignment: Alignment.center,
+                          child: DoableIcon(
+                            tile.icon,
+                            size: 20,
+                            color: selected ? colors.onAccent : colors.ink,
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            tile.title,
+                            style: DoableType.section.copyWith(
+                              color: colors.ink,
+                            ),
+                          ),
+                        ),
+                        if (selected)
+                          DoableIcon(
+                            DoableIconData.check,
+                            size: 18,
+                            color: colors.accent,
+                          ),
+                      ],
                     ),
-                    Expanded(
-                      child: Text(
-                        tile.title,
-                        style: DoableType.section.copyWith(color: colors.ink),
-                      ),
+                    Text(
+                      tile.hint,
+                      style: DoableType.hint.copyWith(color: colors.muted),
                     ),
-                    if (selected)
-                      DoableIcon(
-                        DoableIconData.check,
-                        size: 18,
-                        color: colors.accent,
-                      ),
                   ],
                 ),
-                Text(
-                  tile.hint,
-                  style: DoableType.hint.copyWith(color: colors.muted),
-                ),
-              ],
+              ),
             ),
           ),
         ),
