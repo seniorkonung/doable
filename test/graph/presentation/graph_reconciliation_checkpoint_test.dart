@@ -39,6 +39,7 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_view
 import 'package:doable/src/intention/presentation/details/intention_details_state.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_view_model.dart';
 import 'package:doable/src/intention/presentation/details/intention_page_target.dart';
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
@@ -47,9 +48,10 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/long_term_relation/presentation/details/relation_details_state.dart';
 import 'package:doable/src/long_term_relation/presentation/details/relation_details_view_model.dart';
+import 'package:doable/src/long_term_relation/presentation/intention_relations/intention_relations_state.dart';
+import 'package:doable/src/long_term_relation/presentation/intention_relations/intention_relations_view_model.dart';
 import 'package:doable/src/long_term_relation/presentation/relation_group_paging_policy.dart';
-import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_state.dart';
-import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart';
+import 'package:doable/src/long_term_relation/presentation/relation_list_reconciliation.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
@@ -73,8 +75,9 @@ import '../../support/statistics_read_contract_test_fallback.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/tag_positions.dart';
 
-/// Контрольная точка согласования: каталог, подробные данные и соседство
-/// обслуживаются одним графом, одним coordinator и одним потоком завершений.
+/// Контрольная точка согласования: каталог, подробные данные и вкладка
+/// «Связи» обслуживаются одним графом, одним coordinator и одним потоком
+/// завершений.
 void main() {
   group('согласование выдачи с условием по тегу с настоящим хранилищем', () {
     late AppDatabase database;
@@ -84,6 +87,7 @@ void main() {
     late GraphCommandCoordinator coordinator;
     late TagId tagId;
     late IntentionId ownerId;
+    late IntentionRelationsViewModelProvider relationsProvider;
 
     const browse = BrowseIntentionCatalog();
     IntentionCatalogLoaded? loadedCatalog() =>
@@ -92,9 +96,8 @@ void main() {
           _ => null,
         };
     IntentionCatalogLoaded catalog() => loadedCatalog()!;
-    RelationGroupLoaded neighborhood() =>
-        container.read(relationNeighborhoodViewModelProvider(ownerId))
-            as RelationGroupLoaded;
+    IntentionRelationsLoaded relations() =>
+        container.read(relationsProvider) as IntentionRelationsLoaded;
     IntentionDetailsLoaded details() =>
         container.read(intentionDetailsViewModelProvider(ownerId))
             as IntentionDetailsLoaded;
@@ -147,6 +150,12 @@ void main() {
       ownerId = (IntentionId.decode(
         tagFixtureId(1),
       ) as IntentionIdDecodingSuccess).id;
+      relationsProvider = intentionRelationsViewModelProvider(
+        ownerId,
+        IntentionPageInstance(
+          target: const RelationsTarget(IntentionRelationGroup.needs),
+        ),
+      );
       container = ProviderContainer(
         overrides: [
           personalGraphRepositoryProvider.overrideWithValue(repository),
@@ -166,10 +175,13 @@ void main() {
       coordinator = container.read(graphCommandCoordinatorProvider.notifier);
       container.listen(intentionCatalogViewModelProvider(browse), (_, _) {});
       container.listen(intentionDetailsViewModelProvider(ownerId), (_, _) {});
-      container.listen(
-        relationNeighborhoodViewModelProvider(ownerId),
-        (_, _) {},
+      // Вкладка «Связи» открывается над полученными подробными данными.
+      await _settleUntil(
+        () =>
+            container.read(intentionDetailsViewModelProvider(ownerId))
+                is IntentionDetailsLoaded,
       );
+      container.listen(relationsProvider, (_, _) {});
       await _settleUntil(() => loadedCatalog() != null);
       container
           .read(intentionCatalogViewModelProvider(browse).notifier)
@@ -180,10 +192,7 @@ void main() {
                   tagId,
                 ) ==
                 true &&
-            container.read(relationNeighborhoodViewModelProvider(ownerId))
-                is RelationGroupLoaded &&
-            container.read(intentionDetailsViewModelProvider(ownerId))
-                is IntentionDetailsLoaded,
+            container.read(relationsProvider) is IntentionRelationsLoaded,
       );
     });
 
@@ -198,7 +207,7 @@ void main() {
       final initialRevision = catalog().revision;
       expect(catalog().items.map((item) => item.id), expected.take(10));
       await settle(initialRevision);
-      final countsBefore = neighborhood().counts;
+      final countsBefore = relations().counts;
       final detailsCountsBefore = details().details.relationCounts;
       expect(catalog().items.map((item) => item.id), expected);
       expect(catalog().totalCount, expected.length);
@@ -213,13 +222,16 @@ void main() {
         expect(catalog().items.map((item) => item.id), remaining);
         expect(catalog().totalCount, remaining.length);
 
-        if (neighborhood().nextCursor != null) {
-          final countBefore = neighborhood().items.length;
+        if (relations().nextCursor != null) {
+          final countBefore = relations().items.length;
           await container
-              .read(relationNeighborhoodViewModelProvider(ownerId).notifier)
-              .loadMoreIfNeeded(visibleIndex: countBefore - 1);
-          await _settleUntil(() => neighborhood().items.length > countBefore);
-          expect(neighborhood().counts, countsBefore);
+              .read(relationsProvider.notifier)
+              .loadMoreIfNeeded(
+                scope: RelationScope.active,
+                visibleIndex: countBefore - 1,
+              );
+          await _settleUntil(() => relations().items.length > countBefore);
+          expect(relations().counts, countsBefore);
         }
 
         final assigned = await (coordinator.acceptTagAssign(
@@ -263,7 +275,7 @@ void main() {
         ),
       );
       expect(catalog().items.any((item) => item.id == ownerId), isFalse);
-      expect(neighborhood().counts, countsBefore);
+      expect(relations().counts, countsBefore);
       expect(details().details.relationCounts, detailsCountsBefore);
       expect(catalog().totalCount, expected.length);
     });
@@ -657,6 +669,17 @@ void main() {
       final catalogProvider = intentionCatalogViewModelProvider(
         const BrowseIntentionCatalog(),
       );
+      final relationsProviders = {
+        for (final id in [ids[0], ids[1]])
+          id: intentionRelationsViewModelProvider(
+            id,
+            IntentionPageInstance(
+              target: const RelationsTarget(IntentionRelationGroup.needs),
+            ),
+          ),
+      };
+      IntentionRelationsState relations(IntentionId id) =>
+          container.read(relationsProviders[id]!);
       final filteredProvider = intentionCatalogViewModelProvider(
         SelectRelationParticipant(
           session: IntentionSearchSession(),
@@ -673,12 +696,6 @@ void main() {
             (_, _) {},
             fireImmediately: true,
           ),
-        for (final id in [ids[0], ids[1]])
-          container.listen(
-            relationNeighborhoodViewModelProvider(id),
-            (_, _) {},
-            fireImmediately: true,
-          ),
         for (final id in [selectedActive, untouchedNeighbor])
           container.listen(
             relationDetailsViewModelProvider(id),
@@ -692,20 +709,27 @@ void main() {
         }
         container.dispose();
       });
+      // Вкладка «Связи» открывается над полученными подробными данными.
+      await _settleUntil(
+        () => ids.every(
+          (id) =>
+              container.read(intentionDetailsViewModelProvider(id))
+                  is IntentionDetailsLoaded,
+        ),
+      );
+      for (final provider in relationsProviders.values) {
+        subscriptions.add(
+          container.listen(provider, (_, _) {}, fireImmediately: true),
+        );
+      }
       await _settleUntil(
         () =>
             container.read(catalogProvider).value is IntentionCatalogLoaded &&
             container.read(filteredProvider).value is IntentionCatalogLoaded &&
-            ids.every(
-              (id) =>
-                  container.read(intentionDetailsViewModelProvider(id))
-                      is IntentionDetailsLoaded,
-            ) &&
-            [ids[0], ids[1]].every(
-              (id) =>
-                  container.read(relationNeighborhoodViewModelProvider(id))
-                      is RelationGroupLoaded,
-            ) &&
+            [
+              ids[0],
+              ids[1],
+            ].every((id) => relations(id) is IntentionRelationsLoaded) &&
             [selectedActive, untouchedNeighbor].every(
               (id) =>
                   container.read(relationDetailsViewModelProvider(id))
@@ -762,10 +786,8 @@ void main() {
         () =>
             container.read(relationDetailsViewModelProvider(selectedActive))
                 is RelationDetailsDeleted &&
-            container.read(relationNeighborhoodViewModelProvider(ids[0]))
-                is RelationGroupEmpty &&
-            container.read(relationNeighborhoodViewModelProvider(ids[1]))
-                is RelationGroupLoaded &&
+            relations(ids[0]) is IntentionRelationsEmpty &&
+            relations(ids[1]) is IntentionRelationsLoaded &&
             container.read(intentionDetailsViewModelProvider(ids[0]))
                 is IntentionDetailsLoaded &&
             (container.read(
@@ -799,15 +821,11 @@ void main() {
         expect(details.details.relationCounts.active, 1);
         expect(details.intention.title, 'Намерение ${ids.indexOf(id) + 1}');
       }
-      final ownerGroup = container.read(
-        relationNeighborhoodViewModelProvider(ids[0]),
-      ) as RelationGroupEmpty;
+      final ownerGroup = relations(ids[0]) as IntentionRelationsEmpty;
       expect(ownerGroup.counts.total, 1);
       expect(ownerGroup.counts.activeCanOutgoing, 1);
       expect(ownerGroup.counts.archivedCanIncoming, 0);
-      final neighborGroup = container.read(
-        relationNeighborhoodViewModelProvider(ids[1]),
-      ) as RelationGroupLoaded;
+      final neighborGroup = relations(ids[1]) as IntentionRelationsLoaded;
       expect(neighborGroup.items.single.relation.id, untouchedNeighbor);
       expect(neighborGroup.counts.total, 1);
       final remainingDetails = container.read(
@@ -884,9 +902,9 @@ void main() {
         testIntentionId(1),
       ]);
       expect(harness.detailsCounts.activeNeedOutgoing, 2);
-      expect(harness.neighborhood.items, hasLength(2));
-      expect(harness.neighborhood.totalCount, 2);
-      expect(harness.neighborhood.progress, isA<RelationGroupIdle>());
+      expect(harness.relations.items, hasLength(2));
+      expect(harness.relations.counts.activeNeedOutgoing, 2);
+      expect(harness.relations.progress, isA<RelationListIdle>());
 
       // Переименование уже загруженного участника той же выдачи.
       await harness.completeParticipantRename(
@@ -913,11 +931,8 @@ void main() {
       expect(harness.catalogTitles[testIntentionId(1001)], 'Переименованное');
       expect(harness.catalog.items, hasLength(3));
       expect(harness.catalog.totalCount, 3);
-      expect(
-        harness.neighborhood.items.first.neighbor.title,
-        'Переименованное',
-      );
-      expect(harness.neighborhood.progress, isA<RelationGroupIdle>());
+      expect(harness.relations.items.first.neighbor.title, 'Переименованное');
+      expect(harness.relations.progress, isA<RelationListIdle>());
       expect(harness.detailsCounts.activeNeedOutgoing, 2);
     },
   );
@@ -927,7 +942,7 @@ void main() {
     'ошибках и инвалидированиях',
     () async {
       final repository = _CheckpointGraphRepository();
-      final harness = _CheckpointHarness(repository, neighborhoodPageSize: 2);
+      final harness = _CheckpointHarness(repository, relationsPageSize: 2);
       addTearDown(harness.dispose);
       await harness.loadInitialSurfaces(
         groupPage: RelationGroupFirstPage(
@@ -938,7 +953,7 @@ void main() {
         ),
       );
 
-      harness.scrollNeighborhoodTo(1);
+      harness.scrollRelationsTo(1);
       await pumpEventQueue();
       repository.completeGroupPage(
         1,
@@ -949,7 +964,7 @@ void main() {
         ),
       );
       await pumpEventQueue();
-      expect(harness.neighborhood.items, hasLength(4));
+      expect(harness.relations.items, hasLength(4));
 
       // Изменение непросматриваемой группы запускает замену выбранной.
       repository.emitIntention(
@@ -964,11 +979,11 @@ void main() {
       repository.failGroupRead(2, const RelationGroupUnavailableFailure());
       await pumpEventQueue();
 
-      expect(harness.neighborhood.items, hasLength(4));
-      expect(harness.neighborhood.counts.activeCanIncoming, 0);
+      expect(harness.relations.items, hasLength(4));
+      expect(harness.relations.counts.activeCanIncoming, 0);
       expect(
-        harness.neighborhood.summaryStatus,
-        isA<RelationSummaryRefreshFailure>(),
+        harness.relations.summaryStatus,
+        isA<RelationListSummaryRefreshFailure>(),
       );
 
       // Повторное инвалидирование запускает новую замену.
@@ -1014,9 +1029,9 @@ void main() {
       );
       await pumpEventQueue();
 
-      expect(harness.neighborhood.items, hasLength(4));
-      expect(harness.neighborhood.counts.activeCanIncoming, 1);
-      expect(harness.neighborhood.progress, isA<RelationGroupIdle>());
+      expect(harness.relations.items, hasLength(4));
+      expect(harness.relations.counts.activeCanIncoming, 1);
+      expect(harness.relations.progress, isA<RelationListIdle>());
 
       // Трасса не выходит за выбранную группу и загруженный предел.
       for (final query in repository.groupQueries) {
@@ -1256,7 +1271,7 @@ void main() {
     'пакет только тега сохраняет каталог и обновляет группу перед продолжением',
     () async {
       final repository = _CheckpointGraphRepository();
-      final harness = _CheckpointHarness(repository, neighborhoodPageSize: 1);
+      final harness = _CheckpointHarness(repository, relationsPageSize: 1);
       addTearDown(harness.dispose);
       await harness.loadInitialSurfaces(
         groupPage: RelationGroupFirstPage(
@@ -1268,7 +1283,7 @@ void main() {
       );
 
       final beforeCatalog = harness.catalog;
-      final beforeGroup = harness.neighborhood;
+      final beforeGroup = harness.relations;
       final accepted = harness.coordinator.acceptTagCreation(
         TagCreationFormKey(),
         CreateTag(
@@ -1301,11 +1316,11 @@ void main() {
 
       expect(harness.catalog.items, beforeCatalog.items);
       expect(harness.catalog.totalCount, beforeCatalog.totalCount);
-      expect(harness.neighborhood.items, beforeGroup.items);
-      expect(harness.neighborhood.counts, beforeGroup.counts);
+      expect(harness.relations.items, beforeGroup.items);
+      expect(harness.relations.counts, beforeGroup.counts);
       expect(repository.catalogQueries, hasLength(1));
 
-      harness.scrollNeighborhoodTo(0);
+      harness.scrollRelationsTo(0);
       await pumpEventQueue();
       expect(repository.groupQueries[1].cursor, isNull);
       repository.completeGroupPage(
@@ -1327,11 +1342,11 @@ void main() {
         ),
       );
       await pumpEventQueue();
-      expect(harness.neighborhood.items, hasLength(2));
-      expect(harness.neighborhood.counts.activeNeedOutgoing, 2);
+      expect(harness.relations.items, hasLength(2));
+      expect(harness.relations.counts.activeNeedOutgoing, 2);
 
       final currentCatalog = harness.catalog;
-      final currentGroup = harness.neighborhood;
+      final currentGroup = harness.relations;
       final unchanged = harness.coordinator.acceptTagUpdate(
         UpdateTag(tagId: tag.id, name: tag.name, color: tag.color),
       ) as TagCommandAccepted;
@@ -1350,14 +1365,14 @@ void main() {
       await pumpEventQueue();
       expect(harness.catalog.items, currentCatalog.items);
       expect(harness.catalog.totalCount, currentCatalog.totalCount);
-      expect(harness.neighborhood.items, currentGroup.items);
-      expect(harness.neighborhood.counts, currentGroup.counts);
+      expect(harness.relations.items, currentGroup.items);
+      expect(harness.relations.counts, currentGroup.counts);
     },
   );
 
   test('позднее продолжение группы не смешивается с пакетом тега', () async {
     final repository = _CheckpointGraphRepository();
-    final harness = _CheckpointHarness(repository, neighborhoodPageSize: 1);
+    final harness = _CheckpointHarness(repository, relationsPageSize: 1);
     addTearDown(harness.dispose);
     await harness.loadInitialSurfaces(
       groupPage: RelationGroupFirstPage(
@@ -1367,7 +1382,7 @@ void main() {
         revision: const TestGraphRevision(4),
       ),
     );
-    harness.scrollNeighborhoodTo(0);
+    harness.scrollRelationsTo(0);
     expect(repository.groupQueries[1].cursor, isNotNull);
 
     final tagId = switch (TagId.decode(
@@ -1402,7 +1417,7 @@ void main() {
       ),
     );
     await pumpEventQueue();
-    expect(harness.neighborhood.items, hasLength(1));
+    expect(harness.relations.items, hasLength(1));
 
     repository.completeGroupPage(
       2,
@@ -1423,14 +1438,14 @@ void main() {
       ),
     );
     await pumpEventQueue();
-    expect(harness.neighborhood.items, hasLength(2));
+    expect(harness.relations.items, hasLength(2));
   });
 
   test(
     'пакет назначения сохраняет счётчики и не смешивает продолжения группы',
     () async {
       final repository = _CheckpointGraphRepository();
-      final harness = _CheckpointHarness(repository, neighborhoodPageSize: 1);
+      final harness = _CheckpointHarness(repository, relationsPageSize: 1);
       addTearDown(harness.dispose);
       await harness.loadInitialSurfaces(
         groupPage: RelationGroupFirstPage(
@@ -1441,7 +1456,7 @@ void main() {
         ),
       );
       final detailsBefore = harness.detailsCounts;
-      harness.scrollNeighborhoodTo(0);
+      harness.scrollRelationsTo(0);
       expect(repository.groupQueries[1].cursor, isNotNull);
 
       final tagId = switch (TagId.decode(
@@ -1508,7 +1523,7 @@ void main() {
         ),
       );
       await pumpEventQueue();
-      expect(harness.neighborhood.items, hasLength(1));
+      expect(harness.relations.items, hasLength(1));
 
       repository.completeGroupPage(
         2,
@@ -1529,9 +1544,9 @@ void main() {
         ),
       );
       await pumpEventQueue();
-      expect(harness.neighborhood.items, hasLength(2));
+      expect(harness.relations.items, hasLength(2));
       expect(
-        harness.neighborhood.counts,
+        harness.relations.counts,
         testRelationCounts(activeNeedOutgoing: 2),
       );
       expect(
@@ -1566,12 +1581,13 @@ final class _CheckpointChoiceIds implements DailyChoiceIdGenerator {
   DailyChoiceId generate() => durabilityChoice(_next++);
 }
 
-/// Единая среда каталога, подробного просмотра и соседства одного намерения.
+/// Единая среда каталога, подробного просмотра и вкладки «Связи» одного
+/// намерения.
 final class _CheckpointHarness {
   _CheckpointHarness(
     this.repository, {
     int catalogPageSize = 100,
-    int neighborhoodPageSize = 50,
+    int relationsPageSize = 50,
   }) : ownerId = testIntentionId(1) {
     _container = ProviderContainer(
       overrides: [
@@ -1585,8 +1601,8 @@ final class _CheckpointHarness {
         ),
         relationGroupPagingPolicyProvider.overrideWithValue(
           RelationGroupPagingPolicy(
-            pageSize: neighborhoodPageSize,
-            prefetchRemaining: neighborhoodPageSize - 1,
+            pageSize: relationsPageSize,
+            prefetchRemaining: relationsPageSize - 1,
           ),
         ),
       ],
@@ -1602,10 +1618,11 @@ final class _CheckpointHarness {
       (_, _) {},
       fireImmediately: true,
     );
-    _neighborhoodSubscription = _container.listen(
-      relationNeighborhoodViewModelProvider(ownerId),
-      (_, _) {},
-      fireImmediately: true,
+    _relationsProvider = intentionRelationsViewModelProvider(
+      ownerId,
+      IntentionPageInstance(
+        target: const RelationsTarget(IntentionRelationGroup.needs),
+      ),
     );
   }
 
@@ -1615,8 +1632,8 @@ final class _CheckpointHarness {
   late final ProviderSubscription<AsyncValue<IntentionCatalogState>>
   _catalogSubscription;
   late final ProviderSubscription<IntentionDetailsState> _detailsSubscription;
-  late final ProviderSubscription<RelationNeighborhoodState>
-  _neighborhoodSubscription;
+  late final IntentionRelationsViewModelProvider _relationsProvider;
+  ProviderSubscription<IntentionRelationsState>? _relationsSubscription;
 
   GraphCommandCoordinator get coordinator =>
       _container.read(graphCommandCoordinatorProvider.notifier);
@@ -1641,17 +1658,22 @@ final class _CheckpointHarness {
 
   RelationCounts get detailsCounts => details.details.relationCounts;
 
-  RelationGroupLoaded get neighborhood =>
-      _container.read(relationNeighborhoodViewModelProvider(ownerId))
-          as RelationGroupLoaded;
+  IntentionRelationsLoaded get relations =>
+      _container.read(_relationsProvider) as IntentionRelationsLoaded;
 
-  void scrollNeighborhoodTo(int visibleIndex) => unawaited(
+  void scrollRelationsTo(int visibleIndex) => unawaited(
     _container
-        .read(relationNeighborhoodViewModelProvider(ownerId).notifier)
-        .loadMoreIfNeeded(visibleIndex: visibleIndex),
+        .read(_relationsProvider.notifier)
+        .loadMoreIfNeeded(
+          scope: RelationScope.active,
+          visibleIndex: visibleIndex,
+        ),
   );
 
   /// Приводит все три поверхности к подтверждённому снимку одной ревизии.
+  ///
+  /// Вкладка «Связи» открывается над полученными подробными данными, поэтому
+  /// её первая порция запрашивается после снимка намерения.
   Future<void> loadInitialSurfaces({RelationGroupFirstPage? groupPage}) async {
     repository.completeCatalogPage(
       0,
@@ -1678,6 +1700,13 @@ final class _CheckpointHarness {
       counts: testRelationCounts(activeNeedOutgoing: 1),
       revision: const TestGraphRevision(4),
     );
+    await pumpEventQueue();
+    _relationsSubscription = _container.listen(
+      _relationsProvider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    await pumpEventQueue();
     repository.completeGroupPage(
       0,
       groupPage ??
@@ -1787,7 +1816,7 @@ final class _CheckpointHarness {
   void dispose() {
     _catalogSubscription.close();
     _detailsSubscription.close();
-    _neighborhoodSubscription.close();
+    _relationsSubscription?.close();
     _container.dispose();
     unawaited(repository.dispose());
   }

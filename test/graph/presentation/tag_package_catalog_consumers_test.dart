@@ -11,6 +11,7 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag_color.dart';
@@ -35,7 +36,8 @@ import 'package_consumers_test_support.dart';
 /// Граф фикстуры: связи 101 (1→2), 102 (2→3), 103 (1→4), 104 (1→5),
 /// дневной выбор 201 от 1 к 3 по пути 101, 102 и отдельное намерение 6.
 /// Намерение 3 наблюдают потребители выбора 201, связи 102 и самого
-/// намерения; намерение 6 не наблюдает никто.
+/// намерения, а его вкладка «Связи» показывает группу связи 102; намерение 6
+/// не наблюдает никто.
 void main() {
   late AppDatabase database;
   late InMemoryDiagnosticsSink diagnostics;
@@ -102,8 +104,6 @@ void main() {
       ..watchRelation(unobservedRelation, observes: false)
       ..intentionDetails(observed, observes: true)
       ..intentionDetails(durabilityIntention(5), observes: false)
-      ..neighborhood(observed, observes: true)
-      ..neighborhood(durabilityIntention(5), observes: false)
       ..relationDetails(observedRelation, observes: true)
       ..relationDetails(unobservedRelation, observes: false)
       ..dailyChoiceCatalog()
@@ -112,6 +112,17 @@ void main() {
       () => probes.allLoaded,
       diagnostics: probes.describe,
     );
+    probes
+      ..intentionRelations(
+        observed,
+        group: IntentionRelationGroup.canBeUsedFor,
+        observes: true,
+      )
+      ..intentionRelations(
+        durabilityIntention(5),
+        group: IntentionRelationGroup.canBeUsedFor,
+        observes: false,
+      );
     // Незавершённая форма и выбор фильтров не должны пострадать от пакета.
     probes.openIntentionEdit(observed).changeTitle('Черновик названия');
     container.read(probes.dailyCatalogProvider.notifier)
@@ -155,7 +166,7 @@ void main() {
     final formBefore = probes.intentionEditDraft(observed);
     expect(formBefore.$1, 'Черновик названия');
     final selectionBefore = probes.dailyCatalogSelection;
-    final neighborhoodSelectionBefore = probes.neighborhoodSelection(observed);
+    final relationsSelectionBefore = probes.relationsSelection(observed);
 
     for (final command in <TagCommand>[
       AssignTag(tagId: tagId, intentionId: observed),
@@ -179,10 +190,7 @@ void main() {
       expect(probes.visibleContent(), contentBefore);
       expect(probes.intentionEditDraft(observed), formBefore);
       expect(probes.dailyCatalogSelection, selectionBefore);
-      expect(
-        probes.neighborhoodSelection(observed),
-        neighborhoodSelectionBefore,
-      );
+      expect(probes.relationsSelection(observed), relationsSelectionBefore);
     }
   });
 
