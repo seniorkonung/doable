@@ -697,6 +697,9 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
+  String get detailsChoicesTab => 'Выборы';
+
+  @override
   String get detailsTitle => 'Подробности намерения';
 
   @override

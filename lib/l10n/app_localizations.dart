@@ -1100,6 +1100,12 @@ abstract class AppLocalizations {
   /// **'Relations: {active} active, {archived} archived'**
   String detailsRelationsTabSemantic(int active, int archived);
 
+  /// Вкладка дневных выборов, прямо использующих намерение
+  ///
+  /// In en, this message translates to:
+  /// **'Choices'**
+  String get detailsChoicesTab;
+
   /// Доступное имя страницы намерения при загрузке и отказе чтения
   ///
   /// In en, this message translates to:

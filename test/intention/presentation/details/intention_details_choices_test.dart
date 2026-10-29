@@ -1,0 +1,340 @@
+import 'dart:async';
+import 'dart:ui' show Tristate;
+
+import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/app/routing/app_router.dart';
+import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
+import 'package:doable/src/daily_choice/domain/calendar_date.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
+import 'package:doable/src/design_system/components/tabs.dart';
+import 'package:doable/src/design_system/doable_theme.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
+import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
+import 'package:doable/src/intention/application/intention_result.dart';
+import 'package:doable/src/intention/domain/intention.dart';
+import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/intention/presentation/details/intention_details_tabs.dart';
+import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
+import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_paging_policy.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+import '../../../long_term_relation/presentation/neighborhood/neighborhood_test_support.dart'
+    show TestRelationGroupCursor;
+import '../../../support/in_memory_quick_creation_mode_store.dart';
+import 'details_test_support.dart';
+
+void main() {
+  for (final (locale, labels) in [
+    ('ru', const ['Обзор', 'Связи', 'Выборы', 'Статистика']),
+    ('en', const ['Overview', 'Relations', 'Choices', 'Statistics']),
+  ]) {
+    testWidgets('$locale: «Выборы» стоят третьей вкладкой без числа', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      final repository = ControlledDetailsRepository();
+      await _openPage(tester, repository, locale: Locale(locale));
+      repository.detailRequests.single.add(
+        ResultSuccess(testDetailsIntention()),
+        relationCounts: testRelationCounts(
+          activeNeedOutgoing: 2,
+          dailySource: 7,
+          dailySelected: 4,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final tabs = find.byType(Tabs<IntentionDetailsTab>);
+      final positions = [
+        for (final label in labels)
+          tester
+              .getCenter(find.descendant(of: tabs, matching: find.text(label)))
+              .dx,
+      ];
+      expect(positions, [...positions]..sort());
+      expect(find.bySemanticsLabel(labels[2]), findsOneWidget);
+      for (final count in ['4', '7', '11']) {
+        expect(
+          find.descendant(of: tabs, matching: find.text(count)),
+          findsNothing,
+        );
+      }
+      expect(repository.dailyChoiceGroupQueries, isEmpty);
+      semantics.dispose();
+    });
+  }
+
+  testWidgets('возвращение к выборам сохраняет роль и начинает список заново', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    final repository = ControlledDetailsRepository();
+    final owner = testDetailsIntention();
+    repository.onDailyChoiceGroupPage = (query) =>
+        _pagedChoices(owner.id, query);
+    await _openPage(tester, repository);
+    repository.detailRequests.single.add(ResultSuccess(owner));
+    await tester.pumpAndSettle();
+    final pageWatches = repository.detailRequests.length;
+
+    await tester.tap(find.text('Choices'));
+    await tester.pumpAndSettle();
+    expect(
+      repository.dailyChoiceGroupQueries.single.role,
+      DailyChoiceRelationRole.source,
+    );
+    final choicesWatch = repository.detailRequests[pageWatches];
+    await tester.tap(
+      find.byKey(const ValueKey('intention-choices-role-selected')),
+    );
+    await tester.pumpAndSettle();
+    await tester.fling(
+      find.byType(CustomScrollView),
+      const Offset(0, -3000),
+      3000,
+    );
+    await tester.pumpAndSettle();
+    final selectedQueries = repository.dailyChoiceGroupQueries
+        .where((query) => query.role == DailyChoiceRelationRole.selected)
+        .toList();
+    expect(selectedQueries.length, greaterThan(1));
+
+    await tester.tap(find.text('Overview'));
+    await tester.pumpAndSettle();
+    expect(choicesWatch.cancellationCount, 1);
+    final queriesBeforeReturn = repository.dailyChoiceGroupQueries.length;
+
+    await tester.tap(find.text('Choices'));
+    await tester.pumpAndSettle();
+    final returnQuery = repository.dailyChoiceGroupQueries
+        .skip(queriesBeforeReturn)
+        .single;
+    expect(returnQuery.role, DailyChoiceRelationRole.selected);
+    expect(returnQuery.cursor, isNull);
+    expect(
+      tester
+          .getSemantics(
+            find.byKey(const ValueKey('intention-choices-role-selected')),
+          )
+          .getSemanticsData()
+          .flagsCollection
+          .isSelected,
+      Tristate.isTrue,
+    );
+    semantics.dispose();
+  });
+
+  testWidgets('пустая роль не скрывает число выборов другой роли', (
+    tester,
+  ) async {
+    final repository = ControlledDetailsRepository();
+    final owner = testDetailsIntention();
+    final counts = testRelationCounts(activeNeedOutgoing: 1, dailySelected: 1);
+    final selectedChoice = _choice(
+      owner.id,
+      role: DailyChoiceRelationRole.selected,
+      index: 1,
+    );
+    repository.onDailyChoiceGroupPage = (query) => GraphResultSuccess(
+      DailyChoiceGroupFirstPage(
+        items: switch (query.role) {
+          DailyChoiceRelationRole.source => const [],
+          DailyChoiceRelationRole.selected => [selectedChoice],
+        },
+        counts: counts,
+        nextCursor: null,
+        revision: const TestDetailsRevision(0),
+      ),
+    );
+    await _openPage(tester, repository);
+    repository.detailRequests.single.add(ResultSuccess(owner));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Choices'));
+    await tester.pumpAndSettle();
+    expect(find.text('There are no relations in this group.'), findsOneWidget);
+    expect(find.text('Daily choices: 1'), findsOneWidget);
+    expect(find.text('Selected action: 1'), findsOneWidget);
+
+    await tester.tap(find.text('Selected action: 1'));
+    await tester.pumpAndSettle();
+    expect(find.text('Not completed'), findsOneWidget);
+  });
+
+  testWidgets(
+    'строка дневного выбора читается диктором и открывает подробности над вкладкой',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      final repository = ControlledDetailsRepository();
+      final owner = testDetailsIntention(title: 'Намерение-владелец');
+      final choice = _choice(
+        owner.id,
+        role: DailyChoiceRelationRole.source,
+        index: 1,
+      );
+      repository.onDailyChoiceGroupPage = (_) => GraphResultSuccess(
+        DailyChoiceGroupFirstPage(
+          items: [choice],
+          counts: testRelationCounts(dailySource: 1),
+          nextCursor: null,
+          revision: const TestDetailsRevision(0),
+        ),
+      );
+      final router = await _openPage(
+        tester,
+        repository,
+        locale: const Locale('ru'),
+      );
+      repository.detailRequests.single.add(ResultSuccess(owner));
+      await tester.pumpAndSettle();
+      final pageWatches = repository.detailRequests.length;
+      await tester.tap(find.text('Выборы'));
+      await tester.pumpAndSettle();
+      final choicesWatch = repository.detailRequests[pageWatches];
+
+      final row = find.byKey(
+        ValueKey('intention-choices-row-${choice.id.toCanonicalString()}'),
+      );
+      await tester.ensureVisible(row);
+      await tester.pumpAndSettle();
+      final label = tester.getSemantics(row).label;
+      expect(label, contains('Исходное намерение'));
+      expect(label, contains('Чтобы Намерение-владелец, я сегодня Действие 1'));
+      expect(label, contains('Выполнено'));
+
+      await tester.tap(row);
+      await tester.pumpAndSettle();
+      expect(router.current.name, DailyChoiceDetailsRoute.name);
+      // Вкладка остаётся выбранной под открытой страницей, и модель живёт.
+      expect(choicesWatch.cancellationCount, 0);
+      semantics.dispose();
+    },
+  );
+}
+
+const _pageLength = 10;
+const _roleTotal = 30;
+
+/// Роль из трёх порций; строки порции не помещаются в видимую часть страницы,
+/// поэтому следующая порция запрашивается только прокруткой.
+RelationGroupPageResult _pagedChoices(
+  IntentionId owner,
+  DailyChoiceGroupQuery query,
+) {
+  final offset = switch (query.cursor) {
+    null => 0,
+    final TestRelationGroupCursor cursor => cursor.offset,
+    _ => throw StateError('Неизвестное продолжение в тесте.'),
+  };
+  final end = offset + _pageLength;
+  final items = [
+    for (var index = offset; index < end; index += 1)
+      _choice(owner, role: query.role, index: index),
+  ];
+  final nextCursor = end < _roleTotal ? TestRelationGroupCursor(end) : null;
+  final counts = testRelationCounts(
+    dailySource: _roleTotal,
+    dailySelected: _roleTotal,
+  );
+  const revision = TestDetailsRevision(0);
+  return GraphResultSuccess(
+    query.cursor == null
+        ? DailyChoiceGroupFirstPage(
+            items: items,
+            counts: counts,
+            nextCursor: nextCursor,
+            revision: revision,
+          )
+        : DailyChoiceGroupContinuationPage(
+            items: items,
+            nextCursor: nextCursor,
+            revision: revision,
+          ),
+  );
+}
+
+DailyChoiceCatalogItem _choice(
+  IntentionId owner, {
+  required DailyChoiceRelationRole role,
+  required int index,
+}) {
+  final roleDigit = role == DailyChoiceRelationRole.source ? 1 : 2;
+  final id = (DailyChoiceId.decode(
+    '00000000-0000-4000-8000-$roleDigit${index.toString().padLeft(11, '0')}',
+  ) as DailyChoiceIdDecodingSuccess).id;
+  final other = testDetailsIntentionId(500 + index);
+  final ownerParticipant = DailyChoiceCatalogParticipant(
+    id: owner,
+    title: 'Намерение-владелец',
+    archiveState: IntentionArchiveState.active,
+    readiness: IntentionReadiness.notReady,
+  );
+  return DailyChoiceCatalogItem(
+    id: id,
+    source: role == DailyChoiceRelationRole.source
+        ? ownerParticipant
+        : DailyChoiceCatalogParticipant(
+            id: other,
+            title: 'Основание $index',
+            archiveState: IntentionArchiveState.active,
+            readiness: IntentionReadiness.notReady,
+          ),
+    selected: role == DailyChoiceRelationRole.selected
+        ? ownerParticipant
+        : DailyChoiceCatalogParticipant(
+            id: other,
+            title: 'Действие $index',
+            archiveState: IntentionArchiveState.active,
+            readiness: IntentionReadiness.ready,
+          ),
+    date: CalendarDate.fromParts(2026, 9, 24),
+    isCompleted: role == DailyChoiceRelationRole.source,
+    schedule: const DailyChoiceAllDay(),
+    priority: DailyChoicePriority.p4,
+    description: null,
+    pathIntentionCount: 2,
+  );
+}
+
+Future<AppRouter> _openPage(
+  WidgetTester tester,
+  ControlledDetailsRepository repository, {
+  Locale locale = const Locale('en'),
+}) async {
+  final router = AppRouter();
+  addTearDown(router.dispose);
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        inMemoryQuickCreationModeOverride,
+        personalGraphRepositoryProvider.overrideWithValue(repository),
+        relationNeighborhoodPagingPolicyProvider.overrideWithValue(
+          RelationNeighborhoodPagingPolicy(
+            pageSize: _pageLength,
+            prefetchRemaining: 0,
+          ),
+        ),
+      ],
+      retry: (retryCount, error) => null,
+      child: MaterialApp.router(
+        theme: doableTheme(Brightness.light),
+        locale: locale,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        routerConfig: router.config(),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+  unawaited(
+    router.push(IntentionDetailsRoute(intentionId: testDetailsIntention().id)),
+  );
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 500));
+  return router;
+}

@@ -50,6 +50,7 @@ void main() {
         Tristate.isTrue,
       );
       expect(repository.relationGroupQueries, hasLength(readsGroups ? 1 : 0));
+      expect(repository.dailyChoiceGroupQueries, isEmpty);
       expect(repository.statisticsQueries, isEmpty);
     });
   }

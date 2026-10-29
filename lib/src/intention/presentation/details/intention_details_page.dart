@@ -12,6 +12,9 @@ import '../../../daily_choice/application/choice_path_draft.dart';
 import '../../../daily_choice/domain/calendar_date.dart';
 import '../../../daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import '../../../daily_choice/presentation/catalog/daily_choice_local_day_observer.dart';
+import '../../../daily_choice/presentation/intention_choices/intention_choices_sliver.dart';
+import '../../../daily_choice/presentation/intention_choices/intention_choices_state.dart';
+import '../../../daily_choice/presentation/intention_choices/intention_choices_view_model.dart';
 import '../../../design_system/components/badge.dart';
 import '../../../design_system/components/button.dart';
 import '../../../design_system/components/confirm_dialog.dart';
@@ -72,6 +75,7 @@ final class _IntentionDetailsPageState
   var _routeIsCurrent = false;
   late IntentionDetailsTab _selectedTab;
   ProviderSubscription<RelationNeighborhoodState>? _neighborhoodSubscription;
+  ProviderSubscription<IntentionChoicesState>? _choicesSubscription;
 
   IntentionStatisticsViewModelProvider get _statisticsProvider =>
       intentionStatisticsViewModelProvider(
@@ -108,6 +112,20 @@ final class _IntentionDetailsPageState
     if (_selectedTab == IntentionDetailsTab.relations) _retainNeighborhood();
   }
 
+  /// Модель «Выборов» живёт, только пока вкладка выбрана, в том числе под
+  /// открытыми над страницей страницами. Роль остаётся в экземпляре страницы.
+  void _syncChoicesRetention() {
+    if (_selectedTab == IntentionDetailsTab.choices) {
+      _choicesSubscription ??= ref.listenManual(
+        intentionChoicesViewModelProvider(widget.intentionId, _pageInstance),
+        (_, _) {},
+      );
+    } else {
+      _choicesSubscription?.close();
+      _choicesSubscription = null;
+    }
+  }
+
   void _retainNeighborhood() {
     // Подписка удерживает соседство с первого показа до закрытия страницы.
     // https://pub.dev/documentation/flutter_riverpod/latest/flutter_riverpod/WidgetRef/listenManual.html
@@ -129,6 +147,7 @@ final class _IntentionDetailsPageState
     setState(() {
       _selectedTab = tab;
     });
+    _syncChoicesRetention();
     _syncStatisticsVisibility();
   }
 
@@ -274,6 +293,8 @@ final class _IntentionDetailsPageState
     if (oldWidget.intentionId != widget.intentionId) {
       _neighborhoodSubscription?.close();
       _neighborhoodSubscription = null;
+      _choicesSubscription?.close();
+      _choicesSubscription = null;
       _startPageInstance();
       _headExtent = null;
       _headHidden.value = false;
@@ -421,6 +442,7 @@ final class _IntentionDetailsPageState
                 today: _localDay.today,
                 selectedTab: _selectedTab,
                 onSelectTab: _selectTab,
+                pageInstance: _pageInstance,
                 statisticsSection: IntentionStatisticsSectionSliver(
                   provider: _statisticsProvider,
                 ),
@@ -501,6 +523,7 @@ final class _DetailsContent extends ConsumerWidget {
     required this.today,
     required this.selectedTab,
     required this.onSelectTab,
+    required this.pageInstance,
     required this.statisticsSection,
   });
 
@@ -513,6 +536,7 @@ final class _DetailsContent extends ConsumerWidget {
   final CalendarDate today;
   final IntentionDetailsTab selectedTab;
   final ValueChanged<IntentionDetailsTab> onSelectTab;
+  final IntentionPageInstance pageInstance;
   final Widget statisticsSection;
 
   @override
@@ -532,6 +556,7 @@ final class _DetailsContent extends ConsumerWidget {
         today: today,
         selectedTab: selectedTab,
         onSelectTab: onSelectTab,
+        pageInstance: pageInstance,
         statisticsSection: statisticsSection,
         onEnableReadiness: ref
             .read(intentionDetailsViewModelProvider(intentionId).notifier)
@@ -575,6 +600,7 @@ final class _LoadedDetails extends StatelessWidget {
     required this.today,
     required this.selectedTab,
     required this.onSelectTab,
+    required this.pageInstance,
     required this.statisticsSection,
     required this.onEnableReadiness,
     required this.onDisableReadiness,
@@ -588,6 +614,7 @@ final class _LoadedDetails extends StatelessWidget {
   final CalendarDate today;
   final IntentionDetailsTab selectedTab;
   final ValueChanged<IntentionDetailsTab> onSelectTab;
+  final IntentionPageInstance pageInstance;
   final Widget statisticsSection;
   final VoidCallback onEnableReadiness;
   final VoidCallback onDisableReadiness;
@@ -726,6 +753,16 @@ final class _LoadedDetails extends StatelessWidget {
                   ),
                 ),
             ],
+            if (selectedTab == IntentionDetailsTab.choices)
+              IntentionChoicesSliver(
+                intentionId: intention.id,
+                pageInstance: pageInstance,
+                onOpenDailyChoice: (choiceId) => unawaited(
+                  context.router.push(
+                    DailyChoiceDetailsRoute(choiceId: choiceId),
+                  ),
+                ),
+              ),
             if (selectedTab == IntentionDetailsTab.statistics)
               statisticsSection,
             if (selectedTab == IntentionDetailsTab.relations)

@@ -187,6 +187,8 @@
   "@detailsRelationsTab": {"description": "Вкладка соседства намерения"},
   "detailsRelationsTabSemantic": "Связи: активных — {active}, архивированных — {archived}",
   "@detailsRelationsTabSemantic": {"description": "Числа долговременных связей на вкладке для диктора", "placeholders": {"active": {"type": "int"}, "archived": {"type": "int"}}},
+  "detailsChoicesTab": "Выборы",
+  "@detailsChoicesTab": {"description": "Вкладка дневных выборов, прямо использующих намерение"},
   "detailsTitle": "Подробности намерения",
   "detailsTypeIntention": "Намерение",
   "detailsTypeAction": "Действие",

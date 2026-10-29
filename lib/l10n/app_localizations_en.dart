@@ -694,6 +694,9 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get detailsChoicesTab => 'Choices';
+
+  @override
   String get detailsTitle => 'Intention details';
 
   @override

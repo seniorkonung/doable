@@ -8,7 +8,7 @@ import '../../../design_system/components/tabs.dart';
 import '../../../design_system/doable_icon.dart';
 import '../../../long_term_relation/application/relation_counts.dart';
 
-enum IntentionDetailsTab { overview, relations, statistics }
+enum IntentionDetailsTab { overview, relations, choices, statistics }
 
 /// Разделы страницы намерения с числами из сводки подробных данных.
 final class IntentionDetailsTabs extends StatelessWidget {
@@ -56,6 +56,11 @@ final class IntentionDetailsTabs extends StatelessWidget {
                 ),
                 count: counts.active,
                 icon: counts.archived > 0 ? DoableIconData.archive : null,
+              ),
+              TabItem(
+                id: IntentionDetailsTab.choices,
+                label: texts.detailsChoicesTab,
+                semanticLabel: texts.detailsChoicesTab,
               ),
               TabItem(
                 id: IntentionDetailsTab.statistics,
