@@ -5,15 +5,15 @@
 **Format version:** 1
 **Result:** No unresolved findings
 **Coverage status:** Complete
-**Summary:** Проверены все 5 коммитов задач 4.24–4.28 фазы 4. Обрезка плоскостей `TextField.saved` и `OptionTiles`, возврат выбора листа параметров после анимации закрытия, видимая занятость при отклонённом входе в правку, удаление тона у недоступного пункта меню и удаление избыточной проверки страницы соответствуют критериям задач. Полная проверка `mise run check` на проверенной голове прошла. Окно в 180 мс между закрытием листа параметров и выдачей выбора, в которое страница принимает нажатия, передано в задачу 4.29: поздний выбор отбрасывается, если страница перестала быть текущим маршрутом. Сохранены принятые риски AR1, AR2 и AR3.
+**Summary:** Проверен коммит задачи 4.29, последней задачи фазы 4. Выбор листа параметров, пришедший после анимации закрытия, теперь начинает действие, только если страница смонтирована и остаётся текущим маршрутом. Иначе выбор молча отбрасывается. Новая проверка падает на базе и проходит на голове. Полный `mise run check` на проверенной голове прошёл. Сохранены принятые риски AR1, AR2 и AR3.
 
 ## Review target
 
-- **Baseline ref:** 36db1541bd27d2e7c3543d181c3c71269f7de2b0
-- **Base commit:** 36db1541bd27d2e7c3543d181c3c71269f7de2b0
-- **Reviewed head:** 52b23a9b2ff14eba17103dcc00244de7c8ea858a
-- **Target commits:** ["3914e28a138fabe5d869009a5c1aa93d7cf8f812","538504c27076e3276df273cf8a6502b4f3c9a1ee","59a8522df8d47c91a7674bad882abe030c4ebc79","6f285b2b3ae91b5a95c21cfc63eea9e90b4f6d4b","52b23a9b2ff14eba17103dcc00244de7c8ea858a"]
-- **Reviewable paths:** ["lib/src/design_system/components/option_tiles.dart","lib/src/design_system/components/options_menu.dart","lib/src/design_system/components/sheet.dart","lib/src/design_system/components/text_field.dart","lib/src/intention/presentation/details/intention_details_page.dart","lib/src/intention/presentation/details/intention_options.dart","openspec/changes/redesign-intention-page/tasks.md","test/app/intention_app_lifecycle_test.dart","test/app/navigation/app_shell_operation_reset_test.dart","test/design_system/option_tiles_test.dart","test/design_system/options_menu_test.dart","test/design_system/text_field_test.dart","test/intention/presentation/details/intention_details_head_test.dart","test/intention/presentation/details/intention_details_options_test.dart","test/intention/presentation/details/intention_details_page_test.dart","test/intention/presentation/details/intention_options_test.dart","test/support/intention_options.dart"]
+- **Baseline ref:** c6993b160ceb7047bb4d040c53bac14a717773de
+- **Base commit:** c6993b160ceb7047bb4d040c53bac14a717773de
+- **Reviewed head:** cf759d468d8134266cdf00db91170f3419d58251
+- **Target commits:** ["cf759d468d8134266cdf00db91170f3419d58251"]
+- **Reviewable paths:** ["lib/src/intention/presentation/details/intention_details_page.dart","openspec/changes/redesign-intention-page/tasks.md","test/intention/presentation/details/intention_details_options_test.dart"]
 - **OpenSpec change:** redesign-intention-page
 - **OpenSpec schema:** intent-driven
 - **Target scope:** User-requested bounded range
@@ -22,46 +22,22 @@
 
 ## Reviewed increment
 
-### U1 · Плоскости сохранённого текста и плиток обрезаются областью прокрутки
+### U1 · Поздний выбор листа параметров не начинает действие поверх открытого или на уходящей странице
 
-- **Work items:** ["4.24"]
-- **Requirements and scenarios:** ["intention-management: Обзор намерения", "design: решение 11", "README компонентов TextField и OptionTiles"]
-- **Affected boundary:** Потребители `TextField.saved` и `OptionTiles` — «Обзор» страницы намерения и листы с прокруткой — и пользователь, видящий прозрачную `TopBar` и полосу состояния
-- **Implementation target:** ["lib/src/design_system/components/option_tiles.dart", "lib/src/design_system/components/text_field.dart", "test/design_system/option_tiles_test.dart", "test/design_system/text_field_test.dart"]
-- **Applicable constraints and non-goals:** Компоненты остаются представлением без предметных типов (ADR-0030), значения берутся из токенов (ADR-0029). Вид, размеры, семантика, отклик нажатия и кольцо фокуса не меняются.
-
-### U2 · Выбор в листе параметров и недоступный пункт меню
-
-- **Work items:** ["4.25", "4.27"]
-- **Requirements and scenarios:** ["intention-management: Параметры намерения на его странице", "intention-management: Параметры намерения на его странице / Архивирование из параметров", "design: меню параметров закрывается до начала операции (ADR-0032, ADR-0042)", "README компонентов OptionsMenu и OptionRow"]
-- **Affected boundary:** Показ `OptionsMenu` через `showDoableSheet` и его вызывающий `_openOptions` страницы намерения; остальные потребители `showDoableSheet` как граница совместимости
-- **Implementation target:** ["lib/src/design_system/components/options_menu.dart", "lib/src/design_system/components/sheet.dart", "lib/src/intention/presentation/details/intention_options.dart", "test/design_system/options_menu_test.dart", "test/intention/presentation/details/intention_options_test.dart", "test/intention/presentation/details/intention_details_options_test.dart", "test/support/intention_options.dart", "test/app/intention_app_lifecycle_test.dart", "test/app/navigation/app_shell_operation_reset_test.dart"]
-- **Applicable constraints and non-goals:** Момент выдачи результата у остальных потребителей `showDoableSheet` не меняется, новых общих параметров `showDoableSheet` нет. Закрытие без выбора возвращает отсутствие выбора. Вид и поведение меню и строк не меняются.
-
-### U3 · Видимая занятость при отклонённом входе в правку
-
-- **Work items:** ["4.26"]
-- **Requirements and scenarios:** ["intention-management: Экран изменения намерения", "intention-management: Экран изменения намерения / Возвращение во время сохранения не позволяет снова открыть правку"]
-- **Affected boundary:** Пользователь страницы намерения; модель подробных данных и общий координатор команд графа
-- **Implementation target:** ["lib/src/intention/presentation/details/intention_details_page.dart", "test/intention/presentation/details/intention_details_head_test.dart"]
-- **Applicable constraints and non-goals:** Новых механизмов занятости, подписок на координатор и параметров нет; возврат доступности идёт через существующий путь завершения модели.
-
-### U4 · Удаление избыточной проверки страницы
-
-- **Work items:** ["4.28"]
-- **Requirements and scenarios:** ["intention-management: Страница намерения и её вкладки / Шапка архивированного намерения", "intention-management: Обзор намерения / Обзор только что созданного намерения"]
-- **Affected boundary:** Набор проверок проекта
-- **Implementation target:** ["test/intention/presentation/details/intention_details_page_test.dart"]
-- **Applicable constraints and non-goals:** Код приложения и остальные проверки не меняются; каждое ожидание удаляемой проверки остаётся покрытым.
+- **Work items:** ["4.29"]
+- **Requirements and scenarios:** ["intention-management: Параметры намерения на его странице", "design: меню параметров закрывается до начала операции (ADR-0032, ADR-0042)"]
+- **Affected boundary:** Пользователь страницы намерения; обработка страницей результата листа параметров
+- **Implementation target:** ["lib/src/intention/presentation/details/intention_details_page.dart", "test/intention/presentation/details/intention_details_options_test.dart"]
+- **Applicable constraints and non-goals:** Лист исчезает до начала действия. Страница не блокирует ввод на время анимации закрытия. `sheet.dart`, `showDoableSheet`, `OptionsMenu` и остальные потребители листов не меняются. Обычный выбор и закрытие без выбора ведут себя как раньше.
 - **Excluded change scope:** Вкладки «Выборы» и «Связи» фаз 5 и 6 не считались обязательствами диапазона.
 
 ## Pass coverage
 
 | Pass | Status | Evidence or limitation |
 |---|---|---|
-| Independent decision review | Complete | Четыре свежих изолированных рецензента по `implementation-decision-review` с нейтральными брифами, без артефактов планирования, ADR, истории коммитов и прежнего отчёта. U1 — 4 пути; рецензент прогнал обе проверки компонентов на голове (34 прошли) и во временной копии вне репозитория с компонентами базы: обе новые проверки падают на цвете пикселя `fill`. U2 — 9 путей; по уточнению координатора цель дополнена `intention_details_page.dart` — вызывающим `_openOptions`, общим с U3. После этого покрытие полное; найденное окно позднего выбора передано в задачу 4.29. U3 — 2 пути, покрытие полное. U4 — 1 путь; по уточнению координатора цель дополнена `intention_details_head_test.dart`, на который опирается покрытие метки «Archived». После этого покрытие полное. |
-| OpenSpec conformance | Complete | Задачи 4.24–4.28 сверены с критериями приёмки и требованиями «Обзор намерения», «Параметры намерения на его странице», «Экран изменения намерения», «Страница намерения и её вкладки» и с ADR-0042 в обе стороны. Регрессионные проверки 4.24 и 4.25 различают прежнее и новое поведение, проверка шапки 4.26 переписана по критерию. Три ожидания удалённой проверки 4.28 подтверждены проверками шапки и «Обзора». `mise exec --no-deps -- openspec validate redesign-intention-page --strict --no-interactive --json` дал valid. Полный `mise run check` в рабочей копии, совпадавшей с 52b23a9b2ff14eba17103dcc00244de7c8ea858a и чистой, прошёл: format (833 файла, 0 изменено), проверки скриптов, `flutter analyze` без замечаний, 3665 обычных и 18 процессных тестов. Сборка APK и проверки на устройстве не выполнялись: по правилам проекта они за пользователем. |
-| Code quality | Complete | Пять линз `code-review-and-quality` применены в контексте координатора ко всем путям доставки на голове. Поведение `TransitionRoute.completed`, `IgnorePointer` барьера закрывающегося маршрута и `Ink._paddingIncludingDecoration` сверено с исходниками Flutter 3.47.1. Отдельно проверено, что `DoableMetrics.space2` = 8 не меньше выступа кольца фокуса 4. |
+| Independent decision review | Complete | Один свежий изолированный рецензент по `implementation-decision-review` с нейтральным брифом, без артефактов планирования, ADR, истории коммитов и прежнего отчёта. Цель — 2 пути U1. Замечаний нет, покрытие полное. Рецензент прогнал `intention_details_options_test.dart` (13 из 13) и `flutter analyze` по целевым файлам на голове. В одноразовой копии вне репозитория он подтвердил, что новая проверка падает на базе. Пробами он проверил вход в правку через название в окне закрытия и выбор из второго листа. |
+| OpenSpec conformance | Complete | Критерии задачи 4.29 сверены с изменением в обе стороны: условие `mounted` и `ModalRoute.isCurrentOf(context)`, молчаливое отбрасывание, неизменность листа и меню, дополненный комментарий на русском. Проверка воспроизводит последовательность «Архивировать» и затем «⋯» и продвигает окно через `pump(Duration)`. Во временной копии `/tmp` на голове с `intention_details_page.dart` базы она падает на строке 188 (`repository.commands` не пуст); копия удалена. `mise exec --no-deps -- openspec validate redesign-intention-page --strict --no-interactive --json` дал valid, все 63 задачи отмечены. Полный `mise run check` в рабочей копии, совпадавшей с cf759d468d8134266cdf00db91170f3419d58251 и чистой, прошёл: format (833 файла, 0 изменено), проверки скриптов, `flutter analyze` без замечаний, 3666 обычных и 18 процессных тестов. Сборка APK и проверки на устройстве не выполнялись: по правилам проекта они за пользователем. |
+| Code quality | Complete | Пять линз `code-review-and-quality` применены в контексте координатора к обоим путям доставки на голове. Сверено, что лист и диалог подтверждения показываются в корневом навигаторе (`sheet.dart:56`, `confirm_dialog.dart:90`) и что страница и экран изменения объявлены в корневом стеке (`app_router.dart:36-37`). |
 
 ## Findings
 
@@ -110,18 +86,12 @@ No unresolved findings remain in the implementation review.
 
 ## Review coverage
 
-Обрезка плоскостей. Оба компонента рисуют плоскость, рамку и кольцо фокуса в собственном `DecoratedBox`, а отклик нажатия — на прозрачном `Material` внутри него. Поэтому всё нарисованное идёт в порядке потомков и обрезается областью прокрутки. Отступ содержимого плитки `decoration.padding + space3` повторяет прежний сдвиг на толщину рамки, который давал `Ink`. Прежние проверки компонентов перенаправлены с `Ink` на `DecoratedBox` без изменения ожиданий. Новые проверки задают геометрию: верх компонента на 14, пиксель панели на 30. На базе они падают, на голове проходят. Отдельный помощник `_pixel` в двух файлах проверок следует сложившемуся в проекте способу: свои помощники чтения пикселей есть и в `calendar_handle_test.dart`, `order_button_test.dart` и `sheet_test.dart`. Замечанием он не выделен.
+Поздний выбор. `showDoableSheet` выдаёт выбор `OptionsMenu` после снятия маршрута листа. Поэтому при обычном выборе страница снова текущая и действие начинается как раньше. Если в окне закрытия открыт второй лист, экран изменения или диалог, страница перестаёт быть текущей. То же происходит, когда она уходит по «назад». Все эти маршруты лежат в корневом стеке, поэтому одна проверка `ModalRoute.isCurrentOf` отсекает все четыре последовательности из задачи. Закрытие без выбора по-прежнему завершается на `option == null`. `isCurrentOf` не добавляет подписки: страница уже зависит от этого аспекта маршрута в `didChangeDependencies` (`intention_details_page.dart:140`). Повторный запуск архивирования или восстановления из другой точки входа по-прежнему гасит координатор команд.
 
-Выбор в листе. Флаг `_resultAfterClosing` ставит только `SheetPresentation.closeWithChoice`, и вызывает его только `OptionsMenu`. Остальные потребители `showDoableSheet` получают результат в момент закрытия: обёртка `then` добавляет лишь микрозадачу. `TransitionRoute.completed` завершается и при `dispose`, поэтому показ не зависает, если маршрут сняли иначе. Закрытие затемнением и «назад» по-прежнему даёт отсутствие выбора. Проверка меню различает моменты: на 90 мс из 180 лист на экране и результата нет, после окончания анимации результат есть. Проверочные помощники приложения получили лишний кадр, потому что выбор приходит после снятия маршрута. Окно 180 мс, в которое страница принимает нажатия и поздний выбор начинает действие поверх открытого листа, экрана или диалога либо на уходящей странице, передано в задачу 4.29.
-
-Недоступный пункт. `OptionsMenuItem.unavailable` больше не принимает тон и всегда даёт обычный. Сборщик параметров не передаёт тон выключенному «Удалить», доступное «Удалить» сохраняет опасный тон. Проверка меню подтверждает передачу опасного тона строке на доступном пункте.
-
-Занятость при отклонённой правке. Все три входа — название, описание и «Изменить» в параметрах — идут через `_openEdit`. Отказ из-за занятости у координатора вызывает существующий `refreshOperationRunning`. Возврат доступности после завершения идёт через `_handleCompletion` и `_scheduleGateRefresh` модели, в том числе после отказа команды. Проверка шапки подтверждает `onEdit == null` после нажатия и снова доступный `onEdit` после завершения команды.
-
-Удалённая проверка. Метку «Archived» покрывает параметризованная проверка шапки архивированного намерения на `en`. Приглашение «Add a description» покрывает проверка «Обзора» без описания на `ru` и `en`. Выбранную плитку «Намерение» у неготового намерения покрывает проверка «Обзора» только что созданного намерения. Используемые помощники и импорты остались.
+Проверка. Новая проверка воспроизводит одну последовательность, как требует задача: «Архивировать», затем «⋯» до конца закрытия. Она подтверждает, что команд нет, открыт ровно один лист и в нём есть пункты. Сценарии с экраном изменения, диалогом и уходом страницы опираются на тот же признак и отдельными проверками не закреплены; задача этого не требует.
 
 Принятые риски. Диапазон не трогает `TopBar` с кнопкой справа, область нажатия названия `PageHead` и delta-спецификации: условия AR1, AR2 и AR3 сохраняются.
 
-Правила проекта. Комментарии и названия проверок написаны на русском. `pump(Duration)` в проверках только продвигает кадры и не измеряет время. Безопасности, данных, схемы хранилища и миграций диапазон не касается.
+Правила проекта. Комментарий и название проверки написаны на русском. `pump(Duration)` только продвигает кадры и не измеряет время. Безопасности, данных, схемы хранилища и миграций диапазон не касается.
 
-Не выполнено: сборка APK и ручные проверки на устройстве. За пользователем остаются: отсутствие цветов «Обзора» в панели при прокрутке на устройстве в обеих темах, в том числе в листах; отклик нажатия и кольцо фокуса плиток и сохранённого текста; исчезновение листа параметров до начала действия; занятость страницы при отклонённом входе в правку.
+Не выполнено: сборка APK и ручные проверки на устройстве. За пользователем остаются: быстрое повторное нажатие «⋯», названия или «назад» сразу после выбора пункта в листе параметров не запускает выбранное действие поверх открытого или на уходящей странице; обычный выбор пункта по-прежнему срабатывает после исчезновения листа.
