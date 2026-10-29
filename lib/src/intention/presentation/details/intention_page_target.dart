@@ -42,6 +42,20 @@ final class IntentionPageInstance {
   /// Роль вкладки «Выборы»; до первой смены — «исходное».
   DailyChoiceRelationRole choicesRole = DailyChoiceRelationRole.source;
 
-  /// Группа вкладки «Связи»; её задаёт первая модель вкладки этого экземпляра.
-  IntentionRelationGroup? relationsGroup;
+  /// Настройки вкладки «Связи»; их задаёт первая модель вкладки этого
+  /// экземпляра.
+  IntentionRelationsSettings? relations;
+}
+
+/// Выбранная группа и раскрытые архивы групп вкладки «Связи».
+final class IntentionRelationsSettings {
+  IntentionRelationsSettings({
+    required this.group,
+    required Set<IntentionRelationGroup> expandedArchives,
+  }) : expandedArchives = {...expandedArchives};
+
+  IntentionRelationGroup group;
+
+  /// Группы, архив которых раскрыт; флаг каждой группы меняется отдельно.
+  final Set<IntentionRelationGroup> expandedArchives;
 }

@@ -9,6 +9,7 @@ import '../../intention/application/intention_details.dart'
 import '../../intention/application/intention_result.dart' as intention_result;
 import '../../intention/domain/intention_id.dart';
 import '../../tag/application/tag_change.dart';
+import '../application/relation_counts.dart';
 import '../application/relation_group_page.dart';
 import 'relation_group_paging.dart';
 import 'relation_group_paging_policy.dart';
@@ -23,20 +24,27 @@ typedef RelationListIntentionObservation =
 ///
 /// Слой владеет подписками на наблюдение намерения и завершения координатора,
 /// сравнением ревизий, пересборкой, первым чтением, подгрузкой, повторами и
-/// завершением контекста при удалении намерения. Вкладка задаёт запрос
-/// порции, принадлежность строки и признак значимого изменения, а
-/// опубликованное состояние слоя переводит в свою форму.
+/// завершением контекста при удалении намерения. Вкладка задаёт части
+/// списка с запросом порции и принадлежностью строки, признак значимого
+/// изменения, а опубликованное состояние слоя переводит в свою форму.
+///
+/// Все части публикуются вместе на одной ревизии: строка, которая переходит
+/// между частями, видна ровно в одной из них.
 ///
 /// Подписки и первое чтение [query] начинаются при создании; [dispose]
 /// отбрасывает ответы и подписки.
-final class RelationListReconciliation<Row, Id extends Object> {
+final class RelationListReconciliation<
+  Part extends Object,
+  Row,
+  Id extends Object
+> {
   RelationListReconciliation({
     required this._intentionId,
     required Stream<RelationListIntentionObservation> Function(IntentionId)
     watchIntention,
     required Stream<GraphCommandCompletion> completions,
     required this._policy,
-    required RelationListQuery<Row, Id> query,
+    required RelationListQuery<Part, Row, Id> query,
     required this._publish,
   }) : _query = query {
     _subscribe(watchIntention, completions);
@@ -45,78 +53,121 @@ final class RelationListReconciliation<Row, Id extends Object> {
 
   final IntentionId _intentionId;
   final RelationGroupPagingPolicy _policy;
-  final void Function(RelationListState<Row>) _publish;
+  final void Function(RelationListState<Part, Row>) _publish;
   final _paging = RelationGroupPaging();
 
   StreamSubscription<RelationListIntentionObservation>? _intentionSubscription;
   StreamSubscription<GraphCommandCompletion>? _completionSubscription;
-  RelationListQuery<Row, Id> _query;
-  RelationListState<Row> _state = RelationListInitialLoad<Row>();
+  RelationListQuery<Part, Row, Id> _query;
+  RelationListState<Part, Row> _state = RelationListInitialLoad<Part, Row>();
   var _isTerminated = false;
   var _isDisposed = false;
 
   /// Намерение подтверждённо отсутствует, список больше не читается.
   bool get isTerminated => _isTerminated;
 
-  /// Начинает список заново с первой порции запроса и отбрасывает ответы
+  /// Начинает список заново с первых порций запроса и отбрасывает ответы
   /// прежнего.
-  void restart(RelationListQuery<Row, Id> query) {
+  void restart(RelationListQuery<Part, Row, Id> query) {
     final generation = _paging.nextGeneration();
     _query = query;
-    _update(RelationListInitialLoad<Row>());
+    _update(RelationListInitialLoad<Part, Row>());
     unawaited(_loadFirstPage(generation, query));
+  }
+
+  /// Меняет состав частей, сохраняя хотя бы одну из прежних.
+  ///
+  /// Убранные части отбрасываются сразу. Добавленные получают первую порцию
+  /// на ревизии опубликованных, а до готовности новой пары видна прежняя.
+  void reshape(RelationListQuery<Part, Row, Id> query) {
+    if (_isTerminated) return;
+    final current = _state;
+    _query = query;
+    switch (current) {
+      case RelationListInitialLoad():
+        restart(query);
+      case RelationListInitialFailure() || RelationListIntentionNotFound():
+        break;
+      case RelationListConfirmed():
+        final retained = current.retaining(query.parts.keys);
+        final added = [
+          for (final entry in query.parts.entries)
+            if (!retained.parts.containsKey(entry.key)) entry,
+        ];
+        if (_paging.hasActiveRequest) {
+          // Ответ прежнего состава не подходит новой паре.
+          _paging.cancelRequest();
+          unawaited(_refresh(retained, requestedPart: retained.loadingPart));
+        } else if (added.isEmpty) {
+          _update(retained);
+        } else {
+          unawaited(_extend(retained, added));
+        }
+    }
   }
 
   /// Повторяет первое чтение после устранимого отказа.
   Future<void> retryFirstPage() {
     final current = _state;
-    if (current is! RelationListInitialFailure<Row> || !current.canRetry) {
+    if (current is! RelationListInitialFailure<Part, Row> ||
+        !current.canRetry) {
       return Future.value();
     }
     final generation = _paging.nextGeneration();
-    _update(RelationListInitialLoad<Row>());
+    _update(RelationListInitialLoad<Part, Row>());
     return _loadFirstPage(generation, _query);
   }
 
-  /// Подгружает следующую порцию при приближении к концу загруженной части.
+  /// Подгружает следующую порцию [part] при приближении к концу её
+  /// загруженной части.
   ///
   /// Пока порция ожидается, повторная прокрутка не отправляет её второй раз.
-  Future<void> loadMoreIfNeeded({required int visibleIndex}) {
+  Future<void> loadMoreIfNeeded({
+    required Part part,
+    required int visibleIndex,
+  }) {
     final current = _state;
-    if (current is! RelationListConfirmed<Row> ||
-        current.data.nextCursor == null ||
-        current.summaryStatus is! RelationListSummaryCurrent ||
-        current.progress is! RelationListIdle ||
-        visibleIndex < 0 ||
-        current.data.items.length - visibleIndex - 1 >
-            _policy.prefetchRemaining) {
-      return Future.value();
-    }
-    return _loadMore(current);
-  }
-
-  Future<void> retryLoadMore() {
-    final current = _state;
-    if (current is! RelationListConfirmed<Row> ||
+    if (current is! RelationListConfirmed<Part, Row> ||
         current.summaryStatus is! RelationListSummaryCurrent) {
       return Future.value();
     }
-    final progress = current.progress;
-    if (progress is! RelationListLoadMoreFailure || !progress.canRetry) {
+    final loaded = current.parts[part];
+    if (loaded == null ||
+        loaded.data.nextCursor == null ||
+        loaded.progress is! RelationListIdle ||
+        visibleIndex < 0 ||
+        loaded.data.items.length - visibleIndex - 1 >
+            _policy.prefetchRemaining) {
       return Future.value();
     }
-    return _loadMore(current);
+    return _loadMore(current, part, loaded);
+  }
+
+  Future<void> retryLoadMore({required Part part}) {
+    final current = _state;
+    if (current is! RelationListConfirmed<Part, Row> ||
+        current.summaryStatus is! RelationListSummaryCurrent) {
+      return Future.value();
+    }
+    final loaded = current.parts[part];
+    final progress = loaded?.progress;
+    if (loaded == null ||
+        progress is! RelationListLoadMoreFailure ||
+        !progress.canRetry) {
+      return Future.value();
+    }
+    return _loadMore(current, part, loaded);
   }
 
   Future<void> retryRefresh() {
     final current = _state;
-    if (current is! RelationListConfirmed<Row>) return Future.value();
+    if (current is! RelationListConfirmed<Part, Row>) return Future.value();
     final summaryStatus = current.summaryStatus;
     if (summaryStatus is! RelationListSummaryRefreshFailure ||
         !summaryStatus.canRetry) {
       return Future.value();
     }
-    return _refresh(current, includeRequestedPage: false);
+    return _refresh(current, requestedPart: null);
   }
 
   void dispose() {
@@ -126,26 +177,30 @@ final class RelationListReconciliation<Row, Id extends Object> {
     unawaited(_completionSubscription?.cancel());
   }
 
-  void _update(RelationListState<Row> value) {
+  void _update(RelationListState<Part, Row> value) {
     _state = value;
     _publish(value);
   }
 
   Future<void> _loadFirstPage(
     int generation,
-    RelationListQuery<Row, Id> query,
+    RelationListQuery<Part, Row, Id> query,
   ) async {
     final request = _paging.startRequest(generation);
-    final result = await _paging.readFirst(_source(query), request);
+    final parts = query.parts.entries.toList();
+    final results = await Future.wait([
+      for (final MapEntry(value: part) in parts)
+        _paging.readFirst(_source(part), request),
+    ]);
     if (_isDisposed || !_paging.owns(request)) return;
     _paging.finishRequest(request);
-    switch (result) {
+    switch (_collect(parts, results)) {
       case GraphResultSuccess(:final value):
-        if (_paging.precedesRequiredRevision(value.revision)) {
+        if (!_isConsistent(value)) {
           unawaited(_loadFirstPage(generation, query));
           return;
         }
-        _update(RelationListConfirmed(value));
+        _update(RelationListConfirmed(_freshParts(value)));
       case GraphResultFailure(failure: RelationGroupIntentionNotFoundFailure()):
         _finishIntentionContext();
       case GraphResultFailure(:final failure):
@@ -155,65 +210,122 @@ final class RelationListReconciliation<Row, Id extends Object> {
     }
   }
 
-  Future<void> _loadMore(RelationListConfirmed<Row> confirmed) async {
-    if (_paging.hasActiveRequest || confirmed.data.nextCursor == null) return;
-    if (_paging.precedesRequiredRevision(confirmed.data.revision)) {
-      return _refresh(confirmed, includeRequestedPage: true);
+  Future<void> _loadMore(
+    RelationListConfirmed<Part, Row> confirmed,
+    Part part,
+    RelationListPart<Row> loaded,
+  ) async {
+    if (_paging.hasActiveRequest || loaded.data.nextCursor == null) return;
+    if (_paging.precedesRequiredRevision(confirmed.revision)) {
+      return _refresh(confirmed, requestedPart: part);
     }
     final request = _paging.startRequest(_paging.generation);
-    _update(confirmed.withProgress(const RelationListLoadingMore()));
+    _update(confirmed.withProgress(part, const RelationListLoadingMore()));
     final result = await _paging.loadMore(
-      _source(_query),
-      confirmed.data,
+      _source(_query.parts[part]!),
+      loaded.data,
       request,
     );
     if (_isDisposed || !_paging.owns(request)) return;
     _paging.finishRequest(request);
     final current = _state;
-    if (current is! RelationListConfirmed<Row>) return;
+    if (current is! RelationListConfirmed<Part, Row>) return;
     switch (result) {
       case GraphResultSuccess(:final value):
         if (_paging.precedesRequiredRevision(value.revision)) {
-          unawaited(_refresh(current, includeRequestedPage: true));
+          unawaited(_refresh(current, requestedPart: part));
           return;
         }
+        _update(current.withPart(part, RelationListPart(value)));
+      case GraphResultFailure(failure: RelationGroupIntentionNotFoundFailure()):
+        _finishIntentionContext();
+      case GraphResultFailure(:final failure):
         _update(
-          RelationListConfirmed(value, summaryStatus: current.summaryStatus),
+          current.withProgress(part, RelationListLoadMoreFailure(failure)),
+        );
+      case null:
+        unawaited(_refresh(current, requestedPart: part));
+    }
+  }
+
+  /// Добавленные части читают первую порцию и присоединяются к
+  /// опубликованным, только если ревизия общая; иначе пара пересобирается
+  /// целиком.
+  Future<void> _extend(
+    RelationListConfirmed<Part, Row> confirmed,
+    List<MapEntry<Part, RelationListPartQuery<Row, Id>>> added,
+  ) async {
+    if (_paging.precedesRequiredRevision(confirmed.revision)) {
+      return _refresh(confirmed, requestedPart: null);
+    }
+    final request = _paging.startRequest(_paging.generation);
+    _update(confirmed);
+    final results = await Future.wait([
+      for (final MapEntry(value: part) in added)
+        _paging.readFirst(_source(part), request),
+    ]);
+    if (_isDisposed || !_paging.owns(request)) return;
+    _paging.finishRequest(request);
+    final current = _state;
+    if (current is! RelationListConfirmed<Part, Row>) return;
+    switch (_collect(added, results)) {
+      case GraphResultSuccess(:final value):
+        if (!_isConsistent({
+          for (final MapEntry(:key, :value) in current.parts.entries)
+            key: value.data,
+          ...value,
+        })) {
+          unawaited(_refresh(current, requestedPart: null));
+          return;
+        }
+        final fresh = _freshParts(value);
+        _update(
+          RelationListConfirmed({
+            for (final key in _query.parts.keys)
+              key: ?(fresh[key] ?? current.parts[key]),
+          }, summaryStatus: current.summaryStatus),
         );
       case GraphResultFailure(failure: RelationGroupIntentionNotFoundFailure()):
         _finishIntentionContext();
       case GraphResultFailure(:final failure):
-        _update(current.withProgress(RelationListLoadMoreFailure(failure)));
+        _update(
+          current.withSummaryStatus(RelationListSummaryRefreshFailure(failure)),
+        );
       case null:
-        unawaited(_refresh(current, includeRequestedPage: true));
+        break;
     }
   }
 
-  /// Прежняя подтверждённая часть остаётся видимой, пока ядро собирает замену.
+  /// Прежняя подтверждённая пара остаётся видимой, пока ядро собирает
+  /// замену. Каждая часть повторяет своё загруженное, а [requestedPart] —
+  /// ещё и запрошенное продолжение; новая часть получает первую порцию.
   Future<void> _refresh(
-    RelationListConfirmed<Row> confirmed, {
-    required bool includeRequestedPage,
+    RelationListConfirmed<Part, Row> confirmed, {
+    required Part? requestedPart,
   }) async {
     if (_paging.hasActiveRequest) return;
     final request = _paging.startRequest(_paging.generation);
-    final source = _source(_query);
-    final refreshBase = confirmed.withProgress(const RelationListIdle());
+    final parts = _query.parts.entries.toList();
+    final refreshBase = confirmed.withIdleProgress();
     _update(
       refreshBase.withSummaryStatus(const RelationListSummaryRefreshing()),
     );
     try {
       while (_paging.owns(request)) {
-        final result = await _paging.refresh(
-          source,
-          request,
-          loadedCount: confirmed.data.items.length,
-          includeRequestedPage: includeRequestedPage,
-        );
+        final results = await Future.wait([
+          for (final MapEntry(key: key, value: part) in parts)
+            _paging.refresh(
+              _source(part),
+              request,
+              loadedCount: confirmed.parts[key]?.data.items.length ?? 0,
+              includeRequestedPage: key == requestedPart,
+            ),
+        ]);
         if (_isDisposed || !_paging.owns(request)) return;
-        switch (result) {
+        switch (_collect(parts, results)) {
           case GraphResultSuccess(:final value):
-            if (_paging.precedesRequiredRevision(value.revision)) continue;
-            _update(RelationListConfirmed(value));
+            if (!_isConsistent(value)) continue;
+            _update(RelationListConfirmed(_freshParts(value)));
             return;
           case GraphResultFailure(
             failure: RelationGroupIntentionNotFoundFailure(),
@@ -236,13 +348,57 @@ final class RelationListReconciliation<Row, Id extends Object> {
     }
   }
 
-  RelationPagingSource<Row, Id> _source(RelationListQuery<Row, Id> query) =>
+  /// Отсутствие намерения важнее прочих отказов частей; `null` означает
+  /// ответ прежнего запроса.
+  GraphResult<Map<Part, RelationPagingData<Row>>, RelationGroupReadFailure>?
+  _collect(
+    List<MapEntry<Part, RelationListPartQuery<Row, Id>>> parts,
+    List<RelationPagingResult<Row>?> results,
+  ) {
+    final collected = <Part, RelationPagingData<Row>>{};
+    RelationGroupReadFailure? failure;
+    for (final (index, result) in results.indexed) {
+      switch (result) {
+        case GraphResultSuccess(:final value):
+          collected[parts[index].key] = value;
+        case GraphResultFailure(failure: final partFailure):
+          if (failure == null ||
+              partFailure is RelationGroupIntentionNotFoundFailure) {
+            failure = partFailure;
+          }
+        case null:
+          return null;
+      }
+    }
+    return failure == null
+        ? GraphResultSuccess(collected)
+        : GraphResultFailure(failure);
+  }
+
+  /// Части публикуются только на одной ревизии не старше затребованной.
+  bool _isConsistent(Map<Part, RelationPagingData<Row>> parts) {
+    final revision = parts.values.first.revision;
+    return parts.values.every(
+      (part) =>
+          !_paging.precedesRequiredRevision(part.revision) &&
+          part.revision.compareTo(revision) == GraphRevisionOrder.same,
+    );
+  }
+
+  Map<Part, RelationListPart<Row>> _freshParts(
+    Map<Part, RelationPagingData<Row>> parts,
+  ) => {
+    for (final MapEntry(:key, :value) in parts.entries)
+      key: RelationListPart(value),
+  };
+
+  RelationPagingSource<Row, Id> _source(RelationListPartQuery<Row, Id> part) =>
       RelationPagingSource(
         pageSize: _policy.pageSize,
-        identify: query.identify,
+        identify: part.identify,
         readPage: (cursor) async {
           try {
-            return await query.readPage(cursor, _policy.pageSize);
+            return await part.readPage(cursor, _policy.pageSize);
           } on Object {
             // Неизвестная причина отказа не выдаётся за отсутствие данных.
             return const GraphResultFailure(RelationGroupUnexpectedFailure());
@@ -323,8 +479,8 @@ final class RelationListReconciliation<Row, Id extends Object> {
       return;
     }
     final current = _state;
-    final confirmed = current is RelationListConfirmed<Row>
-        ? current.data
+    final confirmed = current is RelationListConfirmed<Part, Row>
+        ? current
         : null;
     if (confirmedChange.changes.any(
       (change) => _query.isSignificant(change, confirmed),
@@ -341,10 +497,11 @@ final class RelationListReconciliation<Row, Id extends Object> {
     if (!_isNewerThanKnown(revision)) return;
     _paging.requireRevision(revision);
     final current = _state;
-    if (current is RelationListConfirmed<Row> &&
-        current.progress is RelationListLoadingMore) {
+    if (current is! RelationListConfirmed<Part, Row>) return;
+    final loadingPart = current.loadingPart;
+    if (loadingPart != null) {
       _paging.cancelRequest();
-      unawaited(_refresh(current, includeRequestedPage: true));
+      unawaited(_refresh(current, requestedPart: loadingPart));
     }
   }
 
@@ -352,27 +509,27 @@ final class RelationListReconciliation<Row, Id extends Object> {
     if (!_isNewerThanKnown(revision)) return;
     _paging.requireRevision(revision);
     final current = _state;
-    if (current is RelationListConfirmed<Row> &&
-        current.progress is RelationListLoadingMore) {
+    if (current is! RelationListConfirmed<Part, Row>) return;
+    final loadingPart = current.loadingPart;
+    if (loadingPart != null) {
       // Продолжение прежней ревизии может задержаться или не завершиться.
       // Новую основу читаем сразу, сохраняя предел запрошенной порции.
       _paging.cancelRequest();
-      unawaited(_refresh(current, includeRequestedPage: true));
-    } else if (current is RelationListConfirmed<Row> &&
-        !_paging.hasActiveRequest) {
-      unawaited(_refresh(current, includeRequestedPage: false));
+      unawaited(_refresh(current, requestedPart: loadingPart));
+    } else if (!_paging.hasActiveRequest) {
+      unawaited(_refresh(current, requestedPart: null));
     }
   }
 
-  /// Ревизия новее опубликованной части и уже затребованной основы.
+  /// Ревизия новее опубликованной пары и уже затребованной основы.
   bool _isNewerThanKnown(GraphRevision revision) {
     bool isNotNewer(GraphRevision known) => switch (revision.compareTo(known)) {
       GraphRevisionOrder.older || GraphRevisionOrder.same => true,
       GraphRevisionOrder.newer || GraphRevisionOrder.differentEpoch => false,
     };
     final current = _state;
-    if (current is RelationListConfirmed<Row> &&
-        isNotNewer(current.data.revision)) {
+    if (current is RelationListConfirmed<Part, Row> &&
+        isNotNewer(current.revision)) {
       return false;
     }
     final required = _paging.requiredRevision;
@@ -381,8 +538,8 @@ final class RelationListReconciliation<Row, Id extends Object> {
 
   bool _observationPrecedesKnownRevision(GraphRevision revision) {
     final current = _state;
-    if (current is RelationListConfirmed<Row> &&
-        _paging.precedes(revision, current.data.revision)) {
+    if (current is RelationListConfirmed<Part, Row> &&
+        _paging.precedes(revision, current.revision)) {
       return true;
     }
     return _paging.precedesRequiredRevision(revision);
@@ -408,19 +565,35 @@ final class RelationListReconciliation<Row, Id extends Object> {
     if (_isTerminated) return;
     _isTerminated = true;
     _paging.nextGeneration();
-    _update(RelationListIntentionNotFound<Row>());
+    _update(RelationListIntentionNotFound<Part, Row>());
     unawaited(_intentionSubscription?.cancel());
     unawaited(_completionSubscription?.cancel());
   }
 }
 
 /// Предметная часть списка, которую задаёт вкладка.
-final class RelationListQuery<Row, Id extends Object> {
-  const RelationListQuery({
-    required this.readPage,
-    required this.identify,
+final class RelationListQuery<Part extends Object, Row, Id extends Object> {
+  RelationListQuery({
+    required Map<Part, RelationListPartQuery<Row, Id>> parts,
     required this.isSignificant,
-  });
+  }) : assert(parts.isNotEmpty, 'У списка есть хотя бы одна часть.'),
+       parts = Map.unmodifiable(parts);
+
+  /// Читаемые части в порядке показа.
+  final Map<Part, RelationListPartQuery<Row, Id>> parts;
+
+  /// Требует ли подтверждённое изменение новой основы списка. Опубликованная
+  /// пара передаётся, когда она есть.
+  final bool Function(
+    GraphChange change,
+    RelationListConfirmed<Part, Row>? confirmed,
+  )
+  isSignificant;
+}
+
+/// Чтение одной части списка.
+final class RelationListPartQuery<Row, Id extends Object> {
+  const RelationListPartQuery({required this.readPage, required this.identify});
 
   /// Первая порция при `null`, иначе продолжение по курсору.
   final Future<RelationPagingPageResult<Row>> Function(
@@ -429,27 +602,24 @@ final class RelationListQuery<Row, Id extends Object> {
   )
   readPage;
 
-  /// Идентификатор строки своего списка или `null` для чужой строки.
+  /// Идентификатор строки своей части или `null` для чужой строки.
   final Id? Function(Row) identify;
-
-  /// Требует ли подтверждённое изменение новой основы списка. Опубликованная
-  /// часть передаётся, когда она есть.
-  final bool Function(GraphChange change, RelationPagingData<Row>? confirmed)
-  isSignificant;
 }
 
 /// Опубликованное состояние списка, которое вкладка переводит в свою форму.
-sealed class RelationListState<Row> {
+sealed class RelationListState<Part extends Object, Row> {
   const RelationListState();
 }
 
 /// Первое чтение: подтверждённых строк ещё нет.
-final class RelationListInitialLoad<Row> extends RelationListState<Row> {
+final class RelationListInitialLoad<Part extends Object, Row>
+    extends RelationListState<Part, Row> {
   const RelationListInitialLoad();
 }
 
 /// Первое чтение завершилось отказом; это не пустой список.
-final class RelationListInitialFailure<Row> extends RelationListState<Row> {
+final class RelationListInitialFailure<Part extends Object, Row>
+    extends RelationListState<Part, Row> {
   const RelationListInitialFailure(this.failure);
 
   final RelationGroupReadFailure failure;
@@ -459,32 +629,85 @@ final class RelationListInitialFailure<Row> extends RelationListState<Row> {
 }
 
 /// Намерение подтверждённо отсутствует, список больше не читается.
-final class RelationListIntentionNotFound<Row> extends RelationListState<Row> {
+final class RelationListIntentionNotFound<Part extends Object, Row>
+    extends RelationListState<Part, Row> {
   const RelationListIntentionNotFound();
 }
 
-/// Подтверждённая загруженная часть и сводка на одной ревизии графа.
-final class RelationListConfirmed<Row> extends RelationListState<Row> {
-  const RelationListConfirmed(
-    this.data, {
+/// Подтверждённые загруженные части и сводка на одной ревизии графа.
+///
+/// Части идут в порядке запроса. Добавленная часть появляется здесь только
+/// вместе с остальными на общей ревизии.
+final class RelationListConfirmed<Part extends Object, Row>
+    extends RelationListState<Part, Row> {
+  RelationListConfirmed(
+    Map<Part, RelationListPart<Row>> parts, {
     this.summaryStatus = const RelationListSummaryCurrent(),
-    this.progress = const RelationListIdle(),
-  });
+  }) : assert(parts.isNotEmpty, 'У списка есть хотя бы одна часть.'),
+       parts = Map.unmodifiable(parts);
+
+  final Map<Part, RelationListPart<Row>> parts;
+  final RelationListSummaryStatus summaryStatus;
+
+  /// Полная сводка, полученная вместе с первыми порциями частей.
+  RelationCounts get counts => parts.values.first.data.counts;
+
+  GraphRevision get revision => parts.values.first.data.revision;
+
+  /// Строки всех частей в порядке показа.
+  Iterable<Row> get items => parts.values.expand((part) => part.data.items);
+
+  /// Часть, продолжение которой сейчас ожидается.
+  Part? get loadingPart {
+    for (final MapEntry(:key, :value) in parts.entries) {
+      if (value.progress is RelationListLoadingMore) return key;
+    }
+    return null;
+  }
+
+  RelationListConfirmed<Part, Row> withSummaryStatus(
+    RelationListSummaryStatus value,
+  ) => RelationListConfirmed(parts, summaryStatus: value);
+
+  RelationListConfirmed<Part, Row> withPart(
+    Part key,
+    RelationListPart<Row> value,
+  ) => RelationListConfirmed({
+    for (final MapEntry(key: partKey, value: part) in parts.entries)
+      partKey: partKey == key ? value : part,
+  }, summaryStatus: summaryStatus);
+
+  RelationListConfirmed<Part, Row> withProgress(
+    Part key,
+    RelationListProgress value,
+  ) => RelationListConfirmed({
+    for (final MapEntry(key: partKey, value: part) in parts.entries)
+      partKey: partKey == key ? part.withProgress(value) : part,
+  }, summaryStatus: summaryStatus);
+
+  RelationListConfirmed<Part, Row> withIdleProgress() => RelationListConfirmed({
+    for (final MapEntry(:key, :value) in parts.entries)
+      key: value.withProgress(const RelationListIdle()),
+  }, summaryStatus: summaryStatus);
+
+  RelationListConfirmed<Part, Row> retaining(Iterable<Part> keys) {
+    final retained = keys.toSet();
+    return RelationListConfirmed({
+      for (final MapEntry(:key, :value) in parts.entries)
+        if (retained.contains(key)) key: value,
+    }, summaryStatus: summaryStatus);
+  }
+}
+
+/// Загруженная часть списка и подгрузка её продолжения.
+final class RelationListPart<Row> {
+  const RelationListPart(this.data, {this.progress = const RelationListIdle()});
 
   final RelationPagingData<Row> data;
-  final RelationListSummaryStatus summaryStatus;
   final RelationListProgress progress;
 
-  RelationListConfirmed<Row> withSummaryStatus(
-    RelationListSummaryStatus value,
-  ) => RelationListConfirmed(data, summaryStatus: value, progress: progress);
-
-  RelationListConfirmed<Row> withProgress(RelationListProgress value) =>
-      RelationListConfirmed(
-        data,
-        summaryStatus: summaryStatus,
-        progress: value,
-      );
+  RelationListPart<Row> withProgress(RelationListProgress value) =>
+      RelationListPart(data, progress: value);
 }
 
 /// Актуальность опубликованной пары строк и сводки.

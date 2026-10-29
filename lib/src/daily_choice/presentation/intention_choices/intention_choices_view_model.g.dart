@@ -88,7 +88,7 @@ final class IntentionChoicesViewModelProvider
 }
 
 String _$intentionChoicesViewModelHash() =>
-    r'a6caf3272692a4c1a732aa26a0516b5f955b2d04';
+    r'b0957440a6d6dea35fea4fe26849ad27c5cf8f77';
 
 /// Порциями получает прямые дневные выборы намерения в роли, сохранённой
 /// экземпляром страницы.

@@ -33,14 +33,14 @@ void main() {
       addTearDown(harness.dispose);
 
       harness.list.restart(harness.query('новый'));
-      expect(harness.state, isA<RelationListInitialLoad<int>>());
+      expect(harness.state, isA<RelationListInitialLoad<_Part, int>>());
       expect(harness.reads.listAt(1), 'новый');
       harness.reads.first(1, [1], total: 1, revision: 2);
       await pumpEventQueue();
       harness.reads.first(0, [2], total: 1, revision: 1);
       await pumpEventQueue();
 
-      expect(harness.confirmed.data.items, [1]);
+      expect(harness.active.data.items, [1]);
     },
   );
 
@@ -67,16 +67,16 @@ void main() {
     harness.reads.first(0, [1, 2], total: 5, revision: 1, next: 2);
     await pumpEventQueue();
     harness.scrollTo(1);
-    expect(harness.confirmed.progress, isA<RelationListLoadingMore>());
+    expect(harness.active.progress, isA<RelationListLoadingMore>());
 
     harness.emitIntention(revision: 2);
     await pumpEventQueue();
-    expect(harness.confirmed.data.items, [1, 2]);
+    expect(harness.active.data.items, [1, 2]);
     expect(
       harness.confirmed.summaryStatus,
       isA<RelationListSummaryRefreshing>(),
     );
-    expect(harness.confirmed.progress, isA<RelationListIdle>());
+    expect(harness.active.progress, isA<RelationListIdle>());
     expect(harness.reads.cursorAt(2), isNull);
 
     harness.reads.continuation(1, [3, 4], revision: 1, next: 4);
@@ -92,8 +92,8 @@ void main() {
     await pumpEventQueue();
 
     final current = harness.confirmed;
-    expect(current.data.items, [1, 2, 3, 4]);
-    expect(current.data.nextCursor, const _Cursor(4));
+    expect(harness.active.data.items, [1, 2, 3, 4]);
+    expect(harness.active.data.nextCursor, const _Cursor(4));
     expect(current.summaryStatus, isA<RelationListSummaryCurrent>());
     expect(harness.reads.count, 4);
   });
@@ -110,7 +110,7 @@ void main() {
 
       harness.reads.fail(1, const RelationGroupSnapshotExpired());
       await pumpEventQueue();
-      expect(harness.confirmed.data.items, [1, 2]);
+      expect(harness.active.data.items, [1, 2]);
       expect(
         harness.confirmed.summaryStatus,
         isA<RelationListSummaryRefreshing>(),
@@ -122,8 +122,8 @@ void main() {
       await pumpEventQueue();
 
       final current = harness.confirmed;
-      expect(current.data.items, [1, 2, 3, 4]);
-      expect(current.data.nextCursor, const _Cursor(4));
+      expect(harness.active.data.items, [1, 2, 3, 4]);
+      expect(harness.active.data.nextCursor, const _Cursor(4));
       expect(current.summaryStatus, isA<RelationListSummaryCurrent>());
       expect(harness.reads.count, 4);
     },
@@ -144,7 +144,7 @@ void main() {
     expect(harness.reads.cursorAt(1), isNull);
     harness.reads.first(1, [1, 2], total: 4, revision: 1, next: 2);
     await pumpEventQueue();
-    expect(harness.confirmed.data.counts.activeNeedOutgoing, 4);
+    expect(harness.confirmed.counts.activeNeedOutgoing, 4);
     expect(
       harness.confirmed.summaryStatus,
       isA<RelationListSummaryRefreshing>(),
@@ -154,8 +154,8 @@ void main() {
     await pumpEventQueue();
 
     final current = harness.confirmed;
-    expect(current.data.items, [5, 6]);
-    expect(current.data.counts.activeNeedOutgoing, 2);
+    expect(harness.active.data.items, [5, 6]);
+    expect(current.counts.activeNeedOutgoing, 2);
     expect(current.summaryStatus, isA<RelationListSummaryCurrent>());
   });
 
@@ -164,7 +164,7 @@ void main() {
     final observed = <List<int>?>[];
     final harness = _ListHarness(
       isSignificant: (change, confirmed) {
-        observed.add(confirmed?.items);
+        observed.add(confirmed?.items.toList());
         return change is IntentionCatalogMutation;
       },
     );
@@ -194,14 +194,14 @@ void main() {
 
       harness.emitIntentionNotFound(revision: 2);
       await pumpEventQueue();
-      expect(harness.state, isA<RelationListIntentionNotFound<int>>());
+      expect(harness.state, isA<RelationListIntentionNotFound<_Part, int>>());
       expect(harness.list.isTerminated, isTrue);
 
       harness.reads.continuation(1, [3, 4], revision: 1);
       harness.emitIntention(revision: 3);
       await pumpEventQueue();
       harness.scrollTo(1);
-      expect(harness.state, isA<RelationListIntentionNotFound<int>>());
+      expect(harness.state, isA<RelationListIntentionNotFound<_Part, int>>());
       expect(harness.reads.count, 2);
     },
   );
@@ -214,11 +214,11 @@ void main() {
     await pumpEventQueue();
 
     await harness.completeOwnerDeletion(revision: 2);
-    expect(harness.state, isA<RelationListIntentionNotFound<int>>());
+    expect(harness.state, isA<RelationListIntentionNotFound<_Part, int>>());
 
     harness.emitIntention(revision: 3);
     await pumpEventQueue();
-    expect(harness.state, isA<RelationListIntentionNotFound<int>>());
+    expect(harness.state, isA<RelationListIntentionNotFound<_Part, int>>());
     expect(harness.reads.count, 1);
   });
 
@@ -231,7 +231,7 @@ void main() {
 
     harness.emitIntention(revision: 2);
     await pumpEventQueue();
-    expect(harness.confirmed.data.items, [1]);
+    expect(harness.active.data.items, [1]);
     expect(
       harness.confirmed.summaryStatus,
       isA<RelationListSummaryRefreshing>(),
@@ -240,8 +240,8 @@ void main() {
     harness.reads.fail(1, const RelationGroupUnavailableFailure());
     await pumpEventQueue();
     final stale = harness.confirmed;
-    expect(stale.data.items, [1]);
-    expect(stale.data.counts.activeNeedOutgoing, 1);
+    expect(stale.parts[_Part.active]!.data.items, [1]);
+    expect(stale.counts.activeNeedOutgoing, 1);
     expect(
       stale.summaryStatus,
       isA<RelationListSummaryRefreshFailure>().having(
@@ -256,7 +256,7 @@ void main() {
     expect(harness.reads.count, 3);
     harness.reads.first(2, [1, 2], total: 2, revision: 2);
     await pumpEventQueue();
-    expect(harness.confirmed.data.items, [1, 2]);
+    expect(harness.active.data.items, [1, 2]);
     expect(harness.confirmed.summaryStatus, isA<RelationListSummaryCurrent>());
   });
 
@@ -271,7 +271,7 @@ void main() {
 
       expect(
         harness.state,
-        isA<RelationListInitialFailure<int>>()
+        isA<RelationListInitialFailure<_Part, int>>()
             .having(
               (state) => state.failure,
               'failure',
@@ -310,7 +310,7 @@ void main() {
       harness.failIntention(observation);
       await pumpEventQueue();
 
-      expect(harness.confirmed.data.items, [1]);
+      expect(harness.active.data.items, [1]);
       expect(
         harness.confirmed.summaryStatus,
         isA<RelationListSummaryRefreshFailure>().having(
@@ -354,7 +354,7 @@ void main() {
       await pumpEventQueue();
       expect(
         harness.state,
-        isA<RelationListInitialFailure<int>>()
+        isA<RelationListInitialFailure<_Part, int>>()
             .having((state) => state.failure, 'failure', failure)
             .having((state) => state.canRetry, 'canRetry', canRetry),
       );
@@ -363,10 +363,10 @@ void main() {
       unawaited(harness.list.retryFirstPage());
       expect(harness.reads.count, canRetry ? 2 : 1);
       if (!canRetry) return;
-      expect(harness.state, isA<RelationListInitialLoad<int>>());
+      expect(harness.state, isA<RelationListInitialLoad<_Part, int>>());
       harness.reads.first(1, [1], total: 1, revision: 1);
       await pumpEventQueue();
-      expect(harness.confirmed.data.items, [1]);
+      expect(harness.active.data.items, [1]);
     });
 
     test('отказ подгрузки «$name» сохраняет строки, а повтор '
@@ -379,48 +379,157 @@ void main() {
 
       fail(harness.reads, 1);
       await pumpEventQueue();
-      expect(harness.confirmed.data.items, [1, 2]);
+      expect(harness.active.data.items, [1, 2]);
       expect(
         harness.confirmed.summaryStatus,
         isA<RelationListSummaryCurrent>(),
       );
       expect(
-        harness.confirmed.progress,
+        harness.active.progress,
         isA<RelationListLoadMoreFailure>()
             .having((progress) => progress.failure, 'failure', failure)
             .having((progress) => progress.canRetry, 'canRetry', canRetry),
       );
 
-      unawaited(harness.list.retryLoadMore());
-      unawaited(harness.list.retryLoadMore());
+      unawaited(harness.list.retryLoadMore(part: _Part.active));
+      unawaited(harness.list.retryLoadMore(part: _Part.active));
       expect(harness.reads.count, canRetry ? 3 : 2);
       if (!canRetry) return;
       expect(harness.reads.cursorAt(2), const _Cursor(2));
       harness.reads.continuation(2, [3], revision: 1);
       await pumpEventQueue();
-      expect(harness.confirmed.data.items, [1, 2, 3]);
-      expect(harness.confirmed.data.nextCursor, isNull);
+      expect(harness.active.data.items, [1, 2, 3]);
+      expect(harness.active.data.nextCursor, isNull);
     });
   }
+
+  test(
+    'первое чтение публикует части только вместе на одной ревизии',
+    () async {
+      final harness = _ListHarness(parts: {_Part.active, _Part.archived});
+      addTearDown(harness.dispose);
+      expect(harness.reads.listAt(0), 'исходный');
+      expect(harness.reads.listAt(1), 'исходный архив');
+
+      harness.reads.first(0, [1], total: 1, revision: 1);
+      await pumpEventQueue();
+      expect(harness.state, isA<RelationListInitialLoad<_Part, int>>());
+      harness.reads.first(1, [100], total: 1, revision: 2);
+      await pumpEventQueue();
+      expect(harness.state, isA<RelationListInitialLoad<_Part, int>>());
+      expect(harness.reads.listAt(2), 'исходный');
+      expect(harness.reads.listAt(3), 'исходный архив');
+      harness.reads.first(2, [1, 2], total: 2, revision: 2);
+      harness.reads.first(3, [100], total: 1, revision: 2);
+      await pumpEventQueue();
+
+      expect(harness.active.data.items, [1, 2]);
+      expect(harness.archived?.data.items, [100]);
+      expect(
+        harness.published.whereType<RelationListConfirmed<_Part, int>>(),
+        hasLength(1),
+      );
+    },
+  );
+
+  test('подгрузка продолжает часть у конца прокрутки, а пересборка повторяет '
+      'загруженное каждой частью', () async {
+    final harness = _ListHarness(parts: {_Part.active, _Part.archived});
+    addTearDown(harness.dispose);
+    harness.reads.first(0, [1, 2], total: 3, revision: 1, next: 2);
+    harness.reads.first(1, [100, 101], total: 4, revision: 1, next: 2);
+    await pumpEventQueue();
+
+    harness.scrollTo(1, part: _Part.archived);
+    expect(harness.reads.listAt(2), 'исходный архив');
+    expect(harness.reads.cursorAt(2), const _Cursor(2));
+    expect(harness.archived?.progress, isA<RelationListLoadingMore>());
+    expect(harness.active.progress, isA<RelationListIdle>());
+    harness.reads.continuation(2, [102, 103], revision: 1);
+    await pumpEventQueue();
+    expect(harness.archived?.data.items, [100, 101, 102, 103]);
+
+    harness.emitIntention(revision: 2);
+    await pumpEventQueue();
+    expect(harness.reads.listAt(3), 'исходный');
+    expect(harness.reads.cursorAt(3), isNull);
+    expect(harness.reads.listAt(4), 'исходный архив');
+    expect(harness.reads.cursorAt(4), isNull);
+    harness.reads.first(3, [1, 2], total: 3, revision: 2, next: 2);
+    harness.reads.first(4, [100, 101], total: 4, revision: 2, next: 2);
+    await pumpEventQueue();
+    expect(harness.reads.count, 6);
+    expect(harness.reads.listAt(5), 'исходный архив');
+    expect(harness.reads.cursorAt(5), const _Cursor(2));
+    expect(
+      harness.confirmed.summaryStatus,
+      isA<RelationListSummaryRefreshing>(),
+    );
+    harness.reads.continuation(5, [102, 103], revision: 2);
+    await pumpEventQueue();
+
+    expect(harness.active.data.items, [1, 2]);
+    expect(harness.active.data.nextCursor, const _Cursor(2));
+    expect(harness.archived?.data.items, [100, 101, 102, 103]);
+    expect(harness.confirmed.summaryStatus, isA<RelationListSummaryCurrent>());
+    expect(harness.reads.count, 6);
+  });
+
+  test(
+    'отказ одной части сохраняет прежнюю пару с отказом обновления',
+    () async {
+      final harness = _ListHarness(parts: {_Part.active, _Part.archived});
+      addTearDown(harness.dispose);
+      harness.reads.first(0, [1], total: 1, revision: 1);
+      harness.reads.first(1, [100], total: 1, revision: 1);
+      await pumpEventQueue();
+
+      harness.emitIntention(revision: 2);
+      await pumpEventQueue();
+      harness.reads.first(2, [1, 2], total: 2, revision: 2);
+      await pumpEventQueue();
+      expect(harness.active.data.items, [1]);
+      harness.reads.fail(3, const RelationGroupUnavailableFailure());
+      await pumpEventQueue();
+
+      expect(harness.active.data.items, [1]);
+      expect(harness.archived?.data.items, [100]);
+      expect(
+        harness.confirmed.summaryStatus,
+        isA<RelationListSummaryRefreshFailure>(),
+      );
+      expect(
+        harness.published.whereType<RelationListConfirmed<_Part, int>>().map(
+          (state) => state.parts[_Part.active]!.data.items,
+        ),
+        everyElement([1]),
+      );
+    },
+  );
 }
+
+/// Части проверочного списка.
+enum _Part { active, archived }
 
 /// Слой над подставными чтением порций и наблюдением намерения. Завершения
 /// публикует настоящий координатор над управляемым репозиторием.
 final class _ListHarness {
   _ListHarness({
-    bool Function(GraphChange, RelationPagingData<int>?)? isSignificant,
+    bool Function(GraphChange, RelationListConfirmed<_Part, int>?)?
+    isSignificant,
+    Set<_Part> parts = const {_Part.active},
   }) : _isSignificant = isSignificant ?? ((_, _) => false) {
     container = ProviderContainer(
       overrides: [
         personalGraphRepositoryProvider.overrideWithValue(repository),
       ],
     );
-    list = RelationListReconciliation<int, int>(
+    list = RelationListReconciliation<_Part, int, int>(
       intentionId: owner.id,
       watchIntention: (_) => _observations.stream,
       completions: _coordinator.completions,
       policy: RelationGroupPagingPolicy(pageSize: 2, prefetchRemaining: 1),
-      query: query('исходный'),
+      query: query('исходный', parts: parts),
       publish: (value) {
         published.add(value);
         state = value;
@@ -431,30 +540,50 @@ final class _ListHarness {
   final owner = testDetailsIntention();
   final repository = ControlledDetailsRepository();
   final reads = _Reads();
-  final published = <RelationListState<int>>[];
-  final bool Function(GraphChange, RelationPagingData<int>?) _isSignificant;
+  final published = <RelationListState<_Part, int>>[];
+  final bool Function(GraphChange, RelationListConfirmed<_Part, int>?)
+  _isSignificant;
   final _observations =
       StreamController<RelationListIntentionObservation>.broadcast();
   late final ProviderContainer container;
-  late final RelationListReconciliation<int, int> list;
-  RelationListState<int> state = const RelationListInitialLoad();
+  late final RelationListReconciliation<_Part, int, int> list;
+  RelationListState<_Part, int> state = const RelationListInitialLoad();
 
-  RelationListConfirmed<int> get confirmed =>
-      state as RelationListConfirmed<int>;
+  RelationListConfirmed<_Part, int> get confirmed =>
+      state as RelationListConfirmed<_Part, int>;
+
+  RelationListPart<int> get active => confirmed.parts[_Part.active]!;
+
+  RelationListPart<int>? get archived => confirmed.parts[_Part.archived];
 
   GraphCommandCoordinator get _coordinator =>
       container.read(graphCommandCoordinatorProvider.notifier);
 
-  /// Строки списка — положительные числа, чужие строки — отрицательные.
-  RelationListQuery<int, int> query(String name) => RelationListQuery(
-    readPage: (cursor, _) => reads.read(name, cursor),
-    identify: (row) => row > 0 ? row : null,
+  /// Строки активной части — числа от 1 до 99, архивной — от 100, чужие
+  /// строки — отрицательные. Чтения архивной части помечены « архив».
+  RelationListQuery<_Part, int, int> query(
+    String name, {
+    Set<_Part> parts = const {_Part.active},
+  }) => RelationListQuery(
+    parts: {
+      for (final part in parts)
+        part: RelationListPartQuery(
+          readPage: (cursor, _) => reads.read(switch (part) {
+            _Part.active => name,
+            _Part.archived => '$name архив',
+          }, cursor),
+          identify: (row) => switch (part) {
+            _Part.active => row > 0 && row < 100 ? row : null,
+            _Part.archived => row >= 100 ? row : null,
+          },
+        ),
+    },
     isSignificant: _isSignificant,
   );
 
   /// Прокрутка не ожидает ответа: порция приходит по команде теста.
-  void scrollTo(int visibleIndex) =>
-      unawaited(list.loadMoreIfNeeded(visibleIndex: visibleIndex));
+  void scrollTo(int visibleIndex, {_Part part = _Part.active}) =>
+      unawaited(list.loadMoreIfNeeded(part: part, visibleIndex: visibleIndex));
 
   void emitIntention({required int revision}) => _observations.add(
     ResultSuccess(

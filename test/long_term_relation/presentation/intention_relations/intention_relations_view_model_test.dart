@@ -46,7 +46,8 @@ void main() {
 
       expect(harness.state, isA<IntentionRelationsInitialLoad>());
       expect(harness.state.group, expected);
-      expect(harness.pageInstance.relationsGroup, expected);
+      expect(harness.pageInstance.relations?.group, expected);
+      expect(harness.pageInstance.relations?.expandedArchives, isEmpty);
       expect(repository.requestCount, 1);
       _expectFirstPageOf(repository.queryAt(0), expected);
     });
@@ -138,7 +139,7 @@ void main() {
       harness.viewModel.selectGroup(IntentionRelationGroup.canUse);
 
       expect(
-        harness.pageInstance.relationsGroup,
+        harness.pageInstance.relations?.group,
         IntentionRelationGroup.canUse,
       );
       expect(harness.state, isA<IntentionRelationsInitialLoad>());
@@ -207,7 +208,7 @@ void main() {
     addTearDown(otherSubscription.close);
 
     harness.viewModel.selectGroup(IntentionRelationGroup.neededFor);
-    expect(other.relationsGroup, IntentionRelationGroup.canUse);
+    expect(other.relations?.group, IntentionRelationGroup.canUse);
     expect(
       harness.container.read(otherProvider).group,
       IntentionRelationGroup.canUse,
@@ -632,30 +633,472 @@ void main() {
       harness.viewModel.selectGroup(IntentionRelationGroup.canUse);
 
       expect(harness.state, isA<IntentionRelationsIntentionNotFound>());
-      expect(harness.pageInstance.relationsGroup, IntentionRelationGroup.needs);
+      expect(
+        harness.pageInstance.relations?.group,
+        IntentionRelationGroup.needs,
+      );
       expect(repository.requestCount, 1);
     },
   );
+
+  test('архив архивированного намерения раскрыт сразу', () async {
+    final repository = ControlledNeighborhoodRepository();
+    final harness = await _RelationsHarness.open(
+      repository,
+      archiveState: IntentionArchiveState.archived,
+    );
+    addTearDown(harness.dispose);
+
+    expect(
+      harness.pageInstance.relations?.expandedArchives,
+      IntentionRelationGroup.values.toSet(),
+    );
+    expect(repository.requestCount, 2);
+    _expectFirstPageOf(repository.queryAt(0), IntentionRelationGroup.needs);
+    _expectFirstPageOf(
+      repository.queryAt(1),
+      IntentionRelationGroup.needs,
+      scope: RelationScope.archived,
+    );
+    final counts = testRelationCounts(archivedNeedOutgoing: 2);
+    repository.completePage(
+      0,
+      RelationGroupFirstPage(
+        items: const [],
+        counts: counts,
+        nextCursor: null,
+        revision: const TestGraphRevision(4),
+      ),
+    );
+    repository.completePage(
+      1,
+      RelationGroupFirstPage(
+        items: testGroupRows(
+          ownerId: harness.intentionId,
+          from: 1,
+          count: 2,
+          scope: RelationScope.archived,
+        ),
+        counts: counts,
+        nextCursor: null,
+        revision: const TestGraphRevision(4),
+      ),
+    );
+    await pumpEventQueue();
+
+    expect(harness.state, isA<IntentionRelationsEmpty>());
+    expect(harness.archivedIds, [testRelationId(1), testRelationId(2)]);
+    expect(repository.requestCount, 2);
+  });
+
+  test('раскрытие архива читает первую порцию тех же типа и направления, а '
+      'сворачивание отбрасывает её строки', () async {
+    final repository = ControlledNeighborhoodRepository();
+    final harness = await _RelationsHarness.open(
+      repository,
+      target: const RelationsTarget(IntentionRelationGroup.neededFor),
+    );
+    addTearDown(harness.dispose);
+    final ownerId = harness.intentionId;
+    final counts = testRelationCounts(
+      activeNeedIncoming: 1,
+      archivedNeedIncoming: 2,
+    );
+    repository.completePage(
+      0,
+      RelationGroupFirstPage(
+        items: testGroupRows(
+          ownerId: ownerId,
+          from: 1,
+          count: 1,
+          direction: RelationDirection.incoming,
+        ),
+        counts: counts,
+        nextCursor: null,
+        revision: const TestGraphRevision(4),
+      ),
+    );
+    await pumpEventQueue();
+    expect(harness.loaded.hasConfirmedEnd, isTrue);
+    expect(harness.loaded.archive, isA<IntentionRelationsArchiveFolded>());
+
+    harness.viewModel.expandArchive();
+
+    expect(harness.pageInstance.relations?.expandedArchives, {
+      IntentionRelationGroup.neededFor,
+    });
+    expect(harness.loaded.archive, isA<IntentionRelationsArchivePending>());
+    expect(harness.relationIds, [testRelationId(1)]);
+    expect(repository.requestCount, 2);
+    _expectFirstPageOf(
+      repository.queryAt(1),
+      IntentionRelationGroup.neededFor,
+      scope: RelationScope.archived,
+    );
+    repository.completePage(
+      1,
+      RelationGroupFirstPage(
+        items: testGroupRows(
+          ownerId: ownerId,
+          from: 10,
+          count: 2,
+          direction: RelationDirection.incoming,
+          scope: RelationScope.archived,
+        ),
+        counts: counts,
+        nextCursor: null,
+        revision: const TestGraphRevision(4),
+      ),
+    );
+    await pumpEventQueue();
+
+    expect(harness.relationIds, [testRelationId(1)]);
+    expect(harness.archivedIds, [testRelationId(10), testRelationId(11)]);
+    expect(harness.loaded.summaryStatus, isA<RelationListSummaryCurrent>());
+    expect(repository.requestCount, 2);
+
+    harness.viewModel.collapseArchive();
+
+    expect(harness.pageInstance.relations?.expandedArchives, isEmpty);
+    expect(harness.loaded.archive, isA<IntentionRelationsArchiveFolded>());
+    expect(harness.relationIds, [testRelationId(1)]);
+    expect(repository.requestCount, 2);
+  });
+
+  test('смена группы сохраняет раскрытие архивов, а новая модель экземпляра '
+      'снова получает раскрытый архив', () async {
+    final repository = ControlledNeighborhoodRepository();
+    final harness = await _RelationsHarness.open(repository);
+    addTearDown(harness.dispose);
+    final ownerId = harness.intentionId;
+    final counts = testRelationCounts(
+      activeNeedOutgoing: 1,
+      archivedNeedOutgoing: 1,
+      activeCanOutgoing: 1,
+      archivedCanOutgoing: 1,
+    );
+    repository.completePage(
+      0,
+      RelationGroupFirstPage(
+        items: testGroupRows(ownerId: ownerId, from: 1, count: 1),
+        counts: counts,
+        nextCursor: null,
+        revision: const TestGraphRevision(4),
+      ),
+    );
+    await pumpEventQueue();
+    harness.viewModel.expandArchive();
+    repository.completePage(
+      1,
+      RelationGroupFirstPage(
+        items: testGroupRows(
+          ownerId: ownerId,
+          from: 10,
+          count: 1,
+          scope: RelationScope.archived,
+        ),
+        counts: counts,
+        nextCursor: null,
+        revision: const TestGraphRevision(4),
+      ),
+    );
+    await pumpEventQueue();
+
+    harness.viewModel.selectGroup(IntentionRelationGroup.canUse);
+    expect(repository.requestCount, 3);
+    _expectFirstPageOf(repository.queryAt(2), IntentionRelationGroup.canUse);
+    repository.completePage(
+      2,
+      RelationGroupFirstPage(
+        items: testGroupRows(
+          ownerId: ownerId,
+          from: 20,
+          count: 1,
+          type: LongTermRelationType.can,
+        ),
+        counts: counts,
+        nextCursor: null,
+        revision: const TestGraphRevision(4),
+      ),
+    );
+    await pumpEventQueue();
+    expect(harness.loaded.archive, isA<IntentionRelationsArchiveFolded>());
+    expect(repository.requestCount, 3);
+
+    harness.viewModel.selectGroup(IntentionRelationGroup.needs);
+    expect(repository.requestCount, 5);
+    _expectFirstPageOf(repository.queryAt(3), IntentionRelationGroup.needs);
+    _expectFirstPageOf(
+      repository.queryAt(4),
+      IntentionRelationGroup.needs,
+      scope: RelationScope.archived,
+    );
+
+    await harness.release();
+    repository.emitIntention(
+      _intention(
+        ownerId,
+        IntentionReadiness.notReady,
+        archiveState: IntentionArchiveState.archived,
+      ),
+      counts: counts,
+      revision: const TestGraphRevision(9),
+    );
+    await pumpEventQueue();
+    harness.retain();
+
+    expect(harness.pageInstance.relations?.expandedArchives, {
+      IntentionRelationGroup.needs,
+    });
+    expect(repository.requestCount, 7);
+    _expectFirstPageOf(repository.queryAt(5), IntentionRelationGroup.needs);
+    _expectFirstPageOf(
+      repository.queryAt(6),
+      IntentionRelationGroup.needs,
+      scope: RelationScope.archived,
+    );
+  });
+
+  test('многолетний архив раскрывается одной порцией', () async {
+    final repository = ControlledNeighborhoodRepository();
+    final harness = await _RelationsHarness.open(repository);
+    addTearDown(harness.dispose);
+    final counts = testRelationCounts(archivedNeedOutgoing: 5000);
+    repository.completePage(
+      0,
+      RelationGroupFirstPage(
+        items: const [],
+        counts: counts,
+        nextCursor: null,
+        revision: const TestGraphRevision(4),
+      ),
+    );
+    await pumpEventQueue();
+
+    harness.viewModel.expandArchive();
+    expect(repository.queryAt(1).pageSize, 50);
+    repository.completePage(
+      1,
+      RelationGroupFirstPage(
+        items: testGroupRows(
+          ownerId: harness.intentionId,
+          from: 1,
+          count: 50,
+          scope: RelationScope.archived,
+        ),
+        counts: counts,
+        nextCursor: const TestRelationGroupCursor(50),
+        revision: const TestGraphRevision(4),
+      ),
+    );
+    await pumpEventQueue();
+
+    final archive =
+        harness.confirmed.archive as IntentionRelationsArchiveExpanded;
+    expect(archive.items, hasLength(50));
+    expect(archive.nextCursor, isNotNull);
+    expect(harness.confirmed.counts.archivedNeedOutgoing, 5000);
+    expect(repository.requestCount, 2);
+
+    unawaited(
+      harness.viewModel.loadMoreIfNeeded(
+        scope: RelationScope.archived,
+        visibleIndex: 49,
+      ),
+    );
+    expect(repository.requestCount, 3);
+    final continuation = repository.queryAt(2);
+    expect(continuation.scope, RelationScope.archived);
+    expect(continuation.cursor, const TestRelationGroupCursor(50));
+  });
+
+  test('архивирование, восстановление связи и каскад публикуют обе части на '
+      'одной ревизии', () async {
+    final repository = ControlledNeighborhoodRepository();
+    final harness = await _RelationsHarness.open(repository);
+    addTearDown(harness.dispose);
+    final ownerId = harness.intentionId;
+    RelationGroupEntry active(int index) =>
+        testGroupRow(ownerId: ownerId, index: index);
+    RelationGroupEntry archived(int index) => testGroupRow(
+      ownerId: ownerId,
+      index: index,
+      scope: RelationScope.archived,
+    );
+    void completePair(
+      int index, {
+      required List<RelationGroupEntry> activeRows,
+      required List<RelationGroupEntry> archivedRows,
+      required int revision,
+    }) {
+      final counts = testRelationCounts(
+        activeNeedOutgoing: activeRows.length,
+        archivedNeedOutgoing: archivedRows.length,
+      );
+      // Архивная часть отвечает раньше активной.
+      for (final (offset, rows) in [(1, archivedRows), (0, activeRows)]) {
+        repository.completePage(
+          index + offset,
+          RelationGroupFirstPage(
+            items: rows,
+            counts: counts,
+            nextCursor: null,
+            revision: TestGraphRevision(revision),
+          ),
+        );
+      }
+    }
+
+    repository.completePage(
+      0,
+      RelationGroupFirstPage(
+        items: [active(1), active(2)],
+        counts: testRelationCounts(
+          activeNeedOutgoing: 2,
+          archivedNeedOutgoing: 1,
+        ),
+        nextCursor: null,
+        revision: const TestGraphRevision(4),
+      ),
+    );
+    await pumpEventQueue();
+    harness.viewModel.expandArchive();
+    repository.completePage(
+      1,
+      RelationGroupFirstPage(
+        items: [archived(10)],
+        counts: testRelationCounts(
+          activeNeedOutgoing: 2,
+          archivedNeedOutgoing: 1,
+        ),
+        nextCursor: null,
+        revision: const TestGraphRevision(4),
+      ),
+    );
+    await pumpEventQueue();
+    harness.viewModel.rememberVisibleRelation(testRelationId(2));
+
+    await harness.completeRelationCommand(
+      ArchiveLongTermRelation(testRelationId(2)),
+      _relationUpdateSuccess(
+        revision: const TestGraphRevision(9),
+        before: active(2).relation,
+        after: archived(2).relation,
+        counts: {
+          ownerId: testRelationCounts(
+            activeNeedOutgoing: 1,
+            archivedNeedOutgoing: 2,
+          ),
+        },
+      ),
+    );
+    completePair(
+      2,
+      activeRows: [active(1)],
+      archivedRows: [archived(2), archived(10)],
+      revision: 9,
+    );
+    await pumpEventQueue();
+    expect(harness.relationIds, [testRelationId(1)]);
+    expect(harness.archivedIds, [testRelationId(2), testRelationId(10)]);
+    expect(harness.confirmed.scrollAnchor?.id, testRelationId(2));
+
+    await harness.completeRelationCommand(
+      RestoreLongTermRelation(testRelationId(2)),
+      _relationUpdateSuccess(
+        revision: const TestGraphRevision(11),
+        before: archived(2).relation,
+        after: active(2).relation,
+        counts: {
+          ownerId: testRelationCounts(
+            activeNeedOutgoing: 2,
+            archivedNeedOutgoing: 1,
+          ),
+        },
+      ),
+    );
+    completePair(
+      4,
+      activeRows: [active(1), active(2)],
+      archivedRows: [archived(10)],
+      revision: 11,
+    );
+    await pumpEventQueue();
+    expect(harness.relationIds, [testRelationId(1), testRelationId(2)]);
+    expect(harness.archivedIds, [testRelationId(10)]);
+
+    final owner = _intention(ownerId, IntentionReadiness.notReady);
+    final start = harness.coordinator.acceptExisting(
+      ArchiveIntention(ownerId),
+      presentationTitle: owner.title,
+    ) as IntentionCommandAccepted;
+    repository.completeIntentionCommand(
+      0,
+      testNeighborhoodSavedResult(
+        before: owner,
+        after: _intention(
+          ownerId,
+          IntentionReadiness.notReady,
+          archiveState: IntentionArchiveState.archived,
+        ),
+        revision: const TestGraphRevision(13),
+      ),
+    );
+    await start.future;
+    await pumpEventQueue();
+    completePair(
+      6,
+      activeRows: const [],
+      archivedRows: [archived(1), archived(2), archived(10)],
+      revision: 13,
+    );
+    await pumpEventQueue();
+    expect(harness.state, isA<IntentionRelationsEmpty>());
+    expect(harness.archivedIds, [
+      testRelationId(1),
+      testRelationId(2),
+      testRelationId(10),
+    ]);
+    expect(repository.requestCount, 8);
+
+    // На каждой опубликованной ревизии связь видна ровно в одной части.
+    for (final state
+        in harness.published.whereType<IntentionRelationsConfirmed>()) {
+      final ids = [
+        if (state case IntentionRelationsLoaded(:final items))
+          for (final item in items) item.relation.id,
+        if (state.archive case IntentionRelationsArchiveExpanded(:final items))
+          for (final item in items) item.relation.id,
+      ];
+      expect(ids.toSet(), hasLength(ids.length));
+      expect(ids, contains(testRelationId(2)));
+    }
+  });
 }
 
 void _expectFirstPageOf(
   RelationGroupQuery query,
-  IntentionRelationGroup group,
-) {
+  IntentionRelationGroup group, {
+  RelationScope scope = RelationScope.active,
+}) {
   expect(query.type, group.type);
   expect(query.direction, group.direction);
-  expect(query.scope, RelationScope.active);
+  expect(query.scope, scope);
   expect(query.cursor, isNull);
 }
 
-Intention _intention(IntentionId id, IntentionReadiness readiness) {
+Intention _intention(
+  IntentionId id,
+  IntentionReadiness readiness, {
+  IntentionArchiveState archiveState = IntentionArchiveState.active,
+}) {
   final timestamp = IntentionTimestamp(DateTime.utc(2026, 9, 20));
   return Intention(
     id: id,
     title: 'Намерение',
     description: null,
     readiness: readiness,
-    archiveState: IntentionArchiveState.active,
+    archiveState: archiveState,
     createdAt: timestamp,
     updatedAt: timestamp,
   );
@@ -729,6 +1172,7 @@ final class _RelationsHarness {
     ControlledNeighborhoodRepository repository, {
     IntentionPageTarget target = const OverviewTarget(),
     IntentionReadiness readiness = IntentionReadiness.notReady,
+    IntentionArchiveState archiveState = IntentionArchiveState.active,
     int pageSize = 50,
     bool retain = true,
   }) async {
@@ -753,7 +1197,7 @@ final class _RelationsHarness {
       (_, _) {},
     );
     repository.emitIntention(
-      _intention(harness.intentionId, readiness),
+      _intention(harness.intentionId, readiness, archiveState: archiveState),
       counts: testRelationCounts(),
       revision: const TestGraphRevision(1),
     );
@@ -769,6 +1213,9 @@ final class _RelationsHarness {
   final IntentionId intentionId;
   ProviderSubscription<IntentionDetailsState>? _detailsSubscription;
   ProviderSubscription<IntentionRelationsState>? _subscription;
+
+  /// Состояния, опубликованные удерживаемой моделью.
+  final published = <IntentionRelationsState>[];
 
   IntentionRelationsViewModelProvider get _provider =>
       intentionRelationsViewModelProvider(intentionId, pageInstance);
@@ -786,13 +1233,25 @@ final class _RelationsHarness {
 
   IntentionRelationsLoaded get loaded => state as IntentionRelationsLoaded;
 
+  IntentionRelationsConfirmed get confirmed =>
+      state as IntentionRelationsConfirmed;
+
   List<LongTermRelationId> get relationIds => [
     for (final item in loaded.items) item.relation.id,
   ];
 
+  List<LongTermRelationId> get archivedIds => [
+    for (final item
+        in (confirmed.archive as IntentionRelationsArchiveExpanded).items)
+      item.relation.id,
+  ];
+
   /// Слушатель удерживает модель, как выбранная вкладка страницы.
   void retain() {
-    _subscription = container.listen(_provider, (_, _) {});
+    _subscription = container.listen(
+      _provider,
+      (_, next) => published.add(next),
+    );
   }
 
   /// Снимает слушателя и ждёт автоматического освобождения модели.
@@ -822,6 +1281,8 @@ final class _RelationsHarness {
     final commandIndex = repository.relationCommands.length;
     final start = switch (command) {
       UpdateLongTermRelation() => coordinator.acceptRelationUpdate(command),
+      ArchiveLongTermRelation() => coordinator.acceptRelationArchive(command),
+      RestoreLongTermRelation() => coordinator.acceptRelationRestore(command),
       _ => throw UnsupportedError('Команда не используется в этих проверках.'),
     };
     expect(start, isA<LongTermRelationCommandAccepted>());

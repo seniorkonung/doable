@@ -35,7 +35,12 @@ final class IntentionChoicesViewModel extends _$IntentionChoicesViewModel {
   late IntentionPageInstance _pageInstance;
   late PersonalGraphRepository _repository;
   late DailyChoiceRelationRole _role;
-  late RelationListReconciliation<DailyChoiceCatalogItem, DailyChoiceId> _list;
+  late RelationListReconciliation<
+    DailyChoiceRelationRole,
+    DailyChoiceCatalogItem,
+    DailyChoiceId
+  >
+  _list;
 
   @override
   IntentionChoicesState build(
@@ -75,47 +80,65 @@ final class IntentionChoicesViewModel extends _$IntentionChoicesViewModel {
   ///
   /// Пока порция ожидается, повторная прокрутка не отправляет её второй раз.
   Future<void> loadMoreIfNeeded({required int visibleIndex}) =>
-      _list.loadMoreIfNeeded(visibleIndex: visibleIndex);
+      _list.loadMoreIfNeeded(part: _role, visibleIndex: visibleIndex);
 
-  Future<void> retryLoadMore() => _list.retryLoadMore();
+  Future<void> retryLoadMore() => _list.retryLoadMore(part: _role);
 
   Future<void> retryRefresh() => _list.retryRefresh();
 
+  /// Список выбранной роли — форма из одной части.
   IntentionChoicesState _project(
-    RelationListState<DailyChoiceCatalogItem> value,
-  ) => switch (value) {
-    RelationListInitialLoad() => IntentionChoicesInitialLoad(role: _role),
-    RelationListInitialFailure(:final failure) =>
-      IntentionChoicesInitialFailure(role: _role, failure: failure),
-    RelationListIntentionNotFound() => IntentionChoicesIntentionNotFound(
-      role: _role,
-    ),
-    RelationListConfirmed(:final data, :final summaryStatus)
-        when data.items.isEmpty =>
-      IntentionChoicesEmpty(
-        role: _role,
-        counts: data.counts,
-        revision: data.revision,
-        summaryStatus: summaryStatus,
-      ),
-    RelationListConfirmed(:final data, :final summaryStatus, :final progress) =>
-      IntentionChoicesLoaded(
-        role: _role,
-        counts: data.counts,
-        revision: data.revision,
-        summaryStatus: summaryStatus,
-        items: data.items,
-        nextCursor: data.nextCursor,
-        progress: progress,
-      ),
-  };
+    RelationListState<DailyChoiceRelationRole, DailyChoiceCatalogItem> value,
+  ) {
+    switch (value) {
+      case RelationListInitialLoad():
+        return IntentionChoicesInitialLoad(role: _role);
+      case RelationListInitialFailure(:final failure):
+        return IntentionChoicesInitialFailure(role: _role, failure: failure);
+      case RelationListIntentionNotFound():
+        return IntentionChoicesIntentionNotFound(role: _role);
+      case RelationListConfirmed(
+        :final parts,
+        :final counts,
+        :final revision,
+        :final summaryStatus,
+      ):
+        final part = parts[_role]!;
+        if (part.data.items.isEmpty) {
+          return IntentionChoicesEmpty(
+            role: _role,
+            counts: counts,
+            revision: revision,
+            summaryStatus: summaryStatus,
+          );
+        }
+        return IntentionChoicesLoaded(
+          role: _role,
+          counts: counts,
+          revision: revision,
+          summaryStatus: summaryStatus,
+          items: part.data.items,
+          nextCursor: part.data.nextCursor,
+          progress: part.progress,
+        );
+    }
+  }
 
-  RelationListQuery<DailyChoiceCatalogItem, DailyChoiceId> _query(
-    DailyChoiceRelationRole role,
-  ) => RelationListQuery(
-    identify: (item) => _belongsToRole(item, role) ? item.id : null,
+  RelationListQuery<
+    DailyChoiceRelationRole,
+    DailyChoiceCatalogItem,
+    DailyChoiceId
+  >
+  _query(DailyChoiceRelationRole role) => RelationListQuery(
+    parts: {role: _partQuery(role)},
     isSignificant: (change, confirmed) =>
         _isSignificant(change, role, confirmed),
+  );
+
+  RelationListPartQuery<DailyChoiceCatalogItem, DailyChoiceId> _partQuery(
+    DailyChoiceRelationRole role,
+  ) => RelationListPartQuery(
+    identify: (item) => _belongsToRole(item, role) ? item.id : null,
     readPage: (cursor, pageSize) async => switch (await _readPage(
       role,
       cursor,
@@ -161,7 +184,8 @@ final class IntentionChoicesViewModel extends _$IntentionChoicesViewModel {
   bool _isSignificant(
     GraphChange change,
     DailyChoiceRelationRole role,
-    RelationPagingData<DailyChoiceCatalogItem>? confirmed,
+    RelationListConfirmed<DailyChoiceRelationRole, DailyChoiceCatalogItem>?
+    confirmed,
   ) {
     final items = confirmed?.items ?? const <DailyChoiceCatalogItem>[];
     bool differsFromPublished(RelationCounts counts) =>
