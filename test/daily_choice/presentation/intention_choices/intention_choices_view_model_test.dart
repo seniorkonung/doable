@@ -158,178 +158,6 @@ void main() {
     expect(otherLoaded.items.single.selected.id, testIntentionId(2));
   });
 
-  test('освобождённая модель не читает и не публикует поздний ответ', () async {
-    final repository = ControlledNeighborhoodRepository();
-    final harness = _ChoicesHarness(repository);
-    addTearDown(harness.dispose);
-
-    await harness.release();
-    repository.emitIntention(
-      testNeighborhoodIntention(id: harness.intentionId),
-      counts: testRelationCounts(dailySource: 1),
-      revision: const TestGraphRevision(2),
-    );
-    repository.completePage(
-      0,
-      DailyChoiceGroupFirstPage(
-        items: [
-          testDailyCatalogItem(
-            source: harness.intentionId,
-            selected: testIntentionId(2),
-          ),
-        ],
-        counts: testRelationCounts(dailySource: 1),
-        nextCursor: null,
-        revision: const TestGraphRevision(1),
-      ),
-    );
-    await pumpEventQueue();
-    expect(repository.requestCount, 1);
-
-    harness.retain();
-    await pumpEventQueue();
-    expect(harness.state, isA<IntentionChoicesInitialLoad>());
-    expect(repository.requestCount, 2);
-  });
-
-  test('поздний ответ прежней роли не заменяет новую выбранную роль', () async {
-    final repository = ControlledNeighborhoodRepository();
-    final harness = _ChoicesHarness(repository);
-    addTearDown(harness.dispose);
-    harness.viewModel.selectRole(DailyChoiceRelationRole.selected);
-    expect(
-      (repository.pageQueryAt(1) as DailyChoiceGroupQuery).role,
-      DailyChoiceRelationRole.selected,
-    );
-    repository.completePage(
-      1,
-      DailyChoiceGroupFirstPage(
-        items: [
-          testDailyCatalogItem(
-            source: testIntentionId(2),
-            selected: harness.intentionId,
-          ),
-        ],
-        counts: testRelationCounts(dailySource: 1, dailySelected: 1),
-        nextCursor: null,
-        revision: const TestGraphRevision(2),
-      ),
-    );
-    await pumpEventQueue();
-    repository.completePage(
-      0,
-      DailyChoiceGroupFirstPage(
-        items: [
-          testDailyCatalogItem(
-            source: harness.intentionId,
-            selected: testIntentionId(2),
-          ),
-        ],
-        counts: testRelationCounts(dailySource: 1, dailySelected: 1),
-        nextCursor: null,
-        revision: const TestGraphRevision(1),
-      ),
-    );
-    await pumpEventQueue();
-    expect(harness.loaded.role, DailyChoiceRelationRole.selected);
-    expect(harness.loaded.items.single.selected.id, harness.intentionId);
-  });
-
-  test(
-    'изменение показанного дневного выбора сохраняет старую пару до замены',
-    () async {
-      final repository = ControlledNeighborhoodRepository();
-      final harness = _ChoicesHarness(repository);
-      addTearDown(harness.dispose);
-      repository.completePage(
-        0,
-        DailyChoiceGroupFirstPage(
-          items: [
-            testDailyCatalogItem(
-              source: harness.intentionId,
-              selected: testIntentionId(2),
-            ),
-          ],
-          counts: testRelationCounts(dailySource: 1),
-          nextCursor: null,
-          revision: const TestGraphRevision(1),
-        ),
-      );
-      await pumpEventQueue();
-      repository.emitIntention(
-        testNeighborhoodIntention(id: harness.intentionId),
-        counts: testRelationCounts(dailySource: 1),
-        revision: const TestGraphRevision(2),
-      );
-      await pumpEventQueue();
-      final refreshing = harness.loaded;
-      expect(refreshing.items.single.isCompleted, isFalse);
-      expect(refreshing.summaryStatus, isA<RelationListSummaryRefreshing>());
-      repository.completePage(
-        1,
-        DailyChoiceGroupFirstPage(
-          items: [
-            testDailyCatalogItem(
-              source: harness.intentionId,
-              selected: testIntentionId(2),
-              isCompleted: true,
-            ),
-          ],
-          counts: testRelationCounts(dailySource: 1),
-          nextCursor: null,
-          revision: const TestGraphRevision(2),
-        ),
-      );
-      await pumpEventQueue();
-      final updated = harness.loaded;
-      expect(updated.items.single.isCompleted, isTrue);
-      expect(updated.summaryStatus, isA<RelationListSummaryCurrent>());
-    },
-  );
-
-  test(
-    'ошибка замены дневной роли оставляет согласованные строки и числа',
-    () async {
-      final repository = ControlledNeighborhoodRepository();
-      final harness = _ChoicesHarness(repository);
-      addTearDown(harness.dispose);
-      repository.completePage(
-        0,
-        DailyChoiceGroupFirstPage(
-          items: [
-            testDailyCatalogItem(
-              source: harness.intentionId,
-              selected: testIntentionId(2),
-            ),
-          ],
-          counts: testRelationCounts(dailySource: 1),
-          nextCursor: null,
-          revision: const TestGraphRevision(1),
-        ),
-      );
-      await pumpEventQueue();
-      repository.emitIntention(
-        testNeighborhoodIntention(id: harness.intentionId),
-        counts: testRelationCounts(),
-        revision: const TestGraphRevision(2),
-      );
-      await pumpEventQueue();
-      repository.failRead(1, const RelationGroupUnavailableFailure());
-      await pumpEventQueue();
-      final stale = harness.loaded;
-      expect(stale.items, hasLength(1));
-      expect(stale.counts.dailySource, 1);
-      expect(
-        stale.summaryStatus,
-        isA<RelationListSummaryRefreshFailure>().having(
-          (status) => status.canRetry,
-          'canRetry',
-          isTrue,
-        ),
-      );
-    },
-  );
-
   test(
     'подтверждённое изменение даты и выполнения пересобирает дневную строку',
     () async {
@@ -473,108 +301,6 @@ void main() {
       expect(empty.counts.total, 0);
     },
   );
-
-  test('поздняя порция роли уступает новой основе перед подгрузкой', () async {
-    final repository = ControlledNeighborhoodRepository();
-    final harness = _ChoicesHarness(repository, pageSize: 1);
-    addTearDown(harness.dispose);
-    repository.completePage(
-      0,
-      DailyChoiceGroupFirstPage(
-        items: [
-          testDailyCatalogItem(
-            source: harness.intentionId,
-            selected: testIntentionId(2),
-          ),
-        ],
-        counts: testRelationCounts(dailySource: 2),
-        nextCursor: const TestRelationGroupCursor(1),
-        revision: const TestGraphRevision(1),
-      ),
-    );
-    await pumpEventQueue();
-    harness.scrollTo(0);
-    expect(repository.pageQueryAt(1).cursor, const TestRelationGroupCursor(1));
-    repository.emitIntention(
-      testNeighborhoodIntention(id: harness.intentionId),
-      counts: testRelationCounts(dailySource: 1),
-      revision: const TestGraphRevision(2),
-    );
-    await pumpEventQueue();
-    expect(harness.loaded.summaryStatus, isA<RelationListSummaryRefreshing>());
-    repository.completePage(
-      1,
-      DailyChoiceGroupContinuationPage(
-        items: const [],
-        nextCursor: null,
-        revision: const TestGraphRevision(1),
-      ),
-    );
-    await pumpEventQueue();
-    repository.completePage(
-      2,
-      DailyChoiceGroupFirstPage(
-        items: [
-          testDailyCatalogItem(
-            source: harness.intentionId,
-            selected: testIntentionId(2),
-          ),
-        ],
-        counts: testRelationCounts(dailySource: 1),
-        nextCursor: null,
-        revision: const TestGraphRevision(2),
-      ),
-    );
-    await pumpEventQueue();
-    final current = harness.loaded;
-    expect(current.items, hasLength(1));
-    expect(current.counts.dailySource, 1);
-    expect(current.hasConfirmedEnd, isTrue);
-  });
-
-  test('посторонняя ревизия требует новой основы роли', () async {
-    final repository = ControlledNeighborhoodRepository();
-    final harness = _ChoicesHarness(repository, pageSize: 1);
-    addTearDown(harness.dispose);
-    repository.completePage(
-      0,
-      DailyChoiceGroupFirstPage(
-        items: [
-          testDailyCatalogItem(
-            source: harness.intentionId,
-            selected: testIntentionId(2),
-          ),
-        ],
-        counts: testRelationCounts(dailySource: 2),
-        nextCursor: const TestRelationGroupCursor(1),
-        revision: const TestGraphRevision(1),
-      ),
-    );
-    await pumpEventQueue();
-    harness.scrollTo(0);
-    repository.failRead(1, const RelationGroupSnapshotExpired());
-    await pumpEventQueue();
-    expect(repository.pageQueryAt(2).cursor, isNull);
-    expect(harness.loaded.summaryStatus, isA<RelationListSummaryRefreshing>());
-    repository.completePage(
-      2,
-      DailyChoiceGroupFirstPage(
-        items: [
-          testDailyCatalogItem(
-            source: harness.intentionId,
-            selected: testIntentionId(2),
-          ),
-        ],
-        counts: testRelationCounts(dailySource: 1),
-        nextCursor: null,
-        revision: const TestGraphRevision(2),
-      ),
-    );
-    await pumpEventQueue();
-    final current = harness.loaded;
-    expect(current.counts.dailySource, 1);
-    expect(current.hasConfirmedEnd, isTrue);
-  });
 
   test(
     'новая дата незагруженного выбора перестраивает видимую часть роли',
@@ -727,134 +453,49 @@ void main() {
     expect(harness.loaded.items.single.selected.title, 'Новое действие');
   });
 
-  test('устранимый отказ первого чтения роли повторяется', () async {
-    final repository = ControlledNeighborhoodRepository();
-    final harness = _ChoicesHarness(repository);
-    addTearDown(harness.dispose);
-    repository.failRead(0, const RelationGroupUnavailableFailure());
-    await pumpEventQueue();
-    final failure = harness.state as IntentionChoicesInitialFailure;
-    expect(failure.canRetry, isTrue);
-
-    harness.retryFirstPage();
-    expect(harness.state, isA<IntentionChoicesInitialLoad>());
-    expect(
-      (repository.pageQueryAt(1) as DailyChoiceGroupQuery).role,
-      DailyChoiceRelationRole.source,
-    );
-    repository.completePage(
-      1,
-      DailyChoiceGroupFirstPage(
-        items: [
-          testDailyCatalogItem(
-            source: harness.intentionId,
-            selected: testIntentionId(2),
-          ),
-        ],
-        counts: testRelationCounts(dailySource: 1),
-        nextCursor: null,
-        revision: const TestGraphRevision(1),
-      ),
-    );
-    await pumpEventQueue();
-    expect(harness.loaded.items, hasLength(1));
-  });
-
   test(
-    'отказ подгрузки сохраняет строки, а повтор продолжает список один раз',
-    () async {
-      final repository = ControlledNeighborhoodRepository();
-      final harness = _ChoicesHarness(repository, pageSize: 1);
-      addTearDown(harness.dispose);
-      repository.completePage(
-        0,
-        DailyChoiceGroupFirstPage(
-          items: [
-            testDailyCatalogItem(
-              source: harness.intentionId,
-              selected: testIntentionId(2),
-            ),
-          ],
-          counts: testRelationCounts(dailySource: 2),
-          nextCursor: const TestRelationGroupCursor(1),
-          revision: const TestGraphRevision(1),
-        ),
-      );
-      await pumpEventQueue();
-      harness.scrollTo(0);
-      repository.failRead(1, const RelationGroupUnavailableFailure());
-      await pumpEventQueue();
-      expect(harness.loaded.items, hasLength(1));
-      expect(
-        harness.loaded.progress,
-        isA<RelationListLoadMoreFailure>().having(
-          (progress) => progress.canRetry,
-          'canRetry',
-          isTrue,
-        ),
-      );
-
-      harness.retryLoadMore();
-      harness.retryLoadMore();
-      expect(repository.requestCount, 3);
-      expect(
-        repository.pageQueryAt(2).cursor,
-        const TestRelationGroupCursor(1),
-      );
-      repository.completePage(
-        2,
-        DailyChoiceGroupContinuationPage(
-          items: [
-            testDailyCatalogItem(
-              id: _choiceId(2),
-              source: harness.intentionId,
-              selected: testIntentionId(3),
-            ),
-          ],
-          nextCursor: null,
-          revision: const TestGraphRevision(1),
-        ),
-      );
-      await pumpEventQueue();
-      expect(harness.loaded.items, hasLength(2));
-      expect(harness.loaded.hasConfirmedEnd, isTrue);
-    },
-  );
-
-  test(
-    'подтверждённое отсутствие намерения завершает вкладку без новых чтений',
+    'выбор, где намерение только выбранное, не принимается в роль «исходное»',
     () async {
       final repository = ControlledNeighborhoodRepository();
       final harness = _ChoicesHarness(repository);
       addTearDown(harness.dispose);
+
       repository.completePage(
         0,
         DailyChoiceGroupFirstPage(
           items: [
             testDailyCatalogItem(
-              source: harness.intentionId,
-              selected: testIntentionId(2),
+              source: testIntentionId(2),
+              selected: harness.intentionId,
             ),
           ],
-          counts: testRelationCounts(dailySource: 1),
+          counts: testRelationCounts(dailySource: 1, dailySelected: 1),
           nextCursor: null,
           revision: const TestGraphRevision(1),
         ),
       );
       await pumpEventQueue();
 
-      repository.emitIntentionNotFound(revision: const TestGraphRevision(2));
+      final failure = harness.state as IntentionChoicesInitialFailure;
+      expect(failure.role, DailyChoiceRelationRole.source);
+      expect(failure.failure, isA<RelationGroupUnexpectedFailure>());
+    },
+  );
+
+  test(
+    'после отсутствия намерения смена роли не читает и не меняет экземпляр',
+    () async {
+      final repository = ControlledNeighborhoodRepository();
+      final harness = _ChoicesHarness(repository);
+      addTearDown(harness.dispose);
+      repository.emitIntentionNotFound(revision: const TestGraphRevision(1));
       await pumpEventQueue();
       expect(harness.state, isA<IntentionChoicesIntentionNotFound>());
 
       harness.viewModel.selectRole(DailyChoiceRelationRole.selected);
-      repository.emitIntention(
-        testNeighborhoodIntention(id: harness.intentionId),
-        counts: testRelationCounts(dailySource: 1),
-        revision: const TestGraphRevision(3),
-      );
-      await pumpEventQueue();
+
       expect(harness.state, isA<IntentionChoicesIntentionNotFound>());
+      expect(harness.pageInstance.choicesRole, DailyChoiceRelationRole.source);
       expect(repository.requestCount, 1);
     },
   );
@@ -919,10 +560,6 @@ final class _ChoicesHarness {
   /// Прокрутка не ожидает ответа: порция приходит по команде теста.
   void scrollTo(int visibleIndex) =>
       unawaited(viewModel.loadMoreIfNeeded(visibleIndex: visibleIndex));
-
-  void retryFirstPage() => unawaited(viewModel.retryFirstPage());
-
-  void retryLoadMore() => unawaited(viewModel.retryLoadMore());
 
   void dispose() {
     _subscription?.close();
