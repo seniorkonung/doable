@@ -172,6 +172,24 @@ void main() {
     );
   });
 
+  testWidgets('выбор «Архивировать» отбрасывается, если до окончания '
+      'закрытия листа над страницей открыт второй лист', (tester) async {
+    final repository = ControlledDetailsRepository();
+    await _openLoaded(tester, repository, testDetailsIntention());
+
+    await _openOptions(tester);
+    await tester.tap(_inSheet('Архивировать'));
+    await tester.pump();
+    await tester.tap(_optionsButton);
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump();
+
+    expect(repository.commands, isEmpty);
+    expect(find.byType(Sheet), findsOneWidget);
+    expect(_rows(tester).map((row) => row.name), contains('Архивировать'));
+  });
+
   testWidgets('во время изменяющей операции открытый лист не даёт выбрать '
       'пункты, а после её окончания открывает их', (tester) async {
     final repository = ControlledDetailsRepository();

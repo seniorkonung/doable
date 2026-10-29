@@ -301,7 +301,9 @@ final class _IntentionDetailsPageState
   }
 
   /// Лист закрывается до начала действия, поэтому оно начинается уже на
-  /// странице (ADR-0042).
+  /// странице (ADR-0042). Выбор приходит после анимации закрытия, когда
+  /// страница уже принимает нажатия, поэтому поздний выбор отбрасывается,
+  /// если над страницей уже что-то открыто или она уходит.
   Future<void> _openOptions() async {
     final provider = intentionDetailsViewModelProvider(widget.intentionId);
     final option = await showDoableSheet<IntentionOption>(
@@ -309,7 +311,11 @@ final class _IntentionDetailsPageState
       builder: (context, sheet) =>
           _IntentionOptionsSheet(sheet: sheet, provider: provider),
     );
-    if (option == null || !mounted) return;
+    if (option == null ||
+        !mounted ||
+        !(ModalRoute.isCurrentOf(context) ?? false)) {
+      return;
+    }
     final model = ref.read(provider.notifier);
     switch (option) {
       case IntentionOption.edit:
