@@ -817,6 +817,14 @@ class AppLocalizationsRu extends AppLocalizations {
       'Чтобы добавлять связи, восстановите намерение.';
 
   @override
+  String get detailsRelationsArchiveFold => 'Архив';
+
+  @override
+  String detailsRelationsArchiveFoldSemantic(String group, int count) {
+    return 'Архив группы «$group»: $count';
+  }
+
+  @override
   String get detailsChoicesTab => 'Выборы';
 
   @override

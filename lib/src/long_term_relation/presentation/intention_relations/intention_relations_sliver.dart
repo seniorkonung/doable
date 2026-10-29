@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../../../design_system/components/add_row.dart';
+import '../../../design_system/components/archived_fold.dart';
 import '../../../design_system/components/count_tiles.dart';
 import '../../../design_system/components/empty_state.dart';
 import '../../../design_system/components/relation_row.dart';
@@ -25,11 +26,12 @@ import 'intention_relations_state.dart';
 import 'intention_relations_view_model.dart';
 
 /// Вкладка «Связи» страницы намерения: плитки четырёх групп, строка о смысле
-/// выбранной группы с «Добавить» и порционный список её активных связей.
+/// выбранной группы с «Добавить», порционный список её активных связей и
+/// свёрнутый архив группы после них.
 ///
 /// Список остаётся ленивым внутри общего scrollable страницы, а подгрузка
-/// следует за построенными строками. Пустая группа объясняется в оставшейся
-/// высоте под строкой «Добавить».
+/// каждой части следует за её построенными строками. Пустая группа
+/// объясняется в оставшейся высоте под строкой «Добавить».
 final class IntentionRelationsSliver extends ConsumerStatefulWidget {
   const IntentionRelationsSliver({
     required this.details,
@@ -68,7 +70,7 @@ final class _IntentionRelationsSliverState
   final _rowKeys = <LongTermRelationId, GlobalKey>{};
   ScrollPosition? _scrollPosition;
   var _captureScheduled = false;
-  int? _scheduledLoadMoreIndex;
+  final _scheduledLoadMoreIndexes = <RelationScope, int>{};
 
   IntentionRelationsViewModelProvider get _provider =>
       intentionRelationsViewModelProvider(widget.owner.id, widget.pageInstance);
@@ -106,7 +108,8 @@ final class _IntentionRelationsSliverState
     // https://pub.dev/documentation/flutter_riverpod/3.4.2/flutter_riverpod/WidgetRef/listen.html
     ref.listen(provider, _scheduleAnchorRestoration);
     final viewModel = ref.read(provider.notifier);
-    _retainRowKeys(state);
+    final layout = _BodyLayout.of(state);
+    _retainRowKeys(layout);
     _scheduleVisibleRelationCapture();
 
     return SliverMainAxisGroup(
@@ -142,8 +145,14 @@ final class _IntentionRelationsSliverState
                 child: _groupAddRow(AppLocalizations.of(context), state.group),
               );
             }
-            return _buildBodyChild(context, state, index - 2, viewModel);
-          }, childCount: _bodyChildCount(state) + 2),
+            return _buildBodyChild(
+              context,
+              state,
+              layout,
+              index - 2,
+              viewModel,
+            );
+          }, childCount: layout.childCount + 2),
         ),
         if (_isEmptyGroup(state))
           SliverFillRemaining(
@@ -199,21 +208,58 @@ final class _IntentionRelationsSliverState
     IntentionRelationsIntentionNotFound() => false,
   };
 
-  int _bodyChildCount(IntentionRelationsState state) => switch (state) {
-    IntentionRelationsLoaded(:final items) => items.length + 1,
-    IntentionRelationsInitialLoad() ||
-    IntentionRelationsInitialFailure() ||
-    IntentionRelationsIntentionNotFound() ||
-    IntentionRelationsEmpty() => 1,
-  };
-
   Widget _buildBodyChild(
     BuildContext context,
     IntentionRelationsState state,
+    _BodyLayout layout,
     int index,
     IntentionRelationsViewModel viewModel,
   ) {
     final localizations = AppLocalizations.of(context);
+    final activeEnd = layout.active.length;
+    if (index < activeEnd) {
+      return _buildRow(
+        RelationScope.active,
+        layout.active,
+        index,
+        state.group,
+        viewModel,
+      );
+    }
+    final fold = layout.fold;
+    if (fold != null && index == activeEnd) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(
+          DoableMetrics.space5,
+          0,
+          DoableMetrics.space5,
+          DoableMetrics.space2,
+        ),
+        child: ArchivedFold(
+          text: localizations.detailsRelationsArchiveFold,
+          count: fold.count,
+          open: fold.open,
+          label: localizations.detailsRelationsArchiveFoldSemantic(
+            _groupName(localizations, state.group),
+            fold.count,
+          ),
+          onToggle: fold.open
+              ? viewModel.collapseArchive
+              : viewModel.expandArchive,
+        ),
+      );
+    }
+    final archivedStart = activeEnd + (fold == null ? 0 : 1);
+    final archivedIndex = index - archivedStart;
+    if (archivedIndex < layout.archived.length) {
+      return _buildRow(
+        RelationScope.archived,
+        layout.archived,
+        archivedIndex,
+        state.group,
+        viewModel,
+      );
+    }
     return switch (state) {
       IntentionRelationsInitialLoad() => RelationListStatus.initialLoad(
         localizations,
@@ -226,29 +272,33 @@ final class _IntentionRelationsSliverState
         ),
       IntentionRelationsIntentionNotFound() =>
         RelationListStatus.intentionNotFound(localizations),
-      final IntentionRelationsEmpty empty => _EmptyGroupStatuses(
-        summaryStatus: empty.summaryStatus,
-        onRetryRefresh: viewModel.retryRefresh,
-      ),
-      final IntentionRelationsLoaded loaded when index < loaded.items.length =>
-        _buildRow(loaded, index, viewModel),
-      final IntentionRelationsLoaded loaded => _LoadedGroupFooter(
-        state: loaded,
-        onRetryLoadMore: loaded.summaryStatus is RelationListSummaryCurrent
-            ? () => viewModel.retryLoadMore(scope: RelationScope.active)
-            : null,
-        onRetryRefresh: viewModel.retryRefresh,
-      ),
+      final IntentionRelationsConfirmed confirmed => switch (layout.tail) {
+        final tail? => _GroupFooter(
+          progress: tail.progress,
+          summaryStatus: confirmed.summaryStatus,
+          hasConfirmedEnd: tail.hasConfirmedEnd,
+          onRetryLoadMore: confirmed.summaryStatus is RelationListSummaryCurrent
+              ? () => viewModel.retryLoadMore(scope: tail.scope)
+              : null,
+          onRetryRefresh: viewModel.retryRefresh,
+        ),
+        null => _EmptyGroupStatuses(
+          summaryStatus: confirmed.summaryStatus,
+          onRetryRefresh: viewModel.retryRefresh,
+        ),
+      },
     };
   }
 
   Widget _buildRow(
-    IntentionRelationsLoaded state,
+    RelationScope scope,
+    List<RelationGroupEntry> items,
     int index,
+    IntentionRelationGroup group,
     IntentionRelationsViewModel viewModel,
   ) {
-    _scheduleLoadMore(index, viewModel);
-    final item = state.items[index];
+    _scheduleLoadMore(scope, index, viewModel);
+    final item = items[index];
     final relationId = item.relation.id;
     return Padding(
       key: _rowKeys.putIfAbsent(relationId, GlobalKey.new),
@@ -265,42 +315,35 @@ final class _IntentionRelationsSliverState
         item: item,
         owner: widget.owner,
         onOpen: () => widget.onOpenRelation(relationId),
-        onWalk: () => widget.onWalk(item.neighbor.id, state.group),
+        onWalk: () => widget.onWalk(item.neighbor.id, group),
       ),
     );
   }
 
   void _scheduleLoadMore(
+    RelationScope scope,
     int visibleIndex,
     IntentionRelationsViewModel viewModel,
   ) {
-    if (_scheduledLoadMoreIndex == visibleIndex) {
+    if (_scheduledLoadMoreIndexes[scope] == visibleIndex) {
       return;
     }
-    _scheduledLoadMoreIndex = visibleIndex;
+    _scheduledLoadMoreIndexes[scope] = visibleIndex;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;
       }
-      _scheduledLoadMoreIndex = null;
+      _scheduledLoadMoreIndexes.remove(scope);
       unawaited(
-        viewModel.loadMoreIfNeeded(
-          scope: RelationScope.active,
-          visibleIndex: visibleIndex,
-        ),
+        viewModel.loadMoreIfNeeded(scope: scope, visibleIndex: visibleIndex),
       );
     });
   }
 
-  void _retainRowKeys(IntentionRelationsState state) {
-    final retained = switch (state) {
-      IntentionRelationsLoaded(:final items) => {
-        for (final item in items) item.relation.id,
-      },
-      IntentionRelationsInitialLoad() ||
-      IntentionRelationsInitialFailure() ||
-      IntentionRelationsIntentionNotFound() ||
-      IntentionRelationsEmpty() => <LongTermRelationId>{},
+  void _retainRowKeys(_BodyLayout layout) {
+    final retained = {
+      for (final item in [...layout.active, ...layout.archived])
+        item.relation.id,
     };
     _rowKeys.removeWhere((id, _) => !retained.contains(id));
   }
@@ -424,13 +467,7 @@ final class _GroupTiles extends StatelessWidget {
     AppLocalizations l10n,
     IntentionRelationGroup group,
   ) {
-    final name = switch (group) {
-      IntentionRelationGroup.needs => l10n.detailsRelationsGroupNeeds,
-      IntentionRelationGroup.canUse => l10n.detailsRelationsGroupCanUse,
-      IntentionRelationGroup.neededFor => l10n.detailsRelationsGroupNeededFor,
-      IntentionRelationGroup.canBeUsedFor =>
-        l10n.detailsRelationsGroupCanBeUsedFor,
-    };
+    final name = _groupName(l10n, group);
     int countIn(RelationScope scope) => counts.forGroup(
       scope: scope,
       type: group.type,
@@ -619,21 +656,27 @@ final class _EmptyGroupNotice extends StatelessWidget {
   }
 }
 
-final class _LoadedGroupFooter extends StatelessWidget {
-  const _LoadedGroupFooter({
-    required this.state,
+/// Нижний статус списка: подгрузка и отказ подгрузки последней показанной
+/// части, обновление группы и подтверждённый конец.
+final class _GroupFooter extends StatelessWidget {
+  const _GroupFooter({
+    required this.progress,
+    required this.summaryStatus,
+    required this.hasConfirmedEnd,
     required this.onRetryLoadMore,
     required this.onRetryRefresh,
   });
 
-  final IntentionRelationsLoaded state;
+  final RelationListProgress progress;
+  final RelationListSummaryStatus summaryStatus;
+  final bool hasConfirmedEnd;
   final Future<void> Function()? onRetryLoadMore;
   final Future<void> Function() onRetryRefresh;
 
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
-    return switch ((state.progress, state.summaryStatus)) {
+    return switch ((progress, summaryStatus)) {
       (RelationListLoadingMore(), _) => RelationListStatus.loadingMore(
         localizations,
       ),
@@ -652,9 +695,138 @@ final class _LoadedGroupFooter extends StatelessWidget {
           onRetry: onRetryRefresh,
         ),
       (RelationListIdle(), RelationListSummaryCurrent()) =>
-        state.hasConfirmedEnd
+        hasConfirmedEnd
             ? RelationListStatus.confirmedEnd(localizations)
             : const SizedBox(height: DoableMetrics.space4),
     };
   }
+}
+
+String _groupName(AppLocalizations l10n, IntentionRelationGroup group) =>
+    switch (group) {
+      IntentionRelationGroup.needs => l10n.detailsRelationsGroupNeeds,
+      IntentionRelationGroup.canUse => l10n.detailsRelationsGroupCanUse,
+      IntentionRelationGroup.neededFor => l10n.detailsRelationsGroupNeededFor,
+      IntentionRelationGroup.canBeUsedFor =>
+        l10n.detailsRelationsGroupCanBeUsedFor,
+    };
+
+/// Порядок тела списка под строкой «Добавить»: активные строки, строка
+/// свёрнутого архива, строки раскрытого архива и один нижний статус.
+///
+/// Архив стоит после последней активной связи, поэтому его строка и строки
+/// архивной части появляются, когда активная часть получена до конца, а в
+/// группе есть архивированные связи.
+final class _BodyLayout {
+  const _BodyLayout({
+    this.active = const [],
+    this.fold,
+    this.archived = const [],
+    this.tail,
+  });
+
+  factory _BodyLayout.of(IntentionRelationsState state) => switch (state) {
+    IntentionRelationsInitialLoad() ||
+    IntentionRelationsInitialFailure() ||
+    IntentionRelationsIntentionNotFound() => const _BodyLayout(),
+    final IntentionRelationsEmpty empty => _BodyLayout._confirmed(
+      empty,
+      active: const [],
+      activeEnd: true,
+      activeTail: null,
+    ),
+    final IntentionRelationsLoaded loaded => _BodyLayout._confirmed(
+      loaded,
+      active: loaded.items,
+      activeEnd: loaded.nextCursor == null,
+      activeTail: _FooterPart(
+        RelationScope.active,
+        loaded.progress,
+        loaded.hasConfirmedEnd,
+      ),
+    ),
+  };
+
+  factory _BodyLayout._confirmed(
+    IntentionRelationsConfirmed state, {
+    required List<RelationGroupEntry> active,
+    required bool activeEnd,
+    required _FooterPart? activeTail,
+  }) {
+    final count = state.counts.forGroup(
+      scope: RelationScope.archived,
+      type: state.group.type,
+      direction: state.group.direction,
+    );
+    if (!activeEnd || count == 0) {
+      return _BodyLayout(active: active, tail: activeTail);
+    }
+    final summaryCurrent = state.summaryStatus is RelationListSummaryCurrent;
+    return switch (state.archive) {
+      IntentionRelationsArchiveFolded() => _BodyLayout(
+        active: active,
+        fold: _ArchiveFold(count: count, open: false),
+        tail: const _FooterPart(
+          RelationScope.archived,
+          RelationListIdle(),
+          false,
+        ),
+      ),
+      IntentionRelationsArchivePending() => _BodyLayout(
+        active: active,
+        fold: _ArchiveFold(count: count, open: true),
+        tail: const _FooterPart(
+          RelationScope.archived,
+          RelationListIdle(),
+          false,
+        ),
+      ),
+      IntentionRelationsArchiveExpanded(
+        :final items,
+        :final progress,
+        :final nextCursor,
+      ) =>
+        _BodyLayout(
+          active: active,
+          fold: _ArchiveFold(count: count, open: true),
+          archived: items,
+          tail: _FooterPart(
+            RelationScope.archived,
+            progress,
+            nextCursor == null && summaryCurrent,
+          ),
+        ),
+    };
+  }
+
+  final List<RelationGroupEntry> active;
+
+  /// Строка архива, если она стоит в списке.
+  final _ArchiveFold? fold;
+
+  /// Строки раскрытого архива, которые показаны после его строки.
+  final List<RelationGroupEntry> archived;
+
+  /// Часть, которой кончается список, и её статусы; у пустой группы без
+  /// архива статусов части нет.
+  final _FooterPart? tail;
+
+  int get childCount =>
+      active.length + (fold == null ? 0 : 1) + archived.length + 1;
+}
+
+final class _ArchiveFold {
+  const _ArchiveFold({required this.count, required this.open});
+
+  final int count;
+  final bool open;
+}
+
+/// Статусы подгрузки и конца той части, которой кончается список.
+final class _FooterPart {
+  const _FooterPart(this.scope, this.progress, this.hasConfirmedEnd);
+
+  final RelationScope scope;
+  final RelationListProgress progress;
+  final bool hasConfirmedEnd;
 }

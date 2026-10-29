@@ -812,6 +812,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Restore the intention to add relations.';
 
   @override
+  String get detailsRelationsArchiveFold => 'Archived';
+
+  @override
+  String detailsRelationsArchiveFoldSemantic(String group, int count) {
+    return 'Archived in $group: $count';
+  }
+
+  @override
   String get detailsChoicesTab => 'Choices';
 
   @override

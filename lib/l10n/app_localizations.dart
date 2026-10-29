@@ -1286,6 +1286,18 @@ abstract class AppLocalizations {
   /// **'Restore the intention to add relations.'**
   String get detailsRelationsEmptyArchivedText;
 
+  /// Подпись строки свёрнутого архива группы связей после её активных связей
+  ///
+  /// In en, this message translates to:
+  /// **'Archived'**
+  String get detailsRelationsArchiveFold;
+
+  /// Доступное название кнопки архива группы связей: группа и число архивированных связей
+  ///
+  /// In en, this message translates to:
+  /// **'Archived in {group}: {count}'**
+  String detailsRelationsArchiveFoldSemantic(String group, int count);
+
   /// Вкладка дневных выборов, прямо использующих намерение
   ///
   /// In en, this message translates to:

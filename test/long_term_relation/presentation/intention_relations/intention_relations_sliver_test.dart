@@ -1,5 +1,6 @@
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/design_system/components/add_row.dart';
+import 'package:doable/src/design_system/components/archived_fold.dart';
 import 'package:doable/src/design_system/components/count_tiles.dart';
 import 'package:doable/src/design_system/components/empty_state.dart';
 import 'package:doable/src/design_system/components/relation_row.dart';
@@ -676,6 +677,7 @@ void main() {
       expect(find.byType(EmptyState), findsNothing);
       expect(find.byKey(_addKey), findsOneWidget);
       expect(_tiles(tester).tiles.first.archived, isTrue);
+      expect(_fold(tester).count, 2);
     });
 
     testWidgets('[${locale.languageCode}] отказ обновления пустой группы '
@@ -756,6 +758,304 @@ void main() {
       expect(_rowFinder(2), findsOneWidget);
       expect(find.text(l10n.relationNeighborhoodConfirmedEnd), findsOne);
     });
+
+    testWidgets('[${locale.languageCode}] архива нет, пока активная часть не '
+        'получена до конца', (tester) async {
+      final counts = testRelationCounts(
+        activeNeedOutgoing: 11,
+        archivedNeedOutgoing: 2,
+      );
+      final harness = await _Harness.pump(
+        tester,
+        locale: locale,
+        counts: counts,
+        policy: RelationGroupPagingPolicy(pageSize: 10, prefetchRemaining: 2),
+      );
+      harness.repository.completePage(
+        0,
+        RelationGroupFirstPage(
+          items: testGroupRows(ownerId: harness.ownerId, from: 1, count: 10),
+          counts: counts,
+          nextCursor: const TestRelationGroupCursor(10),
+          revision: revision,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(ArchivedFold), findsNothing);
+
+      await _scrollTo(tester, _rowFinder(8), settle: false);
+      await _pumpUntilRequestCount(tester, harness.repository, 2);
+      harness.repository.completePage(
+        1,
+        RelationGroupContinuationPage(
+          items: testGroupRows(ownerId: harness.ownerId, from: 11, count: 1),
+          nextCursor: null,
+          revision: revision,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Архив стоит сразу после последней активной связи.
+      await _scrollTo(tester, find.byType(ArchivedFold));
+      expect(
+        tester.getTopLeft(find.byType(ArchivedFold)).dy,
+        greaterThanOrEqualTo(tester.getBottomLeft(_rowFinder(11)).dy),
+      );
+      final fold = _fold(tester);
+      expect(fold.count, 2);
+      expect(fold.open, isFalse);
+      // Свёрнутый архив не читается.
+      expect(harness.repository.requestCount, 2);
+    });
+
+    testWidgets('[${locale.languageCode}] в группе без архивированных связей '
+        'архива нет, а конец списка подтверждён', (tester) async {
+      final counts = testRelationCounts(
+        activeNeedOutgoing: 1,
+        archivedCanOutgoing: 3,
+      );
+      final harness = await _Harness.pump(
+        tester,
+        locale: locale,
+        counts: counts,
+        viewportHeight: 900,
+      );
+      harness.repository.completePage(
+        0,
+        RelationGroupFirstPage(
+          items: testGroupRows(ownerId: harness.ownerId, from: 1, count: 1),
+          counts: counts,
+          nextCursor: null,
+          revision: revision,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(_rowFinder(1), findsOneWidget);
+      expect(find.byType(ArchivedFold), findsNothing);
+      expect(find.text(l10n.relationNeighborhoodConfirmedEnd), findsOne);
+    });
+
+    testWidgets('[${locale.languageCode}] нажатие раскрывает архив группы '
+        'чтением только его первой порции и сворачивает его', (tester) async {
+      final counts = testRelationCounts(
+        activeNeedOutgoing: 1,
+        archivedNeedOutgoing: 2,
+        archivedNeedIncoming: 5,
+      );
+      final harness = await _Harness.pump(
+        tester,
+        locale: locale,
+        counts: counts,
+        viewportHeight: 900,
+      );
+      harness.repository.completePage(
+        0,
+        RelationGroupFirstPage(
+          items: testGroupRows(ownerId: harness.ownerId, from: 1, count: 1),
+          counts: counts,
+          nextCursor: null,
+          revision: revision,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final folded = _fold(tester);
+      expect(folded.open, isFalse);
+      expect(folded.count, 2);
+      expect(folded.text, l10n.detailsRelationsArchiveFold);
+      expect(
+        folded.label,
+        l10n.detailsRelationsArchiveFoldSemantic(
+          names[IntentionRelationGroup.needs]!,
+          2,
+        ),
+      );
+      // Свёрнутый архив не читается и не называет конец всей группы.
+      expect(harness.repository.requestCount, 1);
+      expect(find.text(l10n.relationNeighborhoodConfirmedEnd), findsNothing);
+
+      await tester.tap(_foldButton);
+      await tester.pump();
+      expect(harness.repository.requestCount, 2);
+      final query = harness.repository.queryAt(1);
+      expect(query.type, LongTermRelationType.need);
+      expect(query.direction, RelationDirection.outgoing);
+      expect(query.scope, RelationScope.archived);
+      expect(query.cursor, isNull);
+      expect(_fold(tester).open, isTrue);
+      expect(_rowFinder(10), findsNothing);
+
+      harness.repository.completePage(
+        1,
+        RelationGroupFirstPage(
+          items: testGroupRows(
+            ownerId: harness.ownerId,
+            from: 10,
+            count: 2,
+            scope: RelationScope.archived,
+          ),
+          counts: counts,
+          nextCursor: null,
+          revision: revision,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Строки архива стоят под его строкой в приглушённом виде.
+      expect(_relationRow(tester, 1).archived, isFalse);
+      for (final index in [10, 11]) {
+        expect(_relationRow(tester, index).archived, isTrue);
+        expect(
+          tester.getTopLeft(_rowFinder(index)).dy,
+          greaterThan(tester.getBottomLeft(find.byType(ArchivedFold)).dy),
+        );
+      }
+      expect(find.text(l10n.relationNeighborhoodConfirmedEnd), findsOne);
+      expect(harness.repository.requestCount, 2);
+
+      await tester.tap(_foldButton);
+      await tester.pump();
+      expect(_fold(tester).open, isFalse);
+      expect(_rowFinder(10), findsNothing);
+      expect(_rowFinder(11), findsNothing);
+      expect(_rowFinder(1), findsOneWidget);
+      expect(harness.repository.requestCount, 2);
+    });
+
+    testWidgets('[${locale.languageCode}] архив архивированного намерения '
+        'раскрыт сразу и не заменяется пустым состоянием', (tester) async {
+      final counts = testRelationCounts(archivedNeedOutgoing: 2);
+      final harness = await _Harness.pump(
+        tester,
+        locale: locale,
+        archiveState: IntentionArchiveState.archived,
+        counts: counts,
+        viewportHeight: 900,
+      );
+      expect(harness.repository.requestCount, 2);
+      expect(harness.repository.queryAt(0).scope, RelationScope.active);
+      expect(harness.repository.queryAt(1).scope, RelationScope.archived);
+
+      harness.repository.completePage(
+        0,
+        RelationGroupFirstPage(
+          items: const [],
+          counts: counts,
+          nextCursor: null,
+          revision: revision,
+        ),
+      );
+      harness.repository.completePage(
+        1,
+        RelationGroupFirstPage(
+          items: testGroupRows(
+            ownerId: harness.ownerId,
+            from: 1,
+            count: 2,
+            scope: RelationScope.archived,
+          ),
+          counts: counts,
+          nextCursor: null,
+          revision: revision,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(EmptyState), findsNothing);
+      final fold = _fold(tester);
+      expect(fold.open, isTrue);
+      expect(fold.count, 2);
+      expect(_relationRow(tester, 1).archived, isTrue);
+      expect(_relationRow(tester, 2).archived, isTrue);
+      expect(harness.repository.requestCount, 2);
+    });
+
+    testWidgets('[${locale.languageCode}] подгружает архивную часть у её '
+        'конца и показывает её статусы', (tester) async {
+      final counts = testRelationCounts(
+        activeNeedOutgoing: 1,
+        archivedNeedOutgoing: 11,
+      );
+      final harness = await _Harness.pump(
+        tester,
+        locale: locale,
+        counts: counts,
+        policy: RelationGroupPagingPolicy(pageSize: 10, prefetchRemaining: 2),
+      );
+      harness.repository.completePage(
+        0,
+        RelationGroupFirstPage(
+          items: testGroupRows(ownerId: harness.ownerId, from: 1, count: 1),
+          counts: counts,
+          nextCursor: null,
+          revision: revision,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await _scrollTo(tester, find.byType(ArchivedFold));
+      await tester.tap(_foldButton);
+      await tester.pump();
+      harness.repository.completePage(
+        1,
+        RelationGroupFirstPage(
+          items: testGroupRows(
+            ownerId: harness.ownerId,
+            from: 10,
+            count: 10,
+            scope: RelationScope.archived,
+          ),
+          counts: counts,
+          nextCursor: const TestRelationGroupCursor(10),
+          revision: revision,
+        ),
+      );
+      await tester.pumpAndSettle();
+      // Начало архива ещё далеко от конца его загруженной части.
+      expect(harness.repository.requestCount, 2);
+
+      await _scrollTo(tester, _rowFinder(17), settle: false);
+      await _pumpUntilRequestCount(tester, harness.repository, 3);
+      final continuation = harness.repository.queryAt(2);
+      expect(continuation.scope, RelationScope.archived);
+      expect(continuation.cursor, const TestRelationGroupCursor(10));
+      await _scrollTo(
+        tester,
+        find.text(l10n.relationNeighborhoodLoadingMore),
+        settle: false,
+      );
+
+      harness.repository.failRead(2, const RelationGroupUnavailableFailure());
+      await tester.pumpAndSettle();
+      await _scrollTo(
+        tester,
+        find.text(l10n.relationNeighborhoodLoadMoreUnavailable),
+      );
+      await tester.tap(find.text(l10n.commonRetry));
+      await tester.pump();
+      expect(harness.repository.requestCount, 4);
+      final retry = harness.repository.queryAt(3);
+      expect(retry.scope, RelationScope.archived);
+      expect(retry.cursor, const TestRelationGroupCursor(10));
+
+      harness.repository.completePage(
+        3,
+        RelationGroupContinuationPage(
+          items: testGroupRows(
+            ownerId: harness.ownerId,
+            from: 20,
+            count: 1,
+            scope: RelationScope.archived,
+          ),
+          nextCursor: null,
+          revision: revision,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await _scrollTo(tester, find.text(l10n.relationNeighborhoodConfirmedEnd));
+      expect(_rowFinder(20), findsOneWidget);
+      expect(_relationRow(tester, 20).archived, isTrue);
+    });
   }
 
   testWidgets('пустое состояние стоит в оставшейся высоте под строкой '
@@ -829,6 +1129,98 @@ void main() {
     expect(_rowFinder(1), findsNothing);
     expect(
       tester.getTopLeft(_rowFinder(8)).dy,
+      closeTo(tester.getBottomLeft(find.byKey(_tabsKey)).dy, 0.01),
+    );
+  });
+
+  testWidgets('после пересборки возвращает видимую строку архива под '
+      'закреплённые вкладки', (tester) async {
+    final counts = testRelationCounts(
+      activeNeedOutgoing: 1,
+      archivedNeedOutgoing: 20,
+    );
+    final harness = await _Harness.pump(tester, counts: counts);
+    harness.repository.completePage(
+      0,
+      RelationGroupFirstPage(
+        items: testGroupRows(ownerId: harness.ownerId, from: 1, count: 1),
+        counts: counts,
+        nextCursor: null,
+        revision: revision,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _scrollTo(tester, find.byType(ArchivedFold));
+    await tester.tap(_foldButton);
+    await tester.pump();
+    harness.repository.completePage(
+      1,
+      RelationGroupFirstPage(
+        items: testGroupRows(
+          ownerId: harness.ownerId,
+          from: 10,
+          count: 20,
+          scope: RelationScope.archived,
+        ),
+        counts: counts,
+        nextCursor: null,
+        revision: revision,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Восемнадцатая связь начинается сразу под вкладками.
+    await _scrollTo(tester, _rowFinder(18));
+    final position = _position(tester);
+    final tabsBottom = tester.getBottomLeft(find.byKey(_tabsKey)).dy;
+    await position.animateTo(
+      position.pixels + tester.getTopLeft(_rowFinder(18)).dy - tabsBottom,
+      duration: const Duration(milliseconds: 100),
+      curve: Curves.linear,
+    );
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(_rowFinder(18)).dy, closeTo(tabsBottom, 0.01));
+
+    // Новая ревизия убирает три первые архивированные связи: без якоря
+    // строка ушла бы вверх под вкладки.
+    final refreshed = testRelationCounts(
+      activeNeedOutgoing: 1,
+      archivedNeedOutgoing: 17,
+    );
+    harness.repository.emitIntention(
+      testNeighborhoodIntention(id: harness.ownerId),
+      counts: refreshed,
+      revision: const TestGraphRevision(3),
+    );
+    await _pumpUntilRequestCount(tester, harness.repository, 4);
+    harness.repository.completePage(
+      2,
+      RelationGroupFirstPage(
+        items: testGroupRows(ownerId: harness.ownerId, from: 1, count: 1),
+        counts: refreshed,
+        nextCursor: null,
+        revision: const TestGraphRevision(3),
+      ),
+    );
+    harness.repository.completePage(
+      3,
+      RelationGroupFirstPage(
+        items: testGroupRows(
+          ownerId: harness.ownerId,
+          from: 13,
+          count: 17,
+          scope: RelationScope.archived,
+        ),
+        counts: refreshed,
+        nextCursor: null,
+        revision: const TestGraphRevision(3),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(_rowFinder(10), findsNothing);
+    expect(
+      tester.getTopLeft(_rowFinder(18)).dy,
       closeTo(tester.getBottomLeft(find.byKey(_tabsKey)).dy, 0.01),
     );
   });
@@ -968,6 +1360,16 @@ RelationGroupFirstPage _emptyPage(
   nextCursor: null,
   revision: revision,
 );
+
+/// Кнопка стоит у левого края строки архива, поэтому центр строки её не
+/// касается.
+final _foldButton = find.descendant(
+  of: find.byType(ArchivedFold),
+  matching: find.byType(TextButton),
+);
+
+ArchivedFold _fold(WidgetTester tester) =>
+    tester.widget(find.byType(ArchivedFold));
 
 CountTiles<IntentionRelationGroup> _tiles(WidgetTester tester) =>
     tester.widget(find.byType(CountTiles<IntentionRelationGroup>));
