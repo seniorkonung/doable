@@ -432,12 +432,13 @@ void main() {
       {...positions}..remove(tagFixtureId(_rest)),
       {...positionsBefore}..remove(tagFixtureId(_rest)),
     );
-    await _waitFor(
-      tester,
-      () =>
-          tester.getTopLeft(_assignmentRow(_rest)).dy <
-          tester.getTopLeft(_assignmentRow(_health)).dy,
-    );
+    // Чипы тегов идут рядами: раньше стоит чип выше или левее в том же ряду.
+    await _waitFor(tester, () {
+      final rest = tester.getTopLeft(_assignmentRow(_rest));
+      final health = tester.getTopLeft(_assignmentRow(_health));
+      return rest.dy < health.dy ||
+          (rest.dy == health.dy && rest.dx < health.dx);
+    });
 
     await _closePanelAndPage(tester, l10n);
     final restHealth = l10n.intentionSummaryTags('Отдых, Здоровье');

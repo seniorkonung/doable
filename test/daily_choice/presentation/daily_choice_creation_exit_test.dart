@@ -24,7 +24,6 @@ import 'package:doable/src/intention/presentation/details/intention_details_page
 import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/statistics/application/statistics_read_contract.dart';
 import 'package:doable/src/statistics/application/intention_statistics_breakdown.dart';
@@ -347,7 +346,9 @@ Future<_App> _launch(
     router.push(IntentionDetailsRoute(intentionId: durabilityIntention(1))),
   );
   await tester.pumpAndSettle();
-  await _tap(tester, 'relation-neighborhood-create-relation');
+  await tester.tap(find.text('Связи'));
+  await tester.pumpAndSettle();
+  await _tap(tester, 'intention-relations-add');
   await tester.enterText(
     find.byKey(const ValueKey('relation-editor-description')),
     'Чужой черновик',
@@ -474,10 +475,6 @@ final class _Repository implements PersonalGraphRepository {
   Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(
     IntentionId id,
   ) => delegate.watchIntention(id);
-  @override
-  Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
-    IntentionId id,
-  ) => delegate.getRelationCounts(id);
   @override
   Future<RelationGroupPageResult> getRelationGroupPage(
     RelationGroupPageQuery query,

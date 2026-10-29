@@ -4,7 +4,6 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
-import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
 import 'package:doable/src/daily_choice/presentation/source_picker/daily_choice_source_picker_page.dart';
 import 'package:doable/src/daily_choice/presentation/daily_choice_picker_context.dart';
@@ -13,10 +12,11 @@ import 'package:doable/src/graph/application/personal_graph_repository_provider.
 import 'package:doable/src/intention/application/intention_catalog.dart'
     hide IntentionCatalogPage;
 import 'package:doable/src/intention/application/intention_result.dart';
-import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/domain/intention.dart';
+import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
@@ -30,118 +30,12 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../intention/presentation/catalog/catalog_test_support.dart';
 import '../../long_term_relation/presentation/details/relation_details_test_support.dart';
-import '../../long_term_relation/presentation/neighborhood/neighborhood_test_support.dart'
+import '../../long_term_relation/presentation/relation_graph_test_support.dart'
     hide testRelationCounts;
 import '../../support/app_root_pages.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 
 void main() {
-  testWidgets('верхний обход открывается из активного намерения', (
-    tester,
-  ) async {
-    final repository = ControlledRelationDetailsRepository();
-    addTearDown(repository.dispose);
-    final router = AppRouter();
-    addTearDown(router.dispose);
-    final sourceId = testIntentionId(51);
-    final relatedId = testIntentionId(52);
-
-    await _pumpRouter(tester, repository, router);
-    unawaited(router.push(IntentionDetailsRoute(intentionId: sourceId)));
-    await _settleNeighborhood(
-      tester,
-      repository,
-      expectedWatches: 2,
-      expectedQueries: 1,
-    );
-    const revision = TestGraphRevision(1);
-    final source = testNeighborhoodIntention(id: sourceId, title: 'Действие');
-    repository.emitIntention(
-      Intention(
-        id: source.id,
-        title: source.title,
-        description: source.description,
-        readiness: IntentionReadiness.ready,
-        archiveState: source.archiveState,
-        createdAt: source.createdAt,
-        updatedAt: source.updatedAt,
-      ),
-      counts: testRelationCounts(activeNeedOutgoing: 1),
-      revision: revision,
-    );
-    repository.completeGroupPage(
-      0,
-      RelationGroupFirstPage(
-        items: [
-          _row(
-            relationId: testRelationId(51),
-            sourceId: sourceId,
-            relatedId: relatedId,
-            sourceTitle: 'Действие',
-            relatedTitle: 'Другое действие',
-          ),
-        ],
-        counts: testRelationCounts(activeNeedOutgoing: 1),
-        nextCursor: null,
-        revision: revision,
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    final open = find.byKey(const ValueKey('intention-details-choose-path'));
-    expect(open, findsOneWidget);
-    await tester.ensureVisible(open);
-    await tester.tap(open);
-    await tester.pump(const Duration(milliseconds: 400));
-    await tester.pump();
-    expect(
-      tester
-          .widget<ChoicePathPage>(find.byType(ChoicePathPage))
-          .sourceIntentionId,
-      sourceId,
-    );
-  });
-
-  testWidgets('архивное намерение не предлагает верхний обход', (tester) async {
-    final repository = ControlledRelationDetailsRepository();
-    addTearDown(repository.dispose);
-    final router = AppRouter();
-    addTearDown(router.dispose);
-    final sourceId = testIntentionId(53);
-
-    await _pumpRouter(tester, repository, router);
-    unawaited(router.push(IntentionDetailsRoute(intentionId: sourceId)));
-    await _settleNeighborhood(
-      tester,
-      repository,
-      expectedWatches: 2,
-      expectedQueries: 1,
-    );
-    const revision = TestGraphRevision(1);
-    repository.emitIntention(
-      testNeighborhoodIntention(
-        id: sourceId,
-        archiveState: IntentionArchiveState.archived,
-      ),
-      counts: testRelationCounts(),
-      revision: revision,
-    );
-    repository.completeGroupPage(
-      0,
-      RelationGroupFirstPage(
-        items: const [],
-        counts: testRelationCounts(),
-        nextCursor: null,
-        revision: revision,
-      ),
-    );
-    await tester.pumpAndSettle();
-    expect(
-      find.byKey(const ValueKey('intention-details-choose-path')),
-      findsNothing,
-    );
-  });
-
   testWidgets(
     'открывает начальную Главную и каталоги оболочки через сгенерированные '
     'PageRouteInfo',
@@ -262,13 +156,14 @@ void main() {
 
     await _pumpRouter(tester, repository, router);
     unawaited(router.push(IntentionDetailsRoute(intentionId: idA)));
-    await _settleNeighborhood(
+    await _showRelations(tester, repository, idA, 'А');
+    await _settleRelations(
       tester,
       repository,
       expectedWatches: 2,
       expectedQueries: 1,
     );
-    _serveNeighborhood(
+    _serveRelations(
       repository,
       intentionId: idA,
       title: 'А',
@@ -277,7 +172,6 @@ void main() {
         relationId: relationAb,
         sourceId: idA,
         relatedId: idB,
-        sourceTitle: 'А',
         relatedTitle: 'Б',
       ),
     );
@@ -291,7 +185,6 @@ void main() {
             relationId: relationAb,
             sourceId: idA,
             relatedId: idB,
-            sourceTitle: 'А',
             relatedTitle: 'Б',
           ),
           revision: const TestGraphRevision(1),
@@ -302,13 +195,14 @@ void main() {
       find.byKey(const ValueKey('relation-details-related-participant')),
     );
     await tester.pump(const Duration(milliseconds: 400));
-    await _settleNeighborhood(
+    await _showRelations(tester, repository, idB, 'Б');
+    await _settleRelations(
       tester,
       repository,
       expectedWatches: 4,
       expectedQueries: 2,
     );
-    _serveNeighborhood(
+    _serveRelations(
       repository,
       intentionId: idB,
       title: 'Б',
@@ -317,7 +211,6 @@ void main() {
         relationId: relationBa,
         sourceId: idB,
         relatedId: idA,
-        sourceTitle: 'Б',
         relatedTitle: 'А',
       ),
     );
@@ -332,7 +225,6 @@ void main() {
             relationId: relationBa,
             sourceId: idB,
             relatedId: idA,
-            sourceTitle: 'Б',
             relatedTitle: 'А',
           ),
           revision: const TestGraphRevision(1),
@@ -345,11 +237,38 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(IntentionDetailsPage), findsWidgets);
-    expect(find.text('To А, you need Б'), findsWidgets);
+    await tester.tap(find.text('Relations').first);
+    // Новая страница А получает связи своей вкладки заново.
+    await _settleRelations(
+      tester,
+      repository,
+      expectedWatches: 5,
+      expectedQueries: 3,
+    );
+    expect(repository.groupQueries[2].intentionId, idA);
+    _serveRelations(
+      repository,
+      intentionId: idA,
+      title: 'А',
+      queryIndex: 2,
+      row: _row(
+        relationId: relationAb,
+        sourceId: idA,
+        relatedId: idB,
+        relatedTitle: 'Б',
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(
+        ValueKey('intention-relations-row-${relationAb.toCanonicalString()}'),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets(
-    'создание из группы соседства открывает форму с контекстом направления',
+    'создание из группы соседства открывает форму с группой выбранных типа и направления',
     (tester) async {
       final repository = ControlledRelationDetailsRepository();
       addTearDown(repository.dispose);
@@ -360,13 +279,14 @@ void main() {
 
       await _pumpRouter(tester, repository, router);
       unawaited(router.push(IntentionDetailsRoute(intentionId: ownerId)));
-      await _settleNeighborhood(
+      await _showRelations(tester, repository, ownerId, 'А');
+      await _settleRelations(
         tester,
         repository,
         expectedWatches: 2,
         expectedQueries: 1,
       );
-      _serveNeighborhood(
+      _serveRelations(
         repository,
         intentionId: ownerId,
         title: 'А',
@@ -375,15 +295,12 @@ void main() {
           relationId: testRelationId(1),
           sourceId: ownerId,
           relatedId: neighborId,
-          sourceTitle: 'А',
           relatedTitle: 'Б',
         ),
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(
-        find.byKey(const ValueKey('relation-neighborhood-create-relation')),
-      );
+      await tester.tap(find.byKey(const ValueKey('intention-relations-add')));
       await tester.pumpAndSettle();
 
       expect(
@@ -392,16 +309,16 @@ void main() {
             .editorContext,
         RelationCreationContext(
           participant: testParticipant(ownerId, title: 'А'),
-          direction: RelationDirection.outgoing,
+          group: IntentionRelationGroup.needs,
         ),
       );
 
       await tester.pageBack();
       await tester.pumpAndSettle();
       await tester.tap(
-        find.byKey(const ValueKey('relation-neighborhood-direction-incoming')),
+        find.byKey(const ValueKey('intention-relations-group-neededFor')),
       );
-      await _settleNeighborhood(
+      await _settleRelations(
         tester,
         repository,
         expectedWatches: 2,
@@ -418,9 +335,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(
-        find.byKey(const ValueKey('relation-neighborhood-create-relation')),
-      );
+      await tester.tap(find.byKey(const ValueKey('intention-relations-add')));
       await tester.pumpAndSettle();
 
       expect(
@@ -429,7 +344,42 @@ void main() {
             .editorContext,
         RelationCreationContext(
           participant: testParticipant(ownerId, title: 'А'),
-          direction: RelationDirection.incoming,
+          group: IntentionRelationGroup.neededFor,
+        ),
+      );
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('intention-relations-group-canBeUsedFor')),
+      );
+      await _settleRelations(
+        tester,
+        repository,
+        expectedWatches: 2,
+        expectedQueries: 3,
+      );
+      repository.completeGroupPage(
+        2,
+        RelationGroupFirstPage(
+          items: const [],
+          counts: testRelationCounts(activeNeedOutgoing: 1),
+          nextCursor: null,
+          revision: const TestGraphRevision(1),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('intention-relations-add')));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester
+            .widget<RelationEditorPage>(find.byType(RelationEditorPage))
+            .editorContext,
+        RelationCreationContext(
+          participant: testParticipant(ownerId, title: 'А'),
+          group: IntentionRelationGroup.canBeUsedFor,
         ),
       );
     },
@@ -465,7 +415,7 @@ Future<void> _pumpRouter(
 }
 
 /// Ожидает, пока открытая страница намерения начнёт согласованное чтение.
-Future<void> _settleNeighborhood(
+Future<void> _settleRelations(
   WidgetTester tester,
   ControlledRelationDetailsRepository repository, {
   required int expectedWatches,
@@ -479,20 +429,20 @@ Future<void> _settleNeighborhood(
     }
     await tester.pump();
   }
-  throw StateError('Страница намерения не начала чтение соседства.');
+  throw StateError('Страница намерения не начала чтение связей.');
 }
 
-void _serveNeighborhood(
+void _serveRelations(
   ControlledRelationDetailsRepository repository, {
   required IntentionId intentionId,
   required String title,
   required int queryIndex,
-  required LongTermRelationSummary row,
+  required RelationGroupEntry row,
 }) {
   const revision = TestGraphRevision(1);
   final counts = testRelationCounts(activeNeedOutgoing: 1);
   repository.emitIntention(
-    testNeighborhoodIntention(id: intentionId, title: title),
+    testGraphIntention(id: intentionId, title: title),
     counts: counts,
     revision: revision,
   );
@@ -507,13 +457,13 @@ void _serveNeighborhood(
   );
 }
 
-LongTermRelationSummary _row({
+/// Строка исходящей группы намерения [sourceId] с соседом [relatedId].
+RelationGroupEntry _row({
   required LongTermRelationId relationId,
   required IntentionId sourceId,
   required IntentionId relatedId,
-  required String sourceTitle,
   required String relatedTitle,
-}) => LongTermRelationSummary(
+}) => RelationGroupEntry(
   relation: LongTermRelation(
     id: relationId,
     sourceIntentionId: sourceId,
@@ -523,9 +473,12 @@ LongTermRelationSummary _row({
     scope: RelationScope.active,
     creationSequence: RelationCreationSequence(1),
   ),
-  source: testParticipant(sourceId, title: sourceTitle),
-  related: testParticipant(relatedId, title: relatedTitle),
-  hasDescription: false,
+  neighbor: RelationNeighbor(
+    id: relatedId,
+    title: relatedTitle,
+    archiveState: IntentionArchiveState.active,
+    readiness: IntentionReadiness.notReady,
+  ),
 );
 
 Future<void> _openRelation(
@@ -533,16 +486,34 @@ Future<void> _openRelation(
   LongTermRelationId relationId,
 ) async {
   final row = find.byKey(
-    ValueKey('relation-neighborhood-row-${relationId.toCanonicalString()}'),
+    ValueKey('intention-relations-row-${relationId.toCanonicalString()}'),
   );
   await tester.scrollUntilVisible(
     row,
     300,
-    scrollable: find.byType(Scrollable).last,
+    scrollable: find.byType(Scrollable).first,
   );
   await tester.pumpAndSettle();
   await tester.tap(row);
   // Открытая связь читается: индикатор чтения не даёт дождаться покоя.
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 400));
+}
+
+Future<void> _showRelations(
+  WidgetTester tester,
+  ControlledRelationDetailsRepository repository,
+  IntentionId id,
+  String title,
+) async {
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 400));
+  repository.emitIntention(
+    testGraphIntention(id: id, title: title),
+    counts: testRelationCounts(activeNeedOutgoing: 1),
+    revision: const TestGraphRevision(1),
+  );
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Relations').first);
+  await tester.pump();
 }

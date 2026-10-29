@@ -225,7 +225,12 @@ void main() {
       ValueKey('tag-assignment-remove-${tagFixtureId(firstTagNumber)}'),
       skipOffstage: false,
     );
-    final empty = find.text('Назначений тегов пока нет.', skipOffstage: false);
+    // Без тегов блок состоит из одной шапки, а «Добавить» называется
+    // «Добавить теги».
+    final empty = find.byWidgetPredicate(
+      (widget) => widget is Text && widget.semanticsLabel == 'Добавить теги',
+      skipOffstage: false,
+    );
     await _tap(tester, homeRemove);
     await _until(tester, empty);
     await tester.pumpAndSettle();

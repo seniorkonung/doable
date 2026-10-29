@@ -26,7 +26,6 @@ import 'package:doable/src/design_system/components/day_mark.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
-import 'package:doable/src/graph/application/selected_relations.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
@@ -40,10 +39,11 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_purp
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
+import 'package:doable/src/intention/presentation/details/intention_options.dart';
+import 'package:doable/src/intention/presentation/edit/intention_edit_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_id_generator.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
-import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/statistics/application/statistics_read_contract.dart';
@@ -67,6 +67,8 @@ import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 import '../../support/inline_text.dart';
+import '../../support/intention_edit_screen.dart';
+import '../../support/intention_options.dart';
 import '../../support/tag_positions.dart';
 
 /// Активные намерения «Намерение 01» … «Намерение 40»: выдача каталога
@@ -233,10 +235,7 @@ void main() {
       await _until(tester, find.byType(IntentionDetailsPage));
       await tester.pumpAndSettle();
       app.repository.holdNextCommand();
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('intention-details-archive')),
-      );
+      await _chooseIntentionOption(tester, IntentionOption.archive);
       await _waitFor(tester, () => app.repository.isHolding);
 
       await _select(tester, AppDestination.home);
@@ -264,9 +263,9 @@ void main() {
         find.byType(IntentionDetailsPage, skipOffstage: false),
         findsNothing,
       );
-      expect(find.byKey(_message), findsOneWidget);
+      // Успех архивирования виден в согласованных корнях, а не в сообщении.
+      expect(_builtMessages, findsNothing);
       expect(app.repository.commands.single, isA<ArchiveIntention>());
-      await _closeMessage(tester);
 
       await _select(tester, AppDestination.intentionGraph);
       expect(
@@ -277,7 +276,6 @@ void main() {
       expect(_intentionCatalogParameters(tester, app), catalogBefore);
       await _select(tester, AppDestination.dailyChoices);
       expect(_dailyChoiceParameters(tester, app), dailyBefore);
-      await _closeMessage(tester);
       expect(_builtMessages, findsNothing);
       expect(tester.takeException(), isNull);
     });
@@ -365,16 +363,20 @@ void main() {
         find.byKey(const ValueKey('daily-choice-intention-2')),
         IntentionDetailsPage,
       );
-      await _tap(tester, find.byKey(const ValueKey('intention-details-edit')));
-      await tester.enterText(
-        find.byKey(const ValueKey('intention-details-edit-title')),
-        newTitle,
-      );
-      await _tap(
+      await _open(tester, intentionHeadTitle, IntentionEditPage);
+      await tester.enterText(intentionEditTitleField, newTitle);
+      await _tap(tester, intentionEditSave);
+      await _waitFor(
         tester,
-        find.byKey(const ValueKey('intention-details-edit-submit')),
+        () => find.byType(IntentionEditPage).evaluate().isEmpty,
       );
-      await _until(tester, find.text(newTitle));
+      await _until(
+        tester,
+        find.descendant(
+          of: find.byType(IntentionDetailsPage),
+          matching: find.text(newTitle),
+        ),
+      );
       await _select(tester, AppDestination.intentionGraph);
 
       expect(_catalogRow(newTitle), findsOneWidget);
@@ -413,18 +415,10 @@ void main() {
       await _select(tester, AppDestination.intentionGraph);
       await _enterTitleFilter(tester, app, _activeTitle(1), total: 1);
       await _open(tester, _catalogRow(_activeTitle(1)), IntentionDetailsPage);
-      await _tap(
-        tester,
-        find.byKey(
-          const ValueKey('relation-neighborhood-daily-source'),
-          skipOffstage: false,
-        ),
-      );
+      await _tap(tester, find.text('Choices').first);
       await _open(
         tester,
-        find.byKey(
-          ValueKey('relation-neighborhood-daily-row-${tagFixtureId(changed)}'),
-        ),
+        find.byKey(ValueKey('intention-choices-row-${tagFixtureId(changed)}')),
         DailyChoiceDetailsPage,
       );
       await _tap(tester, find.byKey(const ValueKey('daily-choice-edit-open')));
@@ -445,6 +439,7 @@ void main() {
         find.byKey(const ValueKey('daily-choice-edit-open')),
       );
       await _closeTop(tester, DailyChoiceDetailsPage);
+      await _tap(tester, find.text(app.l10n.statisticsSectionTitle).first);
       // Флажок доступен в другом каталоге; корневой остаётся скрытым.
       final dayLabel = app.l10n.statisticsCalendarDaySemantics(
         DateTime.utc(_choiceDate.year, _choiceDate.month, _choiceDate.day),
@@ -453,6 +448,7 @@ void main() {
       final statisticsDay = find.bySemanticsLabel(
         RegExp('^${RegExp.escape(dayLabel)}'),
       );
+      await _until(tester, statisticsDay);
       await tester.scrollUntilVisible(
         statisticsDay,
         -500,
@@ -765,7 +761,7 @@ void main() {
         fails
             ? 'отказ архивирования предъявляется один раз, а смена пункта не '
                   'повторяет и не откладывает операцию'
-            : 'архивирование завершается и предъявляется один раз, а смена пункта '
+            : 'архивирование завершается без сообщения, а смена пункта '
                   'не отменяет, не повторяет и не откладывает операцию',
         (tester) async {
           final app = await _start(tester);
@@ -782,10 +778,7 @@ void main() {
           await _open(tester, _catalogRow(archived), IntentionDetailsPage);
           app.repository.holdNextCommand();
           if (fails) app.faults.failNextArchiveWrite();
-          await _tap(
-            tester,
-            find.byKey(const ValueKey('intention-details-archive')),
-          );
+          await _chooseIntentionOption(tester, IntentionOption.archive);
           // Операция принята и дошла до хранилища до смены пункта.
           await _waitFor(tester, () => app.repository.isHolding);
           await _closeTop(tester, IntentionDetailsPage);
@@ -797,40 +790,48 @@ void main() {
           expect(_builtMessages, findsNothing);
           expect(archiveState(), 0);
 
-          // Результат приходит, пока выбран другой пункт, и предъявляется
-          // сразу на его странице, а не при возвращении к началу перехода.
           app.repository.releaseCommand();
-          await _until(tester, find.byKey(_message));
-          await tester.pumpAndSettle();
+          if (fails) {
+            // Отказ приходит, пока выбран другой пункт, и предъявляется
+            // сразу на его странице, а не при возвращении к началу перехода.
+            await _until(tester, find.byKey(_message));
+            await tester.pumpAndSettle();
 
-          final message = find.text(
-            l10n.graphOperationMessage(
-              l10n.graphOperationArchive,
-              archived,
-              fails
-                  ? l10n.detailsStateChangeUnavailable
-                  : l10n.detailsArchivedSuccess,
-            ),
-          );
-          expect(find.byKey(_message), findsOneWidget);
-          expect(
-            find.descendant(
-              of: find.byType(daily_page.DailyChoiceCatalogPage),
-              matching: message,
-            ),
-            findsOneWidget,
-          );
+            final message = find.text(
+              l10n.graphOperationMessage(
+                l10n.graphOperationArchive,
+                archived,
+                l10n.detailsStateChangeUnavailable,
+              ),
+            );
+            expect(find.byKey(_message), findsOneWidget);
+            expect(
+              find.descendant(
+                of: find.byType(daily_page.DailyChoiceCatalogPage),
+                matching: message,
+              ),
+              findsOneWidget,
+            );
+            // Смена пункта не предъявляет отказ заново.
+            await _select(tester, AppDestination.home);
+            expect(find.byKey(_message), findsOneWidget);
+            expect(message, findsOneWidget);
+            await _select(tester, AppDestination.intentionGraph);
+            expect(find.byKey(_message), findsOneWidget);
+            expect(_catalogRow(archived), findsOneWidget);
+            await _closeMessage(tester);
+          } else {
+            // Успех виден в согласованных данных каталога, а не в сообщении.
+            await _select(tester, AppDestination.intentionGraph);
+            await _waitFor(
+              tester,
+              () => _catalogRow(archived).evaluate().isEmpty,
+            );
+            await tester.pumpAndSettle();
+            expect(_builtMessages, findsNothing);
+          }
           expect(app.repository.commands.single, isA<ArchiveIntention>());
-          expect(archiveState(), fails ? 0 : 1);
-          // Смена пункта не предъявляет результат заново.
-          await _select(tester, AppDestination.home);
-          expect(find.byKey(_message), findsOneWidget);
-          expect(message, findsOneWidget);
-          await _select(tester, AppDestination.intentionGraph);
-          expect(find.byKey(_message), findsOneWidget);
-          expect(_catalogRow(archived), fails ? findsOneWidget : findsNothing);
 
-          await _closeMessage(tester);
           for (final destination in AppDestination.values) {
             await _select(tester, destination);
             expect(_builtMessages, findsNothing, reason: destination.name);
@@ -1445,6 +1446,14 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
   await tester.pump();
 }
 
+Future<void> _chooseIntentionOption(
+  WidgetTester tester,
+  IntentionOption option,
+) async {
+  await _tap(tester, intentionOptionsButton);
+  await _tap(tester, intentionOption(option));
+}
+
 /// Отказывает ближайшей записи архивирования недоступностью хранилища:
 /// транзакция команды откатывается самим адаптером.
 final class _ArchiveWriteFaults extends LocalDatabaseConnectionObserver {
@@ -1560,11 +1569,6 @@ final class _ObservedRepository implements PersonalGraphRepository {
   ) => _delegate.watchIntention(id);
 
   @override
-  Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
-    IntentionId intentionId,
-  ) => _delegate.getRelationCounts(intentionId);
-
-  @override
   Future<RelationGroupPageResult> getRelationGroupPage(
     RelationGroupPageQuery query,
   ) => _delegate.getRelationGroupPage(query);
@@ -1572,16 +1576,6 @@ final class _ObservedRepository implements PersonalGraphRepository {
   @override
   Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) =>
       _delegate.watchRelation(id);
-
-  @override
-  Future<SelectedRelationsReadResult> getSelectedRelations(
-    SelectedRelationsQuery query,
-  ) => _delegate.getSelectedRelations(query);
-
-  @override
-  Stream<SelectedRelationsReadResult> watchSelectedRelations(
-    SelectedRelationsQuery query,
-  ) => _delegate.watchSelectedRelations(query);
 
   @override
   Future<ChoicePathContinuationResult> getChoicePathContinuations(

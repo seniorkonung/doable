@@ -7,6 +7,7 @@ import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
+import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
@@ -428,9 +429,11 @@ GraphSnapshot<LongTermRelationDetails?> _relationSnapshot(
 Future<GraphRevision> _revision(
   DriftPersonalGraphRepository repository,
   IntentionId intentionId,
-) async => (await repository.getRelationCounts(
-  intentionId,
-) as ResultSuccess<GraphSnapshot<RelationCounts>>).value.revision;
+) async =>
+    (await repository.watchIntention(intentionId).first
+            as ResultSuccess<GraphSnapshot<IntentionDetails?>>)
+        .value
+        .revision;
 
 DriftPersonalGraphRepository _repository(
   AppDatabase database,

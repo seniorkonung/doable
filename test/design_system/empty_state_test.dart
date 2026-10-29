@@ -156,6 +156,130 @@ void main() {
     expect((title.top + text.bottom) / 2, (400 - 40) / 2);
   });
 
+  testWidgets('по умолчанию текст не шире 260, над блоком нет поля, а под '
+      'ним свободные 40', (tester) async {
+    await tester.pumpWidget(
+      _app(
+        room: 120,
+        textScale: 2,
+        state: const EmptyState(title: _title, text: _text),
+      ),
+    );
+
+    expect(_textConstraints(tester).maxWidth, 260);
+    expect(tester.getRect(find.text(_title)).top, 0);
+    final block = tester.getRect(find.byType(EmptyState));
+    expect(block.bottom - tester.getRect(find.text(_text)).bottom, 40);
+  });
+
+  testWidgets('с шириной текста 270 и полями 24 сверху и снизу, как в '
+      '«Связях», блок стоит по центру между полями', (tester) async {
+    await tester.pumpWidget(
+      _app(
+        room: 400,
+        state: const EmptyState(
+          title: _title,
+          text: _text,
+          textMaxWidth: 270,
+          spaceAbove: 24,
+          spaceBelow: 24,
+        ),
+      ),
+    );
+
+    expect(_textConstraints(tester).maxWidth, 270);
+    final title = tester.getRect(find.text(_title));
+    final text = tester.getRect(find.text(_text));
+    expect((title.top + text.bottom) / 2, 24 + (400 - 24 - 24) / 2);
+  });
+
+  testWidgets('с полями 24 в низком месте блок начинается под верхним полем, а '
+      'под текстом оставляет нижнее', (tester) async {
+    await tester.pumpWidget(
+      _app(
+        room: 120,
+        textScale: 2,
+        state: const EmptyState(
+          title: _title,
+          text: _text,
+          textMaxWidth: 270,
+          spaceAbove: 24,
+          spaceBelow: 24,
+        ),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(tester.getRect(find.text(_title)).top, 24);
+    final block = tester.getRect(find.byType(EmptyState));
+    expect(block.bottom - tester.getRect(find.text(_text)).bottom, 24);
+  });
+
+  group('правило pretty', () {
+    // В тестовом шрифте каждый знак шириной в кегль 15, поэтому в ширину 270
+    // входит 18 знаков.
+    const fourWords = 'аааа бббб вввв гггг';
+
+    testWidgets('переносит слово в последнюю строку, чтобы она не состояла '
+        'из одного слова', (tester) async {
+      await tester.pumpWidget(
+        _app(
+          room: 400,
+          state: const EmptyState(
+            title: _title,
+            text: fourWords,
+            textMaxWidth: 270,
+            pretty: true,
+          ),
+        ),
+      );
+
+      expect(_lineOf(tester, fourWords, 'вввв'), 1);
+      expect(_lineOf(tester, fourWords, 'гггг'), 1);
+      expect(_lineOf(tester, fourWords, 'бббб'), 0);
+    });
+
+    testWidgets('выключенное правило переносит тот же текст как '
+        'прежде', (tester) async {
+      await tester.pumpWidget(
+        _app(
+          room: 400,
+          state: const EmptyState(
+            title: _title,
+            text: fourWords,
+            textMaxWidth: 270,
+          ),
+        ),
+      );
+
+      expect(_textConstraints(tester, fourWords).maxWidth, 270);
+      expect(_lineOf(tester, fourWords, 'вввв'), 0);
+      expect(_lineOf(tester, fourWords, 'гггг'), 1);
+    });
+
+    testWidgets('без ширины, в которой число строк не растёт, переносит '
+        'текст как обычно', (tester) async {
+      // Слово из 17 знаков шириной 255 в более узкой ширине разорвалось бы,
+      // а в 270 последняя строка состоит из одного слова.
+      const longWord = 'ааааааааааааааааа б';
+      await tester.pumpWidget(
+        _app(
+          room: 400,
+          state: const EmptyState(
+            title: _title,
+            text: longWord,
+            textMaxWidth: 270,
+            pretty: true,
+          ),
+        ),
+      );
+
+      expect(_textConstraints(tester, longWord).maxWidth, 270);
+      expect(_lineOf(tester, longWord, 'а'), 0);
+      expect(_lineOf(tester, longWord, 'б'), 1);
+    });
+  });
+
   testWidgets('заголовок объявляется заголовком, а текст читается после '
       'него', (tester) async {
     final semantics = tester.ensureSemantics();
@@ -231,6 +355,20 @@ final _buttonPlate = find.descendant(
   matching: find.byType(Material),
 );
 const _text = 'Введите название в поиске, чтобы создать первый тег.';
+
+BoxConstraints _textConstraints(WidgetTester tester, [String text = _text]) =>
+    tester.renderObject<RenderParagraph>(find.text(text)).constraints;
+
+/// Номер строки, с которой начинается первое вхождение [word] в [text].
+int _lineOf(WidgetTester tester, String text, String word) {
+  final paragraph = tester.renderObject<RenderParagraph>(find.text(text));
+  final caret = paragraph.getOffsetForCaret(
+    TextPosition(offset: text.indexOf(word)),
+    Rect.zero,
+  );
+  final lineHeight = DoableType.body.fontSize! * DoableType.body.height!;
+  return (caret.dy / lineHeight).round();
+}
 
 TextStyle _style(WidgetTester tester, String text) =>
     tester.renderObject<RenderParagraph>(find.text(text)).text.style!;

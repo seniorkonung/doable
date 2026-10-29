@@ -3,6 +3,7 @@ import '../../graph/application/graph_revision.dart';
 import '../../intention/domain/intention.dart';
 import '../../intention/domain/intention_id.dart';
 import '../../intention/domain/intention_text.dart';
+import '../../shared/domain/text_preview.dart';
 import '../domain/long_term_relation.dart';
 import '../domain/long_term_relation_description.dart';
 import 'long_term_relation_permissions.dart';
@@ -27,6 +28,33 @@ final class RelationParticipantSummary {
   final IntentionId id;
   final String title;
   final IntentionArchiveState archiveState;
+}
+
+/// Сосед в строке группы: участник связи, который не владеет группой.
+final class RelationNeighbor {
+  factory RelationNeighbor({
+    required IntentionId id,
+    required String title,
+    required IntentionArchiveState archiveState,
+    required IntentionReadiness readiness,
+  }) => RelationNeighbor._(
+    id: id,
+    title: IntentionText.normalizeTitle(title),
+    archiveState: archiveState,
+    readiness: readiness,
+  );
+
+  const RelationNeighbor._({
+    required this.id,
+    required this.title,
+    required this.archiveState,
+    required this.readiness,
+  });
+
+  final IntentionId id;
+  final String title;
+  final IntentionArchiveState archiveState;
+  final IntentionReadiness readiness;
 }
 
 enum LongTermRelationProjectionValidationFailure { participantMismatch }
@@ -64,6 +92,41 @@ final class LongTermRelationSummary {
   final RelationParticipantSummary source;
   final RelationParticipantSummary related;
   final bool hasDescription;
+}
+
+/// Строка порции группы связей: связь, её сосед и начало описания.
+///
+/// Владельца группы в строке нет: его знает страница, которая читает группу.
+final class RelationGroupEntry {
+  factory RelationGroupEntry({
+    required LongTermRelation relation,
+    required RelationNeighbor neighbor,
+    TextPreview? descriptionPreview,
+  }) {
+    if (neighbor.id != relation.sourceIntentionId &&
+        neighbor.id != relation.relatedIntentionId) {
+      throw const LongTermRelationProjectionValidationException(
+        LongTermRelationProjectionValidationFailure.participantMismatch,
+      );
+    }
+    return RelationGroupEntry._(
+      relation: relation,
+      neighbor: neighbor,
+      descriptionPreview: descriptionPreview,
+    );
+  }
+
+  const RelationGroupEntry._({
+    required this.relation,
+    required this.neighbor,
+    required this.descriptionPreview,
+  });
+
+  final LongTermRelation relation;
+  final RelationNeighbor neighbor;
+
+  /// Начало описания; у связи без описания его нет.
+  final TextPreview? descriptionPreview;
 }
 
 final class LongTermRelationDetails {

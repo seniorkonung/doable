@@ -124,24 +124,24 @@ sealed class RelationGroupPage {
 
 final class RelationGroupFirstPage extends RelationGroupPage {
   RelationGroupFirstPage({
-    required List<LongTermRelationSummary> items,
+    required List<RelationGroupEntry> items,
     required this.counts,
     required super.nextCursor,
     required super.revision,
   }) : items = List.unmodifiable(items);
 
-  final List<LongTermRelationSummary> items;
+  final List<RelationGroupEntry> items;
   final RelationCounts counts;
 }
 
 final class RelationGroupContinuationPage extends RelationGroupPage {
   RelationGroupContinuationPage({
-    required List<LongTermRelationSummary> items,
+    required List<RelationGroupEntry> items,
     required super.nextCursor,
     required super.revision,
   }) : items = List.unmodifiable(items);
 
-  final List<LongTermRelationSummary> items;
+  final List<RelationGroupEntry> items;
 }
 
 final class DailyChoiceGroupFirstPage extends RelationGroupPage {

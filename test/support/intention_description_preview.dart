@@ -1,10 +1,8 @@
-import 'package:doable/src/intention/application/intention_description_preview.dart';
+import 'package:doable/src/shared/domain/text_preview.dart';
 
 /// Строит начало описания так же, как источники краткой сводки намерения.
-IntentionDescriptionPreview? testDescriptionPreview(String? description) =>
+TextPreview? testDescriptionPreview(String? description) =>
     switch (description) {
-      final description? => IntentionDescriptionPreview.fromDescription(
-        description,
-      ),
+      final description? => TextPreview.fromText(description),
       null => null,
     };

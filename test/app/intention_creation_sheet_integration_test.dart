@@ -12,6 +12,7 @@ import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openFileBackedLocalDatabase;
+import 'package:doable/src/design_system/components/option_tiles.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/design_system/components/tag_row.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
@@ -45,6 +46,7 @@ import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_state.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_view_model.dart';
 import 'package:flutter/foundation.dart';
+import 'package:doable/src/design_system/components/page_head.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -968,27 +970,27 @@ Future<void> _expectCreatedPage(
   expect(assignments.freshness, TagAssignmentsFreshness.current);
   expect(
     tester
-        .widget<Text>(find.byKey(const ValueKey('intention-details-title')))
-        .data,
+        .widget<PageHead>(find.byKey(const ValueKey('intention-details-title')))
+        .name,
     title,
   );
   expect(
     find.descendant(
       of: page,
-      matching: find.text(description ?? app.l10n.detailsNoDescription),
+      matching: find.text(description ?? app.l10n.detailsAddDescription),
     ),
     findsOneWidget,
   );
   expect(
-    find.descendant(
-      of: page,
-      matching: find.text(
-        readiness == IntentionReadiness.ready
-            ? app.l10n.catalogReady
-            : app.l10n.catalogNotReady,
-      ),
-    ),
-    findsOneWidget,
+    tester
+        .widget<OptionTiles<IntentionReadiness>>(
+          find.descendant(
+            of: page,
+            matching: find.byType(OptionTiles<IntentionReadiness>),
+          ),
+        )
+        .value,
+    readiness,
   );
   for (final tag in assignments.items) {
     final row = find.byKey(
@@ -997,7 +999,9 @@ Future<void> _expectCreatedPage(
     await tester.scrollUntilVisible(
       row,
       200,
-      scrollable: find.descendant(of: page, matching: find.byType(Scrollable)),
+      scrollable: find
+          .descendant(of: page, matching: find.byType(Scrollable))
+          .first,
     );
     await tester.pumpAndSettle();
     expect(
@@ -1040,7 +1044,11 @@ Future<void> _closeCreatedPage(
       tester,
       find.descendant(
         of: find.byType(IntentionDetailsPage),
-        matching: find.byType(BackButton),
+        matching: find.bySemanticsLabel(
+          MaterialLocalizations.of(
+            tester.element(find.byType(IntentionDetailsPage)),
+          ).backButtonTooltip,
+        ),
       ),
     );
   }

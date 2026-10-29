@@ -12,6 +12,7 @@ import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
+import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
@@ -343,9 +344,12 @@ Future<RelationCounts> _counts(
   PersonalGraphRepository repository,
   IntentionId id,
 ) async {
-  final result = await repository.getRelationCounts(id);
-  expect(result, isA<ResultSuccess<GraphSnapshot<RelationCounts>>>());
-  return (result as ResultSuccess<GraphSnapshot<RelationCounts>>).value.value;
+  final result = await repository.watchIntention(id).first;
+  expect(result, isA<ResultSuccess<GraphSnapshot<IntentionDetails?>>>());
+  return (result as ResultSuccess<GraphSnapshot<IntentionDetails?>>)
+      .value
+      .value!
+      .relationCounts;
 }
 
 Future<void> _insertIntention(

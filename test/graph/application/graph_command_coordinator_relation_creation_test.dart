@@ -1,6 +1,5 @@
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
-import 'package:doable/src/graph/application/selected_relations.dart';
 
 import 'dart:async';
 
@@ -19,7 +18,6 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
-import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
@@ -107,20 +105,6 @@ final class _ControlledPersonalGraphRepository
         'Наблюдение дневного выбора не используется этим тестом.',
       );
 
-  @override
-  Future<SelectedRelationsReadResult> getSelectedRelations(
-    SelectedRelationsQuery query,
-  ) => throw UnsupportedError(
-    'Чтение выбранных связей не используется в этом тесте.',
-  );
-
-  @override
-  Stream<SelectedRelationsReadResult> watchSelectedRelations(
-    SelectedRelationsQuery query,
-  ) => throw UnsupportedError(
-    'Наблюдение выбранных связей не используется в этом тесте.',
-  );
-
   final commands = <Object>[];
   final _results = <Completer<Object>>[];
   Object? nextError;
@@ -145,11 +129,6 @@ final class _ControlledPersonalGraphRepository
   Future<Result<IntentionCatalogPage>> getCatalogPage(
     IntentionCatalogQuery query,
   ) => throw UnsupportedError('Каталог не используется в этих тестах.');
-
-  @override
-  Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
-    IntentionId intentionId,
-  ) => throw UnsupportedError('Сводка не используется в этих тестах.');
 
   @override
   Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(

@@ -1,6 +1,5 @@
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
-import 'package:doable/src/graph/application/selected_relations.dart';
 
 import 'dart:async';
 
@@ -26,7 +25,7 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_description.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 
-import '../neighborhood/neighborhood_test_support.dart';
+import '../relation_graph_test_support.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/statistics_read_contract_test_fallback.dart';
 
@@ -90,20 +89,6 @@ final class ControlledRelationDetailsRepository
       throw UnsupportedError(
         'Наблюдение дневного выбора не используется этим тестом.',
       );
-
-  @override
-  Future<SelectedRelationsReadResult> getSelectedRelations(
-    SelectedRelationsQuery query,
-  ) => throw UnsupportedError(
-    'Чтение выбранных связей не используется в этом тесте.',
-  );
-
-  @override
-  Stream<SelectedRelationsReadResult> watchSelectedRelations(
-    SelectedRelationsQuery query,
-  ) => throw UnsupportedError(
-    'Наблюдение выбранных связей не используется в этом тесте.',
-  );
 
   final relationWatches = <ControlledRelationWatch>[];
   final watchedIntentionIds = <IntentionId>[];
@@ -227,11 +212,6 @@ final class ControlledRelationDetailsRepository
   Future<Result<IntentionCatalogPage>> getCatalogPage(
     IntentionCatalogQuery query,
   ) => throw UnsupportedError('Каталог не используется в этом тесте.');
-
-  @override
-  Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
-    IntentionId intentionId,
-  ) => throw UnsupportedError('Отдельная сводка не читается этим тестом.');
 
   @override
   Future<GraphCommandResult<TSuccess, TFailure>> execute<

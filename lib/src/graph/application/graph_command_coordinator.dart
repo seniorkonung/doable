@@ -15,8 +15,6 @@ import '../../long_term_relation/domain/long_term_relation_id.dart';
 import '../../tag/application/tag_command.dart';
 import '../../tag/application/tag_result.dart';
 import '../../tag/domain/tag_id.dart';
-import 'blocking_relation_reference.dart';
-import 'delete_blocking_relations.dart';
 import 'graph_change.dart';
 import 'graph_command_result.dart';
 import 'graph_revision.dart';
@@ -125,13 +123,6 @@ final class LongTermRelationOperationToken extends GraphOperationToken {
   String toString() => 'LongTermRelationOperationToken';
 }
 
-final class BlockingRelationsDeleteOperationToken extends GraphOperationToken {
-  BlockingRelationsDeleteOperationToken._();
-
-  @override
-  String toString() => 'BlockingRelationsDeleteOperationToken';
-}
-
 final class DailyChoiceOperationToken extends GraphOperationToken {
   DailyChoiceOperationToken._();
 
@@ -193,12 +184,14 @@ sealed class GraphCommandCompletion {
 /// Политику предъявления задаёт вид завершения. По умолчанию действует
 /// протокол ADR-0012: успех сразу принадлежит оболочке, а отказ — открытой
 /// экранной сессии инициатора. У операции с политикой «только отказ» по
-/// ADR-0016 предъявляемо только завершение отказа.
+/// ADR-0016 отказ сразу принадлежит оболочке. У политики «успех без сообщения»
+/// по ADR-0046 отказ сохраняет протокол ADR-0012. Обе политики исключают
+/// успешное завершение из этого типа.
 sealed class GraphPresentableCompletion extends GraphCommandCompletion {
   const GraphPresentableCompletion();
 }
 
-final class IntentionCommandCompletion extends GraphPresentableCompletion {
+sealed class IntentionCommandCompletion extends GraphCommandCompletion {
   const IntentionCommandCompletion._({
     required this.token,
     required this.kind,
@@ -239,6 +232,33 @@ final class IntentionCommandCompletion extends GraphPresentableCompletion {
   };
 }
 
+final class IntentionPresentableCompletion extends IntentionCommandCompletion
+    implements GraphPresentableCompletion {
+  const IntentionPresentableCompletion._({
+    required super.token,
+    required super.kind,
+    required super.target,
+    required super.confirmedResult,
+  }) : super._();
+}
+
+/// Успех операции, которая не объявляет его сообщением, публикуется только
+/// для согласования данных.
+///
+/// Так завершаются изменение текста с политикой «успех без сообщения» по
+/// ADR-0046, а также изменение готовности, архивирование и восстановление с
+/// политикой «только отказ» по ADR-0016.
+final class IntentionUnannouncedSuccessCompletion
+    extends IntentionCommandCompletion {
+  const IntentionUnannouncedSuccessCompletion._({
+    required super.token,
+    required super.kind,
+    required super.target,
+    required ResultSuccess<ConfirmedGraphResult<IntentionCommandSuccess>>
+    result,
+  }) : super._(confirmedResult: result);
+}
+
 enum LongTermRelationCommandKind { create, update, archive, restore, delete }
 
 final class LongTermRelationCommandCompletion
@@ -270,34 +290,6 @@ final class LongTermRelationCommandCompletion
 
   @override
   bool get isFailure => switch (confirmedResult) {
-    GraphResultSuccess() => false,
-    GraphResultFailure() => true,
-  };
-}
-
-final class BlockingRelationsDeleteCompletion
-    extends GraphPresentableCompletion {
-  const BlockingRelationsDeleteCompletion._({
-    required this.token,
-    required this.intentionId,
-    required this.presentationTitle,
-    required this.result,
-  });
-
-  @override
-  final BlockingRelationsDeleteOperationToken token;
-  final IntentionId intentionId;
-  final String presentationTitle;
-  final DeleteBlockingRelationsResult result;
-
-  @override
-  ConfirmedGraphChangePackage? get confirmedChange => switch (result) {
-    GraphResultSuccess(:final value) => value,
-    GraphResultFailure() => null,
-  };
-
-  @override
-  bool get isFailure => switch (result) {
     GraphResultSuccess() => false,
     GraphResultFailure() => true,
   };
@@ -700,10 +692,6 @@ final class LongTermRelationCommandAlreadyRunning
   const LongTermRelationCommandAlreadyRunning();
 }
 
-sealed class BlockingRelationsDeleteStart {
-  const BlockingRelationsDeleteStart();
-}
-
 sealed class DailyChoiceCommandStart {
   const DailyChoiceCommandStart();
 }
@@ -732,22 +720,6 @@ final class TagCommandAccepted extends TagCommandStart {
 
 final class TagCommandAlreadyRunning extends TagCommandStart {
   const TagCommandAlreadyRunning();
-}
-
-final class BlockingRelationsDeleteAccepted
-    extends BlockingRelationsDeleteStart {
-  const BlockingRelationsDeleteAccepted({
-    required this.token,
-    required this.future,
-  });
-
-  final BlockingRelationsDeleteOperationToken token;
-  final Future<BlockingRelationsDeleteCompletion> future;
-}
-
-final class BlockingRelationsDeleteAlreadyRunning
-    extends BlockingRelationsDeleteStart {
-  const BlockingRelationsDeleteAlreadyRunning();
 }
 
 sealed class GraphExportStart {
@@ -819,7 +791,6 @@ final class GraphManualBackupAlreadyRunning extends GraphManualBackupStart {
 final class GraphCommandCoordinatorDraining extends IntentionCommandStart
     implements
         LongTermRelationCommandStart,
-        BlockingRelationsDeleteStart,
         DailyChoiceCommandStart,
         TagCommandStart,
         GraphExportStart,
@@ -951,6 +922,11 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     CreateIntention command,
   ) => _accept(formKey, command, const CreatingIntentionOperationTarget());
 
+  /// Принимает команду существующего намерения.
+  ///
+  /// Политику предъявления задаёт вид команды: удаление следует ADR-0012,
+  /// изменение текста — ADR-0046, а изменение готовности, архивирование и
+  /// восстановление — политике «только отказ» по ADR-0016.
   IntentionCommandStart acceptExisting(
     ExistingIntentionCommand command, {
     required String presentationTitle,
@@ -1134,43 +1110,6 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     };
   }
 
-  BlockingRelationsDeleteStart acceptBlockingRelationsDelete(
-    DeleteBlockingRelations command, {
-    required String presentationTitle,
-  }) {
-    final token = BlockingRelationsDeleteOperationToken._();
-    final acceptance = _acceptOperation(
-      keys: {
-        ExistingIntentionKey(command.intentionId),
-        for (final reference in command.references)
-          switch (reference) {
-            LongTermBlockingRelationReference(:final id) =>
-              ExistingLongTermRelationKey(id),
-            DailyChoiceBlockingRelationReference(:final id) =>
-              ExistingDailyChoiceKey(id),
-          },
-      },
-      entry: _PresentationEntry(token),
-      execute: () async => BlockingRelationsDeleteCompletion._(
-        token: token,
-        intentionId: command.intentionId,
-        presentationTitle: presentationTitle,
-        result: await _executeBlockingRelationsDelete(command),
-      ),
-    );
-    return switch (acceptance) {
-      _GraphCommandAccepted(:final future) => BlockingRelationsDeleteAccepted(
-        token: token,
-        future: future.then(
-          (completion) => completion as BlockingRelationsDeleteCompletion,
-        ),
-      ),
-      _GraphCommandAlreadyRunning() =>
-        const BlockingRelationsDeleteAlreadyRunning(),
-      _GraphCommandDraining() => const GraphCommandCoordinatorDraining(),
-    };
-  }
-
   LongTermRelationCommandStart _acceptRelation({
     required GraphCommandKey key,
     required LongTermRelationCommand command,
@@ -1211,12 +1150,28 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
   ) {
     final token = IntentionOperationToken._();
     final kind = _kindOf(command);
+    final policy = _intentionPresentationPolicyOf(kind);
     final acceptance = _acceptOperation(
       keys: {key},
-      entry: _PresentationEntry(token),
+      // Права инициатора у операций «только отказ» нет: отказ сразу
+      // принадлежит оболочке.
+      entry: _PresentationEntry(token)
+        ..initiatorReleased = policy == _PresentationPolicy.failureOnly,
       execute: () async {
         final result = await _executeIntention(command);
-        return IntentionCommandCompletion._(
+        if (policy != _PresentationPolicy.standard &&
+            result
+                is ResultSuccess<
+                  ConfirmedGraphResult<IntentionCommandSuccess>
+                >) {
+          return IntentionUnannouncedSuccessCompletion._(
+            token: token,
+            kind: kind,
+            target: target,
+            result: result,
+          );
+        }
+        return IntentionPresentableCompletion._(
           token: token,
           kind: kind,
           target: target,
@@ -1262,8 +1217,8 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
       if (completion is GraphPresentableCompletion) {
         _placeAtPublication(entry, completion);
       } else {
-        // Успех операции с политикой «только отказ» права предъявления не
-        // образует.
+        // Успех политик «только отказ» и «успех без сообщения» не оставляет
+        // непредъявленной записи.
         _discardEntry(entry);
       }
       for (final key in keys) {
@@ -1542,8 +1497,8 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
 
   /// Выдаёт открытой экранной сессии право предъявить её failure.
   ///
-  /// Success инициатору не выдаётся: он сразу принадлежит оболочке. После
-  /// освобождения сессии или выдачи права оболочке возвращает `null`.
+  /// Успех инициатору не выдаётся. После освобождения сессии или выдачи
+  /// права оболочке возвращает `null`.
   GraphInitiatorPresentationClaim? claimInitiatorFailure(
     GraphOperationToken token,
   ) {
@@ -1768,19 +1723,6 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     }
   }
 
-  Future<DeleteBlockingRelationsResult> _executeBlockingRelationsDelete(
-    DeleteBlockingRelations command,
-  ) async {
-    try {
-      return await _repository.execute(command);
-    } on Object {
-      return const GraphCommandFailed<
-        BlockingRelationsDeleted,
-        DeleteBlockingRelationsFailure
-      >(DeleteBlockingRelationsUnexpectedFailure());
-    }
-  }
-
   Future<DailyChoiceCommandResult> _executeDailyChoice(
     DailyChoiceCommand command,
   ) async {
@@ -1858,6 +1800,30 @@ final class _GraphCommandAlreadyRunning extends _GraphCommandAcceptance {
 final class _GraphCommandDraining extends _GraphCommandAcceptance {
   const _GraphCommandDraining();
 }
+
+/// Политика предъявления результата, которую задаёт вид операции.
+enum _PresentationPolicy {
+  /// Протокол ADR-0012: успех принадлежит оболочке, отказ — сначала
+  /// инициатору.
+  standard,
+
+  /// ADR-0016: успех не предъявляется, отказ сразу принадлежит оболочке.
+  failureOnly,
+
+  /// ADR-0046: успех не предъявляется, отказ следует протоколу ADR-0012.
+  silentSuccess,
+}
+
+_PresentationPolicy _intentionPresentationPolicyOf(IntentionCommandKind kind) =>
+    switch (kind) {
+      IntentionCommandKind.create ||
+      IntentionCommandKind.delete => _PresentationPolicy.standard,
+      IntentionCommandKind.update => _PresentationPolicy.silentSuccess,
+      IntentionCommandKind.enableReadiness ||
+      IntentionCommandKind.disableReadiness ||
+      IntentionCommandKind.archive ||
+      IntentionCommandKind.restore => _PresentationPolicy.failureOnly,
+    };
 
 IntentionCommandKind _kindOf(IntentionCommand command) => switch (command) {
   CreateIntention() => IntentionCommandKind.create,

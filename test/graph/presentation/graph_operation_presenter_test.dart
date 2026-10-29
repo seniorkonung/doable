@@ -9,7 +9,6 @@ import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
-import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -1148,148 +1147,6 @@ void main() {
     expect(find.byType(SnackBar), findsNothing);
   });
 
-  testWidgets('массовый успех на английском называет операцию и намерение', (
-    tester,
-  ) async {
-    final harness = await _pumpPresenterApp(tester);
-    final deletion = harness.startBlockingRelationsDelete(title: 'Связанное');
-    harness.completeBlockingRelationsDeleted(deletion);
-    await tester.pumpAndSettle();
-
-    expect(
-      find.text(
-        'Delete selected relations — “Связанное”: Selected relations deleted.',
-      ),
-      findsOneWidget,
-    );
-    await _closeMessage(tester);
-    expect(find.byType(SnackBar), findsNothing);
-  });
-
-  testWidgets(
-    'ошибка массовой операции остаётся у открытого инициатора до его ухода',
-    (tester) async {
-      final harness = await _pumpPresenterApp(tester);
-      final deletion = harness.startBlockingRelationsDelete(
-        title: 'Связанное',
-        releaseInitiator: false,
-      );
-      harness.completeBlockingRelationsFailure(
-        deletion,
-        const DeleteBlockingRelationsUnavailableFailure(),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.byType(SnackBar), findsNothing);
-      harness.releaseInitiatorClaim(
-        harness.claimInitiatorFailure(deletion.token)!,
-      );
-      await tester.pumpAndSettle();
-      expect(
-        find.text(
-          'Delete selected relations — “Связанное”: Selected relations couldn’t be deleted. Try again.',
-        ),
-        findsOneWidget,
-      );
-      await _closeMessage(tester);
-      expect(find.byType(SnackBar), findsNothing);
-    },
-  );
-
-  // Английский текст массового успеха проверяет отдельный тест выше.
-  const massDeleted = (
-    locale: Locale('ru'),
-    message:
-        'Удаление выбранных связей — «Связанное»: Выбранные связи удалены.',
-  );
-  testWidgets(
-    'массовый успех локализуется для ${massDeleted.locale.languageCode}',
-    (tester) async {
-      final harness = await _pumpPresenterApp(
-        tester,
-        locale: massDeleted.locale,
-      );
-      final deletion = harness.startBlockingRelationsDelete(title: 'Связанное');
-      harness.completeBlockingRelationsDeleted(deletion);
-      await tester.pumpAndSettle();
-      expect(find.text(massDeleted.message), findsOneWidget);
-      await _closeMessage(tester);
-      expect(find.byType(SnackBar), findsNothing);
-    },
-  );
-
-  testWidgets(
-    'массовый конфликт на русском не раскрывает идентификатор связи',
-    (tester) async {
-      final harness = await _pumpPresenterApp(
-        tester,
-        locale: const Locale('ru'),
-      );
-      final deletion = harness.startBlockingRelationsDelete(title: 'Связанное');
-      harness.completeBlockingRelationsFailure(
-        deletion,
-        DeleteBlockingRelationsSelectionConflictFailure.longTerm(
-          relationId: _relationId,
-          reason: BlockingRelationConflictReason.relationMissing,
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(
-        find.text(
-          'Удаление выбранных связей — «Связанное»: Выбранный набор устарел. Обновите выбор и подтвердите его снова.',
-        ),
-        findsOneWidget,
-      );
-      expect(find.textContaining('018f47c2'), findsNothing);
-      await _closeMessage(tester);
-    },
-  );
-
-  for (final scenario
-      in <({DeleteBlockingRelationsFailure failure, String outcome})>[
-        (
-          failure: DeleteBlockingRelationsIntentionNotFoundFailure(
-            testDetailsIntentionId(1),
-          ),
-          outcome:
-              'This intention no longer exists. Relations weren’t deleted.',
-        ),
-        (
-          failure: const DeleteBlockingRelationsUnavailableFailure(),
-          outcome: 'Selected relations couldn’t be deleted. Try again.',
-        ),
-        (
-          failure: const DeleteBlockingRelationsCorruptionFailure(),
-          outcome:
-              'Stored data is damaged. Selected relations weren’t deleted.',
-        ),
-        (
-          failure: const DeleteBlockingRelationsUnexpectedFailure(),
-          outcome: 'Selected relations couldn’t be deleted because of an unexpected error.',
-        ),
-      ]) {
-    testWidgets(
-      'массовый отказ ${scenario.failure.runtimeType} безопасен на английском',
-      (tester) async {
-        final harness = await _pumpPresenterApp(tester);
-        final deletion = harness.startBlockingRelationsDelete(
-          title: 'Связанное',
-        );
-        harness.completeBlockingRelationsFailure(deletion, scenario.failure);
-        await tester.pumpAndSettle();
-
-        expect(
-          find.text(
-            'Delete selected relations — “Связанное”: ${scenario.outcome}',
-          ),
-          findsOneWidget,
-        );
-        await _closeMessage(tester);
-      },
-    );
-  }
-
   for (final scenario in <({RelationParticipantRole role, String outcome})>[
     (
       role: RelationParticipantRole.source,
@@ -2050,7 +1907,6 @@ final class _PresenterHarness {
   final _commandIndexes = <IntentionCommandAccepted, int>{};
   final _titles = <IntentionCommandAccepted, (int, String)>{};
   final _relationIndexes = <LongTermRelationCommandAccepted, int>{};
-  final _blockingIndexes = <BlockingRelationsDeleteAccepted, int>{};
   final _dailyChoiceIndexes = <DailyChoiceCommandAccepted, int>{};
   final _tagIndexes = <TagCommandAccepted, int>{};
   final _exports = <GraphExportAccepted, Completer<GraphExportOutcome>>{};
@@ -2282,67 +2138,6 @@ final class _PresenterHarness {
     DailyChoiceCommandFailure failure,
   ) => repository.completeDailyChoiceCommand(
     _dailyChoiceIndexes[accepted]!,
-    GraphCommandFailed(failure),
-  );
-
-  BlockingRelationsDeleteAccepted startBlockingRelationsDelete({
-    required String title,
-    bool releaseInitiator = true,
-  }) {
-    final commandIndex = repository.blockingRelationsCommands.length;
-    final accepted = _coordinator.acceptBlockingRelationsDelete(
-      DeleteBlockingRelations.longTerm(
-        intentionId: testDetailsIntentionId(1),
-        relationIds: {_relationId},
-      ),
-      presentationTitle: title,
-    ) as BlockingRelationsDeleteAccepted;
-    if (releaseInitiator) {
-      _coordinator.releaseInitiatorPresentation(accepted.token);
-    }
-    _blockingIndexes[accepted] = commandIndex;
-    return accepted;
-  }
-
-  void completeBlockingRelationsDeleted(
-    BlockingRelationsDeleteAccepted accepted,
-  ) {
-    const revision = TestDetailsRevision(6);
-    final relation = LongTermRelation(
-      id: _relationId,
-      sourceIntentionId: testDetailsIntentionId(1),
-      relatedIntentionId: testDetailsIntentionId(2),
-      type: LongTermRelationType.need,
-      priority: RelationPriority.p2,
-      scope: RelationScope.active,
-      creationSequence: RelationCreationSequence(1),
-    );
-    final command =
-        repository.blockingRelationsCommands[_blockingIndexes[accepted]!];
-    repository.completeBlockingRelationsCommand(
-      _blockingIndexes[accepted]!,
-      GraphCommandSucceeded(
-        ConfirmedGraphResult(
-          revision: revision,
-          value: BlockingRelationsDeleted(
-            command: command,
-            revision: revision,
-            deletedRelations: [relation],
-            counts: {
-              testDetailsIntentionId(1): testRelationCounts(),
-              testDetailsIntentionId(2): testRelationCounts(),
-            },
-          ),
-        ),
-      ),
-    );
-  }
-
-  void completeBlockingRelationsFailure(
-    BlockingRelationsDeleteAccepted accepted,
-    DeleteBlockingRelationsFailure failure,
-  ) => repository.completeBlockingRelationsCommand(
-    _blockingIndexes[accepted]!,
     GraphCommandFailed(failure),
   );
 

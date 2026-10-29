@@ -39,10 +39,12 @@ abstract final class IntentionText {
     }
   }
 
+  /// Пусто ли название после нормализации [normalizeTitle].
+  static bool isBlankTitle(String value) => value.trim().isEmpty;
+
   static String normalizeTitle(String value) {
     ensureValidUnicodeRepertoire(value, field: IntentionTextField.title);
-    final normalized = value.trim();
-    if (normalized.isEmpty) {
+    if (isBlankTitle(value)) {
       throw const IntentionTextValidationException(
         IntentionTextValidationFailure(
           field: IntentionTextField.title,
@@ -50,6 +52,7 @@ abstract final class IntentionText {
         ),
       );
     }
+    final normalized = value.trim();
     _ensureLength(normalized, maxTitleLength, IntentionTextField.title);
     return normalized;
   }

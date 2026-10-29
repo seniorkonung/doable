@@ -509,150 +509,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get intentionSummaryNoTags => 'No tags';
 
   @override
-  String get relationNeighborhoodTitle => 'Relations';
-
-  @override
-  String relationNeighborhoodSelectedCount(int count) {
-    return 'Selected relations: $count';
-  }
-
-  @override
-  String get relationNeighborhoodAddToSelection => 'Add to selection';
-
-  @override
-  String get relationNeighborhoodRemoveFromSelection => 'Remove from selection';
-
-  @override
-  String get blockingRelationsReviewAction => 'Review selected relations';
-
-  @override
-  String get blockingRelationsConfirmationTitle =>
-      'Delete selected relations permanently?';
-
-  @override
-  String get blockingRelationsConfirmationWarning =>
-      'Review each selected relation. Only the selected relations will be deleted. Selected daily choices will be deleted with all their path steps. This cannot be undone. The intention will remain; deleting it requires a separate confirmation.';
-
-  @override
-  String get blockingRelationsConfirmationPreservedTags =>
-      'The reusable tags and all their assignments to intentions will remain.';
-
-  @override
-  String blockingRelationsConfirmationCount(int count) {
-    return 'To delete: $count';
-  }
-
-  @override
-  String blockingRelationsParticipantId(String id) {
-    return 'Identifier: $id';
-  }
-
-  @override
-  String get blockingRelationsDeleting => 'Deleting selected relations…';
-
-  @override
-  String get blockingRelationsBusy =>
-      'Another change to these relations or the intention is already running.';
-
-  @override
-  String get blockingRelationsDraining =>
-      'The app is closing. The change was not accepted.';
-
-  @override
-  String get blockingRelationsEditSelectionAction => 'Return to selection';
-
-  @override
-  String get blockingRelationsRefreshSelectionAction => 'Refresh selection';
-
-  @override
-  String get blockingRelationsRefreshingSelection =>
-      'Checking selected relations…';
-
-  @override
-  String blockingRelationsInvalidSelectedRelationId(String id) {
-    return 'Relation: $id';
-  }
-
-  @override
-  String get blockingRelationsInvalidMissing =>
-      'This relation no longer exists. Remove it from the selection and confirm the remaining set again.';
-
-  @override
-  String get blockingRelationsInvalidMoved =>
-      'This relation no longer belongs to this intention. Remove it from the selection and confirm the remaining set again.';
-
-  @override
-  String get blockingRelationsInvalidProtected =>
-      'This relation is used in a saved daily path. First delete the daily choice separately, then select and confirm deletion of the freed long-term relation again. The entire selected set remains unchanged.';
-
-  @override
-  String get blockingRelationsRefreshIntentionNotFound =>
-      'This intention no longer exists. Its relations cannot be deleted here.';
-
-  @override
-  String get blockingRelationsRefreshUnavailable =>
-      'Selected relations could not be checked. Your selection is unchanged; try checking again.';
-
-  @override
-  String get blockingRelationsRefreshCorruption =>
-      'Selected relations could not be checked because the data is damaged. Deletion was not started.';
-
-  @override
-  String get blockingRelationsRefreshUnexpected =>
-      'Selected relations could not be checked. Deletion was not started.';
-
-  @override
-  String get blockingRelationsDeleteMissing =>
-      'A selected relation no longer exists. Refresh the selection and confirm it again.';
-
-  @override
-  String get blockingRelationsDeleteMoved =>
-      'A selected relation no longer belongs to this intention. Refresh the selection and confirm it again.';
-
-  @override
-  String get blockingRelationsDeleteProhibited =>
-      'A selected relation is now used in a saved daily path. The entire set remains unchanged. First delete the daily choice separately, then select and confirm deletion of the freed long-term relation again.';
-
-  @override
   String get relationNeighborhoodSummaryLoading =>
       'Loading relations and summary…';
-
-  @override
-  String get relationNeighborhoodSummaryUnavailable =>
-      'The relation summary couldn’t be loaded.';
-
-  @override
-  String get relationNeighborhoodSavedSummaryRefreshing =>
-      'Updating saved relation numbers…';
-
-  @override
-  String get relationNeighborhoodSavedSummaryStale =>
-      'Saved relation numbers are out of date because the refresh failed.';
-
-  @override
-  String relationNeighborhoodTotal(int count) {
-    return 'Total relations: $count';
-  }
-
-  @override
-  String relationNeighborhoodActiveTotal(int count) {
-    return 'Active relations: $count';
-  }
-
-  @override
-  String relationNeighborhoodArchivedTotal(int count) {
-    return 'Archived relations: $count';
-  }
-
-  @override
-  String relationNeighborhoodNeedTotal(int count) {
-    return 'Need: $count';
-  }
-
-  @override
-  String relationNeighborhoodCanTotal(int count) {
-    return 'Can: $count';
-  }
 
   @override
   String relationNeighborhoodDailyTotal(int count) {
@@ -666,39 +524,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get relationNeighborhoodDailySelectedRole => 'Selected action';
 
   @override
-  String get relationNeighborhoodLongTermGroups => 'Long-term relations';
-
-  @override
-  String get relationNeighborhoodScopeLabel => 'Relation state';
-
-  @override
-  String get relationNeighborhoodScopeActive => 'Active relations';
-
-  @override
-  String get relationNeighborhoodScopeArchived => 'Archived relations';
-
-  @override
-  String get relationNeighborhoodTypeLabel => 'Relation type';
-
-  @override
   String get relationNeighborhoodTypeNeed => 'Need';
 
   @override
   String get relationNeighborhoodTypeCan => 'Can';
-
-  @override
-  String get relationNeighborhoodDirectionLabel => 'Direction';
-
-  @override
-  String get relationNeighborhoodDirectionIncoming => 'Incoming';
-
-  @override
-  String get relationNeighborhoodDirectionOutgoing => 'Outgoing';
-
-  @override
-  String relationNeighborhoodSelectedGroupCount(int count) {
-    return 'In the whole selected group: $count';
-  }
 
   @override
   String get relationNeighborhoodInitialUnavailable =>
@@ -782,7 +611,278 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get detailsTabsLabel => 'Intention sections';
+
+  @override
+  String get detailsOverviewTab => 'Overview';
+
+  @override
+  String get detailsRelationsTab => 'Relations';
+
+  @override
+  String detailsRelationsTabSemantic(int active, int archived) {
+    return 'Relations: $active active, $archived archived';
+  }
+
+  @override
+  String get detailsRelationsGroupsLabel => 'Relation groups';
+
+  @override
+  String get detailsRelationsGroupNeeds => 'Needs';
+
+  @override
+  String get detailsRelationsGroupCanUse => 'Can use';
+
+  @override
+  String get detailsRelationsGroupNeededFor => 'Needed for';
+
+  @override
+  String get detailsRelationsGroupCanBeUsedFor => 'Can be used for';
+
+  @override
+  String detailsRelationsGroupTileSemantic(String group, int count) {
+    return '$group: $count active';
+  }
+
+  @override
+  String detailsRelationsGroupTileArchivedSemantic(String group, int count) {
+    return '$group: $count active, some archived';
+  }
+
+  @override
+  String detailsRelationsRowNeed(String priority) {
+    return 'need · $priority';
+  }
+
+  @override
+  String detailsRelationsRowCan(String priority) {
+    return 'can · $priority';
+  }
+
+  @override
+  String detailsRelationsNeighborArchived(String title) {
+    return '“$title” is archived';
+  }
+
+  @override
+  String detailsRelationsWalkIntention(String title) {
+    return 'Open the intention page: $title';
+  }
+
+  @override
+  String detailsRelationsWalkAction(String title) {
+    return 'Open the action page: $title';
+  }
+
+  @override
+  String get detailsRelationsNeedsHint =>
+      'To get there, you need each of these.';
+
+  @override
+  String get detailsRelationsCanUseHint =>
+      'To get there, you can do any of these.';
+
+  @override
+  String get detailsRelationsNeededForHint => 'Each of these needs it.';
+
+  @override
+  String get detailsRelationsCanBeUsedForHint =>
+      'Each of these can use it, as one of the ways.';
+
+  @override
+  String get detailsRelationsAdd => 'Add';
+
+  @override
+  String get detailsRelationsAddNeedsLabel => 'Add what it needs';
+
+  @override
+  String get detailsRelationsAddCanUseLabel => 'Add what it can use';
+
+  @override
+  String get detailsRelationsAddNeededForLabel =>
+      'Add an intention that needs it';
+
+  @override
+  String get detailsRelationsAddCanBeUsedForLabel =>
+      'Add an intention that can use it';
+
+  @override
+  String get detailsRelationsEmptyNeedsTitle => 'Needs nothing yet';
+
+  @override
+  String get detailsRelationsEmptyNeedsIntentionText =>
+      'Add what this intention cannot do without.';
+
+  @override
+  String get detailsRelationsEmptyNeedsActionText =>
+      'An action can stand alone. Add what it needs if it has steps of its own.';
+
+  @override
+  String get detailsRelationsEmptyCanUseTitle => 'Nothing to use yet';
+
+  @override
+  String get detailsRelationsEmptyCanUseText =>
+      'Add what helps to get there without being required.';
+
+  @override
+  String get detailsRelationsEmptyNeededForTitle => 'Nothing needs it yet';
+
+  @override
+  String get detailsRelationsEmptyNeededForText =>
+      'Intentions that cannot do without this one will appear here.';
+
+  @override
+  String get detailsRelationsEmptyCanBeUsedForTitle => 'Nothing can use it yet';
+
+  @override
+  String get detailsRelationsEmptyCanBeUsedForText =>
+      'Intentions that this one is a way to will appear here.';
+
+  @override
+  String get detailsRelationsEmptyArchivedText =>
+      'Restore the intention to add relations.';
+
+  @override
+  String get detailsRelationsArchiveFold => 'Archived';
+
+  @override
+  String detailsRelationsArchiveFoldSemantic(String group, int count) {
+    return 'Archived in $group: $count';
+  }
+
+  @override
+  String get detailsChoicesTab => 'Choices';
+
+  @override
+  String get detailsChoicesSourceHint =>
+      'Daily choices that start from this intention.';
+
+  @override
+  String get detailsChoicesSelectedHint =>
+      'Daily choices that end in this intention.';
+
+  @override
+  String get detailsChoicesAdd => 'Add';
+
+  @override
+  String get detailsChoicesAddSourceLabel =>
+      'Create a daily choice that starts from this intention';
+
+  @override
+  String get detailsChoicesAddSelectedLabel =>
+      'Create a daily choice that ends in this action';
+
+  @override
   String get detailsTitle => 'Intention details';
+
+  @override
+  String get detailsTypeIntention => 'Intention';
+
+  @override
+  String get detailsTypeAction => 'Action';
+
+  @override
+  String get detailsTypeChoiceLabel => 'Intention or action';
+
+  @override
+  String get detailsTypeIntentionHint =>
+      'Any size. It may take more than a day.';
+
+  @override
+  String get detailsTypeActionHint =>
+      'Doable within one day, and clear what to do.';
+
+  @override
+  String get detailsArchivedBadge => 'Archived';
+
+  @override
+  String get detailsArchivedNote =>
+      'Archived intentions stay in saved paths and are not offered in new ones.';
+
+  @override
+  String get detailsRestoreFromArchiveAction => 'Restore from archive';
+
+  @override
+  String get detailsOptionsLabel => 'Options of the intention';
+
+  @override
+  String get detailsOptionsTitle => 'Intention';
+
+  @override
+  String get detailsOptionEdit => 'Edit';
+
+  @override
+  String get detailsOptionArchive => 'Archive';
+
+  @override
+  String get detailsOptionDelete => 'Delete';
+
+  @override
+  String get detailsOptionArchiveWithRelations =>
+      'Its relations are archived with it';
+
+  @override
+  String get detailsOptionArchiveAlone =>
+      'It stays in saved paths, new ones will not use it';
+
+  @override
+  String get detailsOptionRestoreWithRelations =>
+      'Its relations stay archived until you restore them';
+
+  @override
+  String get detailsOptionRestoreAlone => 'New paths can use it again';
+
+  @override
+  String get detailsOptionDeleteKeepsTags => 'Its tags stay';
+
+  @override
+  String get detailsOptionDeleteRelationsFirst => 'Delete its relations first';
+
+  @override
+  String get detailsOptionDeleteDailyChoicesFirst =>
+      'Delete its daily choices first';
+
+  @override
+  String get detailsOptionDeleteRelationsAndDailyChoicesFirst =>
+      'Delete its relations and daily choices first';
+
+  @override
+  String get detailsOptionWait => 'Wait for the current change to finish';
+
+  @override
+  String get detailsDeleteDialogTitle => 'Delete intention?';
+
+  @override
+  String get detailsDeleteDialogTextBefore => 'This removes the intention ';
+
+  @override
+  String get detailsDeleteDialogTextAfter =>
+      ' with its description and cannot be undone. Its tags stay.';
+
+  @override
+  String get detailsDeleteDialogCancel => 'Cancel';
+
+  @override
+  String get detailsDeleteDialogConfirm => 'Delete';
+
+  @override
+  String detailsEditTitleLabel(String title) {
+    return 'Edit the name: $title';
+  }
+
+  @override
+  String detailsEditDescriptionLabel(String description) {
+    return 'Edit the description: $description';
+  }
+
+  @override
+  String get detailsAddDescription => 'Add a description';
+
+  @override
+  String get detailsCreatedLabel => 'Created';
+
+  @override
+  String get detailsChangedLabel => 'Changed';
 
   @override
   String get detailsLoading => 'Loading intention…';
@@ -806,88 +906,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get detailsOperationRunning => 'Saving changes…';
 
   @override
-  String get detailsDescriptionLabel => 'Description';
-
-  @override
-  String get detailsNoDescription => 'No description';
-
-  @override
-  String get detailsReadinessLabel => 'Readiness';
-
-  @override
-  String get detailsArchiveStateLabel => 'State';
-
-  @override
   String get detailsActive => 'Active';
 
   @override
   String get detailsArchived => 'Archived';
 
   @override
-  String get detailsEditAction => 'Edit';
-
-  @override
-  String get detailsSaveAction => 'Save changes';
-
-  @override
   String get detailsCancelEditAction => 'Cancel';
 
   @override
-  String get detailsSaved => 'Changes saved.';
-
-  @override
-  String get detailsEnableReadinessAction => 'Mark as ready for action';
-
-  @override
-  String get detailsDisableReadinessAction => 'Mark as not ready for action';
-
-  @override
-  String get detailsReadinessConfirmationTitle => 'Ready for action?';
-
-  @override
-  String get detailsReadinessOneDayCriterion =>
-      'It can be completed fully within one day.';
-
-  @override
-  String get detailsReadinessClarityCriterion =>
-      'It is clear enough for a person to carry out.';
-
-  @override
-  String get detailsConfirmReadinessAction => 'Mark as ready';
-
-  @override
-  String get detailsArchiveAction => 'Archive';
-
-  @override
-  String get detailsRestoreAction => 'Restore';
-
-  @override
-  String get detailsDeleteAction => 'Delete permanently';
-
-  @override
-  String get detailsDeleteConfirmationTitle => 'Delete intention permanently?';
-
-  @override
-  String get detailsDeleteConfirmationMessage =>
-      'This can’t be undone. The intention, its description, and all its tag assignments, including those not shown here, will be permanently deleted. The tags will remain.';
-
-  @override
-  String get detailsConfirmDeleteAction => 'Delete permanently';
-
-  @override
   String get detailsDeleted => 'Intention deleted.';
-
-  @override
-  String get detailsReadinessEnabled => 'Marked as ready for action.';
-
-  @override
-  String get detailsReadinessDisabled => 'Marked as not ready for action.';
-
-  @override
-  String get detailsArchivedSuccess => 'Intention archived.';
-
-  @override
-  String get detailsRestoredSuccess => 'Intention restored.';
 
   @override
   String get detailsStateChangeInvalid =>
@@ -929,21 +957,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'The intention wasn’t deleted: its relations still block deletion. Archived relations and relations that aren’t loaded yet block it too.';
 
   @override
-  String get detailsShowBlockingRelationsAction => 'Show blocking relations';
-
-  @override
-  String get detailsArchiveCascadeExplanation =>
-      'Archiving also archives the intention’s direct relations. Neighbouring intentions and their other relations stay unchanged.';
-
-  @override
-  String detailsRestoreRelationsExplanation(int count) {
-    return 'Restoring returns only the intention. Its relations stay archived: $count.';
-  }
-
-  @override
-  String get detailsShowArchivedRelationsAction => 'Show archived relations';
-
-  @override
   String get detailsDeleteUnavailable =>
       'The intention couldn’t be deleted. Try again.';
 
@@ -977,6 +990,34 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get detailsUpdateUnexpected =>
       'The changes couldn’t be saved because of an unexpected error.';
+
+  @override
+  String get intentionEditTitle => 'Edit intention';
+
+  @override
+  String get intentionEditSaveAction => 'Save';
+
+  @override
+  String get intentionEditNameLabel => 'Name';
+
+  @override
+  String get intentionEditDescriptionLabel => 'Description';
+
+  @override
+  String get intentionEditDescriptionPlaceholder => 'Add a description';
+
+  @override
+  String get intentionEditDiscardTitle => 'Discard changes?';
+
+  @override
+  String get intentionEditDiscardMessage =>
+      'Your changes to the intention won’t be saved.';
+
+  @override
+  String get intentionEditDiscardAction => 'Discard';
+
+  @override
+  String get intentionEditContinueAction => 'Keep editing';
 
   @override
   String get editorTitle => 'Create intention';
@@ -1148,33 +1189,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get graphOperationDelete => 'Delete';
-
-  @override
-  String get graphOperationDeleteBlockingRelations =>
-      'Delete selected relations';
-
-  @override
-  String get blockingRelationsDeleted => 'Selected relations deleted.';
-
-  @override
-  String get blockingRelationsDeleteIntentionNotFound =>
-      'This intention no longer exists. Relations weren’t deleted.';
-
-  @override
-  String get blockingRelationsDeleteConflict =>
-      'The selected relations changed. Refresh the selection and confirm again.';
-
-  @override
-  String get blockingRelationsDeleteUnavailable =>
-      'Selected relations couldn’t be deleted. Try again.';
-
-  @override
-  String get blockingRelationsDeleteCorruption =>
-      'Stored data is damaged. Selected relations weren’t deleted.';
-
-  @override
-  String get blockingRelationsDeleteUnexpected =>
-      'Selected relations couldn’t be deleted because of an unexpected error.';
 
   @override
   String get graphOperationNewIntention => 'new intention';
@@ -1824,7 +1838,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'The tag assignment operation failed because of an unexpected error.';
 
   @override
-  String get tagAssignmentsTitle => 'Assigned tags';
+  String get tagAssignmentsTitle => 'Tags';
 
   @override
   String get tagAssignmentsIntention => 'intention';
@@ -1844,9 +1858,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tagAssignmentsLoading => 'Loading assignments…';
 
   @override
-  String get tagAssignmentsEmpty => 'No tags assigned yet.';
-
-  @override
   String get tagAssignmentsRefreshing => 'Refreshing assignments…';
 
   @override
@@ -1862,19 +1873,19 @@ class AppLocalizationsEn extends AppLocalizations {
       'Could not load assignments because of an unexpected error.';
 
   @override
-  String get tagAssignmentsChoose => 'Choose a tag';
+  String get tagAssignmentsAdd => 'Add';
 
   @override
-  String tagAssignmentsChooseSemantic(String targetKind, String archiveState) {
-    return 'Choose a tag for the $archiveState $targetKind';
+  String tagAssignmentsAddLabel(String tagNames) {
+    return 'Tags: $tagNames. Add or remove';
   }
 
   @override
-  String get tagAssignmentsRemove => 'Remove assignment';
+  String get tagAssignmentsAddEmptyLabel => 'Add tags';
 
   @override
   String tagAssignmentsRemoveNamed(String tagName) {
-    return 'Remove assignment: $tagName';
+    return 'Remove the tag: $tagName';
   }
 
   @override
@@ -2139,9 +2150,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get relationDeleteUnexpected =>
       'The relation couldn’t be deleted because of an unexpected error.';
-
-  @override
-  String get relationNeighborhoodOpenRelation => 'Opens the relation details';
 
   @override
   String get relationNeighborhoodOpenDailyChoice =>
@@ -2705,20 +2713,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get relationEditorSaving => 'Saving…';
 
   @override
-  String get relationNeighborhoodCreateOutgoingAction =>
-      'Create an outgoing relation';
-
-  @override
-  String get relationNeighborhoodCreateIncomingAction =>
-      'Create an incoming relation';
-
-  @override
   String relationEditorPriorityOption(String priority) {
     return 'Priority $priority';
   }
-
-  @override
-  String get detailsChoosePathAction => 'Choose an action along a path';
 
   @override
   String get choicePathTitle => 'Choose a path to an action';

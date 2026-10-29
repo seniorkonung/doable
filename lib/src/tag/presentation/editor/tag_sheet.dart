@@ -121,7 +121,7 @@ final class _TagSheetState extends ConsumerState<_TagSheet> {
               label: l10n.tagEditorNameLabel,
               leading: TagDot(color: selectedColor, size: TagDotSize.large),
               onChanged: model.changeName,
-              error: fieldFailure,
+              error: fieldFailure == null ? null : Text(fieldFailure),
             ),
             const SizedBox(height: DoableMetrics.space1),
             TagColorPicker(

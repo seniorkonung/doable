@@ -14,6 +14,7 @@ import 'package:doable/src/intention/application/intention_catalog.dart'
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_permissions.dart';
@@ -344,13 +345,18 @@ void main() {
   }
 
   testWidgets(
-    'исходящая группа предвыбирает текущее намерение исходным участником',
+    'исходящая группа «Можно использовать» предвыбирает намерение исходным '
+    'участником и тип «можно»',
     (tester) async {
       final repository = ControlledRelationFormRepository();
       addTearDown(repository.dispose);
-      await _openForm(tester, repository, RelationDirection.outgoing);
+      await _openForm(tester, repository, IntentionRelationGroup.canUse);
 
       expect(find.text('Текущее намерение'), findsOneWidget);
+      expect(_isChipSelected(tester, 'relation-editor-type-can'), isTrue);
+      expect(_isChipSelected(tester, 'relation-editor-type-need'), isFalse);
+      expect(find.text('the related intention'), findsOneWidget);
+      expect(find.text('a priority from P1 to P4'), findsOneWidget);
       await _selectParticipant(
         tester,
         repository,
@@ -360,7 +366,6 @@ void main() {
         index: 2,
       );
       expect(find.text('Много ходить'), findsOneWidget);
-      await _selectType(tester, 'need');
       await _selectPriority(tester, 'p1');
       await tester.tap(find.byKey(const ValueKey('relation-editor-submit')));
       await tester.pump();
@@ -369,7 +374,7 @@ void main() {
       final command = repository.commandAt(0);
       expect(command.sourceIntentionId, _contextIntentionId);
       expect(command.relatedIntentionId, testSummary(index: 2).id);
-      expect(command.type, LongTermRelationType.need);
+      expect(command.type, LongTermRelationType.can);
       expect(command.priority, RelationPriority.p1);
       expect(command.description, isNull);
     },
@@ -383,7 +388,7 @@ void main() {
       final router = await _openForm(
         tester,
         repository,
-        RelationDirection.outgoing,
+        IntentionRelationGroup.needs,
       );
       await _selectParticipant(
         tester,
@@ -422,8 +427,9 @@ void main() {
     (tester) async {
       final repository = ControlledRelationFormRepository();
       addTearDown(repository.dispose);
-      await _openForm(tester, repository, RelationDirection.incoming);
+      await _openForm(tester, repository, IntentionRelationGroup.neededFor);
 
+      expect(_isChipSelected(tester, 'relation-editor-type-need'), isTrue);
       await _selectParticipant(
         tester,
         repository,
@@ -452,9 +458,10 @@ void main() {
     (tester) async {
       final repository = ControlledRelationFormRepository();
       addTearDown(repository.dispose);
-      await _openForm(tester, repository, RelationDirection.outgoing);
+      await _openForm(tester, repository, null);
 
       expect(find.text('To create the relation, provide:'), findsOneWidget);
+      expect(find.text('the source intention'), findsOneWidget);
       expect(find.text('the related intention'), findsOneWidget);
       expect(find.text('the relation type'), findsOneWidget);
       expect(find.text('a priority from P1 to P4'), findsOneWidget);
@@ -470,13 +477,22 @@ void main() {
       await _selectParticipant(
         tester,
         repository,
-        actionKey: 'relation-editor-select-related',
+        actionKey: 'relation-editor-select-source',
         catalogIndex: 1,
+        title: 'Быть здоровым',
+        index: 3,
+      );
+      await _selectParticipant(
+        tester,
+        repository,
+        actionKey: 'relation-editor-select-related',
+        catalogIndex: 2,
         title: 'Много ходить',
         index: 2,
       );
       await _selectType(tester, 'need');
 
+      expect(find.text('the source intention'), findsNothing);
       expect(find.text('the related intention'), findsNothing);
       expect(find.text('the relation type'), findsNothing);
       expect(find.text('a priority from P1 to P4'), findsOneWidget);
@@ -489,7 +505,7 @@ void main() {
   ) async {
     final repository = ControlledRelationFormRepository();
     addTearDown(repository.dispose);
-    await _openForm(tester, repository, RelationDirection.outgoing);
+    await _openForm(tester, repository, IntentionRelationGroup.needs);
     await _completeDraft(tester, repository);
 
     const description = '  Сохранить буквально\nвторая строка  ';
@@ -508,7 +524,7 @@ void main() {
   ) async {
     final repository = ControlledRelationFormRepository();
     addTearDown(repository.dispose);
-    await _openForm(tester, repository, RelationDirection.outgoing);
+    await _openForm(tester, repository, IntentionRelationGroup.needs);
     await _completeDraft(tester, repository);
 
     final tooLong = 'я' * (LongTermRelationDescription.maxGraphemeClusters + 1);
@@ -540,7 +556,7 @@ void main() {
       final router = await _openForm(
         tester,
         repository,
-        RelationDirection.outgoing,
+        IntentionRelationGroup.needs,
       );
       await _completeDraft(tester, repository);
       await tester.enterText(
@@ -617,7 +633,7 @@ void main() {
       final router = await _openForm(
         tester,
         repository,
-        RelationDirection.outgoing,
+        IntentionRelationGroup.needs,
       );
       await _completeDraft(tester, repository);
       await _occupySharedSurface(tester, repository);
@@ -675,7 +691,7 @@ void main() {
       final router = await _openForm(
         tester,
         repository,
-        RelationDirection.outgoing,
+        IntentionRelationGroup.needs,
       );
       await _completeDraft(tester, repository);
 
@@ -731,7 +747,7 @@ void main() {
       final router = await _openForm(
         tester,
         repository,
-        RelationDirection.outgoing,
+        IntentionRelationGroup.needs,
       );
       await _completeDraft(tester, repository);
 
@@ -1522,7 +1538,7 @@ void main() {
     await _openForm(
       tester,
       repository,
-      RelationDirection.outgoing,
+      IntentionRelationGroup.needs,
       locale: const Locale('ru'),
     );
 
@@ -1543,7 +1559,7 @@ void main() {
 
     final repository = ControlledRelationFormRepository();
     addTearDown(repository.dispose);
-    await _openForm(tester, repository, RelationDirection.outgoing);
+    await _openForm(tester, repository, IntentionRelationGroup.needs);
     final sourceSemantics = tester.getSemantics(
       find.byKey(const ValueKey('relation-editor-participant-source')),
     );
@@ -1585,7 +1601,7 @@ RelationParticipantSummary _participantSummary({
 Future<AppRouter> _openForm(
   WidgetTester tester,
   ControlledRelationFormRepository repository,
-  RelationDirection? direction, {
+  IntentionRelationGroup? group, {
   Locale? locale = const Locale('en'),
 }) async {
   // Высокая поверхность держит поля формы построенными без прокрутки.
@@ -1620,11 +1636,11 @@ Future<AppRouter> _openForm(
   unawaited(
     router.push(
       RelationEditorRoute(
-        editorContext: switch (direction) {
+        editorContext: switch (group) {
           null => const RelationBlankCreationContext(),
-          final direction => RelationCreationContext(
+          final group => RelationCreationContext(
             participant: _contextParticipant,
-            direction: direction,
+            group: group,
           ),
         },
       ),

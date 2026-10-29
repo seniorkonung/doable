@@ -7,7 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../daily_choice/presentation/daily_choice_command_failure_message.dart';
 import '../../data_transfer/presentation/graph_import_failure_message.dart';
-import '../application/delete_blocking_relations.dart';
 import '../../intention/application/intention_catalog.dart';
 import '../../intention/application/intention_result.dart';
 import '../../long_term_relation/application/long_term_relation_command.dart';
@@ -32,7 +31,8 @@ import 'graph_operation_message_plan.dart';
 /// с первого кадра, в котором сообщение видно.
 ///
 /// Что предъявлять, решает coordinator: ручная копия и операции тегов
-/// приходят сюда только отказом (ADR-0016).
+/// приходят сюда только отказом (ADR-0016), как и изменение текста намерения
+/// (ADR-0046).
 final class GraphOperationPresenter extends ConsumerStatefulWidget {
   const GraphOperationPresenter({required this.child, super.key});
 
@@ -307,14 +307,11 @@ GraphOperationMessage _messageFor(
   AppLocalizations localizations,
   GraphPresentableCompletion completion,
 ) => switch (completion) {
-  IntentionCommandCompletion() => GraphOperationMessage(
+  IntentionPresentableCompletion() => GraphOperationMessage(
     _intentionMessage(localizations, completion),
   ),
   LongTermRelationCommandCompletion() => GraphOperationMessage(
     _relationMessage(localizations, completion),
-  ),
-  BlockingRelationsDeleteCompletion() => GraphOperationMessage(
-    _blockingRelationsDeleteMessage(localizations, completion),
   ),
   DailyChoiceCommandCompletion() => GraphOperationMessage(
     _dailyChoiceMessage(localizations, completion),
@@ -428,32 +425,9 @@ String _dailyChoiceMessage(
   },
 );
 
-String _blockingRelationsDeleteMessage(
-  AppLocalizations localizations,
-  BlockingRelationsDeleteCompletion completion,
-) => localizations.graphOperationMessage(
-  localizations.graphOperationDeleteBlockingRelations,
-  completion.presentationTitle,
-  switch (completion.result) {
-    GraphResultSuccess() => localizations.blockingRelationsDeleted,
-    GraphResultFailure(:final failure) => switch (failure) {
-      DeleteBlockingRelationsIntentionNotFoundFailure() =>
-        localizations.blockingRelationsDeleteIntentionNotFound,
-      DeleteBlockingRelationsSelectionConflictFailure() =>
-        localizations.blockingRelationsDeleteConflict,
-      DeleteBlockingRelationsUnavailableFailure() =>
-        localizations.blockingRelationsDeleteUnavailable,
-      DeleteBlockingRelationsCorruptionFailure() =>
-        localizations.blockingRelationsDeleteCorruption,
-      DeleteBlockingRelationsUnexpectedFailure() =>
-        localizations.blockingRelationsDeleteUnexpected,
-    },
-  },
-);
-
 String _intentionMessage(
   AppLocalizations localizations,
-  IntentionCommandCompletion completion,
+  IntentionPresentableCompletion completion,
 ) {
   final operation = switch (completion.kind) {
     IntentionCommandKind.create => localizations.graphOperationCreate,
@@ -553,7 +527,7 @@ String _relationOutcomeFor(
 
 String _intentionOutcomeFor(
   AppLocalizations localizations,
-  IntentionCommandCompletion completion,
+  IntentionPresentableCompletion completion,
 ) => switch (completion.result) {
   ResultSuccess(:final value) => _successFor(
     localizations,
@@ -574,29 +548,21 @@ String _successFor(
 ) => switch ((kind, success)) {
   (IntentionCommandKind.create, IntentionSaved()) =>
     localizations.editorCreated,
-  (IntentionCommandKind.update, IntentionSaved()) => localizations.detailsSaved,
-  (IntentionCommandKind.enableReadiness, IntentionSaved()) =>
-    localizations.detailsReadinessEnabled,
-  (IntentionCommandKind.disableReadiness, IntentionSaved()) =>
-    localizations.detailsReadinessDisabled,
-  (IntentionCommandKind.archive, IntentionSaved()) =>
-    localizations.detailsArchivedSuccess,
-  (IntentionCommandKind.restore, IntentionSaved()) =>
-    localizations.detailsRestoredSuccess,
+  (
+    IntentionCommandKind.update ||
+        IntentionCommandKind.enableReadiness ||
+        IntentionCommandKind.disableReadiness ||
+        IntentionCommandKind.archive ||
+        IntentionCommandKind.restore,
+    _,
+  ) =>
+    throw StateError(
+      'Успех этой операции намерения не образует права предъявления.',
+    ),
   (IntentionCommandKind.delete, IntentionDeleted()) =>
     localizations.detailsDeleted,
   (IntentionCommandKind.create, IntentionDeleted()) =>
     localizations.editorCreateUnexpected,
-  (IntentionCommandKind.update, IntentionDeleted()) =>
-    localizations.detailsUpdateUnexpected,
-  (
-    IntentionCommandKind.enableReadiness ||
-        IntentionCommandKind.disableReadiness ||
-        IntentionCommandKind.archive ||
-        IntentionCommandKind.restore,
-    IntentionDeleted(),
-  ) =>
-    localizations.detailsStateChangeUnexpected,
   (IntentionCommandKind.delete, IntentionSaved()) =>
     localizations.detailsDeleteUnexpected,
 };

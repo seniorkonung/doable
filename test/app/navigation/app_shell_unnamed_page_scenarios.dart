@@ -131,7 +131,7 @@ void _registerUnnamedPageTests() {
     await _select(tester, AppDestination.intentionGraph);
     await _open(
       tester,
-      _summary(IntentionCatalogPage, 'Читать'),
+      _summary(IntentionCatalogPage, 'Гулять'),
       IntentionDetailsPage,
     );
     _expectAboveShell(
@@ -140,23 +140,16 @@ void _registerUnnamedPageTests() {
       AppDestination.intentionGraph,
       expectedPanel: true,
     );
-    await _tap(tester, find.byKey(const ValueKey('intention-details-delete')));
-    await _until(tester, find.byType(AlertDialog));
+    await _tap(tester, intentionOptionsButton);
+    await _tap(tester, intentionOption(IntentionOption.delete));
+    await _until(tester, find.byType(Dialog));
     await tester.pumpAndSettle();
     expect(_destinations.hitTestable(), findsNothing);
     expect(_announcedDestinations, findsNothing);
-    expect(
-      find.byKey(const ValueKey('intention-details-edit')).hitTestable(),
-      findsNothing,
-    );
-    expect(
-      find
-          .byKey(const ValueKey('intention-details-confirm-delete'))
-          .hitTestable(),
-      findsOneWidget,
-    );
+    expect(intentionOptionsButton.hitTestable(), findsNothing);
+    expect(intentionDeletionConfirm.hitTestable(), findsOneWidget);
     await tester.binding.handlePopRoute();
-    await _gone(tester, AlertDialog);
+    await _gone(tester, Dialog);
     _expectAboveShell(
       tester,
       IntentionDetailsPage,

@@ -313,11 +313,6 @@ final class IntentionDetailReadDiagnosticsEvent extends DiagnosticsEvent {
     : super(status);
 }
 
-final class RelationCountsReadDiagnosticsEvent extends DiagnosticsEvent {
-  const RelationCountsReadDiagnosticsEvent({required DiagnosticsStatus status})
-    : super(status);
-}
-
 final class RelationGroupPageReadDiagnosticsEvent extends DiagnosticsEvent {
   const RelationGroupPageReadDiagnosticsEvent({
     required this.pageSize,
@@ -347,12 +342,6 @@ final class DailyChoiceGroupPageReadDiagnosticsEvent extends DiagnosticsEvent {
 final class LongTermRelationDetailReadDiagnosticsEvent
     extends DiagnosticsEvent {
   const LongTermRelationDetailReadDiagnosticsEvent({
-    required DiagnosticsStatus status,
-  }) : super(status);
-}
-
-final class SelectedRelationsReadDiagnosticsEvent extends DiagnosticsEvent {
-  const SelectedRelationsReadDiagnosticsEvent({
     required DiagnosticsStatus status,
   }) : super(status);
 }
@@ -407,12 +396,6 @@ final class LongTermRelationCommandDiagnosticsEvent extends DiagnosticsEvent {
   }) : super(status);
 
   final LongTermRelationCommandDiagnosticsType commandType;
-}
-
-final class BlockingRelationsDeleteDiagnosticsEvent extends DiagnosticsEvent {
-  const BlockingRelationsDeleteDiagnosticsEvent({
-    required DiagnosticsStatus status,
-  }) : super(status);
 }
 
 /// Этап записи снимка графа.

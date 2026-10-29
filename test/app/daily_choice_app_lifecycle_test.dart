@@ -26,7 +26,6 @@ import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
-import 'package:doable/src/graph/application/selected_relations.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_details.dart';
@@ -35,7 +34,6 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_id_generator.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
-import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/statistics/application/statistics_read_contract.dart';
@@ -537,82 +535,6 @@ void main() {
         find.byKey(const ValueKey('graph-operation-message')),
         findsNothing,
       );
-
-      expectDailyChoicesRootPage(ready.container.read(appRouterProvider));
-      await openIntentionGraph(
-        tester,
-        waitFor: (tester, finder) =>
-            _until(tester, () => finder.evaluate().isNotEmpty),
-        content: find.text('Намерение 1'),
-      );
-      expectIntentionGraphRootPage(ready.container.read(appRouterProvider));
-      await _tap(tester, find.text('Намерение 1').first);
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('intention-details-delete')),
-      );
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('intention-details-confirm-delete')),
-      );
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('intention-details-show-blocking-relations')),
-      );
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('relation-neighborhood-daily-source')),
-      );
-      await _tap(
-        tester,
-        find.byKey(
-          ValueKey('relation-neighborhood-select-daily-${durabilityUuid(201)}'),
-        ),
-      );
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('relation-neighborhood-type-can')),
-      );
-      await _tap(
-        tester,
-        find.byKey(
-          ValueKey('relation-neighborhood-select-${durabilityUuid(104)}'),
-        ),
-      );
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('blocking-relations-review')),
-      );
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('blocking-relations-confirm-delete')),
-      );
-      await _until(
-        tester,
-        () => _storedIds(harness, 'daily_choices').length == 1,
-      );
-      expect(
-        (await repository.getDailyChoice(
-          durabilityChoice(201),
-        ) as DailyChoiceReadSuccess).value.value,
-        isNull,
-      );
-      expect(
-        (await repository.getDailyChoice(
-          durabilityChoice(202),
-        ) as DailyChoiceReadSuccess).value.value,
-        isNotNull,
-      );
-      expect(_storedIds(harness, 'daily_choices'), {durabilityUuid(202)});
-      expect(
-        _storedIds(harness, 'long_term_relations'),
-        contains(durabilityUuid(101)),
-      );
-      expect(
-        _storedIds(harness, 'long_term_relations'),
-        isNot(contains(durabilityUuid(104))),
-      );
-      expect(_storedIds(harness, 'intentions'), hasLength(5));
     },
   );
 
@@ -1052,11 +974,6 @@ final class _ObservedRepository implements PersonalGraphRepository {
   ) => _delegate.watchIntention(id);
 
   @override
-  Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
-    IntentionId intentionId,
-  ) => _delegate.getRelationCounts(intentionId);
-
-  @override
   Future<RelationGroupPageResult> getRelationGroupPage(
     RelationGroupPageQuery query,
   ) => _delegate.getRelationGroupPage(query);
@@ -1064,16 +981,6 @@ final class _ObservedRepository implements PersonalGraphRepository {
   @override
   Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) =>
       _delegate.watchRelation(id);
-
-  @override
-  Future<SelectedRelationsReadResult> getSelectedRelations(
-    SelectedRelationsQuery query,
-  ) => _delegate.getSelectedRelations(query);
-
-  @override
-  Stream<SelectedRelationsReadResult> watchSelectedRelations(
-    SelectedRelationsQuery query,
-  ) => _delegate.watchSelectedRelations(query);
 
   @override
   Future<ChoicePathContinuationResult> getChoicePathContinuations(

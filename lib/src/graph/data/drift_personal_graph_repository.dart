@@ -46,7 +46,6 @@ import '../../graph_snapshots/graph_snapshot_store.dart'
 import '../../intention/application/intention_command.dart';
 import '../../intention/application/intention_id_generator.dart';
 import '../../intention/application/intention_catalog.dart';
-import '../../intention/application/intention_description_preview.dart';
 import '../../intention/application/intention_details.dart';
 import '../../intention/application/intention_result.dart';
 import '../../intention/application/title_search_key.dart';
@@ -64,6 +63,7 @@ import '../../long_term_relation/domain/long_term_relation.dart'
 import '../../long_term_relation/domain/long_term_relation_description.dart';
 import '../../long_term_relation/domain/long_term_relation_id.dart';
 import '../../shared/diagnostics/diagnostics_sink.dart';
+import '../../shared/domain/text_preview.dart';
 import '../../statistics/application/contribution_counts.dart';
 import '../../statistics/application/intention_statistics_breakdown.dart';
 import '../../statistics/application/intention_statistics_calendar.dart';
@@ -81,13 +81,10 @@ import '../../tag/domain/tag.dart' as tag_domain;
 import '../../tag/domain/tag_assignment.dart';
 import '../../tag/domain/tag_id.dart';
 import '../../tag/domain/tag_position.dart';
-import '../application/blocking_relation_reference.dart';
-import '../application/delete_blocking_relations.dart';
 import '../application/graph_change.dart';
 import '../application/graph_command_result.dart';
 import '../application/graph_revision.dart';
 import '../application/personal_graph_repository.dart';
-import '../application/selected_relations.dart';
 import 'drift_relation_count_aggregates.dart';
 import 'contribution_reachability.dart';
 import 'graph_fact_capture.dart';
@@ -104,10 +101,8 @@ part 'drift_personal_graph_repository_daily_choice_catalog.dart';
 part 'drift_personal_graph_repository_daily_choice_day_statuses.dart';
 part 'drift_personal_graph_repository_daily_choice_commands.dart';
 part 'drift_personal_graph_repository_relation_commands.dart';
-part 'drift_personal_graph_repository_blocking_relations.dart';
 part 'drift_personal_graph_repository_relation_details.dart';
 part 'drift_personal_graph_repository_relation_groups.dart';
-part 'drift_personal_graph_repository_selected_relations.dart';
 part 'drift_personal_graph_repository_choice_path_reads.dart';
 part 'drift_personal_graph_repository_tag_reads.dart';
 part 'drift_personal_graph_repository_tag_commands.dart';
@@ -168,8 +163,6 @@ final class DriftPersonalGraphRepository
   _dailyChoiceWatchers = {};
   final Map<LongTermRelationId, Set<_RelationWatchRegistration>>
   _relationWatchers = {};
-  final Set<_SelectedRelationsWatchRegistration> _selectedRelationsWatchers =
-      {};
   var _mutationSequence = 0;
   var _lastRelationChangeSequence = 0;
   ContributionRelationGraph? _statisticsRelationSnapshot;
@@ -390,52 +383,6 @@ final class DriftPersonalGraphRepository
   }
 
   @override
-  Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
-    IntentionId intentionId,
-  ) async {
-    final stopwatch = Stopwatch()..start();
-    _recordDiagnostics(
-      const RelationCountsReadDiagnosticsEvent(status: DiagnosticsStarted()),
-    );
-
-    try {
-      final snapshot = await _sequencer.run(
-        () => _database.transaction(() async {
-          final exists = await _database
-              .customSelect(
-                'SELECT 1 FROM intentions WHERE id = ?',
-                variables: [Variable<String>(intentionId.toCanonicalString())],
-                readsFrom: {_database.intentions},
-              )
-              .getSingleOrNull();
-          if (exists == null) throw const _IntentionNotFound();
-          return GraphSnapshot(
-            value: await _readVerifiedRelationCounts(intentionId),
-            revision: _currentRevision,
-          );
-        }),
-      );
-      _recordDiagnostics(
-        RelationCountsReadDiagnosticsEvent(
-          status: DiagnosticsSucceeded(stopwatch.elapsed),
-        ),
-      );
-      return ResultSuccess(snapshot);
-    } on Object catch (error) {
-      final failure = _classifyRelationCountsReadFailure(error);
-      _recordDiagnostics(
-        RelationCountsReadDiagnosticsEvent(
-          status: DiagnosticsFailed(
-            duration: stopwatch.elapsed,
-            code: _diagnosticsFailureCode(failure),
-          ),
-        ),
-      );
-      return ResultFailure(failure);
-    }
-  }
-
-  @override
   Future<RelationGroupPageResult> getRelationGroupPage(
     RelationGroupPageQuery query,
   ) => _readRelationGroupPage(query);
@@ -443,16 +390,6 @@ final class DriftPersonalGraphRepository
   @override
   Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) =>
       _watchRelation(id);
-
-  @override
-  Future<SelectedRelationsReadResult> getSelectedRelations(
-    SelectedRelationsQuery query,
-  ) => _readSelectedRelations(query);
-
-  @override
-  Stream<SelectedRelationsReadResult> watchSelectedRelations(
-    SelectedRelationsQuery query,
-  ) => _watchSelectedRelations(query);
 
   @override
   Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(
@@ -591,8 +528,6 @@ final class DriftPersonalGraphRepository
       ),
       final LongTermRelationCommand relationCommand =>
         await _executeLongTermRelation(relationCommand),
-      final DeleteBlockingRelations deleteCommand =>
-        await _executeDeleteBlockingRelations(deleteCommand),
       final DailyChoiceCommand dailyChoiceCommand => await _executeDailyChoice(
         dailyChoiceCommand,
       ),
@@ -785,7 +720,6 @@ final class DriftPersonalGraphRepository
     _notifyIntentionWatchersFor(stableChanges);
     _notifyDailyChoiceWatchersFor(stableChanges);
     _notifyRelationWatchersFor(stableChanges);
-    _notifySelectedRelationsWatchersFor(stableChanges);
   }
 
   /// Создаёт намерение вместе с полным начальным состоянием команды.
@@ -1444,9 +1378,7 @@ final class DriftPersonalGraphRepository
     id: intention.id,
     title: intention.title,
     descriptionPreview: switch (intention.description) {
-      final description? => IntentionDescriptionPreview.fromDescription(
-        description,
-      ),
+      final description? => TextPreview.fromText(description),
       null => null,
     },
     readiness: intention.readiness,
@@ -1843,13 +1775,6 @@ IntentionFailure _classifyDetailReadFailure(Object error) {
 
 IntentionFailure _classifyCatalogReadFailure(Object error) =>
     _classifyDetailReadFailure(error);
-
-IntentionFailure _classifyRelationCountsReadFailure(Object error) {
-  if (error is _IntentionNotFound) {
-    return const IntentionNotFoundFailure();
-  }
-  return _classifyDetailReadFailure(error);
-}
 
 IntentionFailure _classifyCommandFailure(
   Object error,

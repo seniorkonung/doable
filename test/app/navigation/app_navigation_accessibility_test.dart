@@ -16,6 +16,7 @@ import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openInMemoryLocalDatabase;
 import 'package:doable/src/design_system/doable_icon.dart';
+import 'package:doable/src/design_system/components/top_bar.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
@@ -95,14 +96,21 @@ void main() {
         for (final name in names.values) {
           expect(find.byTooltip(name), findsOneWidget);
         }
-        final appBar = find.byType(AppBar);
-        final title = tester.widget<AppBar>(appBar).title!;
-        final rect = tester.getRect(find.byWidget(title));
+        final topBar = find.byType(TopBar);
+        final appBar = topBar.evaluate().isNotEmpty
+            ? topBar
+            : find.byType(AppBar);
+        final title = topBar.evaluate().isNotEmpty
+            ? find.bySemanticsLabel(tester.widget<TopBar>(topBar).routeName)
+            : find.byWidget(tester.widget<AppBar>(appBar).title!);
+        final rect = tester.getRect(title);
         expect(rect.top, greaterThanOrEqualTo(tester.getRect(appBar).top));
         expect(rect.bottom, lessThanOrEqualTo(tester.getRect(appBar).bottom));
+        expect(tester.getSemantics(title).flagsCollection.namesRoute, isTrue);
         expect(
-          tester.getSemantics(find.byWidget(title)).flagsCollection.isHeader,
-          isTrue,
+          tester.getSemantics(title).flagsCollection.isHeader,
+          topBar.evaluate().isEmpty ||
+              tester.widget<TopBar>(topBar).title != null,
         );
         expect(tester.takeException(), isNull);
       }

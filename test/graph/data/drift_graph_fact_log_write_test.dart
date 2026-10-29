@@ -4,7 +4,6 @@ import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show AppDatabase, GraphLogPackage;
-import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
@@ -225,13 +224,8 @@ void main() {
       repository.execute(DeleteDailyChoice(choice.id)),
       ['удаление дневного выбора'],
     );
-    await expectOnePackage<BlockingRelationsDeleted>(
-      repository.execute(
-        DeleteBlockingRelations.longTerm(
-          intentionId: source.id,
-          relationIds: [relation.id],
-        ),
-      ),
+    await expectOnePackage<LongTermRelationDeleted>(
+      repository.execute(DeleteLongTermRelation(relation.id)),
       ['удаление связи'],
     );
   });

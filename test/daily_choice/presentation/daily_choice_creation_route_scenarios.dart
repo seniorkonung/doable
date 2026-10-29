@@ -36,10 +36,12 @@ void _registerCreationRouteScenarios() {
           content: find.text('Основание'),
         );
         await _tap(tester, find.text('Основание').first);
+        await _tap(tester, find.text('Связи'));
         final createRelation = find.byKey(
-          const ValueKey('relation-neighborhood-create-relation'),
+          const ValueKey('intention-relations-add'),
         );
-        await _waitFor(tester, createRelation);
+        // Строка «Добавить» строится раньше, чем страница доезжает до места.
+        await _waitFor(tester, createRelation.hitTestable());
         await _tap(tester, createRelation.first);
         final description = find.byKey(
           const ValueKey('relation-editor-description'),

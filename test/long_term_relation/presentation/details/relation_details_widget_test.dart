@@ -15,7 +15,7 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../neighborhood/neighborhood_test_support.dart';
+import '../relation_graph_test_support.dart';
 import '../../../support/ordinary_page_test_app.dart';
 import 'relation_details_test_support.dart';
 

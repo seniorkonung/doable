@@ -1,46 +1,63 @@
 import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart' hide Badge, TextField;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../../../app/navigation/ordinary_page_scaffold.dart';
 import '../../../app/routing/app_router.gr.dart';
 import '../../../daily_choice/application/choice_path_draft.dart';
+import '../../../daily_choice/domain/calendar_date.dart';
 import '../../../daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import '../../../daily_choice/presentation/catalog/daily_choice_local_day_observer.dart';
-import '../../../graph/presentation/operation_failure_presentation.dart';
-import '../../application/intention_result.dart';
+import '../../../daily_choice/presentation/intention_choices/intention_choices_sliver.dart';
+import '../../../daily_choice/presentation/intention_choices/intention_choices_state.dart';
+import '../../../daily_choice/presentation/intention_choices/intention_choices_view_model.dart';
+import '../../../design_system/components/badge.dart';
+import '../../../design_system/components/button.dart';
+import '../../../design_system/components/confirm_dialog.dart';
+import '../../../design_system/components/option_tiles.dart';
+import '../../../design_system/components/options_menu.dart';
+import '../../../design_system/components/page_head.dart';
+import '../../../design_system/components/sheet.dart';
+import '../../../design_system/components/text_field.dart';
+import '../../../design_system/components/top_bar.dart';
+import '../../../design_system/doable_icon.dart';
+import '../../../design_system/doable_metrics.dart';
+import '../../../graph/application/graph_command_coordinator.dart';
 import '../../domain/intention.dart';
 import '../../domain/intention_id.dart';
-import '../../domain/intention_text.dart';
+import '../edit/intention_edit_page.dart';
 import '../../../long_term_relation/application/long_term_relation_projection.dart';
+import '../../../long_term_relation/application/relation_counts.dart';
 import '../../../long_term_relation/presentation/editor/relation_editor_state.dart';
-import '../../../long_term_relation/presentation/neighborhood/relation_neighborhood_sliver.dart';
-import '../../../long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart';
+import '../../../long_term_relation/presentation/intention_relations/intention_relations_sliver.dart';
+import '../../../long_term_relation/presentation/intention_relations/intention_relations_state.dart';
+import '../../../long_term_relation/presentation/intention_relations/intention_relations_view_model.dart';
 import '../../../tag/presentation/assignments/tag_assignments_section.dart';
-import '../../../tag/presentation/assignments/tag_assignments_state.dart';
-import '../../../tag/presentation/assignments/tag_assignments_view_model.dart';
 import '../../../tag/presentation/panel/tags_panel.dart';
 import '../../../tag/presentation/panel/tags_panel_context.dart';
-import '../../../statistics/application/intention_statistics_target.dart';
 import '../../../statistics/presentation/intention_statistics_section.dart';
 import '../../../statistics/presentation/intention_statistics_view_model.dart';
-import '../operation/operation_state.dart';
+import 'intention_dates.dart';
 import 'intention_details_state.dart';
 import 'intention_details_view_model.dart';
+import 'intention_details_tabs.dart';
+import 'intention_options.dart';
+import 'intention_page_target.dart';
 
 @RoutePage()
 final class IntentionDetailsPage extends ConsumerStatefulWidget {
   const IntentionDetailsPage({
     required this.intentionId,
-    this.statisticsTarget,
+    this.target = const OverviewTarget(),
     super.key,
   });
 
   final IntentionId intentionId;
-  final IntentionStatisticsTarget? statisticsTarget;
+  final IntentionPageTarget target;
 
   @override
   ConsumerState<IntentionDetailsPage> createState() =>
@@ -49,29 +66,103 @@ final class IntentionDetailsPage extends ConsumerStatefulWidget {
 
 final class _IntentionDetailsPageState
     extends ConsumerState<IntentionDetailsPage> {
-  final _neighborhoodKey = GlobalKey();
-  final _statisticsKey = GlobalKey();
-  var _statisticsPageKey = Object();
+  final _headKey = GlobalKey();
+  final _scrollController = ScrollController();
+  final _headHidden = ValueNotifier(false);
+  double? _headExtent;
+  var _headMeasurementScheduled = false;
+  late IntentionPageInstance _pageInstance;
   late final DailyChoiceLocalDayObserver _localDay;
-  var _visible = false;
-  var _statisticsOpeningScheduled = false;
-  var _selectionMode = false;
+  var _routeIsCurrent = false;
+  late IntentionDetailsTab _selectedTab;
+  ProviderSubscription<IntentionRelationsState>? _relationsSubscription;
+  ProviderSubscription<IntentionChoicesState>? _choicesSubscription;
 
   IntentionStatisticsViewModelProvider get _statisticsProvider =>
       intentionStatisticsViewModelProvider(
         widget.intentionId,
-        _statisticsPageKey,
-        target: widget.statisticsTarget,
+        _pageInstance,
+        target: switch (_pageInstance.target) {
+          StatisticsTarget(:final statistics) => statistics,
+          OverviewTarget() || RelationsTarget() || ChoicesTarget() => null,
+        },
       );
+
+  IntentionRelationsViewModelProvider get _relationsProvider =>
+      intentionRelationsViewModelProvider(widget.intentionId, _pageInstance);
 
   @override
   void initState() {
     super.initState();
+    _startPageInstance();
+    _scrollController.addListener(_syncHeadHidden);
     _localDay = DailyChoiceLocalDayObserver(
       readLocalDay: ref.read(dailyChoiceLocalDateSourceProvider),
-      onTodayChanged: () =>
-          ref.read(_statisticsProvider.notifier).setLocalDate(_localDay.today),
+      onTodayChanged: () {
+        ref.read(_statisticsProvider.notifier).setLocalDate(_localDay.today);
+        // Строка дат «Обзора» называет год по сегодняшнему дню.
+        setState(() {});
+      },
     );
+  }
+
+  void _startPageInstance() {
+    _pageInstance = IntentionPageInstance(target: widget.target);
+    _selectedTab = switch (_pageInstance.target) {
+      OverviewTarget() => IntentionDetailsTab.overview,
+      RelationsTarget() => IntentionDetailsTab.relations,
+      ChoicesTarget() => IntentionDetailsTab.choices,
+      StatisticsTarget() => IntentionDetailsTab.statistics,
+    };
+    _syncRelationsRetention();
+    _syncChoicesRetention();
+  }
+
+  /// Модель «Связей» живёт, только пока вкладка выбрана, в том числе под
+  /// открытыми над страницей страницами. Группа и раскрытие архивов
+  /// остаются в экземпляре страницы. Первую модель экземпляра настраивают
+  /// полученные подробные данные, поэтому до них модель не создаётся.
+  void _syncRelationsRetention() {
+    if (_selectedTab != IntentionDetailsTab.relations) {
+      _relationsSubscription?.close();
+      _relationsSubscription = null;
+      return;
+    }
+    if (_relationsSubscription != null ||
+        ref.read(intentionDetailsViewModelProvider(widget.intentionId))
+            is! IntentionDetailsLoaded) {
+      return;
+    }
+    // https://pub.dev/documentation/flutter_riverpod/latest/flutter_riverpod/WidgetRef/listenManual.html
+    _relationsSubscription = ref.listenManual(_relationsProvider, (_, _) {});
+  }
+
+  /// Модель «Выборов» живёт, только пока вкладка выбрана, в том числе под
+  /// открытыми над страницей страницами. Роль остаётся в экземпляре страницы.
+  void _syncChoicesRetention() {
+    if (_selectedTab == IntentionDetailsTab.choices) {
+      _choicesSubscription ??= ref.listenManual(
+        intentionChoicesViewModelProvider(widget.intentionId, _pageInstance),
+        (_, _) {},
+      );
+    } else {
+      _choicesSubscription?.close();
+      _choicesSubscription = null;
+    }
+  }
+
+  void _selectTab(IntentionDetailsTab tab) {
+    if (tab == _selectedTab) return;
+    if (_headHidden.value) {
+      // https://api.flutter.dev/flutter/widgets/ScrollController/jumpTo.html
+      _scrollController.jumpTo(_headExtent!);
+    }
+    setState(() {
+      _selectedTab = tab;
+    });
+    _syncRelationsRetention();
+    _syncChoicesRetention();
+    _syncStatisticsVisibility();
   }
 
   @override
@@ -79,8 +170,21 @@ final class _IntentionDetailsPageState
     super.didChangeDependencies();
     // Учитывает также диалоги и удаление маршрута до конца его анимации.
     // https://api.flutter.dev/flutter/widgets/ModalRoute/isCurrentOf.html
-    _visible = ModalRoute.isCurrentOf(context) == true;
+    _routeIsCurrent = ModalRoute.isCurrentOf(context) == true;
     _syncStatisticsVisibility();
+    if (_routeIsCurrent) _refreshOperationRunning();
+  }
+
+  /// Пока страница была скрыта, например экраном изменения, координатор мог
+  /// принять команду намерения не от её модели. Блок тегов перечитывает
+  /// занятость в перестройке, которую вызывает новое состояние модели.
+  void _refreshOperationRunning() {
+    scheduleMicrotask(() {
+      if (!mounted) return;
+      ref
+          .read(intentionDetailsViewModelProvider(widget.intentionId).notifier)
+          .refreshOperationRunning();
+    });
   }
 
   void _syncStatisticsVisibility() {
@@ -88,64 +192,128 @@ final class _IntentionDetailsPageState
       if (!mounted) return;
       final model = ref.read(_statisticsProvider.notifier);
       model.setLocalDate(_localDay.today);
-      model.setVisible(_visible);
+      model.setVisible(
+        _routeIsCurrent && _selectedTab == IntentionDetailsTab.statistics,
+      );
     });
   }
 
   @override
   void dispose() {
     _localDay.dispose();
+    _scrollController.dispose();
+    _headHidden.dispose();
     super.dispose();
+  }
+
+  void _syncHeadHidden() {
+    final extent = _headExtent;
+    _headHidden.value =
+        extent != null &&
+        _scrollController.hasClients &&
+        _scrollController.offset >= extent;
+  }
+
+  void _scheduleHeadMeasurement() {
+    if (_headMeasurementScheduled) return;
+    _headMeasurementScheduled = true;
+    // Первую высоту и изменения размера читаем после завершения раскладки:
+    // https://api.flutter.dev/flutter/widgets/SizeChangedLayoutNotifier-class.html
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _headMeasurementScheduled = false;
+      if (!mounted) return;
+      _headExtent = _headKey.currentContext?.size?.height;
+      _syncHeadHidden();
+    });
+  }
+
+  /// Модель могла ещё не отразить команду, которую координатор принял не от
+  /// этой страницы, поэтому перед открытием занятость читается у него.
+  /// Отклонённое так нажатие делает модель видимо занятой.
+  void _openEdit(IntentionEditFocus focus) {
+    final intentionId = widget.intentionId;
+    final details = ref.read(intentionDetailsViewModelProvider(intentionId));
+    if (details is! IntentionDetailsLoaded || !_canOpenEdit(details)) {
+      return;
+    }
+    if (ref
+        .read(graphCommandCoordinatorProvider.notifier)
+        .isRunning(intentionId)) {
+      ref
+          .read(intentionDetailsViewModelProvider(intentionId).notifier)
+          .refreshOperationRunning();
+      return;
+    }
+    unawaited(
+      context.router.push(
+        IntentionEditRoute(intentionId: intentionId, focus: focus),
+      ),
+    );
+  }
+
+  bool _canOpenEdit(IntentionDetailsLoaded loaded) =>
+      !loaded.isOperationRunning && !loaded.isAwaitingConfirmedSnapshot;
+  Widget _buildHead(IntentionDetailsLoaded loaded) {
+    final localizations = AppLocalizations.of(context);
+    final name = loaded.intention.title;
+    final archived =
+        loaded.intention.archiveState == IntentionArchiveState.archived;
+    _scheduleHeadMeasurement();
+    return NotificationListener<SizeChangedLayoutNotification>(
+      onNotification: (_) {
+        _scheduleHeadMeasurement();
+        return false;
+      },
+      child: SizeChangedLayoutNotifier(
+        key: _headKey,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: DoableMetrics.space5),
+          child: PageHead(
+            key: const ValueKey('intention-details-title'),
+            name: name,
+            editLabel: localizations.detailsEditTitleLabel(name),
+            onEdit: _canOpenEdit(loaded)
+                ? () => _openEdit(IntentionEditFocus.title)
+                : null,
+            muted: archived,
+            badge: archived
+                ? Badge.archived(word: localizations.detailsArchivedBadge)
+                : null,
+            note: archived ? localizations.detailsArchivedNote : null,
+            button: archived
+                ? Button.quietBlock(
+                    key: const ValueKey('intention-details-head-restore'),
+                    label: localizations.detailsRestoreFromArchiveAction,
+                    onPressed: loaded.isOperationRunning
+                        ? null
+                        : ref
+                              .read(
+                                intentionDetailsViewModelProvider(
+                                  widget.intentionId,
+                                ).notifier,
+                              )
+                              .restore,
+                  )
+                : null,
+          ),
+        ),
+      ),
+    );
   }
 
   @override
   void didUpdateWidget(covariant IntentionDetailsPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.intentionId != widget.intentionId) {
-      _selectionMode = false;
-      _statisticsPageKey = Object();
-      _statisticsOpeningScheduled = false;
+      _relationsSubscription?.close();
+      _relationsSubscription = null;
+      _choicesSubscription?.close();
+      _choicesSubscription = null;
+      _startPageInstance();
+      _headExtent = null;
+      _headHidden.value = false;
       _syncStatisticsVisibility();
     }
-  }
-
-  void _openStatisticsAfterLoad(IntentionDetailsState details) {
-    if (widget.statisticsTarget == null ||
-        _statisticsOpeningScheduled ||
-        details is! IntentionDetailsLoaded) {
-      return;
-    }
-    // Высота тегов над разделом меняется после начальной загрузки.
-    if (ref.watch(tagAssignmentsViewModelProvider(widget.intentionId))
-        is TagAssignmentsInitialLoading) {
-      return;
-    }
-    _statisticsOpeningScheduled = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final sectionContext = _statisticsKey.currentContext;
-      if (sectionContext == null) return;
-      // Цель применяется единожды, после размещения загруженной страницы.
-      // https://api.flutter.dev/flutter/widgets/Scrollable/ensureVisible.html
-      unawaited(Scrollable.ensureVisible(sectionContext));
-    });
-  }
-
-  void _showBlockingRelations() {
-    ref
-        .read(
-          relationNeighborhoodViewModelProvider(widget.intentionId).notifier,
-        )
-        .showBlockingRelations();
-    setState(() => _selectionMode = true);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final neighborhoodContext = _neighborhoodKey.currentContext;
-      if (mounted && neighborhoodContext != null) {
-        unawaited(
-          Scrollable.ensureVisible(neighborhoodContext, alignment: 0.05),
-        );
-      }
-    });
   }
 
   Future<void> _delete() async {
@@ -167,21 +335,124 @@ final class _IntentionDetailsPageState
     }
   }
 
+  /// Лист закрывается до начала действия, поэтому оно начинается уже на
+  /// странице (ADR-0042). Выбор приходит после анимации закрытия, когда
+  /// страница уже принимает нажатия, поэтому поздний выбор отбрасывается,
+  /// если над страницей уже что-то открыто или она уходит.
+  Future<void> _openOptions() async {
+    final provider = intentionDetailsViewModelProvider(widget.intentionId);
+    final option = await showDoableSheet<IntentionOption>(
+      context: context,
+      builder: (context, sheet) =>
+          _IntentionOptionsSheet(sheet: sheet, provider: provider),
+    );
+    if (option == null ||
+        !mounted ||
+        !(ModalRoute.isCurrentOf(context) ?? false)) {
+      return;
+    }
+    final model = ref.read(provider.notifier);
+    switch (option) {
+      case IntentionOption.edit:
+        _openEdit(IntentionEditFocus.title);
+      case IntentionOption.archive:
+        model.archive();
+      case IntentionOption.restore:
+        model.restore();
+      case IntentionOption.delete:
+        await _confirmDeletion();
+    }
+  }
+
+  Future<void> _confirmDeletion() async {
+    final details = ref.read(
+      intentionDetailsViewModelProvider(widget.intentionId),
+    );
+    if (details is! IntentionDetailsLoaded) return;
+    final localizations = AppLocalizations.of(context);
+    final confirmed = await showConfirmDialog(
+      context: context,
+      title: localizations.detailsDeleteDialogTitle,
+      text: ConfirmDialogText(
+        before: localizations.detailsDeleteDialogTextBefore,
+        name: details.intention.title,
+        after: localizations.detailsDeleteDialogTextAfter,
+      ),
+      cancelLabel: localizations.detailsDeleteDialogCancel,
+      actionLabel: localizations.detailsDeleteDialogConfirm,
+    );
+    if (confirmed) await _delete();
+  }
+
   @override
   Widget build(BuildContext context) {
     final intentionId = widget.intentionId;
     final localizations = AppLocalizations.of(context);
     final provider = intentionDetailsViewModelProvider(intentionId);
     final details = ref.watch(provider);
+    ref.listen(provider, (_, _) => _syncRelationsRetention());
     // Подписка принадлежит странице, в том числе пока её данные загружаются.
     ref.watch(_statisticsProvider);
-    _openStatisticsAfterLoad(details);
-    // Открытие страницы одновременно начинает только начальную группу
-    // соседства; сам sliver переиспользует это состояние после загрузки
-    // подробных данных намерения.
-    ref.watch(relationNeighborhoodViewModelProvider(intentionId));
+    // Пока модель «Связей» существует, число вкладки берётся из её
+    // опубликованного состояния, чтобы не расходиться с плитками и списком.
+    final relationCounts = _relationsSubscription == null
+        ? null
+        : ref.watch(
+            _relationsProvider.select(
+              (state) => switch (state) {
+                IntentionRelationsConfirmed(:final counts) => counts,
+                IntentionRelationsInitialLoad() ||
+                IntentionRelationsInitialFailure() ||
+                IntentionRelationsIntentionNotFound() => null,
+              },
+            ),
+          );
     return OrdinaryPageScaffold(
-      appBar: AppBar(title: Text(localizations.detailsTitle)),
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(DoableMetrics.tapMin),
+        // Флаг прокрутки перестраивает только панель, сохраняя тело страницы:
+        // https://api.flutter.dev/flutter/widgets/ValueListenableBuilder-class.html
+        child: ValueListenableBuilder(
+          valueListenable: _headHidden,
+          builder: (context, headHidden, _) {
+            final backLabel = MaterialLocalizations.of(context)
+                .backButtonTooltip;
+            void onBack() => context.router.pop();
+            if (details is! IntentionDetailsLoaded) {
+              return TopBar.withoutTitle(
+                routeName: localizations.detailsTitle,
+                backLabel: backLabel,
+                onBack: onBack,
+              );
+            }
+            final intention = details.intention;
+            final (type, typeIcon) = switch (intention.readiness) {
+              IntentionReadiness.ready => (
+                localizations.detailsTypeAction,
+                DoableIconData.bolt,
+              ),
+              IntentionReadiness.notReady => (
+                localizations.detailsTypeIntention,
+                DoableIconData.intention,
+              ),
+            };
+            return TopBar.back(
+              title: headHidden ? intention.title : type,
+              titleIcon: headHidden ? null : typeIcon,
+              muted:
+                  headHidden &&
+                  intention.archiveState == IntentionArchiveState.archived,
+              backLabel: backLabel,
+              onBack: onBack,
+              action: TopBarAction(
+                icon: DoableIconData.more,
+                label: localizations.detailsOptionsLabel,
+                onPressed: () => unawaited(_openOptions()),
+              ),
+            );
+          },
+        ),
+      ),
       body: SafeArea(
         child: Column(
           children: [
@@ -190,20 +461,58 @@ final class _IntentionDetailsPageState
               child: _DetailsContent(
                 intentionId: intentionId,
                 state: details,
-                selectionMode: _selectionMode,
-                neighborhoodKey: _neighborhoodKey,
+                scrollController: _scrollController,
+                buildHead: _buildHead,
+                onEditDescription:
+                    details is IntentionDetailsLoaded && _canOpenEdit(details)
+                    ? () => _openEdit(IntentionEditFocus.description)
+                    : null,
+                headHidden: _headHidden,
+                today: _localDay.today,
+                selectedTab: _selectedTab,
+                onSelectTab: _selectTab,
+                pageInstance: _pageInstance,
+                relationCounts: relationCounts,
                 statisticsSection: IntentionStatisticsSectionSliver(
-                  key: _statisticsKey,
                   provider: _statisticsProvider,
                 ),
-                onShowBlockingRelations: _showBlockingRelations,
-                onDelete: _delete,
               ),
             ),
           ],
         ),
       ),
     );
+  }
+}
+
+/// Лист «Намерение» следит за снимком страницы: операция, начатая или
+/// завершённая при открытом листе, сразу меняет доступность пунктов.
+final class _IntentionOptionsSheet extends ConsumerWidget {
+  const _IntentionOptionsSheet({required this.sheet, required this.provider});
+
+  final SheetPresentation sheet;
+  final IntentionDetailsViewModelProvider provider;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final route = ModalRoute.of(context);
+    ref.listen(provider, (_, next) {
+      // Без подробных данных параметрам не к чему относиться. Лист, который
+      // уже закрывается, не текущий, и страницу под ним это не закрывает.
+      if (next is! IntentionDetailsLoaded && (route?.isCurrent ?? false)) {
+        Navigator.of(context).pop();
+      }
+    });
+    final localizations = AppLocalizations.of(context);
+    return switch (ref.watch(provider)) {
+      final IntentionDetailsLoaded loaded => OptionsMenu<IntentionOption>(
+        sheet,
+        title: localizations.detailsOptionsTitle,
+        items: intentionOptions(localizations, loaded),
+      ),
+      // Лист уже закрывается вслед за утратой данных.
+      _ => const SizedBox.shrink(),
+    };
   }
 }
 
@@ -237,20 +546,30 @@ final class _DetailsContent extends ConsumerWidget {
   const _DetailsContent({
     required this.intentionId,
     required this.state,
-    required this.selectionMode,
-    required this.neighborhoodKey,
+    required this.scrollController,
+    required this.buildHead,
+    required this.onEditDescription,
+    required this.headHidden,
+    required this.today,
+    required this.selectedTab,
+    required this.onSelectTab,
+    required this.pageInstance,
+    required this.relationCounts,
     required this.statisticsSection,
-    required this.onShowBlockingRelations,
-    required this.onDelete,
   });
 
   final IntentionId intentionId;
   final IntentionDetailsState state;
-  final bool selectionMode;
-  final GlobalKey neighborhoodKey;
+  final ScrollController scrollController;
+  final Widget Function(IntentionDetailsLoaded loaded) buildHead;
+  final VoidCallback? onEditDescription;
+  final ValueListenable<bool> headHidden;
+  final CalendarDate today;
+  final IntentionDetailsTab selectedTab;
+  final ValueChanged<IntentionDetailsTab> onSelectTab;
+  final IntentionPageInstance pageInstance;
+  final RelationCounts? relationCounts;
   final Widget statisticsSection;
-  final VoidCallback onShowBlockingRelations;
-  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -262,52 +581,22 @@ final class _DetailsContent extends ConsumerWidget {
       ),
       final IntentionDetailsLoaded loaded => _LoadedDetails(
         state: loaded,
-        selectionMode: selectionMode,
-        neighborhoodKey: neighborhoodKey,
+        scrollController: scrollController,
+        pageHead: buildHead(loaded),
+        onEditDescription: onEditDescription,
+        headHidden: headHidden,
+        today: today,
+        selectedTab: selectedTab,
+        onSelectTab: onSelectTab,
+        pageInstance: pageInstance,
+        relationCounts: relationCounts ?? loaded.details.relationCounts,
         statisticsSection: statisticsSection,
-        onBeginEditing: ref
-            .read(intentionDetailsViewModelProvider(intentionId).notifier)
-            .beginEditing,
-        onCancelEditing: ref
-            .read(intentionDetailsViewModelProvider(intentionId).notifier)
-            .cancelEditing,
-        onTitleChanged: ref
-            .read(intentionDetailsViewModelProvider(intentionId).notifier)
-            .changeTitle,
-        onDescriptionChanged: ref
-            .read(intentionDetailsViewModelProvider(intentionId).notifier)
-            .changeDescription,
-        onSave: ref
-            .read(intentionDetailsViewModelProvider(intentionId).notifier)
-            .saveChanges,
         onEnableReadiness: ref
             .read(intentionDetailsViewModelProvider(intentionId).notifier)
             .enableReadiness,
         onDisableReadiness: ref
             .read(intentionDetailsViewModelProvider(intentionId).notifier)
             .disableReadiness,
-        onArchive: ref
-            .read(intentionDetailsViewModelProvider(intentionId).notifier)
-            .archive,
-        onRestore: ref
-            .read(intentionDetailsViewModelProvider(intentionId).notifier)
-            .restore,
-        onDelete: onDelete,
-        onRetryStateChange: () {
-          final provider = intentionDetailsViewModelProvider(intentionId);
-          final current = ref.read(provider);
-          if (current is IntentionDetailsLoaded &&
-              current.stateChange?.kind ==
-                  IntentionDetailsStateChangeKind.delete) {
-            if (current.stateChange!.canRetry) onDelete();
-          } else {
-            ref.read(provider.notifier).retryStateChange();
-          }
-        },
-        onShowBlockingRelations: onShowBlockingRelations,
-        onShowArchivedRelations: ref
-            .read(relationNeighborhoodViewModelProvider(intentionId).notifier)
-            .showArchivedRelations,
       ),
       IntentionDetailsNotFound() => _DetailsStatus(
         message: localizations.detailsNotFound,
@@ -333,695 +622,227 @@ final class _DetailsContent extends ConsumerWidget {
 }
 
 final class _LoadedDetails extends StatelessWidget {
+  static const double _datesGap = 10;
+
   const _LoadedDetails({
     required this.state,
-    required this.selectionMode,
-    required this.neighborhoodKey,
+    required this.scrollController,
+    required this.pageHead,
+    required this.onEditDescription,
+    required this.headHidden,
+    required this.today,
+    required this.selectedTab,
+    required this.onSelectTab,
+    required this.pageInstance,
+    required this.relationCounts,
     required this.statisticsSection,
-    required this.onBeginEditing,
-    required this.onCancelEditing,
-    required this.onTitleChanged,
-    required this.onDescriptionChanged,
-    required this.onSave,
     required this.onEnableReadiness,
     required this.onDisableReadiness,
-    required this.onArchive,
-    required this.onRestore,
-    required this.onDelete,
-    required this.onRetryStateChange,
-    required this.onShowBlockingRelations,
-    required this.onShowArchivedRelations,
   });
 
   final IntentionDetailsLoaded state;
-  final bool selectionMode;
-  final GlobalKey neighborhoodKey;
+  final ScrollController scrollController;
+  final Widget pageHead;
+  final VoidCallback? onEditDescription;
+  final ValueListenable<bool> headHidden;
+  final CalendarDate today;
+  final IntentionDetailsTab selectedTab;
+  final ValueChanged<IntentionDetailsTab> onSelectTab;
+  final IntentionPageInstance pageInstance;
+  final RelationCounts relationCounts;
   final Widget statisticsSection;
-  final VoidCallback onBeginEditing;
-  final VoidCallback onCancelEditing;
-  final ValueChanged<String> onTitleChanged;
-  final ValueChanged<String> onDescriptionChanged;
-  final VoidCallback onSave;
   final VoidCallback onEnableReadiness;
   final VoidCallback onDisableReadiness;
-  final VoidCallback onArchive;
-  final VoidCallback onRestore;
-  final VoidCallback onDelete;
-  final VoidCallback onRetryStateChange;
-  final VoidCallback onShowBlockingRelations;
-  final VoidCallback onShowArchivedRelations;
 
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
     final intention = state.intention;
-    final readiness = switch (intention.readiness) {
-      IntentionReadiness.ready => localizations.catalogReady,
-      IntentionReadiness.notReady => localizations.catalogNotReady,
-    };
-    final archiveState = switch (intention.archiveState) {
-      IntentionArchiveState.active => localizations.detailsActive,
-      IntentionArchiveState.archived => localizations.detailsArchived,
-    };
+    final isActive = intention.archiveState == IntentionArchiveState.active;
+    final owner = RelationParticipantSummary(
+      id: intention.id,
+      title: intention.title,
+      archiveState: intention.archiveState,
+    );
     return CustomScrollView(
+      controller: scrollController,
       slivers: [
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-          sliver: SliverToBoxAdapter(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Semantics(
-                  header: true,
-                  child: Text(
-                    intention.title,
-                    key: const ValueKey('intention-details-title'),
-                    style: Theme.of(context).textTheme.headlineSmall,
+        SliverToBoxAdapter(child: pageHead),
+        IntentionDetailsTabs(
+          headHidden: headHidden,
+          value: selectedTab,
+          onChange: onSelectTab,
+          counts: relationCounts,
+        ),
+        IntentionDetailsTabBody(
+          slivers: [
+            if (selectedTab == IntentionDetailsTab.overview) ...[
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(
+                  DoableMetrics.space5,
+                  DoableMetrics.space1,
+                  DoableMetrics.space5,
+                  0,
+                ),
+                sliver: SliverToBoxAdapter(
+                  child: TextField.saved(
+                    value: intention.description ?? '',
+                    placeholder: localizations.detailsAddDescription,
+                    label: switch (intention.description) {
+                      final description? =>
+                        localizations.detailsEditDescriptionLabel(description),
+                      null => localizations.detailsAddDescription,
+                    },
+                    onOpen: onEditDescription,
                   ),
                 ),
-                const SizedBox(height: 24),
-                _DetailsField(
-                  label: localizations.detailsDescriptionLabel,
-                  value:
-                      intention.description ??
-                      localizations.detailsNoDescription,
-                ),
-                const SizedBox(height: 16),
-                _DetailsField(
-                  label: localizations.detailsReadinessLabel,
-                  value: readiness,
-                ),
-                const SizedBox(height: 16),
-                _DetailsField(
-                  label: localizations.detailsArchiveStateLabel,
-                  value: archiveState,
-                ),
-              ],
-            ),
-          ),
-        ),
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
-          sliver: SliverToBoxAdapter(
-            child: switch (state.edit) {
-              final edit? => _DetailsEditForm(
-                edit: edit,
-                isOperationRunning: state.isOperationRunning,
-                onCancel: onCancelEditing,
-                onTitleChanged: onTitleChanged,
-                onDescriptionChanged: onDescriptionChanged,
-                onSave: onSave,
               ),
-              null => _DetailsActions(
-                state: state,
-                onBeginEditing: onBeginEditing,
-                onEnableReadiness: onEnableReadiness,
-                onDisableReadiness: onDisableReadiness,
-                onArchive: onArchive,
-                onRestore: onRestore,
-                onDelete: onDelete,
-                onRetryStateChange: onRetryStateChange,
-                onShowBlockingRelations: onShowBlockingRelations,
-                onShowArchivedRelations: onShowArchivedRelations,
-                onChoosePath: () => unawaited(
-                  context.router.push(
-                    ChoicePathRoute(
-                      sourceIntentionId: intention.id,
-                      direction: ChoicePathDraftDirection.topDown,
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(
+                  DoableMetrics.space5,
+                  DoableMetrics.space3,
+                  DoableMetrics.space5,
+                  0,
+                ),
+                sliver: SliverToBoxAdapter(
+                  child: OptionTiles<IntentionReadiness>(
+                    first: OptionTile(
+                      id: IntentionReadiness.notReady,
+                      icon: DoableIconData.intention,
+                      title: localizations.detailsTypeIntention,
+                      hint: localizations.detailsTypeIntentionHint,
+                    ),
+                    second: OptionTile(
+                      id: IntentionReadiness.ready,
+                      icon: DoableIconData.bolt,
+                      title: localizations.detailsTypeAction,
+                      hint: localizations.detailsTypeActionHint,
+                    ),
+                    value: intention.readiness,
+                    label: localizations.detailsTypeChoiceLabel,
+                    onChange: state.isOperationRunning
+                        ? null
+                        : (readiness) => switch (readiness) {
+                            IntentionReadiness.ready => onEnableReadiness(),
+                            IntentionReadiness.notReady => onDisableReadiness(),
+                          },
+                  ),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(
+                  DoableMetrics.space5,
+                  DoableMetrics.space2,
+                  DoableMetrics.space5,
+                  0,
+                ),
+                sliver: SliverToBoxAdapter(
+                  child: TagAssignmentsSection(
+                    intentionId: intention.id,
+                    isArchived:
+                        intention.archiveState ==
+                        IntentionArchiveState.archived,
+                    onChooseTag: (intentionId) => unawaited(
+                      showTagsPanel(
+                        context,
+                        TagsPanelAssignmentContext(intentionId),
+                      ),
                     ),
                   ),
                 ),
               ),
-            },
-          ),
-        ),
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
-          sliver: SliverToBoxAdapter(
-            child: TagAssignmentsSection(
-              intentionId: intention.id,
-              isArchived:
-                  intention.archiveState == IntentionArchiveState.archived,
-              onChooseTag: (intentionId) => unawaited(
-                showTagsPanel(context, TagsPanelAssignmentContext(intentionId)),
-              ),
-            ),
-          ),
-        ),
-        statisticsSection,
-        RelationNeighborhoodSliver(
-          key: neighborhoodKey,
-          intentionId: intention.id,
-          intentionTitle: intention.title,
-          selectionMode: selectionMode,
-          onOpenRelation: (relationId) => unawaited(
-            context.router.push(RelationDetailsRoute(relationId: relationId)),
-          ),
-          onOpenDailyChoice: (choiceId) => unawaited(
-            context.router.push(DailyChoiceDetailsRoute(choiceId: choiceId)),
-          ),
-          onCreateRelation: (direction) => unawaited(
-            context.router.push(
-              RelationEditorRoute(
-                editorContext: RelationCreationContext(
-                  participant: RelationParticipantSummary(
-                    id: intention.id,
-                    title: intention.title,
-                    archiveState: intention.archiveState,
+              SliverPadding(
+                // Строка начинается вровень со словом «Теги».
+                padding: const EdgeInsets.fromLTRB(
+                  DoableMetrics.space5 + DoableMetrics.space1,
+                  _datesGap,
+                  DoableMetrics.space5 + DoableMetrics.space1,
+                  DoableMetrics.space4,
+                ),
+                sliver: SliverToBoxAdapter(
+                  child: intentionDatesLine(
+                    localizations: localizations,
+                    locale: Localizations.localeOf(context).toLanguageTag(),
+                    createdAt: intention.createdAt,
+                    updatedAt: intention.updatedAt,
+                    today: today,
                   ),
-                  direction: direction,
                 ),
               ),
-            ),
-          ),
-        ),
-        const SliverToBoxAdapter(child: SizedBox(height: 24)),
-      ],
-    );
-  }
-}
-
-final class _DetailsActions extends StatelessWidget {
-  const _DetailsActions({
-    required this.state,
-    required this.onBeginEditing,
-    required this.onEnableReadiness,
-    required this.onDisableReadiness,
-    required this.onArchive,
-    required this.onRestore,
-    required this.onDelete,
-    required this.onRetryStateChange,
-    required this.onShowBlockingRelations,
-    required this.onShowArchivedRelations,
-    required this.onChoosePath,
-  });
-
-  final IntentionDetailsLoaded state;
-  final VoidCallback onBeginEditing;
-  final VoidCallback onEnableReadiness;
-  final VoidCallback onDisableReadiness;
-  final VoidCallback onArchive;
-  final VoidCallback onRestore;
-  final VoidCallback onDelete;
-  final VoidCallback onRetryStateChange;
-  final VoidCallback onShowBlockingRelations;
-  final VoidCallback onShowArchivedRelations;
-  final VoidCallback onChoosePath;
-
-  @override
-  Widget build(BuildContext context) {
-    final localizations = AppLocalizations.of(context);
-    final controlsEnabled = !state.isOperationRunning;
-    final failure = _failureMessage(localizations);
-    final isArchived =
-        state.intention.archiveState == IntentionArchiveState.archived;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (failure != null) ...[
-          OperationFailurePresentation(
-            claim: state.stateChange?.failurePresentation,
-            message: failure,
-            messageKey: const ValueKey(
-              'intention-details-state-change-failure',
-            ),
-          ),
-          if (state.stateChange?.canRetry ?? false) ...[
-            const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: FilledButton(
-                key: const ValueKey('intention-details-state-change-retry'),
-                onPressed: controlsEnabled ? onRetryStateChange : null,
-                child: Text(localizations.commonRetry),
-              ),
-            ),
-          ],
-          // Блокирующие связи показываются в актуальном соседстве: удаление
-          // остаётся запрещённым и для архивных, и для незагруженных связей.
-          if (_isBlockedByRelations) ...[
-            const SizedBox(height: 12),
-            Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: OutlinedButton.icon(
-                key: const ValueKey(
-                  'intention-details-show-blocking-relations',
+            ],
+            if (selectedTab == IntentionDetailsTab.choices)
+              IntentionChoicesSliver(
+                intentionId: intention.id,
+                pageInstance: pageInstance,
+                onOpenDailyChoice: (choiceId) => unawaited(
+                  context.router.push(
+                    DailyChoiceDetailsRoute(choiceId: choiceId),
+                  ),
                 ),
-                onPressed: onShowBlockingRelations,
-                icon: const Icon(Icons.link_off_outlined),
-                label: Text(localizations.detailsShowBlockingRelationsAction),
-              ),
-            ),
-          ],
-          const SizedBox(height: 16),
-        ],
-        // Переход состояния объясняется до его запуска: архивирование
-        // каскадно архивирует связи, а восстановление их не возвращает.
-        if (isArchived)
-          _RelationImpactExplanation(
-            explanationKey: const ValueKey(
-              'intention-details-restore-explanation',
-            ),
-            message: localizations.detailsRestoreRelationsExplanation(
-              state.details.relationCounts.archived,
-            ),
-            actionKey: const ValueKey(
-              'intention-details-show-archived-relations',
-            ),
-            actionLabel: localizations.detailsShowArchivedRelationsAction,
-            onAction: onShowArchivedRelations,
-          )
-        else
-          _RelationImpactExplanation(
-            explanationKey: const ValueKey(
-              'intention-details-archive-explanation',
-            ),
-            message: localizations.detailsArchiveCascadeExplanation,
-          ),
-        const SizedBox(height: 16),
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            if (!isArchived)
-              FilledButton.icon(
-                key: const ValueKey('intention-details-choose-path'),
-                onPressed: controlsEnabled ? onChoosePath : null,
-                icon: const Icon(Icons.route_outlined),
-                label: Text(localizations.detailsChoosePathAction),
-              ),
-            OutlinedButton.icon(
-              key: const ValueKey('intention-details-edit'),
-              onPressed: controlsEnabled ? onBeginEditing : null,
-              icon: const Icon(Icons.edit_outlined),
-              label: Text(localizations.detailsEditAction),
-            ),
-            if (state.intention.readiness == IntentionReadiness.notReady)
-              OutlinedButton.icon(
-                key: const ValueKey('intention-details-enable-readiness'),
-                onPressed: controlsEnabled
-                    ? () => unawaited(_confirmReadiness(context))
+                // Создание дневного выбора не изменяет намерение, поэтому
+                // изменяющая операция его не выключает: недопустимое начало
+                // отклоняет модель пути.
+                onAddAsSource: isActive
+                    ? () => _startChoicePath(
+                        context,
+                        ChoicePathDraftDirection.topDown,
+                      )
                     : null,
-                icon: const Icon(Icons.check_circle_outline),
-                label: Text(localizations.detailsEnableReadinessAction),
-              )
-            else
-              OutlinedButton.icon(
-                key: const ValueKey('intention-details-disable-readiness'),
-                onPressed: controlsEnabled ? onDisableReadiness : null,
-                icon: const Icon(Icons.remove_circle_outline),
-                label: Text(localizations.detailsDisableReadinessAction),
+                onAddAsSelected:
+                    isActive && intention.readiness == IntentionReadiness.ready
+                    ? () => _startChoicePath(
+                        context,
+                        ChoicePathDraftDirection.bottomUp,
+                      )
+                    : null,
               ),
-            if (state.intention.archiveState == IntentionArchiveState.active)
-              OutlinedButton.icon(
-                key: const ValueKey('intention-details-archive'),
-                onPressed: controlsEnabled ? onArchive : null,
-                icon: const Icon(Icons.archive_outlined),
-                label: Text(localizations.detailsArchiveAction),
-              )
-            else
-              OutlinedButton.icon(
-                key: const ValueKey('intention-details-restore'),
-                onPressed: controlsEnabled ? onRestore : null,
-                icon: const Icon(Icons.unarchive_outlined),
-                label: Text(localizations.detailsRestoreAction),
-              ),
-            FilledButton.icon(
-              key: const ValueKey('intention-details-delete'),
-              onPressed: controlsEnabled
-                  ? () => unawaited(_confirmDeletion(context))
-                  : null,
-              style: FilledButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.error,
-                foregroundColor: Theme.of(context).colorScheme.onError,
-              ),
-              icon: const Icon(Icons.delete_forever_outlined),
-              label: Text(localizations.detailsDeleteAction),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  /// Отказ удаления вызван связями намерения, а не иным конфликтом.
-  bool get _isBlockedByRelations {
-    final stateChange = state.stateChange;
-    if (stateChange == null ||
-        stateChange.kind != IntentionDetailsStateChangeKind.delete) {
-      return false;
-    }
-    return stateChange.operation is OperationFailed<Intention> &&
-        (stateChange.operation as OperationFailed<Intention>).failure
-            is IntentionHasBlockingRelationsFailure;
-  }
-
-  Future<void> _confirmReadiness(BuildContext context) async {
-    final localizations = AppLocalizations.of(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(localizations.detailsReadinessConfirmationTitle),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(localizations.detailsReadinessOneDayCriterion),
-            const SizedBox(height: 12),
-            Text(localizations.detailsReadinessClarityCriterion),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text(localizations.detailsCancelEditAction),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: Text(localizations.detailsConfirmReadinessAction),
-          ),
-        ],
-      ),
-    );
-    if (confirmed ?? false) {
-      onEnableReadiness();
-    }
-  }
-
-  Future<void> _confirmDeletion(BuildContext context) async {
-    final localizations = AppLocalizations.of(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(localizations.detailsDeleteConfirmationTitle),
-        content: Text(localizations.detailsDeleteConfirmationMessage),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text(localizations.detailsCancelEditAction),
-          ),
-          FilledButton(
-            key: const ValueKey('intention-details-confirm-delete'),
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(dialogContext).colorScheme.error,
-              foregroundColor: Theme.of(dialogContext).colorScheme.onError,
-            ),
-            child: Text(localizations.detailsConfirmDeleteAction),
-          ),
-        ],
-      ),
-    );
-    if (confirmed ?? false) {
-      onDelete();
-    }
-  }
-
-  String? _failureMessage(AppLocalizations localizations) {
-    final stateChange = state.stateChange;
-    if (stateChange == null) {
-      return null;
-    }
-    if (stateChange.operation case OperationFailed<Intention>(:final failure)) {
-      return switch (stateChange.kind) {
-        IntentionDetailsStateChangeKind.delete => _deleteFailureMessage(
-          localizations,
-          failure,
-        ),
-        IntentionDetailsStateChangeKind.enableReadiness ||
-        IntentionDetailsStateChangeKind.disableReadiness ||
-        IntentionDetailsStateChangeKind.archive ||
-        IntentionDetailsStateChangeKind.restore => _stateChangeFailureMessage(
-          localizations,
-          failure,
-        ),
-      };
-    }
-    return null;
-  }
-
-  String _deleteFailureMessage(
-    AppLocalizations localizations,
-    IntentionFailure failure,
-  ) => switch (failure) {
-    IntentionGenericValidationFailure() ||
-    IntentionTextInputValidationFailure() ||
-    IntentionCreationTagsMissingFailure() => localizations.detailsDeleteInvalid,
-    IntentionNotFoundFailure() => localizations.detailsDeleteNotFound,
-    IntentionConflictFailure() => localizations.detailsDeleteConflict,
-    IntentionHasBlockingRelationsFailure() =>
-      localizations.detailsDeleteBlockedByRelations,
-    IntentionUnavailableFailure() => localizations.detailsDeleteUnavailable,
-    IntentionCorruptionFailure() => localizations.detailsDeleteCorruption,
-    IntentionUnexpectedFailure() => localizations.detailsDeleteUnexpected,
-  };
-
-  String _stateChangeFailureMessage(
-    AppLocalizations localizations,
-    IntentionFailure failure,
-  ) => switch (failure) {
-    IntentionGenericValidationFailure() ||
-    IntentionTextInputValidationFailure() ||
-    IntentionCreationTagsMissingFailure() =>
-      localizations.detailsStateChangeInvalid,
-    IntentionNotFoundFailure() => localizations.detailsStateChangeNotFound,
-    IntentionConflictFailure() => localizations.detailsStateChangeConflict,
-    IntentionHasBlockingRelationsFailure() =>
-      localizations.detailsStateChangeUnexpected,
-    IntentionUnavailableFailure() =>
-      localizations.detailsStateChangeUnavailable,
-    IntentionCorruptionFailure() => localizations.detailsStateChangeCorruption,
-    IntentionUnexpectedFailure() => localizations.detailsStateChangeUnexpected,
-  };
-}
-
-final class _DetailsEditForm extends StatefulWidget {
-  const _DetailsEditForm({
-    required this.edit,
-    required this.isOperationRunning,
-    required this.onCancel,
-    required this.onTitleChanged,
-    required this.onDescriptionChanged,
-    required this.onSave,
-  });
-
-  final IntentionDetailsEdit edit;
-  final bool isOperationRunning;
-  final VoidCallback onCancel;
-  final ValueChanged<String> onTitleChanged;
-  final ValueChanged<String> onDescriptionChanged;
-  final VoidCallback onSave;
-
-  @override
-  State<_DetailsEditForm> createState() => _DetailsEditFormState();
-}
-
-final class _DetailsEditFormState extends State<_DetailsEditForm> {
-  late final TextEditingController _titleController;
-  late final TextEditingController _descriptionController;
-
-  @override
-  void initState() {
-    super.initState();
-    _titleController = TextEditingController(text: widget.edit.title);
-    _descriptionController = TextEditingController(
-      text: widget.edit.description,
-    );
-  }
-
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _descriptionController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final localizations = AppLocalizations.of(context);
-    final edit = widget.edit;
-    final controlsEnabled = !widget.isOperationRunning;
-    final generalFailure = _generalFailure(localizations, edit.operation);
-    final titleFailure = _fieldFailure(
-      localizations,
-      edit.operation,
-      IntentionTextField.title,
-    );
-    final descriptionFailure = _fieldFailure(
-      localizations,
-      edit.operation,
-      IntentionTextField.description,
-    );
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        TextField(
-          key: const ValueKey('intention-details-edit-title'),
-          controller: _titleController,
-          enabled: controlsEnabled,
-          autofocus: true,
-          textInputAction: TextInputAction.next,
-          decoration: InputDecoration(
-            labelText: localizations.editorTitleLabel,
-            error: titleFailure == null
-                ? null
-                : OperationFailurePresentation(
-                    claim: edit.failurePresentation,
-                    message: titleFailure,
+            if (selectedTab == IntentionDetailsTab.statistics)
+              statisticsSection,
+            if (selectedTab == IntentionDetailsTab.relations)
+              IntentionRelationsSliver(
+                details: state.details,
+                pageInstance: pageInstance,
+                onOpenRelation: (relationId) => unawaited(
+                  context.router.push(
+                    RelationDetailsRoute(relationId: relationId),
                   ),
-          ),
-          onChanged: widget.onTitleChanged,
-        ),
-        const SizedBox(height: 16),
-        TextField(
-          key: const ValueKey('intention-details-edit-description'),
-          controller: _descriptionController,
-          enabled: controlsEnabled,
-          minLines: 4,
-          maxLines: null,
-          keyboardType: TextInputType.multiline,
-          decoration: InputDecoration(
-            labelText: localizations.editorDescriptionLabel,
-            alignLabelWithHint: true,
-            error: descriptionFailure == null
-                ? null
-                : OperationFailurePresentation(
-                    claim: edit.failurePresentation,
-                    message: descriptionFailure,
+                ),
+                onWalk: (neighborId, group) => unawaited(
+                  context.router.push(
+                    IntentionDetailsRoute(
+                      intentionId: neighborId,
+                      target: RelationsTarget(group),
+                    ),
                   ),
-          ),
-          onChanged: widget.onDescriptionChanged,
-        ),
-        if (generalFailure != null) ...[
-          const SizedBox(height: 16),
-          OperationFailurePresentation(
-            claim: edit.failurePresentation,
-            message: generalFailure,
-            messageKey: const ValueKey('intention-details-edit-failure'),
-          ),
-        ],
-        const SizedBox(height: 24),
-        // При увеличенном тексте действия переходят на следующие строки.
-        // https://api.flutter.dev/flutter/widgets/Wrap-class.html
-        Wrap(
-          alignment: WrapAlignment.end,
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            TextButton(
-              key: const ValueKey('intention-details-edit-cancel'),
-              onPressed: controlsEnabled ? widget.onCancel : null,
-              child: Text(localizations.detailsCancelEditAction),
-            ),
-            FilledButton(
-              key: const ValueKey('intention-details-edit-submit'),
-              onPressed: controlsEnabled && edit.canSubmit
-                  ? widget.onSave
-                  : null,
-              child: Text(_submitLabel(localizations, edit)),
-            ),
+                ),
+                onAdd: (group) => unawaited(
+                  context.router.push(
+                    RelationEditorRoute(
+                      editorContext: RelationCreationContext(
+                        participant: owner,
+                        group: group,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ],
     );
   }
 
-  String _submitLabel(
-    AppLocalizations localizations,
-    IntentionDetailsEdit edit,
-  ) => switch (edit.operation) {
-    OperationRunning<Intention>() => localizations.detailsOperationRunning,
-    OperationFailed<Intention>(failure: IntentionUnavailableFailure()) =>
-      localizations.commonRetry,
-    OperationIdle<Intention>() ||
-    OperationSucceeded<Intention>() ||
-    OperationFailed<Intention>() => localizations.detailsSaveAction,
-  };
-
-  String? _fieldFailure(
-    AppLocalizations localizations,
-    OperationState<Intention> operation,
-    IntentionTextField field,
-  ) {
-    if (operation
-        case OperationFailed<Intention>(
-          failure: IntentionTextInputValidationFailure(:final textFailure),
-        )
-        when textFailure.field == field) {
-      return switch ((field, textFailure.reason)) {
-        (IntentionTextField.title, IntentionTextValidationReason.empty) =>
-          localizations.editorTitleEmpty,
-        (IntentionTextField.title, IntentionTextValidationReason.tooLong) =>
-          localizations.editorTitleTooLong,
-        (
-          IntentionTextField.title,
-          IntentionTextValidationReason.invalidUnicodeRepertoire,
-        ) =>
-          localizations.editorTitleInvalidUnicode,
-        (
-          IntentionTextField.description,
-          IntentionTextValidationReason.tooLong,
-        ) =>
-          localizations.editorDescriptionTooLong,
-        (
-          IntentionTextField.description,
-          IntentionTextValidationReason.invalidUnicodeRepertoire,
-        ) =>
-          localizations.editorDescriptionInvalidUnicode,
-        (IntentionTextField.description, IntentionTextValidationReason.empty) ||
-        (
-          IntentionTextField.titleFilter,
-          _,
-        ) => localizations.detailsUpdateInvalidInput,
-      };
-    }
-    return null;
-  }
-
-  String? _generalFailure(
-    AppLocalizations localizations,
-    OperationState<Intention> operation,
-  ) => switch (operation) {
-    OperationIdle<Intention>() ||
-    OperationRunning<Intention>() ||
-    OperationSucceeded<Intention>() => null,
-    OperationFailed<Intention>(:final failure) => switch (failure) {
-      IntentionTextInputValidationFailure(:final textFailure)
-          when textFailure.field == IntentionTextField.title ||
-              textFailure.field == IntentionTextField.description =>
-        null,
-      IntentionGenericValidationFailure() ||
-      IntentionTextInputValidationFailure() ||
-      IntentionCreationTagsMissingFailure() =>
-        localizations.detailsUpdateInvalidInput,
-      IntentionNotFoundFailure() => localizations.detailsUpdateNotFound,
-      IntentionConflictFailure() => localizations.detailsUpdateConflict,
-      IntentionHasBlockingRelationsFailure() =>
-        localizations.detailsUpdateUnexpected,
-      IntentionUnavailableFailure() => localizations.detailsUpdateUnavailable,
-      IntentionCorruptionFailure() => localizations.detailsUpdateCorruption,
-      IntentionUnexpectedFailure() => localizations.detailsUpdateUnexpected,
-    },
-  };
-}
-
-final class _DetailsField extends StatelessWidget {
-  const _DetailsField({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: Theme.of(context).textTheme.labelLarge),
-        const SizedBox(height: 4),
-        Text(value),
-      ],
-    );
-  }
+  void _startChoicePath(
+    BuildContext context,
+    ChoicePathDraftDirection direction,
+  ) => unawaited(
+    context.router.push(
+      ChoicePathRoute(
+        sourceIntentionId: state.intention.id,
+        direction: direction,
+      ),
+    ),
+  );
 }
 
 final class _DetailsStatus extends StatelessWidget {
@@ -1063,46 +884,4 @@ final class _DetailsStatus extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Объяснение влияния связей на переход состояния намерения.
-///
-/// Объяснение доступно до запуска операции, а переход ведёт в существующее
-/// соседство того же намерения.
-final class _RelationImpactExplanation extends StatelessWidget {
-  const _RelationImpactExplanation({
-    required this.explanationKey,
-    required this.message,
-    this.actionKey,
-    this.actionLabel,
-    this.onAction,
-  }) : assert((actionLabel == null) == (onAction == null)),
-       assert((actionKey == null) == (onAction == null));
-
-  final Key explanationKey;
-  final String message;
-  final Key? actionKey;
-  final String? actionLabel;
-  final VoidCallback? onAction;
-
-  @override
-  Widget build(BuildContext context) => Semantics(
-    key: explanationKey,
-    container: true,
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(message),
-        if (onAction case final action?) ...[
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            key: actionKey,
-            onPressed: action,
-            icon: const Icon(Icons.inventory_2_outlined),
-            label: Text(actionLabel!),
-          ),
-        ],
-      ],
-    ),
-  );
 }

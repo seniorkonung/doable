@@ -1,6 +1,5 @@
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
-import 'package:doable/src/graph/application/selected_relations.dart';
 
 import 'dart:async';
 
@@ -10,7 +9,6 @@ import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
-import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -109,37 +107,21 @@ final class ControlledDetailsRepository
         'Наблюдение дневного выбора не используется этим тестом.',
       );
 
-  @override
-  Future<SelectedRelationsReadResult> getSelectedRelations(
-    SelectedRelationsQuery query,
-  ) => throw UnsupportedError(
-    'Чтение выбранных связей не используется в этом тесте.',
-  );
+  ControlledDetailsRepository({this.shareSecondWatch = false});
 
-  @override
-  Stream<SelectedRelationsReadResult> watchSelectedRelations(
-    SelectedRelationsQuery query,
-  ) => throw UnsupportedError(
-    'Наблюдение выбранных связей не используется в этом тесте.',
-  );
-
-  ControlledDetailsRepository({this.shareSecondWatch = true});
-
-  /// Страница подробностей и соседство наблюдают одно намерение параллельно.
+  /// Страница подробностей и вкладка «Связи» наблюдают одно намерение
+  /// параллельно.
   bool shareSecondWatch;
 
   final detailRequests = <ControlledDetailRequest>[];
   final catalogQueries = <IntentionCatalogQuery>[];
   final commands = <IntentionCommand>[];
   final relationCommands = <LongTermRelationCommand>[];
-  final blockingRelationsCommands = <DeleteBlockingRelations>[];
   final dailyChoiceCommands = <DailyChoiceCommand>[];
   final tagCommands = <TagCommand>[];
   final _commandRequests =
       <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
   final _relationCommandRequests = <Completer<LongTermRelationCommandResult>>[];
-  final _blockingRelationsCommandRequests =
-      <Completer<DeleteBlockingRelationsResult>>[];
   final _dailyChoiceCommandRequests = <Completer<DailyChoiceCommandResult>>[];
   final _tagCommandRequests = <Completer<TagCommandResult>>[];
   var _watchCallCount = 0;
@@ -149,7 +131,7 @@ final class ControlledDetailsRepository
   Stream<LongTermRelationReadResult> Function(LongTermRelationId id)?
   onWatchRelation;
 
-  /// Запросы порций соседства в порядке их поступления.
+  /// Запросы порций групп связей в порядке их поступления.
   final relationGroupQueries = <RelationGroupQuery>[];
   final dailyChoiceGroupQueries = <DailyChoiceGroupQuery>[];
 
@@ -168,7 +150,7 @@ final class ControlledDetailsRepository
         super.getIntentionStatisticsSection(query);
   }
 
-  /// Ответ соседства на конкретный запрос; по умолчанию группа пуста.
+  /// Ответ на запрос порции группы связей; по умолчанию группа пуста.
   RelationGroupPageResult Function(RelationGroupQuery query)?
   onRelationGroupPage;
   RelationGroupPageResult Function(DailyChoiceGroupQuery query)?
@@ -185,18 +167,6 @@ final class ControlledDetailsRepository
     }
     return Future.value(answerCatalogQuery(query, result));
   }
-
-  @override
-  Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
-    IntentionId intentionId,
-  ) => Future.value(
-    ResultSuccess(
-      GraphSnapshot(
-        value: testRelationCounts(),
-        revision: const TestDetailsRevision(0),
-      ),
-    ),
-  );
 
   @override
   Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
@@ -270,8 +240,6 @@ final class ControlledDetailsRepository
       final LongTermRelationCommand relation => await _executeRelation(
         relation,
       ),
-      final DeleteBlockingRelations deletion =>
-        await _executeBlockingRelationsDelete(deletion),
       final DailyChoiceCommand choice => await _executeDailyChoice(choice),
       final TagCommand tag => await _executeTag(tag),
       _ => throw UnsupportedError('Неизвестная команда графа в тесте.'),
@@ -312,20 +280,6 @@ final class ControlledDetailsRepository
 
   void failTagCommand(int index, Object error) =>
       _tagCommandRequests[index].completeError(error);
-
-  Future<DeleteBlockingRelationsResult> _executeBlockingRelationsDelete(
-    DeleteBlockingRelations command,
-  ) {
-    blockingRelationsCommands.add(command);
-    final request = Completer<DeleteBlockingRelationsResult>();
-    _blockingRelationsCommandRequests.add(request);
-    return request.future;
-  }
-
-  void completeBlockingRelationsCommand(
-    int index,
-    DeleteBlockingRelationsResult result,
-  ) => _blockingRelationsCommandRequests[index].complete(result);
 
   Future<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>
   _executeIntention(IntentionCommand command) {
@@ -499,39 +453,37 @@ final class _DetailsCatalogEntrySnapshot
   bool matches(IntentionCatalogQuery query) => query.includes(summary);
 }
 
-/// Строка выбранной группы соседства намерения-владельца.
-LongTermRelationSummary testDetailsRelationRow({
+/// Строка выбранной группы связей намерения-владельца.
+RelationGroupEntry testDetailsRelationRow({
   required IntentionId ownerId,
   required int index,
   LongTermRelationType type = LongTermRelationType.need,
   RelationDirection direction = RelationDirection.outgoing,
   RelationScope scope = RelationScope.active,
+  IntentionId? neighborId,
+  String? neighborTitle,
+  IntentionReadiness neighborReadiness = IntentionReadiness.notReady,
 }) {
-  final neighborId = testDetailsIntentionId(900 + index);
+  neighborId ??= testDetailsIntentionId(900 + index);
   final isOutgoing = direction == RelationDirection.outgoing;
-  final sourceId = isOutgoing ? ownerId : neighborId;
-  final relatedId = isOutgoing ? neighborId : ownerId;
-  return LongTermRelationSummary(
+  return RelationGroupEntry(
     relation: LongTermRelation(
       id: _testDetailsRelationId(index),
-      sourceIntentionId: sourceId,
-      relatedIntentionId: relatedId,
+      sourceIntentionId: isOutgoing ? ownerId : neighborId,
+      relatedIntentionId: isOutgoing ? neighborId : ownerId,
       type: type,
       priority: RelationPriority.p2,
       scope: scope,
       creationSequence: RelationCreationSequence(index),
     ),
-    source: RelationParticipantSummary(
-      id: sourceId,
-      title: isOutgoing ? 'Намерение-владелец' : 'Исходное $index',
+    neighbor: RelationNeighbor(
+      id: neighborId,
+      title:
+          neighborTitle ??
+          (isOutgoing ? 'Связанное $index' : 'Исходное $index'),
       archiveState: IntentionArchiveState.active,
+      readiness: neighborReadiness,
     ),
-    related: RelationParticipantSummary(
-      id: relatedId,
-      title: isOutgoing ? 'Связанное $index' : 'Намерение-владелец',
-      archiveState: IntentionArchiveState.active,
-    ),
-    hasDescription: false,
   );
 }
 

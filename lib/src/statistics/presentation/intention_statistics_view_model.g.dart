@@ -21,7 +21,11 @@ final class IntentionStatisticsViewModelProvider
         > {
   IntentionStatisticsViewModelProvider._({
     required IntentionStatisticsViewModelFamily super.from,
-    required (IntentionId, Object, {IntentionStatisticsTarget? target})
+    required (
+      IntentionId,
+      IntentionPageInstance, {
+      IntentionStatisticsTarget? target,
+    })
     super.argument,
   }) : super(
          retry: null,
@@ -66,7 +70,7 @@ final class IntentionStatisticsViewModelProvider
 }
 
 String _$intentionStatisticsViewModelHash() =>
-    r'8b44d7875bd618f85018be1e4e233f81cbfd0513';
+    r'a2e277935521d288a4e3dc444906929bcfacdfa7';
 
 final class IntentionStatisticsViewModelFamily extends $Family
     with
@@ -75,7 +79,11 @@ final class IntentionStatisticsViewModelFamily extends $Family
           IntentionStatisticsState,
           IntentionStatisticsState,
           IntentionStatisticsState,
-          (IntentionId, Object, {IntentionStatisticsTarget? target})
+          (
+            IntentionId,
+            IntentionPageInstance, {
+            IntentionStatisticsTarget? target,
+          })
         > {
   IntentionStatisticsViewModelFamily._()
     : super(
@@ -88,10 +96,10 @@ final class IntentionStatisticsViewModelFamily extends $Family
 
   IntentionStatisticsViewModelProvider call(
     IntentionId intentionId,
-    Object pageKey, {
+    IntentionPageInstance pageInstance, {
     IntentionStatisticsTarget? target,
   }) => IntentionStatisticsViewModelProvider._(
-    argument: (intentionId, pageKey, target: target),
+    argument: (intentionId, pageInstance, target: target),
     from: this,
   );
 
@@ -102,14 +110,19 @@ final class IntentionStatisticsViewModelFamily extends $Family
 abstract class _$IntentionStatisticsViewModel
     extends $Notifier<IntentionStatisticsState> {
   late final _$args =
-      ref.$arg as (IntentionId, Object, {IntentionStatisticsTarget? target});
+      ref.$arg
+          as (
+            IntentionId,
+            IntentionPageInstance, {
+            IntentionStatisticsTarget? target,
+          });
   IntentionId get intentionId => _$args.$1;
-  Object get pageKey => _$args.$2;
+  IntentionPageInstance get pageInstance => _$args.$2;
   IntentionStatisticsTarget? get target => _$args.target;
 
   IntentionStatisticsState build(
     IntentionId intentionId,
-    Object pageKey, {
+    IntentionPageInstance pageInstance, {
     IntentionStatisticsTarget? target,
   });
   @$mustCallSuper

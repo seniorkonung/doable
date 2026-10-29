@@ -47,13 +47,6 @@ void main() {
         expect(_history(router), history);
         expect(router.hasPagelessTopRoute, isFalse);
         expect(find.text('С чего начать'), findsNothing);
-        expect(
-          tester
-              .widget<TextField>(_key('intention-details-edit-title'))
-              .controller!
-              .text,
-          'Несохранённое название',
-        );
       }
     },
   );
@@ -125,13 +118,6 @@ void main() {
           expect(_history(router), history);
           expect(tabs.activeIndex, selected);
           if (origin == _Origin.deep) {
-            expect(
-              tester
-                  .widget<TextField>(_key('intention-details-edit-title'))
-                  .controller!
-                  .text,
-              'Несохранённое название',
-            );
             await router.maybePop();
             await tester.pumpAndSettle();
             expect(

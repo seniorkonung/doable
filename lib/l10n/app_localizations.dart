@@ -806,221 +806,11 @@ abstract class AppLocalizations {
   /// **'No tags'**
   String get intentionSummaryNoTags;
 
-  /// Заголовок соседства намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Relations'**
-  String get relationNeighborhoodTitle;
-
-  /// No description provided for @relationNeighborhoodSelectedCount.
-  ///
-  /// In en, this message translates to:
-  /// **'Selected relations: {count}'**
-  String relationNeighborhoodSelectedCount(int count);
-
-  /// Действие выбора конкретной блокирующей связи
-  ///
-  /// In en, this message translates to:
-  /// **'Add to selection'**
-  String get relationNeighborhoodAddToSelection;
-
-  /// Действие снятия выбора конкретной блокирующей связи
-  ///
-  /// In en, this message translates to:
-  /// **'Remove from selection'**
-  String get relationNeighborhoodRemoveFromSelection;
-
-  /// Открыть полный набор выбранных связей для подтверждения
-  ///
-  /// In en, this message translates to:
-  /// **'Review selected relations'**
-  String get blockingRelationsReviewAction;
-
-  /// Заголовок подтверждения массового удаления
-  ///
-  /// In en, this message translates to:
-  /// **'Delete selected relations permanently?'**
-  String get blockingRelationsConfirmationTitle;
-
-  /// Необратимость удаления связей и сохранность намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Review each selected relation. Only the selected relations will be deleted. Selected daily choices will be deleted with all their path steps. This cannot be undone. The intention will remain; deleting it requires a separate confirmation.'**
-  String get blockingRelationsConfirmationWarning;
-
-  /// Сохранение переиспользуемых тегов и всех назначений намерениям при удалении связей
-  ///
-  /// In en, this message translates to:
-  /// **'The reusable tags and all their assignments to intentions will remain.'**
-  String get blockingRelationsConfirmationPreservedTags;
-
-  /// Число связей в подтверждённом наборе
-  ///
-  /// In en, this message translates to:
-  /// **'To delete: {count}'**
-  String blockingRelationsConfirmationCount(int count);
-
-  /// Идентификатор участника для различения одноимённых намерений
-  ///
-  /// In en, this message translates to:
-  /// **'Identifier: {id}'**
-  String blockingRelationsParticipantId(String id);
-
-  /// Состояние принятого массового удаления
-  ///
-  /// In en, this message translates to:
-  /// **'Deleting selected relations…'**
-  String get blockingRelationsDeleting;
-
-  /// Отказ при занятом намерении или выбранной связи
-  ///
-  /// In en, this message translates to:
-  /// **'Another change to these relations or the intention is already running.'**
-  String get blockingRelationsBusy;
-
-  /// Отказ при завершении работы приложения
-  ///
-  /// In en, this message translates to:
-  /// **'The app is closing. The change was not accepted.'**
-  String get blockingRelationsDraining;
-
-  /// Вернуться к сохранённому выбору после ошибки
-  ///
-  /// In en, this message translates to:
-  /// **'Return to selection'**
-  String get blockingRelationsEditSelectionAction;
-
-  /// Явная актуализация выбранного набора после конфликта или перед просмотром
-  ///
-  /// In en, this message translates to:
-  /// **'Refresh selection'**
-  String get blockingRelationsRefreshSelectionAction;
-
-  /// Состояние проверки выбранных связей
-  ///
-  /// In en, this message translates to:
-  /// **'Checking selected relations…'**
-  String get blockingRelationsRefreshingSelection;
-
-  /// Идентификатор недоступной выбранной связи
-  ///
-  /// In en, this message translates to:
-  /// **'Relation: {id}'**
-  String blockingRelationsInvalidSelectedRelationId(String id);
-
-  /// Причина устаревания выбранной связи: удалена
-  ///
-  /// In en, this message translates to:
-  /// **'This relation no longer exists. Remove it from the selection and confirm the remaining set again.'**
-  String get blockingRelationsInvalidMissing;
-
-  /// Причина устаревания выбранной связи: заменён участник
-  ///
-  /// In en, this message translates to:
-  /// **'This relation no longer belongs to this intention. Remove it from the selection and confirm the remaining set again.'**
-  String get blockingRelationsInvalidMoved;
-
-  /// Защита выбранной связи сохранённым дневным путём
-  ///
-  /// In en, this message translates to:
-  /// **'This relation is used in a saved daily path. First delete the daily choice separately, then select and confirm deletion of the freed long-term relation again. The entire selected set remains unchanged.'**
-  String get blockingRelationsInvalidProtected;
-
-  /// Безопасное отсутствие намерения при проверке выбора
-  ///
-  /// In en, this message translates to:
-  /// **'This intention no longer exists. Its relations cannot be deleted here.'**
-  String get blockingRelationsRefreshIntentionNotFound;
-
-  /// Устранимая ошибка чтения выбранного набора
-  ///
-  /// In en, this message translates to:
-  /// **'Selected relations could not be checked. Your selection is unchanged; try checking again.'**
-  String get blockingRelationsRefreshUnavailable;
-
-  /// Повреждение данных при чтении выбранного набора
-  ///
-  /// In en, this message translates to:
-  /// **'Selected relations could not be checked because the data is damaged. Deletion was not started.'**
-  String get blockingRelationsRefreshCorruption;
-
-  /// Неожиданная ошибка чтения выбранного набора
-  ///
-  /// In en, this message translates to:
-  /// **'Selected relations could not be checked. Deletion was not started.'**
-  String get blockingRelationsRefreshUnexpected;
-
-  /// Конфликт массового удаления: выбранная связь отсутствует
-  ///
-  /// In en, this message translates to:
-  /// **'A selected relation no longer exists. Refresh the selection and confirm it again.'**
-  String get blockingRelationsDeleteMissing;
-
-  /// Конфликт массового удаления: связь сменила участников
-  ///
-  /// In en, this message translates to:
-  /// **'A selected relation no longer belongs to this intention. Refresh the selection and confirm it again.'**
-  String get blockingRelationsDeleteMoved;
-
-  /// Конфликт массового удаления: связь заблокирована
-  ///
-  /// In en, this message translates to:
-  /// **'A selected relation is now used in a saved daily path. The entire set remains unchanged. First delete the daily choice separately, then select and confirm deletion of the freed long-term relation again.'**
-  String get blockingRelationsDeleteProhibited;
-
   /// Первоначальная загрузка соседства и полной сводки
   ///
   /// In en, this message translates to:
   /// **'Loading relations and summary…'**
   String get relationNeighborhoodSummaryLoading;
-
-  /// Полная сводка ещё не подтверждена из-за ошибки
-  ///
-  /// In en, this message translates to:
-  /// **'The relation summary couldn’t be loaded.'**
-  String get relationNeighborhoodSummaryUnavailable;
-
-  /// Состояние обновления сохранённой согласованной сводки рядом с её числами
-  ///
-  /// In en, this message translates to:
-  /// **'Updating saved relation numbers…'**
-  String get relationNeighborhoodSavedSummaryRefreshing;
-
-  /// Состояние устаревшей сохранённой сводки рядом с её числами
-  ///
-  /// In en, this message translates to:
-  /// **'Saved relation numbers are out of date because the refresh failed.'**
-  String get relationNeighborhoodSavedSummaryStale;
-
-  /// No description provided for @relationNeighborhoodTotal.
-  ///
-  /// In en, this message translates to:
-  /// **'Total relations: {count}'**
-  String relationNeighborhoodTotal(int count);
-
-  /// No description provided for @relationNeighborhoodActiveTotal.
-  ///
-  /// In en, this message translates to:
-  /// **'Active relations: {count}'**
-  String relationNeighborhoodActiveTotal(int count);
-
-  /// No description provided for @relationNeighborhoodArchivedTotal.
-  ///
-  /// In en, this message translates to:
-  /// **'Archived relations: {count}'**
-  String relationNeighborhoodArchivedTotal(int count);
-
-  /// No description provided for @relationNeighborhoodNeedTotal.
-  ///
-  /// In en, this message translates to:
-  /// **'Need: {count}'**
-  String relationNeighborhoodNeedTotal(int count);
-
-  /// No description provided for @relationNeighborhoodCanTotal.
-  ///
-  /// In en, this message translates to:
-  /// **'Can: {count}'**
-  String relationNeighborhoodCanTotal(int count);
 
   /// No description provided for @relationNeighborhoodDailyTotal.
   ///
@@ -1040,36 +830,6 @@ abstract class AppLocalizations {
   /// **'Selected action'**
   String get relationNeighborhoodDailySelectedRole;
 
-  /// Подпись групп долговременных связей в соседстве
-  ///
-  /// In en, this message translates to:
-  /// **'Long-term relations'**
-  String get relationNeighborhoodLongTermGroups;
-
-  /// Подпись выбора активных или архивных связей
-  ///
-  /// In en, this message translates to:
-  /// **'Relation state'**
-  String get relationNeighborhoodScopeLabel;
-
-  /// Активный охват соседства
-  ///
-  /// In en, this message translates to:
-  /// **'Active relations'**
-  String get relationNeighborhoodScopeActive;
-
-  /// Архивный охват соседства
-  ///
-  /// In en, this message translates to:
-  /// **'Archived relations'**
-  String get relationNeighborhoodScopeArchived;
-
-  /// Подпись выбора типа долговременной связи
-  ///
-  /// In en, this message translates to:
-  /// **'Relation type'**
-  String get relationNeighborhoodTypeLabel;
-
   /// Тип долговременной связи нужно
   ///
   /// In en, this message translates to:
@@ -1081,30 +841,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Can'**
   String get relationNeighborhoodTypeCan;
-
-  /// Подпись выбора направления связи
-  ///
-  /// In en, this message translates to:
-  /// **'Direction'**
-  String get relationNeighborhoodDirectionLabel;
-
-  /// Входящее направление относительно намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Incoming'**
-  String get relationNeighborhoodDirectionIncoming;
-
-  /// Исходящее направление относительно намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Outgoing'**
-  String get relationNeighborhoodDirectionOutgoing;
-
-  /// No description provided for @relationNeighborhoodSelectedGroupCount.
-  ///
-  /// In en, this message translates to:
-  /// **'In the whole selected group: {count}'**
-  String relationNeighborhoodSelectedGroupCount(int count);
 
   /// Устранимая ошибка начального чтения группы
   ///
@@ -1232,11 +968,461 @@ abstract class AppLocalizations {
   /// **'To {source}, you can {related}'**
   String relationNeighborhoodCanPhrase(String source, String related);
 
-  /// Заголовок подробного просмотра намерения
+  /// Доступное название полосы вкладок страницы намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Intention sections'**
+  String get detailsTabsLabel;
+
+  /// Вкладка прежних данных и действий намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Overview'**
+  String get detailsOverviewTab;
+
+  /// Вкладка соседства намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Relations'**
+  String get detailsRelationsTab;
+
+  /// Числа долговременных связей на вкладке для диктора
+  ///
+  /// In en, this message translates to:
+  /// **'Relations: {active} active, {archived} archived'**
+  String detailsRelationsTabSemantic(int active, int archived);
+
+  /// Доступное название плиток групп связей на вкладке «Связи»
+  ///
+  /// In en, this message translates to:
+  /// **'Relation groups'**
+  String get detailsRelationsGroupsLabel;
+
+  /// Группа исходящих связей «нужно» на вкладке «Связи»
+  ///
+  /// In en, this message translates to:
+  /// **'Needs'**
+  String get detailsRelationsGroupNeeds;
+
+  /// Группа исходящих связей «можно» на вкладке «Связи»
+  ///
+  /// In en, this message translates to:
+  /// **'Can use'**
+  String get detailsRelationsGroupCanUse;
+
+  /// Группа входящих связей «нужно» на вкладке «Связи»
+  ///
+  /// In en, this message translates to:
+  /// **'Needed for'**
+  String get detailsRelationsGroupNeededFor;
+
+  /// Группа входящих связей «можно» на вкладке «Связи»
+  ///
+  /// In en, this message translates to:
+  /// **'Can be used for'**
+  String get detailsRelationsGroupCanBeUsedFor;
+
+  /// Доступное название плитки группы без архивированных связей
+  ///
+  /// In en, this message translates to:
+  /// **'{group}: {count} active'**
+  String detailsRelationsGroupTileSemantic(String group, int count);
+
+  /// Доступное название плитки группы, в которой есть архивированные связи
+  ///
+  /// In en, this message translates to:
+  /// **'{group}: {count} active, some archived'**
+  String detailsRelationsGroupTileArchivedSemantic(String group, int count);
+
+  /// Подпись типа и приоритета над названием соседа в строке связи «нужно»
+  ///
+  /// In en, this message translates to:
+  /// **'need · {priority}'**
+  String detailsRelationsRowNeed(String priority);
+
+  /// Подпись типа и приоритета над названием соседа в строке связи «можно»
+  ///
+  /// In en, this message translates to:
+  /// **'can · {priority}'**
+  String detailsRelationsRowCan(String priority);
+
+  /// Часть доступного названия строки связи с архивированным соседом
+  ///
+  /// In en, this message translates to:
+  /// **'“{title}” is archived'**
+  String detailsRelationsNeighborArchived(String title);
+
+  /// Доступное название стрелки строки связи, когда сосед — намерение
+  ///
+  /// In en, this message translates to:
+  /// **'Open the intention page: {title}'**
+  String detailsRelationsWalkIntention(String title);
+
+  /// Доступное название стрелки строки связи, когда сосед — действие
+  ///
+  /// In en, this message translates to:
+  /// **'Open the action page: {title}'**
+  String detailsRelationsWalkAction(String title);
+
+  /// Подсказка о смысле группы «Нужно» под плитками вкладки «Связи»
+  ///
+  /// In en, this message translates to:
+  /// **'To get there, you need each of these.'**
+  String get detailsRelationsNeedsHint;
+
+  /// Подсказка о смысле группы «Можно использовать» под плитками вкладки «Связи»
+  ///
+  /// In en, this message translates to:
+  /// **'To get there, you can do any of these.'**
+  String get detailsRelationsCanUseHint;
+
+  /// Подсказка о смысле группы «Нужно для» под плитками вкладки «Связи»
+  ///
+  /// In en, this message translates to:
+  /// **'Each of these needs it.'**
+  String get detailsRelationsNeededForHint;
+
+  /// Подсказка о смысле группы «Можно использовать для» под плитками вкладки «Связи»
+  ///
+  /// In en, this message translates to:
+  /// **'Each of these can use it, as one of the ways.'**
+  String get detailsRelationsCanBeUsedForHint;
+
+  /// Видимая подпись начала создания связи на вкладке «Связи»
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get detailsRelationsAdd;
+
+  /// Доступное название «Добавить» у группы «Нужно»
+  ///
+  /// In en, this message translates to:
+  /// **'Add what it needs'**
+  String get detailsRelationsAddNeedsLabel;
+
+  /// Доступное название «Добавить» у группы «Можно использовать»
+  ///
+  /// In en, this message translates to:
+  /// **'Add what it can use'**
+  String get detailsRelationsAddCanUseLabel;
+
+  /// Доступное название «Добавить» у группы «Нужно для»
+  ///
+  /// In en, this message translates to:
+  /// **'Add an intention that needs it'**
+  String get detailsRelationsAddNeededForLabel;
+
+  /// Доступное название «Добавить» у группы «Можно использовать для»
+  ///
+  /// In en, this message translates to:
+  /// **'Add an intention that can use it'**
+  String get detailsRelationsAddCanBeUsedForLabel;
+
+  /// Заголовок пустой группы «Нужно»
+  ///
+  /// In en, this message translates to:
+  /// **'Needs nothing yet'**
+  String get detailsRelationsEmptyNeedsTitle;
+
+  /// Текст пустой группы «Нужно» у намерения, которое не действие
+  ///
+  /// In en, this message translates to:
+  /// **'Add what this intention cannot do without.'**
+  String get detailsRelationsEmptyNeedsIntentionText;
+
+  /// Текст пустой группы «Нужно» у действия
+  ///
+  /// In en, this message translates to:
+  /// **'An action can stand alone. Add what it needs if it has steps of its own.'**
+  String get detailsRelationsEmptyNeedsActionText;
+
+  /// Заголовок пустой группы «Можно использовать»
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to use yet'**
+  String get detailsRelationsEmptyCanUseTitle;
+
+  /// Текст пустой группы «Можно использовать»
+  ///
+  /// In en, this message translates to:
+  /// **'Add what helps to get there without being required.'**
+  String get detailsRelationsEmptyCanUseText;
+
+  /// Заголовок пустой группы «Нужно для»
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing needs it yet'**
+  String get detailsRelationsEmptyNeededForTitle;
+
+  /// Текст пустой группы «Нужно для»
+  ///
+  /// In en, this message translates to:
+  /// **'Intentions that cannot do without this one will appear here.'**
+  String get detailsRelationsEmptyNeededForText;
+
+  /// Заголовок пустой группы «Можно использовать для»
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing can use it yet'**
+  String get detailsRelationsEmptyCanBeUsedForTitle;
+
+  /// Текст пустой группы «Можно использовать для»
+  ///
+  /// In en, this message translates to:
+  /// **'Intentions that this one is a way to will appear here.'**
+  String get detailsRelationsEmptyCanBeUsedForText;
+
+  /// Текст пустой группы архивированного намерения вместо объяснения, что появится в группе
+  ///
+  /// In en, this message translates to:
+  /// **'Restore the intention to add relations.'**
+  String get detailsRelationsEmptyArchivedText;
+
+  /// Подпись строки свёрнутого архива группы связей после её активных связей
+  ///
+  /// In en, this message translates to:
+  /// **'Archived'**
+  String get detailsRelationsArchiveFold;
+
+  /// Доступное название кнопки архива группы связей: группа и число архивированных связей
+  ///
+  /// In en, this message translates to:
+  /// **'Archived in {group}: {count}'**
+  String detailsRelationsArchiveFoldSemantic(String group, int count);
+
+  /// Вкладка дневных выборов, прямо использующих намерение
+  ///
+  /// In en, this message translates to:
+  /// **'Choices'**
+  String get detailsChoicesTab;
+
+  /// Подсказка над непустым списком роли «исходное» на вкладке «Выборы»
+  ///
+  /// In en, this message translates to:
+  /// **'Daily choices that start from this intention.'**
+  String get detailsChoicesSourceHint;
+
+  /// Подсказка над непустым списком роли «выбранное» на вкладке «Выборы»
+  ///
+  /// In en, this message translates to:
+  /// **'Daily choices that end in this intention.'**
+  String get detailsChoicesSelectedHint;
+
+  /// Видимая подпись начала дневного выбора на вкладке «Выборы»
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get detailsChoicesAdd;
+
+  /// Доступное название «Добавить» у роли «исходное»
+  ///
+  /// In en, this message translates to:
+  /// **'Create a daily choice that starts from this intention'**
+  String get detailsChoicesAddSourceLabel;
+
+  /// Доступное название «Добавить» у роли «выбранное»
+  ///
+  /// In en, this message translates to:
+  /// **'Create a daily choice that ends in this action'**
+  String get detailsChoicesAddSelectedLabel;
+
+  /// Доступное имя страницы намерения при загрузке и отказе чтения
   ///
   /// In en, this message translates to:
   /// **'Intention details'**
   String get detailsTitle;
+
+  /// Тип неготового намерения в верхней панели его страницы
+  ///
+  /// In en, this message translates to:
+  /// **'Intention'**
+  String get detailsTypeIntention;
+
+  /// Тип готового к действию намерения в верхней панели его страницы
+  ///
+  /// In en, this message translates to:
+  /// **'Action'**
+  String get detailsTypeAction;
+
+  /// Доступное название пары плиток выбора готовности к действию на обзоре намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Intention or action'**
+  String get detailsTypeChoiceLabel;
+
+  /// Пояснение плитки неготового намерения на обзоре
+  ///
+  /// In en, this message translates to:
+  /// **'Any size. It may take more than a day.'**
+  String get detailsTypeIntentionHint;
+
+  /// Оба критерия действия на плитке готового намерения на обзоре
+  ///
+  /// In en, this message translates to:
+  /// **'Doable within one day, and clear what to do.'**
+  String get detailsTypeActionHint;
+
+  /// Метка архива после названия в шапке страницы архивированного намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Archived'**
+  String get detailsArchivedBadge;
+
+  /// Строка о смысле архива под названием в шапке страницы архивированного намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Archived intentions stay in saved paths and are not offered in new ones.'**
+  String get detailsArchivedNote;
+
+  /// Кнопка восстановления намерения из архива в шапке его страницы
+  ///
+  /// In en, this message translates to:
+  /// **'Restore from archive'**
+  String get detailsRestoreFromArchiveAction;
+
+  /// Доступное название кнопки «⋯» в верхней панели страницы намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Options of the intention'**
+  String get detailsOptionsLabel;
+
+  /// Заголовок листа параметров намерения: вид предмета
+  ///
+  /// In en, this message translates to:
+  /// **'Intention'**
+  String get detailsOptionsTitle;
+
+  /// Пункт параметров намерения, открывающий экран изменения
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get detailsOptionEdit;
+
+  /// Пункт параметров активного намерения, архивирующий его
+  ///
+  /// In en, this message translates to:
+  /// **'Archive'**
+  String get detailsOptionArchive;
+
+  /// Опасный пункт параметров намерения, открывающий подтверждение удаления
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get detailsOptionDelete;
+
+  /// Пояснение архивирования намерения с активными связями
+  ///
+  /// In en, this message translates to:
+  /// **'Its relations are archived with it'**
+  String get detailsOptionArchiveWithRelations;
+
+  /// Пояснение архивирования намерения без активных связей
+  ///
+  /// In en, this message translates to:
+  /// **'It stays in saved paths, new ones will not use it'**
+  String get detailsOptionArchiveAlone;
+
+  /// Пояснение восстановления намерения, у которого есть связи
+  ///
+  /// In en, this message translates to:
+  /// **'Its relations stay archived until you restore them'**
+  String get detailsOptionRestoreWithRelations;
+
+  /// Пояснение восстановления намерения без связей
+  ///
+  /// In en, this message translates to:
+  /// **'New paths can use it again'**
+  String get detailsOptionRestoreAlone;
+
+  /// Пояснение доступного удаления намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Its tags stay'**
+  String get detailsOptionDeleteKeepsTags;
+
+  /// Причина выключенного удаления намерения с долговременными связями
+  ///
+  /// In en, this message translates to:
+  /// **'Delete its relations first'**
+  String get detailsOptionDeleteRelationsFirst;
+
+  /// Причина выключенного удаления намерения с дневными выборами
+  ///
+  /// In en, this message translates to:
+  /// **'Delete its daily choices first'**
+  String get detailsOptionDeleteDailyChoicesFirst;
+
+  /// Причина выключенного удаления намерения со связями и дневными выборами
+  ///
+  /// In en, this message translates to:
+  /// **'Delete its relations and daily choices first'**
+  String get detailsOptionDeleteRelationsAndDailyChoicesFirst;
+
+  /// Причина недоступности пунктов параметров во время изменяющей операции
+  ///
+  /// In en, this message translates to:
+  /// **'Wait for the current change to finish'**
+  String get detailsOptionWait;
+
+  /// Вопрос подтверждения удаления намерения из параметров
+  ///
+  /// In en, this message translates to:
+  /// **'Delete intention?'**
+  String get detailsDeleteDialogTitle;
+
+  /// Текст подтверждения удаления до выделенного названия намерения
+  ///
+  /// In en, this message translates to:
+  /// **'This removes the intention '**
+  String get detailsDeleteDialogTextBefore;
+
+  /// Текст подтверждения удаления после выделенного названия намерения
+  ///
+  /// In en, this message translates to:
+  /// **' with its description and cannot be undone. Its tags stay.'**
+  String get detailsDeleteDialogTextAfter;
+
+  /// Отмена удаления намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get detailsDeleteDialogCancel;
+
+  /// Подтверждение удаления намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get detailsDeleteDialogConfirm;
+
+  /// Доступное название кнопки-названия в шапке страницы намерения, которая открывает экран изменения; название намерения не переводится
+  ///
+  /// In en, this message translates to:
+  /// **'Edit the name: {title}'**
+  String detailsEditTitleLabel(String title);
+
+  /// Доступное название описания на вкладке «Обзор», которое открывает экран изменения с курсором в описании; описание намерения не переводится
+  ///
+  /// In en, this message translates to:
+  /// **'Edit the description: {description}'**
+  String detailsEditDescriptionLabel(String description);
+
+  /// Приглашение добавить описание на вкладке «Обзор» намерения без описания; открывает экран изменения с курсором в описании
+  ///
+  /// In en, this message translates to:
+  /// **'Add a description'**
+  String get detailsAddDescription;
+
+  /// Метка даты создания намерения в строке дат в конце вкладки «Обзор»
+  ///
+  /// In en, this message translates to:
+  /// **'Created'**
+  String get detailsCreatedLabel;
+
+  /// Метка даты последнего изменения намерения в строке дат в конце вкладки «Обзор»
+  ///
+  /// In en, this message translates to:
+  /// **'Changed'**
+  String get detailsChangedLabel;
 
   /// Начальная загрузка подробных данных намерения
   ///
@@ -1274,30 +1460,6 @@ abstract class AppLocalizations {
   /// **'Saving changes…'**
   String get detailsOperationRunning;
 
-  /// Подпись описания в подробных данных намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Description'**
-  String get detailsDescriptionLabel;
-
-  /// Отсутствующее описание в подробных данных намерения
-  ///
-  /// In en, this message translates to:
-  /// **'No description'**
-  String get detailsNoDescription;
-
-  /// Подпись готовности к действию в подробных данных
-  ///
-  /// In en, this message translates to:
-  /// **'Readiness'**
-  String get detailsReadinessLabel;
-
-  /// Подпись архивного состояния в подробных данных
-  ///
-  /// In en, this message translates to:
-  /// **'State'**
-  String get detailsArchiveStateLabel;
-
   /// Активное состояние намерения в подробных данных
   ///
   /// In en, this message translates to:
@@ -1310,131 +1472,17 @@ abstract class AppLocalizations {
   /// **'Archived'**
   String get detailsArchived;
 
-  /// Действие перехода к изменению намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Edit'**
-  String get detailsEditAction;
-
-  /// Действие сохранения изменённых данных намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Save changes'**
-  String get detailsSaveAction;
-
   /// Действие отмены изменения намерения до отправки
   ///
   /// In en, this message translates to:
   /// **'Cancel'**
   String get detailsCancelEditAction;
 
-  /// Подтверждение успешного изменения намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Changes saved.'**
-  String get detailsSaved;
-
-  /// Действие начала явного включения готовности намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Mark as ready for action'**
-  String get detailsEnableReadinessAction;
-
-  /// Явное действие выключения готовности намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Mark as not ready for action'**
-  String get detailsDisableReadinessAction;
-
-  /// Заголовок объяснения критериев готовности к действию
-  ///
-  /// In en, this message translates to:
-  /// **'Ready for action?'**
-  String get detailsReadinessConfirmationTitle;
-
-  /// Критерий полной однодневной выполнимости действия
-  ///
-  /// In en, this message translates to:
-  /// **'It can be completed fully within one day.'**
-  String get detailsReadinessOneDayCriterion;
-
-  /// Критерий операционной понятности действия человеку
-  ///
-  /// In en, this message translates to:
-  /// **'It is clear enough for a person to carry out.'**
-  String get detailsReadinessClarityCriterion;
-
-  /// Подтверждение соответствия обоим критериям действия
-  ///
-  /// In en, this message translates to:
-  /// **'Mark as ready'**
-  String get detailsConfirmReadinessAction;
-
-  /// Явное действие архивирования намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Archive'**
-  String get detailsArchiveAction;
-
-  /// Явное действие восстановления намерения из архива
-  ///
-  /// In en, this message translates to:
-  /// **'Restore'**
-  String get detailsRestoreAction;
-
-  /// Действие начала физического удаления намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Delete permanently'**
-  String get detailsDeleteAction;
-
-  /// Заголовок подтверждения необратимого удаления намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Delete intention permanently?'**
-  String get detailsDeleteConfirmationTitle;
-
-  /// Объяснение необратимости физического удаления намерения
-  ///
-  /// In en, this message translates to:
-  /// **'This can’t be undone. The intention, its description, and all its tag assignments, including those not shown here, will be permanently deleted. The tags will remain.'**
-  String get detailsDeleteConfirmationMessage;
-
-  /// Явное подтверждение физического удаления намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Delete permanently'**
-  String get detailsConfirmDeleteAction;
-
   /// Подтверждение физического удаления намерения после ухода из подробного просмотра
   ///
   /// In en, this message translates to:
   /// **'Intention deleted.'**
   String get detailsDeleted;
-
-  /// Подтверждение включённой готовности к действию
-  ///
-  /// In en, this message translates to:
-  /// **'Marked as ready for action.'**
-  String get detailsReadinessEnabled;
-
-  /// Подтверждение выключенной готовности к действию
-  ///
-  /// In en, this message translates to:
-  /// **'Marked as not ready for action.'**
-  String get detailsReadinessDisabled;
-
-  /// Подтверждение архивирования намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Intention archived.'**
-  String get detailsArchivedSuccess;
-
-  /// Подтверждение восстановления намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Intention restored.'**
-  String get detailsRestoredSuccess;
 
   /// Безопасная ошибка недопустимого перехода состояния
   ///
@@ -1496,30 +1544,6 @@ abstract class AppLocalizations {
   /// **'The intention wasn’t deleted: its relations still block deletion. Archived relations and relations that aren’t loaded yet block it too.'**
   String get detailsDeleteBlockedByRelations;
 
-  /// Переход к актуальным группам связей, блокирующих удаление
-  ///
-  /// In en, this message translates to:
-  /// **'Show blocking relations'**
-  String get detailsShowBlockingRelationsAction;
-
-  /// Объяснение каскада непосредственных связей перед архивированием
-  ///
-  /// In en, this message translates to:
-  /// **'Archiving also archives the intention’s direct relations. Neighbouring intentions and their other relations stay unchanged.'**
-  String get detailsArchiveCascadeExplanation;
-
-  /// Объяснение сохранённого архива связей перед восстановлением
-  ///
-  /// In en, this message translates to:
-  /// **'Restoring returns only the intention. Its relations stay archived: {count}.'**
-  String detailsRestoreRelationsExplanation(int count);
-
-  /// Переход к архивным группам связей намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Show archived relations'**
-  String get detailsShowArchivedRelationsAction;
-
   /// Устранимая недоступность физического удаления намерения
   ///
   /// In en, this message translates to:
@@ -1573,6 +1597,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The changes couldn’t be saved because of an unexpected error.'**
   String get detailsUpdateUnexpected;
+
+  /// Заголовок экрана изменения названия и описания намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Edit intention'**
+  String get intentionEditTitle;
+
+  /// Действие сохранения в верхней панели экрана изменения намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get intentionEditSaveAction;
+
+  /// Заполнитель и доступное название поля названия на экране изменения намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get intentionEditNameLabel;
+
+  /// Доступное название поля описания на экране изменения намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get intentionEditDescriptionLabel;
+
+  /// Заполнитель пустого поля описания на экране изменения намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Add a description'**
+  String get intentionEditDescriptionPlaceholder;
+
+  /// Вопрос перед уходом с экрана изменения намерения с несохранённым текстом
+  ///
+  /// In en, this message translates to:
+  /// **'Discard changes?'**
+  String get intentionEditDiscardTitle;
+
+  /// Объяснение, что несохранённые изменения намерения будут потеряны при уходе с экрана
+  ///
+  /// In en, this message translates to:
+  /// **'Your changes to the intention won’t be saved.'**
+  String get intentionEditDiscardMessage;
+
+  /// Действие вопроса об отмене изменений, закрывающее экран изменения намерения без сохранения
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get intentionEditDiscardAction;
+
+  /// Действие вопроса об отмене изменений, возвращающее к полям экрана изменения намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Keep editing'**
+  String get intentionEditContinueAction;
 
   /// Заголовок формы создания намерения
   ///
@@ -1867,48 +1945,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Delete'**
   String get graphOperationDelete;
-
-  /// Вид массовой операции в сообщении оболочки
-  ///
-  /// In en, this message translates to:
-  /// **'Delete selected relations'**
-  String get graphOperationDeleteBlockingRelations;
-
-  /// Успешное массовое удаление выбранных связей
-  ///
-  /// In en, this message translates to:
-  /// **'Selected relations deleted.'**
-  String get blockingRelationsDeleted;
-
-  /// Намерение исчезло до массового удаления
-  ///
-  /// In en, this message translates to:
-  /// **'This intention no longer exists. Relations weren’t deleted.'**
-  String get blockingRelationsDeleteIntentionNotFound;
-
-  /// Устаревший набор массового удаления
-  ///
-  /// In en, this message translates to:
-  /// **'The selected relations changed. Refresh the selection and confirm again.'**
-  String get blockingRelationsDeleteConflict;
-
-  /// Временная недоступность массового удаления
-  ///
-  /// In en, this message translates to:
-  /// **'Selected relations couldn’t be deleted. Try again.'**
-  String get blockingRelationsDeleteUnavailable;
-
-  /// Повреждение данных при массовом удалении
-  ///
-  /// In en, this message translates to:
-  /// **'Stored data is damaged. Selected relations weren’t deleted.'**
-  String get blockingRelationsDeleteCorruption;
-
-  /// Непредвиденная ошибка массового удаления
-  ///
-  /// In en, this message translates to:
-  /// **'Selected relations couldn’t be deleted because of an unexpected error.'**
-  String get blockingRelationsDeleteUnexpected;
 
   /// Безопасное обозначение создаваемого намерения до подтверждения
   ///
@@ -2809,10 +2845,10 @@ abstract class AppLocalizations {
   /// **'The tag assignment operation failed because of an unexpected error.'**
   String get tagAssignmentUnexpected;
 
-  /// Заголовок блока назначений
+  /// Заголовок блока тегов намерения
   ///
   /// In en, this message translates to:
-  /// **'Assigned tags'**
+  /// **'Tags'**
   String get tagAssignmentsTitle;
 
   /// Вид получателя: намерение
@@ -2845,12 +2881,6 @@ abstract class AppLocalizations {
   /// **'Loading assignments…'**
   String get tagAssignmentsLoading;
 
-  /// Существующий получатель без назначений
-  ///
-  /// In en, this message translates to:
-  /// **'No tags assigned yet.'**
-  String get tagAssignmentsEmpty;
-
   /// Актуализация открытых назначений
   ///
   /// In en, this message translates to:
@@ -2875,28 +2905,28 @@ abstract class AppLocalizations {
   /// **'Could not load assignments because of an unexpected error.'**
   String get tagAssignmentsUnexpected;
 
-  /// Переход к выбору тега
+  /// Видимая подпись открытия панели тегов намерения
   ///
   /// In en, this message translates to:
-  /// **'Choose a tag'**
-  String get tagAssignmentsChoose;
+  /// **'Add'**
+  String get tagAssignmentsAdd;
 
-  /// Доступная подпись перехода к выбору
+  /// Доступная подпись «Добавить» с перечнем назначенных тегов
   ///
   /// In en, this message translates to:
-  /// **'Choose a tag for the {archiveState} {targetKind}'**
-  String tagAssignmentsChooseSemantic(String targetKind, String archiveState);
+  /// **'Tags: {tagNames}. Add or remove'**
+  String tagAssignmentsAddLabel(String tagNames);
 
-  /// Снятие одной пары назначения
+  /// Доступная подпись «Добавить» у намерения без тегов
   ///
   /// In en, this message translates to:
-  /// **'Remove assignment'**
-  String get tagAssignmentsRemove;
+  /// **'Add tags'**
+  String get tagAssignmentsAddEmptyLabel;
 
-  /// Доступная подпись снятия назначения конкретного тега
+  /// Доступная подпись крестика, который снимает тег с намерения
   ///
   /// In en, this message translates to:
-  /// **'Remove assignment: {tagName}'**
+  /// **'Remove the tag: {tagName}'**
   String tagAssignmentsRemoveNamed(String tagName);
 
   /// Ожидание подтверждения снятия
@@ -3322,12 +3352,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The relation couldn’t be deleted because of an unexpected error.'**
   String get relationDeleteUnexpected;
-
-  /// Назначение перехода из строки соседства в подробный просмотр связи
-  ///
-  /// In en, this message translates to:
-  /// **'Opens the relation details'**
-  String get relationNeighborhoodOpenRelation;
 
   /// Назначение перехода к полному пути дневного выбора
   ///
@@ -4295,29 +4319,11 @@ abstract class AppLocalizations {
   /// **'Saving…'**
   String get relationEditorSaving;
 
-  /// Создание связи из исходящей группы соседства
-  ///
-  /// In en, this message translates to:
-  /// **'Create an outgoing relation'**
-  String get relationNeighborhoodCreateOutgoingAction;
-
-  /// Создание связи из входящей группы соседства
-  ///
-  /// In en, this message translates to:
-  /// **'Create an incoming relation'**
-  String get relationNeighborhoodCreateIncomingAction;
-
   /// Вариант приоритета P1–P4 в форме создания связи
   ///
   /// In en, this message translates to:
   /// **'Priority {priority}'**
   String relationEditorPriorityOption(String priority);
-
-  /// Открыть верхний обход из активного намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Choose an action along a path'**
-  String get detailsChoosePathAction;
 
   /// Заголовок верхнего обхода
   ///

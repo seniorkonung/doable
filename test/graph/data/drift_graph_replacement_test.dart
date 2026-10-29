@@ -13,7 +13,6 @@ import 'package:doable/src/data_transfer/application/graph_replacement.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
-import 'package:doable/src/graph/application/selected_relations.dart';
 import 'package:doable/src/graph/data/contribution_reachability.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/graph_backups/graph_backup_registry.dart';
@@ -351,10 +350,9 @@ void main() {
     });
 
     test('после замены наблюдатели намерения, дневного выбора, '
-        'долговременной связи, выбранных связей и тега перечитывают их на '
+        'долговременной связи и тега перечитывают их на '
         'ревизии новой эпохи', () async {
       await createPreviousGraph();
-      final health = _intentionId(_goldenHealthId);
       final relation = _relationId(_goldenHealthRunningRelationId);
       final reads = <String, StreamIterator<_SnapshotRead>>{
         'намерение': StreamIterator(
@@ -365,14 +363,6 @@ void main() {
         ),
         'долговременная связь': StreamIterator(
           repository.watchRelation(relation),
-        ),
-        'выбранные связи': StreamIterator(
-          repository.watchSelectedRelations(
-            SelectedRelationsQuery(
-              intentionId: health,
-              relationIds: [relation],
-            ),
-          ),
         ),
         'тег': StreamIterator(repository.watchTag(_tagId(_goldenSportTagId))),
       };

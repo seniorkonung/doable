@@ -2,6 +2,7 @@ import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -16,12 +17,16 @@ final class OrdinaryPageTestApp extends StatefulWidget {
     required this.home,
     this.locale = const Locale('en'),
     this.builder,
+    this.routes = const [],
     super.key,
   });
 
   final Widget home;
   final Locale locale;
   final TransitionBuilder? builder;
+
+  /// Маршруты, которые проверяемая страница открывает поверх себя.
+  final List<AutoRoute> routes;
 
   @override
   State<OrdinaryPageTestApp> createState() => _OrdinaryPageTestAppState();
@@ -43,6 +48,7 @@ final class _OrdinaryPageTestAppState extends State<OrdinaryPageTestApp> {
         ],
       ),
       NamedRouteDef(name: 'TestOrdinaryRoute', builder: (_, _) => widget.home),
+      ...widget.routes,
     ],
   );
 
@@ -56,6 +62,8 @@ final class _OrdinaryPageTestAppState extends State<OrdinaryPageTestApp> {
   Widget build(BuildContext context) => ProviderScope(
     overrides: [inMemoryQuickCreationModeOverride],
     child: MaterialApp.router(
+      theme: doableTheme(Brightness.light),
+      darkTheme: doableTheme(Brightness.dark),
       locale: widget.locale,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,

@@ -168,10 +168,16 @@ void main() {
       ),
       IntentionDetailsPage,
     );
+    await _tap(tester, find.text('Relations').first);
+    // Вкладка «Связи» действия открывается на группе «Нужно для».
+    await _tap(
+      tester,
+      find.byKey(const ValueKey('intention-relations-group-needs')),
+    );
     await _open(
       tester,
       find.byKey(
-        const ValueKey('relation-neighborhood-create-relation'),
+        const ValueKey('intention-relations-add'),
         skipOffstage: false,
       ),
       RelationEditorPage,

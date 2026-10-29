@@ -1,6 +1,7 @@
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
@@ -187,20 +188,20 @@ void defineRelationParticipantSelectionTests({
   required Future<AppRouter> Function(
     WidgetTester,
     ControlledRelationFormRepository,
-    RelationDirection,
+    IntentionRelationGroup,
   )
   openForm,
 }) {
-  for (final (name, direction, firstRole, secondRole) in [
-    ('Исходящий', RelationDirection.outgoing, 'source', 'related'),
-    ('Входящий', RelationDirection.incoming, 'related', 'source'),
+  for (final (name, group, firstRole, secondRole) in [
+    ('Исходящий', IntentionRelationGroup.needs, 'source', 'related'),
+    ('Входящий', IntentionRelationGroup.neededFor, 'related', 'source'),
   ]) {
     testWidgets(
       '$name вход: повторный выбор, исключение другой роли и отмена',
       (tester) async {
         final repository = ControlledRelationFormRepository();
         addTearDown(repository.dispose);
-        final router = await openForm(tester, repository, direction);
+        final router = await openForm(tester, repository, group);
         const title = 'Текущее намерение';
         final current = testSummary(index: 1, title: title);
         final sameTitle = testSummary(index: 2, title: title);
@@ -305,11 +306,15 @@ void defineRelationParticipantSelectionTests({
         final command = repository.commandAt(0);
         expect(
           command.sourceIntentionId,
-          direction == RelationDirection.outgoing ? current.id : sameTitle.id,
+          group.direction == RelationDirection.outgoing
+              ? current.id
+              : sameTitle.id,
         );
         expect(
           command.relatedIntentionId,
-          direction == RelationDirection.outgoing ? sameTitle.id : current.id,
+          group.direction == RelationDirection.outgoing
+              ? sameTitle.id
+              : current.id,
         );
         expect(command.type, LongTermRelationType.need);
         expect(command.priority, RelationPriority.p3);

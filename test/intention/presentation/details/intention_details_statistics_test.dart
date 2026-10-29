@@ -1,17 +1,21 @@
 import 'dart:async';
-import 'dart:ui' show SemanticsAction;
+import 'dart:ui' show SemanticsAction, Tristate;
 
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
+import 'package:doable/src/design_system/components/tabs.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
+import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:doable/src/intention/presentation/details/intention_page_target.dart';
+import 'package:doable/src/intention/presentation/details/intention_details_tabs.dart';
 import 'package:doable/src/statistics/application/contribution_counts.dart';
 import 'package:doable/src/statistics/application/intention_statistics_breakdown.dart';
 import 'package:doable/src/statistics/application/intention_statistics_calendar.dart';
@@ -70,9 +74,11 @@ void main() {
               locale: Locale(locale),
               home: IntentionDetailsPage(
                 intentionId: intention.id,
-                statisticsTarget: IntentionStatisticsTarget(
-                  view: StatisticsView.throughRelations,
-                  period: period,
+                target: StatisticsTarget(
+                  IntentionStatisticsTarget(
+                    view: StatisticsView.throughRelations,
+                    period: period,
+                  ),
                 ),
               ),
             ),
@@ -242,20 +248,10 @@ void main() {
         date = CalendarDate.fromParts(2026, 10, 14);
         await tester.pump(const Duration(hours: 1));
         await tester.pumpAndSettle();
-        final relations = find.text(texts.relationNeighborhoodTitle);
-        await tester.scrollUntilVisible(
-          relations,
-          150,
-          scrollable: scrollable,
-          maxScrolls: 500,
-        );
-        position.jumpTo(
-          position.pixels +
-              tester.getTopLeft(relations).dy -
-              tester.getRect(scrollView).top,
-        );
-        await tester.pumpAndSettle();
+        final relations = find.text(texts.detailsRelationsTab).first;
         await tester.ensureVisible(relations);
+        await tester.pumpAndSettle();
+        await tester.tap(relations);
         await tester.pumpAndSettle();
         expect(relations.hitTestable(), findsOneWidget);
         expect(updating.hitTestable(), findsNothing);
@@ -264,7 +260,7 @@ void main() {
     );
   }
   testWidgets(
-    'обычное открытие показывает статистику между тегами и связями для обоих состояний намерения',
+    'обычное открытие показывает обзор, статистика доступна на своей вкладке для обоих состояний намерения',
     (tester) async {
       for (final archiveState in IntentionArchiveState.values) {
         final repository = ControlledDetailsRepository()
@@ -292,32 +288,30 @@ void main() {
         repository.detailRequests.single.add(ResultSuccess(intention));
         await tester.pumpAndSettle();
 
-        expect(find.text(intention.title).hitTestable(), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('intention-details-title')).hitTestable(),
+          findsOneWidget,
+        );
+        expect(repository.statisticsQueries, isEmpty);
+        expect(repository.relationGroupQueries, isEmpty);
+        expect(
+          find.byType(TagAssignmentsSection, skipOffstage: false),
+          findsOneWidget,
+        );
+        await tester.tap(find.text('Связи').first);
+        await tester.pump();
+        repository.detailRequests.last.add(ResultSuccess(intention));
+        await tester.pumpAndSettle();
+        expect(repository.statisticsQueries, isEmpty);
+        final statistics = find.text('Статистика').first;
+        await tester.tap(statistics);
+        await tester.pumpAndSettle();
         final query = repository.statisticsQueries.single;
         expect(query.intentionId, intention.id);
         expect(query.period, StatisticsMonth(2026, 10));
         expect(query.view, StatisticsView.throughRelations);
         expect(query.localDate, CalendarDate.fromParts(2026, 10, 12));
-        final initialGroup = repository.relationGroupQueries.single;
-        expect(initialGroup.direction, RelationDirection.outgoing);
-        expect(initialGroup.type, LongTermRelationType.need);
-        expect(initialGroup.scope, RelationScope.active);
-
-        final tags = find.byType(TagAssignmentsSection, skipOffstage: false);
-        final statistics = find.text('Статистика', skipOffstage: false);
-        expect(statistics, findsOneWidget);
-        expect(
-          tester.getTopLeft(tags).dy,
-          lessThan(tester.getTopLeft(statistics).dy),
-        );
-        expect(
-          tester.getTopLeft(statistics).dy,
-          lessThan(
-            tester.getTopLeft(find.text('Связи', skipOffstage: false)).dy,
-          ),
-        );
-        await tester.ensureVisible(statistics);
-        await tester.pumpAndSettle();
+        expect(find.byType(TagAssignmentsSection), findsNothing);
         expect(statistics.hitTestable(), findsOneWidget);
         expect(find.textContaining('октябрь 2026'), findsOneWidget);
         await tester.pumpWidget(const SizedBox.shrink());
@@ -327,7 +321,223 @@ void main() {
   );
 
   testWidgets(
-    'цель маршрута применяется до чтения и прокручивает раздел только при первом получении намерения',
+    'скрытые изменения ждут вкладки статистики и объединяются в одно чтение',
+    (tester) async {
+      var revision = 0;
+      final repository = ControlledDetailsRepository()
+        ..onStatisticsSection = (query) =>
+            _emptySection(query, revision: revision);
+      final intention = testDetailsIntention();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            personalGraphRepositoryProvider.overrideWithValue(repository),
+            dailyChoiceLocalDateSourceProvider.overrideWithValue(
+              () => DailyChoiceLocalDay(
+                date: CalendarDate.fromParts(2026, 10, 12),
+                untilNextDate: const Duration(hours: 12),
+              ),
+            ),
+          ],
+          child: OrdinaryPageTestApp(
+            locale: const Locale('ru'),
+            home: IntentionDetailsPage(
+              intentionId: intention.id,
+              target: StatisticsTarget(
+                IntentionStatisticsTarget(
+                  view: StatisticsView.intermediateIntentions,
+                  period: StatisticsYear(2025),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      repository.detailRequests.single.add(ResultSuccess(intention));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Предыдущий год'));
+      await tester.pumpAndSettle();
+      expect(repository.statisticsQueries, hasLength(2));
+
+      final context = tester.element(find.byType(IntentionDetailsPage));
+      final coordinator = ProviderScope.containerOf(
+        context,
+        listen: false,
+      ).read(graphCommandCoordinatorProvider.notifier);
+      Future<void> change() async {
+        revision += 1;
+        final before = testDetailsIntention(index: revision + 1);
+        final after = testDetailsIntention(
+          index: revision + 1,
+          archiveState: IntentionArchiveState.archived,
+        );
+        final accepted = coordinator.acceptExisting(
+          ArchiveIntention(before.id),
+          presentationTitle: before.title,
+        ) as IntentionCommandAccepted;
+        repository.completeCommand(
+          revision - 1,
+          testDetailsSavedResult(
+            after,
+            before: before,
+            revision: TestDetailsRevision(revision),
+          ),
+        );
+        await accepted.future;
+        await tester.pumpAndSettle();
+      }
+
+      await tester.tap(find.text('Обзор').first);
+      await tester.pumpAndSettle();
+      await change();
+      await change();
+      expect(repository.statisticsQueries, hasLength(2));
+
+      unawaited(
+        Navigator.of(context).push<void>(
+          MaterialPageRoute(
+            builder: (context) => Scaffold(
+              body: TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Закрыть'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await change();
+      expect(repository.statisticsQueries, hasLength(2));
+      await tester.tap(find.text('Закрыть'));
+      await tester.pumpAndSettle();
+      expect(repository.statisticsQueries, hasLength(2));
+
+      await tester.tap(find.text('Статистика').first);
+      await tester.pumpAndSettle();
+      expect(repository.statisticsQueries, hasLength(3));
+      expect(repository.statisticsQueries.last.period, StatisticsYear(2024));
+      expect(
+        repository.statisticsQueries.last.view,
+        StatisticsView.intermediateIntentions,
+      );
+      expect(find.text('2024'), findsOneWidget);
+      await tester.tap(find.text('Обзор').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Статистика').first);
+      await tester.pumpAndSettle();
+      expect(repository.statisticsQueries, hasLength(3));
+      expect(find.text('2024'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'обновление цели сохраняет выбор, смена намерения начинает новый экземпляр',
+    (tester) async {
+      final repository = ControlledDetailsRepository()
+        ..onStatisticsSection = _emptySection;
+      final first = testDetailsIntention();
+      final second = testDetailsIntention(index: 2);
+      final page = ValueNotifier(
+        IntentionDetailsPage(
+          intentionId: first.id,
+          target: StatisticsTarget(
+            IntentionStatisticsTarget(
+              view: StatisticsView.intermediateIntentions,
+              period: StatisticsYear(2025),
+            ),
+          ),
+        ),
+      );
+      addTearDown(page.dispose);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            personalGraphRepositoryProvider.overrideWithValue(repository),
+          ],
+          child: OrdinaryPageTestApp(
+            locale: const Locale('ru'),
+            home: ValueListenableBuilder(
+              valueListenable: page,
+              builder: (_, value, _) => value,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      repository.detailRequests.single.add(ResultSuccess(first));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Предыдущий год'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Обзор').first);
+      await tester.pumpAndSettle();
+
+      final nextTarget = StatisticsTarget(
+        IntentionStatisticsTarget(
+          view: StatisticsView.sourceIntentions,
+          period: StatisticsYear(2030),
+        ),
+      );
+      page.value = IntentionDetailsPage(
+        intentionId: first.id,
+        target: nextTarget,
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .getSemantics(find.bySemanticsLabel('Обзор'))
+            .getSemanticsData()
+            .flagsCollection
+            .isSelected,
+        Tristate.isTrue,
+      );
+      expect(repository.statisticsQueries, hasLength(2));
+      await tester.tap(find.text('Статистика').first);
+      await tester.pumpAndSettle();
+      expect(find.text('2024'), findsOneWidget);
+      expect(repository.statisticsQueries, hasLength(2));
+      expect(
+        repository.statisticsQueries.last.view,
+        StatisticsView.intermediateIntentions,
+      );
+
+      await tester.tap(find.text('Обзор').first);
+      await tester.pumpAndSettle();
+
+      page.value = IntentionDetailsPage(
+        intentionId: second.id,
+        target: nextTarget,
+      );
+      await tester.pump();
+      repository.detailRequests.last.add(ResultSuccess(second));
+      await tester.pumpAndSettle();
+      expect(find.text('2030'), findsOneWidget);
+      expect(repository.statisticsQueries, hasLength(3));
+      expect(repository.statisticsQueries.last.intentionId, second.id);
+      expect(
+        repository.statisticsQueries.last.view,
+        StatisticsView.sourceIntentions,
+      );
+      expect(
+        tester
+            .getSemantics(
+              find.descendant(
+                of: find.byType(Tabs<IntentionDetailsTab>),
+                matching: find.bySemanticsLabel('Статистика'),
+              ),
+            )
+            .getSemanticsData()
+            .flagsCollection
+            .isSelected,
+        Tristate.isTrue,
+      );
+      expect(repository.relationGroupQueries, isEmpty);
+    },
+  );
+
+  testWidgets(
+    'две страницы одного намерения сохраняют независимые вкладки и статистику',
     (tester) async {
       final repository = ControlledDetailsRepository()
         ..onStatisticsSection = _emptySection;
@@ -365,9 +575,11 @@ void main() {
         router.push(
           IntentionDetailsRoute(
             intentionId: intention.id,
-            statisticsTarget: IntentionStatisticsTarget(
-              view: StatisticsView.intermediateIntentions,
-              period: StatisticsYear(2025),
+            target: StatisticsTarget(
+              IntentionStatisticsTarget(
+                view: StatisticsView.intermediateIntentions,
+                period: StatisticsYear(2025),
+              ),
             ),
           ),
         ),
@@ -381,9 +593,9 @@ void main() {
       );
       repository.detailRequests.single.add(ResultSuccess(intention));
       await tester.pumpAndSettle();
-      expect(find.text('Статистика').hitTestable(), findsOneWidget);
+      expect(find.text('Статистика').first.hitTestable(), findsOneWidget);
       expect(find.text('2025'), findsOneWidget);
-      expect(repository.relationGroupQueries, hasLength(1));
+      expect(repository.relationGroupQueries, isEmpty);
 
       await tester.tap(find.text('Месяц'));
       await tester.pumpAndSettle();
@@ -409,13 +621,18 @@ void main() {
         StatisticsMonth(2026, 10),
       );
 
+      await tester.tap(find.text('Overview').first);
+      await tester.pumpAndSettle();
+
       unawaited(
         router.push(
           IntentionDetailsRoute(
             intentionId: intention.id,
-            statisticsTarget: IntentionStatisticsTarget(
-              view: StatisticsView.sourceIntentions,
-              period: StatisticsYear(2020),
+            target: StatisticsTarget(
+              IntentionStatisticsTarget(
+                view: StatisticsView.sourceIntentions,
+                period: StatisticsYear(2020),
+              ),
             ),
           ),
         ),
@@ -426,11 +643,25 @@ void main() {
       await tester.tap(find.byTooltip('Previous year'));
       await tester.pumpAndSettle();
       expect(find.text('2019'), findsOneWidget);
+      await tester.tap(find.text('Relations').first);
+      await tester.pumpAndSettle();
       router.pop();
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .getSemantics(find.bySemanticsLabel('Overview'))
+            .getSemanticsData()
+            .flagsCollection
+            .isSelected,
+        Tristate.isTrue,
+      );
+      await tester.tap(find.text('Statistics').first);
       await tester.pumpAndSettle();
       expect(find.text('Новое название').hitTestable(), findsOneWidget);
       expect(repository.statisticsQueries, hasLength(4));
-      await tester.ensureVisible(find.text('Statistics', skipOffstage: false));
+      await tester.ensureVisible(
+        find.text('Statistics', skipOffstage: false).first,
+      );
       await tester.pumpAndSettle();
       expect(find.textContaining('October 2026'), findsOneWidget);
       expect(repository.statisticsQueries.last.period, StatisticsYear(2019));
@@ -464,6 +695,8 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
       repository.detailRequests.single.add(ResultSuccess(intention));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Статистика'));
       await tester.pumpAndSettle();
       date = CalendarDate.fromParts(2026, 10, 13);
       await tester.pump(const Duration(hours: 1));
@@ -527,11 +760,12 @@ Finder _visibleRowCounts(WidgetTester tester, AppLocalizations texts) {
 void _expectFullyVisible(WidgetTester tester, Finder finder) {
   expect(finder, findsOneWidget);
   final viewport = tester.getRect(find.byType(CustomScrollView));
+  final tabs = tester.getRect(find.byType(Tabs<IntentionDetailsTab>));
   final rect = tester.getRect(finder);
-  expect(rect.top, greaterThanOrEqualTo(viewport.top));
-  expect(rect.bottom, lessThanOrEqualTo(viewport.bottom));
-  expect(rect.left, greaterThanOrEqualTo(viewport.left));
-  expect(rect.right, lessThanOrEqualTo(viewport.right));
+  expect(rect.top, greaterThanOrEqualTo(tabs.bottom - 1e-6));
+  expect(rect.bottom, lessThanOrEqualTo(viewport.bottom + 1e-6));
+  expect(rect.left, greaterThanOrEqualTo(viewport.left - 1e-6));
+  expect(rect.right, lessThanOrEqualTo(viewport.right + 1e-6));
 }
 
 Future<void> _placeInFreeArea(
@@ -541,7 +775,7 @@ Future<void> _placeInFreeArea(
   Finder? notice,
 }) async {
   final top = notice == null
-      ? tester.getRect(find.byType(CustomScrollView)).top
+      ? tester.getRect(find.byType(Tabs<IntentionDetailsTab>)).bottom
       : tester.getRect(notice).bottom + 8;
   position.jumpTo(position.pixels + tester.getTopLeft(target).dy - top);
   await tester.pumpAndSettle();
@@ -549,7 +783,10 @@ Future<void> _placeInFreeArea(
   if (notice != null) _expectFullyVisible(tester, notice);
 }
 
-IntentionStatisticsSectionResult _emptySection(IntentionStatisticsQuery query) {
+IntentionStatisticsSectionResult _emptySection(
+  IntentionStatisticsQuery query, {
+  int revision = 0,
+}) {
   final zero = ContributionCounts(planned: 0, contribution: 0);
   final intentions = StatisticsBreakdownFirstPage<StatisticsItem>(
     items: const [],
@@ -560,7 +797,7 @@ IntentionStatisticsSectionResult _emptySection(IntentionStatisticsQuery query) {
   return IntentionStatisticsSectionSuccess(
     IntentionStatisticsSection(
       query: query,
-      revision: const TestDetailsRevision(0),
+      revision: TestDetailsRevision(revision),
       cards: IntentionStatisticsCards(
         sourceIntentions: zero,
         intermediateIntentions: zero,

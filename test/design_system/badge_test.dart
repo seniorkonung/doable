@@ -3,7 +3,9 @@ import 'package:doable/src/design_system/doable_colors.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/design_system/doable_metrics.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
+import 'package:doable/src/design_system/doable_type.dart';
 import 'package:flutter/material.dart' hide Badge;
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -48,6 +50,81 @@ void main() {
       });
     }
   }
+
+  for (final (themeName, brightness, colors) in [
+    ('светлой', Brightness.light, DoableColors.light),
+    ('тёмной', Brightness.dark, DoableColors.dark),
+  ]) {
+    testWidgets('в $themeName теме метка архива — слово caption цвета muted '
+        'в одну строку на fill с углами radius-xs за значком архива 13', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _app(
+          brightness: brightness,
+          child: const Badge.archived(word: 'Архив'),
+        ),
+      );
+
+      final badge = tester.getRect(find.byType(Badge));
+      final ground = tester.widget<DecoratedBox>(
+        find.descendant(
+          of: find.byType(Badge),
+          matching: find.byType(DecoratedBox),
+        ),
+      );
+      expect(
+        ground.decoration,
+        BoxDecoration(
+          color: colors.fill,
+          borderRadius: BorderRadius.circular(DoableMetrics.radiusXs),
+        ),
+      );
+
+      final icon = tester.widget<DoableIcon>(find.byType(DoableIcon));
+      expect(icon.icon, DoableIconData.archive);
+      expect(icon.size, 13);
+      expect(icon.color, colors.muted);
+
+      final word = tester.getRect(find.text('Архив'));
+      final iconRect = tester.getRect(find.byType(DoableIcon));
+      expect(badge.height, 20);
+      expect(word.top - badge.top, 1);
+      expect(badge.bottom - word.bottom, 1);
+      expect(iconRect.left - badge.left, 5);
+      expect(word.left - iconRect.right, DoableMetrics.space1);
+      expect(badge.right - word.right, 7);
+      expect(iconRect.center.dy, badge.center.dy);
+
+      final paragraph = tester.renderObject<RenderParagraph>(
+        find.descendant(
+          of: find.text('Архив'),
+          matching: find.byType(RichText),
+        ),
+      );
+      expect(paragraph.maxLines, 1);
+      expect(paragraph.softWrap, isFalse);
+      final style = paragraph.text.style!;
+      expect(style.color, colors.muted);
+      expect(style.fontSize, DoableType.caption.fontSize);
+      expect(style.height, DoableType.caption.height);
+      expect(style.fontWeight, DoableType.caption.fontWeight);
+    });
+  }
+
+  testWidgets('диктор читает слово метки архива, и метка не кнопка', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+
+    await tester.pumpWidget(_app(child: const Badge.archived(word: 'Архив')));
+
+    expect(
+      tester.getSemantics(find.text('Архив')),
+      matchesSemantics(label: 'Архив'),
+    );
+    semantics.dispose();
+  });
 
   testWidgets('метка не создаёт узла экранного диктора', (tester) async {
     final semantics = tester.ensureSemantics();

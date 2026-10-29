@@ -34,6 +34,8 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_page
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_section.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
+import 'package:doable/src/intention/presentation/details/intention_options.dart';
+import 'package:doable/src/intention/presentation/edit/intention_edit_page.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
@@ -44,6 +46,7 @@ import 'package:doable/src/long_term_relation/presentation/editor/relation_edito
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_state.dart';
 import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_choice.dart';
 import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart';
+import 'package:doable/src/design_system/components/page_head.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -55,8 +58,11 @@ import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
+import '../../support/intention_edit_screen.dart';
+import '../../support/intention_options.dart';
 import '../../support/quick_creation.dart';
 import '../../support/temporary_graph_files.dart';
+import '../../support/intention_choices_tab.dart';
 import '../../support/tag_positions.dart';
 
 part 'app_shell_page_matrix.dart';
@@ -69,6 +75,10 @@ const _read = 1;
 /// Активное готовое намерение «Бегать»: связанный участник связи и выбранное
 /// действие дневного выбора.
 const _run = 2;
+
+/// Активное намерение «Гулять» без связей и дневных выборов: его удаление
+/// доступно в параметрах.
+const _walk = 3;
 
 /// Связь «Читать» → «Бегать» — единственный шаг пути дневного выбора.
 const _relation = 101;
@@ -141,7 +151,7 @@ void main() {
   const destination = AppDestination.dailyChoices;
   testWidgets(
     'выбор пункта ${destination.index + 1} со страницы участника удаляет '
-    'незавершённую форму связи и правку намерения без сохранения',
+    'незавершённую форму связи без сохранения',
     (tester) async {
       final router = await _start(tester);
       await _select(tester, AppDestination.intentionGraph);
@@ -150,9 +160,11 @@ void main() {
         _summary(IntentionCatalogPage, 'Читать'),
         IntentionDetailsPage,
       );
+      await _tap(tester, find.text('Relations').first);
+      await _tap(tester, _outgoingNeedGroup);
       await _open(
         tester,
-        find.byKey(const ValueKey('relation-neighborhood-create-relation')),
+        find.byKey(const ValueKey('intention-relations-add')),
         RelationEditorPage,
       );
       await _open(
@@ -184,22 +196,6 @@ void main() {
         IntentionDetailsPage,
         AppDestination.intentionGraph,
       );
-      await _tap(tester, find.byKey(const ValueKey('intention-details-edit')));
-      await tester.enterText(
-        find.byKey(const ValueKey('intention-details-edit-title')),
-        'Несохранённое название',
-      );
-      await tester.enterText(
-        find.byKey(const ValueKey('intention-details-edit-description')),
-        'Несохранённое описание',
-      );
-      tester.testTextInput.hide();
-      await tester.pumpAndSettle();
-      _expectAboveShell(
-        tester,
-        IntentionDetailsPage,
-        AppDestination.intentionGraph,
-      );
 
       await _select(tester, destination);
 
@@ -224,15 +220,17 @@ void main() {
       );
       expect(
         tester
-            .widget<Text>(find.byKey(const ValueKey('intention-details-title')))
-            .data,
+            .widget<PageHead>(
+              find.byKey(const ValueKey('intention-details-title')),
+            )
+            .name,
         'Читать',
       );
-      expect(find.text('Несохранённое название'), findsNothing);
-      expect(find.text('Несохранённое описание'), findsNothing);
+      await _tap(tester, find.text('Relations').first);
+      await _tap(tester, _outgoingNeedGroup);
       await _open(
         tester,
-        find.byKey(const ValueKey('relation-neighborhood-create-relation')),
+        find.byKey(const ValueKey('intention-relations-add')),
         RelationEditorPage,
       );
       expect(
@@ -260,9 +258,15 @@ const _rootPages = {
   AppDestination.intentionGraph: IntentionCatalogPage,
 };
 
-/// Строка связи «Читать» → «Бегать» в соседстве намерения.
+/// Группа «Нужно» действия «Читать»: вкладка «Связи» действия открывается
+/// на группе «Нужно для».
+final _outgoingNeedGroup = find.byKey(
+  const ValueKey('intention-relations-group-needs'),
+);
+
+/// Строка связи «Читать» → «Бегать» во вкладке «Связи» намерения.
 final _relationRow = find.byKey(
-  ValueKey('relation-neighborhood-row-${tagFixtureId(_relation)}'),
+  ValueKey('intention-relations-row-${tagFixtureId(_relation)}'),
 );
 
 /// Продолжение пути по связи «Читать» → «Бегать».
@@ -441,11 +445,15 @@ Future<AppRouter> _start(
   return ready.container.read(appRouterProvider);
 }
 
-/// Два намерения, связь между ними, дневной выбор по этой связи и тег:
-/// каждая страница приложения получает свои данные.
+/// Два намерения, связь между ними, дневной выбор по этой связи, тег и
+/// свободное намерение: каждая страница приложения получает свои данные.
 void _seed(sqlite.Database database) {
   seedRawGraph(database, () {
-    for (final (number, title) in [(_read, 'Читать'), (_run, 'Бегать')]) {
+    for (final (number, title) in [
+      (_read, 'Читать'),
+      (_run, 'Бегать'),
+      (_walk, 'Гулять'),
+    ]) {
       database.execute(
         'INSERT INTO intentions (id, title, is_action_ready, is_archived, '
         'created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',

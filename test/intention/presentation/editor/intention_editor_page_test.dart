@@ -104,6 +104,23 @@ void main() {
     },
   );
 
+  testWidgets('перенос строки во вставленном названии становится пробелом', (
+    tester,
+  ) async {
+    final sessions = _EditorSessions();
+    await _openEditor(
+      tester,
+      ControlledCatalogRepository(),
+      observers: [sessions],
+    );
+
+    await tester.enterText(find.byKey(_title), 'Бегать\nпо утрам');
+    await tester.pump();
+
+    expect(_fieldText(tester, 'intention-editor-title'), 'Бегать по утрам');
+    expect(sessions.state(tester).draft.title, 'Бегать по утрам');
+  });
+
   testWidgets(
     'мягкие переносы сохраняют текст принятой команды, действие перехода и запрет правок во время отправки и повтора',
     (tester) async {

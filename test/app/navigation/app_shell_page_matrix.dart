@@ -11,6 +11,7 @@ typedef _PageCase = ({
 
 enum _MatrixEntry {
   intention,
+  editIntention,
   dailyChoice,
   creation,
   condition,
@@ -21,13 +22,14 @@ enum _MatrixEntry {
   draftTags,
   replaceChoice,
   replaceTopDown,
-  choosePath,
+  addChoice,
   continuePath,
   selectAction,
   selectSource,
   confirmPath,
   editChoice,
   createRelation,
+  outgoingRelations,
   incomingRelations,
   editRelation,
   changeSource,
@@ -35,6 +37,7 @@ enum _MatrixEntry {
 
   Finder get finder => switch (this) {
     _MatrixEntry.intention => _summary(IntentionCatalogPage, 'Читать'),
+    _MatrixEntry.editIntention => intentionHeadTitle,
     _MatrixEntry.dailyChoice => find.byKey(
       const ValueKey('daily-choice-row-1'),
     ),
@@ -59,9 +62,7 @@ enum _MatrixEntry {
     _MatrixEntry.replaceTopDown => find.byKey(
       const ValueKey('daily-choice-replace-top-down'),
     ),
-    _MatrixEntry.choosePath => find.byKey(
-      const ValueKey('intention-details-choose-path'),
-    ),
+    _MatrixEntry.addChoice => intentionChoicesAdd,
     _MatrixEntry.continuePath => _continuePath,
     _MatrixEntry.selectAction => find.byKey(
       const ValueKey('choice-path-select-action'),
@@ -76,10 +77,11 @@ enum _MatrixEntry {
       const ValueKey('daily-choice-edit-open'),
     ),
     _MatrixEntry.createRelation => find.byKey(
-      const ValueKey('relation-neighborhood-create-relation'),
+      const ValueKey('intention-relations-add'),
     ),
+    _MatrixEntry.outgoingRelations => _outgoingNeedGroup,
     _MatrixEntry.incomingRelations => find.byKey(
-      const ValueKey('relation-neighborhood-direction-incoming'),
+      const ValueKey('intention-relations-group-neededFor'),
     ),
     _MatrixEntry.editRelation => find.byKey(
       const ValueKey('relation-details-edit-relation'),
@@ -282,10 +284,16 @@ void _registerPageMatrixTests() {
       entries: [read],
     ),
     (
+      name: 'изменение намерения',
+      page: IntentionEditPage,
+      panel: false,
+      entries: [read, _MatrixEntry.editIntention],
+    ),
+    (
       name: 'долговременная связь',
       page: RelationDetailsPage,
       panel: true,
-      entries: [read, _MatrixEntry.relation],
+      entries: [read, _MatrixEntry.outgoingRelations, _MatrixEntry.relation],
     ),
     (
       name: 'дневной выбор',
@@ -315,7 +323,7 @@ void _registerPageMatrixTests() {
       name: 'путь от намерения',
       page: ChoicePathPage,
       panel: false,
-      entries: [read, _MatrixEntry.choosePath],
+      entries: [read, _MatrixEntry.addChoice],
     ),
     (
       name: 'подтверждение дневного выбора сверху вниз',
@@ -323,7 +331,7 @@ void _registerPageMatrixTests() {
       panel: false,
       entries: [
         read,
-        _MatrixEntry.choosePath,
+        _MatrixEntry.addChoice,
         _MatrixEntry.continuePath,
         _MatrixEntry.selectAction,
         _MatrixEntry.confirmPath,
@@ -351,7 +359,11 @@ void _registerPageMatrixTests() {
       name: 'создание исходящей связи',
       page: RelationEditorPage,
       panel: false,
-      entries: [read, _MatrixEntry.createRelation],
+      entries: [
+        read,
+        _MatrixEntry.outgoingRelations,
+        _MatrixEntry.createRelation,
+      ],
     ),
     (
       name: 'создание входящей связи',
@@ -367,19 +379,34 @@ void _registerPageMatrixTests() {
       name: 'изменение связи',
       page: RelationEditorPage,
       panel: false,
-      entries: [read, _MatrixEntry.relation, _MatrixEntry.editRelation],
+      entries: [
+        read,
+        _MatrixEntry.outgoingRelations,
+        _MatrixEntry.relation,
+        _MatrixEntry.editRelation,
+      ],
     ),
     (
       name: 'поиск исходного участника',
       page: RelationParticipantPickerPage,
       panel: false,
-      entries: [read, _MatrixEntry.createRelation, _MatrixEntry.changeSource],
+      entries: [
+        read,
+        _MatrixEntry.outgoingRelations,
+        _MatrixEntry.createRelation,
+        _MatrixEntry.changeSource,
+      ],
     ),
     (
       name: 'поиск связанного участника',
       page: RelationParticipantPickerPage,
       panel: false,
-      entries: [read, _MatrixEntry.createRelation, _MatrixEntry.selectRelated],
+      entries: [
+        read,
+        _MatrixEntry.outgoingRelations,
+        _MatrixEntry.createRelation,
+        _MatrixEntry.selectRelated,
+      ],
     ),
   ];
 
@@ -416,6 +443,15 @@ void _registerPageMatrixTests() {
               wait: _until,
             );
           default:
+            if (entry == _MatrixEntry.relation ||
+                entry == _MatrixEntry.createRelation ||
+                entry == _MatrixEntry.outgoingRelations ||
+                entry == _MatrixEntry.incomingRelations) {
+              await _tap(tester, find.text('Relations').first);
+            }
+            if (entry == _MatrixEntry.addChoice) {
+              await openIntentionChoicesTab(tester, waitFor: _until, tap: _tap);
+            }
             await _tap(tester, entry.finder);
         }
         await tester.pumpAndSettle();
@@ -425,7 +461,7 @@ void _registerPageMatrixTests() {
       final variant = switch (tester.widget(find.byType(row.page))) {
         RelationEditorPage(:final editorContext) => switch (editorContext) {
           RelationBlankCreationContext() => 'создание связи без участников',
-          RelationCreationContext(:final direction) => switch (direction) {
+          RelationCreationContext(:final group) => switch (group.direction) {
             RelationDirection.outgoing => 'создание исходящей связи',
             RelationDirection.incoming => 'создание входящей связи',
           },
@@ -451,6 +487,11 @@ void _registerPageMatrixTests() {
           destination,
           expectedPanel: row.panel,
         );
+      }
+      if (row.page == IntentionEditPage) {
+        // Страница намерения под закрытым экраном изменения снова с панелью.
+        await _close(tester, IntentionEditPage);
+        _expectAboveShell(tester, IntentionDetailsPage, destination);
       }
       expect(tester.takeException(), isNull);
     });

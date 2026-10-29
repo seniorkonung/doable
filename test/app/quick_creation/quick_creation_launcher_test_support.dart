@@ -119,12 +119,6 @@ Future<BuildContext> _source(
       router.push(IntentionDetailsRoute(intentionId: durabilityIntention(2))),
     );
     await tester.pumpAndSettle();
-    await tester.tap(_key('intention-details-edit'));
-    await tester.pumpAndSettle();
-    await tester.enterText(
-      _key('intention-details-edit-title'),
-      'Несохранённое название',
-    );
   }
   return tester.element(find.byType(origin.page));
 }

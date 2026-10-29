@@ -31,6 +31,7 @@ import 'package:doable/src/long_term_relation/application/long_term_relation_com
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart'
     show RelationScope;
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
+import 'package:doable/src/intention/presentation/details/intention_page_target.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/statistics/application/intention_statistics_target.dart';
 import 'package:doable/src/statistics/application/intention_statistics_read_contract.dart';
@@ -226,19 +227,21 @@ void main() {
       );
       await _scrollTo(tester, _text('Новое название действия'));
       expect(_text('Новое название действия').hitTestable(), findsWidgets);
-      await _scrollTo(tester, _text(app.texts.relationNeighborhoodTitle));
-      await _scrollTo(
-        tester,
-        _text(app.texts.relationNeighborhoodSelectedGroupCount(119)),
-      );
+      await tester.tap(_text(app.texts.detailsRelationsTab).first);
+      await tester.pumpAndSettle();
+      // 119 исходящих «нужно», одна исходящая «можно» и одна входящая «нужно».
       expect(
-        _text(app.texts.relationNeighborhoodSelectedGroupCount(119))
-            .hitTestable(),
+        find.bySemanticsLabel(app.texts.detailsRelationsTabSemantic(121, 2)),
         findsOneWidget,
       );
       _scroll(tester).position.jumpTo(0);
       await tester.pumpAndSettle();
-      expect(_text(app.texts.detailsEditAction).hitTestable(), findsOneWidget);
+      await tester.tap(_text(app.texts.detailsOverviewTab).first);
+      await tester.pumpAndSettle();
+      expect(
+        _text(app.texts.detailsAddDescription).hitTestable(),
+        findsOneWidget,
+      );
       expect(tester.takeException(), isNull);
     },
   );
@@ -475,9 +478,11 @@ final class _App {
           .push(
             IntentionDetailsRoute(
               intentionId: durabilityIntention(intention),
-              statisticsTarget: IntentionStatisticsTarget(
-                view: view,
-                period: period ?? StatisticsMonth(2026, 10),
+              target: StatisticsTarget(
+                IntentionStatisticsTarget(
+                  view: view,
+                  period: period ?? StatisticsMonth(2026, 10),
+                ),
               ),
             ),
           ),

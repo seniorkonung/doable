@@ -3,8 +3,12 @@ import 'dart:async';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/data/local/app_database.dart'
     hide Tag, TagAssignment;
+import 'package:doable/src/design_system/components/list_state.dart';
+import 'package:doable/src/design_system/components/notice.dart';
+import 'package:doable/src/design_system/components/tag_chip.dart';
 import 'package:doable/src/design_system/components/tag_dot.dart';
 import 'package:doable/src/design_system/doable_colors.dart';
+import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -59,6 +63,7 @@ Widget _host({
       tagAssignmentsChangesProvider.overrideWithValue(changes),
   ],
   child: MaterialApp(
+    theme: doableTheme(Brightness.light),
     locale: locale,
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
@@ -94,7 +99,7 @@ void main() {
   });
   tearDown(() => database.close());
 
-  testWidgets('назначения показывают точку и кольцо перед названиями', (
+  testWidgets('чипы показывают точку и кольцо перед названиями', (
     tester,
   ) async {
     final reads = _PendingReads();
@@ -132,19 +137,16 @@ void main() {
       final text = tester.widget<RichText>(
         find.descendant(of: title, matching: find.byType(RichText)),
       );
-      expect(
-        text.text.style!.color,
-        Theme.of(tester.element(title)).textTheme.bodyMedium!.color,
-      );
+      expect(text.text.style!.color, DoableColors.light.ink);
     }
   });
 
   for (final (locale, removeText) in [
-    (const Locale('ru'), 'Снять назначение'),
-    (const Locale('en'), 'Remove assignment'),
+    (const Locale('ru'), 'Убрать тег'),
+    (const Locale('en'), 'Remove the tag'),
   ]) {
     testWidgets(
-      'строка назначения показывает точку, название и снятие без перехода к тегу: ${locale.languageCode}',
+      'чип тега показывает точку, название и крестик без перехода к тегу: ${locale.languageCode}',
       (tester) async {
         final semantics = tester.ensureSemantics();
         await tester.pumpWidget(
@@ -168,20 +170,27 @@ void main() {
           findsOneWidget,
         );
         expect(
-          find.descendant(
-            of: row,
-            matching: find.byWidgetPredicate(
-              (widget) => widget is ButtonStyleButton,
-            ),
-          ),
-          findsOneWidget,
+          find.descendant(of: row, matching: find.byType(TagChip)),
+          findsNothing,
         );
+        expect(tester.widget(row), isA<TagChip>());
         final remove = find.descendant(
           of: row,
-          matching: find.byTooltip('$removeText: Дом'),
+          matching: find.byKey(
+            ValueKey('tag-assignment-remove-${tagFixtureId(firstTagNumber)}'),
+          ),
         );
         expect(remove, findsOneWidget);
-        expect(tester.getSemantics(remove).tooltip, '$removeText: Дом');
+        expect(
+          tester.getSemantics(remove),
+          isSemantics(
+            label: '$removeText: Дом',
+            isButton: true,
+            hasEnabledState: true,
+            isEnabled: true,
+            hasTapAction: true,
+          ),
+        );
         expect(find.byIcon(Icons.arrow_forward), findsNothing);
         semantics.dispose();
       },
@@ -189,7 +198,7 @@ void main() {
   }
 
   testWidgets(
-    'снятие последнего назначения сохраняет тег и показывает пустой список',
+    'снятие крестиком последнего тега сохраняет тег и оставляет одну шапку',
     (tester) async {
       final semantics = tester.ensureSemantics();
       final chosen = <IntentionId>[];
@@ -203,11 +212,14 @@ void main() {
       );
       await _pumpUntil(tester, () => find.text('Работа').evaluate().isNotEmpty);
       expect(find.text('Работа'), findsOneWidget);
-      expect(find.text('Выбрать тег'), findsOneWidget);
-      expect(find.byTooltip('Снять назначение: Работа'), findsOneWidget);
-      await tester.tap(find.text('Выбрать тег'));
+      expect(find.text('Теги'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('Теги: Работа. Добавить или убрать'),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Добавить'));
       expect(chosen, [_intentionId(3)]);
-      await tester.tap(find.byTooltip('Снять назначение: Работа'));
+      await tester.tap(find.bySemanticsLabel('Убрать тег: Работа'));
       await _pumpUntil(
         tester,
         () => raw.select(
@@ -223,7 +235,11 @@ void main() {
         isEmpty,
       );
       expect(find.text('Работа'), findsNothing);
-      expect(find.text('Выбрать тег'), findsOneWidget);
+      expect(find.byType(TagChip), findsNothing);
+      expect(_listState(), findsNothing);
+      expect(find.byType(Notice), findsNothing);
+      expect(find.text('Теги'), findsOneWidget);
+      expect(find.bySemanticsLabel('Добавить теги'), findsOneWidget);
       semantics.dispose();
     },
   );
@@ -231,6 +247,7 @@ void main() {
   testWidgets('архивированное действие снимает только своё назначение', (
     tester,
   ) async {
+    final semantics = tester.ensureSemantics();
     final intentionId = _intentionId(2);
     final chosen = <IntentionId>[];
     await tester.pumpWidget(
@@ -244,12 +261,12 @@ void main() {
     );
     await _pumpUntil(tester, () => find.text('Дом').evaluate().isNotEmpty);
     expect(
-      find.byTooltip('Выбрать тег для получателя: намерение, в архиве'),
+      find.bySemanticsLabel('Теги: Дом. Добавить или убрать'),
       findsOneWidget,
     );
-    await tester.tap(find.text('Выбрать тег'));
+    await tester.tap(find.text('Добавить'));
     expect(chosen, [intentionId]);
-    await tester.tap(find.byTooltip('Снять назначение: Дом'));
+    await tester.tap(find.bySemanticsLabel('Убрать тег: Дом'));
     await _pumpUntil(
       tester,
       () => raw.select('SELECT * FROM tag_assignments WHERE intention_id = ?', [
@@ -263,6 +280,7 @@ void main() {
       ]),
       hasLength(1),
     );
+    semantics.dispose();
   });
 
   testWidgets('актуализация сохраняет строки при отказе и даёт явный повтор', (
@@ -284,7 +302,13 @@ void main() {
         changes: changes.stream,
       ),
     );
-    expect(find.text('Загружаем назначения…'), findsOneWidget);
+    expect(
+      find.ancestor(
+        of: find.text('Загружаем назначения…'),
+        matching: _listState(),
+      ),
+      findsOneWidget,
+    );
     reads.page(0, [_tag(301, 'Дом')]);
     await tester.pumpAndSettle();
     expect(find.text('Дом'), findsOneWidget);
@@ -311,6 +335,13 @@ void main() {
     previousChoose();
     expect(chosen, isEmpty);
     expect(find.text('Дом'), findsOneWidget);
+    expect(
+      find.ancestor(
+        of: find.text('Не удалось загрузить назначения. Повторите попытку.'),
+        matching: find.byType(Notice),
+      ),
+      findsOneWidget,
+    );
     await tester.tap(find.text('Повторить'));
     await tester.pump();
     expect(reads.queries, [_intentionId(1), _intentionId(1), _intentionId(1)]);
@@ -418,11 +449,7 @@ void main() {
           find.byKey(const ValueKey('tag-assignments-choose')),
         )
         .onPressed!;
-    final previousRemove = tester
-        .widget<TextButton>(
-          find.byKey(ValueKey('tag-assignment-remove-${tagFixtureId(301)}')),
-        )
-        .onPressed!;
+    final previousRemove = _removeTap(tester, 301)!;
 
     await tester.pumpWidget(host(_intentionId(2)));
     reads.page(1, [_tag(301, 'Дом')]);
@@ -501,6 +528,20 @@ void main() {
               )
               .onPressed,
           isNull,
+        );
+        expect(_removeTap(tester, 301), isNull);
+        expect(
+          tester.getSemantics(
+            find.byKey(ValueKey('tag-assignment-remove-${tagFixtureId(301)}')),
+          ),
+          isSemantics(hasEnabledState: true, isEnabled: false),
+        );
+        expect(
+          find.ancestor(
+            of: find.text('Снимаем назначение…'),
+            matching: _listState(),
+          ),
+          findsOneWidget,
         );
 
         await tester.pumpWidget(host(showSection: false));
@@ -603,7 +644,7 @@ void main() {
       );
       await tester.pump();
       expect(
-        find.byTooltip('Снять назначение: ${longName.trim()}'),
+        find.bySemanticsLabel('Убрать тег: ${longName.trim()}'),
         findsOneWidget,
       );
       semantics.dispose();
@@ -694,6 +735,20 @@ Tag _tag(int number, String name, {TagColor? color}) => Tag(
   color: color,
   position: tagPositionAt(number),
 );
+
+/// Виды `ListState` — закрытые подклассы, поэтому ищем по типу-предку.
+Finder _listState() => find.byWidgetPredicate((widget) => widget is ListState);
+
+VoidCallback? _removeTap(WidgetTester tester, int number) => tester
+    .widget<InkWell>(
+      find.descendant(
+        of: find.byKey(
+          ValueKey('tag-assignment-remove-${tagFixtureId(number)}'),
+        ),
+        matching: find.byType(InkWell),
+      ),
+    )
+    .onTap;
 
 Future<void> _pumpUntil(WidgetTester tester, bool Function() done) async {
   for (var attempt = 0; attempt < 30 && !done(); attempt++) {

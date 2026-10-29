@@ -43,7 +43,11 @@ enum DoableIconData {
   chevronDown('chevron_down'),
   selector('selector'),
   sortAsc('sort_asc'),
-  sortDesc('sort_desc');
+  sortDesc('sort_desc'),
+  back('back'),
+  more('more'),
+  closeSmall('close_small'),
+  unarchive('unarchive');
 
   const DoableIconData(this._assetName);
 

@@ -370,116 +370,15 @@
   "@intentionSummaryNoTags": {
     "description": "Подтверждённое отсутствие тегов у намерения в результате поиска"
   },
-  "relationNeighborhoodTitle": "Relations",
-  "relationNeighborhoodSelectedCount": "Selected relations: {count}",
-  "@relationNeighborhoodSelectedCount": {
-    "placeholders": {"count": {"type": "int"}}
-  },
-  "relationNeighborhoodAddToSelection": "Add to selection",
-  "@relationNeighborhoodAddToSelection": {
-    "description": "Действие выбора конкретной блокирующей связи"
-  },
-  "relationNeighborhoodRemoveFromSelection": "Remove from selection",
-  "@relationNeighborhoodRemoveFromSelection": {
-    "description": "Действие снятия выбора конкретной блокирующей связи"
-  },
-  "blockingRelationsReviewAction": "Review selected relations",
-  "@blockingRelationsReviewAction": {"description": "Открыть полный набор выбранных связей для подтверждения"},
-  "blockingRelationsConfirmationTitle": "Delete selected relations permanently?",
-  "@blockingRelationsConfirmationTitle": {"description": "Заголовок подтверждения массового удаления"},
-  "blockingRelationsConfirmationWarning": "Review each selected relation. Only the selected relations will be deleted. Selected daily choices will be deleted with all their path steps. This cannot be undone. The intention will remain; deleting it requires a separate confirmation.",
-  "@blockingRelationsConfirmationWarning": {"description": "Необратимость удаления связей и сохранность намерения"},
-  "blockingRelationsConfirmationPreservedTags": "The reusable tags and all their assignments to intentions will remain.",
-  "@blockingRelationsConfirmationPreservedTags": {"description": "Сохранение переиспользуемых тегов и всех назначений намерениям при удалении связей"},
-  "blockingRelationsConfirmationCount": "To delete: {count}",
-  "@blockingRelationsConfirmationCount": {"description": "Число связей в подтверждённом наборе", "placeholders": {"count": {"type": "int"}}},
-  "blockingRelationsParticipantId": "Identifier: {id}",
-  "@blockingRelationsParticipantId": {"description": "Идентификатор участника для различения одноимённых намерений", "placeholders": {"id": {"type": "String"}}},
-  "blockingRelationsDeleting": "Deleting selected relations…",
-  "@blockingRelationsDeleting": {"description": "Состояние принятого массового удаления"},
-  "blockingRelationsBusy": "Another change to these relations or the intention is already running.",
-  "@blockingRelationsBusy": {"description": "Отказ при занятом намерении или выбранной связи"},
-  "blockingRelationsDraining": "The app is closing. The change was not accepted.",
-  "@blockingRelationsDraining": {"description": "Отказ при завершении работы приложения"},
-  "blockingRelationsEditSelectionAction": "Return to selection",
-  "@blockingRelationsEditSelectionAction": {"description": "Вернуться к сохранённому выбору после ошибки"},
-  "blockingRelationsRefreshSelectionAction": "Refresh selection",
-  "@blockingRelationsRefreshSelectionAction": {"description": "Явная актуализация выбранного набора после конфликта или перед просмотром"},
-  "blockingRelationsRefreshingSelection": "Checking selected relations…",
-  "@blockingRelationsRefreshingSelection": {"description": "Состояние проверки выбранных связей"},
-  "blockingRelationsInvalidSelectedRelationId": "Relation: {id}",
-  "@blockingRelationsInvalidSelectedRelationId": {"description": "Идентификатор недоступной выбранной связи", "placeholders": {"id": {"type": "String"}}},
-  "blockingRelationsInvalidMissing": "This relation no longer exists. Remove it from the selection and confirm the remaining set again.",
-  "@blockingRelationsInvalidMissing": {"description": "Причина устаревания выбранной связи: удалена"},
-  "blockingRelationsInvalidMoved": "This relation no longer belongs to this intention. Remove it from the selection and confirm the remaining set again.",
-  "@blockingRelationsInvalidMoved": {"description": "Причина устаревания выбранной связи: заменён участник"},
-  "blockingRelationsInvalidProtected": "This relation is used in a saved daily path. First delete the daily choice separately, then select and confirm deletion of the freed long-term relation again. The entire selected set remains unchanged.",
-  "@blockingRelationsInvalidProtected": {"description": "Защита выбранной связи сохранённым дневным путём"},
-  "blockingRelationsRefreshIntentionNotFound": "This intention no longer exists. Its relations cannot be deleted here.",
-  "@blockingRelationsRefreshIntentionNotFound": {"description": "Безопасное отсутствие намерения при проверке выбора"},
-  "blockingRelationsRefreshUnavailable": "Selected relations could not be checked. Your selection is unchanged; try checking again.",
-  "@blockingRelationsRefreshUnavailable": {"description": "Устранимая ошибка чтения выбранного набора"},
-  "blockingRelationsRefreshCorruption": "Selected relations could not be checked because the data is damaged. Deletion was not started.",
-  "@blockingRelationsRefreshCorruption": {"description": "Повреждение данных при чтении выбранного набора"},
-  "blockingRelationsRefreshUnexpected": "Selected relations could not be checked. Deletion was not started.",
-  "@blockingRelationsRefreshUnexpected": {"description": "Неожиданная ошибка чтения выбранного набора"},
-  "blockingRelationsDeleteMissing": "A selected relation no longer exists. Refresh the selection and confirm it again.",
-  "@blockingRelationsDeleteMissing": {"description": "Конфликт массового удаления: выбранная связь отсутствует"},
-  "blockingRelationsDeleteMoved": "A selected relation no longer belongs to this intention. Refresh the selection and confirm it again.",
-  "@blockingRelationsDeleteMoved": {"description": "Конфликт массового удаления: связь сменила участников"},
-  "blockingRelationsDeleteProhibited": "A selected relation is now used in a saved daily path. The entire set remains unchanged. First delete the daily choice separately, then select and confirm deletion of the freed long-term relation again.",
-  "@blockingRelationsDeleteProhibited": {"description": "Конфликт массового удаления: связь заблокирована"},
   "relationNeighborhoodSummaryLoading": "Loading relations and summary…",
-  "relationNeighborhoodSummaryUnavailable": "The relation summary couldn’t be loaded.",
-  "relationNeighborhoodSavedSummaryRefreshing": "Updating saved relation numbers…",
-  "@relationNeighborhoodSavedSummaryRefreshing": {
-    "description": "Состояние обновления сохранённой согласованной сводки рядом с её числами"
-  },
-  "relationNeighborhoodSavedSummaryStale": "Saved relation numbers are out of date because the refresh failed.",
-  "@relationNeighborhoodSavedSummaryStale": {
-    "description": "Состояние устаревшей сохранённой сводки рядом с её числами"
-  },
-  "relationNeighborhoodTotal": "Total relations: {count}",
-  "@relationNeighborhoodTotal": {
-    "placeholders": {"count": {"type": "int"}}
-  },
-  "relationNeighborhoodActiveTotal": "Active relations: {count}",
-  "@relationNeighborhoodActiveTotal": {
-    "placeholders": {"count": {"type": "int"}}
-  },
-  "relationNeighborhoodArchivedTotal": "Archived relations: {count}",
-  "@relationNeighborhoodArchivedTotal": {
-    "placeholders": {"count": {"type": "int"}}
-  },
-  "relationNeighborhoodNeedTotal": "Need: {count}",
-  "@relationNeighborhoodNeedTotal": {
-    "placeholders": {"count": {"type": "int"}}
-  },
-  "relationNeighborhoodCanTotal": "Can: {count}",
   "relationNeighborhoodDailyTotal": "Daily choices: {count}",
   "@relationNeighborhoodDailyTotal": {"placeholders": {"count": {"type": "int"}}},
   "relationNeighborhoodDailySourceRole": "Source intention",
   "@relationNeighborhoodDailySourceRole": {"description": "Роль намерения как источника дневного выбора"},
   "relationNeighborhoodDailySelectedRole": "Selected action",
   "@relationNeighborhoodDailySelectedRole": {"description": "Роль намерения как выбранного действия"},
-  "relationNeighborhoodLongTermGroups": "Long-term relations",
-  "@relationNeighborhoodLongTermGroups": {"description": "Подпись групп долговременных связей в соседстве"},
-  "@relationNeighborhoodCanTotal": {
-    "placeholders": {"count": {"type": "int"}}
-  },
-  "relationNeighborhoodScopeLabel": "Relation state",
-  "relationNeighborhoodScopeActive": "Active relations",
-  "relationNeighborhoodScopeArchived": "Archived relations",
-  "relationNeighborhoodTypeLabel": "Relation type",
   "relationNeighborhoodTypeNeed": "Need",
   "relationNeighborhoodTypeCan": "Can",
-  "relationNeighborhoodDirectionLabel": "Direction",
-  "relationNeighborhoodDirectionIncoming": "Incoming",
-  "relationNeighborhoodDirectionOutgoing": "Outgoing",
-  "relationNeighborhoodSelectedGroupCount": "In the whole selected group: {count}",
-  "@relationNeighborhoodSelectedGroupCount": {
-    "placeholders": {"count": {"type": "int"}}
-  },
   "relationNeighborhoodInitialUnavailable": "The relations and summary couldn’t be loaded. Try again.",
   "relationNeighborhoodInitialCorruption": "Stored relation data is damaged and can’t be shown.",
   "relationNeighborhoodInitialUnexpected": "The relations couldn’t be loaded because of an unexpected error.",
@@ -516,41 +415,14 @@
       "related": {"type": "String"}
     }
   },
-  "@relationNeighborhoodTitle": {
-    "description": "Заголовок соседства намерения"
-  },
   "@relationNeighborhoodSummaryLoading": {
     "description": "Первоначальная загрузка соседства и полной сводки"
-  },
-  "@relationNeighborhoodSummaryUnavailable": {
-    "description": "Полная сводка ещё не подтверждена из-за ошибки"
-  },
-  "@relationNeighborhoodScopeLabel": {
-    "description": "Подпись выбора активных или архивных связей"
-  },
-  "@relationNeighborhoodScopeActive": {
-    "description": "Активный охват соседства"
-  },
-  "@relationNeighborhoodScopeArchived": {
-    "description": "Архивный охват соседства"
-  },
-  "@relationNeighborhoodTypeLabel": {
-    "description": "Подпись выбора типа долговременной связи"
   },
   "@relationNeighborhoodTypeNeed": {
     "description": "Тип долговременной связи нужно"
   },
   "@relationNeighborhoodTypeCan": {
     "description": "Тип долговременной связи можно"
-  },
-  "@relationNeighborhoodDirectionLabel": {
-    "description": "Подпись выбора направления связи"
-  },
-  "@relationNeighborhoodDirectionIncoming": {
-    "description": "Входящее направление относительно намерения"
-  },
-  "@relationNeighborhoodDirectionOutgoing": {
-    "description": "Исходящее направление относительно намерения"
   },
   "@relationNeighborhoodInitialUnavailable": {
     "description": "Устранимая ошибка начального чтения группы"
@@ -606,9 +478,225 @@
   "@relationNeighborhoodRelatedParticipant": {
     "description": "Подпись связанного участника связи"
   },
+  "detailsTabsLabel": "Intention sections",
+  "@detailsTabsLabel": {"description": "Доступное название полосы вкладок страницы намерения"},
+  "detailsOverviewTab": "Overview",
+  "@detailsOverviewTab": {"description": "Вкладка прежних данных и действий намерения"},
+  "detailsRelationsTab": "Relations",
+  "@detailsRelationsTab": {"description": "Вкладка соседства намерения"},
+  "detailsRelationsTabSemantic": "Relations: {active} active, {archived} archived",
+  "@detailsRelationsTabSemantic": {"description": "Числа долговременных связей на вкладке для диктора", "placeholders": {"active": {"type": "int"}, "archived": {"type": "int"}}},
+  "detailsRelationsGroupsLabel": "Relation groups",
+  "@detailsRelationsGroupsLabel": {"description": "Доступное название плиток групп связей на вкладке «Связи»"},
+  "detailsRelationsGroupNeeds": "Needs",
+  "@detailsRelationsGroupNeeds": {"description": "Группа исходящих связей «нужно» на вкладке «Связи»"},
+  "detailsRelationsGroupCanUse": "Can use",
+  "@detailsRelationsGroupCanUse": {"description": "Группа исходящих связей «можно» на вкладке «Связи»"},
+  "detailsRelationsGroupNeededFor": "Needed for",
+  "@detailsRelationsGroupNeededFor": {"description": "Группа входящих связей «нужно» на вкладке «Связи»"},
+  "detailsRelationsGroupCanBeUsedFor": "Can be used for",
+  "@detailsRelationsGroupCanBeUsedFor": {"description": "Группа входящих связей «можно» на вкладке «Связи»"},
+  "detailsRelationsGroupTileSemantic": "{group}: {count} active",
+  "@detailsRelationsGroupTileSemantic": {"description": "Доступное название плитки группы без архивированных связей", "placeholders": {"group": {"type": "String"}, "count": {"type": "int"}}},
+  "detailsRelationsGroupTileArchivedSemantic": "{group}: {count} active, some archived",
+  "@detailsRelationsGroupTileArchivedSemantic": {"description": "Доступное название плитки группы, в которой есть архивированные связи", "placeholders": {"group": {"type": "String"}, "count": {"type": "int"}}},
+  "detailsRelationsRowNeed": "need · {priority}",
+  "@detailsRelationsRowNeed": {"description": "Подпись типа и приоритета над названием соседа в строке связи «нужно»", "placeholders": {"priority": {"type": "String"}}},
+  "detailsRelationsRowCan": "can · {priority}",
+  "@detailsRelationsRowCan": {"description": "Подпись типа и приоритета над названием соседа в строке связи «можно»", "placeholders": {"priority": {"type": "String"}}},
+  "detailsRelationsNeighborArchived": "“{title}” is archived",
+  "@detailsRelationsNeighborArchived": {"description": "Часть доступного названия строки связи с архивированным соседом", "placeholders": {"title": {"type": "String"}}},
+  "detailsRelationsWalkIntention": "Open the intention page: {title}",
+  "@detailsRelationsWalkIntention": {"description": "Доступное название стрелки строки связи, когда сосед — намерение", "placeholders": {"title": {"type": "String"}}},
+  "detailsRelationsWalkAction": "Open the action page: {title}",
+  "@detailsRelationsWalkAction": {"description": "Доступное название стрелки строки связи, когда сосед — действие", "placeholders": {"title": {"type": "String"}}},
+  "detailsRelationsNeedsHint": "To get there, you need each of these.",
+  "@detailsRelationsNeedsHint": {"description": "Подсказка о смысле группы «Нужно» под плитками вкладки «Связи»"},
+  "detailsRelationsCanUseHint": "To get there, you can do any of these.",
+  "@detailsRelationsCanUseHint": {"description": "Подсказка о смысле группы «Можно использовать» под плитками вкладки «Связи»"},
+  "detailsRelationsNeededForHint": "Each of these needs it.",
+  "@detailsRelationsNeededForHint": {"description": "Подсказка о смысле группы «Нужно для» под плитками вкладки «Связи»"},
+  "detailsRelationsCanBeUsedForHint": "Each of these can use it, as one of the ways.",
+  "@detailsRelationsCanBeUsedForHint": {"description": "Подсказка о смысле группы «Можно использовать для» под плитками вкладки «Связи»"},
+  "detailsRelationsAdd": "Add",
+  "@detailsRelationsAdd": {"description": "Видимая подпись начала создания связи на вкладке «Связи»"},
+  "detailsRelationsAddNeedsLabel": "Add what it needs",
+  "@detailsRelationsAddNeedsLabel": {"description": "Доступное название «Добавить» у группы «Нужно»"},
+  "detailsRelationsAddCanUseLabel": "Add what it can use",
+  "@detailsRelationsAddCanUseLabel": {"description": "Доступное название «Добавить» у группы «Можно использовать»"},
+  "detailsRelationsAddNeededForLabel": "Add an intention that needs it",
+  "@detailsRelationsAddNeededForLabel": {"description": "Доступное название «Добавить» у группы «Нужно для»"},
+  "detailsRelationsAddCanBeUsedForLabel": "Add an intention that can use it",
+  "@detailsRelationsAddCanBeUsedForLabel": {"description": "Доступное название «Добавить» у группы «Можно использовать для»"},
+  "detailsRelationsEmptyNeedsTitle": "Needs nothing yet",
+  "@detailsRelationsEmptyNeedsTitle": {"description": "Заголовок пустой группы «Нужно»"},
+  "detailsRelationsEmptyNeedsIntentionText": "Add what this intention cannot do without.",
+  "@detailsRelationsEmptyNeedsIntentionText": {"description": "Текст пустой группы «Нужно» у намерения, которое не действие"},
+  "detailsRelationsEmptyNeedsActionText": "An action can stand alone. Add what it needs if it has steps of its own.",
+  "@detailsRelationsEmptyNeedsActionText": {"description": "Текст пустой группы «Нужно» у действия"},
+  "detailsRelationsEmptyCanUseTitle": "Nothing to use yet",
+  "@detailsRelationsEmptyCanUseTitle": {"description": "Заголовок пустой группы «Можно использовать»"},
+  "detailsRelationsEmptyCanUseText": "Add what helps to get there without being required.",
+  "@detailsRelationsEmptyCanUseText": {"description": "Текст пустой группы «Можно использовать»"},
+  "detailsRelationsEmptyNeededForTitle": "Nothing needs it yet",
+  "@detailsRelationsEmptyNeededForTitle": {"description": "Заголовок пустой группы «Нужно для»"},
+  "detailsRelationsEmptyNeededForText": "Intentions that cannot do without this one will appear here.",
+  "@detailsRelationsEmptyNeededForText": {"description": "Текст пустой группы «Нужно для»"},
+  "detailsRelationsEmptyCanBeUsedForTitle": "Nothing can use it yet",
+  "@detailsRelationsEmptyCanBeUsedForTitle": {"description": "Заголовок пустой группы «Можно использовать для»"},
+  "detailsRelationsEmptyCanBeUsedForText": "Intentions that this one is a way to will appear here.",
+  "@detailsRelationsEmptyCanBeUsedForText": {"description": "Текст пустой группы «Можно использовать для»"},
+  "detailsRelationsEmptyArchivedText": "Restore the intention to add relations.",
+  "@detailsRelationsEmptyArchivedText": {"description": "Текст пустой группы архивированного намерения вместо объяснения, что появится в группе"},
+  "detailsRelationsArchiveFold": "Archived",
+  "@detailsRelationsArchiveFold": {"description": "Подпись строки свёрнутого архива группы связей после её активных связей"},
+  "detailsRelationsArchiveFoldSemantic": "Archived in {group}: {count}",
+  "@detailsRelationsArchiveFoldSemantic": {"description": "Доступное название кнопки архива группы связей: группа и число архивированных связей", "placeholders": {"group": {"type": "String"}, "count": {"type": "int"}}},
+  "detailsChoicesTab": "Choices",
+  "@detailsChoicesTab": {"description": "Вкладка дневных выборов, прямо использующих намерение"},
+  "detailsChoicesSourceHint": "Daily choices that start from this intention.",
+  "@detailsChoicesSourceHint": {"description": "Подсказка над непустым списком роли «исходное» на вкладке «Выборы»"},
+  "detailsChoicesSelectedHint": "Daily choices that end in this intention.",
+  "@detailsChoicesSelectedHint": {"description": "Подсказка над непустым списком роли «выбранное» на вкладке «Выборы»"},
+  "detailsChoicesAdd": "Add",
+  "@detailsChoicesAdd": {"description": "Видимая подпись начала дневного выбора на вкладке «Выборы»"},
+  "detailsChoicesAddSourceLabel": "Create a daily choice that starts from this intention",
+  "@detailsChoicesAddSourceLabel": {"description": "Доступное название «Добавить» у роли «исходное»"},
+  "detailsChoicesAddSelectedLabel": "Create a daily choice that ends in this action",
+  "@detailsChoicesAddSelectedLabel": {"description": "Доступное название «Добавить» у роли «выбранное»"},
   "detailsTitle": "Intention details",
   "@detailsTitle": {
-    "description": "Заголовок подробного просмотра намерения"
+    "description": "Доступное имя страницы намерения при загрузке и отказе чтения"
+  },
+  "detailsTypeIntention": "Intention",
+  "@detailsTypeIntention": {
+    "description": "Тип неготового намерения в верхней панели его страницы"
+  },
+  "detailsTypeAction": "Action",
+  "@detailsTypeAction": {
+    "description": "Тип готового к действию намерения в верхней панели его страницы"
+  },
+  "detailsTypeChoiceLabel": "Intention or action",
+  "@detailsTypeChoiceLabel": {
+    "description": "Доступное название пары плиток выбора готовности к действию на обзоре намерения"
+  },
+  "detailsTypeIntentionHint": "Any size. It may take more than a day.",
+  "@detailsTypeIntentionHint": {
+    "description": "Пояснение плитки неготового намерения на обзоре"
+  },
+  "detailsTypeActionHint": "Doable within one day, and clear what to do.",
+  "@detailsTypeActionHint": {
+    "description": "Оба критерия действия на плитке готового намерения на обзоре"
+  },
+  "detailsArchivedBadge": "Archived",
+  "@detailsArchivedBadge": {
+    "description": "Метка архива после названия в шапке страницы архивированного намерения"
+  },
+  "detailsArchivedNote": "Archived intentions stay in saved paths and are not offered in new ones.",
+  "@detailsArchivedNote": {
+    "description": "Строка о смысле архива под названием в шапке страницы архивированного намерения"
+  },
+  "detailsRestoreFromArchiveAction": "Restore from archive",
+  "@detailsRestoreFromArchiveAction": {
+    "description": "Кнопка восстановления намерения из архива в шапке его страницы"
+  },
+  "detailsOptionsLabel": "Options of the intention",
+  "@detailsOptionsLabel": {
+    "description": "Доступное название кнопки «⋯» в верхней панели страницы намерения"
+  },
+  "detailsOptionsTitle": "Intention",
+  "@detailsOptionsTitle": {
+    "description": "Заголовок листа параметров намерения: вид предмета"
+  },
+  "detailsOptionEdit": "Edit",
+  "@detailsOptionEdit": {
+    "description": "Пункт параметров намерения, открывающий экран изменения"
+  },
+  "detailsOptionArchive": "Archive",
+  "@detailsOptionArchive": {
+    "description": "Пункт параметров активного намерения, архивирующий его"
+  },
+  "detailsOptionDelete": "Delete",
+  "@detailsOptionDelete": {
+    "description": "Опасный пункт параметров намерения, открывающий подтверждение удаления"
+  },
+  "detailsOptionArchiveWithRelations": "Its relations are archived with it",
+  "@detailsOptionArchiveWithRelations": {
+    "description": "Пояснение архивирования намерения с активными связями"
+  },
+  "detailsOptionArchiveAlone": "It stays in saved paths, new ones will not use it",
+  "@detailsOptionArchiveAlone": {
+    "description": "Пояснение архивирования намерения без активных связей"
+  },
+  "detailsOptionRestoreWithRelations": "Its relations stay archived until you restore them",
+  "@detailsOptionRestoreWithRelations": {
+    "description": "Пояснение восстановления намерения, у которого есть связи"
+  },
+  "detailsOptionRestoreAlone": "New paths can use it again",
+  "@detailsOptionRestoreAlone": {
+    "description": "Пояснение восстановления намерения без связей"
+  },
+  "detailsOptionDeleteKeepsTags": "Its tags stay",
+  "@detailsOptionDeleteKeepsTags": {
+    "description": "Пояснение доступного удаления намерения"
+  },
+  "detailsOptionDeleteRelationsFirst": "Delete its relations first",
+  "@detailsOptionDeleteRelationsFirst": {
+    "description": "Причина выключенного удаления намерения с долговременными связями"
+  },
+  "detailsOptionDeleteDailyChoicesFirst": "Delete its daily choices first",
+  "@detailsOptionDeleteDailyChoicesFirst": {
+    "description": "Причина выключенного удаления намерения с дневными выборами"
+  },
+  "detailsOptionDeleteRelationsAndDailyChoicesFirst": "Delete its relations and daily choices first",
+  "@detailsOptionDeleteRelationsAndDailyChoicesFirst": {
+    "description": "Причина выключенного удаления намерения со связями и дневными выборами"
+  },
+  "detailsOptionWait": "Wait for the current change to finish",
+  "@detailsOptionWait": {
+    "description": "Причина недоступности пунктов параметров во время изменяющей операции"
+  },
+  "detailsDeleteDialogTitle": "Delete intention?",
+  "@detailsDeleteDialogTitle": {
+    "description": "Вопрос подтверждения удаления намерения из параметров"
+  },
+  "detailsDeleteDialogTextBefore": "This removes the intention ",
+  "@detailsDeleteDialogTextBefore": {
+    "description": "Текст подтверждения удаления до выделенного названия намерения"
+  },
+  "detailsDeleteDialogTextAfter": " with its description and cannot be undone. Its tags stay.",
+  "@detailsDeleteDialogTextAfter": {
+    "description": "Текст подтверждения удаления после выделенного названия намерения"
+  },
+  "detailsDeleteDialogCancel": "Cancel",
+  "@detailsDeleteDialogCancel": {
+    "description": "Отмена удаления намерения"
+  },
+  "detailsDeleteDialogConfirm": "Delete",
+  "@detailsDeleteDialogConfirm": {
+    "description": "Подтверждение удаления намерения"
+  },
+  "detailsEditTitleLabel": "Edit the name: {title}",
+  "@detailsEditTitleLabel": {
+    "description": "Доступное название кнопки-названия в шапке страницы намерения, которая открывает экран изменения; название намерения не переводится",
+    "placeholders": {"title": {"type": "String"}}
+  },
+  "detailsEditDescriptionLabel": "Edit the description: {description}",
+  "@detailsEditDescriptionLabel": {
+    "description": "Доступное название описания на вкладке «Обзор», которое открывает экран изменения с курсором в описании; описание намерения не переводится",
+    "placeholders": {"description": {"type": "String"}}
+  },
+  "detailsAddDescription": "Add a description",
+  "@detailsAddDescription": {
+    "description": "Приглашение добавить описание на вкладке «Обзор» намерения без описания; открывает экран изменения с курсором в описании"
+  },
+  "detailsCreatedLabel": "Created",
+  "@detailsCreatedLabel": {
+    "description": "Метка даты создания намерения в строке дат в конце вкладки «Обзор»"
+  },
+  "detailsChangedLabel": "Changed",
+  "@detailsChangedLabel": {
+    "description": "Метка даты последнего изменения намерения в строке дат в конце вкладки «Обзор»"
   },
   "detailsLoading": "Loading intention…",
   "@detailsLoading": {
@@ -634,22 +722,6 @@
   "@detailsOperationRunning": {
     "description": "Сохраняющаяся между экранами выполняющаяся операция намерения"
   },
-  "detailsDescriptionLabel": "Description",
-  "@detailsDescriptionLabel": {
-    "description": "Подпись описания в подробных данных намерения"
-  },
-  "detailsNoDescription": "No description",
-  "@detailsNoDescription": {
-    "description": "Отсутствующее описание в подробных данных намерения"
-  },
-  "detailsReadinessLabel": "Readiness",
-  "@detailsReadinessLabel": {
-    "description": "Подпись готовности к действию в подробных данных"
-  },
-  "detailsArchiveStateLabel": "State",
-  "@detailsArchiveStateLabel": {
-    "description": "Подпись архивного состояния в подробных данных"
-  },
   "detailsActive": "Active",
   "@detailsActive": {
     "description": "Активное состояние намерения в подробных данных"
@@ -658,89 +730,13 @@
   "@detailsArchived": {
     "description": "Архивное состояние намерения в подробных данных"
   },
-  "detailsEditAction": "Edit",
-  "@detailsEditAction": {
-    "description": "Действие перехода к изменению намерения"
-  },
-  "detailsSaveAction": "Save changes",
-  "@detailsSaveAction": {
-    "description": "Действие сохранения изменённых данных намерения"
-  },
   "detailsCancelEditAction": "Cancel",
   "@detailsCancelEditAction": {
     "description": "Действие отмены изменения намерения до отправки"
   },
-  "detailsSaved": "Changes saved.",
-  "@detailsSaved": {
-    "description": "Подтверждение успешного изменения намерения"
-  },
-  "detailsEnableReadinessAction": "Mark as ready for action",
-  "@detailsEnableReadinessAction": {
-    "description": "Действие начала явного включения готовности намерения"
-  },
-  "detailsDisableReadinessAction": "Mark as not ready for action",
-  "@detailsDisableReadinessAction": {
-    "description": "Явное действие выключения готовности намерения"
-  },
-  "detailsReadinessConfirmationTitle": "Ready for action?",
-  "@detailsReadinessConfirmationTitle": {
-    "description": "Заголовок объяснения критериев готовности к действию"
-  },
-  "detailsReadinessOneDayCriterion": "It can be completed fully within one day.",
-  "@detailsReadinessOneDayCriterion": {
-    "description": "Критерий полной однодневной выполнимости действия"
-  },
-  "detailsReadinessClarityCriterion": "It is clear enough for a person to carry out.",
-  "@detailsReadinessClarityCriterion": {
-    "description": "Критерий операционной понятности действия человеку"
-  },
-  "detailsConfirmReadinessAction": "Mark as ready",
-  "@detailsConfirmReadinessAction": {
-    "description": "Подтверждение соответствия обоим критериям действия"
-  },
-  "detailsArchiveAction": "Archive",
-  "@detailsArchiveAction": {
-    "description": "Явное действие архивирования намерения"
-  },
-  "detailsRestoreAction": "Restore",
-  "@detailsRestoreAction": {
-    "description": "Явное действие восстановления намерения из архива"
-  },
-  "detailsDeleteAction": "Delete permanently",
-  "@detailsDeleteAction": {
-    "description": "Действие начала физического удаления намерения"
-  },
-  "detailsDeleteConfirmationTitle": "Delete intention permanently?",
-  "@detailsDeleteConfirmationTitle": {
-    "description": "Заголовок подтверждения необратимого удаления намерения"
-  },
-  "detailsDeleteConfirmationMessage": "This can’t be undone. The intention, its description, and all its tag assignments, including those not shown here, will be permanently deleted. The tags will remain.",
-  "@detailsDeleteConfirmationMessage": {
-    "description": "Объяснение необратимости физического удаления намерения"
-  },
-  "detailsConfirmDeleteAction": "Delete permanently",
-  "@detailsConfirmDeleteAction": {
-    "description": "Явное подтверждение физического удаления намерения"
-  },
   "detailsDeleted": "Intention deleted.",
   "@detailsDeleted": {
     "description": "Подтверждение физического удаления намерения после ухода из подробного просмотра"
-  },
-  "detailsReadinessEnabled": "Marked as ready for action.",
-  "@detailsReadinessEnabled": {
-    "description": "Подтверждение включённой готовности к действию"
-  },
-  "detailsReadinessDisabled": "Marked as not ready for action.",
-  "@detailsReadinessDisabled": {
-    "description": "Подтверждение выключенной готовности к действию"
-  },
-  "detailsArchivedSuccess": "Intention archived.",
-  "@detailsArchivedSuccess": {
-    "description": "Подтверждение архивирования намерения"
-  },
-  "detailsRestoredSuccess": "Intention restored.",
-  "@detailsRestoredSuccess": {
-    "description": "Подтверждение восстановления намерения"
   },
   "detailsStateChangeInvalid": "The intention state couldn’t be changed.",
   "@detailsStateChangeInvalid": {
@@ -782,27 +778,6 @@
   "@detailsDeleteBlockedByRelations": {
     "description": "Объяснение блокировки удаления намерения его связями"
   },
-  "detailsShowBlockingRelationsAction": "Show blocking relations",
-  "@detailsShowBlockingRelationsAction": {
-    "description": "Переход к актуальным группам связей, блокирующих удаление"
-  },
-  "detailsArchiveCascadeExplanation": "Archiving also archives the intention’s direct relations. Neighbouring intentions and their other relations stay unchanged.",
-  "@detailsArchiveCascadeExplanation": {
-    "description": "Объяснение каскада непосредственных связей перед архивированием"
-  },
-  "detailsRestoreRelationsExplanation": "Restoring returns only the intention. Its relations stay archived: {count}.",
-  "@detailsRestoreRelationsExplanation": {
-    "description": "Объяснение сохранённого архива связей перед восстановлением",
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "detailsShowArchivedRelationsAction": "Show archived relations",
-  "@detailsShowArchivedRelationsAction": {
-    "description": "Переход к архивным группам связей намерения"
-  },
   "detailsDeleteUnavailable": "The intention couldn’t be deleted. Try again.",
   "@detailsDeleteUnavailable": {
     "description": "Устранимая недоступность физического удаления намерения"
@@ -838,6 +813,42 @@
   "detailsUpdateUnexpected": "The changes couldn’t be saved because of an unexpected error.",
   "@detailsUpdateUnexpected": {
     "description": "Терминальная непредвиденная ошибка изменения намерения"
+  },
+  "intentionEditTitle": "Edit intention",
+  "@intentionEditTitle": {
+    "description": "Заголовок экрана изменения названия и описания намерения"
+  },
+  "intentionEditSaveAction": "Save",
+  "@intentionEditSaveAction": {
+    "description": "Действие сохранения в верхней панели экрана изменения намерения"
+  },
+  "intentionEditNameLabel": "Name",
+  "@intentionEditNameLabel": {
+    "description": "Заполнитель и доступное название поля названия на экране изменения намерения"
+  },
+  "intentionEditDescriptionLabel": "Description",
+  "@intentionEditDescriptionLabel": {
+    "description": "Доступное название поля описания на экране изменения намерения"
+  },
+  "intentionEditDescriptionPlaceholder": "Add a description",
+  "@intentionEditDescriptionPlaceholder": {
+    "description": "Заполнитель пустого поля описания на экране изменения намерения"
+  },
+  "intentionEditDiscardTitle": "Discard changes?",
+  "@intentionEditDiscardTitle": {
+    "description": "Вопрос перед уходом с экрана изменения намерения с несохранённым текстом"
+  },
+  "intentionEditDiscardMessage": "Your changes to the intention won’t be saved.",
+  "@intentionEditDiscardMessage": {
+    "description": "Объяснение, что несохранённые изменения намерения будут потеряны при уходе с экрана"
+  },
+  "intentionEditDiscardAction": "Discard",
+  "@intentionEditDiscardAction": {
+    "description": "Действие вопроса об отмене изменений, закрывающее экран изменения намерения без сохранения"
+  },
+  "intentionEditContinueAction": "Keep editing",
+  "@intentionEditContinueAction": {
+    "description": "Действие вопроса об отмене изменений, возвращающее к полям экрана изменения намерения"
   },
   "editorTitle": "Create intention",
   "@editorTitle": {
@@ -1049,34 +1060,6 @@
   "graphOperationDelete": "Delete",
   "@graphOperationDelete": {
     "description": "Вид операции удаления намерения в сообщении оболочки"
-  },
-  "graphOperationDeleteBlockingRelations": "Delete selected relations",
-  "@graphOperationDeleteBlockingRelations": {
-    "description": "Вид массовой операции в сообщении оболочки"
-  },
-  "blockingRelationsDeleted": "Selected relations deleted.",
-  "@blockingRelationsDeleted": {
-    "description": "Успешное массовое удаление выбранных связей"
-  },
-  "blockingRelationsDeleteIntentionNotFound": "This intention no longer exists. Relations weren’t deleted.",
-  "@blockingRelationsDeleteIntentionNotFound": {
-    "description": "Намерение исчезло до массового удаления"
-  },
-  "blockingRelationsDeleteConflict": "The selected relations changed. Refresh the selection and confirm again.",
-  "@blockingRelationsDeleteConflict": {
-    "description": "Устаревший набор массового удаления"
-  },
-  "blockingRelationsDeleteUnavailable": "Selected relations couldn’t be deleted. Try again.",
-  "@blockingRelationsDeleteUnavailable": {
-    "description": "Временная недоступность массового удаления"
-  },
-  "blockingRelationsDeleteCorruption": "Stored data is damaged. Selected relations weren’t deleted.",
-  "@blockingRelationsDeleteCorruption": {
-    "description": "Повреждение данных при массовом удалении"
-  },
-  "blockingRelationsDeleteUnexpected": "Selected relations couldn’t be deleted because of an unexpected error.",
-  "@blockingRelationsDeleteUnexpected": {
-    "description": "Непредвиденная ошибка массового удаления"
   },
   "graphOperationNewIntention": "new intention",
   "@graphOperationNewIntention": {
@@ -1406,8 +1389,8 @@
   "@tagAssignmentCorruption": { "description": "Повреждение при назначении или снятии" },
   "tagAssignmentUnexpected": "The tag assignment operation failed because of an unexpected error.",
   "@tagAssignmentUnexpected": { "description": "Неизвестный отказ назначения или снятия" },
-  "tagAssignmentsTitle": "Assigned tags",
-  "@tagAssignmentsTitle": {"description": "Заголовок блока назначений"},
+  "tagAssignmentsTitle": "Tags",
+  "@tagAssignmentsTitle": {"description": "Заголовок блока тегов намерения"},
   "tagAssignmentsIntention": "intention",
   "@tagAssignmentsIntention": {"description": "Вид получателя: намерение"},
   "tagAssignmentsActive": "active",
@@ -1418,8 +1401,6 @@
   "@tagAssignmentsContext": {"description": "Контекст блока для экранного диктора", "placeholders": {"targetKind": {"type": "String"}, "archiveState": {"type": "String"}}},
   "tagAssignmentsLoading": "Loading assignments…",
   "@tagAssignmentsLoading": {"description": "Начальная загрузка назначений"},
-  "tagAssignmentsEmpty": "No tags assigned yet.",
-  "@tagAssignmentsEmpty": {"description": "Существующий получатель без назначений"},
   "tagAssignmentsRefreshing": "Refreshing assignments…",
   "@tagAssignmentsRefreshing": {"description": "Актуализация открытых назначений"},
   "tagAssignmentsUnavailable": "Could not load assignments. Try again.",
@@ -1428,14 +1409,14 @@
   "@tagAssignmentsCorruption": {"description": "Повреждение данных назначений"},
   "tagAssignmentsUnexpected": "Could not load assignments because of an unexpected error.",
   "@tagAssignmentsUnexpected": {"description": "Неизвестный отказ чтения назначений"},
-  "tagAssignmentsChoose": "Choose a tag",
-  "@tagAssignmentsChoose": {"description": "Переход к выбору тега"},
-  "tagAssignmentsChooseSemantic": "Choose a tag for the {archiveState} {targetKind}",
-  "@tagAssignmentsChooseSemantic": {"description": "Доступная подпись перехода к выбору", "placeholders": {"targetKind": {"type": "String"}, "archiveState": {"type": "String"}}},
-  "tagAssignmentsRemove": "Remove assignment",
-  "@tagAssignmentsRemove": {"description": "Снятие одной пары назначения"},
-  "tagAssignmentsRemoveNamed": "Remove assignment: {tagName}",
-  "@tagAssignmentsRemoveNamed": {"description": "Доступная подпись снятия назначения конкретного тега", "placeholders": {"tagName": {"type": "String"}}},
+  "tagAssignmentsAdd": "Add",
+  "@tagAssignmentsAdd": {"description": "Видимая подпись открытия панели тегов намерения"},
+  "tagAssignmentsAddLabel": "Tags: {tagNames}. Add or remove",
+  "@tagAssignmentsAddLabel": {"description": "Доступная подпись «Добавить» с перечнем назначенных тегов", "placeholders": {"tagNames": {"type": "String"}}},
+  "tagAssignmentsAddEmptyLabel": "Add tags",
+  "@tagAssignmentsAddEmptyLabel": {"description": "Доступная подпись «Добавить» у намерения без тегов"},
+  "tagAssignmentsRemoveNamed": "Remove the tag: {tagName}",
+  "@tagAssignmentsRemoveNamed": {"description": "Доступная подпись крестика, который снимает тег с намерения", "placeholders": {"tagName": {"type": "String"}}},
   "tagAssignmentsRemoving": "Removing assignment…",
   "@tagAssignmentsRemoving": {"description": "Ожидание подтверждения снятия"},
   "tagNameInvalidUnicode": "Tag name contains invalid characters.",
@@ -1700,12 +1681,8 @@
   "@relationDeleteUnexpected": {
     "description": "Терминальная непредвиденная ошибка удаления связи"
   },
-  "relationNeighborhoodOpenRelation": "Opens the relation details",
   "relationNeighborhoodOpenDailyChoice": "Open the full saved daily path",
   "@relationNeighborhoodOpenDailyChoice": {"description": "Назначение перехода к полному пути дневного выбора"},
-  "@relationNeighborhoodOpenRelation": {
-    "description": "Назначение перехода из строки соседства в подробный просмотр связи"
-  },
   "relationDetailsTitle": "Relation",
   "@relationDetailsTitle": {
     "description": "Заголовок подробного просмотра связи"
@@ -2243,14 +2220,6 @@
   "@relationEditorSaving": {
     "description": "Выполняемое изменение долговременной связи"
   },
-  "relationNeighborhoodCreateOutgoingAction": "Create an outgoing relation",
-  "@relationNeighborhoodCreateOutgoingAction": {
-    "description": "Создание связи из исходящей группы соседства"
-  },
-  "relationNeighborhoodCreateIncomingAction": "Create an incoming relation",
-  "@relationNeighborhoodCreateIncomingAction": {
-    "description": "Создание связи из входящей группы соседства"
-  },
   "relationEditorPriorityOption": "Priority {priority}",
   "@relationEditorPriorityOption": {
     "description": "Вариант приоритета P1–P4 в форме создания связи",
@@ -2260,8 +2229,6 @@
       }
     }
   },
-  "detailsChoosePathAction": "Choose an action along a path",
-  "@detailsChoosePathAction": {"description": "Открыть верхний обход из активного намерения"},
   "choicePathTitle": "Choose a path to an action",
   "@choicePathTitle": {"description": "Заголовок верхнего обхода"},
   "choicePathBottomTitle": "Choose a source for the action",

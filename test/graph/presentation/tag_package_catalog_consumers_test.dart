@@ -4,7 +4,6 @@ import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
-import 'package:doable/src/graph/application/selected_relations.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
@@ -12,7 +11,7 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
-import 'package:doable/src/intention/presentation/details/intention_details_view_model.dart';
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag_color.dart';
@@ -37,7 +36,8 @@ import 'package_consumers_test_support.dart';
 /// Граф фикстуры: связи 101 (1→2), 102 (2→3), 103 (1→4), 104 (1→5),
 /// дневной выбор 201 от 1 к 3 по пути 101, 102 и отдельное намерение 6.
 /// Намерение 3 наблюдают потребители выбора 201, связи 102 и самого
-/// намерения; намерение 6 не наблюдает никто.
+/// намерения, а его вкладка «Связи» показывает группу связи 102; намерение 6
+/// не наблюдает никто.
 void main() {
   late AppDatabase database;
   late InMemoryDiagnosticsSink diagnostics;
@@ -102,24 +102,8 @@ void main() {
       ..watchDailyChoice(choice, observes: true)
       ..watchRelation(observedRelation, observes: true)
       ..watchRelation(unobservedRelation, observes: false)
-      ..watchSelectedRelations(
-        SelectedRelationsQuery(
-          intentionId: durabilityIntention(2),
-          relationIds: [observedRelation],
-        ),
-        observes: true,
-      )
-      ..watchSelectedRelations(
-        SelectedRelationsQuery(
-          intentionId: durabilityIntention(1),
-          relationIds: [unobservedRelation],
-        ),
-        observes: false,
-      )
       ..intentionDetails(observed, observes: true)
       ..intentionDetails(durabilityIntention(5), observes: false)
-      ..neighborhood(observed, observes: true)
-      ..neighborhood(durabilityIntention(5), observes: false)
       ..relationDetails(observedRelation, observes: true)
       ..relationDetails(unobservedRelation, observes: false)
       ..dailyChoiceCatalog()
@@ -128,10 +112,19 @@ void main() {
       () => probes.allLoaded,
       diagnostics: probes.describe,
     );
+    probes
+      ..intentionRelations(
+        observed,
+        group: IntentionRelationGroup.canBeUsedFor,
+        observes: true,
+      )
+      ..intentionRelations(
+        durabilityIntention(5),
+        group: IntentionRelationGroup.canBeUsedFor,
+        observes: false,
+      );
     // Незавершённая форма и выбор фильтров не должны пострадать от пакета.
-    container.read(intentionDetailsViewModelProvider(observed).notifier)
-      ..beginEditing()
-      ..changeTitle('Черновик названия');
+    probes.openIntentionEdit(observed).changeTitle('Черновик названия');
     container.read(probes.dailyCatalogProvider.notifier)
       ..selectDate(durabilityChoiceDate)
       ..toggleSection(false)
@@ -170,10 +163,10 @@ void main() {
   test('назначение и снятие тега не меняют форму, выбор и содержимое '
       'потребителей', () async {
     final contentBefore = probes.visibleContent();
-    final formBefore = probes.intentionDetailsEdit(observed);
-    expect(formBefore?.$1, 'Черновик названия');
+    final formBefore = probes.intentionEditDraft(observed);
+    expect(formBefore.$1, 'Черновик названия');
     final selectionBefore = probes.dailyCatalogSelection;
-    final neighborhoodSelectionBefore = probes.neighborhoodSelection(observed);
+    final relationsSelectionBefore = probes.relationsSelection(observed);
 
     for (final command in <TagCommand>[
       AssignTag(tagId: tagId, intentionId: observed),
@@ -195,12 +188,9 @@ void main() {
         );
       }
       expect(probes.visibleContent(), contentBefore);
-      expect(probes.intentionDetailsEdit(observed), formBefore);
+      expect(probes.intentionEditDraft(observed), formBefore);
       expect(probes.dailyCatalogSelection, selectionBefore);
-      expect(
-        probes.neighborhoodSelection(observed),
-        neighborhoodSelectionBefore,
-      );
+      expect(probes.relationsSelection(observed), relationsSelectionBefore);
     }
   });
 
@@ -208,7 +198,7 @@ void main() {
     'пакет тега ненаблюдаемого намерения не затрагивает потребителей',
     () async {
       final contentBefore = probes.visibleContent();
-      final formBefore = probes.intentionDetailsEdit(observed);
+      final formBefore = probes.intentionEditDraft(observed);
 
       probes.reset();
       await run(AssignTag(tagId: tagId, intentionId: isolated));
@@ -218,7 +208,7 @@ void main() {
         expect(probe.forbiddenStates, isEmpty, reason: probe.name);
       }
       expect(probes.visibleContent(), contentBefore);
-      expect(probes.intentionDetailsEdit(observed), formBefore);
+      expect(probes.intentionEditDraft(observed), formBefore);
     },
   );
 
@@ -226,7 +216,7 @@ void main() {
     'создание с начальными назначениями не затрагивает потребителей',
     () async {
       final contentBefore = probes.visibleContent();
-      final formBefore = probes.intentionDetailsEdit(observed);
+      final formBefore = probes.intentionEditDraft(observed);
 
       probes.reset();
       final completion = await (coordinator.acceptCreation(
@@ -245,7 +235,7 @@ void main() {
         expect(probe.forbiddenStates, isEmpty, reason: probe.name);
       }
       expect(probes.visibleContent(), contentBefore);
-      expect(probes.intentionDetailsEdit(observed), formBefore);
+      expect(probes.intentionEditDraft(observed), formBefore);
     },
   );
 
@@ -272,7 +262,7 @@ void main() {
     expect(observedTags(), [(tagId, 'Здоровье', null)]);
     final searchBefore = search()!;
     final contentBefore = probes.visibleContent();
-    final formBefore = probes.intentionDetailsEdit(observed);
+    final formBefore = probes.intentionEditDraft(observed);
     final selectionBefore = probes.dailyCatalogSelection;
 
     probes.reset();
@@ -301,7 +291,7 @@ void main() {
       expect(probe.forbiddenStates, isEmpty, reason: probe.name);
     }
     expect(probes.visibleContent(), contentBefore);
-    expect(probes.intentionDetailsEdit(observed), formBefore);
+    expect(probes.intentionEditDraft(observed), formBefore);
     expect(probes.dailyCatalogSelection, selectionBefore);
   });
 
@@ -360,7 +350,7 @@ void main() {
     expect(assignmentOrders.last, ['Здоровье', 'Спорт']);
     final searchBefore = search()!;
     final contentBefore = probes.visibleContent();
-    final formBefore = probes.intentionDetailsEdit(observed);
+    final formBefore = probes.intentionEditDraft(observed);
     final selectionBefore = probes.dailyCatalogSelection;
 
     probes.reset();
@@ -391,7 +381,7 @@ void main() {
       expect(probe.forbiddenStates, isEmpty, reason: probe.name);
     }
     expect(probes.visibleContent(), contentBefore);
-    expect(probes.intentionDetailsEdit(observed), formBefore);
+    expect(probes.intentionEditDraft(observed), formBefore);
     expect(probes.dailyCatalogSelection, selectionBefore);
   });
 }

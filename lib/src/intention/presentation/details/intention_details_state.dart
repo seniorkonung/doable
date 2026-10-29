@@ -1,10 +1,6 @@
-import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_revision.dart';
 import '../../application/intention_details.dart' as application;
-import '../../application/intention_result.dart';
 import '../../domain/intention.dart';
-import '../../domain/intention_text.dart';
-import '../operation/operation_state.dart';
 
 sealed class IntentionDetailsState {
   const IntentionDetailsState({required this.isOperationRunning});
@@ -21,157 +17,30 @@ final class IntentionDetailsLoaded extends IntentionDetailsState {
     required this.details,
     required this.revision,
     required super.isOperationRunning,
-    this.edit,
-    this.stateChange,
+    this.isAwaitingConfirmedSnapshot = false,
   });
 
   final application.IntentionDetails details;
   final GraphRevision revision;
   Intention get intention => details.intention;
-  final IntentionDetailsEdit? edit;
-  final IntentionDetailsStateChange? stateChange;
+
+  /// Подтверждённое изменение этого намерения уже опубликовано, а снимок с
+  /// ним ещё не принят: показанные поля старше последнего подтверждённого
+  /// текста, и правка по ним открываться не должна.
+  final bool isAwaitingConfirmedSnapshot;
 
   IntentionDetailsLoaded copyWith({
     application.IntentionDetails? details,
     GraphRevision? revision,
     bool? isOperationRunning,
-    IntentionDetailsEdit? edit,
-    bool clearEdit = false,
-    IntentionDetailsStateChange? stateChange,
-    bool clearStateChange = false,
+    bool? isAwaitingConfirmedSnapshot,
   }) => IntentionDetailsLoaded(
     details: details ?? this.details,
     revision: revision ?? this.revision,
     isOperationRunning: isOperationRunning ?? this.isOperationRunning,
-    edit: clearEdit ? null : edit ?? this.edit,
-    stateChange: clearStateChange ? null : stateChange ?? this.stateChange,
+    isAwaitingConfirmedSnapshot:
+        isAwaitingConfirmedSnapshot ?? this.isAwaitingConfirmedSnapshot,
   );
-}
-
-enum IntentionDetailsStateChangeKind {
-  enableReadiness,
-  disableReadiness,
-  archive,
-  restore,
-  delete,
-}
-
-final class IntentionDetailsStateChange {
-  const IntentionDetailsStateChange.running(this.kind)
-    : operation = const OperationRunning<Intention>(),
-      failurePresentation = null;
-
-  IntentionDetailsStateChange.failed(
-    this.kind,
-    IntentionFailure failure, {
-    this.failurePresentation,
-  }) : operation = OperationFailed<Intention>(failure);
-
-  final IntentionDetailsStateChangeKind kind;
-  final OperationState<Intention> operation;
-
-  /// Право открытого просмотра предъявить ошибку перехода по видимому кадру.
-  final GraphInitiatorPresentationClaim? failurePresentation;
-
-  bool get canRetry => switch (operation) {
-    OperationFailed<Intention>(failure: IntentionUnavailableFailure()) => true,
-    OperationIdle<Intention>() ||
-    OperationRunning<Intention>() ||
-    OperationSucceeded<Intention>() ||
-    OperationFailed<Intention>() => false,
-  };
-}
-
-final class IntentionDetailsEdit {
-  const IntentionDetailsEdit({
-    required this.title,
-    required this.description,
-    required this.operation,
-    this.failurePresentation,
-  });
-
-  factory IntentionDetailsEdit.fromIntention(Intention intention) =>
-      IntentionDetailsEdit(
-        title: intention.title,
-        description: intention.description ?? '',
-        operation: const OperationIdle<Intention>(),
-      );
-
-  final String title;
-  final String description;
-  final OperationState<Intention> operation;
-
-  /// Право открытой формы изменения предъявить ошибку по видимому кадру.
-  final GraphInitiatorPresentationClaim? failurePresentation;
-
-  bool get canRetry => switch (operation) {
-    OperationFailed<Intention>(failure: IntentionUnavailableFailure()) => true,
-    OperationIdle<Intention>() ||
-    OperationRunning<Intention>() ||
-    OperationSucceeded<Intention>() ||
-    OperationFailed<Intention>() => false,
-  };
-
-  bool get canSubmit => operation is OperationIdle<Intention> || canRetry;
-
-  IntentionDetailsEdit withTitle(String value) => _withEditedText(
-    title: value,
-    description: description,
-    field: IntentionTextField.title,
-  );
-
-  IntentionDetailsEdit withDescription(String value) => _withEditedText(
-    title: title,
-    description: value,
-    field: IntentionTextField.description,
-  );
-
-  IntentionDetailsEdit withOperation(
-    OperationState<Intention> value, {
-    GraphInitiatorPresentationClaim? failurePresentation,
-  }) => IntentionDetailsEdit(
-    title: title,
-    description: description,
-    operation: value,
-    failurePresentation: failurePresentation,
-  );
-
-  IntentionDetailsEdit _withEditedText({
-    required String title,
-    required String description,
-    required IntentionTextField field,
-  }) {
-    final nextOperation = _operationAfterEditing(field);
-    return IntentionDetailsEdit(
-      title: title,
-      description: description,
-      operation: nextOperation,
-      failurePresentation: nextOperation is OperationFailed<Intention>
-          ? failurePresentation
-          : null,
-    );
-  }
-
-  OperationState<Intention> _operationAfterEditing(IntentionTextField field) {
-    final current = operation;
-    if (current is! OperationFailed<Intention>) {
-      return current;
-    }
-    return switch (current.failure) {
-      IntentionTextInputValidationFailure(:final textFailure)
-          when textFailure.field == field =>
-        const OperationIdle<Intention>(),
-      IntentionGenericValidationFailure() => const OperationIdle<Intention>(),
-      IntentionTextInputValidationFailure() ||
-      IntentionCreationTagsMissingFailure() ||
-      IntentionNotFoundFailure() ||
-      IntentionConflictFailure() ||
-      IntentionHasBlockingRelationsFailure() ||
-      IntentionUnavailableFailure() ||
-      IntentionCorruptionFailure() ||
-      IntentionUnexpectedFailure() => current,
-    };
-  }
 }
 
 final class IntentionDetailsNotFound extends IntentionDetailsState {

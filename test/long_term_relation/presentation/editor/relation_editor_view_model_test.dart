@@ -2,6 +2,7 @@ import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/domain/intention.dart';
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_permissions.dart';
@@ -111,6 +112,26 @@ void main() {
         }
       });
     }
+  });
+
+  group('Создание связи из группы', () {
+    test('только что открытая форма не изменена, смена типа её изменяет', () {
+      final harness = _EditorHarness(
+        RelationCreationContext(
+          participant: testEditorParticipant(1),
+          group: IntentionRelationGroup.canUse,
+        ),
+      );
+
+      expect(harness.state.type, LongTermRelationType.can);
+      expect(harness.state.hasChanges, isFalse);
+
+      harness.viewModel.selectType(LongTermRelationType.need);
+      expect(harness.state.hasChanges, isTrue);
+
+      harness.viewModel.selectType(LongTermRelationType.can);
+      expect(harness.state.hasChanges, isFalse);
+    });
   });
 
   group('Отправка черновика', () {
@@ -694,7 +715,7 @@ final class _EditorHarness {
   factory _EditorHarness.outgoing() => _EditorHarness(
     RelationCreationContext(
       participant: testEditorParticipant(1),
-      direction: RelationDirection.outgoing,
+      group: IntentionRelationGroup.needs,
     ),
   );
 

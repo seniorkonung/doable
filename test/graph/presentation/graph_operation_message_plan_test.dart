@@ -22,6 +22,7 @@ void main() {
     final coordinator = container.read(
       graphCommandCoordinatorProvider.notifier,
     );
+    final registration = coordinator.registerAppPresentation();
     successes = [];
     failures = [];
     try {
@@ -39,7 +40,11 @@ void main() {
                 ? const ResultFailure(IntentionUnavailableFailure())
                 : testDetailsDeletedResult(intention),
           );
-          (isFailure ? failures : successes).add(await accepted.future);
+          coordinator.releaseInitiatorPresentation(accepted.token);
+          await accepted.future;
+          final claim = (await registration.nextClaim())!;
+          (isFailure ? failures : successes).add(claim.completions.single);
+          coordinator.confirmAppPresentation(claim, [accepted.token]);
         }
       }
     } finally {

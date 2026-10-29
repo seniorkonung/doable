@@ -6,6 +6,7 @@ import 'package:doable/src/daily_choice/application/choice_path_continuations.da
 
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/design_system/components/option_tiles.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:auto_route/auto_route.dart';
@@ -15,12 +16,10 @@ import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openInMemoryLocalDatabase;
-import 'package:doable/src/graph/application/delete_blocking_relations.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
-import 'package:doable/src/graph/application/selected_relations.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_details.dart';
@@ -29,135 +28,30 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart'
     as catalog_page;
+import 'package:doable/src/intention/presentation/details/intention_options.dart';
+import 'package:doable/src/intention/presentation/edit/intention_edit_page.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:doable/src/design_system/components/page_head.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/app_root_pages.dart';
 import '../support/in_memory_diagnostics_sink.dart';
+import '../support/intention_options.dart';
 import '../support/tag_read_contract_test_fallback.dart';
 import '../support/statistics_read_contract_test_fallback.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
 import '../support/quick_creation.dart';
 import '../support/intention_description_preview.dart';
+import '../support/intention_edit_screen.dart';
 import '../support/intention_title_order_key.dart';
 
 void main() {
-  testWidgets(
-    'ошибка массового удаления после ухода из собранного экрана предъявляется один раз',
-    (tester) async {
-      tester.view.physicalSize = const Size(1200, 6000);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.reset);
-      final semantics = tester.ensureSemantics();
-      tester.binding.platformDispatcher.localesTestValue = const [Locale('en')];
-      addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
-      final intentionA = _intention(title: 'A', description: null);
-      final intentionB = _intention(
-        uuid: '018f0000-0000-7000-8000-000000000002',
-        title: 'B',
-        description: null,
-      );
-      final repository = _DelayedPersonalGraphRepository(
-        relation: _relationSummary(intentionA, intentionB),
-      );
-      final runtime = await _pumpCatalog(tester, repository, [
-        intentionA,
-        intentionB,
-      ]);
-      await _openDetails(tester, repository, intentionA, requestIndex: 0);
-      await tester.ensureVisible(
-        find.byKey(const ValueKey('intention-details-delete')),
-      );
-      await tester.tap(find.byKey(const ValueKey('intention-details-delete')));
-      await tester.pump();
-      await tester.tap(
-        find.byKey(const ValueKey('intention-details-confirm-delete')),
-      );
-      await _pumpUntil(tester, () => repository.commands.length == 1);
-      repository.completeCommand(
-        0,
-        ResultFailure(IntentionHasBlockingRelationsFailure(intentionA.id)),
-      );
-      await _pumpUntil(
-        tester,
-        () => find
-            .byKey(const ValueKey('intention-details-show-blocking-relations'))
-            .evaluate()
-            .isNotEmpty,
-      );
-      final showBlocking = find.byKey(
-        const ValueKey('intention-details-show-blocking-relations'),
-      );
-      await tester.ensureVisible(showBlocking);
-      await tester.tap(showBlocking);
-      await tester.pumpAndSettle();
-      final select = find.byKey(
-        ValueKey(
-          'relation-neighborhood-select-${_relationId.toCanonicalString()}',
-        ),
-      );
-      await tester.ensureVisible(select);
-      await tester.tap(select);
-      await tester.pumpAndSettle();
-      final review = find.byKey(const ValueKey('blocking-relations-review'));
-      await tester.ensureVisible(review);
-      await tester.tap(review);
-      await _pumpUntil(
-        tester,
-        () => find
-            .byKey(const ValueKey('blocking-relations-confirm-delete'))
-            .evaluate()
-            .isNotEmpty,
-      );
-      await tester.tap(
-        find.byKey(const ValueKey('blocking-relations-confirm-delete')),
-      );
-      await _pumpUntil(
-        tester,
-        () => repository.blockingRelationsCommands.length == 1,
-      );
-      expect(repository.blockingRelationsCommands.single.relationIds, {
-        _relationId,
-      });
-
-      await tester.pumpAndSettle();
-      await _goBack(tester);
-      await _openDetails(tester, repository, intentionB, requestIndex: 1);
-      expect(runtime.commandCoordinator.isRunning(intentionA.id), isTrue);
-      repository.completeBlockingRelationsCommand(
-        0,
-        const GraphCommandFailed<
-          BlockingRelationsDeleted,
-          DeleteBlockingRelationsFailure
-        >(DeleteBlockingRelationsUnavailableFailure()),
-      );
-      await tester.pumpAndSettle();
-      const message =
-          'Delete selected relations — “A”: Selected relations couldn’t be deleted. Try again.';
-      expect(find.text(message), findsOneWidget);
-      expect(
-        tester.getSemantics(
-          find.byKey(const ValueKey('graph-operation-message')),
-        ),
-        matchesSemantics(
-          label: message,
-          isLiveRegion: true,
-          textDirection: TextDirection.ltr,
-        ),
-      );
-      await _closeOperationMessage(tester);
-      expect(find.text(message), findsNothing);
-      semantics.dispose();
-    },
-  );
-
   testWidgets(
     'проходит полный app-level lifecycle через задерживаемый repository',
     (tester) async {
@@ -242,31 +136,17 @@ void main() {
       );
 
       await tester.tap(find.text(created.title));
-      await _pumpUntil(tester, () => repository.detailRequests.length == 2);
+      await _pumpUntil(tester, () => repository.detailRequests.length == 1);
       repository.emitDetail(0, created);
       await tester.pumpAndSettle();
       expect(find.text(created.description!), findsOneWidget);
 
-      await tester.ensureVisible(
-        find.byKey(const ValueKey('intention-details-edit')),
-      );
-      await tester.tap(find.byKey(const ValueKey('intention-details-edit')));
-      await tester.pump();
-      await tester.enterText(
-        find.byKey(const ValueKey('intention-details-edit-title')),
-        'Укреплять здоровье',
-      );
-      await tester.enterText(
-        find.byKey(const ValueKey('intention-details-edit-description')),
-        'Новое описание',
-      );
-      await tester.ensureVisible(
-        find.byKey(const ValueKey('intention-details-edit-submit')),
-      );
+      await tester.tap(intentionHeadTitle);
       await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const ValueKey('intention-details-edit-submit')),
-      );
+      await tester.enterText(intentionEditTitleField, 'Укреплять здоровье');
+      await tester.enterText(intentionEditDescriptionField, 'Новое описание');
+      await tester.pump();
+      await tester.tap(intentionEditSave);
       await tester.pump();
       final updated = _copyIntention(
         created,
@@ -278,37 +158,39 @@ void main() {
         1,
         _saved(updated, before: created, revision: 2),
       );
-      await _pumpUntil(tester, () => repository.detailRequests.length == 3);
+      await _pumpUntil(tester, () => repository.detailRequests.length == 2);
+      // Успешное сохранение закрывает экран изменения без сообщения.
+      await _pumpUntil(
+        tester,
+        () => find.byType(IntentionEditPage).evaluate().isEmpty,
+      );
 
       repository.emitDetail(0, created);
       await tester.pump();
       await _scrollCurrentPageToTop(tester);
       expect(
         tester
-            .widget<Text>(find.byKey(const ValueKey('intention-details-title')))
-            .data,
+            .widget<PageHead>(
+              find.byKey(const ValueKey('intention-details-title')),
+            )
+            .name,
         created.title,
       );
       expect(find.text(updated.title), findsNothing);
       repository.emitDetail(2, updated);
       await tester.pumpAndSettle();
-      expect(
-        find.text('Edit — “Укреплять здоровье”: Changes saved.'),
-        findsOneWidget,
-      );
-      await _closeOperationMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
 
-      final enableReadiness = find.byKey(
-        const ValueKey('intention-details-enable-readiness'),
+      final actionTile = find.descendant(
+        of: find.byType(OptionTiles<IntentionReadiness>),
+        matching: find.text('Action'),
       );
       await Scrollable.ensureVisible(
-        tester.element(enableReadiness),
+        tester.element(actionTile),
         alignment: 0.5,
       );
       await tester.pumpAndSettle();
-      await tester.tap(enableReadiness);
-      await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(FilledButton, 'Mark as ready'));
+      await tester.tap(actionTile);
       await tester.pump();
       final ready = _copyIntention(
         updated,
@@ -319,18 +201,21 @@ void main() {
         2,
         _saved(ready, before: updated, revision: 3),
       );
-      await _pumpUntil(tester, () => repository.detailRequests.length == 4);
+      await _pumpUntil(tester, () => repository.detailRequests.length == 3);
       repository.emitDetail(3, ready);
       await tester.pumpAndSettle();
       await _scrollCurrentPageToTop(tester);
-      expect(find.text('Ready for action'), findsOneWidget);
+      expect(
+        tester
+            .widget<OptionTiles<IntentionReadiness>>(
+              find.byType(OptionTiles<IntentionReadiness>),
+            )
+            .value,
+        IntentionReadiness.ready,
+      );
       await _closeOperationMessage(tester);
 
-      await tester.ensureVisible(
-        find.byKey(const ValueKey('intention-details-archive')),
-      );
-      await tester.tap(find.byKey(const ValueKey('intention-details-archive')));
-      await tester.pump();
+      await chooseIntentionOption(tester, IntentionOption.archive);
       final archived = _copyIntention(
         ready,
         archiveState: IntentionArchiveState.archived,
@@ -340,14 +225,14 @@ void main() {
         3,
         _saved(archived, before: ready, revision: 4),
       );
-      await _pumpUntil(tester, () => repository.detailRequests.length == 5);
+      await _pumpUntil(tester, () => repository.detailRequests.length == 4);
       repository.emitDetail(4, archived);
       await tester.pumpAndSettle();
       await _scrollCurrentPageToTop(tester);
       expect(find.text('Archived'), findsOneWidget);
       await _closeOperationMessage(tester);
 
-      await tester.pageBack();
+      await tester.tap(find.bySemanticsLabel('Back'));
       await tester.pumpAndSettle();
       expect(find.text('No active intentions yet.'), findsOneWidget);
       await _selectScope(tester, 'Archived');
@@ -365,13 +250,10 @@ void main() {
       expect(find.text(archived.title), findsOneWidget);
 
       await tester.tap(find.text(archived.title));
-      await _pumpUntil(tester, () => repository.detailRequests.length == 7);
+      await _pumpUntil(tester, () => repository.detailRequests.length == 5);
       repository.emitDetail(4, archived);
       await tester.pumpAndSettle();
-      await tester.ensureVisible(
-        find.byKey(const ValueKey('intention-details-restore')),
-      );
-      await tester.tap(find.byKey(const ValueKey('intention-details-restore')));
+      await tester.tap(intentionHeadRestore);
       await tester.pump();
       final restored = _copyIntention(
         archived,
@@ -382,14 +264,14 @@ void main() {
         4,
         _saved(restored, before: archived, revision: 5),
       );
-      await _pumpUntil(tester, () => repository.detailRequests.length == 8);
+      await _pumpUntil(tester, () => repository.detailRequests.length == 6);
       repository.emitDetail(5, restored);
       await tester.pumpAndSettle();
       await _scrollCurrentPageToTop(tester);
-      expect(find.text('Active'), findsOneWidget);
+      expect(find.text('Archived'), findsNothing);
       await _closeOperationMessage(tester);
 
-      await tester.pageBack();
+      await tester.tap(find.bySemanticsLabel('Back'));
       await tester.pumpAndSettle();
       expect(find.text('No archived intentions yet.'), findsOneWidget);
       await _selectScope(tester, 'Active');
@@ -406,22 +288,18 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.tap(find.text(restored.title));
-      await _pumpUntil(tester, () => repository.detailRequests.length == 10);
+      await _pumpUntil(tester, () => repository.detailRequests.length == 7);
       repository.emitDetail(6, restored);
       await tester.pumpAndSettle();
-      await tester.ensureVisible(
-        find.byKey(const ValueKey('intention-details-delete')),
-      );
+      await tester.tap(intentionOptionsButton);
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('intention-details-delete')));
+      await tester.tap(intentionOption(IntentionOption.delete));
       await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const ValueKey('intention-details-confirm-delete')),
-      );
+      await tester.tap(intentionDeletionConfirm);
       await tester.pump();
       expect(repository.commands.last, isA<DeleteIntention>());
 
-      await tester.pageBack();
+      await tester.tap(find.bySemanticsLabel('Back'));
       await tester.pumpAndSettle();
       expect(find.byType(catalog_page.IntentionCatalogPage), findsOneWidget);
       repository.completeCommand(5, _deleted(restored, revision: 6));
@@ -832,13 +710,10 @@ Future<void> _selectScope(WidgetTester tester, String label) async {
   await tester.pump();
 }
 
-Future<void> _goBack(WidgetTester tester) async {
-  await tester.tap(find.byType(BackButton));
-  await tester.pumpAndSettle();
-}
-
 Future<void> _scrollCurrentPageToTop(WidgetTester tester) async {
-  final scrollable = tester.state<ScrollableState>(find.byType(Scrollable));
+  final scrollable = tester.state<ScrollableState>(
+    find.byType(Scrollable).first,
+  );
   scrollable.position.jumpTo(scrollable.position.minScrollExtent);
   await tester.pump();
 }
@@ -878,21 +753,6 @@ Future<AppRuntime> _pumpCatalog(
   );
   await tester.pumpAndSettle();
   return runtime;
-}
-
-Future<void> _openDetails(
-  WidgetTester tester,
-  _DelayedPersonalGraphRepository repository,
-  Intention intention, {
-  required int requestIndex,
-}) async {
-  await tester.tap(find.text(intention.title));
-  await _pumpUntil(
-    tester,
-    () => repository.detailIds.where((id) => id == intention.id).length >= 2,
-  );
-  repository.emitDetail(requestIndex, intention);
-  await tester.pumpAndSettle();
 }
 
 Future<void> _pumpUntil(WidgetTester tester, bool Function() condition) async {
@@ -938,50 +798,9 @@ final class _DelayedPersonalGraphRepository
         'Наблюдение дневного выбора не используется этим тестом.',
       );
 
-  @override
-  Future<SelectedRelationsReadResult> getSelectedRelations(
-    SelectedRelationsQuery query,
-  ) async => _selectedSnapshot(query);
-
-  @override
-  Stream<SelectedRelationsReadResult> watchSelectedRelations(
-    SelectedRelationsQuery query,
-  ) => Stream.value(_selectedSnapshot(query));
-
-  SelectedRelationsReadResult _selectedSnapshot(
-    SelectedRelationsQuery query,
-  ) => SelectedRelationsReadSuccess(
-    GraphSnapshot(
-      revision: _Revision(_revisions[query.intentionId] ?? 0),
-      value: SelectedRelationsSnapshot(
-        query: query,
-        entries: {
-          for (final id in query.relationIds)
-            id: relation == null || relation!.relation.id != id
-                ? SelectedRelationMissing(id)
-                : relation!.relation.sourceIntentionId != query.intentionId &&
-                      relation!.relation.relatedIntentionId != query.intentionId
-                ? SelectedRelationNoLongerBlocking(id)
-                : SelectedRelationPresent(
-                    LongTermRelationDetails(
-                      relation: relation!.relation,
-                      source: relation!.source,
-                      related: relation!.related,
-                      description: null,
-                    ),
-                  ),
-        },
-      ),
-    ),
-  );
-
-  _DelayedPersonalGraphRepository({this.relation});
-
-  final LongTermRelationSummary? relation;
-
   RelationCounts _countsFor(IntentionId id) => RelationCounts(
-    activeNeedIncoming: relation?.relation.relatedIntentionId == id ? 1 : 0,
-    activeNeedOutgoing: relation?.relation.sourceIntentionId == id ? 1 : 0,
+    activeNeedIncoming: 0,
+    activeNeedOutgoing: 0,
     activeCanIncoming: 0,
     activeCanOutgoing: 0,
     archivedNeedIncoming: 0,
@@ -994,12 +813,9 @@ final class _DelayedPersonalGraphRepository
   final detailRequests =
       <StreamController<Result<GraphSnapshot<IntentionDetails?>>>>[];
   final commands = <IntentionCommand>[];
-  final blockingRelationsCommands = <DeleteBlockingRelations>[];
   final _pages = <Completer<Result<IntentionCatalogPage>>>[];
   final _commands =
       <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
-  final _blockingRelationsRequests =
-      <Completer<DeleteBlockingRelationsResult>>[];
   final _revisions = <IntentionId, int>{};
 
   @override
@@ -1011,18 +827,6 @@ final class _DelayedPersonalGraphRepository
     _pages.add(request);
     return request.future;
   }
-
-  @override
-  Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
-    IntentionId intentionId,
-  ) => Future.value(
-    ResultSuccess(
-      GraphSnapshot(
-        value: _countsFor(intentionId),
-        revision: _Revision(_revisions[intentionId] ?? 0),
-      ),
-    ),
-  );
 
   @override
   Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
@@ -1037,17 +841,7 @@ final class _DelayedPersonalGraphRepository
   ) => Future.value(
     GraphResultSuccess(
       RelationGroupFirstPage(
-        items:
-            relation != null &&
-                query.intentionId == relation!.relation.sourceIntentionId &&
-                query.group ==
-                    const LongTermRelationGroup(
-                      scope: RelationScope.active,
-                      type: LongTermRelationType.need,
-                      direction: RelationDirection.outgoing,
-                    )
-            ? [relation!]
-            : const [],
+        items: const [],
         counts: _countsFor(query.intentionId),
         nextCursor: null,
         revision: _Revision(_revisions[query.intentionId] ?? 0),
@@ -1059,17 +853,7 @@ final class _DelayedPersonalGraphRepository
   Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) =>
       Stream.value(
         GraphResultSuccess(
-          GraphSnapshot(
-            value: relation == null || relation!.relation.id != id
-                ? null
-                : LongTermRelationDetails(
-                    relation: relation!.relation,
-                    source: relation!.source,
-                    related: relation!.related,
-                    description: null,
-                  ),
-            revision: const _Revision(0),
-          ),
+          GraphSnapshot(value: null, revision: const _Revision(0)),
         ),
       );
 
@@ -1089,12 +873,6 @@ final class _DelayedPersonalGraphRepository
     TSuccess extends GraphCommandOutcome,
     TFailure extends GraphCommandFailure
   >(GraphCommand<TSuccess, TFailure> command) async {
-    if (command is DeleteBlockingRelations) {
-      blockingRelationsCommands.add(command as DeleteBlockingRelations);
-      final request = Completer<DeleteBlockingRelationsResult>();
-      _blockingRelationsRequests.add(request);
-      return await request.future as GraphCommandResult<TSuccess, TFailure>;
-    }
     if (command is! IntentionCommand) {
       throw UnsupportedError('Команды связей не используются в этих тестах.');
     }
@@ -1144,11 +922,6 @@ final class _DelayedPersonalGraphRepository
   ) {
     _commands[index].complete(result);
   }
-
-  void completeBlockingRelationsCommand(
-    int index,
-    DeleteBlockingRelationsResult result,
-  ) => _blockingRelationsRequests[index].complete(result);
 
   Future<void> close() async {
     for (final request in detailRequests) {
@@ -1207,39 +980,6 @@ IntentionSummary _summary(Intention intention) => IntentionSummary(
   updatedAt: intention.updatedAt,
   titleOrderKey: testTitleOrderKey(intention.title),
 );
-
-final _relationId = switch (LongTermRelationId.decode(
-  '018f0000-0000-7000-8000-000000000003',
-)) {
-  LongTermRelationIdDecodingSuccess(:final id) => id,
-  InvalidLongTermRelationIdDecoding() => throw StateError(
-    'Некорректный fixture связи.',
-  ),
-};
-
-LongTermRelationSummary _relationSummary(Intention source, Intention related) =>
-    LongTermRelationSummary(
-      relation: LongTermRelation(
-        id: _relationId,
-        sourceIntentionId: source.id,
-        relatedIntentionId: related.id,
-        type: LongTermRelationType.need,
-        priority: RelationPriority.p2,
-        scope: RelationScope.active,
-        creationSequence: RelationCreationSequence(1),
-      ),
-      source: RelationParticipantSummary(
-        id: source.id,
-        title: source.title,
-        archiveState: source.archiveState,
-      ),
-      related: RelationParticipantSummary(
-        id: related.id,
-        title: related.title,
-        archiveState: related.archiveState,
-      ),
-      hasDescription: false,
-    );
 
 Result<ConfirmedGraphResult<IntentionCommandSuccess>> _saved(
   Intention intention, {

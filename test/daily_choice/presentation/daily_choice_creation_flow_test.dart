@@ -15,11 +15,13 @@ import 'package:doable/src/daily_choice/presentation/details/daily_choice_detail
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_creation_page.dart';
 import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/design_system/components/tabs.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
+import 'package:doable/src/intention/presentation/details/intention_details_tabs.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
@@ -35,6 +37,7 @@ import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
+import '../../support/intention_choices_tab.dart';
 import '../../support/quick_creation.dart';
 
 part 'daily_choice_creation_route_scenarios.dart';
@@ -71,13 +74,10 @@ Future<void> _openPath(WidgetTester tester) async {
     content: find.text('Основание'),
   );
   await _tap(tester, find.text('Основание').first);
-  await _waitFor(
+  await startDailyChoiceFromIntentionChoices(
     tester,
-    find.byKey(const ValueKey('intention-details-choose-path')),
-  );
-  await _tap(
-    tester,
-    find.byKey(const ValueKey('intention-details-choose-path')),
+    waitFor: _waitFor,
+    tap: _tap,
   );
 }
 
@@ -123,15 +123,43 @@ Future<void> _restartPath(
               as AppRuntimeReady)
           .container
           .read(appRouterProvider);
-  expect(router.stackData.last.name, DailyChoiceDetailsRoute.name);
+  final history = [for (final route in router.stackData) route.name];
+  expect(history.last, DailyChoiceDetailsRoute.name);
+  final created = tester
+      .widget<DailyChoiceDetailsPage>(find.byType(DailyChoiceDetailsPage))
+      .choiceId;
   await tester.binding.handlePopRoute();
   await tester.pumpAndSettle();
   switch (direction) {
     case ChoicePathDraftDirection.topDown:
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('intention-details-choose-path')),
+      // Созданный выбор открыт прямо над намерением: пошагового выбора и
+      // подтверждения в истории нет, а «назад» возвращает на вкладку
+      // «Выборы» с прежней ролью и созданным выбором в списке.
+      expect(history[history.length - 2], IntentionDetailsRoute.name);
+      expect(router.current.name, IntentionDetailsRoute.name);
+      expect(
+        tester
+            .widget<Tabs<IntentionDetailsTab>>(
+              find.byType(Tabs<IntentionDetailsTab>),
+            )
+            .value,
+        IntentionDetailsTab.choices,
       );
+      expect(
+        tester
+            .widget<ChoiceChip>(
+              find.byKey(const ValueKey('intention-choices-role-source')),
+            )
+            .selected,
+        isTrue,
+      );
+      await _waitFor(
+        tester,
+        find.byKey(
+          ValueKey('intention-choices-row-${created.toCanonicalString()}'),
+        ),
+      );
+      await _tap(tester, intentionChoicesAdd);
     case ChoicePathDraftDirection.bottomUp:
       await openDailyChoiceQuickCreation(
         tester,

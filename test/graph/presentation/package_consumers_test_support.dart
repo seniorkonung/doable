@@ -10,7 +10,6 @@ import 'package:doable/src/daily_choice/presentation/details/daily_choice_detail
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_view_model.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
-import 'package:doable/src/graph/application/selected_relations.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
@@ -18,12 +17,17 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_state.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_view_model.dart';
+import 'package:doable/src/intention/presentation/edit/intention_edit_state.dart';
+import 'package:doable/src/intention/presentation/details/intention_page_target.dart';
+import 'package:doable/src/intention/presentation/edit/intention_edit_view_model.dart';
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/long_term_relation/presentation/details/relation_details_state.dart';
 import 'package:doable/src/long_term_relation/presentation/details/relation_details_view_model.dart';
-import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_state.dart';
-import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart';
+import 'package:doable/src/long_term_relation/presentation/intention_relations/intention_relations_state.dart';
+import 'package:doable/src/long_term_relation/presentation/intention_relations/intention_relations_view_model.dart';
+import 'package:doable/src/long_term_relation/presentation/relation_list_reconciliation.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
@@ -74,6 +78,8 @@ final class PackageConsumerProbes {
   final _subscriptions = <StreamSubscription<Object?>>[];
   final _providerSubscriptions = <ProviderSubscription<Object?>>[];
   final _notifiers = <ChangeNotifier>[];
+  final _intentionEdits = <IntentionId, IntentionEditViewModelProvider>{};
+  final _relationPages = <IntentionId, IntentionPageInstance>{};
 
   PackageConsumerProbe _add(String name, {required bool observes}) {
     final probe = PackageConsumerProbe(name, observes: observes);
@@ -145,31 +151,6 @@ final class PackageConsumerProbes {
     );
   }
 
-  void watchSelectedRelations(
-    SelectedRelationsQuery query, {
-    required bool observes,
-  }) {
-    final probe = _add(
-      'выбранные связи ${_label(query.intentionId.toCanonicalString())}',
-      observes: observes,
-    );
-    _subscriptions.add(
-      _repository.watchSelectedRelations(query).listen((result) {
-        probe
-          ..updates += 1
-          ..loaded = true;
-        switch (result) {
-          case SelectedRelationsReadSuccess(:final value):
-            probe
-              ..revision = value.revision
-              ..content = () => _selectedContent(value.value);
-          default:
-            probe.forbiddenStates.add(result);
-        }
-      }),
-    );
-  }
-
   void intentionDetails(IntentionId id, {required bool observes}) {
     final probe = _add(
       'подробности намерения ${_label(id.toCanonicalString())}',
@@ -210,17 +191,26 @@ final class PackageConsumerProbes {
     );
   }
 
-  void neighborhood(IntentionId id, {required bool observes}) {
+  /// Открывает вкладку «Связи» на группе [group] над полученными подробными
+  /// данными намерения.
+  void intentionRelations(
+    IntentionId id, {
+    required IntentionRelationGroup group,
+    required bool observes,
+  }) {
     final probe = _add(
-      'окрестность намерения ${_label(id.toCanonicalString())}',
+      'связи намерения ${_label(id.toCanonicalString())}',
       observes: observes,
     );
-    void observe(RelationNeighborhoodState state) {
+    final page = _relationPages[id] = IntentionPageInstance(
+      target: RelationsTarget(group),
+    );
+    void observe(IntentionRelationsState state) {
       switch (state) {
-        case RelationGroupConfirmedState():
+        case IntentionRelationsConfirmed():
           probe
             ..loaded = true
-            ..content = () => _neighborhoodContent(state);
+            ..content = () => _relationsContent(state);
           final order = probe.revision == null
               ? null
               : state.revision.compareTo(probe.revision!);
@@ -228,20 +218,20 @@ final class PackageConsumerProbes {
             probe.updates += 1;
           }
           probe.revision = state.revision;
-          if (state.summaryStatus is RelationSummaryRefreshFailure) {
+          if (state.summaryStatus is RelationListSummaryRefreshFailure) {
             probe.forbiddenStates.add(state);
           }
-        case RelationGroupInitialLoad():
+        case IntentionRelationsInitialLoad():
           if (probe.loaded) probe.forbiddenStates.add(state);
-        case RelationGroupInitialFailure() ||
-            RelationNeighborhoodIntentionNotFound():
+        case IntentionRelationsInitialFailure() ||
+            IntentionRelationsIntentionNotFound():
           probe.forbiddenStates.add(state);
       }
     }
 
     _providerSubscriptions.add(
-      _container.listen<RelationNeighborhoodState>(
-        relationNeighborhoodViewModelProvider(id),
+      _container.listen<IntentionRelationsState>(
+        intentionRelationsViewModelProvider(id, page),
         (_, next) {
           observe(next);
         },
@@ -375,17 +365,25 @@ final class PackageConsumerProbes {
     return (selection.date, selection.completedExpanded);
   }
 
-  Object? neighborhoodSelection(IntentionId id) {
-    final state = _container.read(relationNeighborhoodViewModelProvider(id));
-    return (state.selection, state.group);
+  /// Выбранная группа вкладки «Связи» и раскрытие её архива.
+  (IntentionRelationGroup, bool) relationsSelection(IntentionId id) {
+    final settings = _relationPages[id]!.relations!;
+    return (settings.group, settings.expandedArchives.contains(settings.group));
   }
 
-  (String, String, Object)? intentionDetailsEdit(IntentionId id) {
-    final state = _container.read(intentionDetailsViewModelProvider(id));
-    if (state is! IntentionDetailsLoaded) return null;
-    final edit = state.edit;
-    if (edit == null) return null;
-    return (edit.title, edit.description, edit.operation.runtimeType);
+  /// Открывает над полученными подробными данными сессию экрана изменения
+  /// намерения и удерживает её до [dispose].
+  IntentionEditViewModel openIntentionEdit(IntentionId id) {
+    final provider = intentionEditViewModelProvider(IntentionEditFormKey(), id);
+    _intentionEdits[id] = provider;
+    _providerSubscriptions.add(_container.listen(provider, (_, _) {}));
+    return _container.read(provider.notifier);
+  }
+
+  /// Черновик и состояние операции сессии, открытой [openIntentionEdit].
+  (String, String, Object) intentionEditDraft(IntentionId id) {
+    final state = _container.read(_intentionEdits[id]!);
+    return (state.title, state.description, state.operation.runtimeType);
   }
 
   bool observingSettledAt(GraphRevision revision) => all
@@ -498,36 +496,30 @@ Object _dailyCatalogContent(DailyChoiceCatalogLoaded state) => [
   state.incomplete.nextCursor == null && state.completed.nextCursor == null,
 ];
 
-Object _selectedContent(SelectedRelationsSnapshot snapshot) => [
-  for (final MapEntry(:key, :value) in snapshot.entriesByReference.entries)
-    (
-      key,
-      switch (value) {
-        SelectedRelationPresent(:final details) => _relationContent(details),
-        SelectedDailyChoicePresent(:final item) => _dailyItem(item),
-        SelectedRelationMissing() ||
-        SelectedRelationNoLongerBlocking() ||
-        SelectedDailyChoiceMissing() ||
-        SelectedDailyChoiceNoLongerBlocking() => value.runtimeType,
-      },
-    ),
-];
+Object _relationEntry(RelationGroupEntry item) => (
+  item.relation.id,
+  item.neighbor.id,
+  item.neighbor.title,
+  item.neighbor.archiveState,
+  item.neighbor.readiness,
+  item.descriptionPreview?.text,
+);
 
-Object _neighborhoodContent(RelationGroupConfirmedState state) => [
+Object _relationsContent(IntentionRelationsConfirmed state) => [
+  state.group,
   state.counts,
   switch (state) {
-    RelationGroupLoaded(:final items) => [
-      for (final item in items)
-        (
-          item.relation.id,
-          _participant(item.source),
-          _participant(item.related),
-        ),
+    IntentionRelationsLoaded(:final items) => [
+      for (final item in items) _relationEntry(item),
     ],
-    DailyChoiceGroupLoaded(:final items) => [
-      for (final item in items) _dailyItem(item),
+    IntentionRelationsEmpty() => const [],
+  },
+  switch (state.archive) {
+    IntentionRelationsArchiveExpanded(:final items) => [
+      for (final item in items) _relationEntry(item),
     ],
-    RelationGroupEmpty() => const [],
+    IntentionRelationsArchiveFolded() ||
+    IntentionRelationsArchivePending() => const [],
   },
 ];
 

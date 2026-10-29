@@ -51,26 +51,154 @@ void main() {
       Brightness.dark => DoableColors.dark,
     };
 
-    for (final (kind, look, label, build, background, foreground) in [
-      (
-        'тихая',
-        'плашка fill с текстом ink',
-        'Отмена',
-        (VoidCallback? onPressed) =>
-            Button.quiet(label: 'Отмена', onPressed: onPressed),
-        colors.fill,
-        colors.ink,
-      ),
-      (
-        'разрушительная',
-        'плашка accent с текстом on-accent',
-        'Удалить',
-        (VoidCallback? onPressed) =>
-            Button.danger(label: 'Удалить', onPressed: onPressed),
-        colors.accent,
-        colors.onAccent,
-      ),
-    ]) {
+    testWidgets('в $theme теме тихая кнопка на всю ширину — плашка fill '
+        'с текстом ink высотой control-height в строке tap-min', (
+      tester,
+    ) async {
+      var presses = 0;
+      await tester.pumpWidget(
+        _app(
+          brightness: brightness,
+          button: Button.quietBlock(
+            label: 'Восстановить из архива',
+            onPressed: () => presses++,
+          ),
+        ),
+      );
+
+      final plane = tester.getRect(_plane);
+      expect(plane.width, 360);
+      expect(plane.height, DoableMetrics.controlHeight);
+      expect(_planeMaterial(tester).color, colors.fill);
+      expect(_planeMaterial(tester).shape, const StadiumBorder());
+      final area = tester.getRect(find.byType(Button));
+      expect(
+        area.height,
+        greaterThanOrEqualTo(DoableMetrics.tapMin),
+        reason: 'область нажатия выше плашки',
+      );
+      expect(area.center, plane.center);
+
+      final style = _labelStyle(tester, 'Восстановить из архива');
+      expect(style.color, colors.ink);
+      expect(style.fontSize, DoableType.section.fontSize);
+      expect(style.fontWeight, DoableType.section.fontWeight);
+      expect(
+        tester.getCenter(find.text('Восстановить из архива')),
+        plane.center,
+      );
+
+      await tester.tapAt(Offset(area.center.dx, area.top + 1));
+      expect(presses, 1);
+    });
+
+    testWidgets('в $theme теме выключенная тихая кнопка на всю ширину '
+        'остаётся на месте плашкой fill с текстом grip и объявляется '
+        'недоступной', (tester) async {
+      final semantics = tester.ensureSemantics();
+      await tester.pumpWidget(
+        _app(
+          brightness: brightness,
+          button: Button.quietBlock(
+            label: 'Восстановить из архива',
+            onPressed: () {},
+          ),
+        ),
+      );
+      final enabledPlane = tester.getRect(_plane);
+
+      await tester.pumpWidget(
+        _app(
+          brightness: brightness,
+          button: const Button.quietBlock(
+            label: 'Восстановить из архива',
+            onPressed: null,
+          ),
+        ),
+      );
+      // Material меняет цвета кнопки с анимацией.
+      await tester.pumpAndSettle();
+
+      expect(tester.getRect(_plane), enabledPlane);
+      expect(_planeMaterial(tester).color, colors.fill);
+      expect(_labelStyle(tester, 'Восстановить из архива').color, colors.grip);
+      expect(
+        tester.getSemantics(find.text('Восстановить из архива')),
+        matchesSemantics(
+          label: 'Восстановить из архива',
+          isButton: true,
+          hasEnabledState: true,
+        ),
+      );
+      semantics.dispose();
+    });
+  }
+
+  for (final brightness in Brightness.values) {
+    final theme = brightness == Brightness.light ? 'светлой' : 'тёмной';
+    final colors = switch (brightness) {
+      Brightness.light => DoableColors.light,
+      Brightness.dark => DoableColors.dark,
+    };
+
+    for (final (
+          kind,
+          look,
+          label,
+          build,
+          background,
+          foreground,
+          height,
+          sidePadding,
+        )
+        in [
+          (
+            'компактная основная',
+            'плашка ink с текстом bg размера sm',
+            'Сохранить',
+            (VoidCallback? onPressed) =>
+                Button.primarySmall(label: 'Сохранить', onPressed: onPressed),
+            colors.ink,
+            colors.bg,
+            DoableMetrics.controlHeightSm,
+            14.0,
+          ),
+          (
+            'основная',
+            'плашка ink с текстом bg размера md',
+            'Продолжить правку',
+            (VoidCallback? onPressed) => Button.primaryCompact(
+              label: 'Продолжить правку',
+              onPressed: onPressed,
+            ),
+            colors.ink,
+            colors.bg,
+            DoableMetrics.controlHeight,
+            DoableMetrics.space4,
+          ),
+          (
+            'тихая',
+            'плашка fill с текстом ink',
+            'Отмена',
+            (VoidCallback? onPressed) =>
+                Button.quiet(label: 'Отмена', onPressed: onPressed),
+            colors.fill,
+            colors.ink,
+            DoableMetrics.controlHeight,
+            DoableMetrics.space4,
+          ),
+          (
+            'разрушительная',
+            'плашка accent с текстом on-accent',
+            'Удалить',
+            (VoidCallback? onPressed) =>
+                Button.danger(label: 'Удалить', onPressed: onPressed),
+            colors.accent,
+            colors.onAccent,
+            DoableMetrics.controlHeight,
+            DoableMetrics.space4,
+          ),
+        ]) {
       testWidgets('в $theme теме $kind кнопка — $look шириной по подписи', (
         tester,
       ) async {
@@ -80,8 +208,8 @@ void main() {
 
         final plane = tester.getRect(_plane);
         final text = tester.getRect(find.text(label));
-        expect(plane.height, DoableMetrics.controlHeight);
-        expect(plane.width, text.width + 2 * DoableMetrics.space4);
+        expect(plane.height, height);
+        expect(plane.width, text.width + 2 * sidePadding);
         expect(_planeMaterial(tester).color, background);
         expect(_planeMaterial(tester).shape, const StadiumBorder());
         expect(
@@ -132,84 +260,99 @@ void main() {
       Brightness.dark => DoableColors.dark,
     };
 
-    testWidgets('в $theme теме текстовая кнопка — текст accent без плашки '
-        'размера sm с областью нажатия не меньше tap-min', (tester) async {
-      final semantics = tester.ensureSemantics();
-      await tester.pumpWidget(
-        _app(
-          brightness: brightness,
-          button: Button.text(
-            label: 'Сбросить',
-            semanticLabel: 'Сбросить условия',
-            onPressed: () {},
+    for (final (size, label, semanticLabel, build, height, sidePadding) in [
+      (
+        'sm',
+        'Сбросить',
+        'Сбросить условия',
+        (VoidCallback? onPressed) => Button.text(
+          label: 'Сбросить',
+          semanticLabel: 'Сбросить условия',
+          onPressed: onPressed,
+        ),
+        DoableMetrics.controlHeightSm,
+        DoableMetrics.space2,
+      ),
+      (
+        'md',
+        'Отменить',
+        'Отменить',
+        (VoidCallback? onPressed) =>
+            Button.textMedium(label: 'Отменить', onPressed: onPressed),
+        DoableMetrics.controlHeight,
+        14.0,
+      ),
+    ]) {
+      testWidgets('в $theme теме текстовая кнопка размера $size — текст '
+          'accent без плашки с областью нажатия не меньше tap-min', (
+        tester,
+      ) async {
+        final semantics = tester.ensureSemantics();
+        await tester.pumpWidget(
+          _app(brightness: brightness, button: build(() {}), block: false),
+        );
+
+        final pill = tester.getRect(_plane);
+        final text = tester.getRect(find.text(label));
+        expect(pill.height, height);
+        expect(pill.width, text.width + 2 * sidePadding);
+        expect(_planeMaterial(tester).color, Colors.transparent);
+        expect(
+          tester.getSize(find.byType(Button)).height,
+          greaterThanOrEqualTo(DoableMetrics.tapMin),
+          reason: 'область нажатия выше подписи',
+        );
+
+        final style = _labelStyle(tester, label);
+        expect(style.color, colors.accent);
+        expect(style.fontSize, DoableType.section.fontSize);
+        expect(style.fontWeight, DoableType.section.fontWeight);
+        expect(tester.getCenter(find.text(label)), pill.center);
+        expect(
+          tester.getSemantics(find.byType(Button)),
+          matchesSemantics(
+            label: semanticLabel,
+            isButton: true,
+            hasEnabledState: true,
+            isEnabled: true,
+            isFocusable: true,
+            hasTapAction: true,
+            hasFocusAction: true,
           ),
-          block: false,
-        ),
-      );
+        );
+        semantics.dispose();
+      });
 
-      final pill = tester.getRect(_plane);
-      final text = tester.getRect(find.text('Сбросить'));
-      expect(pill.height, DoableMetrics.controlHeightSm);
-      expect(pill.width, text.width + 2 * DoableMetrics.space2);
-      expect(_planeMaterial(tester).color, Colors.transparent);
-      expect(
-        tester.getSize(find.byType(Button)).height,
-        greaterThanOrEqualTo(DoableMetrics.tapMin),
-        reason: 'область нажатия выше подписи',
-      );
+      testWidgets('в $theme теме выключенная текстовая кнопка размера $size '
+          'остаётся на месте с текстом grip и объявляется недоступной', (
+        tester,
+      ) async {
+        final semantics = tester.ensureSemantics();
+        await tester.pumpWidget(
+          _app(brightness: brightness, button: build(() {}), block: false),
+        );
+        final enabledPill = tester.getRect(_plane);
 
-      final style = _labelStyle(tester, 'Сбросить');
-      expect(style.color, colors.accent);
-      expect(style.fontSize, DoableType.section.fontSize);
-      expect(style.fontWeight, DoableType.section.fontWeight);
-      expect(tester.getCenter(find.text('Сбросить')), pill.center);
-      expect(
-        tester.getSemantics(find.byType(Button)),
-        matchesSemantics(
-          label: 'Сбросить условия',
-          isButton: true,
-          hasEnabledState: true,
-          isEnabled: true,
-          isFocusable: true,
-          hasTapAction: true,
-          hasFocusAction: true,
-        ),
-      );
-      semantics.dispose();
-    });
+        await tester.pumpWidget(
+          _app(brightness: brightness, button: build(null), block: false),
+        );
+        // Material меняет цвета кнопки с анимацией.
+        await tester.pumpAndSettle();
 
-    testWidgets('в $theme теме выключенная текстовая кнопка остаётся на месте '
-        'с текстом grip и объявляется недоступной', (tester) async {
-      final semantics = tester.ensureSemantics();
-      Button build(VoidCallback? onPressed) => Button.text(
-        label: 'Сбросить',
-        semanticLabel: 'Сбросить условия',
-        onPressed: onPressed,
-      );
-      await tester.pumpWidget(
-        _app(brightness: brightness, button: build(() {}), block: false),
-      );
-      final enabledPill = tester.getRect(_plane);
-
-      await tester.pumpWidget(
-        _app(brightness: brightness, button: build(null), block: false),
-      );
-      // Material меняет цвета кнопки с анимацией.
-      await tester.pumpAndSettle();
-
-      expect(tester.getRect(_plane), enabledPill);
-      expect(_planeMaterial(tester).color, Colors.transparent);
-      expect(_labelStyle(tester, 'Сбросить').color, colors.grip);
-      expect(
-        tester.getSemantics(find.byType(Button)),
-        matchesSemantics(
-          label: 'Сбросить условия',
-          isButton: true,
-          hasEnabledState: true,
-        ),
-      );
-      semantics.dispose();
-    });
+        expect(tester.getRect(_plane), enabledPill);
+        expect(_planeMaterial(tester).color, Colors.transparent);
+        expect(_labelStyle(tester, label).color, colors.grip);
+        expect(
+          tester.getSemantics(find.byType(Button)),
+          matchesSemantics(
+            label: semanticLabel,
+            isButton: true,
+            hasEnabledState: true,
+          ),
+        );
+        semantics.dispose();
+      });
+    }
   }
 
   testWidgets('нажатие по области выше плашки передаётся потребителю', (
@@ -274,6 +417,33 @@ void main() {
     expect(plane.height, greaterThan(DoableMetrics.controlHeight));
     expect(plane.top, lessThan(label.top));
     expect(plane.bottom, greaterThan(label.bottom));
+  });
+
+  testWidgets('с крупным шрифтом длинная подпись тихой кнопки на всю ширину '
+      'переносится внутри плашки', (tester) async {
+    const label = 'Восстановить из архива вместе со всеми связями';
+    await tester.pumpWidget(
+      _app(
+        textScale: 2,
+        button: Button.quietBlock(label: label, onPressed: () {}),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    final plane = tester.getRect(_plane);
+    final text = tester.getRect(find.text(label));
+    expect(plane.width, 360);
+    expect(
+      text.height,
+      greaterThan(
+        DoableType.section.fontSize! * DoableType.section.height! * 2,
+      ),
+      reason: 'подпись занимает больше одной строки',
+    );
+    expect(plane.top, lessThan(text.top));
+    expect(plane.bottom, greaterThan(text.bottom));
+    expect(plane.left, lessThan(text.left));
+    expect(plane.right, greaterThan(text.right));
   });
 }
 

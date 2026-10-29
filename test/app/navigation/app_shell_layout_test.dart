@@ -448,8 +448,8 @@ void main() {
         final app = await _start(tester, insets: _safeArea);
         await _select(tester, destination);
 
-        _acceptArchive(app, intention: 2);
-        await _until(tester, _messageOf(2));
+        _acceptDelete(app, intention: 3);
+        await _until(tester, _messageOf(3));
         await tester.pumpAndSettle();
 
         // Сообщение показывает Scaffold корневой страницы: оно стоит прямо
@@ -458,7 +458,7 @@ void main() {
         final message = tester.getRect(find.byType(SnackBar));
         expect(message.bottom, bar.top);
         expect(message.bottom, _safeArea.contentBottom);
-        expect(_messageOf(2).hitTestable(), findsOneWidget);
+        expect(_messageOf(3).hitTestable(), findsOneWidget);
         // Панель при видимом сообщении остаётся на месте и принимает нажатия.
         expect(bar.bottom, _screen.height);
         expect(appNavigationDestinations().hitTestable(), findsExactly(3));
@@ -493,27 +493,27 @@ void main() {
       final app = await _start(tester, insets: _safeArea);
       await _buildEveryTab(tester);
 
-      _acceptArchive(app, intention: 2);
-      _acceptArchive(app, intention: 3);
-      await _until(tester, _messageOf(2));
+      _acceptDelete(app, intention: 3);
+      _acceptDelete(app, intention: 4);
+      await _until(tester, _messageOf(3));
       await tester.pumpAndSettle();
 
       // Сообщение видно один раз, на выбранной странице.
       expect(_messages, findsOneWidget);
-      expect(_messageOf(2), findsOneWidget);
-      expect(_messageOf(3), findsNothing);
+      expect(_messageOf(3), findsOneWidget);
+      expect(_messageOf(4), findsNothing);
 
       // Смена пункта не предъявляет сообщение заново и не пропускает очередь.
       await _select(tester, AppDestination.home);
       expect(_messages, findsOneWidget);
-      expect(_messageOf(2), findsOneWidget);
-      expect(_messageOf(3), findsNothing);
+      expect(_messageOf(3), findsOneWidget);
+      expect(_messageOf(4), findsNothing);
 
       await _closeMessage(tester);
-      await _until(tester, _messageOf(3));
+      await _until(tester, _messageOf(4));
       await tester.pumpAndSettle();
       expect(_messages, findsOneWidget);
-      expect(_messageOf(2), findsNothing);
+      expect(_messageOf(3), findsNothing);
 
       await _closeMessage(tester);
       for (final destination in AppDestination.values) {
@@ -530,8 +530,8 @@ void main() {
       final app = await _start(tester, insets: _safeArea);
       await _buildEveryTab(tester);
       await _select(tester, AppDestination.intentionGraph);
-      _acceptArchive(app, intention: 2);
-      await _until(tester, _messageOf(2));
+      _acceptDelete(app, intention: 3);
+      await _until(tester, _messageOf(3));
       await tester.pumpAndSettle();
 
       await tester.tap(
@@ -547,7 +547,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(AppNavigationBar), findsOneWidget);
-      expect(_messageOf(2), findsOneWidget);
+      expect(_messageOf(3), findsOneWidget);
       expect(tester.takeException(), isNull);
 
       await tester.binding.handlePopRoute();
@@ -555,7 +555,7 @@ void main() {
 
       expect(find.byType(IntentionCatalogPage), findsOneWidget);
       expect(find.byType(AppNavigationBar), findsOneWidget);
-      expect(_messageOf(2), findsOneWidget);
+      expect(_messageOf(3), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   });
@@ -777,15 +777,15 @@ void _seed(
   });
 }
 
-/// Принимает архивирование: его успех предъявляет общая поверхность на
-/// той странице, которая открыта в момент результата.
-void _acceptArchive(_App app, {required int intention}) {
+/// Принимает удаление намерения без связей: его успех предъявляет общая
+/// поверхность на той странице, которая открыта в момент результата.
+void _acceptDelete(_App app, {required int intention}) {
   final id = (IntentionId.decode(
     tagFixtureId(intention),
   ) as IntentionIdDecodingSuccess).id;
   expect(
     app.coordinator.acceptExisting(
-      ArchiveIntention(id),
+      DeleteIntention(id),
       presentationTitle: _intentionTitle(intention),
     ),
     isA<IntentionCommandAccepted>(),

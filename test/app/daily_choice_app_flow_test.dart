@@ -22,6 +22,7 @@ import '../support/daily_choice_catalog_controls.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
+import '../support/intention_choices_tab.dart';
 
 /// Дата дневных выборов, которые сценарии создают через форму. Она же —
 /// локальное сегодня каталога: каталог открывается на дне этих записей.
@@ -147,9 +148,10 @@ void main() {
       await openIntentionGraph(tester, waitFor: _until);
       await _until(tester, find.text('Намерение 1'));
       await _tap(tester, find.text('Намерение 1').first);
-      await _tap(
+      await startDailyChoiceFromIntentionChoices(
         tester,
-        find.byKey(const ValueKey('intention-details-choose-path')),
+        waitFor: _until,
+        tap: _tap,
       );
       await _tap(
         tester,
@@ -163,10 +165,8 @@ void main() {
       final firstId = _savedIds(harness).single;
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('intention-details-choose-path')),
-      );
+      // Вкладка «Выборы» остаётся выбранной после возвращения к намерению.
+      await _tap(tester, intentionChoicesAdd);
       await _tap(
         tester,
         find.byKey(ValueKey('choice-path-continue-${durabilityUuid(101)}')),

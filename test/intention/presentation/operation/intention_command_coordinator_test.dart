@@ -1,6 +1,5 @@
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
-import 'package:doable/src/graph/application/selected_relations.dart';
 
 import 'dart:async';
 
@@ -19,7 +18,6 @@ import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
@@ -35,6 +33,8 @@ import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/statistics_read_contract_test_fallback.dart';
 import '../../../support/tag_positions.dart';
 import '../../../support/intention_title_order_key.dart';
+import '../details/details_test_support.dart'
+    show testDetailsIntention, testDetailsSavedResult;
 
 void main() {
   group('GraphCommandCoordinator', () {
@@ -503,6 +503,164 @@ void main() {
       },
     );
 
+    for (final leaveBeforeCompletion in [false, true]) {
+      test('успех изменения публикуется без права предъявления '
+          'при уходе до результата: $leaveBeforeCompletion', () async {
+        final repository = _ControlledGraphRepository();
+        final coordinator = _graphCoordinator(repository);
+        final before = testDetailsIntention(index: 1, title: 'Прежнее');
+        final saved = testDetailsIntention(
+          index: 1,
+          title: 'Новое название',
+          description: 'Новое описание',
+        );
+        final completions = <GraphCommandCompletion>[];
+        final subscription = coordinator.completions.listen(completions.add);
+        final registration = coordinator.registerAppPresentation();
+        final claims = <GraphAppPresentationClaim?>[];
+        unawaited(registration.nextClaim().then(claims.add));
+
+        final accepted = _acceptExisting(
+          coordinator,
+          UpdateIntention(
+            id: before.id,
+            title: saved.title,
+            description: saved.description,
+          ),
+        ) as IntentionCommandAccepted;
+        if (leaveBeforeCompletion) {
+          coordinator.releaseInitiatorPresentation(accepted.token);
+        }
+        repository.complete(0, testDetailsSavedResult(saved, before: before));
+        final completion = await accepted.future;
+        await pumpEventQueue();
+
+        expect(
+          completion.result,
+          isA<ResultSuccess<IntentionCommandSuccess>>(),
+        );
+        expect(completion.confirmedChange, isNotNull);
+        expect(completions, [same(completion)]);
+        expect(completion, isNot(isA<GraphPresentableCompletion>()));
+        expect(coordinator.claimInitiatorFailure(accepted.token), isNull);
+        expect(claims, isEmpty);
+
+        coordinator.releaseInitiatorPresentation(accepted.token);
+        final failed = _acceptExisting(
+          coordinator,
+          UpdateIntention(id: before.id, title: 'Повтор', description: null),
+        ) as IntentionCommandAccepted;
+        coordinator.releaseInitiatorPresentation(failed.token);
+        repository.complete(
+          1,
+          const ResultFailure(IntentionUnavailableFailure()),
+        );
+        final failure = await failed.future;
+        await pumpEventQueue();
+
+        expect(claims.single!.completions, [same(failure)]);
+        coordinator.confirmAppPresentation(claims.single!, [failed.token]);
+        final remaining = registration.nextClaim();
+        await coordinator.shutdown();
+        expect(await remaining, isNull);
+        await subscription.cancel();
+      });
+    }
+
+    test(
+      'отказ изменения принадлежит экрану и передаётся оболочке один раз',
+      () async {
+        final repository = _ControlledGraphRepository();
+        final coordinator = _graphCoordinator(repository);
+        final registration = coordinator.registerAppPresentation();
+        final claims = <GraphAppPresentationClaim?>[];
+        unawaited(registration.nextClaim().then(claims.add));
+        final accepted = _acceptExisting(
+          coordinator,
+          UpdateIntention(
+            id: _id(_firstUuid),
+            title: 'Правка',
+            description: null,
+          ),
+        ) as IntentionCommandAccepted;
+        repository.complete(
+          0,
+          const ResultFailure(IntentionUnavailableFailure()),
+        );
+        final completion = await accepted.future;
+        final initiatorClaim = coordinator.claimInitiatorFailure(
+          accepted.token,
+        );
+        expect(initiatorClaim, isNotNull);
+        await pumpEventQueue();
+        expect(claims, isEmpty);
+
+        coordinator.releaseInitiatorClaim(initiatorClaim!);
+        await pumpEventQueue();
+        expect(claims.single!.completions, [same(completion)]);
+        expect(coordinator.claimInitiatorFailure(accepted.token), isNull);
+        coordinator.confirmPresentation(initiatorClaim);
+        coordinator.confirmAppPresentation(claims.single!, [accepted.token]);
+        coordinator.releaseInitiatorPresentation(accepted.token);
+        final remaining = registration.nextClaim();
+        await coordinator.shutdown();
+        expect(await remaining, isNull);
+      },
+    );
+
+    for (final (name, command) in [
+      ('включение готовности', EnableIntentionReadiness.new),
+      ('выключение готовности', DisableIntentionReadiness.new),
+      ('архивирование', ArchiveIntention.new),
+      ('восстановление', RestoreIntention.new),
+    ]) {
+      test('$name: успех не предъявляется никому, а отказ при открытой '
+          'странице сразу предъявляет оболочка один раз', () async {
+        final repository = _ControlledGraphRepository();
+        final coordinator = _graphCoordinator(repository);
+        final intention = testDetailsIntention(index: 1);
+        final completions = <GraphCommandCompletion>[];
+        final subscription = coordinator.completions.listen(completions.add);
+        final registration = coordinator.registerAppPresentation();
+        final claims = <GraphAppPresentationClaim?>[];
+        unawaited(registration.nextClaim().then(claims.add));
+
+        final succeeded = _acceptExisting(
+          coordinator,
+          command(intention.id),
+        ) as IntentionCommandAccepted;
+        repository.complete(0, testDetailsSavedResult(intention));
+        final success = await succeeded.future;
+        await pumpEventQueue();
+
+        expect(success.confirmedChange, isNotNull);
+        expect(completions, [same(success)]);
+        expect(success, isNot(isA<GraphPresentableCompletion>()));
+        expect(coordinator.claimInitiatorFailure(succeeded.token), isNull);
+        expect(claims, isEmpty);
+
+        // Страница остаётся открытой: право инициатора не освобождается.
+        final failed = _acceptExisting(
+          coordinator,
+          command(intention.id),
+        ) as IntentionCommandAccepted;
+        repository.complete(
+          1,
+          const ResultFailure(IntentionUnavailableFailure()),
+        );
+        final failure = await failed.future;
+        await pumpEventQueue();
+
+        expect(coordinator.claimInitiatorFailure(failed.token), isNull);
+        expect(claims.single!.completions, [same(failure)]);
+        coordinator.confirmAppPresentation(claims.single!, [failed.token]);
+        final remaining = registration.nextClaim();
+        await coordinator.shutdown();
+        expect(await remaining, isNull);
+        await subscription.cancel();
+      });
+    }
+
     test('failure открытой сессии принадлежит инициатору и не блокирует очередь оболочки', () async {
       final repository = _ControlledGraphRepository();
       final coordinator = _graphCoordinator(repository);
@@ -510,7 +668,7 @@ void main() {
 
       final failed = _acceptExisting(
         coordinator,
-        ArchiveIntention(_id(_firstUuid)),
+        DeleteIntention(_id(_firstUuid)),
       ) as IntentionCommandAccepted;
       final succeeded = _acceptExisting(
         coordinator,
@@ -558,7 +716,7 @@ void main() {
 
       final failed = _acceptExisting(
         coordinator,
-        ArchiveIntention(_id(_firstUuid)),
+        DeleteIntention(_id(_firstUuid)),
       ) as IntentionCommandAccepted;
       final firstSuccess = _acceptExisting(
         coordinator,
@@ -1081,20 +1239,6 @@ final class _ControlledGraphRepository
         'Наблюдение дневного выбора не используется этим тестом.',
       );
 
-  @override
-  Future<SelectedRelationsReadResult> getSelectedRelations(
-    SelectedRelationsQuery query,
-  ) => throw UnsupportedError(
-    'Чтение выбранных связей не используется в этом тесте.',
-  );
-
-  @override
-  Stream<SelectedRelationsReadResult> watchSelectedRelations(
-    SelectedRelationsQuery query,
-  ) => throw UnsupportedError(
-    'Наблюдение выбранных связей не используется в этом тесте.',
-  );
-
   final commands = <IntentionCommand>[];
   final _results =
       <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
@@ -1142,11 +1286,6 @@ final class _ControlledGraphRepository
   Future<Result<IntentionCatalogPage>> getCatalogPage(
     IntentionCatalogQuery query,
   ) => throw UnsupportedError('Каталог не используется в этих тестах.');
-
-  @override
-  Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
-    IntentionId intentionId,
-  ) => throw UnsupportedError('Сводка не используется в этих тестах.');
 
   @override
   Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
@@ -1198,20 +1337,6 @@ final class _ControlledPersonalGraphRepository
         'Наблюдение дневного выбора не используется этим тестом.',
       );
 
-  @override
-  Future<SelectedRelationsReadResult> getSelectedRelations(
-    SelectedRelationsQuery query,
-  ) => throw UnsupportedError(
-    'Чтение выбранных связей не используется в этом тесте.',
-  );
-
-  @override
-  Stream<SelectedRelationsReadResult> watchSelectedRelations(
-    SelectedRelationsQuery query,
-  ) => throw UnsupportedError(
-    'Наблюдение выбранных связей не используется в этом тесте.',
-  );
-
   final commands = <IntentionCommand>[];
   final _results =
       <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
@@ -1248,11 +1373,6 @@ final class _ControlledPersonalGraphRepository
   Future<Result<IntentionCatalogPage>> getCatalogPage(
     IntentionCatalogQuery query,
   ) => throw UnsupportedError('Каталог не используется в этих тестах.');
-
-  @override
-  Future<Result<GraphSnapshot<RelationCounts>>> getRelationCounts(
-    IntentionId intentionId,
-  ) => throw UnsupportedError('Сводка не используется в этих тестах.');
 
   @override
   Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
