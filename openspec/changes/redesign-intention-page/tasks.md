@@ -1264,7 +1264,7 @@
     - проверки, подменяющие политику: `test/daily_choice/presentation/intention_choices/intention_choices_view_model_test.dart`, `test/intention/presentation/details/intention_details_choices_test.dart`, `test/intention/presentation/details/intention_details_delete_test.dart`, `test/graph/presentation/graph_reconciliation_checkpoint_test.dart`, проверки соседства.
   - **Размер:** S — перенос механический.
 
-- [ ] 6.2 Вынести общий слой согласования порционного списка страницы с графом и перевести на него модель «Выборов» без изменения поведения
+- [x] 6.2 Вынести общий слой согласования порционного списка страницы с графом и перевести на него модель «Выборов» без изменения поведения
   - **Критерии приёмки:**
     - По решениям 6 и 8 дизайна над ядром `RelationGroupPaging` стоит общий слой согласования порционного списка страницы с подтверждёнными изменениями графа. Слой владеет:
       - подпиской на `watchIntention` и завершения координатора и их разбором;

@@ -13,6 +13,7 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/details/intention_page_target.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/presentation/relation_group_paging_policy.dart';
+import 'package:doable/src/long_term_relation/presentation/relation_list_reconciliation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -263,10 +264,7 @@ void main() {
       await pumpEventQueue();
       final refreshing = harness.loaded;
       expect(refreshing.items.single.isCompleted, isFalse);
-      expect(
-        refreshing.summaryStatus,
-        isA<IntentionChoicesSummaryRefreshing>(),
-      );
+      expect(refreshing.summaryStatus, isA<RelationListSummaryRefreshing>());
       repository.completePage(
         1,
         DailyChoiceGroupFirstPage(
@@ -285,7 +283,7 @@ void main() {
       await pumpEventQueue();
       final updated = harness.loaded;
       expect(updated.items.single.isCompleted, isTrue);
-      expect(updated.summaryStatus, isA<IntentionChoicesSummaryCurrent>());
+      expect(updated.summaryStatus, isA<RelationListSummaryCurrent>());
     },
   );
 
@@ -323,7 +321,7 @@ void main() {
       expect(stale.counts.dailySource, 1);
       expect(
         stale.summaryStatus,
-        isA<IntentionChoicesSummaryRefreshFailure>().having(
+        isA<RelationListSummaryRefreshFailure>().having(
           (status) => status.canRetry,
           'canRetry',
           isTrue,
@@ -389,7 +387,7 @@ void main() {
       await pumpEventQueue();
       expect(
         harness.loaded.summaryStatus,
-        isA<IntentionChoicesSummaryRefreshing>(),
+        isA<RelationListSummaryRefreshing>(),
       );
       repository.completePage(
         1,
@@ -458,7 +456,7 @@ void main() {
       await pumpEventQueue();
       expect(
         harness.loaded.summaryStatus,
-        isA<IntentionChoicesSummaryRefreshing>(),
+        isA<RelationListSummaryRefreshing>(),
       );
       repository.completePage(
         1,
@@ -503,10 +501,7 @@ void main() {
       revision: const TestGraphRevision(2),
     );
     await pumpEventQueue();
-    expect(
-      harness.loaded.summaryStatus,
-      isA<IntentionChoicesSummaryRefreshing>(),
-    );
+    expect(harness.loaded.summaryStatus, isA<RelationListSummaryRefreshing>());
     repository.completePage(
       1,
       DailyChoiceGroupContinuationPage(
@@ -560,10 +555,7 @@ void main() {
     repository.failRead(1, const RelationGroupSnapshotExpired());
     await pumpEventQueue();
     expect(repository.pageQueryAt(2).cursor, isNull);
-    expect(
-      harness.loaded.summaryStatus,
-      isA<IntentionChoicesSummaryRefreshing>(),
-    );
+    expect(harness.loaded.summaryStatus, isA<RelationListSummaryRefreshing>());
     repository.completePage(
       2,
       DailyChoiceGroupFirstPage(
@@ -643,7 +635,7 @@ void main() {
       await pumpEventQueue();
       expect(
         harness.loaded.summaryStatus,
-        isA<IntentionChoicesSummaryRefreshing>(),
+        isA<RelationListSummaryRefreshing>(),
       );
       repository.completePage(
         1,
@@ -714,10 +706,7 @@ void main() {
     );
     await start.future;
     await pumpEventQueue();
-    expect(
-      harness.loaded.summaryStatus,
-      isA<IntentionChoicesSummaryRefreshing>(),
-    );
+    expect(harness.loaded.summaryStatus, isA<RelationListSummaryRefreshing>());
     expect(harness.loaded.items.single.selected.title, 'Действие');
     repository.completePage(
       1,
@@ -798,7 +787,7 @@ void main() {
       expect(harness.loaded.items, hasLength(1));
       expect(
         harness.loaded.progress,
-        isA<IntentionChoicesLoadMoreFailure>().having(
+        isA<RelationListLoadMoreFailure>().having(
           (progress) => progress.canRetry,
           'canRetry',
           isTrue,

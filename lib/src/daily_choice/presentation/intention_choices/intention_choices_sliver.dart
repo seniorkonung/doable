@@ -10,6 +10,7 @@ import '../../../intention/domain/intention_id.dart';
 import '../../../intention/presentation/details/intention_page_target.dart';
 import '../../../long_term_relation/application/relation_counts.dart';
 import '../../../long_term_relation/application/relation_group_page.dart';
+import '../../../long_term_relation/presentation/relation_list_reconciliation.dart';
 import '../../application/daily_choice_catalog.dart';
 import '../../domain/daily_choice_id.dart';
 import 'intention_choices_state.dart';
@@ -174,8 +175,8 @@ final class _IntentionChoicesSliverState
         state: loaded,
         onRetryLoadMore: switch ((loaded.progress, loaded.summaryStatus)) {
           (
-            final IntentionChoicesLoadMoreFailure failure,
-            IntentionChoicesSummaryCurrent(),
+            final RelationListLoadMoreFailure failure,
+            RelationListSummaryCurrent(),
           )
               when failure.canRetry =>
             viewModel.retryLoadMore,
@@ -190,7 +191,7 @@ final class _IntentionChoicesSliverState
     IntentionChoicesConfirmed state,
     IntentionChoicesViewModel viewModel,
   ) => switch (state.summaryStatus) {
-    final IntentionChoicesSummaryRefreshFailure failure when failure.canRetry =>
+    final RelationListSummaryRefreshFailure failure when failure.canRetry =>
       viewModel.retryRefresh,
     _ => null,
   };
@@ -360,7 +361,7 @@ final class _DailyChoiceRow extends StatelessWidget {
 final class _EmptyRole extends StatelessWidget {
   const _EmptyRole({required this.summaryStatus, required this.onRetryRefresh});
 
-  final IntentionChoicesSummaryStatus summaryStatus;
+  final RelationListSummaryStatus summaryStatus;
   final Future<void> Function()? onRetryRefresh;
 
   @override
@@ -369,12 +370,12 @@ final class _EmptyRole extends StatelessWidget {
     return Column(
       children: [
         _ChoicesStatus(message: localizations.relationNeighborhoodEmpty),
-        if (summaryStatus is IntentionChoicesSummaryRefreshing)
+        if (summaryStatus is RelationListSummaryRefreshing)
           _ChoicesStatus(
             message: localizations.relationNeighborhoodRefreshing,
             progressIndicator: true,
           ),
-        if (summaryStatus is IntentionChoicesSummaryRefreshFailure)
+        if (summaryStatus is RelationListSummaryRefreshFailure)
           _ChoicesStatus(
             message: localizations.relationNeighborhoodRefreshFailed,
             retry: onRetryRefresh,
@@ -399,25 +400,24 @@ final class _LoadedRoleFooter extends StatelessWidget {
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
     return switch ((state.progress, state.summaryStatus)) {
-      (IntentionChoicesLoadingMore(), _) => _ChoicesStatus(
+      (RelationListLoadingMore(), _) => _ChoicesStatus(
         message: localizations.relationNeighborhoodLoadingMore,
         progressIndicator: true,
       ),
-      (final IntentionChoicesLoadMoreFailure failure, _) => _ChoicesStatus(
+      (final RelationListLoadMoreFailure failure, _) => _ChoicesStatus(
         message: _loadMoreFailureMessage(localizations, failure.failure),
         retry: onRetryLoadMore,
       ),
-      (IntentionChoicesIdle(), IntentionChoicesSummaryRefreshing()) =>
-        _ChoicesStatus(
-          message: localizations.relationNeighborhoodRefreshing,
-          progressIndicator: true,
-        ),
-      (IntentionChoicesIdle(), IntentionChoicesSummaryRefreshFailure()) =>
+      (RelationListIdle(), RelationListSummaryRefreshing()) => _ChoicesStatus(
+        message: localizations.relationNeighborhoodRefreshing,
+        progressIndicator: true,
+      ),
+      (RelationListIdle(), RelationListSummaryRefreshFailure()) =>
         _ChoicesStatus(
           message: localizations.relationNeighborhoodRefreshFailed,
           retry: onRetryRefresh,
         ),
-      (IntentionChoicesIdle(), IntentionChoicesSummaryCurrent()) =>
+      (RelationListIdle(), RelationListSummaryCurrent()) =>
         state.hasConfirmedEnd
             ? _ChoicesStatus(
                 message: localizations.relationNeighborhoodConfirmedEnd,
