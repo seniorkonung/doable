@@ -996,3 +996,16 @@
   - **Зависимости:** 4.5, 4.19.
   - **Предполагаемые файлы:** `lib/src/intention/presentation/details/intention_details_page.dart`, `test/intention/presentation/details/intention_details_head_test.dart`.
   - **Размер:** XS.
+
+- [ ] 4.27 Убрать тон у недоступного пункта `OptionsMenu`: выключенная строка рисуется одинаково при любом тоне
+  - **Критерии приёмки:**
+    - Конструктор `OptionsMenuItem.unavailable` в `options_menu.dart` не принимает параметр `tone`, и недоступный пункт всегда имеет обычный тон. По README `OptionRow` и критерию задачи 4.18 выключенная строка рисуется плиткой `fill` со значком и названием `grip` независимо от тона, поэтому параметр ни на что не влиял.
+    - Сборщик меню в `intention_options.dart` не передаёт тон выключенному «Удалить». Доступное «Удалить» сохраняет опасный тон.
+    - Проверки `options_menu_test.dart` не передают тон недоступному пункту (вызовы около строк 122 и 152). Ожидание опасного тона у недоступного пункта (`rows.last.tone` около строки 44) не остаётся: проверка листа по-прежнему подтверждает, что лист передаёт строке опасный тон доступного пункта. В `intention_options_test.dart` ожидание опасного тона у выключенного удаления (около строки 116) удалено, а ожидание опасного тона доступного удаления сохраняется.
+    - Вид и поведение меню и строк не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/options_menu_test.dart test/design_system/option_row_test.dart test/intention/presentation/details`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 4.18, 4.19, 4.25 — тоже меняет `options_menu.dart` и его проверку.
+  - **Предполагаемые файлы:** `lib/src/design_system/components/options_menu.dart`, `lib/src/intention/presentation/details/intention_options.dart`, `test/design_system/options_menu_test.dart`, `test/intention/presentation/details/intention_options_test.dart`.
+  - **Размер:** XS.
