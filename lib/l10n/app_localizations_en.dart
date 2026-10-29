@@ -509,48 +509,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get intentionSummaryNoTags => 'No tags';
 
   @override
-  String get relationNeighborhoodTitle => 'Relations';
-
-  @override
   String get relationNeighborhoodSummaryLoading =>
       'Loading relations and summary…';
-
-  @override
-  String get relationNeighborhoodSummaryUnavailable =>
-      'The relation summary couldn’t be loaded.';
-
-  @override
-  String get relationNeighborhoodSavedSummaryRefreshing =>
-      'Updating saved relation numbers…';
-
-  @override
-  String get relationNeighborhoodSavedSummaryStale =>
-      'Saved relation numbers are out of date because the refresh failed.';
-
-  @override
-  String relationNeighborhoodTotal(int count) {
-    return 'Total relations: $count';
-  }
-
-  @override
-  String relationNeighborhoodActiveTotal(int count) {
-    return 'Active relations: $count';
-  }
-
-  @override
-  String relationNeighborhoodArchivedTotal(int count) {
-    return 'Archived relations: $count';
-  }
-
-  @override
-  String relationNeighborhoodNeedTotal(int count) {
-    return 'Need: $count';
-  }
-
-  @override
-  String relationNeighborhoodCanTotal(int count) {
-    return 'Can: $count';
-  }
 
   @override
   String relationNeighborhoodDailyTotal(int count) {
@@ -564,39 +524,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get relationNeighborhoodDailySelectedRole => 'Selected action';
 
   @override
-  String get relationNeighborhoodLongTermGroups => 'Long-term relations';
-
-  @override
-  String get relationNeighborhoodScopeLabel => 'Relation state';
-
-  @override
-  String get relationNeighborhoodScopeActive => 'Active relations';
-
-  @override
-  String get relationNeighborhoodScopeArchived => 'Archived relations';
-
-  @override
-  String get relationNeighborhoodTypeLabel => 'Relation type';
-
-  @override
   String get relationNeighborhoodTypeNeed => 'Need';
 
   @override
   String get relationNeighborhoodTypeCan => 'Can';
-
-  @override
-  String get relationNeighborhoodDirectionLabel => 'Direction';
-
-  @override
-  String get relationNeighborhoodDirectionIncoming => 'Incoming';
-
-  @override
-  String get relationNeighborhoodDirectionOutgoing => 'Outgoing';
-
-  @override
-  String relationNeighborhoodSelectedGroupCount(int count) {
-    return 'In the whole selected group: $count';
-  }
 
   @override
   String get relationNeighborhoodInitialUnavailable =>
@@ -2221,9 +2152,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'The relation couldn’t be deleted because of an unexpected error.';
 
   @override
-  String get relationNeighborhoodOpenRelation => 'Opens the relation details';
-
-  @override
   String get relationNeighborhoodOpenDailyChoice =>
       'Open the full saved daily path';
 
@@ -2783,14 +2711,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get relationEditorSaving => 'Saving…';
-
-  @override
-  String get relationNeighborhoodCreateOutgoingAction =>
-      'Create an outgoing relation';
-
-  @override
-  String get relationNeighborhoodCreateIncomingAction =>
-      'Create an incoming relation';
 
   @override
   String relationEditorPriorityOption(String priority) {

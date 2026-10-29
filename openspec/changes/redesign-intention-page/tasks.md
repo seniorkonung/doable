@@ -1633,7 +1633,7 @@
     - проверки: `test/intention/presentation/details/intention_details_relations_test.dart` (новый), `test/intention/presentation/details/details_test_support.dart`, `test/intention/presentation/details/intention_details_tabs_test.dart`, `test/app/navigation/app_shell_page_matrix.dart`, `test/app/routing/app_router_test.dart`, `test/app/long_term_relation_app_flow_test.dart`.
   - **Размер:** M.
 
-- [ ] 6.20 Удалить прежнее соседство связей
+- [x] 6.20 Удалить прежнее соседство связей
   - **Критерии приёмки:**
     - По результату фазы 6 плана в приложении нет `RelationNeighborhoodViewModel`, его состояния с `RelationGroupSelection`, `RelationNeighborhoodSliver` и их сгенерированных частей, и никакой модуль на них не ссылается.
     - Проверки модели и вида соседства удалены. Перед удалением подтверждено, что каждое их ожидание покрыто проверками ядра порций, общего слоя, модели и вида «Связей»; непокрытые ожидания перенесены туда. Общие подставные реализации из `neighborhood_test_support.dart`, которые нужны другим проверкам, сохраняются вне удаляемого каталога без частей соседства.

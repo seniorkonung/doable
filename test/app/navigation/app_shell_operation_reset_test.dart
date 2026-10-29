@@ -37,7 +37,7 @@ import '../../intention/presentation/details/details_test_support.dart';
 import '../../intention/presentation/picker/intention_picker_test_support.dart';
 import '../../long_term_relation/presentation/details/relation_details_test_support.dart'
     show ControlledRelationWatch, testRelationDetails;
-import '../../long_term_relation/presentation/neighborhood/neighborhood_test_support.dart'
+import '../../long_term_relation/presentation/relation_graph_test_support.dart'
     show testRelationId;
 import '../../support/app_root_pages.dart';
 import '../../support/in_memory_diagnostics_sink.dart';

@@ -12,7 +12,7 @@ import 'package:doable/src/long_term_relation/presentation/details/relation_deta
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../neighborhood/neighborhood_test_support.dart';
+import '../relation_graph_test_support.dart';
 import '../daily_path_change_test_support.dart';
 import 'relation_details_test_support.dart';
 

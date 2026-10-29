@@ -69,7 +69,7 @@ import '../../support/daily_choice_durability_fixture.dart';
 import '../../support/daily_choice_local_date.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
-import '../../long_term_relation/presentation/neighborhood/neighborhood_test_support.dart';
+import '../../long_term_relation/presentation/relation_graph_test_support.dart';
 import '../../support/tag_read_contract_test_fallback.dart';
 import '../../support/statistics_read_contract_test_fallback.dart';
 import '../../support/tag_storage_fixture.dart';
@@ -875,7 +875,7 @@ void main() {
       );
       repository.emitIntention(
         harness.ownerId,
-        testNeighborhoodIntention(id: harness.ownerId, title: 'Владелец'),
+        testGraphIntention(id: harness.ownerId, title: 'Владелец'),
         counts: testRelationCounts(activeNeedOutgoing: 2),
         revision: const TestGraphRevision(9),
       );
@@ -969,7 +969,7 @@ void main() {
       // Изменение непросматриваемой группы запускает замену выбранной.
       repository.emitIntention(
         harness.ownerId,
-        testNeighborhoodIntention(id: harness.ownerId, title: 'Владелец'),
+        testGraphIntention(id: harness.ownerId, title: 'Владелец'),
         counts: testRelationCounts(activeNeedOutgoing: 6, activeCanIncoming: 1),
         revision: const TestGraphRevision(9),
       );
@@ -989,13 +989,13 @@ void main() {
       // Повторное инвалидирование запускает новую замену.
       repository.emitIntention(
         harness.ownerId,
-        testNeighborhoodIntention(id: harness.ownerId, title: 'Владелец'),
+        testGraphIntention(id: harness.ownerId, title: 'Владелец'),
         counts: testRelationCounts(activeNeedOutgoing: 6, activeCanIncoming: 1),
         revision: const TestGraphRevision(11),
       );
       repository.emitIntention(
         harness.ownerId,
-        testNeighborhoodIntention(id: harness.ownerId, title: 'Владелец'),
+        testGraphIntention(id: harness.ownerId, title: 'Владелец'),
         counts: testRelationCounts(activeNeedOutgoing: 6, activeCanIncoming: 1),
         revision: const TestGraphRevision(11),
       );
@@ -1115,7 +1115,7 @@ void main() {
     for (var index = 0; index < participantIds.length; index++) {
       repository.emitIntention(
         participantIds[index],
-        testNeighborhoodIntention(
+        testGraphIntention(
           id: participantIds[index],
           title: 'Участник ${String.fromCharCode(1040 + index)}',
         ),
@@ -1225,7 +1225,7 @@ void main() {
     for (var index = 0; index < participantIds.length; index++) {
       repository.emitIntention(
         participantIds[index],
-        testNeighborhoodIntention(
+        testGraphIntention(
           id: participantIds[index],
           title: 'Устаревший участник',
         ),
@@ -1245,7 +1245,7 @@ void main() {
     for (var index = 0; index < participantIds.length; index++) {
       repository.emitIntention(
         participantIds[index],
-        testNeighborhoodIntention(
+        testGraphIntention(
           id: participantIds[index],
           title: 'Участник ${String.fromCharCode(1040 + index)}',
         ),
@@ -1696,7 +1696,7 @@ final class _CheckpointHarness {
 
     repository.emitIntention(
       ownerId,
-      testNeighborhoodIntention(id: ownerId, title: 'Владелец'),
+      testGraphIntention(id: ownerId, title: 'Владелец'),
       counts: testRelationCounts(activeNeedOutgoing: 1),
       revision: const TestGraphRevision(4),
     );
@@ -1800,7 +1800,7 @@ final class _CheckpointHarness {
       commandIndex,
       ResultSuccess(
         IntentionSaved(
-          testNeighborhoodIntention(id: participantId, title: title),
+          testGraphIntention(id: participantId, title: title),
           catalogMutation: IntentionCatalogUpdated(
             revision: revision,
             before: catalog_support.TestCatalogEntrySnapshot(before),

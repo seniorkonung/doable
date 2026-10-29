@@ -29,14 +29,14 @@ import 'package:doable/src/long_term_relation/application/relation_group_page.da
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 
-import '../../../support/daily_choice_reconciliation_fixture.dart';
-import '../../../support/tag_read_contract_test_fallback.dart';
-import '../../../support/statistics_read_contract_test_fallback.dart';
-import '../../../support/intention_description_preview.dart';
-import '../../../support/intention_title_order_key.dart';
+import '../../support/daily_choice_reconciliation_fixture.dart';
+import '../../support/tag_read_contract_test_fallback.dart';
+import '../../support/statistics_read_contract_test_fallback.dart';
+import '../../support/intention_description_preview.dart';
+import '../../support/intention_title_order_key.dart';
 
 /// Управляемый граф: каждое чтение группы завершается тестом вручную.
-final class ControlledNeighborhoodRepository
+final class ControlledRelationGraphRepository
     with StatisticsReadContractTestFallback, TagReadContractTestFallback
     implements PersonalGraphRepository {
   @override
@@ -192,7 +192,7 @@ final class ControlledNeighborhoodRepository
   @override
   Future<Result<IntentionCatalogPage>> getCatalogPage(
     IntentionCatalogQuery query,
-  ) => throw UnsupportedError('Каталог не используется в тесте соседства.');
+  ) => throw UnsupportedError('Каталог не используется в этом тесте.');
 
   @override
   Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) =>
@@ -394,7 +394,7 @@ LongTermRelationDetails _relationDetails(
   );
 }
 
-Intention testNeighborhoodIntention({
+Intention testGraphIntention({
   required IntentionId id,
   String title = 'Намерение',
   String? description,
@@ -413,7 +413,7 @@ Intention testNeighborhoodIntention({
   );
 }
 
-Result<IntentionCommandSuccess> testNeighborhoodSavedResult({
+Result<IntentionCommandSuccess> testIntentionSavedResult({
   required Intention before,
   required Intention after,
   required GraphRevision revision,
@@ -424,27 +424,26 @@ Result<IntentionCommandSuccess> testNeighborhoodSavedResult({
     after,
     catalogMutation: IntentionCatalogUpdated(
       revision: revision,
-      before: _NeighborhoodCatalogEntrySnapshot(before),
-      after: _NeighborhoodCatalogEntrySnapshot(after),
+      before: _CatalogEntrySnapshot(before),
+      after: _CatalogEntrySnapshot(after),
     ),
     additionalCatalogMutations: additionalCatalogMutations,
     additionalChanges: additionalChanges,
   ),
 );
 
-IntentionCatalogUpdated testNeighborhoodCatalogUpdated({
+IntentionCatalogUpdated testIntentionCatalogUpdated({
   required Intention before,
   required Intention after,
   required GraphRevision revision,
 }) => IntentionCatalogUpdated(
   revision: revision,
-  before: _NeighborhoodCatalogEntrySnapshot(before),
-  after: _NeighborhoodCatalogEntrySnapshot(after),
+  before: _CatalogEntrySnapshot(before),
+  after: _CatalogEntrySnapshot(after),
 );
 
-final class _NeighborhoodCatalogEntrySnapshot
-    implements IntentionCatalogEntrySnapshot {
-  _NeighborhoodCatalogEntrySnapshot(Intention intention)
+final class _CatalogEntrySnapshot implements IntentionCatalogEntrySnapshot {
+  _CatalogEntrySnapshot(Intention intention)
     : summary = IntentionSummary(
         id: intention.id,
         title: intention.title,

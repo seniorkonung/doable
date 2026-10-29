@@ -514,47 +514,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get intentionSummaryNoTags => 'Без тегов';
 
   @override
-  String get relationNeighborhoodTitle => 'Связи';
-
-  @override
   String get relationNeighborhoodSummaryLoading => 'Загружаем связи и сводку…';
-
-  @override
-  String get relationNeighborhoodSummaryUnavailable =>
-      'Не удалось загрузить сводку связей.';
-
-  @override
-  String get relationNeighborhoodSavedSummaryRefreshing =>
-      'Обновляем сохранённые числа связей…';
-
-  @override
-  String get relationNeighborhoodSavedSummaryStale =>
-      'Сохранённые числа связей устарели: обновить данные не удалось.';
-
-  @override
-  String relationNeighborhoodTotal(int count) {
-    return 'Всего связей: $count';
-  }
-
-  @override
-  String relationNeighborhoodActiveTotal(int count) {
-    return 'Активных связей: $count';
-  }
-
-  @override
-  String relationNeighborhoodArchivedTotal(int count) {
-    return 'Архивных связей: $count';
-  }
-
-  @override
-  String relationNeighborhoodNeedTotal(int count) {
-    return 'Нужно: $count';
-  }
-
-  @override
-  String relationNeighborhoodCanTotal(int count) {
-    return 'Можно: $count';
-  }
 
   @override
   String relationNeighborhoodDailyTotal(int count) {
@@ -568,39 +528,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get relationNeighborhoodDailySelectedRole => 'Выбранное действие';
 
   @override
-  String get relationNeighborhoodLongTermGroups => 'Долговременные связи';
-
-  @override
-  String get relationNeighborhoodScopeLabel => 'Состояние связей';
-
-  @override
-  String get relationNeighborhoodScopeActive => 'Активные связи';
-
-  @override
-  String get relationNeighborhoodScopeArchived => 'Архивные связи';
-
-  @override
-  String get relationNeighborhoodTypeLabel => 'Тип связи';
-
-  @override
   String get relationNeighborhoodTypeNeed => 'Нужно';
 
   @override
   String get relationNeighborhoodTypeCan => 'Можно';
-
-  @override
-  String get relationNeighborhoodDirectionLabel => 'Направление';
-
-  @override
-  String get relationNeighborhoodDirectionIncoming => 'Входящие';
-
-  @override
-  String get relationNeighborhoodDirectionOutgoing => 'Исходящие';
-
-  @override
-  String relationNeighborhoodSelectedGroupCount(int count) {
-    return 'Во всей выбранной группе: $count';
-  }
 
   @override
   String get relationNeighborhoodInitialUnavailable =>
@@ -2245,10 +2176,6 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось удалить связь из-за непредвиденной ошибки.';
 
   @override
-  String get relationNeighborhoodOpenRelation =>
-      'Открывает подробные данные связи';
-
-  @override
   String get relationNeighborhoodOpenDailyChoice =>
       'Открыть полный путь дневного выбора';
 
@@ -2810,14 +2737,6 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get relationEditorSaving => 'Сохраняем…';
-
-  @override
-  String get relationNeighborhoodCreateOutgoingAction =>
-      'Создать исходящую связь';
-
-  @override
-  String get relationNeighborhoodCreateIncomingAction =>
-      'Создать входящую связь';
 
   @override
   String relationEditorPriorityOption(String priority) {

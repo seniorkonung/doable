@@ -806,65 +806,11 @@ abstract class AppLocalizations {
   /// **'No tags'**
   String get intentionSummaryNoTags;
 
-  /// Заголовок соседства намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Relations'**
-  String get relationNeighborhoodTitle;
-
   /// Первоначальная загрузка соседства и полной сводки
   ///
   /// In en, this message translates to:
   /// **'Loading relations and summary…'**
   String get relationNeighborhoodSummaryLoading;
-
-  /// Полная сводка ещё не подтверждена из-за ошибки
-  ///
-  /// In en, this message translates to:
-  /// **'The relation summary couldn’t be loaded.'**
-  String get relationNeighborhoodSummaryUnavailable;
-
-  /// Состояние обновления сохранённой согласованной сводки рядом с её числами
-  ///
-  /// In en, this message translates to:
-  /// **'Updating saved relation numbers…'**
-  String get relationNeighborhoodSavedSummaryRefreshing;
-
-  /// Состояние устаревшей сохранённой сводки рядом с её числами
-  ///
-  /// In en, this message translates to:
-  /// **'Saved relation numbers are out of date because the refresh failed.'**
-  String get relationNeighborhoodSavedSummaryStale;
-
-  /// No description provided for @relationNeighborhoodTotal.
-  ///
-  /// In en, this message translates to:
-  /// **'Total relations: {count}'**
-  String relationNeighborhoodTotal(int count);
-
-  /// No description provided for @relationNeighborhoodActiveTotal.
-  ///
-  /// In en, this message translates to:
-  /// **'Active relations: {count}'**
-  String relationNeighborhoodActiveTotal(int count);
-
-  /// No description provided for @relationNeighborhoodArchivedTotal.
-  ///
-  /// In en, this message translates to:
-  /// **'Archived relations: {count}'**
-  String relationNeighborhoodArchivedTotal(int count);
-
-  /// No description provided for @relationNeighborhoodNeedTotal.
-  ///
-  /// In en, this message translates to:
-  /// **'Need: {count}'**
-  String relationNeighborhoodNeedTotal(int count);
-
-  /// No description provided for @relationNeighborhoodCanTotal.
-  ///
-  /// In en, this message translates to:
-  /// **'Can: {count}'**
-  String relationNeighborhoodCanTotal(int count);
 
   /// No description provided for @relationNeighborhoodDailyTotal.
   ///
@@ -884,36 +830,6 @@ abstract class AppLocalizations {
   /// **'Selected action'**
   String get relationNeighborhoodDailySelectedRole;
 
-  /// Подпись групп долговременных связей в соседстве
-  ///
-  /// In en, this message translates to:
-  /// **'Long-term relations'**
-  String get relationNeighborhoodLongTermGroups;
-
-  /// Подпись выбора активных или архивных связей
-  ///
-  /// In en, this message translates to:
-  /// **'Relation state'**
-  String get relationNeighborhoodScopeLabel;
-
-  /// Активный охват соседства
-  ///
-  /// In en, this message translates to:
-  /// **'Active relations'**
-  String get relationNeighborhoodScopeActive;
-
-  /// Архивный охват соседства
-  ///
-  /// In en, this message translates to:
-  /// **'Archived relations'**
-  String get relationNeighborhoodScopeArchived;
-
-  /// Подпись выбора типа долговременной связи
-  ///
-  /// In en, this message translates to:
-  /// **'Relation type'**
-  String get relationNeighborhoodTypeLabel;
-
   /// Тип долговременной связи нужно
   ///
   /// In en, this message translates to:
@@ -925,30 +841,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Can'**
   String get relationNeighborhoodTypeCan;
-
-  /// Подпись выбора направления связи
-  ///
-  /// In en, this message translates to:
-  /// **'Direction'**
-  String get relationNeighborhoodDirectionLabel;
-
-  /// Входящее направление относительно намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Incoming'**
-  String get relationNeighborhoodDirectionIncoming;
-
-  /// Исходящее направление относительно намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Outgoing'**
-  String get relationNeighborhoodDirectionOutgoing;
-
-  /// No description provided for @relationNeighborhoodSelectedGroupCount.
-  ///
-  /// In en, this message translates to:
-  /// **'In the whole selected group: {count}'**
-  String relationNeighborhoodSelectedGroupCount(int count);
 
   /// Устранимая ошибка начального чтения группы
   ///
@@ -3461,12 +3353,6 @@ abstract class AppLocalizations {
   /// **'The relation couldn’t be deleted because of an unexpected error.'**
   String get relationDeleteUnexpected;
 
-  /// Назначение перехода из строки соседства в подробный просмотр связи
-  ///
-  /// In en, this message translates to:
-  /// **'Opens the relation details'**
-  String get relationNeighborhoodOpenRelation;
-
   /// Назначение перехода к полному пути дневного выбора
   ///
   /// In en, this message translates to:
@@ -4432,18 +4318,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Saving…'**
   String get relationEditorSaving;
-
-  /// Создание связи из исходящей группы соседства
-  ///
-  /// In en, this message translates to:
-  /// **'Create an outgoing relation'**
-  String get relationNeighborhoodCreateOutgoingAction;
-
-  /// Создание связи из входящей группы соседства
-  ///
-  /// In en, this message translates to:
-  /// **'Create an incoming relation'**
-  String get relationNeighborhoodCreateIncomingAction;
 
   /// Вариант приоритета P1–P4 в форме создания связи
   ///

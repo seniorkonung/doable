@@ -222,6 +222,175 @@ void main() {
     expect(harness.reads.count, 1);
   });
 
+  test(
+    'незначимое завершение координатора не мешает продолжению по курсору',
+    () async {
+      final harness = _ListHarness();
+      addTearDown(harness.dispose);
+      harness.reads.first(0, [1, 2], total: 4, revision: 1, next: 2);
+      await pumpEventQueue();
+
+      await harness.completeOwnerRename(revision: 2);
+      expect(
+        harness.confirmed.summaryStatus,
+        isA<RelationListSummaryCurrent>(),
+      );
+      harness.scrollTo(1);
+
+      expect(harness.reads.count, 2);
+      expect(harness.reads.cursorAt(1), const _Cursor(2));
+    },
+  );
+
+  test('отсутствие намерения при первом чтении завершает список без новых '
+      'чтений', () async {
+    final harness = _ListHarness();
+    addTearDown(harness.dispose);
+
+    harness.reads.fail(
+      0,
+      RelationGroupIntentionNotFoundFailure(harness.owner.id),
+    );
+    await pumpEventQueue();
+    expect(harness.state, isA<RelationListIntentionNotFound<_Part, int>>());
+    expect(harness.list.isTerminated, isTrue);
+
+    harness.emitIntention(revision: 2);
+    await pumpEventQueue();
+    unawaited(harness.list.retryFirstPage());
+    expect(harness.state, isA<RelationListIntentionNotFound<_Part, int>>());
+    expect(harness.reads.count, 1);
+  });
+
+  test(
+    'поздняя первая порция после отсутствия намерения не публикуется',
+    () async {
+      final harness = _ListHarness();
+      addTearDown(harness.dispose);
+
+      harness.emitIntentionNotFound(revision: 1);
+      await pumpEventQueue();
+      harness.reads.first(0, [1], total: 1, revision: 1);
+      await pumpEventQueue();
+
+      expect(harness.state, isA<RelationListIntentionNotFound<_Part, int>>());
+      expect(
+        harness.published.whereType<RelationListConfirmed<_Part, int>>(),
+        isEmpty,
+      );
+    },
+  );
+
+  test(
+    'отсутствие намерения на ревизии старше опубликованной не завершает список',
+    () async {
+      final harness = _ListHarness();
+      addTearDown(harness.dispose);
+      harness.reads.first(0, [1], total: 1, revision: 2);
+      await pumpEventQueue();
+
+      harness.emitIntentionNotFound(revision: 1);
+      await pumpEventQueue();
+
+      expect(harness.active.data.items, [1]);
+      expect(harness.list.isTerminated, isFalse);
+    },
+  );
+
+  test('первая порция старше ревизии, наблюдённой во время чтения, читается '
+      'заново', () async {
+    final harness = _ListHarness();
+    addTearDown(harness.dispose);
+
+    harness.emitIntention(revision: 2);
+    await pumpEventQueue();
+    harness.reads.first(0, [1], total: 1, revision: 1);
+    await pumpEventQueue();
+    expect(harness.state, isA<RelationListInitialLoad<_Part, int>>());
+    expect(harness.reads.count, 2);
+    expect(harness.reads.cursorAt(1), isNull);
+
+    harness.reads.first(1, [], total: 0, revision: 2);
+    await pumpEventQueue();
+    expect(
+      harness.published.whereType<RelationListConfirmed<_Part, int>>(),
+      hasLength(1),
+    );
+    expect(harness.active.data.items, isEmpty);
+    expect(harness.confirmed.summaryStatus, isA<RelationListSummaryCurrent>());
+  });
+
+  test('наблюдение не новее известной ревизии не требует новой основы и не '
+      'снимает отказ обновления', () async {
+    final harness = _ListHarness();
+    addTearDown(harness.dispose);
+    harness.reads.first(0, [1], total: 1, revision: 2);
+    await pumpEventQueue();
+
+    harness.emitIntention(revision: 2);
+    harness.emitIntention(revision: 1);
+    await pumpEventQueue();
+    expect(harness.reads.count, 1);
+    expect(harness.confirmed.summaryStatus, isA<RelationListSummaryCurrent>());
+
+    harness.emitIntention(revision: 4);
+    await pumpEventQueue();
+    expect(harness.reads.count, 2);
+    harness.emitIntention(revision: 3);
+    await pumpEventQueue();
+    expect(harness.reads.count, 2);
+
+    harness.reads.fail(1, const RelationGroupUnavailableFailure());
+    await pumpEventQueue();
+    harness.emitIntention(revision: 4);
+    harness.emitIntention(revision: 2);
+    await pumpEventQueue();
+    expect(harness.reads.count, 2);
+    expect(harness.active.data.items, [1]);
+    expect(
+      harness.confirmed.summaryStatus,
+      isA<RelationListSummaryRefreshFailure>(),
+    );
+  });
+
+  for (final lateSuccess in [true, false]) {
+    test('запоздалый ${lateSuccess ? 'успех' : 'отказ'} подгрузки не снимает '
+        'отказ обновления, а повтор доступен только у обновления', () async {
+      final harness = _ListHarness();
+      addTearDown(harness.dispose);
+      harness.reads.first(0, [1, 2], total: 4, revision: 1, next: 2);
+      await pumpEventQueue();
+      harness.scrollTo(1);
+      harness.failIntention(const IntentionUnavailableFailure());
+      await pumpEventQueue();
+
+      if (lateSuccess) {
+        harness.reads.continuation(1, [3, 4], revision: 1);
+      } else {
+        harness.reads.fail(1, const RelationGroupUnavailableFailure());
+      }
+      await pumpEventQueue();
+      expect(harness.active.data.items, lateSuccess ? [1, 2, 3, 4] : [1, 2]);
+      expect(
+        harness.confirmed.summaryStatus,
+        isA<RelationListSummaryRefreshFailure>(),
+      );
+
+      unawaited(harness.list.retryLoadMore(part: _Part.active));
+      expect(harness.reads.count, 2);
+      unawaited(harness.list.retryRefresh());
+      expect(harness.reads.count, 3);
+      expect(harness.reads.cursorAt(2), isNull);
+      harness.reads.first(2, [1, 2], total: 2, revision: 2);
+      await pumpEventQueue();
+      expect(harness.active.data.items, [1, 2]);
+      expect(
+        harness.confirmed.summaryStatus,
+        isA<RelationListSummaryCurrent>(),
+      );
+    });
+  }
+
   test('до готовности замены видна прежняя часть, а отказ обновления её '
       'сохраняет', () async {
     final harness = _ListHarness();
@@ -321,6 +490,20 @@ void main() {
       );
     });
   }
+
+  test('повтор первого чтения после перезапуска читает новый запрос', () async {
+    final harness = _ListHarness();
+    addTearDown(harness.dispose);
+
+    harness.list.restart(harness.query('новый'));
+    harness.reads.fail(1, const RelationGroupUnavailableFailure());
+    await pumpEventQueue();
+    unawaited(harness.list.retryFirstPage());
+
+    expect(harness.reads.count, 3);
+    expect(harness.reads.listAt(2), 'новый');
+    expect(harness.reads.cursorAt(2), isNull);
+  });
 
   for (final (name, fail, failure, canRetry)
       in <(String, void Function(_Reads, int), Matcher, bool)>[

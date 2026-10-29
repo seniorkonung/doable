@@ -17,14 +17,14 @@ import 'package:doable/src/long_term_relation/presentation/relation_list_reconci
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../../long_term_relation/presentation/neighborhood/neighborhood_test_support.dart';
+import '../../../long_term_relation/presentation/relation_graph_test_support.dart';
 import '../../../support/daily_choice_reconciliation_fixture.dart';
 
 void main() {
   test(
     'без сохранённого выбора вкладка начинает с первой порции роли «исходное»',
     () async {
-      final repository = ControlledNeighborhoodRepository();
+      final repository = ControlledRelationGraphRepository();
       final harness = _ChoicesHarness(repository);
       addTearDown(harness.dispose);
 
@@ -40,7 +40,7 @@ void main() {
   test(
     'смена роли записывается в экземпляр, и новая модель начинает с неё заново',
     () async {
-      final repository = ControlledNeighborhoodRepository();
+      final repository = ControlledRelationGraphRepository();
       final harness = _ChoicesHarness(repository, pageSize: 1);
       addTearDown(harness.dispose);
       repository.completePage(
@@ -98,7 +98,7 @@ void main() {
   );
 
   test('две страницы одного намерения не делят роль и порции', () async {
-    final repository = ControlledNeighborhoodRepository();
+    final repository = ControlledRelationGraphRepository();
     final harness = _ChoicesHarness(repository);
     addTearDown(harness.dispose);
     final other = IntentionPageInstance(target: const OverviewTarget());
@@ -161,7 +161,7 @@ void main() {
   test(
     'подтверждённое изменение даты и выполнения пересобирает дневную строку',
     () async {
-      final repository = ControlledNeighborhoodRepository();
+      final repository = ControlledRelationGraphRepository();
       final harness = _ChoicesHarness(repository);
       addTearDown(harness.dispose);
       final choice = reconciliationChoice(
@@ -243,7 +243,7 @@ void main() {
   test(
     'удаление последнего выбора заменяет роль пустой на новой ревизии',
     () async {
-      final repository = ControlledNeighborhoodRepository();
+      final repository = ControlledRelationGraphRepository();
       final harness = _ChoicesHarness(repository);
       addTearDown(harness.dispose);
       final choice = reconciliationChoice(
@@ -305,7 +305,7 @@ void main() {
   test(
     'новая дата незагруженного выбора перестраивает видимую часть роли',
     () async {
-      final repository = ControlledNeighborhoodRepository();
+      final repository = ControlledRelationGraphRepository();
       final harness = _ChoicesHarness(repository, pageSize: 1);
       addTearDown(harness.dispose);
       final unseenId = _choiceId(2);
@@ -387,7 +387,7 @@ void main() {
   );
 
   test('переименование показанного участника пересобирает роль', () async {
-    final repository = ControlledNeighborhoodRepository();
+    final repository = ControlledRelationGraphRepository();
     final harness = _ChoicesHarness(repository);
     addTearDown(harness.dispose);
     final participantId = testIntentionId(2);
@@ -406,11 +406,8 @@ void main() {
       ),
     );
     await pumpEventQueue();
-    final before = testNeighborhoodIntention(
-      id: participantId,
-      title: 'Действие',
-    );
-    final after = testNeighborhoodIntention(
+    final before = testGraphIntention(id: participantId, title: 'Действие');
+    final after = testGraphIntention(
       id: participantId,
       title: 'Новое действие',
     );
@@ -424,7 +421,7 @@ void main() {
     ) as IntentionCommandAccepted;
     repository.completeIntentionCommand(
       0,
-      testNeighborhoodSavedResult(
+      testIntentionSavedResult(
         before: before,
         after: after,
         revision: const TestGraphRevision(2),
@@ -456,7 +453,7 @@ void main() {
   test(
     'выбор, где намерение только выбранное, не принимается в роль «исходное»',
     () async {
-      final repository = ControlledNeighborhoodRepository();
+      final repository = ControlledRelationGraphRepository();
       final harness = _ChoicesHarness(repository);
       addTearDown(harness.dispose);
 
@@ -485,7 +482,7 @@ void main() {
   test(
     'после отсутствия намерения смена роли не читает и не меняет экземпляр',
     () async {
-      final repository = ControlledNeighborhoodRepository();
+      final repository = ControlledRelationGraphRepository();
       final harness = _ChoicesHarness(repository);
       addTearDown(harness.dispose);
       repository.emitIntentionNotFound(revision: const TestGraphRevision(1));
@@ -526,7 +523,7 @@ final class _ChoicesHarness {
     retain();
   }
 
-  final ControlledNeighborhoodRepository repository;
+  final ControlledRelationGraphRepository repository;
   final IntentionId intentionId;
   final pageInstance = IntentionPageInstance(target: const OverviewTarget());
   late final ProviderContainer container;

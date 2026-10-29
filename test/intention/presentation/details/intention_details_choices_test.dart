@@ -27,7 +27,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../../long_term_relation/presentation/neighborhood/neighborhood_test_support.dart'
+import '../../../long_term_relation/presentation/relation_graph_test_support.dart'
     show TestRelationGroupCursor;
 import '../../../support/in_memory_quick_creation_mode_store.dart';
 import 'details_test_support.dart';

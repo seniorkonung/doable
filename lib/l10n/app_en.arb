@@ -370,58 +370,15 @@
   "@intentionSummaryNoTags": {
     "description": "Подтверждённое отсутствие тегов у намерения в результате поиска"
   },
-  "relationNeighborhoodTitle": "Relations",
   "relationNeighborhoodSummaryLoading": "Loading relations and summary…",
-  "relationNeighborhoodSummaryUnavailable": "The relation summary couldn’t be loaded.",
-  "relationNeighborhoodSavedSummaryRefreshing": "Updating saved relation numbers…",
-  "@relationNeighborhoodSavedSummaryRefreshing": {
-    "description": "Состояние обновления сохранённой согласованной сводки рядом с её числами"
-  },
-  "relationNeighborhoodSavedSummaryStale": "Saved relation numbers are out of date because the refresh failed.",
-  "@relationNeighborhoodSavedSummaryStale": {
-    "description": "Состояние устаревшей сохранённой сводки рядом с её числами"
-  },
-  "relationNeighborhoodTotal": "Total relations: {count}",
-  "@relationNeighborhoodTotal": {
-    "placeholders": {"count": {"type": "int"}}
-  },
-  "relationNeighborhoodActiveTotal": "Active relations: {count}",
-  "@relationNeighborhoodActiveTotal": {
-    "placeholders": {"count": {"type": "int"}}
-  },
-  "relationNeighborhoodArchivedTotal": "Archived relations: {count}",
-  "@relationNeighborhoodArchivedTotal": {
-    "placeholders": {"count": {"type": "int"}}
-  },
-  "relationNeighborhoodNeedTotal": "Need: {count}",
-  "@relationNeighborhoodNeedTotal": {
-    "placeholders": {"count": {"type": "int"}}
-  },
-  "relationNeighborhoodCanTotal": "Can: {count}",
   "relationNeighborhoodDailyTotal": "Daily choices: {count}",
   "@relationNeighborhoodDailyTotal": {"placeholders": {"count": {"type": "int"}}},
   "relationNeighborhoodDailySourceRole": "Source intention",
   "@relationNeighborhoodDailySourceRole": {"description": "Роль намерения как источника дневного выбора"},
   "relationNeighborhoodDailySelectedRole": "Selected action",
   "@relationNeighborhoodDailySelectedRole": {"description": "Роль намерения как выбранного действия"},
-  "relationNeighborhoodLongTermGroups": "Long-term relations",
-  "@relationNeighborhoodLongTermGroups": {"description": "Подпись групп долговременных связей в соседстве"},
-  "@relationNeighborhoodCanTotal": {
-    "placeholders": {"count": {"type": "int"}}
-  },
-  "relationNeighborhoodScopeLabel": "Relation state",
-  "relationNeighborhoodScopeActive": "Active relations",
-  "relationNeighborhoodScopeArchived": "Archived relations",
-  "relationNeighborhoodTypeLabel": "Relation type",
   "relationNeighborhoodTypeNeed": "Need",
   "relationNeighborhoodTypeCan": "Can",
-  "relationNeighborhoodDirectionLabel": "Direction",
-  "relationNeighborhoodDirectionIncoming": "Incoming",
-  "relationNeighborhoodDirectionOutgoing": "Outgoing",
-  "relationNeighborhoodSelectedGroupCount": "In the whole selected group: {count}",
-  "@relationNeighborhoodSelectedGroupCount": {
-    "placeholders": {"count": {"type": "int"}}
-  },
   "relationNeighborhoodInitialUnavailable": "The relations and summary couldn’t be loaded. Try again.",
   "relationNeighborhoodInitialCorruption": "Stored relation data is damaged and can’t be shown.",
   "relationNeighborhoodInitialUnexpected": "The relations couldn’t be loaded because of an unexpected error.",
@@ -458,41 +415,14 @@
       "related": {"type": "String"}
     }
   },
-  "@relationNeighborhoodTitle": {
-    "description": "Заголовок соседства намерения"
-  },
   "@relationNeighborhoodSummaryLoading": {
     "description": "Первоначальная загрузка соседства и полной сводки"
-  },
-  "@relationNeighborhoodSummaryUnavailable": {
-    "description": "Полная сводка ещё не подтверждена из-за ошибки"
-  },
-  "@relationNeighborhoodScopeLabel": {
-    "description": "Подпись выбора активных или архивных связей"
-  },
-  "@relationNeighborhoodScopeActive": {
-    "description": "Активный охват соседства"
-  },
-  "@relationNeighborhoodScopeArchived": {
-    "description": "Архивный охват соседства"
-  },
-  "@relationNeighborhoodTypeLabel": {
-    "description": "Подпись выбора типа долговременной связи"
   },
   "@relationNeighborhoodTypeNeed": {
     "description": "Тип долговременной связи нужно"
   },
   "@relationNeighborhoodTypeCan": {
     "description": "Тип долговременной связи можно"
-  },
-  "@relationNeighborhoodDirectionLabel": {
-    "description": "Подпись выбора направления связи"
-  },
-  "@relationNeighborhoodDirectionIncoming": {
-    "description": "Входящее направление относительно намерения"
-  },
-  "@relationNeighborhoodDirectionOutgoing": {
-    "description": "Исходящее направление относительно намерения"
   },
   "@relationNeighborhoodInitialUnavailable": {
     "description": "Устранимая ошибка начального чтения группы"
@@ -1751,12 +1681,8 @@
   "@relationDeleteUnexpected": {
     "description": "Терминальная непредвиденная ошибка удаления связи"
   },
-  "relationNeighborhoodOpenRelation": "Opens the relation details",
   "relationNeighborhoodOpenDailyChoice": "Open the full saved daily path",
   "@relationNeighborhoodOpenDailyChoice": {"description": "Назначение перехода к полному пути дневного выбора"},
-  "@relationNeighborhoodOpenRelation": {
-    "description": "Назначение перехода из строки соседства в подробный просмотр связи"
-  },
   "relationDetailsTitle": "Relation",
   "@relationDetailsTitle": {
     "description": "Заголовок подробного просмотра связи"
@@ -2293,14 +2219,6 @@
   "relationEditorSaving": "Saving…",
   "@relationEditorSaving": {
     "description": "Выполняемое изменение долговременной связи"
-  },
-  "relationNeighborhoodCreateOutgoingAction": "Create an outgoing relation",
-  "@relationNeighborhoodCreateOutgoingAction": {
-    "description": "Создание связи из исходящей группы соседства"
-  },
-  "relationNeighborhoodCreateIncomingAction": "Create an incoming relation",
-  "@relationNeighborhoodCreateIncomingAction": {
-    "description": "Создание связи из входящей группы соседства"
   },
   "relationEditorPriorityOption": "Priority {priority}",
   "@relationEditorPriorityOption": {

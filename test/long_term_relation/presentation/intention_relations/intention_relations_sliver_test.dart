@@ -24,7 +24,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../neighborhood/neighborhood_test_support.dart';
+import '../relation_graph_test_support.dart';
 
 void main() {
   const revision = TestGraphRevision(2);
@@ -680,8 +680,8 @@ void main() {
       expect(_fold(tester).count, 2);
     });
 
-    testWidgets('[${locale.languageCode}] отказ обновления пустой группы '
-        'остаётся виден рядом с пустым состоянием', (tester) async {
+    testWidgets('[${locale.languageCode}] обновление пустой группы и его '
+        'отказ остаются видны рядом с пустым состоянием', (tester) async {
       final harness = await _Harness.pump(
         tester,
         locale: locale,
@@ -691,11 +691,15 @@ void main() {
       await tester.pumpAndSettle();
 
       harness.repository.emitIntention(
-        testNeighborhoodIntention(id: harness.ownerId),
+        testGraphIntention(id: harness.ownerId),
         counts: testRelationCounts(),
         revision: const TestGraphRevision(3),
       );
       await _pumpUntilRequestCount(tester, harness.repository, 2);
+      await tester.pump();
+      expect(find.byType(EmptyState), findsOneWidget);
+      expect(find.text(l10n.relationNeighborhoodRefreshing), findsOne);
+
       harness.repository.failRead(1, const RelationGroupUnavailableFailure());
       await tester.pumpAndSettle();
 
@@ -727,7 +731,7 @@ void main() {
 
       final refreshed = testRelationCounts(activeNeedOutgoing: 2);
       harness.repository.emitIntention(
-        testNeighborhoodIntention(id: harness.ownerId),
+        testGraphIntention(id: harness.ownerId),
         counts: refreshed,
         revision: const TestGraphRevision(3),
       );
@@ -1078,6 +1082,50 @@ void main() {
     expect(1600 - text.bottom, greaterThanOrEqualTo(24));
   });
 
+  testWidgets('плитки, «Добавить», строка и архив соблюдают правила '
+      'доступности при русской локали', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final counts = testRelationCounts(
+      activeNeedOutgoing: 1,
+      archivedNeedOutgoing: 1,
+    );
+    final harness = await _Harness.pump(
+      tester,
+      locale: const Locale('ru'),
+      ownerTitle: 'Build продукт',
+      counts: counts,
+      viewportHeight: 1200,
+    );
+    harness.repository.completePage(
+      0,
+      RelationGroupFirstPage(
+        items: [
+          testGroupRow(
+            ownerId: harness.ownerId,
+            index: 1,
+            priority: RelationPriority.p1,
+            neighborTitle: 'Ship без перевода',
+          ),
+        ],
+        counts: counts,
+        nextCursor: null,
+        revision: revision,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Всё стоит выше края экрана: строки под закреплёнными вкладками
+    // обрезаны и не проходят проверку области нажатия.
+    expect(_rowFinder(1), findsOneWidget);
+    expect(find.byType(ArchivedFold), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    // Контракт дизайн-системы задаёт область нажатия 44.
+    await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
+    await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+    await expectLater(tester, meetsGuideline(textContrastGuideline));
+    semantics.dispose();
+  });
+
   testWidgets('после пересборки возвращает видимую строку под закреплённые '
       'вкладки', (tester) async {
     final counts = testRelationCounts(activeNeedOutgoing: 20);
@@ -1110,7 +1158,7 @@ void main() {
     // ушла бы вверх под вкладки.
     final refreshed = testRelationCounts(activeNeedOutgoing: 17);
     harness.repository.emitIntention(
-      testNeighborhoodIntention(id: harness.ownerId),
+      testGraphIntention(id: harness.ownerId),
       counts: refreshed,
       revision: const TestGraphRevision(3),
     );
@@ -1188,7 +1236,7 @@ void main() {
       archivedNeedOutgoing: 17,
     );
     harness.repository.emitIntention(
-      testNeighborhoodIntention(id: harness.ownerId),
+      testGraphIntention(id: harness.ownerId),
       counts: refreshed,
       revision: const TestGraphRevision(3),
     );
@@ -1237,7 +1285,7 @@ const _addKey = ValueKey('intention-relations-add');
 final class _Harness {
   _Harness._(this.repository, this.pageInstance);
 
-  final ControlledNeighborhoodRepository repository;
+  final ControlledRelationGraphRepository repository;
   final IntentionPageInstance pageInstance;
   final IntentionId ownerId = testIntentionId(1);
   final opened = <LongTermRelationId>[];
@@ -1261,7 +1309,7 @@ final class _Harness {
         ..devicePixelRatio = 1;
       addTearDown(tester.view.reset);
     }
-    final repository = ControlledNeighborhoodRepository();
+    final repository = ControlledRelationGraphRepository();
     addTearDown(repository.dispose);
     final harness = _Harness._(
       repository,
@@ -1314,7 +1362,7 @@ final class _Harness {
     );
     await tester.pump();
     repository.emitIntention(
-      testNeighborhoodIntention(
+      testGraphIntention(
         id: harness.ownerId,
         title: ownerTitle,
         readiness: readiness,
@@ -1411,7 +1459,7 @@ Future<void> _scrollTo(
 
 Future<void> _pumpUntilRequestCount(
   WidgetTester tester,
-  ControlledNeighborhoodRepository repository,
+  ControlledRelationGraphRepository repository,
   int expected,
 ) async {
   for (var attempt = 0; attempt < 100; attempt += 1) {

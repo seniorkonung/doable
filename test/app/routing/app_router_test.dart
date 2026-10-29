@@ -30,7 +30,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../intention/presentation/catalog/catalog_test_support.dart';
 import '../../long_term_relation/presentation/details/relation_details_test_support.dart';
-import '../../long_term_relation/presentation/neighborhood/neighborhood_test_support.dart'
+import '../../long_term_relation/presentation/relation_graph_test_support.dart'
     hide testRelationCounts;
 import '../../support/app_root_pages.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
@@ -157,13 +157,13 @@ void main() {
     await _pumpRouter(tester, repository, router);
     unawaited(router.push(IntentionDetailsRoute(intentionId: idA)));
     await _showRelations(tester, repository, idA, 'А');
-    await _settleNeighborhood(
+    await _settleRelations(
       tester,
       repository,
       expectedWatches: 2,
       expectedQueries: 1,
     );
-    _serveNeighborhood(
+    _serveRelations(
       repository,
       intentionId: idA,
       title: 'А',
@@ -196,13 +196,13 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 400));
     await _showRelations(tester, repository, idB, 'Б');
-    await _settleNeighborhood(
+    await _settleRelations(
       tester,
       repository,
       expectedWatches: 4,
       expectedQueries: 2,
     );
-    _serveNeighborhood(
+    _serveRelations(
       repository,
       intentionId: idB,
       title: 'Б',
@@ -239,14 +239,14 @@ void main() {
     expect(find.byType(IntentionDetailsPage), findsWidgets);
     await tester.tap(find.text('Relations').first);
     // Новая страница А получает связи своей вкладки заново.
-    await _settleNeighborhood(
+    await _settleRelations(
       tester,
       repository,
       expectedWatches: 5,
       expectedQueries: 3,
     );
     expect(repository.groupQueries[2].intentionId, idA);
-    _serveNeighborhood(
+    _serveRelations(
       repository,
       intentionId: idA,
       title: 'А',
@@ -280,13 +280,13 @@ void main() {
       await _pumpRouter(tester, repository, router);
       unawaited(router.push(IntentionDetailsRoute(intentionId: ownerId)));
       await _showRelations(tester, repository, ownerId, 'А');
-      await _settleNeighborhood(
+      await _settleRelations(
         tester,
         repository,
         expectedWatches: 2,
         expectedQueries: 1,
       );
-      _serveNeighborhood(
+      _serveRelations(
         repository,
         intentionId: ownerId,
         title: 'А',
@@ -318,7 +318,7 @@ void main() {
       await tester.tap(
         find.byKey(const ValueKey('intention-relations-group-neededFor')),
       );
-      await _settleNeighborhood(
+      await _settleRelations(
         tester,
         repository,
         expectedWatches: 2,
@@ -353,7 +353,7 @@ void main() {
       await tester.tap(
         find.byKey(const ValueKey('intention-relations-group-canBeUsedFor')),
       );
-      await _settleNeighborhood(
+      await _settleRelations(
         tester,
         repository,
         expectedWatches: 2,
@@ -415,7 +415,7 @@ Future<void> _pumpRouter(
 }
 
 /// Ожидает, пока открытая страница намерения начнёт согласованное чтение.
-Future<void> _settleNeighborhood(
+Future<void> _settleRelations(
   WidgetTester tester,
   ControlledRelationDetailsRepository repository, {
   required int expectedWatches,
@@ -429,10 +429,10 @@ Future<void> _settleNeighborhood(
     }
     await tester.pump();
   }
-  throw StateError('Страница намерения не начала чтение соседства.');
+  throw StateError('Страница намерения не начала чтение связей.');
 }
 
-void _serveNeighborhood(
+void _serveRelations(
   ControlledRelationDetailsRepository repository, {
   required IntentionId intentionId,
   required String title,
@@ -442,7 +442,7 @@ void _serveNeighborhood(
   const revision = TestGraphRevision(1);
   final counts = testRelationCounts(activeNeedOutgoing: 1);
   repository.emitIntention(
-    testNeighborhoodIntention(id: intentionId, title: title),
+    testGraphIntention(id: intentionId, title: title),
     counts: counts,
     revision: revision,
   );
@@ -509,7 +509,7 @@ Future<void> _showRelations(
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 400));
   repository.emitIntention(
-    testNeighborhoodIntention(id: id, title: title),
+    testGraphIntention(id: id, title: title),
     counts: testRelationCounts(activeNeedOutgoing: 1),
     revision: const TestGraphRevision(1),
   );

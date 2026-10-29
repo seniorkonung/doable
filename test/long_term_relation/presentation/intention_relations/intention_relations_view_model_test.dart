@@ -28,7 +28,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/daily_choice_reconciliation_fixture.dart';
-import '../neighborhood/neighborhood_test_support.dart';
+import '../relation_graph_test_support.dart';
 
 void main() {
   for (final (readiness, expected) in [
@@ -37,7 +37,7 @@ void main() {
   ]) {
     test('без группы в цели ${readiness.name} открывает первую порцию '
         'группы ${expected.name}', () async {
-      final repository = ControlledNeighborhoodRepository();
+      final repository = ControlledRelationGraphRepository();
       final harness = await _RelationsHarness.open(
         repository,
         readiness: readiness,
@@ -54,7 +54,7 @@ void main() {
   }
 
   test('группа цели открывается вместо группы по готовности', () async {
-    final repository = ControlledNeighborhoodRepository();
+    final repository = ControlledRelationGraphRepository();
     final harness = await _RelationsHarness.open(
       repository,
       target: const RelationsTarget(IntentionRelationGroup.canBeUsedFor),
@@ -72,7 +72,7 @@ void main() {
   test(
     'новая модель экземпляра сохраняет группу после смены готовности',
     () async {
-      final repository = ControlledNeighborhoodRepository();
+      final repository = ControlledRelationGraphRepository();
       final harness = await _RelationsHarness.open(repository);
       addTearDown(harness.dispose);
       expect(harness.state.group, IntentionRelationGroup.needs);
@@ -96,7 +96,7 @@ void main() {
   test(
     'группа, выбранная после открытия по цели, переживает новую модель',
     () async {
-      final repository = ControlledNeighborhoodRepository();
+      final repository = ControlledRelationGraphRepository();
       final harness = await _RelationsHarness.open(
         repository,
         target: const RelationsTarget(IntentionRelationGroup.canUse),
@@ -118,7 +118,7 @@ void main() {
   test(
     'смена группы записывается в экземпляр и отбрасывает строки прежней',
     () async {
-      final repository = ControlledNeighborhoodRepository();
+      final repository = ControlledRelationGraphRepository();
       final harness = await _RelationsHarness.open(repository);
       addTearDown(harness.dispose);
       repository.completePage(
@@ -170,7 +170,7 @@ void main() {
   );
 
   test('группы не читаются до создания модели и после освобождения', () async {
-    final repository = ControlledNeighborhoodRepository();
+    final repository = ControlledRelationGraphRepository();
     final harness = await _RelationsHarness.open(repository, retain: false);
     addTearDown(harness.dispose);
     expect(repository.requestCount, 0);
@@ -191,7 +191,7 @@ void main() {
   });
 
   test('две страницы одного намерения не делят группу и порции', () async {
-    final repository = ControlledNeighborhoodRepository();
+    final repository = ControlledRelationGraphRepository();
     final harness = await _RelationsHarness.open(repository);
     addTearDown(harness.dispose);
     final other = IntentionPageInstance(
@@ -244,7 +244,7 @@ void main() {
           : 'изменение непросматриваемой группы обновляет полностью '
                 'загруженную группу',
       () async {
-        final repository = ControlledNeighborhoodRepository();
+        final repository = ControlledRelationGraphRepository();
         final harness = await _RelationsHarness.open(repository);
         addTearDown(harness.dispose);
         final ownerId = harness.intentionId;
@@ -322,7 +322,7 @@ void main() {
   }
 
   test('приоритет связи другой группы не требует новой основы', () async {
-    final repository = ControlledNeighborhoodRepository();
+    final repository = ControlledRelationGraphRepository();
     final harness = await _RelationsHarness.open(repository);
     addTearDown(harness.dispose);
     final ownerId = harness.intentionId;
@@ -368,7 +368,7 @@ void main() {
   test(
     'приоритет незагруженной связи группы пересобирает загруженную часть',
     () async {
-      final repository = ControlledNeighborhoodRepository();
+      final repository = ControlledRelationGraphRepository();
       final harness = await _RelationsHarness.open(repository, pageSize: 2);
       addTearDown(harness.dispose);
       final ownerId = harness.intentionId;
@@ -424,7 +424,7 @@ void main() {
   );
 
   test('описание загруженной связи пересобирает её строку', () async {
-    final repository = ControlledNeighborhoodRepository();
+    final repository = ControlledRelationGraphRepository();
     final harness = await _RelationsHarness.open(repository);
     addTearDown(harness.dispose);
     final ownerId = harness.intentionId;
@@ -480,17 +480,14 @@ void main() {
   });
 
   test('переименование соседа загруженной строки пересобирает её', () async {
-    final repository = ControlledNeighborhoodRepository();
+    final repository = ControlledRelationGraphRepository();
     final harness = await _RelationsHarness.open(repository);
     addTearDown(harness.dispose);
     harness.completeNeedsPage(0, count: 1);
     await pumpEventQueue();
     final neighborId = harness.loaded.items.single.neighbor.id;
-    final before = testNeighborhoodIntention(id: neighborId);
-    final after = testNeighborhoodIntention(
-      id: neighborId,
-      title: 'Новое название',
-    );
+    final before = testGraphIntention(id: neighborId);
+    final after = testGraphIntention(id: neighborId, title: 'Новое название');
     final start = harness.coordinator.acceptExisting(
       UpdateIntention(
         id: neighborId,
@@ -501,7 +498,7 @@ void main() {
     ) as IntentionCommandAccepted;
     repository.completeIntentionCommand(
       0,
-      testNeighborhoodSavedResult(
+      testIntentionSavedResult(
         before: before,
         after: after,
         revision: const TestGraphRevision(9),
@@ -532,7 +529,7 @@ void main() {
   test(
     'дневной выбор владельца обновляет сводку при выбранной группе',
     () async {
-      final repository = ControlledNeighborhoodRepository();
+      final repository = ControlledRelationGraphRepository();
       final harness = await _RelationsHarness.open(repository);
       addTearDown(harness.dispose);
       final ownerId = harness.intentionId;
@@ -590,7 +587,7 @@ void main() {
   test(
     'замена на новой ревизии возвращает прокрутку к видимой связи',
     () async {
-      final repository = ControlledNeighborhoodRepository();
+      final repository = ControlledRelationGraphRepository();
       final harness = await _RelationsHarness.open(repository);
       addTearDown(harness.dispose);
       harness.completeNeedsPage(0, count: 3);
@@ -623,7 +620,7 @@ void main() {
   test(
     'после отсутствия намерения смена группы не читает и не меняет экземпляр',
     () async {
-      final repository = ControlledNeighborhoodRepository();
+      final repository = ControlledRelationGraphRepository();
       final harness = await _RelationsHarness.open(repository);
       addTearDown(harness.dispose);
       repository.emitIntentionNotFound(revision: const TestGraphRevision(9));
@@ -642,7 +639,7 @@ void main() {
   );
 
   test('архив архивированного намерения раскрыт сразу', () async {
-    final repository = ControlledNeighborhoodRepository();
+    final repository = ControlledRelationGraphRepository();
     final harness = await _RelationsHarness.open(
       repository,
       archiveState: IntentionArchiveState.archived,
@@ -693,7 +690,7 @@ void main() {
 
   test('раскрытие архива читает первую порцию тех же типа и направления, а '
       'сворачивание отбрасывает её строки', () async {
-    final repository = ControlledNeighborhoodRepository();
+    final repository = ControlledRelationGraphRepository();
     final harness = await _RelationsHarness.open(
       repository,
       target: const RelationsTarget(IntentionRelationGroup.neededFor),
@@ -767,7 +764,7 @@ void main() {
 
   test('смена группы сохраняет раскрытие архивов, а новая модель экземпляра '
       'снова получает раскрытый архив', () async {
-    final repository = ControlledNeighborhoodRepository();
+    final repository = ControlledRelationGraphRepository();
     final harness = await _RelationsHarness.open(repository);
     addTearDown(harness.dispose);
     final ownerId = harness.intentionId;
@@ -860,7 +857,7 @@ void main() {
   });
 
   test('многолетний архив раскрывается одной порцией', () async {
-    final repository = ControlledNeighborhoodRepository();
+    final repository = ControlledRelationGraphRepository();
     final harness = await _RelationsHarness.open(repository);
     addTearDown(harness.dispose);
     final counts = testRelationCounts(archivedNeedOutgoing: 5000);
@@ -914,7 +911,7 @@ void main() {
 
   test('архивирование, восстановление связи и каскад публикуют обе части на '
       'одной ревизии', () async {
-    final repository = ControlledNeighborhoodRepository();
+    final repository = ControlledRelationGraphRepository();
     final harness = await _RelationsHarness.open(repository);
     addTearDown(harness.dispose);
     final ownerId = harness.intentionId;
@@ -1034,7 +1031,7 @@ void main() {
     ) as IntentionCommandAccepted;
     repository.completeIntentionCommand(
       0,
-      testNeighborhoodSavedResult(
+      testIntentionSavedResult(
         before: owner,
         after: _intention(
           ownerId,
@@ -1169,7 +1166,7 @@ final class _RelationsHarness {
   /// Модель «Связей» создаётся над полученными подробными данными, как на
   /// странице намерения.
   static Future<_RelationsHarness> open(
-    ControlledNeighborhoodRepository repository, {
+    ControlledRelationGraphRepository repository, {
     IntentionPageTarget target = const OverviewTarget(),
     IntentionReadiness readiness = IntentionReadiness.notReady,
     IntentionArchiveState archiveState = IntentionArchiveState.active,
@@ -1207,7 +1204,7 @@ final class _RelationsHarness {
     return harness;
   }
 
-  final ControlledNeighborhoodRepository repository;
+  final ControlledRelationGraphRepository repository;
   final IntentionPageInstance pageInstance;
   final ProviderContainer container;
   final IntentionId intentionId;
