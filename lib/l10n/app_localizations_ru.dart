@@ -700,6 +700,25 @@ class AppLocalizationsRu extends AppLocalizations {
   String get detailsChoicesTab => 'Выборы';
 
   @override
+  String get detailsChoicesSourceHint =>
+      'Дневные выборы, которые начинаются с этого намерения.';
+
+  @override
+  String get detailsChoicesSelectedHint =>
+      'Дневные выборы, которые заканчиваются этим намерением.';
+
+  @override
+  String get detailsChoicesAdd => 'Добавить';
+
+  @override
+  String get detailsChoicesAddSourceLabel =>
+      'Создать дневной выбор, который начинается с этого намерения';
+
+  @override
+  String get detailsChoicesAddSelectedLabel =>
+      'Создать дневной выбор, который заканчивается этим действием';
+
+  @override
   String get detailsTitle => 'Подробности намерения';
 
   @override

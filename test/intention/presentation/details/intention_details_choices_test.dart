@@ -9,6 +9,9 @@ import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
+import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
+import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
+import 'package:doable/src/design_system/components/add_row.dart';
 import 'package:doable/src/design_system/components/tabs.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -273,6 +276,203 @@ void main() {
       semantics.dispose();
     },
   );
+
+  testWidgets('вход со страницы намерения не требует поиска', (tester) async {
+    final repository = ControlledDetailsRepository();
+    final owner = testDetailsIntention();
+    repository.onDailyChoiceGroupPage = (_) => _rolePage(const []);
+    await _openPage(tester, repository, target: const ChoicesTarget());
+    for (final request in repository.detailRequests) {
+      request.add(ResultSuccess(owner));
+    }
+    await tester.pumpAndSettle();
+    // Пустой список роли оставляет одно «Добавить» без подсказки.
+    expect(
+      find.text('Daily choices that start from this intention.'),
+      findsNothing,
+    );
+
+    await tester.tap(find.byKey(_add));
+    await _pumpRouteTransition(tester);
+    _expectChoicePath(tester, owner.id, ChoicePathDraftDirection.topDown);
+  });
+
+  testWidgets('вход со страницы действия идёт снизу вверх', (tester) async {
+    final repository = ControlledDetailsRepository();
+    final owner = testDetailsIntention(readiness: IntentionReadiness.ready);
+    repository.onDailyChoiceGroupPage = (query) =>
+        _rolePage([_choice(owner.id, role: query.role, index: 1)]);
+    await _openPage(tester, repository, target: const ChoicesTarget());
+    for (final request in repository.detailRequests) {
+      request.add(ResultSuccess(owner));
+    }
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Daily choices that start from this intention.'),
+      findsOneWidget,
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('intention-choices-role-selected')),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Daily choices that end in this intention.'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(_add));
+    await _pumpRouteTransition(tester);
+    _expectChoicePath(tester, owner.id, ChoicePathDraftDirection.bottomUp);
+  });
+
+  testWidgets('у архивированного намерения нет «Добавить» ни в одной роли', (
+    tester,
+  ) async {
+    final repository = ControlledDetailsRepository();
+    final owner = testDetailsIntention(
+      readiness: IntentionReadiness.ready,
+      archiveState: IntentionArchiveState.archived,
+    );
+    repository.onDailyChoiceGroupPage = (query) =>
+        _rolePage([_choice(owner.id, role: query.role, index: 1)]);
+    await _openPage(tester, repository, target: const ChoicesTarget());
+    for (final request in repository.detailRequests) {
+      request.add(ResultSuccess(owner));
+    }
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Daily choices that start from this intention.'),
+      findsOneWidget,
+    );
+    expect(find.byKey(_add), findsNothing);
+
+    await tester.tap(
+      find.byKey(const ValueKey('intention-choices-role-selected')),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Daily choices that end in this intention.'),
+      findsOneWidget,
+    );
+    expect(find.byKey(_add), findsNothing);
+  });
+
+  testWidgets(
+    'у роли «выбранное» неготового намерения нет «Добавить», а пустая роль '
+    'остаётся без строки',
+    (tester) async {
+      final repository = ControlledDetailsRepository();
+      final owner = testDetailsIntention();
+      var selectedItems = [
+        _choice(owner.id, role: DailyChoiceRelationRole.selected, index: 1),
+      ];
+      repository.onDailyChoiceGroupPage = (query) =>
+          _rolePage(switch (query.role) {
+            DailyChoiceRelationRole.source => const [],
+            DailyChoiceRelationRole.selected => selectedItems,
+          });
+      await _openPage(tester, repository, target: const ChoicesTarget());
+      for (final request in repository.detailRequests) {
+        request.add(ResultSuccess(owner));
+      }
+      await tester.pumpAndSettle();
+      expect(find.byKey(_add), findsOneWidget);
+
+      await tester.tap(
+        find.byKey(const ValueKey('intention-choices-role-selected')),
+      );
+      await tester.pumpAndSettle();
+      // Утрата готовности сохраняет прежние выборы с этим действием.
+      expect(
+        find.text('Daily choices that end in this intention.'),
+        findsOneWidget,
+      );
+      expect(find.byKey(_add), findsNothing);
+
+      selectedItems = const [];
+      await tester.tap(
+        find.byKey(const ValueKey('intention-choices-role-source')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('intention-choices-role-selected')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(AddRow), findsNothing);
+    },
+  );
+
+  for (final (locale, sourceLabel, selectedLabel) in [
+    (
+      'ru',
+      'Создать дневной выбор, который начинается с этого намерения',
+      'Создать дневной выбор, который заканчивается этим действием',
+    ),
+    (
+      'en',
+      'Create a daily choice that starts from this intention',
+      'Create a daily choice that ends in this action',
+    ),
+  ]) {
+    testWidgets('$locale: «Добавить» называет начало дневного выбора', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      final repository = ControlledDetailsRepository();
+      final owner = testDetailsIntention(readiness: IntentionReadiness.ready);
+      repository.onDailyChoiceGroupPage = (_) => _rolePage(const []);
+      await _openPage(
+        tester,
+        repository,
+        locale: Locale(locale),
+        target: const ChoicesTarget(),
+      );
+      for (final request in repository.detailRequests) {
+        request.add(ResultSuccess(owner));
+      }
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsLabel(sourceLabel), findsOneWidget);
+
+      await tester.tap(
+        find.byKey(const ValueKey('intention-choices-role-selected')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsLabel(selectedLabel), findsOneWidget);
+      semantics.dispose();
+    });
+  }
+}
+
+const _add = ValueKey('intention-choices-add');
+
+RelationGroupPageResult _rolePage(List<DailyChoiceCatalogItem> items) =>
+    GraphResultSuccess(
+      DailyChoiceGroupFirstPage(
+        items: items,
+        counts: testRelationCounts(
+          dailySource: items.length,
+          dailySelected: items.length,
+        ),
+        nextCursor: null,
+        revision: const TestDetailsRevision(0),
+      ),
+    );
+
+/// Пошаговый выбор продолжает читать продолжения, поэтому переход
+/// прокручивается на время анимации, а не до покоя.
+Future<void> _pumpRouteTransition(WidgetTester tester) async {
+  await tester.pump(const Duration(milliseconds: 400));
+  await tester.pump();
+}
+
+void _expectChoicePath(
+  WidgetTester tester,
+  IntentionId sourceIntentionId,
+  ChoicePathDraftDirection direction,
+) {
+  final page = tester.widget<ChoicePathPage>(find.byType(ChoicePathPage));
+  expect(page.sourceIntentionId, sourceIntentionId);
+  expect(page.direction, direction);
 }
 
 /// Выбранная роль отмечена в переключателе, а в списке только её строка.

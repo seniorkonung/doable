@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
+import '../../../design_system/components/add_row.dart';
+import '../../../design_system/doable_metrics.dart';
 import '../../../intention/domain/intention_id.dart';
 import '../../../intention/presentation/details/intention_page_target.dart';
 import '../../../long_term_relation/application/relation_counts.dart';
@@ -22,6 +24,8 @@ final class IntentionChoicesSliver extends ConsumerStatefulWidget {
     required this.intentionId,
     required this.pageInstance,
     required this.onOpenDailyChoice,
+    required this.onAddAsSource,
+    required this.onAddAsSelected,
     super.key,
   });
 
@@ -30,6 +34,14 @@ final class IntentionChoicesSliver extends ConsumerStatefulWidget {
 
   /// Открывает сохранённый путь дневного выбора по его идентификатору.
   final ValueChanged<DailyChoiceId> onOpenDailyChoice;
+
+  /// Начинает дневной выбор от этого намерения; без обработчика у роли
+  /// «исходное» нет «Добавить».
+  final VoidCallback? onAddAsSource;
+
+  /// Начинает дневной выбор, который заканчивается этим намерением; без
+  /// обработчика у роли «выбранное» нет «Добавить».
+  final VoidCallback? onAddAsSelected;
 
   @override
   ConsumerState<IntentionChoicesSliver> createState() =>
@@ -48,11 +60,18 @@ final class _IntentionChoicesSliverState
     );
     final state = ref.watch(provider);
     final viewModel = ref.read(provider.notifier);
+    final addRow = _addRow(AppLocalizations.of(context), state);
+    final headerCount = addRow == null ? 1 : 2;
     return SliverList(
       delegate: SliverChildBuilderDelegate((context, index) {
         if (index == 0) {
           return Padding(
-            padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
+            padding: EdgeInsets.fromLTRB(
+              16,
+              24,
+              16,
+              addRow == null ? 16 : DoableMetrics.space1,
+            ),
             child: _RoleSummary(
               counts: switch (state) {
                 IntentionChoicesConfirmed(:final counts) => counts,
@@ -65,9 +84,57 @@ final class _IntentionChoicesSliverState
             ),
           );
         }
-        return _buildBodyChild(context, state, index - 1, viewModel);
-      }, childCount: _bodyChildCount(state) + 1),
+        if (addRow != null && index == 1) {
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, DoableMetrics.space1),
+            child: addRow,
+          );
+        }
+        return _buildBodyChild(context, state, index - headerCount, viewModel);
+      }, childCount: _bodyChildCount(state) + headerCount),
     );
+  }
+
+  /// Подсказка называет роль, только когда её подтверждённый список не пуст;
+  /// без «Добавить» и без подсказки строки нет.
+  AddRow? _addRow(AppLocalizations l10n, IntentionChoicesState state) {
+    final (hint, addLabel, onAdd) = switch (state.role) {
+      DailyChoiceRelationRole.source => (
+        l10n.detailsChoicesSourceHint,
+        l10n.detailsChoicesAddSourceLabel,
+        widget.onAddAsSource,
+      ),
+      DailyChoiceRelationRole.selected => (
+        l10n.detailsChoicesSelectedHint,
+        l10n.detailsChoicesAddSelectedLabel,
+        widget.onAddAsSelected,
+      ),
+    };
+    const addKey = ValueKey('intention-choices-add');
+    final hasItems = switch (state) {
+      IntentionChoicesLoaded() => true,
+      IntentionChoicesInitialLoad() ||
+      IntentionChoicesInitialFailure() ||
+      IntentionChoicesIntentionNotFound() ||
+      IntentionChoicesEmpty() => false,
+    };
+    return switch ((hasItems, onAdd)) {
+      (true, final onAdd?) => AddRow.hint(
+        hint: hint,
+        addText: l10n.detailsChoicesAdd,
+        addLabel: addLabel,
+        onAdd: onAdd,
+        addKey: addKey,
+      ),
+      (true, null) => AddRow.hintOnly(hint: hint),
+      (false, final onAdd?) => AddRow.addOnly(
+        addText: l10n.detailsChoicesAdd,
+        addLabel: addLabel,
+        onAdd: onAdd,
+        addKey: addKey,
+      ),
+      (false, null) => null,
+    };
   }
 
   int _bodyChildCount(IntentionChoicesState state) => switch (state) {

@@ -558,6 +558,16 @@
   "@detailsRelationsTabSemantic": {"description": "Числа долговременных связей на вкладке для диктора", "placeholders": {"active": {"type": "int"}, "archived": {"type": "int"}}},
   "detailsChoicesTab": "Choices",
   "@detailsChoicesTab": {"description": "Вкладка дневных выборов, прямо использующих намерение"},
+  "detailsChoicesSourceHint": "Daily choices that start from this intention.",
+  "@detailsChoicesSourceHint": {"description": "Подсказка над непустым списком роли «исходное» на вкладке «Выборы»"},
+  "detailsChoicesSelectedHint": "Daily choices that end in this intention.",
+  "@detailsChoicesSelectedHint": {"description": "Подсказка над непустым списком роли «выбранное» на вкладке «Выборы»"},
+  "detailsChoicesAdd": "Add",
+  "@detailsChoicesAdd": {"description": "Видимая подпись начала дневного выбора на вкладке «Выборы»"},
+  "detailsChoicesAddSourceLabel": "Create a daily choice that starts from this intention",
+  "@detailsChoicesAddSourceLabel": {"description": "Доступное название «Добавить» у роли «исходное»"},
+  "detailsChoicesAddSelectedLabel": "Create a daily choice that ends in this action",
+  "@detailsChoicesAddSelectedLabel": {"description": "Доступное название «Добавить» у роли «выбранное»"},
   "detailsTitle": "Intention details",
   "@detailsTitle": {
     "description": "Доступное имя страницы намерения при загрузке и отказе чтения"

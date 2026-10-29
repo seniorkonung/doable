@@ -1106,6 +1106,36 @@ abstract class AppLocalizations {
   /// **'Choices'**
   String get detailsChoicesTab;
 
+  /// Подсказка над непустым списком роли «исходное» на вкладке «Выборы»
+  ///
+  /// In en, this message translates to:
+  /// **'Daily choices that start from this intention.'**
+  String get detailsChoicesSourceHint;
+
+  /// Подсказка над непустым списком роли «выбранное» на вкладке «Выборы»
+  ///
+  /// In en, this message translates to:
+  /// **'Daily choices that end in this intention.'**
+  String get detailsChoicesSelectedHint;
+
+  /// Видимая подпись начала дневного выбора на вкладке «Выборы»
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get detailsChoicesAdd;
+
+  /// Доступное название «Добавить» у роли «исходное»
+  ///
+  /// In en, this message translates to:
+  /// **'Create a daily choice that starts from this intention'**
+  String get detailsChoicesAddSourceLabel;
+
+  /// Доступное название «Добавить» у роли «выбранное»
+  ///
+  /// In en, this message translates to:
+  /// **'Create a daily choice that ends in this action'**
+  String get detailsChoicesAddSelectedLabel;
+
   /// Доступное имя страницы намерения при загрузке и отказе чтения
   ///
   /// In en, this message translates to:

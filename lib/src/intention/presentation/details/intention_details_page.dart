@@ -625,6 +625,7 @@ final class _LoadedDetails extends StatelessWidget {
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
     final intention = state.intention;
+    final isActive = intention.archiveState == IntentionArchiveState.active;
     return CustomScrollView(
       controller: scrollController,
       slivers: [
@@ -764,6 +765,22 @@ final class _LoadedDetails extends StatelessWidget {
                     DailyChoiceDetailsRoute(choiceId: choiceId),
                   ),
                 ),
+                // Создание дневного выбора не изменяет намерение, поэтому
+                // изменяющая операция его не выключает: недопустимое начало
+                // отклоняет модель пути.
+                onAddAsSource: isActive
+                    ? () => _startChoicePath(
+                        context,
+                        ChoicePathDraftDirection.topDown,
+                      )
+                    : null,
+                onAddAsSelected:
+                    isActive && intention.readiness == IntentionReadiness.ready
+                    ? () => _startChoicePath(
+                        context,
+                        ChoicePathDraftDirection.bottomUp,
+                      )
+                    : null,
               ),
             if (selectedTab == IntentionDetailsTab.statistics)
               statisticsSection,
@@ -800,6 +817,18 @@ final class _LoadedDetails extends StatelessWidget {
       ],
     );
   }
+
+  void _startChoicePath(
+    BuildContext context,
+    ChoicePathDraftDirection direction,
+  ) => unawaited(
+    context.router.push(
+      ChoicePathRoute(
+        sourceIntentionId: state.intention.id,
+        direction: direction,
+      ),
+    ),
+  );
 }
 
 final class _DetailsStatus extends StatelessWidget {

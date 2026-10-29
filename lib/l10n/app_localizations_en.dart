@@ -697,6 +697,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get detailsChoicesTab => 'Choices';
 
   @override
+  String get detailsChoicesSourceHint =>
+      'Daily choices that start from this intention.';
+
+  @override
+  String get detailsChoicesSelectedHint =>
+      'Daily choices that end in this intention.';
+
+  @override
+  String get detailsChoicesAdd => 'Add';
+
+  @override
+  String get detailsChoicesAddSourceLabel =>
+      'Create a daily choice that starts from this intention';
+
+  @override
+  String get detailsChoicesAddSelectedLabel =>
+      'Create a daily choice that ends in this action';
+
+  @override
   String get detailsTitle => 'Intention details';
 
   @override
