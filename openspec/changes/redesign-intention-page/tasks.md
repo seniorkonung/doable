@@ -1363,7 +1363,7 @@
     - проверки: `test/long_term_relation/presentation/editor/relation_editor_view_model_test.dart`, `test/long_term_relation/presentation/editor/relation_editor_page_test.dart`, `test/long_term_relation/presentation/editor/relation_creation_navigation_test.dart`, `test/app/routing/app_router_test.dart`, `test/app/navigation/app_shell_operation_reset_test.dart`, `test/app/navigation/app_shell_page_matrix.dart`.
   - **Размер:** M — замена конструктора в проверках механическая.
 
-- [ ] 6.7 Добавить модель вкладки «Связи», которая порциями получает активные связи выбранной группы и принадлежит экземпляру страницы
+- [x] 6.7 Добавить модель вкладки «Связи», которая порциями получает активные связи выбранной группы и принадлежит экземпляру страницы
   - **Критерии приёмки:**
     - По решениям 2 и 6 дизайна `IntentionRelationsViewModel` — семейство по `IntentionId` и `IntentionPageInstance` поверх общего слоя из 6.2. Модель освобождается вместе со строками, продолжениями и подписками, когда её больше никто не слушает. До создания модели группы не читаются.
     - Выбранная группа — настройка экземпляра страницы рядом с ролью «Выборов». `RelationsTarget` получает необязательную группу `IntentionRelationGroup`.

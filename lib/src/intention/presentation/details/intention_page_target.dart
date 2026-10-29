@@ -1,3 +1,4 @@
+import '../../../long_term_relation/application/intention_relation_group.dart';
 import '../../../long_term_relation/application/relation_group.dart';
 import '../../../statistics/application/intention_statistics_target.dart';
 
@@ -11,7 +12,10 @@ final class OverviewTarget extends IntentionPageTarget {
 }
 
 final class RelationsTarget extends IntentionPageTarget {
-  const RelationsTarget();
+  const RelationsTarget([this.group]);
+
+  /// Группа, которую вкладка «Связи» выбирает при первом показе.
+  final IntentionRelationGroup? group;
 }
 
 final class ChoicesTarget extends IntentionPageTarget {
@@ -37,4 +41,7 @@ final class IntentionPageInstance {
 
   /// Роль вкладки «Выборы»; до первой смены — «исходное».
   DailyChoiceRelationRole choicesRole = DailyChoiceRelationRole.source;
+
+  /// Группа вкладки «Связи»; её задаёт первая модель вкладки этого экземпляра.
+  IntentionRelationGroup? relationsGroup;
 }
