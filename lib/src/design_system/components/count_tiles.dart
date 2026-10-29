@@ -49,6 +49,7 @@ final class CountTile<T extends Object> {
     required this.semanticLabel,
     this.glyph,
     this.archived = false,
+    this.key,
   }) : assert(count >= 0);
 
   final T id;
@@ -63,6 +64,9 @@ final class CountTile<T extends Object> {
 
   /// Малый значок архива после числа.
   final bool archived;
+
+  /// Ключ плитки, по которому потребитель находит её в дереве.
+  final Key? key;
 }
 
 /// Плитки с числом и подписью в сетке равных колонок; ровно одна плитка
@@ -113,6 +117,7 @@ final class CountTiles<T extends Object> extends StatelessWidget {
                   for (final tile in tiles.sublist(start, start + columnCount))
                     Expanded(
                       child: _Tile(
+                        key: tile.key,
                         tile: tile,
                         open: tile.id == value,
                         onPick: onPick,
@@ -128,7 +133,12 @@ final class CountTiles<T extends Object> extends StatelessWidget {
 }
 
 final class _Tile<T extends Object> extends StatefulWidget {
-  const _Tile({required this.tile, required this.open, required this.onPick});
+  const _Tile({
+    required this.tile,
+    required this.open,
+    required this.onPick,
+    super.key,
+  });
 
   final CountTile<T> tile;
   final bool open;

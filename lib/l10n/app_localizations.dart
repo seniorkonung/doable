@@ -1100,6 +1100,78 @@ abstract class AppLocalizations {
   /// **'Relations: {active} active, {archived} archived'**
   String detailsRelationsTabSemantic(int active, int archived);
 
+  /// Доступное название плиток групп связей на вкладке «Связи»
+  ///
+  /// In en, this message translates to:
+  /// **'Relation groups'**
+  String get detailsRelationsGroupsLabel;
+
+  /// Группа исходящих связей «нужно» на вкладке «Связи»
+  ///
+  /// In en, this message translates to:
+  /// **'Needs'**
+  String get detailsRelationsGroupNeeds;
+
+  /// Группа исходящих связей «можно» на вкладке «Связи»
+  ///
+  /// In en, this message translates to:
+  /// **'Can use'**
+  String get detailsRelationsGroupCanUse;
+
+  /// Группа входящих связей «нужно» на вкладке «Связи»
+  ///
+  /// In en, this message translates to:
+  /// **'Needed for'**
+  String get detailsRelationsGroupNeededFor;
+
+  /// Группа входящих связей «можно» на вкладке «Связи»
+  ///
+  /// In en, this message translates to:
+  /// **'Can be used for'**
+  String get detailsRelationsGroupCanBeUsedFor;
+
+  /// Доступное название плитки группы без архивированных связей
+  ///
+  /// In en, this message translates to:
+  /// **'{group}: {count} active'**
+  String detailsRelationsGroupTileSemantic(String group, int count);
+
+  /// Доступное название плитки группы, в которой есть архивированные связи
+  ///
+  /// In en, this message translates to:
+  /// **'{group}: {count} active, some archived'**
+  String detailsRelationsGroupTileArchivedSemantic(String group, int count);
+
+  /// Подпись типа и приоритета над названием соседа в строке связи «нужно»
+  ///
+  /// In en, this message translates to:
+  /// **'need · {priority}'**
+  String detailsRelationsRowNeed(String priority);
+
+  /// Подпись типа и приоритета над названием соседа в строке связи «можно»
+  ///
+  /// In en, this message translates to:
+  /// **'can · {priority}'**
+  String detailsRelationsRowCan(String priority);
+
+  /// Часть доступного названия строки связи с архивированным соседом
+  ///
+  /// In en, this message translates to:
+  /// **'“{title}” is archived'**
+  String detailsRelationsNeighborArchived(String title);
+
+  /// Доступное название стрелки строки связи, когда сосед — намерение
+  ///
+  /// In en, this message translates to:
+  /// **'Open the intention page: {title}'**
+  String detailsRelationsWalkIntention(String title);
+
+  /// Доступное название стрелки строки связи, когда сосед — действие
+  ///
+  /// In en, this message translates to:
+  /// **'Open the action page: {title}'**
+  String detailsRelationsWalkAction(String title);
+
   /// Вкладка дневных выборов, прямо использующих намерение
   ///
   /// In en, this message translates to:

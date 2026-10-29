@@ -697,6 +697,56 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
+  String get detailsRelationsGroupsLabel => 'Группы связей';
+
+  @override
+  String get detailsRelationsGroupNeeds => 'Нужно';
+
+  @override
+  String get detailsRelationsGroupCanUse => 'Можно использовать';
+
+  @override
+  String get detailsRelationsGroupNeededFor => 'Нужно для';
+
+  @override
+  String get detailsRelationsGroupCanBeUsedFor => 'Можно использовать для';
+
+  @override
+  String detailsRelationsGroupTileSemantic(String group, int count) {
+    return '$group: активных — $count';
+  }
+
+  @override
+  String detailsRelationsGroupTileArchivedSemantic(String group, int count) {
+    return '$group: активных — $count, есть архивированные';
+  }
+
+  @override
+  String detailsRelationsRowNeed(String priority) {
+    return 'нужно · $priority';
+  }
+
+  @override
+  String detailsRelationsRowCan(String priority) {
+    return 'можно · $priority';
+  }
+
+  @override
+  String detailsRelationsNeighborArchived(String title) {
+    return '«$title» в архиве';
+  }
+
+  @override
+  String detailsRelationsWalkIntention(String title) {
+    return 'Открыть страницу намерения: $title';
+  }
+
+  @override
+  String detailsRelationsWalkAction(String title) {
+    return 'Открыть страницу действия: $title';
+  }
+
+  @override
   String get detailsChoicesTab => 'Выборы';
 
   @override

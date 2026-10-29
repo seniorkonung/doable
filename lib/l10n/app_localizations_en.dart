@@ -694,6 +694,56 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get detailsRelationsGroupsLabel => 'Relation groups';
+
+  @override
+  String get detailsRelationsGroupNeeds => 'Needs';
+
+  @override
+  String get detailsRelationsGroupCanUse => 'Can use';
+
+  @override
+  String get detailsRelationsGroupNeededFor => 'Needed for';
+
+  @override
+  String get detailsRelationsGroupCanBeUsedFor => 'Can be used for';
+
+  @override
+  String detailsRelationsGroupTileSemantic(String group, int count) {
+    return '$group: $count active';
+  }
+
+  @override
+  String detailsRelationsGroupTileArchivedSemantic(String group, int count) {
+    return '$group: $count active, some archived';
+  }
+
+  @override
+  String detailsRelationsRowNeed(String priority) {
+    return 'need · $priority';
+  }
+
+  @override
+  String detailsRelationsRowCan(String priority) {
+    return 'can · $priority';
+  }
+
+  @override
+  String detailsRelationsNeighborArchived(String title) {
+    return '“$title” is archived';
+  }
+
+  @override
+  String detailsRelationsWalkIntention(String title) {
+    return 'Open the intention page: $title';
+  }
+
+  @override
+  String detailsRelationsWalkAction(String title) {
+    return 'Open the action page: $title';
+  }
+
+  @override
   String get detailsChoicesTab => 'Choices';
 
   @override
