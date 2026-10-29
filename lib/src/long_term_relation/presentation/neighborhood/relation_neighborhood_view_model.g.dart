@@ -80,7 +80,7 @@ final class RelationNeighborhoodViewModelProvider
 }
 
 String _$relationNeighborhoodViewModelHash() =>
-    r'f770d5509314f661d4101b94dbb974c132715d92';
+    r'6765f45c112ba88283897e6c5447a8c4be234b57';
 
 /// Управляет первым чтением и подгрузкой одной выбранной группы связей.
 ///

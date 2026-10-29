@@ -47,7 +47,7 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/long_term_relation/presentation/details/relation_details_state.dart';
 import 'package:doable/src/long_term_relation/presentation/details/relation_details_view_model.dart';
-import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_paging_policy.dart';
+import 'package:doable/src/long_term_relation/presentation/relation_group_paging_policy.dart';
 import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_state.dart';
 import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
@@ -157,11 +157,8 @@ void main() {
               filterDebounce: const Duration(milliseconds: 250),
             ),
           ),
-          relationNeighborhoodPagingPolicyProvider.overrideWithValue(
-            RelationNeighborhoodPagingPolicy(
-              pageSize: 10,
-              prefetchRemaining: 0,
-            ),
+          relationGroupPagingPolicyProvider.overrideWithValue(
+            RelationGroupPagingPolicy(pageSize: 10, prefetchRemaining: 0),
           ),
         ],
         retry: (retryCount, error) => null,
@@ -1583,8 +1580,8 @@ final class _CheckpointHarness {
             filterDebounce: const Duration(milliseconds: 250),
           ),
         ),
-        relationNeighborhoodPagingPolicyProvider.overrideWithValue(
-          RelationNeighborhoodPagingPolicy(
+        relationGroupPagingPolicyProvider.overrideWithValue(
+          RelationGroupPagingPolicy(
             pageSize: neighborhoodPageSize,
             prefetchRemaining: neighborhoodPageSize - 1,
           ),

@@ -13,7 +13,7 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_options.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
-import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_paging_policy.dart';
+import 'package:doable/src/long_term_relation/presentation/relation_group_paging_policy.dart';
 import 'package:doable/src/design_system/components/option_row.dart';
 import 'package:doable/src/design_system/components/page_head.dart';
 import 'package:flutter/material.dart';
@@ -233,7 +233,7 @@ void main() {
         tester,
         repository,
         intention.id,
-        pagingPolicy: RelationNeighborhoodPagingPolicy(
+        pagingPolicy: RelationGroupPagingPolicy(
           pageSize: 2,
           prefetchRemaining: 0,
         ),
@@ -286,7 +286,7 @@ Future<void> _pumpDetailsPage(
   WidgetTester tester,
   ControlledDetailsRepository repository,
   IntentionId intentionId, {
-  RelationNeighborhoodPagingPolicy? pagingPolicy,
+  RelationGroupPagingPolicy? pagingPolicy,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
@@ -294,7 +294,7 @@ Future<void> _pumpDetailsPage(
         inMemoryQuickCreationModeOverride,
         personalGraphRepositoryProvider.overrideWithValue(repository),
         if (pagingPolicy case final policy?)
-          relationNeighborhoodPagingPolicyProvider.overrideWithValue(policy),
+          relationGroupPagingPolicyProvider.overrideWithValue(policy),
       ],
       retry: (retryCount, error) => null,
       child: _localizedApp(IntentionDetailsPage(intentionId: intentionId)),

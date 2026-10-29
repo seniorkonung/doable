@@ -16,7 +16,7 @@ import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
-import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_paging_policy.dart';
+import 'package:doable/src/long_term_relation/presentation/relation_group_paging_policy.dart';
 import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_state.dart';
 import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -1820,8 +1820,8 @@ final class _NeighborhoodHarness {
     _container = ProviderContainer(
       overrides: [
         personalGraphRepositoryProvider.overrideWithValue(repository),
-        relationNeighborhoodPagingPolicyProvider.overrideWithValue(
-          RelationNeighborhoodPagingPolicy(
+        relationGroupPagingPolicyProvider.overrideWithValue(
+          RelationGroupPagingPolicy(
             pageSize: pageSize,
             prefetchRemaining: prefetchRemaining ?? pageSize - 1,
           ),

@@ -20,7 +20,7 @@ import '../../application/relation_group_page.dart';
 import '../../domain/long_term_relation.dart';
 import '../../domain/long_term_relation_id.dart';
 import '../relation_group_paging.dart';
-import 'relation_neighborhood_paging_policy.dart';
+import '../relation_group_paging_policy.dart';
 import 'relation_neighborhood_state.dart';
 
 part 'relation_neighborhood_view_model.g.dart';
@@ -38,7 +38,7 @@ final class RelationNeighborhoodViewModel
   late IntentionId _intentionId;
   late PersonalGraphRepository _repository;
   late GraphCommandCoordinator _coordinator;
-  late RelationNeighborhoodPagingPolicy _policy;
+  late RelationGroupPagingPolicy _policy;
   StreamSubscription<
     intention_result.Result<
       GraphSnapshot<intention_application.IntentionDetails?>
@@ -55,7 +55,7 @@ final class RelationNeighborhoodViewModel
     _intentionId = intentionId;
     _repository = ref.watch(personalGraphRepositoryProvider);
     _coordinator = ref.watch(graphCommandCoordinatorProvider.notifier);
-    _policy = ref.watch(relationNeighborhoodPagingPolicyProvider);
+    _policy = ref.watch(relationGroupPagingPolicyProvider);
     _isTerminated = false;
     _subscribeToGraphChanges();
     ref.onDispose(() {

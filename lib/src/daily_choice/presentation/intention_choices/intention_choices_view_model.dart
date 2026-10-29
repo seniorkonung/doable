@@ -16,7 +16,7 @@ import '../../../intention/application/intention_result.dart'
 import '../../../intention/domain/intention_id.dart';
 import '../../../intention/presentation/details/intention_page_target.dart';
 import '../../../long_term_relation/application/relation_group_page.dart';
-import '../../../long_term_relation/presentation/neighborhood/relation_neighborhood_paging_policy.dart';
+import '../../../long_term_relation/presentation/relation_group_paging_policy.dart';
 import '../../../long_term_relation/presentation/relation_group_paging.dart';
 import '../../../tag/application/tag_change.dart';
 import '../../application/daily_choice_catalog.dart';
@@ -41,7 +41,7 @@ final class IntentionChoicesViewModel extends _$IntentionChoicesViewModel {
   late IntentionPageInstance _pageInstance;
   late PersonalGraphRepository _repository;
   late GraphCommandCoordinator _coordinator;
-  late RelationNeighborhoodPagingPolicy _policy;
+  late RelationGroupPagingPolicy _policy;
   StreamSubscription<
     intention_result.Result<
       GraphSnapshot<intention_application.IntentionDetails?>
@@ -60,7 +60,7 @@ final class IntentionChoicesViewModel extends _$IntentionChoicesViewModel {
     _pageInstance = pageInstance;
     _repository = ref.watch(personalGraphRepositoryProvider);
     _coordinator = ref.watch(graphCommandCoordinatorProvider.notifier);
-    _policy = ref.watch(relationNeighborhoodPagingPolicyProvider);
+    _policy = ref.watch(relationGroupPagingPolicyProvider);
     _isTerminated = false;
     _subscribeToGraphChanges();
     ref.onDispose(() {

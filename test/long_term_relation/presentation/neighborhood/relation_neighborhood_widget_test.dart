@@ -9,7 +9,7 @@ import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
-import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_paging_policy.dart';
+import 'package:doable/src/long_term_relation/presentation/relation_group_paging_policy.dart';
 import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_sliver.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -387,7 +387,7 @@ void main() {
         tester,
         repository,
         ownerId,
-        pagingPolicy: RelationNeighborhoodPagingPolicy(
+        pagingPolicy: RelationGroupPagingPolicy(
           pageSize: 6,
           prefetchRemaining: 2,
         ),
@@ -478,7 +478,7 @@ void main() {
           tester,
           repository,
           ownerId,
-          pagingPolicy: RelationNeighborhoodPagingPolicy(
+          pagingPolicy: RelationGroupPagingPolicy(
             pageSize: 3,
             prefetchRemaining: 1,
           ),
@@ -692,11 +692,8 @@ Future<void> _pumpNeighborhoodSliver(
     ProviderScope(
       overrides: [
         personalGraphRepositoryProvider.overrideWithValue(repository),
-        relationNeighborhoodPagingPolicyProvider.overrideWithValue(
-          RelationNeighborhoodPagingPolicy(
-            pageSize: pageSize,
-            prefetchRemaining: 0,
-          ),
+        relationGroupPagingPolicyProvider.overrideWithValue(
+          RelationGroupPagingPolicy(pageSize: pageSize, prefetchRemaining: 0),
         ),
       ],
       retry: (retryCount, error) => null,
@@ -830,18 +827,15 @@ Future<void> _pumpDetailsPage(
   ControlledNeighborhoodRepository repository,
   IntentionId ownerId, {
   Locale locale = const Locale('en'),
-  RelationNeighborhoodPagingPolicy? pagingPolicy,
+  RelationGroupPagingPolicy? pagingPolicy,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
         personalGraphRepositoryProvider.overrideWithValue(repository),
-        relationNeighborhoodPagingPolicyProvider.overrideWithValue(
+        relationGroupPagingPolicyProvider.overrideWithValue(
           pagingPolicy ??
-              RelationNeighborhoodPagingPolicy(
-                pageSize: 50,
-                prefetchRemaining: 15,
-              ),
+              RelationGroupPagingPolicy(pageSize: 50, prefetchRemaining: 15),
         ),
       ],
       retry: (retryCount, error) => null,

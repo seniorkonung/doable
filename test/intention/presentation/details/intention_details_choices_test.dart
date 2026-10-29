@@ -22,7 +22,7 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_tabs.dart';
 import 'package:doable/src/intention/presentation/details/intention_page_target.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
-import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_paging_policy.dart';
+import 'package:doable/src/long_term_relation/presentation/relation_group_paging_policy.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -598,8 +598,8 @@ Future<AppRouter> _openPage(
       overrides: [
         inMemoryQuickCreationModeOverride,
         personalGraphRepositoryProvider.overrideWithValue(repository),
-        relationNeighborhoodPagingPolicyProvider.overrideWithValue(
-          RelationNeighborhoodPagingPolicy(
+        relationGroupPagingPolicyProvider.overrideWithValue(
+          RelationGroupPagingPolicy(
             pageSize: _pageLength,
             prefetchRemaining: 0,
           ),

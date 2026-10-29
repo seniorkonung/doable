@@ -12,7 +12,7 @@ import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/details/intention_page_target.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
-import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_paging_policy.dart';
+import 'package:doable/src/long_term_relation/presentation/relation_group_paging_policy.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -884,8 +884,8 @@ final class _ChoicesHarness {
     container = ProviderContainer(
       overrides: [
         personalGraphRepositoryProvider.overrideWithValue(repository),
-        relationNeighborhoodPagingPolicyProvider.overrideWithValue(
-          RelationNeighborhoodPagingPolicy(
+        relationGroupPagingPolicyProvider.overrideWithValue(
+          RelationGroupPagingPolicy(
             pageSize: pageSize,
             prefetchRemaining: pageSize - 1,
           ),
