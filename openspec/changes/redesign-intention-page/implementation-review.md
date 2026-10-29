@@ -3,17 +3,17 @@
 ## Assessment
 
 **Format version:** 1
-**Result:** No unresolved findings
+**Result:** Changes needed
 **Coverage status:** Complete
-**Summary:** Проверен коммит задачи 4.29, последней задачи фазы 4. Выбор листа параметров, пришедший после анимации закрытия, теперь начинает действие, только если страница смонтирована и остаётся текущим маршрутом. Иначе выбор молча отбрасывается. Новая проверка падает на базе и проходит на голове. Полный `mise run check` на проверенной голове прошёл. Сохранены принятые риски AR1, AR2 и AR3.
+**Summary:** Проверены все коммиты фазы 5 (задачи 5.1–5.10). Вкладка «Выборы», её модель экземпляра, «Добавить», возврат после создания и удаление дневных групп из соседства соответствуют требованиям и задачам. Нарушений поведения не найдено, полный `mise run check` на голове прошёл. Остаются две находки низкой серьёзности. F14: публичные nullable-геттеры `AddRow`, нужные только одной проверке. F15: протокол согласования списка с графом скопирован в модель «Выборов», а не получил одного владельца. Сохранены принятые риски AR1, AR2 и AR3.
 
 ## Review target
 
-- **Baseline ref:** c6993b160ceb7047bb4d040c53bac14a717773de
-- **Base commit:** c6993b160ceb7047bb4d040c53bac14a717773de
-- **Reviewed head:** cf759d468d8134266cdf00db91170f3419d58251
-- **Target commits:** ["cf759d468d8134266cdf00db91170f3419d58251"]
-- **Reviewable paths:** ["lib/src/intention/presentation/details/intention_details_page.dart","openspec/changes/redesign-intention-page/tasks.md","test/intention/presentation/details/intention_details_options_test.dart"]
+- **Baseline ref:** f3af97106c8fe878eb80af98d28eed44d79e2de4
+- **Base commit:** f3af97106c8fe878eb80af98d28eed44d79e2de4
+- **Reviewed head:** 5b52b0da6d38673d7b061f3cf3a22672367d6f3a
+- **Target commits:** ["874a1d9061364c07c803253121cbfa2046310748","c8f59a23c0696f4aa234ee0a5ac96f50e214c563","d6926b61e19647217f90f53484803ef36f698b90","1ea62240572a19d3da552dc188ea91b50a09d4eb","55e45aa4eca7451854a3dce3ad2ec344ffbe198c","55bf75ef1a4d0886051c0585aaa51624a84d3fe9","81e45c9cb9350841cef3eef63127b144d72f8717","15f032f6321c727be86724f7650ab3e1beee53b9","0721a7504f48f7d215993edd25b6ad96cec6255d","5b52b0da6d38673d7b061f3cf3a22672367d6f3a"]
+- **Reviewable paths:** ["lib/l10n/app_en.arb","lib/l10n/app_localizations.dart","lib/l10n/app_localizations_en.dart","lib/l10n/app_localizations_ru.dart","lib/l10n/app_ru.arb","lib/src/daily_choice/presentation/intention_choices/intention_choices_sliver.dart","lib/src/daily_choice/presentation/intention_choices/intention_choices_state.dart","lib/src/daily_choice/presentation/intention_choices/intention_choices_view_model.dart","lib/src/daily_choice/presentation/intention_choices/intention_choices_view_model.g.dart","lib/src/design_system/components/add_row.dart","lib/src/intention/presentation/details/intention_details_page.dart","lib/src/intention/presentation/details/intention_details_tabs.dart","lib/src/intention/presentation/details/intention_page_target.dart","lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_sliver.dart","lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_state.dart","lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart","lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.g.dart","openspec/changes/redesign-intention-page/tasks.md","test/app/daily_choice_app_flow_test.dart","test/app/navigation/app_shell_page_matrix.dart","test/app/navigation/app_shell_pages_above_test.dart","test/app/navigation/app_shell_state_test.dart","test/app/routing/app_router_test.dart","test/daily_choice/presentation/daily_choice_creation_flow_test.dart","test/daily_choice/presentation/intention_choices/intention_choices_view_model_test.dart","test/design_system/add_row_test.dart","test/graph/presentation/graph_reconciliation_checkpoint_test.dart","test/graph/presentation/package_consumers_test_support.dart","test/intention/presentation/details/intention_details_choices_test.dart","test/intention/presentation/details/intention_details_page_test.dart","test/intention/presentation/details/intention_details_tabs_test.dart","test/long_term_relation/presentation/neighborhood/neighborhood_test_support.dart","test/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model_test.dart","test/long_term_relation/presentation/neighborhood/relation_neighborhood_widget_test.dart","test/support/intention_choices_tab.dart"]
 - **OpenSpec change:** redesign-intention-page
 - **OpenSpec schema:** intent-driven
 - **Target scope:** User-requested bounded range
@@ -22,26 +22,59 @@
 
 ## Reviewed increment
 
-### U1 · Поздний выбор листа параметров не начинает действие поверх открытого или на уходящей странице
+### U1 · Дневные выборы страницы и их создание идут через вкладку «Выборы» экземпляра страницы
 
-- **Work items:** ["4.29"]
-- **Requirements and scenarios:** ["intention-management: Параметры намерения на его странице", "design: меню параметров закрывается до начала операции (ADR-0032, ADR-0042)"]
-- **Affected boundary:** Пользователь страницы намерения; обработка страницей результата листа параметров
-- **Implementation target:** ["lib/src/intention/presentation/details/intention_details_page.dart", "test/intention/presentation/details/intention_details_options_test.dart"]
-- **Applicable constraints and non-goals:** Лист исчезает до начала действия. Страница не блокирует ввод на время анимации закрытия. `sheet.dart`, `showDoableSheet`, `OptionsMenu` и остальные потребители листов не меняются. Обычный выбор и закрытие без выбора ведут себя как раньше.
-- **Excluded change scope:** Вкладки «Выборы» и «Связи» фаз 5 и 6 не считались обязательствами диапазона.
+- **Work items:** ["5.1","5.2","5.3","5.5","5.6","5.7","5.10"]
+- **Requirements and scenarios:** ["intention-management: Страница намерения и её вкладки / Возвращение к выборам сохраняет роль и начинает список заново", "intention-management: Цель открытия страницы намерения / Две страницы одного намерения не влияют друг на друга", "intention-management: Получение блокирующих связей намерения / Прямые дневные зависимости доступны в обеих ролях", "daily-choice-management: Входы в создание дневного выбора / Вход со страницы намерения не требует поиска, Вход со страницы действия идёт снизу вверх", "daily-choice-management: Открытие созданного дневного выбора / Созданный выбор открывается вместо построения пути", "design: решения 2 и 8"]
+- **Affected boundary:** Пользователь страницы намерения; состояние экземпляра страницы и чтения групп дневных выборов из локального графа; вход в существующий поток создания дневного выбора
+- **Implementation target:** ["lib/l10n/app_en.arb","lib/l10n/app_localizations.dart","lib/l10n/app_localizations_en.dart","lib/l10n/app_localizations_ru.dart","lib/l10n/app_ru.arb","lib/src/daily_choice/presentation/intention_choices/intention_choices_sliver.dart","lib/src/daily_choice/presentation/intention_choices/intention_choices_state.dart","lib/src/daily_choice/presentation/intention_choices/intention_choices_view_model.dart","lib/src/daily_choice/presentation/intention_choices/intention_choices_view_model.g.dart","lib/src/intention/presentation/details/intention_details_page.dart","lib/src/intention/presentation/details/intention_details_tabs.dart","lib/src/intention/presentation/details/intention_page_target.dart","test/app/daily_choice_app_flow_test.dart","test/app/navigation/app_shell_page_matrix.dart","test/app/navigation/app_shell_pages_above_test.dart","test/app/routing/app_router_test.dart","test/daily_choice/presentation/daily_choice_creation_flow_test.dart","test/daily_choice/presentation/intention_choices/intention_choices_view_model_test.dart","test/intention/presentation/details/intention_details_choices_test.dart","test/intention/presentation/details/intention_details_page_test.dart","test/intention/presentation/details/intention_details_tabs_test.dart","test/long_term_relation/presentation/neighborhood/neighborhood_test_support.dart","test/support/intention_choices_tab.dart"]
+- **Applicable constraints and non-goals:** Схема, формат графа, журнал фактов и копии не меняются. Строки и переключатель ролей переносятся без нового оформления. Роли «на пути» и числа на вкладке нет. Роль принадлежит экземпляру страницы; данные намерения общие для его страниц. Маршруты создания сами владеют границей потока (ADR-0022).
+- **Excluded change scope:** Вкладка «Связи» по дизайну, удаление прежнего соседства и его политики порций относятся к фазе 6 и не считались обязательствами диапазона.
+
+### U2 · Строка `AddRow` с подсказкой, без «Добавить» или без подсказки
+
+- **Work items:** ["5.4"]
+- **Requirements and scenarios:** ["design: решение 11 — компоненты дизайн-системы", "README `AddRow` дизайн-системы"]
+- **Affected boundary:** Потребители компонента `AddRow` и пользователь, читающий и нажимающий строку
+- **Implementation target:** ["lib/src/design_system/components/add_row.dart","test/design_system/add_row_test.dart"]
+- **Applicable constraints and non-goals:** Компонент только презентационный (ADR-0030). Варианты добавляются только для текущего потребителя. Строка с заголовком и `TagsSection` сохраняют поведение; выключенного «Добавить» в строке с подсказкой нет.
+
+### U3 · В соседстве на «Связях» больше нет дневных групп
+
+- **Work items:** ["5.8","5.9"]
+- **Requirements and scenarios:** ["plan: фаза 5, результат «Прежнее соседство на вкладке «Связи» больше не содержит дневных групп»", "long-term-relation-management: Согласованность счётчиков с подтверждёнными изменениями графа"]
+- **Affected boundary:** Модель и вид соседства на вкладке «Связи»; проверки согласования графа и состояния оболочки
+- **Implementation target:** ["lib/src/intention/presentation/details/intention_details_page.dart","lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_sliver.dart","lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_state.dart","lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart","lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.g.dart","test/app/navigation/app_shell_state_test.dart","test/graph/presentation/graph_reconciliation_checkpoint_test.dart","test/graph/presentation/package_consumers_test_support.dart","test/intention/presentation/details/intention_details_page_test.dart","test/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model_test.dart","test/long_term_relation/presentation/neighborhood/relation_neighborhood_widget_test.dart"]
+- **Applicable constraints and non-goals:** Долговременные группы, их порции и якоря, полная сводка и её согласование, в том числе после изменений дневных выборов, не меняются.
 
 ## Pass coverage
 
 | Pass | Status | Evidence or limitation |
 |---|---|---|
-| Independent decision review | Complete | Один свежий изолированный рецензент по `implementation-decision-review` с нейтральным брифом, без артефактов планирования, ADR, истории коммитов и прежнего отчёта. Цель — 2 пути U1. Замечаний нет, покрытие полное. Рецензент прогнал `intention_details_options_test.dart` (13 из 13) и `flutter analyze` по целевым файлам на голове. В одноразовой копии вне репозитория он подтвердил, что новая проверка падает на базе. Пробами он проверил вход в правку через название в окне закрытия и выбор из второго листа. |
-| OpenSpec conformance | Complete | Критерии задачи 4.29 сверены с изменением в обе стороны: условие `mounted` и `ModalRoute.isCurrentOf(context)`, молчаливое отбрасывание, неизменность листа и меню, дополненный комментарий на русском. Проверка воспроизводит последовательность «Архивировать» и затем «⋯» и продвигает окно через `pump(Duration)`. Во временной копии `/tmp` на голове с `intention_details_page.dart` базы она падает на строке 188 (`repository.commands` не пуст); копия удалена. `mise exec --no-deps -- openspec validate redesign-intention-page --strict --no-interactive --json` дал valid, все 63 задачи отмечены. Полный `mise run check` в рабочей копии, совпадавшей с cf759d468d8134266cdf00db91170f3419d58251 и чистой, прошёл: format (833 файла, 0 изменено), проверки скриптов, `flutter analyze` без замечаний, 3666 обычных и 18 процессных тестов. Сборка APK и проверки на устройстве не выполнялись: по правилам проекта они за пользователем. |
-| Code quality | Complete | Пять линз `code-review-and-quality` применены в контексте координатора к обоим путям доставки на голове. Сверено, что лист и диалог подтверждения показываются в корневом навигаторе (`sheet.dart:56`, `confirm_dialog.dart:90`) и что страница и экран изменения объявлены в корневом стеке (`app_router.dart:36-37`). |
+| Independent decision review | Complete | Два свежих изолированных рецензента по `implementation-decision-review` с нейтральными брифами, без артефактов планирования, ADR, истории коммитов и прежнего отчёта. U1 и U3 делят `intention_details_page.dart`, поэтому их проверял один рецензент по объединённому списку из 32 путей. Он прогнал 85 тестов из 6 наборов и `flutter analyze` по затронутым каталогам. U2 проверял второй рецензент по 2 путям: 21 тест `add_row_test.dart` и `tags_section_test.dart`, `flutter analyze`. Оба сообщили полное покрытие назначенных путей. |
+| OpenSpec conformance | Complete | Критерии 5.1–5.10 сверены с диффом и проверками в обе стороны. Команды `rg` из 5.7 и 5.9 ничего не находят. `mise exec --no-deps -- openspec validate redesign-intention-page --strict --no-interactive --json` дал valid, все 73 задачи отмечены. Полный `mise run check` прошёл в рабочей копии, совпадавшей с 5b52b0da6d38673d7b061f3cf3a22672367d6f3a и чистой: format (840 файлов, 0 изменено), проверки скриптов, `flutter analyze` без замечаний, 3689 обычных и 18 процессных тестов. APK `build/app/outputs/flutter-apk/app-release.apk` собран реализацией 5.10 вместе с головой. Проверки на устройстве не выполнялись: по правилам проекта они за пользователем. |
+| Code quality | Complete | Пять линз `code-review-and-quality` применены в контексте координатора к путям доставки на голове: модель, состояние и sliver «Выборов», удержание модели страницей, цель открытия, `AddRow`, урезанные модель, состояние и вид соседства, строки локализации. |
 
 ## Findings
 
-No unresolved findings remain in the implementation review.
+### F14 · Low — Публичные nullable-геттеры `AddRow` существуют только для одной проверки и неоднозначны
+
+- **Evidence:** `lib/src/design_system/components/add_row.dart:64-80` заменяет прежние non-null поля `title`, `addText`, `addLabel`, `onAdd` и `addKey` публичными геттерами `String?`, `VoidCallback?` и `Key?` поверх закрытых `_Lead` и `_Add`. Их читает только `test/design_system/tags_section_test.dart:20`. Потребители в приложении (`tags_section.dart`, `intention_choices_sliver.dart`) лишь вызывают конструкторы. `onAdd == null` теперь означает и выключенное «Добавить» строки с заголовком, и отсутствие «Добавить»; `title == null` — и строку с подсказкой, и строку без текста.
+- **Evidence revisions:** ["5b52b0da6d38673d7b061f3cf3a22672367d6f3a"]
+- **Impact:** Публичный контракт компонента дизайн-системы несёт лишнюю поверхность без потребителя в приложении. Код, который начнёт её читать, должен угадывать вариант строки по `null`, что возвращает проверки, от которых закрытая модель вариантов защищает.
+- **Required outcome:** Публичный API `AddRow` не раскрывает неоднозначных nullable-проекций внутреннего варианта без потребителя. Проверка того, что `TagsSection` передаёт строке заголовок, подписи, ключ и выключенность, опирается на наблюдаемое поведение или на однозначные значения.
+- **Earliest source of truth:** implementation/tests
+- **Affected artifacts:** ["lib/src/design_system/components/add_row.dart","test/design_system/tags_section_test.dart"]
+
+### F15 · Low — Протокол согласования списка с графом скопирован в модель «Выборов»
+
+- **Evidence:** `lib/src/daily_choice/presentation/intention_choices/intention_choices_view_model.dart` почти построчно повторяет слой над общим ядром порций из `relation_neighborhood_view_model.dart`. Повторяются подписка на `watchIntention` и завершения координатора (309–336 против 381–408), разбор наблюдения намерения (338–371 против 410–448), разбор завершений (373–389 против 450–470), сравнение ревизий и запуск пересборки, цикл пересборки, первое чтение и подгрузка (137–249 против 188–281), сопоставление отказов и завершение контекста. Отдельно скопированы статусы сводки и подгрузки в `intention_choices_state.dart:130-182` и виджет статуса с сообщениями отказов в `intention_choices_sliver.dart:430-504`. Копии уже расходятся в устройстве при одинаковом поведении: `_isNewerThanKnown` против ручных сравнений, `_noteUnrelatedRevision` против `_noteUnrelatedTagRevision`. Размер порции «Выборов» берётся из `relationNeighborhoodPagingPolicyProvider` соседства (`intention_choices_view_model.dart:19, 63`). По плану в фазе 6 соседство заменяется новой моделью «Связей», которой нужен тот же протокол.
+- **Evidence revisions:** ["5b52b0da6d38673d7b061f3cf3a22672367d6f3a"]
+- **Impact:** Самая хрупкая часть списков — поздние ответы, устаревшие продолжения, чужие ревизии и удаление намерения — получает отдельного владельца на каждой вкладке и отдельный набор проверок одних и тех же гонок. Исправление в одной копии не доходит до другой, а модель «Связей» фазы 6 добавит третью копию. Дефект такого рода проявится как устаревший список или пропущенное обновление только на одной вкладке.
+- **Required outcome:** У протокола согласования порционного списка страницы с подтверждёнными изменениями графа одно место владения. Вкладка задаёт только своё: запрос порции, принадлежность строки, признак значимого изменения и форму состояния. Параметры порций «Выборов» не принадлежат удаляемой модели соседства.
+- **Earliest source of truth:** design/ADR
+- **Affected artifacts:** ["design.md: решения 6, 8 и 14", "plan.md: фаза 6", "lib/src/daily_choice/presentation/intention_choices/intention_choices_view_model.dart", "lib/src/long_term_relation/presentation/relation_group_paging.dart"]
+- **Decision needed:** Выносить ли общий слой согласования сейчас, отдельной задачей фазы 5, или при построении модели «Связей» в фазе 6, либо принять дублирование как остаточный риск. Выбор меняет объём фазы 6 и её проверки.
 
 ## Accepted risks
 
@@ -86,12 +119,16 @@ No unresolved findings remain in the implementation review.
 
 ## Review coverage
 
-Поздний выбор. `showDoableSheet` выдаёт выбор `OptionsMenu` после снятия маршрута листа. Поэтому при обычном выборе страница снова текущая и действие начинается как раньше. Если в окне закрытия открыт второй лист, экран изменения или диалог, страница перестаёт быть текущей. То же происходит, когда она уходит по «назад». Все эти маршруты лежат в корневом стеке, поэтому одна проверка `ModalRoute.isCurrentOf` отсекает все четыре последовательности из задачи. Закрытие без выбора по-прежнему завершается на `option == null`. `isCurrentOf` не добавляет подписки: страница уже зависит от этого аспекта маршрута в `didChangeDependencies` (`intention_details_page.dart:140`). Повторный запуск архивирования или восстановления из другой точки входа по-прежнему гасит координатор команд.
+Модель «Выборов». Семейство по `IntentionId` и `IntentionPageInstance`; роль хранится в экземпляре страницы и записывается при смене. Страница удерживает модель через `listenManual`, только пока выбрана вкладка, в том числе под открытыми над ней страницами. Уход на другую вкладку и смена намерения закрывают подписку, а autoDispose освобождает строки, продолжения и подписки. Поколения ядра порций и `ref.mounted` отбрасывают поздние ответы прежней роли и освобождённой модели. Согласование реагирует на `DailyChoiceChange` своей роли и загруженных строк, изменения участников, изменённую сводку, удаление намерения и чужие ревизии тегов; прежняя пара показывается до замены. Проверки модели воспроизводят дневные проверки соседства и добавляют роль по умолчанию, сохранённую роль, независимость экземпляров и молчание после освобождения.
 
-Проверка. Новая проверка воспроизводит одну последовательность, как требует задача: «Архивировать», затем «⋯» до конца закрытия. Она подтверждает, что команд нет, открыт ровно один лист и в нём есть пункты. Сценарии с экраном изменения, диалогом и уходом страницы опираются на тот же признак и отдельными проверками не закреплены; задача этого не требует.
+Страница и вход в создание. Порядок вкладок, отсутствие числа и доступное имя «Выборов» на двух языках, отсутствие чтений на «Обзоре», «Связях» и «Статистике», цель `ChoicesTarget`, независимость двух страниц и возвращение с сохранённой ролью и одной первой порцией подтверждены проверками страницы. «Добавить» берёт доступность из принятого снимка: «исходное» у активного намерения, «выбранное» у активного действия, нет у архивированного и у «выбранного» неготового. Подсказка показывается только у непустого подтверждённого списка; строка только с подсказкой у архивированного намерения соответствует README `AddRow` («The row has no Add where nothing can be added»). Сценарий потока создания подтверждает открытие созданного выбора и возвращение на «Выборы» с той же ролью и новой строкой без шагов пути в истории. Дублирующие проверки маршрутизатора удалены, их ожидания покрыты проверками 5.5.
 
-Принятые риски. Диапазон не трогает `TopBar` с кнопкой справа, область нажатия названия `PageHead` и delta-спецификации: условия AR1, AR2 и AR3 сохраняются.
+Соседство. Состояние больше не несёт группы: она выводится из долговременного выбора. Ветви дневных групп, `selectDailyGroup` и дневные строки вида удалены, согласование сводки по изменениям дневных выборов сохранено. Все строки `relationNeighborhood*` по-прежнему используются; удалена только `detailsChoosePathAction`.
 
-Правила проекта. Комментарий и название проверки написаны на русском. `pump(Duration)` только продвигает кадры и не измеряет время. Безопасности, данных, схемы хранилища и миграций диапазон не касается.
+Находки рецензентов. Обе приняты после сверки с кодом и записаны как F14 и F15. Вопрос рецензента U1 о строке с одной подсказкой снят README `AddRow`.
 
-Не выполнено: сборка APK и ручные проверки на устройстве. За пользователем остаются: быстрое повторное нажатие «⋯», названия или «назад» сразу после выбора пункта в листе параметров не запускает выбранное действие поверх открытого или на уходящей странице; обычный выбор пункта по-прежнему срабатывает после исчезновения листа.
+Принятые риски. Диапазон не трогает delta-спецификации, `TopBar` с кнопкой справа и `PageHead`: условия AR1, AR2 и AR3 сохраняются.
+
+Правила проекта. Комментарии и названия проверок на русском. Обычные проверки не измеряют время. Схемы, данных и миграций диапазон не касается.
+
+Не выполнено: ручные проверки на устройстве из 5.10. За пользователем остаются вкладка «Выборы» между «Связями» и «Статистикой» без числа с прежними строками и переключателем ролей; «Добавить» у обеих ролей и его отсутствие у архивированного намерения и у «выбранного» неготового; сохранение роли после ухода на «Обзор» и после создания выбора; обе темы и увеличенный текст.
