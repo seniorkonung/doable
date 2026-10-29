@@ -7,7 +7,12 @@ import 'package:doable/src/daily_choice/application/choice_path_continuations.da
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
+import 'package:doable/src/daily_choice/domain/calendar_date.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
+import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -24,6 +29,7 @@ import 'package:doable/src/long_term_relation/application/relation_group_page.da
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 
+import '../../../support/daily_choice_reconciliation_fixture.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/statistics_read_contract_test_fallback.dart';
 import '../../../support/intention_description_preview.dart';
@@ -486,5 +492,83 @@ RelationCounts testCountsForGroup({
     archivedNeedOutgoing: !isActive && isNeed && !isIncoming ? count : 0,
     archivedCanIncoming: !isActive && !isNeed && isIncoming ? count : 0,
     archivedCanOutgoing: !isActive && !isNeed && !isIncoming ? count : 0,
+  );
+}
+
+/// Строка дневной роли с участниками, заданными проверкой.
+DailyChoiceCatalogItem testDailyCatalogItem({
+  required IntentionId source,
+  required IntentionId selected,
+  DailyChoiceId? id,
+  CalendarDate? date,
+  String selectedTitle = 'Действие',
+  bool isCompleted = false,
+}) {
+  final choice = reconciliationChoice(source: source, selected: selected);
+  return DailyChoiceCatalogItem(
+    id: id ?? choice.id,
+    source: DailyChoiceCatalogParticipant(
+      id: source,
+      title: 'Источник',
+      archiveState: IntentionArchiveState.active,
+      readiness: IntentionReadiness.notReady,
+    ),
+    selected: DailyChoiceCatalogParticipant(
+      id: selected,
+      title: selectedTitle,
+      archiveState: IntentionArchiveState.active,
+      readiness: IntentionReadiness.ready,
+    ),
+    date: date ?? choice.date,
+    isCompleted: isCompleted,
+    schedule: const DailyChoiceAllDay(),
+    priority: DailyChoicePriority.p4,
+    description: null,
+    pathIntentionCount: 2,
+  );
+}
+
+/// Подтверждённое изменение полей дневного выбора на ревизии 2.
+DailyChoiceCommandResult testDailyFieldsUpdatedResult({
+  required DailyChoice before,
+  required DailyChoice after,
+  required Map<IntentionId, RelationCounts> counts,
+}) {
+  final created = reconciliationChoiceCreated(
+    choice: before,
+    pathRelationId: testRelationId(3),
+    revision: const TestGraphRevision(1),
+    counts: counts,
+  );
+  final path = switch (created) {
+    GraphResultSuccess(
+      value: ConfirmedGraphResult(value: DailyChoiceCreated(:final path)),
+    ) =>
+      path,
+    _ => throw StateError('Ожидался подтверждённый путь.'),
+  };
+  return GraphCommandSucceeded<
+    DailyChoiceCommandSuccess,
+    DailyChoiceCommandFailure
+  >(
+    ConfirmedGraphResult(
+      revision: const TestGraphRevision(2),
+      value: DailyChoiceFieldsUpdated(
+        before: before,
+        choice: after,
+        path: path,
+        changes: [
+          DailyChoiceChange(
+            revision: const TestGraphRevision(2),
+            before: before,
+            after: after,
+            releasedRelationIds: const [],
+            occupiedRelationIds: const [],
+            intentionCounts: counts,
+            relationPermissions: const {},
+          ),
+        ],
+      ),
+    ),
   );
 }

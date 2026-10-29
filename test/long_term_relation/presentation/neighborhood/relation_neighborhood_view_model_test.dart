@@ -1,13 +1,10 @@
 import 'dart:async';
 
-import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -57,7 +54,7 @@ void main() {
       2,
       DailyChoiceGroupFirstPage(
         items: [
-          _dailyCatalogItem(
+          testDailyCatalogItem(
             source: testIntentionId(2),
             selected: harness.intentionId,
           ),
@@ -72,7 +69,7 @@ void main() {
       1,
       DailyChoiceGroupFirstPage(
         items: [
-          _dailyCatalogItem(
+          testDailyCatalogItem(
             source: harness.intentionId,
             selected: testIntentionId(2),
           ),
@@ -112,7 +109,7 @@ void main() {
         1,
         DailyChoiceGroupFirstPage(
           items: [
-            _dailyCatalogItem(
+            testDailyCatalogItem(
               source: harness.intentionId,
               selected: testIntentionId(2),
             ),
@@ -136,7 +133,7 @@ void main() {
         2,
         DailyChoiceGroupFirstPage(
           items: [
-            _dailyCatalogItem(
+            testDailyCatalogItem(
               source: harness.intentionId,
               selected: testIntentionId(2),
               isCompleted: true,
@@ -175,7 +172,7 @@ void main() {
         1,
         DailyChoiceGroupFirstPage(
           items: [
-            _dailyCatalogItem(
+            testDailyCatalogItem(
               source: harness.intentionId,
               selected: testIntentionId(2),
             ),
@@ -227,7 +224,7 @@ void main() {
         1,
         DailyChoiceGroupFirstPage(
           items: [
-            _dailyCatalogItem(
+            testDailyCatalogItem(
               source: harness.intentionId,
               selected: testIntentionId(2),
             ),
@@ -312,7 +309,7 @@ void main() {
         2,
         DailyChoiceGroupFirstPage(
           items: [
-            _dailyCatalogItem(
+            testDailyCatalogItem(
               source: harness.intentionId,
               selected: testIntentionId(2),
               date: CalendarDate.fromParts(2026, 9, 24),
@@ -354,7 +351,7 @@ void main() {
       1,
       DailyChoiceGroupFirstPage(
         items: [
-          _dailyCatalogItem(
+          testDailyCatalogItem(
             source: harness.intentionId,
             selected: testIntentionId(2),
           ),
@@ -425,7 +422,7 @@ void main() {
         1,
         DailyChoiceGroupFirstPage(
           items: [
-            _dailyCatalogItem(
+            testDailyCatalogItem(
               source: harness.intentionId,
               selected: testIntentionId(2),
             ),
@@ -464,7 +461,7 @@ void main() {
         3,
         DailyChoiceGroupFirstPage(
           items: [
-            _dailyCatalogItem(
+            testDailyCatalogItem(
               source: harness.intentionId,
               selected: testIntentionId(2),
             ),
@@ -501,7 +498,7 @@ void main() {
       1,
       DailyChoiceGroupFirstPage(
         items: [
-          _dailyCatalogItem(
+          testDailyCatalogItem(
             source: harness.intentionId,
             selected: testIntentionId(2),
           ),
@@ -524,7 +521,7 @@ void main() {
       3,
       DailyChoiceGroupFirstPage(
         items: [
-          _dailyCatalogItem(
+          testDailyCatalogItem(
             source: harness.intentionId,
             selected: testIntentionId(2),
           ),
@@ -567,7 +564,7 @@ void main() {
         1,
         DailyChoiceGroupFirstPage(
           items: [
-            _dailyCatalogItem(
+            testDailyCatalogItem(
               source: harness.intentionId,
               selected: testIntentionId(2),
             ),
@@ -602,7 +599,7 @@ void main() {
       ) as DailyChoiceCommandAccepted;
       repository.completeDailyChoiceCommand(
         0,
-        _dailyFieldsUpdatedResult(
+        testDailyFieldsUpdatedResult(
           before: before,
           after: after,
           counts: {
@@ -621,7 +618,7 @@ void main() {
         2,
         DailyChoiceGroupFirstPage(
           items: [
-            _dailyCatalogItem(
+            testDailyCatalogItem(
               id: unseenId,
               source: harness.intentionId,
               selected: testIntentionId(3),
@@ -662,7 +659,7 @@ void main() {
         1,
         DailyChoiceGroupFirstPage(
           items: [
-            _dailyCatalogItem(
+            testDailyCatalogItem(
               source: harness.intentionId,
               selected: participantId,
             ),
@@ -711,7 +708,7 @@ void main() {
         2,
         DailyChoiceGroupFirstPage(
           items: [
-            _dailyCatalogItem(
+            testDailyCatalogItem(
               source: harness.intentionId,
               selected: participantId,
               selectedTitle: 'Новое действие',
@@ -2514,82 +2511,6 @@ LongTermRelationSummary _summaryForRelation(LongTermRelation relation) =>
       related: testParticipant(relation.relatedIntentionId),
       hasDescription: false,
     );
-
-DailyChoiceCatalogItem _dailyCatalogItem({
-  required IntentionId source,
-  required IntentionId selected,
-  DailyChoiceId? id,
-  CalendarDate? date,
-  String selectedTitle = 'Действие',
-  bool isCompleted = false,
-}) {
-  final choice = reconciliationChoice(source: source, selected: selected);
-  return DailyChoiceCatalogItem(
-    id: id ?? choice.id,
-    source: DailyChoiceCatalogParticipant(
-      id: source,
-      title: 'Источник',
-      archiveState: IntentionArchiveState.active,
-      readiness: IntentionReadiness.notReady,
-    ),
-    selected: DailyChoiceCatalogParticipant(
-      id: selected,
-      title: selectedTitle,
-      archiveState: IntentionArchiveState.active,
-      readiness: IntentionReadiness.ready,
-    ),
-    date: date ?? choice.date,
-    isCompleted: isCompleted,
-    schedule: const DailyChoiceAllDay(),
-    priority: DailyChoicePriority.p4,
-    description: null,
-    pathIntentionCount: 2,
-  );
-}
-
-DailyChoiceCommandResult _dailyFieldsUpdatedResult({
-  required DailyChoice before,
-  required DailyChoice after,
-  required Map<IntentionId, RelationCounts> counts,
-}) {
-  final created = reconciliationChoiceCreated(
-    choice: before,
-    pathRelationId: testRelationId(3),
-    revision: const TestGraphRevision(1),
-    counts: counts,
-  );
-  final path = switch (created) {
-    GraphResultSuccess(
-      value: ConfirmedGraphResult(value: DailyChoiceCreated(:final path)),
-    ) =>
-      path,
-    _ => throw StateError('Ожидался подтверждённый путь.'),
-  };
-  return GraphCommandSucceeded<
-    DailyChoiceCommandSuccess,
-    DailyChoiceCommandFailure
-  >(
-    ConfirmedGraphResult(
-      revision: const TestGraphRevision(2),
-      value: DailyChoiceFieldsUpdated(
-        before: before,
-        choice: after,
-        path: path,
-        changes: [
-          DailyChoiceChange(
-            revision: const TestGraphRevision(2),
-            before: before,
-            after: after,
-            releasedRelationIds: const [],
-            occupiedRelationIds: const [],
-            intentionCounts: counts,
-            relationPermissions: const {},
-          ),
-        ],
-      ),
-    ),
-  );
-}
 
 final class _NeighborhoodHarness {
   _NeighborhoodHarness(

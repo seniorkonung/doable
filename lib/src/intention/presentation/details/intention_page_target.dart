@@ -1,3 +1,4 @@
+import '../../../long_term_relation/application/relation_group.dart';
 import '../../../statistics/application/intention_statistics_target.dart';
 
 /// Начальная вкладка страницы намерения.
@@ -19,10 +20,17 @@ final class StatisticsTarget extends IntentionPageTarget {
   final IntentionStatisticsTarget statistics;
 }
 
-/// Страница удерживает ключ и начальную цель до закрытия или смены намерения.
-/// Равенство по идентичности разделяет состояния страниц одного намерения.
+/// Страница удерживает ключ, начальную цель и настройки вкладок до закрытия
+/// или смены намерения. Равенство по идентичности разделяет состояния страниц
+/// одного намерения.
+///
+/// Настройки переживают освобождение моделей вкладок, поэтому строк, курсоров
+/// и якорей списков в них нет.
 final class IntentionPageInstance {
   IntentionPageInstance({required this.target});
 
   final IntentionPageTarget target;
+
+  /// Роль вкладки «Выборы»; до первой смены — «исходное».
+  DailyChoiceRelationRole choicesRole = DailyChoiceRelationRole.source;
 }
