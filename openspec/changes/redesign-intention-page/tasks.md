@@ -969,3 +969,17 @@
   - **Зависимости:** 4.3, 4.6.
   - **Предполагаемые файлы:** `lib/src/design_system/components/text_field.dart`, `lib/src/design_system/components/option_tiles.dart`, `test/design_system/text_field_test.dart`, `test/design_system/option_tiles_test.dart`.
   - **Размер:** S.
+
+- [ ] 4.25 Возвращать выбранный пункт `OptionsMenu` только после окончания обратной анимации закрытия листа
+  - **Критерии приёмки:**
+    - Показ `OptionsMenu` отдаёт выбранный доступный пункт вызывающему только после окончания обратной анимации закрытия листа, а не в момент `pop`. Сейчас `OptionsMenu` закрывает лист через `Navigator.pop(value)`, а будущее `showDoableSheet` завершается сразу при `pop`, до обратной анимации. Так соблюдается записанный контракт `OptionsMenu`, критерий задачи 4.18 и ADR-0042: действие начинается без открытого листа.
+    - Поэтому `_openOptions` страницы намерения вызывает архивирование или восстановление, открывает экран изменения или диалог удаления уже после исчезновения листа, и уходящий лист параметров не перерисовывает пункты из-за начатой команды.
+    - Закрытие без выбора (затемнением и «назад») по-прежнему возвращает отсутствие выбора.
+    - Меняется только показ `OptionsMenu`. Момент возврата результата у остальных потребителей `showDoableSheet` (экспорт, резервные копии, старт дневного выбора, панели тегов, листы выбора и прочие) не меняется. Механизм выбирает реализация, например ожидание завершения маршрута листа в пути показа `OptionsMenu`, без новых общих параметров `showDoableSheet`. Контракт и документация `OptionsMenu`, задача 4.18 и ADR-0042 по смыслу не меняются.
+    - Проверка возврата выбранного пункта в `options_menu_test.dart` различает моменты: пока анимация закрытия листа идёт, результат ещё не получен, а после её окончания получен.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/options_menu_test.dart test/intention/presentation/details`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 4.18, 4.19.
+  - **Предполагаемые файлы:** `lib/src/design_system/components/options_menu.dart`, при необходимости `lib/src/design_system/components/sheet.dart` без изменения поведения других потребителей и `lib/src/intention/presentation/details/intention_details_page.dart`, `test/design_system/options_menu_test.dart`.
+  - **Размер:** S.
