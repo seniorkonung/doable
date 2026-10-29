@@ -231,7 +231,7 @@ void _registerOrdinaryPaginationTests() {
       _expectFullyVisible(tester, end, insets);
       final row = find.byKey(
         ValueKey(
-          'relation-neighborhood-row-${tagFixtureId(5000 + _lastLayoutRelation)}',
+          'intention-relations-row-${tagFixtureId(5000 + _lastLayoutRelation)}',
         ),
       );
       final last = find

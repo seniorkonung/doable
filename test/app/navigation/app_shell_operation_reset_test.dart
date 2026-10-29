@@ -153,6 +153,7 @@ void main() {
     expect(app.repository.commands, isEmpty);
     unawaited(app.router.maybePop());
     await tester.pumpAndSettle();
+    await app.answerSourceReread(tester);
     await _expectSourceActiveRelationCount(tester, 0);
     unawaited(app.router.maybePop());
     await tester.pumpAndSettle();
@@ -214,6 +215,7 @@ void main() {
     unawaited(app.router.maybePop());
     await tester.pumpAndSettle();
     expect(find.byType(RelationDetailsPage, skipOffstage: false), findsNothing);
+    await app.answerSourceReread(tester);
     await _expectSourceActiveRelationCount(tester, 0);
     unawaited(app.router.maybePop());
     await tester.pumpAndSettle();
@@ -535,31 +537,20 @@ void _expectSelected(WidgetTester tester, AppDestination destination) {
   );
 }
 
-/// Сводка связей на странице исходного намерения подтверждает [count]
-/// активных связей.
+/// Вкладка «Связи» страницы исходного намерения подтверждает [count]
+/// активных связей без архивированных.
 Future<void> _expectSourceActiveRelationCount(
   WidgetTester tester,
   int count,
 ) async {
   await tester.tap(find.text('Связи').first);
   await tester.pumpAndSettle();
-  final summary = find.byKey(
-    const ValueKey('relation-neighborhood-summary-numbers'),
+  final l10n = AppLocalizations.of(
+    tester.element(find.byType(IntentionDetailsPage)),
   );
-  await tester.scrollUntilVisible(
-    summary,
-    300,
-    scrollable: find
-        .descendant(
-          of: find.byType(IntentionDetailsPage),
-          matching: find.byType(Scrollable),
-        )
-        .first,
-  );
-  final l10n = AppLocalizations.of(tester.element(summary));
   expect(
-    tester.getSemantics(summary).label,
-    contains(l10n.relationNeighborhoodActiveTotal(count)),
+    find.bySemanticsLabel(l10n.detailsRelationsTabSemantic(count, 0)),
+    findsOneWidget,
   );
 }
 
@@ -597,6 +588,7 @@ final class _ControlledApp {
   var completedCommands = 0;
   var completedRelationCommands = 0;
   var _relationDeleted = false;
+  var _answeredDetailRequests = 0;
   GraphCommandCoordinator get coordinator => runtime.commandCoordinator;
 
   static Future<_ControlledApp> start(WidgetTester tester) async {
@@ -678,11 +670,15 @@ final class _ControlledApp {
         ),
       );
     };
-    await _openDetails(tester, intention);
+    await _openDetails(tester, intention, activeNeedOutgoing: 1);
     await _expectSourceActiveRelationCount(tester, 1);
   }
 
-  Future<void> _openDetails(WidgetTester tester, Intention shown) async {
+  Future<void> _openDetails(
+    WidgetTester tester,
+    Intention shown, {
+    int activeNeedOutgoing = 0,
+  }) async {
     final requests = repository.detailRequests.length;
     unawaited(router.push(IntentionDetailsRoute(intentionId: shown.id)));
     await tester.pump();
@@ -692,8 +688,29 @@ final class _ControlledApp {
     final opened = repository.detailRequests.skip(requests).toList();
     expect(opened, isNotEmpty);
     for (final request in opened) {
-      request.add(ResultSuccess(shown));
+      request.add(
+        ResultSuccess(shown),
+        relationCounts: testRelationCounts(
+          activeNeedOutgoing: activeNeedOutgoing,
+        ),
+      );
     }
+    _answeredDetailRequests = repository.detailRequests.length;
+    await tester.pumpAndSettle();
+  }
+
+  /// Отвечает перечитыванию страницы исходного намерения после подтверждённого
+  /// удаления связи: сводка наблюдения уже не содержит удалённую связь.
+  Future<void> answerSourceReread(WidgetTester tester) async {
+    for (final request in repository.detailRequests.skip(
+      _answeredDetailRequests,
+    )) {
+      request.add(
+        ResultSuccess(intention),
+        revision: const TestDetailsRevision(1),
+      );
+    }
+    _answeredDetailRequests = repository.detailRequests.length;
     await tester.pumpAndSettle();
   }
 

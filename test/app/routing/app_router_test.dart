@@ -275,9 +275,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(
-        find.byKey(const ValueKey('relation-neighborhood-create-relation')),
-      );
+      await tester.tap(find.byKey(const ValueKey('intention-relations-add')));
       await tester.pumpAndSettle();
 
       expect(
@@ -312,9 +310,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(
-        find.byKey(const ValueKey('relation-neighborhood-create-relation')),
-      );
+      await tester.tap(find.byKey(const ValueKey('intention-relations-add')));
       await tester.pumpAndSettle();
 
       expect(
@@ -349,9 +345,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(
-        find.byKey(const ValueKey('relation-neighborhood-create-relation')),
-      );
+      await tester.tap(find.byKey(const ValueKey('intention-relations-add')));
       await tester.pumpAndSettle();
 
       expect(
@@ -467,7 +461,7 @@ Future<void> _openRelation(
   LongTermRelationId relationId,
 ) async {
   final row = find.byKey(
-    ValueKey('relation-neighborhood-row-${relationId.toCanonicalString()}'),
+    ValueKey('intention-relations-row-${relationId.toCanonicalString()}'),
   );
   await tester.scrollUntilVisible(
     row,

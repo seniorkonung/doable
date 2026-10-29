@@ -172,7 +172,7 @@ void main() {
     await _open(
       tester,
       find.byKey(
-        const ValueKey('relation-neighborhood-create-relation'),
+        const ValueKey('intention-relations-add'),
         skipOffstage: false,
       ),
       RelationEditorPage,

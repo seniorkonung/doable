@@ -76,7 +76,7 @@ enum _MatrixEntry {
       const ValueKey('daily-choice-edit-open'),
     ),
     _MatrixEntry.createRelation => find.byKey(
-      const ValueKey('relation-neighborhood-create-relation'),
+      const ValueKey('intention-relations-add'),
     ),
     _MatrixEntry.incomingRelations => find.byKey(
       const ValueKey('relation-neighborhood-direction-incoming'),

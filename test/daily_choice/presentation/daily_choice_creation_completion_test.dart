@@ -212,11 +212,9 @@ Future<_App> _launch(
   await tester.tap(find.text('Связи'));
   await tester.pumpAndSettle();
   await tester.ensureVisible(
-    find.byKey(const ValueKey('relation-neighborhood-create-relation')).first,
+    find.byKey(const ValueKey('intention-relations-add')).first,
   );
-  await tester.tap(
-    find.byKey(const ValueKey('relation-neighborhood-create-relation')).first,
-  );
+  await tester.tap(find.byKey(const ValueKey('intention-relations-add')).first);
   await tester.pumpAndSettle();
   await tester.enterText(
     find.byKey(const ValueKey('relation-editor-description')),

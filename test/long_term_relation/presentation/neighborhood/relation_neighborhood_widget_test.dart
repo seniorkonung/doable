@@ -656,9 +656,7 @@ void main() {
         findsOneWidget,
       );
       await Scrollable.ensureVisible(
-        tester.element(
-          find.byKey(const ValueKey('relation-neighborhood-create-relation')),
-        ),
+        tester.element(find.byKey(const ValueKey('intention-relations-add'))),
         alignment: 0.5,
       );
       await tester.pumpAndSettle();
@@ -763,7 +761,7 @@ Finder _rowFinder(int index) =>
     _rowFinderById(testRelationId(index).toCanonicalString());
 
 Finder _rowFinderById(String relationId) =>
-    find.byKey(ValueKey('relation-neighborhood-row-$relationId'));
+    find.byKey(ValueKey('intention-relations-row-$relationId'));
 
 typedef _Group = ({
   RelationScope scope,

@@ -229,13 +229,9 @@ void main() {
       expect(_text('Новое название действия').hitTestable(), findsWidgets);
       await tester.tap(_text(app.texts.detailsRelationsTab).first);
       await tester.pumpAndSettle();
-      await _scrollTo(
-        tester,
-        _text(app.texts.relationNeighborhoodSelectedGroupCount(119)),
-      );
+      // 119 исходящих «нужно», одна исходящая «можно» и одна входящая «нужно».
       expect(
-        _text(app.texts.relationNeighborhoodSelectedGroupCount(119))
-            .hitTestable(),
+        find.bySemanticsLabel(app.texts.detailsRelationsTabSemantic(121, 2)),
         findsOneWidget,
       );
       _scroll(tester).position.jumpTo(0);

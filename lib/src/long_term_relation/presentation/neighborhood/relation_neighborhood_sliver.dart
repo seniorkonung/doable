@@ -177,7 +177,7 @@ final class _RelationNeighborhoodSliverState
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: _RelationRow(
         key: ValueKey(
-          'relation-neighborhood-row-${item.relation.id.toCanonicalString()}',
+          'intention-relations-row-${item.relation.id.toCanonicalString()}',
         ),
         item: item,
         owner: widget.owner,
@@ -371,7 +371,7 @@ final class _NeighborhoodHeader extends StatelessWidget {
           Align(
             alignment: AlignmentDirectional.centerStart,
             child: FilledButton.icon(
-              key: const ValueKey('relation-neighborhood-create-relation'),
+              key: const ValueKey('intention-relations-add'),
               onPressed: () => onCreateRelation(state.selection.relationGroup),
               icon: const Icon(Icons.add_link),
               label: Text(switch (state.selection.direction) {

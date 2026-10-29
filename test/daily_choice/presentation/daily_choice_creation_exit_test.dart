@@ -348,7 +348,7 @@ Future<_App> _launch(
   await tester.pumpAndSettle();
   await tester.tap(find.text('Связи'));
   await tester.pumpAndSettle();
-  await _tap(tester, 'relation-neighborhood-create-relation');
+  await _tap(tester, 'intention-relations-add');
   await tester.enterText(
     find.byKey(const ValueKey('relation-editor-description')),
     'Чужой черновик',

@@ -476,9 +476,7 @@ Future<void> _createNeedRelation(
   bool verifyFormSemantics = false,
 }) async {
   await _chooseDetailsTab(tester, 'Relations');
-  final create = find.byKey(
-    const ValueKey('relation-neighborhood-create-relation'),
-  );
+  final create = find.byKey(const ValueKey('intention-relations-add'));
   await _ensureVisible(tester, create);
   await tester.tap(create);
   await _pumpUntilFound(
@@ -539,7 +537,7 @@ Future<void> _createNeedRelation(
   await tester.tap(find.bySemanticsLabel('Back'));
   await _pumpUntilFound(
     tester,
-    find.byKey(const ValueKey('relation-neighborhood-summary')),
+    find.byKey(const ValueKey('intention-relations-add')),
   );
 }
 

@@ -163,7 +163,7 @@ void main() {
       await _tap(tester, find.text('Relations').first);
       await _open(
         tester,
-        find.byKey(const ValueKey('relation-neighborhood-create-relation')),
+        find.byKey(const ValueKey('intention-relations-add')),
         RelationEditorPage,
       );
       await _open(
@@ -228,7 +228,7 @@ void main() {
       await _tap(tester, find.text('Relations').first);
       await _open(
         tester,
-        find.byKey(const ValueKey('relation-neighborhood-create-relation')),
+        find.byKey(const ValueKey('intention-relations-add')),
         RelationEditorPage,
       );
       expect(
@@ -258,7 +258,7 @@ const _rootPages = {
 
 /// Строка связи «Читать» → «Бегать» в соседстве намерения.
 final _relationRow = find.byKey(
-  ValueKey('relation-neighborhood-row-${tagFixtureId(_relation)}'),
+  ValueKey('intention-relations-row-${tagFixtureId(_relation)}'),
 );
 
 /// Продолжение пути по связи «Читать» → «Бегать».
