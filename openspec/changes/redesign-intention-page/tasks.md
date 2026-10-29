@@ -1344,7 +1344,7 @@
     - фикстуры порций групп: `test/long_term_relation/presentation/neighborhood/neighborhood_test_support.dart`, `test/intention/presentation/details/details_test_support.dart`, `test/app/routing/app_router_test.dart`, `test/app/intention_app_lifecycle_test.dart`, `test/app/navigation/app_shell_operation_reset_test.dart`, `test/graph/presentation/graph_reconciliation_checkpoint_test.dart`.
   - **Размер:** M — замена типа в фикстурах механическая.
 
-- [ ] 6.6 Начинать создание связи с ролью участника и типом, которые задаёт группа `IntentionRelationGroup`
+- [x] 6.6 Начинать создание связи с ролью участника и типом, которые задаёт группа `IntentionRelationGroup`
   - **Критерии приёмки:**
     - По решениям 2 и 7 дизайна в прикладном слое связей есть перечисление `IntentionRelationGroup` четырёх групп страницы: `needs` — «нужно», исходящие; `canUse` — «можно», исходящие; `neededFor` — «нужно», входящие; `canBeUsedFor` — «можно», входящие. Каждое значение даёт тип и направление.
     - `RelationCreationContext(participant, direction)` заменён на `RelationCreationContext(participant, group)`:

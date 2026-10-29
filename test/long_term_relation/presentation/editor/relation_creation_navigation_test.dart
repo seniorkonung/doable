@@ -7,9 +7,9 @@ import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/presentation/details/relation_details_page.dart';
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_page.dart';
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_state.dart';
@@ -36,7 +36,7 @@ void main() {
     tester,
   ) async {
     final app = await _launch(tester);
-    await _openForm(tester, app, RelationDirection.outgoing);
+    await _openForm(tester, app, IntentionRelationGroup.needs);
     app.router.holdPickerResult = true;
     await tester.tap(_key('relation-editor-change-source'));
     await tester.pump();
@@ -51,7 +51,7 @@ void main() {
     expect(find.text('Участник 1'), findsOneWidget);
     tester.widget<CreationExitAction>(find.byType(CreationExitAction)).onExit();
     await tester.pumpAndSettle();
-    await _openForm(tester, app, RelationDirection.outgoing);
+    await _openForm(tester, app, IntentionRelationGroup.needs);
     final matchId = app.router.stackData.last.matchId;
     app.router.releasePicker();
     await tester.pumpAndSettle();
@@ -66,7 +66,7 @@ void main() {
     'обычное закрытие поиска сохраняет прежний черновик и возможность отправки',
     (tester) async {
       final app = await _launch(tester);
-      await _openForm(tester, app, RelationDirection.outgoing);
+      await _openForm(tester, app, IntentionRelationGroup.needs);
       await _fill(tester, app);
       await tester.enterText(
         _key('relation-editor-description'),
@@ -262,7 +262,7 @@ void main() {
     'принятая отправка сразу запрещает старые обработчики открытия участников',
     (tester) async {
       final app = await _launch(tester);
-      await _openForm(tester, app, RelationDirection.outgoing);
+      await _openForm(tester, app, IntentionRelationGroup.needs);
       await _fill(tester, app);
       final openDetails = tester
           .widget<IconButton>(_key('relation-editor-open-source-details'))
@@ -289,7 +289,7 @@ void main() {
     'поздний успех после закрытия формы до dispose сохраняет новую форму',
     (tester) async {
       final app = await _launch(tester);
-      await _openForm(tester, app, RelationDirection.outgoing);
+      await _openForm(tester, app, IntentionRelationGroup.needs);
       await _fill(tester, app);
       await _tap(tester, 'relation-editor-submit');
       final old = tester.state(find.byType(RelationEditorPage));
@@ -347,16 +347,16 @@ Future<void> _tap(WidgetTester tester, String key) async {
 Future<void> _openForm(
   WidgetTester tester,
   _App app,
-  RelationDirection? direction,
+  IntentionRelationGroup? group,
 ) async {
   unawaited(
     app.router.push(
       RelationEditorRoute(
-        editorContext: direction == null
+        editorContext: group == null
             ? const RelationBlankCreationContext()
             : RelationCreationContext(
                 participant: _participant(1),
-                direction: direction,
+                group: group,
               ),
       ),
     ),
@@ -436,7 +436,7 @@ Future<_App> _launch(
   repository.completeCatalogPage(0, const []);
   await tester.pumpAndSettle();
   final app = _App(router, repository);
-  await _openForm(tester, app, RelationDirection.outgoing);
+  await _openForm(tester, app, IntentionRelationGroup.needs);
   await tester.enterText(
     _key('relation-editor-description'),
     'Нижний черновик',

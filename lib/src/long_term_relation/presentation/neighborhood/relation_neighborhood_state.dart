@@ -1,5 +1,6 @@
 import '../../../graph/application/graph_revision.dart';
 import '../../../intention/domain/intention_id.dart';
+import '../../application/intention_relation_group.dart';
 import '../../application/long_term_relation_projection.dart';
 import '../../application/relation_counts.dart';
 import '../../application/relation_group_page.dart';
@@ -27,6 +28,19 @@ final class RelationGroupSelection {
   final LongTermRelationType type;
   final RelationDirection direction;
   final RelationScope scope;
+
+  /// Группа страницы с выбранными типом и направлением; архивное состояние
+  /// на создание связи не влияет.
+  IntentionRelationGroup get relationGroup => switch ((type, direction)) {
+    (LongTermRelationType.need, RelationDirection.outgoing) =>
+      IntentionRelationGroup.needs,
+    (LongTermRelationType.can, RelationDirection.outgoing) =>
+      IntentionRelationGroup.canUse,
+    (LongTermRelationType.need, RelationDirection.incoming) =>
+      IntentionRelationGroup.neededFor,
+    (LongTermRelationType.can, RelationDirection.incoming) =>
+      IntentionRelationGroup.canBeUsedFor,
+  };
 
   RelationGroupSelection withType(LongTermRelationType value) =>
       RelationGroupSelection(type: value, direction: direction, scope: scope);

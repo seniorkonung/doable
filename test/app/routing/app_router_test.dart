@@ -16,6 +16,7 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
@@ -242,7 +243,7 @@ void main() {
   });
 
   testWidgets(
-    'создание из группы соседства открывает форму с контекстом направления',
+    'создание из группы соседства открывает форму с группой выбранных типа и направления',
     (tester) async {
       final repository = ControlledRelationDetailsRepository();
       addTearDown(repository.dispose);
@@ -285,7 +286,7 @@ void main() {
             .editorContext,
         RelationCreationContext(
           participant: testParticipant(ownerId, title: 'А'),
-          direction: RelationDirection.outgoing,
+          group: IntentionRelationGroup.needs,
         ),
       );
 
@@ -322,7 +323,44 @@ void main() {
             .editorContext,
         RelationCreationContext(
           participant: testParticipant(ownerId, title: 'А'),
-          direction: RelationDirection.incoming,
+          group: IntentionRelationGroup.neededFor,
+        ),
+      );
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('relation-neighborhood-type-can')),
+      );
+      await _settleNeighborhood(
+        tester,
+        repository,
+        expectedWatches: 2,
+        expectedQueries: 3,
+      );
+      repository.completeGroupPage(
+        2,
+        RelationGroupFirstPage(
+          items: const [],
+          counts: testRelationCounts(activeNeedOutgoing: 1),
+          nextCursor: null,
+          revision: const TestGraphRevision(1),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(const ValueKey('relation-neighborhood-create-relation')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        tester
+            .widget<RelationEditorPage>(find.byType(RelationEditorPage))
+            .editorContext,
+        RelationCreationContext(
+          participant: testParticipant(ownerId, title: 'А'),
+          group: IntentionRelationGroup.canBeUsedFor,
         ),
       );
     },

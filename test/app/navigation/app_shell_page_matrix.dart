@@ -439,7 +439,7 @@ void _registerPageMatrixTests() {
       final variant = switch (tester.widget(find.byType(row.page))) {
         RelationEditorPage(:final editorContext) => switch (editorContext) {
           RelationBlankCreationContext() => 'создание связи без участников',
-          RelationCreationContext(:final direction) => switch (direction) {
+          RelationCreationContext(:final group) => switch (group.direction) {
             RelationDirection.outgoing => 'создание исходящей связи',
             RelationDirection.incoming => 'создание входящей связи',
           },

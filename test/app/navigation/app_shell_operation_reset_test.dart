@@ -22,10 +22,10 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_options.dart';
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/presentation/details/relation_details_page.dart';
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_page.dart';
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_state.dart';
@@ -178,7 +178,7 @@ void main() {
               title: 'Независимый участник',
               archiveState: IntentionArchiveState.active,
             ),
-            direction: RelationDirection.outgoing,
+            group: IntentionRelationGroup.needs,
           ),
         ),
       ),
@@ -237,7 +237,7 @@ void main() {
                 title: 'Независимый участник',
                 archiveState: IntentionArchiveState.active,
               ),
-              direction: RelationDirection.outgoing,
+              group: IntentionRelationGroup.needs,
             ),
           ),
         ),
@@ -473,7 +473,7 @@ void main() {
               title: 'Исходное намерение',
               archiveState: IntentionArchiveState.active,
             ),
-            direction: RelationDirection.outgoing,
+            group: IntentionRelationGroup.needs,
           ),
         ),
       ),

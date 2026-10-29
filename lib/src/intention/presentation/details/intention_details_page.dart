@@ -773,12 +773,12 @@ final class _LoadedDetails extends StatelessWidget {
                     RelationDetailsRoute(relationId: relationId),
                   ),
                 ),
-                onCreateRelation: (direction) => unawaited(
+                onCreateRelation: (group) => unawaited(
                   context.router.push(
                     RelationEditorRoute(
                       editorContext: RelationCreationContext(
                         participant: owner,
-                        direction: direction,
+                        group: group,
                       ),
                     ),
                   ),

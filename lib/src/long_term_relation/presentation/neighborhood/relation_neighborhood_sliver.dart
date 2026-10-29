@@ -8,6 +8,7 @@ import '../../../../l10n/app_localizations.dart';
 import '../../../intention/domain/intention.dart';
 import '../../../intention/domain/intention_id.dart';
 import '../../../intention/presentation/intention_summary_view.dart';
+import '../../application/intention_relation_group.dart';
 import '../../application/long_term_relation_projection.dart';
 import '../../application/relation_counts.dart';
 import '../../application/relation_group_page.dart';
@@ -37,8 +38,8 @@ final class RelationNeighborhoodSliver extends ConsumerStatefulWidget {
   /// Открывает подробные данные выбранной связи; маршрут выбирает страница.
   final ValueChanged<LongTermRelationId> onOpenRelation;
 
-  /// Открывает создание связи в направлении выбранной группы соседства.
-  final ValueChanged<RelationDirection> onCreateRelation;
+  /// Открывает создание связи в группе выбранных типа и направления.
+  final ValueChanged<IntentionRelationGroup> onCreateRelation;
 
   @override
   ConsumerState<RelationNeighborhoodSliver> createState() =>
@@ -319,7 +320,7 @@ final class _NeighborhoodHeader extends StatelessWidget {
   final ValueChanged<RelationScope> onSelectScope;
   final ValueChanged<LongTermRelationType> onSelectType;
   final ValueChanged<RelationDirection> onSelectDirection;
-  final ValueChanged<RelationDirection> onCreateRelation;
+  final ValueChanged<IntentionRelationGroup> onCreateRelation;
   final Future<void> Function()? onRetryRefresh;
 
   @override
@@ -371,7 +372,7 @@ final class _NeighborhoodHeader extends StatelessWidget {
             alignment: AlignmentDirectional.centerStart,
             child: FilledButton.icon(
               key: const ValueKey('relation-neighborhood-create-relation'),
-              onPressed: () => onCreateRelation(state.selection.direction),
+              onPressed: () => onCreateRelation(state.selection.relationGroup),
               icon: const Icon(Icons.add_link),
               label: Text(switch (state.selection.direction) {
                 RelationDirection.outgoing =>

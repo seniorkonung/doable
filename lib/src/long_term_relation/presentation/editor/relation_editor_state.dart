@@ -1,6 +1,7 @@
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_revision.dart';
 import '../../../intention/domain/intention_id.dart';
+import '../../application/intention_relation_group.dart';
 import '../../application/long_term_relation_command.dart';
 import '../../application/long_term_relation_projection.dart';
 import '../../application/long_term_relation_permissions.dart';
@@ -23,33 +24,36 @@ final class RelationBlankCreationContext extends RelationEditorContext {
   const RelationBlankCreationContext();
 }
 
-/// Контекст группы соседства, из которой открыт черновик создания связи.
+/// Контекст группы связей, из которой открыт черновик создания связи.
 ///
 /// Направление группы задаёт роль текущего намерения: исходящая группа
-/// предвыбирает его исходным участником, входящая — связанным. Обе роли
-/// остаются доступными для замены, поэтому контекст задаёт только начало
-/// черновика, а не окончательную пару.
+/// предвыбирает его исходным участником, входящая — связанным. Тип группы
+/// становится начальным типом формы. Роли и тип остаются доступными для
+/// замены, поэтому контекст задаёт только начало черновика, а не
+/// окончательную связь.
 final class RelationCreationContext extends RelationEditorContext {
   const RelationCreationContext({
     required this.participant,
-    required this.direction,
+    required this.group,
   }) : super();
 
   /// Снимок текущего намерения, уже загруженный подробным просмотром.
   final RelationParticipantSummary participant;
-  final RelationDirection direction;
+  final IntentionRelationGroup group;
 
   RelationParticipantSummary? get initialSourceParticipant =>
-      switch (direction) {
+      switch (group.direction) {
         RelationDirection.outgoing => participant,
         RelationDirection.incoming => null,
       };
 
   RelationParticipantSummary? get initialRelatedParticipant =>
-      switch (direction) {
+      switch (group.direction) {
         RelationDirection.outgoing => null,
         RelationDirection.incoming => participant,
       };
+
+  LongTermRelationType get initialType => group.type;
 
   @override
   bool operator ==(Object other) =>
@@ -57,14 +61,14 @@ final class RelationCreationContext extends RelationEditorContext {
       other.participant.id == participant.id &&
       other.participant.title == participant.title &&
       other.participant.archiveState == participant.archiveState &&
-      other.direction == direction;
+      other.group == group;
 
   @override
   int get hashCode => Object.hash(
     participant.id,
     participant.title,
     participant.archiveState,
-    direction,
+    group,
   );
 }
 
@@ -331,7 +335,7 @@ final class RelationEditorState {
           relatedRevision: null,
           permissions: const LongTermRelationPermissions.unknown(),
           permissionRevision: null,
-          type: null,
+          type: creation.initialType,
           priority: null,
           description: '',
           operation: const RelationEditorIdle(),
@@ -452,7 +456,7 @@ final class RelationEditorState {
     final RelationCreationContext creation =>
       sourceParticipant != creation.initialSourceParticipant ||
           relatedParticipant != creation.initialRelatedParticipant ||
-          type != null ||
+          type != creation.initialType ||
           priority != null ||
           description.isNotEmpty,
     RelationEditingContext(:final details) =>
