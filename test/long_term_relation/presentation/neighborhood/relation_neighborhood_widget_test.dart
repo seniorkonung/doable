@@ -51,7 +51,6 @@ void main() {
             ownerId: ownerId,
             from: 1,
             count: counts.activeNeedOutgoing,
-            ownerTitle: 'Моё намерение',
             neighborTitles: const {1: 'Сосед один', 2: 'Сосед два'},
           ),
           counts: counts,
@@ -182,14 +181,8 @@ void main() {
       _completeGroup(repository, requestIndex, ownerId, counts, _groups[4]);
       await tester.pumpAndSettle();
 
-      await _scrollTo(
-        tester,
-        find.text('To Исходное 1, you can Намерение-владелец'),
-      );
-      expect(
-        find.text('To Исходное 1, you can Намерение-владелец'),
-        findsOneWidget,
-      );
+      await _scrollTo(tester, find.text('To Исходное 1, you can Намерение'));
+      expect(find.text('To Исходное 1, you can Намерение'), findsOneWidget);
     },
   );
 
@@ -644,7 +637,6 @@ void main() {
               ownerId: ownerId,
               index: 1,
               priority: RelationPriority.p1,
-              ownerTitle: 'Build продукт',
               neighborTitle: 'Ship без перевода',
             ),
           ],
@@ -705,7 +697,7 @@ Future<void> _pumpNeighborhoodSliver(
           body: CustomScrollView(
             slivers: [
               RelationNeighborhoodSliver(
-                intentionId: ownerId,
+                owner: testParticipant(ownerId),
                 onOpenRelation: onOpenRelation ?? (_) {},
                 onCreateRelation: (_) {},
               ),

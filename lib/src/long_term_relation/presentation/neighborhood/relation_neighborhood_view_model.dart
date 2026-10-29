@@ -321,7 +321,7 @@ final class RelationNeighborhoodViewModel
     nextCursor: _cursorOf(confirmed),
   );
 
-  RelationPagingSource<LongTermRelationSummary, LongTermRelationId> _source(
+  RelationPagingSource<RelationGroupEntry, LongTermRelationId> _source(
     RelationGroupSelection selection,
   ) => RelationPagingSource(
     pageSize: _policy.pageSize,
@@ -359,7 +359,7 @@ final class RelationNeighborhoodViewModel
   );
 
   RelationGroupConfirmedState _confirmedState(
-    RelationPagingData<LongTermRelationSummary> data, {
+    RelationPagingData<RelationGroupEntry> data, {
     RelationGroupScrollAnchor? scrollAnchor,
   }) => data.items.isEmpty
       ? RelationGroupEmpty(
@@ -636,7 +636,7 @@ final class RelationNeighborhoodViewModel
   }
 
   bool _belongsToGroup(
-    LongTermRelationSummary item,
+    RelationGroupEntry item,
     RelationGroupSelection selection,
   ) {
     final relation = item.relation;
@@ -649,12 +649,11 @@ final class RelationNeighborhoodViewModel
     };
   }
 
-  List<LongTermRelationSummary> _itemsOf(
-    RelationGroupConfirmedState confirmed,
-  ) => switch (confirmed) {
-    RelationGroupEmpty() => const [],
-    RelationGroupLoaded(:final items) => items,
-  };
+  List<RelationGroupEntry> _itemsOf(RelationGroupConfirmedState confirmed) =>
+      switch (confirmed) {
+        RelationGroupEmpty() => const [],
+        RelationGroupLoaded(:final items) => items,
+      };
 
   RelationGroupCursor? _cursorOf(RelationGroupConfirmedState confirmed) =>
       switch (confirmed) {
@@ -662,15 +661,14 @@ final class RelationNeighborhoodViewModel
         RelationGroupEmpty() => null,
       };
 
-  List<LongTermRelationSummary> _itemsOfState(
-    RelationNeighborhoodState current,
-  ) => switch (current) {
-    RelationGroupLoaded(:final items) => items,
-    RelationGroupInitialLoad() ||
-    RelationGroupInitialFailure() ||
-    RelationNeighborhoodIntentionNotFound() ||
-    RelationGroupEmpty() => const [],
-  };
+  List<RelationGroupEntry> _itemsOfState(RelationNeighborhoodState current) =>
+      switch (current) {
+        RelationGroupLoaded(:final items) => items,
+        RelationGroupInitialLoad() ||
+        RelationGroupInitialFailure() ||
+        RelationNeighborhoodIntentionNotFound() ||
+        RelationGroupEmpty() => const [],
+      };
 
   RelationGroupConfirmedState _withSummaryStatus(
     RelationGroupConfirmedState confirmed,

@@ -453,7 +453,7 @@ final class _DetailsCatalogEntrySnapshot
 }
 
 /// Строка выбранной группы соседства намерения-владельца.
-LongTermRelationSummary testDetailsRelationRow({
+RelationGroupEntry testDetailsRelationRow({
   required IntentionId ownerId,
   required int index,
   LongTermRelationType type = LongTermRelationType.need,
@@ -462,29 +462,22 @@ LongTermRelationSummary testDetailsRelationRow({
 }) {
   final neighborId = testDetailsIntentionId(900 + index);
   final isOutgoing = direction == RelationDirection.outgoing;
-  final sourceId = isOutgoing ? ownerId : neighborId;
-  final relatedId = isOutgoing ? neighborId : ownerId;
-  return LongTermRelationSummary(
+  return RelationGroupEntry(
     relation: LongTermRelation(
       id: _testDetailsRelationId(index),
-      sourceIntentionId: sourceId,
-      relatedIntentionId: relatedId,
+      sourceIntentionId: isOutgoing ? ownerId : neighborId,
+      relatedIntentionId: isOutgoing ? neighborId : ownerId,
       type: type,
       priority: RelationPriority.p2,
       scope: scope,
       creationSequence: RelationCreationSequence(index),
     ),
-    source: RelationParticipantSummary(
-      id: sourceId,
-      title: isOutgoing ? 'Намерение-владелец' : 'Исходное $index',
+    neighbor: RelationNeighbor(
+      id: neighborId,
+      title: isOutgoing ? 'Связанное $index' : 'Исходное $index',
       archiveState: IntentionArchiveState.active,
+      readiness: IntentionReadiness.notReady,
     ),
-    related: RelationParticipantSummary(
-      id: relatedId,
-      title: isOutgoing ? 'Связанное $index' : 'Намерение-владелец',
-      archiveState: IntentionArchiveState.active,
-    ),
-    hasDescription: false,
   );
 }
 

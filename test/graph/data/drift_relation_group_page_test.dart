@@ -3,11 +3,14 @@ import 'package:doable/src/data/local/app_database.dart'
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
+import 'package:doable/src/intention/domain/intention.dart'
+    show IntentionArchiveState, IntentionReadiness;
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
+import 'package:doable/src/shared/domain/text_preview.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter_test/flutter_test.dart';
 
@@ -100,6 +103,131 @@ void main() {
               ? summary.relation.sourceIntentionId
               : summary.relation.relatedIntentionId,
           ownerId,
+        );
+      }
+    },
+  );
+
+  test(
+    'отдаёт соседа с готовностью и началом описания без владельца группы',
+    () async {
+      final longDescription = 'я' * (TextPreview.maxLength + 1);
+      for (final direction in RelationDirection.values) {
+        final base = direction == RelationDirection.outgoing ? 10 : 20;
+        final readyNeighbor = _intentionId(_uuid(base));
+        final plainNeighbor = _intentionId(_uuid(base + 1));
+        final longNeighbor = _intentionId(_uuid(base + 2));
+        final archivedNeighbor = _intentionId(_uuid(base + 3));
+        await _insertIntention(
+          database,
+          readyNeighbor,
+          title: 'Готовый сосед $base',
+          isActionReady: true,
+        );
+        await _insertIntention(
+          database,
+          plainNeighbor,
+          title: 'Сосед без описания $base',
+        );
+        await _insertIntention(
+          database,
+          longNeighbor,
+          title: 'Сосед с длинным описанием $base',
+        );
+        await _insertIntention(
+          database,
+          archivedNeighbor,
+          title: 'Архивный сосед $base',
+          isArchived: true,
+        );
+        for (final (index, participantId, scope, description) in [
+          (
+            0,
+            readyNeighbor,
+            RelationScope.active,
+            '  Начало\n\n  описания\tсвязи  ',
+          ),
+          (1, plainNeighbor, RelationScope.active, null),
+          (2, longNeighbor, RelationScope.active, longDescription),
+          (3, archivedNeighbor, RelationScope.archived, 'Архивная связь'),
+        ]) {
+          await _insertRelation(
+            database,
+            id: _relationId(_uuid(100 + base + index)),
+            ownerId: ownerId,
+            participantId: participantId,
+            type: LongTermRelationType.need,
+            direction: direction,
+            scope: scope,
+            priority: RelationPriority.values[index],
+            description: description,
+          );
+        }
+
+        RelationGroupQuery query(
+          RelationScope scope,
+          RelationGroupCursor? cursor,
+        ) => RelationGroupQuery(
+          intentionId: ownerId,
+          type: LongTermRelationType.need,
+          direction: direction,
+          scope: scope,
+          pageSize: 2,
+          cursor: cursor,
+        );
+        final first = _page(
+          await repository.getRelationGroupPage(
+            query(RelationScope.active, null),
+          ),
+        ) as RelationGroupFirstPage;
+        final continuation = _page(
+          await repository.getRelationGroupPage(
+            query(RelationScope.active, first.nextCursor),
+          ),
+        ) as RelationGroupContinuationPage;
+        final archived = _page(
+          await repository.getRelationGroupPage(
+            query(RelationScope.archived, null),
+          ),
+        ) as RelationGroupFirstPage;
+
+        final entries = [...first.items, ...continuation.items];
+        expect(first.items, hasLength(2));
+        expect(continuation.nextCursor, isNull);
+        expect(entries.map((entry) => entry.neighbor.id), [
+          readyNeighbor,
+          plainNeighbor,
+          longNeighbor,
+        ]);
+        expect(entries.map((entry) => entry.neighbor.title), [
+          'Готовый сосед $base',
+          'Сосед без описания $base',
+          'Сосед с длинным описанием $base',
+        ]);
+        expect(entries.map((entry) => entry.neighbor.readiness), [
+          IntentionReadiness.ready,
+          IntentionReadiness.notReady,
+          IntentionReadiness.notReady,
+        ]);
+        expect(
+          entries.map((entry) => entry.neighbor.archiveState),
+          everyElement(IntentionArchiveState.active),
+        );
+        expect(entries.map((entry) => entry.descriptionPreview?.text), [
+          'Начало описания связи',
+          null,
+          'я' * TextPreview.maxLength,
+        ]);
+        expect(archived.items.single.neighbor.id, archivedNeighbor);
+        expect(
+          archived.items.single.neighbor.archiveState,
+          IntentionArchiveState.archived,
+        );
+        // Владелец группы не попадает в строку: соседом всегда служит
+        // другой участник связи.
+        expect(
+          [...entries, ...archived.items].map((entry) => entry.neighbor.id),
+          isNot(contains(ownerId)),
         );
       }
     },
@@ -314,6 +442,8 @@ Future<void> _insertIntention(
   AppDatabase database,
   IntentionId id, {
   required String title,
+  bool isActionReady = false,
+  bool isArchived = false,
 }) => seedGraph(
   database,
   () => database
@@ -322,6 +452,8 @@ Future<void> _insertIntention(
         IntentionsCompanion.insert(
           id: id.toCanonicalString(),
           title: title,
+          isActionReady: Value(isActionReady),
+          isArchived: Value(isArchived),
           createdAt: DateTime.utc(2026, 9, 20).microsecondsSinceEpoch,
           updatedAt: DateTime.utc(2026, 9, 20).microsecondsSinceEpoch,
         ),

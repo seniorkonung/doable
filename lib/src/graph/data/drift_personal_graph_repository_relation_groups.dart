@@ -322,7 +322,7 @@ extension _RelationGroupPageReading on DriftPersonalGraphRepository {
         .get();
   }
 
-  Future<List<LongTermRelationSummary>> _rehydrateRelationGroupItems(
+  Future<List<RelationGroupEntry>> _rehydrateRelationGroupItems(
     Iterable<QueryRow> rawRows,
     RelationGroupQuery query,
   ) async {
@@ -330,82 +330,96 @@ extension _RelationGroupPageReading on DriftPersonalGraphRepository {
       for (final rawRow in rawRows) StoredLongTermRelation.decode(rawRow.data),
     ];
     final relations = [for (final row in rows) row.toDomain()];
+    IntentionId ownerOf(
+      relation_domain.LongTermRelation relation,
+    ) => switch (query.direction) {
+      relation_domain.RelationDirection.incoming => relation.relatedIntentionId,
+      relation_domain.RelationDirection.outgoing => relation.sourceIntentionId,
+    };
+    IntentionId neighborOf(
+      relation_domain.LongTermRelation relation,
+    ) => switch (query.direction) {
+      relation_domain.RelationDirection.incoming => relation.sourceIntentionId,
+      relation_domain.RelationDirection.outgoing => relation.relatedIntentionId,
+    };
     for (final relation in relations) {
-      final ownerId = switch (query.direction) {
-        relation_domain.RelationDirection.incoming =>
-          relation.relatedIntentionId,
-        relation_domain.RelationDirection.outgoing =>
-          relation.sourceIntentionId,
-      };
-      if (ownerId != query.intentionId ||
+      if (ownerOf(relation) != query.intentionId ||
           relation.type != query.type ||
           relation.scope != query.scope) {
         throw const StoredGraphCorruption();
       }
     }
 
-    final participantIds = <IntentionId>{
-      for (final relation in relations) ...[
-        relation.sourceIntentionId,
-        relation.relatedIntentionId,
-      ],
+    final neighbors = {
+      for (final intention in await _readIntentionsByIds({
+        for (final relation in relations) neighborOf(relation),
+      }))
+        intention.id: RelationNeighbor(
+          id: intention.id,
+          title: intention.title,
+          archiveState: intention.archiveState,
+          readiness: intention.readiness,
+        ),
     };
-    final participants = await _readRelationParticipants(participantIds);
     return List.unmodifiable([
       for (var index = 0; index < relations.length; index++)
-        LongTermRelationSummary(
+        RelationGroupEntry(
           relation: relations[index],
-          source:
-              participants[relations[index].sourceIntentionId] ??
+          neighbor:
+              neighbors[neighborOf(relations[index])] ??
               (throw const StoredGraphCorruption()),
-          related:
-              participants[relations[index].relatedIntentionId] ??
-              (throw const StoredGraphCorruption()),
-          hasDescription: rows[index].hasDescription,
+          descriptionPreview: switch (rows[index].description) {
+            final description? => TextPreview.fromText(description.value),
+            null => null,
+          },
         ),
     ]);
   }
 
   Future<Map<IntentionId, RelationParticipantSummary>>
-  _readRelationParticipants(Set<IntentionId> ids) async {
-    if (ids.isEmpty) return const {};
+  _readRelationParticipants(Set<IntentionId> ids) async => Map.unmodifiable({
+    for (final participant in await _readIntentionsByIds(ids))
+      participant.id: RelationParticipantSummary(
+        id: participant.id,
+        title: participant.title,
+        archiveState: participant.archiveState,
+      ),
+  });
+
+  Future<List<domain.Intention>> _readIntentionsByIds(
+    Set<IntentionId> ids,
+  ) async {
+    if (ids.isEmpty) return const [];
     final orderedIds = ids.toList(growable: false);
-    final participants = <domain.Intention>[];
+    final intentions = <domain.Intention>[];
     const batchSize = 400;
     for (var start = 0; start < orderedIds.length; start += batchSize) {
       final end = start + batchSize < orderedIds.length
           ? start + batchSize
           : orderedIds.length;
-      final intentions = _database.intentions;
-      final query = _database.selectOnly(intentions)
+      final table = _database.intentions;
+      final query = _database.selectOnly(table)
         ..addColumns([
-          intentions.id,
-          intentions.title,
-          intentions.description,
-          intentions.isActionReady,
-          intentions.isArchived,
-          intentions.createdAt,
-          intentions.updatedAt,
+          table.id,
+          table.title,
+          table.description,
+          table.isActionReady,
+          table.isArchived,
+          table.createdAt,
+          table.updatedAt,
         ])
         ..where(
-          intentions.id.isIn([
+          table.id.isIn([
             for (final id in orderedIds.sublist(start, end))
               id.toCanonicalString(),
           ]),
         );
-      participants.addAll([
+      intentions.addAll([
         for (final row in await query.get())
           decodeStoredIntention(row.rawData.data, 'intentions.'),
       ]);
     }
-    return Map.unmodifiable({
-      for (final participant in participants)
-        participant.id: RelationParticipantSummary(
-          id: participant.id,
-          title: participant.title,
-          archiveState: participant.archiveState,
-        ),
-    });
+    return intentions;
   }
 
   _DriftRelationGroupCursor _relationGroupCursorAt(

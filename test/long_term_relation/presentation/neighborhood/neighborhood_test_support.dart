@@ -70,7 +70,10 @@ final class ControlledNeighborhoodRepository
   final intentionCommands = <IntentionCommand>[];
   final relationCommands = <LongTermRelationCommand>[];
   final dailyChoiceCommands = <DailyChoiceCommand>[];
-  final _relationRows = <LongTermRelationId, LongTermRelationSummary>{};
+
+  /// Строки порций вместе с владельцем группы, которого сама строка не несёт.
+  final _relationRows =
+      <LongTermRelationId, (IntentionId ownerId, RelationGroupEntry entry)>{};
   GraphRevision? _latestRevision;
   final _intentionController =
       StreamController<Result<GraphSnapshot<IntentionDetails?>>>.broadcast(
@@ -97,10 +100,11 @@ final class ControlledNeighborhoodRepository
       RelationGroupFirstPage(:final items) ||
       RelationGroupContinuationPage(:final items) => items,
       DailyChoiceGroupFirstPage() ||
-      DailyChoiceGroupContinuationPage() => <LongTermRelationSummary>[],
+      DailyChoiceGroupContinuationPage() => <RelationGroupEntry>[],
     };
+    final ownerId = pageQueries[index].intentionId;
     for (final row in rows) {
-      _relationRows[row.relation.id] = row;
+      _relationRows[row.relation.id] = (ownerId, row);
     }
     if (page is RelationGroupFirstPage || page is DailyChoiceGroupFirstPage) {
       _latestRevision = page.revision;
@@ -197,12 +201,7 @@ final class ControlledNeighborhoodRepository
           GraphSnapshot(
             value: switch (_relationRows[id]) {
               null => null,
-              final row => LongTermRelationDetails(
-                relation: row.relation,
-                source: row.source,
-                related: row.related,
-                description: null,
-              ),
+              (final ownerId, final entry) => _relationDetails(ownerId, entry),
             },
             revision: _latestRevision ?? const TestGraphRevision(0),
           ),
@@ -323,50 +322,45 @@ RelationParticipantSummary testParticipant(
 );
 
 /// Строка выбранной группы намерения-владельца.
-LongTermRelationSummary testGroupRow({
+RelationGroupEntry testGroupRow({
   required IntentionId ownerId,
   required int index,
   LongTermRelationType type = LongTermRelationType.need,
   RelationDirection direction = RelationDirection.outgoing,
   RelationScope scope = RelationScope.active,
   RelationPriority priority = RelationPriority.p2,
-  String ownerTitle = 'Намерение-владелец',
   String? neighborTitle,
 }) {
   final neighborId = testIntentionId(1000 + index);
   final isOutgoing = direction == RelationDirection.outgoing;
-  final sourceId = isOutgoing ? ownerId : neighborId;
-  final relatedId = isOutgoing ? neighborId : ownerId;
-  return LongTermRelationSummary(
+  return RelationGroupEntry(
     relation: LongTermRelation(
       id: testRelationId(index),
-      sourceIntentionId: sourceId,
-      relatedIntentionId: relatedId,
+      sourceIntentionId: isOutgoing ? ownerId : neighborId,
+      relatedIntentionId: isOutgoing ? neighborId : ownerId,
       type: type,
       priority: priority,
       scope: scope,
       creationSequence: RelationCreationSequence(index),
     ),
-    source: testParticipant(
-      sourceId,
-      title: isOutgoing ? ownerTitle : neighborTitle ?? 'Исходное $index',
+    neighbor: RelationNeighbor(
+      id: neighborId,
+      title:
+          neighborTitle ??
+          (isOutgoing ? 'Связанное $index' : 'Исходное $index'),
+      archiveState: IntentionArchiveState.active,
+      readiness: IntentionReadiness.notReady,
     ),
-    related: testParticipant(
-      relatedId,
-      title: isOutgoing ? neighborTitle ?? 'Связанное $index' : ownerTitle,
-    ),
-    hasDescription: false,
   );
 }
 
-List<LongTermRelationSummary> testGroupRows({
+List<RelationGroupEntry> testGroupRows({
   required IntentionId ownerId,
   required int from,
   required int count,
   LongTermRelationType type = LongTermRelationType.need,
   RelationDirection direction = RelationDirection.outgoing,
   RelationScope scope = RelationScope.active,
-  String ownerTitle = 'Намерение-владелец',
   Map<int, String> neighborTitles = const {},
 }) => [
   for (var offset = 0; offset < count; offset += 1)
@@ -376,10 +370,29 @@ List<LongTermRelationSummary> testGroupRows({
       type: type,
       direction: direction,
       scope: scope,
-      ownerTitle: ownerTitle,
       neighborTitle: neighborTitles[from + offset],
     ),
 ];
+
+LongTermRelationDetails _relationDetails(
+  IntentionId ownerId,
+  RelationGroupEntry entry,
+) {
+  final relation = entry.relation;
+  final neighbor = testParticipant(
+    entry.neighbor.id,
+    title: entry.neighbor.title,
+    archiveState: entry.neighbor.archiveState,
+  );
+  final owner = testParticipant(ownerId);
+  final ownerIsSource = relation.sourceIntentionId == ownerId;
+  return LongTermRelationDetails(
+    relation: relation,
+    source: ownerIsSource ? owner : neighbor,
+    related: ownerIsSource ? neighbor : owner,
+    description: null,
+  );
+}
 
 Intention testNeighborhoodIntention({
   required IntentionId id,

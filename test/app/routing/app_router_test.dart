@@ -12,6 +12,7 @@ import 'package:doable/src/graph/application/personal_graph_repository_provider.
 import 'package:doable/src/intention/application/intention_catalog.dart'
     hide IntentionCatalogPage;
 import 'package:doable/src/intention/application/intention_result.dart';
+import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
@@ -170,7 +171,6 @@ void main() {
         relationId: relationAb,
         sourceId: idA,
         relatedId: idB,
-        sourceTitle: 'А',
         relatedTitle: 'Б',
       ),
     );
@@ -184,7 +184,6 @@ void main() {
             relationId: relationAb,
             sourceId: idA,
             relatedId: idB,
-            sourceTitle: 'А',
             relatedTitle: 'Б',
           ),
           revision: const TestGraphRevision(1),
@@ -211,7 +210,6 @@ void main() {
         relationId: relationBa,
         sourceId: idB,
         relatedId: idA,
-        sourceTitle: 'Б',
         relatedTitle: 'А',
       ),
     );
@@ -226,7 +224,6 @@ void main() {
             relationId: relationBa,
             sourceId: idB,
             relatedId: idA,
-            sourceTitle: 'Б',
             relatedTitle: 'А',
           ),
           revision: const TestGraphRevision(1),
@@ -272,7 +269,6 @@ void main() {
           relationId: testRelationId(1),
           sourceId: ownerId,
           relatedId: neighborId,
-          sourceTitle: 'А',
           relatedTitle: 'Б',
         ),
       );
@@ -384,7 +380,7 @@ void _serveNeighborhood(
   required IntentionId intentionId,
   required String title,
   required int queryIndex,
-  required LongTermRelationSummary row,
+  required RelationGroupEntry row,
 }) {
   const revision = TestGraphRevision(1);
   final counts = testRelationCounts(activeNeedOutgoing: 1);
@@ -404,13 +400,13 @@ void _serveNeighborhood(
   );
 }
 
-LongTermRelationSummary _row({
+/// Строка исходящей группы намерения [sourceId] с соседом [relatedId].
+RelationGroupEntry _row({
   required LongTermRelationId relationId,
   required IntentionId sourceId,
   required IntentionId relatedId,
-  required String sourceTitle,
   required String relatedTitle,
-}) => LongTermRelationSummary(
+}) => RelationGroupEntry(
   relation: LongTermRelation(
     id: relationId,
     sourceIntentionId: sourceId,
@@ -420,9 +416,12 @@ LongTermRelationSummary _row({
     scope: RelationScope.active,
     creationSequence: RelationCreationSequence(1),
   ),
-  source: testParticipant(sourceId, title: sourceTitle),
-  related: testParticipant(relatedId, title: relatedTitle),
-  hasDescription: false,
+  neighbor: RelationNeighbor(
+    id: relatedId,
+    title: relatedTitle,
+    archiveState: IntentionArchiveState.active,
+    readiness: IntentionReadiness.notReady,
+  ),
 );
 
 Future<void> _openRelation(

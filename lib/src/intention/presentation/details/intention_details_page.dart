@@ -626,6 +626,11 @@ final class _LoadedDetails extends StatelessWidget {
     final localizations = AppLocalizations.of(context);
     final intention = state.intention;
     final isActive = intention.archiveState == IntentionArchiveState.active;
+    final owner = RelationParticipantSummary(
+      id: intention.id,
+      title: intention.title,
+      archiveState: intention.archiveState,
+    );
     return CustomScrollView(
       controller: scrollController,
       slivers: [
@@ -762,7 +767,7 @@ final class _LoadedDetails extends StatelessWidget {
               statisticsSection,
             if (selectedTab == IntentionDetailsTab.relations)
               RelationNeighborhoodSliver(
-                intentionId: intention.id,
+                owner: owner,
                 onOpenRelation: (relationId) => unawaited(
                   context.router.push(
                     RelationDetailsRoute(relationId: relationId),
@@ -772,11 +777,7 @@ final class _LoadedDetails extends StatelessWidget {
                   context.router.push(
                     RelationEditorRoute(
                       editorContext: RelationCreationContext(
-                        participant: RelationParticipantSummary(
-                          id: intention.id,
-                          title: intention.title,
-                          archiveState: intention.archiveState,
-                        ),
+                        participant: owner,
                         direction: direction,
                       ),
                     ),

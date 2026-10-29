@@ -913,7 +913,10 @@ void main() {
       expect(harness.catalogTitles[testIntentionId(1001)], 'Переименованное');
       expect(harness.catalog.items, hasLength(3));
       expect(harness.catalog.totalCount, 3);
-      expect(harness.neighborhood.items.first.related.title, 'Переименованное');
+      expect(
+        harness.neighborhood.items.first.neighbor.title,
+        'Переименованное',
+      );
       expect(harness.neighborhood.progress, isA<RelationGroupIdle>());
       expect(harness.detailsCounts.activeNeedOutgoing, 2);
     },

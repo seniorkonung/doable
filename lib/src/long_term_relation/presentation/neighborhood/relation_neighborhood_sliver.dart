@@ -5,6 +5,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
+import '../../../intention/domain/intention.dart';
 import '../../../intention/domain/intention_id.dart';
 import '../../../intention/presentation/intention_summary_view.dart';
 import '../../application/long_term_relation_projection.dart';
@@ -21,13 +22,17 @@ import 'relation_neighborhood_view_model.dart';
 /// scrollable страницы. Содержимое невыбранных групп не запрашивается.
 final class RelationNeighborhoodSliver extends ConsumerStatefulWidget {
   const RelationNeighborhoodSliver({
-    required this.intentionId,
+    required this.owner,
     required this.onOpenRelation,
     required this.onCreateRelation,
     super.key,
   });
 
-  final IntentionId intentionId;
+  /// Намерение страницы: название и архивное состояние берутся из её
+  /// подробных данных, потому что строка группы владельца не несёт.
+  final RelationParticipantSummary owner;
+
+  IntentionId get intentionId => owner.id;
 
   /// Открывает подробные данные выбранной связи; маршрут выбирает страница.
   final ValueChanged<LongTermRelationId> onOpenRelation;
@@ -174,6 +179,7 @@ final class _RelationNeighborhoodSliverState
           'relation-neighborhood-row-${item.relation.id.toCanonicalString()}',
         ),
         item: item,
+        owner: widget.owner,
         onOpen: widget.onOpenRelation,
       ),
     );
@@ -804,24 +810,28 @@ final class _ChoiceGroup<T> extends StatelessWidget {
 }
 
 final class _RelationRow extends StatelessWidget {
-  const _RelationRow({required this.item, required this.onOpen, super.key});
+  const _RelationRow({
+    required this.item,
+    required this.owner,
+    required this.onOpen,
+    super.key,
+  });
 
-  final LongTermRelationSummary item;
+  final RelationGroupEntry item;
+  final RelationParticipantSummary owner;
   final ValueChanged<LongTermRelationId> onOpen;
 
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
     final relation = item.relation;
+    final ownerIsSource = relation.sourceIntentionId == owner.id;
+    final (source, related) = ownerIsSource
+        ? (owner.title, item.neighbor.title)
+        : (item.neighbor.title, owner.title);
     final phrase = relation.type == LongTermRelationType.need
-        ? localizations.relationNeighborhoodNeedPhrase(
-            item.source.title,
-            item.related.title,
-          )
-        : localizations.relationNeighborhoodCanPhrase(
-            item.source.title,
-            item.related.title,
-          );
+        ? localizations.relationNeighborhoodNeedPhrase(source, related)
+        : localizations.relationNeighborhoodCanPhrase(source, related);
     final priority = switch (relation.priority) {
       RelationPriority.p1 => 'P1',
       RelationPriority.p2 => 'P2',
@@ -876,12 +886,18 @@ final class _RelationRow extends StatelessWidget {
                       _Participant(
                         label:
                             localizations.relationNeighborhoodSourceParticipant,
-                        participant: item.source,
+                        title: source,
+                        archiveState: ownerIsSource
+                            ? owner.archiveState
+                            : item.neighbor.archiveState,
                       ),
                       _Participant(
                         label: localizations
                             .relationNeighborhoodRelatedParticipant,
-                        participant: item.related,
+                        title: related,
+                        archiveState: ownerIsSource
+                            ? item.neighbor.archiveState
+                            : owner.archiveState,
                       ),
                     ],
                   ),
@@ -896,10 +912,15 @@ final class _RelationRow extends StatelessWidget {
 }
 
 final class _Participant extends StatelessWidget {
-  const _Participant({required this.label, required this.participant});
+  const _Participant({
+    required this.label,
+    required this.title,
+    required this.archiveState,
+  });
 
   final String label;
-  final RelationParticipantSummary participant;
+  final String title;
+  final IntentionArchiveState archiveState;
 
   @override
   Widget build(BuildContext context) => Column(
@@ -910,8 +931,8 @@ final class _Participant extends StatelessWidget {
         child: Text(label, style: Theme.of(context).textTheme.labelLarge),
       ),
       IntentionSummaryView(
-        title: participant.title,
-        archiveState: participant.archiveState,
+        title: title,
+        archiveState: archiveState,
         showArchiveState: true,
       ),
     ],

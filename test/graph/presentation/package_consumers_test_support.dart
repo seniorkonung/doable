@@ -489,8 +489,11 @@ Object _neighborhoodContent(RelationGroupConfirmedState state) => [
       for (final item in items)
         (
           item.relation.id,
-          _participant(item.source),
-          _participant(item.related),
+          item.neighbor.id,
+          item.neighbor.title,
+          item.neighbor.archiveState,
+          item.neighbor.readiness,
+          item.descriptionPreview?.text,
         ),
     ],
     RelationGroupEmpty() => const [],

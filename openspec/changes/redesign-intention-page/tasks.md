@@ -1318,7 +1318,7 @@
     - проверки: `test/shared/domain/text_preview_test.dart` (новый, вместо `test/intention/application/intention_description_preview_test.dart`), `test/intention/application/intention_contract_test.dart`, `test/support/intention_description_preview.dart`.
   - **Размер:** S.
 
-- [ ] 6.5 Отдавать в порциях группы связей строку `RelationGroupEntry` с соседом, его готовностью и началом описания
+- [x] 6.5 Отдавать в порциях группы связей строку `RelationGroupEntry` с соседом, его готовностью и началом описания
   - **Критерии приёмки:**
     - По решению 6 дизайна и ADR-0047 первая порция и продолжение группы связей содержат `RelationGroupEntry` вместо `LongTermRelationSummary`:
       - саму связь;

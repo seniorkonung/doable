@@ -129,7 +129,7 @@ void main() {
         final harness = _NeighborhoodHarness(repository);
         addTearDown(harness.dispose);
         final row = testGroupRow(ownerId: harness.intentionId, index: 1);
-        final items = initiallyEmpty ? <LongTermRelationSummary>[] : [row];
+        final items = initiallyEmpty ? <RelationGroupEntry>[] : [row];
         final activeCount = initiallyEmpty ? 0 : 1;
         repository.completePage(
           0,
@@ -198,7 +198,7 @@ void main() {
         relation: removed.relation,
         counts: {
           owner: testRelationCounts(),
-          removed.related.id: testRelationCounts(),
+          removed.neighbor.id: testRelationCounts(),
         },
       ),
     );
@@ -259,7 +259,7 @@ void main() {
         relation: removed.relation,
         counts: {
           owner: testRelationCounts(activeNeedOutgoing: 2),
-          removed.related.id: testRelationCounts(),
+          removed.neighbor.id: testRelationCounts(),
         },
       ),
     );
@@ -323,9 +323,7 @@ void main() {
           index: 2,
           scope: RelationScope.archived,
         );
-        final initialItems = initiallyEmpty
-            ? <LongTermRelationSummary>[]
-            : [kept];
+        final initialItems = initiallyEmpty ? <RelationGroupEntry>[] : [kept];
         final activeCount = initiallyEmpty ? 0 : 1;
         repository.completePage(
           0,
@@ -351,7 +349,7 @@ void main() {
             relation: removed.relation,
             counts: {
               owner: testRelationCounts(activeNeedOutgoing: activeCount),
-              removed.related.id: testRelationCounts(),
+              removed.neighbor.id: testRelationCounts(),
             },
           ),
         );
@@ -909,7 +907,7 @@ void main() {
     await pumpEventQueue();
 
     expect(harness.loaded.summaryStatus, isA<RelationSummaryRefreshing>());
-    expect(harness.loaded.items.single.related.title, 'Связанное 1');
+    expect(harness.loaded.items.single.neighbor.title, 'Связанное 1');
 
     repository.completePage(
       1,
@@ -926,7 +924,7 @@ void main() {
       ),
     );
     await pumpEventQueue();
-    expect(harness.loaded.items.single.related.title, 'Новое название');
+    expect(harness.loaded.items.single.neighbor.title, 'Новое название');
   });
 
   test(
@@ -1632,12 +1630,12 @@ void main() {
               ),
               IntentionRelationCountsChanged(
                 revision: revision,
-                intentionId: removed.related.id,
+                intentionId: removed.neighbor.id,
                 counts: testRelationCounts(),
               ),
               IntentionRelationCountsChanged(
                 revision: revision,
-                intentionId: archived.related.id,
+                intentionId: archived.neighbor.id,
                 counts: testRelationCounts(),
               ),
               LongTermRelationDeletedChange(
@@ -1803,13 +1801,20 @@ LongTermRelation _copyRelation(
   creationSequence: relation.creationSequence,
 );
 
-LongTermRelationSummary _summaryForRelation(LongTermRelation relation) =>
-    LongTermRelationSummary(
-      relation: relation,
-      source: testParticipant(relation.sourceIntentionId),
-      related: testParticipant(relation.relatedIntentionId),
-      hasDescription: false,
-    );
+RelationGroupEntry _summaryForRelation(LongTermRelation relation) {
+  final ownerId = testIntentionId(1);
+  return RelationGroupEntry(
+    relation: relation,
+    neighbor: RelationNeighbor(
+      id: relation.sourceIntentionId == ownerId
+          ? relation.relatedIntentionId
+          : relation.sourceIntentionId,
+      title: 'Намерение',
+      archiveState: IntentionArchiveState.active,
+      readiness: IntentionReadiness.notReady,
+    ),
+  );
+}
 
 final class _NeighborhoodHarness {
   _NeighborhoodHarness(

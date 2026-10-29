@@ -335,7 +335,7 @@ RelationGroupPage _page(RelationGroupPageResult result) {
   return (result as RelationGroupPageSuccess).value;
 }
 
-List<LongTermRelationSummary> _longTermItems(RelationGroupPage page) =>
+List<RelationGroupEntry> _longTermItems(RelationGroupPage page) =>
     switch (page) {
       RelationGroupFirstPage(:final items) ||
       RelationGroupContinuationPage(:final items) => items,

@@ -234,7 +234,7 @@ final class RelationGroupLoaded extends RelationGroupConfirmedState {
     required super.counts,
     required super.revision,
     super.summaryStatus,
-    required List<LongTermRelationSummary> items,
+    required List<RelationGroupEntry> items,
     required this.nextCursor,
     this.progress = const RelationGroupIdle(),
     this.scrollAnchor,
@@ -242,7 +242,7 @@ final class RelationGroupLoaded extends RelationGroupConfirmedState {
 
   /// Последовательная загруженная часть группы в порядке приоритета и
   /// последовательности создания.
-  final List<LongTermRelationSummary> items;
+  final List<RelationGroupEntry> items;
   final RelationGroupCursor? nextCursor;
   @override
   final RelationGroupProgress progress;
