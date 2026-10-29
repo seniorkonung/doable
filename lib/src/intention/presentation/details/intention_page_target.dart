@@ -14,6 +14,10 @@ final class RelationsTarget extends IntentionPageTarget {
   const RelationsTarget();
 }
 
+final class ChoicesTarget extends IntentionPageTarget {
+  const ChoicesTarget();
+}
+
 final class StatisticsTarget extends IntentionPageTarget {
   const StatisticsTarget(this.statistics);
 

@@ -17,6 +17,7 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_tabs.dart';
+import 'package:doable/src/intention/presentation/details/intention_page_target.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/presentation/neighborhood/relation_neighborhood_paging_policy.dart';
 import 'package:flutter/material.dart';
@@ -215,6 +216,89 @@ void main() {
       semantics.dispose();
     },
   );
+  testWidgets(
+    'две страницы одного намерения не меняют друг у друга роль и строки выборов',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      final repository = ControlledDetailsRepository();
+      final owner = testDetailsIntention();
+      final choices = {
+        for (final role in DailyChoiceRelationRole.values)
+          role: _choice(owner.id, role: role, index: 1),
+      };
+      repository.onDailyChoiceGroupPage = (query) => GraphResultSuccess(
+        DailyChoiceGroupFirstPage(
+          items: [choices[query.role]!],
+          counts: testRelationCounts(dailySource: 1, dailySelected: 1),
+          nextCursor: null,
+          revision: const TestDetailsRevision(0),
+        ),
+      );
+      final router = await _openPage(
+        tester,
+        repository,
+        target: const ChoicesTarget(),
+      );
+      // Страницу и модель «Выборов» питают отдельные наблюдения намерения.
+      for (final request in repository.detailRequests) {
+        request.add(ResultSuccess(owner));
+      }
+      await tester.pumpAndSettle();
+
+      unawaited(
+        router.push(
+          IntentionDetailsRoute(
+            intentionId: owner.id,
+            target: const ChoicesTarget(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(repository.dailyChoiceGroupQueries.map((query) => query.role), [
+        DailyChoiceRelationRole.source,
+        DailyChoiceRelationRole.source,
+      ]);
+      await tester.tap(
+        find.byKey(const ValueKey('intention-choices-role-selected')),
+      );
+      await tester.pumpAndSettle();
+      _expectRows(tester, choices, shown: DailyChoiceRelationRole.selected);
+      final queriesBeforeBack = repository.dailyChoiceGroupQueries.length;
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(router.stack, hasLength(2));
+      _expectRows(tester, choices, shown: DailyChoiceRelationRole.source);
+      expect(repository.dailyChoiceGroupQueries, hasLength(queriesBeforeBack));
+      semantics.dispose();
+    },
+  );
+}
+
+/// Выбранная роль отмечена в переключателе, а в списке только её строка.
+void _expectRows(
+  WidgetTester tester,
+  Map<DailyChoiceRelationRole, DailyChoiceCatalogItem> choices, {
+  required DailyChoiceRelationRole shown,
+}) {
+  for (final MapEntry(key: role, value: choice) in choices.entries) {
+    expect(
+      tester
+          .getSemantics(
+            find.byKey(ValueKey('intention-choices-role-${role.name}')),
+          )
+          .getSemanticsData()
+          .flagsCollection
+          .isSelected,
+      role == shown ? Tristate.isTrue : Tristate.isFalse,
+    );
+    expect(
+      find.byKey(
+        ValueKey('intention-choices-row-${choice.id.toCanonicalString()}'),
+      ),
+      role == shown ? findsOneWidget : findsNothing,
+    );
+  }
 }
 
 const _pageLength = 10;
@@ -305,6 +389,7 @@ Future<AppRouter> _openPage(
   WidgetTester tester,
   ControlledDetailsRepository repository, {
   Locale locale = const Locale('en'),
+  IntentionPageTarget target = const OverviewTarget(),
 }) async {
   final router = AppRouter();
   addTearDown(router.dispose);
@@ -332,7 +417,12 @@ Future<AppRouter> _openPage(
   );
   await tester.pumpAndSettle();
   unawaited(
-    router.push(IntentionDetailsRoute(intentionId: testDetailsIntention().id)),
+    router.push(
+      IntentionDetailsRoute(
+        intentionId: testDetailsIntention().id,
+        target: target,
+      ),
+    ),
   );
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 500));

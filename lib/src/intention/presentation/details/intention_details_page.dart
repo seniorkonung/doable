@@ -83,7 +83,7 @@ final class _IntentionDetailsPageState
         _pageInstance,
         target: switch (_pageInstance.target) {
           StatisticsTarget(:final statistics) => statistics,
-          OverviewTarget() || RelationsTarget() => null,
+          OverviewTarget() || RelationsTarget() || ChoicesTarget() => null,
         },
       );
 
@@ -107,9 +107,11 @@ final class _IntentionDetailsPageState
     _selectedTab = switch (_pageInstance.target) {
       OverviewTarget() => IntentionDetailsTab.overview,
       RelationsTarget() => IntentionDetailsTab.relations,
+      ChoicesTarget() => IntentionDetailsTab.choices,
       StatisticsTarget() => IntentionDetailsTab.statistics,
     };
     if (_selectedTab == IntentionDetailsTab.relations) _retainNeighborhood();
+    _syncChoicesRetention();
   }
 
   /// Модель «Выборов» живёт, только пока вкладка выбрана, в том числе под
