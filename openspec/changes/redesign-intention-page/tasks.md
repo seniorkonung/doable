@@ -983,3 +983,16 @@
   - **Зависимости:** 4.18, 4.19.
   - **Предполагаемые файлы:** `lib/src/design_system/components/options_menu.dart`, при необходимости `lib/src/design_system/components/sheet.dart` без изменения поведения других потребителей и `lib/src/intention/presentation/details/intention_details_page.dart`, `test/design_system/options_menu_test.dart`.
   - **Размер:** S.
+
+- [ ] 4.26 Показывать занятость страницы намерения, когда вход в правку отклонён из-за команды, которую её модель ещё не отразила
+  - **Критерии приёмки:**
+    - Если `_openEdit` в `intention_details_page.dart` отклоняет нажатие на название в шапке, описание или приглашение его добавить или пункт «Изменить», потому что координатор считает намерение занятым (`isRunning`), а модель страницы этого ещё не отразила, страница вызывает существующий `IntentionDetailsViewModel.refreshOperationRunning()`. Так модель становится видимо занятой, как отклонённое изменение готовности, архивирования или восстановления через `AlreadyRunning`. Сейчас нажатие молча ничего не делает, а входы остаются доступными, что нарушает требование «Экран изменения намерения».
+    - После этого входы в правку и прочие изменяющие действия страницы недоступны, а после завершения операции снова доступны у сохранившегося намерения через существующий путь `_handleCompletion` и `_scheduleGateRefresh` модели.
+    - Новые механизмы занятости, подписки на координатор и параметры не добавляются.
+    - Проверка `intention_details_head_test.dart` «нажатие на название не открывает экран изменения, если команду приняла не страница и она ещё не отразила занятость» переписана: после нажатия экран изменения не открыт и `PageHead.onEdit` равен `null`, а после завершения команды координатора `onEdit` снова доступен.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/details`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 4.5, 4.19.
+  - **Предполагаемые файлы:** `lib/src/intention/presentation/details/intention_details_page.dart`, `test/intention/presentation/details/intention_details_head_test.dart`.
+  - **Размер:** XS.
