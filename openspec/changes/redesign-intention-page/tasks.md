@@ -1009,3 +1009,16 @@
   - **Зависимости:** 4.18, 4.19, 4.25 — тоже меняет `options_menu.dart` и его проверку.
   - **Предполагаемые файлы:** `lib/src/design_system/components/options_menu.dart`, `lib/src/intention/presentation/details/intention_options.dart`, `test/design_system/options_menu_test.dart`, `test/intention/presentation/details/intention_options_test.dart`.
   - **Размер:** XS.
+
+- [ ] 4.28 Удалить проверку страницы намерения, все ожидания которой подтверждают проверки шапки и «Обзора»
+  - **Критерии приёмки:**
+    - В `intention_details_page_test.dart` нет проверки «показывает архивное состояние и отсутствие описания». После задачи 4.21 она проверяет только метку «Archived», приглашение «Add a description» и выбранную плитку «Намерение» у неготового намерения и не ловит регрессии, которую не ловят другие проверки.
+    - Перед удалением подтверждено, что каждое её ожидание остаётся покрытым: метку архивированного намерения на английском — сценарий шапки архивированного намерения в `intention_details_head_test.dart`, приглашение «Add a description» — проверка приглашения добавить описание в `intention_details_overview_test.dart` для английского языка, выбранную плитку «Намерение» у неготового намерения — проверка «Обзора» только что созданного намерения в `intention_details_overview_test.dart`.
+    - Вспомогательные функции и импорты `intention_details_page_test.dart`, которые после удаления больше нигде не используются, удалены. Используемые другими проверками, например `_pumpDetailsPage` и `_selectedType`, остаются.
+    - Код приложения и остальные проверки не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/details`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 4.21.
+  - **Предполагаемые файлы:** `test/intention/presentation/details/intention_details_page_test.dart`.
+  - **Размер:** XS.
