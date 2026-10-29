@@ -196,14 +196,19 @@ final class _IntentionDetailsPageState
 
   /// Модель могла ещё не отразить команду, которую координатор принял не от
   /// этой страницы, поэтому перед открытием занятость читается у него.
+  /// Отклонённое так нажатие делает модель видимо занятой.
   void _openEdit(IntentionEditFocus focus) {
     final intentionId = widget.intentionId;
     final details = ref.read(intentionDetailsViewModelProvider(intentionId));
-    if (details is! IntentionDetailsLoaded ||
-        !_canOpenEdit(details) ||
-        ref
-            .read(graphCommandCoordinatorProvider.notifier)
-            .isRunning(intentionId)) {
+    if (details is! IntentionDetailsLoaded || !_canOpenEdit(details)) {
+      return;
+    }
+    if (ref
+        .read(graphCommandCoordinatorProvider.notifier)
+        .isRunning(intentionId)) {
+      ref
+          .read(intentionDetailsViewModelProvider(intentionId).notifier)
+          .refreshOperationRunning();
       return;
     }
     unawaited(

@@ -299,8 +299,17 @@ void main() {
     expect(tester.widget<PageHead>(find.byType(PageHead)).onEdit, isNotNull);
 
     await tester.tap(find.text('Бегать'));
-    await tester.pumpAndSettle();
+    // Индикатор выполняющейся команды не даёт кадрам успокоиться.
+    await tester.pump(const Duration(seconds: 1));
     expect(find.byType(IntentionEditPage), findsNothing);
+    expect(tester.widget<PageHead>(find.byType(PageHead)).onEdit, isNull);
+
+    repository.completeCommand(
+      0,
+      const ResultFailure(IntentionUnavailableFailure()),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.widget<PageHead>(find.byType(PageHead)).onEdit, isNotNull);
   });
 
   testWidgets('скрытая шапка переносит полное название в панель без значка, '
