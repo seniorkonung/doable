@@ -1,14 +1,8 @@
 import 'package:doable/l10n/app_localizations.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/design_system/components/page_head.dart';
 import 'package:doable/src/design_system/components/tabs.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_tabs.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
@@ -26,234 +20,6 @@ import 'neighborhood_test_support.dart';
 
 void main() {
   const revision = TestGraphRevision(1);
-
-  testWidgets(
-    'дневные роли показывают точные количества, строку и переход к пути',
-    (tester) async {
-      final semantics = tester.ensureSemantics();
-      final repository = ControlledNeighborhoodRepository();
-      addTearDown(repository.dispose);
-      final owner = testIntentionId(1);
-      final sourceChoice = _dailyItem(
-        owner: owner,
-        role: DailyChoiceRelationRole.source,
-      );
-      final selectedChoice = _dailyItem(
-        owner: owner,
-        role: DailyChoiceRelationRole.selected,
-      );
-      final opened = <DailyChoiceId>[];
-      await _pumpNeighborhoodSliver(
-        tester,
-        repository,
-        owner,
-        locale: const Locale('ru'),
-        onOpenDailyChoice: opened.add,
-      );
-      const counts = (source: 1, selected: 1);
-      repository.completePage(
-        0,
-        RelationGroupFirstPage(
-          items: const [],
-          counts: testRelationCounts(
-            dailySource: counts.source,
-            dailySelected: counts.selected,
-          ),
-          nextCursor: null,
-          revision: revision,
-        ),
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('Всего связей: 2'), findsOneWidget);
-      expect(find.text('Исходное намерение: 1'), findsOneWidget);
-      expect(find.text('Выбранное действие: 1'), findsOneWidget);
-
-      final sourceGroup = find.byKey(
-        const ValueKey('relation-neighborhood-daily-source'),
-      );
-      await _scrollTo(tester, sourceGroup);
-      await tester.tap(sourceGroup);
-      await tester.pump();
-      expect(repository.pageQueryAt(1), isA<DailyChoiceGroupQuery>());
-      expect(
-        (repository.pageQueryAt(1) as DailyChoiceGroupQuery).role,
-        DailyChoiceRelationRole.source,
-      );
-      repository.completePage(
-        1,
-        DailyChoiceGroupFirstPage(
-          items: [sourceChoice],
-          counts: testRelationCounts(dailySource: 1, dailySelected: 1),
-          nextCursor: null,
-          revision: revision,
-        ),
-      );
-      await tester.pumpAndSettle();
-      final sourceRow = find.byKey(
-        ValueKey(
-          'relation-neighborhood-daily-row-${sourceChoice.id.toCanonicalString()}',
-        ),
-      );
-      await _scrollTo(tester, sourceRow);
-      expect(
-        find.text('Чтобы Намерение-владелец, я сегодня Действие'),
-        findsOneWidget,
-      );
-      expect(find.text('Дата дневного выбора: 2026-09-24'), findsOneWidget);
-      expect(find.text('Выполнено'), findsOneWidget);
-      final sourceSemantics = tester.getSemantics(sourceRow).label;
-      expect(sourceSemantics, contains('Исходное намерение'));
-      expect(sourceSemantics, contains('Выполнено'));
-      await tester.tap(sourceRow);
-      expect(opened, [sourceChoice.id]);
-
-      final selectedGroup = find.byKey(
-        const ValueKey('relation-neighborhood-daily-selected'),
-      );
-      await _scrollTo(tester, selectedGroup);
-      await tester.tap(selectedGroup);
-      await tester.pump();
-      expect(
-        (repository.pageQueryAt(2) as DailyChoiceGroupQuery).role,
-        DailyChoiceRelationRole.selected,
-      );
-      repository.completePage(
-        2,
-        DailyChoiceGroupFirstPage(
-          items: [selectedChoice],
-          counts: testRelationCounts(dailySource: 1, dailySelected: 1),
-          nextCursor: null,
-          revision: revision,
-        ),
-      );
-      await tester.pumpAndSettle();
-      final selectedRow = find.byKey(
-        ValueKey(
-          'relation-neighborhood-daily-row-${selectedChoice.id.toCanonicalString()}',
-        ),
-      );
-      await _scrollTo(tester, selectedRow);
-      expect(
-        tester.getSemantics(selectedRow).label,
-        contains('Выбранное действие'),
-      );
-      expect(tester.getSemantics(selectedRow).label, contains('Не выполнено'));
-      semantics.dispose();
-    },
-  );
-
-  testWidgets('пустая дневная группа не скрывает другие зависимости', (
-    tester,
-  ) async {
-    final repository = ControlledNeighborhoodRepository();
-    addTearDown(repository.dispose);
-    final owner = testIntentionId(1);
-    final selectedChoice = _dailyItem(
-      owner: owner,
-      role: DailyChoiceRelationRole.selected,
-    );
-    await _pumpNeighborhoodSliver(tester, repository, owner);
-    expect(find.text('Loading relations and summary…'), findsOneWidget);
-    repository.completePage(
-      0,
-      RelationGroupFirstPage(
-        items: testGroupRows(ownerId: owner, from: 1, count: 1),
-        counts: testRelationCounts(activeNeedOutgoing: 1, dailySelected: 1),
-        nextCursor: null,
-        revision: revision,
-      ),
-    );
-    await tester.pumpAndSettle();
-    final sourceGroup = find.byKey(
-      const ValueKey('relation-neighborhood-daily-source'),
-    );
-    await _scrollTo(tester, sourceGroup);
-    await tester.tap(sourceGroup);
-    await tester.pump();
-    expect(find.text('Loading relations and summary…'), findsOneWidget);
-    expect(find.text('There are no relations in this group.'), findsNothing);
-    repository.completePage(
-      1,
-      DailyChoiceGroupFirstPage(
-        items: const [],
-        counts: testRelationCounts(activeNeedOutgoing: 1, dailySelected: 1),
-        nextCursor: null,
-        revision: revision,
-      ),
-    );
-    await tester.pumpAndSettle();
-    await _scrollTo(tester, find.text('There are no relations in this group.'));
-    expect(find.text('There are no relations in this group.'), findsOneWidget);
-    await _scrollTo(tester, find.text('Total relations: 2'));
-    expect(find.text('Total relations: 2'), findsOneWidget);
-    expect(find.text('Selected action: 1'), findsOneWidget);
-    final selectedGroup = find.byKey(
-      const ValueKey('relation-neighborhood-daily-selected'),
-    );
-    await _scrollTo(tester, selectedGroup);
-    await tester.tap(selectedGroup);
-    await tester.pump();
-    repository.completePage(
-      2,
-      DailyChoiceGroupFirstPage(
-        items: [selectedChoice],
-        counts: testRelationCounts(activeNeedOutgoing: 1, dailySelected: 1),
-        nextCursor: null,
-        revision: revision,
-      ),
-    );
-    await tester.pumpAndSettle();
-    final row = find.byKey(
-      ValueKey(
-        'relation-neighborhood-daily-row-${selectedChoice.id.toCanonicalString()}',
-      ),
-    );
-    await _scrollTo(tester, row);
-    expect(find.text('Not completed'), findsOneWidget);
-  });
-
-  testWidgets('дневная строка читается', (tester) async {
-    final repository = ControlledNeighborhoodRepository();
-    addTearDown(repository.dispose);
-    final owner = testIntentionId(1);
-    final item = _dailyItem(owner: owner, role: DailyChoiceRelationRole.source);
-
-    await _pumpNeighborhoodSliver(tester, repository, owner);
-    repository.completePage(
-      0,
-      RelationGroupFirstPage(
-        items: const [],
-        counts: testRelationCounts(dailySource: 1),
-        nextCursor: null,
-        revision: revision,
-      ),
-    );
-    await tester.pumpAndSettle();
-    final group = find.byKey(
-      const ValueKey('relation-neighborhood-daily-source'),
-    );
-    await _scrollTo(tester, group);
-    await tester.tap(group);
-    await tester.pump();
-    repository.completePage(
-      1,
-      DailyChoiceGroupFirstPage(
-        items: [item],
-        counts: testRelationCounts(dailySource: 1),
-        nextCursor: null,
-        revision: revision,
-      ),
-    );
-    await tester.pumpAndSettle();
-    final row = find.byKey(
-      ValueKey(
-        'relation-neighborhood-daily-row-${item.id.toCanonicalString()}',
-      ),
-    );
-    await _scrollTo(tester, row);
-    expect(find.text('Daily choice date: 2026-09-24'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
 
   testWidgets(
     'открывает активные исходящие связи «нужно» и показывает полную сводку',
@@ -921,7 +687,6 @@ Future<void> _pumpNeighborhoodSliver(
   Locale locale = const Locale('en'),
   int pageSize = 2,
   ValueChanged<LongTermRelationId>? onOpenRelation,
-  ValueChanged<DailyChoiceId>? onOpenDailyChoice,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
@@ -945,7 +710,6 @@ Future<void> _pumpNeighborhoodSliver(
               RelationNeighborhoodSliver(
                 intentionId: ownerId,
                 onOpenRelation: onOpenRelation ?? (_) {},
-                onOpenDailyChoice: onOpenDailyChoice ?? (_) {},
                 onCreateRelation: (_) {},
               ),
             ],
@@ -956,42 +720,6 @@ Future<void> _pumpNeighborhoodSliver(
   );
   await tester.pump();
   await _pumpUntilRequestCount(tester, repository, 1);
-}
-
-DailyChoiceCatalogItem _dailyItem({
-  required IntentionId owner,
-  required DailyChoiceRelationRole role,
-}) {
-  final id = (DailyChoiceId.decode(
-    '00000000-0000-4000-8000-${(role == DailyChoiceRelationRole.source ? 101 : 102).toString().padLeft(12, '0')}',
-  ) as DailyChoiceIdDecodingSuccess).id;
-  final source = DailyChoiceCatalogParticipant(
-    id: role == DailyChoiceRelationRole.source ? owner : testIntentionId(2),
-    title: role == DailyChoiceRelationRole.source
-        ? 'Намерение-владелец'
-        : 'Основание',
-    archiveState: IntentionArchiveState.active,
-    readiness: IntentionReadiness.notReady,
-  );
-  final selected = DailyChoiceCatalogParticipant(
-    id: role == DailyChoiceRelationRole.selected ? owner : testIntentionId(2),
-    title: role == DailyChoiceRelationRole.selected
-        ? 'Намерение-владелец'
-        : 'Действие',
-    archiveState: IntentionArchiveState.active,
-    readiness: IntentionReadiness.ready,
-  );
-  return DailyChoiceCatalogItem(
-    id: id,
-    source: source,
-    selected: selected,
-    date: CalendarDate.fromParts(2026, 9, 24),
-    isCompleted: role == DailyChoiceRelationRole.source,
-    schedule: const DailyChoiceAllDay(),
-    priority: DailyChoicePriority.p4,
-    description: null,
-    pathIntentionCount: 2,
-  );
 }
 
 Future<void> _scrollTo(

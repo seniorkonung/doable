@@ -1189,7 +1189,7 @@
   - **Предполагаемые файлы:** `test/graph/presentation/graph_reconciliation_checkpoint_test.dart`, `test/app/navigation/app_shell_state_test.dart`, `test/intention/presentation/details/intention_details_page_test.dart`.
   - **Размер:** M.
 
-- [ ] 5.9 Убрать дневные группы из соседства на вкладке «Связи»
+- [x] 5.9 Убрать дневные группы из соседства на вкладке «Связи»
   - **Критерии приёмки:**
     - По результату фазы 5 плана в соседстве нет дневных групп:
       - у `RelationNeighborhoodViewModel` нет `selectDailyGroup`, дневного источника порций и согласования строк дневной роли;

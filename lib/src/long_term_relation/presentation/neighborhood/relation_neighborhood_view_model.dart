@@ -2,8 +2,6 @@ import 'dart:async';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../../../daily_choice/application/daily_choice_catalog.dart';
-import '../../../daily_choice/domain/daily_choice_id.dart';
 import '../../../graph/application/graph_change.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_command_result.dart';
@@ -49,11 +47,6 @@ final class RelationNeighborhoodViewModel
   _intentionSubscription;
   StreamSubscription<GraphCommandCompletion>? _completionSubscription;
   var _selection = RelationGroupSelection.initial;
-  RelationGroup _group = const LongTermRelationGroup(
-    type: LongTermRelationType.need,
-    direction: RelationDirection.outgoing,
-    scope: RelationScope.active,
-  );
   LongTermRelationId? _visibleRelationId;
   var _isTerminated = false;
 
@@ -75,26 +68,25 @@ final class RelationNeighborhoodViewModel
     return RelationGroupInitialLoad(
       intentionId: intentionId,
       selection: _selection,
-      group: _group,
     );
   }
 
   void selectType(LongTermRelationType type) {
-    if (_group is LongTermRelationGroup && _selection.type == type) {
+    if (_selection.type == type) {
       return;
     }
     _restart(_selection.withType(type));
   }
 
   void selectDirection(RelationDirection direction) {
-    if (_group is LongTermRelationGroup && _selection.direction == direction) {
+    if (_selection.direction == direction) {
       return;
     }
     _restart(_selection.withDirection(direction));
   }
 
   void selectScope(RelationScope scope) {
-    if (_group is LongTermRelationGroup && _selection.scope == scope) {
+    if (_selection.scope == scope) {
       return;
     }
     _restart(_selection.withScope(scope));
@@ -102,19 +94,10 @@ final class RelationNeighborhoodViewModel
 
   /// Открывает один из восьми точных переходов полной сводки.
   void selectGroup(RelationGroupSelection selection) {
-    if (_group is LongTermRelationGroup && _selection == selection) {
+    if (_selection == selection) {
       return;
     }
     _restart(selection);
-  }
-
-  /// Выбирает одну прямую роль дневных выборов без чтения других групп.
-  void selectDailyGroup(DailyChoiceRelationRole role) {
-    final group = DailyChoiceRelationGroup(role: role);
-    if (_group == group) {
-      return;
-    }
-    _restartGroup(group);
   }
 
   /// Повторяет первое чтение выбранной группы после устранимого отказа.
@@ -127,7 +110,6 @@ final class RelationNeighborhoodViewModel
     state = RelationGroupInitialLoad(
       intentionId: _intentionId,
       selection: current.selection,
-      group: current.group,
     );
     return _loadFirstPage(generation);
   }
@@ -140,7 +122,6 @@ final class RelationNeighborhoodViewModel
     if (current is! RelationGroupConfirmedState) return Future.value();
     final length = switch (current) {
       RelationGroupLoaded(:final items) => items.length,
-      DailyChoiceGroupLoaded(:final items) => items.length,
       RelationGroupEmpty() => null,
     };
     if (length == null ||
@@ -195,23 +176,11 @@ final class RelationNeighborhoodViewModel
 
   void _restart(RelationGroupSelection selection) {
     _selection = selection;
-    _restartGroup(
-      LongTermRelationGroup(
-        type: selection.type,
-        direction: selection.direction,
-        scope: selection.scope,
-      ),
-    );
-  }
-
-  void _restartGroup(RelationGroup group) {
-    _group = group;
     _visibleRelationId = null;
     final generation = _paging.nextGeneration();
     state = RelationGroupInitialLoad(
       intentionId: _intentionId,
-      selection: _selection,
-      group: group,
+      selection: selection,
     );
     unawaited(_loadFirstPage(generation));
   }
@@ -219,17 +188,10 @@ final class RelationNeighborhoodViewModel
   Future<void> _loadFirstPage(int generation) async {
     final request = _paging.startRequest(generation);
     final selection = _selection;
-    final group = _group;
-    final result = await switch (group) {
-      final LongTermRelationGroup longTerm => _mapPagingResult(
-        _paging.readFirst(_longTermSource(longTerm), request),
-        (data) => _longTermState(longTerm, data),
-      ),
-      final DailyChoiceRelationGroup daily => _mapPagingResult(
-        _paging.readFirst(_dailySource(daily), request),
-        (data) => _dailyState(daily, data),
-      ),
-    };
+    final result = await _mapPagingResult(
+      _paging.readFirst(_source(selection), request),
+      _confirmedState,
+    );
     if (!ref.mounted || !_paging.owns(request)) return;
     _paging.finishRequest(request);
     switch (result) {
@@ -242,7 +204,7 @@ final class RelationNeighborhoodViewModel
       case GraphResultFailure(failure: RelationGroupIntentionNotFoundFailure()):
         _finishIntentionContext();
       case GraphResultFailure(:final failure):
-        state = _initialFailure(selection, group, failure);
+        state = _initialFailure(selection, failure);
       case null:
         break;
     }
@@ -258,24 +220,11 @@ final class RelationNeighborhoodViewModel
     final result = await switch (confirmed) {
       RelationGroupLoaded() => _mapPagingResult(
         _paging.loadMore(
-          _longTermSource(confirmed.group as LongTermRelationGroup),
+          _source(confirmed.selection),
           _pagingData(confirmed, confirmed.items),
           request,
         ),
-        (data) => _longTermState(
-          confirmed.group as LongTermRelationGroup,
-          data,
-          scrollAnchor: confirmed.scrollAnchor,
-        ),
-      ),
-      DailyChoiceGroupLoaded() => _mapPagingResult(
-        _paging.loadMore(
-          _dailySource(confirmed.group as DailyChoiceRelationGroup),
-          _pagingData(confirmed, confirmed.items),
-          request,
-        ),
-        (data) =>
-            _dailyState(confirmed.group as DailyChoiceRelationGroup, data),
+        (data) => _confirmedState(data, scrollAnchor: confirmed.scrollAnchor),
       ),
       RelationGroupEmpty() => null,
     };
@@ -313,26 +262,15 @@ final class RelationNeighborhoodViewModel
     state = _withSummaryStatus(refreshBase, const RelationSummaryRefreshing());
     try {
       while (_paging.owns(request)) {
-        final result = await switch (confirmed.group) {
-          final LongTermRelationGroup group => _mapPagingResult(
-            _paging.refresh(
-              _longTermSource(group),
-              request,
-              loadedCount: _itemsOf(confirmed).length,
-              includeRequestedPage: includeRequestedPage,
-            ),
-            (data) => _longTermState(group, data),
+        final result = await _mapPagingResult(
+          _paging.refresh(
+            _source(confirmed.selection),
+            request,
+            loadedCount: _itemsOf(confirmed).length,
+            includeRequestedPage: includeRequestedPage,
           ),
-          final DailyChoiceRelationGroup group => _mapPagingResult(
-            _paging.refresh(
-              _dailySource(group),
-              request,
-              loadedCount: _dailyItemsOf(confirmed).length,
-              includeRequestedPage: includeRequestedPage,
-            ),
-            (data) => _dailyState(group, data),
-          ),
-        };
+          _confirmedState,
+        );
         if (!ref.mounted || !_paging.owns(request)) return;
         switch (result) {
           case GraphResultSuccess(:final value):
@@ -383,18 +321,24 @@ final class RelationNeighborhoodViewModel
     nextCursor: _cursorOf(confirmed),
   );
 
-  RelationPagingSource<LongTermRelationSummary, LongTermRelationId>
-  _longTermSource(LongTermRelationGroup group) => RelationPagingSource(
+  RelationPagingSource<LongTermRelationSummary, LongTermRelationId> _source(
+    RelationGroupSelection selection,
+  ) => RelationPagingSource(
     pageSize: _policy.pageSize,
-    identify: (item) => _belongsToGroup(item, group) ? item.relation.id : null,
+    identify: (item) =>
+        _belongsToGroup(item, selection) ? item.relation.id : null,
     readPage: (cursor) async =>
-        switch (await _readPage(group, cursor: cursor)) {
+        switch (await _readPage(selection, cursor: cursor)) {
           GraphResultSuccess(value: final RelationGroupFirstPage page) =>
             GraphResultSuccess(
               RelationPagingFirstPage(
                 items: page.items,
                 counts: page.counts,
-                totalCount: page.counts.forSelection(group),
+                totalCount: page.counts.forGroup(
+                  scope: selection.scope,
+                  type: selection.type,
+                  direction: selection.direction,
+                ),
                 revision: page.revision,
                 nextCursor: page.nextCursor,
               ),
@@ -414,82 +358,25 @@ final class RelationNeighborhoodViewModel
         },
   );
 
-  RelationPagingSource<DailyChoiceCatalogItem, DailyChoiceId> _dailySource(
-    DailyChoiceRelationGroup group,
-  ) => RelationPagingSource(
-    pageSize: _policy.pageSize,
-    identify: (item) => _dailyItemBelongsToGroup(item, group) ? item.id : null,
-    readPage: (cursor) async => switch (await _readPage(
-      group,
-      cursor: cursor,
-    )) {
-      GraphResultSuccess(value: final DailyChoiceGroupFirstPage page) =>
-        GraphResultSuccess(
-          RelationPagingFirstPage(
-            items: page.items,
-            counts: page.counts,
-            totalCount: page.counts.forSelection(group),
-            revision: page.revision,
-            nextCursor: page.nextCursor,
-          ),
-        ),
-      GraphResultSuccess(value: final DailyChoiceGroupContinuationPage page) =>
-        GraphResultSuccess(
-          RelationPagingContinuationPage(
-            items: page.items,
-            revision: page.revision,
-            nextCursor: page.nextCursor,
-          ),
-        ),
-      GraphResultSuccess() => const GraphResultFailure(
-        RelationGroupUnexpectedFailure(),
-      ),
-      GraphResultFailure(:final failure) => GraphResultFailure(failure),
-    },
-  );
-
-  RelationGroupConfirmedState _longTermState(
-    LongTermRelationGroup group,
+  RelationGroupConfirmedState _confirmedState(
     RelationPagingData<LongTermRelationSummary> data, {
     RelationGroupScrollAnchor? scrollAnchor,
   }) => data.items.isEmpty
-      ? _emptyState(group, data)
+      ? RelationGroupEmpty(
+          intentionId: _intentionId,
+          selection: _selection,
+          counts: data.counts,
+          revision: data.revision,
+        )
       : RelationGroupLoaded(
           intentionId: _intentionId,
           selection: _selection,
-          group: group,
           counts: data.counts,
           revision: data.revision,
           items: data.items,
           nextCursor: data.nextCursor,
           scrollAnchor: scrollAnchor,
         );
-
-  RelationGroupConfirmedState _dailyState(
-    DailyChoiceRelationGroup group,
-    RelationPagingData<DailyChoiceCatalogItem> data,
-  ) => data.items.isEmpty
-      ? _emptyState(group, data)
-      : DailyChoiceGroupLoaded(
-          intentionId: _intentionId,
-          selection: _selection,
-          group: group,
-          counts: data.counts,
-          revision: data.revision,
-          items: data.items,
-          nextCursor: data.nextCursor,
-        );
-
-  RelationGroupEmpty _emptyState<Row>(
-    RelationGroup group,
-    RelationPagingData<Row> data,
-  ) => RelationGroupEmpty(
-    intentionId: _intentionId,
-    selection: _selection,
-    group: group,
-    counts: data.counts,
-    revision: data.revision,
-  );
 
   void _subscribeToGraphChanges() {
     try {
@@ -554,7 +441,7 @@ final class RelationNeighborhoodViewModel
             RelationSummaryRefreshFailure(mapped),
           ),
           RelationGroupInitialLoad() || RelationGroupInitialFailure() =>
-            _initialFailure(current.selection, current.group, mapped),
+            _initialFailure(current.selection, mapped),
           RelationNeighborhoodIntentionNotFound() => current,
         };
     }
@@ -613,18 +500,12 @@ final class RelationNeighborhoodViewModel
       item.relation.sourceIntentionId,
       item.relation.relatedIntentionId,
     ],
-    if (state case DailyChoiceGroupLoaded(:final items))
-      for (final item in items) ...[item.source.id, item.selected.id],
   };
 
   bool _changesAffectObservedState(Iterable<GraphChange> changes) {
     final current = state;
     final items = _itemsOfState(current);
     final loadedRelationIds = {for (final item in items) item.relation.id};
-    final loadedDailyChoiceIds = <DailyChoiceId>{
-      if (current case DailyChoiceGroupLoaded(:final items))
-        for (final item in items) item.id,
-    };
     final observedIntentionIds = _observedIntentionIds;
     for (final change in changes) {
       switch (change) {
@@ -639,31 +520,12 @@ final class RelationNeighborhoodViewModel
               counts != current.counts) {
             return true;
           }
-        case DailyChoiceChange(
-          :final intentionCounts,
-          :final before,
-          :final after,
-        ):
+        case DailyChoiceChange(:final intentionCounts):
+          // Дневной выбор меняет только полную сводку намерения.
           final counts = intentionCounts[_intentionId];
-          final choiceId = after?.id ?? before?.id;
-          final selectedDailyRole = switch (_group) {
-            DailyChoiceRelationGroup(:final role) => role,
-            LongTermRelationGroup() => null,
-          };
-          final affectsSelectedRole = switch (selectedDailyRole) {
-            DailyChoiceRelationRole.source =>
-              before?.sourceIntentionId == _intentionId ||
-                  after?.sourceIntentionId == _intentionId,
-            DailyChoiceRelationRole.selected =>
-              before?.selectedIntentionId == _intentionId ||
-                  after?.selectedIntentionId == _intentionId,
-            null => false,
-          };
-          if (affectsSelectedRole ||
-              loadedDailyChoiceIds.contains(choiceId) ||
-              (counts != null &&
-                  (current is! RelationGroupConfirmedState ||
-                      counts != current.counts))) {
+          if (counts != null &&
+              (current is! RelationGroupConfirmedState ||
+                  counts != current.counts)) {
             return true;
           }
         case LongTermRelationChange(:final id, :final before, :final after):
@@ -731,8 +593,7 @@ final class RelationNeighborhoodViewModel
     }
     _paging.requireRevision(revision);
     if (current is RelationGroupConfirmedState) {
-      if ((current is RelationGroupLoaded ||
-              current is DailyChoiceGroupLoaded) &&
+      if (current is RelationGroupLoaded &&
           current.progress is RelationGroupLoadingMore) {
         // Продолжение прежней ревизии может задержаться или не завершиться.
         // Новую основу читаем сразу, сохраняя предел запрошенной порции.
@@ -769,23 +630,14 @@ final class RelationNeighborhoodViewModel
     state = RelationNeighborhoodIntentionNotFound(
       intentionId: _intentionId,
       selection: _selection,
-      group: _group,
     );
     unawaited(_intentionSubscription?.cancel());
     unawaited(_completionSubscription?.cancel());
   }
 
-  bool _dailyItemBelongsToGroup(
-    DailyChoiceCatalogItem item,
-    DailyChoiceRelationGroup group,
-  ) => switch (group.role) {
-    DailyChoiceRelationRole.source => item.source.id == _intentionId,
-    DailyChoiceRelationRole.selected => item.selected.id == _intentionId,
-  };
-
   bool _belongsToGroup(
     LongTermRelationSummary item,
-    LongTermRelationGroup selection,
+    RelationGroupSelection selection,
   ) {
     final relation = item.relation;
     if (relation.type != selection.type || relation.scope != selection.scope) {
@@ -802,20 +654,11 @@ final class RelationNeighborhoodViewModel
   ) => switch (confirmed) {
     RelationGroupEmpty() => const [],
     RelationGroupLoaded(:final items) => items,
-    DailyChoiceGroupLoaded() => const [],
-  };
-
-  List<DailyChoiceCatalogItem> _dailyItemsOf(
-    RelationGroupConfirmedState confirmed,
-  ) => switch (confirmed) {
-    DailyChoiceGroupLoaded(:final items) => items,
-    RelationGroupEmpty() || RelationGroupLoaded() => const [],
   };
 
   RelationGroupCursor? _cursorOf(RelationGroupConfirmedState confirmed) =>
       switch (confirmed) {
-        RelationGroupLoaded(:final nextCursor) ||
-        DailyChoiceGroupLoaded(:final nextCursor) => nextCursor,
+        RelationGroupLoaded(:final nextCursor) => nextCursor,
         RelationGroupEmpty() => null,
       };
 
@@ -823,7 +666,6 @@ final class RelationNeighborhoodViewModel
     RelationNeighborhoodState current,
   ) => switch (current) {
     RelationGroupLoaded(:final items) => items,
-    DailyChoiceGroupLoaded() => const [],
     RelationGroupInitialLoad() ||
     RelationGroupInitialFailure() ||
     RelationNeighborhoodIntentionNotFound() ||
@@ -836,9 +678,6 @@ final class RelationNeighborhoodViewModel
   ) => switch (confirmed) {
     final RelationGroupEmpty empty => empty.withSummaryStatus(summaryStatus),
     final RelationGroupLoaded loaded => loaded.withSummaryStatus(summaryStatus),
-    final DailyChoiceGroupLoaded loaded => loaded.withSummaryStatus(
-      summaryStatus,
-    ),
   };
 
   RelationGroupConfirmedState _withProgress(
@@ -847,17 +686,12 @@ final class RelationNeighborhoodViewModel
   ) => switch (confirmed) {
     final RelationGroupEmpty empty => empty.withProgress(progress),
     final RelationGroupLoaded loaded => loaded.withProgress(progress),
-    final DailyChoiceGroupLoaded loaded => loaded.withProgress(progress),
   };
 
   RelationGroupConfirmedState _withScrollAnchor({
     required RelationGroupConfirmedState previous,
     required RelationGroupConfirmedState replacement,
   }) {
-    if (replacement is DailyChoiceGroupLoaded ||
-        previous is DailyChoiceGroupLoaded) {
-      return replacement;
-    }
     final anchor = _paging.chooseAnchor(
       previous: _itemsOf(previous),
       replacement: _itemsOf(replacement),
@@ -871,7 +705,6 @@ final class RelationNeighborhoodViewModel
       RelationGroupLoaded() => RelationGroupLoaded(
         intentionId: replacement.intentionId,
         selection: replacement.selection,
-        group: replacement.group,
         counts: replacement.counts,
         revision: replacement.revision,
         summaryStatus: replacement.summaryStatus,
@@ -883,7 +716,6 @@ final class RelationNeighborhoodViewModel
           index: anchor.index,
         ),
       ),
-      DailyChoiceGroupLoaded() => replacement,
     };
   }
 
@@ -899,37 +731,28 @@ final class RelationNeighborhoodViewModel
 
   RelationGroupInitialFailure _initialFailure(
     RelationGroupSelection selection,
-    RelationGroup group,
     RelationGroupReadFailure failure,
   ) => RelationGroupInitialFailure(
     intentionId: _intentionId,
     selection: selection,
-    group: group,
     failure: failure,
   );
 
   Future<RelationGroupPageResult> _readPage(
-    RelationGroup group, {
+    RelationGroupSelection selection, {
     RelationGroupCursor? cursor,
   }) async {
     try {
-      return await _repository.getRelationGroupPage(switch (group) {
-        LongTermRelationGroup(:final type, :final direction, :final scope) =>
-          RelationGroupQuery(
-            intentionId: _intentionId,
-            type: type,
-            direction: direction,
-            scope: scope,
-            pageSize: _policy.pageSize,
-            cursor: cursor,
-          ),
-        DailyChoiceRelationGroup(:final role) => DailyChoiceGroupQuery(
+      return await _repository.getRelationGroupPage(
+        RelationGroupQuery(
           intentionId: _intentionId,
-          role: role,
+          type: selection.type,
+          direction: selection.direction,
+          scope: selection.scope,
           pageSize: _policy.pageSize,
           cursor: cursor,
         ),
-      });
+      );
     } on Object {
       // Неизвестная причина отказа не выдаётся за отсутствие данных.
       return const GraphResultFailure(RelationGroupUnexpectedFailure());

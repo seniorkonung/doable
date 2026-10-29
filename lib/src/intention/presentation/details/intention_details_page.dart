@@ -768,11 +768,6 @@ final class _LoadedDetails extends StatelessWidget {
                     RelationDetailsRoute(relationId: relationId),
                   ),
                 ),
-                onOpenDailyChoice: (choiceId) => unawaited(
-                  context.router.push(
-                    DailyChoiceDetailsRoute(choiceId: choiceId),
-                  ),
-                ),
                 onCreateRelation: (direction) => unawaited(
                   context.router.push(
                     RelationEditorRoute(

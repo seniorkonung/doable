@@ -354,7 +354,7 @@ final class PackageConsumerProbes {
 
   Object? neighborhoodSelection(IntentionId id) {
     final state = _container.read(relationNeighborhoodViewModelProvider(id));
-    return (state.selection, state.group);
+    return state.selection;
   }
 
   /// Открывает над полученными подробными данными сессию экрана изменения
@@ -492,9 +492,6 @@ Object _neighborhoodContent(RelationGroupConfirmedState state) => [
           _participant(item.source),
           _participant(item.related),
         ),
-    ],
-    DailyChoiceGroupLoaded(:final items) => [
-      for (final item in items) _dailyItem(item),
     ],
     RelationGroupEmpty() => const [],
   },
