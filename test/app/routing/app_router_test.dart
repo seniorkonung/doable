@@ -4,7 +4,6 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
-import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
 import 'package:doable/src/daily_choice/presentation/source_picker/daily_choice_source_picker_page.dart';
 import 'package:doable/src/daily_choice/presentation/daily_choice_picker_context.dart';
@@ -14,7 +13,6 @@ import 'package:doable/src/intention/application/intention_catalog.dart'
     hide IntentionCatalogPage;
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
@@ -36,85 +34,6 @@ import '../../support/app_root_pages.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 
 void main() {
-  testWidgets('верхний обход открывается из активного намерения', (
-    tester,
-  ) async {
-    final repository = ControlledRelationDetailsRepository();
-    addTearDown(repository.dispose);
-    final router = AppRouter();
-    addTearDown(router.dispose);
-    final sourceId = testIntentionId(51);
-
-    await _pumpRouter(tester, repository, router);
-    unawaited(router.push(IntentionDetailsRoute(intentionId: sourceId)));
-    await _settleNeighborhood(
-      tester,
-      repository,
-      expectedWatches: 1,
-      expectedQueries: 0,
-    );
-    const revision = TestGraphRevision(1);
-    final source = testNeighborhoodIntention(id: sourceId, title: 'Действие');
-    repository.emitIntention(
-      Intention(
-        id: source.id,
-        title: source.title,
-        description: source.description,
-        readiness: IntentionReadiness.ready,
-        archiveState: source.archiveState,
-        createdAt: source.createdAt,
-        updatedAt: source.updatedAt,
-      ),
-      counts: testRelationCounts(activeNeedOutgoing: 1),
-      revision: revision,
-    );
-    await tester.pumpAndSettle();
-
-    final open = find.byKey(const ValueKey('intention-details-choose-path'));
-    expect(open, findsOneWidget);
-    await tester.ensureVisible(open);
-    await tester.tap(open);
-    await tester.pump(const Duration(milliseconds: 400));
-    await tester.pump();
-    expect(
-      tester
-          .widget<ChoicePathPage>(find.byType(ChoicePathPage))
-          .sourceIntentionId,
-      sourceId,
-    );
-  });
-
-  testWidgets('архивное намерение не предлагает верхний обход', (tester) async {
-    final repository = ControlledRelationDetailsRepository();
-    addTearDown(repository.dispose);
-    final router = AppRouter();
-    addTearDown(router.dispose);
-    final sourceId = testIntentionId(53);
-
-    await _pumpRouter(tester, repository, router);
-    unawaited(router.push(IntentionDetailsRoute(intentionId: sourceId)));
-    await _settleNeighborhood(
-      tester,
-      repository,
-      expectedWatches: 1,
-      expectedQueries: 0,
-    );
-    const revision = TestGraphRevision(1);
-    repository.emitIntention(
-      testNeighborhoodIntention(
-        id: sourceId,
-        archiveState: IntentionArchiveState.archived,
-      ),
-      counts: testRelationCounts(),
-      revision: revision,
-    );
-    await tester.pumpAndSettle();
-    expect(
-      find.byKey(const ValueKey('intention-details-choose-path')),
-      findsNothing,
-    );
-  });
-
   testWidgets(
     'открывает начальную Главную и каталоги оболочки через сгенерированные '
     'PageRouteInfo',

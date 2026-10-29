@@ -62,6 +62,7 @@ import '../../support/intention_edit_screen.dart';
 import '../../support/intention_options.dart';
 import '../../support/quick_creation.dart';
 import '../../support/temporary_graph_files.dart';
+import '../../support/intention_choices_tab.dart';
 import '../../support/tag_positions.dart';
 
 part 'app_shell_page_matrix.dart';

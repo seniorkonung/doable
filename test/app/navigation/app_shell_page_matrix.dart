@@ -22,7 +22,7 @@ enum _MatrixEntry {
   draftTags,
   replaceChoice,
   replaceTopDown,
-  choosePath,
+  addChoice,
   continuePath,
   selectAction,
   selectSource,
@@ -61,9 +61,7 @@ enum _MatrixEntry {
     _MatrixEntry.replaceTopDown => find.byKey(
       const ValueKey('daily-choice-replace-top-down'),
     ),
-    _MatrixEntry.choosePath => find.byKey(
-      const ValueKey('intention-details-choose-path'),
-    ),
+    _MatrixEntry.addChoice => intentionChoicesAdd,
     _MatrixEntry.continuePath => _continuePath,
     _MatrixEntry.selectAction => find.byKey(
       const ValueKey('choice-path-select-action'),
@@ -323,7 +321,7 @@ void _registerPageMatrixTests() {
       name: 'путь от намерения',
       page: ChoicePathPage,
       panel: false,
-      entries: [read, _MatrixEntry.choosePath],
+      entries: [read, _MatrixEntry.addChoice],
     ),
     (
       name: 'подтверждение дневного выбора сверху вниз',
@@ -331,7 +329,7 @@ void _registerPageMatrixTests() {
       panel: false,
       entries: [
         read,
-        _MatrixEntry.choosePath,
+        _MatrixEntry.addChoice,
         _MatrixEntry.continuePath,
         _MatrixEntry.selectAction,
         _MatrixEntry.confirmPath,
@@ -428,6 +426,9 @@ void _registerPageMatrixTests() {
                 entry == _MatrixEntry.createRelation ||
                 entry == _MatrixEntry.incomingRelations) {
               await _tap(tester, find.text('Relations').first);
+            }
+            if (entry == _MatrixEntry.addChoice) {
+              await openIntentionChoicesTab(tester, waitFor: _until, tap: _tap);
             }
             await _tap(tester, entry.finder);
         }
