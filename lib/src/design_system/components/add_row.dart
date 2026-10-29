@@ -8,7 +8,8 @@ import '../doable_icon.dart';
 import '../doable_metrics.dart';
 import '../doable_type.dart';
 
-/// Строка с заголовком того, что лежит под ней, и «Добавить» у правого края.
+/// Строка о том, что лежит под ней: заголовок или подсказка и «Добавить»
+/// у правого края.
 ///
 /// Область нажатия «Добавить» выходит за край строки и принимает касания
 /// там, пока родитель строки шире её на эту полосу, например поле содержимого
@@ -21,55 +22,98 @@ final class AddRow extends StatelessWidget {
 
   /// Строка с заголовком, как шапка блока тегов. Без обработчика «Добавить»
   /// выключено и остаётся на своём месте.
-  const AddRow({
-    required this.title,
-    required this.addText,
-    required this.addLabel,
-    required this.onAdd,
-    this.addKey,
+  AddRow({
+    required String title,
+    required String addText,
+    required String addLabel,
+    required VoidCallback? onAdd,
+    Key? addKey,
     super.key,
-  });
+  }) : _lead = _Title(title),
+       _add = _Add(text: addText, label: addLabel, onAdd: onAdd, key: addKey);
 
-  final String title;
+  /// Строка с подсказкой об открытом списке и «Добавить».
+  AddRow.hint({
+    required String hint,
+    required String addText,
+    required String addLabel,
+    required VoidCallback onAdd,
+    Key? addKey,
+    super.key,
+  }) : _lead = _Hint(hint),
+       _add = _Add(text: addText, label: addLabel, onAdd: onAdd, key: addKey);
+
+  /// Строка с одной подсказкой: добавить в список нечего.
+  AddRow.hintOnly({required String hint, super.key})
+    : _lead = _Hint(hint),
+      _add = null;
+
+  /// Строка с одним «Добавить» у правого края.
+  AddRow.addOnly({
+    required String addText,
+    required String addLabel,
+    required VoidCallback onAdd,
+    Key? addKey,
+    super.key,
+  }) : _lead = null,
+       _add = _Add(text: addText, label: addLabel, onAdd: onAdd, key: addKey);
+
+  final _Lead? _lead;
+  final _Add? _add;
+
+  String? get title => switch (_lead) {
+    _Title(:final text) => text,
+    _Hint() || null => null,
+  };
 
   /// Видимая подпись «Добавить».
-  final String addText;
+  String? get addText => _add?.text;
 
   /// Доступное название «Добавить»: что именно оно добавляет.
-  final String addLabel;
+  String? get addLabel => _add?.label;
 
   /// Без обработчика «Добавить» окрашено `grip`, как выключенная текстовая
   /// кнопка, и объявляется недоступным.
-  final VoidCallback? onAdd;
+  VoidCallback? get onAdd => _add?.onAdd;
 
   /// Ключ области нажатия «Добавить», по нему её находят сценарии экрана.
-  final Key? addKey;
+  Key? get addKey => _add?.key;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).extension<DoableColors>()!;
+    final lead = _lead;
+    final add = _add;
 
-    return _EndOverhang(
-      extent: _addOverhang,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: DoableMetrics.tapMin),
-        child: Row(
-          spacing: DoableMetrics.space3,
-          children: [
+    final row = ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: DoableMetrics.tapMin),
+      child: Row(
+        spacing: DoableMetrics.space3,
+        children: [
+          if (lead == null)
+            const Spacer()
+          else
             Expanded(
               child: Padding(
                 padding: const EdgeInsetsDirectional.only(
                   start: DoableMetrics.space1,
                 ),
-                child: Text(
-                  title,
-                  style: DoableType.row.copyWith(color: colors.ink),
-                ),
+                child: switch (lead) {
+                  _Title(:final text) => Text(
+                    text,
+                    style: DoableType.row.copyWith(color: colors.ink),
+                  ),
+                  _Hint(:final text) => Text(
+                    text,
+                    style: DoableType.hint.copyWith(color: colors.muted),
+                  ),
+                },
               ),
             ),
+          if (add != null)
             TextButton(
-              key: addKey,
-              onPressed: onAdd,
+              key: add.key,
+              onPressed: add.onAdd,
               style: TextButton.styleFrom(
                 foregroundColor: colors.accent,
                 disabledForegroundColor: colors.grip,
@@ -92,17 +136,46 @@ final class AddRow extends StatelessWidget {
                   DoableIcon(
                     DoableIconData.plusSmall,
                     size: _plusSize,
-                    color: onAdd == null ? colors.grip : colors.accent,
+                    color: add.onAdd == null ? colors.grip : colors.accent,
                   ),
-                  Text(addText, semanticsLabel: addLabel),
+                  Text(add.text, semanticsLabel: add.label),
                 ],
               ),
             ),
-          ],
-        ),
+        ],
       ),
     );
+
+    return add == null ? row : _EndOverhang(extent: _addOverhang, child: row);
   }
+}
+
+sealed class _Lead {
+  const _Lead(this.text);
+
+  final String text;
+}
+
+final class _Title extends _Lead {
+  const _Title(super.text);
+}
+
+final class _Hint extends _Lead {
+  const _Hint(super.text);
+}
+
+final class _Add {
+  const _Add({
+    required this.text,
+    required this.label,
+    required this.onAdd,
+    required this.key,
+  });
+
+  final String text;
+  final String label;
+  final VoidCallback? onAdd;
+  final Key? key;
 }
 
 /// Отдаёт ребёнку ширину на [extent] больше своей: лишняя полоса лежит
