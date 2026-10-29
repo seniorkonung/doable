@@ -1209,7 +1209,7 @@
     - проверки: `test/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model_test.dart`, `test/long_term_relation/presentation/neighborhood/relation_neighborhood_widget_test.dart`, `test/graph/presentation/package_consumers_test_support.dart`.
   - **Размер:** M — в основном удаление.
 
-- [ ] 5.10 Подтвердить готовность пятой фазы: дневные выборы страницы и их создание идут через вкладку «Выборы»
+- [x] 5.10 Подтвердить готовность пятой фазы: дневные выборы страницы и их создание идут через вкладку «Выборы»
   - **Критерии приёмки:**
     - Выполнено условие «Ready to advance» пятой фазы:
       - требования о просмотре прямых дневных зависимостей и входах в создание дневного выбора выполняются через вкладку;
