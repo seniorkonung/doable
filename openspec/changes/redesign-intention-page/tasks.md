@@ -1231,3 +1231,18 @@
   - **Зависимости:** 5.1–5.9.
   - **Предполагаемые файлы:** нет, только проверка и сборка.
   - **Размер:** XS.
+
+- [ ] 5.11 Убрать из `AddRow` публичные nullable-геттеры, которые читает только проверка `TagsSection`
+  - **Критерии приёмки:**
+    - В `lib/src/design_system/components/add_row.dart` нет публичных геттеров `title`, `addText`, `addLabel`, `onAdd` и `addKey`. Закрытая модель вариантов (`_Lead` с `_Title` и `_Hint`, `_Add`) и конструкторы `AddRow`, `AddRow.hint`, `AddRow.hintOnly`, `AddRow.addOnly` не меняются.
+    - Проверка «блок передаёт строке заголовок, подписи, ключ и выключенность «Добавить»» в `test/design_system/tags_section_test.dart` не читает поля виджета `AddRow`. Она подтверждает наблюдаемое поведение при `onAdd: null`:
+      - тексты «Теги» и «Добавить» стоят внутри `AddRow` (`find.descendant`);
+      - кнопка находится по ключу;
+      - семантика кнопки: подпись «Добавить теги», кнопка, есть состояние доступности, выключена.
+    - Поведение и вид приложения не меняются. Потребители `tags_section.dart` и `intention_choices_sliver.dart` не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/add_row_test.dart test/design_system/tags_section_test.dart`.
+    - `mise exec --no-deps -- flutter analyze` без замечаний.
+  - **Зависимости:** 5.4.
+  - **Предполагаемые файлы:** `lib/src/design_system/components/add_row.dart`, `test/design_system/tags_section_test.dart`.
+  - **Размер:** XS.
