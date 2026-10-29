@@ -415,19 +415,10 @@ void main() {
       await _select(tester, AppDestination.intentionGraph);
       await _enterTitleFilter(tester, app, _activeTitle(1), total: 1);
       await _open(tester, _catalogRow(_activeTitle(1)), IntentionDetailsPage);
-      await _tap(tester, find.text('Relations').first);
-      await _tap(
-        tester,
-        find.byKey(
-          const ValueKey('relation-neighborhood-daily-source'),
-          skipOffstage: false,
-        ),
-      );
+      await _tap(tester, find.text('Choices').first);
       await _open(
         tester,
-        find.byKey(
-          ValueKey('relation-neighborhood-daily-row-${tagFixtureId(changed)}'),
-        ),
+        find.byKey(ValueKey('intention-choices-row-${tagFixtureId(changed)}')),
         DailyChoiceDetailsPage,
       );
       await _tap(tester, find.byKey(const ValueKey('daily-choice-edit-open')));

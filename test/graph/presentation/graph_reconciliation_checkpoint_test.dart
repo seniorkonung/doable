@@ -12,6 +12,8 @@ import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalo
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_state.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_view_model.dart';
+import 'package:doable/src/daily_choice/presentation/intention_choices/intention_choices_state.dart';
+import 'package:doable/src/daily_choice/presentation/intention_choices/intention_choices_view_model.dart';
 
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/data/local/app_database.dart'
@@ -36,6 +38,7 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_stat
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_state.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_view_model.dart';
+import 'package:doable/src/intention/presentation/details/intention_page_target.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
@@ -313,6 +316,15 @@ void main() {
       final catalogProvider = dailyChoiceCatalogViewModelProvider(
         DailyChoiceCatalogInstance(initialDate: durabilityChoiceDate),
       );
+      final pages = {
+        for (final number in [1, 3, 4, 5])
+          number: IntentionPageInstance(target: const ChoicesTarget()),
+      };
+      IntentionChoicesViewModelProvider choicesProvider(int number) =>
+          intentionChoicesViewModelProvider(
+            durabilityIntention(number),
+            pages[number]!,
+          );
       final subscriptions = [
         container.listen(catalogProvider, (_, _) {}, fireImmediately: true),
         for (final number in [1, 2, 3, 4, 5])
@@ -323,7 +335,7 @@ void main() {
           ),
         for (final number in [1, 3, 4, 5])
           container.listen(
-            relationNeighborhoodViewModelProvider(durabilityIntention(number)),
+            choicesProvider(number),
             (_, _) {},
             fireImmediately: true,
           ),
@@ -345,23 +357,15 @@ void main() {
       final details = DailyChoiceDetailsViewModel(repository, firstId);
       addTearDown(details.dispose);
 
-      for (final number in [1, 3, 4, 5]) {
+      for (final number in [3, 4]) {
         container
-            .read(
-              relationNeighborhoodViewModelProvider(durabilityIntention(number))
-                  .notifier,
-            )
-            .selectDailyGroup(
-              number == 3 || number == 4
-                  ? DailyChoiceRelationRole.selected
-                  : DailyChoiceRelationRole.source,
-            );
+            .read(choicesProvider(number).notifier)
+            .selectRole(DailyChoiceRelationRole.selected);
       }
       DailyChoiceCatalogLoaded catalog() =>
           container.read(catalogProvider) as DailyChoiceCatalogLoaded;
-      DailyChoiceGroupLoaded group(int number) => container.read(
-        relationNeighborhoodViewModelProvider(durabilityIntention(number)),
-      ) as DailyChoiceGroupLoaded;
+      IntentionChoicesLoaded choices(int number) =>
+          container.read(choicesProvider(number)) as IntentionChoicesLoaded;
       IntentionDetailsLoaded intention(int number) => container.read(
         intentionDetailsViewModelProvider(durabilityIntention(number)),
       ) as IntentionDetailsLoaded;
@@ -373,18 +377,14 @@ void main() {
             container.read(catalogProvider) is DailyChoiceCatalogLoaded &&
             details.state is DailyChoiceDetailsLoaded &&
             [1, 3].every(
-              (number) => container.read(
-                relationNeighborhoodViewModelProvider(
-                  durabilityIntention(number),
-                ),
-              ) is DailyChoiceGroupLoaded,
+              (number) =>
+                  container.read(choicesProvider(number))
+                      is IntentionChoicesLoaded,
             ) &&
             [4, 5].every(
-              (number) => container.read(
-                relationNeighborhoodViewModelProvider(
-                  durabilityIntention(number),
-                ),
-              ) is RelationGroupEmpty,
+              (number) =>
+                  container.read(choicesProvider(number))
+                      is IntentionChoicesEmpty,
             ) &&
             [1, 2, 3, 4, 5].every(
               (number) => container.read(
@@ -400,13 +400,7 @@ void main() {
           container.read(catalogProvider).runtimeType,
           details.state.runtimeType,
           for (final number in [1, 3, 4, 5])
-            container
-                .read(
-                  relationNeighborhoodViewModelProvider(
-                    durabilityIntention(number),
-                  ),
-                )
-                .runtimeType,
+            container.read(choicesProvider(number)).runtimeType,
           for (final number in [1, 2, 3, 4, 5])
             container
                 .read(
@@ -423,21 +417,21 @@ void main() {
       };
       expect(catalog().selection.date, durabilityChoiceDate);
       expect(catalog().items.map((item) => item.id), [firstId]);
-      expect(group(1).items.map((item) => item.id), [firstId]);
-      expect(group(3).items.map((item) => item.id), [firstId]);
+      expect(choices(1).items.map((item) => item.id), [firstId]);
+      expect(choices(3).items.map((item) => item.id), [firstId]);
       expect(relation(101).permissions.canDelete, isFalse);
       expect(relation(102).permissions.canDelete, isFalse);
       expect(relation(105).permissions.canDelete, isTrue);
       expect(
         (container.read(
-          relationNeighborhoodViewModelProvider(durabilityIntention(4)),
-        ) as RelationGroupEmpty).counts.dailySelected,
+          choicesProvider(4),
+        ) as IntentionChoicesEmpty).counts.dailySelected,
         0,
       );
       expect(
         (container.read(
-          relationNeighborhoodViewModelProvider(durabilityIntention(5)),
-        ) as RelationGroupEmpty).counts.dailySource,
+          choicesProvider(5),
+        ) as IntentionChoicesEmpty).counts.dailySource,
         0,
       );
 
@@ -455,15 +449,15 @@ void main() {
             catalog().revision.compareTo(repeatRevision) ==
                 GraphRevisionOrder.same &&
             catalog().totalCount == 2 &&
-            group(1).items.length == 2 &&
-            group(3).items.length == 2,
+            choices(1).items.length == 2 &&
+            choices(3).items.length == 2,
       );
       expect(catalog().items.map((item) => item.id).toSet(), {
         firstId,
         repeatId,
       });
-      expect(group(1).counts.dailySource, 2);
-      expect(group(3).counts.dailySelected, 2);
+      expect(choices(1).counts.dailySource, 2);
+      expect(choices(3).counts.dailySelected, 2);
       expect(relation(101).permissions.canDelete, isFalse);
       expect(relation(105).permissions.canDelete, isTrue);
       expect(intention(2).details.relationCounts.dailySource, 0);
@@ -500,7 +494,7 @@ void main() {
                 GraphRevisionOrder.same &&
             [1, 3, 4, 5].every(
               (number) =>
-                  group(number).revision.compareTo(replacementRevision) ==
+                  choices(number).revision.compareTo(replacementRevision) ==
                   GraphRevisionOrder.same,
             ),
       );
@@ -514,16 +508,16 @@ void main() {
         catalog().items.singleWhere((item) => item.id == firstId).source.id,
         durabilityIntention(5),
       );
-      expect(group(1).items.map((item) => item.id), [repeatId]);
-      expect(group(3).items.map((item) => item.id), [repeatId]);
-      expect(group(4).items.map((item) => item.id), [firstId]);
-      expect(group(5).items.map((item) => item.id), [firstId]);
+      expect(choices(1).items.map((item) => item.id), [repeatId]);
+      expect(choices(3).items.map((item) => item.id), [repeatId]);
+      expect(choices(4).items.map((item) => item.id), [firstId]);
+      expect(choices(5).items.map((item) => item.id), [firstId]);
       expect(
         [
-          group(1).counts.dailySource,
-          group(3).counts.dailySelected,
-          group(4).counts.dailySelected,
-          group(5).counts.dailySource,
+          choices(1).counts.dailySource,
+          choices(3).counts.dailySelected,
+          choices(4).counts.dailySelected,
+          choices(5).counts.dailySource,
         ],
         [1, 1, 1, 1],
       );
@@ -554,12 +548,8 @@ void main() {
             catalog().revision.compareTo(deletionRevision) ==
                 GraphRevisionOrder.same &&
             catalog().totalCount == 1 &&
-            container.read(
-              relationNeighborhoodViewModelProvider(durabilityIntention(1)),
-            ) is RelationGroupEmpty &&
-            container.read(
-              relationNeighborhoodViewModelProvider(durabilityIntention(3)),
-            ) is RelationGroupEmpty &&
+            container.read(choicesProvider(1)) is IntentionChoicesEmpty &&
+            container.read(choicesProvider(3)) is IntentionChoicesEmpty &&
             relation(101).permissionRevision.compareTo(deletionRevision) ==
                 GraphRevisionOrder.same &&
             relation(105).permissions.canDelete == false,
