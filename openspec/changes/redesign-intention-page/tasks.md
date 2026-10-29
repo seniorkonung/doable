@@ -1246,3 +1246,425 @@
   - **Зависимости:** 5.4.
   - **Предполагаемые файлы:** `lib/src/design_system/components/add_row.dart`, `test/design_system/tags_section_test.dart`.
   - **Размер:** XS.
+
+## Phase 6: Вкладка «Связи» по дизайну
+
+- [ ] 6.1 Перенести политику размера порций из соседства в общий модуль порционных списков страницы
+  - **Критерии приёмки:**
+    - По решению 6 дизайна политика размера порции и запаса до подгрузки живёт рядом с ядром `RelationGroupPaging`, а не в `relation_neighborhood_paging_policy.dart`. Тип политики, проверка её пределов, производственные значения 50 и 15 и провайдер не зависят от соседства. Файл политики соседства удалён.
+    - Модели соседства и «Выборов» и проверки, которые подменяют политику, используют общий модуль. Размер порций, условие подгрузки и отказы проверки пределов не меняются, ожидания проверок сохраняются.
+  - **Проверка:**
+    - `mise run codegen` — провайдеры пересозданы.
+    - `rg -n "RelationNeighborhoodPagingPolicy|relationNeighborhoodPagingPolicy|relation_neighborhood_paging_policy" lib test` ничего не находит.
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation test/daily_choice/presentation/intention_choices test/intention/presentation/details test/graph/presentation`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - `lib/src/long_term_relation/presentation/relation_group_paging_policy.dart` (новый) и сгенерированный провайдер, `lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_paging_policy.dart` (удаляется), `lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart`, `lib/src/daily_choice/presentation/intention_choices/intention_choices_view_model.dart`;
+    - проверки, подменяющие политику: `test/daily_choice/presentation/intention_choices/intention_choices_view_model_test.dart`, `test/intention/presentation/details/intention_details_choices_test.dart`, `test/intention/presentation/details/intention_details_delete_test.dart`, `test/graph/presentation/graph_reconciliation_checkpoint_test.dart`, проверки соседства.
+  - **Размер:** S — перенос механический.
+
+- [ ] 6.2 Вынести общий слой согласования порционного списка страницы с графом и перевести на него модель «Выборов» без изменения поведения
+  - **Критерии приёмки:**
+    - По решениям 6 и 8 дизайна над ядром `RelationGroupPaging` стоит общий слой согласования порционного списка страницы с подтверждёнными изменениями графа. Слой владеет:
+      - подпиской на `watchIntention` и завершения координатора и их разбором;
+      - сравнением ревизий и циклом пересборки;
+      - первым чтением, подгрузкой по политике из 6.1 и повторами после устранимых отказов;
+      - сопоставлением отказов наблюдения намерения с отказами чтения;
+      - завершением контекста при удалении намерения;
+      - статусами сводки и подгрузки.
+
+      Провайдеров, вкладок и предметных групп слой не знает. Вкладка задаёт только запрос порции, принадлежность строки, признак значимого изменения и форму публикуемого состояния.
+    - `IntentionChoicesViewModel` стоит на слое и задаёт только роль, принадлежность строки роли и признак значимого изменения: `DailyChoiceChange` своей роли и загруженных строк, изменения участников загруженных строк и изменение сводки намерения. Своих подписок, сравнения ревизий, цикла пересборки и сопоставления отказов у модели нет. Смена роли, настройки экземпляра и освобождение работают как прежде.
+    - Поведение вкладки «Выборы» не меняется. Проверки модели и страницы «Выборов» проходят с прежними ожиданиями; в них меняются только имена типов статусов, которые теперь принадлежат слою. Модель соседства в этой задаче не меняется.
+  - **Проверка:**
+    - `mise run codegen` — провайдеры пересозданы.
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/intention_choices test/intention/presentation/details test/long_term_relation/presentation test/graph/presentation`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 6.1.
+  - **Предполагаемые файлы:**
+    - `lib/src/long_term_relation/presentation/relation_list_reconciliation.dart` (новый, рядом с ядром порций), `lib/src/daily_choice/presentation/intention_choices/intention_choices_view_model.dart`, `lib/src/daily_choice/presentation/intention_choices/intention_choices_state.dart`, `lib/src/daily_choice/presentation/intention_choices/intention_choices_sliver.dart`;
+    - проверки — только имена типов статусов: `test/daily_choice/presentation/intention_choices/intention_choices_view_model_test.dart`, `test/intention/presentation/details/intention_details_choices_test.dart`.
+  - **Размер:** M.
+
+- [ ] 6.3 Перенести проверки гонок согласования из проверок модели «Выборов» в проверки общего слоя
+  - **Критерии приёмки:**
+    - Каждая обязанность слоя из 6.2 проверяется на уровне слоя, без провайдеров вкладки, с подставными чтением порций, наблюдением намерения и завершениями координатора:
+      - поздний ответ прежнего выбора или освобождённого потребителя ничего не публикует;
+      - устаревшее продолжение и прерванная подгрузка ведут к новой основе в пределах загруженной части и запрошенной порции;
+      - чужая ревизия требует новой основы, а запоздалое чтение не возвращает прежние строки и сводку;
+      - удаление намерения по наблюдению и по завершению координатора завершает контекст без новых чтений;
+      - до готовности замены видна прежняя подтверждённая часть с состоянием обновления, отказ обновления её сохраняет;
+      - категории отказов первого чтения и подгрузки; повтор доступен только при устранимой недоступности и продолжает список один раз.
+    - Проверки модели «Выборов», которые проверяли только эти механизмы, перенесены, а не продублированы. У модели остаются проверки её решений: роль по умолчанию и сохранённая роль, запись смены роли в экземпляр, принадлежность строк роли, признак значимого изменения и независимость двух экземпляров.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/relation_list_reconciliation_test.dart test/daily_choice/presentation/intention_choices`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 6.2.
+  - **Предполагаемые файлы:** `test/long_term_relation/presentation/relation_list_reconciliation_test.dart` (новый), `test/daily_choice/presentation/intention_choices/intention_choices_view_model_test.dart`.
+  - **Размер:** M.
+
+- [ ] 6.4 Перенести правило начала описания из `IntentionDescriptionPreview` в общий модуль текста
+  - **Критерии приёмки:**
+    - По решению 6 дизайна правило начала описания живёт в общем модуле текста `lib/src/shared/domain/` под именем без предметной сущности: серии пробельных символов схлопываются, края обрезаются, остаётся не больше 512 расширенных графемных кластеров, пустой результат не допускается. Каталог намерений строит начало описания по этому правилу. `IntentionDescriptionPreview` удалён, а не оставлен обёрткой.
+    - Каталог намерений ведёт себя как прежде. Проверки правила перенесены к общему модулю, проверки каталога сохраняют ожидания.
+  - **Проверка:**
+    - `rg -n "IntentionDescriptionPreview" lib test` ничего не находит.
+    - `mise exec --no-deps -- flutter test test/shared/domain test/intention/application test/intention/data test/intention/presentation/catalog`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - `lib/src/shared/domain/text_preview.dart` (новый), `lib/src/intention/application/intention_description_preview.dart` (удаляется), `lib/src/intention/application/intention_catalog.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`;
+    - проверки: `test/shared/domain/text_preview_test.dart` (новый, вместо `test/intention/application/intention_description_preview_test.dart`), `test/intention/application/intention_contract_test.dart`, `test/support/intention_description_preview.dart`.
+  - **Размер:** S.
+
+- [ ] 6.5 Отдавать в порциях группы связей строку `RelationGroupEntry` с соседом, его готовностью и началом описания
+  - **Критерии приёмки:**
+    - По решению 6 дизайна и ADR-0047 первая порция и продолжение группы связей содержат `RelationGroupEntry` вместо `LongTermRelationSummary`:
+      - саму связь;
+      - соседа — участника, который не владеет группой: идентификатор, название, архивное состояние и готовность к действию;
+      - `descriptionPreview` — начало описания связи по правилу из 6.4; у связи без описания его нет.
+
+      Владельца группы и `hasDescription` в строке нет. SQL, порядок, порции, курсоры, сводка и проверка принадлежности строк группе не меняются. Чтение пути выбора и `RelationParticipantSummary` не меняются.
+    - Прежнее соседство до удаления в 6.20 показывает прежние формулировку и обоих участников. Соседа оно берёт из строки, а название и архивное состояние владельца — из подробных данных страницы.
+    - Проверки чтения группы подтверждают:
+      - начало описания: схлопнутые пробелы, обрезку краёв, предел длины и отсутствие у связи без описания;
+      - готовность соседа во входящих и исходящих группах;
+      - отсутствие владельца в строке;
+      - неизменные порядок и порции.
+
+      Фикстуры проверок, которые строят порции групп, переходят на новый тип с прежними ожиданиями.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph/data/drift_relation_group_page_test.dart test/graph/data/drift_relation_group_large_fixture_test.dart test/long_term_relation test/intention/presentation/details test/graph/presentation test/app --exclude-tags=flutter_process`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 6.4.
+  - **Предполагаемые файлы:**
+    - `lib/src/long_term_relation/application/relation_group_page.dart`, `lib/src/long_term_relation/application/long_term_relation_projection.dart`, `lib/src/graph/data/drift_personal_graph_repository_relation_groups.dart`, `lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart`, `lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_sliver.dart`, `lib/src/intention/presentation/details/intention_details_page.dart`;
+    - проверки: `test/graph/data/drift_relation_group_page_test.dart`, `test/graph/data/drift_relation_group_large_fixture_test.dart`, `test/long_term_relation/application/relation_group_page_test.dart`;
+    - фикстуры порций групп: `test/long_term_relation/presentation/neighborhood/neighborhood_test_support.dart`, `test/intention/presentation/details/details_test_support.dart`, `test/app/routing/app_router_test.dart`, `test/app/intention_app_lifecycle_test.dart`, `test/app/navigation/app_shell_operation_reset_test.dart`, `test/graph/presentation/graph_reconciliation_checkpoint_test.dart`.
+  - **Размер:** M — замена типа в фикстурах механическая.
+
+- [ ] 6.6 Начинать создание связи с ролью участника и типом, которые задаёт группа `IntentionRelationGroup`
+  - **Критерии приёмки:**
+    - По решениям 2 и 7 дизайна в прикладном слое связей есть перечисление `IntentionRelationGroup` четырёх групп страницы: `needs` — «нужно», исходящие; `canUse` — «можно», исходящие; `neededFor` — «нужно», входящие; `canBeUsedFor` — «можно», входящие. Каждое значение даёт тип и направление.
+    - `RelationCreationContext(participant, direction)` заменён на `RelationCreationContext(participant, group)`:
+      - роль участника выводится из направления группы, а начальный тип формы — из её типа;
+      - `==` и `hashCode` включают группу;
+      - изменённость формы создания сравнивает тип с типом группы: только что открытая форма не изменена;
+      - тип остаётся переключаемым.
+    - Прежнее соседство передаёт группу своего выбранного типа и направления. Других вызывающих с направлением нет.
+    - Проверки редактора подтверждают сценарий «Вход из исходящей группы»: из «Можно использовать» намерение выбрано исходным участником, тип «можно» выбран, а связанный участник и приоритет не выбраны. Входящая группа выбирает намерение связанным участником. Проверки подтверждают отсутствие изменённости сразу после открытия и её появление при смене типа. Остальные проверки, которые строят контекст создания, сохраняют ожидания.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/editor test/app/routing/app_router_test.dart test/app/navigation`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - `lib/src/long_term_relation/application/intention_relation_group.dart` (новый), `lib/src/long_term_relation/presentation/editor/relation_editor_state.dart`, `lib/src/long_term_relation/presentation/editor/relation_editor_view_model.dart`, `lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_sliver.dart`, `lib/src/intention/presentation/details/intention_details_page.dart`;
+    - проверки: `test/long_term_relation/presentation/editor/relation_editor_view_model_test.dart`, `test/long_term_relation/presentation/editor/relation_editor_page_test.dart`, `test/long_term_relation/presentation/editor/relation_creation_navigation_test.dart`, `test/app/routing/app_router_test.dart`, `test/app/navigation/app_shell_operation_reset_test.dart`, `test/app/navigation/app_shell_page_matrix.dart`.
+  - **Размер:** M — замена конструктора в проверках механическая.
+
+- [ ] 6.7 Добавить модель вкладки «Связи», которая порциями получает активные связи выбранной группы и принадлежит экземпляру страницы
+  - **Критерии приёмки:**
+    - По решениям 2 и 6 дизайна `IntentionRelationsViewModel` — семейство по `IntentionId` и `IntentionPageInstance` поверх общего слоя из 6.2. Модель освобождается вместе со строками, продолжениями и подписками, когда её больше никто не слушает. До создания модели группы не читаются.
+    - Выбранная группа — настройка экземпляра страницы рядом с ролью «Выборов». `RelationsTarget` получает необязательную группу `IntentionRelationGroup`.
+      - Начальная группа задаётся один раз, при первом создании модели экземпляра: группой из цели, а без неё — по готовности из последнего принятого снимка подробных данных: `needs` для неготового намерения, `neededFor` для действия.
+      - Следующие модели того же экземпляра берут сохранённый выбор. Изменение готовности и новые показы его не сбрасывают.
+      - Настройки не содержат строк, курсоров и якорей.
+    - Модель публикует сводку и активную часть выбранной группы — строки `RelationGroupEntry`, продолжение и подгрузку — на одной ревизии. Смена группы отбрасывает строки прежней группы, начинает первую порцию новой и записывает группу в экземпляр.
+    - Признак значимого изменения модели:
+      - изменение связи, которое вводит её в выбранную группу, выводит из неё или меняет её приоритет;
+      - изменение загруженной связи;
+      - изменение владельца или соседа загруженной строки;
+      - изменение любого группового количества владельца, в том числе от дневных выборов.
+
+      Остальное согласует слой. Якорь прокрутки хранит идентификатор связи активной части.
+    - Проверки модели подтверждают:
+      - начальную группу по цели, по готовности неготового намерения и действия и сохранённый выбор у новой модели того же экземпляра;
+      - запись смены группы в экземпляр и первую порцию только выбранной группы;
+      - отсутствие чтений до создания модели и после её освобождения;
+      - независимость групп и порций двух экземпляров одного намерения;
+      - признак значимого изменения, включая сценарии «Изменение непросматриваемой группы обновляет полностью загруженную страницу» и «Пустая выбранная группа не задерживает обновление сводки».
+
+      Ожидания проверок долговременных групп из `relation_neighborhood_view_model_test.dart`, которые относятся к решениям модели, воспроизведены для новой модели. Гонки не повторяются: их проверяет слой (6.3).
+  - **Проверка:**
+    - `mise run codegen` — провайдеры пересозданы.
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/intention_relations test/intention/presentation/details`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 6.3, 6.5, 6.6.
+  - **Предполагаемые файлы:**
+    - `lib/src/long_term_relation/presentation/intention_relations/intention_relations_view_model.dart` (новый), `lib/src/long_term_relation/presentation/intention_relations/intention_relations_state.dart` (новый) и сгенерированный провайдер, `lib/src/intention/presentation/details/intention_page_target.dart`;
+    - проверки: `test/long_term_relation/presentation/intention_relations/intention_relations_view_model_test.dart` (новый).
+  - **Размер:** M.
+
+- [ ] 6.8 Публиковать в модели «Связей» архив выбранной группы вместе с её активной частью на одной ревизии
+  - **Критерии приёмки:**
+    - По решению 6 дизайна и ADR-0047 состояние модели — сводка, активная часть и, пока архив группы раскрыт, архивная часть на одной ревизии. Общий слой из 6.2 принимает форму из нескольких частей:
+      - первое чтение получает первые порции раскрытых частей на одной ревизии;
+      - подгрузка идёт той части, к концу которой подходит прокрутка;
+      - пересборка повторяет загруженное каждой частью и запрошенное продолжение и заменяет все части атомарно.
+
+      «Выборы» остаются формой из одной части без изменения поведения.
+    - Раскрытие архива — флаг каждой группы в настройках экземпляра.
+      - Только при первом создании модели экземпляра флаги всех групп раскрыты у архивированного намерения и свёрнуты у активного.
+      - Раскрытие читает первую порцию архивированных связей группы, сворачивание отбрасывает её строки.
+      - Смена группы отбрасывает строки прежней группы и сохраняет флаги. Возвращение к группе с раскрытым архивом снова получает его первую порцию без повторного раскрытия.
+      - Свёрнутый архив и невыбранные группы не читаются.
+    - Архивирование и восстановление связи и каскадное архивирование намерения переносят строку между частями: на любой опубликованной ревизии связь видна ровно в одной части. Отказ одной части задерживает публикацию всей новой пары, а прежняя пара остаётся с состоянием обновления или отказа. Якорь прокрутки хранит идентификатор связи из любой части.
+    - Проверки слоя подтверждают публикацию нескольких частей на одной ревизии, пересборку в пределах загруженного каждой частью и сохранение прежней пары при отказе одной части. Проверки модели подтверждают:
+      - пару на одной ревизии при архивировании и восстановлении связи и каскаде;
+      - начальные флаги раскрытия и их сохранение при смене группы и у новой модели того же экземпляра;
+      - сценарии «Просмотр архива сохраняет тип и направление», «Смена типа в архиве сохраняет архивное состояние списка», «Многолетний архив не загружается целиком при открытии» и «Архив архивированного намерения раскрыт сразу».
+  - **Проверка:**
+    - `mise run codegen` — провайдеры пересозданы.
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation test/daily_choice/presentation/intention_choices`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 6.7.
+  - **Предполагаемые файлы:**
+    - `lib/src/long_term_relation/presentation/relation_list_reconciliation.dart`, `lib/src/long_term_relation/presentation/intention_relations/intention_relations_view_model.dart`, `lib/src/long_term_relation/presentation/intention_relations/intention_relations_state.dart`, `lib/src/intention/presentation/details/intention_page_target.dart`;
+    - проверки: `test/long_term_relation/presentation/relation_list_reconciliation_test.dart`, `test/long_term_relation/presentation/intention_relations/intention_relations_view_model_test.dart`.
+  - **Размер:** M.
+
+- [ ] 6.9 Перевести проверки контрольной точки согласования графа и потребителей пакета изменений с модели соседства на модель «Связей»
+  - **Критерии приёмки:**
+    - Проверки контрольной точки согласования графа и потребители пакета изменений наблюдают `IntentionRelationsViewModel` с экземпляром страницы. Группы они выбирают через `IntentionRelationGroup`, архивные связи получают раскрытием архива группы, а не выбором типа, направления и архивного состояния соседства.
+    - Ожидания сохраняются: согласование счётчиков и списков после создания, изменения типа и участников, архивирования, восстановления, удаления связи и каскада на настоящем хранилище, без двойного применения изменения и без возврата прежних чисел запоздалым чтением.
+    - Эти файлы не используют `RelationNeighborhoodViewModel`, `RelationGroupSelection` и состояния соседства.
+  - **Проверка:**
+    - `rg -n "relationNeighborhoodViewModelProvider|RelationGroupSelection|RelationNeighborhoodState" test/graph/presentation` ничего не находит.
+    - `mise exec --no-deps -- flutter test test/graph/presentation`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 6.8.
+  - **Предполагаемые файлы:** `test/graph/presentation/graph_reconciliation_checkpoint_test.dart`, `test/graph/presentation/package_consumers_test_support.dart`.
+  - **Размер:** M.
+
+- [ ] 6.10 Добавить в дизайн-систему плитки групп `CountTiles` в две и три колонки
+  - **Критерии приёмки:**
+    - По README `CountTiles`, решению 11 дизайна и ADR-0048 потребитель передаёт плитки с идентификатором, числом, подписью и доступным названием, раскладку в две или три колонки, открытую плитку, обработчик выбора и доступное название группы. У плитки группы связей есть необязательный глиф направления: тип «нужно» или «можно» и направление от намерения или к нему — и отметка архива. Предметных типов в компоненте нет (ADR-0030).
+      - Плитки — равные колонки в `space-2`; углы `radius-lg`, поля 11 сверху и `space-3` по бокам и снизу. Число — стиль `headline` с табличными цифрами, подпись — стиль `caption` цвета `muted` в 2 под ним. Нулевое число — цвета `grip`.
+      - Открытая плитка — плоскость `fill`, закрытая — без плоскости с внутренним кольцом `hairline` в 1. Открыта ровно одна.
+      - Отметка архива — малый значок архива цвета `muted` после числа.
+      - Глиф 38 × 12 стоит в конце строки числа и строится из `RelationStroke`: сплошная линия для «нужно», пунктир 3/3 для «можно»; закрашенная точка — это намерение, кольцо — другое; стрелка идёт от намерения к тому, что ему нужно или что оно может использовать. Цвет глифа — цвет числа.
+    - Плитки для экранного диктора — радиогруппа с доступным названием; каждая плитка называет себя переданным доступным названием и сообщает выбранное состояние.
+    - Широкой плитки и вариантов «Выборов» и «Статистики» нет.
+    - Компонентные проверки в обеих темах подтверждают:
+      - обе раскладки — в две и три колонки — с равными колонками и отступами;
+      - цвета открытой и закрытой плиток и нулевого числа;
+      - отметку архива и вид и направление глифа;
+      - вызов обработчика и семантику радиогруппы с выбранным состоянием;
+      - перенос длинных подписей без переполнения при увеличенном тексте.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/count_tiles_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `lib/src/design_system/components/count_tiles.dart` (новый), `test/design_system/count_tiles_test.dart` (новый).
+  - **Размер:** M.
+
+- [ ] 6.11 Добавить в дизайн-систему строку связи `RelationRow`
+  - **Критерии приёмки:**
+    - По README `RelationRow` и решению 11 дизайна потребитель передаёт тип «нужно» или «можно», приоритет 1–4, готовую подпись типа и приоритета, название соседа, необязательную заметку, признаки «сосед — действие», «связь архивирована» и «сосед архивирован», обработчики нажатия на строку и на стрелку и доступные названия строки и стрелки. Предметных типов и выбора строк удержанием в компоненте нет (ADR-0030).
+      - Строка — плоскость с углами `radius-lg`: для `p1`–`p3` цвет приоритета смешан на 10% с `fill`, для `p4` — чистый `fill`.
+      - Над названием — метка типа 15 × 2, сплошная для «нужно» и пунктирная для «можно», и подпись стилем `label`. Для `p1`–`p3` метка цвета приоритета, подпись — этот цвет, смешанный с `ink`; для `p4` метка `grip`, подпись `muted`.
+      - После подписи в 6 друг от друга — `Badge.mark` архива цвета `muted`, если сосед архивирован, и молния цвета `ink`, если сосед — действие; в приглушённой строке молния `muted`.
+      - Название — стиль `action`, переносится и не обрезается. Заметка — стиль `note` цвета `muted`, не больше двух строк; без заметки её строки нет.
+      - Архивированная связь — плоскость `fill`, метка `grip`, подпись и название `muted`. Связь с архивированным соседом сохраняет цвет, а название соседа `muted`.
+      - Две области нажатия: строка и стрелка цвета `muted` шириной 48 на всю высоту строки.
+    - Компонентные проверки в обеих темах подтверждают подкраску `p1`–`p4`, цвета метки и подписи, отметки соседа, приглушение архивированной связи и названия архивированного соседа, перенос названия, предел заметки в две строки и её отсутствие, раздельные обработчики и семантику строки и стрелки, отсутствие переполнения при увеличенном тексте.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/relation_row_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `lib/src/design_system/components/relation_row.dart` (новый), `test/design_system/relation_row_test.dart` (новый).
+  - **Размер:** M.
+
+- [ ] 6.12 Добавить в дизайн-систему строку свёрнутого архива `ArchivedFold`
+  - **Критерии приёмки:**
+    - По README `ArchivedFold` и решению 11 дизайна потребитель передаёт число, раскрытость, обработчик, подпись и доступное название, которое называет группу.
+      - Строка стилем `label` цвета `muted`: значок архива 14, подпись, число табличными цифрами и шеврон 16, через 6 друг от друга.
+      - Шеврон смотрит вниз у свёрнутого архива и вверх у раскрытого; поворот анимирован.
+      - Кнопка высотой `tap-min` стоит у левого края в `space-1` от него и занимает в списке 36.
+    - Компонентные проверки в обеих темах подтверждают раскладку и цвета, направление шеврона, вызов обработчика, семантику кнопки с раскрытым или свёрнутым состоянием и отсутствие переполнения при увеличенном тексте.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/archived_fold_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `lib/src/design_system/components/archived_fold.dart` (новый), `test/design_system/archived_fold_test.dart` (новый).
+  - **Размер:** S.
+
+- [ ] 6.13 Расширить `EmptyState` шириной текста и свободными полями сверху и снизу
+  - **Критерии приёмки:**
+    - По README `EmptyState` и решению 11 дизайна потребитель может задать наибольшую ширину текста, свободное поле над заголовком и свободное поле под блоком. По умолчанию они равны 260, 0 и 40, поэтому нынешние потребители не меняются. Блок по-прежнему центрируется в оставшейся высоте, а в низком месте начинается сверху.
+    - Других параметров README (`minHeight`, `pretty`, `level`) нет: у них нет потребителя.
+    - Компонентные проверки подтверждают ширину текста и оба поля для «Связей» — 270, 24 и 24 — и прежнюю раскладку по умолчанию. Остальные проверки компонента сохраняют ожидания.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/empty_state_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `lib/src/design_system/components/empty_state.dart`, `test/design_system/empty_state_test.dart`.
+  - **Размер:** S.
+
+- [ ] 6.14 Вынести вид статусов порционного списка и сообщения его отказов из вкладки «Выборы» в общий вид
+  - **Критерии приёмки:**
+    - По решению 6 дизайна статусы, которыми владеет общий слой, имеют общий вид: первое чтение, отказ первого чтения, отсутствие намерения, подгрузка, отказ подгрузки, обновление, отказ обновления и подтверждённый конец — с прежними сообщениями отказов по категориям, индикатором, живой областью и повтором только при устранимой недоступности.
+    - Вкладка «Выборы» показывает статусы общим видом. Её вид, тексты и семантика не меняются, проверки сохраняют ожидания.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/details test/daily_choice/presentation/intention_choices`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 6.2.
+  - **Предполагаемые файлы:** `lib/src/long_term_relation/presentation/relation_list_status.dart` (новый), `lib/src/daily_choice/presentation/intention_choices/intention_choices_sliver.dart`.
+  - **Размер:** S.
+
+- [ ] 6.15 Показывать во вкладке «Связи» плитки четырёх групп и порционный список активных связей выбранной группы
+  - **Критерии приёмки:**
+    - По решениям 6 и 12 дизайна `IntentionRelationsSliver` строится над моделью из 6.7 и пока не стоит на странице. Название, готовность и архивное состояние владельца и сводку подробных данных он получает от страницы.
+    - Плитки `CountTiles` в две колонки стоят в 8 под вкладками: «Нужно», «Можно использовать» сверху, «Нужно для», «Можно использовать для» снизу. Каждая показывает число активных связей группы, глиф её типа и направления и отметку архива, если в группе есть архивированные связи. Числа берутся из опубликованного состояния модели, а до первой публикации — из сводки подробных данных. Выбор плитки выбирает группу в модели. Доступное название плитки — название группы, число и наличие архива; группа плиток называется «Группы связей» / «Relation groups».
+    - Строки активной части — `RelationRow`:
+      - подпись «нужно · P1» / «need · P1», сосед с отметками архива и действия, начало описания как заметка;
+      - нажатие на строку открывает подробности связи, стрелка передаёт странице соседа и группу строки;
+      - доступное название строки — формулировка «Чтобы …, нужно/можно …» с владельцем и соседом по направлению, приоритет, архивные состояния и заметка; стрелки — что откроется страница соседа.
+
+      Строки идут через `space-2`, ключ строки — `intention-relations-row-<id>`, ключ плитки — `intention-relations-group-<группа>`.
+    - Подгрузка начинается при приближении к концу активной части. Статусы показывает общий вид из 6.14. Восстановление якоря после пересборки учитывает высоту закреплённых вкладок, чтобы строка не уходила под них.
+    - Проверки вида на русском и английском подтверждают:
+      - порядок, числа, глифы и отметки архива плиток, числа до первой публикации и выбор группы плиткой; сценарии «Все групповые количества видны до выбора списка» и «Количество возле перехода учитывает направление»;
+      - состав, отметки и семантику строки, сценарий «Строка связи показывает соседа и описание», открытие подробностей связи и передачу соседа и группы стрелкой;
+      - подгрузку, статусы и восстановление якоря под закреплёнными вкладками.
+
+      Ожидания проверок долговременных групп из `relation_neighborhood_widget_test.dart`, которые относятся к строкам и статусам, воспроизведены для нового вида.
+  - **Проверка:**
+    - `mise run codegen` — локализация пересоздана.
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/intention_relations test/design_system/count_tiles_test.dart test/design_system/relation_row_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 6.7, 6.10, 6.11, 6.14.
+  - **Предполагаемые файлы:**
+    - `lib/src/long_term_relation/presentation/intention_relations/intention_relations_sliver.dart` (новый), `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` и сгенерированная локализация;
+    - проверки: `test/long_term_relation/presentation/intention_relations/intention_relations_sliver_test.dart` (новый).
+  - **Размер:** M.
+
+- [ ] 6.16 Показывать под плитками смысл выбранной группы с «Добавить» и объяснять пустую группу
+  - **Критерии приёмки:**
+    - По требованию «Порционное получение выбранной группы связей намерения» под плитками в 4 стоит `AddRow` с подсказкой о смысле группы:
+
+      | Группа | Подсказка | «Добавить» для диктора |
+      |---|---|---|
+      | «Нужно» | «Чтобы достичь этого, нужно всё перечисленное.» / «To get there, you need each of these.» | «Добавить то, что нужно» / «Add what it needs» |
+      | «Можно использовать» | «Чтобы достичь этого, можно сделать любое из перечисленного.» / «To get there, you can do any of these.» | «Добавить то, что можно использовать» / «Add what it can use» |
+      | «Нужно для» | «Каждому из них это нужно.» / «Each of these needs it.» | «Добавить намерение, которому это нужно» / «Add an intention that needs it» |
+      | «Можно использовать для» | «Каждое из них может использовать это как один из путей.» / «Each of these can use it, as one of the ways.» | «Добавить намерение, которое может это использовать» / «Add an intention that can use it» |
+
+      «Добавить» передаёт странице выбранную группу. У архивированного намерения строка держит только подсказку. Ключ «Добавить» — `intention-relations-add`.
+    - Группа без активных и архивированных связей показывает `EmptyState` без значка, с шириной текста 270 и полями 24 сверху и снизу в оставшейся высоте под строкой «Добавить»:
+
+      | Группа | Заголовок | Текст |
+      |---|---|---|
+      | «Нужно» | «Пока ничего не нужно» / «Needs nothing yet» | намерение: «Добавьте то, без чего этому намерению не обойтись.» / «Add what this intention cannot do without.»; действие: «Действие может обходиться без других. Добавьте то, что ему нужно, если у него есть свои шаги.» / «An action can stand alone. Add what it needs if it has steps of its own.» |
+      | «Можно использовать» | «Пока нечего использовать» / «Nothing to use yet» | «Добавьте то, что помогает достичь этого, но не обязательно.» / «Add what helps to get there without being required.» |
+      | «Нужно для» | «Пока ни для чего не нужно» / «Nothing needs it yet» | «Здесь появятся намерения, которым без этого не обойтись.» / «Intentions that cannot do without this one will appear here.» |
+      | «Можно использовать для» | «Пока ни для чего не используется» / «Nothing can use it yet» | «Здесь появятся намерения, к которым это — один из путей.» / «Intentions that this one is a way to will appear here.» |
+
+      У архивированного намерения заголовок прежний, а текст — «Чтобы добавлять связи, восстановите намерение.» / «Restore the intention to add relations.» Группа только с архивированными связями пустой не считается. Плитки и строка «Добавить» над пустым состоянием остаются.
+    - Проверки вида на русском и английском подтверждают подсказку и доступное название «Добавить» каждой группы, передачу группы, отсутствие «Добавить» у архивированного намерения, пустые состояния всех групп для намерения и действия, сценарии «Пустая группа архивированного намерения» и «Пустая группа не снимает блокировку другой группы» и отсутствие пустого состояния у группы только с архивом.
+  - **Проверка:**
+    - `mise run codegen` — локализация пересоздана.
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/intention_relations test/design_system/add_row_test.dart test/design_system/empty_state_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 6.13, 6.15.
+  - **Предполагаемые файлы:** `lib/src/long_term_relation/presentation/intention_relations/intention_relations_sliver.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` и сгенерированная локализация, `test/long_term_relation/presentation/intention_relations/intention_relations_sliver_test.dart`.
+  - **Размер:** M.
+
+- [ ] 6.17 Показывать во вкладке «Связи» свёрнутый архив группы после её активных связей
+  - **Критерии приёмки:**
+    - По требованию «Порционное получение выбранной группы связей намерения» и решению 6 дизайна `ArchivedFold` стоит после последней активной связи, когда активная часть получена до подтверждённого конца, а в группе есть архивированные связи. Подпись — «Архив» / «Archived», число — архивированные связи группы. Доступное название называет группу и число.
+    - Нажатие раскрывает или сворачивает архив группы в модели. Раскрытый архив показывает свои строки `RelationRow` в приглушённом виде со своей подгрузкой и статусами общего вида. Восстановление якоря работает для строк обеих частей.
+    - Проверки вида подтверждают:
+      - отсутствие архива до конца активной части и в группе без архивированных связей;
+      - раскрытие с чтением только первой порции архива группы и сворачивание;
+      - раскрытый сразу архив архивированного намерения;
+      - подгрузку и статусы архивной части и якорь её строки.
+  - **Проверка:**
+    - `mise run codegen` — локализация пересоздана.
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/intention_relations test/design_system/archived_fold_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 6.8, 6.12, 6.16.
+  - **Предполагаемые файлы:** `lib/src/long_term_relation/presentation/intention_relations/intention_relations_sliver.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` и сгенерированная локализация, `test/long_term_relation/presentation/intention_relations/intention_relations_sliver_test.dart`.
+  - **Размер:** M.
+
+- [ ] 6.18 Перевести сценарии, которые только проходят через связи страницы намерения, на ключи и числа, не зависящие от вида соседства
+  - **Критерии приёмки:**
+    - Действие создания связи в прежнем соседстве получает ключ `intention-relations-add`, а строки связей — ключи `intention-relations-row-<id>`: те же, что у вида «Связей» из 6.15 и 6.16. Сценарии, которые этими элементами только входят в создание связи или открывают связь, используют новые ключи и сохраняют ожидания.
+    - Сценарии, которые сверяли число связей по сводке соседства, сверяют его по доступному названию вкладки «Связи». Их ожидания по смыслу не меняются.
+    - Поведение и вид приложения не меняются.
+  - **Проверка:**
+    - `rg -n "relation-neighborhood-create-relation|relation-neighborhood-row-|relation-neighborhood-summary|relationNeighborhoodSelectedGroupCount|relationNeighborhoodActiveTotal" test/app test/daily_choice` ничего не находит.
+    - `mise exec --no-deps -- flutter test test/app test/daily_choice/presentation test/long_term_relation/presentation/neighborhood --exclude-tags=flutter_process`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 6.6 — прежнее соседство уже передаёт группу, как «Добавить» новой вкладки.
+  - **Предполагаемые файлы:**
+    - `lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_sliver.dart`;
+    - проверки: `test/app/navigation/app_shell_back_test.dart`, `test/app/navigation/app_shell_page_matrix.dart`, `test/app/navigation/app_shell_pages_above_test.dart`, `test/app/navigation/app_shell_operation_reset_test.dart`, `test/app/navigation/ordinary_page_layout_scenarios.dart`, `test/app/routing/app_router_test.dart`, `test/app/intention_statistics_app_flow_test.dart`, `test/app/long_term_relation_app_flow_test.dart`, `test/daily_choice/presentation/daily_choice_creation_completion_test.dart`, `test/daily_choice/presentation/daily_choice_creation_exit_test.dart`, `test/daily_choice/presentation/daily_choice_creation_route_scenarios.dart`, `test/long_term_relation/presentation/neighborhood/relation_neighborhood_widget_test.dart`.
+  - **Размер:** M — замена ключей механическая.
+
+- [ ] 6.19 Показывать на странице намерения вкладку «Связи» по дизайну вместо прежнего соседства
+  - **Критерии приёмки:**
+    - По решениям 2 и 6 дизайна тело вкладки «Связи» — вид из 6.15–6.17. Прежнее соседство на странице больше не показывается; его код остаётся до 6.20.
+      - Модель «Связей» существует, только пока выбрана вкладка «Связи», в том числе когда над страницей открыта другая страница. До первого показа модели и чтений групп нет.
+      - При уходе на другую вкладку модель освобождается вместе со строками, продолжениями и подписками. Возвращение сохраняет группу и флаги архивов и получает только первые порции показанных частей.
+      - Число на вкладке «Связи» берётся из опубликованного состояния модели, пока она существует, иначе — из подробных данных.
+      - Смена намерения у того же виджета начинает новый экземпляр без прежней модели.
+    - Нажатие на строку открывает подробности связи. «Добавить» открывает форму создания с `RelationCreationContext(participant, group)` выбранной группы. Стрелка открывает страницу соседа с `RelationsTarget(group)` группы строки.
+    - Проверки страницы подтверждают:
+      - сценарии «Возвращение к связям сохраняет настройки и начинает список заново», «Открытие намерения загружает только активную группу «нужно»» и «Действие открывает группу «Нужно для»»;
+      - отсутствие чтений групп при открытии на «Обзоре», «Выборах» и «Статистике»;
+      - число вкладки из модели и из подробных данных;
+      - сценарии «Стрелка открывает соседа на той же группе» и «Две страницы одного намерения не влияют друг на друга»;
+      - сценарий «Вход из исходящей группы» и возвращение после созданной связи на «Связи» с прежней группой и новой связью в списке.
+    - Проверки, которые выбирали группы, архив и строки прежнего соседства на странице, переведены на плитки, архив и строки новой вкладки с прежними ожиданиями. Сценарии из 6.18 сохраняют ожидания.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/details test/long_term_relation test/daily_choice/presentation test/app --exclude-tags=flutter_process`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 6.17, 6.18.
+  - **Предполагаемые файлы:**
+    - `lib/src/intention/presentation/details/intention_details_page.dart`, `lib/src/intention/presentation/details/intention_details_tabs.dart`;
+    - проверки: `test/intention/presentation/details/intention_details_relations_test.dart` (новый), `test/intention/presentation/details/details_test_support.dart`, `test/intention/presentation/details/intention_details_tabs_test.dart`, `test/app/navigation/app_shell_page_matrix.dart`, `test/app/routing/app_router_test.dart`, `test/app/long_term_relation_app_flow_test.dart`.
+  - **Размер:** M.
+
+- [ ] 6.20 Удалить прежнее соседство связей
+  - **Критерии приёмки:**
+    - По результату фазы 6 плана в приложении нет `RelationNeighborhoodViewModel`, его состояния с `RelationGroupSelection`, `RelationNeighborhoodSliver` и их сгенерированных частей, и никакой модуль на них не ссылается.
+    - Проверки модели и вида соседства удалены. Перед удалением подтверждено, что каждое их ожидание покрыто проверками ядра порций, общего слоя, модели и вида «Связей»; непокрытые ожидания перенесены туда. Общие подставные реализации из `neighborhood_test_support.dart`, которые нужны другим проверкам, сохраняются вне удаляемого каталога без частей соседства.
+    - Строки локализации, которые больше нигде не используются, удалены на обоих языках. Строки, которые используют вкладки «Выборы» и «Связи», подробности связи, путь выбора и статистика, остаются.
+  - **Проверка:**
+    - `mise run codegen` — провайдеры и локализация пересозданы.
+    - `rg -n "RelationNeighborhood|relation_neighborhood|RelationGroupSelection|relation-neighborhood-" lib test` ничего не находит.
+    - `mise exec --no-deps -- flutter test test/long_term_relation test/intention test/daily_choice test/graph/presentation test/app --exclude-tags=flutter_process`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 6.9, 6.19.
+  - **Предполагаемые файлы:**
+    - `lib/src/long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart`, `relation_neighborhood_state.dart`, `relation_neighborhood_sliver.dart` и сгенерированный провайдер (удаляются), `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` и сгенерированная локализация;
+    - проверки: `test/long_term_relation/presentation/neighborhood/` (удаляется), общая поддержка проверок связей вместо `neighborhood_test_support.dart` и её потребители.
+  - **Размер:** M — в основном удаление.
+
+- [ ] 6.21 Подтвердить готовность шестой фазы: вкладка «Связи» работает по дизайну, а у списков страницы один владелец согласования с графом
+  - **Критерии приёмки:**
+    - Выполнено условие «Ready to advance» шестой фазы:
+      - требования о порционном получении групп, навигации по связям, счётчиках страницы и входах в создание связи выполняются через вкладку;
+      - цель открытия выбирает заданную группу, а две страницы одного намерения не влияют на выбранную группу, раскрытие архива и загруженные порции друг друга;
+      - автоматические проверки подтверждают сохранение группы и флагов архивов при переключении вкладок, повторное получение с первой порции без восстановления прежнего объёма и освобождение прежних данных;
+      - копий протокола согласования в моделях вкладок нет: гонки поздних ответов, устаревших продолжений, чужих ревизий и удаления намерения проверяются в общем слое, а модели вкладок — только по своему;
+      - компонентные проверки в обеих темах покрывают обе раскладки `CountTiles`; эталоны подчиняются правилу решения 14 дизайна;
+      - вся страница соответствует proposal, полная проверка проекта проходит.
+    - Прежнего соседства, его переключателей и вида в приложении нет.
+    - Результаты проверок и путь к APK сообщены в сессии. Ручная проверка на устройстве остаётся за пользователем и не блокирует готовность фазы.
+  - **Проверка:**
+    - Команда `rg` из 6.20 ничего не находит.
+    - `mise run check` и `mise exec --no-deps -- openspec validate redesign-intention-page --strict --no-interactive`; после фиксации изменений — `mise run codegen-check` на чистой рабочей копии.
+    - `mise exec --no-deps -- flutter build apk --release` с артефактом `build/app/outputs/flutter-apk/app-release.apk`. Если через DTD найдено запущенное приложение, выполнить hot restart и проверить `get_runtime_errors`. Эмулятор и устройство не запускаются.
+    - Сообщить оставшиеся ручные проверки:
+      - плитки в две колонки с числами, глифами, отметками архива и нулями; группа по умолчанию у намерения и у действия;
+      - подсказка и «Добавить» под плитками, форма создания с выбранными ролью и типом;
+      - строки с подкраской приоритета, отметками соседа и заметкой в две строки; стрелка открывает соседа на той же группе;
+      - архив после активных связей, раскрытие и сворачивание, раскрытый архив архивированного намерения, пустые группы;
+      - сохранение группы и архивов при переходе «Связи» → «Обзор» → «Связи»;
+      - обе темы и увеличенный текст.
+  - **Зависимости:** 6.1–6.20.
+  - **Предполагаемые файлы:** нет, только проверка и сборка.
+  - **Размер:** XS.
