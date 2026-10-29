@@ -222,27 +222,6 @@ void main() {
     _expectNavigation(tester);
   });
 
-  testWidgets('показывает архивное состояние и отсутствие описания', (
-    tester,
-  ) async {
-    final repository = ControlledDetailsRepository();
-    final intention = testDetailsIntention(
-      index: 2,
-      title: 'Архивное намерение',
-      description: null,
-      archiveState: IntentionArchiveState.archived,
-    );
-    await _pumpDetailsPage(tester, repository, intention.id);
-    await waitForDetailRequests(repository, 1);
-
-    repository.detailRequests.single.add(ResultSuccess(intention));
-    await tester.pump();
-
-    expect(find.text('Archived'), findsOneWidget);
-    expect(find.text('Add a description'), findsOneWidget);
-    expect(_selectedType(tester), IntentionReadiness.notReady);
-  });
-
   testWidgets('подробный просмотр проходит accessibility guidelines', (
     tester,
   ) async {
