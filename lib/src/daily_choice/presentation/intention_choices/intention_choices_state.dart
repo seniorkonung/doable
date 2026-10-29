@@ -24,9 +24,6 @@ final class IntentionChoicesInitialFailure extends IntentionChoicesState {
   });
 
   final RelationGroupReadFailure failure;
-
-  /// Обычный повтор предоставляется только при устранимой недоступности.
-  bool get canRetry => failure is RelationGroupUnavailableFailure;
 }
 
 /// Намерение подтверждённо отсутствует, его выборы больше не читаются.

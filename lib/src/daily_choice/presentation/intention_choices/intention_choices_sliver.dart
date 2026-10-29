@@ -11,6 +11,7 @@ import '../../../intention/presentation/details/intention_page_target.dart';
 import '../../../long_term_relation/application/relation_counts.dart';
 import '../../../long_term_relation/application/relation_group_page.dart';
 import '../../../long_term_relation/presentation/relation_list_reconciliation.dart';
+import '../../../long_term_relation/presentation/relation_list_status.dart';
 import '../../application/daily_choice_catalog.dart';
 import '../../domain/daily_choice_id.dart';
 import 'intention_choices_state.dart';
@@ -154,47 +155,32 @@ final class _IntentionChoicesSliverState
   ) {
     final localizations = AppLocalizations.of(context);
     return switch (state) {
-      IntentionChoicesInitialLoad() => _ChoicesStatus(
-        message: localizations.relationNeighborhoodSummaryLoading,
-        progressIndicator: true,
+      IntentionChoicesInitialLoad() => RelationListStatus.initialLoad(
+        localizations,
       ),
-      final IntentionChoicesInitialFailure failure => _ChoicesStatus(
-        message: _initialFailureMessage(localizations, failure.failure),
-        retry: failure.canRetry ? viewModel.retryFirstPage : null,
-      ),
-      IntentionChoicesIntentionNotFound() => _ChoicesStatus(
-        message: localizations.relationNeighborhoodIntentionNotFound,
-      ),
+      final IntentionChoicesInitialFailure failure =>
+        RelationListStatus.initialFailure(
+          localizations,
+          failure: failure.failure,
+          onRetry: viewModel.retryFirstPage,
+        ),
+      IntentionChoicesIntentionNotFound() =>
+        RelationListStatus.intentionNotFound(localizations),
       final IntentionChoicesEmpty empty => _EmptyRole(
         summaryStatus: empty.summaryStatus,
-        onRetryRefresh: _retryRefresh(empty, viewModel),
+        onRetryRefresh: viewModel.retryRefresh,
       ),
       final IntentionChoicesLoaded loaded when index < loaded.items.length =>
         _buildRow(loaded, index, viewModel),
       final IntentionChoicesLoaded loaded => _LoadedRoleFooter(
         state: loaded,
-        onRetryLoadMore: switch ((loaded.progress, loaded.summaryStatus)) {
-          (
-            final RelationListLoadMoreFailure failure,
-            RelationListSummaryCurrent(),
-          )
-              when failure.canRetry =>
-            viewModel.retryLoadMore,
-          _ => null,
-        },
-        onRetryRefresh: _retryRefresh(loaded, viewModel),
+        onRetryLoadMore: loaded.summaryStatus is RelationListSummaryCurrent
+            ? viewModel.retryLoadMore
+            : null,
+        onRetryRefresh: viewModel.retryRefresh,
       ),
     };
   }
-
-  Future<void> Function()? _retryRefresh(
-    IntentionChoicesConfirmed state,
-    IntentionChoicesViewModel viewModel,
-  ) => switch (state.summaryStatus) {
-    final RelationListSummaryRefreshFailure failure when failure.canRetry =>
-      viewModel.retryRefresh,
-    _ => null,
-  };
 
   Widget _buildRow(
     IntentionChoicesLoaded state,
@@ -362,23 +348,21 @@ final class _EmptyRole extends StatelessWidget {
   const _EmptyRole({required this.summaryStatus, required this.onRetryRefresh});
 
   final RelationListSummaryStatus summaryStatus;
-  final Future<void> Function()? onRetryRefresh;
+  final Future<void> Function() onRetryRefresh;
 
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
     return Column(
       children: [
-        _ChoicesStatus(message: localizations.relationNeighborhoodEmpty),
+        RelationListStatus(message: localizations.relationNeighborhoodEmpty),
         if (summaryStatus is RelationListSummaryRefreshing)
-          _ChoicesStatus(
-            message: localizations.relationNeighborhoodRefreshing,
-            progressIndicator: true,
-          ),
-        if (summaryStatus is RelationListSummaryRefreshFailure)
-          _ChoicesStatus(
-            message: localizations.relationNeighborhoodRefreshFailed,
-            retry: onRetryRefresh,
+          RelationListStatus.refreshing(localizations),
+        if (summaryStatus case final RelationListSummaryRefreshFailure refresh)
+          RelationListStatus.refreshFailure(
+            localizations,
+            failure: refresh.failure,
+            onRetry: onRetryRefresh,
           ),
       ],
     );
@@ -394,111 +378,33 @@ final class _LoadedRoleFooter extends StatelessWidget {
 
   final IntentionChoicesLoaded state;
   final Future<void> Function()? onRetryLoadMore;
-  final Future<void> Function()? onRetryRefresh;
+  final Future<void> Function() onRetryRefresh;
 
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
     return switch ((state.progress, state.summaryStatus)) {
-      (RelationListLoadingMore(), _) => _ChoicesStatus(
-        message: localizations.relationNeighborhoodLoadingMore,
-        progressIndicator: true,
+      (RelationListLoadingMore(), _) => RelationListStatus.loadingMore(
+        localizations,
       ),
-      (final RelationListLoadMoreFailure failure, _) => _ChoicesStatus(
-        message: _loadMoreFailureMessage(localizations, failure.failure),
-        retry: onRetryLoadMore,
-      ),
-      (RelationListIdle(), RelationListSummaryRefreshing()) => _ChoicesStatus(
-        message: localizations.relationNeighborhoodRefreshing,
-        progressIndicator: true,
-      ),
-      (RelationListIdle(), RelationListSummaryRefreshFailure()) =>
-        _ChoicesStatus(
-          message: localizations.relationNeighborhoodRefreshFailed,
-          retry: onRetryRefresh,
+      (final RelationListLoadMoreFailure failure, _) =>
+        RelationListStatus.loadMoreFailure(
+          localizations,
+          failure: failure.failure,
+          onRetry: onRetryLoadMore,
+        ),
+      (RelationListIdle(), RelationListSummaryRefreshing()) =>
+        RelationListStatus.refreshing(localizations),
+      (RelationListIdle(), final RelationListSummaryRefreshFailure refresh) =>
+        RelationListStatus.refreshFailure(
+          localizations,
+          failure: refresh.failure,
+          onRetry: onRetryRefresh,
         ),
       (RelationListIdle(), RelationListSummaryCurrent()) =>
         state.hasConfirmedEnd
-            ? _ChoicesStatus(
-                message: localizations.relationNeighborhoodConfirmedEnd,
-              )
+            ? RelationListStatus.confirmedEnd(localizations)
             : const SizedBox(height: 16),
     };
   }
 }
-
-final class _ChoicesStatus extends StatelessWidget {
-  const _ChoicesStatus({
-    required this.message,
-    this.progressIndicator = false,
-    this.retry,
-  });
-
-  final String message;
-  final bool progressIndicator;
-  final Future<void> Function()? retry;
-
-  @override
-  Widget build(BuildContext context) => Semantics(
-    container: true,
-    liveRegion: progressIndicator || retry != null,
-    child: Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (progressIndicator) ...[
-                const SizedBox.square(
-                  dimension: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-                const SizedBox(width: 12),
-              ],
-              Expanded(child: Text(message)),
-            ],
-          ),
-          if (retry case final retry?) ...[
-            const SizedBox(height: 12),
-            FilledButton(
-              onPressed: () => unawaited(retry()),
-              child: Text(AppLocalizations.of(context).commonRetry),
-            ),
-          ],
-        ],
-      ),
-    ),
-  );
-}
-
-String _initialFailureMessage(
-  AppLocalizations localizations,
-  RelationGroupReadFailure failure,
-) => switch (failure) {
-  RelationGroupUnavailableFailure() =>
-    localizations.relationNeighborhoodInitialUnavailable,
-  RelationGroupCorruptionFailure() =>
-    localizations.relationNeighborhoodInitialCorruption,
-  RelationGroupUnexpectedFailure() =>
-    localizations.relationNeighborhoodInitialUnexpected,
-  RelationGroupSnapshotExpired() =>
-    localizations.relationNeighborhoodInitialInvalid,
-  RelationGroupIntentionNotFoundFailure() =>
-    localizations.relationNeighborhoodIntentionNotFound,
-};
-
-String _loadMoreFailureMessage(
-  AppLocalizations localizations,
-  RelationGroupReadFailure failure,
-) => switch (failure) {
-  RelationGroupUnavailableFailure() =>
-    localizations.relationNeighborhoodLoadMoreUnavailable,
-  RelationGroupCorruptionFailure() =>
-    localizations.relationNeighborhoodLoadMoreCorruption,
-  RelationGroupUnexpectedFailure() =>
-    localizations.relationNeighborhoodLoadMoreUnexpected,
-  RelationGroupSnapshotExpired() || RelationGroupIntentionNotFoundFailure() =>
-    localizations.relationNeighborhoodLoadMoreInvalid,
-};
