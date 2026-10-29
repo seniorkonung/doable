@@ -70,7 +70,7 @@ final class OptionsMenu<T extends Object> extends StatelessWidget {
             hint: item.hint,
             tone: item.tone,
             onPressed: switch (item.value) {
-              final value? => () => Navigator.of(context).pop(value),
+              final value? => () => sheet.closeWithChoice(value),
               null => null,
             },
           ),

@@ -323,6 +323,7 @@ Future<void> _choose(WidgetTester tester, String name) async {
   await tester.tap(_inSheet(name));
   await tester.pump();
   await tester.pump(const Duration(seconds: 1));
+  await tester.pump();
 }
 
 Finder get _optionsButton => find.bySemanticsLabel('Параметры намерения');

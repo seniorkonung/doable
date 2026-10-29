@@ -20,6 +20,15 @@ final class SheetPresentation {
   const SheetPresentation._(this._route);
 
   final _DoableSheetRoute<Object?> _route;
+
+  /// Закрывает лист выбором [choice], который показ отдаёт только после
+  /// окончания анимации закрытия, а не в момент закрытия.
+  ///
+  /// Так действие, выбранное в листе, начинается уже без листа на экране.
+  void closeWithChoice(Object choice) {
+    _route._resultAfterClosing = true;
+    _route.navigator!.pop(choice);
+  }
 }
 
 /// Показывает лист над корневым навигатором, перекрывая всю страницу и
@@ -27,9 +36,11 @@ final class SheetPresentation {
 ///
 /// [builder] строит [Sheet], [Sheet.expandable] или композицию на их основе с
 /// переданной возможностью. Потребитель закрывает лист через Navigator.pop с
-/// результатом типа [T]; закрытие без выбора даёт null. Лист перетаскивает сам
-/// [Sheet], а затемнение, системное «назад», фокус и семантика маршрута
-/// принадлежат модальной нижней панели Material:
+/// результатом типа [T], и показ отдаёт его в момент закрытия, или через
+/// [SheetPresentation.closeWithChoice], и показ отдаёт его после анимации
+/// закрытия; закрытие без выбора даёт null. Лист перетаскивает сам [Sheet], а
+/// затемнение, системное «назад», фокус и семантика маршрута принадлежат
+/// модальной нижней панели Material:
 /// https://api.flutter.dev/flutter/material/ModalBottomSheetRoute-class.html
 ///
 /// С [hostsMessages] лист содержит собственный прозрачный [Scaffold], и
@@ -76,7 +87,10 @@ Future<T?> showDoableSheet<T>({
       ),
     ),
   );
-  return navigator.push(route);
+  return navigator.push(route).then((result) async {
+    if (route._resultAfterClosing) await route.completed;
+    return result;
+  });
 }
 
 /// Длительность движения листа, которое не ведёт палец.
@@ -146,6 +160,9 @@ final class _DoableSheetRoute<T> extends ModalBottomSheetRoute<T> {
   /// Высота, на которую маршрут уводит лист при закрытии, при последней
   /// раскладке: лист вместе с отступом клавиатуры под ним.
   double _extent = 0;
+
+  /// Показ отдаёт результат только после окончания анимации закрытия.
+  bool _resultAfterClosing = false;
 
   /// Значение анимации маршрута: 0 — лист закрыт, 1 — в компактном размере.
   AnimationController get _animation => controller!;

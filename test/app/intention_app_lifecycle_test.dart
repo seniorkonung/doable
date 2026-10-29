@@ -215,10 +215,7 @@ void main() {
       );
       await _closeOperationMessage(tester);
 
-      await tester.tap(intentionOptionsButton);
-      await tester.pumpAndSettle();
-      await tester.tap(intentionOption(IntentionOption.archive));
-      await tester.pump();
+      await chooseIntentionOption(tester, IntentionOption.archive);
       final archived = _copyIntention(
         ready,
         archiveState: IntentionArchiveState.archived,

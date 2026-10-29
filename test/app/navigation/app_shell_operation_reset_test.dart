@@ -763,13 +763,13 @@ final class _ControlledApp {
   }
 
   Future<void> archive(WidgetTester tester) async {
-    await _chooseIntentionOption(tester, IntentionOption.archive);
+    await chooseIntentionOption(tester, IntentionOption.archive);
     expect(repository.commands.last, isA<ArchiveIntention>());
     expect(coordinator.isRunning(intention.id), isTrue);
   }
 
   Future<void> delete(WidgetTester tester) async {
-    await _chooseIntentionOption(tester, IntentionOption.delete);
+    await chooseIntentionOption(tester, IntentionOption.delete);
     await tester.pumpAndSettle();
     await tester.tap(intentionDeletionConfirm);
     await tester.pump();
@@ -781,14 +781,4 @@ final class _ControlledApp {
   void complete(Result<IntentionCommandSuccess> result) {
     repository.completeCommand(completedCommands++, result);
   }
-}
-
-Future<void> _chooseIntentionOption(
-  WidgetTester tester,
-  IntentionOption option,
-) async {
-  await tester.tap(intentionOptionsButton);
-  await tester.pumpAndSettle();
-  await tester.tap(intentionOption(option));
-  await tester.pump();
 }

@@ -58,6 +58,12 @@ void main() {
         final menu = await _open(tester, brightness: brightness);
 
         await tester.tap(find.text('Архивировать'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 90));
+
+        expect(find.byType(Sheet), findsOne);
+        expect(menu.result, isNull);
+
         await tester.pumpAndSettle();
 
         expect(find.byType(Sheet), findsNothing);
