@@ -61,24 +61,6 @@ final class AddRow extends StatelessWidget {
   final _Lead? _lead;
   final _Add? _add;
 
-  String? get title => switch (_lead) {
-    _Title(:final text) => text,
-    _Hint() || null => null,
-  };
-
-  /// Видимая подпись «Добавить».
-  String? get addText => _add?.text;
-
-  /// Доступное название «Добавить»: что именно оно добавляет.
-  String? get addLabel => _add?.label;
-
-  /// Без обработчика «Добавить» окрашено `grip`, как выключенная текстовая
-  /// кнопка, и объявляется недоступным.
-  VoidCallback? get onAdd => _add?.onAdd;
-
-  /// Ключ области нажатия «Добавить», по нему её находят сценарии экрана.
-  Key? get addKey => _add?.key;
-
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).extension<DoableColors>()!;

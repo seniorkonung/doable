@@ -15,17 +15,16 @@ void main() {
     final semantics = tester.ensureSemantics();
     await tester.pumpWidget(_app(child: _section(onAdd: null)));
 
-    final row = tester.widget<AddRow>(find.byType(AddRow));
-    expect(
-      (row.title, row.addText, row.addLabel, row.onAdd, row.addKey),
-      ('Теги', 'Добавить', 'Добавить теги', null, _addKey),
-    );
+    final row = find.byType(AddRow);
+    expect(find.descendant(of: row, matching: find.text('Теги')), findsOne);
+    expect(find.descendant(of: row, matching: find.text('Добавить')), findsOne);
     expect(
       tester.getSemantics(find.byKey(_addKey)),
       matchesSemantics(
         label: 'Добавить теги',
         isButton: true,
         hasEnabledState: true,
+        isEnabled: false,
       ),
     );
     semantics.dispose();
