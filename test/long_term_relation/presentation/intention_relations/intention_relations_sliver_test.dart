@@ -1,5 +1,7 @@
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/design_system/components/add_row.dart';
 import 'package:doable/src/design_system/components/count_tiles.dart';
+import 'package:doable/src/design_system/components/empty_state.dart';
 import 'package:doable/src/design_system/components/relation_row.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
@@ -181,6 +183,7 @@ void main() {
         locale: locale,
         ownerTitle: 'Быть здоровым',
         counts: counts,
+        viewportHeight: 900,
       );
       harness.repository.completePage(
         0,
@@ -438,7 +441,7 @@ void main() {
     testWidgets('[${locale.languageCode}] отличает пустую группу от '
         'загрузки', (tester) async {
       final harness = await _Harness.pump(tester, locale: locale);
-      expect(find.text(l10n.relationNeighborhoodEmpty), findsNothing);
+      expect(find.byType(EmptyState), findsNothing);
 
       harness.repository.completePage(
         0,
@@ -451,7 +454,252 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text(l10n.relationNeighborhoodSummaryLoading), findsNothing);
-      expect(find.text(l10n.relationNeighborhoodEmpty), findsOne);
+      expect(find.byType(EmptyState), findsOne);
+    });
+
+    testWidgets('[${locale.languageCode}] под плитками стоит подсказка о '
+        'смысле выбранной группы, а «Добавить» передаёт группу странице', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      final harness = await _Harness.pump(tester, locale: locale);
+      final hints = {
+        IntentionRelationGroup.needs: l10n.detailsRelationsNeedsHint,
+        IntentionRelationGroup.canUse: l10n.detailsRelationsCanUseHint,
+        IntentionRelationGroup.neededFor: l10n.detailsRelationsNeededForHint,
+        IntentionRelationGroup.canBeUsedFor:
+            l10n.detailsRelationsCanBeUsedForHint,
+      };
+      final addLabels = {
+        IntentionRelationGroup.needs: l10n.detailsRelationsAddNeedsLabel,
+        IntentionRelationGroup.canUse: l10n.detailsRelationsAddCanUseLabel,
+        IntentionRelationGroup.neededFor:
+            l10n.detailsRelationsAddNeededForLabel,
+        IntentionRelationGroup.canBeUsedFor:
+            l10n.detailsRelationsAddCanBeUsedForLabel,
+      };
+
+      for (final group in IntentionRelationGroup.values) {
+        if (group != IntentionRelationGroup.needs) {
+          await tester.tap(_tileFinder(group));
+          await tester.pump();
+        }
+        for (final entry in hints.entries) {
+          expect(
+            find.text(entry.value),
+            entry.key == group ? findsOneWidget : findsNothing,
+          );
+        }
+        expect(find.text(l10n.detailsRelationsAdd), findsOneWidget);
+        await tester.tap(find.bySemanticsLabel(addLabels[group]!));
+        expect(harness.adds.last, group);
+      }
+      expect(harness.adds, IntentionRelationGroup.values);
+      semantics.dispose();
+    });
+
+    testWidgets('[${locale.languageCode}] строка «Добавить» стоит в 4 под '
+        'плитками, а список следует за ней сразу', (tester) async {
+      final counts = testRelationCounts(activeNeedOutgoing: 1);
+      final harness = await _Harness.pump(
+        tester,
+        locale: locale,
+        counts: counts,
+      );
+      harness.repository.completePage(
+        0,
+        RelationGroupFirstPage(
+          items: testGroupRows(ownerId: harness.ownerId, from: 1, count: 1),
+          counts: counts,
+          nextCursor: null,
+          revision: revision,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final tiles = tester.getRect(
+        find.byType(CountTiles<IntentionRelationGroup>),
+      );
+      final addRow = tester.getRect(find.byType(AddRow));
+      expect(addRow.top, tiles.bottom + 4);
+      expect(tester.getTopLeft(_rowFinder(1)).dy, addRow.bottom);
+    });
+
+    testWidgets('[${locale.languageCode}] у архивированного намерения строка '
+        'держит только подсказку', (tester) async {
+      await _Harness.pump(
+        tester,
+        locale: locale,
+        archiveState: IntentionArchiveState.archived,
+      );
+
+      expect(find.text(l10n.detailsRelationsNeedsHint), findsOneWidget);
+      expect(find.byKey(_addKey), findsNothing);
+      expect(find.text(l10n.detailsRelationsAdd), findsNothing);
+    });
+
+    testWidgets('[${locale.languageCode}] пустая группа объясняет, какие '
+        'связи в ней появятся, без значка и «Добавить» не пропадает', (
+      tester,
+    ) async {
+      final harness = await _Harness.pump(tester, locale: locale);
+      final titles = {
+        IntentionRelationGroup.needs: l10n.detailsRelationsEmptyNeedsTitle,
+        IntentionRelationGroup.canUse: l10n.detailsRelationsEmptyCanUseTitle,
+        IntentionRelationGroup.neededFor:
+            l10n.detailsRelationsEmptyNeededForTitle,
+        IntentionRelationGroup.canBeUsedFor:
+            l10n.detailsRelationsEmptyCanBeUsedForTitle,
+      };
+      final texts = {
+        IntentionRelationGroup.needs:
+            l10n.detailsRelationsEmptyNeedsIntentionText,
+        IntentionRelationGroup.canUse: l10n.detailsRelationsEmptyCanUseText,
+        IntentionRelationGroup.neededFor:
+            l10n.detailsRelationsEmptyNeededForText,
+        IntentionRelationGroup.canBeUsedFor:
+            l10n.detailsRelationsEmptyCanBeUsedForText,
+      };
+
+      for (final (index, group) in IntentionRelationGroup.values.indexed) {
+        if (group != IntentionRelationGroup.needs) {
+          await tester.tap(_tileFinder(group));
+          await tester.pump();
+        }
+        harness.repository.completePage(index, _emptyPage(revision));
+        await tester.pumpAndSettle();
+
+        final empty = tester.widget<EmptyState>(find.byType(EmptyState));
+        expect(empty.title, titles[group]);
+        expect(empty.text, texts[group]);
+        expect(empty.icon, isNull);
+        expect(empty.action, isNull);
+        expect(empty.textMaxWidth, 270);
+        expect(empty.pretty, isTrue);
+        expect(empty.spaceAbove, 24);
+        expect(empty.spaceBelow, 24);
+        expect(find.byType(AddRow), findsOneWidget);
+        expect(find.byKey(_addKey), findsOneWidget);
+        expect(find.byType(CountTiles<IntentionRelationGroup>), findsOneWidget);
+      }
+    });
+
+    testWidgets('[${locale.languageCode}] пустая группа «Нужно» действия '
+        'напоминает, что действие может обходиться без других', (tester) async {
+      final harness = await _Harness.pump(
+        tester,
+        locale: locale,
+        readiness: IntentionReadiness.ready,
+        target: const RelationsTarget(IntentionRelationGroup.needs),
+      );
+      harness.repository.completePage(0, _emptyPage(revision));
+      await tester.pumpAndSettle();
+
+      final empty = tester.widget<EmptyState>(find.byType(EmptyState));
+      expect(empty.title, l10n.detailsRelationsEmptyNeedsTitle);
+      expect(empty.text, l10n.detailsRelationsEmptyNeedsActionText);
+      expect(empty.pretty, isTrue);
+    });
+
+    testWidgets('[${locale.languageCode}] пустая группа архивированного '
+        'намерения просит восстановить его, а плитки и подсказка остаются', (
+      tester,
+    ) async {
+      final harness = await _Harness.pump(
+        tester,
+        locale: locale,
+        archiveState: IntentionArchiveState.archived,
+      );
+      final titles = {
+        IntentionRelationGroup.needs: l10n.detailsRelationsEmptyNeedsTitle,
+        IntentionRelationGroup.canUse: l10n.detailsRelationsEmptyCanUseTitle,
+        IntentionRelationGroup.neededFor:
+            l10n.detailsRelationsEmptyNeededForTitle,
+        IntentionRelationGroup.canBeUsedFor:
+            l10n.detailsRelationsEmptyCanBeUsedForTitle,
+      };
+
+      for (final (index, group) in IntentionRelationGroup.values.indexed) {
+        if (group != IntentionRelationGroup.needs) {
+          await tester.tap(_tileFinder(group));
+          await tester.pump();
+        }
+        // Активная и архивная части группы читаются парой запросов.
+        harness.repository.completePage(index * 2, _emptyPage(revision));
+        harness.repository.completePage(index * 2 + 1, _emptyPage(revision));
+        await tester.pumpAndSettle();
+
+        final empty = tester.widget<EmptyState>(find.byType(EmptyState));
+        expect(empty.title, titles[group]);
+        expect(empty.text, l10n.detailsRelationsEmptyArchivedText);
+        expect(empty.icon, isNull);
+        expect(empty.textMaxWidth, 270);
+        expect(empty.pretty, isTrue);
+        expect(empty.spaceAbove, 24);
+        expect(empty.spaceBelow, 24);
+        expect(_tiles(tester).value, group);
+        expect(find.byKey(_addKey), findsNothing);
+      }
+    });
+
+    testWidgets('[${locale.languageCode}] пустая группа не снимает отметку '
+        'архива другой группы', (tester) async {
+      final harness = await _Harness.pump(tester, locale: locale);
+      harness.repository.completePage(
+        0,
+        _emptyPage(
+          revision,
+          counts: testRelationCounts(archivedCanIncoming: 2),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(EmptyState), findsOneWidget);
+      expect(
+        [for (final tile in _tiles(tester).tiles) tile.archived],
+        [false, false, false, true],
+      );
+    });
+
+    testWidgets('[${locale.languageCode}] группа только с архивированными '
+        'связями не считается пустой', (tester) async {
+      final harness = await _Harness.pump(tester, locale: locale);
+      harness.repository.completePage(
+        0,
+        _emptyPage(
+          revision,
+          counts: testRelationCounts(archivedNeedOutgoing: 2),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(EmptyState), findsNothing);
+      expect(find.byKey(_addKey), findsOneWidget);
+      expect(_tiles(tester).tiles.first.archived, isTrue);
+    });
+
+    testWidgets('[${locale.languageCode}] отказ обновления пустой группы '
+        'остаётся виден рядом с пустым состоянием', (tester) async {
+      final harness = await _Harness.pump(
+        tester,
+        locale: locale,
+        viewportHeight: 900,
+      );
+      harness.repository.completePage(0, _emptyPage(revision));
+      await tester.pumpAndSettle();
+
+      harness.repository.emitIntention(
+        testNeighborhoodIntention(id: harness.ownerId),
+        counts: testRelationCounts(),
+        revision: const TestGraphRevision(3),
+      );
+      await _pumpUntilRequestCount(tester, harness.repository, 2);
+      harness.repository.failRead(1, const RelationGroupUnavailableFailure());
+      await tester.pumpAndSettle();
+
+      expect(find.byType(EmptyState), findsOneWidget);
+      expect(find.text(l10n.relationNeighborhoodRefreshFailed), findsOne);
+      expect(find.text(l10n.commonRetry), findsOne);
     });
 
     testWidgets('[${locale.languageCode}] показывает обновление и его отказ '
@@ -461,6 +709,7 @@ void main() {
         tester,
         locale: locale,
         counts: counts,
+        viewportHeight: 900,
       );
       harness.repository.completePage(
         0,
@@ -508,6 +757,26 @@ void main() {
       expect(find.text(l10n.relationNeighborhoodConfirmedEnd), findsOne);
     });
   }
+
+  testWidgets('пустое состояние стоит в оставшейся высоте под строкой '
+      '«Добавить» с полями 24 сверху и снизу', (tester) async {
+    final harness = await _Harness.pump(tester, viewportHeight: 1600);
+    harness.repository.completePage(0, _emptyPage(revision));
+    await tester.pumpAndSettle();
+
+    final addRowBottom = tester.getRect(find.byType(AddRow)).bottom;
+    final empty = tester.widget<EmptyState>(find.byType(EmptyState));
+    final title = tester.getRect(find.text(empty.title));
+    final text = tester.getRect(find.text(empty.text));
+    // Блок стоит посередине между строкой «Добавить» и низом области
+    // прокрутки, а над ним и под ним остаётся не меньше 24.
+    expect(
+      (title.top + text.bottom) / 2,
+      closeTo((addRowBottom + 1600) / 2, 1),
+    );
+    expect(title.top - addRowBottom, greaterThanOrEqualTo(24));
+    expect(1600 - text.bottom, greaterThanOrEqualTo(24));
+  });
 
   testWidgets('после пересборки возвращает видимую строку под закреплённые '
       'вкладки', (tester) async {
@@ -569,6 +838,7 @@ const _locales = [Locale('ru'), Locale('en')];
 const _headHeight = 300.0;
 const _tabsHeight = 52.0;
 const _tabsKey = ValueKey('test-pinned-tabs');
+const _addKey = ValueKey('intention-relations-add');
 
 /// Вкладка «Связи» под шапкой и закреплёнными вкладками, как на странице:
 /// подробные данные намерения передаёт страница.
@@ -580,15 +850,25 @@ final class _Harness {
   final IntentionId ownerId = testIntentionId(1);
   final opened = <LongTermRelationId>[];
   final walks = <(IntentionId, IntentionRelationGroup)>[];
+  final adds = <IntentionRelationGroup>[];
 
   static Future<_Harness> pump(
     WidgetTester tester, {
     Locale locale = const Locale('en'),
     String ownerTitle = 'Намерение',
+    IntentionReadiness readiness = IntentionReadiness.notReady,
+    IntentionArchiveState archiveState = IntentionArchiveState.active,
     RelationCounts? counts,
     IntentionPageTarget target = const OverviewTarget(),
     RelationGroupPagingPolicy? policy,
+    double? viewportHeight,
   }) async {
+    if (viewportHeight != null) {
+      tester.view
+        ..physicalSize = Size(800, viewportHeight)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+    }
     final repository = ControlledNeighborhoodRepository();
     addTearDown(repository.dispose);
     final harness = _Harness._(
@@ -631,6 +911,7 @@ final class _Harness {
                       onOpenRelation: harness.opened.add,
                       onWalk: (neighborId, group) =>
                           harness.walks.add((neighborId, group)),
+                      onAdd: harness.adds.add,
                     ),
                 ],
               ),
@@ -641,7 +922,12 @@ final class _Harness {
     );
     await tester.pump();
     repository.emitIntention(
-      testNeighborhoodIntention(id: harness.ownerId, title: ownerTitle),
+      testNeighborhoodIntention(
+        id: harness.ownerId,
+        title: ownerTitle,
+        readiness: readiness,
+        archiveState: archiveState,
+      ),
       counts: counts ?? testRelationCounts(),
       revision: const TestGraphRevision(1),
     );
@@ -672,6 +958,16 @@ final class _PinnedTabs extends SliverPersistentHeaderDelegate {
   @override
   bool shouldRebuild(_PinnedTabs oldDelegate) => false;
 }
+
+RelationGroupFirstPage _emptyPage(
+  TestGraphRevision revision, {
+  RelationCounts? counts,
+}) => RelationGroupFirstPage(
+  items: const [],
+  counts: counts ?? testRelationCounts(),
+  nextCursor: null,
+  revision: revision,
+);
 
 CountTiles<IntentionRelationGroup> _tiles(WidgetTester tester) =>
     tester.widget(find.byType(CountTiles<IntentionRelationGroup>));

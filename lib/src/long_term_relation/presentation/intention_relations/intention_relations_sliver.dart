@@ -5,7 +5,9 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
+import '../../../design_system/components/add_row.dart';
 import '../../../design_system/components/count_tiles.dart';
+import '../../../design_system/components/empty_state.dart';
 import '../../../design_system/components/relation_row.dart';
 import '../../../design_system/doable_metrics.dart';
 import '../../../intention/application/intention_details.dart';
@@ -22,17 +24,19 @@ import '../relation_list_status.dart';
 import 'intention_relations_state.dart';
 import 'intention_relations_view_model.dart';
 
-/// Вкладка «Связи» страницы намерения: плитки четырёх групп и порционный
-/// список активных связей выбранной группы.
+/// Вкладка «Связи» страницы намерения: плитки четырёх групп, строка о смысле
+/// выбранной группы с «Добавить» и порционный список её активных связей.
 ///
-/// Единственный sliver сохраняет ленивое построение строк внутри общего
-/// scrollable страницы, а подгрузка следует за построенными строками.
+/// Список остаётся ленивым внутри общего scrollable страницы, а подгрузка
+/// следует за построенными строками. Пустая группа объясняется в оставшейся
+/// высоте под строкой «Добавить».
 final class IntentionRelationsSliver extends ConsumerStatefulWidget {
   const IntentionRelationsSliver({
     required this.details,
     required this.pageInstance,
     required this.onOpenRelation,
     required this.onWalk,
+    required this.onAdd,
     super.key,
   });
 
@@ -47,6 +51,10 @@ final class IntentionRelationsSliver extends ConsumerStatefulWidget {
   /// Открывает страницу соседа на группе, в которой стоит строка.
   final void Function(IntentionId neighborId, IntentionRelationGroup group)
   onWalk;
+
+  /// Начинает создание связи выбранной группы; на архивированном намерении
+  /// «Добавить» нет, и обработчик не вызывается.
+  final ValueChanged<IntentionRelationGroup> onAdd;
 
   Intention get owner => details.intention;
 
@@ -101,33 +109,95 @@ final class _IntentionRelationsSliverState
     _retainRowKeys(state);
     _scheduleVisibleRelationCapture();
 
-    return SliverList(
-      delegate: SliverChildBuilderDelegate((context, index) {
-        if (index == 0) {
-          return Padding(
-            padding: const EdgeInsets.fromLTRB(
-              DoableMetrics.space5,
-              DoableMetrics.space2,
-              DoableMetrics.space5,
-              DoableMetrics.space2,
-            ),
-            child: _GroupTiles(
-              counts: switch (state) {
-                IntentionRelationsConfirmed(:final counts) => counts,
-                IntentionRelationsInitialLoad() ||
-                IntentionRelationsInitialFailure() ||
-                IntentionRelationsIntentionNotFound() =>
-                  widget.details.relationCounts,
-              },
-              selected: state.group,
-              onSelect: viewModel.selectGroup,
-            ),
-          );
-        }
-        return _buildBodyChild(context, state, index - 1, viewModel);
-      }, childCount: _bodyChildCount(state) + 1),
+    return SliverMainAxisGroup(
+      slivers: [
+        SliverList(
+          delegate: SliverChildBuilderDelegate((context, index) {
+            if (index == 0) {
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  DoableMetrics.space5,
+                  DoableMetrics.space2,
+                  DoableMetrics.space5,
+                  DoableMetrics.space1,
+                ),
+                child: _GroupTiles(
+                  counts: switch (state) {
+                    IntentionRelationsConfirmed(:final counts) => counts,
+                    IntentionRelationsInitialLoad() ||
+                    IntentionRelationsInitialFailure() ||
+                    IntentionRelationsIntentionNotFound() =>
+                      widget.details.relationCounts,
+                  },
+                  selected: state.group,
+                  onSelect: viewModel.selectGroup,
+                ),
+              );
+            }
+            if (index == 1) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: DoableMetrics.space5,
+                ),
+                child: _groupAddRow(AppLocalizations.of(context), state.group),
+              );
+            }
+            return _buildBodyChild(context, state, index - 2, viewModel);
+          }, childCount: _bodyChildCount(state) + 2),
+        ),
+        if (_isEmptyGroup(state))
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: _EmptyGroupNotice(owner: widget.owner, group: state.group),
+          ),
+      ],
     );
   }
+
+  /// Подсказка о смысле группы стоит и над списком, и над пустым состоянием;
+  /// у архивированного намерения при ней нет «Добавить».
+  AddRow _groupAddRow(AppLocalizations l10n, IntentionRelationGroup group) {
+    final hint = switch (group) {
+      IntentionRelationGroup.needs => l10n.detailsRelationsNeedsHint,
+      IntentionRelationGroup.canUse => l10n.detailsRelationsCanUseHint,
+      IntentionRelationGroup.neededFor => l10n.detailsRelationsNeededForHint,
+      IntentionRelationGroup.canBeUsedFor =>
+        l10n.detailsRelationsCanBeUsedForHint,
+    };
+    return switch (widget.owner.archiveState) {
+      IntentionArchiveState.active => AddRow.hint(
+        hint: hint,
+        addText: l10n.detailsRelationsAdd,
+        addLabel: switch (group) {
+          IntentionRelationGroup.needs => l10n.detailsRelationsAddNeedsLabel,
+          IntentionRelationGroup.canUse => l10n.detailsRelationsAddCanUseLabel,
+          IntentionRelationGroup.neededFor =>
+            l10n.detailsRelationsAddNeededForLabel,
+          IntentionRelationGroup.canBeUsedFor =>
+            l10n.detailsRelationsAddCanBeUsedForLabel,
+        },
+        onAdd: () => widget.onAdd(group),
+        addKey: const ValueKey('intention-relations-add'),
+      ),
+      IntentionArchiveState.archived => AddRow.hintOnly(hint: hint),
+    };
+  }
+
+  /// Пустой считается группа без активных и архивированных связей: группа
+  /// только с архивом показывает его, а не объяснение.
+  bool _isEmptyGroup(IntentionRelationsState state) => switch (state) {
+    IntentionRelationsEmpty(:final counts, :final group) =>
+      counts.forGroup(
+            scope: RelationScope.archived,
+            type: group.type,
+            direction: group.direction,
+          ) ==
+          0,
+    IntentionRelationsLoaded() ||
+    IntentionRelationsInitialLoad() ||
+    IntentionRelationsInitialFailure() ||
+    IntentionRelationsIntentionNotFound() => false,
+  };
 
   int _bodyChildCount(IntentionRelationsState state) => switch (state) {
     IntentionRelationsLoaded(:final items) => items.length + 1,
@@ -156,7 +226,7 @@ final class _IntentionRelationsSliverState
         ),
       IntentionRelationsIntentionNotFound() =>
         RelationListStatus.intentionNotFound(localizations),
-      final IntentionRelationsEmpty empty => _EmptyGroup(
+      final IntentionRelationsEmpty empty => _EmptyGroupStatuses(
         summaryStatus: empty.summaryStatus,
         onRetryRefresh: viewModel.retryRefresh,
       ),
@@ -474,8 +544,10 @@ final class _GroupRow extends StatelessWidget {
   }
 }
 
-final class _EmptyGroup extends StatelessWidget {
-  const _EmptyGroup({
+/// Статусы обновления пустой группы: само объяснение стоит ниже, в
+/// оставшейся высоте.
+final class _EmptyGroupStatuses extends StatelessWidget {
+  const _EmptyGroupStatuses({
     required this.summaryStatus,
     required this.onRetryRefresh,
   });
@@ -488,7 +560,6 @@ final class _EmptyGroup extends StatelessWidget {
     final localizations = AppLocalizations.of(context);
     return Column(
       children: [
-        RelationListStatus(message: localizations.relationNeighborhoodEmpty),
         if (summaryStatus is RelationListSummaryRefreshing)
           RelationListStatus.refreshing(localizations),
         if (summaryStatus case final RelationListSummaryRefreshFailure refresh)
@@ -498,6 +569,52 @@ final class _EmptyGroup extends StatelessWidget {
             onRetry: onRetryRefresh,
           ),
       ],
+    );
+  }
+}
+
+/// Объяснение пустой группы: что в ней появится, а у архивированного
+/// намерения — что для добавления связей его нужно восстановить.
+final class _EmptyGroupNotice extends StatelessWidget {
+  const _EmptyGroupNotice({required this.owner, required this.group});
+
+  final Intention owner;
+  final IntentionRelationGroup group;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final title = switch (group) {
+      IntentionRelationGroup.needs => l10n.detailsRelationsEmptyNeedsTitle,
+      IntentionRelationGroup.canUse => l10n.detailsRelationsEmptyCanUseTitle,
+      IntentionRelationGroup.neededFor =>
+        l10n.detailsRelationsEmptyNeededForTitle,
+      IntentionRelationGroup.canBeUsedFor =>
+        l10n.detailsRelationsEmptyCanBeUsedForTitle,
+    };
+    final text = switch ((owner.archiveState, group)) {
+      (IntentionArchiveState.archived, _) =>
+        l10n.detailsRelationsEmptyArchivedText,
+      (IntentionArchiveState.active, IntentionRelationGroup.needs) =>
+        switch (owner.readiness) {
+          IntentionReadiness.notReady =>
+            l10n.detailsRelationsEmptyNeedsIntentionText,
+          IntentionReadiness.ready => l10n.detailsRelationsEmptyNeedsActionText,
+        },
+      (IntentionArchiveState.active, IntentionRelationGroup.canUse) =>
+        l10n.detailsRelationsEmptyCanUseText,
+      (IntentionArchiveState.active, IntentionRelationGroup.neededFor) =>
+        l10n.detailsRelationsEmptyNeededForText,
+      (IntentionArchiveState.active, IntentionRelationGroup.canBeUsedFor) =>
+        l10n.detailsRelationsEmptyCanBeUsedForText,
+    };
+    return EmptyState(
+      title: title,
+      text: text,
+      textMaxWidth: 270,
+      spaceAbove: DoableMetrics.space6,
+      spaceBelow: DoableMetrics.space6,
+      pretty: true,
     );
   }
 }

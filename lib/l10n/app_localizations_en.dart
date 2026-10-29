@@ -744,6 +744,74 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get detailsRelationsNeedsHint =>
+      'To get there, you need each of these.';
+
+  @override
+  String get detailsRelationsCanUseHint =>
+      'To get there, you can do any of these.';
+
+  @override
+  String get detailsRelationsNeededForHint => 'Each of these needs it.';
+
+  @override
+  String get detailsRelationsCanBeUsedForHint =>
+      'Each of these can use it, as one of the ways.';
+
+  @override
+  String get detailsRelationsAdd => 'Add';
+
+  @override
+  String get detailsRelationsAddNeedsLabel => 'Add what it needs';
+
+  @override
+  String get detailsRelationsAddCanUseLabel => 'Add what it can use';
+
+  @override
+  String get detailsRelationsAddNeededForLabel =>
+      'Add an intention that needs it';
+
+  @override
+  String get detailsRelationsAddCanBeUsedForLabel =>
+      'Add an intention that can use it';
+
+  @override
+  String get detailsRelationsEmptyNeedsTitle => 'Needs nothing yet';
+
+  @override
+  String get detailsRelationsEmptyNeedsIntentionText =>
+      'Add what this intention cannot do without.';
+
+  @override
+  String get detailsRelationsEmptyNeedsActionText =>
+      'An action can stand alone. Add what it needs if it has steps of its own.';
+
+  @override
+  String get detailsRelationsEmptyCanUseTitle => 'Nothing to use yet';
+
+  @override
+  String get detailsRelationsEmptyCanUseText =>
+      'Add what helps to get there without being required.';
+
+  @override
+  String get detailsRelationsEmptyNeededForTitle => 'Nothing needs it yet';
+
+  @override
+  String get detailsRelationsEmptyNeededForText =>
+      'Intentions that cannot do without this one will appear here.';
+
+  @override
+  String get detailsRelationsEmptyCanBeUsedForTitle => 'Nothing can use it yet';
+
+  @override
+  String get detailsRelationsEmptyCanBeUsedForText =>
+      'Intentions that this one is a way to will appear here.';
+
+  @override
+  String get detailsRelationsEmptyArchivedText =>
+      'Restore the intention to add relations.';
+
+  @override
   String get detailsChoicesTab => 'Choices';
 
   @override

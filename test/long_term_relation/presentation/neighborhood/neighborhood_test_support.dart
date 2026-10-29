@@ -398,6 +398,7 @@ Intention testNeighborhoodIntention({
   required IntentionId id,
   String title = 'Намерение',
   String? description,
+  IntentionReadiness readiness = IntentionReadiness.notReady,
   IntentionArchiveState archiveState = IntentionArchiveState.active,
 }) {
   final timestamp = IntentionTimestamp(DateTime.utc(2026, 9, 20));
@@ -405,7 +406,7 @@ Intention testNeighborhoodIntention({
     id: id,
     title: title,
     description: description,
-    readiness: IntentionReadiness.notReady,
+    readiness: readiness,
     archiveState: archiveState,
     createdAt: timestamp,
     updatedAt: timestamp,

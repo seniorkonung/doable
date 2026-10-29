@@ -747,6 +747,76 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
+  String get detailsRelationsNeedsHint =>
+      'Чтобы достичь этого, нужно всё перечисленное.';
+
+  @override
+  String get detailsRelationsCanUseHint =>
+      'Чтобы достичь этого, можно сделать любое из перечисленного.';
+
+  @override
+  String get detailsRelationsNeededForHint => 'Каждому из них это нужно.';
+
+  @override
+  String get detailsRelationsCanBeUsedForHint =>
+      'Каждое из них может использовать это как один из путей.';
+
+  @override
+  String get detailsRelationsAdd => 'Добавить';
+
+  @override
+  String get detailsRelationsAddNeedsLabel => 'Добавить то, что нужно';
+
+  @override
+  String get detailsRelationsAddCanUseLabel =>
+      'Добавить то, что можно использовать';
+
+  @override
+  String get detailsRelationsAddNeededForLabel =>
+      'Добавить намерение, которому это нужно';
+
+  @override
+  String get detailsRelationsAddCanBeUsedForLabel =>
+      'Добавить намерение, которое может это использовать';
+
+  @override
+  String get detailsRelationsEmptyNeedsTitle => 'Пока ничего не нужно';
+
+  @override
+  String get detailsRelationsEmptyNeedsIntentionText =>
+      'Добавьте то, без чего этому намерению не обойтись.';
+
+  @override
+  String get detailsRelationsEmptyNeedsActionText =>
+      'Действие может обходиться без других. Добавьте то, что ему нужно, если у него есть свои шаги.';
+
+  @override
+  String get detailsRelationsEmptyCanUseTitle => 'Пока нечего использовать';
+
+  @override
+  String get detailsRelationsEmptyCanUseText =>
+      'Добавьте то, что помогает достичь этого, но не обязательно.';
+
+  @override
+  String get detailsRelationsEmptyNeededForTitle => 'Пока ни для чего не нужно';
+
+  @override
+  String get detailsRelationsEmptyNeededForText =>
+      'Здесь появятся намерения, которым без этого не обойтись.';
+
+  @override
+  String get detailsRelationsEmptyCanBeUsedForTitle =>
+      'Пока ни для чего не используется';
+
+  @override
+  String get detailsRelationsEmptyCanBeUsedForText =>
+      'Здесь появятся намерения, к которым это — один из путей.';
+
+  @override
+  String get detailsRelationsEmptyArchivedText =>
+      'Чтобы добавлять связи, восстановите намерение.';
+
+  @override
   String get detailsChoicesTab => 'Выборы';
 
   @override

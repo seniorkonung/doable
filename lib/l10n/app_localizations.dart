@@ -1172,6 +1172,120 @@ abstract class AppLocalizations {
   /// **'Open the action page: {title}'**
   String detailsRelationsWalkAction(String title);
 
+  /// Подсказка о смысле группы «Нужно» под плитками вкладки «Связи»
+  ///
+  /// In en, this message translates to:
+  /// **'To get there, you need each of these.'**
+  String get detailsRelationsNeedsHint;
+
+  /// Подсказка о смысле группы «Можно использовать» под плитками вкладки «Связи»
+  ///
+  /// In en, this message translates to:
+  /// **'To get there, you can do any of these.'**
+  String get detailsRelationsCanUseHint;
+
+  /// Подсказка о смысле группы «Нужно для» под плитками вкладки «Связи»
+  ///
+  /// In en, this message translates to:
+  /// **'Each of these needs it.'**
+  String get detailsRelationsNeededForHint;
+
+  /// Подсказка о смысле группы «Можно использовать для» под плитками вкладки «Связи»
+  ///
+  /// In en, this message translates to:
+  /// **'Each of these can use it, as one of the ways.'**
+  String get detailsRelationsCanBeUsedForHint;
+
+  /// Видимая подпись начала создания связи на вкладке «Связи»
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get detailsRelationsAdd;
+
+  /// Доступное название «Добавить» у группы «Нужно»
+  ///
+  /// In en, this message translates to:
+  /// **'Add what it needs'**
+  String get detailsRelationsAddNeedsLabel;
+
+  /// Доступное название «Добавить» у группы «Можно использовать»
+  ///
+  /// In en, this message translates to:
+  /// **'Add what it can use'**
+  String get detailsRelationsAddCanUseLabel;
+
+  /// Доступное название «Добавить» у группы «Нужно для»
+  ///
+  /// In en, this message translates to:
+  /// **'Add an intention that needs it'**
+  String get detailsRelationsAddNeededForLabel;
+
+  /// Доступное название «Добавить» у группы «Можно использовать для»
+  ///
+  /// In en, this message translates to:
+  /// **'Add an intention that can use it'**
+  String get detailsRelationsAddCanBeUsedForLabel;
+
+  /// Заголовок пустой группы «Нужно»
+  ///
+  /// In en, this message translates to:
+  /// **'Needs nothing yet'**
+  String get detailsRelationsEmptyNeedsTitle;
+
+  /// Текст пустой группы «Нужно» у намерения, которое не действие
+  ///
+  /// In en, this message translates to:
+  /// **'Add what this intention cannot do without.'**
+  String get detailsRelationsEmptyNeedsIntentionText;
+
+  /// Текст пустой группы «Нужно» у действия
+  ///
+  /// In en, this message translates to:
+  /// **'An action can stand alone. Add what it needs if it has steps of its own.'**
+  String get detailsRelationsEmptyNeedsActionText;
+
+  /// Заголовок пустой группы «Можно использовать»
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to use yet'**
+  String get detailsRelationsEmptyCanUseTitle;
+
+  /// Текст пустой группы «Можно использовать»
+  ///
+  /// In en, this message translates to:
+  /// **'Add what helps to get there without being required.'**
+  String get detailsRelationsEmptyCanUseText;
+
+  /// Заголовок пустой группы «Нужно для»
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing needs it yet'**
+  String get detailsRelationsEmptyNeededForTitle;
+
+  /// Текст пустой группы «Нужно для»
+  ///
+  /// In en, this message translates to:
+  /// **'Intentions that cannot do without this one will appear here.'**
+  String get detailsRelationsEmptyNeededForText;
+
+  /// Заголовок пустой группы «Можно использовать для»
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing can use it yet'**
+  String get detailsRelationsEmptyCanBeUsedForTitle;
+
+  /// Текст пустой группы «Можно использовать для»
+  ///
+  /// In en, this message translates to:
+  /// **'Intentions that this one is a way to will appear here.'**
+  String get detailsRelationsEmptyCanBeUsedForText;
+
+  /// Текст пустой группы архивированного намерения вместо объяснения, что появится в группе
+  ///
+  /// In en, this message translates to:
+  /// **'Restore the intention to add relations.'**
+  String get detailsRelationsEmptyArchivedText;
+
   /// Вкладка дневных выборов, прямо использующих намерение
   ///
   /// In en, this message translates to:
