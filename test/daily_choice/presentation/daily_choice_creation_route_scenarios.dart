@@ -40,7 +40,8 @@ void _registerCreationRouteScenarios() {
         final createRelation = find.byKey(
           const ValueKey('intention-relations-add'),
         );
-        await _waitFor(tester, createRelation);
+        // Строка «Добавить» строится раньше, чем страница доезжает до места.
+        await _waitFor(tester, createRelation.hitTestable());
         await _tap(tester, createRelation.first);
         final description = find.byKey(
           const ValueKey('relation-editor-description'),

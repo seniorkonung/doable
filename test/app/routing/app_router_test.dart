@@ -238,8 +238,33 @@ void main() {
 
     expect(find.byType(IntentionDetailsPage), findsWidgets);
     await tester.tap(find.text('Relations').first);
+    // Новая страница А получает связи своей вкладки заново.
+    await _settleNeighborhood(
+      tester,
+      repository,
+      expectedWatches: 5,
+      expectedQueries: 3,
+    );
+    expect(repository.groupQueries[2].intentionId, idA);
+    _serveNeighborhood(
+      repository,
+      intentionId: idA,
+      title: 'А',
+      queryIndex: 2,
+      row: _row(
+        relationId: relationAb,
+        sourceId: idA,
+        relatedId: idB,
+        relatedTitle: 'Б',
+      ),
+    );
     await tester.pumpAndSettle();
-    expect(find.text('To А, you need Б'), findsWidgets);
+    expect(
+      find.byKey(
+        ValueKey('intention-relations-row-${relationAb.toCanonicalString()}'),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets(
@@ -291,7 +316,7 @@ void main() {
       await tester.pageBack();
       await tester.pumpAndSettle();
       await tester.tap(
-        find.byKey(const ValueKey('relation-neighborhood-direction-incoming')),
+        find.byKey(const ValueKey('intention-relations-group-neededFor')),
       );
       await _settleNeighborhood(
         tester,
@@ -326,7 +351,7 @@ void main() {
       await tester.pageBack();
       await tester.pumpAndSettle();
       await tester.tap(
-        find.byKey(const ValueKey('relation-neighborhood-type-can')),
+        find.byKey(const ValueKey('intention-relations-group-canBeUsedFor')),
       );
       await _settleNeighborhood(
         tester,

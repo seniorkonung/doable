@@ -210,6 +210,11 @@ void _registerOrdinaryPaginationTests() {
       await _settle(tester);
       await tester.tap(find.text(l10n.detailsRelationsTab).first);
       await _settle(tester);
+      // Вкладка «Связи» действия открывается на группе «Нужно для».
+      await tester.tap(
+        find.byKey(const ValueKey('intention-relations-group-needs')),
+      );
+      await _settle(tester);
       faults.isFailing = true;
       await _scrollToEnd(tester, find.byType(IntentionDetailsPage));
       final failure = find.text(l10n.relationNeighborhoodLoadMoreUnavailable);

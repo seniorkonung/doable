@@ -161,6 +161,7 @@ void main() {
         IntentionDetailsPage,
       );
       await _tap(tester, find.text('Relations').first);
+      await _tap(tester, _outgoingNeedGroup);
       await _open(
         tester,
         find.byKey(const ValueKey('intention-relations-add')),
@@ -226,6 +227,7 @@ void main() {
         'Читать',
       );
       await _tap(tester, find.text('Relations').first);
+      await _tap(tester, _outgoingNeedGroup);
       await _open(
         tester,
         find.byKey(const ValueKey('intention-relations-add')),
@@ -256,7 +258,13 @@ const _rootPages = {
   AppDestination.intentionGraph: IntentionCatalogPage,
 };
 
-/// Строка связи «Читать» → «Бегать» в соседстве намерения.
+/// Группа «Нужно» действия «Читать»: вкладка «Связи» действия открывается
+/// на группе «Нужно для».
+final _outgoingNeedGroup = find.byKey(
+  const ValueKey('intention-relations-group-needs'),
+);
+
+/// Строка связи «Читать» → «Бегать» во вкладке «Связи» намерения.
 final _relationRow = find.byKey(
   ValueKey('intention-relations-row-${tagFixtureId(_relation)}'),
 );

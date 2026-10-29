@@ -250,7 +250,10 @@ void main() {
 
       // Полное количество группы не подменяется числом загруженных строк.
       expect(
-        find.text('In the whole selected group: 250', skipOffstage: false),
+        find.descendant(
+          of: find.byKey(const ValueKey('intention-relations-group-needs')),
+          matching: find.text('250'),
+        ),
         findsOneWidget,
       );
 

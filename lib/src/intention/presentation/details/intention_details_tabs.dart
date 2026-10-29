@@ -10,7 +10,7 @@ import '../../../long_term_relation/application/relation_counts.dart';
 
 enum IntentionDetailsTab { overview, relations, choices, statistics }
 
-/// Разделы страницы намерения с числами из сводки подробных данных.
+/// Разделы страницы намерения; число связей передаёт страница.
 final class IntentionDetailsTabs extends StatelessWidget {
   const IntentionDetailsTabs({
     required this.value,

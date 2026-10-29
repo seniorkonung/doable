@@ -1607,7 +1607,7 @@
     - проверки: `test/app/navigation/app_shell_back_test.dart`, `test/app/navigation/app_shell_page_matrix.dart`, `test/app/navigation/app_shell_pages_above_test.dart`, `test/app/navigation/app_shell_operation_reset_test.dart`, `test/app/navigation/ordinary_page_layout_scenarios.dart`, `test/app/routing/app_router_test.dart`, `test/app/intention_statistics_app_flow_test.dart`, `test/app/long_term_relation_app_flow_test.dart`, `test/daily_choice/presentation/daily_choice_creation_completion_test.dart`, `test/daily_choice/presentation/daily_choice_creation_exit_test.dart`, `test/daily_choice/presentation/daily_choice_creation_route_scenarios.dart`, `test/long_term_relation/presentation/neighborhood/relation_neighborhood_widget_test.dart`.
   - **Размер:** M — замена ключей механическая.
 
-- [ ] 6.19 Показывать на странице намерения вкладку «Связи» по дизайну вместо прежнего соседства
+- [x] 6.19 Показывать на странице намерения вкладку «Связи» по дизайну вместо прежнего соседства
   - **Критерии приёмки:**
     - По решениям 2 и 6 дизайна тело вкладки «Связи» — вид из 6.15–6.17. Прежнее соседство на странице больше не показывается; его код остаётся до 6.20.
       - Модель «Связей» существует, только пока выбрана вкладка «Связи», в том числе когда над страницей открыта другая страница. До первого показа модели и чтений групп нет.

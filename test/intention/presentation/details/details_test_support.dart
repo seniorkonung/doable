@@ -109,7 +109,8 @@ final class ControlledDetailsRepository
 
   ControlledDetailsRepository({this.shareSecondWatch = false});
 
-  /// Страница подробностей и соседство наблюдают одно намерение параллельно.
+  /// Страница подробностей и вкладка «Связи» наблюдают одно намерение
+  /// параллельно.
   bool shareSecondWatch;
 
   final detailRequests = <ControlledDetailRequest>[];
@@ -130,7 +131,7 @@ final class ControlledDetailsRepository
   Stream<LongTermRelationReadResult> Function(LongTermRelationId id)?
   onWatchRelation;
 
-  /// Запросы порций соседства в порядке их поступления.
+  /// Запросы порций групп связей в порядке их поступления.
   final relationGroupQueries = <RelationGroupQuery>[];
   final dailyChoiceGroupQueries = <DailyChoiceGroupQuery>[];
 
@@ -149,7 +150,7 @@ final class ControlledDetailsRepository
         super.getIntentionStatisticsSection(query);
   }
 
-  /// Ответ соседства на конкретный запрос; по умолчанию группа пуста.
+  /// Ответ на запрос порции группы связей; по умолчанию группа пуста.
   RelationGroupPageResult Function(RelationGroupQuery query)?
   onRelationGroupPage;
   RelationGroupPageResult Function(DailyChoiceGroupQuery query)?
@@ -452,15 +453,18 @@ final class _DetailsCatalogEntrySnapshot
   bool matches(IntentionCatalogQuery query) => query.includes(summary);
 }
 
-/// Строка выбранной группы соседства намерения-владельца.
+/// Строка выбранной группы связей намерения-владельца.
 RelationGroupEntry testDetailsRelationRow({
   required IntentionId ownerId,
   required int index,
   LongTermRelationType type = LongTermRelationType.need,
   RelationDirection direction = RelationDirection.outgoing,
   RelationScope scope = RelationScope.active,
+  IntentionId? neighborId,
+  String? neighborTitle,
+  IntentionReadiness neighborReadiness = IntentionReadiness.notReady,
 }) {
-  final neighborId = testDetailsIntentionId(900 + index);
+  neighborId ??= testDetailsIntentionId(900 + index);
   final isOutgoing = direction == RelationDirection.outgoing;
   return RelationGroupEntry(
     relation: LongTermRelation(
@@ -474,9 +478,11 @@ RelationGroupEntry testDetailsRelationRow({
     ),
     neighbor: RelationNeighbor(
       id: neighborId,
-      title: isOutgoing ? 'Связанное $index' : 'Исходное $index',
+      title:
+          neighborTitle ??
+          (isOutgoing ? 'Связанное $index' : 'Исходное $index'),
       archiveState: IntentionArchiveState.active,
-      readiness: IntentionReadiness.notReady,
+      readiness: neighborReadiness,
     ),
   );
 }

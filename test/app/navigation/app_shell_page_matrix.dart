@@ -29,6 +29,7 @@ enum _MatrixEntry {
   confirmPath,
   editChoice,
   createRelation,
+  outgoingRelations,
   incomingRelations,
   editRelation,
   changeSource,
@@ -78,8 +79,9 @@ enum _MatrixEntry {
     _MatrixEntry.createRelation => find.byKey(
       const ValueKey('intention-relations-add'),
     ),
+    _MatrixEntry.outgoingRelations => _outgoingNeedGroup,
     _MatrixEntry.incomingRelations => find.byKey(
-      const ValueKey('relation-neighborhood-direction-incoming'),
+      const ValueKey('intention-relations-group-neededFor'),
     ),
     _MatrixEntry.editRelation => find.byKey(
       const ValueKey('relation-details-edit-relation'),
@@ -291,7 +293,7 @@ void _registerPageMatrixTests() {
       name: 'долговременная связь',
       page: RelationDetailsPage,
       panel: true,
-      entries: [read, _MatrixEntry.relation],
+      entries: [read, _MatrixEntry.outgoingRelations, _MatrixEntry.relation],
     ),
     (
       name: 'дневной выбор',
@@ -357,7 +359,11 @@ void _registerPageMatrixTests() {
       name: 'создание исходящей связи',
       page: RelationEditorPage,
       panel: false,
-      entries: [read, _MatrixEntry.createRelation],
+      entries: [
+        read,
+        _MatrixEntry.outgoingRelations,
+        _MatrixEntry.createRelation,
+      ],
     ),
     (
       name: 'создание входящей связи',
@@ -373,19 +379,34 @@ void _registerPageMatrixTests() {
       name: 'изменение связи',
       page: RelationEditorPage,
       panel: false,
-      entries: [read, _MatrixEntry.relation, _MatrixEntry.editRelation],
+      entries: [
+        read,
+        _MatrixEntry.outgoingRelations,
+        _MatrixEntry.relation,
+        _MatrixEntry.editRelation,
+      ],
     ),
     (
       name: 'поиск исходного участника',
       page: RelationParticipantPickerPage,
       panel: false,
-      entries: [read, _MatrixEntry.createRelation, _MatrixEntry.changeSource],
+      entries: [
+        read,
+        _MatrixEntry.outgoingRelations,
+        _MatrixEntry.createRelation,
+        _MatrixEntry.changeSource,
+      ],
     ),
     (
       name: 'поиск связанного участника',
       page: RelationParticipantPickerPage,
       panel: false,
-      entries: [read, _MatrixEntry.createRelation, _MatrixEntry.selectRelated],
+      entries: [
+        read,
+        _MatrixEntry.outgoingRelations,
+        _MatrixEntry.createRelation,
+        _MatrixEntry.selectRelated,
+      ],
     ),
   ];
 
@@ -424,6 +445,7 @@ void _registerPageMatrixTests() {
           default:
             if (entry == _MatrixEntry.relation ||
                 entry == _MatrixEntry.createRelation ||
+                entry == _MatrixEntry.outgoingRelations ||
                 entry == _MatrixEntry.incomingRelations) {
               await _tap(tester, find.text('Relations').first);
             }

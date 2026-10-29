@@ -31,10 +31,11 @@ import '../../domain/intention.dart';
 import '../../domain/intention_id.dart';
 import '../edit/intention_edit_page.dart';
 import '../../../long_term_relation/application/long_term_relation_projection.dart';
+import '../../../long_term_relation/application/relation_counts.dart';
 import '../../../long_term_relation/presentation/editor/relation_editor_state.dart';
-import '../../../long_term_relation/presentation/neighborhood/relation_neighborhood_sliver.dart';
-import '../../../long_term_relation/presentation/neighborhood/relation_neighborhood_state.dart';
-import '../../../long_term_relation/presentation/neighborhood/relation_neighborhood_view_model.dart';
+import '../../../long_term_relation/presentation/intention_relations/intention_relations_sliver.dart';
+import '../../../long_term_relation/presentation/intention_relations/intention_relations_state.dart';
+import '../../../long_term_relation/presentation/intention_relations/intention_relations_view_model.dart';
 import '../../../tag/presentation/assignments/tag_assignments_section.dart';
 import '../../../tag/presentation/panel/tags_panel.dart';
 import '../../../tag/presentation/panel/tags_panel_context.dart';
@@ -74,7 +75,7 @@ final class _IntentionDetailsPageState
   late final DailyChoiceLocalDayObserver _localDay;
   var _routeIsCurrent = false;
   late IntentionDetailsTab _selectedTab;
-  ProviderSubscription<RelationNeighborhoodState>? _neighborhoodSubscription;
+  ProviderSubscription<IntentionRelationsState>? _relationsSubscription;
   ProviderSubscription<IntentionChoicesState>? _choicesSubscription;
 
   IntentionStatisticsViewModelProvider get _statisticsProvider =>
@@ -86,6 +87,9 @@ final class _IntentionDetailsPageState
           OverviewTarget() || RelationsTarget() || ChoicesTarget() => null,
         },
       );
+
+  IntentionRelationsViewModelProvider get _relationsProvider =>
+      intentionRelationsViewModelProvider(widget.intentionId, _pageInstance);
 
   @override
   void initState() {
@@ -110,8 +114,27 @@ final class _IntentionDetailsPageState
       ChoicesTarget() => IntentionDetailsTab.choices,
       StatisticsTarget() => IntentionDetailsTab.statistics,
     };
-    if (_selectedTab == IntentionDetailsTab.relations) _retainNeighborhood();
+    _syncRelationsRetention();
     _syncChoicesRetention();
+  }
+
+  /// Модель «Связей» живёт, только пока вкладка выбрана, в том числе под
+  /// открытыми над страницей страницами. Группа и раскрытие архивов
+  /// остаются в экземпляре страницы. Первую модель экземпляра настраивают
+  /// полученные подробные данные, поэтому до них модель не создаётся.
+  void _syncRelationsRetention() {
+    if (_selectedTab != IntentionDetailsTab.relations) {
+      _relationsSubscription?.close();
+      _relationsSubscription = null;
+      return;
+    }
+    if (_relationsSubscription != null ||
+        ref.read(intentionDetailsViewModelProvider(widget.intentionId))
+            is! IntentionDetailsLoaded) {
+      return;
+    }
+    // https://pub.dev/documentation/flutter_riverpod/latest/flutter_riverpod/WidgetRef/listenManual.html
+    _relationsSubscription = ref.listenManual(_relationsProvider, (_, _) {});
   }
 
   /// Модель «Выборов» живёт, только пока вкладка выбрана, в том числе под
@@ -128,27 +151,16 @@ final class _IntentionDetailsPageState
     }
   }
 
-  void _retainNeighborhood() {
-    // Подписка удерживает соседство с первого показа до закрытия страницы.
-    // https://pub.dev/documentation/flutter_riverpod/latest/flutter_riverpod/WidgetRef/listenManual.html
-    _neighborhoodSubscription ??= ref.listenManual(
-      relationNeighborhoodViewModelProvider(widget.intentionId),
-      (_, _) {},
-    );
-  }
-
   void _selectTab(IntentionDetailsTab tab) {
     if (tab == _selectedTab) return;
     if (_headHidden.value) {
       // https://api.flutter.dev/flutter/widgets/ScrollController/jumpTo.html
       _scrollController.jumpTo(_headExtent!);
     }
-    if (tab == IntentionDetailsTab.relations) {
-      _retainNeighborhood();
-    }
     setState(() {
       _selectedTab = tab;
     });
+    _syncRelationsRetention();
     _syncChoicesRetention();
     _syncStatisticsVisibility();
   }
@@ -293,8 +305,8 @@ final class _IntentionDetailsPageState
   void didUpdateWidget(covariant IntentionDetailsPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.intentionId != widget.intentionId) {
-      _neighborhoodSubscription?.close();
-      _neighborhoodSubscription = null;
+      _relationsSubscription?.close();
+      _relationsSubscription = null;
       _choicesSubscription?.close();
       _choicesSubscription = null;
       _startPageInstance();
@@ -378,8 +390,23 @@ final class _IntentionDetailsPageState
     final localizations = AppLocalizations.of(context);
     final provider = intentionDetailsViewModelProvider(intentionId);
     final details = ref.watch(provider);
+    ref.listen(provider, (_, _) => _syncRelationsRetention());
     // Подписка принадлежит странице, в том числе пока её данные загружаются.
     ref.watch(_statisticsProvider);
+    // Пока модель «Связей» существует, число вкладки берётся из её
+    // опубликованного состояния, чтобы не расходиться с плитками и списком.
+    final relationCounts = _relationsSubscription == null
+        ? null
+        : ref.watch(
+            _relationsProvider.select(
+              (state) => switch (state) {
+                IntentionRelationsConfirmed(:final counts) => counts,
+                IntentionRelationsInitialLoad() ||
+                IntentionRelationsInitialFailure() ||
+                IntentionRelationsIntentionNotFound() => null,
+              },
+            ),
+          );
     return OrdinaryPageScaffold(
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(DoableMetrics.tapMin),
@@ -445,6 +472,7 @@ final class _IntentionDetailsPageState
                 selectedTab: _selectedTab,
                 onSelectTab: _selectTab,
                 pageInstance: _pageInstance,
+                relationCounts: relationCounts,
                 statisticsSection: IntentionStatisticsSectionSliver(
                   provider: _statisticsProvider,
                 ),
@@ -526,6 +554,7 @@ final class _DetailsContent extends ConsumerWidget {
     required this.selectedTab,
     required this.onSelectTab,
     required this.pageInstance,
+    required this.relationCounts,
     required this.statisticsSection,
   });
 
@@ -539,6 +568,7 @@ final class _DetailsContent extends ConsumerWidget {
   final IntentionDetailsTab selectedTab;
   final ValueChanged<IntentionDetailsTab> onSelectTab;
   final IntentionPageInstance pageInstance;
+  final RelationCounts? relationCounts;
   final Widget statisticsSection;
 
   @override
@@ -559,6 +589,7 @@ final class _DetailsContent extends ConsumerWidget {
         selectedTab: selectedTab,
         onSelectTab: onSelectTab,
         pageInstance: pageInstance,
+        relationCounts: relationCounts ?? loaded.details.relationCounts,
         statisticsSection: statisticsSection,
         onEnableReadiness: ref
             .read(intentionDetailsViewModelProvider(intentionId).notifier)
@@ -603,6 +634,7 @@ final class _LoadedDetails extends StatelessWidget {
     required this.selectedTab,
     required this.onSelectTab,
     required this.pageInstance,
+    required this.relationCounts,
     required this.statisticsSection,
     required this.onEnableReadiness,
     required this.onDisableReadiness,
@@ -617,6 +649,7 @@ final class _LoadedDetails extends StatelessWidget {
   final IntentionDetailsTab selectedTab;
   final ValueChanged<IntentionDetailsTab> onSelectTab;
   final IntentionPageInstance pageInstance;
+  final RelationCounts relationCounts;
   final Widget statisticsSection;
   final VoidCallback onEnableReadiness;
   final VoidCallback onDisableReadiness;
@@ -639,7 +672,7 @@ final class _LoadedDetails extends StatelessWidget {
           headHidden: headHidden,
           value: selectedTab,
           onChange: onSelectTab,
-          counts: state.details.relationCounts,
+          counts: relationCounts,
         ),
         IntentionDetailsTabBody(
           slivers: [
@@ -766,14 +799,23 @@ final class _LoadedDetails extends StatelessWidget {
             if (selectedTab == IntentionDetailsTab.statistics)
               statisticsSection,
             if (selectedTab == IntentionDetailsTab.relations)
-              RelationNeighborhoodSliver(
-                owner: owner,
+              IntentionRelationsSliver(
+                details: state.details,
+                pageInstance: pageInstance,
                 onOpenRelation: (relationId) => unawaited(
                   context.router.push(
                     RelationDetailsRoute(relationId: relationId),
                   ),
                 ),
-                onCreateRelation: (group) => unawaited(
+                onWalk: (neighborId, group) => unawaited(
+                  context.router.push(
+                    IntentionDetailsRoute(
+                      intentionId: neighborId,
+                      target: RelationsTarget(group),
+                    ),
+                  ),
+                ),
+                onAdd: (group) => unawaited(
                   context.router.push(
                     RelationEditorRoute(
                       editorContext: RelationCreationContext(

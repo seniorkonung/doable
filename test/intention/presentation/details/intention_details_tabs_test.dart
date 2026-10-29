@@ -1,20 +1,23 @@
 import 'dart:async';
-import 'dart:ui' show Tristate;
+import 'dart:ui' show CheckedState, Tristate;
 
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
+import 'package:doable/src/design_system/components/count_tiles.dart';
 import 'package:doable/src/design_system/components/page_head.dart';
 import 'package:doable/src/design_system/components/tabs.dart';
 import 'package:doable/src/design_system/components/top_bar.dart';
+import 'package:doable/src/design_system/doable_metrics.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_tabs.dart';
 import 'package:doable/src/intention/presentation/details/intention_page_target.dart';
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/relation_group.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/statistics/application/intention_statistics_target.dart';
@@ -133,10 +136,10 @@ void main() {
         expect(_pagePosition(tester).pixels, headHidden ? extent : offset);
         _expectTabsLine(tester, visible: headHidden);
         final tabs = find.byType(Tabs<IntentionDetailsTab>);
-        final header = find.text('Relations').last;
+        final groups = find.byType(CountTiles<IntentionRelationGroup>);
         expect(
-          tester.getTopLeft(header).dy,
-          closeTo(tester.getBottomLeft(tabs).dy + 24, 0.01),
+          tester.getTopLeft(groups).dy,
+          closeTo(tester.getBottomLeft(tabs).dy + DoableMetrics.space2, 0.01),
         );
       },
     );
@@ -218,7 +221,9 @@ void main() {
       await tester.pumpAndSettle();
       expect(repository.relationGroupQueries, hasLength(1));
       expect(find.text('Описание'), findsNothing);
-      final can = find.byKey(const ValueKey('relation-neighborhood-type-can'));
+      final can = find.byKey(
+        const ValueKey('intention-relations-group-canUse'),
+      );
       await tester.ensureVisible(can);
       await tester.pumpAndSettle();
       await tester.tap(can);
@@ -234,11 +239,19 @@ void main() {
       expect(find.text('Описание'), findsOneWidget);
       await tester.tap(find.text('Relations'));
       await tester.pumpAndSettle();
-      expect(repository.relationGroupQueries, hasLength(queries));
+      // Возвращение получает заново только первую порцию активной части
+      // сохранённой группы: архив её свёрнут.
+      expect(repository.relationGroupQueries, hasLength(queries + 1));
+      final reread = repository.relationGroupQueries.last;
+      expect(reread.type, LongTermRelationType.can);
+      expect(reread.direction, RelationDirection.outgoing);
+      expect(reread.scope, RelationScope.active);
+      expect(reread.cursor, isNull);
       expect(
-        tester.getSemantics(can).getSemanticsData().flagsCollection.isSelected,
-        Tristate.isTrue,
+        tester.getSemantics(can).getSemanticsData().flagsCollection.isChecked,
+        CheckedState.isTrue,
       );
+      final queriesBeforeOpening = repository.relationGroupQueries.length;
 
       final other = testDetailsIntention(index: 2);
       _pagePosition(tester).jumpTo(100);
@@ -253,10 +266,8 @@ void main() {
       await tester.tap(find.bySemanticsLabel('Back'));
       await tester.pumpAndSettle();
       expect(_pagePosition(tester).pixels, offsetBeforeOpening);
-      expect(
-        find.byKey(const ValueKey('relation-neighborhood-type-can')),
-        findsOneWidget,
-      );
+      expect(can, findsOneWidget);
+      expect(repository.relationGroupQueries, hasLength(queriesBeforeOpening));
       expect(find.text('Описание'), findsNothing);
 
       await tester.tap(find.text('Statistics').first);

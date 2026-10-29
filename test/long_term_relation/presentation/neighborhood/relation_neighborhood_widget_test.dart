@@ -1,10 +1,9 @@
 import 'package:doable/l10n/app_localizations.dart';
-import 'package:doable/src/design_system/components/page_head.dart';
-import 'package:doable/src/design_system/components/tabs.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
-import 'package:doable/src/intention/presentation/details/intention_details_tabs.dart';
+import 'package:doable/src/intention/presentation/details/intention_details_state.dart';
+import 'package:doable/src/intention/presentation/details/intention_details_view_model.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
@@ -60,8 +59,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await _scrollTo(tester, find.text('Relations').last);
-      expect(find.text('Relations'), findsNWidgets(2));
+      await _scrollTo(tester, find.text('Relations'));
       expect(find.text('Total relations: 36'), findsOneWidget);
       expect(find.text('Active relations: 10'), findsNWidgets(2));
       expect(find.text('Archived relations: 26'), findsNWidgets(2));
@@ -453,111 +451,6 @@ void main() {
     },
   );
 
-  for (final headHidden in [false, true]) {
-    testWidgets(
-      'возврат на связи после согласования ${headHidden ? 'начинает тело под закреплёнными вкладками' : 'сохраняет видимую шапку'} без старого якоря',
-      (tester) async {
-        await tester.binding.setSurfaceSize(const Size(800, 1400));
-        addTearDown(() => tester.binding.setSurfaceSize(null));
-        final repository = ControlledNeighborhoodRepository();
-        addTearDown(repository.dispose);
-        final ownerId = testIntentionId(1);
-        final intention = testNeighborhoodIntention(
-          id: ownerId,
-          description: List.filled(60, 'Строка описания').join('\n'),
-        );
-        final counts = testRelationCounts(activeNeedOutgoing: 4);
-        await _pumpDetailsPage(
-          tester,
-          repository,
-          ownerId,
-          pagingPolicy: RelationGroupPagingPolicy(
-            pageSize: 3,
-            prefetchRemaining: 1,
-          ),
-        );
-        repository.emitIntention(intention, counts: counts, revision: revision);
-        repository.completePage(
-          0,
-          RelationGroupFirstPage(
-            items: testGroupRows(ownerId: ownerId, from: 1, count: 3),
-            counts: counts,
-            nextCursor: const TestRelationGroupCursor(3),
-            revision: revision,
-          ),
-        );
-        await tester.pumpAndSettle();
-        final extent = tester.getSize(find.byType(PageHead)).height;
-        await _scrollTo(tester, _rowFinder(3), settle: false);
-        await _pumpUntilRequestCount(tester, repository, 2);
-        repository.completePage(
-          1,
-          RelationGroupContinuationPage(
-            items: testGroupRows(ownerId: ownerId, from: 4, count: 1),
-            nextCursor: null,
-            revision: revision,
-          ),
-        );
-        await tester.pumpAndSettle();
-        await _scrollTo(tester, _rowFinder(1));
-        repository.emitIntention(
-          intention,
-          counts: counts,
-          revision: const TestGraphRevision(2),
-        );
-        await _pumpUntilRequestCount(tester, repository, 3);
-        repository.completePage(
-          2,
-          RelationGroupFirstPage(
-            items: testGroupRows(ownerId: ownerId, from: 1, count: 3),
-            counts: counts,
-            nextCursor: const TestRelationGroupCursor(3),
-            revision: const TestGraphRevision(2),
-          ),
-        );
-        await _pumpUntilRequestCount(tester, repository, 4);
-        repository.completePage(
-          3,
-          RelationGroupContinuationPage(
-            items: testGroupRows(ownerId: ownerId, from: 4, count: 1),
-            nextCursor: null,
-            revision: const TestGraphRevision(2),
-          ),
-        );
-        await tester.pumpAndSettle();
-
-        await tester.tap(find.text('Overview'));
-        await tester.pumpAndSettle();
-        final position = tester
-            .state<ScrollableState>(
-              find
-                  .descendant(
-                    of: find.byType(CustomScrollView),
-                    matching: find.byType(Scrollable),
-                  )
-                  .first,
-            )
-            .position;
-        final offset = headHidden ? extent + 20 : extent / 2;
-        position.jumpTo(offset);
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('Relations'));
-        await tester.pumpAndSettle();
-
-        // Прежняя строка построена: ошибочное восстановление смогло бы
-        // прокрутить к ней и скрыть заголовок с выбором группы.
-        expect(_rowFinder(1), findsOneWidget);
-        expect(position.pixels, headHidden ? extent : offset);
-        final tabs = find.byType(Tabs<IntentionDetailsTab>);
-        expect(
-          tester.getTopLeft(find.text('Relations').last).dy,
-          closeTo(tester.getBottomLeft(tabs).dy + 24, 0.01),
-        );
-        expect(repository.requestCount, 4);
-      },
-    );
-  }
-
   testWidgets('связывает русское состояние обновления с числами', (
     tester,
   ) async {
@@ -812,6 +705,8 @@ const _groups = <_Group>[
   ),
 ];
 
+/// Соседство над подробными данными намерения, как его показывала страница
+/// намерения: название и архивное состояние владельца берутся из них.
 Future<void> _pumpDetailsPage(
   WidgetTester tester,
   ControlledNeighborhoodRepository repository,
@@ -831,7 +726,27 @@ Future<void> _pumpDetailsPage(
       retry: (retryCount, error) => null,
       child: OrdinaryPageTestApp(
         locale: locale,
-        home: IntentionDetailsPage(intentionId: ownerId),
+        home: Scaffold(
+          body: Consumer(
+            builder: (context, ref, _) => CustomScrollView(
+              slivers: [
+                switch (ref.watch(intentionDetailsViewModelProvider(ownerId))) {
+                  IntentionDetailsLoaded(:final intention) =>
+                    RelationNeighborhoodSliver(
+                      owner: RelationParticipantSummary(
+                        id: intention.id,
+                        title: intention.title,
+                        archiveState: intention.archiveState,
+                      ),
+                      onOpenRelation: (_) {},
+                      onCreateRelation: (_) {},
+                    ),
+                  _ => const SliverToBoxAdapter(),
+                },
+              ],
+            ),
+          ),
+        ),
       ),
     ),
   );
@@ -841,19 +756,13 @@ Future<void> _pumpDetailsPage(
     counts: testRelationCounts(),
     revision: const TestGraphRevision(0),
   );
-  await tester.pumpAndSettle();
-  final texts = AppLocalizations.of(
-    tester.element(find.byType(IntentionDetailsPage)),
-  );
-  await tester.tap(find.text(texts.detailsRelationsTab));
-  await tester.pump();
   for (var attempt = 0; attempt < 100; attempt += 1) {
     if (repository.intentionIds.length >= 2 && repository.requestCount >= 1) {
       return;
     }
     await tester.pump();
   }
-  throw StateError('Страница не начала согласованное чтение соседства.');
+  throw StateError('Соседство не начало согласованное чтение.');
 }
 
 void _completeGroup(

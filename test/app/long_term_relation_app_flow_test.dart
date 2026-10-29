@@ -8,7 +8,9 @@ import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart'
     as catalog_page;
+import 'package:doable/src/design_system/components/archived_fold.dart';
 import 'package:doable/src/design_system/components/option_row.dart';
+import 'package:doable/src/design_system/components/relation_row.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_options.dart';
@@ -118,20 +120,21 @@ void main() {
       await _dismissOperationMessage(tester);
 
       const initialPhrase = 'To Беречь здоровье, you need Много ходить';
-      await _pumpUntilFound(tester, find.text(initialPhrase));
-      expect(find.text('Active relations: 1'), findsWidgets);
-      final groupControl = tester.getSemantics(
-        find.byKey(
-          const ValueKey('relation-neighborhood-group-active-need-outgoing'),
-        ),
+      await _pumpUntilFound(tester, _relationRow(initialPhrase));
+      expect(
+        find.bySemanticsLabel('Relations: 1 active, 0 archived'),
+        findsOneWidget,
       );
-      expect(groupControl.label, contains('Outgoing: 1'));
+      final groupControl = tester.getSemantics(
+        find.byKey(const ValueKey('intention-relations-group-needs')),
+      );
+      expect(groupControl.label, contains('Needs: 1 active'));
       expect(
         groupControl.getSemanticsData().hasAction(SemanticsAction.tap),
         isTrue,
       );
 
-      await tester.tap(find.text(initialPhrase));
+      await tester.tap(_relationRow(initialPhrase));
       await _pumpUntilFound(
         tester,
         find.byKey(const ValueKey('relation-details-description')),
@@ -152,16 +155,14 @@ void main() {
       );
       await _pumpUntilDetailsTitle(tester, 'Много ходить');
       await _chooseDetailsTab(tester, 'Relations');
-      await _ensureVisible(
-        tester,
-        find.byKey(const ValueKey('relation-neighborhood-direction-incoming')),
+      final neededFor = find.byKey(
+        const ValueKey('intention-relations-group-neededFor'),
       );
-      await tester.tap(
-        find.byKey(const ValueKey('relation-neighborhood-direction-incoming')),
-      );
-      await _pumpUntilFound(tester, find.text(initialPhrase));
+      await _ensureVisible(tester, neededFor);
+      await tester.tap(neededFor);
+      await _pumpUntilFound(tester, _relationRow(initialPhrase));
 
-      await tester.tap(find.text(initialPhrase));
+      await tester.tap(_relationRow(initialPhrase));
       await _pumpUntilFound(
         tester,
         find.byKey(const ValueKey('relation-details-source-participant')),
@@ -174,27 +175,24 @@ void main() {
       await _renameCurrentIntention(tester, 'Укреплять здоровье');
       await _chooseDetailsTab(tester, 'Relations');
       const renamedPhrase = 'To Укреплять здоровье, you need Много ходить';
-      await _pumpUntilFound(tester, find.text(renamedPhrase));
+      await _pumpUntilFound(tester, _relationRow(renamedPhrase));
 
       await _chooseIntentionOption(tester, IntentionOption.archive);
       await _pumpUntilFound(tester, intentionHeadRestore);
       await _dismissOperationMessage(tester);
 
       await _chooseDetailsTab(tester, 'Relations');
-      await _ensureVisible(
-        tester,
-        find.byKey(const ValueKey('relation-neighborhood-scope-archived')),
-      );
-      await tester.tap(
-        find.byKey(const ValueKey('relation-neighborhood-scope-archived')),
-      );
-      await _pumpUntilFound(tester, find.text(renamedPhrase));
+      await _expandArchive(tester);
+      await _pumpUntilFound(tester, _relationRow(renamedPhrase));
 
       await _chooseIntentionOption(tester, IntentionOption.restore);
       await _pumpUntilAbsent(tester, intentionHeadRestore);
       await _dismissOperationMessage(tester);
-      expect(find.text(renamedPhrase), findsOneWidget);
-      expect(find.text('Archived relations: 1'), findsWidgets);
+      expect(_relationRow(renamedPhrase), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('Relations: 0 active, 1 archived'),
+        findsOneWidget,
+      );
 
       await tester.pumpWidget(const SizedBox.shrink());
       await firstRuntime.shutdown();
@@ -209,15 +207,9 @@ void main() {
 
       await _openIntention(tester, 'Укреплять здоровье');
       await _chooseDetailsTab(tester, 'Relations');
-      await _ensureVisible(
-        tester,
-        find.byKey(const ValueKey('relation-neighborhood-scope-archived')),
-      );
-      await tester.tap(
-        find.byKey(const ValueKey('relation-neighborhood-scope-archived')),
-      );
-      await _pumpUntilFound(tester, find.text(renamedPhrase));
-      await tester.tap(find.text(renamedPhrase));
+      await _expandArchive(tester);
+      await _pumpUntilFound(tester, _relationRow(renamedPhrase));
+      await tester.tap(_relationRow(renamedPhrase));
       await _pumpUntilFound(
         tester,
         find.byKey(const ValueKey('relation-details-description')),
@@ -339,11 +331,11 @@ void main() {
       await _pumpUntilAbsent(tester, find.byType(Sheet));
       await _chooseDetailsTab(tester, 'Relations');
       final canGroup = find.byKey(
-        const ValueKey('relation-neighborhood-group-active-can-outgoing'),
+        const ValueKey('intention-relations-group-canUse'),
       );
       await _ensureVisible(tester, canGroup);
       await tester.tap(canGroup);
-      await _tapWhenFound(tester, find.text(lifecyclePhrase));
+      await _tapWhenFound(tester, _relationRow(lifecyclePhrase));
       await _pumpUntilFound(
         tester,
         find.byKey(const ValueKey('relation-details-delete-relation')),
@@ -352,7 +344,7 @@ void main() {
       await _deleteCurrentRelation(tester);
       await _pumpUntilFound(tester, intentionOptionsButton);
       await _dismissOperationMessage(tester);
-      expect(find.text(lifecyclePhrase), findsNothing);
+      expect(_relationRow(lifecyclePhrase), findsNothing);
 
       await _deleteCurrentIntention(tester);
       await _pumpUntilAbsent(tester, find.byType(IntentionDetailsPage));
@@ -639,30 +631,24 @@ Future<void> _openArchivedCanRelation(
 }) async {
   await _openIntention(tester, participantTitle);
   await _chooseDetailsTab(tester, 'Relations');
-  final archived = find.byKey(
-    const ValueKey('relation-neighborhood-scope-archived'),
-  );
-  await _ensureVisible(tester, archived);
-  await tester.tap(archived);
-  final can = find.byKey(const ValueKey('relation-neighborhood-type-can'));
-  await _ensureVisible(tester, can);
-  await tester.tap(can);
+  // Одноимённые намерения неразличимы в каталоге: открытое может быть и
+  // исходным, и связанным участником связи.
+  final canUse = find.byKey(const ValueKey('intention-relations-group-canUse'));
+  await _pumpUntilFound(tester, canUse);
+  await _ensureVisible(tester, canUse);
+  await tester.tap(canUse);
   await tester.pumpAndSettle(const Duration(milliseconds: 1));
-
-  final outgoing = find.byKey(
-    const ValueKey('relation-neighborhood-direction-outgoing'),
-  );
-  await _ensureVisible(tester, outgoing);
-  final outgoingLabel = tester.getSemantics(outgoing).label;
-  if (!outgoingLabel.contains('Outgoing: 1')) {
-    final incoming = find.byKey(
-      const ValueKey('relation-neighborhood-direction-incoming'),
+  if (!tester.getSemantics(canUse).label.contains('some archived')) {
+    final canBeUsedFor = find.byKey(
+      const ValueKey('intention-relations-group-canBeUsedFor'),
     );
-    await _ensureVisible(tester, incoming);
-    await tester.tap(incoming);
+    await _ensureVisible(tester, canBeUsedFor);
+    await tester.tap(canBeUsedFor);
+    await tester.pumpAndSettle(const Duration(milliseconds: 1));
   }
+  await _expandArchive(tester);
 
-  await _tapWhenFound(tester, find.text(phrase));
+  await _tapWhenFound(tester, _relationRow(phrase));
   await _pumpUntilFound(
     tester,
     find.byKey(const ValueKey('relation-details-description')),
@@ -797,6 +783,25 @@ Future<void> _tapWhenFound(
     await tester.pump(const Duration(milliseconds: 1));
   }
   fail('App-level поток не позволил выбрать ожидаемый элемент: $finder');
+}
+
+/// Строка вкладки «Связи», доступное имя которой начинается с формулировки
+/// связи [phrase].
+Finder _relationRow(String phrase) => find.byWidgetPredicate(
+  (widget) =>
+      widget is RelationRow && widget.semanticLabel.startsWith('$phrase. '),
+);
+
+/// Раскрывает свёрнутый архив выбранной группы, когда его строка появится.
+Future<void> _expandArchive(WidgetTester tester) async {
+  final fold = find.descendant(
+    of: find.byType(ArchivedFold),
+    matching: find.byType(TextButton),
+  );
+  await _pumpUntilFound(tester, fold);
+  await _ensureVisible(tester, fold);
+  await tester.tap(fold);
+  await tester.pump();
 }
 
 String _textByKey(WidgetTester tester, String key) =>
