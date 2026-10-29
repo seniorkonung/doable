@@ -46,7 +46,6 @@ import '../../graph_snapshots/graph_snapshot_store.dart'
 import '../../intention/application/intention_command.dart';
 import '../../intention/application/intention_id_generator.dart';
 import '../../intention/application/intention_catalog.dart';
-import '../../intention/application/intention_description_preview.dart';
 import '../../intention/application/intention_details.dart';
 import '../../intention/application/intention_result.dart';
 import '../../intention/application/title_search_key.dart';
@@ -64,6 +63,7 @@ import '../../long_term_relation/domain/long_term_relation.dart'
 import '../../long_term_relation/domain/long_term_relation_description.dart';
 import '../../long_term_relation/domain/long_term_relation_id.dart';
 import '../../shared/diagnostics/diagnostics_sink.dart';
+import '../../shared/domain/text_preview.dart';
 import '../../statistics/application/contribution_counts.dart';
 import '../../statistics/application/intention_statistics_breakdown.dart';
 import '../../statistics/application/intention_statistics_calendar.dart';
@@ -1378,9 +1378,7 @@ final class DriftPersonalGraphRepository
     id: intention.id,
     title: intention.title,
     descriptionPreview: switch (intention.description) {
-      final description? => IntentionDescriptionPreview.fromDescription(
-        description,
-      ),
+      final description? => TextPreview.fromText(description),
       null => null,
     },
     readiness: intention.readiness,

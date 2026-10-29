@@ -1,10 +1,10 @@
 import '../../graph/application/graph_revision.dart';
+import '../../shared/domain/text_preview.dart';
 import '../../tag/domain/tag.dart';
 import '../../tag/domain/tag_id.dart';
 import '../domain/intention.dart';
 import '../domain/intention_id.dart';
 import '../domain/intention_text.dart';
-import 'intention_description_preview.dart';
 import 'title_search_key.dart';
 
 enum IntentionScope { active, archived, all }
@@ -343,7 +343,7 @@ final class IntentionSummary {
   final String title;
 
   /// Начало описания; `null` означает отсутствие описания.
-  final IntentionDescriptionPreview? descriptionPreview;
+  final TextPreview? descriptionPreview;
   final IntentionReadiness readiness;
   final IntentionArchiveState archiveState;
   final IntentionTimestamp createdAt;

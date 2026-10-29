@@ -16,7 +16,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../support/tag_positions.dart';
 import '../../support/intention_title_order_key.dart';
 
-import 'package:doable/src/intention/application/intention_description_preview.dart';
+import 'package:doable/src/shared/domain/text_preview.dart';
 
 void main() {
   group('поисковый ключ названия намерения', () {
@@ -474,9 +474,7 @@ void main() {
       final summary = IntentionSummary(
         id: _intentionId('00000000-0000-4000-8000-000000000003'),
         title: 'Гулять',
-        descriptionPreview: IntentionDescriptionPreview.fromDescription(
-          'Описание',
-        ),
+        descriptionPreview: TextPreview.fromText('Описание'),
         readiness: IntentionReadiness.ready,
         archiveState: IntentionArchiveState.archived,
         createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
@@ -529,9 +527,7 @@ void main() {
       final summary = IntentionSummary(
         id: _intentionId('00000000-0000-4000-8000-000000000003'),
         title: 'Гулять',
-        descriptionPreview: IntentionDescriptionPreview.fromDescription(
-          'Описание',
-        ),
+        descriptionPreview: TextPreview.fromText('Описание'),
         readiness: IntentionReadiness.ready,
         archiveState: IntentionArchiveState.archived,
         createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
@@ -617,9 +613,7 @@ void main() {
       final summary = IntentionSummary(
         id: _intentionId('00000000-0000-4000-8000-000000000003'),
         title: 'Гулять',
-        descriptionPreview: IntentionDescriptionPreview.fromDescription(
-          'Описание',
-        ),
+        descriptionPreview: TextPreview.fromText('Описание'),
         readiness: IntentionReadiness.ready,
         archiveState: IntentionArchiveState.archived,
         createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
