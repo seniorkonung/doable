@@ -2245,8 +2245,6 @@
       }
     }
   },
-  "detailsChoosePathAction": "Choose an action along a path",
-  "@detailsChoosePathAction": {"description": "Открыть верхний обход из активного намерения"},
   "choicePathTitle": "Choose a path to an action",
   "@choicePathTitle": {"description": "Заголовок верхнего обхода"},
   "choicePathBottomTitle": "Choose a source for the action",

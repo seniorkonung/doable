@@ -910,20 +910,18 @@ void _expectPageControls(WidgetTester tester, {required bool enabled}) {
         .onChange,
     matcher,
   );
-  for (final key in [
-    'intention-details-choose-path',
-    'tag-assignments-choose',
-  ]) {
-    expect(
-      tester
-          .widget<ButtonStyleButton>(
-            find.byKey(ValueKey(key), skipOffstage: false),
-          )
-          .onPressed,
-      matcher,
-      reason: key,
-    );
-  }
+  expect(
+    tester
+        .widget<ButtonStyleButton>(
+          find.byKey(
+            const ValueKey('tag-assignments-choose'),
+            skipOffstage: false,
+          ),
+        )
+        .onPressed,
+    matcher,
+    reason: 'tag-assignments-choose',
+  );
   expect(
     tester
         .widget<InkWell>(

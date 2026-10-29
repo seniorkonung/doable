@@ -731,30 +731,6 @@ final class _LoadedDetails extends StatelessWidget {
                   ),
                 ),
               ),
-              if (intention.archiveState == IntentionArchiveState.active)
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
-                  sliver: SliverToBoxAdapter(
-                    child: Align(
-                      alignment: AlignmentDirectional.centerStart,
-                      child: FilledButton.icon(
-                        key: const ValueKey('intention-details-choose-path'),
-                        onPressed: state.isOperationRunning
-                            ? null
-                            : () => unawaited(
-                                context.router.push(
-                                  ChoicePathRoute(
-                                    sourceIntentionId: intention.id,
-                                    direction: ChoicePathDraftDirection.topDown,
-                                  ),
-                                ),
-                              ),
-                        icon: const Icon(Icons.route_outlined),
-                        label: Text(localizations.detailsChoosePathAction),
-                      ),
-                    ),
-                  ),
-                ),
             ],
             if (selectedTab == IntentionDetailsTab.choices)
               IntentionChoicesSliver(

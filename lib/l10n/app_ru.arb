@@ -765,7 +765,6 @@
   "relationNeighborhoodCreateOutgoingAction": "Создать исходящую связь",
   "relationNeighborhoodCreateIncomingAction": "Создать входящую связь",
   "relationEditorPriorityOption": "Приоритет {priority}",
-  "detailsChoosePathAction": "Выбрать действие по пути",
   "choicePathTitle": "Выбор пути к действию",
   "choicePathBottomTitle": "Выбор основания для действия",
   "choicePathBottomTraversal": "Обход: от действия к основанию",

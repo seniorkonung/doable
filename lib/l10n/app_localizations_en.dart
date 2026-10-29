@@ -2672,9 +2672,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get detailsChoosePathAction => 'Choose an action along a path';
-
-  @override
   String get choicePathTitle => 'Choose a path to an action';
 
   @override

@@ -4253,12 +4253,6 @@ abstract class AppLocalizations {
   /// **'Priority {priority}'**
   String relationEditorPriorityOption(String priority);
 
-  /// Открыть верхний обход из активного намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Choose an action along a path'**
-  String get detailsChoosePathAction;
-
   /// Заголовок верхнего обхода
   ///
   /// In en, this message translates to:

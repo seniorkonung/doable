@@ -2697,9 +2697,6 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get detailsChoosePathAction => 'Выбрать действие по пути';
-
-  @override
   String get choicePathTitle => 'Выбор пути к действию';
 
   @override
