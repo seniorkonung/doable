@@ -17,14 +17,15 @@ final class OptionsMenuItem<T extends Object> {
   });
 
   /// Пункт, которым сейчас нельзя воспользоваться: он остаётся на своём месте
-  /// приглушённым, а [reason] называет, что мешает и что сделать сначала.
+  /// приглушённым при любом тоне, поэтому тона у него нет, а [reason]
+  /// называет, что мешает и что сделать сначала.
   const OptionsMenuItem.unavailable({
     required this.icon,
     required this.name,
     required String reason,
-    this.tone = OptionRowTone.normal,
   }) : value = null,
-       hint = reason;
+       hint = reason,
+       tone = OptionRowTone.normal;
 
   /// Значение доступного пункта; у недоступного его нет.
   final T? value;

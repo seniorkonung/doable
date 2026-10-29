@@ -113,7 +113,6 @@ void main() {
         )[2];
         expect(delete.value, isNull);
         expect(delete.hint, reason);
-        expect(delete.tone, OptionRowTone.danger);
       }
     }
   });

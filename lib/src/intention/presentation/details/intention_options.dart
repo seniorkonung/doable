@@ -89,7 +89,6 @@ List<OptionsMenuItem<IntentionOption>> intentionOptions(
           icon: DoableIconData.delete,
           name: localizations.detailsOptionDelete,
           reason: blockedReason,
-          tone: OptionRowTone.danger,
         );
 
   return [edit, stateChange, delete];

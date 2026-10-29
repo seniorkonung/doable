@@ -17,7 +17,11 @@ void main() {
         tester,
       ) async {
         final semantics = tester.ensureSemantics();
-        await _open(tester, brightness: brightness);
+        await _open(
+          tester,
+          brightness: brightness,
+          items: [_items[0], _items[1], _availableDelete],
+        );
 
         expect(
           tester.getSemantics(find.text('Намерение')),
@@ -125,7 +129,6 @@ void main() {
               icon: DoableIconData.delete,
               name: 'Удалить намерение',
               reason: 'Сначала удалите его связи и дневные выборы',
-              tone: OptionRowTone.danger,
             ),
           ],
         );
@@ -137,7 +140,7 @@ void main() {
   }
 }
 
-enum _Option { edit, archive }
+enum _Option { edit, archive, delete }
 
 const _items = [
   OptionsMenuItem(
@@ -155,9 +158,16 @@ const _items = [
     icon: DoableIconData.delete,
     name: 'Удалить',
     reason: 'Сначала удалите его связи',
-    tone: OptionRowTone.danger,
   ),
 ];
+
+const _availableDelete = OptionsMenuItem(
+  value: _Option.delete,
+  icon: DoableIconData.delete,
+  name: 'Удалить',
+  hint: 'Его теги сохранятся',
+  tone: OptionRowTone.danger,
+);
 
 /// Открытый лист и результат его показа, когда показ завершился.
 final class _OpenedMenu {
