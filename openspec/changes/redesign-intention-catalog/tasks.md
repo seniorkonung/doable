@@ -421,7 +421,7 @@
     - Проверки страницы, которые читали текстовые признаки и отметку архива только в охвате «Все», ждут метку архива в любом охвате. `tag_app_flow_test.dart` проверяет цвет тега по чипу строки.
   - **Проверка:**
     - `mise run codegen`.
-    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog test/intention/presentation/intention_tag_search_accessibility_test.dart test/app/tag_app_flow_test.dart test/app/intention_tag_search_app_flow_test.dart test/app/intention_creation_sheet_integration_test.dart test/app/navigation/app_shell_state_test.dart test/app/navigation/app_shell_layout_test.dart`.
+    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog test/intention/presentation/intention_tag_search_accessibility_test.dart test/app/tag_app_flow_test.dart test/app/intention_tag_search_app_flow_test.dart test/app/intention_creation_sheet_integration_test.dart test/app/long_term_relation_app_flow_test.dart test/app/navigation`.
     - `mise exec --no-deps -- flutter analyze`.
   - **Зависимости:** 4.1.
   - **Предполагаемые файлы:**
@@ -487,7 +487,7 @@
     - `app_shell_state_test.dart` подтверждает, что тип сохраняется при переключении пунктов, а `app_shell_graph_generation_test.dart` — что после замены графа тип начальный.
     - `intention_catalog_page_test.dart` подтверждает на странице лист с числами охватов и типов, новую выдачу сверху при смене типа и сортировку по названию. Случаи четырёх порядков и локализации выпадающих списков удалены.
   - **Проверка:**
-    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog test/app/navigation test/app/graph_import_app_flow_test.dart test/app/graph_restore_app_flow_test.dart test/app/intention_app_lifecycle_test.dart test/app/intention_creation_sheet_integration_test.dart test/app/intention_tag_search_app_flow_test.dart test/intention/presentation/details/intention_details_page_test.dart`.
+    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog test/app/navigation test/app/graph_import_app_flow_test.dart test/app/graph_restore_app_flow_test.dart test/app/intention_app_lifecycle_test.dart test/app/intention_creation_sheet_integration_test.dart test/app/intention_tag_search_app_flow_test.dart test/app/creation_flows_integration_test.dart test/intention/presentation/details/intention_details_page_test.dart`.
     - `mise exec --no-deps -- flutter analyze`.
   - **Зависимости:** 4.4, 4.5.
   - **Предполагаемые файлы:**
@@ -502,7 +502,7 @@
     - Шаги `intentionCatalogTitleField`, `intentionCatalogTitleFieldLabel`, `intentionCatalogTagFilterControl` и чтение названия в `shownIntentionCatalogParameters` работают с новой строкой поиска. Сценарии не меняются.
     - `intention_catalog_page_test.dart` и `intention_tag_search_accessibility_test.dart` находят поле общими шагами, а ошибку недопустимого фильтра проверяют в новом поле.
   - **Проверка:**
-    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog test/intention/presentation/intention_tag_search_accessibility_test.dart test/intention/presentation/editor/intention_editor_page_test.dart test/intention/presentation/editor/intention_creation_sheet_accessibility_test.dart test/app/navigation test/app/tag_assignment_app_flow_test.dart test/tag/presentation/tag_accessibility_test.dart test/app/intention_tag_search_app_flow_test.dart test/app/creation_flows_integration_test.dart test/app/intention_creation_sheet_integration_test.dart`.
+    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog test/intention/presentation/intention_tag_search_accessibility_test.dart test/intention/presentation/editor/intention_editor_page_test.dart test/intention/presentation/editor/intention_creation_sheet_accessibility_test.dart test/app/navigation test/app/tag_assignment_app_flow_test.dart test/tag/presentation/tag_accessibility_test.dart test/app/intention_tag_search_app_flow_test.dart test/app/creation_flows_integration_test.dart test/app/intention_creation_sheet_integration_test.dart test/app/graph_import_app_flow_test.dart test/app/graph_restore_app_flow_test.dart`.
     - `mise exec --no-deps -- flutter analyze`.
   - **Зависимости:** 4.6 — та же раскладка параметров страницы.
   - **Предполагаемые файлы:**
@@ -534,13 +534,15 @@
     - Отметки панели, порядок условий, снятие условия при подтверждённом удалении тега и отказ принимать уже удалённый тег не меняются.
     - Случаи проверок о предъявлении условий удалены: название, цвет, снимки разных ревизий.
   - **Проверка:**
-    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog test/tag/presentation test/app/intention_tag_search_app_flow_test.dart`.
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog test/intention/presentation/picker test/intention/presentation/intention_tag_search_accessibility_test.dart test/tag/presentation test/long_term_relation/presentation/participant_picker test/daily_choice/presentation/source_picker test/daily_choice/presentation/action_picker test/app/intention_tag_search_app_flow_test.dart`.
     - `mise exec --no-deps -- flutter analyze`.
   - **Зависимости:** 4.8.
   - **Предполагаемые файлы:**
-    - `lib/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart`, `lib/src/tag/presentation/panel/tags_panel_view_model.dart`;
-    - проверки `test/intention/presentation/catalog/intention_tag_conditions_view_model_test.dart`, `intention_catalog_tag_filter_integration_test.dart`, `test/tag/presentation/panel/tags_panel_test.dart`, `tags_panel_view_model_test.dart`.
-  - **Размер:** S.
+    - `lib/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart` и сгенерированный `intention_tag_conditions_view_model.g.dart`, `lib/src/tag/presentation/panel/tags_panel_view_model.dart`;
+    - проверки `test/intention/presentation/catalog/intention_tag_conditions_view_model_test.dart`, `intention_catalog_tag_filter_integration_test.dart`, `test/tag/presentation/panel/tags_panel_test.dart`, `tags_panel_view_model_test.dart`;
+    - остальные вызовы `cycle`: `test/intention/presentation/catalog/intention_catalog_page_test.dart`, `intention_picker_session_test_support.dart`, `test/intention/presentation/picker/intention_picker_view_test.dart`, `test/intention/presentation/intention_tag_search_accessibility_test.dart`, `test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart`, `test/daily_choice/presentation/daily_choice_picker_tag_search_test_support.dart`.
+  - **Размер:** M.
 
 - [ ] 4.10 Собрать каркас страницы: крупный заголовок, закреплённые поиск и заголовок списка, прокрутка только у списка
   - **Критерии приёмки:**
@@ -549,13 +551,13 @@
     - Проверки подтверждают: при прокрутке заголовок, поле, кнопка фильтра и заголовок списка не сдвигаются; прокрученная до конца последняя строка стоит над панелью при всех вставках `app_shell_layout_test.dart`; при масштабе текста 2 и клавиатуре 336 на экране 320×844 нет переполнения, список получает высоту и прокручивается, а поле не сдвигается.
     - Проверки, привязанные к `AppBar` страницы, сохраняют смысл на новом заголовке: `app_shell_test.dart`, `app_navigation_accessibility_test.dart`, `app_shell_pages_above_test.dart`, `app_shell_layout_test.dart` и `_catalogBar` в `intention_editor_page_test.dart`.
   - **Проверка:**
-    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog test/intention/presentation/editor/intention_editor_page_test.dart test/intention/presentation/editor/intention_creation_sheet_accessibility_test.dart test/app/navigation test/app/intention_creation_sheet_integration_test.dart test/app/graph_import_app_flow_test.dart test/app/graph_restore_app_flow_test.dart`.
+    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog test/intention/presentation/intention_tag_search_accessibility_test.dart test/intention/presentation/editor/intention_editor_page_test.dart test/intention/presentation/editor/intention_creation_sheet_accessibility_test.dart test/app/navigation test/app/intention_creation_sheet_integration_test.dart test/app/graph_import_app_flow_test.dart test/app/graph_restore_app_flow_test.dart`.
     - `mise exec --no-deps -- flutter analyze`.
   - **Зависимости:** 4.6, 4.7, 4.8 — все закреплённые части уже на странице.
   - **Предполагаемые файлы:**
     - меняется `lib/src/intention/presentation/catalog/intention_catalog_page.dart`, `intention_search_results.dart`; удаляется `intention_search_layout.dart`;
     - `test/support/intention_catalog_controls.dart`;
-    - проверки: `test/intention/presentation/catalog/intention_catalog_page_test.dart`, `test/intention/presentation/editor/intention_editor_page_test.dart`, `test/app/intention_creation_sheet_integration_test.dart`, в `test/app/navigation/`: `app_shell_layout_test.dart`, `app_shell_test.dart`, `app_shell_pages_above_test.dart`, `app_navigation_accessibility_test.dart`.
+    - проверки: `test/intention/presentation/catalog/intention_catalog_page_test.dart`, `test/intention/presentation/intention_tag_search_accessibility_test.dart` — его `_pageScrollable` и `_reach` держатся на `IntentionSearchLayout`, `test/intention/presentation/editor/intention_editor_page_test.dart`, `test/app/intention_creation_sheet_integration_test.dart`, в `test/app/navigation/`: `app_shell_layout_test.dart`, `app_shell_test.dart`, `app_shell_pages_above_test.dart`, `app_navigation_accessibility_test.dart`.
   - **Размер:** M.
 
 - [ ] 4.11 Называть охват в пустой выдаче выбранного типа при открытом охвате
@@ -590,7 +592,7 @@
     - `test/app/intention_app_lifecycle_test.dart` ждёт сообщения третьей причины пустой выдачи: строка 239 `No active intentions yet.` → `No active intentions` (архив не пуст), строка 278 `No archived intentions yet.` → `Nothing in the archive` (архивный охват), строка 315 `No active intentions yet.` → `No intentions yet` (намерений нет совсем). Тестовый адаптер не меняется: `answerCatalogQuery` уже отдаёт матрицу чисел, а модель согласует её при архивировании и удалении.
   - **Проверка:**
     - `mise run codegen`.
-    - `mise exec --no-deps -- flutter test test/intention/presentation test/app/navigation test/app/intention_app_lifecycle_test.dart test/app/intention_tag_search_app_flow_test.dart test/app/intention_creation_sheet_tags_test.dart test/app/intention_creation_sheet_integration_test.dart`.
+    - `mise exec --no-deps -- flutter test test/intention/presentation test/app/navigation test/app/intention_app_lifecycle_test.dart test/app/intention_tag_search_app_flow_test.dart test/app/intention_creation_sheet_tags_test.dart test/app/intention_creation_sheet_integration_test.dart test/app/graph_import_app_flow_test.dart test/app/graph_restore_app_flow_test.dart test/app/tag_app_flow_test.dart test/app/creation_flows_integration_test.dart test/app/long_term_relation_app_flow_test.dart`.
     - `mise exec --no-deps -- flutter analyze`.
   - **Зависимости:** 4.2, 4.10, 4.11.
   - **Предполагаемые файлы:**

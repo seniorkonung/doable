@@ -4,11 +4,6 @@
 
 Файл ведёт оркестратор. Решения приняты пользователем в сессии решений и исполняются автономно, по одной finding за сессию. Сессия исполнения удаляет раздел своей finding в коммите её устранения.
 
-## F2 · Medium — Команды проверки задач пропускают прямых потребителей изменённых шагов и типов
-
-- **Решение:** Устранить
-- **Как устранить:** Изменить только tasks.md, незавершённые задачи фазы 4; новых задач не добавлять, порядок не менять, поведение продукта не меняется. Дополнить команды проверки и предполагаемые файлы. 4.2: в команде заменить два файла навигации всей папкой test/app/navigation и добавить test/app/long_term_relation_app_flow_test.dart. 4.6: добавить test/app/creation_flows_integration_test.dart. 4.7: добавить test/app/graph_import_app_flow_test.dart и test/app/graph_restore_app_flow_test.dart. 4.9: назвать в предполагаемых файлах все вызовы `cycle` — test/intention/presentation/picker/intention_picker_view_test.dart, test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart, test/daily_choice/presentation/daily_choice_picker_tag_search_test_support.dart, test/intention/presentation/catalog/intention_picker_session_test_support.dart, test/intention/presentation/intention_tag_search_accessibility_test.dart; в команду добавить `mise run codegen` и папки test/intention/presentation/picker, test/long_term_relation/presentation/participant_picker, test/daily_choice/presentation/source_picker, test/daily_choice/presentation/action_picker и названный файл доступности; размер 4.9 поднять с S до M. 4.10: добавить test/intention/presentation/intention_tag_search_accessibility_test.dart в файлы и команду, потому что на удаляемом IntentionSearchLayout держатся его _pageScrollable и _reach. 4.12: добавить в команду test/app/graph_import_app_flow_test.dart, test/app/graph_restore_app_flow_test.dart, test/app/tag_app_flow_test.dart, test/app/creation_flows_integration_test.dart и test/app/long_term_relation_app_flow_test.dart вместе с файлом из решения F1.
-
 ## F3 · Low — `tagPhraseText` остаётся без вызовов, и ни одна задача его не удаляет
 
 - **Решение:** Устранить
