@@ -532,7 +532,7 @@
   - **Критерии приёмки:**
     - `IntentionTagCondition` несёт только `tagId` и `requirement`. Название и цвет условия, ревизия записи, ветка `TagUpdatedChange`, `toggleRequirement`, `remove` и `IntentionTagRequirement.toggled` удалены: после задачи 4.8 их никто не читает и не вызывает.
     - `IntentionTagConditionSet.cycle` принимает идентификатор тега без `snapshotRevision`, и панель тегов вызывает его так.
-    - Отметки панели, порядок условий, снятие условия при подтверждённом удалении тега и отказ принимать уже удалённый тег не меняются.
+    - Отметки панели, снятие условия при подтверждённом удалении тега и отказ принимать уже удалённый тег не меняются.
     - Случаи проверок о предъявлении условий удалены: название, цвет, снимки разных ревизий.
   - **Проверка:**
     - `mise run codegen`.
@@ -629,4 +629,20 @@
     - `mise exec --no-deps -- flutter build apk --release`.
   - **Зависимости:** 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9, 4.10, 4.11, 4.12, 4.13.
   - **Предполагаемые файлы:** нет (только проверка).
+  - **Размер:** XS.
+
+- [ ] 4.15 Убрать порядок условий по тегам из документации их модели и из её проверок
+  - **Критерии приёмки:**
+    - Документация `IntentionTagConditionsState`, `tagFilter` и `cycle` в `intention_tag_conditions_view_model.dart` не упоминает порядок условий: ни порядок добавления, ни конец порядка, ни прежнее место.
+    - Меняются только комментарии: список `conditions` и словарь `_requirements` остаются, поведение приложения не меняется.
+    - В `intention_tag_conditions_view_model_test.dart` нет случая о сохранении места условия (:46-68).
+    - Случай о снятии условий при подтверждённом удалении тега сравнивает два оставшихся условия без учёта порядка (:151), а его название не говорит о местах условий.
+  - **Проверка:**
+    - `mise exec --no-deps -- openspec validate redesign-intention-catalog --strict`.
+    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog/intention_tag_conditions_view_model_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - меняется `lib/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart`;
+    - проверка `test/intention/presentation/catalog/intention_tag_conditions_view_model_test.dart`.
   - **Размер:** XS.
