@@ -13,6 +13,7 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_stat
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
 import 'package:doable/src/intention/presentation/search/intention_search_list.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
+import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
@@ -241,6 +242,50 @@ void main() {
       );
       await _waitForQueries(tester, h, 2);
       h.repository.complete(1, _firstPage(_actions(30)));
+      await _settle(tester);
+
+      expect(h.position.pixels, 0);
+    });
+
+    testWidgets('первая новая выдача после монтирования на уже загруженную '
+        'открывается с начала списка', (tester) async {
+      final h = await _open(tester, loadedBeforeMount: _actions(30));
+      await _flingDown(tester, h);
+
+      h.notifier.changeTagFilter(
+        IntentionTagFilter(excludedTagIds: [_sport.id]),
+      );
+      await _waitForQueries(tester, h, 2);
+      h.repository.complete(1, _firstPage(_actions(30)));
+      await _settle(tester);
+
+      expect(h.position.pixels, 0);
+    });
+
+    testWidgets('удаление исключённого тега открывает новую выдачу с начала '
+        'списка', (tester) async {
+      final h = await _open(tester);
+      h.repository.complete(0, _firstPage(_actions(1)));
+      await _settle(tester);
+      h.notifier.changeTagFilter(
+        IntentionTagFilter(excludedTagIds: [_sport.id]),
+      );
+      await _waitForQueries(tester, h, 2);
+      h.repository.complete(1, _firstPage(_actions(30)));
+      await _settle(tester);
+      await _flingDown(tester, h);
+
+      await acceptTagCommand(
+        h.container,
+        h.repository,
+        DeleteTag(_sport.id),
+        tagDeletionSuccess(
+          tagId: _sport.id,
+          revision: const TestCatalogRevision(2),
+        ),
+      ).future;
+      await _waitForQueries(tester, h, 3);
+      h.repository.complete(2, _firstPage(_actions(30)));
       await _settle(tester);
 
       expect(h.position.pixels, 0);
@@ -497,6 +542,7 @@ Future<_Harness> _open(
   IntentionCatalogPurpose? purpose,
   Locale locale = const Locale('ru'),
   int pageSize = 100,
+  List<IntentionSummary>? loadedBeforeMount,
 }) async {
   final repository = ControlledCatalogRepository();
   // Подгрузка начинается, когда построена последняя загруженная строка.
@@ -512,6 +558,23 @@ Future<_Harness> _open(
     repository,
     purpose ?? SelectDailyChoiceAction(session: IntentionSearchSession()),
   );
+  if (loadedBeforeMount != null) {
+    // Модель удерживает другой слушатель: выдача монтируется на готовую
+    // порцию и не видит уведомлений её загрузки.
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: Consumer(
+          builder: (context, ref, _) {
+            ref.watch(intentionCatalogViewModelProvider(h.purpose));
+            return const SizedBox.shrink();
+          },
+        ),
+      ),
+    );
+    h.repository.complete(0, _firstPage(loadedBeforeMount));
+    await _settle(tester);
+  }
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: container,

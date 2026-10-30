@@ -2589,6 +2589,27 @@ class AppLocalizationsEn extends AppLocalizations {
       'Everything here is marked as an action.';
 
   @override
+  String get intentionCatalogNoActiveTitle => 'No active intentions';
+
+  @override
+  String get intentionCatalogNoActiveText =>
+      'Tap the plus below to create a new one. The Show row brings up the archived ones.';
+
+  @override
+  String get intentionCatalogNoIntentionsTitle => 'No intentions yet';
+
+  @override
+  String get intentionCatalogNoIntentionsText =>
+      'Your intentions will appear here. Tap the plus below to create the first one.';
+
+  @override
+  String get intentionCatalogEmptyArchiveTitle => 'Nothing in the archive';
+
+  @override
+  String get intentionCatalogEmptyArchiveText =>
+      'An intention you archive leaves the active list and stays here.';
+
+  @override
   String get intentionPickerActionTitle => 'Choose an action';
 
   @override

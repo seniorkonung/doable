@@ -4011,6 +4011,42 @@ abstract class AppLocalizations {
   /// **'Everything here is marked as an action.'**
   String get intentionPickerEmptyIntentionsText;
 
+  /// Заголовок пустого активного охвата каталога, когда в архиве есть намерения
+  ///
+  /// In en, this message translates to:
+  /// **'No active intentions'**
+  String get intentionCatalogNoActiveTitle;
+
+  /// Текст пустого активного охвата каталога, когда в архиве есть намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Tap the plus below to create a new one. The Show row brings up the archived ones.'**
+  String get intentionCatalogNoActiveText;
+
+  /// Заголовок пустого каталога, когда намерений нет совсем
+  ///
+  /// In en, this message translates to:
+  /// **'No intentions yet'**
+  String get intentionCatalogNoIntentionsTitle;
+
+  /// Текст пустого каталога, когда намерений нет совсем
+  ///
+  /// In en, this message translates to:
+  /// **'Your intentions will appear here. Tap the plus below to create the first one.'**
+  String get intentionCatalogNoIntentionsText;
+
+  /// Заголовок пустого архивного охвата каталога
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing in the archive'**
+  String get intentionCatalogEmptyArchiveTitle;
+
+  /// Текст пустого архивного охвата каталога
+  ///
+  /// In en, this message translates to:
+  /// **'An intention you archive leaves the active list and stays here.'**
+  String get intentionCatalogEmptyArchiveText;
+
   /// Заголовок шапки экрана выбора действия
   ///
   /// In en, this message translates to:

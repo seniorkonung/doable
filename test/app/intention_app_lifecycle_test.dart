@@ -236,7 +236,7 @@ void main() {
 
       await tester.tap(find.bySemanticsLabel('Back'));
       await tester.pumpAndSettle();
-      expect(find.text('No active intentions yet.'), findsOneWidget);
+      expect(find.text('No active intentions'), findsOneWidget);
       await selectIntentionCatalogScope(tester, IntentionScope.archived);
       await _pumpUntil(tester, () => repository.pageQueries.length == 2);
       repository.completePage(
@@ -275,7 +275,7 @@ void main() {
 
       await tester.tap(find.bySemanticsLabel('Back'));
       await tester.pumpAndSettle();
-      expect(find.text('No archived intentions yet.'), findsOneWidget);
+      expect(find.text('Nothing in the archive'), findsOneWidget);
       await selectIntentionCatalogScope(tester, IntentionScope.active);
       await _pumpUntil(tester, () => repository.pageQueries.length == 3);
       repository.completePage(
@@ -312,7 +312,7 @@ void main() {
         findsOneWidget,
       );
       expect(find.text(restored.title), findsNothing);
-      expect(find.text('No active intentions yet.'), findsOneWidget);
+      expect(find.text('No intentions yet'), findsOneWidget);
     },
   );
 

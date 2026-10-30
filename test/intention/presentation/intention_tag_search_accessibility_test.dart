@@ -1,13 +1,14 @@
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/design_system/components/catalog_row.dart';
+import 'package:doable/src/design_system/components/list_state.dart';
 import 'package:doable/src/design_system/components/search_field.dart';
+import 'package:doable/src/design_system/doable_metrics.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
     hide IntentionCatalogPage;
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_catalog_status_views.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
@@ -224,10 +225,13 @@ void main() {
       expect(rowNode, isSemantics(isButton: true, hasTapAction: true));
     }
 
-    final continuation = find.byType(IntentionCatalogContinuationStatusView);
+    // Виды состояния списка — закрытые наследники ListState.
+    final continuation = find.byWidgetPredicate(
+      (widget) => widget is ListState,
+    );
     final continuationRetry = find.descendant(
       of: continuation,
-      matching: find.widgetWithText(FilledButton, l10n.commonRetry),
+      matching: find.widgetWithText(InkWell, l10n.commonRetry),
     );
     await _reach(tester, continuationRetry, list);
     _expectTappable(tester, continuationRetry);
@@ -242,7 +246,7 @@ void main() {
     // оформлению, поэтому размер цели проверяется у самого повтора.
     expect(
       tester.getSize(continuationRetry).height,
-      greaterThanOrEqualTo(kMinInteractiveDimension),
+      greaterThanOrEqualTo(DoableMetrics.tapMin),
     );
     await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
     await expectLater(tester, meetsGuideline(textContrastGuideline));

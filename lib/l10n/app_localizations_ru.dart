@@ -2613,6 +2613,27 @@ class AppLocalizationsRu extends AppLocalizations {
       'Здесь всё отмечено как действия.';
 
   @override
+  String get intentionCatalogNoActiveTitle => 'Нет активных намерений';
+
+  @override
+  String get intentionCatalogNoActiveText =>
+      'Новое создаётся кнопкой с плюсом внизу, а архивированные показывает строка «Показать».';
+
+  @override
+  String get intentionCatalogNoIntentionsTitle => 'Намерений пока нет';
+
+  @override
+  String get intentionCatalogNoIntentionsText =>
+      'Ваши намерения появятся здесь. Первое создаётся кнопкой с плюсом внизу.';
+
+  @override
+  String get intentionCatalogEmptyArchiveTitle => 'В архиве ничего нет';
+
+  @override
+  String get intentionCatalogEmptyArchiveText =>
+      'Архивированное намерение уходит из активного списка и остаётся здесь.';
+
+  @override
   String get intentionPickerActionTitle => 'Выбор действия';
 
   @override

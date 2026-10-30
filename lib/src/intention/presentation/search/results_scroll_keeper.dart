@@ -20,16 +20,14 @@ import '../catalog/intention_catalog_state.dart';
 final class ResultsScrollKeeper {
   /// [shown] возвращает выдачу, по которой построен список; первая новая
   /// выдача после показанной при создании начнётся с верхней позиции.
-  /// [keepScrollOffset] передаётся контроллеру прокрутки: сохранять ли
-  /// смещение в [PageStorage].
   ResultsScrollKeeper({
     required AsyncValue<IntentionCatalogState> Function() shown,
-    required bool keepScrollOffset,
-  }) : controller = ScrollController(keepScrollOffset: keepScrollOffset),
-       _shown = shown,
+  }) : _shown = shown,
        _query = _confirmedQuery(shown().value);
 
-  final ScrollController controller;
+  /// Прокрутка одна для всех состояний и не пересоздаётся, а новая выдача
+  /// начинается с верхней позиции: сохранённое смещение не нужно.
+  final controller = ScrollController(keepScrollOffset: false);
 
   /// Выдача, по которой построен список. Она может отставать от модели:
   /// скрытая страница не перестраивается, пока её снова не покажут, и после
@@ -52,20 +50,16 @@ final class ResultsScrollKeeper {
       _itemKeys.putIfAbsent(id, () => GlobalKey());
 
   /// Учитывает переход модели от [previous] к [next].
-  ///
-  /// Возвращает, началась ли новая выдача: тогда список уже переведён к
-  /// верхней позиции, если он показан.
-  bool onCatalogChanged(
+  void onCatalogChanged(
     AsyncValue<IntentionCatalogState>? previous,
     AsyncValue<IntentionCatalogState> next,
   ) {
     final nextState = next.value;
     // Модель публикует каждую выдачу, в том числе когда список до неё не был
     // показан.
-    var startsNewResults = false;
     final query = _confirmedQuery(nextState);
     if (query != null && !identical(query, _query)) {
-      startsNewResults = _query != null;
+      final startsNewResults = _query != null;
       _query = query;
       if (startsNewResults) {
         _jumpToTop();
@@ -80,7 +74,7 @@ final class ResultsScrollKeeper {
 
     final previousState = previous?.value;
     if (nextState is! IntentionCatalogLoaded) {
-      return startsNewResults;
+      return;
     }
     if (_pendingVisualAnchor == null &&
         previousState is IntentionCatalogLoaded &&
@@ -89,7 +83,6 @@ final class ResultsScrollKeeper {
       _pendingVisualAnchor = _captureVisualAnchor(previousState);
     }
     _scheduleMaintenance();
-    return startsNewResults;
   }
 
   void dispose() {

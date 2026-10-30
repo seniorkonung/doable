@@ -79,12 +79,7 @@ final class _IntentionSearchListState
   void initState() {
     super.initState();
     _shown = ref.read(intentionCatalogViewModelProvider(widget.purpose));
-    // Прокрутка одна для всех состояний и не пересоздаётся, а новая выдача
-    // начинается с верхней позиции: сохранённое смещение не нужно.
-    _scrollKeeper = ResultsScrollKeeper(
-      shown: () => _shown,
-      keepScrollOffset: false,
-    );
+    _scrollKeeper = ResultsScrollKeeper(shown: () => _shown);
   }
 
   @override

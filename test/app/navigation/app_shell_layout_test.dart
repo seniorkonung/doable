@@ -18,11 +18,12 @@ import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/design_system/components/list_state.dart';
+import 'package:doable/src/design_system/doable_metrics.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_catalog_status_views.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/long_term_relation/presentation/details/relation_details_page.dart';
@@ -221,8 +222,9 @@ void main() {
         faults.isFailing = true;
         await _scrollToEnd(tester, page);
 
-        final continuation = find.byType(
-          IntentionCatalogContinuationStatusView,
+        // Виды состояния списка — закрытые наследники ListState.
+        final continuation = find.byWidgetPredicate(
+          (widget) => widget is ListState,
         );
         final failure = find.descendant(
           of: continuation,
@@ -230,7 +232,7 @@ void main() {
         );
         final retry = find.descendant(
           of: continuation,
-          matching: find.byType(FilledButton),
+          matching: find.byType(InkWell),
         );
         // Отступы состояния нажатий не принимают: полную видимость проверяют
         // его сообщение и повтор, а границу выдачи — всё состояние.
@@ -828,9 +830,12 @@ Future<void> _focusTitleFilter(WidgetTester tester, _Insets insets) async {
   _expectFullyVisible(tester, intentionCatalogTitleField, insets);
 }
 
-/// Конец выдачи использует доступное место до панели либо клавиатуры.
+/// Конец выдачи стоит над панелью либо клавиатурой с отступом по макету.
 void _expectCatalogEnd(WidgetTester tester, Finder last, _Insets insets) {
-  expect(tester.getRect(last).bottom, moreOrLessEquals(insets.contentBottom));
+  expect(
+    tester.getRect(last).bottom,
+    moreOrLessEquals(insets.contentBottom - DoableMetrics.space6),
+  );
   expect(find.byKey(const ValueKey('catalog-create-intention')), findsNothing);
 }
 

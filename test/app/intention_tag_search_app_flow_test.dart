@@ -170,8 +170,8 @@ void main() {
       await _cycle(tester, _sport, TagRowFilterMark.mustBePresent);
       await _closeFilterPanel(tester, l10n);
       await _addCondition(tester, l10n, _health, present: false);
-      await _until(tester, find.text(l10n.catalogTagConditionsEmpty));
-      expect(find.text(l10n.catalogActiveEmpty), findsNothing);
+      await _until(tester, find.text(l10n.intentionPickerNoIntentionsByTags));
+      expect(find.text(l10n.intentionCatalogNoIntentionsTitle), findsNothing);
       expect(intentionCatalogRows, findsNothing);
 
       // Поиск не выполняет команд тегов и не меняет граф.
@@ -332,7 +332,7 @@ void main() {
 
     expect(_panelNames(tester), ['Парк', 'Здоровье', 'Спорт', 'Отдых']);
     expect(shownIntentionCatalogParameters(tester).tagConditions, 1);
-    await _until(tester, find.text(l10n.catalogTagConditionsEmpty));
+    await _until(tester, find.text(l10n.intentionPickerNoIntentionsByTags));
     expect(intentionCatalogRows, findsNothing);
     // Создание в фильтре не назначает тег ни одному намерению.
     expect(_assignments(app.raw), assignmentsBefore);

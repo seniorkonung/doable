@@ -2050,6 +2050,30 @@
   "@intentionPickerEmptyIntentionsText": {
     "description": "Текст пустого выбранного типа «Только намерения» в каталоге с открытым охватом"
   },
+  "intentionCatalogNoActiveTitle": "No active intentions",
+  "@intentionCatalogNoActiveTitle": {
+    "description": "Заголовок пустого активного охвата каталога, когда в архиве есть намерения"
+  },
+  "intentionCatalogNoActiveText": "Tap the plus below to create a new one. The Show row brings up the archived ones.",
+  "@intentionCatalogNoActiveText": {
+    "description": "Текст пустого активного охвата каталога, когда в архиве есть намерения"
+  },
+  "intentionCatalogNoIntentionsTitle": "No intentions yet",
+  "@intentionCatalogNoIntentionsTitle": {
+    "description": "Заголовок пустого каталога, когда намерений нет совсем"
+  },
+  "intentionCatalogNoIntentionsText": "Your intentions will appear here. Tap the plus below to create the first one.",
+  "@intentionCatalogNoIntentionsText": {
+    "description": "Текст пустого каталога, когда намерений нет совсем"
+  },
+  "intentionCatalogEmptyArchiveTitle": "Nothing in the archive",
+  "@intentionCatalogEmptyArchiveTitle": {
+    "description": "Заголовок пустого архивного охвата каталога"
+  },
+  "intentionCatalogEmptyArchiveText": "An intention you archive leaves the active list and stays here.",
+  "@intentionCatalogEmptyArchiveText": {
+    "description": "Текст пустого архивного охвата каталога"
+  },
   "intentionPickerActionTitle": "Choose an action",
   "@intentionPickerActionTitle": {
     "description": "Заголовок шапки экрана выбора действия"

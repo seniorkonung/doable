@@ -5,17 +5,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
+import '../../../design_system/components/empty_state.dart';
 import '../../../design_system/doable_colors.dart';
+import '../../../design_system/doable_icon.dart';
 import '../../../design_system/doable_metrics.dart';
 import '../../../design_system/doable_type.dart';
 import '../../application/intention_catalog.dart';
 import '../search/intention_list_header.dart';
 import '../search/intention_search_bar.dart';
 import '../search/intention_search_kind.dart';
+import '../search/intention_search_list.dart';
 import 'intention_catalog_purpose.dart';
 import 'intention_catalog_row.dart';
+import 'intention_catalog_state.dart';
 import 'intention_catalog_view_model.dart';
-import 'intention_search_results.dart';
+import 'intention_tag_conditions_view_model.dart';
 
 /// Назначение общего просмотра каталога намерений.
 ///
@@ -42,10 +46,19 @@ final class _IntentionCatalogPageState
     super.dispose();
   }
 
+  void _resetFilters() {
+    _filterController.clear();
+    ref
+        .read(intentionCatalogViewModelProvider(_purpose).notifier)
+        .clearTitleFilter();
+    ref
+        .read(intentionTagConditionsViewModelProvider(_purpose).notifier)
+        .clear();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final localizations = AppLocalizations.of(context);
-    final catalog = ref.watch(intentionCatalogViewModelProvider(_purpose));
+    final l10n = AppLocalizations.of(context);
     return AnnotatedRegion<SystemUiOverlayStyle>(
       // Без AppBar стиль системной строки задаёт страница:
       // https://api.flutter.dev/flutter/services/SystemChrome/setSystemUIOverlayStyle.html
@@ -74,21 +87,9 @@ final class _IntentionCatalogPageState
                   ),
                 ),
                 Expanded(
-                  child: IntentionSearchResults(
+                  child: IntentionSearchList(
                     purpose: _purpose,
-                    catalog: catalog,
-                    listKey: const PageStorageKey<String>(
-                      'intention-catalog-list',
-                    ),
-                    messages: IntentionSearchResultsMessages(
-                      loading: localizations.catalogLoading,
-                      unavailable: localizations.catalogUnavailable,
-                      corruption: localizations.catalogCorruption,
-                      unexpected: localizations.catalogUnexpectedFailure,
-                    ),
-                    emptyMessage: (empty) =>
-                        _emptyMessage(localizations, empty.query),
-                    itemBuilder: (context, results, summary) =>
+                    rowBuilder: (context, results, summary) =>
                         IntentionCatalogRow(
                           summary: summary,
                           requiredTagIds:
@@ -99,6 +100,9 @@ final class _IntentionCatalogPageState
                             );
                           },
                         ),
+                    emptyScope: (empty) => _emptyScope(l10n, empty),
+                    onResetFilters: _resetFilters,
+                    bottomPadding: DoableMetrics.space6,
                   ),
                 ),
               ],
@@ -109,21 +113,28 @@ final class _IntentionCatalogPageState
     );
   }
 
-  String _emptyMessage(
-    AppLocalizations localizations,
-    IntentionCatalogQuery query,
-  ) {
-    // Условия по тегам сужают охват: пустая выдача не означает, что в нём
-    // нет намерений.
-    if (query.tagFilter != IntentionTagFilter.empty) {
-      return localizations.catalogTagConditionsEmpty;
-    }
-    return switch (query.scope) {
-      IntentionScope.active => localizations.catalogActiveEmpty,
-      IntentionScope.archived => localizations.catalogArchivedEmpty,
-      IntentionScope.all => localizations.catalogAllEmpty,
-    };
-  }
+  /// Архивные намерения считаются без условия типа: сводка охватов при
+  /// выбранном типе не видит архивные намерения другого типа.
+  EmptyState _emptyScope(AppLocalizations l10n, IntentionCatalogEmpty empty) =>
+      switch ((empty.scope, empty.counts)) {
+        (IntentionScope.archived, _) => EmptyState(
+          icon: DoableIconData.archive,
+          title: l10n.intentionCatalogEmptyArchiveTitle,
+          text: l10n.intentionCatalogEmptyArchiveText,
+        ),
+        (IntentionScope.active, IntentionCountsByScopeAndType(:final archived))
+            when archived.all > 0 =>
+          EmptyState(
+            icon: DoableIconData.intention,
+            title: l10n.intentionCatalogNoActiveTitle,
+            text: l10n.intentionCatalogNoActiveText,
+          ),
+        (IntentionScope.active || IntentionScope.all, _) => EmptyState(
+          icon: DoableIconData.intention,
+          title: l10n.intentionCatalogNoIntentionsTitle,
+          text: l10n.intentionCatalogNoIntentionsText,
+        ),
+      };
 }
 
 /// Части страницы над выдачей: заголовок, строка поиска и заголовок списка.
