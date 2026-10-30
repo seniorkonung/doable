@@ -1,0 +1,120 @@
+## Phase 1: Поиск участника показывает занятые пары и открывает занимающую связь
+
+- [ ] 1.1 Заменить исключение второго участника в запросе каталога и назначении поиска участника пробой пары `RelationPairProbe`, которую поиск строит из описания выбора, не меняя выдачи
+  - **Критерии приёмки:**
+    - `IntentionCatalogQuery` и `SelectRelationParticipant` несут необязательную `pairProbe` по решению 2 design: участника другой роли, выбираемую роль и изменяемую связь. Поля `excludedIntentionId` в них нет. Модель каталога переносит пробу из назначения в запросы первой порции и продолжения.
+    - Запрос с пробой исключает участника другой роли по идентификатору в трёх местах: в чтении Drift, в `IntentionCatalogQuery.includes` и при сопоставлении снимков мутаций с запросом. Запрос без пробы ничего не исключает. Выдача, числа и порядок не меняются, а прежние проверки исключения переведены на пробу и проходят.
+    - `RelationParticipantPickerPage` строит пробу из `RelationParticipantChoice`, пока участник другой роли выбран. В пробу входят выбираемая роль и идентификатор изменяемой связи: его форма передаёт в `RelationChangeChoiceFlow`. При создании изменяемой связи нет, а без участника другой роли нет и пробы. Проверки формы подтверждают пробу обоих потоков.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/application/intention_contract_test.dart test/intention/data test/intention/presentation test/long_term_relation/presentation test/graph/presentation/graph_reconciliation_checkpoint_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет. Работа начинается на `main` со слитым `redesign-intention-catalog`. Если его решения поменялись до слияния, сначала сверяются `design.md` и ADR-0050 (Plan Constraints).
+  - **Предполагаемые файлы:**
+    - `lib/src/intention/application/intention_catalog.dart`, `lib/src/intention/presentation/catalog/intention_catalog_purpose.dart`, `lib/src/intention/presentation/catalog/intention_catalog_view_model.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`;
+    - `lib/src/long_term_relation/presentation/participant_picker/relation_participant_choice.dart`, `lib/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart`, `lib/src/long_term_relation/presentation/editor/relation_editor_page.dart`;
+    - механический перевод проверок с `excludedIntentionId`: `test/intention/application/intention_contract_test.dart`, `test/intention/data/drift_intention_catalog_test.dart`, `test/intention/data/drift_intention_repository_large_fixture_test.dart`, `test/intention/presentation/catalog/intention_catalog_tag_filter_view_model_test.dart`, `test/intention/presentation/catalog/intention_catalog_tag_filter_integration_test.dart`, `test/intention/presentation/catalog/intention_picker_session_test_support.dart`, `test/intention/presentation/picker/intention_picker_view_test.dart`, `test/long_term_relation/presentation/editor/relation_form_test_support.dart`, `test/long_term_relation/presentation/editor/relation_participant_selection_scenarios.dart`, `test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart`, `test/long_term_relation/presentation/participant_picker/relation_participant_picker_session_test.dart`, `test/graph/presentation/graph_reconciliation_checkpoint_test.dart`.
+  - **Размер:** M — поле заменяется одним значением, проверки переводятся механически.
+
+- [ ] 1.2 Находить в той же порции каталога связь, которая занимает пару каждой строки, по пробе запроса
+  - **Критерии приёмки:**
+    - Первая порция и продолжение запроса с пробой несут `pairOccupants`. Для строки, выбор которой в выбираемой роли дал бы занятую направленную пару, карта хранит `PairOccupant` — идентификатор и `RelationScope` занимающей связи. Без пробы карты нет, а ключи вне строк порции отклоняет `IntentionCatalogPageValidationException`.
+    - Drift находит связь тем же чтением порции через `LEFT JOIN` по уникальному индексу пары (решение 3 design). Проверки хранилища подтверждают:
+      - обе роли и архивную занимающую связь;
+      - изменяемая связь и связь обратного направления пару не занимают;
+      - продолжение несёт отметки своих строк;
+      - число совпадений, числа по типам и порядок от занятости не зависят.
+
+      Схема хранилища не меняется.
+    - Тестовые репозитории соблюдают контракт: `answerCatalogQuery` и порции формы связи отвечают на запрос с пробой картой, а на запрос без пробы — без неё.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/application/intention_contract_test.dart test/intention/data/drift_intention_catalog_test.dart test/long_term_relation/presentation/editor test/long_term_relation/presentation/participant_picker`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.1.
+  - **Предполагаемые файлы:** `lib/src/intention/application/intention_catalog.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `test/support/intention_type_counts.dart`, `test/long_term_relation/presentation/editor/relation_form_test_support.dart`, `test/intention/application/intention_contract_test.dart`, `test/intention/data/drift_intention_catalog_test.dart`.
+  - **Размер:** M.
+
+- [ ] 1.3 Хранить в модели каталога занимающие связи загруженных строк рядом со строками и объединять их с продолжениями
+  - **Критерии приёмки:**
+    - `IntentionCatalogLoaded` поиска с пробой несёт занимающие связи своих строк из первой порции. Продолжение добавляет свои по действующим правилам ревизий порций.
+    - Порция без карты при пробе даёт непредвиденное состояние выдачи или продолжения, как порция без запрошенных чисел по типам.
+    - Выдача без пробы — общий каталог и поиски дневного выбора — не меняется.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog`.
+  - **Зависимости:** 1.2.
+  - **Предполагаемые файлы:** `lib/src/intention/presentation/catalog/intention_catalog_state.dart`, `lib/src/intention/presentation/catalog/intention_catalog_view_model.dart`, `test/intention/presentation/catalog/intention_catalog_view_model_test.dart`, `test/intention/presentation/catalog/intention_catalog_revision_protocol_test.dart`.
+  - **Размер:** S.
+
+- [ ] 1.4 Согласовывать занимающие связи загруженных строк с подтверждёнными изменениями связей и намерений, не перечитывая выдачу
+  - **Критерии приёмки:**
+    - Пакет изменений каталога берёт и `LongTermRelationChange`. Чистая функция кандидата по пробе (решение 4 design) обрабатывает оба состояния факта:
+      - «до» снимает отметку кандидата, если она указывает на эту связь;
+      - «после» ставит `PairOccupant`, если строка кандидата загружена.
+
+      Функция проверена отдельно для создания, замены участника, архивирования, восстановления, удаления и изменяемой связи.
+    - Каталожные мутации при пробе: оставшаяся строка сохраняет отметку, а удалённая теряет её. Созданное намерение входит свободным, а строка, вошедшая по изменению намерения, начинает выдачу с первой порции. Без пробы согласование прежнее.
+    - Изменение отметки не меняет место строки, число в заголовке и курсор.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog test/graph/presentation/graph_reconciliation_checkpoint_test.dart`.
+  - **Зависимости:** 1.3.
+  - **Предполагаемые файлы:** `lib/src/intention/presentation/catalog/intention_catalog_view_model.dart` и новый файл функции кандидата рядом с ним; проверки функции кандидата и согласования в `test/intention/presentation/catalog/` рядом с `intention_catalog_mutation_reconciliation_test.dart`.
+  - **Размер:** M.
+
+- [ ] 1.5 Добавить в `Badge` метку-слово строки списка без значка
+  - **Критерии приёмки:**
+    - Вариант показывает только слово на заливке `bg`, как значковые метки строки списка, и оформлен одинаково при любом слове.
+    - У метки нет узла экранного диктора: слово называет доступное название строки.
+    - Варианты `Badge.mark` и `Badge.archived` не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/badge_test.dart`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `lib/src/design_system/components/badge.dart`, `test/design_system/badge_test.dart`.
+  - **Размер:** S.
+
+- [ ] 1.6 Показывать в поиске участника отметку занятой пары и открывать нажатием на текст отмеченной строки занимающую связь поверх поиска
+  - **Критерии приёмки:**
+    - Отметка строки с занимающей связью в загруженной выдаче:
+      - линия меток начинается словом «Уже связано» для активной связи или «Связь в архиве» для архивной, затем идут метки `IntentionRowContent`;
+      - название не приглушается, место строки и число в заголовке не меняются;
+      - доступное название дополняется отметкой и тем, что нажатие откроет существующую связь, а отдельного узла у метки нет;
+      - тексты есть на русском и английском.
+    - Нажатие на текст отмеченной строки не выбирает намерение: `IntentionPickerView` передаёт `PairOccupant` необязательному обработчику страницы. `RelationParticipantPickerPage` открывает подробный просмотр занимающей связи поверх поиска в обоих потоках и при любом её архивном состоянии, а «назад» возвращает в поиск без выбора. Стрелка по-прежнему открывает страницу намерения.
+    - Строки без отметки и поиски без пробы не меняются.
+  - **Проверка:**
+    - `mise run codegen` — локализация пересоздана.
+    - `mise exec --no-deps -- flutter test test/intention/presentation/picker test/intention/presentation/search test/long_term_relation/presentation/participant_picker test/long_term_relation/presentation/editor`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.3, 1.5.
+  - **Предполагаемые файлы:**
+    - `lib/src/intention/presentation/picker/intention_picker_row.dart`, `lib/src/intention/presentation/picker/intention_picker_view.dart`, `lib/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` и сгенерированная локализация;
+    - проверки: `test/intention/presentation/picker/intention_picker_view_test.dart`, `test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart`, `test/long_term_relation/presentation/participant_picker/participant_picker_test_support.dart`.
+  - **Размер:** M.
+
+- [ ] 1.7 Подтвердить сценарием приложения на настоящем хранилище, что поиск участника отмечает занятые пары и снимает отметку после удаления связи на странице, открытой из поиска
+  - **Критерии приёмки:**
+    - На локальной базе проходит первый сценарий требования «Отметка занятой пары в поиске участника». При создании связи от «Быть здоровым» строка «Много ходить» отмечена «Уже связано», «Плавать» — «Связь в архиве», «Высыпаться» показано обычной строкой, а заголовок показывает 3.
+    - После удаления связи на странице «Много ходить», открытой стрелкой из поиска, возврат показывает строку на прежнем месте без отметки, и строка выбирается.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app/long_term_relation_app_flow_test.dart`.
+  - **Зависимости:** 1.4, 1.6.
+  - **Предполагаемые файлы:** `test/app/long_term_relation_app_flow_test.dart`.
+  - **Размер:** S.
+
+- [ ] 1.8 Подтвердить готовность первой фазы: поиск участника отмечает занятые пары в обоих потоках и открывает занимающую связь, а общий каталог и поиски дневного выбора не изменились
+  - **Критерии приёмки:**
+    - Выполнено условие «Ready to advance» первой фазы:
+      - отметки и переходы из отмеченных строк соответствуют спецификации в обоих потоках, включая отметки после изменений связей на страницах, открытых из поиска;
+      - общий каталог и поиски дневного выбора не изменились;
+      - полные проверки проекта проходят.
+    - В запросе каталога, назначении поиска участника и их проверках нет `excludedIntentionId`.
+    - Результаты проверок и путь к APK сообщены в сессии. Ручная проверка на устройстве остаётся за пользователем и не блокирует готовность фазы.
+  - **Проверка:**
+    - `grep -rn 'excludedIntentionId' lib/src/intention lib/src/long_term_relation lib/src/graph/data/drift_personal_graph_repository.dart test/intention test/long_term_relation test/graph/presentation` ничего не находит.
+    - `mise run check` и `mise exec --no-deps -- openspec validate mark-occupied-pairs-in-relation-participant-picker --strict --no-interactive`; после фиксации изменений — `mise run codegen-check` на чистой рабочей копии.
+    - `mise exec --no-deps -- flutter build apk --release` с артефактом `build/app/outputs/flutter-apk/app-release.apk`. Если через DTD найдено запущенное приложение, выполнить hot restart и проверить `get_runtime_errors`. Эмулятор и устройство не запускаются.
+    - Сообщить оставшиеся ручные проверки:
+      - метки «Уже связано» и «Связь в архиве» в поиске участника в светлой и тёмной темах;
+      - экранный диктор читает отметку и действие нажатия, а у метки нет отдельного узла;
+      - нажатие на текст отмеченной строки открывает связь, а «назад» возвращает в поиск.
+  - **Зависимости:** 1.1–1.7.
+  - **Предполагаемые файлы:** нет, только проверка и сборка.
+  - **Размер:** XS.
