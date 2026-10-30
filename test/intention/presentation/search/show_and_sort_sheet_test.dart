@@ -63,7 +63,7 @@ void main() {
         ];
         await _show(tester, purpose);
 
-        final all = ru ? 'Всё' : 'All';
+        final all = ru ? 'Намерения и действия' : 'Intentions and actions';
         final intentionsOnly = ru ? 'Только намерения' : 'Intentions only';
         final actions = ru ? 'Только действия' : 'Actions only';
         expect(
@@ -165,7 +165,10 @@ void main() {
         expect(find.byType(MenuItemButton), findsNWidgets(3));
         expect(_menuText('1'), findsNothing);
         expect(_menuText('0'), findsNothing);
-        expect(_menuOption(ru ? 'Всё' : 'All'), findsOneWidget);
+        expect(
+          _menuOption(ru ? 'Намерения и действия' : 'Intentions and actions'),
+          findsOneWidget,
+        );
         expect(
           _menuOption(ru ? 'Только намерения' : 'Intentions only'),
           findsOneWidget,
@@ -200,7 +203,9 @@ void main() {
         expect(position, greaterThan(0));
         await _show(tester, purpose);
         await _openTypes(tester, ru);
-        await tester.tap(_menuOption(ru ? 'Всё' : 'All'));
+        await tester.tap(
+          _menuOption(ru ? 'Намерения и действия' : 'Intentions and actions'),
+        );
         await tester.pumpAndSettle();
         expect(find.byType(MenuItemButton), findsNothing);
         expect(h.repository.queries, hasLength(1));
@@ -284,7 +289,10 @@ void main() {
         unchanged();
         await _openSort(tester, ru);
         expect(find.byType(MenuItemButton), findsNWidgets(3));
-        expect(_menuOption(ru ? 'Всё' : 'All'), findsNothing);
+        expect(
+          _menuOption(ru ? 'Намерения и действия' : 'Intentions and actions'),
+          findsNothing,
+        );
         await tester.tap(_menuOption(ru ? 'Название' : 'Name'));
         await tester.pumpAndSettle();
         unchanged();
@@ -412,7 +420,10 @@ void main() {
                 expect(screen.contains(menu.topLeft), isTrue);
                 expect(screen.contains(menu.bottomRight), isTrue);
                 for (final (label, count) in [
-                  (ru ? 'Всё' : 'All', '123'),
+                  (
+                    ru ? 'Намерения и действия' : 'Intentions and actions',
+                    '123',
+                  ),
                   (ru ? 'Только намерения' : 'Intentions only', '1'),
                   (ru ? 'Только действия' : 'Actions only', '122'),
                 ]) {
@@ -461,6 +472,31 @@ void main() {
         }
       }
     }
+
+    testWidgets(
+      '${locale.languageCode}: подпись типа без ограничения переносится в строке при двукратном масштабе',
+      (tester) async {
+        final purpose = SelectDailyChoiceSource(
+          session: IntentionSearchSession(),
+        );
+        await _open(tester, purpose, locale, width: 320, textScale: 2);
+        await _show(tester, purpose);
+
+        final bounds = tester.getRect(
+          find.byType(SelectRow<IntentionTypeChoice>),
+        );
+        final caption = _option(ru ? 'Тип' : 'Type');
+        final chosen = _option(
+          ru ? 'Намерения и действия' : 'Intentions and actions',
+        );
+        _wholeText(tester, caption, bounds, textScale: 2);
+        _wholeText(tester, chosen, bounds, textScale: 2);
+        expect(
+          tester.getRect(caption).right,
+          lessThan(tester.getRect(chosen).left),
+        );
+      },
+    );
 
     testWidgets(
       '${locale.languageCode}: поле и направление меняются по последнему выбору до ответа новой порции',
@@ -541,7 +577,10 @@ void main() {
                 expectedOrder.direction ==
                 IntentionCatalogSortDirection.descending,
           );
-          _selectedType(tester, ru ? 'Всё' : 'All');
+          _selectedType(
+            tester,
+            ru ? 'Намерения и действия' : 'Intentions and actions',
+          );
           expect(_option('1'), findsNothing);
           expect(find.text(ru ? 'Сбросить' : 'Reset'), findsOneWidget);
           _header(tester, all, summary);
@@ -633,7 +672,10 @@ void main() {
 
         await tester.tap(_option(ru ? 'Сбросить' : 'Reset'));
         await tester.pump();
-        _selectedType(tester, ru ? 'Всё' : 'All');
+        _selectedType(
+          tester,
+          ru ? 'Намерения и действия' : 'Intentions and actions',
+        );
         expect(_option(ru ? 'Дата создания' : 'Date created'), findsOneWidget);
         _direction(
           tester,
@@ -709,7 +751,10 @@ void main() {
         await tester.tap(_option(actions));
         await tester.pump();
         expect(find.byType(MenuItemButton), findsNothing);
-        expect(_option(ru ? 'Всё' : 'All'), findsNothing);
+        expect(
+          _option(ru ? 'Намерения и действия' : 'Intentions and actions'),
+          findsNothing,
+        );
         expect(h.repository.queries, hasLength(1));
         expect(_option(ru ? 'Сбросить' : 'Reset'), findsNothing);
 

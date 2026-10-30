@@ -3757,7 +3757,7 @@ abstract class AppLocalizations {
   /// Вариант без ограничения по типу в строке и меню листа параметров поиска
   ///
   /// In en, this message translates to:
-  /// **'All'**
+  /// **'Intentions and actions'**
   String get intentionPickerTypeAll;
 
   /// Вариант намерений без готовности к действию в строке и меню листа параметров поиска

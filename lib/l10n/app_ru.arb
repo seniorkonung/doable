@@ -693,7 +693,7 @@
   "@intentionPickerPurposeSheetBack": {"description": "Кнопка, которая закрывает лист назначения и возвращает к выдаче поиска"},
   "intentionPickerTypeCaption": "Тип",
   "@intentionPickerTypeCaption": {"description": "Название группы типа намерения"},
-  "intentionPickerTypeAll": "Всё",
+  "intentionPickerTypeAll": "Намерения и действия",
   "@intentionPickerTypeAll": {"description": "Вариант без ограничения по типу в строке и меню листа параметров поиска"},
   "intentionPickerTypeIntentionsOnly": "Только намерения",
   "@intentionPickerTypeIntentionsOnly": {"description": "Вариант намерений без готовности к действию в строке и меню листа параметров поиска"},

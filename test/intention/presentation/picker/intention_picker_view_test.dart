@@ -106,7 +106,7 @@ void main() {
               typeRow.value,
               purpose is SelectDailyChoiceAction
                   ? (ru ? 'Только действия' : 'Actions only')
-                  : (ru ? 'Всё' : 'All'),
+                  : (ru ? 'Намерения и действия' : 'Intentions and actions'),
             );
             if (sortByName) {
               await tester.tap(
