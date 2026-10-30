@@ -36,15 +36,13 @@ enum _MatrixEntry {
   selectRelated;
 
   Finder get finder => switch (this) {
-    _MatrixEntry.intention => _summary(IntentionCatalogPage, 'Читать'),
+    _MatrixEntry.intention => intentionCatalogRow('Читать'),
     _MatrixEntry.editIntention => intentionHeadTitle,
     _MatrixEntry.dailyChoice => find.byKey(
       const ValueKey('daily-choice-row-1'),
     ),
     _MatrixEntry.creation || _MatrixEntry.action => quickCreationAction(),
-    _MatrixEntry.condition => find.byKey(
-      const ValueKey('intention-tag-conditions-add'),
-    ),
+    _MatrixEntry.condition => intentionCatalogTagFilterControl,
     _MatrixEntry.actionCandidate => _summary(
       DailyChoiceActionPickerPage,
       'Бегать',
@@ -101,11 +99,7 @@ void _registerPageMatrixTests() {
   ) async {
     final router = await _start(tester);
     await _select(tester, AppDestination.intentionGraph);
-    await _open(
-      tester,
-      _summary(IntentionCatalogPage, 'Читать'),
-      IntentionDetailsPage,
-    );
+    await _open(tester, intentionCatalogRow('Читать'), IntentionDetailsPage);
     unawaited(router.push(DailyChoiceDateCatalogRoute(date: _choiceDate)));
     await _until(tester, find.byType(DailyChoiceDateCatalogPage));
     await tester.pumpAndSettle();
@@ -148,11 +142,7 @@ void _registerPageMatrixTests() {
       'навигации, а «назад» закрывает только её', (tester) async {
     final router = await _start(tester);
     await _select(tester, AppDestination.intentionGraph);
-    await _open(
-      tester,
-      _summary(IntentionCatalogPage, 'Читать'),
-      IntentionDetailsPage,
-    );
+    await _open(tester, intentionCatalogRow('Читать'), IntentionDetailsPage);
     await _tap(tester, _MatrixEntry.assignTags.finder);
     await _until(
       tester,
@@ -191,8 +181,7 @@ void _registerPageMatrixTests() {
       'возвращает каталог с прежними параметрами', (tester) async {
     final router = await _start(tester);
     await _select(tester, AppDestination.intentionGraph);
-    final filter = find.byKey(const ValueKey('catalog-filter-field'));
-    await tester.enterText(filter, 'Читать');
+    await enterIntentionCatalogTitle(tester, 'Читать');
     await _tap(tester, _MatrixEntry.condition.finder);
     await _until(
       tester,
@@ -218,7 +207,7 @@ void _registerPageMatrixTests() {
     await tester.binding.handlePopRoute();
     await _gone(tester, Sheet);
     _expectRootPage(tester, router, AppDestination.intentionGraph);
-    expect(tester.widget<TextField>(filter).controller!.text, 'Читать');
+    expect(shownIntentionCatalogParameters(tester).titleFilter, 'Читать');
     expect(tester.takeException(), isNull);
   });
 

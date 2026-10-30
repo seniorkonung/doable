@@ -37,7 +37,6 @@ import 'package:doable/src/intention/presentation/details/intention_details_page
 import 'package:doable/src/intention/presentation/details/intention_options.dart';
 import 'package:doable/src/intention/presentation/edit/intention_edit_page.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
-import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
@@ -56,6 +55,7 @@ import '../../support/app_root_pages.dart';
 import '../../support/daily_choice_local_date.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
+import '../../support/intention_catalog_controls.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 import '../../support/intention_edit_screen.dart';
@@ -155,11 +155,7 @@ void main() {
     (tester) async {
       final router = await _start(tester);
       await _select(tester, AppDestination.intentionGraph);
-      await _open(
-        tester,
-        _summary(IntentionCatalogPage, 'Читать'),
-        IntentionDetailsPage,
-      );
+      await _open(tester, intentionCatalogRow('Читать'), IntentionDetailsPage);
       await _tap(tester, find.text('Relations').first);
       await _tap(tester, _outgoingNeedGroup);
       await _open(
@@ -213,11 +209,7 @@ void main() {
       await tester.pumpAndSettle();
       _expectRootPage(tester, router, AppDestination.home);
       await _select(tester, AppDestination.intentionGraph);
-      await _open(
-        tester,
-        _summary(IntentionCatalogPage, 'Читать'),
-        IntentionDetailsPage,
-      );
+      await _open(tester, intentionCatalogRow('Читать'), IntentionDetailsPage);
       expect(
         tester
             .widget<PageHead>(
@@ -292,16 +284,11 @@ final _announcedDestinations = find.semantics.byPredicate(
   describeMatch: (_) => 'пункты панели для экранного диктора',
 );
 
-/// Строка выдачи намерений с названием [title] на странице [page]: в
-/// каталоге — строка каталога, в поисках выбора — строка экрана выбора.
+/// Строка выдачи намерений с названием [title] на странице выбора [page].
 Finder _summary(Type page, String title) => find.descendant(
   of: find.byType(page),
   matching: find.byWidgetPredicate(
-    (widget) => switch (widget) {
-      IntentionSummaryView(title: final shown) ||
-      PickerRow(name: final shown) => shown == title,
-      _ => false,
-    },
+    (widget) => widget is PickerRow && widget.name == title,
   ),
 );
 
@@ -399,10 +386,7 @@ void _expectCreationSheetAboveCatalog(WidgetTester tester) {
   expect(_destinations, findsExactly(3));
   expect(_destinations.hitTestable(), findsNothing);
   expect(_announcedDestinations, findsNothing);
-  expect(
-    find.byKey(const ValueKey('catalog-filter-field')).hitTestable(),
-    findsNothing,
-  );
+  expect(intentionCatalogTitleField.hitTestable(), findsNothing);
 }
 
 /// Запускает приложение на засеянном хранилище и ждёт Главную. Страницам

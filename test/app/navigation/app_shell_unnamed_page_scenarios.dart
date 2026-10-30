@@ -129,11 +129,7 @@ void _registerUnnamedPageTests() {
   ) async {
     final router = await _start(tester);
     await _select(tester, AppDestination.intentionGraph);
-    await _open(
-      tester,
-      _summary(IntentionCatalogPage, 'Гулять'),
-      IntentionDetailsPage,
-    );
+    await _open(tester, intentionCatalogRow('Гулять'), IntentionDetailsPage);
     _expectAboveShell(
       tester,
       IntentionDetailsPage,

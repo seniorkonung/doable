@@ -28,7 +28,6 @@ import 'package:doable/src/intention/presentation/editor/intention_editor_page.d
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/long_term_relation/presentation/details/relation_details_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
-import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -39,6 +38,7 @@ import '../../support/daily_choice_catalog_controls.dart';
 import '../../support/daily_choice_local_date.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
+import '../../support/intention_catalog_controls.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 import '../../support/quick_creation.dart';
@@ -161,18 +161,18 @@ void main() {
         const count = 40;
         await _start(tester, intentions: count, insets: insets);
         await _select(tester, AppDestination.intentionGraph);
-        await _until(tester, find.text('Total intentions: $count'));
+        await _until(tester, intentionCatalogTotal(count));
 
         if (insets.keyboard > 0) {
           // Поле фильтра в фокусе остаётся над клавиатурой и сужает выдачу.
-          await tester.enterText(_titleFilter, 'Намерение 00');
-          await _until(tester, find.text('Total intentions: 9'));
+          await enterIntentionCatalogTitle(tester, 'Намерение 00');
+          await _until(tester, intentionCatalogTotal(9));
           await tester.pumpAndSettle();
           expect(
             tester
                 .widget<EditableText>(
                   find.descendant(
-                    of: _titleFilter,
+                    of: intentionCatalogTitleField,
                     matching: find.byType(EditableText),
                   ),
                 )
@@ -180,15 +180,15 @@ void main() {
                 .hasFocus,
             isTrue,
           );
-          expect(_titleFilter.hitTestable(), findsOneWidget);
-          _expectFullyVisible(tester, _titleFilter, insets);
+          expect(intentionCatalogTitleField.hitTestable(), findsOneWidget);
+          _expectFullyVisible(tester, intentionCatalogTitleField, insets);
         }
 
         await _scrollToEnd(tester, find.byType(IntentionCatalogPage));
 
         // Порядок по умолчанию — от новых к старым: первое намерение стоит
         // последним.
-        final lastRow = _catalogRow(_intentionTitle(1));
+        final lastRow = intentionCatalogRow(_intentionTitle(1));
         _expectFullyVisible(tester, lastRow, insets);
         _expectCatalogEnd(tester, lastRow, insets);
         expect(lastRow.hitTestable(), findsOneWidget);
@@ -204,26 +204,26 @@ void main() {
         const count = 20;
         await _start(tester, intentions: count, insets: insets);
         await _select(tester, AppDestination.intentionGraph);
-        await _until(tester, find.text('Total intentions: $count'));
+        await _until(tester, intentionCatalogTotal(count));
         if (insets.keyboard > 0) {
           // Клавиатуру открывает поле фильтра в фокусе.
-          await tester.enterText(_titleFilter, 'Намерение 00');
-          await _until(tester, find.text('Total intentions: 9'));
+          await enterIntentionCatalogTitle(tester, 'Намерение 00');
+          await _until(tester, intentionCatalogTotal(9));
           await tester.pumpAndSettle();
         }
-        expect(_catalogListScroll(tester).pixels, 0);
+        expect(intentionCatalogListPosition(tester).pixels, 0);
         expect(_catalogPageScroll(tester).pixels, 0);
 
         await _flingCatalog(tester, const Offset(0, -300));
 
-        final list = _catalogListScroll(tester);
+        final list = intentionCatalogListPosition(tester);
         final page = _catalogPageScroll(tester);
         expect(list.pixels, moreOrLessEquals(list.maxScrollExtent));
         expect(page.pixels, moreOrLessEquals(page.maxScrollExtent));
         expect(page.maxScrollExtent, greaterThan(0));
         // Порядок по умолчанию — от новых к старым: первое намерение стоит
         // последним.
-        final lastRow = _catalogRow(_intentionTitle(1));
+        final lastRow = intentionCatalogRow(_intentionTitle(1));
         _expectFullyVisible(tester, lastRow, insets);
         _expectCatalogEnd(tester, lastRow, insets);
         expect(lastRow.hitTestable(), findsOneWidget);
@@ -231,15 +231,17 @@ void main() {
         await _flingCatalog(tester, const Offset(0, 300));
 
         expect(
-          _catalogListScroll(tester).pixels,
-          moreOrLessEquals(_catalogListScroll(tester).minScrollExtent),
+          intentionCatalogListPosition(tester).pixels,
+          moreOrLessEquals(
+            intentionCatalogListPosition(tester).minScrollExtent,
+          ),
         );
         expect(
           _catalogPageScroll(tester).pixels,
           moreOrLessEquals(_catalogPageScroll(tester).minScrollExtent),
         );
-        _expectFullyVisible(tester, _titleFilter, insets);
-        expect(_titleFilter.hitTestable(), findsOneWidget);
+        _expectFullyVisible(tester, intentionCatalogTitleField, insets);
+        expect(intentionCatalogTitleField.hitTestable(), findsOneWidget);
         expect(tester.takeException(), isNull);
       });
     }
@@ -258,13 +260,13 @@ void main() {
           observer: faults,
         );
         await _select(tester, AppDestination.intentionGraph);
-        await _until(tester, find.text('Total intentions: $count'));
+        await _until(tester, intentionCatalogTotal(count));
         final page = find.byType(IntentionCatalogPage);
         if (insets.keyboard > 0) {
           // Клавиатуру открывает поле фильтра в фокусе, а выдача остаётся
           // больше одной порции.
           await _focusTitleFilter(tester, insets);
-          expect(find.text('Total intentions: $count'), findsOneWidget);
+          expect(intentionCatalogTotal(count), findsOneWidget);
         }
 
         faults.isFailing = true;
@@ -294,7 +296,7 @@ void main() {
         await _scrollToEnd(tester, page);
 
         expect(continuation, findsNothing);
-        final lastRow = _catalogRow(_intentionTitle(1));
+        final lastRow = intentionCatalogRow(_intentionTitle(1));
         _expectFullyVisible(tester, lastRow, insets);
         _expectCatalogEnd(tester, lastRow, insets);
         expect(lastRow.hitTestable(), findsOneWidget);
@@ -534,15 +536,7 @@ void main() {
       await _until(tester, _messageOf(3));
       await tester.pumpAndSettle();
 
-      await tester.tap(
-        find
-            .descendant(
-              of: find.byType(IntentionCatalogPage),
-              matching: find.byType(IntentionSummaryView),
-            )
-            .hitTestable()
-            .first,
-      );
+      await tester.tap(intentionCatalogRows.hitTestable().first);
       await _until(tester, find.byType(IntentionDetailsPage));
       await tester.pumpAndSettle();
 
@@ -573,8 +567,6 @@ const _rootPages = {
   AppDestination.dailyChoices: DailyChoiceCatalogPage,
   AppDestination.intentionGraph: IntentionCatalogPage,
 };
-
-final _titleFilter = find.byKey(const ValueKey('catalog-filter-field'));
 
 /// Строка выдачи каталога дневных выборов с номером [number].
 Finder _dailyChoiceRow(int number) =>
@@ -615,12 +607,6 @@ Finder _messageOf(int intention) => find.descendant(
 
 String _intentionTitle(int number) =>
     'Намерение ${number.toString().padLeft(3, '0')}';
-
-/// Строка выдачи каталога намерений с названием [title].
-Finder _catalogRow(String title) => find.descendant(
-  of: find.byType(IntentionCatalogPage),
-  matching: find.widgetWithText(IntentionSummaryView, title),
-);
 
 /// Управляемая недоступность хранилища: пока [isFailing], каждое обращение
 /// завершается отказом занятости.
@@ -875,13 +861,13 @@ void _expectFullyVisible(WidgetTester tester, Finder finder, _Insets insets) {
 /// Ставит фокус в поле фильтра названия каталога намерений, не меняя поиск:
 /// поле видно над клавиатурой.
 Future<void> _focusTitleFilter(WidgetTester tester, _Insets insets) async {
-  await tester.showKeyboard(_titleFilter);
+  await tester.showKeyboard(intentionCatalogTitleField);
   await tester.pumpAndSettle();
   expect(
     tester
         .widget<EditableText>(
           find.descendant(
-            of: _titleFilter,
+            of: intentionCatalogTitleField,
             matching: find.byType(EditableText),
           ),
         )
@@ -889,8 +875,8 @@ Future<void> _focusTitleFilter(WidgetTester tester, _Insets insets) async {
         .hasFocus,
     isTrue,
   );
-  expect(_titleFilter.hitTestable(), findsOneWidget);
-  _expectFullyVisible(tester, _titleFilter, insets);
+  expect(intentionCatalogTitleField.hitTestable(), findsOneWidget);
+  _expectFullyVisible(tester, intentionCatalogTitleField, insets);
 }
 
 /// Конец выдачи использует доступное место до панели либо клавиатуры.
@@ -968,23 +954,11 @@ List<double> _scrollOffsets(WidgetTester tester, Finder page) => [
 /// упирается в край, он уходит за край лишь на малую долю пути, и дальше
 /// страницу ведёт только переданная ей инерция флинга.
 Future<void> _flingCatalog(WidgetTester tester, Offset offset) async {
-  final list = tester.getRect(_catalogList);
+  final list = tester.getRect(intentionCatalogList);
   final top = math.max(list.top, tester.getRect(find.byType(AppBar)).bottom);
   await tester.flingFrom(Offset(list.left + 24, top + 24), offset, 6000);
   await tester.pumpAndSettle(const Duration(milliseconds: 16));
 }
-
-/// Собственный список выдачи каталога намерений.
-final _catalogList = find.byKey(
-  const PageStorageKey<String>('intention-catalog-list'),
-);
-
-/// Прокрутка списка выдачи каталога намерений.
-ScrollPosition _catalogListScroll(WidgetTester tester) => tester
-    .state<ScrollableState>(
-      find.descendant(of: _catalogList, matching: find.byType(Scrollable)),
-    )
-    .position;
 
 /// Общая прокрутка параметров поиска и выдачи каталога намерений.
 ScrollPosition _catalogPageScroll(WidgetTester tester) => tester

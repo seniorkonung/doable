@@ -287,7 +287,7 @@
     - меняются `test/app/navigation/app_shell_state_test.dart`, `app_shell_graph_generation_test.dart`.
   - **Размер:** M.
 
-- [ ] 3.2 Провести через общие шаги каталога сценарии оболочки: системное «назад», страницы поверх, сброс операции, вход в пункт и нижние вставки
+- [x] 3.2 Провести через общие шаги каталога сценарии оболочки: системное «назад», страницы поверх, сброс операции, вход в пункт и нижние вставки
   - **Критерии приёмки:**
     - Шаги получают `intentionCatalogTitleField`, `intentionCatalogTagFilterControl`, `intentionCatalogList` и `shownIntentionCatalogRows` — названия построенных строк сверху вниз.
     - `app_shell_back_test.dart`, `app_shell_pages_above_test.dart` с `app_shell_page_matrix.dart`, `app_shell_operation_reset_test.dart`, `app_shell_test.dart` и `app_shell_layout_test.dart` находят поле, кнопку условий, список и строки только этими шагами: локальных `_titleFilter`, `_catalogList`, `_catalogRow`, `_catalogRows`, `_catalogOffset`, `_catalogListScroll` нет, а `_summary` ищет только строки экранов выбора. `app_shell_test.dart` проверяет вход в пункт по `shownIntentionCatalogParameters` и `intentionCatalogTitleField`, а не по строкам `catalogScopeLabel` и `catalogFilterLabel`.

@@ -33,9 +33,32 @@ typedef ShownIntentionCatalogParameters = ({
 final _page = find.byType(IntentionCatalogPage);
 final _scopeControl = find.byKey(const ValueKey('catalog-scope-control'));
 final _orderControl = find.byKey(const ValueKey('catalog-order-control'));
-final _titleField = find.byKey(const ValueKey('catalog-filter-field'));
-final _tagConditionsAdd = find.byKey(
+
+/// Поле, в которое человек вводит название для поиска в каталоге намерений.
+///
+/// Для проверок его размещения и доступности: видимости, фокуса и соседства с
+/// другими элементами. Вводить название и читать его надо шагами
+/// [enterIntentionCatalogTitle] и [shownIntentionCatalogParameters].
+final intentionCatalogTitleField = find.byKey(
+  const ValueKey('catalog-filter-field'),
+);
+
+/// Элемент, которым человек открывает панель условий по тегам каталога
+/// намерений.
+///
+/// Для проверок его размещения и для сценариев, которые открывают панель
+/// фильтра сами. Добавлять условие надо шагом
+/// [addIntentionCatalogTagCondition].
+final intentionCatalogTagFilterControl = find.byKey(
   const ValueKey('intention-tag-conditions-add'),
+);
+
+/// Прокручиваемый список выдачи открытого каталога намерений.
+///
+/// Для проверок его размещения и жестов по списку. Прокрутку читают шаги
+/// [intentionCatalogListPosition] и [shownIntentionCatalogOffsets].
+final intentionCatalogList = find.byKey(
+  const PageStorageKey<String>('intention-catalog-list'),
 );
 
 /// Строки выдачи открытого каталога намерений.
@@ -43,6 +66,16 @@ final intentionCatalogRows = find.descendant(
   of: _page,
   matching: find.byType(IntentionSummaryView),
 );
+
+/// Названия построенных строк выдачи открытого каталога намерений сверху вниз.
+///
+/// Строки за краем видимой части, которые список уже построил, тоже входят.
+List<String> shownIntentionCatalogRows(WidgetTester tester) => [
+  for (final row in tester.widgetList<IntentionSummaryView>(
+    intentionCatalogRows,
+  ))
+    row.title,
+];
 
 /// Строка выдачи открытого каталога намерений с названием [title].
 Finder intentionCatalogRow(String title) => find.descendant(
@@ -88,7 +121,7 @@ Future<void> selectIntentionCatalogOrder(
 
 /// Вводит [title] фильтром названия.
 Future<void> enterIntentionCatalogTitle(WidgetTester tester, String title) =>
-    tester.enterText(_titleField, title);
+    tester.enterText(intentionCatalogTitleField, title);
 
 /// Добавляет условие [requirement] по тегу [tag] из панели фильтра и закрывает
 /// её, не дожидаясь выдачи с этим условием.
@@ -102,7 +135,7 @@ Future<void> addIntentionCatalogTagCondition(
   RootPageTap tap = tapWhenFound,
   RootPageWait waitFor = pumpUntilFound,
 }) async {
-  await tap(tester, _tagConditionsAdd);
+  await tap(tester, intentionCatalogTagFilterControl);
   await tester.pump(_transition);
   final row = find.byKey(ValueKey('tags-panel-row-${tag.toCanonicalString()}'));
   for (var cycle = 0; cycle < tagConditionCycles(requirement); cycle++) {
@@ -110,7 +143,7 @@ Future<void> addIntentionCatalogTagCondition(
   }
   // Панель фильтра применяет условие сразу, а «назад» только закрывает её.
   await tester.binding.handlePopRoute();
-  await waitFor(tester, _tagConditionsAdd.hitTestable());
+  await waitFor(tester, intentionCatalogTagFilterControl.hitTestable());
 }
 
 /// Параметры поиска открытого каталога. Каталог, который показывает другие
@@ -122,7 +155,10 @@ ShownIntentionCatalogParameters shownIntentionCatalogParameters(
   return (
     scope: _shownChoice(_scopeControl, _scopeLabels(texts)),
     order: _shownChoice(_orderControl, _orderLabels(texts)),
-    titleFilter: tester.widget<TextField>(_titleField).controller!.text,
+    titleFilter: tester
+        .widget<TextField>(intentionCatalogTitleField)
+        .controller!
+        .text,
     tagConditions: find
         .descendant(
           of: _page,
@@ -138,9 +174,7 @@ ScrollPosition intentionCatalogListPosition(WidgetTester tester) => tester
     .state<ScrollableState>(
       find
           .descendant(
-            of: find.byKey(
-              const PageStorageKey<String>('intention-catalog-list'),
-            ),
+            of: intentionCatalogList,
             matching: find.byType(Scrollable),
           )
           .first,

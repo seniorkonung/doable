@@ -42,6 +42,7 @@ import '../../long_term_relation/presentation/relation_graph_test_support.dart'
 import '../../support/app_root_pages.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
+import '../../support/intention_catalog_controls.dart';
 import '../../support/intention_options.dart';
 
 const _failure =
@@ -319,7 +320,7 @@ void main() {
     // Каталог возвращается на место вместе с анимацией закрытия страницы;
     // «+ Тег» нажимаем, как только кнопка доступна, а страница ещё не
     // освобождена.
-    final add = find.byKey(const ValueKey('intention-tag-conditions-add'));
+    final add = intentionCatalogTagFilterControl;
     await _until(tester, () => add.hitTestable().evaluate().isNotEmpty);
     expect(
       find.byType(IntentionDetailsPage, skipOffstage: false),

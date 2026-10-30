@@ -11,6 +11,8 @@ import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalo
 import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openInMemoryLocalDatabase;
+import 'package:doable/src/intention/application/intention_catalog.dart'
+    hide IntentionCatalogPage;
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:flutter/material.dart';
@@ -19,11 +21,10 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../support/app_root_pages.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
+import '../../support/intention_catalog_controls.dart';
 import '../../support/quick_creation.dart';
 
 void main() {
-  final l10n = lookupAppLocalizations(const Locale('en'));
-
   testWidgets('пункт календаря открывает каталог дневных выборов', (
     tester,
   ) async {
@@ -57,8 +58,15 @@ void main() {
     expect(find.byType(IntentionCatalogPage), findsOneWidget);
     expect(find.byType(HomePage), findsNothing);
     expect(_selected(tester), AppDestination.intentionGraph);
-    expect(find.text(l10n.catalogScopeLabel), findsOneWidget);
-    expect(find.text(l10n.catalogFilterLabel), findsOneWidget);
+    // Вход в пункт показывает каталог с начальными параметрами и полем
+    // названия для поиска.
+    expect(shownIntentionCatalogParameters(tester), (
+      scope: IntentionScope.active,
+      order: IntentionCatalogOrder.createdAtDescending,
+      titleFilter: '',
+      tagConditions: 0,
+    ));
+    expect(intentionCatalogTitleField, findsOneWidget);
     await openQuickCreation(
       tester,
       QuickCreationMode.intention,
