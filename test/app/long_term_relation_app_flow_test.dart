@@ -20,10 +20,14 @@ import 'package:doable/src/intention/presentation/details/intention_options.dart
 import 'package:doable/src/intention/presentation/edit/intention_edit_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/intention/presentation/picker/intention_picker_row.dart';
+import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_page.dart';
+import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter/material.dart';
+import 'package:drift/native.dart' show DatabaseSetup;
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../support/app_root_pages.dart';
 import '../support/graph_seed.dart';
@@ -444,6 +448,194 @@ void main() {
       expect(_pickerRow(_walk), findsNothing);
     },
   );
+
+  testWidgets(
+    'восстановление из поиска при создании связи открывает связь с её собственными данными, а «назад» возвращает страницу начала создания',
+    (tester) async {
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      tester.binding.platformDispatcher.localesTestValue = const [Locale('ru')];
+      addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
+      final l10n = lookupAppLocalizations(const Locale('ru'));
+
+      final semantics = tester.ensureSemantics();
+      tester.view.physicalSize = const Size(1200, 6000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      final storage = (await tester.runAsync(LocalDatabaseHarness.fileBacked))!;
+      addTearDown(storage.dispose);
+      await tester.runAsync(() async {
+        await _seedArchivedSwimRelation(await storage.openReadyDatabase());
+        await storage.closePersistenceObjectGraph();
+      });
+      final diagnostics = InMemoryDiagnosticsSink();
+      late sqlite.Database raw;
+      final runtime = _fileRuntime(
+        storage,
+        diagnostics: diagnostics,
+        setup: (database) => raw = database,
+      );
+      addTearDown(() async {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await runtime.shutdown();
+      });
+
+      await tester.pumpWidget(MainApp(runtime: runtime));
+      await openIntentionGraph(tester, waitFor: _pumpUntilFound);
+      await _pumpUntilFound(tester, find.text(_healthy));
+
+      // Создание начато на странице «Быть здоровым»: в форме вид «можно»,
+      // приоритет P4 и описание, которых нет у архивированной связи.
+      await _openIntention(tester, _healthy);
+      await _chooseDetailsTab(tester, l10n.detailsRelationsTab);
+      final create = find.byKey(const ValueKey('intention-relations-add'));
+      await _ensureVisible(tester, create);
+      await tester.tap(create);
+      final selectRelated = find.byKey(
+        const ValueKey('relation-editor-select-related'),
+      );
+      await _pumpUntilFound(tester, selectRelated);
+      for (final key in [
+        'relation-editor-type-can',
+        'relation-editor-priority-p4',
+      ]) {
+        final choice = find.byKey(ValueKey(key));
+        await _ensureVisible(tester, choice);
+        await tester.tap(choice);
+        await tester.pump();
+      }
+      await tester.enterText(
+        find.byKey(const ValueKey('relation-editor-description')),
+        'Описание из формы',
+      );
+      await _ensureVisible(tester, selectRelated);
+      await tester.tap(selectRelated);
+      await _pumpUntilFound(tester, _pickerRow(_swim));
+      await tester.pumpAndSettle(const Duration(milliseconds: 1));
+      expect(_pickerMarks(tester, l10n, _swim), [
+        l10n.intentionPickerPairArchived,
+      ]);
+
+      // Подтверждение предупреждает о том, что из формы не сохранится.
+      await tester.tap(
+        find.descendant(of: _pickerRow(_swim), matching: find.text(_swim)),
+      );
+      await _pumpUntilFound(
+        tester,
+        find.text(l10n.participantPickerRestoreTitle),
+      );
+      await tester.pumpAndSettle(const Duration(milliseconds: 1));
+      expect(
+        find.text(
+          l10n.participantPickerRestoreWarning(
+            [
+              l10n.participantPickerRestoreWarningCanType,
+              l10n.participantPickerRestoreWarningPriority,
+              l10n.participantPickerRestoreWarningDescription,
+            ].join(', '),
+          ),
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(find.text(l10n.participantPickerRestoreConfirm));
+
+      // Вместо формы открыта та же связь с собственными данными.
+      await _pumpUntilFound(
+        tester,
+        find.byKey(const ValueKey('relation-details-phrase')),
+      );
+      await tester.pumpAndSettle(const Duration(milliseconds: 1));
+      expect(
+        _textByKey(tester, 'relation-details-phrase'),
+        l10n.relationNeighborhoodNeedPhrase(_healthy, _swim),
+      );
+      expect(
+        _textByKey(tester, 'relation-details-type'),
+        l10n.relationNeighborhoodTypeNeed,
+      );
+      expect(_textByKey(tester, 'relation-details-priority'), 'P2');
+      expect(
+        _textByKey(tester, 'relation-details-description'),
+        _swimDescription,
+      );
+      expect(
+        _textByKey(tester, 'relation-details-scope'),
+        l10n.relationNeighborhoodRelationActive,
+      );
+      expect(
+        raw.select(
+          'SELECT id, source_intention_id, related_intention_id, type, '
+          'priority, description, is_archived FROM long_term_relations',
+        ),
+        [
+          {
+            'id': _id(_swimRelationNumber),
+            'source_intention_id': _id(1),
+            'related_intention_id': _id(2),
+            'type': 'need',
+            'priority': 2,
+            'description': _swimDescription,
+            'is_archived': 0,
+          },
+        ],
+      );
+      expect(find.byType(RelationParticipantPickerPage), findsNothing);
+      expect(find.byType(RelationEditorPage), findsNothing);
+
+      // Успех предъявлен один раз и не повторяется после закрытия сообщения.
+      final restored = find.text(
+        l10n.graphOperationMessage(
+          l10n.graphOperationRestore,
+          l10n.graphOperationRelation,
+          l10n.relationRestored,
+        ),
+      );
+      await _pumpUntilFound(tester, restored);
+      expect(restored, findsOneWidget);
+      await _dismissOperationMessage(tester);
+      expect(restored, findsNothing);
+      expect(
+        diagnostics.events
+            .whereType<LongTermRelationCommandDiagnosticsEvent>()
+            .where((event) => event.status is DiagnosticsSucceeded)
+            .map((event) => event.commandType),
+        [LongTermRelationCommandDiagnosticsType.restore],
+      );
+
+      // «Назад» возвращает страницу начала создания, а поиска и формы нет в
+      // истории: следующее «назад» уходит в каталог.
+      await tester.binding.handlePopRoute();
+      await _pumpUntilDetailsTitle(tester, _healthy);
+      expect(
+        find.byType(RelationParticipantPickerPage, skipOffstage: false),
+        findsNothing,
+      );
+      expect(
+        find.byType(RelationEditorPage, skipOffstage: false),
+        findsNothing,
+      );
+      await _chooseDetailsTab(tester, l10n.detailsRelationsTab);
+      await _pumpUntilFound(
+        tester,
+        _relationRow(l10n.relationNeighborhoodNeedPhrase(_healthy, _swim)),
+      );
+      expect(
+        find.bySemanticsLabel(l10n.detailsRelationsTabSemantic(1, 0)),
+        findsOneWidget,
+      );
+
+      await tester.binding.handlePopRoute();
+      await _pumpUntilFound(
+        tester,
+        find.byType(catalog_page.IntentionCatalogPage),
+      );
+      expect(
+        find.byType(RelationEditorPage, skipOffstage: false),
+        findsNothing,
+      );
+      semantics.dispose();
+    },
+  );
 }
 
 const _healthy = 'Быть здоровым';
@@ -483,6 +675,33 @@ Future<void> _seedOccupiedPairs(AppDatabase database) =>
       }
     });
 
+const _swimRelationNumber = 101;
+const _swimDescription = '  Утреннее плавание\n🏊  ';
+
+/// Активные намерения «Быть здоровым» и «Плавать» и архивированная связь
+/// «Чтобы быть здоровым, нужно плавать» с приоритетом P2 и описанием.
+Future<void> _seedArchivedSwimRelation(AppDatabase database) =>
+    seedGraph(database, () async {
+      for (final (number, title) in [(1, _healthy), (2, _swim)]) {
+        await database.customStatement(
+          'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, 0, 0, ?, ?)',
+          [_id(number), title, number, number],
+        );
+      }
+      await database.customStatement(
+        'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, description, is_archived) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [
+          _id(_swimRelationNumber),
+          _id(1),
+          _id(2),
+          'need',
+          2,
+          _swimDescription,
+          1,
+        ],
+      );
+    });
+
 Finder _pickerRow(String title) => find.byWidgetPredicate(
   (widget) => widget is IntentionPickerRow && widget.summary.title == title,
   description: 'строка поиска участника «$title»',
@@ -516,9 +735,11 @@ List<String> _pickerMarks(
 AppRuntime _fileRuntime(
   LocalDatabaseHarness database, {
   required InMemoryDiagnosticsSink diagnostics,
+  DatabaseSetup? setup,
 }) => AppRuntime(
   quickCreationModeStore: InMemoryQuickCreationModeStore(),
-  connectionFactory: () => openFileBackedLocalDatabase(database.databaseFile),
+  connectionFactory: () =>
+      openFileBackedLocalDatabase(database.databaseFile, setup: setup),
   diagnosticsSink: diagnostics,
 );
 
