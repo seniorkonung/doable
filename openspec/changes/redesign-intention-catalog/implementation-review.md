@@ -5,15 +5,15 @@
 **Format version:** 1
 **Result:** No unresolved findings
 **Coverage status:** Complete
-**Summary:** Фаза 1 переносит экраны выбора на общий модуль поиска в соответствии с задачами 1.1–1.8.
+**Summary:** Задачи 1.9–1.11 завершают фазу 1. Хранитель места удерживает первую видимую строку, когда верх списка приходится на промежуток между строками. Пауза ввода, загрузка и отказы первой порции сразу встают наверх. Повторяющиеся случаи `IntentionSearchKind` удалены без потери покрытия. Полная проверка проекта проходит.
 
 ## Review target
 
-- **Baseline ref:** a1a2f06f86a3633aa9ab0bf43bc996741ce8402b
-- **Base commit:** a1a2f06f86a3633aa9ab0bf43bc996741ce8402b
-- **Reviewed head:** fdbfd885c4fd62d08e79d00d3b867d80df48c37a
-- **Target commits:** ["2896be464ebc7639f525fea1086de72cf1c9499c", "6f5e6fb31c1a3545b9a212fe6b9326a53805e7f1", "77b519f59c6155fbafb0e863b7a543d81240cd1b", "0365c911cc3f93e0bea396906553a53cff0d1d46", "2c6af558e4d74122d4d895f5cef12fe533864dc5", "54a95220606d8a3c67e71c6ed3c4bc7353041512", "31a3a7c31256e375c14f388ca0ef20d658478a55", "5b3064ed169add7daf1bf52d4a14115e86cdb7ce", "fdbfd885c4fd62d08e79d00d3b867d80df48c37a"]
-- **Reviewable paths:** ["lib/l10n/app_en.arb", "lib/l10n/app_localizations.dart", "lib/l10n/app_localizations_en.dart", "lib/l10n/app_localizations_ru.dart", "lib/l10n/app_ru.arb", "lib/src/intention/presentation/catalog/intention_search_results.dart", "lib/src/intention/presentation/picker/intention_picker_kind.dart", "lib/src/intention/presentation/picker/intention_picker_row.dart", "lib/src/intention/presentation/picker/intention_picker_view.dart", "lib/src/intention/presentation/search/intention_list_header.dart", "lib/src/intention/presentation/search/intention_row_content.dart", "lib/src/intention/presentation/search/intention_search_bar.dart", "lib/src/intention/presentation/search/intention_search_kind.dart", "lib/src/intention/presentation/search/intention_search_list.dart", "lib/src/intention/presentation/search/results_scroll_keeper.dart", "lib/src/intention/presentation/search/show_and_sort_sheet.dart", "openspec/changes/redesign-intention-catalog/task-profiles.md", "openspec/changes/redesign-intention-catalog/tasks.md", "test/intention/presentation/picker/intention_picker_view_test.dart", "test/intention/presentation/search/intention_search_kind_test.dart", "test/intention/presentation/search/intention_search_list_test.dart", "test/intention/presentation/search/show_and_sort_sheet_test.dart"]
+- **Baseline ref:** 4cd590d54d7a120b0b0e2dcf4c15be278cde6a6d
+- **Base commit:** 4cd590d54d7a120b0b0e2dcf4c15be278cde6a6d
+- **Reviewed head:** 2f87e17b0151558f0336c9aae5390901702ca22b
+- **Target commits:** ["3343a0de58f869e053b94e24410d3b80e3f9314a", "d5512a523b621b09ad9f921146c63ca9f76ff29c", "ba20efd907d256f8e713a4b2ac2b7361fab1633c", "2f87e17b0151558f0336c9aae5390901702ca22b"]
+- **Reviewable paths:** ["lib/src/intention/presentation/search/results_scroll_keeper.dart", "openspec/changes/redesign-intention-catalog/task-profiles.md", "openspec/changes/redesign-intention-catalog/tasks.md", "test/intention/presentation/search/intention_search_kind_test.dart", "test/intention/presentation/search/intention_search_list_test.dart"]
 - **OpenSpec change:** redesign-intention-catalog
 - **OpenSpec schema:** intent-driven
 - **Target scope:** User-requested bounded range
@@ -22,56 +22,37 @@
 
 ## Reviewed increment
 
-### U1 · Разбор назначения и правило содержания строки в модуле поиска
+### U1 · Удержание первой видимой строки, когда верх списка в промежутке между строками
 
-- **Work items:** ["1.1", "1.2"]
-- **Requirements and scenarios:** ["intention-management: Строка результата поиска намерений", "intention-management: Экран поиска для выбора намерения", "design: решение 1", "design: решение 6 (IntentionRowContent)"]
-- **Affected boundary:** Экраны выбора действия, исходного намерения и участника; модуль `presentation/search/`.
-- **Implementation target:** ["lib/src/intention/presentation/search/intention_search_kind.dart", "lib/src/intention/presentation/picker/intention_picker_kind.dart", "lib/src/intention/presentation/search/intention_row_content.dart", "lib/src/intention/presentation/picker/intention_picker_row.dart", "test/intention/presentation/search/intention_search_kind_test.dart"]
-- **Applicable constraints and non-goals:** Ключи и тексты экранов выбора не меняются; экран выбора не принимает назначение каталога; один исчерпывающий разбор назначения в модуле поиска.
-- **Excluded change scope:** Строка каталога `CatalogRow`/`IntentionCatalogRow` — фаза 4.
+- **Work items:** ["1.9"]
+- **Requirements and scenarios:** ["intention-management: Сохранение состояния загруженного каталога", "design: решение 5"]
+- **Affected boundary:** Выдача экранов выбора при согласовании с подтверждёнными операциями без смены запроса; общий `ResultsScrollKeeper`, которым пользуется и прежняя выдача каталога.
+- **Implementation target:** ["lib/src/intention/presentation/search/results_scroll_keeper.dart", "test/intention/presentation/search/intention_search_list_test.dart"]
+- **Applicable constraints and non-goals:** Соседние строки-кандидаты и остальное поведение хранителя не меняются. Прежняя выдача каталога без промежутков между строками ведёт себя как раньше.
 
-### U2 · Общий хранитель места и общая выдача
+### U2 · Состояния вместо строк сразу сверху
 
-- **Work items:** ["1.3", "1.4"]
-- **Requirements and scenarios:** ["intention-management: Сохранение состояния загруженного каталога", "intention-management: Пустая выдача поиска намерений", "intention-management: Состояния получения каталогов и подробных данных намерений", "design: решение 5"]
-- **Affected boundary:** Выдача экранов выбора и прежняя выдача каталога при согласовании с подтверждёнными операциями и смене параметров.
-- **Implementation target:** ["lib/src/intention/presentation/search/results_scroll_keeper.dart", "lib/src/intention/presentation/catalog/intention_search_results.dart", "lib/src/intention/presentation/search/intention_search_list.dart", "lib/src/intention/presentation/picker/intention_picker_view.dart", "test/intention/presentation/search/intention_search_list_test.dart", "test/intention/presentation/picker/intention_picker_view_test.dart"]
-- **Applicable constraints and non-goals:** Прежняя страница каталога ведёт себя как раньше; экраны выбора меняют только удержание видимой строки при согласовании; новая выдача начинается сверху.
-- **Excluded change scope:** Пустые состояния каталога и снятие `PageStorage` вместе с прежней страницей — фаза 4.
+- **Work items:** ["1.10"]
+- **Requirements and scenarios:** ["intention-management: Состояния получения каталогов и подробных данных намерений", "design: решение 5 (мгновенный переход наверх)"]
+- **Affected boundary:** Выдача экранов выбора при переходе к паузе ввода, загрузке или отказу первой порции во время прокрутки.
+- **Implementation target:** ["lib/src/intention/presentation/search/results_scroll_keeper.dart", "test/intention/presentation/search/intention_search_list_test.dart"]
+- **Applicable constraints and non-goals:** Прокрутка в `IntentionSearchList` остаётся одной для всех состояний. Удержание строки при согласовании, начало новой выдачи сверху и прежняя выдача каталога не меняются.
 
-### U3 · Общий лист, строка поиска и заголовок списка
+### U3 · Удаление повторяющихся проверок `IntentionSearchKind`
 
-- **Work items:** ["1.5", "1.6"]
-- **Requirements and scenarios:** ["intention-management: Параметры показа в поиске намерений", "intention-management: Меню параметров показа в поиске намерений", "intention-management: Заголовок списка поиска намерений", "intention-management: Кнопка фильтра по тегам в поиске намерений"]
-- **Affected boundary:** Шапка под заголовком экрана выбора и лист «Показать и упорядочить».
-- **Implementation target:** ["lib/src/intention/presentation/search/show_and_sort_sheet.dart", "lib/src/intention/presentation/search/intention_search_bar.dart", "lib/src/intention/presentation/search/intention_list_header.dart", "lib/src/intention/presentation/picker/intention_picker_view.dart", "test/intention/presentation/search/show_and_sort_sheet_test.dart"]
-- **Applicable constraints and non-goals:** Вид, ключи и поведение экранов выбора не меняются.
-- **Excluded change scope:** Строка «Показать», числа по охватам и сброс охвата — фазы 2 и 4.
-
-### U4 · Подпись типа без ограничения
-
-- **Work items:** ["1.7"]
-- **Requirements and scenarios:** ["intention-management: Параметры показа в поиске намерений / Крупный текст переносится в строках и меню", "intention-management: Меню параметров показа в поиске намерений / Меню типа показывает количества независимо от выбранного типа"]
-- **Affected boundary:** Строка «Тип» и её меню в листе экранов выбора на русском и английском.
-- **Implementation target:** ["lib/l10n/app_en.arb", "lib/l10n/app_ru.arb", "lib/l10n/app_localizations.dart", "lib/l10n/app_localizations_en.dart", "lib/l10n/app_localizations_ru.dart", "test/intention/presentation/search/show_and_sort_sheet_test.dart", "test/intention/presentation/picker/intention_picker_view_test.dart"]
-- **Applicable constraints and non-goals:** Заголовок списка по-прежнему называет тип «Все» / `All`; наборы ключей ru и en симметричны.
-
-### U5 · Готовность фазы 1
-
-- **Work items:** ["1.8"]
-- **Requirements and scenarios:** ["plan.md: Phase 1 / Ready to advance"]
-- **Affected boundary:** Вся фаза 1: экраны выбора на общем модуле, прежний каталог без изменений.
-- **Implementation target:** ["test/intention/presentation/search/intention_search_list_test.dart", "test/intention/presentation/search/show_and_sort_sheet_test.dart", "test/intention/presentation/picker/intention_picker_view_test.dart"]
-- **Applicable constraints and non-goals:** Без проверок на устройстве; полная проверка проекта `mise run check`.
+- **Work items:** ["1.11"]
+- **Requirements and scenarios:** ["tasks.md: 1.11"]
+- **Affected boundary:** Набор тестов модуля поиска намерений; код приложения не меняется.
+- **Implementation target:** ["test/intention/presentation/search/intention_search_kind_test.dart"]
+- **Applicable constraints and non-goals:** Остаются проверки варианта каталога. Префиксы ключей экранов выбора закреплены тестами экранов выбора. Называние типа закреплено доступными названиями в `intention_picker_row_test.dart`.
 
 ## Pass coverage
 
 | Pass | Status | Evidence or limitation |
 |---|---|---|
-| Independent decision review | Complete | Один свежий изолированный ревьюер (Sonnet, `implementation-decision-review`) на объединённую группу U1–U5 со всеми 20 путями поставки и тестов диапазона; планирующие артефакты ему не передавались. |
-| OpenSpec conformance | Complete | В рабочем дереве на голове fdbfd885c4fd62d08e79d00d3b867d80df48c37a без незакоммиченных изменений: `mise run check` — `flutter analyze` без замечаний, 3836 обычных и 18 процессных тестов прошли; `mise run codegen-check` — код сгенерирован актуально; `openspec validate redesign-intention-catalog --strict --json` — valid. Задачи 1.1–1.8 сопоставлены с кодом и тестами диапазона. |
-| Code quality | Complete | Пять осей по всем путям поставки на голове fdbfd885c4fd62d08e79d00d3b867d80df48c37a с вызывающими `intention_catalog_page.dart` и тестами выдачи каталога. |
+| Independent decision review | Complete | Работали два свежих изолированных ревьюера (Sonnet, `implementation-decision-review`), планирующие артефакты им не передавались. Первый получил группу перекрытия U1+U2 с путями `results_scroll_keeper.dart` и `intention_search_list_test.dart`; в его бриф вошла и цель U3. Второй отдельно проверил U3 с путём `intention_search_kind_test.dart`. Находок нет. |
+| OpenSpec conformance | Complete | Проверки шли в рабочем дереве на голове 2f87e17b0151558f0336c9aae5390901702ca22b без незакоммиченных изменений. `mise run check`: `dart format` без изменений, `flutter analyze` без замечаний, 3835 обычных и 18 процессных тестов прошли. `openspec validate redesign-intention-catalog --strict --json` — valid. Когда `results_scroll_keeper.dart` временно вернули к базе 4cd590d54d7a120b0b0e2dcf4c15be278cde6a6d, три новых теста `intention_search_list_test.dart` упали; после восстановления файла дерево снова чистое. |
+| Code quality | Complete | Пять осей проверены по `results_scroll_keeper.dart` на голове, вместе с вызывающими `intention_search_list.dart` и `intention_search_results.dart` и с построением запроса в `intention_catalog_view_model.dart`. |
 
 ## Findings
 
@@ -79,4 +60,11 @@ No unresolved findings remain in the implementation review.
 
 ## Review coverage
 
-Проверены все девять коммитов диапазона и все 22 изменённых пути. Пути поставки и тестов прочитаны на голове и сопоставлены с базой: `IntentionSearchKind` и удалённый `IntentionPickerKind`, `IntentionRowContent` и `IntentionPickerRow`, `ResultsScrollKeeper`, прежняя выдача каталога `intention_search_results.dart` с её единственным вызывающим `intention_catalog_page.dart`, `IntentionSearchList` вместо удалённого `IntentionPickerResults`, общий лист «Показать и упорядочить», `IntentionSearchBar`, `IntentionListHeader`, `IntentionPickerView`, изменения ARB и сгенерированной локализации. Проверено, что разбор назначений в представлении остался только в `IntentionSearchKind`, а прежних `IntentionPickerKind` и `intentionPickerKeyPrefix` в `lib/` нет. Удаление обработки смены назначения в прежней выдаче каталога недостижимо и не является находкой: страница передаёт постоянное `BrowseIntentionCatalog()`. Требования delta-спецификации к экранам выбора, строке результата, пустой выдаче, заголовку списка, листу, меню и типу сопоставлены с кодом и тестами. Задачи будущих фаз не считались обязательствами диапазона. `task-profiles.md` и отметки `tasks.md` — планирующие свидетельства. Данных, схемы, безопасности и внешних зависимостей диапазон не касается.
+Проверены все четыре коммита диапазона и все пять изменённых путей.
+
+- **U1.** Условие `extent.end > currentOffset` выбирает первую построенную строку, нижний край которой ниже верха списка. Если верх списка внутри строки, результат тот же, что у прежнего условия, в том числе на точной границе строк. Если верх в промежутке, сдвиг внутри строки отрицателен и проходит через существующие пути `exact.start + offsetWithinItem` и приближения с ограничением `_jumpWithinExtent`.
+- **U2.** `_showsStatusInsteadOfRows` повторяет выбор `IntentionSearchList` исчерпывающим `switch` с теми же параметрами `skipLoadingOnReload`/`skipLoadingOnRefresh`. Поэтому новое состояние модели не скомпилируется, пока его не классифицируют.
+- **Прежняя страница каталога.** Хранитель там прыгает наверх у ещё не перестроенного `ListView` и может записать 0 в `PageStorage`. Видимого изменения поведения это не даёт: каждая сборка модели создаёт новый `IntentionCatalogQuery` (`intention_catalog_view_model.dart:113`), а состояния вместо строк возникают только в сборке и при первой порции. Значит, любая выдача после такого состояния начинается заново, и хранилище смещения заменяется.
+- **U3.** Префиксы `daily-choice-action`, `daily-choice-source` и `participant-picker` используются поиском по ключам в тестах экранов выбора. Называние типа для всех трёх назначений проверяют доступные названия в `intention_picker_row_test.dart`.
+- **Планирование.** Отметки 1.9–1.11 в `tasks.md` и `task-profiles.md` — планирующие свидетельства. Задачи будущих фаз не считались обязательствами диапазона.
+- **Не затронуто.** Данных, схемы, безопасности и внешних зависимостей диапазон не касается.
