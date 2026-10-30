@@ -5,6 +5,9 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
+import 'package:doable/src/long_term_relation/application/relation_pair_probe.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'catalog_reconciliation_test_support.dart';
@@ -448,4 +451,102 @@ void main() {
       expect(current.nextCursor, isNull);
     },
   );
+
+  test('занимающие связи удержанной continuation входят в выдачу вместе с её строками', () async {
+    final repository = ControlledCatalogRepository();
+    final container = reconciliationCatalogContainer(
+      repository,
+      pageSize: 2,
+      prefetchRemaining: 1,
+    );
+    final provider = intentionCatalogViewModelProvider(
+      SelectRelationParticipant(
+        selectionContext: RelationParticipantSelectionContext.activeRelation,
+        session: IntentionSearchSession(),
+        pairProbe: RelationPairProbe(
+          counterpartId: testSummary(index: 9).id,
+          candidateRole: RelationParticipantRole.related,
+        ),
+      ),
+    );
+    final subscription = container.listen(
+      provider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+    addTearDown(container.dispose);
+
+    final occupant = PairOccupant(
+      relationId: testRelation(
+        sourceIntentionId: testSummary(index: 9).id,
+        relatedIntentionId: testSummary(index: 1).id,
+      ).id,
+      scope: RelationScope.archived,
+    );
+    repository.complete(
+      0,
+      ResultSuccess(
+        IntentionCatalogFirstPage(
+          items: [testSummary(index: 4), testSummary(index: 3)],
+          totalCount: 4,
+          nextCursor: const TestCatalogCursor(),
+          revision: const TestCatalogRevision(1),
+        ),
+      ),
+    );
+    await container.read(provider.future);
+
+    final load = container
+        .read(provider.notifier)
+        .loadNextPageIfNeeded(visibleIndex: 0);
+    await waitForCatalogQueries(repository, 2);
+    repository.complete(
+      1,
+      ResultSuccess(
+        IntentionCatalogContinuationPage(
+          items: [testSummary(index: 2), testSummary(index: 1)],
+          nextCursor: null,
+          revision: const TestCatalogRevision(2),
+          pairOccupants: {testSummary(index: 1).id: occupant},
+        ),
+      ),
+    );
+    await load;
+
+    expect(
+      container.read(provider).requireValue,
+      isA<IntentionCatalogLoaded>()
+          .having((loaded) => loaded.items, 'строки', hasLength(2))
+          .having(
+            (loaded) => loaded.pairOccupants,
+            'занимающие связи',
+            isEmpty,
+          ),
+    );
+
+    await completeCatalogCommand(
+      container,
+      repository,
+      const CreateIntention(title: 'Новое', description: null),
+      IntentionSaved(
+        testIntention(index: 5, title: 'Новое'),
+        catalogMutation: IntentionCatalogCreated(
+          revision: const TestCatalogRevision(2),
+          entry: TestCatalogEntrySnapshot(
+            testSummary(index: 5, title: 'Новое'),
+          ),
+        ),
+      ),
+    );
+
+    expect(
+      container.read(provider).requireValue,
+      isA<IntentionCatalogLoaded>()
+          .having((loaded) => loaded.items, 'строки', hasLength(5))
+          .having((loaded) => loaded.pairOccupants, 'занимающие связи', {
+            testSummary(index: 1).id: occupant,
+          }),
+    );
+  });
 }

@@ -7,6 +7,7 @@ import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_revision.dart';
 import '../../../graph/application/personal_graph_repository.dart';
 import '../../../graph/application/personal_graph_repository_provider.dart';
+import '../../../long_term_relation/application/relation_pair_probe.dart';
 import '../../../tag/application/tag_change.dart';
 import '../../../tag/domain/tag.dart';
 import '../../../tag/domain/tag_id.dart';
@@ -361,7 +362,8 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
             counts.inScope(query.scope).matching(query.readinessFilter),
       _ => false,
     };
-    if (!countsAgree) {
+    final pairOccupants = _pairOccupantsFor(query, page);
+    if (!countsAgree || pairOccupants == null) {
       return IntentionCatalogUnexpected(selection: selection, query: query);
     }
     if (page.items.isEmpty) {
@@ -387,8 +389,17 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       counts: page.counts,
       nextCursor: page.nextCursor,
       revision: page.revision,
+      pairOccupants: pairOccupants,
     );
   }
+
+  /// Занимающие связи строк [page] выдачи по [query]; `null` — запрос несёт
+  /// пробу пары, а порция не ответила на неё картой. Запрос без пробы
+  /// отметок не ждёт.
+  Map<IntentionId, PairOccupant>? _pairOccupantsFor(
+    IntentionCatalogQuery query,
+    IntentionCatalogPage page,
+  ) => query.pairProbe == null ? const {} : page.pairOccupants;
 
   IntentionCatalogState _mapFailure(
     IntentionCatalogSelection selection,
@@ -483,9 +494,11 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     IntentionCatalogLoaded confirmed,
     IntentionCatalogPage page,
   ) {
+    final pageOccupants = _pairOccupantsFor(confirmed.query, page);
     if (page is! IntentionCatalogContinuationPage ||
         page.items.length > confirmed.query.pageSize ||
-        page.nextCursor != null && page.items.isEmpty) {
+        page.nextCursor != null && page.items.isEmpty ||
+        pageOccupants == null) {
       return _withContinuation(
         confirmed,
         const IntentionCatalogContinuationUnexpected(),
@@ -494,9 +507,13 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
 
     final knownIds = confirmed.items.map((item) => item.id).toSet();
     final combined = [...confirmed.items];
+    final pairOccupants = {...confirmed.pairOccupants};
     for (final item in page.items) {
       if (knownIds.add(item.id)) {
         combined.add(item);
+        if (pageOccupants[item.id] case final occupant?) {
+          pairOccupants[item.id] = occupant;
+        }
       }
     }
     if (combined.length > confirmed.totalCount) {
@@ -522,6 +539,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       counts: confirmed.counts,
       nextCursor: page.nextCursor,
       revision: confirmed.revision,
+      pairOccupants: pairOccupants,
     );
   }
 
@@ -603,6 +621,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     counts: confirmed.counts,
     nextCursor: confirmed.nextCursor,
     revision: confirmed.revision,
+    pairOccupants: confirmed.pairOccupants,
     continuation: continuation,
   );
 
@@ -812,6 +831,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       counts: confirmed.counts,
       nextCursor: confirmed.nextCursor,
       revision: confirmed.revision,
+      pairOccupants: confirmed.pairOccupants,
       continuation: confirmed.continuation,
     );
   }
@@ -844,6 +864,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       counts: confirmed.counts,
       nextCursor: confirmed.nextCursor,
       revision: confirmed.revision,
+      pairOccupants: confirmed.pairOccupants,
       continuation: confirmed.continuation,
     );
   }
@@ -859,7 +880,11 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       return confirmed;
     }
     return switch (confirmed) {
-      IntentionCatalogLoaded(:final items, :final continuation) =>
+      IntentionCatalogLoaded(
+        :final items,
+        :final pairOccupants,
+        :final continuation,
+      ) =>
         IntentionCatalogLoaded(
           selection: confirmed.selection,
           query: confirmed.query,
@@ -868,6 +893,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
           counts: confirmed.counts,
           nextCursor: confirmed.nextCursor,
           revision: revision,
+          pairOccupants: pairOccupants,
           continuation: continuation,
         ),
       IntentionCatalogEmpty() => IntentionCatalogEmpty(
@@ -930,6 +956,10 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       counts: counts,
       nextCursor: confirmed.nextCursor,
       revision: mutation.revision,
+      pairOccupants: switch (confirmed) {
+        IntentionCatalogLoaded(:final pairOccupants) => pairOccupants,
+        IntentionCatalogEmpty() => const {},
+      },
       continuation: switch (confirmed) {
         IntentionCatalogLoaded(:final continuation) => continuation,
         IntentionCatalogEmpty() => const IntentionCatalogContinuationIdle(),

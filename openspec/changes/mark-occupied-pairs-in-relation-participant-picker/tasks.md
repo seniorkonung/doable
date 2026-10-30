@@ -33,7 +33,7 @@
   - **Предполагаемые файлы:** `lib/src/intention/application/intention_catalog.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `test/support/intention_type_counts.dart`, `test/long_term_relation/presentation/editor/relation_form_test_support.dart`, `test/intention/application/intention_contract_test.dart`, `test/intention/data/drift_intention_catalog_test.dart`.
   - **Размер:** M.
 
-- [ ] 1.3 Хранить в модели каталога занимающие связи загруженных строк рядом со строками и объединять их с продолжениями
+- [x] 1.3 Хранить в модели каталога занимающие связи загруженных строк рядом со строками и объединять их с продолжениями
   - **Критерии приёмки:**
     - `IntentionCatalogLoaded` поиска с пробой несёт занимающие связи своих строк из первой порции. Продолжение добавляет свои по действующим правилам ревизий порций.
     - Порция без карты при пробе даёт непредвиденное состояние выдачи или продолжения, как порция без запрошенных чисел по типам.
