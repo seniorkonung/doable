@@ -29,6 +29,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/app_root_pages.dart';
+import '../../../support/intention_catalog_controls.dart';
 import '../../../support/quick_creation.dart';
 import '../catalog/catalog_test_support.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
@@ -513,11 +514,22 @@ void main() {
           ),
           findsWidgets,
         );
+        // Обход содержит и узлы без подписи, поэтому пустое название поля
+        // прошло бы проверку.
+        final titleFieldName = tester
+            .getSemantics(
+              find.descendant(
+                of: intentionCatalogTitleField,
+                matching: find.byType(EditableText),
+              ),
+            )
+            .label;
+        expect(titleFieldName, isNotEmpty);
         expect(
           _traversal(tester),
           containsAll([
             '${l10n.quickCreationLabel}, ${l10n.quickCreationModeIntention}',
-            l10n.catalogFilterLabel,
+            titleFieldName,
           ]),
         );
         expect(tester.takeException(), isNull);

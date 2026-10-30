@@ -34,6 +34,7 @@ import '../support/daily_choice_catalog_provider.dart';
 import '../support/daily_choice_durability_fixture.dart';
 import '../support/daily_choice_local_date.dart';
 import '../support/graph_seed.dart';
+import '../support/intention_catalog_controls.dart';
 import '../support/intention_creation_origin.dart';
 import '../support/local_database_harness.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
@@ -113,7 +114,7 @@ void main() {
     await tester.pumpAndSettle();
     history.expectRestored(tester, app.router);
     expect(find.text(title), findsOneWidget);
-    expect(find.text(app.l10n.catalogTotalCount(6)), findsOneWidget);
+    expect(intentionCatalogTotal(6), findsOneWidget);
     expect(find.text(first).hitTestable(), findsOneWidget);
     expect(find.text(createdMessage, skipOffstage: false), findsNothing);
     await tester.drag(find.text(first), const Offset(600, 0));

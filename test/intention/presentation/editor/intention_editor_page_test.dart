@@ -37,6 +37,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/app_root_pages.dart';
+import '../../../support/intention_catalog_controls.dart';
 import '../../../support/quick_creation.dart';
 import '../catalog/catalog_test_support.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
@@ -1172,7 +1173,9 @@ void main() {
         expect(tester.getRect(_catalogBar).top, 0);
         expect(
           sheet.top,
-          greaterThanOrEqualTo(tester.getRect(_catalogFilter).bottom),
+          greaterThanOrEqualTo(
+            tester.getRect(intentionCatalogTitleField).bottom,
+          ),
         );
 
         // Фокус — в пустом названии; пустое описание начинается одной
@@ -1205,8 +1208,8 @@ void main() {
         await _openEditor(tester, repository);
 
         final destinations = appNavigationDestinations();
-        expect(_catalogFilter, findsOneWidget);
-        expect(_catalogFilter.hitTestable(), findsNothing);
+        expect(intentionCatalogTitleField, findsOneWidget);
+        expect(intentionCatalogTitleField.hitTestable(), findsNothing);
         expect(quickCreationAction().hitTestable(), findsNothing);
         expect(destinations, findsNWidgets(3));
         expect(destinations.hitTestable(), findsNothing);
@@ -1220,7 +1223,10 @@ void main() {
           ),
           findsNothing,
         );
-        expect(find.semantics.byLabel('Filter by title'), findsNothing);
+        expect(
+          find.semantics.byLabel(intentionCatalogTitleFieldLabel(tester)),
+          findsNothing,
+        );
         expect(find.semantics.byLabel(RegExp('New intention')), findsNothing);
         expect(find.semantics.byLabel('Title'), findsOneWidget);
 
@@ -2280,7 +2286,6 @@ final _catalogBar = find.descendant(
   of: find.byType(IntentionCatalogPage),
   matching: find.byType(AppBar),
 );
-final _catalogFilter = find.byKey(const ValueKey('catalog-filter-field'));
 
 /// Точка над панелью, где под модальным фоном лежит шапка каталога.
 const _outsideSheet = Offset(400, 8);

@@ -20,6 +20,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'app_root_pages.dart';
+import 'inline_text.dart';
 import 'tag_condition_cycles.dart';
 
 /// Параметры поиска, которые показывает каталог намерений.
@@ -29,6 +30,11 @@ typedef ShownIntentionCatalogParameters = ({
   String titleFilter,
   int tagConditions,
 });
+
+/// Строка, которую показывает выдача каталога намерений: название, подпись
+/// тегов в виде `intentionSummaryTags` или `intentionSummaryNoTags` и
+/// прямоугольник на экране.
+typedef ShownIntentionCatalogRow = ({String title, String tags, Rect rect});
 
 final _page = find.byType(IntentionCatalogPage);
 final _scopeControl = find.byKey(const ValueKey('catalog-scope-control'));
@@ -42,6 +48,14 @@ final _orderControl = find.byKey(const ValueKey('catalog-order-control'));
 final intentionCatalogTitleField = find.byKey(
   const ValueKey('catalog-filter-field'),
 );
+
+/// Доступная подпись поля названия каталога.
+///
+/// Берётся из локализации по элементу поля, а не из семантики: под панелью
+/// создания поле скрыто от семантики.
+String intentionCatalogTitleFieldLabel(WidgetTester tester) =>
+    AppLocalizations.of(tester.element(intentionCatalogTitleField))
+        .catalogFilterLabel;
 
 /// Элемент, которым человек открывает панель условий по тегам каталога
 /// намерений.
@@ -67,15 +81,22 @@ final intentionCatalogRows = find.descendant(
   matching: find.byType(IntentionSummaryView),
 );
 
-/// Названия построенных строк выдачи открытого каталога намерений сверху вниз.
+/// Построенные строки выдачи открытого каталога намерений сверху вниз.
 ///
 /// Строки за краем видимой части, которые список уже построил, тоже входят.
-List<String> shownIntentionCatalogRows(WidgetTester tester) => [
-  for (final row in tester.widgetList<IntentionSummaryView>(
-    intentionCatalogRows,
-  ))
-    row.title,
-];
+List<ShownIntentionCatalogRow> shownIntentionCatalogRows(WidgetTester tester) {
+  final texts = AppLocalizations.of(tester.element(_page));
+  return [
+    for (final row in tester.widgetList<IntentionSummaryView>(
+      intentionCatalogRows,
+    ))
+      (
+        title: row.title,
+        tags: _shownTags(tester, row, texts),
+        rect: tester.getRect(find.byWidget(row)),
+      ),
+  ];
+}
 
 /// Строка выдачи открытого каталога намерений с названием [title].
 Finder intentionCatalogRow(String title) => find.descendant(
@@ -146,6 +167,19 @@ Future<void> addIntentionCatalogTagCondition(
   await waitFor(tester, intentionCatalogTagFilterControl.hitTestable());
 }
 
+/// Снимает условие по тегу [tag], не дожидаясь выдачи без него. [tap] — нажатие
+/// сценария; по умолчанию [tapWhenFound].
+Future<void> removeIntentionCatalogTagCondition(
+  WidgetTester tester,
+  TagId tag, {
+  RootPageTap tap = tapWhenFound,
+}) => tap(
+  tester,
+  find.byKey(
+    ValueKey('intention-tag-condition-remove-${tag.toCanonicalString()}'),
+  ),
+);
+
 /// Параметры поиска открытого каталога. Каталог, который показывает другие
 /// значения, проваливает проверку.
 ShownIntentionCatalogParameters shownIntentionCatalogParameters(
@@ -213,6 +247,26 @@ List<ScrollPosition> _pagePositions(WidgetTester tester) {
     for (final state in tester.stateList<ScrollableState>(scrollables))
       state.position,
   ];
+}
+
+/// Подпись тегов, которую показывает строка [row]. Первый текст строки —
+/// название: оно может начинаться так же, как подпись.
+String _shownTags(
+  WidgetTester tester,
+  IntentionSummaryView row,
+  AppLocalizations texts,
+) {
+  final tagsPrefix = texts.intentionSummaryTags('');
+  return tester
+      .widgetList<Text>(
+        find.descendant(of: find.byWidget(row), matching: find.byType(Text)),
+      )
+      .skip(1)
+      .map(textIgnoringInlineWidgets)
+      .singleWhere(
+        (text) =>
+            text == texts.intentionSummaryNoTags || text.startsWith(tagsPrefix),
+      );
 }
 
 /// Выбирает вариант [label] в выпадающем списке [control].

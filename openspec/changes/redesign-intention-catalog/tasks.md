@@ -313,7 +313,7 @@
   - **Предполагаемые файлы:** `test/app/graph_import_app_flow_test.dart`, `test/app/graph_restore_app_flow_test.dart`.
   - **Размер:** S.
 
-- [ ] 3.4 Провести через общие шаги каталога сценарии создания намерения
+- [x] 3.4 Провести через общие шаги каталога сценарии создания намерения
   - **Критерии приёмки:**
     - Шаги получают `removeIntentionCatalogTagCondition(TagId)` и `intentionCatalogTitleFieldLabel(tester)` — доступную подпись поля названия каталога, а `shownIntentionCatalogRows` даёт ещё подпись тегов в виде `intentionSummaryTags` или `intentionSummaryNoTags` и прямоугольник строки на экране. Подпись поля шаг берёт из локализации по элементу поля, а не из семантики: под панелью создания поле скрыто от семантики.
     - `intention_creation_sheet_integration_test.dart` задаёт охват, название, условия и порядок, снимает условие и читает строки и прокрутку только общими шагами: локальных `_selectOption`, `_addCondition`, `_catalogList`, `_catalogListPosition`, `_catalogPagePosition` и ключей элементов каталога нет. Проверка, что новая строка сдвинула список, а видимые строки остались на своих местах, сохраняется.
