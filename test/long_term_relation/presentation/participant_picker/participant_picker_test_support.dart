@@ -17,15 +17,47 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_choice.dart';
 
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/statistics_read_contract_test_fallback.dart';
 import '../../../support/intention_type_counts.dart';
 
+/// Поток создания без формы: экран поиска здесь проверяется отдельно от неё.
+const testRelationCreationFlow = RelationCreationChoiceFlow(
+  restore: _NoRelationRestore(),
+  priority: null,
+  description: '',
+);
+
+/// Дескриптор восстановления, продолжение потока которого задаёт тест.
+final class ControlledRelationRestore implements RelationCreationRestore {
+  @override
+  bool canContinue = true;
+
+  /// Связи, которые поиск передал на восстановление, в порядке передачи.
+  final accepted = <LongTermRelationId>[];
+
+  @override
+  void accept(LongTermRelationId relationId) => accepted.add(relationId);
+}
+
+final class _NoRelationRestore implements RelationCreationRestore {
+  const _NoRelationRestore();
+
+  @override
+  bool get canContinue => true;
+
+  @override
+  void accept(LongTermRelationId relationId) => throw UnsupportedError(
+    'Восстановление не выполняется в тесте выбора участника.',
+  );
+}
+
 /// Репозиторий графа, управляемый тестом выбора участника.
 ///
 /// Каталожные порции остаются единственным источником списка намерений.
-/// Подробные чтения намерения и его соседства только открываются и не
+/// Подробные чтения намерения, его соседства и связи только открываются и не
 /// завершаются: переход к подробным данным проверяется отдельно от выбора.
 final class ControlledParticipantPickerRepository
     with StatisticsReadContractTestFallback, TagReadContractTestFallback
@@ -58,6 +90,10 @@ final class ControlledParticipantPickerRepository
   final _requests = <Completer<Result<IntentionCatalogPage>>>[];
   final _intentionStreams =
       <StreamController<Result<GraphSnapshot<IntentionDetails?>>>>[];
+  final _relationStreams = <StreamController<LongTermRelationReadResult>>[];
+
+  /// Связи, подробный просмотр которых открывали, в порядке открытия.
+  final watchedRelations = <LongTermRelationId>[];
 
   IntentionCatalogQuery queryAt(int index) => queries[index];
 
@@ -65,8 +101,15 @@ final class ControlledParticipantPickerRepository
     _requests[index].complete(answerCatalogQuery(queries[index], result));
   }
 
+  /// Отвечает на последнее чтение связи.
+  void answerRelationRead(LongTermRelationReadResult result) =>
+      _relationStreams.last.add(result);
+
   void dispose() {
     for (final controller in _intentionStreams) {
+      unawaited(controller.close());
+    }
+    for (final controller in _relationStreams) {
       unawaited(controller.close());
     }
   }
@@ -104,8 +147,12 @@ final class ControlledParticipantPickerRepository
   ) => Completer<RelationGroupPageResult>().future;
 
   @override
-  Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) =>
-      throw UnsupportedError('Связи не наблюдаются в тесте выбора участника.');
+  Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) {
+    watchedRelations.add(id);
+    final controller = StreamController<LongTermRelationReadResult>.broadcast();
+    _relationStreams.add(controller);
+    return controller.stream;
+  }
 
   @override
   Future<GraphCommandResult<TSuccess, TFailure>> execute<

@@ -1,3 +1,4 @@
+import 'package:flutter/physics.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,27 +13,29 @@ import '../catalog/intention_catalog_state.dart';
 /// верхней позиции, а пауза ввода, загрузка и отказы первой порции
 /// показываются вместо строк сразу сверху. При обновлении выдачи без смены
 /// параметров поиска хранитель сохраняет экранное положение видимого
-/// намерения, а если оно исчезло из выдачи — ближайшего соседа.
+/// намерения, а если оно исчезло из выдачи — ближайшего соседа. Пока видимая
+/// строка не сместилась, хранитель не трогает прокрутку: `jumpTo` оборвал бы
+/// инерцию и перетаскивание.
 ///
 /// Выдача сообщает хранителю каждое состояние модели через [onCatalogChanged]
-/// из `ref.listen`, до перестройки списка, и оборачивает каждую строку в
-/// [KeyedSubtree] с ключом [keyFor].
+/// из `ref.listen`, до перестройки списка, каждую перестройку — через
+/// [onListBuilt] и оборачивает каждую строку в [KeyedSubtree] с ключом
+/// [keyFor].
 final class ResultsScrollKeeper {
-  /// [shown] возвращает выдачу, по которой построен список; первая новая
-  /// выдача после показанной при создании начнётся с верхней позиции.
-  ResultsScrollKeeper({
-    required AsyncValue<IntentionCatalogState> Function() shown,
-  }) : _shown = shown,
-       _query = _confirmedQuery(shown().value);
+  /// [initial] — выдача, по которой список строится впервые; первая новая
+  /// выдача после неё начнётся с верхней позиции.
+  ResultsScrollKeeper({required AsyncValue<IntentionCatalogState> initial})
+    : _shown = initial,
+      _query = _confirmedQuery(initial.value);
 
   /// Прокрутка одна для всех состояний и не пересоздаётся, а новая выдача
   /// начинается с верхней позиции: сохранённое смещение не нужно.
   final controller = ScrollController(keepScrollOffset: false);
 
   /// Выдача, по которой построен список. Она может отставать от модели:
-  /// скрытая страница не перестраивается, пока её снова не покажут, и после
-  /// кадра якорь ищется среди построенных строк.
-  final AsyncValue<IntentionCatalogState> Function() _shown;
+  /// скрытая страница не перестраивается, пока её снова не покажут, и якорь
+  /// ждёт перестройки по актуальной выдаче.
+  AsyncValue<IntentionCatalogState> _shown;
 
   final _itemKeys = <IntentionId, GlobalKey>{};
 
@@ -79,9 +82,19 @@ final class ResultsScrollKeeper {
     if (_pendingVisualAnchor == null &&
         previousState is IntentionCatalogLoaded &&
         identical(previousState.query, nextState.query) &&
-        _layoutChanged(previousState.items, nextState.items)) {
+        _isShownResultsOf(nextState) &&
+        _mayShiftVisibleRow(previousState, nextState)) {
       _pendingVisualAnchor = _captureVisualAnchor(previousState);
     }
+  }
+
+  /// Учитывает перестройку списка по выдаче [catalog]: после кадра строки уже
+  /// разложены, и хранитель восстанавливает по ним место в списке.
+  void onListBuilt(AsyncValue<IntentionCatalogState> catalog) {
+    if (identical(catalog, _shown)) {
+      return;
+    }
+    _shown = catalog;
     _scheduleMaintenance();
   }
 
@@ -125,19 +138,43 @@ final class ResultsScrollKeeper {
     }
   }
 
-  bool _layoutChanged(
-    List<IntentionSummary> previous,
-    List<IntentionSummary> next,
+  /// Построен ли список по выдаче того же запроса, что и [state].
+  ///
+  /// Скрытая страница не перестраивается, поэтому выдача, начатая под закрытой
+  /// страницей, ещё не показана: построенные строки и их ключи принадлежат
+  /// прежней выдаче, и якорь по ним указал бы чужое место. Новая выдача
+  /// начинается сверху, пока список не перестроен по её запросу.
+  bool _isShownResultsOf(IntentionCatalogLoaded state) {
+    final shown = _shown.value;
+    return shown is IntentionCatalogLoaded &&
+        identical(shown.query, state.query);
+  }
+
+  /// Может ли переход от [previous] к [next] сдвинуть видимую строку.
+  ///
+  /// Строки, добавленные за прежней выдачей, и отметки занятых пар этих новых
+  /// строк видимую строку не сдвигают. Отметка прежней строки сдвигает: она
+  /// добавляет строке или убирает у неё линию меток, и строки под ней
+  /// смещаются.
+  bool _mayShiftVisibleRow(
+    IntentionCatalogLoaded previous,
+    IntentionCatalogLoaded next,
   ) {
-    if (previous.length != next.length) {
+    final previousItems = previous.items;
+    final nextItems = next.items;
+    if (nextItems.length < previousItems.length) {
       return true;
     }
-    for (var index = 0; index < previous.length; index++) {
-      if (!identical(previous[index], next[index])) {
+    for (var index = 0; index < previousItems.length; index++) {
+      if (!identical(previousItems[index], nextItems[index])) {
         return true;
       }
     }
-    return false;
+    // Карту создаёт заново каждое состояние, поэтому отметки сравниваются по
+    // содержимому.
+    return previousItems.any(
+      (item) => previous.pairOccupants[item.id] != next.pairOccupants[item.id],
+    );
   }
 
   _VisualAnchor? _captureVisualAnchor(IntentionCatalogLoaded state) {
@@ -155,12 +192,8 @@ final class ResultsScrollKeeper {
       // становится ближайшая строка ниже, а сдвиг внутри неё отрицателен.
       if (extent.end > currentOffset) {
         return _VisualAnchor(
-          query: state.query,
-          candidateIds: [
-            items[index].id,
-            if (index + 1 < items.length) items[index + 1].id,
-            if (index > 0) items[index - 1].id,
-          ],
+          candidateIds: _idsByDistance(items, index),
+          itemStart: extent.start,
           offsetWithinItem: currentOffset - extent.start,
           remainingApproaches: _VisualAnchor.maxApproaches,
         );
@@ -168,6 +201,16 @@ final class ResultsScrollKeeper {
     }
     return null;
   }
+
+  /// Строка [index] и её соседи от ближних к дальним: якорь ждёт перестройки
+  /// списка, и за это время из выдачи могут уйти и она, и ближайшие соседи.
+  List<IntentionId> _idsByDistance(List<IntentionSummary> items, int index) => [
+    items[index].id,
+    for (var distance = 1; distance < items.length; distance++) ...[
+      if (index + distance < items.length) items[index + distance].id,
+      if (index - distance >= 0) items[index - distance].id,
+    ],
+  ];
 
   void _scheduleMaintenance() {
     if (_maintenanceScheduled) {
@@ -187,11 +230,10 @@ final class ResultsScrollKeeper {
   void _restoreVisualAnchor() {
     final anchor = _pendingVisualAnchor;
     _pendingVisualAnchor = null;
-    final state = _shown().value;
+    final state = _shown.value;
     if (anchor == null ||
         !controller.hasClients ||
-        state is! IntentionCatalogLoaded ||
-        !identical(state.query, anchor.query)) {
+        state is! IntentionCatalogLoaded) {
       return;
     }
 
@@ -202,7 +244,16 @@ final class ResultsScrollKeeper {
     final position = controller.position;
     final exact = _builtItemExtent(state.items[targetIndex].id);
     if (exact != null) {
-      _jumpWithinExtent(position, exact.start + anchor.offsetWithinItem);
+      // Сосед, занявший место ушедшей строки, тоже уже на месте. Смещение
+      // прокрутки здесь не показатель: за время ожидания кадра его меняет сама
+      // идущая прокрутка.
+      if (!nearEqual(
+        exact.start,
+        anchor.itemStart,
+        Tolerance.defaultTolerance.distance,
+      )) {
+        _jumpWithinExtent(position, exact.start + anchor.offsetWithinItem);
+      }
       return;
     }
 
@@ -220,9 +271,10 @@ final class ResultsScrollKeeper {
   }
 
   int? _anchorTargetIndex(_VisualAnchor anchor, List<IntentionSummary> items) {
+    final indexes = {for (final (index, item) in items.indexed) item.id: index};
     for (final id in anchor.candidateIds) {
-      final index = items.indexWhere((item) => item.id == id);
-      if (index >= 0) {
+      final index = indexes[id];
+      if (index != null) {
         return index;
       }
     }
@@ -274,7 +326,7 @@ final class ResultsScrollKeeper {
   }
 
   void _pruneItemKeys() {
-    final state = _shown().value;
+    final state = _shown.value;
     if (state is! IntentionCatalogLoaded) {
       return;
     }
@@ -288,8 +340,8 @@ typedef _ItemExtent = ({double start, double end});
 
 final class _VisualAnchor {
   const _VisualAnchor({
-    required this.query,
     required this.candidateIds,
+    required this.itemStart,
     required this.offsetWithinItem,
     required this.remainingApproaches,
   });
@@ -297,9 +349,10 @@ final class _VisualAnchor {
   /// Предел кадров приближения к якорю за пределами построенной области.
   static const maxApproaches = 3;
 
-  /// Якорь действует только для выдачи того же запроса.
-  final IntentionCatalogQuery query;
   final List<IntentionId> candidateIds;
+
+  /// Начало строки в содержимом списка, когда запомнен якорь.
+  final double itemStart;
 
   /// Сдвиг верха списка от начала строки; отрицателен, когда верх списка
   /// пришёлся на промежуток перед строкой.
@@ -307,8 +360,8 @@ final class _VisualAnchor {
   final int remainingApproaches;
 
   _VisualAnchor afterApproach() => _VisualAnchor(
-    query: query,
     candidateIds: candidateIds,
+    itemStart: itemStart,
     offsetWithinItem: offsetWithinItem,
     remainingApproaches: remainingApproaches - 1,
   );

@@ -943,7 +943,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     LongTermRelationCreationFormKey formKey,
     CreateLongTermRelation command,
   ) => _acceptRelation(
-    key: formKey,
+    keys: {formKey},
     command: command,
     kind: LongTermRelationCommandKind.create,
     target: const CreatingLongTermRelationOperationTarget(),
@@ -952,7 +952,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
   LongTermRelationCommandStart acceptRelationUpdate(
     UpdateLongTermRelation command,
   ) => _acceptRelation(
-    key: ExistingLongTermRelationKey(command.relationId),
+    keys: {ExistingLongTermRelationKey(command.relationId)},
     command: command,
     kind: LongTermRelationCommandKind.update,
     target: ExistingLongTermRelationOperationTarget(command.relationId),
@@ -961,7 +961,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
   LongTermRelationCommandStart acceptRelationArchive(
     ArchiveLongTermRelation command,
   ) => _acceptRelation(
-    key: ExistingLongTermRelationKey(command.relationId),
+    keys: {ExistingLongTermRelationKey(command.relationId)},
     command: command,
     kind: LongTermRelationCommandKind.archive,
     target: ExistingLongTermRelationOperationTarget(command.relationId),
@@ -970,16 +970,35 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
   LongTermRelationCommandStart acceptRelationRestore(
     RestoreLongTermRelation command,
   ) => _acceptRelation(
-    key: ExistingLongTermRelationKey(command.relationId),
+    keys: {ExistingLongTermRelationKey(command.relationId)},
     command: command,
     kind: LongTermRelationCommandKind.restore,
     target: ExistingLongTermRelationOperationTarget(command.relationId),
   );
 
+  /// Принимает восстановление связи из поиска участника как отправку формы
+  /// создания [formKey].
+  ///
+  /// Пока команда выполняется, заняты ключ формы и ключ восстанавливаемой
+  /// связи: повторная отправка формы и любая операция этой связи не
+  /// принимаются и не ставятся в очередь. Успех принадлежит оболочке, как у
+  /// создания из формы. У поиска нет собственного renderer, поэтому отказ
+  /// сразу принадлежит оболочке: скрытая форма удержала бы его до возвращения.
+  LongTermRelationCommandStart acceptRelationRestoreFromCreation(
+    LongTermRelationCreationFormKey formKey,
+    RestoreLongTermRelation command,
+  ) => _acceptRelation(
+    keys: {formKey, ExistingLongTermRelationKey(command.relationId)},
+    command: command,
+    kind: LongTermRelationCommandKind.restore,
+    target: ExistingLongTermRelationOperationTarget(command.relationId),
+    initiatorReleased: true,
+  );
+
   LongTermRelationCommandStart acceptRelationDelete(
     DeleteLongTermRelation command,
   ) => _acceptRelation(
-    key: ExistingLongTermRelationKey(command.relationId),
+    keys: {ExistingLongTermRelationKey(command.relationId)},
     command: command,
     kind: LongTermRelationCommandKind.delete,
     target: ExistingLongTermRelationOperationTarget(command.relationId),
@@ -1111,15 +1130,16 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
   }
 
   LongTermRelationCommandStart _acceptRelation({
-    required GraphCommandKey key,
+    required Set<GraphCommandKey> keys,
     required LongTermRelationCommand command,
     required LongTermRelationCommandKind kind,
     required LongTermRelationOperationTarget target,
+    bool initiatorReleased = false,
   }) {
     final token = LongTermRelationOperationToken._();
     final acceptance = _acceptOperation(
-      keys: {key},
-      entry: _PresentationEntry(token),
+      keys: keys,
+      entry: _PresentationEntry(token)..initiatorReleased = initiatorReleased,
       execute: () async {
         final result = await _executeLongTermRelation(command);
         return LongTermRelationCommandCompletion._(

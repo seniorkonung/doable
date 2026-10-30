@@ -132,16 +132,16 @@ IntentionSaved fullCreationSuccess(
   ],
 );
 
-/// Проводит команду связи через coordinator до опубликованного завершения.
+/// Принимает команду связи через coordinator и подтверждает её в репозитории.
 ///
-/// Ревизия задаётся явно: пакет подтверждённого изменения связи содержит
-/// только изменения графа без каталожной мутации.
-Future<LongTermRelationCommandCompletion> completeRelationCommand(
+/// Завершение команды публикуется асинхронно: вызывающий код сам ждёт его
+/// обычным ожиданием либо кадрами виджет-теста.
+LongTermRelationCommandAccepted acceptRelationCommand(
   ProviderContainer container,
   ControlledCatalogRepository repository,
   LongTermRelationCommand command,
   LongTermRelationCommandResult result,
-) async {
+) {
   final coordinator = container.read(graphCommandCoordinatorProvider.notifier);
   final commandIndex = repository.relationCommands.length;
   final start = switch (command) {
@@ -157,6 +157,25 @@ Future<LongTermRelationCommandCompletion> completeRelationCommand(
   expect(start, isA<LongTermRelationCommandAccepted>());
   final accepted = start as LongTermRelationCommandAccepted;
   repository.completeRelationCommand(commandIndex, result);
+  return accepted;
+}
+
+/// Проводит команду связи через coordinator до опубликованного завершения.
+///
+/// Ревизия задаётся явно: пакет подтверждённого изменения связи содержит
+/// только изменения графа без каталожной мутации.
+Future<LongTermRelationCommandCompletion> completeRelationCommand(
+  ProviderContainer container,
+  ControlledCatalogRepository repository,
+  LongTermRelationCommand command,
+  LongTermRelationCommandResult result,
+) async {
+  final accepted = acceptRelationCommand(
+    container,
+    repository,
+    command,
+    result,
+  );
   final completion = await accepted.future;
   await Future<void>.delayed(Duration.zero);
   return completion;

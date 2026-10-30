@@ -1615,7 +1615,8 @@ List<String?> _shownMenu(WidgetTester tester) => [
 
 /// Значки меток построенных строк каталога в порядке показа.
 List<DoableIconData> _shownMarks(WidgetTester tester) => [
-  for (final badge in tester.widgetList<Badge>(find.byType(Badge))) badge.icon,
+  for (final badge in tester.widgetList<BadgeMark>(find.byType(BadgeMark)))
+    badge.icon,
 ];
 
 Future<void> _completeCatalogWidgetCommand(

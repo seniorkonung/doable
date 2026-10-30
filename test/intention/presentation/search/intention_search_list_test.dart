@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/design_system/components/catalog_header.dart';
 import 'package:doable/src/design_system/components/empty_state.dart';
@@ -5,13 +7,20 @@ import 'package:doable/src/design_system/components/list_state.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/design_system/doable_metrics.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
+import 'package:doable/src/graph/application/graph_change.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
+import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
+import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
 import 'package:doable/src/intention/presentation/search/intention_search_list.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
+import 'package:doable/src/long_term_relation/application/relation_pair_probe.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/domain/tag.dart';
@@ -28,9 +37,12 @@ import '../../../support/tag_positions.dart';
 /// Высота строки-образца выдачи.
 const _rowExtent = 48.0;
 
-final _list = find.byKey(
-  const PageStorageKey<String>('daily-choice-action-list'),
-);
+/// Высота линии меток, которую добавляет отметка занятой пары.
+const _markLineExtent = 20.0;
+
+/// Список выдачи: ключ у него свой для каждого вида поиска, а на странице
+/// теста он один.
+final _list = find.byType(CustomScrollView);
 
 void main() {
   group('состояния без строк', () {
@@ -228,6 +240,29 @@ void main() {
       );
     });
 
+    testWidgets('добавление порции не останавливает идущую прокрутку', (
+      tester,
+    ) async {
+      final h = await _open(tester, pageSize: 20);
+      final all = _actions(40);
+      h.repository.complete(0, _firstPage(all.sublist(0, 20), totalCount: 40));
+      await _settle(tester);
+      await _flingDown(tester, h);
+      await _waitForQueries(tester, h, 2);
+
+      h.repository.complete(
+        1,
+        _continuationPage(all.sublist(20), hasMore: false),
+      );
+      await _settle(tester);
+
+      final confirmed = h.container
+          .read(intentionCatalogViewModelProvider(h.purpose))
+          .requireValue;
+      expect((confirmed as IntentionCatalogLoaded).items, hasLength(40));
+      await _expectScrollContinues(tester, h);
+    });
+
     testWidgets('выдача нового запроса открывается с начала списка', (
       tester,
     ) async {
@@ -422,6 +457,139 @@ void main() {
 
       expect(_rowTop(tester, 'Действие 48'), visibleTop);
     });
+
+    testWidgets('изменение строк после видимой не останавливает идущую '
+        'прокрутку', (tester) async {
+      final h = await _openSportActions(tester);
+      await _flingDown(tester, h);
+
+      await _acceptSportRemoval(h, 2, revision: 2);
+      // Прокрутка уходит от смещения, запомненного при изменении, ещё до кадра
+      // с новыми строками.
+      await tester.pump(const Duration(milliseconds: 16));
+
+      await _expectScrollContinues(tester, h);
+    });
+
+    testWidgets('строка, добавленная перед первой видимой, пока список закрыт '
+        'страницей, оставляет видимую строку на месте', (tester) async {
+      final h = await _openSportActions(tester);
+      h.position.jumpTo(300);
+      await _settle(tester);
+      final visibleTop = _rowTop(tester, 'Действие 50');
+
+      await _coverList(tester);
+      await _assignSportToAction59(tester, h);
+      await _uncoverList(tester);
+
+      expect(_rowTop(tester, 'Действие 50'), visibleTop);
+    });
+
+    testWidgets('первая видимая строка и её соседи ушли из выдачи по одной, '
+        'пока список закрыт страницей: на её месте стоит ближайшая оставшаяся '
+        'строка', (tester) async {
+      final h = await _openSportActions(tester);
+      // Строка «Действие 50» занимает 280–328.
+      h.position.jumpTo(300);
+      await _settle(tester);
+      final visibleTop = _rowTop(tester, 'Действие 50');
+
+      await _coverList(tester);
+      for (final (revision, index) in [(2, 50), (3, 48), (4, 52)]) {
+        await _removeSportFromAction(tester, h, index, revision: revision);
+      }
+      await _uncoverList(tester);
+
+      expect(_rowTop(tester, 'Действие 46'), visibleTop);
+    });
+
+    testWidgets('новая выдача, начатая после изменения строк, пока список '
+        'закрыт страницей, стоит сверху', (tester) async {
+      final h = await _openSportActions(tester);
+      h.position.jumpTo(300);
+      await _settle(tester);
+
+      await _coverList(tester);
+      await _assignSportToAction59(tester, h);
+      h.notifier.changeTagFilter(
+        IntentionTagFilter(excludedTagIds: [_sport.id]),
+      );
+      await _waitForQueries(tester, h, 3);
+      h.repository.complete(2, _firstPage(_actions(30)));
+      await _settle(tester);
+      await _uncoverList(tester);
+
+      expect(h.position.pixels, 0);
+      expect(_rowTop(tester, 'Действие 30'), tester.getTopLeft(_list).dy);
+    });
+
+    testWidgets('подтверждённая операция меняет строки новой выдачи, начатой, '
+        'пока список закрыт страницей: выдача стоит сверху', (tester) async {
+      final h = await _openSportActions(tester);
+      h.position.jumpTo(300);
+      await _settle(tester);
+
+      await _coverList(tester);
+      // Первая строка новой выдачи — новое действие, а за ним идут действия
+      // прежней: их строки список уже строил.
+      h.notifier.changeTagFilter(IntentionTagFilter.empty);
+      await _waitForQueries(tester, h, 3);
+      h.repository.complete(2, _firstPage([_action(61), ..._actions(60)]));
+      await _settle(tester);
+      await _assignSportToAction59(tester, h);
+      await _uncoverList(tester);
+
+      expect(h.position.pixels, 0);
+      expect(_rowTop(tester, 'Действие 61'), tester.getTopLeft(_list).dy);
+    });
+  });
+
+  group('согласование отметок занятых пар', () {
+    testWidgets('отметка появилась у строки над первой видимой, пока список '
+        'закрыт страницей: видимая строка остаётся на месте', (tester) async {
+      final h = await _openRelationParticipants(tester);
+      h.repository.complete(0, _firstPage(_actions(30)));
+      await _settle(tester);
+      h.position.jumpTo(300);
+      await _settle(tester);
+      final visibleTop = _rowTop(tester, 'Действие 25');
+
+      await _coverList(tester);
+      await _createOccupyingRelation(tester, h, _action(28));
+      await _uncoverList(tester);
+
+      expect(_loadedOf(h).pairOccupants, hasLength(1));
+      expect(_rowTop(tester, 'Действие 25'), visibleTop);
+    });
+
+    testWidgets('отметка снята у строки над первой видимой, пока список '
+        'закрыт страницей: видимая строка остаётся на месте', (tester) async {
+      final relation = _occupyingRelation(_action(28));
+      final h = await _openRelationParticipants(tester);
+      h.repository.complete(
+        0,
+        _firstPage(
+          _actions(30),
+          pairOccupants: {
+            _action(28).id: PairOccupant(
+              relationId: relation.id,
+              scope: relation.scope,
+            ),
+          },
+        ),
+      );
+      await _settle(tester);
+      h.position.jumpTo(300);
+      await _settle(tester);
+      final visibleTop = _rowTop(tester, 'Действие 25');
+
+      await _coverList(tester);
+      await _deleteOccupyingRelation(tester, h, relation);
+      await _uncoverList(tester);
+
+      expect(_loadedOf(h).pairOccupants, isEmpty);
+      expect(_rowTop(tester, 'Действие 25'), visibleTop);
+    });
   });
 }
 
@@ -475,6 +643,7 @@ double _rowTop(WidgetTester tester, String title) =>
 Result<IntentionCatalogPage> _firstPage(
   List<IntentionSummary> items, {
   int? totalCount,
+  Map<IntentionId, PairOccupant>? pairOccupants,
 }) {
   final total = totalCount ?? items.length;
   return ResultSuccess(
@@ -483,6 +652,7 @@ Result<IntentionCatalogPage> _firstPage(
       totalCount: total,
       nextCursor: total > items.length ? const TestCatalogCursor() : null,
       revision: const TestCatalogRevision(1),
+      pairOccupants: pairOccupants,
     ),
   );
 }
@@ -586,8 +756,13 @@ Future<_Harness> _open(
         home: Scaffold(
           body: IntentionSearchList(
             purpose: h.purpose,
-            rowBuilder: (context, results, summary) =>
-                SizedBox(height: _rowExtent, child: Text(summary.title)),
+            // Линия меток отмеченной строки делает её выше.
+            rowBuilder: (context, results, summary) => SizedBox(
+              height: results.pairOccupants.containsKey(summary.id)
+                  ? _rowExtent + _markLineExtent
+                  : _rowExtent,
+              child: Text(summary.title),
+            ),
             emptyScope: (_) => const EmptyState(
               title: 'Выбрать не из чего',
               text: 'Доступных активных действий нет.',
@@ -623,6 +798,105 @@ Future<_Harness> _openSportActions(WidgetTester tester) async {
   return h;
 }
 
+/// Участник другой роли в поиске участника связи: выбирается связанное.
+final _counterpart = testSummary(index: 100);
+
+/// Открывает выдачу поиска участника с пробой пары: отметки занятых пар
+/// следуют за подтверждёнными изменениями связей.
+Future<_Harness> _openRelationParticipants(WidgetTester tester) => _open(
+  tester,
+  purpose: SelectRelationParticipant(
+    selectionContext: RelationParticipantSelectionContext.activeRelation,
+    session: IntentionSearchSession(),
+    pairProbe: RelationPairProbe(
+      counterpartId: _counterpart.id,
+      candidateRole: RelationParticipantRole.related,
+    ),
+  ),
+);
+
+IntentionCatalogLoaded _loadedOf(_Harness h) =>
+    h.container.read(intentionCatalogViewModelProvider(h.purpose)).requireValue
+        as IntentionCatalogLoaded;
+
+/// Связь, которая занимает пару участника другой роли и строки [candidate].
+LongTermRelation _occupyingRelation(IntentionSummary candidate) => testRelation(
+  sourceIntentionId: _counterpart.id,
+  relatedIntentionId: candidate.id,
+);
+
+/// Подтверждение команды связи на ревизии 2: первая порция читалась на первой.
+LongTermRelationCommandResult _confirmedRelation(
+  LongTermRelationCommandSuccess success,
+) =>
+    GraphCommandSucceeded<
+      LongTermRelationCommandSuccess,
+      LongTermRelationCommandFailure
+    >(
+      ConfirmedGraphResult(
+        revision: const TestCatalogRevision(2),
+        value: success,
+      ),
+    );
+
+/// Подтверждённое создание связи отмечает строку [candidate].
+Future<void> _createOccupyingRelation(
+  WidgetTester tester,
+  _Harness h,
+  IntentionSummary candidate,
+) async {
+  final relation = _occupyingRelation(candidate);
+  await acceptRelationCommand(
+    h.container,
+    h.repository,
+    CreateLongTermRelation(
+      sourceIntentionId: relation.sourceIntentionId,
+      relatedIntentionId: relation.relatedIntentionId,
+      type: relation.type,
+      priority: relation.priority,
+      description: null,
+    ),
+    _confirmedRelation(
+      LongTermRelationCreated(
+        relation: relation,
+        description: null,
+        changes: [
+          LongTermRelationCreatedChange(
+            revision: const TestCatalogRevision(2),
+            relation: relation,
+          ),
+        ],
+      ),
+    ),
+  ).future;
+  await _settle(tester);
+}
+
+/// Подтверждённое удаление связи снимает отметку её строки.
+Future<void> _deleteOccupyingRelation(
+  WidgetTester tester,
+  _Harness h,
+  LongTermRelation relation,
+) async {
+  await acceptRelationCommand(
+    h.container,
+    h.repository,
+    DeleteLongTermRelation(relation.id),
+    _confirmedRelation(
+      LongTermRelationDeleted(
+        relation: relation,
+        changes: [
+          LongTermRelationDeletedChange(
+            revision: const TestCatalogRevision(2),
+            relation: relation,
+          ),
+        ],
+      ),
+    ),
+  ).future;
+  await _settle(tester);
+}
+
 /// Назначение обязательного тега добавляет строку перед видимой.
 Future<void> _assignSportToAction59(WidgetTester tester, _Harness h) async {
   final (command, result) = intentionTagAssignment(
@@ -636,6 +910,50 @@ Future<void> _assignSportToAction59(WidgetTester tester, _Harness h) async {
   await _settle(tester);
 }
 
+/// Снятие обязательного тега убирает строку из выдачи.
+Future<void> _removeSportFromAction(
+  WidgetTester tester,
+  _Harness h,
+  int index, {
+  required int revision,
+}) async {
+  await _acceptSportRemoval(h, index, revision: revision);
+  await _settle(tester);
+}
+
+/// Подтверждает снятие обязательного тега без следующего кадра.
+Future<void> _acceptSportRemoval(
+  _Harness h,
+  int index, {
+  required int revision,
+}) async {
+  final (command, result) = intentionTagAssignment(
+    state: TagAssignmentState.absent,
+    tagId: _sport.id,
+    before: _action(index, tags: [_sport]),
+    after: _action(index),
+    revision: TestCatalogRevision(revision),
+  );
+  await acceptTagCommand(h.container, h.repository, command, result).future;
+}
+
+/// Закрывает выдачу непрозрачной страницей: скрытый список не перестраивается
+/// по изменениям модели.
+Future<void> _coverList(WidgetTester tester) async {
+  unawaited(
+    tester
+        .state<NavigatorState>(find.byType(Navigator))
+        .push(MaterialPageRoute<void>(builder: (_) => const Scaffold())),
+  );
+  await tester.pumpAndSettle();
+  expect(_list, findsNothing);
+}
+
+Future<void> _uncoverList(WidgetTester tester) async {
+  tester.state<NavigatorState>(find.byType(Navigator)).pop();
+  await tester.pumpAndSettle();
+}
+
 /// Бросает выдачу вниз и оставляет её прокручиваться по инерции: пока
 /// прокрутка движется, смещение не прижимается к краю сжавшегося содержимого.
 Future<void> _flingDown(WidgetTester tester, _Harness h) async {
@@ -643,6 +961,14 @@ Future<void> _flingDown(WidgetTester tester, _Harness h) async {
   await tester.pump(const Duration(milliseconds: 50));
   expect(h.position.pixels, greaterThan(0));
   expect(h.position.activity!.velocity, isNot(0));
+}
+
+/// Проверяет, что инерция бросока не оборвана и список движется дальше.
+Future<void> _expectScrollContinues(WidgetTester tester, _Harness h) async {
+  expect(h.position.activity!.velocity, isNot(0));
+  final pixels = h.position.pixels;
+  await tester.pump(const Duration(milliseconds: 16));
+  expect(h.position.pixels, greaterThan(pixels));
 }
 
 /// Ждёт чтения порции, которое модель начинает после кадра.

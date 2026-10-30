@@ -1758,6 +1758,22 @@
   "@intentionPickerKindIntention": {
     "description": "Вид намерения без готовности к действию в доступном названии строки экрана выбора"
   },
+  "intentionPickerPairLinked": "Already linked",
+  "@intentionPickerPairLinked": {
+    "description": "Метка строки поиска участника связи, пару которой занимает активная связь; она же стоит в доступном названии строки"
+  },
+  "intentionPickerPairArchived": "Archived relation",
+  "@intentionPickerPairArchived": {
+    "description": "Метка строки поиска участника связи, пару которой занимает архивированная связь; она же стоит в доступном названии строки"
+  },
+  "intentionPickerPairOpensRelation": "tapping opens the existing relation",
+  "@intentionPickerPairOpensRelation": {
+    "description": "Действие нажатия на текст строки поиска участника с отметкой занятой пары в доступном названии строки"
+  },
+  "intentionPickerPairOffersRestore": "tapping offers to restore the relation",
+  "@intentionPickerPairOffersRestore": {
+    "description": "Действие нажатия на текст строки поиска участника, когда при создании связи архивную занимающую связь можно восстановить, в доступном названии строки"
+  },
   "intentionPickerOpenActionPage": "Open the page of action {title}",
   "@intentionPickerOpenActionPage": {
     "description": "Доступное название стрелки строки экрана выбора, которая открывает страницу действия",
@@ -2043,6 +2059,48 @@
   "participantPickerEmpty": "No other intentions are available to select.",
   "@participantPickerEmpty": {
     "description": "Отсутствие намерений, доступных для выбора участником"
+  },
+  "participantPickerRestoreTitle": "Restore this relation?",
+  "@participantPickerRestoreTitle": {
+    "description": "Заголовок подтверждения восстановления занимающей связи из поиска участника"
+  },
+  "participantPickerRestoreTextBefore": "The relation “",
+  "@participantPickerRestoreTextBefore": {
+    "description": "Текст подтверждения восстановления до выделенной формулировки связи"
+  },
+  "participantPickerRestoreTextAfter": "” returns with priority {priority}.",
+  "@participantPickerRestoreTextAfter": {
+    "description": "Текст подтверждения восстановления после выделенной формулировки связи",
+    "placeholders": {"priority": {"type": "String"}}
+  },
+  "participantPickerRestoreWarning": "What you set in the form won’t be kept: {changes}.",
+  "@participantPickerRestoreWarning": {
+    "description": "Предупреждение в подтверждении восстановления: данные черновика формы, которые не сохранятся; changes — перечень отличающихся данных через запятую",
+    "placeholders": {"changes": {"type": "String"}}
+  },
+  "participantPickerRestoreWarningNeedType": "type “need”",
+  "@participantPickerRestoreWarningNeedType": {
+    "description": "Перечень предупреждения о восстановлении: выбранный в форме тип «нужно» не сохранится"
+  },
+  "participantPickerRestoreWarningCanType": "type “can”",
+  "@participantPickerRestoreWarningCanType": {
+    "description": "Перечень предупреждения о восстановлении: выбранный в форме тип «можно» не сохранится"
+  },
+  "participantPickerRestoreWarningPriority": "priority",
+  "@participantPickerRestoreWarningPriority": {
+    "description": "Перечень предупреждения о восстановлении: выбранный в форме приоритет не сохранится"
+  },
+  "participantPickerRestoreWarningDescription": "description",
+  "@participantPickerRestoreWarningDescription": {
+    "description": "Перечень предупреждения о восстановлении: введённое в форме описание не сохранится"
+  },
+  "participantPickerRestoreCancel": "Cancel",
+  "@participantPickerRestoreCancel": {
+    "description": "Отмена восстановления занимающей связи из поиска участника"
+  },
+  "participantPickerRestoreConfirm": "Restore",
+  "@participantPickerRestoreConfirm": {
+    "description": "Подтверждение восстановления занимающей связи из поиска участника"
   },
   "participantPickerOpenDetails": "Open intention details",
   "@participantPickerOpenDetails": {

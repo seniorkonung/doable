@@ -18,6 +18,7 @@ import 'package:doable/src/long_term_relation/application/intention_relation_gro
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_permissions.dart';
+import 'package:doable/src/long_term_relation/application/relation_pair_probe.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_description.dart';
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_page.dart';
@@ -835,7 +836,7 @@ void main() {
       whilePickerOpen: () => expectOpenedParticipantChoice(
         tester,
         role: RelationParticipantRole.source,
-        flow: isRelationChangeFlow(RelationScope.archived),
+        flow: isRelationChangeFlow(details.relation.id, RelationScope.archived),
         type: LongTermRelationType.can,
         sourceId: testSummary(index: 1).id,
         relatedId: testSummary(index: 2).id,
@@ -853,7 +854,7 @@ void main() {
       whilePickerOpen: () => expectOpenedParticipantChoice(
         tester,
         role: RelationParticipantRole.related,
-        flow: isRelationChangeFlow(RelationScope.archived),
+        flow: isRelationChangeFlow(details.relation.id, RelationScope.archived),
         type: LongTermRelationType.can,
         sourceId: testSummary(index: 3).id,
         relatedId: testSummary(index: 2).id,
@@ -988,10 +989,19 @@ void main() {
     expectOpenedParticipantChoice(
       tester,
       role: RelationParticipantRole.related,
-      flow: isRelationChangeFlow(RelationScope.active),
+      flow: isRelationChangeFlow(details.relation.id, RelationScope.active),
       type: LongTermRelationType.can,
       sourceId: testSummary(index: 1).id,
       relatedId: testSummary(index: 2).id,
+    );
+    // Изменяемая связь попадает в пробу, чтобы не занимать собственную пару.
+    expect(
+      repository.catalogQueries.last.pairProbe,
+      RelationPairProbe(
+        counterpartId: testSummary(index: 1).id,
+        candidateRole: RelationParticipantRole.related,
+        ignoredRelationId: details.relation.id,
+      ),
     );
   });
 

@@ -1,6 +1,8 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/design_system/components/badge.dart'
+    show BadgeArchived;
 import 'package:doable/src/design_system/components/button.dart';
 import 'package:doable/src/design_system/components/page_head.dart';
 import 'package:doable/src/design_system/components/top_bar.dart';
@@ -147,7 +149,12 @@ void main() {
         final head = tester.widget<PageHead>(find.byType(PageHead));
         expect(head.name, 'Бегать');
         expect(head.muted, archived);
-        expect(head.badge?.word, archived ? badge : null);
+        expect(
+          head.badge,
+          archived
+              ? isA<BadgeArchived>().having((mark) => mark.word, 'word', badge)
+              : isNull,
+        );
         expect(head.note, archived ? note : null);
         expect(head.button?.label, archived ? restore : null);
         final headPart = find.descendant(

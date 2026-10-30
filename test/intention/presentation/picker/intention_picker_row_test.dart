@@ -265,10 +265,142 @@ void main() {
     }
     semantics.dispose();
   });
+
+  for (final (kind, ruWord, enWord, ruAction, enAction) in const [
+    (
+      OccupiedPairKind.linked,
+      'Уже связано',
+      'Already linked',
+      'нажатие откроет существующую связь',
+      'tapping opens the existing relation',
+    ),
+    (
+      OccupiedPairKind.archived,
+      'Связь в архиве',
+      'Archived relation',
+      'нажатие откроет существующую связь',
+      'tapping opens the existing relation',
+    ),
+    (
+      OccupiedPairKind.restorable,
+      'Связь в архиве',
+      'Archived relation',
+      'нажатие предложит восстановить связь',
+      'tapping offers to restore the relation',
+    ),
+  ]) {
+    testWidgets('строка с отметкой ${kind.name} начинает метки словом, не '
+        'приглушает название, называет отметку и действие нажатия и выполняет '
+        'его вместо выбора на двух языках', (tester) async {
+      final semantics = tester.ensureSemantics();
+      var picks = 0;
+      var pageOpenings = 0;
+      var relationOpenings = 0;
+
+      for (final (locale, word, label, actionPage) in [
+        (
+          const Locale('ru'),
+          ruWord,
+          'Много ходить, действие, Без тегов, $ruWord, $ruAction',
+          'Открыть страницу действия «Много ходить»',
+        ),
+        (
+          const Locale('en'),
+          enWord,
+          'Много ходить, action, No tags, $enWord, $enAction',
+          'Open the page of action Много ходить',
+        ),
+      ]) {
+        await tester.pumpWidget(
+          _app(
+            locale: locale,
+            purpose: SelectRelationParticipant(
+              selectionContext:
+                  RelationParticipantSelectionContext.activeRelation,
+              session: IntentionSearchSession(),
+            ),
+            summary: _summary('Много ходить'),
+            occupiedPair: OccupiedPairMark(
+              kind: kind,
+              onTap: () => relationOpenings++,
+            ),
+            onPick: () => picks++,
+            onOpenPage: () => pageOpenings++,
+          ),
+        );
+
+        final marks = tester.widget<PickerRow>(find.byType(PickerRow)).marks;
+        expect(marks, [
+          isA<BadgeWord>().having((mark) => mark.word, 'word', word),
+          isA<BadgeMark>().having(
+            (mark) => mark.icon,
+            'icon',
+            DoableIconData.bolt,
+          ),
+        ]);
+        expect(
+          tester.widget<PickerRow>(find.byType(PickerRow)).archived,
+          false,
+        );
+        expect(find.bySemanticsLabel(label), findsOneWidget);
+        // Метка не создаёт отдельного узла экранного диктора.
+        expect(find.bySemanticsLabel(word), findsNothing);
+
+        await tester.tap(find.bySemanticsLabel(label));
+        expect((picks, pageOpenings, relationOpenings), (0, 0, 1));
+        await tester.tap(find.bySemanticsLabel(actionPage));
+        expect((picks, pageOpenings, relationOpenings), (0, 1, 1));
+        picks = pageOpenings = relationOpenings = 0;
+      }
+      semantics.dispose();
+    });
+  }
+
+  testWidgets('отметка занятой пары не приглушает название активного '
+      'намерения, а у архивированного приглушено только оно', (tester) async {
+    for (final (archiveState, archived) in const [
+      (IntentionArchiveState.active, false),
+      (IntentionArchiveState.archived, true),
+    ]) {
+      await tester.pumpWidget(
+        _app(
+          purpose: SelectRelationParticipant(
+            selectionContext:
+                RelationParticipantSelectionContext.archivedRelation,
+            session: IntentionSearchSession(),
+          ),
+          summary: _summary('Плавать', archiveState: archiveState),
+          occupiedPair: OccupiedPairMark(
+            kind: OccupiedPairKind.archived,
+            onTap: () {},
+          ),
+        ),
+      );
+
+      expect(
+        tester.widget<PickerRow>(find.byType(PickerRow)).archived,
+        archived,
+      );
+      expect(tester.widget<PickerRow>(find.byType(PickerRow)).marks, [
+        isA<BadgeWord>().having((mark) => mark.word, 'word', 'Связь в архиве'),
+        if (archived)
+          isA<BadgeMark>().having(
+            (mark) => mark.icon,
+            'icon',
+            DoableIconData.archive,
+          ),
+        isA<BadgeMark>().having(
+          (mark) => mark.icon,
+          'icon',
+          DoableIconData.bolt,
+        ),
+      ]);
+    }
+  });
 }
 
 List<(DoableIconData, BadgeTone)> _marks(WidgetTester tester) => [
-  for (final badge in tester.widgetList<Badge>(find.byType(Badge)))
+  for (final badge in tester.widgetList<BadgeMark>(find.bySubtype<Badge>()))
     (badge.icon, badge.tone),
 ];
 
@@ -306,6 +438,7 @@ Widget _app({
   required IntentionSummary summary,
   Locale locale = const Locale('ru'),
   Set<TagId> requiredTagIds = const {},
+  OccupiedPairMark? occupiedPair,
   VoidCallback? onPick,
   VoidCallback? onOpenPage,
 }) => MaterialApp(
@@ -323,6 +456,7 @@ Widget _app({
           requiredTagIds: requiredTagIds,
           onPick: onPick ?? () {},
           onOpenPage: onOpenPage ?? () {},
+          occupiedPair: occupiedPair,
         ),
       ),
     ),

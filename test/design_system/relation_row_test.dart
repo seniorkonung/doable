@@ -208,13 +208,13 @@ void main() {
 
       final action = _badges('Действие');
       expect(action, findsOneWidget);
-      expect(tester.widget<Badge>(action).icon, DoableIconData.bolt);
-      expect(tester.widget<Badge>(action).tone, BadgeTone.ink);
+      expect(tester.widget<BadgeMark>(action).icon, DoableIconData.bolt);
+      expect(tester.widget<BadgeMark>(action).tone, BadgeTone.ink);
 
       final marks = _badges('Архивный сосед-действие');
       expect(marks, findsNWidgets(2));
-      final archive = tester.widget<Badge>(marks.at(0));
-      final bolt = tester.widget<Badge>(marks.at(1));
+      final archive = tester.widget<BadgeMark>(marks.at(0));
+      final bolt = tester.widget<BadgeMark>(marks.at(1));
       expect(archive.icon, DoableIconData.archive);
       expect(archive.tone, BadgeTone.muted);
       expect(bolt.icon, DoableIconData.bolt);
@@ -226,7 +226,7 @@ void main() {
 
       final dimmed = _badges('Архивная связь-действие');
       expect(dimmed, findsOneWidget);
-      expect(tester.widget<Badge>(dimmed).tone, BadgeTone.muted);
+      expect(tester.widget<BadgeMark>(dimmed).tone, BadgeTone.muted);
     });
 
     testWidgets(
@@ -516,7 +516,7 @@ Finder _badges(String name) => find.descendant(
     of: find.textContaining(name),
     matching: find.byType(RelationRow),
   ),
-  matching: find.byType(Badge),
+  matching: find.bySubtype<Badge>(),
 );
 
 final Finder _arrow = find.byWidgetPredicate(

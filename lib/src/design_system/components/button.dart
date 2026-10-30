@@ -26,9 +26,10 @@ final class Button extends StatelessWidget {
   }) : _kind = _ButtonKind.primarySmall,
        semanticLabel = null;
 
-  /// Безопасный ответ диалога отмены изменений, который сохраняет работу,
-  /// например «Продолжить правку»: плашка `ink` с текстом `bg` размера md
-  /// шириной по подписи.
+  /// Безопасный ответ диалога, который сохраняет данные, например
+  /// «Продолжить правку» в диалоге отмены изменений или «Вернуть» в диалоге
+  /// подтверждения: плашка `ink` с текстом `bg` размера md шириной по
+  /// подписи.
   const Button.primaryCompact({
     required this.label,
     required this.onPressed,

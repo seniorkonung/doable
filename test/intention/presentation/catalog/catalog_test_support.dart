@@ -337,6 +337,7 @@ LongTermRelation testRelation({
   required IntentionId sourceIntentionId,
   required IntentionId relatedIntentionId,
   int index = 1,
+  RelationScope scope = RelationScope.active,
 }) {
   final encodedId =
       '018f0001-0000-7000-8000-${index.toString().padLeft(12, '0')}';
@@ -352,7 +353,7 @@ LongTermRelation testRelation({
     relatedIntentionId: relatedIntentionId,
     type: LongTermRelationType.need,
     priority: RelationPriority.p2,
-    scope: RelationScope.active,
+    scope: scope,
     creationSequence: RelationCreationSequence(index),
   );
 }

@@ -9,6 +9,10 @@ import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
+import 'package:doable/src/long_term_relation/application/relation_pair_probe.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
@@ -77,7 +81,7 @@ void main() {
               requiredTagIds: [_tagId(firstTagNumber), _tagId(303)],
               excludedTagIds: [_tagId(lastTagNumber), _tagId(304)],
             ),
-            excludedIntentionId: _id(_uuid(3)),
+            pairProbe: _excluding(_id(_uuid(3))),
           ),
         ),
       );
@@ -96,7 +100,7 @@ void main() {
               ],
               excludedTagIds: [_tagId(304), _tagId(lastTagNumber), _tagId(304)],
             ),
-            excludedIntentionId: _id(_uuid(3)),
+            pairProbe: _excluding(_id(_uuid(3))),
             cursor: first.nextCursor,
           ),
         ),
@@ -170,7 +174,7 @@ void main() {
               readinessFilter: IntentionReadinessFilter.readyOnly,
               titleFilter: 'гулять',
               tagFilter: filter,
-              excludedIntentionId: _id(_uuid(236)),
+              pairProbe: _excluding(_id(_uuid(236))),
               order: order,
               pageSize: 100,
               cursor: cursor,
@@ -376,7 +380,7 @@ void main() {
               tagFilter: filter,
               scope: scope,
               readinessFilter: readiness,
-              excludedIntentionId: _id(_uuid(5)),
+              pairProbe: _excluding(_id(_uuid(5))),
               titleFilter: 'гулять',
               cursor: cursor,
             );
@@ -402,7 +406,7 @@ void main() {
           _tagQuery(
             tagFilter: filter,
             scope: IntentionScope.active,
-            excludedIntentionId: _id(_uuid(1)),
+            pairProbe: _excluding(_id(_uuid(1))),
           ),
         ),
       );
@@ -463,7 +467,7 @@ void main() {
         ),
         scope: scope,
         readinessFilter: readiness,
-        excludedIntentionId: _id(_uuid(5)),
+        pairProbe: _excluding(_id(_uuid(5))),
         titleFilter: 'гулять',
         counting: counting,
       );
@@ -591,7 +595,7 @@ void main() {
           snapshot.matches(
             _tagQuery(
               tagFilter: required.tagFilter,
-              excludedIntentionId: snapshot.summary.id,
+              pairProbe: _excluding(snapshot.summary.id),
             ),
           ),
           isFalse,
@@ -1069,6 +1073,243 @@ void main() {
         );
       }
     });
+  });
+
+  group('Занятые пары в порции каталога', () {
+    // Намерения 1–6 в порядке создания. Связи: 1 → 2 активна, 1 → 3 в архиве,
+    // 4 → 1 обратного направления, 6 → 2 в архиве.
+    const healthy = 1;
+    const walking = 2;
+    const swimming = 3;
+    const sleeping = 4;
+    const reading = 5;
+    const resting = 6;
+    const healthyToWalking = 101;
+    const healthyToSwimming = 102;
+    const sleepingToHealthy = 103;
+    const restingToWalking = 104;
+
+    setUp(() {
+      seedRawGraph(raw, () {
+        for (var number = healthy; number <= resting; number++) {
+          raw.execute(
+            '''INSERT INTO intentions
+               (id, title, is_action_ready, is_archived, created_at, updated_at)
+               VALUES (?, ?, ?, 0, ?, ?)''',
+            [
+              _uuid(number),
+              'Намерение $number',
+              number.isEven ? 1 : 0,
+              number,
+              number,
+            ],
+          );
+        }
+        for (final (number, source, related, archived) in [
+          (healthyToWalking, healthy, walking, 0),
+          (healthyToSwimming, healthy, swimming, 1),
+          (sleepingToHealthy, sleeping, healthy, 0),
+          (restingToWalking, resting, walking, 1),
+        ]) {
+          raw.execute(
+            '''INSERT INTO long_term_relations
+               (id, source_intention_id, related_intention_id, type, priority,
+                is_archived) VALUES (?, ?, ?, 'need', 2, ?)''',
+            [_uuid(number), _uuid(source), _uuid(related), archived],
+          );
+        }
+      });
+    });
+
+    PairOccupant occupant(int relation, RelationScope scope) =>
+        PairOccupant(relationId: _relationId(relation), scope: scope);
+
+    RelationPairProbe probe(
+      int counterpart,
+      RelationParticipantRole role, {
+      int? ignoredRelation,
+    }) => RelationPairProbe(
+      counterpartId: _id(_uuid(counterpart)),
+      candidateRole: role,
+      ignoredRelationId: ignoredRelation == null
+          ? null
+          : _relationId(ignoredRelation),
+    );
+
+    Future<IntentionCatalogFirstPage> firstPage(
+      RelationPairProbe? pairProbe, {
+      int pageSize = 10,
+      IntentionCatalogCounting counting = IntentionCatalogCounting.totalOnly,
+    }) async => _firstPage(
+      await repository.getCatalogPage(
+        _tagQuery(
+          tagFilter: IntentionTagFilter.empty,
+          pairProbe: pairProbe,
+          pageSize: pageSize,
+          counting: counting,
+        ),
+      ),
+    );
+
+    test(
+      'отмечает активную и архивную связи исходного при выборе связанного',
+      () async {
+        final page = await firstPage(
+          probe(healthy, RelationParticipantRole.related),
+        );
+
+        expect(page.items.map((item) => item.id), [
+          for (final number in [walking, swimming, sleeping, reading, resting])
+            _id(_uuid(number)),
+        ]);
+        expect(page.pairOccupants, {
+          _id(_uuid(walking)): occupant(healthyToWalking, RelationScope.active),
+          _id(_uuid(swimming)): occupant(
+            healthyToSwimming,
+            RelationScope.archived,
+          ),
+        });
+      },
+    );
+
+    test('отмечает связи к связанному при выборе исходного', () async {
+      final page = await firstPage(
+        probe(walking, RelationParticipantRole.source),
+      );
+
+      expect(page.pairOccupants, {
+        _id(_uuid(healthy)): occupant(healthyToWalking, RelationScope.active),
+        _id(_uuid(resting)): occupant(restingToWalking, RelationScope.archived),
+      });
+    });
+
+    test('связь обратного направления пару не занимает', () async {
+      final asRelated = await firstPage(
+        probe(healthy, RelationParticipantRole.related),
+      );
+      final asSource = await firstPage(
+        probe(healthy, RelationParticipantRole.source),
+      );
+
+      expect(asRelated.pairOccupants, isNot(contains(_id(_uuid(sleeping)))));
+      expect(asSource.pairOccupants, {
+        _id(_uuid(sleeping)): occupant(sleepingToHealthy, RelationScope.active),
+      });
+    });
+
+    test(
+      'изменяемая связь свою пару не занимает, а остальные занимают',
+      () async {
+        final asRelated = await firstPage(
+          probe(
+            healthy,
+            RelationParticipantRole.related,
+            ignoredRelation: healthyToWalking,
+          ),
+        );
+        final asSource = await firstPage(
+          probe(
+            walking,
+            RelationParticipantRole.source,
+            ignoredRelation: healthyToWalking,
+          ),
+        );
+
+        expect(asRelated.pairOccupants, {
+          _id(_uuid(swimming)): occupant(
+            healthyToSwimming,
+            RelationScope.archived,
+          ),
+        });
+        expect(asSource.pairOccupants, {
+          _id(_uuid(resting)): occupant(
+            restingToWalking,
+            RelationScope.archived,
+          ),
+        });
+      },
+    );
+
+    test('запрос без пробы приходит без карты занятости', () async {
+      final page = await firstPage(null);
+
+      expect(page.items, hasLength(6));
+      expect(page.pairOccupants, isNull);
+    });
+
+    test('продолжение несёт отметки только своих строк, а порция без занятых пар — пустую карту', () async {
+      final pairProbe = probe(healthy, RelationParticipantRole.related);
+      final first = await firstPage(pairProbe, pageSize: 2);
+      trace.measured.clear();
+      final second = _continuationPage(
+        await repository.getCatalogPage(
+          _tagQuery(
+            tagFilter: IntentionTagFilter.empty,
+            pairProbe: pairProbe,
+            pageSize: 2,
+            cursor: first.nextCursor,
+          ),
+        ),
+      );
+      _expectReadsBoundedByPage(trace, second.items, 2);
+      final third = _continuationPage(
+        await repository.getCatalogPage(
+          _tagQuery(
+            tagFilter: IntentionTagFilter.empty,
+            pairProbe: pairProbe,
+            pageSize: 2,
+            cursor: second.nextCursor,
+          ),
+        ),
+      );
+
+      expect(first.items.map((item) => item.id), [
+        _id(_uuid(walking)),
+        _id(_uuid(swimming)),
+      ]);
+      expect(first.pairOccupants!.keys, {
+        _id(_uuid(walking)),
+        _id(_uuid(swimming)),
+      });
+      expect(second.items.map((item) => item.id), [
+        _id(_uuid(sleeping)),
+        _id(_uuid(reading)),
+      ]);
+      expect(second.pairOccupants, isEmpty);
+      expect(third.items.map((item) => item.id), [_id(_uuid(resting))]);
+      expect(third.pairOccupants, isEmpty);
+    });
+
+    test(
+      'занятость не меняет число совпадений, числа по типам и порядок',
+      () async {
+        final pairProbe = probe(healthy, RelationParticipantRole.related);
+        final occupied = await firstPage(
+          pairProbe,
+          counting: IntentionCatalogCounting.byType,
+        );
+        seedRawGraph(raw, () {
+          raw.execute('DELETE FROM long_term_relations');
+        });
+        final free = await firstPage(
+          pairProbe,
+          counting: IntentionCatalogCounting.byType,
+        );
+
+        expect(occupied.pairOccupants, isNotEmpty);
+        expect(free.pairOccupants, isEmpty);
+        expect(
+          occupied.items.map((item) => item.id),
+          free.items.map((item) => item.id),
+        );
+        expect(occupied.totalCount, free.totalCount);
+        final occupiedCounts =
+            (occupied.counts as IntentionCountsByType).counts;
+        final freeCounts = (free.counts as IntentionCountsByType).counts;
+        expect(occupiedCounts.all, freeCounts.all);
+        expect(occupiedCounts.actions, freeCounts.actions);
+      },
+    );
   });
 
   group('Порция каталога — собственные теги', () {
@@ -2509,17 +2750,31 @@ IntentionId _id(String value) => switch (IntentionId.decode(value)) {
 String _uuid(int number) =>
     '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}';
 
+LongTermRelationId _relationId(int number) =>
+    switch (LongTermRelationId.decode(_uuid(number))) {
+      LongTermRelationIdDecodingSuccess(:final id) => id,
+      InvalidLongTermRelationIdDecoding() => throw ArgumentError.value(
+        number,
+        'number',
+      ),
+    };
+
 TagId _tagId(int number) => switch (TagId.decode(_uuid(number))) {
   TagIdDecodingSuccess(:final id) => id,
   InvalidTagIdDecoding() => throw ArgumentError.value(number, 'number'),
 };
+
+RelationPairProbe _excluding(IntentionId id) => RelationPairProbe(
+  counterpartId: id,
+  candidateRole: RelationParticipantRole.related,
+);
 
 IntentionCatalogQuery _tagQuery({
   required IntentionTagFilter tagFilter,
   IntentionScope scope = IntentionScope.all,
   IntentionReadinessFilter readinessFilter = IntentionReadinessFilter.all,
   String? titleFilter,
-  IntentionId? excludedIntentionId,
+  RelationPairProbe? pairProbe,
   int pageSize = 1,
   IntentionCatalogCursor? cursor,
   IntentionCatalogCounting counting = IntentionCatalogCounting.totalOnly,
@@ -2528,7 +2783,7 @@ IntentionCatalogQuery _tagQuery({
   readinessFilter: readinessFilter,
   titleFilter: titleFilter,
   tagFilter: tagFilter,
-  excludedIntentionId: excludedIntentionId,
+  pairProbe: pairProbe,
   order: IntentionCatalogOrder.createdAtAscending,
   pageSize: pageSize,
   cursor: cursor,

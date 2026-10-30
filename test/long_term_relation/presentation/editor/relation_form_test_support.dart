@@ -65,6 +65,7 @@ final class ControlledRelationFormRepository
   final catalogQueries = <IntentionCatalogQuery>[];
   final relationCommands = <CreateLongTermRelation>[];
   final relationUpdateCommands = <UpdateLongTermRelation>[];
+  final relationRestoreCommands = <RestoreLongTermRelation>[];
   final relationWatches = <ControlledRelationWatch>[];
   final _intentionStreams =
       <
@@ -103,7 +104,7 @@ final class ControlledRelationFormRepository
     List<IntentionSummary> items, {
     GraphRevision revision = const TestCatalogRevision(1),
   }) {
-    final excluded = catalogQueries[index].excludedIntentionId;
+    final excluded = catalogQueries[index].pairProbe?.counterpartId;
     final available = [
       for (final item in items)
         if (item.id != excluded) item,
@@ -189,6 +190,28 @@ final class ControlledRelationFormRepository
     );
   }
 
+  /// Подтверждает восстановление связи по отправленной команде того же индекса.
+  LongTermRelation completeRelationRestored(int index, {int revision = 1}) {
+    LongTermRelation relationIn(RelationScope scope) => LongTermRelation(
+      id: relationRestoreCommands[index].relationId,
+      sourceIntentionId: testSummary(index: 1).id,
+      relatedIntentionId: testSummary(index: 2).id,
+      type: LongTermRelationType.need,
+      priority: RelationPriority.p2,
+      scope: scope,
+      creationSequence: RelationCreationSequence(1),
+    );
+    final after = relationIn(RelationScope.active);
+    completeRelationUpdated(
+      index,
+      before: relationIn(RelationScope.archived),
+      after: after,
+      description: null,
+      revision: revision,
+    );
+    return after;
+  }
+
   @override
   Future<GraphCommandResult<TSuccess, TFailure>> execute<
     TSuccess extends GraphCommandOutcome,
@@ -197,8 +220,9 @@ final class ControlledRelationFormRepository
     final result = switch (command) {
       final CreateLongTermRelation creation => await _createRelation(creation),
       final UpdateLongTermRelation update => await _updateRelation(update),
+      final RestoreLongTermRelation restore => await _restoreRelation(restore),
       _ => throw UnsupportedError(
-        'Форма связи отправляет только создание или изменение.',
+        'Форма связи отправляет только создание, изменение или восстановление.',
       ),
     };
     return result as GraphCommandResult<TSuccess, TFailure>;
@@ -269,6 +293,15 @@ final class ControlledRelationFormRepository
     UpdateLongTermRelation command,
   ) {
     relationUpdateCommands.add(command);
+    final request = Completer<LongTermRelationCommandResult>();
+    _relationRequests.add(request);
+    return request.future;
+  }
+
+  Future<LongTermRelationCommandResult> _restoreRelation(
+    RestoreLongTermRelation command,
+  ) {
+    relationRestoreCommands.add(command);
     final request = Completer<LongTermRelationCommandResult>();
     _relationRequests.add(request);
     return request.future;

@@ -495,7 +495,10 @@ void _registerPageMatrixTests() {
       final router = await _start(tester);
       final choice = RelationParticipantChoice(
         role: RelationParticipantRole.related,
-        flow: RelationChangeChoiceFlow(relationScope: scope),
+        flow: RelationChangeChoiceFlow(
+          relationId: testFormRelationId(1),
+          relationScope: scope,
+        ),
         type: LongTermRelationType.need,
         source: RelationParticipantSummary(
           id: _intentionId(_read),

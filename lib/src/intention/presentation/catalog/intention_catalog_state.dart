@@ -1,5 +1,7 @@
 import '../../../graph/application/graph_revision.dart';
+import '../../../long_term_relation/application/relation_pair_probe.dart';
 import '../../application/intention_catalog.dart';
+import '../../domain/intention_id.dart';
 
 enum IntentionCatalogFilterValidationFailure {
   invalidUnicodeRepertoire,
@@ -161,10 +163,18 @@ final class IntentionCatalogLoaded extends IntentionCatalogConfirmedState {
     required super.counts,
     required super.nextCursor,
     required super.revision,
+    Map<IntentionId, PairOccupant> pairOccupants = const {},
     this.continuation = const IntentionCatalogContinuationIdle(),
-  }) : items = List.unmodifiable(items);
+  }) : items = List.unmodifiable(items),
+       pairOccupants = Map.unmodifiable(pairOccupants);
 
   final List<IntentionSummary> items;
+
+  /// Связи, занимающие пары загруженных строк, по идентификатору строки; у
+  /// строки без записи пара свободна. Запись принадлежит поиску с пробой пары:
+  /// приходит с той же порцией, что и строка, а затем следует за
+  /// подтверждёнными фактами о связях; без пробы карта пуста.
+  final Map<IntentionId, PairOccupant> pairOccupants;
   final IntentionCatalogContinuationState continuation;
 }
 

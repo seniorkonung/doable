@@ -50,6 +50,36 @@ Future<bool> showConfirmDialog({
   ),
 );
 
+/// Показывает над корневым навигатором диалог перед действием, которое
+/// сохраняет данные, и возвращает, подтверждено ли оно.
+///
+/// [title] — вопрос, называющий действие и предмет; он же — название
+/// маршрута для экранного диктора. [cancelLabel] — подпись quiet-кнопки
+/// отмены и доступное название затемнения, [actionLabel] — подпись основной
+/// кнопки, повторяющая глагол вопроса. [warning] — второй абзац цветом
+/// `ink`: что при этом не сохранится; без него абзаца нет.
+///
+/// Действие даёт true, а отмена, касание затемнения и системное «назад» —
+/// false.
+Future<bool> showPreservingConfirmDialog({
+  required BuildContext context,
+  required String title,
+  required ConfirmDialogText text,
+  String? warning,
+  required String cancelLabel,
+  required String actionLabel,
+}) => _showDialog(
+  context: context,
+  title: title,
+  barrierLabel: cancelLabel,
+  variant: _Preserving(
+    text: text,
+    warning: warning,
+    cancelLabel: cancelLabel,
+    actionLabel: actionLabel,
+  ),
+);
+
 /// Показывает над корневым навигатором диалог перед уходом с несохранённой
 /// работой и возвращает, отменена ли она.
 ///
@@ -114,6 +144,23 @@ final class _Confirm extends _Variant {
   final String actionLabel;
 }
 
+/// Вопрос перед действием, которое сохраняет данные: quiet-кнопка отмены и
+/// основная кнопка действия в space-2 друг от друга, а за первым абзацем
+/// необязательное предупреждение.
+final class _Preserving extends _Variant {
+  const _Preserving({
+    required this.text,
+    required this.warning,
+    required this.cancelLabel,
+    required this.actionLabel,
+  });
+
+  final ConfirmDialogText text;
+  final String? warning;
+  final String cancelLabel;
+  final String actionLabel;
+}
+
 /// Вопрос перед уходом с несохранённой работой: текстовая кнопка отмены
 /// работы и в space-1 за ней основная кнопка, которая её сохраняет.
 final class _Discard extends _Variant {
@@ -146,18 +193,28 @@ final class _ConfirmDialog extends StatelessWidget {
     final colors = theme.extension<DoableColors>()!;
     final shadows = theme.extension<DoableShadows>()!;
 
-    final (paragraph, gap, spacing, outset, actions) = switch (variant) {
-      _Confirm(:final text, :final cancelLabel, :final actionLabel) => (
+    TextSpan paragraphOf(ConfirmDialogText text) => TextSpan(
+      children: [
+        TextSpan(text: text.before),
         TextSpan(
-          children: [
-            TextSpan(text: text.before),
-            TextSpan(
-              text: text.name,
-              style: TextStyle(color: colors.ink),
-            ),
-            TextSpan(text: text.after),
-          ],
+          text: text.name,
+          style: TextStyle(color: colors.ink),
         ),
+        TextSpan(text: text.after),
+      ],
+    );
+
+    final (
+      paragraph,
+      warning,
+      gap,
+      spacing,
+      outset,
+      actions,
+    ) = switch (variant) {
+      _Confirm(:final text, :final cancelLabel, :final actionLabel) => (
+        paragraphOf(text),
+        null,
         DoableMetrics.space4,
         DoableMetrics.space2,
         0.0,
@@ -172,10 +229,34 @@ final class _ConfirmDialog extends StatelessWidget {
           ),
         ],
       ),
+      _Preserving(
+        :final text,
+        :final warning,
+        :final cancelLabel,
+        :final actionLabel,
+      ) =>
+        (
+          paragraphOf(text),
+          warning,
+          DoableMetrics.space4,
+          DoableMetrics.space2,
+          0.0,
+          [
+            Button.quiet(
+              label: cancelLabel,
+              onPressed: () => Navigator.pop(context, false),
+            ),
+            Button.primaryCompact(
+              label: actionLabel,
+              onPressed: () => Navigator.pop(context, true),
+            ),
+          ],
+        ),
       // Строка действий выходит на 8 правее текста, к краю подписи
       // текстовой кнопки без плашки.
       _Discard(:final text, :final discardLabel, :final keepLabel) => (
         TextSpan(text: text),
+        null,
         14.0,
         DoableMetrics.space1,
         8.0,
@@ -247,6 +328,13 @@ final class _ConfirmDialog extends StatelessWidget {
                           paragraph,
                           style: DoableType.body.copyWith(color: colors.muted),
                         ),
+                        if (warning != null) ...[
+                          const SizedBox(height: DoableMetrics.space2),
+                          Text(
+                            warning,
+                            style: DoableType.body.copyWith(color: colors.ink),
+                          ),
+                        ],
                       ],
                     ),
                   ),

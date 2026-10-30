@@ -23,7 +23,9 @@ import 'package:doable/src/intention/presentation/details/intention_details_page
 import 'package:doable/src/intention/presentation/picker/intention_picker_view.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
+import 'package:doable/src/long_term_relation/application/relation_pair_probe.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation_description.dart';
 import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_choice.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/domain/tag.dart';
@@ -44,10 +46,12 @@ import 'participant_picker_test_support.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
 import '../../../support/tag_positions.dart';
 import '../../../support/tag_condition_cycles.dart';
+import '../editor/relation_form_test_support.dart' show testFormRelationId;
 
 void main() {
   _defineTagSearchTests();
   _definePurposeTests();
+  _defineRestoreOfferTests();
 
   for (final (language, title, cancelLabel, emptyMessage) in const [
     (
@@ -157,13 +161,178 @@ void main() {
     expect((await selection)?.value.id, _id(1));
   });
 
+  // Нажатие на текст отмеченной строки открывает занимающую связь, кроме
+  // архивной связи при создании: её восстановление проверяет
+  // _defineRestoreOfferTests.
+  for (final (flow, choice, scope) in [
+    ('создания', _activeRelation.choice, RelationScope.active),
+    ('изменения', _archivedRelation.choice, RelationScope.active),
+    ('изменения', _archivedRelation.choice, RelationScope.archived),
+  ]) {
+    testWidgets('в потоке $flow нажатие на текст строки со связью '
+        '${scope.name} открывает её поверх поиска без выбора, а «назад» '
+        'возвращает в поиск', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final repository = ControlledParticipantPickerRepository();
+      addTearDown(repository.dispose);
+      final router = await _pumpAppWithCatalog(tester, repository);
+      addTearDown(router.dispose);
+
+      var selectionCompleted = false;
+      final selection = _pushPicker(router, choice)
+        ..whenComplete(() => selectionCompleted = true);
+      await _settleRoute(tester);
+      final pickerId = router.current.matchId;
+      final occupied = testSummary(index: 2, title: 'Много ходить');
+      final free = testSummary(index: 1, title: 'Высыпаться');
+      final occupantId = testFormRelationId(5);
+      _completePage(
+        repository,
+        1,
+        [occupied, free],
+        pairOccupants: {
+          occupied.id: PairOccupant(relationId: occupantId, scope: scope),
+        },
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.bySemanticsLabel(RegExp('tapping opens the existing relation')),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Много ходить'));
+      await _settleRoute(tester);
+
+      expect(
+        router.current.argsAs<RelationDetailsRouteArgs>().relationId,
+        occupantId,
+      );
+      expect(repository.watchedRelations, [occupantId]);
+      expect(router.stackData[router.stackData.length - 2].matchId, pickerId);
+      expect(selectionCompleted, isFalse);
+
+      await router.maybePop();
+      await _settleRoute(tester);
+      expect(router.current.matchId, pickerId);
+      expect(selectionCompleted, isFalse);
+
+      await tester.tap(intentionPickerArrow(intentionPickerRows.first));
+      await _settleRoute(tester);
+      expect(
+        router.current.argsAs<IntentionDetailsRouteArgs>().intentionId,
+        occupied.id,
+      );
+      await router.maybePop();
+      await _settleRoute(tester);
+
+      await tester.tap(find.text('Высыпаться'));
+      await tester.pumpAndSettle();
+      expect((await selection)?.value.id, free.id);
+      semantics.dispose();
+    });
+  }
+
+  // Пока форма создания не может продолжаться, например пока выполняется
+  // восстановление, поиск не принимает выбор и нажатия на отмеченные строки.
+  testWidgets('пока поток создания не может продолжаться, нажатия на текст '
+      'свободной и отмеченной строк ничего не делают, а после возобновления '
+      'работают', (tester) async {
+    final repository = ControlledParticipantPickerRepository();
+    addTearDown(repository.dispose);
+    final router = await _pumpAppWithCatalog(tester, repository);
+    addTearDown(router.dispose);
+    final restore = ControlledRelationRestore();
+
+    var selectionCompleted = false;
+    final selection = _pushPicker(router, _creationChoice(restore))
+      ..whenComplete(() => selectionCompleted = true);
+    await _settleRoute(tester);
+    final pickerId = router.current.matchId;
+    final occupied = testSummary(index: 2, title: 'Много ходить');
+    final free = testSummary(index: 1, title: 'Высыпаться');
+    _completePage(
+      repository,
+      1,
+      [occupied, free],
+      pairOccupants: {
+        occupied.id: PairOccupant(
+          relationId: testFormRelationId(5),
+          scope: RelationScope.active,
+        ),
+      },
+    );
+    await tester.pumpAndSettle();
+
+    restore.canContinue = false;
+    await tester.tap(find.text('Высыпаться'));
+    await tester.tap(find.text('Много ходить'));
+    await tester.pumpAndSettle();
+
+    expect(router.current.matchId, pickerId);
+    expect(selectionCompleted, isFalse);
+    expect(repository.watchedRelations, isEmpty);
+
+    restore.canContinue = true;
+    await tester.tap(find.text('Много ходить'));
+    await _settleRoute(tester);
+    expect(
+      router.current.argsAs<RelationDetailsRouteArgs>().relationId,
+      testFormRelationId(5),
+    );
+    await router.maybePop();
+    await _settleRoute(tester);
+
+    await tester.tap(find.text('Высыпаться'));
+    await tester.pumpAndSettle();
+    expect((await selection)?.value.id, free.id);
+  });
+
+  testWidgets('пока поток создания не может продолжаться, стрелка, лист '
+      'назначения и закрытие работают', (tester) async {
+    final repository = ControlledParticipantPickerRepository();
+    addTearDown(repository.dispose);
+    final router = await _pumpAppWithCatalog(tester, repository);
+    addTearDown(router.dispose);
+    final restore = ControlledRelationRestore();
+
+    final selection = _pushPicker(router, _creationChoice(restore));
+    await _settleRoute(tester);
+    final pickerId = router.current.matchId;
+    final summary = testSummary(index: 1, title: 'Высыпаться');
+    _completePage(repository, 1, [summary]);
+    await tester.pumpAndSettle();
+    restore.canContinue = false;
+
+    await tester.tap(intentionPickerArrow(intentionPickerRows.first));
+    await _settleRoute(tester);
+    expect(
+      router.current.argsAs<IntentionDetailsRouteArgs>().intentionId,
+      summary.id,
+    );
+    await router.maybePop();
+    await _settleRoute(tester);
+    expect(router.current.matchId, pickerId);
+
+    await tester.tap(find.text('New relation: related intention'));
+    await tester.pumpAndSettle();
+    expect(find.byType(Sheet), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byType(Sheet), findsNothing);
+
+    await tester.tap(_cancel);
+    await tester.pumpAndSettle();
+    expect(await selection, isNull);
+    expect(find.byType(IntentionPickerView), findsNothing);
+  });
+
   // Заменяемый участник выбираемой роли не исключается.
-  for (final (name, choice, excluded) in [
+  for (final (name, choice, pairProbe) in [
     (
       'новой связи без участника другой роли',
       RelationParticipantChoice(
         role: RelationParticipantRole.source,
-        flow: const RelationCreationChoiceFlow(),
+        flow: testRelationCreationFlow,
         type: null,
         source: _participant(3),
         related: null,
@@ -174,14 +343,19 @@ void main() {
       'активной изменяемой связи',
       RelationParticipantChoice(
         role: RelationParticipantRole.related,
-        flow: const RelationChangeChoiceFlow(
+        flow: RelationChangeChoiceFlow(
+          relationId: _editedRelation,
           relationScope: RelationScope.active,
         ),
         type: LongTermRelationType.need,
         source: _participant(3),
         related: _participant(4),
       ),
-      _id(3),
+      RelationPairProbe(
+        counterpartId: _id(3),
+        candidateRole: RelationParticipantRole.related,
+        ignoredRelationId: _editedRelation,
+      ),
     ),
   ]) {
     testWidgets('описание выбора $name задаёт активный охват и исключение '
@@ -196,10 +370,29 @@ void main() {
 
       final query = repository.queryAt(1);
       expect(query.scope, IntentionScope.active);
-      expect(query.excludedIntentionId, excluded);
+      expect(query.pairProbe, pairProbe);
     });
   }
 }
+
+/// Описание выбора связанного участника при создании связи с дескриптором
+/// [restore]. Вид, приоритет и описание — черновик формы, по умолчанию пустой.
+RelationParticipantChoice _creationChoice(
+  RelationCreationRestore restore, {
+  LongTermRelationType? type,
+  RelationPriority? priority,
+  String description = '',
+}) => RelationParticipantChoice(
+  role: RelationParticipantRole.related,
+  flow: RelationCreationChoiceFlow(
+    restore: restore,
+    priority: priority,
+    description: description,
+  ),
+  type: type,
+  source: _participant(_excludedIndex),
+  related: null,
+);
 
 /// Завершает переход к выбору участника, не ожидая подтверждённой порции.
 ///
@@ -223,8 +416,9 @@ Future<GraphSnapshot<RelationParticipantSummary>?> _pushPicker(
 void _completePage(
   ControlledParticipantPickerRepository repository,
   int index,
-  List<IntentionSummary> items,
-) => repository.complete(
+  List<IntentionSummary> items, {
+  Map<IntentionId, PairOccupant>? pairOccupants,
+}) => repository.complete(
   index,
   ResultSuccess(
     IntentionCatalogFirstPage(
@@ -232,6 +426,7 @@ void _completePage(
       totalCount: items.length,
       nextCursor: null,
       revision: const TestPickerRevision(1),
+      pairOccupants: pairOccupants,
     ),
   ),
 );
@@ -519,11 +714,13 @@ void _defineTagSearchTests() {
 /// Индекс намерения, уже занятого вторым участником связи.
 const _excludedIndex = 9;
 
+final _editedRelation = testFormRelationId(1);
+
 /// Описание выбора и ограничения запроса каталога, которые из него следуют.
 typedef _ParticipantChoiceCase = ({
   RelationParticipantChoice choice,
   IntentionScope scope,
-  IntentionId? excludedIntentionId,
+  RelationPairProbe? pairProbe,
 });
 
 /// Новая связь: исходный участник уже выбран и исключается из поиска
@@ -531,13 +728,16 @@ typedef _ParticipantChoiceCase = ({
 final _ParticipantChoiceCase _activeRelation = (
   choice: RelationParticipantChoice(
     role: RelationParticipantRole.related,
-    flow: const RelationCreationChoiceFlow(),
+    flow: testRelationCreationFlow,
     type: null,
     source: _participant(_excludedIndex),
     related: null,
   ),
   scope: IntentionScope.active,
-  excludedIntentionId: _id(_excludedIndex),
+  pairProbe: RelationPairProbe(
+    counterpartId: _id(_excludedIndex),
+    candidateRole: RelationParticipantRole.related,
+  ),
 );
 
 /// Изменение архивной связи: заменяемый исходный участник остаётся в выдаче,
@@ -545,13 +745,20 @@ final _ParticipantChoiceCase _activeRelation = (
 final _ParticipantChoiceCase _archivedRelation = (
   choice: RelationParticipantChoice(
     role: RelationParticipantRole.source,
-    flow: const RelationChangeChoiceFlow(relationScope: RelationScope.archived),
+    flow: RelationChangeChoiceFlow(
+      relationId: _editedRelation,
+      relationScope: RelationScope.archived,
+    ),
     type: LongTermRelationType.can,
     source: _participant(5),
     related: _participant(_excludedIndex),
   ),
   scope: IntentionScope.all,
-  excludedIntentionId: _id(_excludedIndex),
+  pairProbe: RelationPairProbe(
+    counterpartId: _id(_excludedIndex),
+    candidateRole: RelationParticipantRole.source,
+    ignoredRelationId: _editedRelation,
+  ),
 );
 
 IntentionId _id(int index) => testSummary(index: index).id;
@@ -662,7 +869,7 @@ void _expectParticipantQuery(
 }) {
   expect(query.scope, expected.scope);
   expect(query.readinessFilter, IntentionReadinessFilter.all);
-  expect(query.excludedIntentionId, expected.excludedIntentionId);
+  expect(query.pairProbe, expected.pairProbe);
   expect(query.titleFilter?.map((value) => value), title);
   expect(query.tagFilter, tagFilter);
   expect(query.cursor, isNull);
@@ -730,6 +937,408 @@ Future<void> _pumpUntilQueries(
   fail('Не дождались $count запросов каталога.');
 }
 
+/// Занимающая связь строки «Плавать» в проверках восстановления.
+final _archivedOccupant = testFormRelationId(5);
+
+/// Поиск при создании связи со строкой «Плавать», пару которой занимает
+/// архивная связь, и свободной строкой «Высыпаться».
+typedef _RestoreOffer = ({
+  ControlledParticipantPickerRepository repository,
+  AppRouter router,
+  ControlledRelationRestore restore,
+  LocalKey pickerId,
+  bool Function() selectionCompleted,
+});
+
+Future<_RestoreOffer> _openRestoreOffer(
+  WidgetTester tester, {
+  Locale locale = const Locale('en'),
+  LongTermRelationType? draftType,
+  RelationPriority? draftPriority,
+  String draftDescription = '',
+}) async {
+  final repository = ControlledParticipantPickerRepository();
+  addTearDown(repository.dispose);
+  final router = await _pumpAppWithCatalog(tester, repository, locale: locale);
+  addTearDown(router.dispose);
+  final restore = ControlledRelationRestore();
+  var selectionCompleted = false;
+  unawaited(
+    _pushPicker(
+      router,
+      _creationChoice(
+        restore,
+        type: draftType,
+        priority: draftPriority,
+        description: draftDescription,
+      ),
+    ).whenComplete(() => selectionCompleted = true),
+  );
+  await _settleRoute(tester);
+  final pickerId = router.current.matchId;
+  final occupied = testSummary(index: 2, title: 'Плавать');
+  _completePage(
+    repository,
+    1,
+    [occupied, testSummary(index: 1, title: 'Высыпаться')],
+    pairOccupants: {
+      occupied.id: PairOccupant(
+        relationId: _archivedOccupant,
+        scope: RelationScope.archived,
+      ),
+    },
+  );
+  await tester.pumpAndSettle();
+  return (
+    repository: repository,
+    router: router,
+    restore: restore,
+    pickerId: pickerId,
+    selectionCompleted: () => selectionCompleted,
+  );
+}
+
+/// Успешное чтение архивной связи «быть здоровым» → «плавать» вида [type] с
+/// приоритетом P2 и описанием [description].
+LongTermRelationReadResult _archivedRelationRead(
+  LongTermRelationType type, {
+  String description = '',
+}) => LongTermRelationReadSuccess(
+  GraphSnapshot(
+    revision: const TestPickerRevision(1),
+    value: LongTermRelationDetails(
+      relation: LongTermRelation(
+        id: _archivedOccupant,
+        sourceIntentionId: _id(_excludedIndex),
+        relatedIntentionId: _id(2),
+        type: type,
+        priority: RelationPriority.p2,
+        scope: RelationScope.archived,
+        creationSequence: RelationCreationSequence(1),
+      ),
+      source: _named(_excludedIndex, 'быть здоровым'),
+      related: _named(2, 'плавать'),
+      description: LongTermRelationDescription.fromInput(description),
+    ),
+  ),
+);
+
+/// Предложение восстановить архивную занимающую связь при создании.
+void _defineRestoreOfferTests() {
+  for (final (language, type, label, title, text, action) in const [
+    (
+      'ru',
+      LongTermRelationType.need,
+      'нажатие предложит восстановить связь',
+      'Восстановить связь?',
+      'Вернётся связь «Чтобы быть здоровым, нужно плавать» с приоритетом P2.',
+      'Восстановить',
+    ),
+    (
+      'en',
+      LongTermRelationType.can,
+      'tapping offers to restore the relation',
+      'Restore this relation?',
+      'The relation “To быть здоровым, you can плавать” returns with '
+          'priority P2.',
+      'Restore',
+    ),
+  ]) {
+    testWidgets('$language: строка «Связь в архиве» при создании называет '
+        'предложение восстановить связь, подтверждение показывает формулировку '
+        'и приоритет, а согласие передаёт связь дескриптору', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final offer = await _openRestoreOffer(tester, locale: Locale(language));
+
+      expect(find.bySemanticsLabel(RegExp(label)), findsOneWidget);
+      await tester.tap(find.text('Плавать'));
+      await tester.pump();
+      expect(offer.repository.watchedRelations, [_archivedOccupant]);
+      offer.repository.answerRelationRead(_archivedRelationRead(type));
+      await tester.pumpAndSettle();
+
+      expect(find.text(title), findsOneWidget);
+      expect(find.text(text, findRichText: true), findsOneWidget);
+      expect(offer.restore.accepted, isEmpty);
+
+      await tester.tap(find.text(action));
+      await tester.pumpAndSettle();
+
+      expect(offer.restore.accepted, [_archivedOccupant]);
+      expect(find.text(title), findsNothing);
+      expect(offer.router.current.matchId, offer.pickerId);
+      expect(offer.selectionCompleted(), isFalse);
+      semantics.dispose();
+    });
+  }
+
+  for (final (
+        name,
+        language,
+        type,
+        priority,
+        description,
+        storedDescription,
+        warning,
+      )
+      in <
+        (
+          String,
+          String,
+          LongTermRelationType?,
+          RelationPriority?,
+          String,
+          String,
+          String?,
+        )
+      >[
+        ('в форме ничего не задано', 'ru', null, null, '', 'Утром', null),
+        (
+          'форма совпадает со связью',
+          'ru',
+          LongTermRelationType.need,
+          RelationPriority.p2,
+          'Утром',
+          'Утром',
+          null,
+        ),
+        (
+          'пустое описание не отличается от описания связи',
+          'ru',
+          null,
+          null,
+          '  ',
+          'Утром',
+          null,
+        ),
+        (
+          'вид называется словами',
+          'ru',
+          LongTermRelationType.can,
+          null,
+          '',
+          '',
+          'Заданное в форме не сохранится: вид «можно».',
+        ),
+        (
+          'отличается только приоритет',
+          'en',
+          null,
+          RelationPriority.p3,
+          '',
+          '',
+          'What you set in the form won’t be kept: priority.',
+        ),
+        (
+          'отличается только описание',
+          'en',
+          null,
+          null,
+          'Вечером',
+          'Утром',
+          'What you set in the form won’t be kept: description.',
+        ),
+        (
+          'отличаются вид, приоритет и описание',
+          'en',
+          LongTermRelationType.can,
+          RelationPriority.p3,
+          'Вечером',
+          '',
+          'What you set in the form won’t be kept: type “can”, priority, '
+              'description.',
+        ),
+      ]) {
+    testWidgets('$language: подтверждение восстановления, когда $name, '
+        '${warning == null ? 'не предупреждает' : 'предупреждает'} о данных '
+        'черновика', (tester) async {
+      final offer = await _openRestoreOffer(
+        tester,
+        locale: Locale(language),
+        draftType: type,
+        draftPriority: priority,
+        draftDescription: description,
+      );
+
+      await tester.tap(find.text('Плавать'));
+      await tester.pump();
+      offer.repository.answerRelationRead(
+        _archivedRelationRead(
+          LongTermRelationType.need,
+          description: storedDescription,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining(
+          RegExp('не сохранится|be kept'),
+          findRichText: true,
+        ),
+        warning == null ? findsNothing : findsOneWidget,
+      );
+      if (warning != null) {
+        expect(find.text(warning, findRichText: true), findsOneWidget);
+      }
+    });
+  }
+
+  testWidgets('отмена подтверждения возвращает поиск без команды и выбора, а '
+      'строка снова предлагает восстановление', (tester) async {
+    final offer = await _openRestoreOffer(tester);
+
+    await tester.tap(find.text('Плавать'));
+    await tester.pump();
+    offer.repository.answerRelationRead(
+      _archivedRelationRead(LongTermRelationType.need),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Restore this relation?'), findsNothing);
+    expect(offer.restore.accepted, isEmpty);
+    expect(offer.router.current.matchId, offer.pickerId);
+    expect(offer.selectionCompleted(), isFalse);
+
+    await tester.tap(find.text('Плавать'));
+    await tester.pump();
+    offer.repository.answerRelationRead(
+      _archivedRelationRead(LongTermRelationType.need),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Restore this relation?'), findsOneWidget);
+  });
+
+  for (final (name, read) in <(String, LongTermRelationReadResult)>[
+    (
+      'связи больше нет',
+      const LongTermRelationReadSuccess(
+        GraphSnapshot(revision: TestPickerRevision(1), value: null),
+      ),
+    ),
+    (
+      'чтение отказало',
+      const LongTermRelationReadError(LongTermRelationReadUnavailableFailure()),
+    ),
+  ]) {
+    testWidgets('если $name, подтверждения нет, а поверх поиска открыт '
+        'подробный просмотр этой связи', (tester) async {
+      final offer = await _openRestoreOffer(tester);
+
+      await tester.tap(find.text('Плавать'));
+      await tester.pump();
+      offer.repository.answerRelationRead(read);
+      await _settleRoute(tester);
+
+      expect(find.text('Restore this relation?'), findsNothing);
+      expect(
+        offer.router.current.argsAs<RelationDetailsRouteArgs>().relationId,
+        _archivedOccupant,
+      );
+      expect(
+        offer.router.stackData[offer.router.stackData.length - 2].matchId,
+        offer.pickerId,
+      );
+      expect(offer.restore.accepted, isEmpty);
+    });
+  }
+
+  testWidgets('ответ чтения после закрытия поиска не открывает ни '
+      'подтверждения, ни связи', (tester) async {
+    final offer = await _openRestoreOffer(tester);
+
+    await tester.tap(find.text('Плавать'));
+    await tester.pump();
+    await tester.tap(_cancel);
+    await tester.pumpAndSettle();
+    expect(offer.selectionCompleted(), isTrue);
+
+    offer.repository.answerRelationRead(
+      _archivedRelationRead(LongTermRelationType.need),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Restore this relation?'), findsNothing);
+    expect(offer.router.current.name, isNot(RelationDetailsRoute.name));
+  });
+
+  testWidgets('ответ чтения под страницей поверх поиска ничего не открывает, а '
+      'после возврата строка снова предлагает восстановление', (tester) async {
+    final offer = await _openRestoreOffer(tester);
+
+    await tester.tap(find.text('Плавать'));
+    await tester.pump();
+    await tester.tap(intentionPickerArrow(intentionPickerRows.first));
+    await _settleRoute(tester);
+    offer.repository.answerRelationRead(
+      _archivedRelationRead(LongTermRelationType.need),
+    );
+    await _settleRoute(tester);
+
+    expect(find.text('Restore this relation?'), findsNothing);
+    expect(find.byType(IntentionDetailsPage), findsOneWidget);
+
+    await offer.router.maybePop();
+    await _settleRoute(tester);
+    expect(offer.router.current.matchId, offer.pickerId);
+    await tester.tap(find.text('Плавать'));
+    await tester.pump();
+    offer.repository.answerRelationRead(
+      _archivedRelationRead(LongTermRelationType.need),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Restore this relation?'), findsOneWidget);
+  });
+
+  testWidgets('ответ чтения под листом назначения ничего не открывает', (
+    tester,
+  ) async {
+    final offer = await _openRestoreOffer(tester);
+
+    await tester.tap(find.text('Плавать'));
+    await tester.pump();
+    await tester.tap(find.text('New relation: related intention'));
+    await tester.pumpAndSettle();
+    offer.repository.answerRelationRead(
+      _archivedRelationRead(LongTermRelationType.need),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(Sheet), findsOneWidget);
+    expect(find.text('Restore this relation?'), findsNothing);
+    expect(offer.router.current.matchId, offer.pickerId);
+  });
+
+  testWidgets('пока поток создания не может продолжаться, строка «Связь в '
+      'архиве» не предлагает восстановление', (tester) async {
+    final offer = await _openRestoreOffer(tester);
+    offer.restore.canContinue = false;
+
+    await tester.tap(find.text('Плавать'));
+    await tester.pumpAndSettle();
+
+    expect(offer.repository.watchedRelations, isEmpty);
+    expect(offer.router.current.matchId, offer.pickerId);
+  });
+
+  testWidgets('повторное нажатие до ответа чтения не открывает второго '
+      'подтверждения', (tester) async {
+    final offer = await _openRestoreOffer(tester);
+
+    await tester.tap(find.text('Плавать'));
+    await tester.tap(find.text('Плавать'));
+    await tester.pump();
+    expect(offer.repository.watchedRelations, [_archivedOccupant]);
+
+    offer.repository.answerRelationRead(
+      _archivedRelationRead(LongTermRelationType.need),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Restore this relation?'), findsOneWidget);
+  });
+}
+
 /// Назначение поиска участника на одном языке: подзаголовок с отметкой роли,
 /// строка листа, строка о выбираемой роли и узлы формы связи для диктора.
 typedef _PurposeCase = ({
@@ -767,7 +1376,7 @@ final List<_PurposeCase> _purposeCases = [
     name: 'лист показывает исходное намерение целиком',
     choice: RelationParticipantChoice(
       role: RelationParticipantRole.related,
-      flow: const RelationCreationChoiceFlow(),
+      flow: testRelationCreationFlow,
       type: LongTermRelationType.need,
       source: _named(3, _longSource),
       related: null,
@@ -796,7 +1405,10 @@ final List<_PurposeCase> _purposeCases = [
     name: 'изменение связи показывает заменяемого участника',
     choice: RelationParticipantChoice(
       role: RelationParticipantRole.related,
-      flow: const RelationChangeChoiceFlow(relationScope: RelationScope.active),
+      flow: RelationChangeChoiceFlow(
+        relationId: _editedRelation,
+        relationScope: RelationScope.active,
+      ),
       type: LongTermRelationType.need,
       source: _named(3, 'Быть здоровым'),
       related: _named(4, 'много ходить'),
@@ -827,7 +1439,7 @@ final List<_PurposeCase> _purposeCases = [
     name: 'выбор исходного при пустом связанном и невыбранном виде',
     choice: const RelationParticipantChoice(
       role: RelationParticipantRole.source,
-      flow: RelationCreationChoiceFlow(),
+      flow: testRelationCreationFlow,
       type: null,
       source: null,
       related: null,
@@ -859,7 +1471,8 @@ final List<_PurposeCase> _purposeCases = [
     name: 'архивная изменяемая связь с архивным участником',
     choice: RelationParticipantChoice(
       role: RelationParticipantRole.source,
-      flow: const RelationChangeChoiceFlow(
+      flow: RelationChangeChoiceFlow(
+        relationId: _editedRelation,
         relationScope: RelationScope.archived,
       ),
       type: LongTermRelationType.can,
@@ -1005,7 +1618,7 @@ void _definePurposeTests() {
     await _settleRoute(tester);
     final query = repository.queryAt(1);
     expect(query.scope, IntentionScope.all);
-    expect(query.excludedIntentionId, _id(_excludedIndex));
+    expect(query.pairProbe?.counterpartId, _id(_excludedIndex));
     _completePage(repository, 1, const []);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Relation change: source intention'));

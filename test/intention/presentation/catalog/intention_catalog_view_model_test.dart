@@ -10,6 +10,9 @@ import 'package:doable/src/intention/presentation/catalog/catalog_paging_policy.
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
+import 'package:doable/src/long_term_relation/application/relation_pair_probe.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -1465,6 +1468,198 @@ void main() {
       expect(selection.order, IntentionCatalogOrder.createdAtDescending);
       expect(selection.titleFilterText, isEmpty);
     });
+  });
+
+  group('занимающие связи строк поиска участника', () {
+    final purpose = SelectRelationParticipant(
+      selectionContext: RelationParticipantSelectionContext.activeRelation,
+      session: IntentionSearchSession(),
+      pairProbe: RelationPairProbe(
+        counterpartId: testSummary(index: 9).id,
+        candidateRole: RelationParticipantRole.related,
+      ),
+    );
+    final provider = intentionCatalogViewModelProvider(purpose);
+
+    PairOccupant occupant(int rowIndex, RelationScope scope) => PairOccupant(
+      relationId: testRelation(
+        sourceIntentionId: testSummary(index: 9).id,
+        relatedIntentionId: testSummary(index: rowIndex).id,
+        index: rowIndex,
+      ).id,
+      scope: scope,
+    );
+
+    test(
+      'выдача несёт занимающие связи строк первой порции и продолжений',
+      () async {
+        final repository = ControlledCatalogRepository();
+        final container = _catalogContainer(
+          repository,
+          pageSize: 2,
+          prefetchRemaining: 1,
+        );
+        final subscription = container.listen(
+          provider,
+          (_, _) {},
+          fireImmediately: true,
+        );
+        addTearDown(subscription.close);
+        addTearDown(container.dispose);
+
+        repository.complete(
+          0,
+          ResultSuccess(
+            IntentionCatalogFirstPage(
+              items: [testSummary(index: 4), testSummary(index: 3)],
+              totalCount: 4,
+              nextCursor: const TestCatalogCursor(),
+              revision: const TestCatalogRevision(1),
+              pairOccupants: {
+                testSummary(index: 3).id: occupant(3, RelationScope.archived),
+              },
+            ),
+          ),
+        );
+        final first = await container.read(provider.future);
+        expect(
+          first,
+          isA<IntentionCatalogLoaded>().having(
+            (loaded) => loaded.pairOccupants,
+            'занимающие связи',
+            {testSummary(index: 3).id: occupant(3, RelationScope.archived)},
+          ),
+        );
+
+        final load = container
+            .read(provider.notifier)
+            .loadNextPageIfNeeded(visibleIndex: 0);
+        await _waitForQueries(repository, 2);
+        repository.complete(
+          1,
+          ResultSuccess(
+            IntentionCatalogContinuationPage(
+              items: [testSummary(index: 2), testSummary(index: 1)],
+              nextCursor: null,
+              revision: const TestCatalogRevision(1),
+              pairOccupants: {
+                testSummary(index: 1).id: occupant(1, RelationScope.active),
+              },
+            ),
+          ),
+        );
+        await load;
+
+        expect(
+          container.read(provider).requireValue,
+          isA<IntentionCatalogLoaded>()
+              .having((loaded) => loaded.items, 'строки', hasLength(4))
+              .having((loaded) => loaded.pairOccupants, 'занимающие связи', {
+                testSummary(index: 3).id: occupant(3, RelationScope.archived),
+                testSummary(index: 1).id: occupant(1, RelationScope.active),
+              }),
+        );
+      },
+    );
+
+    test(
+      'первая порция без занимающих связей нарушает контракт выдачи',
+      () async {
+        final repository = ControlledCatalogRepository();
+        final container = _catalogContainer(repository);
+        final subscription = container.listen(
+          provider,
+          (_, _) {},
+          fireImmediately: true,
+        );
+        addTearDown(subscription.close);
+        addTearDown(container.dispose);
+
+        repository.completeVerbatim(
+          0,
+          ResultSuccess(
+            IntentionCatalogFirstPage(
+              items: [testSummary(index: 4)],
+              totalCount: 1,
+              counts: IntentionCountsByType(
+                IntentionTypeCounts(all: 1, actions: 0),
+              ),
+              nextCursor: null,
+              revision: const TestCatalogRevision(1),
+            ),
+          ),
+        );
+
+        expect(
+          await container.read(provider.future),
+          isA<IntentionCatalogUnexpected>(),
+        );
+      },
+    );
+
+    test(
+      'продолжение без занимающих связей нарушает контракт продолжения',
+      () async {
+        final repository = ControlledCatalogRepository();
+        final container = _catalogContainer(
+          repository,
+          pageSize: 2,
+          prefetchRemaining: 1,
+        );
+        final subscription = container.listen(
+          provider,
+          (_, _) {},
+          fireImmediately: true,
+        );
+        addTearDown(subscription.close);
+        addTearDown(container.dispose);
+
+        repository.complete(
+          0,
+          ResultSuccess(
+            IntentionCatalogFirstPage(
+              items: [testSummary(index: 4), testSummary(index: 3)],
+              totalCount: 4,
+              nextCursor: const TestCatalogCursor(),
+              revision: const TestCatalogRevision(1),
+              pairOccupants: {
+                testSummary(index: 3).id: occupant(3, RelationScope.active),
+              },
+            ),
+          ),
+        );
+        await container.read(provider.future);
+        final load = container
+            .read(provider.notifier)
+            .loadNextPageIfNeeded(visibleIndex: 0);
+        await _waitForQueries(repository, 2);
+        repository.completeVerbatim(
+          1,
+          ResultSuccess(
+            IntentionCatalogContinuationPage(
+              items: [testSummary(index: 2), testSummary(index: 1)],
+              nextCursor: null,
+              revision: const TestCatalogRevision(1),
+            ),
+          ),
+        );
+        await load;
+
+        expect(
+          container.read(provider).requireValue,
+          isA<IntentionCatalogLoaded>()
+              .having((loaded) => loaded.items, 'строки', hasLength(2))
+              .having((loaded) => loaded.pairOccupants, 'занимающие связи', {
+                testSummary(index: 3).id: occupant(3, RelationScope.active),
+              })
+              .having(
+                (loaded) => loaded.continuation,
+                'продолжение',
+                isA<IntentionCatalogContinuationUnexpected>(),
+              ),
+        );
+      },
+    );
   });
 
   test('не забирает у оболочки право предъявить completion', () async {

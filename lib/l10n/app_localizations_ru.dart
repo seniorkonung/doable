@@ -2288,6 +2288,20 @@ class AppLocalizationsRu extends AppLocalizations {
   String get intentionPickerKindIntention => 'намерение';
 
   @override
+  String get intentionPickerPairLinked => 'Уже связано';
+
+  @override
+  String get intentionPickerPairArchived => 'Связь в архиве';
+
+  @override
+  String get intentionPickerPairOpensRelation =>
+      'нажатие откроет существующую связь';
+
+  @override
+  String get intentionPickerPairOffersRestore =>
+      'нажатие предложит восстановить связь';
+
+  @override
   String intentionPickerOpenActionPage(String title) {
     return 'Открыть страницу действия «$title»';
   }
@@ -2605,6 +2619,40 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get participantPickerEmpty => 'Других намерений для выбора нет.';
+
+  @override
+  String get participantPickerRestoreTitle => 'Восстановить связь?';
+
+  @override
+  String get participantPickerRestoreTextBefore => 'Вернётся связь «';
+
+  @override
+  String participantPickerRestoreTextAfter(String priority) {
+    return '» с приоритетом $priority.';
+  }
+
+  @override
+  String participantPickerRestoreWarning(String changes) {
+    return 'Заданное в форме не сохранится: $changes.';
+  }
+
+  @override
+  String get participantPickerRestoreWarningNeedType => 'вид «нужно»';
+
+  @override
+  String get participantPickerRestoreWarningCanType => 'вид «можно»';
+
+  @override
+  String get participantPickerRestoreWarningPriority => 'приоритет';
+
+  @override
+  String get participantPickerRestoreWarningDescription => 'описание';
+
+  @override
+  String get participantPickerRestoreCancel => 'Отмена';
+
+  @override
+  String get participantPickerRestoreConfirm => 'Восстановить';
 
   @override
   String get participantPickerOpenDetails =>

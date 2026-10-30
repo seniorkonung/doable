@@ -27,11 +27,11 @@ void main() {
           ),
         );
 
-        final mark = tester.getRect(find.byType(Badge));
+        final mark = tester.getRect(find.bySubtype<Badge>());
         expect(mark.size, const Size(22, 20));
         final ground = tester.widget<DecoratedBox>(
           find.descendant(
-            of: find.byType(Badge),
+            of: find.bySubtype<Badge>(),
             matching: find.byType(DecoratedBox),
           ),
         );
@@ -66,10 +66,10 @@ void main() {
         ),
       );
 
-      final badge = tester.getRect(find.byType(Badge));
+      final badge = tester.getRect(find.bySubtype<Badge>());
       final ground = tester.widget<DecoratedBox>(
         find.descendant(
-          of: find.byType(Badge),
+          of: find.bySubtype<Badge>(),
           matching: find.byType(DecoratedBox),
         ),
       );
@@ -126,6 +126,79 @@ void main() {
     semantics.dispose();
   });
 
+  for (final (themeName, brightness, colors) in [
+    ('светлой', Brightness.light, DoableColors.light),
+    ('тёмной', Brightness.dark, DoableColors.dark),
+  ]) {
+    for (final word in ['Уже связано', 'Связь в архиве']) {
+      testWidgets('в $themeName теме метка-слово «$word» — только слово '
+          'caption цвета ink в одну строку на bg с углами radius-xs, без '
+          'значка', (tester) async {
+        await tester.pumpWidget(
+          _app(
+            brightness: brightness,
+            child: Badge.word(word: word),
+          ),
+        );
+
+        final badge = tester.getRect(find.bySubtype<Badge>());
+        final ground = tester.widget<DecoratedBox>(
+          find.descendant(
+            of: find.bySubtype<Badge>(),
+            matching: find.byType(DecoratedBox),
+          ),
+        );
+        expect(
+          ground.decoration,
+          BoxDecoration(
+            color: colors.bg,
+            borderRadius: BorderRadius.circular(DoableMetrics.radiusXs),
+          ),
+        );
+        expect(find.byType(DoableIcon), findsNothing);
+
+        final text = tester.getRect(find.text(word));
+        expect(badge.height, 20);
+        expect(text.top - badge.top, 1);
+        expect(badge.bottom - text.bottom, 1);
+        expect(text.left - badge.left, 7);
+        expect(badge.right - text.right, 7);
+
+        final paragraph = tester.renderObject<RenderParagraph>(
+          find.descendant(of: find.text(word), matching: find.byType(RichText)),
+        );
+        expect(paragraph.maxLines, 1);
+        expect(paragraph.softWrap, isFalse);
+        final style = paragraph.text.style!;
+        expect(style.color, colors.ink);
+        expect(style.fontSize, DoableType.caption.fontSize);
+        expect(style.height, DoableType.caption.height);
+        expect(style.fontWeight, DoableType.caption.fontWeight);
+      });
+    }
+  }
+
+  testWidgets('метка-слово не создаёт узла экранного диктора: слово называет '
+      'доступное название строки', (tester) async {
+    final semantics = tester.ensureSemantics();
+
+    await tester.pumpWidget(
+      _app(
+        child: Semantics(
+          container: true,
+          explicitChildNodes: true,
+          label: 'Прогулка, уже связано',
+          child: const Badge.word(word: 'Уже связано'),
+        ),
+      ),
+    );
+
+    final node = tester.getSemantics(find.bySubtype<Badge>());
+    expect(node.label, 'Прогулка, уже связано');
+    expect(node.childrenCount, 0);
+    semantics.dispose();
+  });
+
   testWidgets('метка не создаёт узла экранного диктора', (tester) async {
     final semantics = tester.ensureSemantics();
 
@@ -143,7 +216,7 @@ void main() {
       ),
     );
 
-    final node = tester.getSemantics(find.byType(Badge));
+    final node = tester.getSemantics(find.bySubtype<Badge>());
     expect(node.label, 'Прогулка');
     expect(node.childrenCount, 0);
     semantics.dispose();

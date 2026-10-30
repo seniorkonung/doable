@@ -238,6 +238,167 @@ void main() {
   for (final brightness in Brightness.values) {
     final theme = brightness == Brightness.light ? 'светлой' : 'тёмной';
 
+    testWidgets('в $theme теме диалог действия, которое сохраняет данные, '
+        'ставит quiet-кнопку отмены и основную кнопку в space-2 рядом, а '
+        'предупреждение стоит вторым абзацем цветом ink', (tester) async {
+      final colors = _colorsOf(brightness);
+      final dialog = _Dialog(show: _showPreserving);
+      _useScreen(tester);
+      await tester.pumpWidget(dialog.app(brightness: brightness));
+
+      await dialog.open(tester);
+
+      final plane = tester.getRect(_plane);
+      final title = tester.getRect(find.text(_preservingTitle));
+      final paragraph = tester.getRect(_preservingParagraph);
+      expect(paragraph.top, title.bottom + 6);
+      final paragraphStyle = tester
+          .renderObject<RenderParagraph>(_preservingParagraph)
+          .text
+          .style!;
+      expect(paragraphStyle.color, colors.muted);
+
+      final warning = tester.getRect(find.text(_warning));
+      expect(warning.top, paragraph.bottom + DoableMetrics.space2);
+      expect(warning.left, paragraph.left);
+      final warningStyle = tester.widget<Text>(find.text(_warning)).style!;
+      expect(warningStyle.fontSize, DoableType.body.fontSize);
+      expect(warningStyle.color, colors.ink);
+
+      final cancel = tester.getRect(_pillOf('Отмена'));
+      final action = tester.getRect(_pillOf('Вернуть'));
+      expect(cancel.height, DoableMetrics.controlHeight);
+      expect(action.height, DoableMetrics.controlHeight);
+      expect(action.right, plane.right - DoableMetrics.space6);
+      expect(action.left - cancel.right, DoableMetrics.space2);
+      expect(cancel.top, action.top);
+      // Плашки 40 стоят по центру строки действий 44, которая отстоит от
+      // предупреждения и нижнего края плоскости на space-4.
+      expect(cancel.top, warning.bottom + DoableMetrics.space4 + 2);
+      expect(plane.bottom - action.bottom, DoableMetrics.space4 + 2);
+      expect(_pillColorOf(tester, 'Отмена'), colors.fill);
+      expect(_pillColorOf(tester, 'Вернуть'), colors.ink);
+      expect(_labelColorOf(tester, 'Вернуть'), colors.bg);
+    });
+  }
+
+  testWidgets('без предупреждения диалог действия, которое сохраняет данные, '
+      'не оставляет места под второй абзац', (tester) async {
+    final dialog = _Dialog(
+      show: (context) => _showPreserving(context, warning: null),
+    );
+    _useScreen(tester);
+    await tester.pumpWidget(dialog.app());
+
+    await dialog.open(tester);
+
+    expect(find.text(_warning), findsNothing);
+    final plane = tester.getRect(_plane);
+    final paragraph = tester.getRect(_preservingParagraph);
+    final action = tester.getRect(_pillOf('Вернуть'));
+    expect(action.top, paragraph.bottom + DoableMetrics.space4 + 2);
+    expect(plane.bottom - action.bottom, DoableMetrics.space4 + 2);
+  });
+
+  testWidgets('в диалоге действия, которое сохраняет данные, название в '
+      'первом абзаце выделено цветом ink', (tester) async {
+    final colors = _colorsOf(Brightness.light);
+    final dialog = _Dialog(show: _showPreserving);
+    _useScreen(tester);
+    await tester.pumpWidget(dialog.app());
+
+    await dialog.open(tester);
+
+    final text = tester
+        .renderObject<RenderParagraph>(_preservingParagraph)
+        .text;
+    expect(text.toPlainText(), 'Связь «Гулять» снова станет активной.');
+    final spans = <TextSpan>[];
+    text.visitChildren((span) {
+      if (span is TextSpan && span.text != null) spans.add(span);
+      return true;
+    });
+    expect(
+      spans.singleWhere((span) => span.text == 'Гулять').style!.color,
+      colors.ink,
+    );
+  });
+
+  testWidgets('в диалоге действия, которое сохраняет данные, основная кнопка '
+      'закрывает диалог и подтверждает', (tester) async {
+    final dialog = _Dialog(show: _showPreserving);
+    _useScreen(tester);
+    await tester.pumpWidget(dialog.app());
+    await dialog.open(tester);
+
+    await tester.tap(find.text('Вернуть'));
+    await tester.pumpAndSettle();
+
+    expect(_plane, findsNothing);
+    expect(dialog.result, completion(isTrue));
+  });
+
+  for (final (answer, respond)
+      in <(String, Future<void> Function(WidgetTester))>[
+        ('«Отмена»', (tester) => tester.tap(find.text('Отмена'))),
+        ('касание затемнения', (tester) => tester.tapAt(const Offset(10, 10))),
+        ('системное «назад»', (tester) => tester.binding.handlePopRoute()),
+      ]) {
+    testWidgets('в диалоге действия, которое сохраняет данные, $answer '
+        'закрывает диалог без подтверждения', (tester) async {
+      final dialog = _Dialog(show: _showPreserving);
+      _useScreen(tester);
+      await tester.pumpWidget(dialog.app());
+      await dialog.open(tester, overSheet: true);
+
+      await respond(tester);
+      await tester.pumpAndSettle();
+
+      expect(_plane, findsNothing);
+      expect(find.text(_sheetText), findsOneWidget);
+      expect(dialog.result, completion(isFalse));
+    });
+  }
+
+  testWidgets('диалог действия, которое сохраняет данные, объявляет себя '
+      'маршрутом с названием по заголовку, а затемнение называет отмену', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    final dialog = _Dialog(show: _showPreserving);
+    _useScreen(tester);
+    await tester.pumpWidget(dialog.app());
+    await dialog.open(tester);
+
+    expect(
+      find.semantics.byPredicate(
+        (node) =>
+            node.label == _preservingTitle &&
+            node.flagsCollection.scopesRoute &&
+            node.flagsCollection.namesRoute,
+      ),
+      findsOne,
+    );
+    expect(
+      find.semantics.byPredicate(
+        (node) =>
+            node.label == 'Отмена' &&
+            node.getSemanticsData().hasAction(SemanticsAction.dismiss),
+      ),
+      findsOne,
+    );
+    for (final label in ['Отмена', 'Вернуть']) {
+      expect(
+        tester.getSemantics(find.text(label)),
+        isSemantics(label: label, isButton: true, hasTapAction: true),
+      );
+    }
+    semantics.dispose();
+  });
+
+  for (final brightness in Brightness.values) {
+    final theme = brightness == Brightness.light ? 'светлой' : 'тёмной';
+
     testWidgets('в $theme теме диалог отмены изменений ставит текстовую '
         'кнопку отмены и основную кнопку в space-1 рядом, который выходит на '
         '8 правее текста', (tester) async {
@@ -414,6 +575,8 @@ void main() {
 
 const _title = 'Удалить тег?';
 const _sheetText = 'Содержимое листа';
+const _preservingTitle = 'Восстановить связь?';
+const _warning = 'Вид «можно» из формы не сохранится.';
 const _discardTitle = 'Отменить изменения?';
 const _discardText = 'Изменения заметки не сохранятся.';
 const _discardLabel = 'Выйти';
@@ -477,6 +640,22 @@ Future<bool> _showConfirm(BuildContext context) => showConfirmDialog(
   actionLabel: 'Удалить',
 );
 
+Future<bool> _showPreserving(
+  BuildContext context, {
+  String? warning = _warning,
+}) => showPreservingConfirmDialog(
+  context: context,
+  title: _preservingTitle,
+  text: const ConfirmDialogText(
+    before: 'Связь «',
+    name: 'Гулять',
+    after: '» снова станет активной.',
+  ),
+  warning: warning,
+  cancelLabel: 'Отмена',
+  actionLabel: 'Вернуть',
+);
+
 Future<bool> _showDiscard(BuildContext context) => _showDiscardWith(
   context,
   discardLabel: _discardLabel,
@@ -507,6 +686,11 @@ final _plane = find.descendant(
 
 final _paragraph = find.byWidgetPredicate(
   (widget) => widget is RichText && widget.text.toPlainText().contains('спорт'),
+);
+
+final _preservingParagraph = find.byWidgetPredicate(
+  (widget) =>
+      widget is RichText && widget.text.toPlainText().contains('Гулять'),
 );
 
 final _discardParagraph = find.byWidgetPredicate(

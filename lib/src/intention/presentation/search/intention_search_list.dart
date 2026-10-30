@@ -69,17 +69,15 @@ final class _IntentionSearchListState
 
   late final ResultsScrollKeeper _scrollKeeper;
 
-  /// Выдача, по которой построен список.
-  late AsyncValue<IntentionCatalogState> _shown;
-
   IntentionCatalogViewModel get _notifier =>
       ref.read(intentionCatalogViewModelProvider(widget.purpose).notifier);
 
   @override
   void initState() {
     super.initState();
-    _shown = ref.read(intentionCatalogViewModelProvider(widget.purpose));
-    _scrollKeeper = ResultsScrollKeeper(shown: () => _shown);
+    _scrollKeeper = ResultsScrollKeeper(
+      initial: ref.read(intentionCatalogViewModelProvider(widget.purpose)),
+    );
   }
 
   @override
@@ -94,7 +92,8 @@ final class _IntentionSearchListState
     final kind = IntentionSearchKind.of(widget.purpose);
     final provider = intentionCatalogViewModelProvider(widget.purpose);
     ref.listen(provider, _scrollKeeper.onCatalogChanged);
-    final catalog = _shown = ref.watch(provider);
+    final catalog = ref.watch(provider);
+    _scrollKeeper.onListBuilt(catalog);
     final slivers = catalog.when(
       skipLoadingOnReload: false,
       skipLoadingOnRefresh: false,

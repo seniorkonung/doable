@@ -3538,6 +3538,30 @@ abstract class AppLocalizations {
   /// **'intention'**
   String get intentionPickerKindIntention;
 
+  /// Метка строки поиска участника связи, пару которой занимает активная связь; она же стоит в доступном названии строки
+  ///
+  /// In en, this message translates to:
+  /// **'Already linked'**
+  String get intentionPickerPairLinked;
+
+  /// Метка строки поиска участника связи, пару которой занимает архивированная связь; она же стоит в доступном названии строки
+  ///
+  /// In en, this message translates to:
+  /// **'Archived relation'**
+  String get intentionPickerPairArchived;
+
+  /// Действие нажатия на текст строки поиска участника с отметкой занятой пары в доступном названии строки
+  ///
+  /// In en, this message translates to:
+  /// **'tapping opens the existing relation'**
+  String get intentionPickerPairOpensRelation;
+
+  /// Действие нажатия на текст строки поиска участника, когда при создании связи архивную занимающую связь можно восстановить, в доступном названии строки
+  ///
+  /// In en, this message translates to:
+  /// **'tapping offers to restore the relation'**
+  String get intentionPickerPairOffersRestore;
+
   /// Доступное название стрелки строки экрана выбора, которая открывает страницу действия
   ///
   /// In en, this message translates to:
@@ -3986,6 +4010,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No other intentions are available to select.'**
   String get participantPickerEmpty;
+
+  /// Заголовок подтверждения восстановления занимающей связи из поиска участника
+  ///
+  /// In en, this message translates to:
+  /// **'Restore this relation?'**
+  String get participantPickerRestoreTitle;
+
+  /// Текст подтверждения восстановления до выделенной формулировки связи
+  ///
+  /// In en, this message translates to:
+  /// **'The relation “'**
+  String get participantPickerRestoreTextBefore;
+
+  /// Текст подтверждения восстановления после выделенной формулировки связи
+  ///
+  /// In en, this message translates to:
+  /// **'” returns with priority {priority}.'**
+  String participantPickerRestoreTextAfter(String priority);
+
+  /// Предупреждение в подтверждении восстановления: данные черновика формы, которые не сохранятся; changes — перечень отличающихся данных через запятую
+  ///
+  /// In en, this message translates to:
+  /// **'What you set in the form won’t be kept: {changes}.'**
+  String participantPickerRestoreWarning(String changes);
+
+  /// Перечень предупреждения о восстановлении: выбранный в форме тип «нужно» не сохранится
+  ///
+  /// In en, this message translates to:
+  /// **'type “need”'**
+  String get participantPickerRestoreWarningNeedType;
+
+  /// Перечень предупреждения о восстановлении: выбранный в форме тип «можно» не сохранится
+  ///
+  /// In en, this message translates to:
+  /// **'type “can”'**
+  String get participantPickerRestoreWarningCanType;
+
+  /// Перечень предупреждения о восстановлении: выбранный в форме приоритет не сохранится
+  ///
+  /// In en, this message translates to:
+  /// **'priority'**
+  String get participantPickerRestoreWarningPriority;
+
+  /// Перечень предупреждения о восстановлении: введённое в форме описание не сохранится
+  ///
+  /// In en, this message translates to:
+  /// **'description'**
+  String get participantPickerRestoreWarningDescription;
+
+  /// Отмена восстановления занимающей связи из поиска участника
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get participantPickerRestoreCancel;
+
+  /// Подтверждение восстановления занимающей связи из поиска участника
+  ///
+  /// In en, this message translates to:
+  /// **'Restore'**
+  String get participantPickerRestoreConfirm;
 
   /// Назначение перехода к подробным данным намерения из выбора
   ///
