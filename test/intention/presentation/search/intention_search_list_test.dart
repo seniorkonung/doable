@@ -201,33 +201,12 @@ void main() {
   group('согласование выдачи без смены параметров', () {
     testWidgets('строка, добавленная перед видимой, оставляет видимую строку '
         'на месте', (tester) async {
-      final h = await _open(tester);
-      h.notifier.changeTagFilter(
-        IntentionTagFilter(requiredTagIds: [_sport.id]),
-      );
-      await _waitForQueries(tester, h, 2);
-      h.repository.complete(
-        1,
-        _firstPage([
-          for (var index = 60; index >= 1; index -= 2)
-            _action(index, tags: [_sport]),
-        ]),
-      );
-      await _settle(tester);
+      final h = await _openSportActions(tester);
       h.position.jumpTo(300);
       await _settle(tester);
       final visibleTop = _rowTop(tester, 'Действие 46');
 
-      // Назначение обязательного тега добавляет строку перед видимой.
-      final (command, result) = intentionTagAssignment(
-        state: TagAssignmentState.assigned,
-        tagId: _sport.id,
-        before: _action(59),
-        after: _action(59, tags: [_sport]),
-        revision: const TestCatalogRevision(2),
-      );
-      await acceptTagCommand(h.container, h.repository, command, result).future;
-      await _settle(tester);
+      await _assignSportToAction59(tester, h);
 
       final confirmed = h.container
           .read(intentionCatalogViewModelProvider(h.purpose))
@@ -235,6 +214,19 @@ void main() {
       expect((confirmed as IntentionCatalogLoaded).items, hasLength(31));
       expect(h.position.pixels, 300 + _rowExtent + DoableMetrics.space2);
       expect(_rowTop(tester, 'Действие 46'), visibleTop);
+    });
+
+    testWidgets('верх списка в промежутке между строками: первая видимая '
+        'строка остаётся на месте', (tester) async {
+      final h = await _openSportActions(tester);
+      // Строка 5 занимает 280–328, строка 6 начинается с 336.
+      h.position.jumpTo(332);
+      await _settle(tester);
+      final visibleTop = _rowTop(tester, 'Действие 48');
+
+      await _assignSportToAction59(tester, h);
+
+      expect(_rowTop(tester, 'Действие 48'), visibleTop);
     });
   });
 }
@@ -367,6 +359,36 @@ Future<_Harness> _open(
     ),
   );
   return h;
+}
+
+/// Открывает выдачу с обязательным тегом «Спорт»: 30 строк, чётные действия
+/// от 60 до 2.
+Future<_Harness> _openSportActions(WidgetTester tester) async {
+  final h = await _open(tester);
+  h.notifier.changeTagFilter(IntentionTagFilter(requiredTagIds: [_sport.id]));
+  await _waitForQueries(tester, h, 2);
+  h.repository.complete(
+    1,
+    _firstPage([
+      for (var index = 60; index >= 1; index -= 2)
+        _action(index, tags: [_sport]),
+    ]),
+  );
+  await _settle(tester);
+  return h;
+}
+
+/// Назначение обязательного тега добавляет строку перед видимой.
+Future<void> _assignSportToAction59(WidgetTester tester, _Harness h) async {
+  final (command, result) = intentionTagAssignment(
+    state: TagAssignmentState.assigned,
+    tagId: _sport.id,
+    before: _action(59),
+    after: _action(59, tags: [_sport]),
+    revision: const TestCatalogRevision(2),
+  );
+  await acceptTagCommand(h.container, h.repository, command, result).future;
+  await _settle(tester);
 }
 
 /// Ждёт чтения порции, которое модель начинает после кадра.

@@ -131,7 +131,9 @@ final class ResultsScrollKeeper {
       if (extent == null) {
         continue;
       }
-      if (extent.start <= currentOffset && extent.end > currentOffset) {
+      // Верх списка может прийтись на промежуток между строками: тогда якорем
+      // становится ближайшая строка ниже, а сдвиг внутри неё отрицателен.
+      if (extent.end > currentOffset) {
         return _VisualAnchor(
           query: state.query,
           candidateIds: [
@@ -278,6 +280,9 @@ final class _VisualAnchor {
   /// Якорь действует только для выдачи того же запроса.
   final IntentionCatalogQuery query;
   final List<IntentionId> candidateIds;
+
+  /// Сдвиг верха списка от начала строки; отрицателен, когда верх списка
+  /// пришёлся на промежуток перед строкой.
   final double offsetWithinItem;
   final int remainingApproaches;
 
