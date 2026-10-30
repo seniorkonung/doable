@@ -88,6 +88,7 @@ final class ResultsScrollKeeper {
     if (_pendingVisualAnchor == null &&
         previousState is IntentionCatalogLoaded &&
         identical(previousState.query, nextState.query) &&
+        _isShownResultsOf(nextState) &&
         _mayShiftVisibleRow(previousState, nextState)) {
       _pendingVisualAnchor = _captureVisualAnchor(previousState);
     }
@@ -142,6 +143,18 @@ final class ResultsScrollKeeper {
     if (controller.hasClients) {
       controller.jumpTo(0);
     }
+  }
+
+  /// Построен ли список по выдаче того же запроса, что и [state].
+  ///
+  /// Скрытая страница не перестраивается, поэтому выдача, начатая под закрытой
+  /// страницей, ещё не показана: построенные строки и их ключи принадлежат
+  /// прежней выдаче, и якорь по ним указал бы чужое место. Новая выдача
+  /// начинается сверху, пока список не перестроен по её запросу.
+  bool _isShownResultsOf(IntentionCatalogLoaded state) {
+    final shown = _shown.value;
+    return shown is IntentionCatalogLoaded &&
+        identical(shown.query, state.query);
   }
 
   /// Может ли переход от [previous] к [next] сдвинуть видимую строку.

@@ -376,6 +376,26 @@ void main() {
       expect(h.position.pixels, 0);
       expect(_rowTop(tester, 'Действие 30'), tester.getTopLeft(_list).dy);
     });
+
+    testWidgets('подтверждённая операция меняет строки новой выдачи, начатой, '
+        'пока список закрыт страницей: выдача стоит сверху', (tester) async {
+      final h = await _openSportActions(tester);
+      h.position.jumpTo(300);
+      await _settle(tester);
+
+      await _coverList(tester);
+      // Первая строка новой выдачи — новое действие, а за ним идут действия
+      // прежней: их строки список уже строил.
+      h.notifier.changeTagFilter(IntentionTagFilter.empty);
+      await _waitForQueries(tester, h, 3);
+      h.repository.complete(2, _firstPage([_action(61), ..._actions(60)]));
+      await _settle(tester);
+      await _assignSportToAction59(tester, h);
+      await _uncoverList(tester);
+
+      expect(h.position.pixels, 0);
+      expect(_rowTop(tester, 'Действие 61'), tester.getTopLeft(_list).dy);
+    });
   });
 
   group('согласование отметок занятых пар', () {
