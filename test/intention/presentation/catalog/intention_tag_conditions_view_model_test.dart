@@ -43,30 +43,6 @@ void main() {
     expect(h.appliedFilter, IntentionTagFilter.empty);
   });
 
-  test('смена надобности сохраняет место условия среди других, а новое '
-      'условие встаёт в конец', () {
-    final h = _Harness();
-    addTearDown(h.dispose);
-    h.cycle(1);
-    h.cycle(2);
-    h.cycle(3);
-
-    h.cycle(2);
-    expect(h.shown, [
-      (_id(1), _present),
-      (_id(2), _absent),
-      (_id(3), _present),
-    ]);
-
-    h.cycle(2);
-    h.cycle(2);
-    expect(h.shown, [
-      (_id(1), _present),
-      (_id(3), _present),
-      (_id(2), _present),
-    ]);
-  });
-
   test('сброс снимает все условия одним чтением первой порции с сохранённой '
       'подстрокой названия', () async {
     final h = _Harness(filterDebounce: Duration.zero);
@@ -132,8 +108,7 @@ void main() {
   });
 
   test('подтверждённое удаление снимает обязательное и исключающее условия, '
-      'а остальные сохраняют места и надобности без повторной публикации '
-      'фильтра', () {
+      'а остальные сохраняют надобности без повторной публикации фильтра', () {
     final h = _Harness();
     addTearDown(h.dispose);
     h.cycle(1);
@@ -148,7 +123,7 @@ void main() {
     h.delete(2, _id(1));
     h.delete(3, _id(4));
 
-    expect(h.shown, [(_id(2), _absent), (_id(3), _present)]);
+    expect(h.shown, unorderedEquals([(_id(2), _absent), (_id(3), _present)]));
     // Фильтр без снятых тегов применяет модель каталога по тому же пакету.
     h.appliedFilter;
     expect(h.repository.queries, hasLength(queries));

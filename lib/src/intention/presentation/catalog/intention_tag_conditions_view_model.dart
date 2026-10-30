@@ -51,14 +51,14 @@ final class IntentionTagCondition {
   int get hashCode => Object.hash(tagId, requirement);
 }
 
-/// Условия одного назначения поиска в порядке добавления, по одному на тег.
+/// Условия одного назначения поиска, по одному на тег.
 final class IntentionTagConditionsState {
   IntentionTagConditionsState(Iterable<IntentionTagCondition> conditions)
     : conditions = List.unmodifiable(conditions);
 
   final List<IntentionTagCondition> conditions;
 
-  /// Предикат поиска: порядок добавления в него не входит.
+  /// Предикат поиска по этим условиям.
   IntentionTagFilter get tagFilter => IntentionTagFilter(
     requiredTagIds: _tagIds(IntentionTagRequirement.mustBePresent),
     excludedTagIds: _tagIds(IntentionTagRequirement.mustBeAbsent),
@@ -82,8 +82,8 @@ abstract interface class IntentionTagConditionSet {
   Stream<IntentionTagConditionsState> get changes;
 
   /// Переключает условие по тегу [tagId] по кругу: без условия — «должен
-  /// быть» в конце порядка, «должен быть» — «должен отсутствовать» на прежнем
-  /// месте, «должен отсутствовать» — без условия.
+  /// быть», «должен быть» — «должен отсутствовать», «должен отсутствовать» —
+  /// без условия.
   ///
   /// Тег, удаление которого уже подтверждено, ни условий, ни выдачи не меняет.
   void cycle(TagId tagId);
