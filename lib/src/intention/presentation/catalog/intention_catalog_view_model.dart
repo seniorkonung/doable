@@ -138,9 +138,13 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
         },
         order: _order,
         pageSize: _policy.pageSize,
-        counting: switch (type) {
-          IntentionTypeOpen() => IntentionCatalogCounting.byType,
-          IntentionTypePinnedToActions() => IntentionCatalogCounting.totalOnly,
+        counting: switch ((selection.scope, type)) {
+          (IntentionScopeOpen(), IntentionTypeOpen()) =>
+            IntentionCatalogCounting.byScopeAndType,
+          (IntentionScopeFixed(), IntentionTypeOpen()) =>
+            IntentionCatalogCounting.byType,
+          (_, IntentionTypePinnedToActions()) =>
+            IntentionCatalogCounting.totalOnly,
         },
       );
     } on IntentionCatalogQueryValidationException catch (error) {
@@ -322,18 +326,20 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
         page.items.length > query.pageSize) {
       return IntentionCatalogUnexpected(selection: selection, query: query);
     }
-    final IntentionTypeCounts? typeCounts;
-    switch ((query.counting, page.counts)) {
-      case (IntentionCatalogCounting.totalOnly, IntentionCountsTotalOnly()):
-        typeCounts = null;
-      case (
-            IntentionCatalogCounting.byType,
-            IntentionCountsByType(:final counts),
-          )
-          when page.totalCount == counts.matching(query.readinessFilter):
-        typeCounts = counts;
-      case _:
-        return IntentionCatalogUnexpected(selection: selection, query: query);
+    final countsAgree = switch ((query.counting, page.counts)) {
+      (IntentionCatalogCounting.totalOnly, IntentionCountsTotalOnly()) => true,
+      (IntentionCatalogCounting.byType, IntentionCountsByType(:final counts)) =>
+        page.totalCount == counts.matching(query.readinessFilter),
+      (
+        IntentionCatalogCounting.byScopeAndType,
+        final IntentionCountsByScopeAndType counts,
+      ) =>
+        page.totalCount ==
+            counts.inScope(query.scope).matching(query.readinessFilter),
+      _ => false,
+    };
+    if (!countsAgree) {
+      return IntentionCatalogUnexpected(selection: selection, query: query);
     }
     if (page.items.isEmpty) {
       if (page.totalCount != 0 || page.nextCursor != null) {
@@ -342,7 +348,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       return IntentionCatalogEmpty(
         selection: selection,
         query: query,
-        typeCounts: typeCounts,
+        counts: page.counts,
         revision: page.revision,
       );
     }
@@ -355,7 +361,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       query: query,
       items: page.items,
       totalCount: page.totalCount,
-      typeCounts: typeCounts,
+      counts: page.counts,
       nextCursor: page.nextCursor,
       revision: page.revision,
     );
@@ -490,7 +496,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       query: confirmed.query,
       items: combined,
       totalCount: confirmed.totalCount,
-      typeCounts: confirmed.typeCounts,
+      counts: confirmed.counts,
       nextCursor: page.nextCursor,
       revision: confirmed.revision,
     );
@@ -571,7 +577,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     query: confirmed.query,
     items: confirmed.items,
     totalCount: confirmed.totalCount,
-    typeCounts: confirmed.typeCounts,
+    counts: confirmed.counts,
     nextCursor: confirmed.nextCursor,
     revision: confirmed.revision,
     continuation: continuation,
@@ -776,7 +782,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       query: confirmed.query,
       items: items,
       totalCount: confirmed.totalCount,
-      typeCounts: confirmed.typeCounts,
+      counts: confirmed.counts,
       nextCursor: confirmed.nextCursor,
       revision: confirmed.revision,
       continuation: confirmed.continuation,
@@ -808,7 +814,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       query: confirmed.query,
       items: items,
       totalCount: confirmed.totalCount,
-      typeCounts: confirmed.typeCounts,
+      counts: confirmed.counts,
       nextCursor: confirmed.nextCursor,
       revision: confirmed.revision,
       continuation: confirmed.continuation,
@@ -832,7 +838,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
           query: confirmed.query,
           items: items,
           totalCount: confirmed.totalCount,
-          typeCounts: confirmed.typeCounts,
+          counts: confirmed.counts,
           nextCursor: confirmed.nextCursor,
           revision: revision,
           continuation: continuation,
@@ -840,7 +846,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       IntentionCatalogEmpty() => IntentionCatalogEmpty(
         selection: confirmed.selection,
         query: confirmed.query,
-        typeCounts: confirmed.typeCounts,
+        counts: confirmed.counts,
         revision: revision,
       ),
     };
@@ -857,15 +863,13 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     if (totalCount < 0) {
       return null;
     }
-    final IntentionTypeCounts? typeCounts;
-    switch (confirmed.typeCounts) {
-      case null:
-        typeCounts = null;
-      case final counts:
-        typeCounts = _reconcileTypeCounts(counts, confirmed.query, mutation);
-        if (typeCounts == null) {
-          return null;
-        }
+    final counts = _reconcileCounts(
+      confirmed.counts,
+      confirmed.query,
+      mutation,
+    );
+    if (counts == null) {
+      return null;
     }
 
     final items = switch (confirmed) {
@@ -887,7 +891,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       return IntentionCatalogEmpty(
         selection: confirmed.selection,
         query: confirmed.query,
-        typeCounts: typeCounts,
+        counts: counts,
         revision: mutation.revision,
       );
     }
@@ -896,7 +900,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       query: confirmed.query,
       items: items,
       totalCount: totalCount,
-      typeCounts: typeCounts,
+      counts: counts,
       nextCursor: confirmed.nextCursor,
       revision: mutation.revision,
       continuation: switch (confirmed) {
@@ -906,19 +910,69 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     );
   }
 
-  /// Поправляет числа типов на разницу «после − до»: принадлежность
-  /// снимка — по выдаче без условия готовности, тип — по его готовности;
-  /// `null` — числа стали несогласуемыми.
-  IntentionTypeCounts? _reconcileTypeCounts(
-    IntentionTypeCounts counts,
+  /// Поправляет числа на подтверждённую мутацию; `null` — числа стали
+  /// несогласуемыми.
+  ///
+  /// Числа не зависят от условий, которые они разбирают: числа типов считают
+  /// снимки выдачи без условия готовности, а матрица — без условий охвата и
+  /// готовности, с ячейкой по архивному состоянию снимка.
+  IntentionCatalogCounts? _reconcileCounts(
+    IntentionCatalogCounts counts,
     IntentionCatalogQuery query,
     IntentionCatalogMutation mutation,
   ) {
-    final anyTypeQuery = query.withAnyReadiness();
+    switch (counts) {
+      case IntentionCountsTotalOnly():
+        return counts;
+      case IntentionCountsByType(:final counts):
+        final anyTypeQuery = query.withAnyReadiness();
+        final reconciled = _reconcileTypeCounts(
+          counts,
+          mutation,
+          (snapshot) => snapshot.matches(anyTypeQuery),
+        );
+        return reconciled == null ? null : IntentionCountsByType(reconciled);
+      case IntentionCountsByScopeAndType(:final active, :final archived):
+        final anyCellQuery = query.withAnyScopeAndReadiness();
+        IntentionTypeCounts? reconcileCell(
+          IntentionTypeCounts cell,
+          IntentionArchiveState archiveState,
+        ) => _reconcileTypeCounts(
+          cell,
+          mutation,
+          (snapshot) =>
+              snapshot.summary.archiveState == archiveState &&
+              snapshot.matches(anyCellQuery),
+        );
+        final reconciledActive = reconcileCell(
+          active,
+          IntentionArchiveState.active,
+        );
+        final reconciledArchived = reconcileCell(
+          archived,
+          IntentionArchiveState.archived,
+        );
+        if (reconciledActive == null || reconciledArchived == null) {
+          return null;
+        }
+        return IntentionCountsByScopeAndType(
+          active: reconciledActive,
+          archived: reconciledArchived,
+        );
+    }
+  }
+
+  /// Поправляет числа типов на разницу «после − до» среди снимков, которые
+  /// [counted] относит к этим числам; `null` — числа стали несогласуемыми.
+  IntentionTypeCounts? _reconcileTypeCounts(
+    IntentionTypeCounts counts,
+    IntentionCatalogMutation mutation,
+    bool Function(IntentionCatalogEntrySnapshot snapshot) counted,
+  ) {
     var all = counts.all;
     var actions = counts.actions;
     void count(IntentionCatalogEntrySnapshot? snapshot, int delta) {
-      if (snapshot == null || !snapshot.matches(anyTypeQuery)) {
+      if (snapshot == null || !counted(snapshot)) {
         return;
       }
       all += delta;

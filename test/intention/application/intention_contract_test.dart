@@ -468,6 +468,67 @@ void main() {
       }
     });
 
+    test(
+      'запрос без охвата и готовности сохраняет название, теги и исключение',
+      () {
+        final health = Tag(
+          id: _tagId('00000000-0000-4000-8000-000000000102'),
+          name: TagName.fromStored('Здоровье'),
+          color: null,
+          position: tagPositionAt(1002),
+        );
+        final sport = Tag(
+          id: _tagId('00000000-0000-4000-8000-000000000103'),
+          name: TagName.fromStored('Спорт'),
+          color: null,
+          position: tagPositionAt(1004),
+        );
+        const candidateId = '00000000-0000-4000-8000-000000000001';
+        final otherParticipant = _intentionId(
+          '00000000-0000-4000-8000-000000000002',
+        );
+        final anyCellQuery = IntentionCatalogQuery(
+          scope: IntentionScope.active,
+          readinessFilter: IntentionReadinessFilter.notReadyOnly,
+          titleFilter: 'ХОДИТЬ',
+          tagFilter: IntentionTagFilter(
+            requiredTagIds: [health.id],
+            excludedTagIds: [sport.id],
+          ),
+          excludedIntentionId: otherParticipant,
+          order: IntentionCatalogOrder.titleAscending,
+          pageSize: 1,
+          counting: IntentionCatalogCounting.byScopeAndType,
+        ).withAnyScopeAndReadiness();
+
+        for (final (id, title, tags, expected) in [
+          (candidateId, 'Ходить в парк', [health], true),
+          (candidateId, 'Читать', [health], false),
+          (candidateId, 'Ходить в парк', <Tag>[], false),
+          (candidateId, 'Ходить в парк', [health, sport], false),
+          (
+            otherParticipant.toCanonicalString(),
+            'Ходить в парк',
+            [health],
+            false,
+          ),
+        ]) {
+          expect(
+            anyCellQuery.includes(
+              _summary(
+                id: id,
+                title: title,
+                tags: tags,
+                readiness: IntentionReadiness.ready,
+                archiveState: IntentionArchiveState.archived,
+              ),
+            ),
+            expected,
+          );
+        }
+      },
+    );
+
     test('изменение только цвета тега заменяет его состояние в сводке', () {
       final firstId = _tagId('00000000-0000-4000-8000-000000000002');
       final secondId = _tagId('00000000-0000-4000-8000-000000000001');

@@ -212,6 +212,20 @@ final class IntentionCatalogQuery {
     counting: counting,
   );
 
+  /// Тот же запрос без условий охвата и готовности: по нему снимок попадает
+  /// в числа своих охвата и типа.
+  IntentionCatalogQuery withAnyScopeAndReadiness() => IntentionCatalogQuery._(
+    scope: IntentionScope.all,
+    readinessFilter: IntentionReadinessFilter.all,
+    titleFilter: titleFilter,
+    tagFilter: tagFilter,
+    excludedIntentionId: excludedIntentionId,
+    order: order,
+    pageSize: pageSize,
+    cursor: cursor,
+    counting: counting,
+  );
+
   bool includes(IntentionSummary summary) {
     final matchesScope = switch (scope) {
       IntentionScope.active =>
