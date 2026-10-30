@@ -671,3 +671,25 @@
   - **Предполагаемые файлы:**
     - меняется `test/app/tag_app_flow_test.dart`.
   - **Размер:** XS.
+
+- [ ] 4.18 Убрать зависимость от относительного порядка условий из проверок состояния с несколькими условиями по тегам
+  - **Критерии приёмки:**
+    - Ни одна проверка состояния с двумя и более условиями по тегам не зависит от их относительного порядка. Номера строк указаны на коммите `1e2ea1bd`; если они сдвинулись, места ищутся по содержимому.
+    - `test/intention/presentation/catalog/intention_tag_conditions_view_model_test.dart` (:101-106): снимок с двумя условиями сравнивается без учёта порядка условий, а порядок опубликованных снимков остаётся проверенным, потому что это реальная последовательность событий.
+    - `test/intention/presentation/intention_tag_search_accessibility_test.dart` (:134-143): семь условий сравниваются без учёта порядка.
+    - Там же (:158-161): вместо `conditions.first` условие находится по тегу `_tags.first`, и надобность `mustBeAbsent` проверяется у него.
+    - `test/intention/presentation/catalog/intention_catalog_tag_filter_integration_test.dart` (:714-717): два условия сравниваются без учёта порядка.
+    - `test/tag/presentation/panel/tags_panel_view_model_test.dart` (:1153-1156): два условия сравниваются без учёта порядка.
+    - Проверки с одним условием или пустым набором не меняются, новых тестов нет.
+    - Тип `conditions` и словарь `_requirements` модели условий не меняются. Файлы `lib/` и спецификации не меняются, поведение приложения не меняется.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog/intention_tag_conditions_view_model_test.dart test/intention/presentation/intention_tag_search_accessibility_test.dart test/intention/presentation/catalog/intention_catalog_tag_filter_integration_test.dart test/tag/presentation/panel/tags_panel_view_model_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+    - `mise exec --no-deps -- openspec validate redesign-intention-catalog --strict`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - меняется `test/intention/presentation/catalog/intention_tag_conditions_view_model_test.dart`;
+    - меняется `test/intention/presentation/intention_tag_search_accessibility_test.dart`;
+    - меняется `test/intention/presentation/catalog/intention_catalog_tag_filter_integration_test.dart`;
+    - меняется `test/tag/presentation/panel/tags_panel_view_model_test.dart`.
+  - **Размер:** XS.
