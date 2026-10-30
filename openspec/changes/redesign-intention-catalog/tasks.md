@@ -302,7 +302,7 @@
     - меняются в `test/app/navigation/`: `app_shell_back_test.dart`, `app_shell_pages_above_test.dart`, `app_shell_page_matrix.dart`, `app_shell_operation_reset_test.dart`, `app_shell_test.dart`, `app_shell_layout_test.dart`.
   - **Размер:** M.
 
-- [ ] 3.3 Провести через общие шаги каталога сценарии импорта и восстановления графа
+- [x] 3.3 Провести через общие шаги каталога сценарии импорта и восстановления графа
   - **Критерии приёмки:**
     - `graph_import_app_flow_test.dart` и `graph_restore_app_flow_test.dart` задают условие `addIntentionCatalogTagCondition`, прокручивают каталог `jumpIntentionCatalog` и ищут выдачу `intentionCatalogList`. Локальных `_catalogList`, `_tagConditions`, `_positionOf`, `_catalogPosition`, `_catalogPagePosition` и ключей элементов каталога в них нет.
     - До замены графа сценарии подтверждают одно условие и прокрученный каталог, после замены — ни одного условия и каталог с начала, через `shownIntentionCatalogParameters` и `shownIntentionCatalogOffsets`.
