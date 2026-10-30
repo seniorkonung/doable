@@ -135,7 +135,7 @@ void main() {
       );
       final head = tester.getRect(find.byType(PageHead));
       final title = tester.getRect(text);
-      final badge = tester.getRect(find.byType(Badge));
+      final badge = tester.getRect(find.bySubtype<Badge>());
       expect(title.left, head.left);
       expect(title.top - head.top, 2);
       expect(badge.left - title.right, 8);
@@ -177,7 +177,7 @@ void main() {
       final title = tester.getRect(
         find.text('Поддерживать здоровье и хорошее самочувствие'),
       );
-      final badge = tester.getRect(find.byType(Badge));
+      final badge = tester.getRect(find.bySubtype<Badge>());
       expect(badge.left, head.left);
       expect(badge.top - title.bottom, 6);
       expect(head.bottom - badge.bottom, 6);
@@ -265,7 +265,7 @@ void main() {
         expect(paragraph.text.toPlainText(), text);
       }
       final head = tester.getRect(find.byType(PageHead));
-      final badge = tester.getRect(find.byType(Badge));
+      final badge = tester.getRect(find.bySubtype<Badge>());
       expect(badge.left, head.left);
       final note = tester.getRect(find.text(_note));
       expect(note.top - badge.bottom, 6);

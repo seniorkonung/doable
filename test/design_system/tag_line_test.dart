@@ -74,7 +74,7 @@ void main() {
     );
 
     expect(
-      _inLine(tester, find.byType(Badge)),
+      _inLine(tester, find.bySubtype<Badge>()),
       const Rect.fromLTWH(0, 0, 22, 20),
     );
     expect(_inLine(tester, find.byType(TagChip)).left, 28);
@@ -157,7 +157,7 @@ void main() {
     final line = _line(tester);
     expect(line.size.height, 38);
     expect(
-      _inLine(tester, find.byType(Badge)),
+      _inLine(tester, find.bySubtype<Badge>()),
       const Rect.fromLTWH(0, 9, 22, 20),
     );
     expect(line.hiddenTagCount, 2);

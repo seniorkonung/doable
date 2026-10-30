@@ -314,10 +314,14 @@ void main() {
         );
 
         final marks = tester.widget<PickerRow>(find.byType(PickerRow)).marks;
-        expect(
-          [for (final mark in marks) (mark.icon, mark.word)],
-          [(null, word), (DoableIconData.bolt, null)],
-        );
+        expect(marks, [
+          isA<BadgeWord>().having((mark) => mark.word, 'word', word),
+          isA<BadgeMark>().having(
+            (mark) => mark.icon,
+            'icon',
+            DoableIconData.bolt,
+          ),
+        ]);
         expect(
           tester.widget<PickerRow>(find.byType(PickerRow)).archived,
           false,
@@ -361,24 +365,26 @@ void main() {
         tester.widget<PickerRow>(find.byType(PickerRow)).archived,
         archived,
       );
-      expect(
-        [
-          for (final mark
-              in tester.widget<PickerRow>(find.byType(PickerRow)).marks)
-            (mark.icon, mark.word),
-        ],
-        [
-          (null, 'Связь в архиве'),
-          if (archived) (DoableIconData.archive, null),
-          (DoableIconData.bolt, null),
-        ],
-      );
+      expect(tester.widget<PickerRow>(find.byType(PickerRow)).marks, [
+        isA<BadgeWord>().having((mark) => mark.word, 'word', 'Связь в архиве'),
+        if (archived)
+          isA<BadgeMark>().having(
+            (mark) => mark.icon,
+            'icon',
+            DoableIconData.archive,
+          ),
+        isA<BadgeMark>().having(
+          (mark) => mark.icon,
+          'icon',
+          DoableIconData.bolt,
+        ),
+      ]);
     }
   });
 }
 
-List<(DoableIconData?, BadgeTone)> _marks(WidgetTester tester) => [
-  for (final badge in tester.widgetList<Badge>(find.byType(Badge)))
+List<(DoableIconData, BadgeTone)> _marks(WidgetTester tester) => [
+  for (final badge in tester.widgetList<BadgeMark>(find.bySubtype<Badge>()))
     (badge.icon, badge.tone),
 ];
 

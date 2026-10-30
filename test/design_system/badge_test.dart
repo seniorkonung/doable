@@ -27,11 +27,11 @@ void main() {
           ),
         );
 
-        final mark = tester.getRect(find.byType(Badge));
+        final mark = tester.getRect(find.bySubtype<Badge>());
         expect(mark.size, const Size(22, 20));
         final ground = tester.widget<DecoratedBox>(
           find.descendant(
-            of: find.byType(Badge),
+            of: find.bySubtype<Badge>(),
             matching: find.byType(DecoratedBox),
           ),
         );
@@ -66,10 +66,10 @@ void main() {
         ),
       );
 
-      final badge = tester.getRect(find.byType(Badge));
+      final badge = tester.getRect(find.bySubtype<Badge>());
       final ground = tester.widget<DecoratedBox>(
         find.descendant(
-          of: find.byType(Badge),
+          of: find.bySubtype<Badge>(),
           matching: find.byType(DecoratedBox),
         ),
       );
@@ -141,10 +141,10 @@ void main() {
           ),
         );
 
-        final badge = tester.getRect(find.byType(Badge));
+        final badge = tester.getRect(find.bySubtype<Badge>());
         final ground = tester.widget<DecoratedBox>(
           find.descendant(
-            of: find.byType(Badge),
+            of: find.bySubtype<Badge>(),
             matching: find.byType(DecoratedBox),
           ),
         );
@@ -193,7 +193,7 @@ void main() {
       ),
     );
 
-    final node = tester.getSemantics(find.byType(Badge));
+    final node = tester.getSemantics(find.bySubtype<Badge>());
     expect(node.label, 'Прогулка, уже связано');
     expect(node.childrenCount, 0);
     semantics.dispose();
@@ -216,7 +216,7 @@ void main() {
       ),
     );
 
-    final node = tester.getSemantics(find.byType(Badge));
+    final node = tester.getSemantics(find.bySubtype<Badge>());
     expect(node.label, 'Прогулка');
     expect(node.childrenCount, 0);
     semantics.dispose();
