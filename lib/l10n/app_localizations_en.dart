@@ -2392,6 +2392,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get intentionPickerPurposeSheetBack => 'Back to the list';
 
   @override
+  String get intentionPickerScopeCaption => 'Show';
+
+  @override
+  String get intentionPickerScopeActive => 'Active';
+
+  @override
+  String get intentionPickerScopeArchived => 'Archived';
+
+  @override
+  String get intentionPickerScopeAll => 'All, archived included';
+
+  @override
   String get intentionPickerTypeCaption => 'Type';
 
   @override

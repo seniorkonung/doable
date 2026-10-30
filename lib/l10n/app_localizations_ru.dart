@@ -2416,6 +2416,18 @@ class AppLocalizationsRu extends AppLocalizations {
   String get intentionPickerPurposeSheetBack => 'Вернуться к списку';
 
   @override
+  String get intentionPickerScopeCaption => 'Показать';
+
+  @override
+  String get intentionPickerScopeActive => 'Активные';
+
+  @override
+  String get intentionPickerScopeArchived => 'Архивные';
+
+  @override
+  String get intentionPickerScopeAll => 'Все, включая архивные';
+
+  @override
   String get intentionPickerTypeCaption => 'Тип';
 
   @override

@@ -3754,6 +3754,30 @@ abstract class AppLocalizations {
   /// **'Back to the list'**
   String get intentionPickerPurposeSheetBack;
 
+  /// Название группы охвата в листе параметров показа каталога
+  ///
+  /// In en, this message translates to:
+  /// **'Show'**
+  String get intentionPickerScopeCaption;
+
+  /// Вариант активных намерений в строке и меню охвата листа параметров показа
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get intentionPickerScopeActive;
+
+  /// Вариант архивированных намерений в строке и меню охвата листа параметров показа
+  ///
+  /// In en, this message translates to:
+  /// **'Archived'**
+  String get intentionPickerScopeArchived;
+
+  /// Вариант активных и архивированных намерений в строке и меню охвата листа параметров показа
+  ///
+  /// In en, this message translates to:
+  /// **'All, archived included'**
+  String get intentionPickerScopeAll;
+
   /// Название группы типа намерения
   ///
   /// In en, this message translates to:
