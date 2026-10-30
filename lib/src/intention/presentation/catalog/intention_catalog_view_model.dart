@@ -26,6 +26,12 @@ part 'intention_catalog_view_model.g.dart';
 /// выбора участников не разделяют фильтр и загруженную часть.
 @riverpod
 final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
+  /// Начальные параметры показа: при запуске, после замены графа и после
+  /// сброса.
+  static const _initialScope = IntentionScope.active;
+  static const _initialType = IntentionTypeChoice.all;
+  static const _initialOrder = IntentionCatalogOrder.createdAtDescending;
+
   late IntentionCatalogPurpose _purpose;
 
   /// Поколение графа, для которого заданы параметры просмотра.
@@ -193,6 +199,24 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       return;
     }
     _order = order;
+    _applyParametersImmediately();
+  }
+
+  /// Есть ли параметр показа, отличный от начального.
+  ///
+  /// Закреплённые охват и тип не меняются выбором, поэтому всегда начальные.
+  bool get canResetShowParameters =>
+      _scope != _initialScope ||
+      _type != _initialType ||
+      _order != _initialOrder;
+
+  /// Возвращает охват, тип и порядок к начальным одной новой выдачей с первой
+  /// порции; фильтр названия и условия по тегам сохраняет.
+  void resetShowParameters() {
+    if (!canResetShowParameters) {
+      return;
+    }
+    _restoreInitialShowParameters();
     _applyParametersImmediately();
   }
 
@@ -593,12 +617,16 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     _activePageRequest = null;
   }
 
+  void _restoreInitialShowParameters() {
+    _scope = _initialScope;
+    _type = _initialType;
+    _order = _initialOrder;
+  }
+
   void _resetParameters() {
-    _scope = IntentionScope.active;
-    _type = IntentionTypeChoice.all;
+    _restoreInitialShowParameters();
     _titleFilterText = '';
     _tagFilter = IntentionTagFilter.empty;
-    _order = IntentionCatalogOrder.createdAtDescending;
     _filterValidationFailure = null;
     _filterTimer?.cancel();
     _isDebouncingFilter = false;

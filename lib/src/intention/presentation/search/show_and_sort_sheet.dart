@@ -88,26 +88,16 @@ final class _ShowAndSortSheetState extends ConsumerState<_ShowAndSortSheet> {
           (false, IntentionCatalogSortDirection.descending) =>
             l10n.intentionPickerOrderNewest,
         };
-    final canReset =
-        order != IntentionCatalogOrder.createdAtDescending ||
-        switch (selection.type) {
-          IntentionTypeOpen(:final selected) =>
-            selected != IntentionTypeChoice.all,
-          IntentionTypePinnedToActions() => false,
-        };
 
     return Sheet(
       widget.sheet,
       title: l10n.intentionPickerShowAndSortTitle,
       text: l10n.intentionPickerShowAndSortHint,
-      action: canReset
+      action: model.canResetShowParameters
           ? (
               label: l10n.intentionPickerShowAndSortReset,
               semanticLabel: l10n.intentionPickerShowAndSortReset,
-              onPressed: () {
-                model.changeType(IntentionTypeChoice.all);
-                model.changeOrder(IntentionCatalogOrder.createdAtDescending);
-              },
+              onPressed: model.resetShowParameters,
             )
           : null,
       child: Column(

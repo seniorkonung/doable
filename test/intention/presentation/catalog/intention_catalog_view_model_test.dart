@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
@@ -9,6 +10,7 @@ import 'package:doable/src/intention/presentation/catalog/catalog_paging_policy.
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
+import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -1340,6 +1342,131 @@ void main() {
     );
   });
 
+  group('сброс параметров показа', () {
+    test('каталог возвращает охват, тип и порядок одной выдачей, сохраняя '
+        'фильтр названия и условие по тегу, а в начальном состоянии ничего '
+        'не делает', () async {
+      final repository = ControlledCatalogRepository();
+      final container = _catalogContainer(
+        repository,
+        filterDebounce: const Duration(milliseconds: 1),
+      );
+      final provider = intentionCatalogViewModelProvider(
+        const BrowseIntentionCatalog(),
+      );
+      final subscription = container.listen(
+        provider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      addTearDown(container.dispose);
+      final notifier = container.read(provider.notifier);
+      final tagFilter = IntentionTagFilter(requiredTagIds: [_tagId(1)]);
+
+      await _completeEmptyFirstPage(container, repository, 0);
+      expect(notifier.canResetShowParameters, isFalse);
+      notifier.resetShowParameters();
+      await pumpEventQueue();
+      expect(repository.queries, hasLength(1));
+
+      notifier
+        ..changeScope(IntentionScope.all)
+        ..changeType(IntentionTypeChoice.actions)
+        ..changeOrder(IntentionCatalogOrder.titleAscending)
+        ..changeTitleFilter('бег')
+        ..changeTagFilter(tagFilter);
+      await _waitForQueries(repository, 2);
+      await _completeEmptyFirstPage(container, repository, 1);
+      expect(notifier.canResetShowParameters, isTrue);
+
+      notifier.resetShowParameters();
+      await _waitForQueries(repository, 3);
+      await pumpEventQueue();
+
+      expect(repository.queries, hasLength(3));
+      final query = repository.queryAt(2);
+      expect(query.scope, IntentionScope.active);
+      expect(query.readinessFilter, IntentionReadinessFilter.all);
+      expect(query.order, IntentionCatalogOrder.createdAtDescending);
+      expect(query.titleFilter?.map((value) => value), 'бег');
+      expect(query.tagFilter, tagFilter);
+      expect(query.cursor, isNull);
+      await _completeEmptyFirstPage(container, repository, 2);
+      expect(notifier.canResetShowParameters, isFalse);
+      expect(
+        notifier.selection.scope,
+        const IntentionScopeOpen(IntentionScope.active),
+      );
+      expect(
+        notifier.selection.type,
+        const IntentionTypeOpen(IntentionTypeChoice.all),
+      );
+
+      notifier.resetShowParameters();
+      await pumpEventQueue();
+      expect(repository.queries, hasLength(3));
+    });
+
+    test('смена поколения графа возвращает начальный выбор и запрос, '
+        'включая фильтры', () async {
+      final repository = ControlledCatalogRepository();
+      final container = _catalogContainer(
+        repository,
+        filterDebounce: const Duration(milliseconds: 1),
+      );
+      final provider = intentionCatalogViewModelProvider(
+        const BrowseIntentionCatalog(),
+      );
+      final subscription = container.listen(
+        provider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      addTearDown(container.dispose);
+      final notifier = container.read(provider.notifier);
+
+      await _completeEmptyFirstPage(container, repository, 0);
+      notifier
+        ..changeScope(IntentionScope.all)
+        ..changeType(IntentionTypeChoice.actions)
+        ..changeOrder(IntentionCatalogOrder.titleAscending)
+        ..changeTitleFilter('бег');
+      await _waitForQueries(repository, 2);
+      await _completeEmptyFirstPage(container, repository, 1);
+      expect(repository.queryAt(1).titleFilter?.map((value) => value), 'бег');
+
+      final accepted =
+          container
+                  .read(graphCommandCoordinatorProvider.notifier)
+                  .acceptBackupRestore(
+                    (exclusive) => exclusive.replace(
+                      () async => ConfirmedGraphReplacement(
+                        const TestCatalogRevision(0, epoch: 1),
+                      ),
+                    ),
+                  )
+              as GraphBackupRestoreAccepted;
+      await accepted.future;
+      await _waitForQueries(repository, 3);
+      await pumpEventQueue();
+
+      expect(repository.queries, hasLength(3));
+      final query = repository.queryAt(2);
+      expect(query.scope, IntentionScope.active);
+      expect(query.readinessFilter, IntentionReadinessFilter.all);
+      expect(query.order, IntentionCatalogOrder.createdAtDescending);
+      expect(query.titleFilter, isNull);
+      expect(query.tagFilter, IntentionTagFilter.empty);
+      final selection = notifier.selection;
+      expect(selection.scope, const IntentionScopeOpen(IntentionScope.active));
+      expect(selection.type, const IntentionTypeOpen(IntentionTypeChoice.all));
+      expect(selection.order, IntentionCatalogOrder.createdAtDescending);
+      expect(selection.titleFilterText, isEmpty);
+    });
+  });
+
   test('не забирает у оболочки право предъявить completion', () async {
     final intention = testIntention(index: 90, title: 'Изменённое намерение');
     final repository = ControlledCatalogRepository();
@@ -1419,6 +1546,31 @@ Future<void> _waitForQueries(
   }
   fail('Не дождались $count запросов каталога.');
 }
+
+Future<IntentionCatalogState> _completeEmptyFirstPage(
+  ProviderContainer container,
+  ControlledCatalogRepository repository,
+  int index,
+) {
+  repository.complete(
+    index,
+    ResultSuccess(
+      IntentionCatalogFirstPage(
+        items: const [],
+        totalCount: 0,
+        nextCursor: null,
+        revision: const TestCatalogRevision(1),
+      ),
+    ),
+  );
+  return container.read(
+    intentionCatalogViewModelProvider(const BrowseIntentionCatalog()).future,
+  );
+}
+
+TagId _tagId(int number) => (TagId.decode(
+  '00000000-0000-4000-8000-${number.toString().padLeft(12, '0')}',
+) as TagIdDecodingSuccess).id;
 
 Future<T> _waitForState<T extends IntentionCatalogState>(
   ProviderContainer container,
