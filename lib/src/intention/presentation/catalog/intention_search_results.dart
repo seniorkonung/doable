@@ -107,7 +107,7 @@ final class _IntentionSearchResultsState
     // смещение той же выдачи возвращается из [_listStorage], когда список
     // показан снова.
     _scrollKeeper = ResultsScrollKeeper(
-      shown: () => widget.catalog,
+      initial: widget.catalog,
       keepScrollOffset: true,
     );
   }
@@ -124,6 +124,7 @@ final class _IntentionSearchResultsState
       intentionCatalogViewModelProvider(widget.purpose),
       _handleCatalogStateChanged,
     );
+    _scrollKeeper.onListBuilt(widget.catalog);
     final messages = widget.messages;
     return PageStorage(
       bucket: _listStorage,

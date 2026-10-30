@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/design_system/components/catalog_header.dart';
 import 'package:doable/src/design_system/components/empty_state.dart';
@@ -276,6 +278,58 @@ void main() {
 
       expect(_rowTop(tester, 'Действие 48'), visibleTop);
     });
+
+    testWidgets('строка, добавленная перед первой видимой, пока список закрыт '
+        'страницей, оставляет видимую строку на месте', (tester) async {
+      final h = await _openSportActions(tester);
+      h.position.jumpTo(300);
+      await _settle(tester);
+      final visibleTop = _rowTop(tester, 'Действие 50');
+
+      await _coverList(tester);
+      await _assignSportToAction59(tester, h);
+      await _uncoverList(tester);
+
+      expect(_rowTop(tester, 'Действие 50'), visibleTop);
+    });
+
+    testWidgets('первая видимая строка и её соседи ушли из выдачи по одной, '
+        'пока список закрыт страницей: на её месте стоит ближайшая оставшаяся '
+        'строка', (tester) async {
+      final h = await _openSportActions(tester);
+      // Строка «Действие 50» занимает 280–328.
+      h.position.jumpTo(300);
+      await _settle(tester);
+      final visibleTop = _rowTop(tester, 'Действие 50');
+
+      await _coverList(tester);
+      for (final (revision, index) in [(2, 50), (3, 48), (4, 52)]) {
+        await _removeSportFromAction(tester, h, index, revision: revision);
+      }
+      await _uncoverList(tester);
+
+      expect(_rowTop(tester, 'Действие 46'), visibleTop);
+    });
+
+    testWidgets('новая выдача, начатая после изменения строк, пока список '
+        'закрыт страницей, стоит сверху', (tester) async {
+      final h = await _openSportActions(tester);
+      h.position.jumpTo(300);
+      await _settle(tester);
+
+      await _coverList(tester);
+      await _assignSportToAction59(tester, h);
+      h.notifier.changeTagFilter(
+        IntentionTagFilter(excludedTagIds: [_sport.id]),
+      );
+      await _waitForQueries(tester, h, 3);
+      h.repository.complete(2, _firstPage(_actions(30)));
+      await _settle(tester);
+      await _uncoverList(tester);
+
+      expect(h.position.pixels, 0);
+      expect(_rowTop(tester, 'Действие 30'), tester.getTopLeft(_list).dy);
+    });
   });
 }
 
@@ -437,6 +491,41 @@ Future<void> _assignSportToAction59(WidgetTester tester, _Harness h) async {
   );
   await acceptTagCommand(h.container, h.repository, command, result).future;
   await _settle(tester);
+}
+
+/// Снятие обязательного тега убирает строку из выдачи.
+Future<void> _removeSportFromAction(
+  WidgetTester tester,
+  _Harness h,
+  int index, {
+  required int revision,
+}) async {
+  final (command, result) = intentionTagAssignment(
+    state: TagAssignmentState.absent,
+    tagId: _sport.id,
+    before: _action(index, tags: [_sport]),
+    after: _action(index),
+    revision: TestCatalogRevision(revision),
+  );
+  await acceptTagCommand(h.container, h.repository, command, result).future;
+  await _settle(tester);
+}
+
+/// Закрывает выдачу непрозрачной страницей: скрытый список не перестраивается
+/// по изменениям модели.
+Future<void> _coverList(WidgetTester tester) async {
+  unawaited(
+    tester
+        .state<NavigatorState>(find.byType(Navigator))
+        .push(MaterialPageRoute<void>(builder: (_) => const Scaffold())),
+  );
+  await tester.pumpAndSettle();
+  expect(_list, findsNothing);
+}
+
+Future<void> _uncoverList(WidgetTester tester) async {
+  tester.state<NavigatorState>(find.byType(Navigator)).pop();
+  await tester.pumpAndSettle();
 }
 
 /// Бросает выдачу вниз и оставляет её прокручиваться по инерции: пока

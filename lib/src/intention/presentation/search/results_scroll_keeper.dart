@@ -15,26 +15,26 @@ import '../catalog/intention_catalog_state.dart';
 /// намерения, а если оно исчезло из выдачи — ближайшего соседа.
 ///
 /// Выдача сообщает хранителю каждое состояние модели через [onCatalogChanged]
-/// из `ref.listen`, до перестройки списка, и оборачивает каждую строку в
-/// [KeyedSubtree] с ключом [keyFor].
+/// из `ref.listen`, до перестройки списка, каждую перестройку — через
+/// [onListBuilt] и оборачивает каждую строку в [KeyedSubtree] с ключом
+/// [keyFor].
 final class ResultsScrollKeeper {
-  /// [shown] возвращает выдачу, по которой построен список; первая новая
-  /// выдача после показанной при создании начнётся с верхней позиции.
-  /// [keepScrollOffset] передаётся контроллеру прокрутки: сохранять ли
-  /// смещение в [PageStorage].
+  /// [initial] — выдача, по которой список строится впервые; первая новая
+  /// выдача после неё начнётся с верхней позиции. [keepScrollOffset]
+  /// передаётся контроллеру прокрутки: сохранять ли смещение в [PageStorage].
   ResultsScrollKeeper({
-    required AsyncValue<IntentionCatalogState> Function() shown,
+    required AsyncValue<IntentionCatalogState> initial,
     required bool keepScrollOffset,
   }) : controller = ScrollController(keepScrollOffset: keepScrollOffset),
-       _shown = shown,
-       _query = _confirmedQuery(shown().value);
+       _shown = initial,
+       _query = _confirmedQuery(initial.value);
 
   final ScrollController controller;
 
   /// Выдача, по которой построен список. Она может отставать от модели:
-  /// скрытая страница не перестраивается, пока её снова не покажут, и после
-  /// кадра якорь ищется среди построенных строк.
-  final AsyncValue<IntentionCatalogState> Function() _shown;
+  /// скрытая страница не перестраивается, пока её снова не покажут, и якорь
+  /// ждёт перестройки по актуальной выдаче.
+  AsyncValue<IntentionCatalogState> _shown;
 
   final _itemKeys = <IntentionId, GlobalKey>{};
 
@@ -88,8 +88,17 @@ final class ResultsScrollKeeper {
         _layoutChanged(previousState.items, nextState.items)) {
       _pendingVisualAnchor = _captureVisualAnchor(previousState);
     }
-    _scheduleMaintenance();
     return startsNewResults;
+  }
+
+  /// Учитывает перестройку списка по выдаче [catalog]: после кадра строки уже
+  /// разложены, и хранитель восстанавливает по ним место в списке.
+  void onListBuilt(AsyncValue<IntentionCatalogState> catalog) {
+    if (identical(catalog, _shown)) {
+      return;
+    }
+    _shown = catalog;
+    _scheduleMaintenance();
   }
 
   void dispose() {
@@ -163,11 +172,7 @@ final class ResultsScrollKeeper {
       if (extent.end > currentOffset) {
         return _VisualAnchor(
           query: state.query,
-          candidateIds: [
-            items[index].id,
-            if (index + 1 < items.length) items[index + 1].id,
-            if (index > 0) items[index - 1].id,
-          ],
+          candidateIds: _idsByDistance(items, index),
           offsetWithinItem: currentOffset - extent.start,
           remainingApproaches: _VisualAnchor.maxApproaches,
         );
@@ -175,6 +180,16 @@ final class ResultsScrollKeeper {
     }
     return null;
   }
+
+  /// Строка [index] и её соседи от ближних к дальним: якорь ждёт перестройки
+  /// списка, и за это время из выдачи могут уйти и она, и ближайшие соседи.
+  List<IntentionId> _idsByDistance(List<IntentionSummary> items, int index) => [
+    items[index].id,
+    for (var distance = 1; distance < items.length; distance++) ...[
+      if (index + distance < items.length) items[index + distance].id,
+      if (index - distance >= 0) items[index - distance].id,
+    ],
+  ];
 
   void _scheduleMaintenance() {
     if (_maintenanceScheduled) {
@@ -194,7 +209,7 @@ final class ResultsScrollKeeper {
   void _restoreVisualAnchor() {
     final anchor = _pendingVisualAnchor;
     _pendingVisualAnchor = null;
-    final state = _shown().value;
+    final state = _shown.value;
     if (anchor == null ||
         !controller.hasClients ||
         state is! IntentionCatalogLoaded ||
@@ -227,9 +242,10 @@ final class ResultsScrollKeeper {
   }
 
   int? _anchorTargetIndex(_VisualAnchor anchor, List<IntentionSummary> items) {
+    final indexes = {for (final (index, item) in items.indexed) item.id: index};
     for (final id in anchor.candidateIds) {
-      final index = items.indexWhere((item) => item.id == id);
-      if (index >= 0) {
+      final index = indexes[id];
+      if (index != null) {
         return index;
       }
     }
@@ -281,7 +297,7 @@ final class ResultsScrollKeeper {
   }
 
   void _pruneItemKeys() {
-    final state = _shown().value;
+    final state = _shown.value;
     if (state is! IntentionCatalogLoaded) {
       return;
     }

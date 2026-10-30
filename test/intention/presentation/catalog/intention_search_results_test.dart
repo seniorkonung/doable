@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
@@ -146,6 +148,35 @@ void main() {
       expect((h.confirmed as IntentionCatalogLoaded).items, hasLength(31));
 
       expect(h.position.pixels, 300 + _rowExtent);
+    });
+
+    testWidgets('строка, добавленная перед видимой, пока список закрыт '
+        'страницей, оставляет видимую строку на месте', (tester) async {
+      final h = await _open(tester);
+      await h.load(_summaries(first: 60, step: 2));
+      h.position.jumpTo(300);
+      await _settle(tester);
+      final visibleTop = _rowTop(tester, 'Намерение 48');
+      final navigator = tester.state<NavigatorState>(find.byType(Navigator));
+      unawaited(
+        navigator.push(
+          MaterialPageRoute<void>(builder: (_) => const Scaffold()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final (command, result) = intentionTagAssignment(
+        state: TagAssignmentState.assigned,
+        tagId: _health.id,
+        before: testSummary(index: 59, title: 'Намерение 59'),
+        after: testSummary(index: 59, title: 'Намерение 59', tags: [_health]),
+        revision: TestCatalogRevision(++h.revision),
+      );
+      await h.complete(command, result);
+      navigator.pop();
+      await tester.pumpAndSettle();
+
+      expect(_rowTop(tester, 'Намерение 48'), visibleTop);
     });
   });
 
