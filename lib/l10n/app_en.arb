@@ -1867,6 +1867,11 @@
     "description": "Доступное название стрелки строки экрана выбора, которая открывает страницу намерения",
     "placeholders": {"title": {"type": "String"}}
   },
+  "intentionCatalogRowLabel": "Open: {content}",
+  "@intentionCatalogRowLabel": {
+    "description": "Доступное название строки каталога, которая открывает страницу намерения; content — содержание строки",
+    "placeholders": {"content": {"type": "String"}}
+  },
   "intentionPickerShowAndSortTitle": "Show and sort",
   "@intentionPickerShowAndSortTitle": {"description": "Заголовок листа параметров показа поиска"},
   "intentionPickerShowAndSortHint": "The list changes as you choose",

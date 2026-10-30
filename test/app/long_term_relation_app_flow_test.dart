@@ -103,7 +103,10 @@ void main() {
         ),
       );
       final catalogRow = tester.getSemantics(
-        intentionCatalogRow('Беречь здоровье'),
+        find.descendant(
+          of: intentionCatalogRow('Беречь здоровье'),
+          matching: find.text('Беречь здоровье'),
+        ),
       );
       expect(catalogRow.label, contains('Беречь здоровье'));
 

@@ -2367,6 +2367,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String intentionCatalogRowLabel(String content) {
+    return 'Open: $content';
+  }
+
+  @override
   String get intentionPickerShowAndSortTitle => 'Show and sort';
 
   @override

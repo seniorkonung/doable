@@ -13,14 +13,13 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
     hide IntentionCatalogPage;
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_catalog_row.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
-import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'app_root_pages.dart';
-import 'inline_text.dart';
 import 'tag_condition_cycles.dart';
 
 /// Параметры поиска, которые показывает каталог намерений.
@@ -79,7 +78,7 @@ final intentionCatalogList = find.byKey(
 /// Строки выдачи открытого каталога намерений.
 final intentionCatalogRows = find.descendant(
   of: _page,
-  matching: find.byType(IntentionSummaryView),
+  matching: find.byType(IntentionCatalogRow),
 );
 
 /// Построенные строки выдачи открытого каталога намерений сверху вниз.
@@ -88,12 +87,12 @@ final intentionCatalogRows = find.descendant(
 List<ShownIntentionCatalogRow> shownIntentionCatalogRows(WidgetTester tester) {
   final texts = AppLocalizations.of(tester.element(_page));
   return [
-    for (final row in tester.widgetList<IntentionSummaryView>(
+    for (final row in tester.widgetList<IntentionCatalogRow>(
       intentionCatalogRows,
     ))
       (
-        title: row.title,
-        tags: _shownTags(tester, row, texts),
+        title: row.summary.title,
+        tags: _shownTags(row, texts),
         rect: tester.getRect(find.byWidget(row)),
       ),
   ];
@@ -102,7 +101,7 @@ List<ShownIntentionCatalogRow> shownIntentionCatalogRows(WidgetTester tester) {
 /// Строка выдачи открытого каталога намерений с названием [title].
 Finder intentionCatalogRow(String title) => find.descendant(
   of: _page,
-  matching: find.widgetWithText(IntentionSummaryView, title),
+  matching: find.widgetWithText(IntentionCatalogRow, title),
 );
 
 /// Точное количество [count] совпадений подтверждённой выдачи.
@@ -261,24 +260,16 @@ List<ScrollPosition> _pagePositions(WidgetTester tester) {
   ];
 }
 
-/// Подпись тегов, которую показывает строка [row]. Первый текст строки —
-/// название: оно может начинаться так же, как подпись.
-String _shownTags(
-  WidgetTester tester,
-  IntentionSummaryView row,
-  AppLocalizations texts,
-) {
-  final tagsPrefix = texts.intentionSummaryTags('');
-  return tester
-      .widgetList<Text>(
-        find.descendant(of: find.byWidget(row), matching: find.byType(Text)),
-      )
-      .skip(1)
-      .map(textIgnoringInlineWidgets)
-      .singleWhere(
-        (text) =>
-            text == texts.intentionSummaryNoTags || text.startsWith(tagsPrefix),
-      );
+/// Подпись всех тегов строки [row], включая не поместившиеся в линию, в
+/// ручном порядке сводки: порядок показа с обязательными тегами впереди
+/// закрепляет проверка содержания строки.
+String _shownTags(IntentionCatalogRow row, AppLocalizations texts) {
+  final tags = row.summary.tags;
+  return tags.isEmpty
+      ? texts.intentionSummaryNoTags
+      : texts.intentionSummaryTags(
+          tags.map((tag) => tag.name.value).join(', '),
+        );
 }
 
 /// Выбирает вариант [label] в выпадающем списке [control].

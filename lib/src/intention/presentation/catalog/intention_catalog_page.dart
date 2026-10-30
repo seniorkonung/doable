@@ -5,9 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
 import '../../application/intention_catalog.dart';
-import '../../domain/intention.dart';
-import '../intention_summary_view.dart';
 import 'intention_catalog_purpose.dart';
+import 'intention_catalog_row.dart';
 import 'intention_catalog_state.dart';
 import 'intention_catalog_view_model.dart';
 import 'intention_search_layout.dart';
@@ -80,10 +79,10 @@ final class _IntentionCatalogPageState
           ),
           emptyMessage: (empty) => _emptyMessage(localizations, empty.query),
           totalCountLabel: localizations.catalogTotalCount,
-          itemBuilder: (context, results, summary) => _IntentionSummaryTile(
+          itemBuilder: (context, results, summary) => IntentionCatalogRow(
             summary: summary,
-            showArchiveState: results.query.scope == IntentionScope.all,
-            onTap: () {
+            requiredTagIds: results.query.tagFilter.requiredTagIds,
+            onOpen: () {
               context.router.push(
                 IntentionDetailsRoute(intentionId: summary.id),
               );
@@ -246,37 +245,5 @@ enum _OfferedCatalogOrder {
       if (offered.order == order) return offered;
     }
     return null;
-  }
-}
-
-final class _IntentionSummaryTile extends StatelessWidget {
-  const _IntentionSummaryTile({
-    required this.summary,
-    required this.showArchiveState,
-    required this.onTap,
-  });
-
-  final IntentionSummary summary;
-  final bool showArchiveState;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final localizations = AppLocalizations.of(context);
-    final readiness = switch (summary.readiness) {
-      IntentionReadiness.ready => localizations.catalogReady,
-      IntentionReadiness.notReady => localizations.catalogNotReady,
-    };
-    final description = summary.descriptionPreview != null
-        ? localizations.catalogHasDescription
-        : localizations.catalogNoDescription;
-    return IntentionSummaryView(
-      title: summary.title,
-      archiveState: summary.archiveState,
-      showArchiveState: showArchiveState,
-      traits: [readiness, description],
-      confirmedTags: summary.tags,
-      onTap: onTap,
-    );
   }
 }

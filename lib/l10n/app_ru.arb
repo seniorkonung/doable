@@ -680,6 +680,10 @@
   "@intentionPickerOpenIntentionPage": {
     "placeholders": {"title": {"type": "String"}}
   },
+  "intentionCatalogRowLabel": "Открыть: {content}",
+  "@intentionCatalogRowLabel": {
+    "placeholders": {"content": {"type": "String"}}
+  },
   "intentionPickerShowAndSortTitle": "Показать и упорядочить",
   "@intentionPickerShowAndSortTitle": {"description": "Заголовок листа параметров показа поиска"},
   "intentionPickerShowAndSortHint": "Список меняется по мере выбора",

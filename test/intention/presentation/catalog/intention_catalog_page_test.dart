@@ -4,6 +4,10 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/design_system/components/badge.dart';
+import 'package:doable/src/design_system/components/catalog_row.dart';
+import 'package:doable/src/design_system/components/tag_chip.dart';
+import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -22,7 +26,6 @@ import 'package:doable/src/intention/presentation/catalog/intention_search_layou
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_section.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
-import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
@@ -31,7 +34,7 @@ import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Badge;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -98,13 +101,16 @@ void main() {
     expect(find.text('Total intentions: 12'), findsOneWidget);
     expect(find.text('Позвонить врачу'), findsOneWidget);
     expect(find.text('Выбрать страховку'), findsOneWidget);
-    expect(find.text('Ready for action'), findsOneWidget);
-    expect(find.text('Has description'), findsOneWidget);
+    expect(find.text('Описание'), findsOneWidget);
+    expect(find.text('Ready for action'), findsNothing);
+    expect(find.text('Has description'), findsNothing);
+    expect(_shownMarks(tester), [DoableIconData.bolt]);
   });
 
   testWidgets('явно сообщает архивное состояние строки в охвате всех', (
     tester,
   ) async {
+    final semantics = tester.ensureSemantics();
     final repository = ControlledCatalogRepository();
     await tester.pumpWidget(_testApp(repository));
     repository.complete(
@@ -144,13 +150,15 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Архивное намерение'), findsOneWidget);
-    expect(find.text('Archived'), findsOneWidget);
+    expect(_shownMarks(tester), [DoableIconData.archive]);
     expect(
       find.bySemanticsLabel(
-        RegExp('Архивное намерение.*Archived', dotAll: true),
+        'Open: Архивное намерение, archived, intention, No tags',
       ),
       findsOneWidget,
     );
+
+    semantics.dispose();
   });
 
   testWidgets('каталог проходит accessibility guidelines', (tester) async {
@@ -359,7 +367,7 @@ void main() {
       expect(page.pixels, page.maxScrollExtent);
       expect(page.maxScrollExtent, greaterThan(0));
       // Выдача сохраняет порядок порции: последним стоит двадцатое намерение.
-      final lastRow = find.widgetWithText(IntentionSummaryView, 'Намерение 20');
+      final lastRow = find.widgetWithText(CatalogRow, 'Намерение 20');
       expect(lastRow.hitTestable(), findsOneWidget);
 
       // Обратный жест тоже сначала прокручивает список, а страница остаётся
@@ -1153,10 +1161,8 @@ void main() {
     }
   });
 
-  // Архивное состояние строки в охвате всех показывает тест архивного
-  // состояния в охвате всех.
-  testWidgets('архивный охват показывает намерения без отметки '
-      'избранного', (tester) async {
+  testWidgets('архивный охват показывает намерения с меткой архива и без '
+      'отметки избранного', (tester) async {
     const scopeName = 'Archived';
     const scope = IntentionScope.archived;
     final semantics = tester.ensureSemantics();
@@ -1204,16 +1210,17 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final row = find.ancestor(
-      of: find.text('Архивное первое'),
-      matching: find.byType(IntentionSummaryView),
-    );
     expect(find.byIcon(Icons.star), findsNothing);
-    final label = tester.getSemantics(row).label;
-    expect(label, contains('Архивное первое'));
-    expect(label, isNot(contains('Favorite intention')));
-    // Архивный охват сообщает архивное состояние самим выбранным охватом.
-    expect(label.contains('Archived'), isFalse);
+    expect(_shownMarks(tester), [
+      DoableIconData.archive,
+      DoableIconData.archive,
+    ]);
+    expect(
+      find.bySemanticsLabel(
+        'Open: Архивное первое, archived, intention, No tags',
+      ),
+      findsOneWidget,
+    );
     expect(find.text('Total intentions: 2'), findsOneWidget);
 
     semantics.dispose();
@@ -1260,8 +1267,7 @@ void main() {
     expect(_shownConditions(tester), ['Здоровье']);
     expect(_catalogScrollPosition(tester).pixels, 0);
     expect(find.text('Намерение 60'), findsOneWidget);
-    expect(findTextIgnoringInlineWidgets('Tags: Здоровье'), findsWidgets);
-    expect(find.text('No tags'), findsNothing);
+    expect(_rowChips('Здоровье'), findsWidgets);
     expect(repository.tagCommands, isEmpty);
   });
 
@@ -1384,7 +1390,7 @@ void main() {
 
     final message = find.text('Intentions couldn’t be loaded. Try again.');
     expect(message, findsOneWidget);
-    expect(find.byType(IntentionSummaryView), findsNothing);
+    expect(find.byType(CatalogRow), findsNothing);
 
     await tester.tap(find.widgetWithText(FilledButton, 'Try again'));
     await _pumpUntilQueries(tester, repository, restarted + 2);
@@ -1397,7 +1403,7 @@ void main() {
 
     expect(message, findsNothing);
     expect(find.text('Total intentions: 4'), findsOneWidget);
-    expect(find.byType(IntentionSummaryView), findsNWidgets(4));
+    expect(find.byType(CatalogRow), findsNWidgets(4));
   });
 
   testWidgets('после подтверждённого переименования тега строки и чипы '
@@ -1411,7 +1417,7 @@ void main() {
     await _openCatalogWithConditions(tester, container, repository, [
       (health, IntentionTagRequirement.mustBePresent),
     ], _firstPage(_taggedSummaries([health], first: 3, last: 1), revision: 1));
-    expect(findTextIgnoringInlineWidgets('Tags: Здоровье'), findsNWidgets(3));
+    expect(_rowChips('Здоровье'), findsNWidgets(3));
 
     await _completeCatalogWidgetTagCommand(
       tester,
@@ -1426,10 +1432,7 @@ void main() {
     );
 
     expect(_shownConditions(tester), ['Самочувствие']);
-    expect(
-      findTextIgnoringInlineWidgets('Tags: Самочувствие'),
-      findsNWidgets(3),
-    );
+    expect(_rowChips('Самочувствие'), findsNWidgets(3));
     expect(find.text('Total intentions: 3'), findsOneWidget);
 
     final restarted = repository.queries.length;
@@ -1453,7 +1456,7 @@ void main() {
 
     expect(_shownConditions(tester), isEmpty);
     expect(find.text('Total intentions: 5'), findsOneWidget);
-    expect(find.byType(IntentionSummaryView), findsNWidgets(5));
+    expect(find.byType(CatalogRow), findsNWidgets(5));
     expect(repository.queries, hasLength(restarted + 1));
   });
 }
@@ -1615,14 +1618,10 @@ Future<void> _pumpUntilPageInertia(
   final top = math.max(list.top, tester.getRect(find.byType(AppBar)).bottom);
   final bottom = math.min(list.bottom, screen.height);
   final point = Offset(list.center.dx, (top + bottom) / 2);
-  final rows = find.byWidgetPredicate(
-    (widget) => widget is IntentionSummaryView,
-  );
-  final row = rows
-      .evaluate()
-      .map((element) => element.widget as IntentionSummaryView)
+  final row = tester
+      .widgetList<CatalogRow>(find.byType(CatalogRow))
       .singleWhere((row) => tester.getRect(find.byWidget(row)).contains(point));
-  return (point, row.title);
+  return (point, row.name);
 }
 
 /// Стоит ли фокус ввода в текстовом поле [field].
@@ -1733,6 +1732,7 @@ Widget _testApp(
   ],
   retry: (retryCount, error) => null,
   child: MaterialApp(
+    theme: doableTheme(Brightness.light),
     locale: locale,
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
@@ -1744,6 +1744,7 @@ Widget _testAppWithContainer(ProviderContainer container) =>
     UncontrolledProviderScope(
       container: container,
       child: MaterialApp(
+        theme: doableTheme(Brightness.light),
         locale: const Locale('en'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
@@ -1770,18 +1771,10 @@ Widget _routerTestAppWithContainer(
     find.byKey(const PageStorageKey<String>('intention-catalog-list')),
   );
   final visible = <({String title, double top})>[];
-  for (final element in find.byType(ListTile).evaluate()) {
-    final tile = element.widget as ListTile;
-    final title = tile.title;
-    if (title is! Text || title.data == null) {
-      continue;
-    }
-    final finder = find.byElementPredicate(
-      (candidate) => identical(candidate, element),
-    );
-    final rect = tester.getRect(finder);
+  for (final row in tester.widgetList<CatalogRow>(find.byType(CatalogRow))) {
+    final rect = tester.getRect(find.byWidget(row));
     if (rect.bottom > listRect.top && rect.top < listRect.bottom) {
-      visible.add((title: title.data!, top: rect.top));
+      visible.add((title: row.name, top: rect.top));
     }
   }
   visible.sort((left, right) => left.top.compareTo(right.top));
@@ -1791,13 +1784,21 @@ Widget _routerTestAppWithContainer(
 double _catalogTileTop(WidgetTester tester, String title) => tester
     .getTopLeft(
       find.byWidgetPredicate(
-        (widget) =>
-            widget is ListTile &&
-            widget.title is Text &&
-            (widget.title! as Text).data == title,
+        (widget) => widget is CatalogRow && widget.name == title,
       ),
     )
     .dy;
+
+/// Чипы тега с названием [name] в строках каталога.
+Finder _rowChips(String name) => find.descendant(
+  of: find.byType(CatalogRow),
+  matching: find.widgetWithText(TagChip, name),
+);
+
+/// Значки меток построенных строк каталога в порядке показа.
+List<DoableIconData> _shownMarks(WidgetTester tester) => [
+  for (final badge in tester.widgetList<Badge>(find.byType(Badge))) badge.icon,
+];
 
 Future<void> _completeCatalogWidgetCommand(
   WidgetTester tester,

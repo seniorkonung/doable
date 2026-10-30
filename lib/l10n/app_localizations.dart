@@ -3712,6 +3712,12 @@ abstract class AppLocalizations {
   /// **'Open the page of intention {title}'**
   String intentionPickerOpenIntentionPage(String title);
 
+  /// Доступное название строки каталога, которая открывает страницу намерения; content — содержание строки
+  ///
+  /// In en, this message translates to:
+  /// **'Open: {content}'**
+  String intentionCatalogRowLabel(String content);
+
   /// Заголовок листа параметров показа поиска
   ///
   /// In en, this message translates to:

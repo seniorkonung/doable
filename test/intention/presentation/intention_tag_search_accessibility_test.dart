@@ -1,5 +1,6 @@
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
+import 'package:doable/src/design_system/components/catalog_row.dart';
 import 'package:doable/src/design_system/components/search_field.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
@@ -10,7 +11,6 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_stat
 import 'package:doable/src/intention/presentation/catalog/intention_search_layout.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_section.dart';
-import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
@@ -21,7 +21,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/app_root_pages.dart';
-import '../../support/inline_text.dart';
 import 'catalog/catalog_reconciliation_test_support.dart';
 import 'catalog/catalog_test_support.dart';
 import '../../support/tag_condition_cycles.dart';
@@ -243,26 +242,25 @@ void main() {
     await _pumpFrames(tester);
     expect(tester.takeException(), isNull);
 
+    // Первый тег нажатием стал исключённым, и обязательным остался второй из
+    // тегов строки: он называется впереди.
     final tagsLine = l10n.intentionSummaryTags(
-      rowTags.map((tag) => tag.name.value).join(', '),
+      rowTags.reversed.map((tag) => tag.name.value).join(', '),
     );
     for (final summary in items) {
       final row = find.ancestor(
         of: find.text(summary.title),
-        matching: find.byType(IntentionSummaryView),
+        matching: find.byType(CatalogRow),
       );
       await _reach(tester, row, within: list);
       _expectTappable(tester, row);
       final line = summary.tags.isEmpty
           ? l10n.intentionSummaryNoTags
           : tagsLine;
-      _expectNotTruncated(
-        tester,
-        find.descendant(of: row, matching: findTextIgnoringInlineWidgets(line)),
-      );
-      final rowNode = tester.getSemantics(row);
+      _expectNotTruncated(tester, find.text(summary.title));
+      final rowNode = tester.getSemantics(find.text(summary.title));
       expect(rowNode.label, allOf(contains(summary.title), contains(line)));
-      expect(rowNode, isSemantics(hasTapAction: true));
+      expect(rowNode, isSemantics(isButton: true, hasTapAction: true));
     }
 
     final continuation = find.byType(IntentionCatalogContinuationStatusView);
@@ -304,7 +302,7 @@ void main() {
     expect(tester.takeException(), isNull);
     final lastRow = find.ancestor(
       of: find.text(lastSummary.title),
-      matching: find.byType(IntentionSummaryView),
+      matching: find.byType(CatalogRow),
     );
     await _reach(tester, lastRow, within: list);
     _expectTappable(tester, lastRow);

@@ -4,6 +4,7 @@ import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
+import 'package:doable/src/design_system/components/tag_chip.dart';
 import 'package:doable/src/design_system/components/tag_dot.dart';
 import 'package:doable/src/design_system/components/tag_row.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
@@ -80,7 +81,13 @@ void main() {
     await tester.ensureVisible(_conditionLabel);
     await tester.pumpAndSettle();
     await _expectBlueDot(tester, _conditionLabel);
-    await _expectBlueDot(tester, findTextIgnoringInlineWidgets('Теги: Дом'));
+    await _expectBlueDot(
+      tester,
+      find.descendant(
+        of: intentionCatalogRow('Намерение 1'),
+        matching: find.widgetWithText(TagChip, 'Дом'),
+      ),
+    );
     expect(tester.takeException(), isNull);
   });
 
