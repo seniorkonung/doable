@@ -118,6 +118,32 @@ final class ControlledRelationEditorRepository
     return relation;
   }
 
+  RestoreLongTermRelation restoreCommandAt(int index) =>
+      relationCommands[index] as RestoreLongTermRelation;
+
+  /// Подтверждает восстановление связи по отправленной команде того же индекса.
+  LongTermRelation completeRelationRestored(int index, {int revision = 1}) {
+    final command = restoreCommandAt(index);
+    LongTermRelation relationIn(RelationScope scope) => LongTermRelation(
+      id: command.relationId,
+      sourceIntentionId: testEditorIntentionId(1),
+      relatedIntentionId: testEditorIntentionId(2),
+      type: LongTermRelationType.need,
+      priority: RelationPriority.p2,
+      scope: scope,
+      creationSequence: RelationCreationSequence(1),
+    );
+    final before = relationIn(RelationScope.archived);
+    final after = relationIn(RelationScope.active);
+    completeRelationUpdated(
+      index,
+      before: before,
+      after: after,
+      revision: revision,
+    );
+    return after;
+  }
+
   void completeRelationUpdated(
     int index, {
     required LongTermRelation before,

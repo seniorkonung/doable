@@ -693,6 +693,128 @@ void main() {
       expect(harness.state.sourceParticipant?.title, 'Намерение 1');
     });
   });
+
+  group('Восстановление занимающей связи как отправка формы создания', () {
+    final restoredId = testRelationId(7);
+
+    test('принимается при неполном черновике и блокирует форму', () {
+      final harness = _EditorHarness.outgoing();
+      expect(harness.state.completeness, isA<RelationDraftIncomplete>());
+
+      harness.viewModel
+        ..restoreRelation(restoredId)
+        ..restoreRelation(restoredId);
+
+      expect(harness.state.operation, isA<RelationEditorSubmitting>());
+      expect(harness.state.canEdit, isFalse);
+      expect(harness.state.canSubmit, isFalse);
+      expect(harness.repository.commandCount, 1);
+      expect(harness.repository.restoreCommandAt(0).relationId, restoredId);
+    });
+
+    test('не даёт отправить полный черновик, пока оно выполняется', () {
+      final harness = _EditorHarness.outgoing()..fillDraft();
+
+      harness.viewModel
+        ..restoreRelation(restoredId)
+        ..submit();
+
+      expect(harness.repository.commandCount, 1);
+      expect(
+        harness.repository.relationCommands.single,
+        isA<RestoreLongTermRelation>(),
+      );
+    });
+
+    test('принимается после отказа отправки', () async {
+      final harness = _EditorHarness.outgoing()..fillDraft();
+      harness.viewModel.submit();
+      harness.repository.failRelationCommand(
+        0,
+        LongTermRelationPairOccupiedFailure(restoredId),
+      );
+      await harness.settle();
+      expect(harness.state.operation, isA<RelationEditorFailed>());
+
+      harness.viewModel.restoreRelation(restoredId);
+
+      expect(harness.state.operation, isA<RelationEditorSubmitting>());
+      expect(harness.repository.commandCount, 2);
+      expect(harness.repository.restoreCommandAt(1).relationId, restoredId);
+    });
+
+    test('успех завершает поток восстановленной связью', () async {
+      final harness = _EditorHarness.outgoing();
+      harness.viewModel.restoreRelation(restoredId);
+
+      harness.repository.completeRelationRestored(0);
+      await harness.settle();
+
+      expect(
+        harness.state.operation,
+        isA<RelationEditorSucceeded>().having(
+          (operation) => operation.relation.id,
+          'восстановленная связь',
+          restoredId,
+        ),
+      );
+      expect(
+        harness.state.event,
+        isA<RelationEditorCreated>().having(
+          (event) => event.relationId,
+          'связь для открытия',
+          restoredId,
+        ),
+      );
+    });
+
+    test('отказ оставляет черновик и отдаёт сообщение оболочке', () async {
+      final harness = _EditorHarness.outgoing()
+        ..fillDraft(description: '  Мой текст  ');
+      final presenter = harness.coordinator.registerAppPresentation();
+      harness.viewModel.restoreRelation(restoredId);
+
+      harness.repository.failRelationCommand(
+        0,
+        const LongTermRelationUnavailableFailure(),
+      );
+      await harness.settle();
+
+      expect(harness.state.operation, isA<RelationEditorIdle>());
+      expect(harness.state.failurePresentation, isNull);
+      expect(harness.state.event, isNull);
+      expect(harness.state.sourceIntentionId, testEditorIntentionId(1));
+      expect(harness.state.relatedIntentionId, testEditorIntentionId(2));
+      expect(harness.state.type, LongTermRelationType.need);
+      expect(harness.state.priority, RelationPriority.p2);
+      expect(harness.state.description, '  Мой текст  ');
+      expect(harness.state.canSubmit, isTrue);
+
+      final claim = await presenter.nextClaim();
+      expect(claim, isNotNull);
+      expect(claim!.completions.single.isFailure, isTrue);
+      harness.coordinator.confirmAppPresentation(
+        claim,
+        claim.completions.map((completion) => completion.token),
+      );
+
+      harness.viewModel.restoreRelation(restoredId);
+      expect(harness.repository.commandCount, 2);
+    });
+
+    test('не принимается в форме изменения и после выхода из создания', () {
+      final editing = _EditorHarness.editing(testEditorRelationDetails());
+      editing.viewModel.restoreRelation(restoredId);
+      expect(editing.repository.commandCount, 0);
+      expect(editing.state.operation, isA<RelationEditorIdle>());
+
+      final creating = _EditorHarness.outgoing();
+      creating.viewModel
+        ..leaveCreation()
+        ..restoreRelation(restoredId);
+      expect(creating.repository.commandCount, 0);
+    });
+  });
 }
 
 /// Одна открытая форма связи поверх управляемого графа.

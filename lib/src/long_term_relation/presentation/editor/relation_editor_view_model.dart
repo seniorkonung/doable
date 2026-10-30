@@ -11,6 +11,7 @@ import '../../application/long_term_relation_projection.dart';
 import '../../application/long_term_relation_permissions.dart';
 import '../../domain/long_term_relation.dart';
 import '../../domain/long_term_relation_description.dart';
+import '../../domain/long_term_relation_id.dart';
 import 'relation_editor_state.dart';
 
 part 'relation_editor_view_model.g.dart';
@@ -259,10 +260,63 @@ final class RelationEditorViewModel extends _$RelationEditorViewModel {
     }
   }
 
+  /// Восстанавливает занимающую пару архивную связь как отправку формы
+  /// создания.
+  ///
+  /// Полнота черновика не требуется: участник, вид или приоритет могут быть
+  /// ещё не выбраны. Успех завершает поток событием [RelationEditorCreated] с
+  /// восстановленной связью. Отказ предъявляет оболочка, потому что у поиска
+  /// нет собственного renderer, поэтому форма возвращается к тому же
+  /// черновику и не показывает его второй раз.
+  void restoreRelation(LongTermRelationId relationId) {
+    if (!ref.mounted || !_context.isCreating || !state.canEdit) {
+      return;
+    }
+
+    final start = _coordinator.acceptRelationRestoreFromCreation(
+      _formKey,
+      RestoreLongTermRelation(relationId),
+    );
+    switch (start) {
+      case LongTermRelationCommandAccepted(:final token, :final future):
+        _activeToken = token;
+        state = state.withOperation(const RelationEditorSubmitting());
+        unawaited(_finishRestore(future));
+      case LongTermRelationCommandAlreadyRunning():
+        return;
+      case GraphCommandCoordinatorDraining():
+        state = state.withOperation(
+          const RelationEditorFailed(RelationEditorUnexpected()),
+        );
+    }
+  }
+
   void consumeEvent() {
     if (state.event != null) {
       state = state.withoutEvent();
     }
+  }
+
+  Future<void> _finishRestore(
+    Future<LongTermRelationCommandCompletion> future,
+  ) async {
+    final completion = await future;
+    if (!ref.mounted || !identical(_activeToken, completion.token)) {
+      return;
+    }
+
+    _activeToken = null;
+    // Успех принадлежит оболочке, как у создания, а отказ отдан ей сразу:
+    // форма использует только успех, чтобы закрыть поток.
+    state = switch (completion.result) {
+      GraphResultSuccess(value: LongTermRelationUpdated(:final relation)) =>
+        state.withOperation(
+          RelationEditorSucceeded(relation),
+          event: RelationEditorCreated(relation.id),
+        ),
+      GraphResultSuccess() ||
+      GraphResultFailure() => state.withOperation(const RelationEditorIdle()),
+    };
   }
 
   Future<void> _finish(Future<LongTermRelationCommandCompletion> future) async {
