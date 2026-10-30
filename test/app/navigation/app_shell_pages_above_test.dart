@@ -174,7 +174,7 @@ void main() {
         find.byKey(const ValueKey('relation-editor-select-related')),
         RelationParticipantPickerPage,
       );
-      await _tap(tester, _summary(RelationParticipantPickerPage, 'Бегать'));
+      await _tap(tester, _summary(RelationParticipantPickerPage, 'Гулять'));
       await _gone(tester, RelationParticipantPickerPage);
       await _tap(
         tester,
