@@ -1019,7 +1019,9 @@ void main() {
             IntentionCatalogFirstPage(
               items: [intention],
               totalCount: 1,
-              typeCounts: IntentionTypeCounts(all: 2, actions: 1),
+              counts: IntentionCountsByType(
+                IntentionTypeCounts(all: 2, actions: 1),
+              ),
               nextCursor: null,
               revision: const TestCatalogRevision(1),
             ),

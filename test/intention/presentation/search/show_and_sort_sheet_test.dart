@@ -937,9 +937,11 @@ Result<IntentionCatalogPage> _page(
   IntentionCatalogFirstPage(
     items: items,
     totalCount: items.length,
-    typeCounts: all == null
-        ? null
-        : IntentionTypeCounts(all: all, actions: actions!),
+    counts: all == null
+        ? const IntentionCountsTotalOnly()
+        : IntentionCountsByType(
+            IntentionTypeCounts(all: all, actions: actions!),
+          ),
     nextCursor: null,
     revision: const TestCatalogRevision(1),
   ),

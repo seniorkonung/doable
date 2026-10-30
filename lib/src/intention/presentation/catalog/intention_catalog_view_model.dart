@@ -133,7 +133,11 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
         },
         order: _order,
         pageSize: _policy.pageSize,
-        requestsTypeCounts: type is IntentionTypeOpen,
+        counting: switch (type) {
+          IntentionTypeOpen() => IntentionCatalogCounting.byType,
+          IntentionTypeNotOffered() ||
+          IntentionTypePinnedToActions() => IntentionCatalogCounting.totalOnly,
+        },
       );
     } on IntentionCatalogQueryValidationException catch (error) {
       _filterValidationFailure = switch (error.failure) {
@@ -313,12 +317,18 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
         page.items.length > query.pageSize) {
       return IntentionCatalogUnexpected(selection: selection, query: query);
     }
-    final typeCounts = query.requestsTypeCounts ? page.typeCounts : null;
-    if (query.requestsTypeCounts &&
-        (typeCounts == null ||
-            page.totalCount !=
-                _selectedTypeCount(query.readinessFilter, typeCounts))) {
-      return IntentionCatalogUnexpected(selection: selection, query: query);
+    final IntentionTypeCounts? typeCounts;
+    switch ((query.counting, page.counts)) {
+      case (IntentionCatalogCounting.totalOnly, IntentionCountsTotalOnly()):
+        typeCounts = null;
+      case (
+            IntentionCatalogCounting.byType,
+            IntentionCountsByType(:final counts),
+          )
+          when page.totalCount == counts.matching(query.readinessFilter):
+        typeCounts = counts;
+      case _:
+        return IntentionCatalogUnexpected(selection: selection, query: query);
     }
     if (page.items.isEmpty) {
       if (page.totalCount != 0 || page.nextCursor != null) {
@@ -345,16 +355,6 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       revision: page.revision,
     );
   }
-
-  /// Число того типа, который выбирает условие готовности выдачи.
-  static int _selectedTypeCount(
-    IntentionReadinessFilter readinessFilter,
-    IntentionTypeCounts typeCounts,
-  ) => switch (readinessFilter) {
-    IntentionReadinessFilter.all => typeCounts.all,
-    IntentionReadinessFilter.readyOnly => typeCounts.actions,
-    IntentionReadinessFilter.notReadyOnly => typeCounts.intentions,
-  };
 
   IntentionCatalogState _mapFailure(
     IntentionCatalogSelection selection,

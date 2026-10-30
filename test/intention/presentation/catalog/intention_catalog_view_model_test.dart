@@ -908,7 +908,12 @@ void main() {
           expect(container.read(provider.notifier).selection.type, type);
           final query = repository.queryAt(index);
           expect(query.readinessFilter, readiness);
-          expect(query.requestsTypeCounts, isOpen);
+          expect(
+            query.counting,
+            isOpen
+                ? IntentionCatalogCounting.byType
+                : IntentionCatalogCounting.totalOnly,
+          );
 
           repository.complete(
             index,
@@ -977,7 +982,7 @@ void main() {
           expect(notifier.selection.type, IntentionTypeOpen(type));
           final query = repository.queryAt(index + 1);
           expect(query.readinessFilter, readiness);
-          expect(query.requestsTypeCounts, isTrue);
+          expect(query.counting, IntentionCatalogCounting.byType);
           expect(query.cursor, isNull);
         }
 
@@ -1028,48 +1033,96 @@ void main() {
     });
 
     test(
-      'пропущенные или противоречивые числа типов нарушают контракт порции',
+      'числа типов при закреплённом типе нарушают контракт порции',
       () async {
         final repository = ControlledCatalogRepository();
         final container = _catalogContainer(repository);
         addTearDown(container.dispose);
-        final pages = [
-          // Запрошенных чисел нет.
-          IntentionCatalogFirstPage(
-            items: [testSummary(index: 1)],
-            totalCount: 1,
-            nextCursor: null,
-            revision: const TestCatalogRevision(1),
-          ),
-          // Общее количество типа «Все» расходится с числом всех.
-          IntentionCatalogFirstPage(
-            items: [testSummary(index: 1), testSummary(index: 2)],
-            totalCount: 2,
-            typeCounts: IntentionTypeCounts(all: 3, actions: 1),
-            nextCursor: null,
-            revision: const TestCatalogRevision(1),
-          ),
-        ];
+        final provider = intentionCatalogViewModelProvider(
+          SelectDailyChoiceAction(session: IntentionSearchSession()),
+        );
+        final subscription = container.listen(
+          provider,
+          (_, _) {},
+          fireImmediately: true,
+        );
+        addTearDown(subscription.close);
 
-        for (final (index, page) in pages.indexed) {
-          final provider = intentionCatalogViewModelProvider(
-            SelectDailyChoiceSource(session: IntentionSearchSession()),
-          );
-          final subscription = container.listen(
-            provider,
-            (_, _) {},
-            fireImmediately: true,
-          );
-          addTearDown(subscription.close);
-          repository.completeVerbatim(index, ResultSuccess(page));
+        repository.completeVerbatim(
+          0,
+          ResultSuccess(
+            IntentionCatalogFirstPage(
+              items: [testSummary(index: 1)],
+              totalCount: 1,
+              counts: IntentionCountsByType(
+                IntentionTypeCounts(all: 1, actions: 0),
+              ),
+              nextCursor: null,
+              revision: const TestCatalogRevision(1),
+            ),
+          ),
+        );
 
-          expect(
-            await container.read(provider.future),
-            isA<IntentionCatalogUnexpected>(),
-          );
-        }
+        expect(
+          await container.read(provider.future),
+          isA<IntentionCatalogUnexpected>(),
+        );
       },
     );
+
+    test('пропущенные, чужого вида или противоречивые числа типов нарушают контракт порции', () async {
+      final repository = ControlledCatalogRepository();
+      final container = _catalogContainer(repository);
+      addTearDown(container.dispose);
+      final pages = [
+        // Запрошенных чисел нет.
+        IntentionCatalogFirstPage(
+          items: [testSummary(index: 1)],
+          totalCount: 1,
+          nextCursor: null,
+          revision: const TestCatalogRevision(1),
+        ),
+        // Общее количество типа «Все» расходится с числом всех.
+        IntentionCatalogFirstPage(
+          items: [testSummary(index: 1), testSummary(index: 2)],
+          totalCount: 2,
+          counts: IntentionCountsByType(
+            IntentionTypeCounts(all: 3, actions: 1),
+          ),
+          nextCursor: null,
+          revision: const TestCatalogRevision(1),
+        ),
+        // Подсчёт по охватам и типам модель не просила.
+        IntentionCatalogFirstPage(
+          items: [testSummary(index: 1)],
+          totalCount: 1,
+          counts: IntentionCountsByScopeAndType(
+            active: IntentionTypeCounts(all: 1, actions: 0),
+            archived: IntentionTypeCounts(all: 0, actions: 0),
+          ),
+          nextCursor: null,
+          revision: const TestCatalogRevision(1),
+        ),
+      ];
+
+      for (final (index, page) in pages.indexed) {
+        final provider = intentionCatalogViewModelProvider(
+          SelectDailyChoiceSource(session: IntentionSearchSession()),
+        );
+        final subscription = container.listen(
+          provider,
+          (_, _) {},
+          fireImmediately: true,
+        );
+        addTearDown(subscription.close);
+        repository.completeVerbatim(index, ResultSuccess(page));
+
+        expect(
+          await container.read(provider.future),
+          isA<IntentionCatalogUnexpected>(),
+        );
+      }
+    });
   });
 
   test('не забирает у оболочки право предъявить completion', () async {

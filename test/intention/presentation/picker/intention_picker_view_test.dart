@@ -888,7 +888,9 @@ Result<IntentionCatalogPage> _firstPage(
   IntentionCatalogFirstPage(
     items: items,
     totalCount: totalCount ?? items.length,
-    typeCounts: typeCounts,
+    counts: typeCounts == null
+        ? const IntentionCountsTotalOnly()
+        : IntentionCountsByType(typeCounts),
     nextCursor: (totalCount ?? items.length) > items.length
         ? const TestCatalogCursor()
         : null,

@@ -11,6 +11,18 @@ enum IntentionScope { active, archived, all }
 
 enum IntentionReadinessFilter { all, readyOnly, notReadyOnly }
 
+/// Какие числа несёт первая порция каталога кроме общего количества.
+enum IntentionCatalogCounting {
+  /// Только общее количество.
+  totalOnly,
+
+  /// Числа типов в охвате запроса.
+  byType,
+
+  /// Числа типов отдельно в активном и архивном охватах.
+  byScopeAndType,
+}
+
 /// Неизменяемые условия наличия и отсутствия собственных тегов намерения.
 ///
 /// Повторы и порядок идентификаторов не меняют равенство условий.
@@ -134,7 +146,7 @@ final class IntentionCatalogQuery {
     required IntentionCatalogOrder order,
     required int pageSize,
     IntentionCatalogCursor? cursor,
-    bool requestsTypeCounts = false,
+    IntentionCatalogCounting counting = IntentionCatalogCounting.totalOnly,
   }) {
     if (pageSize < minPageSize || pageSize > maxPageSize) {
       throw const IntentionCatalogQueryValidationException(
@@ -152,7 +164,7 @@ final class IntentionCatalogQuery {
       order: order,
       pageSize: pageSize,
       cursor: cursor,
-      requestsTypeCounts: requestsTypeCounts,
+      counting: counting,
     );
   }
 
@@ -165,7 +177,7 @@ final class IntentionCatalogQuery {
     required this.order,
     required this.pageSize,
     required this.cursor,
-    required this.requestsTypeCounts,
+    required this.counting,
   });
 
   static const minPageSize = 1;
@@ -183,8 +195,8 @@ final class IntentionCatalogQuery {
   final int pageSize;
   final IntentionCatalogCursor? cursor;
 
-  /// Просит первую порцию нести [IntentionTypeCounts].
-  final bool requestsTypeCounts;
+  /// Просит первую порцию нести числа вида [counting].
+  final IntentionCatalogCounting counting;
 
   /// Тот же запрос с условием готовности «все»: по нему считаются числа
   /// обоих типов.
@@ -197,7 +209,7 @@ final class IntentionCatalogQuery {
     order: order,
     pageSize: pageSize,
     cursor: cursor,
-    requestsTypeCounts: requestsTypeCounts,
+    counting: counting,
   );
 
   bool includes(IntentionSummary summary) {
@@ -542,32 +554,84 @@ final class IntentionCatalogFirstPage extends IntentionCatalogPage {
   IntentionCatalogFirstPage({
     required super.items,
     required int totalCount,
-    this.typeCounts,
+    this.counts = const IntentionCountsTotalOnly(),
     required super.nextCursor,
     required super.revision,
-  }) : totalCount = _requireTotalCount(totalCount, items.length, typeCounts);
+  }) : totalCount = _requireTotalCount(totalCount, items.length, counts);
 
   /// Количество совпадений со всеми условиями запроса, включая готовность.
   final int totalCount;
 
-  /// Есть тогда и только тогда, когда их попросил запрос.
-  final IntentionTypeCounts? typeCounts;
+  /// Числа вида, который попросил запрос.
+  final IntentionCatalogCounts counts;
 
   static int _requireTotalCount(
     int totalCount,
     int itemCount,
-    IntentionTypeCounts? typeCounts,
+    IntentionCatalogCounts counts,
   ) {
-    if (totalCount < itemCount ||
-        (typeCounts != null && totalCount > typeCounts.all)) {
+    if (totalCount < itemCount || !counts.admitsTotalCount(totalCount)) {
       throw const IntentionCatalogPageValidationException();
     }
     return totalCount;
   }
 }
 
-/// Точные числа обоих типов намерения при всех условиях запроса, кроме
-/// условия готовности.
+/// Числа первой порции каталога сверх общего количества.
+sealed class IntentionCatalogCounts {
+  const IntentionCatalogCounts();
+
+  /// Общее количество не может превышать число всех намерений в этих числах.
+  bool admitsTotalCount(int totalCount);
+}
+
+/// Порция несёт только общее количество.
+final class IntentionCountsTotalOnly extends IntentionCatalogCounts {
+  const IntentionCountsTotalOnly();
+
+  @override
+  bool admitsTotalCount(int totalCount) => true;
+}
+
+/// Числа типов в охвате запроса.
+final class IntentionCountsByType extends IntentionCatalogCounts {
+  const IntentionCountsByType(this.counts);
+
+  final IntentionTypeCounts counts;
+
+  @override
+  bool admitsTotalCount(int totalCount) => totalCount <= counts.all;
+}
+
+/// Числа типов отдельно в активном и архивном охватах.
+final class IntentionCountsByScopeAndType extends IntentionCatalogCounts {
+  const IntentionCountsByScopeAndType({
+    required this.active,
+    required this.archived,
+  });
+
+  final IntentionTypeCounts active;
+  final IntentionTypeCounts archived;
+
+  /// Число всех намерений в обоих охватах.
+  int get all => active.all + archived.all;
+
+  /// Числа типов в [scope]: для охвата «все» — сумма обоих охватов.
+  IntentionTypeCounts inScope(IntentionScope scope) => switch (scope) {
+    IntentionScope.active => active,
+    IntentionScope.archived => archived,
+    IntentionScope.all => IntentionTypeCounts(
+      all: all,
+      actions: active.actions + archived.actions,
+    ),
+  };
+
+  @override
+  bool admitsTotalCount(int totalCount) => totalCount <= all;
+}
+
+/// Точные числа обоих типов намерения в одном охвате при всех условиях запроса,
+/// кроме условия готовности.
 final class IntentionTypeCounts {
   factory IntentionTypeCounts({required int all, required int actions}) {
     if (actions < 0 || actions > all) {
@@ -582,6 +646,14 @@ final class IntentionTypeCounts {
   final int actions;
 
   int get intentions => all - actions;
+
+  /// Число намерений того типа, который выбирает условие готовности.
+  int matching(IntentionReadinessFilter readinessFilter) =>
+      switch (readinessFilter) {
+        IntentionReadinessFilter.all => all,
+        IntentionReadinessFilter.readyOnly => actions,
+        IntentionReadinessFilter.notReadyOnly => intentions,
+      };
 }
 
 final class IntentionCatalogPageValidationException implements Exception {

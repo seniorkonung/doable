@@ -41,7 +41,6 @@ void main() {
                   testSummary(index: i, title: 'Бегать $i'),
               ],
               totalCount: 20,
-              typeCounts: null,
               nextCursor: null,
               revision: const TestCatalogRevision(1),
             ),
