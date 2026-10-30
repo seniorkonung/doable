@@ -2511,6 +2511,49 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
+  String intentionPickerScopeHeader(String scope, String type) {
+    String _temp0 = intl.Intl.selectLogic(type, {
+      'all': 'Активные',
+      'intentions': 'Активные намерения',
+      'actions': 'Активные действия',
+      'other': '',
+    });
+    String _temp1 = intl.Intl.selectLogic(type, {
+      'all': 'Архивные',
+      'intentions': 'Архивные намерения',
+      'actions': 'Архивные действия',
+      'other': '',
+    });
+    String _temp2 = intl.Intl.selectLogic(type, {
+      'all': 'Все',
+      'intentions': 'Все намерения',
+      'actions': 'Все действия',
+      'other': '',
+    });
+    String _temp3 = intl.Intl.selectLogic(scope, {
+      'active': '$_temp0',
+      'archived': '$_temp1',
+      'all': '$_temp2',
+      'other': '',
+    });
+    return '$_temp3';
+  }
+
+  @override
+  String intentionPickerScopeHeaderLabel(String title, String summary) {
+    return 'Показать и упорядочить. Показаны: $title. Сортировка: $summary.';
+  }
+
+  @override
+  String intentionPickerScopeHeaderCountLabel(
+    String title,
+    int count,
+    String summary,
+  ) {
+    return 'Показать и упорядочить. Показаны: $title, $count. Сортировка: $summary.';
+  }
+
+  @override
   String get intentionPickerActionsHeader => 'Действия';
 
   @override

@@ -2487,6 +2487,49 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String intentionPickerScopeHeader(String scope, String type) {
+    String _temp0 = intl.Intl.selectLogic(type, {
+      'all': 'Active',
+      'intentions': 'Active intentions',
+      'actions': 'Active actions',
+      'other': '',
+    });
+    String _temp1 = intl.Intl.selectLogic(type, {
+      'all': 'Archived',
+      'intentions': 'Archived intentions',
+      'actions': 'Archived actions',
+      'other': '',
+    });
+    String _temp2 = intl.Intl.selectLogic(type, {
+      'all': 'All',
+      'intentions': 'All intentions',
+      'actions': 'All actions',
+      'other': '',
+    });
+    String _temp3 = intl.Intl.selectLogic(scope, {
+      'active': '$_temp0',
+      'archived': '$_temp1',
+      'all': '$_temp2',
+      'other': '',
+    });
+    return '$_temp3';
+  }
+
+  @override
+  String intentionPickerScopeHeaderLabel(String title, String summary) {
+    return 'Show and sort. Showing: $title. Sorted by: $summary.';
+  }
+
+  @override
+  String intentionPickerScopeHeaderCountLabel(
+    String title,
+    int count,
+    String summary,
+  ) {
+    return 'Show and sort. Showing: $title, $count. Sorted by: $summary.';
+  }
+
+  @override
   String get intentionPickerActionsHeader => 'Actions';
 
   @override

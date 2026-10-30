@@ -1977,6 +1977,31 @@
       "summary": {"type": "String"}
     }
   },
+  "intentionPickerScopeHeader": "{scope, select, active{{type, select, all{Active} intentions{Active intentions} actions{Active actions} other{}}} archived{{type, select, all{Archived} intentions{Archived intentions} actions{Archived actions} other{}}} all{{type, select, all{All} intentions{All intentions} actions{All actions} other{}}} other{}}",
+  "@intentionPickerScopeHeader": {
+    "description": "Охват и тип словами в заголовке списка каталога намерений; значения select — имена IntentionScope и IntentionTypeChoice",
+    "placeholders": {
+      "scope": {"type": "String"},
+      "type": {"type": "String"}
+    }
+  },
+  "intentionPickerScopeHeaderLabel": "Show and sort. Showing: {title}. Sorted by: {summary}.",
+  "@intentionPickerScopeHeaderLabel": {
+    "description": "Доступное название кнопки заголовка списка каталога до подтверждения количества",
+    "placeholders": {
+      "title": {"type": "String"},
+      "summary": {"type": "String"}
+    }
+  },
+  "intentionPickerScopeHeaderCountLabel": "Show and sort. Showing: {title}, {count}. Sorted by: {summary}.",
+  "@intentionPickerScopeHeaderCountLabel": {
+    "description": "Доступное название кнопки заголовка списка каталога с подтверждённым количеством",
+    "placeholders": {
+      "title": {"type": "String"},
+      "count": {"type": "int"},
+      "summary": {"type": "String"}
+    }
+  },
   "intentionPickerActionsHeader": "Actions",
   "@intentionPickerActionsHeader": {
     "description": "Заголовок выдачи поиска действия на экране выбора"

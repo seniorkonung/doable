@@ -3923,6 +3923,28 @@ abstract class AppLocalizations {
     String summary,
   );
 
+  /// Охват и тип словами в заголовке списка каталога намерений; значения select — имена IntentionScope и IntentionTypeChoice
+  ///
+  /// In en, this message translates to:
+  /// **'{scope, select, active{{type, select, all{Active} intentions{Active intentions} actions{Active actions} other{}}} archived{{type, select, all{Archived} intentions{Archived intentions} actions{Archived actions} other{}}} all{{type, select, all{All} intentions{All intentions} actions{All actions} other{}}} other{}}'**
+  String intentionPickerScopeHeader(String scope, String type);
+
+  /// Доступное название кнопки заголовка списка каталога до подтверждения количества
+  ///
+  /// In en, this message translates to:
+  /// **'Show and sort. Showing: {title}. Sorted by: {summary}.'**
+  String intentionPickerScopeHeaderLabel(String title, String summary);
+
+  /// Доступное название кнопки заголовка списка каталога с подтверждённым количеством
+  ///
+  /// In en, this message translates to:
+  /// **'Show and sort. Showing: {title}, {count}. Sorted by: {summary}.'**
+  String intentionPickerScopeHeaderCountLabel(
+    String title,
+    int count,
+    String summary,
+  );
+
   /// Заголовок выдачи поиска действия на экране выбора
   ///
   /// In en, this message translates to:
