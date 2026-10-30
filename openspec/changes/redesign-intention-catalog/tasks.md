@@ -165,3 +165,101 @@
   - **Предполагаемые файлы:**
     - меняется `test/intention/presentation/search/intention_search_kind_test.dart`.
   - **Размер:** XS.
+
+## Phase 2: Модель и чтение каталога с параметрами показа и точными числами
+
+- [ ] 2.1 Читать первую порцию каталога с видом подсчёта из запроса: только общее количество, числа типов охвата или матрица охватов и типов одним запросом подсчёта
+  - **Критерии приёмки:**
+    - `IntentionCatalogQuery.counting` — перечисление `totalOnly`, `byType`, `byScopeAndType` вместо флага `requestsTypeCounts`. `IntentionCatalogFirstPage` несёт закрытый `IntentionCatalogCounts` вместо необязательных `typeCounts`. Варианты: только общее количество, `IntentionTypeCounts` текущего охвата или активные и архивные `IntentionTypeCounts` с суммой как числом всех намерений (решение 4 design). Порция отклоняет `totalCount` больше числа всех намерений в своих числах.
+    - Для `byScopeAndType` хранилище одним запросом подсчёта без условия охвата считает активные, активные действия, архивные и архивные действия. Остальные условия те же: исключение, теги и название. `totalCount` — число охвата и готовности запроса. Для `totalOnly` и `byType` числа и общее количество прежние. Запрос строк порции не меняется, и первая порция при любом виде читается одним запросом подсчёта.
+    - Модель запрашивает `byType`, когда тип открыт, иначе `totalOnly`. Порцию с другим видом чисел она отклоняет как `IntentionCatalogUnexpected`. Числа экранов выбора, общее количество каталога и их согласование не меняются. `answerCatalogQuery` отвечает тестовым адаптерам по виду подсчёта запроса.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/data/drift_intention_catalog_test.dart test/intention/application/intention_contract_test.dart test/intention/presentation test/long_term_relation/presentation/participant_picker test/daily_choice/presentation/action_picker test/daily_choice/presentation/source_picker`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - `lib/src/intention/application/intention_catalog.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `lib/src/intention/presentation/catalog/intention_catalog_view_model.dart`;
+    - `test/support/intention_type_counts.dart`;
+    - проверки:
+      - `test/intention/data/drift_intention_catalog_test.dart` — числа матрицы и общее количество при каждом охвате и готовности, при тегах, названии и исключении, тем же одним подсчётом;
+      - `test/intention/application/intention_contract_test.dart`;
+      - порции с числами в `test/intention/presentation/catalog/intention_catalog_view_model_test.dart`, `intention_catalog_mutation_reconciliation_test.dart`, `test/intention/presentation/picker/` и `test/intention/presentation/search/show_and_sort_sheet_test.dart` переходят на новый тип.
+  - **Размер:** M.
+
+- [ ] 2.2 Измерить бенчмарком первую порцию активного охвата с матрицей чисел охватов и типов рядом с подсчётом только общего количества
+  - **Критерии приёмки:**
+    - Бенчмарк каталога намерений получает случаи `intentionCatalog/active/counting/totalOnly/firstPage` и `intentionCatalog/active/counting/byScopeAndType/firstPage`. Они измеряют первую порцию активного охвата без фильтров на прежнем наборе из 50 000 намерений, половина которых в архиве, и сравнивают её с бюджетом 100 мс.
+    - Случаи проверяют результат: общее количество 25 000, а матрица — 25 000 активных и 25 000 архивных намерений без действий.
+    - p95 обоих случаев и статус бюджета приведены в отчёте сессии и в теле коммита задачи.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test --no-pub benchmark/intention/intention_catalog_benchmark.dart --concurrency=1 --reporter=expanded`.
+    - `mise exec --no-deps -- flutter test --no-pub benchmark/intention/intention_catalog_benchmark.dart --concurrency=1 --reporter=expanded --dart-define=BENCHMARK_CASE=intentionCatalog/active/counting --dart-define=BENCHMARK_SAMPLES=40 --dart-define=BENCHMARK_WARMUPS=3`.
+  - **Зависимости:** 2.1.
+  - **Предполагаемые файлы:** `benchmark/intention/intention_catalog_benchmark.dart`.
+  - **Размер:** XS.
+
+- [ ] 2.3 Выразить охват и тип в выборе параметров доступностью и открыть каталогу выбор типа
+  - **Критерии приёмки:**
+    - `IntentionCatalogSelection.scope` — закрытый `IntentionScopeAvailability`: `IntentionScopeOpen(selected)` у каталога и `IntentionScopeFixed(scope)` у экранов выбора по их назначению. `changeScope` действует только при открытом охвате и назначение не разбирает.
+    - Каталог получает `IntentionTypeOpen`. `IntentionTypeNotOffered` удалён вместе с его ветками в заголовке списка, листе и тестовой поддержке. Смена типа каталога начинает новую выдачу с первой порции, а смена охвата сохраняет тип, фильтр и порядок.
+    - Прежняя страница каталога берёт охват из `IntentionScopeOpen` и выглядит и ведёт себя как раньше: тип не показывает и остаётся с типом «Все». Каталог с открытым типом запрашивает `byType`, поэтому тестовые адаптеры, которые отвечают каталогу, дают числа типов через `answerCatalogQuery`.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation test/long_term_relation/presentation/participant_picker test/daily_choice/presentation/action_picker test/daily_choice/presentation/source_picker test/graph/presentation test/app`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 2.1 — тестовые адаптеры отвечают по виду подсчёта.
+  - **Предполагаемые файлы:**
+    - `lib/src/intention/presentation/catalog/intention_catalog_state.dart`, `intention_catalog_view_model.dart`, `intention_catalog_page.dart`;
+    - `lib/src/intention/presentation/search/intention_list_header.dart`, `show_and_sort_sheet.dart`;
+    - проверки:
+      - `test/intention/presentation/catalog/intention_catalog_view_model_test.dart` — доступность охвата и типа по назначению, сохранение типа каталога при смене охвата;
+      - `test/intention/presentation/catalog/intention_picker_session_test_support.dart`;
+      - тестовые адаптеры, которые отвечают каталогу первой порцией без `answerCatalogQuery`, например в `test/app/intention_app_lifecycle_test.dart` и `test/graph/presentation/graph_reconciliation_checkpoint_test.dart`.
+  - **Размер:** M.
+
+- [ ] 2.4 Давать подтверждённой выдаче каталога точные числа охватов и типов при текущих фильтрах и сохранять их точными при каждой подтверждённой операции
+  - **Критерии приёмки:**
+    - Модель выбирает вид подсчёта по выбору параметров: открытые охват и тип — `byScopeAndType`, закреплённый охват с открытым типом — `byType`, закреплённый тип — `totalOnly`. Порцию она принимает, только если вид чисел совпадает с запросом, а `totalCount` равен числу текущих охвата и готовности. Иначе — `IntentionCatalogUnexpected`.
+    - Подтверждённое состояние хранит `IntentionCatalogCounts` и даёт производные: `typeCounts` — типы в текущем охвате, `scopeCounts` — охваты при текущем типе. Пока выдача получается и после отказа, чисел нет. Экраны выбора получают те же числа типов, что раньше, а лист и выдача читают производные.
+    - Поправка ±1 сравнивает снимки «до» и «после» с запросом без охвата и готовности (`withAnyScopeAndReadiness()`) и меняет ячейку по архивному состоянию и готовности снимка. Числа остаются точными после создания, изменения, смены готовности, архивирования, восстановления и удаления. Если числа становятся отрицательными или больше суммы, выдача начинается заново с первой порции. `answerCatalogQuery` выводит матрицу, где число охвата и готовности запроса равно общему количеству порции.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation test/intention/application test/long_term_relation/presentation/participant_picker test/daily_choice/presentation/action_picker test/daily_choice/presentation/source_picker test/graph/presentation test/app`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 2.1, 2.3.
+  - **Предполагаемые файлы:**
+    - `lib/src/intention/application/intention_catalog.dart` — `withAnyScopeAndReadiness()`;
+    - `lib/src/intention/presentation/catalog/intention_catalog_state.dart`, `intention_catalog_view_model.dart`;
+    - `lib/src/intention/presentation/search/show_and_sort_sheet.dart`, `intention_search_list.dart` — если меняется доступ к числам типов;
+    - `test/support/intention_type_counts.dart`;
+    - проверки:
+      - `test/intention/presentation/catalog/intention_catalog_view_model_test.dart` — вид подсчёта по выбору, числа матрицы и инварианты первой порции;
+      - `intention_catalog_mutation_reconciliation_test.dart` — согласование матрицы при каждом виде операции, включая переход между охватами.
+  - **Размер:** M.
+
+- [ ] 2.5 Сбрасывать параметры показа одним действием модели и одним новым чтением
+  - **Критерии приёмки:**
+    - Модель даёт `canResetShowParameters` и `resetShowParameters()`. Начальные параметры показа заданы в одном месте: охват «Активные» при открытом охвате, тип «Все» при открытом типе, `createdAtDescending`. Их же восстанавливает сброс при смене поколения графа.
+    - Сброс меняет все отличающиеся параметры и начинает одну новую выдачу с первой порции. Фильтр названия и условия по тегам он не меняет, а в начальном состоянии ничего не делает.
+    - Лист «Показать и упорядочить» предлагает «Сбросить» по `canResetShowParameters` и вызывает `resetShowParameters()`. Сам признак он не считает и двух вызовов не делает. Поведение листа экранов выбора не меняется.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog/intention_catalog_view_model_test.dart test/intention/presentation/search test/intention/presentation/picker`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 2.3 — начальный охват зависит от доступности охвата.
+  - **Предполагаемые файлы:**
+    - `lib/src/intention/presentation/catalog/intention_catalog_view_model.dart`, `lib/src/intention/presentation/search/show_and_sort_sheet.dart`;
+    - проверки:
+      - `test/intention/presentation/catalog/intention_catalog_view_model_test.dart` — сброс каталога. Исходно: охват «Все», тип «Действия», порядок по названию, фильтр «бег» и условие по тегу. Результат: один запрос с начальными параметрами, тем же фильтром и тем же условием;
+      - `test/intention/presentation/search/show_and_sort_sheet_test.dart` — без изменения ожиданий.
+  - **Размер:** S.
+
+- [ ] 2.6 Проверить готовность фазы 2: модель и чтение каталога дают все параметры показа и точные числа, прежняя страница каталога не изменилась
+  - **Критерии приёмки:**
+    - Модельные проверки и проверки чтения подтверждают числа матрицы, их согласование при каждом виде подтверждённой операции, включая переход между охватами, и сброс одним новым чтением.
+    - Требования о точном количестве, порционности и согласовании каталога по-прежнему выполняются для всех назначений. Прежняя страница каталога работает как раньше и новых параметров не показывает.
+    - Результат бенчмарка зафиксирован в коммите задачи 2.2, полная проверка проекта проходит.
+  - **Проверка:**
+    - `openspec validate redesign-intention-catalog --strict`.
+    - `mise run codegen-check`.
+    - `mise run check`.
+  - **Зависимости:** 2.1, 2.2, 2.3, 2.4, 2.5.
+  - **Предполагаемые файлы:** нет (только проверка).
+  - **Размер:** XS.
