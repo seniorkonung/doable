@@ -2,6 +2,7 @@ import 'dart:ui' show Tristate;
 
 import 'package:auto_route/auto_route.dart';
 
+import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
@@ -9,6 +10,8 @@ import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart'
     as catalog_page;
 import 'package:doable/src/design_system/components/archived_fold.dart';
+import 'package:doable/src/design_system/components/catalog_header.dart';
+import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/design_system/components/option_row.dart';
 import 'package:doable/src/design_system/components/relation_row.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
@@ -16,12 +19,14 @@ import 'package:doable/src/intention/presentation/details/intention_details_page
 import 'package:doable/src/intention/presentation/details/intention_options.dart';
 import 'package:doable/src/intention/presentation/edit/intention_edit_page.dart';
 import 'package:doable/src/intention/presentation/intention_summary_view.dart';
+import 'package:doable/src/intention/presentation/picker/intention_picker_row.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/app_root_pages.dart';
+import '../support/graph_seed.dart';
 import '../support/quick_creation.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
@@ -222,54 +227,6 @@ void main() {
         'Archived relation',
       );
 
-      await tester.tap(
-        find.byKey(const ValueKey('relation-details-source-participant')),
-      );
-      await _pumpUntilDetailsTitle(tester, 'Укреплять здоровье');
-      await _createNeedRelation(
-        tester,
-        relatedTitle: 'Много ходить',
-        description: 'Этот текст не должен заменять сохранённый',
-        expectPairConflict: true,
-      );
-      expect(
-        find.text(
-          'A relation with this direction already exists between the selected intentions.',
-        ),
-        findsOneWidget,
-      );
-      expect(find.text('Try again'), findsNothing);
-      expect(
-        find.byKey(const ValueKey('relation-editor-open-existing')),
-        findsOneWidget,
-      );
-      expect(
-        tester
-            .getSemantics(find.byKey(const ValueKey('relation-editor-failure')))
-            .flagsCollection
-            .isLiveRegion,
-        isTrue,
-      );
-
-      const conflictingDraft = 'Этот текст не должен заменять сохранённый';
-      expect(
-        tester
-            .widget<TextField>(
-              find.byKey(const ValueKey('relation-editor-description')),
-            )
-            .controller
-            ?.text,
-        conflictingDraft,
-      );
-
-      await tester.tap(
-        find.byKey(const ValueKey('relation-editor-open-existing')),
-      );
-      await _pumpUntilFound(
-        tester,
-        find.byKey(const ValueKey('relation-details-edit-relation')),
-      );
-
       const lifecycleDescription = '  Литеральный текст\n🧭  ';
       const lifecyclePhrase =
           'To Одинаковое намерение, you can Одинаковое намерение';
@@ -377,6 +334,183 @@ void main() {
       semantics.dispose();
     },
   );
+
+  testWidgets(
+    'поиск связанного отмечает занятые пары и снимает отметку после удаления связи на странице из поиска',
+    (tester) async {
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      tester.binding.platformDispatcher.localesTestValue = const [Locale('ru')];
+      addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
+      final l10n = lookupAppLocalizations(const Locale('ru'));
+
+      tester.view.physicalSize = const Size(1200, 6000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      final storage = (await tester.runAsync(LocalDatabaseHarness.fileBacked))!;
+      addTearDown(storage.dispose);
+      await tester.runAsync(() async {
+        await _seedOccupiedPairs(await storage.openReadyDatabase());
+        await storage.closePersistenceObjectGraph();
+      });
+      final diagnostics = InMemoryDiagnosticsSink();
+      final runtime = _fileRuntime(storage, diagnostics: diagnostics);
+      addTearDown(() async {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await runtime.shutdown();
+      });
+
+      await tester.pumpWidget(MainApp(runtime: runtime));
+      await openIntentionGraph(tester, waitFor: _pumpUntilFound);
+      await _pumpUntilFound(tester, find.text(_healthy));
+
+      await _openIntention(tester, _healthy);
+      await _chooseDetailsTab(tester, l10n.detailsRelationsTab);
+      final create = find.byKey(const ValueKey('intention-relations-add'));
+      await _ensureVisible(tester, create);
+      await tester.tap(create);
+      final selectRelated = find.byKey(
+        const ValueKey('relation-editor-select-related'),
+      );
+      await _pumpUntilFound(tester, selectRelated);
+      await tester.tap(selectRelated);
+      await _pumpUntilFound(tester, _pickerRow(_walk));
+      await tester.pumpAndSettle(const Duration(milliseconds: 1));
+
+      // Занятые пары отмечены, свободная строка обычная, а число не меняется.
+      final order = _pickerRowTitles(tester);
+      expect(order, unorderedEquals([_walk, _swim, _sleep]));
+      expect(_pickerMarks(tester, l10n, _walk), [
+        l10n.intentionPickerPairLinked,
+      ]);
+      expect(_pickerMarks(tester, l10n, _swim), [
+        l10n.intentionPickerPairArchived,
+      ]);
+      expect(_pickerMarks(tester, l10n, _sleep), isEmpty);
+      final header = tester.widget<CatalogHeader>(find.byType(CatalogHeader));
+      expect(header.title, l10n.intentionPickerAllHeader);
+      expect(header.count, 3);
+
+      // Страница из поиска позволяет удалить занимающую связь.
+      await tester.tap(
+        find.descendant(
+          of: _pickerRow(_walk),
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is DoableIcon &&
+                widget.icon == DoableIconData.arrowUpRight,
+            description: 'стрелка строки',
+          ),
+        ),
+      );
+      await _pumpUntilDetailsTitle(tester, _walk);
+      await _chooseDetailsTab(tester, l10n.detailsRelationsTab);
+      final neededFor = find.byKey(
+        const ValueKey('intention-relations-group-neededFor'),
+      );
+      await _ensureVisible(tester, neededFor);
+      await tester.tap(neededFor);
+      final phrase = l10n.relationNeighborhoodNeedPhrase(_healthy, _walk);
+      await _tapWhenFound(tester, _relationRow(phrase));
+      await _pumpUntilFound(
+        tester,
+        find.byKey(const ValueKey('relation-details-delete-relation')),
+      );
+      await _deleteCurrentRelation(tester);
+      await _pumpUntilFound(tester, intentionOptionsButton);
+      await _dismissOperationMessage(tester);
+
+      // Возврат в поиск показывает строку на прежнем месте без отметки.
+      await tester.binding.handlePopRoute();
+      await _pumpUntilFound(tester, _pickerRow(_walk));
+      await _pumpUntilAbsent(tester, find.text(l10n.intentionPickerPairLinked));
+      await tester.pumpAndSettle(const Duration(milliseconds: 1));
+      expect(_pickerRowTitles(tester), order);
+      expect(_pickerMarks(tester, l10n, _walk), isEmpty);
+      expect(_pickerMarks(tester, l10n, _swim), [
+        l10n.intentionPickerPairArchived,
+      ]);
+      expect(tester.widget<CatalogHeader>(find.byType(CatalogHeader)).count, 3);
+
+      // Освобождённая строка выбирается как обычно.
+      await tester.tap(
+        find.descendant(of: _pickerRow(_walk), matching: find.text(_walk)),
+      );
+      await _pumpUntilFound(
+        tester,
+        find.byKey(const ValueKey('relation-editor-change-related')),
+      );
+      await tester.pumpAndSettle(const Duration(milliseconds: 1));
+      expect(_pickerRow(_walk), findsNothing);
+    },
+  );
+}
+
+const _healthy = 'Быть здоровым';
+const _walk = 'Много ходить';
+const _swim = 'Плавать';
+const _sleep = 'Высыпаться';
+
+String _id(int number) =>
+    '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}';
+
+/// Активные намерения «Быть здоровым», «Много ходить», «Плавать» и
+/// «Высыпаться»; от первого идут активная связь к «Много ходить» и
+/// архивированная к «Плаванью», а «Высыпаться» связано с ним обратной
+/// связью, которая пару не занимает.
+Future<void> _seedOccupiedPairs(AppDatabase database) =>
+    seedGraph(database, () async {
+      for (final (number, title) in [
+        (1, _healthy),
+        (2, _walk),
+        (3, _swim),
+        (4, _sleep),
+      ]) {
+        await database.customStatement(
+          'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, 0, 0, ?, ?)',
+          [_id(number), title, number, number],
+        );
+      }
+      for (final (number, source, related, archived) in [
+        (101, 1, 2, 0),
+        (102, 1, 3, 1),
+        (103, 4, 1, 0),
+      ]) {
+        await database.customStatement(
+          'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
+          [_id(number), _id(source), _id(related), 'need', 2, archived],
+        );
+      }
+    });
+
+Finder _pickerRow(String title) => find.byWidgetPredicate(
+  (widget) => widget is IntentionPickerRow && widget.summary.title == title,
+  description: 'строка поиска участника «$title»',
+);
+
+/// Названия строк поиска участника в порядке показа.
+List<String> _pickerRowTitles(WidgetTester tester) => tester
+    .widgetList<IntentionPickerRow>(find.byType(IntentionPickerRow))
+    .map((row) => row.summary.title)
+    .toList();
+
+/// Слова-отметки занятой пары в строке [title]: «Уже связано» или «Связь в
+/// архиве».
+List<String> _pickerMarks(
+  WidgetTester tester,
+  AppLocalizations l10n,
+  String title,
+) {
+  final marks = {
+    l10n.intentionPickerPairLinked,
+    l10n.intentionPickerPairArchived,
+  };
+  return [
+    for (final text in tester.widgetList<Text>(
+      find.descendant(of: _pickerRow(title), matching: find.byType(Text)),
+    ))
+      if (marks.contains(text.data)) text.data!,
+  ];
 }
 
 AppRuntime _fileRuntime(
@@ -463,7 +597,6 @@ Future<void> _createNeedRelation(
   WidgetTester tester, {
   required String relatedTitle,
   required String description,
-  bool expectPairConflict = false,
   bool waitForTerminalOutcome = true,
   bool verifyFormSemantics = false,
 }) async {
@@ -510,13 +643,6 @@ Future<void> _createNeedRelation(
   await tester.tap(submit);
   if (!waitForTerminalOutcome) {
     await tester.pump();
-    return;
-  }
-  if (expectPairConflict) {
-    await _pumpUntilFound(
-      tester,
-      find.byKey(const ValueKey('relation-editor-failure')),
-    );
     return;
   }
   await _pumpUntilAbsent(tester, submit);
