@@ -3,18 +3,14 @@
 ## Assessment
 
 **Format version:** 1
-**Result:** Changes needed
+**Result:** No unresolved findings
 **Coverage status:** Complete
-**Summary:** Проверены задачи фазы 2 (2.1–2.6) против plan.md, design, ADR-0049, спецификаций и кода. Задачи закрывают работой все результаты фазы, стоят в файле после своих зависимостей и не противоречат завершённым задачам 1.1–1.11. Прежняя страница каталога получает только приспособление к новым типам выбора параметров. Остаётся один пробел в проверках: проверки задач 2.1, 2.3 и 2.4 не запускают часть прямых потребителей изменённых частей (F2). Замысел и порядок задач он не меняет. Принятых рисков нет. Отчёт не одобряет изменение и не разрешает Apply.
+**Summary:** Проверены задачи фазы 2 (2.1–2.6) против plan.md, design, ADR-0049, спецификаций и кода. Задачи закрывают работой все результаты фазы, стоят в файле после своих зависимостей и не противоречат завершённым задачам 1.1–1.11. Прежняя страница каталога получает только приспособление к новым типам выбора параметров. Проверки задач 2.1, 2.3 и 2.4 запускают прямых потребителей `answerCatalogQuery` и модели. Принятых рисков нет. Отчёт не одобряет изменение и не разрешает Apply.
 **Validation:** `mise exec --no-deps -- openspec validate redesign-intention-catalog --strict` — `Change 'redesign-intention-catalog' is valid`. Строгая проверка формата не доказывает смысловой полноты. Тесты, анализ, сборка и бенчмарк не запускались: проверялись только артефакты планирования и текущий код. Задачи фаз 3 и 4 ещё не спланированы и в этот обзор не входят.
 
 ## Findings
 
-### F2 · Low — Проверки 2.1, 2.3 и 2.4 пропускают прямых потребителей модели и `answerCatalogQuery`
-
-- **Evidence:** `.claude/rules/testing-scope.md` требует перед завершением задачи запускать тесты изменённых модулей и их прямых потребителей. Задачи 2.1 и 2.4 меняют `answerCatalogQuery`, а 2.1, 2.3 и 2.4 меняют модель, выбор параметров или подтверждённое состояние, которые читают экраны выбора. `answerCatalogQuery` вызывают `test/long_term_relation/presentation/editor/relation_form_test_support.dart:112`, которым пользуются `relation_editor_page_test.dart` и `relation_creation_navigation_test.dart`, и `test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart:1106`. Ни `test/long_term_relation/presentation/editor`, ни `test/daily_choice/presentation/catalog` в команды этих задач не входят.
-- **Impact:** Поломка этих сценариев проходит проверки своей задачи и всплывает только в 2.6, где работы над кодом не запланировано. Исправление тогда выходит за рамки задачи проверки.
-- **Required change:** Команды проверки 2.1, 2.3 и 2.4 включают тесты этих двух потребителей.
+No unresolved findings remain in the reviewed change artifacts and relevant repository context.
 
 ## Review coverage
 
@@ -24,7 +20,7 @@
 
 В коде проверены `IntentionCatalogViewModel` (выбор параметров, `_mapPage`, `_reconcileTypeCounts`, `_resetParameters`), `IntentionCatalogState`, `IntentionCatalogQuery`, `_readFirstCatalogPage`, `_catalogConditionExceptReadiness` и `matches` снимка команды. Там же проверены лист, заголовок списка, общая выдача и прежняя `IntentionCatalogPage`. Лист и выдача читают `typeCounts` разбором состояния, поэтому при производном значении 2.4 может обойтись без их правки, как и оговорено в её перечне файлов. Формула поправки ±1 в 2.4 относится к матрице: для `byType` остаётся условие с закреплённым охватом, как требует фраза «те же числа типов, что раньше», и это закрепляет существующая проверка архивирования на экране выбора в `intention_catalog_mutation_reconciliation_test.dart`.
 
-Проверены пути всех команд и файлов задач и все адаптеры `getCatalogPage` в `test/`. Адаптеры в `test/app` и `test/graph/presentation`, которые отвечают первой порцией без `answerCatalogQuery`, названы в 2.3 и входят в её команду. Файлы с числами типов из перечня 2.1 совпадают с фактическими. Тесты, которые сравнивают `selection.scope` со значением `IntentionScope`, в перечне 2.3 не названы, но входят в её команду и укажут на себя падением.
+Проверены пути всех команд и файлов задач и все адаптеры `getCatalogPage` в `test/`. Адаптеры в `test/app` и `test/graph/presentation`, которые отвечают первой порцией без `answerCatalogQuery`, названы в 2.3 и входят в её команду. Файлы с числами типов из перечня 2.1 совпадают с фактическими. Тесты, которые сравнивают `selection.scope` со значением `IntentionScope`, в перечне 2.3 не названы, но входят в её команду и укажут на себя падением. Все файлы тестов, которые вызывают `answerCatalogQuery`, входят в команды 2.1, 2.3 и 2.4: `relation_editor_page_test.dart`, `relation_creation_navigation_test.dart` и `daily_choice_catalog_page_test.dart` названы явно, а `relation_participant_selection_scenarios.dart` подключает `relation_editor_page_test.dart`.
 
 Условия бенчмарка 2.2 подтверждены: набор на 50 000 намерений архивирует нечётные индексы, `is_action_ready` по умолчанию `FALSE`, фильтр `BENCHMARK_CASE` — регулярное выражение и выбирает оба новых случая, а статус `withinBudget` или `exceeded` появляется при 40 замерах и 3 прогревах, заданных во второй команде.
 

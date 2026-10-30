@@ -174,7 +174,7 @@
     - Для `byScopeAndType` хранилище одним запросом подсчёта без условия охвата считает активные, активные действия, архивные и архивные действия. Остальные условия те же: исключение, теги и название. `totalCount` — число охвата и готовности запроса. Для `totalOnly` и `byType` числа и общее количество прежние. Запрос строк порции не меняется, и первая порция при любом виде читается одним запросом подсчёта.
     - Модель запрашивает `byType`, когда тип открыт, иначе `totalOnly`. Порцию с другим видом чисел она отклоняет как `IntentionCatalogUnexpected`. Числа экранов выбора, общее количество каталога и их согласование не меняются. `answerCatalogQuery` отвечает тестовым адаптерам по виду подсчёта запроса.
   - **Проверка:**
-    - `mise exec --no-deps -- flutter test test/intention/data/drift_intention_catalog_test.dart test/intention/application/intention_contract_test.dart test/intention/presentation test/long_term_relation/presentation/participant_picker test/daily_choice/presentation/action_picker test/daily_choice/presentation/source_picker`.
+    - `mise exec --no-deps -- flutter test test/intention/data/drift_intention_catalog_test.dart test/intention/application/intention_contract_test.dart test/intention/presentation test/long_term_relation/presentation/participant_picker test/daily_choice/presentation/action_picker test/daily_choice/presentation/source_picker test/long_term_relation/presentation/editor/relation_editor_page_test.dart test/long_term_relation/presentation/editor/relation_creation_navigation_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`.
     - `mise exec --no-deps -- flutter analyze`.
   - **Зависимости:** нет.
   - **Предполагаемые файлы:**
@@ -204,7 +204,7 @@
     - Каталог получает `IntentionTypeOpen`. `IntentionTypeNotOffered` удалён вместе с его ветками в заголовке списка, листе и тестовой поддержке. Смена типа каталога начинает новую выдачу с первой порции, а смена охвата сохраняет тип, фильтр и порядок.
     - Прежняя страница каталога берёт охват из `IntentionScopeOpen` и выглядит и ведёт себя как раньше: тип не показывает и остаётся с типом «Все». Каталог с открытым типом запрашивает `byType`, поэтому тестовые адаптеры, которые отвечают каталогу, дают числа типов через `answerCatalogQuery`.
   - **Проверка:**
-    - `mise exec --no-deps -- flutter test test/intention/presentation test/long_term_relation/presentation/participant_picker test/daily_choice/presentation/action_picker test/daily_choice/presentation/source_picker test/graph/presentation test/app`.
+    - `mise exec --no-deps -- flutter test test/intention/presentation test/long_term_relation/presentation/participant_picker test/daily_choice/presentation/action_picker test/daily_choice/presentation/source_picker test/graph/presentation test/app test/long_term_relation/presentation/editor/relation_editor_page_test.dart test/long_term_relation/presentation/editor/relation_creation_navigation_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`.
     - `mise exec --no-deps -- flutter analyze`.
   - **Зависимости:** 2.1 — тестовые адаптеры отвечают по виду подсчёта.
   - **Предполагаемые файлы:**
@@ -222,7 +222,7 @@
     - Подтверждённое состояние хранит `IntentionCatalogCounts` и даёт производные: `typeCounts` — типы в текущем охвате, `scopeCounts` — охваты при текущем типе. Пока выдача получается и после отказа, чисел нет. Экраны выбора получают те же числа типов, что раньше, а лист и выдача читают производные.
     - Поправка ±1 сравнивает снимки «до» и «после» с запросом без охвата и готовности (`withAnyScopeAndReadiness()`) и меняет ячейку по архивному состоянию и готовности снимка. Числа остаются точными после создания, изменения, смены готовности, архивирования, восстановления и удаления. Если числа становятся отрицательными или больше суммы, выдача начинается заново с первой порции. `answerCatalogQuery` выводит матрицу, где число охвата и готовности запроса равно общему количеству порции.
   - **Проверка:**
-    - `mise exec --no-deps -- flutter test test/intention/presentation test/intention/application test/long_term_relation/presentation/participant_picker test/daily_choice/presentation/action_picker test/daily_choice/presentation/source_picker test/graph/presentation test/app`.
+    - `mise exec --no-deps -- flutter test test/intention/presentation test/intention/application test/long_term_relation/presentation/participant_picker test/daily_choice/presentation/action_picker test/daily_choice/presentation/source_picker test/graph/presentation test/app test/long_term_relation/presentation/editor/relation_editor_page_test.dart test/long_term_relation/presentation/editor/relation_creation_navigation_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`.
     - `mise exec --no-deps -- flutter analyze`.
   - **Зависимости:** 2.1, 2.3.
   - **Предполагаемые файлы:**
