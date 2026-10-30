@@ -6,13 +6,20 @@ import 'package:doable/src/design_system/components/empty_state.dart';
 import 'package:doable/src/design_system/components/list_state.dart';
 import 'package:doable/src/design_system/doable_metrics.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
+import 'package:doable/src/graph/application/graph_change.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
+import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
+import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
 import 'package:doable/src/intention/presentation/search/intention_search_list.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
+import 'package:doable/src/long_term_relation/application/relation_pair_probe.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
@@ -28,9 +35,12 @@ import '../../../support/tag_positions.dart';
 /// Высота строки-образца выдачи.
 const _rowExtent = 48.0;
 
-final _list = find.byKey(
-  const PageStorageKey<String>('daily-choice-action-list'),
-);
+/// Высота линии меток, которую добавляет отметка занятой пары.
+const _markLineExtent = 20.0;
+
+/// Список выдачи: ключ у него свой для каждого вида поиска, а на странице
+/// теста он один.
+final _list = find.byType(CustomScrollView);
 
 void main() {
   group('состояния без строк', () {
@@ -367,6 +377,54 @@ void main() {
       expect(_rowTop(tester, 'Действие 30'), tester.getTopLeft(_list).dy);
     });
   });
+
+  group('согласование отметок занятых пар', () {
+    testWidgets('отметка появилась у строки над первой видимой, пока список '
+        'закрыт страницей: видимая строка остаётся на месте', (tester) async {
+      final h = await _openRelationParticipants(tester);
+      h.repository.complete(0, _firstPage(_actions(30)));
+      await _settle(tester);
+      h.position.jumpTo(300);
+      await _settle(tester);
+      final visibleTop = _rowTop(tester, 'Действие 25');
+
+      await _coverList(tester);
+      await _createOccupyingRelation(tester, h, _action(28));
+      await _uncoverList(tester);
+
+      expect(_loadedOf(h).pairOccupants, hasLength(1));
+      expect(_rowTop(tester, 'Действие 25'), visibleTop);
+    });
+
+    testWidgets('отметка снята у строки над первой видимой, пока список '
+        'закрыт страницей: видимая строка остаётся на месте', (tester) async {
+      final relation = _occupyingRelation(_action(28));
+      final h = await _openRelationParticipants(tester);
+      h.repository.complete(
+        0,
+        _firstPage(
+          _actions(30),
+          pairOccupants: {
+            _action(28).id: PairOccupant(
+              relationId: relation.id,
+              scope: relation.scope,
+            ),
+          },
+        ),
+      );
+      await _settle(tester);
+      h.position.jumpTo(300);
+      await _settle(tester);
+      final visibleTop = _rowTop(tester, 'Действие 25');
+
+      await _coverList(tester);
+      await _deleteOccupyingRelation(tester, h, relation);
+      await _uncoverList(tester);
+
+      expect(_loadedOf(h).pairOccupants, isEmpty);
+      expect(_rowTop(tester, 'Действие 25'), visibleTop);
+    });
+  });
 }
 
 final _sport = Tag(
@@ -412,6 +470,7 @@ double _rowTop(WidgetTester tester, String title) =>
 Result<IntentionCatalogPage> _firstPage(
   List<IntentionSummary> items, {
   int? totalCount,
+  Map<IntentionId, PairOccupant>? pairOccupants,
 }) {
   final total = totalCount ?? items.length;
   return ResultSuccess(
@@ -420,6 +479,7 @@ Result<IntentionCatalogPage> _firstPage(
       totalCount: total,
       nextCursor: total > items.length ? const TestCatalogCursor() : null,
       revision: const TestCatalogRevision(1),
+      pairOccupants: pairOccupants,
     ),
   );
 }
@@ -483,8 +543,13 @@ Future<_Harness> _open(
         home: Scaffold(
           body: IntentionSearchList(
             purpose: h.purpose,
-            rowBuilder: (context, results, summary) =>
-                SizedBox(height: _rowExtent, child: Text(summary.title)),
+            // Линия меток отмеченной строки делает её выше.
+            rowBuilder: (context, results, summary) => SizedBox(
+              height: results.pairOccupants.containsKey(summary.id)
+                  ? _rowExtent + _markLineExtent
+                  : _rowExtent,
+              child: Text(summary.title),
+            ),
             emptyScope: (_) => const EmptyState(
               title: 'Выбрать не из чего',
               text: 'Доступных активных действий нет.',
@@ -514,6 +579,105 @@ Future<_Harness> _openSportActions(WidgetTester tester) async {
   );
   await _settle(tester);
   return h;
+}
+
+/// Участник другой роли в поиске участника связи: выбирается связанное.
+final _counterpart = testSummary(index: 100);
+
+/// Открывает выдачу поиска участника с пробой пары: отметки занятых пар
+/// следуют за подтверждёнными изменениями связей.
+Future<_Harness> _openRelationParticipants(WidgetTester tester) => _open(
+  tester,
+  purpose: SelectRelationParticipant(
+    selectionContext: RelationParticipantSelectionContext.activeRelation,
+    session: IntentionSearchSession(),
+    pairProbe: RelationPairProbe(
+      counterpartId: _counterpart.id,
+      candidateRole: RelationParticipantRole.related,
+    ),
+  ),
+);
+
+IntentionCatalogLoaded _loadedOf(_Harness h) =>
+    h.container.read(intentionCatalogViewModelProvider(h.purpose)).requireValue
+        as IntentionCatalogLoaded;
+
+/// Связь, которая занимает пару участника другой роли и строки [candidate].
+LongTermRelation _occupyingRelation(IntentionSummary candidate) => testRelation(
+  sourceIntentionId: _counterpart.id,
+  relatedIntentionId: candidate.id,
+);
+
+/// Подтверждение команды связи на ревизии 2: первая порция читалась на первой.
+LongTermRelationCommandResult _confirmedRelation(
+  LongTermRelationCommandSuccess success,
+) =>
+    GraphCommandSucceeded<
+      LongTermRelationCommandSuccess,
+      LongTermRelationCommandFailure
+    >(
+      ConfirmedGraphResult(
+        revision: const TestCatalogRevision(2),
+        value: success,
+      ),
+    );
+
+/// Подтверждённое создание связи отмечает строку [candidate].
+Future<void> _createOccupyingRelation(
+  WidgetTester tester,
+  _Harness h,
+  IntentionSummary candidate,
+) async {
+  final relation = _occupyingRelation(candidate);
+  await acceptRelationCommand(
+    h.container,
+    h.repository,
+    CreateLongTermRelation(
+      sourceIntentionId: relation.sourceIntentionId,
+      relatedIntentionId: relation.relatedIntentionId,
+      type: relation.type,
+      priority: relation.priority,
+      description: null,
+    ),
+    _confirmedRelation(
+      LongTermRelationCreated(
+        relation: relation,
+        description: null,
+        changes: [
+          LongTermRelationCreatedChange(
+            revision: const TestCatalogRevision(2),
+            relation: relation,
+          ),
+        ],
+      ),
+    ),
+  ).future;
+  await _settle(tester);
+}
+
+/// Подтверждённое удаление связи снимает отметку её строки.
+Future<void> _deleteOccupyingRelation(
+  WidgetTester tester,
+  _Harness h,
+  LongTermRelation relation,
+) async {
+  await acceptRelationCommand(
+    h.container,
+    h.repository,
+    DeleteLongTermRelation(relation.id),
+    _confirmedRelation(
+      LongTermRelationDeleted(
+        relation: relation,
+        changes: [
+          LongTermRelationDeletedChange(
+            revision: const TestCatalogRevision(2),
+            relation: relation,
+          ),
+        ],
+      ),
+    ),
+  ).future;
+  await _settle(tester);
 }
 
 /// Назначение обязательного тега добавляет строку перед видимой.

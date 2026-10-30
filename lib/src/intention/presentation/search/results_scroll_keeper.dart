@@ -88,7 +88,7 @@ final class ResultsScrollKeeper {
     if (_pendingVisualAnchor == null &&
         previousState is IntentionCatalogLoaded &&
         identical(previousState.query, nextState.query) &&
-        _mayShiftVisibleRow(previousState.items, nextState.items)) {
+        _mayShiftVisibleRow(previousState, nextState)) {
       _pendingVisualAnchor = _captureVisualAnchor(previousState);
     }
     return startsNewResults;
@@ -144,20 +144,31 @@ final class ResultsScrollKeeper {
     }
   }
 
-  /// Строки, добавленные за прежней выдачей, видимую строку не сдвигают.
+  /// Может ли переход от [previous] к [next] сдвинуть видимую строку.
+  ///
+  /// Строки, добавленные за прежней выдачей, и отметки занятых пар этих новых
+  /// строк видимую строку не сдвигают. Отметка прежней строки сдвигает: она
+  /// добавляет строке или убирает у неё линию меток, и строки под ней
+  /// смещаются.
   bool _mayShiftVisibleRow(
-    List<IntentionSummary> previous,
-    List<IntentionSummary> next,
+    IntentionCatalogLoaded previous,
+    IntentionCatalogLoaded next,
   ) {
-    if (next.length < previous.length) {
+    final previousItems = previous.items;
+    final nextItems = next.items;
+    if (nextItems.length < previousItems.length) {
       return true;
     }
-    for (var index = 0; index < previous.length; index++) {
-      if (!identical(previous[index], next[index])) {
+    for (var index = 0; index < previousItems.length; index++) {
+      if (!identical(previousItems[index], nextItems[index])) {
         return true;
       }
     }
-    return false;
+    // Карту создаёт заново каждое состояние, поэтому отметки сравниваются по
+    // содержимому.
+    return previousItems.any(
+      (item) => previous.pairOccupants[item.id] != next.pairOccupants[item.id],
+    );
   }
 
   _VisualAnchor? _captureVisualAnchor(IntentionCatalogLoaded state) {
