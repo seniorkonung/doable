@@ -161,3 +161,18 @@
   - **Зависимости:** 1.10.
   - **Предполагаемые файлы:** `lib/src/intention/presentation/search/results_scroll_keeper.dart`, `test/intention/presentation/search/intention_search_list_test.dart`.
   - **Размер:** S.
+
+- [ ] 1.12 Удерживать первую видимую строку выдачи, когда согласование отметок меняет высоту другой строки
+  - **Критерии приёмки:**
+    - Согласование отметок не сдвигает первую видимую строку, даже если меняется высота другой строки выдачи: у строки без меток и тегов появляется или исчезает линия меток.
+    - `ResultsScrollKeeper` считает изменение занимающих связей (`pairOccupants`) той же выдачи, наряду с изменением строк, возможным сдвигом видимой строки. Связи сравниваются по содержимому: конструктор `IntentionCatalogLoaded` создаёт новую карту для каждого состояния.
+    - Результат задачи 1.11 сохраняется: без смещения первой видимой строки хранитель не трогает прокрутку. Порция, которая только добавляет отметки своих новых строк, не считается изменением занимающих связей.
+    - `_applyRelationChanges` в модели каталога по-прежнему сохраняет те же объекты `items`, состав, порядок, число совпадений и курсор. Проекция строки и линия меток не меняются, место под метку не резервируется.
+    - Регрессионная проверка в `test/intention/presentation/search/intention_search_list_test.dart`: появление или снятие отметки у строки над видимой при закрытом списке не сдвигает первую видимую строку. Без исправления проверка падает.
+    - Спецификации не меняются, ветка `change/redesign-intention-catalog` не меняется.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/search test/intention/presentation/catalog/intention_search_results_test.dart test/intention/presentation/picker test/long_term_relation/presentation/participant_picker`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.10, 1.11.
+  - **Предполагаемые файлы:** `lib/src/intention/presentation/search/results_scroll_keeper.dart`, `test/intention/presentation/search/intention_search_list_test.dart`.
+  - **Размер:** S.
