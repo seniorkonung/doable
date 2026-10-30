@@ -514,15 +514,16 @@
 - [ ] 4.8 Убрать условия под полем поиска: условия видны по кнопке фильтра и меняются в панели тегов
   - **Критерии приёмки:**
     - `IntentionTagConditionsSection` и `intention_tag_conditions_section_test.dart` удалены, под полем поиска условий нет.
+    - `lib/src/tag/presentation/tag_phrase_text.dart` удалён вместе с последним вызовом `tagPhraseText`. Своих тестов у файла нет.
     - `shownIntentionCatalogParameters.tagConditions` читает число кнопки фильтра. `removeIntentionCatalogTagCondition` получает надобность снимаемого условия и снимает его нажатиями в панели: оставшиеся из трёх переключений круга после `tagConditionCycles(requirement)`.
     - Сценарии, которые нажимали чип `intention-tag-condition-toggle-*` или читали его подпись, меняют надобность в панели тегов, а подтверждают число условий, отметку панели и выдачу. Локальных `_conditions`, `_conditionLabel` и `_shownConditions` нет. Сообщения пустой выдачи остаются до задачи 4.12.
     - `intention_tag_search_accessibility_test.dart` вместо чипов проверяет кнопку фильтра с числом условий и панель при открытой клавиатуре. `app_shell_page_matrix.dart` сверяет назначение по `IntentionSearchBar`.
   - **Проверка:**
     - `mise exec --no-deps -- flutter test test/intention/presentation/catalog test/intention/presentation/intention_tag_search_accessibility_test.dart test/app/intention_tag_search_app_flow_test.dart test/app/tag_app_flow_test.dart test/app/intention_creation_sheet_integration_test.dart test/app/graph_import_app_flow_test.dart test/app/graph_restore_app_flow_test.dart test/app/navigation`.
     - `mise exec --no-deps -- flutter analyze`.
-  - **Зависимости:** 4.7 — кнопка фильтра уже на странице.
+  - **Зависимости:** 4.3 — первый вызов `tagPhraseText` уже убран; 4.7 — кнопка фильтра уже на странице.
   - **Предполагаемые файлы:**
-    - меняется `lib/src/intention/presentation/catalog/intention_catalog_page.dart`; удаляется `intention_tag_conditions_section.dart`;
+    - меняется `lib/src/intention/presentation/catalog/intention_catalog_page.dart`; удаляются `intention_tag_conditions_section.dart` и `lib/src/tag/presentation/tag_phrase_text.dart`;
     - `test/support/intention_catalog_controls.dart`;
     - проверки: `test/intention/presentation/catalog/intention_catalog_page_test.dart`, `test/intention/presentation/intention_tag_search_accessibility_test.dart`, `test/app/navigation/app_shell_page_matrix.dart`, `test/app/intention_tag_search_app_flow_test.dart`, `test/app/tag_app_flow_test.dart`, `test/app/intention_creation_sheet_integration_test.dart`.
   - **Размер:** M.
@@ -623,7 +624,7 @@
   - **Проверка:**
     - `mise exec --no-deps -- openspec validate redesign-intention-catalog --strict`.
     - `mise run codegen-check`.
-    - `grep -rnE 'IntentionSearchLayout|IntentionSearchResults|IntentionTagConditionsSection|IntentionCatalogStatusView|IntentionCatalogInlineStatus|IntentionCatalogContinuationStatusView|_OfferedCatalogOrder|_IntentionSummaryTile|catalog-scope-control|catalog-order-control|catalog-filter-field|intention-tag-condition' lib test --include='*.dart'` ничего не находит.
+    - `grep -rnE 'IntentionSearchLayout|IntentionSearchResults|IntentionTagConditionsSection|IntentionCatalogStatusView|IntentionCatalogInlineStatus|IntentionCatalogContinuationStatusView|_OfferedCatalogOrder|_IntentionSummaryTile|catalog-scope-control|catalog-order-control|catalog-filter-field|intention-tag-condition|tagPhraseText|tag_phrase_text' lib test --include='*.dart'` ничего не находит.
     - `mise run check`.
     - `mise exec --no-deps -- flutter build apk --release`.
   - **Зависимости:** 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9, 4.10, 4.11, 4.12, 4.13.
