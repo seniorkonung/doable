@@ -62,6 +62,7 @@ void main() {
           testSummary(index: 1, title: 'Читать лучше'),
         ];
         await _show(tester, purpose);
+        expect(_option(ru ? 'Показать' : 'Show'), findsNothing);
 
         final all = ru ? 'Намерения и действия' : 'Intentions and actions';
         final intentionsOnly = ru ? 'Только намерения' : 'Intentions only';
@@ -795,6 +796,224 @@ void main() {
         semantics.dispose();
       },
     );
+
+    testWidgets(
+      '${locale.languageCode}: меню охвата считает намерения выбранного типа, а выбор охвата сразу меняет выдачу',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        final h = await _openCatalog(tester, locale);
+        h.repository.complete(0, _matrixPage());
+        await tester.pumpAndSettle();
+        await _showCatalog(tester);
+
+        final active = ru ? 'Активные' : 'Active';
+        final archived = ru ? 'Архивные' : 'Archived';
+        final all = ru ? 'Все, включая архивные' : 'All, archived included';
+        expect(
+          find.descendant(
+            of: find.byType(Sheet),
+            matching: find.byType(SelectRow<IntentionScope>),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          tester.getRect(_option(ru ? 'Показать' : 'Show')).top,
+          lessThan(tester.getRect(_option(ru ? 'Тип' : 'Type')).top),
+        );
+        _selectedType(tester, active);
+
+        await _openTypes(tester, ru);
+        await tester.tap(_menuOption(ru ? 'Только действия' : 'Actions only'));
+        await tester.pump();
+        await tester.pump();
+        expect(h.repository.queries.last.scope, IntentionScope.active);
+        expect(
+          h.repository.queries.last.readinessFilter,
+          IntentionReadinessFilter.readyOnly,
+        );
+        h.repository.complete(
+          h.repository.queries.length - 1,
+          _matrixPage(totalCount: 4),
+        );
+        await tester.pumpAndSettle();
+
+        await _openScope(tester, ru);
+        _menuChecked(tester, '$active\n4');
+        expect(_menuOption(archived), findsOneWidget);
+        expect(_menuOption(all), findsOneWidget);
+        expect(_menuText('2'), findsOneWidget);
+        expect(_menuText('6'), findsOneWidget);
+        for (final label in ['$archived\n2', '$all\n6']) {
+          final node = tester
+              .getSemantics(find.bySemanticsLabel(label))
+              .getSemanticsData();
+          expect(node.flagsCollection.isChecked, CheckedState.isFalse);
+        }
+
+        await tester.tap(_menuOption(archived));
+        await tester.pump();
+        await tester.pump();
+        expect(find.byType(MenuItemButton), findsNothing);
+        expect(find.byType(Sheet), findsOneWidget);
+        _selectedType(tester, archived);
+        expect(h.repository.queries.last.scope, IntentionScope.archived);
+        semantics.dispose();
+      },
+    );
+
+    testWidgets(
+      '${locale.languageCode}: меню охвата показывает названия без чисел, пока выдача не подтверждена',
+      (tester) async {
+        final h = await _openCatalog(tester, locale);
+        await _showCatalog(tester);
+
+        await _openScope(tester, ru);
+        expect(find.byType(MenuItemButton), findsNWidgets(3));
+        for (final label in [
+          ru ? 'Активные' : 'Active',
+          ru ? 'Архивные' : 'Archived',
+          ru ? 'Все, включая архивные' : 'All, archived included',
+        ]) {
+          expect(_menuOption(label), findsOneWidget);
+        }
+        for (final count in ['3', '7', '10']) {
+          expect(_menuText(count), findsNothing);
+        }
+
+        h.repository.complete(0, _matrixPage());
+        await tester.pumpAndSettle();
+        _menuChecked(tester, '${ru ? 'Активные' : 'Active'}\n7');
+        expect(_menuText('3'), findsOneWidget);
+        expect(_menuText('10'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      '${locale.languageCode}: сброс возвращает активный охват и сохраняет поиск',
+      (tester) async {
+        final h = await _openCatalog(tester, locale);
+        final model = h.container.read(
+          intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+              .notifier,
+        );
+        model.changeTitleFilter('Читать');
+        model.changeScope(IntentionScope.all);
+        await tester.pump();
+        h.repository.complete(h.repository.queries.length - 1, _matrixPage());
+        await tester.pumpAndSettle();
+        await _showCatalog(tester);
+        _selectedType(
+          tester,
+          ru ? 'Все, включая архивные' : 'All, archived included',
+        );
+
+        await tester.tap(_option(ru ? 'Сбросить' : 'Reset'));
+        await tester.pump();
+        _selectedType(tester, ru ? 'Активные' : 'Active');
+        expect(_option(ru ? 'Сбросить' : 'Reset'), findsNothing);
+        expect(h.repository.queries.last.scope, IntentionScope.active);
+        expect(
+          h.repository.queries.last.titleFilter?.map((value) => value),
+          'Читать',
+        );
+      },
+    );
+
+    testWidgets(
+      '${locale.languageCode}: открытие любого из трёх меню закрывает два других',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        final h = await _openCatalog(tester, locale);
+        h.repository.complete(0, _matrixPage());
+        await tester.pumpAndSettle();
+        await _showCatalog(tester);
+
+        final scope = ru ? 'Архивные' : 'Archived';
+        final type = ru ? 'Только намерения' : 'Intentions only';
+        final sort = ru ? 'Дата изменения' : 'Date changed';
+        // Диктор открывает строку напрямую, минуя касание вне меню.
+        Future<void> activate(
+          String caption,
+          String shown,
+          List<String> hidden,
+        ) async {
+          tester.semantics.tap(find.semantics.byLabel(caption));
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 300));
+          await tester.pump();
+          expect(find.byType(MenuItemButton), findsNWidgets(3));
+          expect(_menuOption(shown), findsOneWidget);
+          for (final label in hidden) {
+            expect(_menuOption(label), findsNothing);
+          }
+        }
+
+        await _openScope(tester, ru);
+        expect(_menuOption(scope), findsOneWidget);
+        await activate(ru ? 'Тип' : 'Type', type, [scope, sort]);
+        await activate(ru ? 'Сортировка' : 'Sort by', sort, [scope, type]);
+        await activate(ru ? 'Показать' : 'Show', scope, [type, sort]);
+        await activate(ru ? 'Сортировка' : 'Sort by', sort, [scope, type]);
+        await activate(ru ? 'Тип' : 'Type', type, [scope, sort]);
+        semantics.dispose();
+      },
+    );
+
+    testWidgets(
+      '${locale.languageCode}: подписи строки и меню охвата переносятся при двукратном масштабе',
+      (tester) async {
+        final h = await _openCatalog(tester, locale, width: 320, textScale: 2);
+        h.container.read(
+            intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+                .notifier,
+          )
+          ..changeScope(IntentionScope.all)
+          ..changeType(IntentionTypeChoice.actions);
+        await tester.pump();
+        h.repository.complete(
+          h.repository.queries.length - 1,
+          _matrixPage(totalCount: 6),
+        );
+        await tester.pumpAndSettle();
+        await _showCatalog(tester);
+        await tester.pumpAndSettle();
+
+        final bounds = tester.getRect(find.byType(SelectRow<IntentionScope>));
+        final caption = _option(ru ? 'Показать' : 'Show');
+        final chosen = _option(
+          ru ? 'Все, включая архивные' : 'All, archived included',
+        );
+        _wholeText(tester, caption, bounds, textScale: 2);
+        _wholeText(tester, chosen, bounds, textScale: 2);
+        expect(
+          tester.getRect(caption).right,
+          lessThan(tester.getRect(chosen).left),
+        );
+
+        await _openScope(tester, ru);
+        final screen = Rect.fromLTWH(0, 0, 320, 844);
+        final menu = tester.getRect(_menuPanel);
+        expect(menu.right, bounds.right - 4);
+        expect(menu.width, lessThanOrEqualTo(bounds.width - 8));
+        expect(screen.contains(menu.topLeft), isTrue);
+        expect(screen.contains(menu.bottomRight), isTrue);
+        for (final (label, count) in [
+          (ru ? 'Активные' : 'Active', '4'),
+          (ru ? 'Архивные' : 'Archived', '2'),
+          (ru ? 'Все, включая архивные' : 'All, archived included', '6'),
+        ]) {
+          final item = _menuOption(label);
+          final name = find.descendant(of: item, matching: find.text(label));
+          final number = find.descendant(of: item, matching: find.text(count));
+          _wholeText(tester, name, tester.getRect(item), textScale: 2);
+          _wholeText(tester, number, tester.getRect(item), textScale: 2);
+          expect(
+            tester.getRect(name).right,
+            lessThan(tester.getRect(number).left),
+          );
+        }
+      },
+    );
   }
 }
 
@@ -827,6 +1046,18 @@ final _menuPanel = find.byWidgetPredicate(
 
 Future<void> _openTypes(WidgetTester tester, bool ru) async {
   await tester.tap(_typeButton(ru));
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 300));
+  await tester.pump();
+}
+
+Finder _scopeButton(bool ru) => find.descendant(
+  of: find.byType(Sheet),
+  matching: find.widgetWithText(InkWell, ru ? 'Показать' : 'Show'),
+);
+
+Future<void> _openScope(WidgetTester tester, bool ru) async {
+  await tester.tap(_scopeButton(ru));
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 300));
   await tester.pump();
@@ -927,6 +1158,72 @@ Future<void> _show(WidgetTester tester, IntentionPickerPurpose purpose) async {
 Future<void> _close(WidgetTester tester) async {
   Navigator.of(tester.element(find.byType(Sheet))).pop();
   await tester.pumpAndSettle();
+}
+
+Future<void> _showCatalog(WidgetTester tester) async {
+  unawaited(
+    showShowAndSortSheet(
+      tester.element(find.byType(Scaffold)),
+      const BrowseIntentionCatalog(),
+    ),
+  );
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 300));
+}
+
+/// Первая порция каталога с числами охватов и типов: в активных 7 намерений
+/// и 4 действия, в архивных 3 намерения и 2 действия.
+Result<IntentionCatalogPage> _matrixPage({int totalCount = 7}) => ResultSuccess(
+  IntentionCatalogFirstPage(
+    items: [
+      for (var i = 1; i <= totalCount; i++)
+        testSummary(index: i, readiness: IntentionReadiness.ready),
+    ],
+    totalCount: totalCount,
+    counts: IntentionCountsByScopeAndType(
+      active: IntentionTypeCounts(all: 7, actions: 4),
+      archived: IntentionTypeCounts(all: 3, actions: 2),
+    ),
+    nextCursor: null,
+    revision: const TestCatalogRevision(1),
+  ),
+);
+
+Future<({ProviderContainer container, ControlledCatalogRepository repository})>
+_openCatalog(
+  WidgetTester tester,
+  Locale locale, {
+  double width = 390,
+  double textScale = 1,
+}) async {
+  tester.view
+    ..physicalSize = Size(width, 844)
+    ..devicePixelRatio = 1;
+  tester.platformDispatcher.textScaleFactorTestValue = textScale;
+  addTearDown(tester.view.reset);
+  addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+  final repository = ControlledCatalogRepository();
+  final container = reconciliationCatalogContainer(repository);
+  addTearDown(container.dispose);
+  await tester.pumpWidget(
+    UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(
+        locale: locale,
+        theme: doableTheme(Brightness.light),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: const Scaffold(),
+      ),
+    ),
+  );
+  // Страница каталога держит модель, пока открыт лист.
+  container.listen(
+    intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
+    (_, _) {},
+  );
+  await tester.pump();
+  return (container: container, repository: repository);
 }
 
 Result<IntentionCatalogPage> _page(

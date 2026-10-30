@@ -75,11 +75,8 @@ final class _IntentionSearchListState
   @override
   void initState() {
     super.initState();
-    // Прокрутка одна для всех состояний и не пересоздаётся, а новая выдача
-    // начинается с верхней позиции: сохранённое смещение не нужно.
     _scrollKeeper = ResultsScrollKeeper(
       initial: ref.read(intentionCatalogViewModelProvider(widget.purpose)),
-      keepScrollOffset: false,
     );
   }
 
@@ -190,14 +187,7 @@ final class _IntentionSearchListState
       byTags: query.tagFilter != IntentionTagFilter.empty,
     )) {
       (byTitle: false, byTags: false) when (empty.typeCounts?.all ?? 0) > 0 =>
-        EmptyState(
-          title: l10n.intentionPickerEmptyTypeTitle,
-          text: l10n.intentionPickerEmptyTypeText,
-          action: (
-            label: l10n.intentionPickerShowBothTypes,
-            onPressed: () => _notifier.changeType(IntentionTypeChoice.all),
-          ),
-        ),
+        _emptyType(l10n, empty, actionsOnly: actionsOnly),
       (byTitle: false, byTags: false) => widget.emptyScope(empty),
       (byTitle: true, byTags: false) => _filteredEmpty(
         l10n,
@@ -219,6 +209,40 @@ final class _IntentionSearchListState
             ? l10n.intentionPickerNoActionsFound
             : l10n.intentionPickerNoIntentionsFound,
         text: l10n.intentionPickerChangeTitleOrTags,
+      ),
+    };
+  }
+
+  /// Пустой выбранный тип. При открытом охвате заголовок называет охват,
+  /// а текст и значок — тип; при закреплённом охвате текст общий.
+  EmptyState _emptyType(
+    AppLocalizations l10n,
+    IntentionCatalogEmpty empty, {
+    required bool actionsOnly,
+  }) {
+    final action = (
+      label: l10n.intentionPickerShowBothTypes,
+      onPressed: () => _notifier.changeType(IntentionTypeChoice.all),
+    );
+    return switch (empty.selection.scope) {
+      IntentionScopeOpen() => EmptyState(
+        icon: actionsOnly ? DoableIconData.bolt : DoableIconData.intention,
+        title: l10n.intentionPickerEmptyScopedTypeTitle(
+          empty.query.scope.name,
+          (actionsOnly
+                  ? IntentionTypeChoice.actions
+                  : IntentionTypeChoice.intentions)
+              .name,
+        ),
+        text: actionsOnly
+            ? l10n.intentionPickerEmptyActionsText
+            : l10n.intentionPickerEmptyIntentionsText,
+        action: action,
+      ),
+      IntentionScopeFixed() => EmptyState(
+        title: l10n.intentionPickerEmptyTypeTitle,
+        text: l10n.intentionPickerEmptyTypeText,
+        action: action,
       ),
     };
   }

@@ -37,7 +37,6 @@ import '../../../support/tag_positions.dart';
 const _screen = Size(390, 844);
 const _closeLabel = 'Закрыть поиск';
 const _emptyScopeMessage = 'Доступных активных действий нет.';
-const _revision = TestCatalogRevision(1);
 
 final _actionField = find.byKey(const ValueKey('daily-choice-action-filter'));
 final _filterButton = find.byType(FilterButton);
@@ -498,7 +497,7 @@ void main() {
         };
         await tester.enterText(find.byKey(ValueKey('$prefix-filter')), filter);
         if (required) {
-          h.conditions(purpose).cycle(sport, snapshotRevision: _revision);
+          h.conditions(purpose).cycle(sport.id);
         }
         await tester.pump(const Duration(milliseconds: 300));
         h.repository.complete(
@@ -555,10 +554,10 @@ void main() {
           final field = find.byKey(ValueKey('$prefix-filter'));
           await tester.enterText(field, 'бег');
           final conditions = h.conditions(purpose)
-            ..cycle(sport, snapshotRevision: _revision)
+            ..cycle(sport.id)
             // Второй шаг круга исключает тег.
-            ..cycle(work, snapshotRevision: _revision)
-            ..cycle(work, snapshotRevision: _revision);
+            ..cycle(work.id)
+            ..cycle(work.id);
           await tester.pump(const Duration(milliseconds: 300));
           h.repository.complete(
             h.repository.queries.length - 1,

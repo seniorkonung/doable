@@ -31,6 +31,7 @@ final class _ShowAndSortSheet extends ConsumerStatefulWidget {
 }
 
 final class _ShowAndSortSheetState extends ConsumerState<_ShowAndSortSheet> {
+  final _scopeMenu = MenuController();
   final _typeMenu = MenuController();
   final _sortMenu = MenuController();
 
@@ -44,14 +45,33 @@ final class _ShowAndSortSheetState extends ConsumerState<_ShowAndSortSheet> {
     final catalog = ref.watch(provider);
     final model = ref.read(provider.notifier);
     final selection = model.selection;
-    final counts = switch (catalog) {
+    final confirmed = switch (catalog) {
       AsyncData(
         isLoading: false,
-        value: IntentionCatalogConfirmedState(:final typeCounts),
+        value: final IntentionCatalogConfirmedState state,
       ) =>
-        typeCounts,
+        state,
       _ => null,
     };
+    final counts = confirmed?.typeCounts;
+    final scopeCounts = confirmed?.scopeCounts;
+    final scopeItems = [
+      SelectRowItem(
+        value: IntentionScope.active,
+        label: l10n.intentionPickerScopeActive,
+        count: scopeCounts?.active.toString(),
+      ),
+      SelectRowItem(
+        value: IntentionScope.archived,
+        label: l10n.intentionPickerScopeArchived,
+        count: scopeCounts?.archived.toString(),
+      ),
+      SelectRowItem(
+        value: IntentionScope.all,
+        label: l10n.intentionPickerScopeAll,
+        count: scopeCounts?.all.toString(),
+      ),
+    ];
     final typeItems = [
       SelectRowItem(
         value: IntentionTypeChoice.all,
@@ -104,6 +124,18 @@ final class _ShowAndSortSheetState extends ConsumerState<_ShowAndSortSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (selection.scope case IntentionScopeOpen(:final selected))
+            SelectRow(
+              label: l10n.intentionPickerScopeCaption,
+              items: scopeItems,
+              value: selected,
+              onChanged: model.changeScope,
+              controller: _scopeMenu,
+              onOpen: () {
+                _typeMenu.close();
+                _sortMenu.close();
+              },
+            ),
           if (selection.type case IntentionTypeOpen(:final selected))
             SelectRow(
               label: l10n.intentionPickerTypeCaption,
@@ -111,7 +143,10 @@ final class _ShowAndSortSheetState extends ConsumerState<_ShowAndSortSheet> {
               value: selected,
               onChanged: model.changeType,
               controller: _typeMenu,
-              onOpen: _sortMenu.close,
+              onOpen: () {
+                _scopeMenu.close();
+                _sortMenu.close();
+              },
             ),
           if (selection.type is IntentionTypePinnedToActions)
             SelectRow<IntentionTypeChoice>.disabled(
@@ -137,7 +172,10 @@ final class _ShowAndSortSheetState extends ConsumerState<_ShowAndSortSheet> {
             ],
             value: order.field,
             controller: _sortMenu,
-            onOpen: _typeMenu.close,
+            onOpen: () {
+              _scopeMenu.close();
+              _typeMenu.close();
+            },
             onChanged: (field) {
               final previous = model.selection.order;
               final crossesTitle =

@@ -23,16 +23,14 @@ import '../catalog/intention_catalog_state.dart';
 /// [keyFor].
 final class ResultsScrollKeeper {
   /// [initial] — выдача, по которой список строится впервые; первая новая
-  /// выдача после неё начнётся с верхней позиции. [keepScrollOffset]
-  /// передаётся контроллеру прокрутки: сохранять ли смещение в [PageStorage].
-  ResultsScrollKeeper({
-    required AsyncValue<IntentionCatalogState> initial,
-    required bool keepScrollOffset,
-  }) : controller = ScrollController(keepScrollOffset: keepScrollOffset),
-       _shown = initial,
-       _query = _confirmedQuery(initial.value);
+  /// выдача после неё начнётся с верхней позиции.
+  ResultsScrollKeeper({required AsyncValue<IntentionCatalogState> initial})
+    : _shown = initial,
+      _query = _confirmedQuery(initial.value);
 
-  final ScrollController controller;
+  /// Прокрутка одна для всех состояний и не пересоздаётся, а новая выдача
+  /// начинается с верхней позиции: сохранённое смещение не нужно.
+  final controller = ScrollController(keepScrollOffset: false);
 
   /// Выдача, по которой построен список. Она может отставать от модели:
   /// скрытая страница не перестраивается, пока её снова не покажут, и якорь
@@ -55,20 +53,16 @@ final class ResultsScrollKeeper {
       _itemKeys.putIfAbsent(id, () => GlobalKey());
 
   /// Учитывает переход модели от [previous] к [next].
-  ///
-  /// Возвращает, началась ли новая выдача: тогда список уже переведён к
-  /// верхней позиции, если он показан.
-  bool onCatalogChanged(
+  void onCatalogChanged(
     AsyncValue<IntentionCatalogState>? previous,
     AsyncValue<IntentionCatalogState> next,
   ) {
     final nextState = next.value;
     // Модель публикует каждую выдачу, в том числе когда список до неё не был
     // показан.
-    var startsNewResults = false;
     final query = _confirmedQuery(nextState);
     if (query != null && !identical(query, _query)) {
-      startsNewResults = _query != null;
+      final startsNewResults = _query != null;
       _query = query;
       if (startsNewResults) {
         _jumpToTop();
@@ -83,7 +77,7 @@ final class ResultsScrollKeeper {
 
     final previousState = previous?.value;
     if (nextState is! IntentionCatalogLoaded) {
-      return startsNewResults;
+      return;
     }
     if (_pendingVisualAnchor == null &&
         previousState is IntentionCatalogLoaded &&
@@ -92,7 +86,6 @@ final class ResultsScrollKeeper {
         _mayShiftVisibleRow(previousState, nextState)) {
       _pendingVisualAnchor = _captureVisualAnchor(previousState);
     }
-    return startsNewResults;
   }
 
   /// Учитывает перестройку списка по выдаче [catalog]: после кадра строки уже

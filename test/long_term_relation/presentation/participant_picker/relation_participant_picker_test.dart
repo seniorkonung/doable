@@ -849,7 +849,7 @@ Future<void> _applyConditions(
   var expectedQueries = repository.queries.length;
   for (final (tag, requirement) in conditions) {
     for (var i = 0; i < tagConditionCycles(requirement); i++) {
-      model.cycle(tag, snapshotRevision: const TestCatalogRevision(0));
+      model.cycle(tag.id);
       expectedQueries++;
       await tester.pump();
     }

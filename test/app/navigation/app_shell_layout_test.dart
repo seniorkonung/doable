@@ -18,17 +18,16 @@ import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/design_system/components/list_state.dart';
+import 'package:doable/src/design_system/doable_metrics.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_catalog_status_views.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_search_layout.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/long_term_relation/presentation/details/relation_details_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
-import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -39,6 +38,7 @@ import '../../support/daily_choice_catalog_controls.dart';
 import '../../support/daily_choice_local_date.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
+import '../../support/intention_catalog_controls.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 import '../../support/quick_creation.dart';
@@ -161,18 +161,18 @@ void main() {
         const count = 40;
         await _start(tester, intentions: count, insets: insets);
         await _select(tester, AppDestination.intentionGraph);
-        await _until(tester, find.text('Total intentions: $count'));
+        await _until(tester, intentionCatalogTotal(count));
 
         if (insets.keyboard > 0) {
           // Поле фильтра в фокусе остаётся над клавиатурой и сужает выдачу.
-          await tester.enterText(_titleFilter, 'Намерение 00');
-          await _until(tester, find.text('Total intentions: 9'));
+          await enterIntentionCatalogTitle(tester, 'Намерение 00');
+          await _until(tester, intentionCatalogTotal(9));
           await tester.pumpAndSettle();
           expect(
             tester
                 .widget<EditableText>(
                   find.descendant(
-                    of: _titleFilter,
+                    of: intentionCatalogTitleField,
                     matching: find.byType(EditableText),
                   ),
                 )
@@ -180,66 +180,18 @@ void main() {
                 .hasFocus,
             isTrue,
           );
-          expect(_titleFilter.hitTestable(), findsOneWidget);
-          _expectFullyVisible(tester, _titleFilter, insets);
+          expect(intentionCatalogTitleField.hitTestable(), findsOneWidget);
+          _expectFullyVisible(tester, intentionCatalogTitleField, insets);
         }
 
         await _scrollToEnd(tester, find.byType(IntentionCatalogPage));
 
         // Порядок по умолчанию — от новых к старым: первое намерение стоит
         // последним.
-        final lastRow = _catalogRow(_intentionTitle(1));
+        final lastRow = intentionCatalogRow(_intentionTitle(1));
         _expectFullyVisible(tester, lastRow, insets);
         _expectCatalogEnd(tester, lastRow, insets);
         expect(lastRow.hitTestable(), findsOneWidget);
-        expect(tester.takeException(), isNull);
-      });
-
-      testWidgets('каталог намерений, ${insets.name}: один флинг от начала '
-          'выдачи, загруженной до конца, доводит до конца список и страницу, '
-          'и последняя строка занимает доступную область до панели, '
-          'а обратный флинг возвращает поле фильтра '
-          'названия', (tester) async {
-        // Двадцать строк одним флингом проходятся с запасом.
-        const count = 20;
-        await _start(tester, intentions: count, insets: insets);
-        await _select(tester, AppDestination.intentionGraph);
-        await _until(tester, find.text('Total intentions: $count'));
-        if (insets.keyboard > 0) {
-          // Клавиатуру открывает поле фильтра в фокусе.
-          await tester.enterText(_titleFilter, 'Намерение 00');
-          await _until(tester, find.text('Total intentions: 9'));
-          await tester.pumpAndSettle();
-        }
-        expect(_catalogListScroll(tester).pixels, 0);
-        expect(_catalogPageScroll(tester).pixels, 0);
-
-        await _flingCatalog(tester, const Offset(0, -300));
-
-        final list = _catalogListScroll(tester);
-        final page = _catalogPageScroll(tester);
-        expect(list.pixels, moreOrLessEquals(list.maxScrollExtent));
-        expect(page.pixels, moreOrLessEquals(page.maxScrollExtent));
-        expect(page.maxScrollExtent, greaterThan(0));
-        // Порядок по умолчанию — от новых к старым: первое намерение стоит
-        // последним.
-        final lastRow = _catalogRow(_intentionTitle(1));
-        _expectFullyVisible(tester, lastRow, insets);
-        _expectCatalogEnd(tester, lastRow, insets);
-        expect(lastRow.hitTestable(), findsOneWidget);
-
-        await _flingCatalog(tester, const Offset(0, 300));
-
-        expect(
-          _catalogListScroll(tester).pixels,
-          moreOrLessEquals(_catalogListScroll(tester).minScrollExtent),
-        );
-        expect(
-          _catalogPageScroll(tester).pixels,
-          moreOrLessEquals(_catalogPageScroll(tester).minScrollExtent),
-        );
-        _expectFullyVisible(tester, _titleFilter, insets);
-        expect(_titleFilter.hitTestable(), findsOneWidget);
         expect(tester.takeException(), isNull);
       });
     }
@@ -258,20 +210,21 @@ void main() {
           observer: faults,
         );
         await _select(tester, AppDestination.intentionGraph);
-        await _until(tester, find.text('Total intentions: $count'));
+        await _until(tester, intentionCatalogTotal(count));
         final page = find.byType(IntentionCatalogPage);
         if (insets.keyboard > 0) {
           // Клавиатуру открывает поле фильтра в фокусе, а выдача остаётся
           // больше одной порции.
           await _focusTitleFilter(tester, insets);
-          expect(find.text('Total intentions: $count'), findsOneWidget);
+          expect(intentionCatalogTotal(count), findsOneWidget);
         }
 
         faults.isFailing = true;
         await _scrollToEnd(tester, page);
 
-        final continuation = find.byType(
-          IntentionCatalogContinuationStatusView,
+        // Виды состояния списка — закрытые наследники ListState.
+        final continuation = find.byWidgetPredicate(
+          (widget) => widget is ListState,
         );
         final failure = find.descendant(
           of: continuation,
@@ -279,7 +232,7 @@ void main() {
         );
         final retry = find.descendant(
           of: continuation,
-          matching: find.byType(FilledButton),
+          matching: find.byType(InkWell),
         );
         // Отступы состояния нажатий не принимают: полную видимость проверяют
         // его сообщение и повтор, а границу выдачи — всё состояние.
@@ -294,7 +247,7 @@ void main() {
         await _scrollToEnd(tester, page);
 
         expect(continuation, findsNothing);
-        final lastRow = _catalogRow(_intentionTitle(1));
+        final lastRow = intentionCatalogRow(_intentionTitle(1));
         _expectFullyVisible(tester, lastRow, insets);
         _expectCatalogEnd(tester, lastRow, insets);
         expect(lastRow.hitTestable(), findsOneWidget);
@@ -534,15 +487,7 @@ void main() {
       await _until(tester, _messageOf(3));
       await tester.pumpAndSettle();
 
-      await tester.tap(
-        find
-            .descendant(
-              of: find.byType(IntentionCatalogPage),
-              matching: find.byType(IntentionSummaryView),
-            )
-            .hitTestable()
-            .first,
-      );
+      await tester.tap(intentionCatalogRows.hitTestable().first);
       await _until(tester, find.byType(IntentionDetailsPage));
       await tester.pumpAndSettle();
 
@@ -573,8 +518,6 @@ const _rootPages = {
   AppDestination.dailyChoices: DailyChoiceCatalogPage,
   AppDestination.intentionGraph: IntentionCatalogPage,
 };
-
-final _titleFilter = find.byKey(const ValueKey('catalog-filter-field'));
 
 /// Строка выдачи каталога дневных выборов с номером [number].
 Finder _dailyChoiceRow(int number) =>
@@ -615,12 +558,6 @@ Finder _messageOf(int intention) => find.descendant(
 
 String _intentionTitle(int number) =>
     'Намерение ${number.toString().padLeft(3, '0')}';
-
-/// Строка выдачи каталога намерений с названием [title].
-Finder _catalogRow(String title) => find.descendant(
-  of: find.byType(IntentionCatalogPage),
-  matching: find.widgetWithText(IntentionSummaryView, title),
-);
 
 /// Управляемая недоступность хранилища: пока [isFailing], каждое обращение
 /// завершается отказом занятости.
@@ -875,13 +812,13 @@ void _expectFullyVisible(WidgetTester tester, Finder finder, _Insets insets) {
 /// Ставит фокус в поле фильтра названия каталога намерений, не меняя поиск:
 /// поле видно над клавиатурой.
 Future<void> _focusTitleFilter(WidgetTester tester, _Insets insets) async {
-  await tester.showKeyboard(_titleFilter);
+  await tester.showKeyboard(intentionCatalogTitleField);
   await tester.pumpAndSettle();
   expect(
     tester
         .widget<EditableText>(
           find.descendant(
-            of: _titleFilter,
+            of: intentionCatalogTitleField,
             matching: find.byType(EditableText),
           ),
         )
@@ -889,13 +826,16 @@ Future<void> _focusTitleFilter(WidgetTester tester, _Insets insets) async {
         .hasFocus,
     isTrue,
   );
-  expect(_titleFilter.hitTestable(), findsOneWidget);
-  _expectFullyVisible(tester, _titleFilter, insets);
+  expect(intentionCatalogTitleField.hitTestable(), findsOneWidget);
+  _expectFullyVisible(tester, intentionCatalogTitleField, insets);
 }
 
-/// Конец выдачи использует доступное место до панели либо клавиатуры.
+/// Конец выдачи стоит над панелью либо клавиатурой с отступом по макету.
 void _expectCatalogEnd(WidgetTester tester, Finder last, _Insets insets) {
-  expect(tester.getRect(last).bottom, moreOrLessEquals(insets.contentBottom));
+  expect(
+    tester.getRect(last).bottom,
+    moreOrLessEquals(insets.contentBottom - DoableMetrics.space6),
+  );
   expect(find.byKey(const ValueKey('catalog-create-intention')), findsNothing);
 }
 
@@ -927,8 +867,7 @@ void _expectDailyChoiceEnd(WidgetTester tester, Finder last, _Insets insets) {
 /// в точке, доступной для нажатия. Прокрутка выдачи —
 /// самая вложенная прокрутка страницы: собственный список выдачи каталога
 /// намерений либо прокрутка, которую выдача каталога дневных выборов делит с
-/// фильтрами. Когда список дошёл до своего края, тот же жест продолжает
-/// прокрутку всей страницы.
+/// фильтрами.
 Future<void> _scrollToEnd(WidgetTester tester, Finder page) async {
   final list = find
       .descendant(
@@ -959,44 +898,6 @@ List<double> _scrollOffsets(WidgetTester tester, Finder page) => [
   ))
     scrollable.position.pixels,
 ];
-
-/// Флинг на [offset] по списку выдачи каталога намерений со скоростью, которой
-/// с запасом хватает на список и страницу.
-///
-/// Жест начинается у левого верхнего края видимой части списка, как в
-/// [_scrollToEnd]. Кадры идут с частотой экрана: в кадре, где список
-/// упирается в край, он уходит за край лишь на малую долю пути, и дальше
-/// страницу ведёт только переданная ей инерция флинга.
-Future<void> _flingCatalog(WidgetTester tester, Offset offset) async {
-  final list = tester.getRect(_catalogList);
-  final top = math.max(list.top, tester.getRect(find.byType(AppBar)).bottom);
-  await tester.flingFrom(Offset(list.left + 24, top + 24), offset, 6000);
-  await tester.pumpAndSettle(const Duration(milliseconds: 16));
-}
-
-/// Собственный список выдачи каталога намерений.
-final _catalogList = find.byKey(
-  const PageStorageKey<String>('intention-catalog-list'),
-);
-
-/// Прокрутка списка выдачи каталога намерений.
-ScrollPosition _catalogListScroll(WidgetTester tester) => tester
-    .state<ScrollableState>(
-      find.descendant(of: _catalogList, matching: find.byType(Scrollable)),
-    )
-    .position;
-
-/// Общая прокрутка параметров поиска и выдачи каталога намерений.
-ScrollPosition _catalogPageScroll(WidgetTester tester) => tester
-    .state<ScrollableState>(
-      find
-          .descendant(
-            of: find.byType(IntentionSearchLayout),
-            matching: find.byType(Scrollable),
-          )
-          .first,
-    )
-    .position;
 
 /// Выбирает пункт панели и ждёт его корневую страницу.
 Future<void> _select(WidgetTester tester, AppDestination destination) async {

@@ -11,8 +11,9 @@ import '../catalog/intention_catalog_state.dart';
 import '../catalog/intention_catalog_view_model.dart';
 import 'show_and_sort_sheet.dart';
 
-/// Заголовок списка поиска назначения [purpose]: слова выбранного типа,
-/// количество подтверждённой выдачи и сводка сортировки.
+/// Заголовок списка поиска назначения [purpose]: слова выбранного типа, а при
+/// открытом охвате — охвата вместе с типом, количество подтверждённой выдачи и
+/// сводка сортировки.
 ///
 /// Количество показывается только для подтверждённой выдачи текущих
 /// параметров. Весь заголовок — одна кнопка, которая открывает лист «Показать
@@ -44,13 +45,20 @@ final class _IntentionListHeaderState
     final provider = intentionCatalogViewModelProvider(widget.purpose);
     final catalog = ref.watch(provider);
     final selection = ref.read(provider.notifier).selection;
-    final title = switch (selection.type) {
-      IntentionTypeOpen(selected: IntentionTypeChoice.all) =>
-        l10n.intentionPickerAllHeader,
-      IntentionTypeOpen(selected: IntentionTypeChoice.intentions) =>
-        l10n.intentionPickerIntentionsHeader,
-      IntentionTypeOpen(selected: IntentionTypeChoice.actions) ||
-      IntentionTypePinnedToActions() => l10n.intentionPickerActionsHeader,
+    final type = switch (selection.type) {
+      IntentionTypeOpen(:final selected) => selected,
+      IntentionTypePinnedToActions() => IntentionTypeChoice.actions,
+    };
+    final title = switch (selection.scope) {
+      IntentionScopeOpen(:final selected) => l10n.intentionPickerScopeHeader(
+        selected.name,
+        type.name,
+      ),
+      IntentionScopeFixed() => switch (type) {
+        IntentionTypeChoice.all => l10n.intentionPickerAllHeader,
+        IntentionTypeChoice.intentions => l10n.intentionPickerIntentionsHeader,
+        IntentionTypeChoice.actions => l10n.intentionPickerActionsHeader,
+      },
     };
     final summary = _orderSummary(l10n, selection.order);
     final count = switch (catalog) {
@@ -61,13 +69,25 @@ final class _IntentionListHeaderState
         totalCount,
       _ => null,
     };
+    final label = switch ((selection.scope, count)) {
+      (IntentionScopeOpen(), null) => l10n.intentionPickerScopeHeaderLabel(
+        title,
+        summary,
+      ),
+      (IntentionScopeOpen(), final int count) =>
+        l10n.intentionPickerScopeHeaderCountLabel(title, count, summary),
+      (IntentionScopeFixed(), null) => l10n.intentionPickerHeaderLabel(
+        title,
+        summary,
+      ),
+      (IntentionScopeFixed(), final int count) =>
+        l10n.intentionPickerHeaderCountLabel(title, count, summary),
+    };
     return CatalogHeader(
       title: title,
       count: count,
       summary: summary,
-      label: count == null
-          ? l10n.intentionPickerHeaderLabel(title, summary)
-          : l10n.intentionPickerHeaderCountLabel(title, count, summary),
+      label: label,
       expanded: _expanded,
       onOpen: () => unawaited(_openShowAndSort()),
     );

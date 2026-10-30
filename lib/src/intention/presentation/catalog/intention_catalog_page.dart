@@ -1,18 +1,25 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
+import '../../../design_system/components/empty_state.dart';
+import '../../../design_system/doable_colors.dart';
+import '../../../design_system/doable_icon.dart';
+import '../../../design_system/doable_metrics.dart';
+import '../../../design_system/doable_type.dart';
 import '../../application/intention_catalog.dart';
-import '../../domain/intention.dart';
-import '../intention_summary_view.dart';
+import '../search/intention_list_header.dart';
+import '../search/intention_search_bar.dart';
+import '../search/intention_search_kind.dart';
+import '../search/intention_search_list.dart';
 import 'intention_catalog_purpose.dart';
+import 'intention_catalog_row.dart';
 import 'intention_catalog_state.dart';
 import 'intention_catalog_view_model.dart';
-import 'intention_search_layout.dart';
-import 'intention_search_results.dart';
-import 'intention_tag_conditions_section.dart';
+import 'intention_tag_conditions_view_model.dart';
 
 /// Назначение общего просмотра каталога намерений.
 ///
@@ -39,244 +46,153 @@ final class _IntentionCatalogPageState
     super.dispose();
   }
 
+  void _resetFilters() {
+    _filterController.clear();
+    ref
+        .read(intentionCatalogViewModelProvider(_purpose).notifier)
+        .clearTitleFilter();
+    ref
+        .read(intentionTagConditionsViewModelProvider(_purpose).notifier)
+        .clear();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final localizations = AppLocalizations.of(context);
-    final catalog = ref.watch(intentionCatalogViewModelProvider(_purpose));
-    final notifier = ref.read(
-      intentionCatalogViewModelProvider(_purpose).notifier,
-    );
-    final selection = catalog.value?.selection ?? notifier.selection;
-    return Scaffold(
-      appBar: AppBar(title: Text(localizations.appDestinationIntentionGraph)),
-      body: IntentionSearchLayout(
-        // Загруженная выдача получает всю высоту тела страницы: прокрученные
-        // до конца параметры и список оставляют последнюю строку и состояние
-        // продолжения над панелью навигации при любой высоте параметров.
-        // Начальные состояния и пустая выдача остаются под параметрами.
-        resultsExtent: IntentionSearchResults.showsList(catalog)
-            ? IntentionSearchResultsExtent.fullViewport
-            : IntentionSearchResultsExtent.remainingWhenSufficient,
-        controls: _CatalogControls(
-          selection: selection,
-          scope: switch (selection.scope) {
-            IntentionScopeOpen(:final selected) => selected,
-            IntentionScopeFixed(:final scope) => scope,
-          },
-          filterController: _filterController,
-          onScopeChanged: notifier.changeScope,
-          onFilterChanged: notifier.changeTitleFilter,
-          onOrderChanged: notifier.changeOrder,
-        ),
-        results: IntentionSearchResults(
-          purpose: _purpose,
-          catalog: catalog,
-          listKey: const PageStorageKey<String>('intention-catalog-list'),
-          messages: IntentionSearchResultsMessages(
-            loading: localizations.catalogLoading,
-            unavailable: localizations.catalogUnavailable,
-            corruption: localizations.catalogCorruption,
-            unexpected: localizations.catalogUnexpectedFailure,
-          ),
-          emptyMessage: (empty) => _emptyMessage(localizations, empty.query),
-          totalCountLabel: localizations.catalogTotalCount,
-          itemBuilder: (context, results, summary) => _IntentionSummaryTile(
-            summary: summary,
-            showArchiveState: results.query.scope == IntentionScope.all,
-            onTap: () {
-              context.router.push(
-                IntentionDetailsRoute(intentionId: summary.id),
-              );
-            },
+    final l10n = AppLocalizations.of(context);
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      // Без AppBar стиль системной строки задаёт страница:
+      // https://api.flutter.dev/flutter/services/SystemChrome/setSystemUIOverlayStyle.html
+      value: Theme.of(context).brightness == Brightness.dark
+          ? SystemUiOverlayStyle.light
+          : SystemUiOverlayStyle.dark,
+      child: Scaffold(
+        // Низ тела страницы задаёт оболочка: это верхний край панели навигации
+        // либо клавиатуры.
+        body: SafeArea(
+          bottom: false,
+          child: LayoutBuilder(
+            builder: (context, constraints) => Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // В низком окне с клавиатурой закреплённые части могут не
+                // поместиться: тогда выдача не получает высоты, а они
+                // обрезаются снизу.
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: constraints.maxHeight),
+                  child: UnconstrainedBox(
+                    constrainedAxis: Axis.horizontal,
+                    alignment: Alignment.topCenter,
+                    clipBehavior: Clip.hardEdge,
+                    child: _PinnedParts(filterController: _filterController),
+                  ),
+                ),
+                Expanded(
+                  child: IntentionSearchList(
+                    purpose: _purpose,
+                    rowBuilder: (context, results, summary) =>
+                        IntentionCatalogRow(
+                          summary: summary,
+                          requiredTagIds:
+                              results.query.tagFilter.requiredTagIds,
+                          onOpen: () {
+                            context.router.push(
+                              IntentionDetailsRoute(intentionId: summary.id),
+                            );
+                          },
+                        ),
+                    emptyScope: (empty) => _emptyScope(l10n, empty),
+                    onResetFilters: _resetFilters,
+                    bottomPadding: DoableMetrics.space6,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  String _emptyMessage(
-    AppLocalizations localizations,
-    IntentionCatalogQuery query,
-  ) {
-    // Условия по тегам сужают охват: пустая выдача не означает, что в нём
-    // нет намерений.
-    if (query.tagFilter != IntentionTagFilter.empty) {
-      return localizations.catalogTagConditionsEmpty;
-    }
-    return switch (query.scope) {
-      IntentionScope.active => localizations.catalogActiveEmpty,
-      IntentionScope.archived => localizations.catalogArchivedEmpty,
-      IntentionScope.all => localizations.catalogAllEmpty,
-    };
-  }
+  /// Архивные намерения считаются без условия типа: сводка охватов при
+  /// выбранном типе не видит архивные намерения другого типа.
+  EmptyState _emptyScope(AppLocalizations l10n, IntentionCatalogEmpty empty) =>
+      switch ((empty.scope, empty.counts)) {
+        (IntentionScope.archived, _) => EmptyState(
+          icon: DoableIconData.archive,
+          title: l10n.intentionCatalogEmptyArchiveTitle,
+          text: l10n.intentionCatalogEmptyArchiveText,
+        ),
+        (IntentionScope.active, IntentionCountsByScopeAndType(:final archived))
+            when archived.all > 0 =>
+          EmptyState(
+            icon: DoableIconData.intention,
+            title: l10n.intentionCatalogNoActiveTitle,
+            text: l10n.intentionCatalogNoActiveText,
+          ),
+        (IntentionScope.active || IntentionScope.all, _) => EmptyState(
+          icon: DoableIconData.intention,
+          title: l10n.intentionCatalogNoIntentionsTitle,
+          text: l10n.intentionCatalogNoIntentionsText,
+        ),
+      };
 }
 
-final class _CatalogControls extends StatelessWidget {
-  const _CatalogControls({
-    required this.selection,
-    required this.scope,
-    required this.filterController,
-    required this.onScopeChanged,
-    required this.onFilterChanged,
-    required this.onOrderChanged,
-  });
+/// Части страницы над выдачей: заголовок, строка поиска и заголовок списка.
+final class _PinnedParts extends StatelessWidget {
+  const _PinnedParts({required this.filterController});
 
-  final IntentionCatalogSelection selection;
-  final IntentionScope scope;
   final TextEditingController filterController;
-  final ValueChanged<IntentionScope> onScopeChanged;
-  final ValueChanged<String> onFilterChanged;
-  final ValueChanged<IntentionCatalogOrder> onOrderChanged;
 
   @override
   Widget build(BuildContext context) {
-    final localizations = AppLocalizations.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      child: Column(
-        children: [
-          DropdownButtonFormField<IntentionScope>(
-            key: const ValueKey('catalog-scope-control'),
-            isExpanded: true,
-            initialValue: scope,
-            decoration: InputDecoration(
-              labelText: localizations.catalogScopeLabel,
-            ),
-            items: [
-              for (final scope in IntentionScope.values)
-                DropdownMenuItem(
-                  value: scope,
-                  child: Text(_scopeLabel(localizations, scope)),
-                ),
-            ],
-            onChanged: (scope) {
-              if (scope != null) {
-                onScopeChanged(scope);
-              }
-            },
+    final colors = Theme.of(context).extension<DoableColors>()!;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            DoableMetrics.space5,
+            DoableMetrics.space4,
+            DoableMetrics.space5,
+            0,
           ),
-          const SizedBox(height: 12),
-          TextField(
-            key: const ValueKey('catalog-filter-field'),
+          child: Semantics(
+            header: true,
+            headingLevel: 1,
+            namesRoute: true,
+            // Одна строка оставляет высоту выдаче при крупном тексте, а
+            // экранный диктор получает название целиком.
+            child: Text(
+              IntentionSearchKind.of(_purpose)
+                  .title(AppLocalizations.of(context)),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: DoableType.display.copyWith(color: colors.ink),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            DoableMetrics.space5,
+            DoableMetrics.space3,
+            DoableMetrics.space5,
+            0,
+          ),
+          child: IntentionSearchBar(
+            purpose: _purpose,
             controller: filterController,
-            decoration: InputDecoration(
-              labelText: localizations.catalogFilterLabel,
-              errorText: _filterError(localizations),
-            ),
-            onChanged: onFilterChanged,
           ),
-          const SizedBox(height: 12),
-          const Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: IntentionTagConditionsSection(purpose: _purpose),
+        ),
+        const Padding(
+          padding: EdgeInsets.fromLTRB(
+            DoableMetrics.space5,
+            2,
+            DoableMetrics.space5,
+            6,
           ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<_OfferedCatalogOrder>(
-            key: const ValueKey('catalog-order-control'),
-            isExpanded: true,
-            initialValue: _OfferedCatalogOrder.of(selection.order),
-            decoration: InputDecoration(
-              labelText: localizations.catalogOrderLabel,
-            ),
-            items: [
-              for (final order in _OfferedCatalogOrder.values)
-                DropdownMenuItem(
-                  value: order,
-                  child: Text(_orderLabel(localizations, order)),
-                ),
-            ],
-            onChanged: (order) {
-              if (order != null) {
-                onOrderChanged(order.order);
-              }
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  String? _filterError(AppLocalizations localizations) =>
-      switch (selection.filterValidationFailure) {
-        IntentionCatalogFilterValidationFailure.invalidUnicodeRepertoire =>
-          localizations.catalogFilterInvalidUnicode,
-        IntentionCatalogFilterValidationFailure.tooLong =>
-          localizations.catalogFilterTooLong,
-        null => null,
-      };
-
-  String _scopeLabel(AppLocalizations localizations, IntentionScope scope) =>
-      switch (scope) {
-        IntentionScope.active => localizations.catalogScopeActive,
-        IntentionScope.archived => localizations.catalogScopeArchived,
-        IntentionScope.all => localizations.catalogScopeAll,
-      };
-
-  String _orderLabel(
-    AppLocalizations localizations,
-    _OfferedCatalogOrder order,
-  ) => switch (order) {
-    _OfferedCatalogOrder.createdNewest =>
-      localizations.catalogOrderCreatedNewest,
-    _OfferedCatalogOrder.createdOldest =>
-      localizations.catalogOrderCreatedOldest,
-    _OfferedCatalogOrder.updatedNewest =>
-      localizations.catalogOrderUpdatedNewest,
-    _OfferedCatalogOrder.updatedOldest =>
-      localizations.catalogOrderUpdatedOldest,
-  };
-}
-
-/// Порядки, которые предлагает каталог намерений, в порядке показа.
-///
-/// Порядок по названию допустим в запросе, но каталог его не предлагает.
-enum _OfferedCatalogOrder {
-  createdNewest(IntentionCatalogOrder.createdAtDescending),
-  createdOldest(IntentionCatalogOrder.createdAtAscending),
-  updatedNewest(IntentionCatalogOrder.updatedAtDescending),
-  updatedOldest(IntentionCatalogOrder.updatedAtAscending);
-
-  const _OfferedCatalogOrder(this.order);
-
-  final IntentionCatalogOrder order;
-
-  /// Предлагаемый вариант выбранного порядка, если каталог его предлагает.
-  static _OfferedCatalogOrder? of(IntentionCatalogOrder order) {
-    for (final offered in values) {
-      if (offered.order == order) return offered;
-    }
-    return null;
-  }
-}
-
-final class _IntentionSummaryTile extends StatelessWidget {
-  const _IntentionSummaryTile({
-    required this.summary,
-    required this.showArchiveState,
-    required this.onTap,
-  });
-
-  final IntentionSummary summary;
-  final bool showArchiveState;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final localizations = AppLocalizations.of(context);
-    final readiness = switch (summary.readiness) {
-      IntentionReadiness.ready => localizations.catalogReady,
-      IntentionReadiness.notReady => localizations.catalogNotReady,
-    };
-    final description = summary.descriptionPreview != null
-        ? localizations.catalogHasDescription
-        : localizations.catalogNoDescription;
-    return IntentionSummaryView(
-      title: summary.title,
-      archiveState: summary.archiveState,
-      showArchiveState: showArchiveState,
-      traits: [readiness, description],
-      confirmedTags: summary.tags,
-      onTap: onTap,
+          child: IntentionListHeader(purpose: _purpose),
+        ),
+      ],
     );
   }
 }

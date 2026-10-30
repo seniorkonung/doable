@@ -1,9 +1,15 @@
-import 'dart:math' as math;
-
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/design_system/components/badge.dart';
+import 'package:doable/src/design_system/components/button.dart';
+import 'package:doable/src/design_system/components/catalog_header.dart';
+import 'package:doable/src/design_system/components/catalog_row.dart';
+import 'package:doable/src/design_system/components/empty_state.dart';
+import 'package:doable/src/design_system/components/list_state.dart';
+import 'package:doable/src/design_system/components/tag_chip.dart';
+import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -18,25 +24,22 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_page
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_search_layout.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_section.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
+import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
-import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
-import 'package:flutter/foundation.dart';
-import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Badge;
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/app_root_pages.dart';
-import '../../../support/inline_text.dart';
+import '../../../support/intention_catalog_controls.dart';
 import '../../../support/quick_creation.dart';
 import 'catalog_test_support.dart';
 import 'catalog_reconciliation_test_support.dart';
@@ -51,8 +54,7 @@ void main() {
     await tester.pumpWidget(_testApp(repository));
     repository.queryAt(0);
 
-    expect(find.text('Loading intentions…'), findsOneWidget);
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(_inListState(find.text('Loading intentions…')), findsOneWidget);
 
     repository.complete(
       0,
@@ -93,18 +95,24 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    // Кольцо подгрузки вращается, пока есть следующая порция: покоя кадров
+    // не будет.
+    await tester.pump();
+    await tester.pump();
 
-    expect(find.text('Total intentions: 12'), findsOneWidget);
+    expect(intentionCatalogTotal(12), findsOneWidget);
     expect(find.text('Позвонить врачу'), findsOneWidget);
     expect(find.text('Выбрать страховку'), findsOneWidget);
-    expect(find.text('Ready for action'), findsOneWidget);
-    expect(find.text('Has description'), findsOneWidget);
+    expect(find.text('Описание'), findsOneWidget);
+    expect(find.text('Ready for action'), findsNothing);
+    expect(find.text('Has description'), findsNothing);
+    expect(_shownMarks(tester), [DoableIconData.bolt]);
   });
 
   testWidgets('явно сообщает архивное состояние строки в охвате всех', (
     tester,
   ) async {
+    final semantics = tester.ensureSemantics();
     final repository = ControlledCatalogRepository();
     await tester.pumpWidget(_testApp(repository));
     repository.complete(
@@ -120,10 +128,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('catalog-scope-control')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('All').last);
-    await tester.pump();
+    await selectIntentionCatalogScope(tester, IntentionScope.all);
 
     repository.complete(
       1,
@@ -144,13 +149,15 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Архивное намерение'), findsOneWidget);
-    expect(find.text('Archived'), findsOneWidget);
+    expect(_shownMarks(tester), [DoableIconData.archive]);
     expect(
       find.bySemanticsLabel(
-        RegExp('Архивное намерение.*Archived', dotAll: true),
+        'Open: Архивное намерение, archived, intention, No tags',
       ),
       findsOneWidget,
     );
+
+    semantics.dispose();
   });
 
   testWidgets('каталог проходит accessibility guidelines', (tester) async {
@@ -177,33 +184,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+    await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
     await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
     await expectLater(tester, meetsGuideline(textContrastGuideline));
     semantics.dispose();
-  });
-
-  testWidgets('показывает отдельное пустое состояние активного охвата', (
-    tester,
-  ) async {
-    final repository = ControlledCatalogRepository();
-    await tester.pumpWidget(_testApp(repository));
-    repository.queryAt(0);
-    repository.complete(
-      0,
-      ResultSuccess(
-        IntentionCatalogFirstPage(
-          items: const [],
-          totalCount: 0,
-          nextCursor: null,
-          revision: const TestCatalogRevision(0),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('No active intentions yet.'), findsOneWidget);
-    expect(find.text('Something went wrong'), findsNothing);
   });
 
   testWidgets('предлагает повтор только при устранимой недоступности', (
@@ -235,43 +219,111 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text(message), findsOneWidget);
-      expect(
-        find.widgetWithText(FilledButton, 'Try again'),
-        hasRetry ? findsOneWidget : findsNothing,
-      );
+      expect(find.text('Try again'), hasRetry ? findsOneWidget : findsNothing);
       await tester.pumpWidget(const SizedBox.shrink());
     }
   });
 
-  testWidgets('показывает локализованные параметры каталога и четыре порядка', (
+  testWidgets('заголовок списка открывает лист с числами охватов и типов', (
     tester,
   ) async {
     final repository = ControlledCatalogRepository();
     await tester.pumpWidget(_testApp(repository));
-    repository.queryAt(0);
+    repository.complete(
+      0,
+      ResultSuccess(
+        IntentionCatalogFirstPage(
+          items: [for (var i = 1; i <= 7; i++) testSummary(index: i)],
+          totalCount: 7,
+          counts: IntentionCountsByScopeAndType(
+            active: IntentionTypeCounts(all: 7, actions: 4),
+            archived: IntentionTypeCounts(all: 3, actions: 2),
+          ),
+          nextCursor: null,
+          revision: const TestCatalogRevision(1),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
 
-    expect(find.text('Scope'), findsOneWidget);
-    expect(find.text('Filter by title'), findsOneWidget);
-    expect(find.text('Order'), findsOneWidget);
-    expect(find.text('Active'), findsOneWidget);
-    expect(find.text('Created: newest first'), findsOneWidget);
+    await tester.tap(find.byType(CatalogHeader));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Show'));
+    await tester.pumpAndSettle();
+    expect(_shownMenu(tester), [
+      'Active',
+      '7',
+      'Archived',
+      '3',
+      'All, archived included',
+      '10',
+    ]);
 
-    await tester.tap(find.byKey(const ValueKey('catalog-scope-control')));
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Type'));
+    await tester.pumpAndSettle();
+    expect(_shownMenu(tester), [
+      'Intentions and actions',
+      '7',
+      'Intentions only',
+      '3',
+      'Actions only',
+      '4',
+    ]);
+  });
 
-    expect(find.text('Active'), findsWidgets);
-    expect(find.text('Archived'), findsOneWidget);
-    expect(find.text('All'), findsOneWidget);
+  testWidgets('смена типа в листе начинает новую выдачу с верхней позиции', (
+    tester,
+  ) async {
+    final repository = ControlledCatalogRepository();
+    await tester.pumpWidget(_testApp(repository));
+    repository.complete(0, _firstPage(_taggedSummaries(const [], last: 31)));
+    await tester.pumpAndSettle();
+    _catalogScrollPosition(tester).jumpTo(100);
+    await tester.pump();
 
-    await tester.tap(find.text('Active').last);
-    await tester.pump(const Duration(milliseconds: 300));
-    await tester.tap(find.byKey(const ValueKey('catalog-order-control')));
-    await tester.pump(const Duration(milliseconds: 300));
+    await selectIntentionCatalogType(tester, IntentionTypeChoice.actions);
+    expect(
+      repository.queryAt(1).readinessFilter,
+      IntentionReadinessFilter.readyOnly,
+    );
+    repository.complete(1, _firstPage(_taggedSummaries(const [], last: 31)));
+    await tester.pumpAndSettle();
 
-    expect(find.text('Created: newest first'), findsWidgets);
-    expect(find.text('Created: oldest first'), findsOneWidget);
-    expect(find.text('Updated: newest first'), findsOneWidget);
-    expect(find.text('Updated: oldest first'), findsOneWidget);
+    expect(_catalogScrollPosition(tester).pixels, 0);
+    expect(
+      shownIntentionCatalogParameters(tester).type,
+      IntentionTypeChoice.actions,
+    );
+  });
+
+  testWidgets('каталог предлагает сортировку по названию в обоих порядках', (
+    tester,
+  ) async {
+    final repository = ControlledCatalogRepository();
+    await tester.pumpWidget(_testApp(repository));
+    repository.complete(0, _firstPage(_taggedSummaries(const [], last: 58)));
+    await tester.pumpAndSettle();
+
+    await selectIntentionCatalogOrder(
+      tester,
+      IntentionCatalogOrder.titleDescending,
+    );
+
+    expect(
+      repository.queries.last.order,
+      IntentionCatalogOrder.titleDescending,
+    );
+    repository.complete(
+      repository.queries.length - 1,
+      _firstPage(_taggedSummaries(const [], last: 58)),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      shownIntentionCatalogParameters(tester).order,
+      IntentionCatalogOrder.titleDescending,
+    );
   });
 
   testWidgets('применяет фильтр через 250 мс без кнопки отправки', (
@@ -281,10 +333,7 @@ void main() {
     await tester.pumpWidget(_testApp(repository));
     repository.queryAt(0);
 
-    await tester.enterText(
-      find.byKey(const ValueKey('catalog-filter-field')),
-      'milk',
-    );
+    await enterIntentionCatalogTitle(tester, 'milk');
     await tester.pump(const Duration(milliseconds: 249));
     expect(repository.queries, hasLength(1));
     expect(find.widgetWithText(FilledButton, 'Search'), findsNothing);
@@ -302,334 +351,82 @@ void main() {
     repository.queryAt(0);
     final invalidFilter = List.filled(256, 'a').join();
 
-    await tester.enterText(
-      find.byKey(const ValueKey('catalog-filter-field')),
-      invalidFilter,
-    );
+    await enterIntentionCatalogTitle(tester, invalidFilter);
     await tester.pump(const Duration(milliseconds: 250));
     await tester.pump();
 
     expect(repository.queries, hasLength(1));
-    expect(find.text('Use no more than 255 characters.'), findsOneWidget);
     expect(
-      tester
-          .widget<TextField>(find.byKey(const ValueKey('catalog-filter-field')))
-          .controller
-          ?.text,
-      invalidFilter,
+      find.descendant(
+        of: find.byKey(const ValueKey('intention-catalog-filter')),
+        matching: find.text('Use no more than 255 characters.'),
+      ),
+      findsOneWidget,
     );
+    expect(shownIntentionCatalogParameters(tester).titleFilter, invalidFilter);
   });
 
-  for (final (keyboard, variant) in [
-    (0.0, 'без клавиатуры'),
-    (300.0, 'при открытой клавиатуре'),
-  ]) {
-    testWidgets('жест по списку $variant прокручивает сначала список, а на его '
-        'краю — страницу с параметрами, и последняя строка достижима', (
-      tester,
-    ) async {
-      _usePhoneScreen(tester, keyboard: keyboard);
-      final repository = ControlledCatalogRepository();
-      await tester.pumpWidget(_testApp(repository));
-      repository.complete(
-        0,
-        _firstPage([
-          for (var index = 1; index <= 20; index++)
-            testSummary(index: index, title: 'Намерение $index'),
-        ]),
-      );
-      await tester.pumpAndSettle();
-      final list = find.byKey(
-        const PageStorageKey<String>('intention-catalog-list'),
-      );
-
-      expect(_pageScrollPosition(tester).pixels, 0);
-
-      await tester.dragFrom(
-        tester.getTopLeft(list) + const Offset(24, 24),
-        const Offset(0, -100),
-      );
-      await tester.pumpAndSettle();
-      expect(_catalogScrollPosition(tester).pixels, greaterThan(0));
-      expect(_pageScrollPosition(tester).pixels, 0);
-
-      await _dragCatalogToEnd(tester);
-
-      final page = _pageScrollPosition(tester);
-      expect(page.pixels, page.maxScrollExtent);
-      expect(page.maxScrollExtent, greaterThan(0));
-      // Выдача сохраняет порядок порции: последним стоит двадцатое намерение.
-      final lastRow = find.widgetWithText(IntentionSummaryView, 'Намерение 20');
-      expect(lastRow.hitTestable(), findsOneWidget);
-
-      // Обратный жест тоже сначала прокручивает список, а страница остаётся
-      // в конце.
-      await tester.dragFrom(
-        tester.getTopLeft(list) + const Offset(24, 24),
-        const Offset(0, 100),
-      );
-      await tester.pumpAndSettle();
-      expect(_pageScrollPosition(tester).pixels, page.maxScrollExtent);
-      expect(
-        _catalogScrollPosition(tester).pixels,
-        lessThan(_catalogScrollPosition(tester).maxScrollExtent),
-      );
-      expect(tester.takeException(), isNull);
-    });
-
-    // Порция оболочки из 100 строк длиннее пути одного флинга, поэтому
-    // получение следующей порции после флинга проверяется здесь, на порции
-    // из 20 строк.
-    testWidgets('флинг $variant, начатый при списке и странице в начале, '
-        'доводит до конца список и страницу, и получение следующей порции '
-        'видно целиком до границы тела страницы, а обратный флинг возвращает '
-        'список и страницу к параметрам поиска', (tester) async {
-      _usePhoneScreen(tester, keyboard: keyboard);
-      final bodyBottom = _phone.height - keyboard;
-      final repository = ControlledCatalogRepository();
-      await tester.pumpWidget(
-        _testApp(repository, pageSize: 20, prefetchRemaining: 2),
-      );
-      repository.complete(
-        0,
-        ResultSuccess(
-          IntentionCatalogFirstPage(
-            items: [
-              for (var index = 1; index <= 20; index++)
-                testSummary(index: index, title: 'Намерение $index'),
-            ],
-            totalCount: 21,
-            nextCursor: const TestCatalogCursor(),
-            revision: const TestCatalogRevision(0),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      // Конец списка запрашивает следующую порцию; пока хранилище не
-      // ответило, её получение стоит в конце выдачи.
-      await _scrollCatalogToEnd(tester);
-      await _pumpUntilQueries(tester, repository, 2);
-      _catalogScrollPosition(tester).jumpTo(0);
-      await tester.pumpAndSettle();
-      expect(_catalogScrollPosition(tester).pixels, 0);
-      expect(_pageScrollPosition(tester).pixels, 0);
-
-      await _flingCatalogList(tester, const Offset(0, -300));
-
-      final list = _catalogScrollPosition(tester);
-      final page = _pageScrollPosition(tester);
-      expect(list.pixels, moreOrLessEquals(list.maxScrollExtent));
-      expect(page.pixels, moreOrLessEquals(page.maxScrollExtent));
-      expect(page.maxScrollExtent, greaterThan(0));
-      _expectFullyVisibleInList(
-        tester,
-        find.text('Loading more intentions…'),
-        bodyBottom: bodyBottom,
-      );
-      expect(repository.queries, hasLength(2));
-
-      await _flingCatalogList(tester, const Offset(0, 300));
-
-      expect(
-        _catalogScrollPosition(tester).pixels,
-        moreOrLessEquals(_catalogScrollPosition(tester).minScrollExtent),
-      );
-      expect(
-        _pageScrollPosition(tester).pixels,
-        moreOrLessEquals(_pageScrollPosition(tester).minScrollExtent),
-      );
-      final filter = find.byKey(const ValueKey('catalog-filter-field'));
-      final shownFilter = tester.getRect(filter);
-      expect(
-        shownFilter.top,
-        greaterThanOrEqualTo(tester.getRect(find.byType(AppBar)).bottom),
-      );
-      expect(shownFilter.bottom, lessThanOrEqualTo(bodyBottom));
-      expect(filter.hitTestable(), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    });
-  }
-
-  testWidgets('флинг прокручивает страницу только от края списка: '
-      'слабый флинг внутри списка оставляет страницу на месте, а флинг при '
-      'списке уже в конце сдвигает страницу дальше хода пальца', (
-    tester,
-  ) async {
+  testWidgets('при прокрутке списка заголовок страницы, поиск и заголовок '
+      'списка остаются на месте', (tester) async {
     _usePhoneScreen(tester);
     final repository = ControlledCatalogRepository();
     await tester.pumpWidget(_testApp(repository));
-    repository.complete(
-      0,
-      _firstPage([
-        for (var index = 1; index <= 20; index++)
-          testSummary(index: index, title: 'Намерение $index'),
-      ]),
-    );
+    repository.complete(0, _firstPage(_twentySummaries()));
     await tester.pumpAndSettle();
+    final pinned = [
+      intentionCatalogHeading(tester),
+      intentionCatalogTitleField,
+      intentionCatalogTagFilterControl,
+      find.byType(CatalogHeader),
+    ];
+    final before = [for (final part in pinned) tester.getRect(part)];
 
-    await _flingCatalogList(tester, const Offset(0, -100), speed: 300);
+    // Жест уходит дальше конца списка: дальше прокручивать нечего.
+    await _dragCatalogList(tester, const Offset(0, -3000));
 
     final list = _catalogScrollPosition(tester);
-    expect(list.pixels, greaterThan(0));
-    expect(list.pixels, lessThan(list.maxScrollExtent));
-    expect(_pageScrollPosition(tester).pixels, 0);
-
-    list.jumpTo(list.maxScrollExtent);
-    await tester.pumpAndSettle();
-    expect(_pageScrollPosition(tester).pixels, 0);
-
-    const fingerTravel = 60.0;
-    await _flingCatalogList(
-      tester,
-      const Offset(0, -fingerTravel),
-      speed: 4000,
-    );
-
-    final page = _pageScrollPosition(tester);
-    expect(page.pixels, greaterThan(fingerTravel));
-    expect(page.pixels, lessThanOrEqualTo(page.maxScrollExtent));
-    expect(
-      _catalogScrollPosition(tester).pixels,
-      _catalogScrollPosition(tester).maxScrollExtent,
-    );
+    expect(list.pixels, list.maxScrollExtent);
+    expect([for (final part in pinned) tester.getRect(part)], before);
     expect(tester.takeException(), isNull);
   });
 
-  for (final (handoff, variant) in _pageFlingHandoffs) {
-    testWidgets('касание строки во время инерции к концу, которую странице '
-        'передала $variant, только останавливает страницу, а касание после '
-        'остановки открывает страницу намерения', (tester) async {
-      _usePhoneScreen(tester);
-      final items = [
-        for (var index = 1; index <= 20; index++)
-          testSummary(index: index, title: 'Намерение $index'),
-      ];
-      final router = await _openRoutedCatalog(tester, items);
-      if (handoff == _PageFlingHandoff.fromListEdge) {
-        _catalogScrollPosition(tester)
-            .jumpTo(_catalogScrollPosition(tester).maxScrollExtent);
-        await tester.pumpAndSettle();
-      }
-      expect(_pageScrollPosition(tester).pixels, 0);
+  testWidgets('при двукратном тексте и открытой клавиатуре на узком экране '
+      'страница не переполняется, а список прокручивается под неподвижным '
+      'полем поиска', (tester) async {
+    tester.view.physicalSize = const Size(320, 844);
+    tester.view.devicePixelRatio = 1;
+    tester.view.viewInsets = const FakeViewPadding(bottom: 336);
+    addTearDown(tester.view.reset);
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    final repository = ControlledCatalogRepository();
+    await tester.pumpWidget(_testApp(repository, locale: const Locale('ru')));
+    repository.complete(0, _firstPage(_twentySummaries()));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(tester.getSize(intentionCatalogList).height, greaterThan(0));
+    final field = tester.getRect(intentionCatalogTitleField);
 
-      await _releaseCatalogListFling(
-        tester,
-        const Offset(0, -_pageFlingTravel),
-        speed: handoff.speed,
-      );
-      await _pumpUntilPageInertia(tester, (page) => page.pixels > 0);
+    await _dragCatalogList(tester, const Offset(0, -60));
 
-      final list = _catalogScrollPosition(tester);
-      final page = _pageScrollPosition(tester);
-      expect(list.pixels, moreOrLessEquals(list.maxScrollExtent));
-      final stopped = page.pixels;
-      final (point, row) = _catalogRowAtListCenter(tester);
-      await tester.tapAt(point);
-      await tester.pumpAndSettle();
+    expect(_catalogScrollPosition(tester).pixels, greaterThan(0));
+    expect(tester.getRect(intentionCatalogTitleField), field);
+    expect(tester.takeException(), isNull);
+  });
 
-      expect(router.current.name, isNot(IntentionDetailsRoute.name));
-      expect(page.isScrollingNotifier.value, isFalse);
-      expect(page.pixels, stopped);
-      expect(page.pixels, lessThan(page.maxScrollExtent));
-      expect(list.pixels, moreOrLessEquals(list.maxScrollExtent));
-
-      await tester.tapAt(point);
-      await tester.pumpAndSettle();
-
-      expect(router.current.name, IntentionDetailsRoute.name);
-      expect(
-        router.current.argsAs<IntentionDetailsRouteArgs>().intentionId,
-        items.singleWhere((summary) => summary.title == row).id,
-      );
-    });
-
-    testWidgets('касание поля фильтра названия во время обратной инерции, '
-        'которую странице передала $variant, не ставит в него фокус и '
-        'останавливает страницу, а касание после остановки ставит', (
+  for (final (brightness, icons) in [
+    (Brightness.light, Brightness.dark),
+    (Brightness.dark, Brightness.light),
+  ]) {
+    testWidgets('значки системной строки контрастны теме ${brightness.name}', (
       tester,
     ) async {
-      _usePhoneScreen(tester);
-      await _openRoutedCatalog(tester, [
-        for (var index = 1; index <= 20; index++)
-          testSummary(index: index, title: 'Намерение $index'),
-      ]);
-      await _dragCatalogToEnd(tester);
-      if (handoff == _PageFlingHandoff.fromListEdge) {
-        _catalogScrollPosition(tester).jumpTo(0);
-        await tester.pumpAndSettle();
-      }
-      final page = _pageScrollPosition(tester);
-      expect(page.pixels, page.maxScrollExtent);
-      final filter = find.byKey(const ValueKey('catalog-filter-field'));
-      final appBarBottom = tester.getRect(find.byType(AppBar)).bottom;
+      final repository = ControlledCatalogRepository();
+      await tester.pumpWidget(_testApp(repository, brightness: brightness));
+      repository.queryAt(0);
+      await tester.pump();
 
-      await _releaseCatalogListFling(
-        tester,
-        const Offset(0, _pageFlingTravel),
-        speed: handoff.speed,
-      );
-      // Касание приходится на видимую под шапкой часть поля, пока страница
-      // ещё не дошла до начала.
-      await _pumpUntilPageInertia(
-        tester,
-        (page) =>
-            page.pixels > 0 &&
-            tester.getRect(filter).bottom > appBarBottom + 16,
-      );
-
-      final stopped = page.pixels;
-      final shown = tester.getRect(filter);
-      final point = Offset(
-        shown.center.dx,
-        (math.max(shown.top, appBarBottom) + shown.bottom) / 2,
-      );
-      await tester.tapAt(point);
-      await tester.pumpAndSettle();
-
-      expect(_hasFocus(tester, filter), isFalse);
-      expect(page.isScrollingNotifier.value, isFalse);
-      expect(page.pixels, stopped);
-      expect(page.pixels, greaterThan(0));
-
-      await tester.tapAt(point);
-      await tester.pumpAndSettle();
-
-      expect(_hasFocus(tester, filter), isTrue);
-    });
-
-    // Собственная инерция страницы от трекпада пропускает касания к
-    // содержимому, поэтому и переданная странице — тоже.
-    testWidgets('щелчок во время инерции от трекпада, которую странице '
-        'передала $variant, срабатывает на строке, как во время собственной '
-        'инерции страницы от трекпада', (tester) async {
-      _usePhoneScreen(tester);
-      final items = [
-        for (var index = 1; index <= 20; index++)
-          testSummary(index: index, title: 'Намерение $index'),
-      ];
-      final router = await _openRoutedCatalog(tester, items);
-      if (handoff == _PageFlingHandoff.fromListEdge) {
-        _catalogScrollPosition(tester)
-            .jumpTo(_catalogScrollPosition(tester).maxScrollExtent);
-        await tester.pumpAndSettle();
-      }
-
-      await tester.trackpadFlingFrom(
-        _catalogListFlingStart(tester),
-        const Offset(0, -_pageFlingTravel),
-        handoff.speed,
-      );
-      await _pumpUntilPageInertia(tester, (page) => page.pixels > 0);
-
-      final (point, row) = _catalogRowAtListCenter(tester);
-      await tester.tapAt(point, kind: PointerDeviceKind.mouse);
-      await tester.pumpAndSettle();
-
-      expect(router.current.name, IntentionDetailsRoute.name);
-      expect(
-        router.current.argsAs<IntentionDetailsRouteArgs>().intentionId,
-        items.singleWhere((summary) => summary.title == row).id,
-      );
+      expect(SystemChrome.latestStyle?.statusBarIconBrightness, icons);
     });
   }
 
@@ -645,7 +442,7 @@ void main() {
       find.text('Intentions couldn’t be loaded. Try again.'),
       findsOneWidget,
     );
-    final retry = find.widgetWithText(FilledButton, 'Try again');
+    final retry = find.text('Try again');
     expect(retry.hitTestable(), findsOneWidget);
 
     await tester.tap(retry);
@@ -653,7 +450,7 @@ void main() {
     repository.complete(1, _firstPage(const []));
     await tester.pumpAndSettle();
 
-    expect(find.text('No active intentions yet.'), findsOneWidget);
+    expect(find.text('No intentions yet'), findsOneWidget);
     expect(retry, findsNothing);
     expect(tester.takeException(), isNull);
   });
@@ -821,7 +618,7 @@ void main() {
     );
 
     expect(_loadedCatalog(container).items[1].id, assigned.id);
-    expect(find.text('Total intentions: 31'), findsOneWidget);
+    expect(intentionCatalogTotal(31), findsOneWidget);
     expect(
       _catalogTileTop(tester, anchor.title),
       moreOrLessEquals(anchor.top, epsilon: 0.01),
@@ -843,7 +640,7 @@ void main() {
       _loadedCatalog(container).items.map((item) => item.id),
       isNot(contains(items.first.id)),
     );
-    expect(find.text('Total intentions: 30'), findsOneWidget);
+    expect(intentionCatalogTotal(30), findsOneWidget);
     expect(
       _catalogTileTop(tester, anchor.title),
       moreOrLessEquals(anchor.top, epsilon: 0.01),
@@ -868,7 +665,7 @@ void main() {
     );
 
     expect(find.text(anchor.title), findsNothing);
-    expect(find.text('Total intentions: 29'), findsOneWidget);
+    expect(intentionCatalogTotal(29), findsOneWidget);
     expect(
       _catalogTileTop(tester, nearestSummary.title),
       moreOrLessEquals(anchor.top, epsilon: 0.01),
@@ -891,10 +688,7 @@ void main() {
     await tester.pump();
     await openIntentionGraph(tester);
     repository.queryAt(0);
-    await tester.enterText(
-      find.byKey(const ValueKey('catalog-filter-field')),
-      'Намерение',
-    );
+    await enterIntentionCatalogTitle(tester, 'Намерение');
     await tester.pump(const Duration(milliseconds: 250));
     expect(
       repository.queryAt(1).titleFilter?.map((value) => value),
@@ -961,15 +755,8 @@ void main() {
       moreOrLessEquals(beforePosition, epsilon: 0.01),
     );
 
-    // Нажатие вне неизменённой панели над шапкой каталога закрывает её.
-    await tester.tapAt(
-      tester.getCenter(
-        find.descendant(
-          of: find.byType(IntentionCatalogPage),
-          matching: find.byType(AppBar),
-        ),
-      ),
-    );
+    // Нажатие вне неизменённой панели над заголовком каталога закрывает её.
+    await tester.tapAt(tester.getCenter(intentionCatalogHeading(tester)));
     await tester.pumpAndSettle();
 
     final afterState =
@@ -991,6 +778,42 @@ void main() {
       _catalogScrollPosition(tester).pixels,
       moreOrLessEquals(beforePosition, epsilon: 0.01),
     );
+  });
+
+  testWidgets('возврат со страницы намерения сохраняет смещение и первую '
+      'видимую строку без нового чтения', (tester) async {
+    final repository = ControlledCatalogRepository()
+      ..intentionObservations = (_) => const Stream.empty();
+    final container = reconciliationCatalogContainer(repository);
+    final router = AppRouter();
+    addTearDown(container.dispose);
+    addTearDown(router.dispose);
+    await tester.pumpWidget(_routerTestAppWithContainer(container, router));
+    await tester.pump();
+    await openIntentionGraph(tester);
+    repository.complete(0, _firstPage(_taggedSummaries(const [], last: 31)));
+    await tester.pumpAndSettle();
+    await _dragCatalogList(tester, const Offset(0, -300));
+    await tester.pumpAndSettle();
+    final offset = _catalogScrollPosition(tester).pixels;
+    final visible = _firstVisibleCatalogTile(tester);
+    expect(offset, greaterThan(0));
+
+    // Вторая видимая строка целиком в списке, в отличие от первой.
+    final opened = shownIntentionCatalogRows(tester)
+        .firstWhere((row) => row.rect.top > visible.top);
+    await tester.tapAt(opened.rect.center);
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.byType(IntentionDetailsPage), findsOneWidget);
+    expect(await router.maybePop(), isTrue);
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
+    expectIntentionGraphRootPage(router);
+    expect(_catalogScrollPosition(tester).pixels, offset);
+    expect(_firstVisibleCatalogTile(tester), visible);
+    expect(repository.queries, hasLength(1));
   });
 
   // Выдача под параметрами и выдача на всю высоту тела страницы.
@@ -1018,12 +841,7 @@ void main() {
         findsNothing,
       );
       expect(find.byType(FloatingActionButton), findsNothing);
-      expect(
-        find
-            .byKey(const ValueKey('intention-tag-conditions-add'))
-            .hitTestable(),
-        findsOneWidget,
-      );
+      expect(intentionCatalogTagFilterControl.hitTestable(), findsOneWidget);
       final create = quickCreationAction();
       expect(create.hitTestable(), findsOneWidget);
       await tester.tap(create);
@@ -1043,24 +861,12 @@ void main() {
     });
   }
 
-  testWidgets('локализует параметры каталога на русский язык', (tester) async {
-    final repository = ControlledCatalogRepository();
-    await tester.pumpWidget(_testApp(repository, locale: const Locale('ru')));
-    repository.queryAt(0);
-
-    expect(find.text('Охват'), findsOneWidget);
-    expect(find.text('Фильтр по названию'), findsOneWidget);
-    expect(find.text('Порядок'), findsOneWidget);
-    expect(find.text('Активные'), findsOneWidget);
-    expect(find.text('По созданию: сначала новые'), findsOneWidget);
-  });
-
   testWidgets('автоматически загружает у порога и повторяет ту же порцию', (
     tester,
   ) async {
     final repository = ControlledCatalogRepository();
     await tester.pumpWidget(
-      _testApp(repository, pageSize: 20, prefetchRemaining: 2),
+      _testApp(repository, pageSize: 30, prefetchRemaining: 2),
     );
     const cursor = TestCatalogCursor();
     const revision = TestCatalogRevision(3);
@@ -1069,10 +875,10 @@ void main() {
       ResultSuccess(
         IntentionCatalogFirstPage(
           items: [
-            for (var index = 1; index <= 20; index++)
+            for (var index = 1; index <= 30; index++)
               testSummary(index: index, title: 'Намерение $index'),
           ],
-          totalCount: 21,
+          totalCount: 31,
           nextCursor: cursor,
           revision: revision,
         ),
@@ -1081,18 +887,18 @@ void main() {
     await tester.pumpAndSettle();
     expect(repository.queries, hasLength(1));
 
-    await _dragCatalogList(tester, const Offset(0, -2000));
+    await _dragCatalogList(tester, const Offset(0, -3000));
     await _pumpUntilQueries(tester, repository, 2);
     await tester.pump();
     expect(repository.queryAt(1).cursor, same(cursor));
     await _scrollCatalogToEnd(tester);
-    expect(find.text('Loading more intentions…'), findsOneWidget);
+    expect(_loadingMore, findsOneWidget);
 
     repository.complete(1, const ResultFailure(IntentionUnavailableFailure()));
     await tester.pumpAndSettle();
     expect(find.text('More intentions couldn’t be loaded.'), findsOneWidget);
 
-    final retryButton = find.widgetWithText(FilledButton, 'Try again');
+    final retryButton = find.text('Try again');
     await tester.ensureVisible(retryButton);
     await tester.pumpAndSettle();
     await tester.tap(retryButton);
@@ -1102,7 +908,7 @@ void main() {
       2,
       ResultSuccess(
         IntentionCatalogContinuationPage(
-          items: [testSummary(index: 21, title: 'Последнее намерение')],
+          items: [testSummary(index: 31, title: 'Последнее намерение')],
           nextCursor: null,
           revision: revision,
         ),
@@ -1110,7 +916,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Total intentions: 21'), findsOneWidget);
+    expect(intentionCatalogTotal(31), findsOneWidget);
     expect(repository.queries, hasLength(3));
   });
 
@@ -1149,16 +955,12 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text(message), findsOneWidget);
-      expect(find.widgetWithText(FilledButton, 'Try again'), findsNothing);
+      expect(find.text('Try again'), findsNothing);
     }
   });
 
-  // Архивное состояние строки в охвате всех показывает тест архивного
-  // состояния в охвате всех.
-  testWidgets('архивный охват показывает намерения без отметки '
-      'избранного', (tester) async {
-    const scopeName = 'Archived';
-    const scope = IntentionScope.archived;
+  testWidgets('архивный охват показывает намерения с меткой архива и без '
+      'отметки избранного', (tester) async {
     final semantics = tester.ensureSemantics();
     final repository = ControlledCatalogRepository();
     await tester.pumpWidget(_testApp(repository));
@@ -1175,11 +977,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('catalog-scope-control')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text(scopeName).last);
-    await tester.pump();
-    expect(repository.queryAt(1).scope, scope);
+    await selectIntentionCatalogScope(tester, IntentionScope.archived);
+    expect(repository.queryAt(1).scope, IntentionScope.archived);
     repository.complete(
       1,
       ResultSuccess(
@@ -1204,17 +1003,18 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final row = find.ancestor(
-      of: find.text('Архивное первое'),
-      matching: find.byType(IntentionSummaryView),
-    );
     expect(find.byIcon(Icons.star), findsNothing);
-    final label = tester.getSemantics(row).label;
-    expect(label, contains('Архивное первое'));
-    expect(label, isNot(contains('Favorite intention')));
-    // Архивный охват сообщает архивное состояние самим выбранным охватом.
-    expect(label.contains('Archived'), isFalse);
-    expect(find.text('Total intentions: 2'), findsOneWidget);
+    expect(_shownMarks(tester), [
+      DoableIconData.archive,
+      DoableIconData.archive,
+    ]);
+    expect(
+      find.bySemanticsLabel(
+        'Open: Архивное первое, archived, intention, No tags',
+      ),
+      findsOneWidget,
+    );
+    expect(intentionCatalogTotal(2), findsOneWidget);
 
     semantics.dispose();
   });
@@ -1237,7 +1037,7 @@ void main() {
 
     await _scrollCatalogDown(tester);
 
-    await tester.tap(_addCondition);
+    await tester.tap(intentionCatalogTagFilterControl);
     await tester.pumpAndSettle();
     expect(find.text('Filter by tags'), findsOneWidget);
     await tester.tap(_panelRow(health));
@@ -1257,11 +1057,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expectIntentionGraphRootPage(router);
-    expect(_shownConditions(tester), ['Здоровье']);
+    expect(shownIntentionCatalogParameters(tester).tagConditions, 1);
     expect(_catalogScrollPosition(tester).pixels, 0);
     expect(find.text('Намерение 60'), findsOneWidget);
-    expect(findTextIgnoringInlineWidgets('Tags: Здоровье'), findsWidgets);
-    expect(find.text('No tags'), findsNothing);
+    expect(_rowChips('Здоровье'), findsWidgets);
     expect(repository.tagCommands, isEmpty);
   });
 
@@ -1282,19 +1081,18 @@ void main() {
       (sport, IntentionTagRequirement.mustBeAbsent),
     ], _firstPage(_taggedSummaries([health], last: 58)));
 
-    await tester.tap(find.byKey(const ValueKey('catalog-scope-control')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Archived').last);
+    await selectIntentionCatalogScope(tester, IntentionScope.archived);
     await _pumpUntilQueries(tester, repository, 5);
     expect(repository.queryAt(4).scope, IntentionScope.archived);
     expect(repository.queryAt(4).tagFilter, filter);
     repository.complete(4, _firstPage(_taggedSummaries([health], last: 59)));
     await tester.pumpAndSettle();
-    expect(_shownConditions(tester), ['Здоровье', 'not Спорт']);
+    expect(shownIntentionCatalogParameters(tester).tagConditions, 2);
 
-    await tester.tap(find.byKey(const ValueKey('catalog-order-control')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Created: oldest first').last);
+    await selectIntentionCatalogOrder(
+      tester,
+      IntentionCatalogOrder.createdAtAscending,
+    );
     await _pumpUntilQueries(tester, repository, 6);
     expect(repository.queryAt(5).scope, IntentionScope.archived);
     expect(
@@ -1304,15 +1102,15 @@ void main() {
     expect(repository.queryAt(5).tagFilter, filter);
     repository.complete(5, _firstPage(_taggedSummaries([health], last: 59)));
     await tester.pumpAndSettle();
-    expect(_shownConditions(tester), ['Здоровье', 'not Спорт']);
+    expect(shownIntentionCatalogParameters(tester).tagConditions, 2);
   });
 
   testWidgets('пустая выдача при условиях по тегам сообщает об '
       'отсутствии совпадений по условиям, а не о пустом охвате', (
     tester,
   ) async {
-    const byConditions = 'No intentions match the tag conditions.';
-    const byScope = 'No active intentions yet.';
+    const byConditions = 'No intentions match these tags';
+    const byScope = 'No intentions yet';
     final repository = ControlledCatalogRepository();
     final container = reconciliationCatalogContainer(repository);
     addTearDown(container.dispose);
@@ -1333,7 +1131,176 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text(byConditions), findsOneWidget);
+    expect(find.text('Reset filters'), findsOneWidget);
     expect(find.text(byScope), findsNothing);
+  });
+
+  group('пустая выдача каталога', () {
+    final none = IntentionTypeCounts(all: 0, actions: 0);
+    final intentionsOnly = IntentionTypeCounts(all: 3, actions: 0);
+
+    for (final (name, scope, type, counts, icon, title, text) in [
+      (
+        'все намерения в архиве',
+        IntentionScope.active,
+        IntentionTypeChoice.all,
+        IntentionCountsByScopeAndType(active: none, archived: intentionsOnly),
+        DoableIconData.intention,
+        'Нет активных намерений',
+        'Новое создаётся кнопкой с плюсом внизу, а архивированные показывает '
+            'строка «Показать».',
+      ),
+      (
+        'при типе «Только действия» в архиве только намерения',
+        IntentionScope.active,
+        IntentionTypeChoice.actions,
+        IntentionCountsByScopeAndType(active: none, archived: intentionsOnly),
+        DoableIconData.intention,
+        'Нет активных намерений',
+        'Новое создаётся кнопкой с плюсом внизу, а архивированные показывает '
+            'строка «Показать».',
+      ),
+      (
+        'активный охват без намерений',
+        IntentionScope.active,
+        IntentionTypeChoice.all,
+        IntentionCountsByScopeAndType(active: none, archived: none),
+        DoableIconData.intention,
+        'Намерений пока нет',
+        'Ваши намерения появятся здесь. Первое создаётся кнопкой с плюсом '
+            'внизу.',
+      ),
+      (
+        'охват всех без намерений',
+        IntentionScope.all,
+        IntentionTypeChoice.all,
+        IntentionCountsByScopeAndType(active: none, archived: none),
+        DoableIconData.intention,
+        'Намерений пока нет',
+        'Ваши намерения появятся здесь. Первое создаётся кнопкой с плюсом '
+            'внизу.',
+      ),
+      (
+        'пустой архив',
+        IntentionScope.archived,
+        IntentionTypeChoice.all,
+        IntentionCountsByScopeAndType(active: intentionsOnly, archived: none),
+        DoableIconData.archive,
+        'В архиве ничего нет',
+        'Архивированное намерение уходит из активного списка и остаётся здесь.',
+      ),
+    ]) {
+      testWidgets('$name: заголовок показывает 0, а сообщение называет охват '
+          'без действий сброса', (tester) async {
+        await _openEmptyCatalog(
+          tester,
+          scope: scope,
+          type: type,
+          counts: counts,
+        );
+
+        expect(intentionCatalogTotal(0), findsOneWidget);
+        expect(shownIntentionCatalogParameters(tester).scope, scope);
+        expect(_inEmptyState(find.text(title)), findsOneWidget);
+        expect(_inEmptyState(find.text(text)), findsOneWidget);
+        expect(_inEmptyState(_icon(icon)), findsOneWidget);
+        expect(_inEmptyState(find.byType(Button)), findsNothing);
+      });
+    }
+
+    testWidgets('пустой тип в архиве называет охват и предлагает оба типа', (
+      tester,
+    ) async {
+      await _openEmptyCatalog(
+        tester,
+        scope: IntentionScope.archived,
+        type: IntentionTypeChoice.actions,
+        counts: IntentionCountsByScopeAndType(
+          active: none,
+          archived: intentionsOnly,
+        ),
+      );
+
+      final shown = shownIntentionCatalogParameters(tester);
+      expect(
+        (shown.scope, shown.type),
+        (IntentionScope.archived, IntentionTypeChoice.actions),
+      );
+      expect(intentionCatalogTotal(0), findsOneWidget);
+      expect(_inEmptyState(find.text('Нет действий в архиве')), findsOneWidget);
+      expect(_inEmptyState(find.text('Показать оба типа')), findsOneWidget);
+    });
+
+    testWidgets('фильтр названия без совпадений называет причину вместо '
+        'пустого охвата и оставляет 0 в заголовке', (tester) async {
+      final repository = ControlledCatalogRepository();
+      await tester.pumpWidget(_testApp(repository, locale: const Locale('ru')));
+      repository.complete(0, _firstPage(_twentySummaries()));
+      await tester.pumpAndSettle();
+
+      await enterIntentionCatalogTitle(tester, 'плавать');
+      await _pumpUntilQueries(tester, repository, 2);
+      repository.complete(1, _firstPage(const []));
+      await tester.pumpAndSettle();
+
+      expect(intentionCatalogTotal(0), findsOneWidget);
+      expect(
+        shownIntentionCatalogParameters(tester).scope,
+        IntentionScope.active,
+      );
+      final message = find.text('Нет намерений с таким названием');
+      expect(_inEmptyState(message), findsOneWidget);
+      expect(
+        _inEmptyState(find.text('Попробуйте название короче.')),
+        findsOneWidget,
+      );
+      expect(_inEmptyState(find.text('Сбросить фильтры')), findsOneWidget);
+    });
+
+    testWidgets('«Сбросить фильтры» очищает поле и снимает условия, сохраняя '
+        'тип', (tester) async {
+      final repository = ControlledCatalogRepository();
+      final container = reconciliationCatalogContainer(repository);
+      addTearDown(container.dispose);
+      await tester.pumpWidget(_testAppWithContainer(container));
+      repository.complete(0, _firstPage(const []));
+      await tester.pumpAndSettle();
+      await selectIntentionCatalogType(tester, IntentionTypeChoice.actions);
+      await _pumpUntilQueries(tester, repository, 2);
+      repository.complete(1, _firstPage(const []));
+      await tester.pumpAndSettle();
+      await _selectCondition(
+        tester,
+        container,
+        _tag(1, 'Здоровье'),
+        IntentionTagRequirement.mustBePresent,
+      );
+      await _pumpUntilQueries(tester, repository, 3);
+      await enterIntentionCatalogTitle(tester, 'бег');
+      await _pumpUntilQueries(tester, repository, 4);
+      repository.complete(3, _firstPage(const []));
+      await tester.pumpAndSettle();
+
+      await tester.tap(_inEmptyState(find.text('Reset filters')));
+      await tester.pump();
+      final answered = repository.queries.length;
+      expect(answered, greaterThan(4));
+      repository.complete(
+        answered - 1,
+        _firstPage(_taggedSummaries(const [], first: 3, last: 1)),
+      );
+      await tester.pumpAndSettle();
+
+      final query = repository.queries.last;
+      expect(query.titleFilter, isNull);
+      expect(query.tagFilter, IntentionTagFilter.empty);
+      expect(query.readinessFilter, IntentionReadinessFilter.readyOnly);
+      final shown = shownIntentionCatalogParameters(tester);
+      expect(shown.titleFilter, isEmpty);
+      expect(shown.tagConditions, 0);
+      expect(shown.type, IntentionTypeChoice.actions);
+      expect(intentionCatalogRows, findsNWidgets(3));
+    });
   });
 
   testWidgets('отказ новой выдачи после удаления исключённого тега показан '
@@ -1384,9 +1351,9 @@ void main() {
 
     final message = find.text('Intentions couldn’t be loaded. Try again.');
     expect(message, findsOneWidget);
-    expect(find.byType(IntentionSummaryView), findsNothing);
+    expect(find.byType(CatalogRow), findsNothing);
 
-    await tester.tap(find.widgetWithText(FilledButton, 'Try again'));
+    await tester.tap(find.text('Try again'));
     await _pumpUntilQueries(tester, repository, restarted + 2);
     expect(repository.queryAt(restarted + 1).tagFilter, remaining);
     repository.complete(
@@ -1396,13 +1363,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(message, findsNothing);
-    expect(find.text('Total intentions: 4'), findsOneWidget);
-    expect(find.byType(IntentionSummaryView), findsNWidgets(4));
+    expect(intentionCatalogTotal(4), findsOneWidget);
+    expect(find.byType(CatalogRow), findsNWidgets(4));
   });
 
-  testWidgets('после подтверждённого переименования тега строки и чипы '
-      'показывают новое название, а удаление снимает условие и показывает '
-      'выдачу по оставшимся условиям', (tester) async {
+  testWidgets('после подтверждённого переименования тега строки показывают '
+      'новое название, а удаление снимает условие и показывает выдачу по '
+      'оставшимся условиям', (tester) async {
     final repository = ControlledCatalogRepository();
     final container = reconciliationCatalogContainer(repository);
     addTearDown(container.dispose);
@@ -1411,7 +1378,7 @@ void main() {
     await _openCatalogWithConditions(tester, container, repository, [
       (health, IntentionTagRequirement.mustBePresent),
     ], _firstPage(_taggedSummaries([health], first: 3, last: 1), revision: 1));
-    expect(findTextIgnoringInlineWidgets('Tags: Здоровье'), findsNWidgets(3));
+    expect(_rowChips('Здоровье'), findsNWidgets(3));
 
     await _completeCatalogWidgetTagCommand(
       tester,
@@ -1425,12 +1392,9 @@ void main() {
       ),
     );
 
-    expect(_shownConditions(tester), ['Самочувствие']);
-    expect(
-      findTextIgnoringInlineWidgets('Tags: Самочувствие'),
-      findsNWidgets(3),
-    );
-    expect(find.text('Total intentions: 3'), findsOneWidget);
+    expect(shownIntentionCatalogParameters(tester).tagConditions, 1);
+    expect(_rowChips('Самочувствие'), findsNWidgets(3));
+    expect(intentionCatalogTotal(3), findsOneWidget);
 
     final restarted = repository.queries.length;
     await _completeCatalogWidgetTagCommand(
@@ -1451,11 +1415,67 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(_shownConditions(tester), isEmpty);
-    expect(find.text('Total intentions: 5'), findsOneWidget);
-    expect(find.byType(IntentionSummaryView), findsNWidgets(5));
+    expect(shownIntentionCatalogParameters(tester).tagConditions, 0);
+    expect(intentionCatalogTotal(5), findsOneWidget);
+    expect(find.byType(CatalogRow), findsNWidgets(5));
     expect(repository.queries, hasLength(restarted + 1));
   });
+}
+
+/// Виды состояния списка — закрытые наследники [ListState].
+final _listState = find.byWidgetPredicate((widget) => widget is ListState);
+
+/// Кольцо подгрузки: видимого текста у него нет, только доступное название.
+final _loadingMore = find.byWidgetPredicate(
+  (widget) =>
+      widget is Semantics &&
+      widget.properties.label == 'Loading more intentions',
+);
+
+Finder _inListState(Finder finder) =>
+    find.descendant(of: _listState, matching: finder);
+
+Finder _inEmptyState(Finder finder) =>
+    find.descendant(of: find.byType(EmptyState), matching: finder);
+
+Finder _icon(DoableIconData icon) => find.byWidgetPredicate(
+  (widget) => widget is DoableIcon && widget.icon == icon,
+);
+
+/// Открывает на русском каталог с охватом [scope] и типом [type], в котором
+/// подтверждена пустая первая порция с числами [counts].
+Future<void> _openEmptyCatalog(
+  WidgetTester tester, {
+  required IntentionScope scope,
+  required IntentionTypeChoice type,
+  required IntentionCatalogCounts counts,
+}) async {
+  final repository = ControlledCatalogRepository();
+  final container = reconciliationCatalogContainer(repository);
+  addTearDown(container.dispose);
+  await tester.pumpWidget(
+    _testAppWithContainer(container, locale: const Locale('ru')),
+  );
+  container.read(
+      intentionCatalogViewModelProvider(const BrowseIntentionCatalog())
+          .notifier,
+    )
+    ..changeScope(scope)
+    ..changeType(type);
+  await tester.pump();
+  repository.complete(
+    repository.queries.length - 1,
+    ResultSuccess(
+      IntentionCatalogFirstPage(
+        items: const [],
+        totalCount: 0,
+        counts: counts,
+        nextCursor: null,
+        revision: const TestCatalogRevision(0),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
 }
 
 ScrollPosition _catalogScrollPosition(WidgetTester tester) => tester
@@ -1467,242 +1487,25 @@ ScrollPosition _catalogScrollPosition(WidgetTester tester) => tester
     )
     .position;
 
-/// Экран телефона, на котором параметры поиска и выдача делят высоту.
+/// Экран телефона, на котором двадцать строк выдачи не помещаются.
 const _phone = Size(400, 800);
 
-/// Открывает страницу на экране телефона с клавиатурой высотой [keyboard].
-void _usePhoneScreen(WidgetTester tester, {double keyboard = 0}) {
+/// Открывает страницу на экране телефона.
+void _usePhoneScreen(WidgetTester tester) {
   tester.view.physicalSize = _phone;
   tester.view.devicePixelRatio = 1;
-  tester.view.viewInsets = FakeViewPadding(bottom: keyboard);
   addTearDown(tester.view.reset);
 }
 
-/// Общая прокрутка параметров поиска и выдачи страницы.
-ScrollPosition _pageScrollPosition(WidgetTester tester) => tester
-    .state<ScrollableState>(
-      find
-          .descendant(
-            of: find.byType(IntentionSearchLayout),
-            matching: find.byType(Scrollable),
-          )
-          .first,
-    )
-    .position;
-
-/// Ведёт жест [offset] из середины видимой части списка выдачи: пока
-/// страница не прокручена, нижняя часть списка под параметрами поиска лежит
-/// за нижним краем экрана.
-Future<void> _dragCatalogList(WidgetTester tester, Offset offset) {
-  final list = tester.getRect(
-    find.byKey(const PageStorageKey<String>('intention-catalog-list')),
-  );
-  final screen = tester.view.physicalSize / tester.view.devicePixelRatio;
-  final top = math.max(list.top, tester.getRect(find.byType(AppBar)).bottom);
-  final bottom = math.min(list.bottom, screen.height);
-  return tester.dragFrom(Offset(list.center.dx, (top + bottom) / 2), offset);
-}
-
-/// Прокручивает жестами по списку выдачи до конца списка и страницы.
-Future<void> _dragCatalogToEnd(WidgetTester tester) async {
-  final list = find.byKey(
-    const PageStorageKey<String>('intention-catalog-list'),
-  );
-  for (var attempt = 0; attempt < 50; attempt++) {
-    final before = (
-      _catalogScrollPosition(tester).pixels,
-      _pageScrollPosition(tester).pixels,
-    );
-    final top = math.max(
-      tester.getRect(list).top,
-      tester.getRect(find.byType(AppBar)).bottom,
-    );
-    await tester.dragFrom(
-      Offset(tester.getRect(list).left + 24, top + 24),
-      const Offset(0, -200),
-    );
-    await tester.pumpAndSettle();
-    final after = (
-      _catalogScrollPosition(tester).pixels,
-      _pageScrollPosition(tester).pixels,
-    );
-    if (after == before) return;
-  }
-  fail('Список не дошёл до конца.');
-}
-
-/// Флинг на [offset] со скоростью [speed] из точки у верхнего левого края
-/// видимой части списка выдачи; скорости по умолчанию с запасом хватает на
-/// список и страницу.
-///
-/// Кадры идут с частотой экрана: в кадре, где список упирается в край, он
-/// уходит за край лишь на малую долю пути, и дальше страницу ведёт только
-/// переданная ей инерция флинга.
-Future<void> _flingCatalogList(
-  WidgetTester tester,
-  Offset offset, {
-  double speed = 6000,
-}) async {
-  await _releaseCatalogListFling(tester, offset, speed: speed);
-  await tester.pumpAndSettle(const Duration(milliseconds: 16));
-}
-
-/// Выполняет флинг [_flingCatalogList] и отпускает палец, не дожидаясь
-/// конца инерции.
-Future<void> _releaseCatalogListFling(
-  WidgetTester tester,
-  Offset offset, {
-  required double speed,
-}) => tester.flingFrom(_catalogListFlingStart(tester), offset, speed);
-
-/// Точка у верхнего левого края видимой части списка выдачи, из которой
-/// начинается флинг.
-Offset _catalogListFlingStart(WidgetTester tester) {
-  final list = tester.getRect(
-    find.byKey(const PageStorageKey<String>('intention-catalog-list')),
-  );
-  final top = math.max(list.top, tester.getRect(find.byType(AppBar)).bottom);
-  return Offset(list.left + 24, top + 24);
-}
-
-/// Путь, которым инерция флинга по списку выдачи переходит к странице.
-enum _PageFlingHandoff {
-  /// Флинг начат при списке в начале: страница продолжает инерцию списка,
-  /// дошедшую до его края.
-  listInertia(speed: 6000),
-
-  /// Флинг начат при списке уже у края: список не сдвигается, и инерцию
-  /// пальца сразу продолжает страница.
-  fromListEdge(speed: 2000);
-
-  const _PageFlingHandoff({required this.speed});
-
-  /// Скорость флинга, с которой страница ещё движется, когда касание
-  /// приходится на строку или поле фильтра.
-  final double speed;
-}
-
-/// Ход пальца флинга, инерцию которого продолжает страница: короткий ход
-/// оставляет странице путь и после флинга, начатого у края списка.
-const _pageFlingTravel = 60.0;
-
-const _pageFlingHandoffs = [
-  (_PageFlingHandoff.listInertia, 'инерция списка, дошедшая до его края'),
-  (_PageFlingHandoff.fromListEdge, 'флинг, начатый у края списка'),
+/// Двадцать строк выдачи: на экран телефона они не помещаются.
+List<IntentionSummary> _twentySummaries() => [
+  for (var index = 1; index <= 20; index++)
+    testSummary(index: index, title: 'Намерение $index'),
 ];
 
-/// Ведёт кадры с частотой экрана, пока страница не продолжает инерцию за
-/// списком выдачи и не выполнено [ready], и останавливается посреди
-/// инерции.
-Future<void> _pumpUntilPageInertia(
-  WidgetTester tester,
-  bool Function(ScrollPosition page) ready,
-) async {
-  for (var frame = 0; frame < 120; frame++) {
-    await tester.pump(const Duration(milliseconds: 16));
-    final page = _pageScrollPosition(tester);
-    if (page.isScrollingNotifier.value && ready(page)) return;
-  }
-  fail('Страница не продолжила инерцию списка выдачи.');
-}
-
-/// Середина видимой части списка выдачи и название строки под ней.
-(Offset, String) _catalogRowAtListCenter(WidgetTester tester) {
-  final list = tester.getRect(
-    find.byKey(const PageStorageKey<String>('intention-catalog-list')),
-  );
-  final screen = tester.view.physicalSize / tester.view.devicePixelRatio;
-  final top = math.max(list.top, tester.getRect(find.byType(AppBar)).bottom);
-  final bottom = math.min(list.bottom, screen.height);
-  final point = Offset(list.center.dx, (top + bottom) / 2);
-  final rows = find.byWidgetPredicate(
-    (widget) => widget is IntentionSummaryView,
-  );
-  final row = rows
-      .evaluate()
-      .map((element) => element.widget as IntentionSummaryView)
-      .singleWhere((row) => tester.getRect(find.byWidget(row)).contains(point));
-  return (point, row.title);
-}
-
-/// Стоит ли фокус ввода в текстовом поле [field].
-bool _hasFocus(WidgetTester tester, Finder field) => tester
-    .widget<EditableText>(
-      find.descendant(of: field, matching: find.byType(EditableText)),
-    )
-    .focusNode
-    .hasFocus;
-
-/// Открывает каталог намерений как корневую страницу приложения, в котором
-/// нажатие строки открывает страницу намерения, и показывает выдачу
-/// [items].
-Future<AppRouter> _openRoutedCatalog(
-  WidgetTester tester,
-  List<IntentionSummary> items,
-) async {
-  final repository = ControlledCatalogRepository();
-  final container = reconciliationCatalogContainer(repository);
-  final router = AppRouter();
-  addTearDown(container.dispose);
-  addTearDown(router.dispose);
-  await tester.pumpWidget(_routerTestAppWithContainer(container, router));
-  await tester.pump();
-  await openIntentionGraph(tester);
-  repository.complete(0, _firstPage(items));
-  await tester.pumpAndSettle();
-  return router;
-}
-
-/// Элемент [finder] виден целиком в видимой части списка выдачи.
-///
-/// Та же проверка, что у свидетельств раскладки оболочки: элемент лежит под
-/// шапкой, над нижним краем тела страницы [bodyBottom] и в видимой части
-/// каждой объемлющей прокрутки, а нажатия у его верхнего и нижнего края
-/// попадают в него.
-void _expectFullyVisibleInList(
-  WidgetTester tester,
-  Finder finder, {
-  required double bodyBottom,
-}) {
-  expect(finder, findsOneWidget);
-  final element = finder.evaluate().single;
-  final rect = tester.getRect(finder);
-  var visibleTop = tester.getRect(find.byType(AppBar)).bottom;
-  var visibleBottom = bodyBottom;
-  element.visitAncestorElements((ancestor) {
-    if (ancestor.widget is Scrollable) {
-      final viewport = ancestor.renderObject! as RenderBox;
-      final viewportTop = viewport.localToGlobal(Offset.zero).dy;
-      visibleTop = math.max(visibleTop, viewportTop);
-      visibleBottom = math.min(
-        visibleBottom,
-        viewportTop + viewport.size.height,
-      );
-    }
-    return true;
-  });
-  // Прокрутка до края даёт координаты с ошибкой округления.
-  expect(
-    rect.top,
-    greaterThanOrEqualTo(visibleTop - precisionErrorTolerance),
-    reason: '$finder: верхний край видимой части',
-  );
-  expect(
-    rect.bottom,
-    lessThanOrEqualTo(visibleBottom + precisionErrorTolerance),
-    reason: '$finder: нижний край видимой части',
-  );
-  // Нажатие ровно на границе элементу не принадлежит, поэтому точки
-  // отступают от краёв внутрь.
-  for (final y in [rect.top + 1, rect.bottom - 1]) {
-    final hit = tester.hitTestOnBinding(Offset(rect.center.dx, y));
-    expect(
-      [for (final entry in hit.path) entry.target],
-      contains(element.renderObject),
-      reason: '$finder: нажатие на высоте $y',
-    );
-  }
-}
+/// Ведёт жест [offset] из середины списка выдачи.
+Future<void> _dragCatalogList(WidgetTester tester, Offset offset) =>
+    tester.dragFrom(tester.getCenter(intentionCatalogList), offset);
 
 Future<void> _scrollCatalogToEnd(WidgetTester tester) async {
   for (var attempt = 0; attempt < 5; attempt++) {
@@ -1718,6 +1521,7 @@ Future<void> _scrollCatalogToEnd(WidgetTester tester) async {
 Widget _testApp(
   ControlledCatalogRepository repository, {
   Locale locale = const Locale('en'),
+  Brightness brightness = Brightness.light,
   int pageSize = 100,
   int prefetchRemaining = 30,
 }) => ProviderScope(
@@ -1733,6 +1537,7 @@ Widget _testApp(
   ],
   retry: (retryCount, error) => null,
   child: MaterialApp(
+    theme: doableTheme(brightness),
     locale: locale,
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
@@ -1740,16 +1545,19 @@ Widget _testApp(
   ),
 );
 
-Widget _testAppWithContainer(ProviderContainer container) =>
-    UncontrolledProviderScope(
-      container: container,
-      child: MaterialApp(
-        locale: const Locale('en'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: const IntentionCatalogPage(),
-      ),
-    );
+Widget _testAppWithContainer(
+  ProviderContainer container, {
+  Locale locale = const Locale('en'),
+}) => UncontrolledProviderScope(
+  container: container,
+  child: MaterialApp(
+    theme: doableTheme(Brightness.light),
+    locale: locale,
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: AppLocalizations.supportedLocales,
+    home: const IntentionCatalogPage(),
+  ),
+);
 
 Widget _routerTestAppWithContainer(
   ProviderContainer container,
@@ -1770,18 +1578,10 @@ Widget _routerTestAppWithContainer(
     find.byKey(const PageStorageKey<String>('intention-catalog-list')),
   );
   final visible = <({String title, double top})>[];
-  for (final element in find.byType(ListTile).evaluate()) {
-    final tile = element.widget as ListTile;
-    final title = tile.title;
-    if (title is! Text || title.data == null) {
-      continue;
-    }
-    final finder = find.byElementPredicate(
-      (candidate) => identical(candidate, element),
-    );
-    final rect = tester.getRect(finder);
+  for (final row in tester.widgetList<CatalogRow>(find.byType(CatalogRow))) {
+    final rect = tester.getRect(find.byWidget(row));
     if (rect.bottom > listRect.top && rect.top < listRect.bottom) {
-      visible.add((title: title.data!, top: rect.top));
+      visible.add((title: row.name, top: rect.top));
     }
   }
   visible.sort((left, right) => left.top.compareTo(right.top));
@@ -1791,13 +1591,33 @@ Widget _routerTestAppWithContainer(
 double _catalogTileTop(WidgetTester tester, String title) => tester
     .getTopLeft(
       find.byWidgetPredicate(
-        (widget) =>
-            widget is ListTile &&
-            widget.title is Text &&
-            (widget.title! as Text).data == title,
+        (widget) => widget is CatalogRow && widget.name == title,
       ),
     )
     .dy;
+
+/// Чипы тега с названием [name] в строках каталога.
+Finder _rowChips(String name) => find.descendant(
+  of: find.byType(CatalogRow),
+  matching: find.widgetWithText(TagChip, name),
+);
+
+/// Тексты открытого меню листа сверху вниз: названия вариантов и их числа.
+List<String?> _shownMenu(WidgetTester tester) => [
+  for (final text in tester.widgetList<Text>(
+    find.descendant(
+      of: find.byType(MenuItemButton),
+      matching: find.byType(Text),
+    ),
+  ))
+    text.data,
+];
+
+/// Значки меток построенных строк каталога в порядке показа.
+List<DoableIconData> _shownMarks(WidgetTester tester) => [
+  for (final badge in tester.widgetList<BadgeMark>(find.byType(BadgeMark)))
+    badge.icon,
+];
 
 Future<void> _completeCatalogWidgetCommand(
   WidgetTester tester,
@@ -1831,7 +1651,7 @@ typedef _VisibleCatalogAnchor = ({String title, double top, int index});
 
 /// Загружает страницу каталога с заданными условиями по тегам.
 ///
-/// Условия задаются сразу моделью каталога, минуя раздел условий страницы.
+/// Условия задаются сразу моделью каталога, минуя панель тегов.
 Future<void> _loadTaggedCatalog(
   WidgetTester tester,
   ProviderContainer container,
@@ -1889,23 +1709,8 @@ List<IntentionSummary> _taggedSummaries(
     testSummary(index: index, title: 'Намерение $index', tags: tags),
 ];
 
-final _addCondition = find.byKey(
-  const ValueKey('intention-tag-conditions-add'),
-);
-
 Finder _panelRow(Tag tag) =>
     find.byKey(ValueKey('tags-panel-row-${tag.id.toCanonicalString()}'));
-
-/// Тексты чипов раздела условий в порядке показа.
-List<String> _shownConditions(WidgetTester tester) => [
-  for (final text in tester.widgetList<Text>(
-    find.descendant(
-      of: find.byType(IntentionTagConditionsSection),
-      matching: find.byKey(const ValueKey('intention-tag-condition-label')),
-    ),
-  ))
-    textIgnoringInlineWidgets(text),
-];
 
 Result<IntentionCatalogFirstPage> _firstPage(
   List<IntentionSummary> items, {
@@ -1938,12 +1743,12 @@ Future<void> _selectCondition(
         .notifier,
   );
   for (var i = 0; i < tagConditionCycles(requirement); i++) {
-    conditions.cycle(tag, snapshotRevision: const TestCatalogRevision(0));
+    conditions.cycle(tag.id);
     await tester.pump();
   }
 }
 
-/// Открывает каталог и задаёт условия через модель раздела условий.
+/// Открывает каталог и задаёт условия через модель условий.
 ///
 /// Каждое переключение сразу начинает новую выдачу; [page] отвечает на
 /// последнюю.

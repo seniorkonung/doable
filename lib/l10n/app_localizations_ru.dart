@@ -412,59 +412,11 @@ class AppLocalizationsRu extends AppLocalizations {
   String get catalogLoading => 'Загружаем намерения…';
 
   @override
-  String get catalogScopeLabel => 'Охват';
-
-  @override
-  String get catalogScopeActive => 'Активные';
-
-  @override
-  String get catalogScopeArchived => 'Архивные';
-
-  @override
-  String get catalogScopeAll => 'Все';
-
-  @override
-  String get catalogFilterLabel => 'Фильтр по названию';
-
-  @override
   String get catalogFilterInvalidUnicode =>
       'Введите корректный Unicode-текст без NUL.';
 
   @override
   String get catalogFilterTooLong => 'Используйте не более 255 символов.';
-
-  @override
-  String get catalogOrderLabel => 'Порядок';
-
-  @override
-  String get catalogOrderCreatedNewest => 'По созданию: сначала новые';
-
-  @override
-  String get catalogOrderCreatedOldest => 'По созданию: сначала старые';
-
-  @override
-  String get catalogOrderUpdatedNewest => 'По изменению: сначала новые';
-
-  @override
-  String get catalogOrderUpdatedOldest => 'По изменению: сначала старые';
-
-  @override
-  String catalogTotalCount(int count) {
-    return 'Всего намерений: $count';
-  }
-
-  @override
-  String get catalogActiveEmpty => 'Активных намерений пока нет.';
-
-  @override
-  String get catalogArchivedEmpty => 'Архивных намерений пока нет.';
-
-  @override
-  String get catalogAllEmpty => 'Намерений пока нет.';
-
-  @override
-  String get catalogTagConditionsEmpty =>
-      'По условиям по тегам совпадений нет.';
 
   @override
   String get catalogUnavailable =>
@@ -479,9 +431,6 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось загрузить намерения из-за непредвиденной ошибки.';
 
   @override
-  String get catalogLoadingMore => 'Загружаем ещё намерения…';
-
-  @override
   String get catalogLoadMoreUnavailable =>
       'Не удалось загрузить следующие намерения.';
 
@@ -492,18 +441,6 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get catalogLoadMoreUnexpected =>
       'Не удалось загрузить следующие намерения из-за непредвиденной ошибки.';
-
-  @override
-  String get catalogReady => 'Готово к действию';
-
-  @override
-  String get catalogNotReady => 'Не готово к действию';
-
-  @override
-  String get catalogHasDescription => 'Есть описание';
-
-  @override
-  String get catalogNoDescription => 'Нет описания';
 
   @override
   String intentionSummaryTags(String tags) {
@@ -1625,36 +1562,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get dataImportConfirm => 'Импортировать и заменить';
 
   @override
-  String intentionTagConditionAbsent(String tagName) {
-    return 'не $tagName';
-  }
-
-  @override
-  String intentionTagConditionPresentSemantics(String tagName) {
-    return '$tagName, должен быть';
-  }
-
-  @override
-  String intentionTagConditionAbsentSemantics(String tagName) {
-    return '$tagName, должен отсутствовать';
-  }
-
-  @override
-  String get intentionTagConditionToggleHint =>
-      'Переключить надобность: должен быть или должен отсутствовать';
-
-  @override
-  String intentionTagConditionRemove(String tagName) {
-    return 'Снять условие: $tagName';
-  }
-
-  @override
-  String get intentionTagConditionsAdd => 'Тег';
-
-  @override
-  String get intentionTagConditionsAddSemantics => 'Добавить условие по тегу';
-
-  @override
   String get tagsPanelTitle => 'Теги';
 
   @override
@@ -2405,6 +2312,11 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
+  String intentionCatalogRowLabel(String content) {
+    return 'Открыть: $content';
+  }
+
+  @override
   String get intentionPickerShowAndSortTitle => 'Показать и упорядочить';
 
   @override
@@ -2423,6 +2335,18 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get intentionPickerPurposeSheetBack => 'Вернуться к списку';
+
+  @override
+  String get intentionPickerScopeCaption => 'Показать';
+
+  @override
+  String get intentionPickerScopeActive => 'Активные';
+
+  @override
+  String get intentionPickerScopeArchived => 'Архивные';
+
+  @override
+  String get intentionPickerScopeAll => 'Все, включая архивные';
 
   @override
   String get intentionPickerTypeCaption => 'Тип';
@@ -2508,6 +2432,49 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
+  String intentionPickerScopeHeader(String scope, String type) {
+    String _temp0 = intl.Intl.selectLogic(type, {
+      'all': 'Активные',
+      'intentions': 'Активные намерения',
+      'actions': 'Активные действия',
+      'other': '',
+    });
+    String _temp1 = intl.Intl.selectLogic(type, {
+      'all': 'Архивные',
+      'intentions': 'Архивные намерения',
+      'actions': 'Архивные действия',
+      'other': '',
+    });
+    String _temp2 = intl.Intl.selectLogic(type, {
+      'all': 'Все',
+      'intentions': 'Все намерения',
+      'actions': 'Все действия',
+      'other': '',
+    });
+    String _temp3 = intl.Intl.selectLogic(scope, {
+      'active': '$_temp0',
+      'archived': '$_temp1',
+      'all': '$_temp2',
+      'other': '',
+    });
+    return '$_temp3';
+  }
+
+  @override
+  String intentionPickerScopeHeaderLabel(String title, String summary) {
+    return 'Показать и упорядочить. Показаны: $title. Сортировка: $summary.';
+  }
+
+  @override
+  String intentionPickerScopeHeaderCountLabel(
+    String title,
+    int count,
+    String summary,
+  ) {
+    return 'Показать и упорядочить. Показаны: $title, $count. Сортировка: $summary.';
+  }
+
+  @override
   String get intentionPickerActionsHeader => 'Действия';
 
   @override
@@ -2531,6 +2498,61 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get intentionPickerShowBothTypes => 'Показать оба типа';
+
+  @override
+  String intentionPickerEmptyScopedTypeTitle(String scope, String type) {
+    String _temp0 = intl.Intl.selectLogic(type, {
+      'actions': 'Нет активных действий',
+      'intentions': 'Нет активных намерений',
+      'other': '',
+    });
+    String _temp1 = intl.Intl.selectLogic(type, {
+      'actions': 'Нет действий в архиве',
+      'intentions': 'Нет намерений в архиве',
+      'other': '',
+    });
+    String _temp2 = intl.Intl.selectLogic(type, {
+      'actions': 'Действий пока нет',
+      'intentions': 'Намерений пока нет',
+      'other': '',
+    });
+    String _temp3 = intl.Intl.selectLogic(scope, {
+      'active': '$_temp0',
+      'archived': '$_temp1',
+      'all': '$_temp2',
+      'other': '',
+    });
+    return '$_temp3';
+  }
+
+  @override
+  String get intentionPickerEmptyActionsText =>
+      'Здесь появится намерение, отмеченное как действие.';
+
+  @override
+  String get intentionPickerEmptyIntentionsText =>
+      'Здесь всё отмечено как действия.';
+
+  @override
+  String get intentionCatalogNoActiveTitle => 'Нет активных намерений';
+
+  @override
+  String get intentionCatalogNoActiveText =>
+      'Новое создаётся кнопкой с плюсом внизу, а архивированные показывает строка «Показать».';
+
+  @override
+  String get intentionCatalogNoIntentionsTitle => 'Намерений пока нет';
+
+  @override
+  String get intentionCatalogNoIntentionsText =>
+      'Ваши намерения появятся здесь. Первое создаётся кнопкой с плюсом внизу.';
+
+  @override
+  String get intentionCatalogEmptyArchiveTitle => 'В архиве ничего нет';
+
+  @override
+  String get intentionCatalogEmptyArchiveText =>
+      'Архивированное намерение уходит из активного списка и остаётся здесь.';
 
   @override
   String get intentionPickerActionTitle => 'Выбор действия';

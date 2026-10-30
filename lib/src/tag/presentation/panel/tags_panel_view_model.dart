@@ -136,10 +136,8 @@ final class TagsPanelViewModel extends _$TagsPanelViewModel {
         tagSet.remove(tagId);
       case TagsPanelDraftContext(:final tagSet):
         tagSet.add(row.tag);
-      // Строки показывают показанную ревизию, поэтому название и цвет
-      // условия берутся из её снимка.
       case TagsPanelFilterContext(:final conditions):
-        conditions.cycle(row.tag, snapshotRevision: _shownRevision!);
+        conditions.cycle(tagId);
     }
     return null;
   }
@@ -219,7 +217,6 @@ final class TagsPanelViewModel extends _$TagsPanelViewModel {
     final completion = await creation;
     if (!ref.mounted || opening.isClosed) return;
     if (completion case TagCommandSucceededCompletion(
-      :final confirmedChange,
       result: GraphResultSuccess(value: TagCreated(:final tag)),
     )) {
       state = state.withSearch(TagsPanelSearch.initial);
@@ -234,7 +231,7 @@ final class TagsPanelViewModel extends _$TagsPanelViewModel {
         // Созданного тега ещё нет в условиях, поэтому переключение по кругу
         // делает его условием «должен быть».
         case TagsPanelFilterContext(:final conditions):
-          conditions.cycle(tag, snapshotRevision: confirmedChange.revision);
+          conditions.cycle(tag.id);
       }
     }
   }

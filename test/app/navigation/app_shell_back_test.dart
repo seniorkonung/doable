@@ -14,7 +14,6 @@ import 'package:doable/src/data/local/app_database.dart'
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
-import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -25,6 +24,7 @@ import '../../support/app_root_pages.dart';
 import '../../support/daily_choice_local_date.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
+import '../../support/intention_catalog_controls.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 import '../../support/quick_creation.dart';
@@ -54,13 +54,13 @@ void main() {
       'параметры и позицию каталога', (tester) async {
     final app = await _start(tester);
     await _select(tester, AppDestination.intentionGraph);
-    await tester.enterText(_titleFilter, 'Намерение');
-    await _until(tester, find.text('Total intentions: $_intentionCount'));
+    await enterIntentionCatalogTitle(tester, 'Намерение');
+    await _until(tester, intentionCatalogTotal(_intentionCount));
     await tester.pumpAndSettle();
-    await tester.drag(_catalogList, const Offset(0, -300));
+    await tester.drag(intentionCatalogList, const Offset(0, -300));
     await tester.pumpAndSettle();
-    final offset = _catalogOffset(tester);
-    final rows = _catalogRows(tester);
+    final offset = intentionCatalogListPosition(tester).pixels;
+    final rows = shownIntentionCatalogRows(tester);
     expect(offset, greaterThan(0));
     expect(rows, isNotEmpty);
 
@@ -74,13 +74,10 @@ void main() {
 
     await _select(tester, AppDestination.intentionGraph);
 
-    expect(
-      tester.widget<TextField>(_titleFilter).controller!.text,
-      'Намерение',
-    );
-    expect(find.text('Total intentions: $_intentionCount'), findsOneWidget);
-    expect(_catalogOffset(tester), offset);
-    expect(_catalogRows(tester), rows);
+    expect(shownIntentionCatalogParameters(tester).titleFilter, 'Намерение');
+    expect(intentionCatalogTotal(_intentionCount), findsOneWidget);
+    expect(intentionCatalogListPosition(tester).pixels, offset);
+    expect(shownIntentionCatalogRows(tester), rows);
     expect(app.platform.frameworkHandlesBack, isTrue);
     expect(tester.takeException(), isNull);
   }, variant: _android);
@@ -159,13 +156,10 @@ void main() {
       'и пункт начала истории', (tester) async {
     final app = await _start(tester);
     await _select(tester, AppDestination.intentionGraph);
-    await tester.enterText(_titleFilter, 'Намерение 01');
+    await enterIntentionCatalogTitle(tester, 'Намерение 01');
     await _open(
       tester,
-      find.byWidgetPredicate(
-        (widget) =>
-            widget is IntentionSummaryView && widget.title == 'Намерение 01',
-      ),
+      intentionCatalogRow('Намерение 01'),
       IntentionDetailsPage,
     );
     await _tap(tester, find.text('Relations').first);
@@ -222,14 +216,11 @@ void main() {
       'закрывает только её и не меняет выбранный пункт', (tester) async {
     final app = await _start(tester);
     await _select(tester, AppDestination.intentionGraph);
-    await tester.enterText(_titleFilter, 'Намерение 01');
+    await enterIntentionCatalogTitle(tester, 'Намерение 01');
 
     await _open(
       tester,
-      find.byWidgetPredicate(
-        (widget) =>
-            widget is IntentionSummaryView && widget.title == 'Намерение 01',
-      ),
+      intentionCatalogRow('Намерение 01'),
       IntentionDetailsPage,
     );
     expect(app.platform.frameworkHandlesBack, isTrue);
@@ -295,12 +286,6 @@ const _rootPages = {
   AppDestination.dailyChoices: DailyChoiceCatalogPage,
   AppDestination.intentionGraph: IntentionCatalogPage,
 };
-
-final _titleFilter = find.byKey(const ValueKey('catalog-filter-field'));
-
-final _catalogList = find.byKey(
-  const PageStorageKey<String>('intention-catalog-list'),
-);
 
 /// Обмен приложения с платформой по системному «назад».
 final class _PlatformBack {
@@ -437,27 +422,6 @@ void _expectRootPage(
   expect(bar, findsOneWidget);
   expect(tester.widget<AppNavigationBar>(bar).selected, destination);
 }
-
-/// Позиция прокрутки выдачи каталога намерений.
-double _catalogOffset(WidgetTester tester) => tester
-    .state<ScrollableState>(
-      find
-          .descendant(of: _catalogList, matching: find.byType(Scrollable))
-          .first,
-    )
-    .position
-    .pixels;
-
-/// Названия построенных строк выдачи каталога намерений.
-List<String> _catalogRows(WidgetTester tester) => [
-  for (final row in tester.widgetList<IntentionSummaryView>(
-    find.descendant(
-      of: _catalogList,
-      matching: find.byType(IntentionSummaryView),
-    ),
-  ))
-    row.title,
-];
 
 /// Страница в дереве, включая невыбранную вкладку.
 Finder _built(Type page) => find.byType(page, skipOffstage: false);

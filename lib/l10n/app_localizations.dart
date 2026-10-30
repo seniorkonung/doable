@@ -626,36 +626,6 @@ abstract class AppLocalizations {
   /// **'Loading intentions…'**
   String get catalogLoading;
 
-  /// Подпись выбора охвата каталога
-  ///
-  /// In en, this message translates to:
-  /// **'Scope'**
-  String get catalogScopeLabel;
-
-  /// Охват активных намерений
-  ///
-  /// In en, this message translates to:
-  /// **'Active'**
-  String get catalogScopeActive;
-
-  /// Охват архивированных намерений
-  ///
-  /// In en, this message translates to:
-  /// **'Archived'**
-  String get catalogScopeArchived;
-
-  /// Охват всех существующих намерений
-  ///
-  /// In en, this message translates to:
-  /// **'All'**
-  String get catalogScopeAll;
-
-  /// Подпись поля фильтра каталога по названию
-  ///
-  /// In en, this message translates to:
-  /// **'Filter by title'**
-  String get catalogFilterLabel;
-
   /// Ошибка недопустимого Unicode в фильтре каталога
   ///
   /// In en, this message translates to:
@@ -667,66 +637,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Use no more than 255 characters.'**
   String get catalogFilterTooLong;
-
-  /// Подпись выбора порядка каталога
-  ///
-  /// In en, this message translates to:
-  /// **'Order'**
-  String get catalogOrderLabel;
-
-  /// Убывающий порядок по времени создания
-  ///
-  /// In en, this message translates to:
-  /// **'Created: newest first'**
-  String get catalogOrderCreatedNewest;
-
-  /// Возрастающий порядок по времени создания
-  ///
-  /// In en, this message translates to:
-  /// **'Created: oldest first'**
-  String get catalogOrderCreatedOldest;
-
-  /// Убывающий порядок по времени изменения
-  ///
-  /// In en, this message translates to:
-  /// **'Updated: newest first'**
-  String get catalogOrderUpdatedNewest;
-
-  /// Возрастающий порядок по времени изменения
-  ///
-  /// In en, this message translates to:
-  /// **'Updated: oldest first'**
-  String get catalogOrderUpdatedOldest;
-
-  /// Точное количество намерений в текущей выдаче
-  ///
-  /// In en, this message translates to:
-  /// **'Total intentions: {count}'**
-  String catalogTotalCount(int count);
-
-  /// Пустой каталог активных намерений
-  ///
-  /// In en, this message translates to:
-  /// **'No active intentions yet.'**
-  String get catalogActiveEmpty;
-
-  /// Пустой каталог архивированных намерений
-  ///
-  /// In en, this message translates to:
-  /// **'No archived intentions yet.'**
-  String get catalogArchivedEmpty;
-
-  /// Пустой каталог всех намерений
-  ///
-  /// In en, this message translates to:
-  /// **'No intentions yet.'**
-  String get catalogAllEmpty;
-
-  /// Успешная пустая выдача поиска намерений при действующих условиях по тегам
-  ///
-  /// In en, this message translates to:
-  /// **'No intentions match the tag conditions.'**
-  String get catalogTagConditionsEmpty;
 
   /// Устранимая недоступность первой страницы каталога
   ///
@@ -746,12 +656,6 @@ abstract class AppLocalizations {
   /// **'Intentions couldn’t be loaded because of an unexpected error.'**
   String get catalogUnexpectedFailure;
 
-  /// Загрузка следующей порции каталога
-  ///
-  /// In en, this message translates to:
-  /// **'Loading more intentions…'**
-  String get catalogLoadingMore;
-
   /// Устранимая недоступность следующей порции каталога
   ///
   /// In en, this message translates to:
@@ -769,30 +673,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'More intentions couldn’t be loaded because of an unexpected error.'**
   String get catalogLoadMoreUnexpected;
-
-  /// Признак готовности намерения к действию
-  ///
-  /// In en, this message translates to:
-  /// **'Ready for action'**
-  String get catalogReady;
-
-  /// Признак отсутствия готовности намерения к действию
-  ///
-  /// In en, this message translates to:
-  /// **'Not ready for action'**
-  String get catalogNotReady;
-
-  /// Признак наличия описания намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Has description'**
-  String get catalogHasDescription;
-
-  /// Признак отсутствия описания намерения
-  ///
-  /// In en, this message translates to:
-  /// **'No description'**
-  String get catalogNoDescription;
 
   /// Строка собственных тегов намерения в результате поиска; названия перечислены через запятую
   ///
@@ -2437,48 +2317,6 @@ abstract class AppLocalizations {
   /// **'Import and replace'**
   String get dataImportConfirm;
 
-  /// Текст чипа условия с надобностью «должен отсутствовать»
-  ///
-  /// In en, this message translates to:
-  /// **'not {tagName}'**
-  String intentionTagConditionAbsent(String tagName);
-
-  /// Семантика условия с надобностью «должен быть»
-  ///
-  /// In en, this message translates to:
-  /// **'{tagName}, must be present'**
-  String intentionTagConditionPresentSemantics(String tagName);
-
-  /// Семантика условия с надобностью «должен отсутствовать»
-  ///
-  /// In en, this message translates to:
-  /// **'{tagName}, must be absent'**
-  String intentionTagConditionAbsentSemantics(String tagName);
-
-  /// Назначение нажатия на чип условия
-  ///
-  /// In en, this message translates to:
-  /// **'Toggle requirement: must be present or must be absent'**
-  String get intentionTagConditionToggleHint;
-
-  /// Действие снятия условия по тегу
-  ///
-  /// In en, this message translates to:
-  /// **'Remove condition: {tagName}'**
-  String intentionTagConditionRemove(String tagName);
-
-  /// Подпись кнопки «+ Тег», открывающей выбор тега для условия поиска
-  ///
-  /// In en, this message translates to:
-  /// **'Tag'**
-  String get intentionTagConditionsAdd;
-
-  /// Семантика кнопки добавления условия по тегу
-  ///
-  /// In en, this message translates to:
-  /// **'Add tag condition'**
-  String get intentionTagConditionsAddSemantics;
-
   /// Заголовок панели тегов при выборе тегов намерения
   ///
   /// In en, this message translates to:
@@ -3736,6 +3574,12 @@ abstract class AppLocalizations {
   /// **'Open the page of intention {title}'**
   String intentionPickerOpenIntentionPage(String title);
 
+  /// Доступное название строки каталога, которая открывает страницу намерения; content — содержание строки
+  ///
+  /// In en, this message translates to:
+  /// **'Open: {content}'**
+  String intentionCatalogRowLabel(String content);
+
   /// Заголовок листа параметров показа поиска
   ///
   /// In en, this message translates to:
@@ -3771,6 +3615,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Back to the list'**
   String get intentionPickerPurposeSheetBack;
+
+  /// Название группы охвата в листе параметров показа каталога
+  ///
+  /// In en, this message translates to:
+  /// **'Show'**
+  String get intentionPickerScopeCaption;
+
+  /// Вариант активных намерений в строке и меню охвата листа параметров показа
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get intentionPickerScopeActive;
+
+  /// Вариант архивированных намерений в строке и меню охвата листа параметров показа
+  ///
+  /// In en, this message translates to:
+  /// **'Archived'**
+  String get intentionPickerScopeArchived;
+
+  /// Вариант активных и архивированных намерений в строке и меню охвата листа параметров показа
+  ///
+  /// In en, this message translates to:
+  /// **'All, archived included'**
+  String get intentionPickerScopeAll;
 
   /// Название группы типа намерения
   ///
@@ -3917,6 +3785,28 @@ abstract class AppLocalizations {
     String summary,
   );
 
+  /// Охват и тип словами в заголовке списка каталога намерений; значения select — имена IntentionScope и IntentionTypeChoice
+  ///
+  /// In en, this message translates to:
+  /// **'{scope, select, active{{type, select, all{Active} intentions{Active intentions} actions{Active actions} other{}}} archived{{type, select, all{Archived} intentions{Archived intentions} actions{Archived actions} other{}}} all{{type, select, all{All} intentions{All intentions} actions{All actions} other{}}} other{}}'**
+  String intentionPickerScopeHeader(String scope, String type);
+
+  /// Доступное название кнопки заголовка списка каталога до подтверждения количества
+  ///
+  /// In en, this message translates to:
+  /// **'Show and sort. Showing: {title}. Sorted by: {summary}.'**
+  String intentionPickerScopeHeaderLabel(String title, String summary);
+
+  /// Доступное название кнопки заголовка списка каталога с подтверждённым количеством
+  ///
+  /// In en, this message translates to:
+  /// **'Show and sort. Showing: {title}, {count}. Sorted by: {summary}.'**
+  String intentionPickerScopeHeaderCountLabel(
+    String title,
+    int count,
+    String summary,
+  );
+
   /// Заголовок выдачи поиска действия на экране выбора
   ///
   /// In en, this message translates to:
@@ -3964,6 +3854,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Show both types'**
   String get intentionPickerShowBothTypes;
+
+  /// Заголовок пустого выбранного типа в каталоге с открытым охватом, который называет охват; значения select — имена IntentionScope и IntentionTypeChoice
+  ///
+  /// In en, this message translates to:
+  /// **'{scope, select, active{{type, select, actions{No active actions} intentions{No active intentions} other{}}} archived{{type, select, actions{No actions in the archive} intentions{No intentions in the archive} other{}}} all{{type, select, actions{No actions yet} intentions{No intentions yet} other{}}} other{}}'**
+  String intentionPickerEmptyScopedTypeTitle(String scope, String type);
+
+  /// Текст пустого выбранного типа «Только действия» в каталоге с открытым охватом
+  ///
+  /// In en, this message translates to:
+  /// **'An intention marked as an action is shown here.'**
+  String get intentionPickerEmptyActionsText;
+
+  /// Текст пустого выбранного типа «Только намерения» в каталоге с открытым охватом
+  ///
+  /// In en, this message translates to:
+  /// **'Everything here is marked as an action.'**
+  String get intentionPickerEmptyIntentionsText;
+
+  /// Заголовок пустого активного охвата каталога, когда в архиве есть намерения
+  ///
+  /// In en, this message translates to:
+  /// **'No active intentions'**
+  String get intentionCatalogNoActiveTitle;
+
+  /// Текст пустого активного охвата каталога, когда в архиве есть намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Tap the plus below to create a new one. The Show row brings up the archived ones.'**
+  String get intentionCatalogNoActiveText;
+
+  /// Заголовок пустого каталога, когда намерений нет совсем
+  ///
+  /// In en, this message translates to:
+  /// **'No intentions yet'**
+  String get intentionCatalogNoIntentionsTitle;
+
+  /// Текст пустого каталога, когда намерений нет совсем
+  ///
+  /// In en, this message translates to:
+  /// **'Your intentions will appear here. Tap the plus below to create the first one.'**
+  String get intentionCatalogNoIntentionsText;
+
+  /// Заголовок пустого архивного охвата каталога
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing in the archive'**
+  String get intentionCatalogEmptyArchiveTitle;
+
+  /// Текст пустого архивного охвата каталога
+  ///
+  /// In en, this message translates to:
+  /// **'An intention you archive leaves the active list and stays here.'**
+  String get intentionCatalogEmptyArchiveText;
 
   /// Заголовок шапки экрана выбора действия
   ///

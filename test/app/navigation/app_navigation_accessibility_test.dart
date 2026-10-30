@@ -191,7 +191,7 @@ void main() {
       }
       expect(
         find.descendant(
-          of: _appBar(AppDestination.intentionGraph),
+          of: find.byType(IntentionCatalogPage),
           matching: find.text(names[AppDestination.intentionGraph]!),
         ),
         findsNothing,
@@ -257,12 +257,6 @@ Type _rootPage(AppDestination destination) => switch (destination) {
   AppDestination.dailyChoices => DailyChoiceCatalogPage,
   AppDestination.intentionGraph => IntentionCatalogPage,
 };
-
-/// Шапка корневой страницы пункта.
-Finder _appBar(AppDestination destination) => find.descendant(
-  of: find.byType(_rootPage(destination)),
-  matching: find.byType(AppBar),
-);
 
 /// Название пункта вместе с его положением среди трёх пунктов — так пункт
 /// объявляет экранный диктор.
@@ -378,9 +372,10 @@ void _expectWholeIcons(
   }
 }
 
-/// Дневные выборы открываются с календарём без шапки. Главная и граф
-/// показывают название пункта в шапке без обрезки по высоте, а экранный
-/// диктор получает его целиком.
+/// Дневные выборы открываются с календарём без заголовка страницы. Главная
+/// показывает название пункта в шапке, а граф — крупным заголовком страницы;
+/// название видно без обрезки по высоте, а экранный диктор получает его
+/// целиком.
 ///
 /// Material ограничивает масштаб заголовка шапки и сокращает многоточием
 /// заголовок, не помещающийся по ширине; квадратные глифы тестового шрифта
@@ -392,18 +387,23 @@ void _expectRootContent(
   AppDestination destination,
 ) {
   final name = names[destination]!;
-  final appBar = _appBar(destination);
+  final page = find.byType(_rootPage(destination));
+  final appBar = find.descendant(of: page, matching: find.byType(AppBar));
   if (destination == AppDestination.dailyChoices) {
     expect(appBar, findsNothing);
     expect(find.text(name), findsNothing);
     expect(find.byType(DailyChoiceCalendar), findsOneWidget);
     return;
   }
-  final title = find.descendant(of: appBar, matching: find.text(name));
+  final title = find.descendant(of: page, matching: find.text(name));
   expect(title, findsOneWidget);
   final rect = tester.getRect(title);
   expect(rect.isEmpty, isFalse);
-  for (final container in [tester.getRect(appBar), Offset.zero & _screen]) {
+  // Заголовок страницы графа стоит на самой странице, а не в шапке.
+  final titleArea = destination == AppDestination.intentionGraph
+      ? page
+      : appBar;
+  for (final container in [tester.getRect(titleArea), Offset.zero & _screen]) {
     expect(
       container.contains(rect.topLeft) &&
           container.contains(rect.bottomRight - const Offset(0.1, 0.1)),
@@ -411,7 +411,10 @@ void _expectRootContent(
       reason: 'заголовок $destination обрезан: $rect вне $container',
     );
   }
-  expect(tester.getSemantics(title), isSemantics(label: name, isHeader: true));
+  expect(
+    tester.getSemantics(title),
+    isSemantics(label: name, isHeader: true, namesRoute: true),
+  );
 }
 
 /// Значки панели слева направо вместе с их положением.
