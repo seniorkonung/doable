@@ -1,12 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../../application/intention_catalog.dart';
-import '../../domain/intention_id.dart';
+import '../search/results_scroll_keeper.dart';
 import 'intention_catalog_purpose.dart';
 import 'intention_catalog_state.dart';
 import 'intention_catalog_status_views.dart';
@@ -37,10 +36,9 @@ typedef IntentionSearchResultBuilder = Widget Function(
 
 /// Выдача поиска намерений назначения [purpose].
 ///
-/// Элемент один владеет прокруткой списка и переходом к верхней позиции в
-/// начале новой выдачи. При обновлении выдачи без смены параметров поиска
-/// элемент сохраняет экранное положение видимого намерения, а если оно исчезло
-/// из выдачи — ближайшего соседа. Страница передаёт состояние выдачи своего назначения
+/// Место в списке держит [ResultsScrollKeeper]: новая выдача начинается с
+/// верхней позиции, а обновление выдачи без смены параметров поиска сохраняет
+/// видимое намерение на экране. Страница передаёт состояние выдачи своего назначения
 /// и построение своих строк; элемент не читает граф, не выполняет команд и
 /// не меняет условия поиска.
 final class IntentionSearchResults extends ConsumerStatefulWidget {
@@ -92,19 +90,10 @@ final class IntentionSearchResults extends ConsumerStatefulWidget {
 
 final class _IntentionSearchResultsState
     extends ConsumerState<IntentionSearchResults> {
-  final _scrollController = ScrollController();
-  final _itemKeys = <IntentionId, GlobalKey>{};
+  late final ResultsScrollKeeper _scrollKeeper;
 
   /// Сохранённое смещение списка выдачи между его показами.
   var _listStorage = PageStorageBucket();
-
-  /// Запрос последней подтверждённой выдачи. Модель сохраняет его объект,
-  /// пока согласует и продолжает ту же выдачу, а каждое чтение первой порции —
-  /// после смены параметров, повтора или удаления исключённого тега — несёт
-  /// новый запрос.
-  IntentionCatalogQuery? _query;
-  _VisualAnchor? _pendingVisualAnchor;
-  bool _maintenanceScheduled = false;
 
   IntentionCatalogViewModel get _notifier =>
       ref.read(intentionCatalogViewModelProvider(widget.purpose).notifier);
@@ -114,24 +103,18 @@ final class _IntentionSearchResultsState
     super.initState();
     // База не ждёт первого уведомления модели: иначе первая новая выдача
     // после уже загруженной сама стала бы базой и не началась бы с верхней
-    // позиции.
-    _query = _confirmedQuery(widget.catalog);
-  }
-
-  @override
-  void didUpdateWidget(IntentionSearchResults oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.purpose != widget.purpose) {
-      // Выдача другого назначения не наследует ни позицию, ни якорь.
-      _query = _confirmedQuery(widget.catalog);
-      _pendingVisualAnchor = null;
-      _listStorage = PageStorageBucket();
-    }
+    // позиции. Список снимается с экрана загрузкой и пустой выдачей:
+    // смещение той же выдачи возвращается из [_listStorage], когда список
+    // показан снова.
+    _scrollKeeper = ResultsScrollKeeper(
+      shown: () => widget.catalog,
+      keepScrollOffset: true,
+    );
   }
 
   @override
   void dispose() {
-    _scrollController.dispose();
+    _scrollKeeper.dispose();
     super.dispose();
   }
 
@@ -190,7 +173,7 @@ final class _IntentionSearchResultsState
         results.continuation is! IntentionCatalogContinuationIdle;
     final list = ListView.builder(
       key: widget.listKey,
-      controller: _scrollController,
+      controller: _scrollKeeper.controller,
       padding: EdgeInsets.zero,
       itemCount: results.items.length + (hasContinuationStatus ? 1 : 0),
       itemBuilder: (context, index) {
@@ -203,7 +186,7 @@ final class _IntentionSearchResultsState
         _requestNextPage(index);
         final summary = results.items[index];
         return KeyedSubtree(
-          key: _itemKeyFor(summary.id),
+          key: _scrollKeeper.keyFor(summary.id),
           child: widget.itemBuilder(context, results, summary),
         );
       },
@@ -232,238 +215,15 @@ final class _IntentionSearchResultsState
     });
   }
 
-  static IntentionCatalogQuery? _confirmedQuery(
-    AsyncValue<IntentionCatalogState> catalog,
-  ) => switch (catalog.value) {
-    IntentionCatalogConfirmedState(:final query) => query,
-    _ => null,
-  };
-
   void _handleCatalogStateChanged(
     AsyncValue<IntentionCatalogState>? previous,
     AsyncValue<IntentionCatalogState> next,
   ) {
-    // Модель публикует каждую выдачу, в том числе когда список до неё не был
-    // показан.
-    final query = _confirmedQuery(next);
-    if (query != null && !identical(query, _query)) {
-      final startsNewResults = _query != null;
-      _query = query;
-      if (startsNewResults) {
-        _startFromTop();
-      }
-    }
-
-    final previousState = previous?.value;
-    final nextState = next.value;
-    if (nextState is! IntentionCatalogLoaded) {
-      return;
-    }
-    if (_pendingVisualAnchor == null &&
-        previousState is IntentionCatalogLoaded &&
-        identical(previousState.query, nextState.query) &&
-        _layoutChanged(previousState.items, nextState.items)) {
-      _pendingVisualAnchor = _captureVisualAnchor(previousState);
-    }
-    _scheduleMaintenance();
-  }
-
-  void _startFromTop() {
-    // Новая выдача начинается с верхней позиции: отложенный якорь прежней
-    // выдачи больше не действует.
-    _pendingVisualAnchor = null;
-    // Список снят с экрана загрузкой или пустой выдачей: сохранённое смещение
-    // прежней выдачи вернулось бы вместе с ним. Новое хранилище не переносит
-    // его в новую выдачу.
-    setState(() => _listStorage = PageStorageBucket());
-    if (_scrollController.hasClients) {
-      _scrollController.jumpTo(0);
+    if (_scrollKeeper.onCatalogChanged(previous, next)) {
+      // Список снят с экрана загрузкой или пустой выдачей: сохранённое
+      // смещение прежней выдачи вернулось бы вместе с ним. Новое хранилище
+      // не переносит его в новую выдачу.
+      setState(() => _listStorage = PageStorageBucket());
     }
   }
-
-  GlobalKey _itemKeyFor(IntentionId id) =>
-      _itemKeys.putIfAbsent(id, () => GlobalKey());
-
-  bool _layoutChanged(
-    List<IntentionSummary> previous,
-    List<IntentionSummary> next,
-  ) {
-    if (previous.length != next.length) {
-      return true;
-    }
-    for (var index = 0; index < previous.length; index++) {
-      if (!identical(previous[index], next[index])) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  _VisualAnchor? _captureVisualAnchor(IntentionCatalogLoaded state) {
-    if (!_scrollController.hasClients) {
-      return null;
-    }
-    final items = state.items;
-    final currentOffset = _scrollController.position.pixels;
-    for (var index = 0; index < items.length; index++) {
-      final extent = _builtItemExtent(items[index].id);
-      if (extent == null) {
-        continue;
-      }
-      if (extent.start <= currentOffset && extent.end > currentOffset) {
-        return _VisualAnchor(
-          query: state.query,
-          candidateIds: [
-            items[index].id,
-            if (index + 1 < items.length) items[index + 1].id,
-            if (index > 0) items[index - 1].id,
-          ],
-          offsetWithinItem: currentOffset - extent.start,
-          remainingApproaches: _VisualAnchor.maxApproaches,
-        );
-      }
-    }
-    return null;
-  }
-
-  void _scheduleMaintenance() {
-    if (_maintenanceScheduled) {
-      return;
-    }
-    _maintenanceScheduled = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _maintenanceScheduled = false;
-      if (!mounted) {
-        return;
-      }
-      _restoreVisualAnchor();
-      _pruneItemKeys();
-    });
-  }
-
-  void _restoreVisualAnchor() {
-    final anchor = _pendingVisualAnchor;
-    _pendingVisualAnchor = null;
-    final state = widget.catalog.value;
-    if (anchor == null ||
-        !_scrollController.hasClients ||
-        state is! IntentionCatalogLoaded ||
-        !identical(state.query, anchor.query)) {
-      return;
-    }
-
-    final targetIndex = _anchorTargetIndex(anchor, state.items);
-    if (targetIndex == null) {
-      return;
-    }
-    final position = _scrollController.position;
-    final exact = _builtItemExtent(state.items[targetIndex].id);
-    if (exact != null) {
-      _jumpWithinExtent(position, exact.start + anchor.offsetWithinItem);
-      return;
-    }
-
-    // Много строк, вставленных или удалённых перед якорем, уводят его за
-    // пределы построенной области списка. Сначала приближаемся к нему по
-    // размеру построенных строк, а точное положение восстанавливаем в
-    // следующем кадре, когда якорь уже построен.
-    final estimate = _estimateItemStart(state.items, targetIndex);
-    if (estimate == null || anchor.remainingApproaches == 0) {
-      return;
-    }
-    _jumpWithinExtent(position, estimate + anchor.offsetWithinItem);
-    _pendingVisualAnchor = anchor.afterApproach();
-    _scheduleMaintenance();
-  }
-
-  int? _anchorTargetIndex(_VisualAnchor anchor, List<IntentionSummary> items) {
-    for (final id in anchor.candidateIds) {
-      final index = items.indexWhere((item) => item.id == id);
-      if (index >= 0) {
-        return index;
-      }
-    }
-    return null;
-  }
-
-  double? _estimateItemStart(List<IntentionSummary> items, int targetIndex) {
-    ({int index, _ItemExtent extent})? first;
-    ({int index, _ItemExtent extent})? last;
-    for (var index = 0; index < items.length; index++) {
-      final extent = _builtItemExtent(items[index].id);
-      if (extent == null) {
-        continue;
-      }
-      first ??= (index: index, extent: extent);
-      last = (index: index, extent: extent);
-    }
-    if (first == null || last == null) {
-      return null;
-    }
-    final averageExtent =
-        (last.extent.end - first.extent.start) / (last.index - first.index + 1);
-    if (targetIndex > last.index) {
-      return last.extent.end + (targetIndex - last.index - 1) * averageExtent;
-    }
-    return first.extent.start - (first.index - targetIndex) * averageExtent;
-  }
-
-  _ItemExtent? _builtItemExtent(IntentionId id) {
-    final renderObject = _itemKeys[id]?.currentContext?.findRenderObject();
-    if (renderObject == null || !renderObject.attached) {
-      return null;
-    }
-    final viewport = RenderAbstractViewport.maybeOf(renderObject);
-    if (viewport == null) {
-      return null;
-    }
-    final revealed = viewport.getOffsetToReveal(renderObject, 0);
-    return (
-      start: revealed.offset,
-      end: revealed.offset + revealed.rect.height,
-    );
-  }
-
-  void _jumpWithinExtent(ScrollPosition position, double target) {
-    position.jumpTo(
-      target.clamp(position.minScrollExtent, position.maxScrollExtent),
-    );
-  }
-
-  void _pruneItemKeys() {
-    final state = widget.catalog.value;
-    if (state is! IntentionCatalogLoaded) {
-      return;
-    }
-    final currentIds = state.items.map((item) => item.id).toSet();
-    _itemKeys.removeWhere((id, _) => !currentIds.contains(id));
-  }
-}
-
-/// Положение строки в прокручиваемой области списка.
-typedef _ItemExtent = ({double start, double end});
-
-final class _VisualAnchor {
-  const _VisualAnchor({
-    required this.query,
-    required this.candidateIds,
-    required this.offsetWithinItem,
-    required this.remainingApproaches,
-  });
-
-  /// Предел кадров приближения к якорю за пределами построенной области.
-  static const maxApproaches = 3;
-
-  /// Якорь действует только для выдачи того же запроса.
-  final IntentionCatalogQuery query;
-  final List<IntentionId> candidateIds;
-  final double offsetWithinItem;
-  final int remainingApproaches;
-
-  _VisualAnchor afterApproach() => _VisualAnchor(
-    query: query,
-    candidateIds: candidateIds,
-    offsetWithinItem: offsetWithinItem,
-    remainingApproaches: remainingApproaches - 1,
-  );
 }

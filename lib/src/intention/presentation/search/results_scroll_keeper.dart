@@ -1,0 +1,290 @@
+import 'package:flutter/rendering.dart';
+import 'package:flutter/widgets.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../application/intention_catalog.dart';
+import '../../domain/intention_id.dart';
+import '../catalog/intention_catalog_state.dart';
+
+/// Хранитель места в списке выдачи поиска намерений.
+///
+/// Владеет прокруткой списка и ключами его строк. Новая выдача начинается с
+/// верхней позиции. При обновлении выдачи без смены параметров поиска
+/// хранитель сохраняет экранное положение видимого намерения, а если оно
+/// исчезло из выдачи — ближайшего соседа.
+///
+/// Выдача сообщает хранителю каждое состояние модели через [onCatalogChanged]
+/// из `ref.listen`, до перестройки списка, и оборачивает каждую строку в
+/// [KeyedSubtree] с ключом [keyFor].
+final class ResultsScrollKeeper {
+  /// [shown] возвращает выдачу, по которой построен список; первая новая
+  /// выдача после показанной при создании начнётся с верхней позиции.
+  /// [keepScrollOffset] передаётся контроллеру прокрутки: сохранять ли
+  /// смещение в [PageStorage].
+  ResultsScrollKeeper({
+    required AsyncValue<IntentionCatalogState> Function() shown,
+    required bool keepScrollOffset,
+  }) : controller = ScrollController(keepScrollOffset: keepScrollOffset),
+       _shown = shown,
+       _query = _confirmedQuery(shown().value);
+
+  final ScrollController controller;
+
+  /// Выдача, по которой построен список. Она может отставать от модели:
+  /// скрытая страница не перестраивается, пока её снова не покажут, и после
+  /// кадра якорь ищется среди построенных строк.
+  final AsyncValue<IntentionCatalogState> Function() _shown;
+
+  final _itemKeys = <IntentionId, GlobalKey>{};
+
+  /// Запрос последней подтверждённой выдачи. Модель сохраняет его объект,
+  /// пока согласует и продолжает ту же выдачу, а каждое чтение первой порции —
+  /// после смены параметров, повтора или удаления исключённого тега — несёт
+  /// новый запрос.
+  IntentionCatalogQuery? _query;
+  _VisualAnchor? _pendingVisualAnchor;
+  bool _maintenanceScheduled = false;
+  bool _disposed = false;
+
+  /// Ключ строки намерения [id].
+  GlobalKey keyFor(IntentionId id) =>
+      _itemKeys.putIfAbsent(id, () => GlobalKey());
+
+  /// Учитывает переход модели от [previous] к [next].
+  ///
+  /// Возвращает, началась ли новая выдача: тогда список уже переведён к
+  /// верхней позиции, если он показан.
+  bool onCatalogChanged(
+    AsyncValue<IntentionCatalogState>? previous,
+    AsyncValue<IntentionCatalogState> next,
+  ) {
+    final nextState = next.value;
+    // Модель публикует каждую выдачу, в том числе когда список до неё не был
+    // показан.
+    var startsNewResults = false;
+    final query = _confirmedQuery(nextState);
+    if (query != null && !identical(query, _query)) {
+      startsNewResults = _query != null;
+      _query = query;
+      if (startsNewResults) {
+        _startFromTop();
+      }
+    }
+
+    final previousState = previous?.value;
+    if (nextState is! IntentionCatalogLoaded) {
+      return startsNewResults;
+    }
+    if (_pendingVisualAnchor == null &&
+        previousState is IntentionCatalogLoaded &&
+        identical(previousState.query, nextState.query) &&
+        _layoutChanged(previousState.items, nextState.items)) {
+      _pendingVisualAnchor = _captureVisualAnchor(previousState);
+    }
+    _scheduleMaintenance();
+    return startsNewResults;
+  }
+
+  void dispose() {
+    _disposed = true;
+    controller.dispose();
+  }
+
+  static IntentionCatalogQuery? _confirmedQuery(IntentionCatalogState? state) =>
+      switch (state) {
+        IntentionCatalogConfirmedState(:final query) => query,
+        _ => null,
+      };
+
+  void _startFromTop() {
+    // Новая выдача начинается с верхней позиции: отложенный якорь прежней
+    // выдачи больше не действует.
+    _pendingVisualAnchor = null;
+    if (controller.hasClients) {
+      controller.jumpTo(0);
+    }
+  }
+
+  bool _layoutChanged(
+    List<IntentionSummary> previous,
+    List<IntentionSummary> next,
+  ) {
+    if (previous.length != next.length) {
+      return true;
+    }
+    for (var index = 0; index < previous.length; index++) {
+      if (!identical(previous[index], next[index])) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  _VisualAnchor? _captureVisualAnchor(IntentionCatalogLoaded state) {
+    if (!controller.hasClients) {
+      return null;
+    }
+    final items = state.items;
+    final currentOffset = controller.position.pixels;
+    for (var index = 0; index < items.length; index++) {
+      final extent = _builtItemExtent(items[index].id);
+      if (extent == null) {
+        continue;
+      }
+      if (extent.start <= currentOffset && extent.end > currentOffset) {
+        return _VisualAnchor(
+          query: state.query,
+          candidateIds: [
+            items[index].id,
+            if (index + 1 < items.length) items[index + 1].id,
+            if (index > 0) items[index - 1].id,
+          ],
+          offsetWithinItem: currentOffset - extent.start,
+          remainingApproaches: _VisualAnchor.maxApproaches,
+        );
+      }
+    }
+    return null;
+  }
+
+  void _scheduleMaintenance() {
+    if (_maintenanceScheduled) {
+      return;
+    }
+    _maintenanceScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _maintenanceScheduled = false;
+      if (_disposed) {
+        return;
+      }
+      _restoreVisualAnchor();
+      _pruneItemKeys();
+    });
+  }
+
+  void _restoreVisualAnchor() {
+    final anchor = _pendingVisualAnchor;
+    _pendingVisualAnchor = null;
+    final state = _shown().value;
+    if (anchor == null ||
+        !controller.hasClients ||
+        state is! IntentionCatalogLoaded ||
+        !identical(state.query, anchor.query)) {
+      return;
+    }
+
+    final targetIndex = _anchorTargetIndex(anchor, state.items);
+    if (targetIndex == null) {
+      return;
+    }
+    final position = controller.position;
+    final exact = _builtItemExtent(state.items[targetIndex].id);
+    if (exact != null) {
+      _jumpWithinExtent(position, exact.start + anchor.offsetWithinItem);
+      return;
+    }
+
+    // Много строк, вставленных или удалённых перед якорем, уводят его за
+    // пределы построенной области списка. Сначала приближаемся к нему по
+    // размеру построенных строк, а точное положение восстанавливаем в
+    // следующем кадре, когда якорь уже построен.
+    final estimate = _estimateItemStart(state.items, targetIndex);
+    if (estimate == null || anchor.remainingApproaches == 0) {
+      return;
+    }
+    _jumpWithinExtent(position, estimate + anchor.offsetWithinItem);
+    _pendingVisualAnchor = anchor.afterApproach();
+    _scheduleMaintenance();
+  }
+
+  int? _anchorTargetIndex(_VisualAnchor anchor, List<IntentionSummary> items) {
+    for (final id in anchor.candidateIds) {
+      final index = items.indexWhere((item) => item.id == id);
+      if (index >= 0) {
+        return index;
+      }
+    }
+    return null;
+  }
+
+  double? _estimateItemStart(List<IntentionSummary> items, int targetIndex) {
+    ({int index, _ItemExtent extent})? first;
+    ({int index, _ItemExtent extent})? last;
+    for (var index = 0; index < items.length; index++) {
+      final extent = _builtItemExtent(items[index].id);
+      if (extent == null) {
+        continue;
+      }
+      first ??= (index: index, extent: extent);
+      last = (index: index, extent: extent);
+    }
+    if (first == null || last == null) {
+      return null;
+    }
+    final averageExtent =
+        (last.extent.end - first.extent.start) / (last.index - first.index + 1);
+    if (targetIndex > last.index) {
+      return last.extent.end + (targetIndex - last.index - 1) * averageExtent;
+    }
+    return first.extent.start - (first.index - targetIndex) * averageExtent;
+  }
+
+  _ItemExtent? _builtItemExtent(IntentionId id) {
+    final renderObject = _itemKeys[id]?.currentContext?.findRenderObject();
+    if (renderObject == null || !renderObject.attached) {
+      return null;
+    }
+    final viewport = RenderAbstractViewport.maybeOf(renderObject);
+    if (viewport == null) {
+      return null;
+    }
+    final revealed = viewport.getOffsetToReveal(renderObject, 0);
+    return (
+      start: revealed.offset,
+      end: revealed.offset + revealed.rect.height,
+    );
+  }
+
+  void _jumpWithinExtent(ScrollPosition position, double target) {
+    position.jumpTo(
+      target.clamp(position.minScrollExtent, position.maxScrollExtent),
+    );
+  }
+
+  void _pruneItemKeys() {
+    final state = _shown().value;
+    if (state is! IntentionCatalogLoaded) {
+      return;
+    }
+    final currentIds = state.items.map((item) => item.id).toSet();
+    _itemKeys.removeWhere((id, _) => !currentIds.contains(id));
+  }
+}
+
+/// Положение строки в прокручиваемой области списка.
+typedef _ItemExtent = ({double start, double end});
+
+final class _VisualAnchor {
+  const _VisualAnchor({
+    required this.query,
+    required this.candidateIds,
+    required this.offsetWithinItem,
+    required this.remainingApproaches,
+  });
+
+  /// Предел кадров приближения к якорю за пределами построенной области.
+  static const maxApproaches = 3;
+
+  /// Якорь действует только для выдачи того же запроса.
+  final IntentionCatalogQuery query;
+  final List<IntentionId> candidateIds;
+  final double offsetWithinItem;
+  final int remainingApproaches;
+
+  _VisualAnchor afterApproach() => _VisualAnchor(
+    query: query,
+    candidateIds: candidateIds,
+    offsetWithinItem: offsetWithinItem,
+    remainingApproaches: remainingApproaches - 1,
+  );
+}
