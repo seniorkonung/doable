@@ -186,7 +186,7 @@
       - порции с числами в `test/intention/presentation/catalog/intention_catalog_view_model_test.dart`, `intention_catalog_mutation_reconciliation_test.dart`, `test/intention/presentation/picker/` и `test/intention/presentation/search/show_and_sort_sheet_test.dart` переходят на новый тип.
   - **Размер:** M.
 
-- [ ] 2.2 Измерить бенчмарком первую порцию активного охвата с матрицей чисел охватов и типов рядом с подсчётом только общего количества
+- [x] 2.2 Измерить бенчмарком первую порцию активного охвата с матрицей чисел охватов и типов рядом с подсчётом только общего количества
   - **Критерии приёмки:**
     - Бенчмарк каталога намерений получает случаи `intentionCatalog/active/counting/totalOnly/firstPage` и `intentionCatalog/active/counting/byScopeAndType/firstPage`. Они измеряют первую порцию активного охвата без фильтров на прежнем наборе из 50 000 намерений, половина которых в архиве, и сравнивают её с бюджетом 100 мс.
     - Случаи проверяют результат: общее количество 25 000, а матрица — 25 000 активных и 25 000 архивных намерений без действий.
