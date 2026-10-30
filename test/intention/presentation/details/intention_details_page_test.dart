@@ -36,6 +36,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/app_root_pages.dart';
+import '../../../support/intention_catalog_controls.dart';
 import '../../../support/intention_options.dart';
 import '../../../support/ordinary_page_test_app.dart';
 import '../../../support/tag_positions.dart';
@@ -352,9 +353,7 @@ void main() {
     await tester.pumpAndSettle();
     await openIntentionGraph(tester);
 
-    await tester.tap(find.byKey(const ValueKey('catalog-scope-control')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Archived').last);
+    await selectIntentionCatalogScope(tester, IntentionScope.archived);
     await tester.pumpAndSettle();
     expect(repository.catalogQueries.last.scope, IntentionScope.archived);
 

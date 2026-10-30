@@ -339,7 +339,7 @@
   - **Предполагаемые файлы:** `test/app/intention_tag_search_app_flow_test.dart`, `test/app/tag_app_flow_test.dart`, `test/app/tag_assignment_app_flow_test.dart`, `test/tag/presentation/tag_accessibility_test.dart`.
   - **Размер:** M.
 
-- [ ] 3.6 Провести через общие шаги каталога сценарии связей и жизненного цикла намерений
+- [x] 3.6 Провести через общие шаги каталога сценарии связей и жизненного цикла намерений
   - **Критерии приёмки:**
     - `long_term_relation_app_flow_test.dart` находит строки каталога `intentionCatalogRow`, а не `IntentionSummaryView`.
     - `intention_app_lifecycle_test.dart` и `intention_details_page_test.dart` выбирают охват `selectIntentionCatalogScope` со значением `IntentionScope`, а не подписью и ключом. Локального `_selectScope` нет.
