@@ -130,3 +130,18 @@
   - **Зависимости:** 1.6.
   - **Предполагаемые файлы:** `test/app/navigation/app_shell_pages_above_test.dart`.
   - **Размер:** XS.
+
+- [ ] 1.10 Удерживать первую видимую строку выдачи, когда подтверждённая операция меняет строки перед ней, пока поиск закрыт страницей поверх него
+  - **Критерии приёмки:**
+    - Если подтверждённая операция меняет строки перед видимой, пока поиск закрыт страницей поверх него, после возврата на экране стоит та же первая видимая строка или, если её больше нет в выдаче, ближайший оставшийся сосед. Её место определено по выдаче, которая реально построена и разложена.
+    - `ResultsScrollKeeper` не расходует запомненный якорь и не восстанавливает место по устаревшей выдаче `_shown()`: у скрытой страницы `ref.watch` стоит на паузе, поэтому список не перестраивается, а `ref.listen` продолжает вызывать хранителя. Якорь хранится, пока список не перестроится по актуальной выдаче, и применяется только после этого. Перестройка при возврате запускает восстановление.
+    - Новая выдача (новый объект запроса) по-прежнему сбрасывает якорь и начинается с верхней позиции, в том числе перезапуск поиска участника по требованию «Отметка занятой пары в поиске участника».
+    - Исправление работает для обоих потребителей хранителя: `IntentionSearchList` и `IntentionSearchResults`.
+    - Регрессионная проверка в `test/intention/presentation/search/intention_search_list_test.dart`: список закрыт непрозрачной страницей навигатора, изменение меняет строки перед видимой, а после возврата эта строка на месте. Без исправления проверка падает.
+    - Спецификации не меняются, ветка `change/redesign-intention-catalog` не меняется.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/search test/intention/presentation/catalog/intention_search_results_test.dart test/intention/presentation/picker test/long_term_relation/presentation/participant_picker`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `lib/src/intention/presentation/search/results_scroll_keeper.dart`, `lib/src/intention/presentation/search/intention_search_list.dart`, `lib/src/intention/presentation/catalog/intention_search_results.dart`, `test/intention/presentation/search/intention_search_list_test.dart`.
+  - **Размер:** S.
