@@ -412,59 +412,11 @@ class AppLocalizationsRu extends AppLocalizations {
   String get catalogLoading => 'Загружаем намерения…';
 
   @override
-  String get catalogScopeLabel => 'Охват';
-
-  @override
-  String get catalogScopeActive => 'Активные';
-
-  @override
-  String get catalogScopeArchived => 'Архивные';
-
-  @override
-  String get catalogScopeAll => 'Все';
-
-  @override
-  String get catalogFilterLabel => 'Фильтр по названию';
-
-  @override
   String get catalogFilterInvalidUnicode =>
       'Введите корректный Unicode-текст без NUL.';
 
   @override
   String get catalogFilterTooLong => 'Используйте не более 255 символов.';
-
-  @override
-  String get catalogOrderLabel => 'Порядок';
-
-  @override
-  String get catalogOrderCreatedNewest => 'По созданию: сначала новые';
-
-  @override
-  String get catalogOrderCreatedOldest => 'По созданию: сначала старые';
-
-  @override
-  String get catalogOrderUpdatedNewest => 'По изменению: сначала новые';
-
-  @override
-  String get catalogOrderUpdatedOldest => 'По изменению: сначала старые';
-
-  @override
-  String catalogTotalCount(int count) {
-    return 'Всего намерений: $count';
-  }
-
-  @override
-  String get catalogActiveEmpty => 'Активных намерений пока нет.';
-
-  @override
-  String get catalogArchivedEmpty => 'Архивных намерений пока нет.';
-
-  @override
-  String get catalogAllEmpty => 'Намерений пока нет.';
-
-  @override
-  String get catalogTagConditionsEmpty =>
-      'По условиям по тегам совпадений нет.';
 
   @override
   String get catalogUnavailable =>
@@ -479,9 +431,6 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось загрузить намерения из-за непредвиденной ошибки.';
 
   @override
-  String get catalogLoadingMore => 'Загружаем ещё намерения…';
-
-  @override
   String get catalogLoadMoreUnavailable =>
       'Не удалось загрузить следующие намерения.';
 
@@ -492,18 +441,6 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get catalogLoadMoreUnexpected =>
       'Не удалось загрузить следующие намерения из-за непредвиденной ошибки.';
-
-  @override
-  String get catalogReady => 'Готово к действию';
-
-  @override
-  String get catalogNotReady => 'Не готово к действию';
-
-  @override
-  String get catalogHasDescription => 'Есть описание';
-
-  @override
-  String get catalogNoDescription => 'Нет описания';
 
   @override
   String intentionSummaryTags(String tags) {
@@ -1623,36 +1560,6 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get dataImportConfirm => 'Импортировать и заменить';
-
-  @override
-  String intentionTagConditionAbsent(String tagName) {
-    return 'не $tagName';
-  }
-
-  @override
-  String intentionTagConditionPresentSemantics(String tagName) {
-    return '$tagName, должен быть';
-  }
-
-  @override
-  String intentionTagConditionAbsentSemantics(String tagName) {
-    return '$tagName, должен отсутствовать';
-  }
-
-  @override
-  String get intentionTagConditionToggleHint =>
-      'Переключить надобность: должен быть или должен отсутствовать';
-
-  @override
-  String intentionTagConditionRemove(String tagName) {
-    return 'Снять условие: $tagName';
-  }
-
-  @override
-  String get intentionTagConditionsAdd => 'Тег';
-
-  @override
-  String get intentionTagConditionsAddSemantics => 'Добавить условие по тегу';
 
   @override
   String get tagsPanelTitle => 'Теги';

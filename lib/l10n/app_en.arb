@@ -240,26 +240,6 @@
   "@catalogLoading": {
     "description": "Начальная загрузка каталога намерений"
   },
-  "catalogScopeLabel": "Scope",
-  "@catalogScopeLabel": {
-    "description": "Подпись выбора охвата каталога"
-  },
-  "catalogScopeActive": "Active",
-  "@catalogScopeActive": {
-    "description": "Охват активных намерений"
-  },
-  "catalogScopeArchived": "Archived",
-  "@catalogScopeArchived": {
-    "description": "Охват архивированных намерений"
-  },
-  "catalogScopeAll": "All",
-  "@catalogScopeAll": {
-    "description": "Охват всех существующих намерений"
-  },
-  "catalogFilterLabel": "Filter by title",
-  "@catalogFilterLabel": {
-    "description": "Подпись поля фильтра каталога по названию"
-  },
   "catalogFilterInvalidUnicode": "Enter valid Unicode text without NUL.",
   "@catalogFilterInvalidUnicode": {
     "description": "Ошибка недопустимого Unicode в фильтре каталога"
@@ -267,51 +247,6 @@
   "catalogFilterTooLong": "Use no more than 255 characters.",
   "@catalogFilterTooLong": {
     "description": "Ошибка превышения длины фильтра каталога"
-  },
-  "catalogOrderLabel": "Order",
-  "@catalogOrderLabel": {
-    "description": "Подпись выбора порядка каталога"
-  },
-  "catalogOrderCreatedNewest": "Created: newest first",
-  "@catalogOrderCreatedNewest": {
-    "description": "Убывающий порядок по времени создания"
-  },
-  "catalogOrderCreatedOldest": "Created: oldest first",
-  "@catalogOrderCreatedOldest": {
-    "description": "Возрастающий порядок по времени создания"
-  },
-  "catalogOrderUpdatedNewest": "Updated: newest first",
-  "@catalogOrderUpdatedNewest": {
-    "description": "Убывающий порядок по времени изменения"
-  },
-  "catalogOrderUpdatedOldest": "Updated: oldest first",
-  "@catalogOrderUpdatedOldest": {
-    "description": "Возрастающий порядок по времени изменения"
-  },
-  "catalogTotalCount": "Total intentions: {count}",
-  "@catalogTotalCount": {
-    "description": "Точное количество намерений в текущей выдаче",
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "catalogActiveEmpty": "No active intentions yet.",
-  "@catalogActiveEmpty": {
-    "description": "Пустой каталог активных намерений"
-  },
-  "catalogArchivedEmpty": "No archived intentions yet.",
-  "@catalogArchivedEmpty": {
-    "description": "Пустой каталог архивированных намерений"
-  },
-  "catalogAllEmpty": "No intentions yet.",
-  "@catalogAllEmpty": {
-    "description": "Пустой каталог всех намерений"
-  },
-  "catalogTagConditionsEmpty": "No intentions match the tag conditions.",
-  "@catalogTagConditionsEmpty": {
-    "description": "Успешная пустая выдача поиска намерений при действующих условиях по тегам"
   },
   "catalogUnavailable": "Intentions couldn’t be loaded. Try again.",
   "@catalogUnavailable": {
@@ -325,10 +260,6 @@
   "@catalogUnexpectedFailure": {
     "description": "Терминальное состояние непредвиденной ошибки каталога"
   },
-  "catalogLoadingMore": "Loading more intentions…",
-  "@catalogLoadingMore": {
-    "description": "Загрузка следующей порции каталога"
-  },
   "catalogLoadMoreUnavailable": "More intentions couldn’t be loaded.",
   "@catalogLoadMoreUnavailable": {
     "description": "Устранимая недоступность следующей порции каталога"
@@ -340,22 +271,6 @@
   "catalogLoadMoreUnexpected": "More intentions couldn’t be loaded because of an unexpected error.",
   "@catalogLoadMoreUnexpected": {
     "description": "Терминальная непредвиденная ошибка следующей порции"
-  },
-  "catalogReady": "Ready for action",
-  "@catalogReady": {
-    "description": "Признак готовности намерения к действию"
-  },
-  "catalogNotReady": "Not ready for action",
-  "@catalogNotReady": {
-    "description": "Признак отсутствия готовности намерения к действию"
-  },
-  "catalogHasDescription": "Has description",
-  "@catalogHasDescription": {
-    "description": "Признак наличия описания намерения"
-  },
-  "catalogNoDescription": "No description",
-  "@catalogNoDescription": {
-    "description": "Признак отсутствия описания намерения"
   },
   "intentionSummaryTags": "Tags: {tags}",
   "@intentionSummaryTags": {
@@ -1253,20 +1168,6 @@
   "@dataImportConfirmationFacts": {"description": "Дата сохранения файла импорта по местному времени и числа его намерений, долговременных связей, дневных выборов и тегов из заголовка файла", "placeholders": {"date": {"type": "String", "example": "3 October 2026"}, "intentions": {"type": "int", "format": "decimalPattern"}, "relations": {"type": "int", "format": "decimalPattern"}, "dailyChoices": {"type": "int", "format": "decimalPattern"}, "tags": {"type": "int", "format": "decimalPattern"}}},
   "dataImportConfirm": "Import and replace",
   "@dataImportConfirm": {"description": "Действие подтверждения импорта, начинающее замену графа содержимым файла"},
-  "intentionTagConditionAbsent": "not {tagName}",
-  "@intentionTagConditionAbsent": {"description": "Текст чипа условия с надобностью «должен отсутствовать»", "placeholders": {"tagName": {"type": "String"}}},
-  "intentionTagConditionPresentSemantics": "{tagName}, must be present",
-  "@intentionTagConditionPresentSemantics": {"description": "Семантика условия с надобностью «должен быть»", "placeholders": {"tagName": {"type": "String"}}},
-  "intentionTagConditionAbsentSemantics": "{tagName}, must be absent",
-  "@intentionTagConditionAbsentSemantics": {"description": "Семантика условия с надобностью «должен отсутствовать»", "placeholders": {"tagName": {"type": "String"}}},
-  "intentionTagConditionToggleHint": "Toggle requirement: must be present or must be absent",
-  "@intentionTagConditionToggleHint": {"description": "Назначение нажатия на чип условия"},
-  "intentionTagConditionRemove": "Remove condition: {tagName}",
-  "@intentionTagConditionRemove": {"description": "Действие снятия условия по тегу", "placeholders": {"tagName": {"type": "String"}}},
-  "intentionTagConditionsAdd": "Tag",
-  "@intentionTagConditionsAdd": {"description": "Подпись кнопки «+ Тег», открывающей выбор тега для условия поиска"},
-  "intentionTagConditionsAddSemantics": "Add tag condition",
-  "@intentionTagConditionsAddSemantics": {"description": "Семантика кнопки добавления условия по тегу"},
   "tagsPanelTitle": "Tags",
   "@tagsPanelTitle": {"description": "Заголовок панели тегов при выборе тегов намерения"},
   "tagsPanelAssignmentHint": "Choose as many as you need",

@@ -602,7 +602,7 @@
     - проверки: `test/intention/presentation/catalog/intention_catalog_page_test.dart`, `test/intention/presentation/search/intention_search_list_test.dart`, `test/app/navigation/app_shell_layout_test.dart`, `test/app/intention_app_lifecycle_test.dart`, `test/app/intention_tag_search_app_flow_test.dart`, `test/app/intention_creation_sheet_tags_test.dart`.
   - **Размер:** M.
 
-- [ ] 4.13 Удалить строки локализации, оставшиеся без использования после замены страницы
+- [x] 4.13 Удалить строки локализации, оставшиеся без использования после замены страницы
   - **Критерии приёмки:**
     - В обеих локалях нет ключей `catalogScope*`, `catalogFilterLabel`, `catalogOrder*`, `catalogTotalCount`, `catalogActiveEmpty`, `catalogArchivedEmpty`, `catalogAllEmpty`, `catalogTagConditionsEmpty`, `catalogLoadingMore`, `catalogReady`, `catalogNotReady`, `catalogHasDescription`, `catalogNoDescription` и строк условий `intentionTagCondition*`.
     - Строки загрузки, отказов и ошибок фильтра по решению 8 design остаются: `catalogLoading`, `catalogUnavailable`, `catalogCorruption`, `catalogUnexpectedFailure`, `catalogFilterInvalidUnicode`, `catalogFilterTooLong`, `catalogLoadMore*`. Набор ключей ru и en симметричен.

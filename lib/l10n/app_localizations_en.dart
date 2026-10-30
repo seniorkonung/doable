@@ -408,59 +408,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get catalogLoading => 'Loading intentions…';
 
   @override
-  String get catalogScopeLabel => 'Scope';
-
-  @override
-  String get catalogScopeActive => 'Active';
-
-  @override
-  String get catalogScopeArchived => 'Archived';
-
-  @override
-  String get catalogScopeAll => 'All';
-
-  @override
-  String get catalogFilterLabel => 'Filter by title';
-
-  @override
   String get catalogFilterInvalidUnicode =>
       'Enter valid Unicode text without NUL.';
 
   @override
   String get catalogFilterTooLong => 'Use no more than 255 characters.';
-
-  @override
-  String get catalogOrderLabel => 'Order';
-
-  @override
-  String get catalogOrderCreatedNewest => 'Created: newest first';
-
-  @override
-  String get catalogOrderCreatedOldest => 'Created: oldest first';
-
-  @override
-  String get catalogOrderUpdatedNewest => 'Updated: newest first';
-
-  @override
-  String get catalogOrderUpdatedOldest => 'Updated: oldest first';
-
-  @override
-  String catalogTotalCount(int count) {
-    return 'Total intentions: $count';
-  }
-
-  @override
-  String get catalogActiveEmpty => 'No active intentions yet.';
-
-  @override
-  String get catalogArchivedEmpty => 'No archived intentions yet.';
-
-  @override
-  String get catalogAllEmpty => 'No intentions yet.';
-
-  @override
-  String get catalogTagConditionsEmpty =>
-      'No intentions match the tag conditions.';
 
   @override
   String get catalogUnavailable => 'Intentions couldn’t be loaded. Try again.';
@@ -474,9 +426,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Intentions couldn’t be loaded because of an unexpected error.';
 
   @override
-  String get catalogLoadingMore => 'Loading more intentions…';
-
-  @override
   String get catalogLoadMoreUnavailable =>
       'More intentions couldn’t be loaded.';
 
@@ -487,18 +436,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get catalogLoadMoreUnexpected =>
       'More intentions couldn’t be loaded because of an unexpected error.';
-
-  @override
-  String get catalogReady => 'Ready for action';
-
-  @override
-  String get catalogNotReady => 'Not ready for action';
-
-  @override
-  String get catalogHasDescription => 'Has description';
-
-  @override
-  String get catalogNoDescription => 'No description';
 
   @override
   String intentionSummaryTags(String tags) {
@@ -1600,36 +1537,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dataImportConfirm => 'Import and replace';
-
-  @override
-  String intentionTagConditionAbsent(String tagName) {
-    return 'not $tagName';
-  }
-
-  @override
-  String intentionTagConditionPresentSemantics(String tagName) {
-    return '$tagName, must be present';
-  }
-
-  @override
-  String intentionTagConditionAbsentSemantics(String tagName) {
-    return '$tagName, must be absent';
-  }
-
-  @override
-  String get intentionTagConditionToggleHint =>
-      'Toggle requirement: must be present or must be absent';
-
-  @override
-  String intentionTagConditionRemove(String tagName) {
-    return 'Remove condition: $tagName';
-  }
-
-  @override
-  String get intentionTagConditionsAdd => 'Tag';
-
-  @override
-  String get intentionTagConditionsAddSemantics => 'Add tag condition';
 
   @override
   String get tagsPanelTitle => 'Tags';

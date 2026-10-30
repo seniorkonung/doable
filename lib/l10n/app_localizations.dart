@@ -626,36 +626,6 @@ abstract class AppLocalizations {
   /// **'Loading intentions…'**
   String get catalogLoading;
 
-  /// Подпись выбора охвата каталога
-  ///
-  /// In en, this message translates to:
-  /// **'Scope'**
-  String get catalogScopeLabel;
-
-  /// Охват активных намерений
-  ///
-  /// In en, this message translates to:
-  /// **'Active'**
-  String get catalogScopeActive;
-
-  /// Охват архивированных намерений
-  ///
-  /// In en, this message translates to:
-  /// **'Archived'**
-  String get catalogScopeArchived;
-
-  /// Охват всех существующих намерений
-  ///
-  /// In en, this message translates to:
-  /// **'All'**
-  String get catalogScopeAll;
-
-  /// Подпись поля фильтра каталога по названию
-  ///
-  /// In en, this message translates to:
-  /// **'Filter by title'**
-  String get catalogFilterLabel;
-
   /// Ошибка недопустимого Unicode в фильтре каталога
   ///
   /// In en, this message translates to:
@@ -667,66 +637,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Use no more than 255 characters.'**
   String get catalogFilterTooLong;
-
-  /// Подпись выбора порядка каталога
-  ///
-  /// In en, this message translates to:
-  /// **'Order'**
-  String get catalogOrderLabel;
-
-  /// Убывающий порядок по времени создания
-  ///
-  /// In en, this message translates to:
-  /// **'Created: newest first'**
-  String get catalogOrderCreatedNewest;
-
-  /// Возрастающий порядок по времени создания
-  ///
-  /// In en, this message translates to:
-  /// **'Created: oldest first'**
-  String get catalogOrderCreatedOldest;
-
-  /// Убывающий порядок по времени изменения
-  ///
-  /// In en, this message translates to:
-  /// **'Updated: newest first'**
-  String get catalogOrderUpdatedNewest;
-
-  /// Возрастающий порядок по времени изменения
-  ///
-  /// In en, this message translates to:
-  /// **'Updated: oldest first'**
-  String get catalogOrderUpdatedOldest;
-
-  /// Точное количество намерений в текущей выдаче
-  ///
-  /// In en, this message translates to:
-  /// **'Total intentions: {count}'**
-  String catalogTotalCount(int count);
-
-  /// Пустой каталог активных намерений
-  ///
-  /// In en, this message translates to:
-  /// **'No active intentions yet.'**
-  String get catalogActiveEmpty;
-
-  /// Пустой каталог архивированных намерений
-  ///
-  /// In en, this message translates to:
-  /// **'No archived intentions yet.'**
-  String get catalogArchivedEmpty;
-
-  /// Пустой каталог всех намерений
-  ///
-  /// In en, this message translates to:
-  /// **'No intentions yet.'**
-  String get catalogAllEmpty;
-
-  /// Успешная пустая выдача поиска намерений при действующих условиях по тегам
-  ///
-  /// In en, this message translates to:
-  /// **'No intentions match the tag conditions.'**
-  String get catalogTagConditionsEmpty;
 
   /// Устранимая недоступность первой страницы каталога
   ///
@@ -746,12 +656,6 @@ abstract class AppLocalizations {
   /// **'Intentions couldn’t be loaded because of an unexpected error.'**
   String get catalogUnexpectedFailure;
 
-  /// Загрузка следующей порции каталога
-  ///
-  /// In en, this message translates to:
-  /// **'Loading more intentions…'**
-  String get catalogLoadingMore;
-
   /// Устранимая недоступность следующей порции каталога
   ///
   /// In en, this message translates to:
@@ -769,30 +673,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'More intentions couldn’t be loaded because of an unexpected error.'**
   String get catalogLoadMoreUnexpected;
-
-  /// Признак готовности намерения к действию
-  ///
-  /// In en, this message translates to:
-  /// **'Ready for action'**
-  String get catalogReady;
-
-  /// Признак отсутствия готовности намерения к действию
-  ///
-  /// In en, this message translates to:
-  /// **'Not ready for action'**
-  String get catalogNotReady;
-
-  /// Признак наличия описания намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Has description'**
-  String get catalogHasDescription;
-
-  /// Признак отсутствия описания намерения
-  ///
-  /// In en, this message translates to:
-  /// **'No description'**
-  String get catalogNoDescription;
 
   /// Строка собственных тегов намерения в результате поиска; названия перечислены через запятую
   ///
@@ -2436,48 +2316,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Import and replace'**
   String get dataImportConfirm;
-
-  /// Текст чипа условия с надобностью «должен отсутствовать»
-  ///
-  /// In en, this message translates to:
-  /// **'not {tagName}'**
-  String intentionTagConditionAbsent(String tagName);
-
-  /// Семантика условия с надобностью «должен быть»
-  ///
-  /// In en, this message translates to:
-  /// **'{tagName}, must be present'**
-  String intentionTagConditionPresentSemantics(String tagName);
-
-  /// Семантика условия с надобностью «должен отсутствовать»
-  ///
-  /// In en, this message translates to:
-  /// **'{tagName}, must be absent'**
-  String intentionTagConditionAbsentSemantics(String tagName);
-
-  /// Назначение нажатия на чип условия
-  ///
-  /// In en, this message translates to:
-  /// **'Toggle requirement: must be present or must be absent'**
-  String get intentionTagConditionToggleHint;
-
-  /// Действие снятия условия по тегу
-  ///
-  /// In en, this message translates to:
-  /// **'Remove condition: {tagName}'**
-  String intentionTagConditionRemove(String tagName);
-
-  /// Подпись кнопки «+ Тег», открывающей выбор тега для условия поиска
-  ///
-  /// In en, this message translates to:
-  /// **'Tag'**
-  String get intentionTagConditionsAdd;
-
-  /// Семантика кнопки добавления условия по тегу
-  ///
-  /// In en, this message translates to:
-  /// **'Add tag condition'**
-  String get intentionTagConditionsAddSemantics;
 
   /// Заголовок панели тегов при выборе тегов намерения
   ///
