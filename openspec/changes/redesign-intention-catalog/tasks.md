@@ -496,7 +496,7 @@
     - проверки: `test/intention/presentation/catalog/intention_catalog_page_test.dart`, `intention_search_results_test.dart`, в `test/app/navigation/`: `app_shell_state_test.dart`, `app_shell_graph_generation_test.dart`, `app_shell_test.dart`.
   - **Размер:** M.
 
-- [ ] 4.7 Заменить поле фильтра каталога строкой поиска с кнопкой фильтра
+- [x] 4.7 Заменить поле фильтра каталога строкой поиска с кнопкой фильтра
   - **Критерии приёмки:**
     - Страница показывает `IntentionSearchBar`: поле «Поиск по названию» с ошибкой недопустимого фильтра и кнопку фильтра, которая открывает панель тегов. Прежнего `TextField` нет. Раздел условий под полем остаётся до задачи 4.8.
     - Шаги `intentionCatalogTitleField`, `intentionCatalogTitleFieldLabel`, `intentionCatalogTagFilterControl` и чтение названия в `shownIntentionCatalogParameters` работают с новой строкой поиска. Сценарии не меняются.

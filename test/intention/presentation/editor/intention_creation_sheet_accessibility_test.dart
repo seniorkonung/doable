@@ -514,12 +514,17 @@ void main() {
           ),
           findsWidgets,
         );
+        final traversal = _traversal(tester);
         expect(
-          _traversal(tester),
-          containsAll([
+          traversal,
+          contains(
             '${l10n.quickCreationLabel}, ${l10n.quickCreationModeIntention}',
-            intentionCatalogTitleFieldLabel(tester),
-          ]),
+          ),
+        );
+        // Подсказка поля поиска входит в его подпись, поэтому ищем по вхождению.
+        expect(
+          traversal,
+          anyElement(contains(intentionCatalogTitleFieldLabel(tester))),
         );
         expect(tester.takeException(), isNull);
         semantics.dispose();

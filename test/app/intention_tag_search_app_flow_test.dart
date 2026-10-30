@@ -312,7 +312,10 @@ void main() {
 
     await tester.enterText(
       find.descendant(
-        of: find.byType(SearchField),
+        of: find.descendant(
+          of: find.byType(BottomSheet),
+          matching: find.byType(SearchField),
+        ),
         matching: find.byType(TextField),
       ),
       'Парк',

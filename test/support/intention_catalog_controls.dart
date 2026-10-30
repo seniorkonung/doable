@@ -11,6 +11,7 @@ library;
 
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/design_system/components/catalog_header.dart';
+import 'package:doable/src/design_system/components/filter_button.dart';
 import 'package:doable/src/design_system/components/order_button.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
@@ -52,8 +53,9 @@ final _sheet = find.byType(Sheet);
 /// Для проверок его размещения и доступности: видимости, фокуса и соседства с
 /// другими элементами. Вводить название и читать его надо шагами
 /// [enterIntentionCatalogTitle] и [shownIntentionCatalogParameters].
-final intentionCatalogTitleField = find.byKey(
-  const ValueKey('catalog-filter-field'),
+final intentionCatalogTitleField = find.descendant(
+  of: find.byKey(const ValueKey('intention-catalog-filter')),
+  matching: find.byType(TextField),
 );
 
 /// Доступная подпись поля названия каталога.
@@ -62,16 +64,17 @@ final intentionCatalogTitleField = find.byKey(
 /// создания поле скрыто от семантики.
 String intentionCatalogTitleFieldLabel(WidgetTester tester) =>
     AppLocalizations.of(tester.element(intentionCatalogTitleField))
-        .catalogFilterLabel;
+        .intentionPickerSearchPlaceholder;
 
-/// Элемент, которым человек открывает панель условий по тегам каталога
+/// Кнопка фильтра, которой человек открывает панель условий по тегам каталога
 /// намерений.
 ///
-/// Для проверок его размещения и для сценариев, которые открывают панель
+/// Для проверок её размещения и для сценариев, которые открывают панель
 /// фильтра сами. Добавлять условие надо шагом
 /// [addIntentionCatalogTagCondition].
-final intentionCatalogTagFilterControl = find.byKey(
-  const ValueKey('intention-tag-conditions-add'),
+final intentionCatalogTagFilterControl = find.descendant(
+  of: _page,
+  matching: find.byType(FilterButton),
 );
 
 /// Прокручиваемый список выдачи открытого каталога намерений.

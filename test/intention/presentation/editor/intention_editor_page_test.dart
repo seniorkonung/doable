@@ -1224,7 +1224,9 @@ void main() {
           findsNothing,
         );
         expect(
-          find.semantics.byLabel(intentionCatalogTitleFieldLabel(tester)),
+          find.semantics.byLabel(
+            RegExp(RegExp.escape(intentionCatalogTitleFieldLabel(tester))),
+          ),
           findsNothing,
         );
         expect(find.semantics.byLabel(RegExp('New intention')), findsNothing);

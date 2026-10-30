@@ -359,10 +359,7 @@ void main() {
     await tester.pumpWidget(_testApp(repository));
     repository.queryAt(0);
 
-    await tester.enterText(
-      find.byKey(const ValueKey('catalog-filter-field')),
-      'milk',
-    );
+    await enterIntentionCatalogTitle(tester, 'milk');
     await tester.pump(const Duration(milliseconds: 249));
     expect(repository.queries, hasLength(1));
     expect(find.widgetWithText(FilledButton, 'Search'), findsNothing);
@@ -380,22 +377,19 @@ void main() {
     repository.queryAt(0);
     final invalidFilter = List.filled(256, 'a').join();
 
-    await tester.enterText(
-      find.byKey(const ValueKey('catalog-filter-field')),
-      invalidFilter,
-    );
+    await enterIntentionCatalogTitle(tester, invalidFilter);
     await tester.pump(const Duration(milliseconds: 250));
     await tester.pump();
 
     expect(repository.queries, hasLength(1));
-    expect(find.text('Use no more than 255 characters.'), findsOneWidget);
     expect(
-      tester
-          .widget<TextField>(find.byKey(const ValueKey('catalog-filter-field')))
-          .controller
-          ?.text,
-      invalidFilter,
+      find.descendant(
+        of: find.byKey(const ValueKey('intention-catalog-filter')),
+        matching: find.text('Use no more than 255 characters.'),
+      ),
+      findsOneWidget,
     );
+    expect(shownIntentionCatalogParameters(tester).titleFilter, invalidFilter);
   });
 
   for (final (keyboard, variant) in [
@@ -516,7 +510,7 @@ void main() {
         _pageScrollPosition(tester).pixels,
         moreOrLessEquals(_pageScrollPosition(tester).minScrollExtent),
       );
-      final filter = find.byKey(const ValueKey('catalog-filter-field'));
+      final filter = intentionCatalogTitleField;
       final shownFilter = tester.getRect(filter);
       expect(
         shownFilter.top,
@@ -638,7 +632,7 @@ void main() {
       }
       final page = _pageScrollPosition(tester);
       expect(page.pixels, page.maxScrollExtent);
-      final filter = find.byKey(const ValueKey('catalog-filter-field'));
+      final filter = intentionCatalogTitleField;
       final appBarBottom = tester.getRect(find.byType(AppBar)).bottom;
 
       await _releaseCatalogListFling(
@@ -969,10 +963,7 @@ void main() {
     await tester.pump();
     await openIntentionGraph(tester);
     repository.queryAt(0);
-    await tester.enterText(
-      find.byKey(const ValueKey('catalog-filter-field')),
-      'Намерение',
-    );
+    await enterIntentionCatalogTitle(tester, 'Намерение');
     await tester.pump(const Duration(milliseconds: 250));
     expect(
       repository.queryAt(1).titleFilter?.map((value) => value),
@@ -1096,12 +1087,7 @@ void main() {
         findsNothing,
       );
       expect(find.byType(FloatingActionButton), findsNothing);
-      expect(
-        find
-            .byKey(const ValueKey('intention-tag-conditions-add'))
-            .hitTestable(),
-        findsOneWidget,
-      );
+      expect(intentionCatalogTagFilterControl.hitTestable(), findsOneWidget);
       final create = quickCreationAction();
       expect(create.hitTestable(), findsOneWidget);
       await tester.tap(create);

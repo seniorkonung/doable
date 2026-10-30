@@ -21,6 +21,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/app_root_pages.dart';
+import '../../support/intention_catalog_controls.dart';
 import 'catalog/catalog_reconciliation_test_support.dart';
 import 'catalog/catalog_test_support.dart';
 import '../../support/tag_condition_cycles.dart';
@@ -84,11 +85,13 @@ void main() {
     );
 
     // Поле названия принимает ввод при открытой клавиатуре.
-    final field = find.byKey(const ValueKey('catalog-filter-field'));
+    final field = intentionCatalogTitleField;
     await _reach(tester, field);
     _expectTappable(tester, field);
     expect(
-      find.bySemanticsLabel(RegExp(RegExp.escape(l10n.catalogFilterLabel))),
+      find.bySemanticsLabel(
+        RegExp(RegExp.escape(intentionCatalogTitleFieldLabel(tester))),
+      ),
       findsWidgets,
     );
     await tester.tap(field);
@@ -356,7 +359,10 @@ Future<void> _expectTagsPanelAccessible(
   expect(tester.takeException(), isNull);
   expect(find.text(l10n.tagsPanelFilterTitle), findsOneWidget);
   final search = find.descendant(
-    of: find.byType(SearchField),
+    of: find.descendant(
+      of: find.byType(BottomSheet),
+      matching: find.byType(SearchField),
+    ),
     matching: find.byType(TextField),
   );
   _expectTappable(tester, search);

@@ -6,9 +6,9 @@ import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
 import '../../application/intention_catalog.dart';
 import '../search/intention_list_header.dart';
+import '../search/intention_search_bar.dart';
 import 'intention_catalog_purpose.dart';
 import 'intention_catalog_row.dart';
-import 'intention_catalog_state.dart';
 import 'intention_catalog_view_model.dart';
 import 'intention_search_layout.dart';
 import 'intention_search_results.dart';
@@ -43,10 +43,6 @@ final class _IntentionCatalogPageState
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
     final catalog = ref.watch(intentionCatalogViewModelProvider(_purpose));
-    final notifier = ref.read(
-      intentionCatalogViewModelProvider(_purpose).notifier,
-    );
-    final selection = catalog.value?.selection ?? notifier.selection;
     return Scaffold(
       appBar: AppBar(title: Text(localizations.appDestinationIntentionGraph)),
       body: IntentionSearchLayout(
@@ -57,11 +53,7 @@ final class _IntentionCatalogPageState
         resultsExtent: IntentionSearchResults.showsList(catalog)
             ? IntentionSearchResultsExtent.fullViewport
             : IntentionSearchResultsExtent.remainingWhenSufficient,
-        controls: _CatalogControls(
-          selection: selection,
-          filterController: _filterController,
-          onFilterChanged: notifier.changeTitleFilter,
-        ),
+        controls: _CatalogControls(filterController: _filterController),
         results: IntentionSearchResults(
           purpose: _purpose,
           catalog: catalog,
@@ -105,32 +97,17 @@ final class _IntentionCatalogPageState
 }
 
 final class _CatalogControls extends StatelessWidget {
-  const _CatalogControls({
-    required this.selection,
-    required this.filterController,
-    required this.onFilterChanged,
-  });
+  const _CatalogControls({required this.filterController});
 
-  final IntentionCatalogSelection selection;
   final TextEditingController filterController;
-  final ValueChanged<String> onFilterChanged;
 
   @override
   Widget build(BuildContext context) {
-    final localizations = AppLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: Column(
         children: [
-          TextField(
-            key: const ValueKey('catalog-filter-field'),
-            controller: filterController,
-            decoration: InputDecoration(
-              labelText: localizations.catalogFilterLabel,
-              errorText: _filterError(localizations),
-            ),
-            onChanged: onFilterChanged,
-          ),
+          IntentionSearchBar(purpose: _purpose, controller: filterController),
           const SizedBox(height: 12),
           const Align(
             alignment: AlignmentDirectional.centerStart,
@@ -142,13 +119,4 @@ final class _CatalogControls extends StatelessWidget {
       ),
     );
   }
-
-  String? _filterError(AppLocalizations localizations) =>
-      switch (selection.filterValidationFailure) {
-        IntentionCatalogFilterValidationFailure.invalidUnicodeRepertoire =>
-          localizations.catalogFilterInvalidUnicode,
-        IntentionCatalogFilterValidationFailure.tooLong =>
-          localizations.catalogFilterTooLong,
-        null => null,
-      };
 }
