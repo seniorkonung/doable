@@ -135,9 +135,8 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
         },
         titleFilter: _titleFilterText,
         tagFilter: _tagFilter,
-        excludedIntentionId: switch (purpose) {
-          SelectRelationParticipant(:final excludedIntentionId) =>
-            excludedIntentionId,
+        pairProbe: switch (purpose) {
+          SelectRelationParticipant(:final pairProbe) => pairProbe,
           BrowseIntentionCatalog() ||
           SelectDailyChoiceAction() ||
           SelectDailyChoiceSource() => null,
@@ -587,7 +586,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
         readinessFilter: confirmed.query.readinessFilter,
         titleFilter: confirmed.query.titleFilter?.map((value) => value),
         tagFilter: confirmed.query.tagFilter,
-        excludedIntentionId: confirmed.query.excludedIntentionId,
+        pairProbe: confirmed.query.pairProbe,
         order: confirmed.query.order,
         pageSize: confirmed.query.pageSize,
         cursor: confirmed.nextCursor,

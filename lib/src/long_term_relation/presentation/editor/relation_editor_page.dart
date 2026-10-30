@@ -383,6 +383,7 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage> {
                 RelationCreationContext() => const RelationCreationChoiceFlow(),
                 RelationEditingContext(:final details) =>
                   RelationChangeChoiceFlow(
+                    relationId: details.relation.id,
                     relationScope: details.relation.scope,
                   ),
               },

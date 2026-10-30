@@ -23,6 +23,7 @@ import 'package:doable/src/intention/presentation/details/intention_details_page
 import 'package:doable/src/intention/presentation/picker/intention_picker_view.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
+import 'package:doable/src/long_term_relation/application/relation_pair_probe.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_choice.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
@@ -44,6 +45,7 @@ import 'participant_picker_test_support.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
 import '../../../support/tag_positions.dart';
 import '../../../support/tag_condition_cycles.dart';
+import '../editor/relation_form_test_support.dart' show testFormRelationId;
 
 void main() {
   _defineTagSearchTests();
@@ -158,7 +160,7 @@ void main() {
   });
 
   // Заменяемый участник выбираемой роли не исключается.
-  for (final (name, choice, excluded) in [
+  for (final (name, choice, pairProbe) in [
     (
       'новой связи без участника другой роли',
       RelationParticipantChoice(
@@ -174,14 +176,19 @@ void main() {
       'активной изменяемой связи',
       RelationParticipantChoice(
         role: RelationParticipantRole.related,
-        flow: const RelationChangeChoiceFlow(
+        flow: RelationChangeChoiceFlow(
+          relationId: _editedRelation,
           relationScope: RelationScope.active,
         ),
         type: LongTermRelationType.need,
         source: _participant(3),
         related: _participant(4),
       ),
-      _id(3),
+      RelationPairProbe(
+        counterpartId: _id(3),
+        candidateRole: RelationParticipantRole.related,
+        ignoredRelationId: _editedRelation,
+      ),
     ),
   ]) {
     testWidgets('описание выбора $name задаёт активный охват и исключение '
@@ -196,7 +203,7 @@ void main() {
 
       final query = repository.queryAt(1);
       expect(query.scope, IntentionScope.active);
-      expect(query.excludedIntentionId, excluded);
+      expect(query.pairProbe, pairProbe);
     });
   }
 }
@@ -519,11 +526,13 @@ void _defineTagSearchTests() {
 /// Индекс намерения, уже занятого вторым участником связи.
 const _excludedIndex = 9;
 
+final _editedRelation = testFormRelationId(1);
+
 /// Описание выбора и ограничения запроса каталога, которые из него следуют.
 typedef _ParticipantChoiceCase = ({
   RelationParticipantChoice choice,
   IntentionScope scope,
-  IntentionId? excludedIntentionId,
+  RelationPairProbe? pairProbe,
 });
 
 /// Новая связь: исходный участник уже выбран и исключается из поиска
@@ -537,7 +546,10 @@ final _ParticipantChoiceCase _activeRelation = (
     related: null,
   ),
   scope: IntentionScope.active,
-  excludedIntentionId: _id(_excludedIndex),
+  pairProbe: RelationPairProbe(
+    counterpartId: _id(_excludedIndex),
+    candidateRole: RelationParticipantRole.related,
+  ),
 );
 
 /// Изменение архивной связи: заменяемый исходный участник остаётся в выдаче,
@@ -545,13 +557,20 @@ final _ParticipantChoiceCase _activeRelation = (
 final _ParticipantChoiceCase _archivedRelation = (
   choice: RelationParticipantChoice(
     role: RelationParticipantRole.source,
-    flow: const RelationChangeChoiceFlow(relationScope: RelationScope.archived),
+    flow: RelationChangeChoiceFlow(
+      relationId: _editedRelation,
+      relationScope: RelationScope.archived,
+    ),
     type: LongTermRelationType.can,
     source: _participant(5),
     related: _participant(_excludedIndex),
   ),
   scope: IntentionScope.all,
-  excludedIntentionId: _id(_excludedIndex),
+  pairProbe: RelationPairProbe(
+    counterpartId: _id(_excludedIndex),
+    candidateRole: RelationParticipantRole.source,
+    ignoredRelationId: _editedRelation,
+  ),
 );
 
 IntentionId _id(int index) => testSummary(index: index).id;
@@ -662,7 +681,7 @@ void _expectParticipantQuery(
 }) {
   expect(query.scope, expected.scope);
   expect(query.readinessFilter, IntentionReadinessFilter.all);
-  expect(query.excludedIntentionId, expected.excludedIntentionId);
+  expect(query.pairProbe, expected.pairProbe);
   expect(query.titleFilter?.map((value) => value), title);
   expect(query.tagFilter, tagFilter);
   expect(query.cursor, isNull);
@@ -796,7 +815,10 @@ final List<_PurposeCase> _purposeCases = [
     name: 'изменение связи показывает заменяемого участника',
     choice: RelationParticipantChoice(
       role: RelationParticipantRole.related,
-      flow: const RelationChangeChoiceFlow(relationScope: RelationScope.active),
+      flow: RelationChangeChoiceFlow(
+        relationId: _editedRelation,
+        relationScope: RelationScope.active,
+      ),
       type: LongTermRelationType.need,
       source: _named(3, 'Быть здоровым'),
       related: _named(4, 'много ходить'),
@@ -859,7 +881,8 @@ final List<_PurposeCase> _purposeCases = [
     name: 'архивная изменяемая связь с архивным участником',
     choice: RelationParticipantChoice(
       role: RelationParticipantRole.source,
-      flow: const RelationChangeChoiceFlow(
+      flow: RelationChangeChoiceFlow(
+        relationId: _editedRelation,
         relationScope: RelationScope.archived,
       ),
       type: LongTermRelationType.can,
@@ -1005,7 +1028,7 @@ void _definePurposeTests() {
     await _settleRoute(tester);
     final query = repository.queryAt(1);
     expect(query.scope, IntentionScope.all);
-    expect(query.excludedIntentionId, _id(_excludedIndex));
+    expect(query.pairProbe?.counterpartId, _id(_excludedIndex));
     _completePage(repository, 1, const []);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Relation change: source intention'));

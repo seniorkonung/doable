@@ -1,4 +1,5 @@
 import '../../graph/application/graph_revision.dart';
+import '../../long_term_relation/application/relation_pair_probe.dart';
 import '../../shared/domain/text_preview.dart';
 import '../../tag/domain/tag.dart';
 import '../../tag/domain/tag_id.dart';
@@ -135,14 +136,14 @@ final class IntentionCatalogQueryValidationException implements Exception {
 }
 
 /// Соединяет охват, готовность, название, собственные теги и исключение
-/// участника через «И». Условия не требуют существования выбранных тегов.
+/// участника другой роли из [pairProbe] через «И». Условия не требуют существования выбранных тегов.
 final class IntentionCatalogQuery {
   factory IntentionCatalogQuery({
     required IntentionScope scope,
     IntentionReadinessFilter readinessFilter = IntentionReadinessFilter.all,
     required String? titleFilter,
     IntentionTagFilter tagFilter = IntentionTagFilter.empty,
-    IntentionId? excludedIntentionId,
+    RelationPairProbe? pairProbe,
     required IntentionCatalogOrder order,
     required int pageSize,
     IntentionCatalogCursor? cursor,
@@ -160,7 +161,7 @@ final class IntentionCatalogQuery {
       readinessFilter: readinessFilter,
       titleFilter: normalizedFilter,
       tagFilter: tagFilter,
-      excludedIntentionId: excludedIntentionId,
+      pairProbe: pairProbe,
       order: order,
       pageSize: pageSize,
       cursor: cursor,
@@ -173,7 +174,7 @@ final class IntentionCatalogQuery {
     required this.readinessFilter,
     required this.titleFilter,
     required this.tagFilter,
-    required this.excludedIntentionId,
+    required this.pairProbe,
     required this.order,
     required this.pageSize,
     required this.cursor,
@@ -189,8 +190,9 @@ final class IntentionCatalogQuery {
   final IntentionTitleFilter? titleFilter;
   final IntentionTagFilter tagFilter;
 
-  /// Второй участник связи, исключаемый по идентичности до подсчёта и порции.
-  final IntentionId? excludedIntentionId;
+  /// Пара поиска участника связи; её участник другой роли исключается по
+  /// идентичности до подсчёта и порции.
+  final RelationPairProbe? pairProbe;
   final IntentionCatalogOrder order;
   final int pageSize;
   final IntentionCatalogCursor? cursor;
@@ -205,7 +207,7 @@ final class IntentionCatalogQuery {
     readinessFilter: IntentionReadinessFilter.all,
     titleFilter: titleFilter,
     tagFilter: tagFilter,
-    excludedIntentionId: excludedIntentionId,
+    pairProbe: pairProbe,
     order: order,
     pageSize: pageSize,
     cursor: cursor,
@@ -219,7 +221,7 @@ final class IntentionCatalogQuery {
     readinessFilter: IntentionReadinessFilter.all,
     titleFilter: titleFilter,
     tagFilter: tagFilter,
-    excludedIntentionId: excludedIntentionId,
+    pairProbe: pairProbe,
     order: order,
     pageSize: pageSize,
     cursor: cursor,
@@ -244,7 +246,7 @@ final class IntentionCatalogQuery {
     };
     if (!matchesScope ||
         !matchesReadiness ||
-        summary.id == excludedIntentionId ||
+        summary.id == pairProbe?.counterpartId ||
         !tagFilter.matches(summary.tags.map((tag) => tag.id).toSet())) {
       return false;
     }

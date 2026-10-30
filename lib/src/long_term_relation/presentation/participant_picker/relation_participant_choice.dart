@@ -1,6 +1,7 @@
 import '../../application/long_term_relation_command.dart';
 import '../../application/long_term_relation_projection.dart';
 import '../../domain/long_term_relation.dart';
+import '../../domain/long_term_relation_id.dart';
 
 /// Поток формы связи, из которой открыт поиск участника.
 sealed class RelationParticipantChoiceFlow {
@@ -14,16 +15,20 @@ final class RelationCreationChoiceFlow extends RelationParticipantChoiceFlow {
 
 /// Изменение существующей связи в её подтверждённом архивном состоянии.
 final class RelationChangeChoiceFlow extends RelationParticipantChoiceFlow {
-  const RelationChangeChoiceFlow({required this.relationScope});
+  const RelationChangeChoiceFlow({
+    required this.relationId,
+    required this.relationScope,
+  });
 
+  final LongTermRelationId relationId;
   final RelationScope relationScope;
 }
 
 /// Описание выбора участника, которое форма связи передаёт поиску.
 ///
-/// Участники и вид — значения черновика в момент открытия поиска. Исключение
-/// второго участника и допустимый охват выводятся из описания, поэтому
-/// противоречивое сочетание собрать нельзя.
+/// Участники и вид — значения черновика в момент открытия поиска. Проба пары
+/// и допустимый охват выводятся из описания, поэтому противоречивое сочетание
+/// собрать нельзя.
 final class RelationParticipantChoice {
   const RelationParticipantChoice({
     required this.role,

@@ -103,7 +103,7 @@ final class ControlledRelationFormRepository
     List<IntentionSummary> items, {
     GraphRevision revision = const TestCatalogRevision(1),
   }) {
-    final excluded = catalogQueries[index].excludedIntentionId;
+    final excluded = catalogQueries[index].pairProbe?.counterpartId;
     final available = [
       for (final item in items)
         if (item.id != excluded) item,

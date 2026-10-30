@@ -1,5 +1,5 @@
+import '../../../long_term_relation/application/relation_pair_probe.dart';
 import '../../application/intention_catalog.dart';
-import '../../domain/intention_id.dart';
 
 /// Идентичность одного поиска на всё время жизни его страницы.
 ///
@@ -75,18 +75,19 @@ final class SelectDailyChoiceSource extends IntentionPickerPurpose {
 
 /// Выбор существующего намерения участником долговременной связи.
 ///
-/// Выбранное второе намерение пары исключается по идентификатору: прямая самосвязь
-/// запрещена, а одноимённые намерения остаются разными участниками. Контекст
+/// Участник другой роли из [pairProbe] исключается по идентификатору: прямая
+/// самосвязь запрещена, а одноимённые намерения остаются разными участниками.
+/// Без пробы ничего не исключается: второй участник ещё не выбран. Контекст
 /// редактируемой связи задаёт допустимый архивный охват и не позволяет
 /// вызывающей стороне составить режим выбора только архивных намерений.
 final class SelectRelationParticipant extends IntentionPickerPurpose {
   const SelectRelationParticipant({
     required this.selectionContext,
     required this.session,
-    this.excludedIntentionId,
+    this.pairProbe,
   });
 
-  final IntentionId? excludedIntentionId;
+  final RelationPairProbe? pairProbe;
   final RelationParticipantSelectionContext selectionContext;
 
   final IntentionSearchSession session;
@@ -96,14 +97,14 @@ final class SelectRelationParticipant extends IntentionPickerPurpose {
   @override
   bool operator ==(Object other) =>
       other is SelectRelationParticipant &&
-      other.excludedIntentionId == excludedIntentionId &&
+      other.pairProbe == pairProbe &&
       other.selectionContext == selectionContext &&
       identical(other.session, session);
 
   @override
   int get hashCode => Object.hash(
     SelectRelationParticipant,
-    excludedIntentionId,
+    pairProbe,
     selectionContext,
     identityHashCode(session),
   );

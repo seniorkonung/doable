@@ -14,6 +14,8 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_purp
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
+import 'package:doable/src/long_term_relation/application/relation_pair_probe.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
@@ -87,7 +89,10 @@ void main() {
           'участник активной связи',
           SelectRelationParticipant(
             session: IntentionSearchSession(),
-            excludedIntentionId: _intentionId(2),
+            pairProbe: RelationPairProbe(
+              counterpartId: _intentionId(2),
+              candidateRole: RelationParticipantRole.related,
+            ),
             selectionContext:
                 RelationParticipantSelectionContext.activeRelation,
           ),
@@ -97,7 +102,10 @@ void main() {
           'участник архивной связи',
           SelectRelationParticipant(
             session: IntentionSearchSession(),
-            excludedIntentionId: _intentionId(2),
+            pairProbe: RelationPairProbe(
+              counterpartId: _intentionId(2),
+              candidateRole: RelationParticipantRole.related,
+            ),
             selectionContext:
                 RelationParticipantSelectionContext.archivedRelation,
           ),
@@ -1000,7 +1008,7 @@ Future<List<IntentionSummary>> _readWhole(
         readinessFilter: query.readinessFilter,
         titleFilter: query.titleFilter?.map((value) => value),
         tagFilter: query.tagFilter,
-        excludedIntentionId: query.excludedIntentionId,
+        pairProbe: query.pairProbe,
         order: query.order,
         pageSize: query.pageSize,
         cursor: cursor,

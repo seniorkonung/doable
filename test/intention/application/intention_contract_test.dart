@@ -6,7 +6,9 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/domain/intention_text.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
+import 'package:doable/src/long_term_relation/application/relation_pair_probe.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
@@ -247,13 +249,16 @@ void main() {
         readinessFilter: IntentionReadinessFilter.readyOnly,
         titleFilter: 'ХОДИТЬ',
         tagFilter: filter,
-        excludedIntentionId: otherParticipant,
+        pairProbe: RelationPairProbe(
+          counterpartId: otherParticipant,
+          candidateRole: RelationParticipantRole.related,
+        ),
         order: IntentionCatalogOrder.createdAtAscending,
         pageSize: 1,
       );
 
       expect(query.tagFilter, filter);
-      expect(query.excludedIntentionId, otherParticipant);
+      expect(query.pairProbe?.counterpartId, otherParticipant);
       for (final (id, title, tags, readiness, archiveState, expected) in [
         (
           candidateId,
@@ -326,7 +331,7 @@ void main() {
         );
       }
       expect(_query().tagFilter, IntentionTagFilter.empty);
-      expect(_query().excludedIntentionId, isNull);
+      expect(_query().pairProbe, isNull);
     });
 
     test('условие готовности допускает оба типа, только действия или только намерения без готовности', () {
@@ -388,7 +393,10 @@ void main() {
           requiredTagIds: [health.id],
           excludedTagIds: [sport.id],
         ),
-        excludedIntentionId: otherParticipant,
+        pairProbe: RelationPairProbe(
+          counterpartId: otherParticipant,
+          candidateRole: RelationParticipantRole.related,
+        ),
         order: IntentionCatalogOrder.titleAscending,
         pageSize: 1,
         counting: IntentionCatalogCounting.byType,
@@ -495,7 +503,10 @@ void main() {
             requiredTagIds: [health.id],
             excludedTagIds: [sport.id],
           ),
-          excludedIntentionId: otherParticipant,
+          pairProbe: RelationPairProbe(
+            counterpartId: otherParticipant,
+            candidateRole: RelationParticipantRole.related,
+          ),
           order: IntentionCatalogOrder.titleAscending,
           pageSize: 1,
           counting: IntentionCatalogCounting.byScopeAndType,

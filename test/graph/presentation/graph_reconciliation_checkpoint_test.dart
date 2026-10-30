@@ -44,6 +44,7 @@ import 'package:doable/src/long_term_relation/application/long_term_relation_com
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
+import 'package:doable/src/long_term_relation/application/relation_pair_probe.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/long_term_relation/presentation/details/relation_details_state.dart';
@@ -684,7 +685,10 @@ void main() {
       final filteredProvider = intentionCatalogViewModelProvider(
         SelectRelationParticipant(
           session: IntentionSearchSession(),
-          excludedIntentionId: ids[3],
+          pairProbe: RelationPairProbe(
+            counterpartId: ids[3],
+            candidateRole: RelationParticipantRole.related,
+          ),
           selectionContext: RelationParticipantSelectionContext.activeRelation,
         ),
       );

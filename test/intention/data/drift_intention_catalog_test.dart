@@ -9,6 +9,8 @@ import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
+import 'package:doable/src/long_term_relation/application/relation_pair_probe.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
@@ -77,7 +79,7 @@ void main() {
               requiredTagIds: [_tagId(firstTagNumber), _tagId(303)],
               excludedTagIds: [_tagId(lastTagNumber), _tagId(304)],
             ),
-            excludedIntentionId: _id(_uuid(3)),
+            pairProbe: _excluding(_id(_uuid(3))),
           ),
         ),
       );
@@ -96,7 +98,7 @@ void main() {
               ],
               excludedTagIds: [_tagId(304), _tagId(lastTagNumber), _tagId(304)],
             ),
-            excludedIntentionId: _id(_uuid(3)),
+            pairProbe: _excluding(_id(_uuid(3))),
             cursor: first.nextCursor,
           ),
         ),
@@ -170,7 +172,7 @@ void main() {
               readinessFilter: IntentionReadinessFilter.readyOnly,
               titleFilter: 'гулять',
               tagFilter: filter,
-              excludedIntentionId: _id(_uuid(236)),
+              pairProbe: _excluding(_id(_uuid(236))),
               order: order,
               pageSize: 100,
               cursor: cursor,
@@ -376,7 +378,7 @@ void main() {
               tagFilter: filter,
               scope: scope,
               readinessFilter: readiness,
-              excludedIntentionId: _id(_uuid(5)),
+              pairProbe: _excluding(_id(_uuid(5))),
               titleFilter: 'гулять',
               cursor: cursor,
             );
@@ -402,7 +404,7 @@ void main() {
           _tagQuery(
             tagFilter: filter,
             scope: IntentionScope.active,
-            excludedIntentionId: _id(_uuid(1)),
+            pairProbe: _excluding(_id(_uuid(1))),
           ),
         ),
       );
@@ -463,7 +465,7 @@ void main() {
         ),
         scope: scope,
         readinessFilter: readiness,
-        excludedIntentionId: _id(_uuid(5)),
+        pairProbe: _excluding(_id(_uuid(5))),
         titleFilter: 'гулять',
         counting: counting,
       );
@@ -591,7 +593,7 @@ void main() {
           snapshot.matches(
             _tagQuery(
               tagFilter: required.tagFilter,
-              excludedIntentionId: snapshot.summary.id,
+              pairProbe: _excluding(snapshot.summary.id),
             ),
           ),
           isFalse,
@@ -2514,12 +2516,17 @@ TagId _tagId(int number) => switch (TagId.decode(_uuid(number))) {
   InvalidTagIdDecoding() => throw ArgumentError.value(number, 'number'),
 };
 
+RelationPairProbe _excluding(IntentionId id) => RelationPairProbe(
+  counterpartId: id,
+  candidateRole: RelationParticipantRole.related,
+);
+
 IntentionCatalogQuery _tagQuery({
   required IntentionTagFilter tagFilter,
   IntentionScope scope = IntentionScope.all,
   IntentionReadinessFilter readinessFilter = IntentionReadinessFilter.all,
   String? titleFilter,
-  IntentionId? excludedIntentionId,
+  RelationPairProbe? pairProbe,
   int pageSize = 1,
   IntentionCatalogCursor? cursor,
   IntentionCatalogCounting counting = IntentionCatalogCounting.totalOnly,
@@ -2528,7 +2535,7 @@ IntentionCatalogQuery _tagQuery({
   readinessFilter: readinessFilter,
   titleFilter: titleFilter,
   tagFilter: tagFilter,
-  excludedIntentionId: excludedIntentionId,
+  pairProbe: pairProbe,
   order: IntentionCatalogOrder.createdAtAscending,
   pageSize: pageSize,
   cursor: cursor,

@@ -16,6 +16,8 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_stat
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import 'package:doable/src/intention/presentation/picker/intention_picker_view.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
+import 'package:doable/src/long_term_relation/application/relation_pair_probe.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
@@ -525,7 +527,10 @@ void main() {
         SelectRelationParticipant(
           selectionContext:
               RelationParticipantSelectionContext.archivedRelation,
-          excludedIntentionId: _action(9).id,
+          pairProbe: RelationPairProbe(
+            counterpartId: _action(9).id,
+            candidateRole: RelationParticipantRole.related,
+          ),
           session: IntentionSearchSession(),
         ),
         IntentionTypeChoice.intentions,
@@ -568,7 +573,7 @@ void main() {
           expect(query.readinessFilter, filteredQuery.readinessFilter);
           expect(query.order, IntentionCatalogOrder.titleDescending);
           expect(query.scope, filteredQuery.scope);
-          expect(query.excludedIntentionId, filteredQuery.excludedIntentionId);
+          expect(query.pairProbe, filteredQuery.pairProbe);
           h.repository.complete(
             h.repository.queries.length - 1,
             _firstPage(items),
@@ -614,7 +619,10 @@ void main() {
           final purpose = SelectRelationParticipant(
             selectionContext:
                 RelationParticipantSelectionContext.activeRelation,
-            excludedIntentionId: _action(9).id,
+            pairProbe: RelationPairProbe(
+              counterpartId: _action(9).id,
+              candidateRole: RelationParticipantRole.related,
+            ),
             session: IntentionSearchSession(),
           );
           final items = type == IntentionTypeChoice.intentions
@@ -669,7 +677,7 @@ void main() {
           final query = h.repository.queries.last;
           expect(query.readinessFilter, IntentionReadinessFilter.all);
           expect(query.scope, IntentionScope.active);
-          expect(query.excludedIntentionId, purpose.excludedIntentionId);
+          expect(query.pairProbe, purpose.pairProbe);
           expect(query.order, IntentionCatalogOrder.titleDescending);
           expect(query.cursor, isNull);
           h.repository.complete(

@@ -3,6 +3,8 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
+import 'package:doable/src/long_term_relation/application/relation_pair_probe.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -305,19 +307,22 @@ void main() {
       final repository = ControlledCatalogRepository();
       final container = reconciliationCatalogContainer(repository);
       addTearDown(container.dispose);
-      final excluded = testSummary(index: 9).id;
+      final probe = RelationPairProbe(
+        counterpartId: testSummary(index: 9).id,
+        candidateRole: RelationParticipantRole.related,
+      );
       final purposes = <IntentionCatalogPurpose>[
         const BrowseIntentionCatalog(),
         _actionSearchPurpose,
         _sourceSearchPurpose,
         SelectRelationParticipant(
           session: IntentionSearchSession(),
-          excludedIntentionId: excluded,
+          pairProbe: probe,
           selectionContext: RelationParticipantSelectionContext.activeRelation,
         ),
         SelectRelationParticipant(
           session: IntentionSearchSession(),
-          excludedIntentionId: excluded,
+          pairProbe: probe,
           selectionContext:
               RelationParticipantSelectionContext.archivedRelation,
         ),
@@ -360,7 +365,7 @@ void main() {
               ? IntentionReadinessFilter.readyOnly
               : IntentionReadinessFilter.all,
         );
-        expect(query.excludedIntentionId, index >= 3 ? excluded : null);
+        expect(query.pairProbe, index >= 3 ? probe : null);
         _completeEmptyPage(repository, purposes.length + index);
         await container.read(provider.future);
       }
@@ -397,7 +402,10 @@ void main() {
     _actionSearchPurpose,
     SelectRelationParticipant(
       session: IntentionSearchSession(),
-      excludedIntentionId: testSummary(index: 9).id,
+      pairProbe: RelationPairProbe(
+        counterpartId: testSummary(index: 9).id,
+        candidateRole: RelationParticipantRole.related,
+      ),
       selectionContext: RelationParticipantSelectionContext.archivedRelation,
     ),
   ]) {
@@ -473,10 +481,8 @@ void main() {
           expect(query.scope, first.query.scope);
           expect(query.readinessFilter, first.query.readinessFilter);
           expect(
-            query.excludedIntentionId,
-            purpose is SelectRelationParticipant
-                ? purpose.excludedIntentionId
-                : null,
+            query.pairProbe,
+            purpose is SelectRelationParticipant ? purpose.pairProbe : null,
           );
           expect(query.titleFilter?.map((value) => value), 'ходить');
           expect(query.order, IntentionCatalogOrder.updatedAtAscending);

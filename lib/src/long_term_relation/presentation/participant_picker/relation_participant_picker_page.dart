@@ -10,6 +10,7 @@ import '../../../intention/presentation/catalog/intention_catalog_purpose.dart';
 import '../../../intention/presentation/picker/intention_picker_view.dart';
 import '../../application/long_term_relation_command.dart';
 import '../../application/long_term_relation_projection.dart';
+import '../../application/relation_pair_probe.dart';
 import '../../domain/long_term_relation.dart';
 import 'relation_participant_choice.dart';
 import 'relation_participant_picker_purpose.dart';
@@ -38,16 +39,12 @@ final class _RelationParticipantPickerPageState
     extends State<RelationParticipantPickerPage> {
   late final _purpose = _purposeFor(widget.choice);
 
-  /// Исключает участника другой роли, пока он выбран. Оба состояния
-  /// участников допускает только изменение архивной связи.
+  /// Оба состояния участников допускает только изменение архивной связи.
   static SelectRelationParticipant _purposeFor(
     RelationParticipantChoice choice,
   ) => SelectRelationParticipant(
     session: IntentionSearchSession(),
-    excludedIntentionId: switch (choice.role) {
-      RelationParticipantRole.source => choice.related?.id,
-      RelationParticipantRole.related => choice.source?.id,
-    },
+    pairProbe: _pairProbeFor(choice),
     selectionContext: switch (choice.flow) {
       RelationChangeChoiceFlow(relationScope: RelationScope.archived) =>
         RelationParticipantSelectionContext.archivedRelation,
@@ -57,6 +54,25 @@ final class _RelationParticipantPickerPageState
       ) => RelationParticipantSelectionContext.activeRelation,
     },
   );
+
+  /// Проба есть, пока участник другой роли выбран.
+  static RelationPairProbe? _pairProbeFor(RelationParticipantChoice choice) {
+    final counterpart = switch (choice.role) {
+      RelationParticipantRole.source => choice.related,
+      RelationParticipantRole.related => choice.source,
+    };
+    if (counterpart == null) {
+      return null;
+    }
+    return RelationPairProbe(
+      counterpartId: counterpart.id,
+      candidateRole: choice.role,
+      ignoredRelationId: switch (choice.flow) {
+        RelationCreationChoiceFlow() => null,
+        RelationChangeChoiceFlow(:final relationId) => relationId,
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {

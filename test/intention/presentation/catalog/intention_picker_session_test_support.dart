@@ -8,12 +8,12 @@ import 'package:doable/src/intention/application/intention_catalog.dart'
     hide IntentionCatalogPage;
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
-import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import 'package:doable/src/intention/presentation/picker/intention_picker_view.dart';
+import 'package:doable/src/long_term_relation/application/relation_pair_probe.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
@@ -33,7 +33,7 @@ void defineIntentionPickerSessionTests({
   required String filterKey,
   required String listKey,
   IntentionScope scope = IntentionScope.active,
-  IntentionId? excludedIntentionId,
+  RelationPairProbe? pairProbe,
   required IntentionReadinessFilter readinessFilter,
 }) {
   testWidgets('вложенные поиски сохраняют свои параметры, порции и прокрутку', (
@@ -99,7 +99,7 @@ void defineIntentionPickerSessionTests({
     expect(initialQuery.titleFilter, isNull);
     expect(initialQuery.tagFilter, IntentionTagFilter.empty);
     expect(initialQuery.scope, scope);
-    expect(initialQuery.excludedIntentionId, excludedIntentionId);
+    expect(initialQuery.pairProbe, pairProbe);
     expect(initialQuery.readinessFilter, readinessFilter);
     expect(initialQuery.pageSize, 60);
     repository.complete(7, _page('Вторая'));

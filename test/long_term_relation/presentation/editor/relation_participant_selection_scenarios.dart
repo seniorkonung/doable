@@ -4,7 +4,9 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/long_term_relation/application/relation_pair_probe.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_choice.dart';
 import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart';
 import 'package:flutter/material.dart';
@@ -73,7 +75,7 @@ void defineRelationBlankCreationTests({
       );
       await _settlePicker(tester);
       expect(router.current.name, RelationParticipantPickerRoute.name);
-      expect(repository.catalogQueries.last.excludedIntentionId, isNull);
+      expect(repository.catalogQueries.last.pairProbe, isNull);
       expectOpenedParticipantChoice(
         tester,
         role: RelationParticipantRole.values.byName(firstRole),
@@ -97,7 +99,7 @@ void defineRelationBlankCreationTests({
         find.byKey(ValueKey('relation-editor-select-$firstRole')),
       );
       await _settlePicker(tester);
-      expect(repository.catalogQueries.last.excludedIntentionId, isNull);
+      expect(repository.catalogQueries.last.pairProbe, isNull);
       repository.completeCatalogPage(2, [first, second]);
       await tester.pumpAndSettle();
       await tester.tap(find.text(first.title));
@@ -108,7 +110,13 @@ void defineRelationBlankCreationTests({
         find.byKey(ValueKey('relation-editor-select-$secondRole')),
       );
       await _settlePicker(tester);
-      expect(repository.catalogQueries.last.excludedIntentionId, first.id);
+      expect(
+        repository.catalogQueries.last.pairProbe,
+        RelationPairProbe(
+          counterpartId: first.id,
+          candidateRole: RelationParticipantRole.values.byName(secondRole),
+        ),
+      );
       expectOpenedParticipantChoice(
         tester,
         role: RelationParticipantRole.values.byName(secondRole),
@@ -224,7 +232,7 @@ void defineRelationParticipantSelectionTests({
         );
         await _settlePicker(tester);
         expect(router.current.name, RelationParticipantPickerRoute.name);
-        expect(repository.catalogQueries[1].excludedIntentionId, isNull);
+        expect(repository.catalogQueries[1].pairProbe, isNull);
         // Предвыбранное группой намерение — участник роли, которую заменяют.
         expectOpenedParticipantChoice(
           tester,
@@ -244,7 +252,13 @@ void defineRelationParticipantSelectionTests({
           find.byKey(ValueKey('relation-editor-select-$secondRole')),
         );
         await _settlePicker(tester);
-        expect(repository.catalogQueries[2].excludedIntentionId, current.id);
+        expect(
+          repository.catalogQueries[2].pairProbe,
+          RelationPairProbe(
+            counterpartId: current.id,
+            candidateRole: RelationParticipantRole.values.byName(secondRole),
+          ),
+        );
         repository.completeCatalogPage(2, [current, sameTitle]);
         await tester.pumpAndSettle();
         expect(find.text(title), findsOneWidget);
@@ -256,7 +270,13 @@ void defineRelationParticipantSelectionTests({
           find.byKey(ValueKey('relation-editor-change-$firstRole')),
         );
         await _settlePicker(tester);
-        expect(repository.catalogQueries[3].excludedIntentionId, sameTitle.id);
+        expect(
+          repository.catalogQueries[3].pairProbe,
+          RelationPairProbe(
+            counterpartId: sameTitle.id,
+            candidateRole: RelationParticipantRole.values.byName(firstRole),
+          ),
+        );
         expectOpenedParticipantChoice(
           tester,
           role: RelationParticipantRole.values.byName(firstRole),
@@ -327,8 +347,12 @@ void defineRelationParticipantSelectionTests({
 
 final isRelationCreationFlow = isA<RelationCreationChoiceFlow>();
 
-Matcher isRelationChangeFlow(RelationScope relationScope) =>
-    isA<RelationChangeChoiceFlow>().having(
+Matcher isRelationChangeFlow(
+  LongTermRelationId relationId,
+  RelationScope relationScope,
+) => isA<RelationChangeChoiceFlow>()
+    .having((flow) => flow.relationId, 'изменяемая связь', relationId)
+    .having(
       (flow) => flow.relationScope,
       'архивное состояние изменяемой связи',
       relationScope,

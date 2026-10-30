@@ -5,6 +5,8 @@ import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
+import 'package:doable/src/long_term_relation/application/relation_pair_probe.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -550,12 +552,17 @@ IntentionCatalogQuery _jointQuery({
         _tagId(_excludedTagBase + index),
     ],
   ),
-  excludedIntentionId: switch (IntentionId.decode(
-    _fixtureId(_jointIntentionIndex(_excludedCandidate)),
-  )) {
-    IntentionIdDecodingSuccess(:final id) => id,
-    InvalidIntentionIdDecoding() => throw StateError('Неверный UUID фикстуры.'),
-  },
+  pairProbe: RelationPairProbe(
+    counterpartId: switch (IntentionId.decode(
+      _fixtureId(_jointIntentionIndex(_excludedCandidate)),
+    )) {
+      IntentionIdDecodingSuccess(:final id) => id,
+      InvalidIntentionIdDecoding() => throw StateError(
+        'Неверный UUID фикстуры.',
+      ),
+    },
+    candidateRole: RelationParticipantRole.related,
+  ),
   order: IntentionCatalogOrder.createdAtDescending,
   pageSize: pageSize,
   cursor: cursor,
