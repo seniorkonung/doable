@@ -431,7 +431,7 @@
     - проверки: новый `test/intention/presentation/catalog/intention_catalog_row_test.dart`, `intention_catalog_page_test.dart`, `test/intention/presentation/intention_tag_search_accessibility_test.dart`, `test/app/tag_app_flow_test.dart`.
   - **Размер:** M.
 
-- [ ] 4.3 Оставить в `IntentionSummaryView` только то, что показывает страница подробностей связи
+- [x] 4.3 Оставить в `IntentionSummaryView` только то, что показывает страница подробностей связи
   - **Критерии приёмки:**
     - Параметров `traits`, `confirmedTags` и `showArchiveState` нет: страница подробностей связи — единственный оставшийся потребитель, и она не передаёт признаков и тегов, а архивное состояние показывает всегда.
     - Страница подробностей связи выглядит и ведёт себя как раньше.

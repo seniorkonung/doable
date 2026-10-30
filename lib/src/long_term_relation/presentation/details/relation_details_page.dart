@@ -637,7 +637,6 @@ final class _ParticipantTransition extends StatelessWidget {
             key: transitionKey,
             title: participant.title,
             archiveState: participant.archiveState,
-            showArchiveState: true,
             tapHint: localizations.relationDetailsOpenParticipant,
             onTap: () => unawaited(
               context.router.push(
