@@ -11,8 +11,9 @@ import 'package:doable/src/design_system/components/tag_row.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/data/local/app_database.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
-import 'package:doable/src/intention/presentation/intention_summary_view.dart';
+import 'package:doable/src/intention/application/intention_catalog.dart'
+    show IntentionScope;
+import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_section.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -22,6 +23,7 @@ import '../support/app_root_pages.dart';
 import '../support/inline_text.dart';
 import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
+import '../support/intention_catalog_controls.dart';
 import '../support/tag_storage_fixture.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
 import '../support/quick_creation.dart';
@@ -46,7 +48,6 @@ void main() {
     (tester) async {
       final app = await _App.pump(tester, const Locale('ru'));
       final l10n = app.l10n;
-      const page = IntentionCatalogPage;
       final before = _storedGraph(app.raw);
       final changesBefore = _connectionChanges(app.raw);
       final health = l10n.intentionSummaryTags('Здоровье');
@@ -54,7 +55,7 @@ void main() {
       final all = l10n.intentionSummaryTags('Здоровье, Спорт, Отдых');
 
       // Теги видны и без условий; одноимённые намерения остаются отдельными.
-      await _expectResults(tester, page, [
+      await _expectResults(tester, [
         ('Ходить в парк', healthRest),
         ('Гулять без тегов', l10n.intentionSummaryNoTags),
         ('Читать в тишине', healthRest),
@@ -62,49 +63,49 @@ void main() {
         ('Ходить до магазина', health),
         ('Ходить в парк', healthRest),
       ]);
-      expect(find.text(l10n.catalogTotalCount(6)), findsOneWidget);
-      expect(_conditions(tester, page), isEmpty);
+      expect(intentionCatalogTotal(6), findsOneWidget);
+      expect(shownIntentionCatalogParameters(tester).tagConditions, 0);
 
       // Поиск только по обязательным тегам.
       await _addCondition(tester, l10n, _health, present: true);
       await _addCondition(tester, l10n, _rest, present: true);
-      await _expectResults(tester, page, [
+      await _expectResults(tester, [
         ('Ходить в парк', healthRest),
         ('Читать в тишине', healthRest),
         ('Ходить в зал', all),
         ('Ходить в парк', healthRest),
       ]);
       await _addCondition(tester, l10n, _sport, present: false);
-      final combined = [
-        'Здоровье',
-        'Отдых',
-        l10n.intentionTagConditionAbsent('Спорт'),
-      ];
-      expect(_conditions(tester, page), combined);
-      await _expectResults(tester, page, [
+      expect(shownIntentionCatalogParameters(tester).tagConditions, 3);
+      await _expectResults(tester, [
         ('Ходить в парк', healthRest),
         ('Читать в тишине', healthRest),
         ('Ходить в парк', healthRest),
       ]);
 
       // Название, обязательные и исключённые теги действуют одновременно.
-      await tester.enterText(
-        find.byKey(const ValueKey('catalog-filter-field')),
-        'ходить',
-      );
-      await _expectResults(tester, page, [
+      await enterIntentionCatalogTitle(tester, 'ходить');
+      await _expectResults(tester, [
         ('Ходить в парк', healthRest),
         ('Ходить в парк', healthRest),
       ]);
-      expect(find.text(l10n.catalogTotalCount(2)), findsOneWidget);
+      expect(intentionCatalogTotal(2), findsOneWidget);
 
       // Смена охвата сохраняет совместный фильтр.
-      await _selectScope(tester, l10n.catalogScopeArchived);
-      await _expectResults(tester, page, [('Ходить в парк', healthRest)]);
-      expect(find.text(l10n.catalogTotalCount(1)), findsOneWidget);
-      expect(_conditions(tester, page), combined);
-      await _selectScope(tester, l10n.catalogScopeActive);
-      await _expectResults(tester, page, [
+      await selectIntentionCatalogScope(
+        tester,
+        IntentionScope.archived,
+        tap: _tap,
+      );
+      await _expectResults(tester, [('Ходить в парк', healthRest)]);
+      expect(intentionCatalogTotal(1), findsOneWidget);
+      expect(shownIntentionCatalogParameters(tester).tagConditions, 3);
+      await selectIntentionCatalogScope(
+        tester,
+        IntentionScope.active,
+        tap: _tap,
+      );
+      await _expectResults(tester, [
         ('Ходить в парк', healthRest),
         ('Ходить в парк', healthRest),
       ]);
@@ -120,7 +121,7 @@ void main() {
       await tester.binding.handlePopRoute();
       await _waitFor(tester, () => find.byType(TagRow).evaluate().isEmpty);
       await tester.pumpAndSettle();
-      expect(_conditions(tester, page), combined);
+      expect(shownIntentionCatalogParameters(tester).tagConditions, 3);
 
       // Чип по-прежнему меняет надобность на прежнем месте.
       await _tap(
@@ -129,31 +130,38 @@ void main() {
           ValueKey('intention-tag-condition-toggle-${tagFixtureId(_sport)}'),
         ),
       );
-      expect(_conditions(tester, page), ['Здоровье', 'Отдых', 'Спорт']);
-      await _expectResults(tester, page, [('Ходить в зал', all)]);
+      expect(_conditions(tester), ['Здоровье', 'Отдых', 'Спорт']);
+      await _expectResults(tester, [('Ходить в зал', all)]);
       await _tap(
         tester,
         find.byKey(
           ValueKey('intention-tag-condition-toggle-${tagFixtureId(_sport)}'),
         ),
       );
-      expect(_conditions(tester, page), combined);
-      await _expectResults(tester, page, [
+      expect(_conditions(tester), [
+        'Здоровье',
+        'Отдых',
+        l10n.intentionTagConditionAbsent('Спорт'),
+      ]);
+      await _expectResults(tester, [
         ('Ходить в парк', healthRest),
         ('Ходить в парк', healthRest),
       ]);
 
       // Поиск только с исключением допускает намерение без тегов.
-      await tester.enterText(
-        find.byKey(const ValueKey('catalog-filter-field')),
-        '',
+      await enterIntentionCatalogTitle(tester, '');
+      await removeIntentionCatalogTagCondition(
+        tester,
+        _tagId(_health),
+        tap: _tap,
       );
-      await _removeCondition(tester, _health);
-      await _removeCondition(tester, _rest);
-      expect(_conditions(tester, page), [
-        l10n.intentionTagConditionAbsent('Спорт'),
-      ]);
-      await _expectResults(tester, page, [
+      await removeIntentionCatalogTagCondition(
+        tester,
+        _tagId(_rest),
+        tap: _tap,
+      );
+      expect(shownIntentionCatalogParameters(tester).tagConditions, 1);
+      await _expectResults(tester, [
         ('Ходить в парк', healthRest),
         ('Гулять без тегов', l10n.intentionSummaryNoTags),
         ('Читать в тишине', healthRest),
@@ -171,7 +179,7 @@ void main() {
       await _addCondition(tester, l10n, _health, present: false);
       await _until(tester, find.text(l10n.catalogTagConditionsEmpty));
       expect(find.text(l10n.catalogActiveEmpty), findsNothing);
-      expect(_results(tester, page), isEmpty);
+      expect(intentionCatalogRows, findsNothing);
 
       // Поиск не выполняет команд тегов и не меняет граф.
       expect(_storedGraph(app.raw), before);
@@ -183,13 +191,12 @@ void main() {
   testWidgets('Удаление обязательного тега расширяет выдачу', (tester) async {
     final app = await _App.pump(tester, const Locale('ru'));
     final l10n = app.l10n;
-    const page = IntentionCatalogPage;
     final healthRest = l10n.intentionSummaryTags('Здоровье, Отдых');
     final rest = l10n.intentionSummaryTags('Отдых');
     final health = tagFixtureId(_health);
     await _addCondition(tester, l10n, _health, present: true);
     await _addCondition(tester, l10n, _sport, present: false);
-    await _expectResults(tester, page, [
+    await _expectResults(tester, [
       ('Ходить в парк', healthRest),
       ('Читать в тишине', healthRest),
       ('Ходить до магазина', l10n.intentionSummaryTags('Здоровье')),
@@ -216,10 +223,8 @@ void main() {
     );
 
     await _closePanelAndPage(tester, l10n);
-    expect(_conditions(tester, page), [
-      l10n.intentionTagConditionAbsent('Спорт'),
-    ]);
-    await _expectResults(tester, page, [
+    expect(shownIntentionCatalogParameters(tester).tagConditions, 1);
+    await _expectResults(tester, [
       ('Ходить в парк', rest),
       ('Гулять без тегов', l10n.intentionSummaryNoTags),
       ('Читать в тишине', rest),
@@ -233,21 +238,18 @@ void main() {
   testWidgets('Нажатия переключают надобность по кругу', (tester) async {
     final app = await _App.pump(tester, const Locale('ru'));
     final l10n = app.l10n;
-    const page = IntentionCatalogPage;
     final healthRest = l10n.intentionSummaryTags('Здоровье, Отдых');
     final all = l10n.intentionSummaryTags('Здоровье, Спорт, Отдых');
     final health = l10n.intentionSummaryTags('Здоровье');
     await _openFilterPanel(tester);
 
     await _cycle(tester, _sport, TagRowFilterMark.mustBePresent);
-    expect(_conditions(tester, page), ['Спорт']);
-    await _expectResults(tester, page, [('Ходить в зал', all)]);
+    expect(shownIntentionCatalogParameters(tester).tagConditions, 1);
+    await _expectResults(tester, [('Ходить в зал', all)]);
 
     await _cycle(tester, _sport, TagRowFilterMark.mustBeAbsent);
-    expect(_conditions(tester, page), [
-      l10n.intentionTagConditionAbsent('Спорт'),
-    ]);
-    await _expectResults(tester, page, [
+    expect(shownIntentionCatalogParameters(tester).tagConditions, 1);
+    await _expectResults(tester, [
       ('Ходить в парк', healthRest),
       ('Гулять без тегов', l10n.intentionSummaryNoTags),
       ('Читать в тишине', healthRest),
@@ -256,8 +258,8 @@ void main() {
     ]);
 
     await _cycle(tester, _sport, TagRowFilterMark.none);
-    expect(_conditions(tester, page), isEmpty);
-    await _expectResults(tester, page, [
+    expect(shownIntentionCatalogParameters(tester).tagConditions, 0);
+    await _expectResults(tester, [
       ('Ходить в парк', healthRest),
       ('Гулять без тегов', l10n.intentionSummaryNoTags),
       ('Читать в тишине', healthRest),
@@ -272,17 +274,13 @@ void main() {
   testWidgets('«Сбросить» снимает все условия по тегам', (tester) async {
     final app = await _App.pump(tester, const Locale('ru'));
     final l10n = app.l10n;
-    const page = IntentionCatalogPage;
     final healthRest = l10n.intentionSummaryTags('Здоровье, Отдых');
-    await tester.enterText(
-      find.byKey(const ValueKey('catalog-filter-field')),
-      'ходить',
-    );
+    await enterIntentionCatalogTitle(tester, 'ходить');
     await _openFilterPanel(tester);
     await _cycle(tester, _health, TagRowFilterMark.mustBePresent);
     await _cycle(tester, _sport, TagRowFilterMark.mustBePresent);
     await _cycle(tester, _sport, TagRowFilterMark.mustBeAbsent);
-    await _expectResults(tester, page, [
+    await _expectResults(tester, [
       ('Ходить в парк', healthRest),
       ('Ходить до магазина', l10n.intentionSummaryTags('Здоровье')),
       ('Ходить в парк', healthRest),
@@ -294,28 +292,21 @@ void main() {
       () => find.text(l10n.tagsPanelResetConditions).evaluate().isEmpty,
     );
 
-    expect(_conditions(tester, page), isEmpty);
+    expect(shownIntentionCatalogParameters(tester).tagConditions, 0);
     expect(_panelMarks(tester), everyElement(TagRowFilterMark.none));
-    await _expectResults(tester, page, [
+    await _expectResults(tester, [
       ('Ходить в парк', healthRest),
       ('Ходить в зал', l10n.intentionSummaryTags('Здоровье, Спорт, Отдых')),
       ('Ходить до магазина', l10n.intentionSummaryTags('Здоровье')),
       ('Ходить в парк', healthRest),
     ]);
-    expect(
-      tester
-          .widget<TextField>(find.byKey(const ValueKey('catalog-filter-field')))
-          .controller!
-          .text,
-      'ходить',
-    );
+    expect(shownIntentionCatalogParameters(tester).titleFilter, 'ходить');
     expect(tester.takeException(), isNull);
   });
 
   testWidgets('Созданный в фильтре тег становится условием', (tester) async {
     final app = await _App.pump(tester, const Locale('ru'));
     final l10n = app.l10n;
-    const page = IntentionCatalogPage;
     final assignmentsBefore = _assignments(app.raw);
     await _openFilterPanel(tester);
 
@@ -344,9 +335,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(_panelNames(tester), ['Парк', 'Здоровье', 'Спорт', 'Отдых']);
-    expect(_conditions(tester, page), ['Парк']);
+    expect(shownIntentionCatalogParameters(tester).tagConditions, 1);
     await _until(tester, find.text(l10n.catalogTagConditionsEmpty));
-    expect(_results(tester, page), isEmpty);
+    expect(intentionCatalogRows, findsNothing);
     // Создание в фильтре не назначает тег ни одному намерению.
     expect(_assignments(app.raw), assignmentsBefore);
     expect(tester.takeException(), isNull);
@@ -357,12 +348,11 @@ void main() {
   ) async {
     final app = await _App.pump(tester, const Locale('ru'));
     final l10n = app.l10n;
-    const catalog = IntentionCatalogPage;
     const actions = DailyChoiceActionPickerPage;
     final healthRest = l10n.intentionSummaryTags('Здоровье, Отдых');
     final health = l10n.intentionSummaryTags('Здоровье');
     await _addCondition(tester, l10n, _sport, present: true);
-    await _expectResults(tester, catalog, [
+    await _expectResults(tester, [
       ('Ходить в зал', l10n.intentionSummaryTags('Здоровье, Спорт, Отдых')),
     ]);
     await openQuickCreation(
@@ -393,14 +383,14 @@ void main() {
     await _closeFilterPanel(tester, l10n);
 
     expect(tester.widget<FilterButton>(_filterButton).count, 0);
-    await _expectResults(tester, actions, [
+    await _expectResults(tester, [
       ('Ходить в зал', healthRest),
       ('Ходить до магазина', health),
       ('Ходить в парк', healthRest),
-    ]);
+    ], results: _actionResults);
     await _closeTop(tester, actions);
-    expect(_conditions(tester, catalog), isEmpty);
-    await _expectResults(tester, catalog, [
+    expect(shownIntentionCatalogParameters(tester).tagConditions, 0);
+    await _expectResults(tester, [
       ('Ходить в парк', healthRest),
       ('Гулять без тегов', l10n.intentionSummaryNoTags),
       ('Читать в тишине', healthRest),
@@ -416,7 +406,6 @@ void main() {
   ) async {
     final app = await _App.pump(tester, const Locale('ru'));
     final l10n = app.l10n;
-    const page = IntentionCatalogPage;
     final positionsBefore = _positions(app.raw);
     // У «Читать в тишине» назначены «Здоровье» и «Отдых», но не «Спорт».
     await _tap(tester, find.text('Читать в тишине'));
@@ -442,7 +431,7 @@ void main() {
 
     await _closePanelAndPage(tester, l10n);
     final restHealth = l10n.intentionSummaryTags('Отдых, Здоровье');
-    await _expectResults(tester, page, [
+    await _expectResults(tester, [
       ('Ходить в парк', restHealth),
       ('Гулять без тегов', l10n.intentionSummaryNoTags),
       ('Читать в тишине', restHealth),
@@ -483,7 +472,7 @@ final class _App {
     _seed(raw);
     await tester.pumpWidget(MainApp(runtime: runtime));
     await openIntentionGraph(tester, waitFor: _until);
-    await _until(tester, find.byType(IntentionSummaryView));
+    await _until(tester, intentionCatalogRows);
     await tester.pumpAndSettle();
     return _App(raw, lookupAppLocalizations(locale));
   }
@@ -579,18 +568,22 @@ List<List<Object?>> _assignments(sqlite.Database raw) => raw
 Object? _connectionChanges(sqlite.Database raw) =>
     raw.select('SELECT total_changes() AS count').single['count'];
 
-/// Видимые результаты поиска страницы в порядке выдачи.
-List<_Row> _results(WidgetTester tester, Type page) {
-  final pickerRows = find.descendant(
-    of: find.byType(page),
-    matching: find.byType(PickerRow),
-  );
-  if (pickerRows.evaluate().isEmpty) return _summaryResults(tester, page);
-  // Строка экрана выбора рисует теги линией без текстовых виджетов: их
-  // состав сравнивается в той же подписи, что у прежней строки.
-  final l10n = AppLocalizations.of(tester.element(pickerRows.first));
+/// Результаты каталога намерений в порядке выдачи.
+List<_Row> _catalogResults(WidgetTester tester) => [
+  for (final row in shownIntentionCatalogRows(tester)) (row.title, row.tags),
+];
+
+/// Результаты экрана выбора действия в порядке выдачи.
+///
+/// Строка экрана выбора рисует теги линией без текстовых виджетов: их состав
+/// сравнивается в той же подписи, что у строки каталога.
+List<_Row> _actionResults(WidgetTester tester) {
+  final page = find.byType(DailyChoiceActionPickerPage);
+  final l10n = AppLocalizations.of(tester.element(page));
   return [
-    for (final row in tester.widgetList<PickerRow>(pickerRows))
+    for (final row in tester.widgetList<PickerRow>(
+      find.descendant(of: page, matching: find.byType(PickerRow)),
+    ))
       (
         row.name,
         row.tags.isEmpty
@@ -602,48 +595,21 @@ List<_Row> _results(WidgetTester tester, Type page) {
   ];
 }
 
-List<_Row> _summaryResults(WidgetTester tester, Type page) => [
-  for (final view
-      in find
-          .descendant(
-            of: find.byType(page),
-            matching: find.byType(IntentionSummaryView),
-          )
-          .evaluate())
-    switch (find
-        .descendant(
-          of: find.byElementPredicate((element) => element == view),
-          matching: find.byType(Text),
-        )
-        .evaluate()
-        .map((element) => textIgnoringInlineWidgets(element.widget as Text))
-        .toList()) {
-      [final title, final tags, ...] => (title, tags),
-      final texts => fail('Строка результата без названия и тегов: $texts'),
-    },
-];
-
-/// Подписи чипов выбранных условий страницы в порядке добавления.
-List<String> _conditions(WidgetTester tester, Type page) => [
+/// Подписи чипов выбранных условий каталога в порядке добавления.
+List<String> _conditions(WidgetTester tester) => [
   for (final label
-      in find
-          .descendant(
-            of: find.byType(page),
-            matching: find.byKey(
-              const ValueKey('intention-tag-condition-label'),
-            ),
-          )
-          .evaluate())
+      in find.byKey(const ValueKey('intention-tag-condition-label')).evaluate())
     textIgnoringInlineWidgets(label.widget as Text),
 ];
 
+/// Дожидается результатов [expected]; по умолчанию читает выдачу каталога.
 Future<void> _expectResults(
   WidgetTester tester,
-  Type page,
-  List<_Row> expected,
-) async {
+  List<_Row> expected, {
+  List<_Row> Function(WidgetTester tester) results = _catalogResults,
+}) async {
   for (var attempt = 0; attempt < 100; attempt++) {
-    final actual = _results(tester, page);
+    final actual = results(tester);
     if (actual.length == expected.length &&
         [
           for (var index = 0; index < actual.length; index++)
@@ -657,7 +623,7 @@ Future<void> _expectResults(
     await tester.pump(const Duration(milliseconds: 20));
   }
   await tester.pumpAndSettle();
-  expect(_results(tester, page), expected);
+  expect(results(tester), expected);
 }
 
 /// Добавляет условие в панели фильтра: первое нажатие на тег требует его,
@@ -675,13 +641,10 @@ Future<void> _addCondition(
   await _closeFilterPanel(tester, l10n);
 }
 
-/// Открывает панель фильтра элементом [opener] — по умолчанию кнопкой
-/// «+ Тег» каталога — и ждёт строк тегов.
+/// Открывает панель фильтра элементом [opener] — по умолчанию элементом
+/// каталога — и ждёт строк тегов.
 Future<void> _openFilterPanel(WidgetTester tester, {Finder? opener}) async {
-  await _tap(
-    tester,
-    opener ?? find.byKey(const ValueKey('intention-tag-conditions-add')),
-  );
+  await _tap(tester, opener ?? intentionCatalogTagFilterControl);
   await _until(tester, find.byType(TagRow));
   await tester.pumpAndSettle();
 }
@@ -698,21 +661,6 @@ Future<void> _closeFilterPanel(
 ) async {
   await _tap(tester, find.text(l10n.tagsPanelDone));
   await _waitFor(tester, () => find.byType(TagRow).evaluate().isEmpty);
-  await tester.pumpAndSettle();
-}
-
-Future<void> _removeCondition(WidgetTester tester, int tag) async {
-  await _tap(
-    tester,
-    find.byKey(ValueKey('intention-tag-condition-remove-${tagFixtureId(tag)}')),
-  );
-  await tester.pumpAndSettle();
-}
-
-Future<void> _selectScope(WidgetTester tester, String label) async {
-  await _tap(tester, find.byKey(const ValueKey('catalog-scope-control')));
-  await tester.pumpAndSettle();
-  await tester.tap(find.text(label).last);
   await tester.pumpAndSettle();
 }
 
@@ -808,6 +756,9 @@ Future<void> _dragToFirst(WidgetTester tester, Finder row) async {
   await drag.up();
   await tester.pumpAndSettle();
 }
+
+TagId _tagId(int tag) =>
+    (TagId.decode(tagFixtureId(tag)) as TagIdDecodingSuccess).id;
 
 Finder _panelRow(int tag) =>
     find.byKey(ValueKey('tags-panel-row-${tagFixtureId(tag)}'));

@@ -327,7 +327,7 @@
     - меняются `test/app/intention_creation_sheet_integration_test.dart`, `test/app/creation_flows_integration_test.dart`, `test/intention/presentation/editor/intention_editor_page_test.dart`, `test/intention/presentation/editor/intention_creation_sheet_accessibility_test.dart`.
   - **Размер:** M.
 
-- [ ] 3.5 Провести через общие шаги каталога сценарии поиска по тегам, тегов и их назначения
+- [x] 3.5 Провести через общие шаги каталога сценарии поиска по тегам, тегов и их назначения
   - **Критерии приёмки:**
     - `intention_tag_search_app_flow_test.dart` вводит название, выбирает охват, снимает условия, читает строки каталога, количество и число условий общими шагами, а панель фильтра по умолчанию открывает `intentionCatalogTagFilterControl`. Локальных `_summaryResults`, `_selectScope`, `_removeCondition` и ключей `catalog-*` нет.
     - `tag_app_flow_test.dart` задаёт условие `addIntentionCatalogTagCondition` и ждёт строку по подписи тегов из `shownIntentionCatalogRows`, а `tag_assignment_app_flow_test.dart` и `tag_accessibility_test.dart` ждут `intentionCatalogTagFilterControl`.
