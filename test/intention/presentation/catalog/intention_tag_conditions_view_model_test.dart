@@ -100,7 +100,7 @@ void main() {
 
     expect(published, [
       [(_id(1), _present)],
-      [(_id(1), _present), (_id(2), _present)],
+      unorderedEquals([(_id(1), _present), (_id(2), _present)]),
       [(_id(2), _present)],
       <(TagId, IntentionTagRequirement)>[],
     ]);

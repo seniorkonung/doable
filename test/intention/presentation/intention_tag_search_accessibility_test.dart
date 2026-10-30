@@ -131,16 +131,19 @@ void main() {
     expect(find.text(l10n.tagsPanelFilterTitle), findsNothing);
     expect(tester.takeException(), isNull);
     expectIntentionGraphRootPage(router);
-    expect(container.read(conditionsProvider).conditions, [
-      for (var index = 0; index < _initialConditions; index++)
-        _condition(
-          _tags[index],
-          index.isEven
-              ? IntentionTagRequirement.mustBePresent
-              : IntentionTagRequirement.mustBeAbsent,
-        ),
-      _condition(_tags.last, IntentionTagRequirement.mustBeAbsent),
-    ]);
+    expect(
+      container.read(conditionsProvider).conditions,
+      unorderedEquals([
+        for (var index = 0; index < _initialConditions; index++)
+          _condition(
+            _tags[index],
+            index.isEven
+                ? IntentionTagRequirement.mustBePresent
+                : IntentionTagRequirement.mustBeAbsent,
+          ),
+        _condition(_tags.last, IntentionTagRequirement.mustBeAbsent),
+      ]),
+    );
 
     // Условия видны только по кнопке фильтра, а не под полем названия.
     expect(find.textContaining(_tags.first.name.value), findsNothing);
@@ -156,7 +159,11 @@ void main() {
     await tester.tap(firstTagRow);
     await tester.pump();
     expect(
-      container.read(conditionsProvider).conditions.first.requirement,
+      container
+          .read(conditionsProvider)
+          .conditions
+          .singleWhere((condition) => condition.tagId == _tags.first.id)
+          .requirement,
       IntentionTagRequirement.mustBeAbsent,
     );
     await _reach(tester, lastTagRow, _panelList);

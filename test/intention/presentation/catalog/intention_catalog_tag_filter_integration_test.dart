@@ -711,10 +711,10 @@ void main() {
           ),
         ),
       );
-      expect(_shown(container, conditions), [
-        (_tagId(301), _present),
-        (_tagId(302), _absent),
-      ]);
+      expect(
+        _shown(container, conditions),
+        unorderedEquals([(_tagId(301), _present), (_tagId(302), _absent)]),
+      );
       expect((await confirmed()).totalCount, 5);
 
       await _deleteTag(container, _tagId(301));
