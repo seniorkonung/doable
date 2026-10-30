@@ -1,16 +1,17 @@
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/design_system/components/catalog_header.dart';
+import 'package:doable/src/design_system/components/empty_state.dart';
 import 'package:doable/src/design_system/components/list_state.dart';
+import 'package:doable/src/design_system/doable_metrics.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
-import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
-import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
-import 'package:doable/src/intention/presentation/picker/intention_picker_results.dart';
-import 'package:doable/src/tag/application/tag_command.dart';
+import 'package:doable/src/intention/presentation/search/intention_search_list.dart';
+import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
@@ -22,7 +23,8 @@ import '../catalog/catalog_reconciliation_test_support.dart';
 import '../catalog/catalog_test_support.dart';
 import '../../../support/tag_positions.dart';
 
-const _emptyScopeRu = 'Доступных активных действий нет.';
+/// Высота строки-образца выдачи.
+const _rowExtent = 48.0;
 
 final _list = find.byKey(
   const PageStorageKey<String>('daily-choice-action-list'),
@@ -196,49 +198,43 @@ void main() {
     });
   });
 
-  group('выбор и стрелка', () {
-    testWidgets('выбор передаёт сводку строки с ревизией выдачи, из которой '
-        'строка построена, а стрелка — идентификатор', (tester) async {
-      final semantics = tester.ensureSemantics();
+  group('согласование выдачи без смены параметров', () {
+    testWidgets('строка, добавленная перед видимой, оставляет видимую строку '
+        'на месте', (tester) async {
       final h = await _open(tester);
-      final renamed = Tag(
-        id: _sport.id,
-        name: TagName.fromInput('Бег'),
-        color: _sport.color,
-        position: _sport.position,
+      h.notifier.changeTagFilter(
+        IntentionTagFilter(requiredTagIds: [_sport.id]),
       );
-      final summary = testSummary(
-        index: 1,
-        title: 'Бегать по утрам',
-        readiness: IntentionReadiness.ready,
-        tags: [_sport],
+      await _waitForQueries(tester, h, 2);
+      h.repository.complete(
+        1,
+        _firstPage([
+          for (var index = 60; index >= 1; index -= 2)
+            _action(index, tags: [_sport]),
+        ]),
       );
-      h.repository.complete(0, _firstPage([summary]));
+      await _settle(tester);
+      h.position.jumpTo(300);
+      await _settle(tester);
+      final visibleTop = _rowTop(tester, 'Действие 46');
+
+      // Назначение обязательного тега добавляет строку перед видимой.
+      final (command, result) = intentionTagAssignment(
+        state: TagAssignmentState.assigned,
+        tagId: _sport.id,
+        before: _action(59),
+        after: _action(59, tags: [_sport]),
+        revision: const TestCatalogRevision(2),
+      );
+      await acceptTagCommand(h.container, h.repository, command, result).future;
       await _settle(tester);
 
-      await acceptTagCommand(
-        h.container,
-        h.repository,
-        UpdateTag(tagId: _sport.id, name: renamed.name, color: renamed.color),
-        tagRenameSuccess(
-          before: _sport,
-          after: renamed,
-          revision: const TestCatalogRevision(2),
-        ),
-      ).future;
-      await _settle(tester);
-      await tester.tap(find.text('Бегать по утрам'));
-      await tester.tap(find.bySemanticsLabel(RegExp('Открыть страницу')));
-
-      final pick = h.picks.single;
-      expect(pick.value.id, summary.id);
-      expect(pick.value.tags.single.name.value, 'Бег');
-      expect(
-        pick.revision.compareTo(const TestCatalogRevision(2)),
-        GraphRevisionOrder.same,
-      );
-      expect(h.openedDetails, [summary.id]);
-      semantics.dispose();
+      final confirmed = h.container
+          .read(intentionCatalogViewModelProvider(h.purpose))
+          .requireValue;
+      expect((confirmed as IntentionCatalogLoaded).items, hasLength(31));
+      expect(h.position.pixels, 300 + _rowExtent + DoableMetrics.space2);
+      expect(_rowTop(tester, 'Действие 46'), visibleTop);
     });
   });
 }
@@ -268,15 +264,20 @@ final _listState = find.byWidgetPredicate((widget) => widget is ListState);
 Finder _loading(String text) =>
     find.descendant(of: _listState, matching: find.text(text));
 
+IntentionSummary _action(int index, {List<Tag> tags = const []}) => testSummary(
+  index: index,
+  title: 'Действие $index',
+  readiness: IntentionReadiness.ready,
+  tags: tags,
+);
+
 /// Готовые к действию сводки в порядке выдачи: от новых к старым.
 List<IntentionSummary> _actions(int count) => [
-  for (var index = count; index >= 1; index--)
-    testSummary(
-      index: index,
-      title: 'Действие $index',
-      readiness: IntentionReadiness.ready,
-    ),
+  for (var index = count; index >= 1; index--) _action(index),
 ];
+
+double _rowTop(WidgetTester tester, String title) =>
+    tester.getTopLeft(find.text(title)).dy;
 
 Result<IntentionCatalogPage> _firstPage(
   List<IntentionSummary> items, {
@@ -311,8 +312,6 @@ final class _Harness {
   final ProviderContainer container;
   final ControlledCatalogRepository repository;
   final IntentionPickerPurpose purpose;
-  final picks = <GraphSnapshot<IntentionSummary>>[];
-  final openedDetails = <IntentionId>[];
 
   IntentionCatalogViewModel get notifier =>
       container.read(intentionCatalogViewModelProvider(purpose).notifier);
@@ -352,12 +351,16 @@ Future<_Harness> _open(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
-          body: IntentionPickerResults(
+          body: IntentionSearchList(
             purpose: h.purpose,
-            emptyScopeMessage: _emptyScopeRu,
+            rowBuilder: (context, results, summary) =>
+                SizedBox(height: _rowExtent, child: Text(summary.title)),
+            emptyScope: (_) => const EmptyState(
+              title: 'Выбрать не из чего',
+              text: 'Доступных активных действий нет.',
+            ),
             onResetFilters: () {},
-            onPick: h.picks.add,
-            onOpenDetails: h.openedDetails.add,
+            bottomPadding: DoableMetrics.space10,
           ),
         ),
       ),

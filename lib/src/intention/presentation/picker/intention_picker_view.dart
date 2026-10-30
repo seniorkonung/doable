@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../../../design_system/components/catalog_header.dart';
+import '../../../design_system/components/empty_state.dart';
 import '../../../design_system/components/filter_button.dart';
 import '../../../design_system/components/search_field.dart';
 import '../../../design_system/components/top_bar.dart';
@@ -19,8 +20,9 @@ import '../catalog/intention_catalog_state.dart';
 import '../catalog/intention_catalog_view_model.dart';
 import '../catalog/intention_tag_conditions_view_model.dart';
 import '../search/intention_search_kind.dart';
+import '../search/intention_search_list.dart';
 import 'intention_picker_purpose_sheet.dart';
-import 'intention_picker_results.dart';
+import 'intention_picker_row.dart';
 import 'intention_picker_show_and_sort_sheet.dart';
 
 /// Экран выбора намерения назначения [purpose]: крестик с заголовком, поле
@@ -224,16 +226,28 @@ final class _IntentionPickerViewState
               ),
             ),
             Expanded(
-              child: IntentionPickerResults(
+              child: IntentionSearchList(
                 purpose: widget.purpose,
-                emptyScopeMessage: widget.emptyScopeMessage,
+                rowBuilder: (context, results, summary) => IntentionPickerRow(
+                  key: ValueKey('$keyPrefix-${summary.id.toCanonicalString()}'),
+                  purpose: widget.purpose,
+                  summary: summary,
+                  requiredTagIds: results.query.tagFilter.requiredTagIds,
+                  onPick: () => widget.onPick(
+                    GraphSnapshot(value: summary, revision: results.revision),
+                  ),
+                  onOpenPage: () => widget.onOpenDetails(summary.id),
+                ),
+                emptyScope: (_) => EmptyState(
+                  title: l10n.intentionPickerEmptyScopeTitle,
+                  text: widget.emptyScopeMessage,
+                ),
                 onResetFilters: () {
                   _titleController.clear();
                   notifier.clearTitleFilter();
                   ref.read(conditionsProvider.notifier).clear();
                 },
-                onPick: widget.onPick,
-                onOpenDetails: widget.onOpenDetails,
+                bottomPadding: DoableMetrics.space10,
               ),
             ),
           ],
