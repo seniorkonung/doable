@@ -352,7 +352,7 @@
   - **Предполагаемые файлы:** `test/app/long_term_relation_app_flow_test.dart`, `test/app/intention_app_lifecycle_test.dart`, `test/intention/presentation/details/intention_details_page_test.dart`.
   - **Размер:** S.
 
-- [ ] 3.7 Проверить готовность фазы 3: сценарии проходят каталог через общие шаги на прежней странице
+- [x] 3.7 Проверить готовность фазы 3: сценарии проходят каталог через общие шаги на прежней странице
   - **Критерии приёмки:**
     - Сценарные проверки, которые проходят через каталог, обращаются к его управлению только через общие шаги, и все они проходят на прежней странице.
     - Ключи управления каталогом, ключ списка, `IntentionSummaryView` и строки `Total intentions`, `Filter by title`, `catalogTotalCount`, `catalogFilterLabel` встречаются только в `test/support/intention_catalog_controls.dart` и проверках самой прежней страницы и её частей: `intention_catalog_page_test.dart`, `intention_search_results_test.dart`, `intention_tag_conditions_section_test.dart`, `intention_tag_search_accessibility_test.dart`, `intention_summary_view_test.dart`.
