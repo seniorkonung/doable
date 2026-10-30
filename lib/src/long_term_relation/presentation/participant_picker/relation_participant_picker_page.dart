@@ -20,10 +20,12 @@ import 'relation_participant_picker_purpose.dart';
 /// Страница показывает экран выбора над отдельной сессией ограниченного
 /// каталога, ограничения которого выводит из описания выбора. Второе
 /// намерение пары исключает запрос каталога по идентификатору, поэтому
-/// одноимённые намерения остаются отдельными строками. Выбор возвращает
-/// снимок участника с ревизией выдачи, из которой выбрана строка. Закрытие
-/// не возвращает ничего и не создаёт намерений. Подзаголовок шапки
-/// напоминает связь, из формы которой открыт поиск.
+/// одноимённые намерения остаются отдельными строками. Строки, выбор которых
+/// дал бы занятую пару, отмечены, не выбираются, а нажатие на их текст
+/// открывает занимающую связь поверх поиска. Выбор возвращает снимок
+/// участника с ревизией выдачи, из которой выбрана строка. Закрытие не
+/// возвращает ничего и не создаёт намерений. Подзаголовок шапки напоминает
+/// связь, из формы которой открыт поиск.
 @RoutePage()
 final class RelationParticipantPickerPage extends StatefulWidget {
   const RelationParticipantPickerPage({required this.choice, super.key});
@@ -97,6 +99,11 @@ final class _RelationParticipantPickerPageState
       ),
       onOpenDetails: (id) => unawaited(
         context.router.push(IntentionDetailsRoute(intentionId: id)),
+      ),
+      onOpenOccupant: (occupant) => unawaited(
+        context.router.push(
+          RelationDetailsRoute(relationId: occupant.relationId),
+        ),
       ),
     );
   }

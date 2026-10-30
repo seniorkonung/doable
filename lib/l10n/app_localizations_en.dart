@@ -2357,6 +2357,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get intentionPickerKindIntention => 'intention';
 
   @override
+  String get intentionPickerPairLinked => 'Already linked';
+
+  @override
+  String get intentionPickerPairArchived => 'Archived relation';
+
+  @override
+  String get intentionPickerPairOpensRelation =>
+      'tapping opens the existing relation';
+
+  @override
   String intentionPickerOpenActionPage(String title) {
     return 'Open the page of action $title';
   }

@@ -3700,6 +3700,24 @@ abstract class AppLocalizations {
   /// **'intention'**
   String get intentionPickerKindIntention;
 
+  /// Метка строки поиска участника связи, пару которой занимает активная связь; она же стоит в доступном названии строки
+  ///
+  /// In en, this message translates to:
+  /// **'Already linked'**
+  String get intentionPickerPairLinked;
+
+  /// Метка строки поиска участника связи, пару которой занимает архивированная связь; она же стоит в доступном названии строки
+  ///
+  /// In en, this message translates to:
+  /// **'Archived relation'**
+  String get intentionPickerPairArchived;
+
+  /// Действие нажатия на текст строки поиска участника с отметкой занятой пары в доступном названии строки
+  ///
+  /// In en, this message translates to:
+  /// **'tapping opens the existing relation'**
+  String get intentionPickerPairOpensRelation;
+
   /// Доступное название стрелки строки экрана выбора, которая открывает страницу действия
   ///
   /// In en, this message translates to:

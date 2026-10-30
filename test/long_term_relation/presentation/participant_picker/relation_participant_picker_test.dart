@@ -159,6 +159,71 @@ void main() {
     expect((await selection)?.value.id, _id(1));
   });
 
+  // Нажатие на текст отмеченной строки открывает занимающую связь в обоих
+  // потоках и при любом её архивном состоянии.
+  for (final (flow, choice) in [
+    ('создания', _activeRelation.choice),
+    ('изменения', _archivedRelation.choice),
+  ]) {
+    for (final scope in RelationScope.values) {
+      testWidgets('в потоке $flow нажатие на текст строки со связью '
+          '${scope.name} открывает её поверх поиска без выбора, а «назад» '
+          'возвращает в поиск', (tester) async {
+        final repository = ControlledParticipantPickerRepository();
+        addTearDown(repository.dispose);
+        final router = await _pumpAppWithCatalog(tester, repository);
+        addTearDown(router.dispose);
+
+        var selectionCompleted = false;
+        final selection = _pushPicker(router, choice)
+          ..whenComplete(() => selectionCompleted = true);
+        await _settleRoute(tester);
+        final pickerId = router.current.matchId;
+        final occupied = testSummary(index: 2, title: 'Много ходить');
+        final free = testSummary(index: 1, title: 'Высыпаться');
+        final occupantId = testFormRelationId(5);
+        _completePage(
+          repository,
+          1,
+          [occupied, free],
+          pairOccupants: {
+            occupied.id: PairOccupant(relationId: occupantId, scope: scope),
+          },
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Много ходить'));
+        await _settleRoute(tester);
+
+        expect(
+          router.current.argsAs<RelationDetailsRouteArgs>().relationId,
+          occupantId,
+        );
+        expect(repository.watchedRelations, [occupantId]);
+        expect(router.stackData[router.stackData.length - 2].matchId, pickerId);
+        expect(selectionCompleted, isFalse);
+
+        await router.maybePop();
+        await _settleRoute(tester);
+        expect(router.current.matchId, pickerId);
+        expect(selectionCompleted, isFalse);
+
+        await tester.tap(intentionPickerArrow(intentionPickerRows.first));
+        await _settleRoute(tester);
+        expect(
+          router.current.argsAs<IntentionDetailsRouteArgs>().intentionId,
+          occupied.id,
+        );
+        await router.maybePop();
+        await _settleRoute(tester);
+
+        await tester.tap(find.text('Высыпаться'));
+        await tester.pumpAndSettle();
+        expect((await selection)?.value.id, free.id);
+      });
+    }
+  }
+
   // Заменяемый участник выбираемой роли не исключается.
   for (final (name, choice, pairProbe) in [
     (
@@ -230,8 +295,9 @@ Future<GraphSnapshot<RelationParticipantSummary>?> _pushPicker(
 void _completePage(
   ControlledParticipantPickerRepository repository,
   int index,
-  List<IntentionSummary> items,
-) => repository.complete(
+  List<IntentionSummary> items, {
+  Map<IntentionId, PairOccupant>? pairOccupants,
+}) => repository.complete(
   index,
   ResultSuccess(
     IntentionCatalogFirstPage(
@@ -239,6 +305,7 @@ void _completePage(
       totalCount: items.length,
       nextCursor: null,
       revision: const TestPickerRevision(1),
+      pairOccupants: pairOccupants,
     ),
   ),
 );

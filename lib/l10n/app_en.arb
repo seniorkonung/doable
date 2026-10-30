@@ -1857,6 +1857,18 @@
   "@intentionPickerKindIntention": {
     "description": "Вид намерения без готовности к действию в доступном названии строки экрана выбора"
   },
+  "intentionPickerPairLinked": "Already linked",
+  "@intentionPickerPairLinked": {
+    "description": "Метка строки поиска участника связи, пару которой занимает активная связь; она же стоит в доступном названии строки"
+  },
+  "intentionPickerPairArchived": "Archived relation",
+  "@intentionPickerPairArchived": {
+    "description": "Метка строки поиска участника связи, пару которой занимает архивированная связь; она же стоит в доступном названии строки"
+  },
+  "intentionPickerPairOpensRelation": "tapping opens the existing relation",
+  "@intentionPickerPairOpensRelation": {
+    "description": "Действие нажатия на текст строки поиска участника с отметкой занятой пары в доступном названии строки"
+  },
   "intentionPickerOpenActionPage": "Open the page of action {title}",
   "@intentionPickerOpenActionPage": {
     "description": "Доступное название стрелки строки экрана выбора, которая открывает страницу действия",

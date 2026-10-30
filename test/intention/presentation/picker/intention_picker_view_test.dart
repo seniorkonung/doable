@@ -18,6 +18,7 @@ import 'package:doable/src/intention/presentation/catalog/intention_tag_conditio
 import 'package:doable/src/intention/presentation/picker/intention_picker_view.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/relation_pair_probe.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
@@ -28,6 +29,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../catalog/catalog_reconciliation_test_support.dart';
 import '../catalog/catalog_test_support.dart';
+import '../../../long_term_relation/presentation/editor/relation_form_test_support.dart'
+    show testFormRelationId;
 import '../../../support/tag_positions.dart';
 
 const _screen = Size(390, 844);
@@ -838,6 +841,64 @@ void main() {
     semantics.dispose();
   });
 
+  testWidgets('нажатие на текст отмеченной строки передаёт занимающую связь и '
+      'не выбирает намерение, а остальные строки и число не меняются', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    final h = await _open(
+      tester,
+      purpose: SelectRelationParticipant(
+        selectionContext: RelationParticipantSelectionContext.activeRelation,
+        session: IntentionSearchSession(),
+        pairProbe: RelationPairProbe(
+          counterpartId: testSummary(index: 9).id,
+          candidateRole: RelationParticipantRole.related,
+        ),
+      ),
+    );
+    final walk = _action(3);
+    final swim = _action(2);
+    final sleep = _action(1);
+    final walkOccupant = PairOccupant(
+      relationId: testFormRelationId(1),
+      scope: RelationScope.active,
+    );
+    h.repository.complete(
+      0,
+      _firstPage(
+        [walk, swim, sleep],
+        pairOccupants: {
+          walk.id: walkOccupant,
+          swim.id: PairOccupant(
+            relationId: testFormRelationId(2),
+            scope: RelationScope.archived,
+          ),
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.bySemanticsLabel(RegExp('Уже связано')), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp('Связь в архиве')), findsOneWidget);
+    expect(find.text('Уже связано'), findsOneWidget);
+    expect(find.text('Связь в архиве'), findsOneWidget);
+    expect(_header('Все', 3), findsOneWidget);
+
+    await tester.tap(find.bySemanticsLabel(RegExp('Уже связано')));
+    expect(h.openedOccupants, [walkOccupant]);
+    expect(h.picks, isEmpty);
+
+    await tester.tap(find.bySemanticsLabel(RegExp('Связь в архиве')));
+    expect(h.openedOccupants.length, 2);
+    expect(h.picks, isEmpty);
+
+    await tester.tap(find.text('Действие 1'));
+    expect(h.picks.single.value.id, sleep.id);
+    expect(h.openedOccupants.length, 2);
+    semantics.dispose();
+  });
+
   for (final brightness in Brightness.values) {
     for (final locale in [const Locale('ru'), const Locale('en')]) {
       testWidgets(
@@ -892,6 +953,7 @@ Result<IntentionCatalogPage> _firstPage(
   List<IntentionSummary> items, {
   int? totalCount,
   IntentionTypeCounts? typeCounts,
+  Map<IntentionId, PairOccupant>? pairOccupants,
 }) => ResultSuccess(
   IntentionCatalogFirstPage(
     items: items,
@@ -903,6 +965,7 @@ Result<IntentionCatalogPage> _firstPage(
         ? const TestCatalogCursor()
         : null,
     revision: const TestCatalogRevision(1),
+    pairOccupants: pairOccupants,
   ),
 );
 
@@ -923,6 +986,7 @@ final class _Harness {
   int closes = 0;
   final picks = <GraphSnapshot<IntentionSummary>>[];
   final openedDetails = <IntentionId>[];
+  final openedOccupants = <PairOccupant>[];
 
   IntentionTagConditionsViewModel conditions(IntentionPickerPurpose purpose) =>
       container.read(intentionTagConditionsViewModelProvider(purpose).notifier);
@@ -960,6 +1024,7 @@ Future<_Harness> _open(
           onClose: () => h.closes++,
           onPick: h.picks.add,
           onOpenDetails: h.openedDetails.add,
+          onOpenOccupant: h.openedOccupants.add,
         ),
       ),
     ),

@@ -25,7 +25,7 @@ import '../../../support/intention_type_counts.dart';
 /// Репозиторий графа, управляемый тестом выбора участника.
 ///
 /// Каталожные порции остаются единственным источником списка намерений.
-/// Подробные чтения намерения и его соседства только открываются и не
+/// Подробные чтения намерения, его соседства и связи только открываются и не
 /// завершаются: переход к подробным данным проверяется отдельно от выбора.
 final class ControlledParticipantPickerRepository
     with StatisticsReadContractTestFallback, TagReadContractTestFallback
@@ -58,6 +58,10 @@ final class ControlledParticipantPickerRepository
   final _requests = <Completer<Result<IntentionCatalogPage>>>[];
   final _intentionStreams =
       <StreamController<Result<GraphSnapshot<IntentionDetails?>>>>[];
+  final _relationStreams = <StreamController<LongTermRelationReadResult>>[];
+
+  /// Связи, подробный просмотр которых открывали, в порядке открытия.
+  final watchedRelations = <LongTermRelationId>[];
 
   IntentionCatalogQuery queryAt(int index) => queries[index];
 
@@ -67,6 +71,9 @@ final class ControlledParticipantPickerRepository
 
   void dispose() {
     for (final controller in _intentionStreams) {
+      unawaited(controller.close());
+    }
+    for (final controller in _relationStreams) {
       unawaited(controller.close());
     }
   }
@@ -104,8 +111,12 @@ final class ControlledParticipantPickerRepository
   ) => Completer<RelationGroupPageResult>().future;
 
   @override
-  Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) =>
-      throw UnsupportedError('Связи не наблюдаются в тесте выбора участника.');
+  Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) {
+    watchedRelations.add(id);
+    final controller = StreamController<LongTermRelationReadResult>.broadcast();
+    _relationStreams.add(controller);
+    return controller.stream;
+  }
 
   @override
   Future<GraphCommandResult<TSuccess, TFailure>> execute<

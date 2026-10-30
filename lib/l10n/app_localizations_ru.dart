@@ -2381,6 +2381,16 @@ class AppLocalizationsRu extends AppLocalizations {
   String get intentionPickerKindIntention => 'намерение';
 
   @override
+  String get intentionPickerPairLinked => 'Уже связано';
+
+  @override
+  String get intentionPickerPairArchived => 'Связь в архиве';
+
+  @override
+  String get intentionPickerPairOpensRelation =>
+      'нажатие откроет существующую связь';
+
+  @override
   String intentionPickerOpenActionPage(String title) {
     return 'Открыть страницу действия «$title»';
   }

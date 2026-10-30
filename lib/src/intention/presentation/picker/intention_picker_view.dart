@@ -8,9 +8,11 @@ import '../../../design_system/components/empty_state.dart';
 import '../../../design_system/components/top_bar.dart';
 import '../../../design_system/doable_metrics.dart';
 import '../../../graph/application/graph_revision.dart';
+import '../../../long_term_relation/application/relation_pair_probe.dart';
 import '../../application/intention_catalog.dart';
 import '../../domain/intention_id.dart';
 import '../catalog/intention_catalog_purpose.dart';
+import '../catalog/intention_catalog_state.dart';
 import '../catalog/intention_catalog_view_model.dart';
 import '../catalog/intention_tag_conditions_view_model.dart';
 import '../search/intention_list_header.dart';
@@ -29,7 +31,9 @@ import 'intention_picker_row.dart';
 /// заголовка списка и выдачи.
 ///
 /// Экран не знает маршрутов, права запуска и типа результата: о закрытии,
-/// выборе и открытии подробностей страница узнаёт из обработчиков.
+/// выборе и открытии подробностей страница узнаёт из обработчиков. Строка, пару
+/// которой занимает связь, не выбирается: нажатие на её текст передаёт
+/// занимающую связь в [onOpenOccupant].
 final class IntentionPickerView extends ConsumerStatefulWidget {
   const IntentionPickerView({
     required this.purpose,
@@ -38,6 +42,7 @@ final class IntentionPickerView extends ConsumerStatefulWidget {
     required this.onClose,
     required this.onPick,
     required this.onOpenDetails,
+    this.onOpenOccupant,
     this.purposeDescription,
     super.key,
   });
@@ -62,6 +67,10 @@ final class IntentionPickerView extends ConsumerStatefulWidget {
 
   final void Function(IntentionId id) onOpenDetails;
 
+  /// Открывает связь, которая занимает пару строки. Без обработчика строки не
+  /// отмечаются: так у поисков, которые пробы пары не строят.
+  final void Function(PairOccupant occupant)? onOpenOccupant;
+
   @override
   ConsumerState<IntentionPickerView> createState() =>
       _IntentionPickerViewState();
@@ -78,6 +87,21 @@ final class _IntentionPickerViewState
     setState(() => _purposeExpanded = true);
     await showIntentionPickerPurposeSheet(context, description);
     if (mounted) setState(() => _purposeExpanded = false);
+  }
+
+  OccupiedPairMark? _occupiedPair(
+    IntentionCatalogLoaded results,
+    IntentionSummary summary,
+  ) {
+    final onOpenOccupant = widget.onOpenOccupant;
+    final occupant = results.pairOccupants[summary.id];
+    if (onOpenOccupant == null || occupant == null) {
+      return null;
+    }
+    return OccupiedPairMark(
+      scope: occupant.scope,
+      onOpenRelation: () => onOpenOccupant(occupant),
+    );
   }
 
   @override
@@ -160,6 +184,7 @@ final class _IntentionPickerViewState
                     GraphSnapshot(value: summary, revision: results.revision),
                   ),
                   onOpenPage: () => widget.onOpenDetails(summary.id),
+                  occupiedPair: _occupiedPair(results, summary),
                 ),
                 emptyScope: (_) => EmptyState(
                   title: l10n.intentionPickerEmptyScopeTitle,
