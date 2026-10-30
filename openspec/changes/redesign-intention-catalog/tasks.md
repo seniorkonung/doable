@@ -587,15 +587,16 @@
     - `intention_search_results.dart`, `intention_catalog_status_views.dart` и `intention_search_results_test.dart` удалены. `ResultsScrollKeeper` теряет параметр `keepScrollOffset`, а `onCatalogChanged` — результат: их использовала только прежняя выдача.
     - Случаи «первая после монтирования…» и «удаление исключённого тега…» перенесены в `intention_search_list_test.dart`: других проверок этих путей нет.
     - `intention_catalog_page_test.dart` подтверждает сценарии пустой выдачи спецификации для каталога, включая активный охват с выбранным типом «Только действия» при архиве только из намерений. Загрузка, отказы, подгрузка, сохранение места при согласовании и под панелью создания проходят на новой выдаче с прежними ожиданиями. Проверка возврата со страницы намерения подтверждает то же смещение и ту же первую видимую строку.
+    - `test/app/intention_app_lifecycle_test.dart` ждёт сообщения третьей причины пустой выдачи: строка 239 `No active intentions yet.` → `No active intentions` (архив не пуст), строка 278 `No archived intentions yet.` → `Nothing in the archive` (архивный охват), строка 315 `No active intentions yet.` → `No intentions yet` (намерений нет совсем). Тестовый адаптер не меняется: `answerCatalogQuery` уже отдаёт матрицу чисел, а модель согласует её при архивировании и удалении.
   - **Проверка:**
     - `mise run codegen`.
-    - `mise exec --no-deps -- flutter test test/intention/presentation test/app/navigation test/app/intention_tag_search_app_flow_test.dart test/app/intention_creation_sheet_tags_test.dart test/app/intention_creation_sheet_integration_test.dart`.
+    - `mise exec --no-deps -- flutter test test/intention/presentation test/app/navigation test/app/intention_app_lifecycle_test.dart test/app/intention_tag_search_app_flow_test.dart test/app/intention_creation_sheet_tags_test.dart test/app/intention_creation_sheet_integration_test.dart`.
     - `mise exec --no-deps -- flutter analyze`.
   - **Зависимости:** 4.2, 4.10, 4.11.
   - **Предполагаемые файлы:**
     - меняются `lib/src/intention/presentation/catalog/intention_catalog_page.dart`, `lib/src/intention/presentation/search/results_scroll_keeper.dart`, `intention_search_list.dart`; удаляются `lib/src/intention/presentation/catalog/intention_search_results.dart`, `intention_catalog_status_views.dart`;
     - `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` и сгенерированная локализация;
-    - проверки: `test/intention/presentation/catalog/intention_catalog_page_test.dart`, `test/intention/presentation/search/intention_search_list_test.dart`, `test/app/navigation/app_shell_layout_test.dart`, `test/app/intention_tag_search_app_flow_test.dart`, `test/app/intention_creation_sheet_tags_test.dart`.
+    - проверки: `test/intention/presentation/catalog/intention_catalog_page_test.dart`, `test/intention/presentation/search/intention_search_list_test.dart`, `test/app/navigation/app_shell_layout_test.dart`, `test/app/intention_app_lifecycle_test.dart`, `test/app/intention_tag_search_app_flow_test.dart`, `test/app/intention_creation_sheet_tags_test.dart`.
   - **Размер:** M.
 
 - [ ] 4.13 Удалить строки локализации, оставшиеся без использования после замены страницы
