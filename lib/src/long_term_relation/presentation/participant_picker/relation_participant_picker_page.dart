@@ -2,16 +2,21 @@ import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
+import '../../../design_system/components/confirm_dialog.dart';
 import '../../../graph/application/graph_revision.dart';
+import '../../../graph/application/personal_graph_repository_provider.dart';
 import '../../../intention/presentation/catalog/intention_catalog_purpose.dart';
+import '../../../intention/presentation/picker/intention_picker_row.dart';
 import '../../../intention/presentation/picker/intention_picker_view.dart';
 import '../../application/long_term_relation_command.dart';
 import '../../application/long_term_relation_projection.dart';
 import '../../application/relation_pair_probe.dart';
 import '../../domain/long_term_relation.dart';
+import '../../domain/long_term_relation_id.dart';
 import 'relation_participant_choice.dart';
 import 'relation_participant_picker_purpose.dart';
 
@@ -21,27 +26,30 @@ import 'relation_participant_picker_purpose.dart';
 /// каталога, ограничения которого выводит из описания выбора. Второе
 /// намерение пары исключает запрос каталога по идентификатору, поэтому
 /// одноимённые намерения остаются отдельными строками. Строки, выбор которых
-/// дал бы занятую пару, отмечены, не выбираются, а нажатие на их текст
-/// открывает занимающую связь поверх поиска. Пока форма создания не может
-/// продолжаться, например пока выполняется восстановление, нажатия на текст
-/// строк ничего не делают. Выбор возвращает снимок участника с ревизией
-/// выдачи, из которой выбрана строка. Закрытие не возвращает ничего и не
-/// создаёт намерений. Подзаголовок шапки напоминает связь, из формы которой
-/// открыт поиск.
+/// дал бы занятую пару, отмечены и не выбираются. Нажатие на их текст открывает
+/// занимающую связь поверх поиска, а при создании архивную связь предлагает
+/// восстановить с подтверждением. Пока форма создания не может продолжаться,
+/// например пока выполняется восстановление, нажатия на текст строк ничего не
+/// делают. Выбор возвращает снимок участника с ревизией выдачи, из которой
+/// выбрана строка. Закрытие не возвращает ничего и не создаёт намерений.
+/// Подзаголовок шапки напоминает связь, из формы которой открыт поиск.
 @RoutePage()
-final class RelationParticipantPickerPage extends StatefulWidget {
+final class RelationParticipantPickerPage extends ConsumerStatefulWidget {
   const RelationParticipantPickerPage({required this.choice, super.key});
 
   final RelationParticipantChoice choice;
 
   @override
-  State<RelationParticipantPickerPage> createState() =>
+  ConsumerState<RelationParticipantPickerPage> createState() =>
       _RelationParticipantPickerPageState();
 }
 
 final class _RelationParticipantPickerPageState
-    extends State<RelationParticipantPickerPage> {
+    extends ConsumerState<RelationParticipantPickerPage> {
   late final _purpose = _purposeFor(widget.choice);
+
+  /// Восстановление уже предложено: от нажатия до ответа на подтверждение.
+  bool _offeringRestore = false;
 
   /// Оба состояния участников допускает только изменение архивной связи.
   static SelectRelationParticipant _purposeFor(
@@ -85,6 +93,95 @@ final class _RelationParticipantPickerPageState
     RelationChangeChoiceFlow() => true,
   };
 
+  bool get _ownsTopRoute =>
+      mounted &&
+      context.router.stackData.lastOrNull?.matchId ==
+          context.routeData.matchId &&
+      !context.router.hasPagelessTopRoute;
+
+  void _openRelation(LongTermRelationId id) =>
+      unawaited(context.router.push(RelationDetailsRoute(relationId: id)));
+
+  /// Что значит занятая пара в этом потоке: предложение восстановить архивную
+  /// связь есть только при создании.
+  OccupiedPairMark _occupiedPairMark(PairOccupant occupant) {
+    void open() {
+      if (_canContinue) _openRelation(occupant.relationId);
+    }
+
+    return switch ((widget.choice.flow, occupant.scope)) {
+      (RelationCreationChoiceFlow(:final restore), RelationScope.archived) =>
+        OccupiedPairMark(
+          kind: OccupiedPairKind.restorable,
+          onTap: () => unawaited(_offerRestore(occupant.relationId, restore)),
+        ),
+      (_, RelationScope.active) => OccupiedPairMark(
+        kind: OccupiedPairKind.linked,
+        onTap: open,
+      ),
+      (_, RelationScope.archived) => OccupiedPairMark(
+        kind: OccupiedPairKind.archived,
+        onTap: open,
+      ),
+    };
+  }
+
+  /// Спрашивает, восстановить ли связь [id], и передаёт согласие форме.
+  ///
+  /// Подтверждению нужны данные связи, а строка выдачи их не несёт. Если чтение
+  /// их не дало, сообщения об этом показывает подробный просмотр связи: своей
+  /// поверхности сообщений у поиска нет.
+  Future<void> _offerRestore(
+    LongTermRelationId id,
+    RelationCreationRestore restore,
+  ) async {
+    if (_offeringRestore || !restore.canContinue) return;
+    _offeringRestore = true;
+    try {
+      final read = await ref
+          .read(personalGraphRepositoryProvider)
+          .watchRelation(id)
+          .first;
+      // Пока шло чтение, поиск могли закрыть или перекрыть.
+      if (!_ownsTopRoute) return;
+      if (read case LongTermRelationReadSuccess(
+        value: GraphSnapshot(value: final details?),
+      )) {
+        if (await _confirmRestore(details)) restore.accept(id);
+      } else {
+        _openRelation(id);
+      }
+    } finally {
+      _offeringRestore = false;
+    }
+  }
+
+  Future<bool> _confirmRestore(LongTermRelationDetails details) {
+    final l10n = AppLocalizations.of(context);
+    return showPreservingConfirmDialog(
+      context: context,
+      title: l10n.participantPickerRestoreTitle,
+      text: ConfirmDialogText(
+        before: l10n.participantPickerRestoreTextBefore,
+        name: switch (details.relation.type) {
+          LongTermRelationType.need => l10n.relationNeighborhoodNeedPhrase(
+            details.source.title,
+            details.related.title,
+          ),
+          LongTermRelationType.can => l10n.relationNeighborhoodCanPhrase(
+            details.source.title,
+            details.related.title,
+          ),
+        },
+        after: l10n.participantPickerRestoreTextAfter(
+          details.relation.priority.name.toUpperCase(),
+        ),
+      ),
+      cancelLabel: l10n.participantPickerRestoreCancel,
+      actionLabel: l10n.participantPickerRestoreConfirm,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -112,14 +209,7 @@ final class _RelationParticipantPickerPageState
       onOpenDetails: (id) => unawaited(
         context.router.push(IntentionDetailsRoute(intentionId: id)),
       ),
-      onOpenOccupant: (occupant) {
-        if (!_canContinue) return;
-        unawaited(
-          context.router.push(
-            RelationDetailsRoute(relationId: occupant.relationId),
-          ),
-        );
-      },
+      occupiedPairMark: _occupiedPairMark,
     );
   }
 }

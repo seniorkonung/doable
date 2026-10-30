@@ -3718,6 +3718,12 @@ abstract class AppLocalizations {
   /// **'tapping opens the existing relation'**
   String get intentionPickerPairOpensRelation;
 
+  /// Действие нажатия на текст строки поиска участника, когда при создании связи архивную занимающую связь можно восстановить, в доступном названии строки
+  ///
+  /// In en, this message translates to:
+  /// **'tapping offers to restore the relation'**
+  String get intentionPickerPairOffersRestore;
+
   /// Доступное название стрелки строки экрана выбора, которая открывает страницу действия
   ///
   /// In en, this message translates to:
@@ -4060,6 +4066,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No other intentions are available to select.'**
   String get participantPickerEmpty;
+
+  /// Заголовок подтверждения восстановления занимающей связи из поиска участника
+  ///
+  /// In en, this message translates to:
+  /// **'Restore this relation?'**
+  String get participantPickerRestoreTitle;
+
+  /// Текст подтверждения восстановления до выделенной формулировки связи
+  ///
+  /// In en, this message translates to:
+  /// **'The relation “'**
+  String get participantPickerRestoreTextBefore;
+
+  /// Текст подтверждения восстановления после выделенной формулировки связи
+  ///
+  /// In en, this message translates to:
+  /// **'” returns with priority {priority}.'**
+  String participantPickerRestoreTextAfter(String priority);
+
+  /// Отмена восстановления занимающей связи из поиска участника
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get participantPickerRestoreCancel;
+
+  /// Подтверждение восстановления занимающей связи из поиска участника
+  ///
+  /// In en, this message translates to:
+  /// **'Restore'**
+  String get participantPickerRestoreConfirm;
 
   /// Назначение перехода к подробным данным намерения из выбора
   ///

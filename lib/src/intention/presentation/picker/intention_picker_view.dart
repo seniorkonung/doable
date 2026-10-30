@@ -32,8 +32,8 @@ import 'intention_picker_row.dart';
 ///
 /// Экран не знает маршрутов, права запуска и типа результата: о закрытии,
 /// выборе и открытии подробностей страница узнаёт из обработчиков. Строка, пару
-/// которой занимает связь, не выбирается: нажатие на её текст передаёт
-/// занимающую связь в [onOpenOccupant].
+/// которой занимает связь, не выбирается: вид её отметки и действие нажатия на
+/// текст задаёт [occupiedPairMark].
 final class IntentionPickerView extends ConsumerStatefulWidget {
   const IntentionPickerView({
     required this.purpose,
@@ -42,7 +42,7 @@ final class IntentionPickerView extends ConsumerStatefulWidget {
     required this.onClose,
     required this.onPick,
     required this.onOpenDetails,
-    this.onOpenOccupant,
+    this.occupiedPairMark,
     this.purposeDescription,
     super.key,
   });
@@ -67,9 +67,10 @@ final class IntentionPickerView extends ConsumerStatefulWidget {
 
   final void Function(IntentionId id) onOpenDetails;
 
-  /// Открывает связь, которая занимает пару строки. Без обработчика строки не
-  /// отмечаются: так у поисков, которые пробы пары не строят.
-  final void Function(PairOccupant occupant)? onOpenOccupant;
+  /// Отметка строки, пару которой занимает [PairOccupant]: что значит занятость
+  /// для вызвавшего потока, знает страница. Без неё строки не отмечаются: так у
+  /// поисков, которые пробы пары не строят.
+  final OccupiedPairMark Function(PairOccupant occupant)? occupiedPairMark;
 
   @override
   ConsumerState<IntentionPickerView> createState() =>
@@ -93,15 +94,8 @@ final class _IntentionPickerViewState
     IntentionCatalogLoaded results,
     IntentionSummary summary,
   ) {
-    final onOpenOccupant = widget.onOpenOccupant;
     final occupant = results.pairOccupants[summary.id];
-    if (onOpenOccupant == null || occupant == null) {
-      return null;
-    }
-    return OccupiedPairMark(
-      scope: occupant.scope,
-      onOpenRelation: () => onOpenOccupant(occupant),
-    );
+    return occupant == null ? null : widget.occupiedPairMark?.call(occupant);
   }
 
   @override

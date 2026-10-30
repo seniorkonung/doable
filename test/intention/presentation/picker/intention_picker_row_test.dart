@@ -11,7 +11,6 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/picker/intention_picker_row.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
@@ -267,13 +266,32 @@ void main() {
     semantics.dispose();
   });
 
-  for (final (scope, ruWord, enWord) in const [
-    (RelationScope.active, 'Уже связано', 'Already linked'),
-    (RelationScope.archived, 'Связь в архиве', 'Archived relation'),
+  for (final (kind, ruWord, enWord, ruAction, enAction) in const [
+    (
+      OccupiedPairKind.linked,
+      'Уже связано',
+      'Already linked',
+      'нажатие откроет существующую связь',
+      'tapping opens the existing relation',
+    ),
+    (
+      OccupiedPairKind.archived,
+      'Связь в архиве',
+      'Archived relation',
+      'нажатие откроет существующую связь',
+      'tapping opens the existing relation',
+    ),
+    (
+      OccupiedPairKind.restorable,
+      'Связь в архиве',
+      'Archived relation',
+      'нажатие предложит восстановить связь',
+      'tapping offers to restore the relation',
+    ),
   ]) {
-    testWidgets('строка с занимающей связью (${scope.name}) начинает метки '
-        'словом, не приглушает название, называет отметку и действие нажатия '
-        'и открывает связь вместо выбора на двух языках', (tester) async {
+    testWidgets('строка с отметкой ${kind.name} начинает метки словом, не '
+        'приглушает название, называет отметку и действие нажатия и выполняет '
+        'его вместо выбора на двух языках', (tester) async {
       final semantics = tester.ensureSemantics();
       var picks = 0;
       var pageOpenings = 0;
@@ -283,15 +301,13 @@ void main() {
         (
           const Locale('ru'),
           ruWord,
-          'Много ходить, действие, Без тегов, $ruWord, '
-              'нажатие откроет существующую связь',
+          'Много ходить, действие, Без тегов, $ruWord, $ruAction',
           'Открыть страницу действия «Много ходить»',
         ),
         (
           const Locale('en'),
           enWord,
-          'Много ходить, action, No tags, $enWord, '
-              'tapping opens the existing relation',
+          'Много ходить, action, No tags, $enWord, $enAction',
           'Open the page of action Много ходить',
         ),
       ]) {
@@ -305,8 +321,8 @@ void main() {
             ),
             summary: _summary('Много ходить'),
             occupiedPair: OccupiedPairMark(
-              scope: scope,
-              onOpenRelation: () => relationOpenings++,
+              kind: kind,
+              onTap: () => relationOpenings++,
             ),
             onPick: () => picks++,
             onOpenPage: () => pageOpenings++,
@@ -355,8 +371,8 @@ void main() {
           ),
           summary: _summary('Плавать', archiveState: archiveState),
           occupiedPair: OccupiedPairMark(
-            scope: RelationScope.archived,
-            onOpenRelation: () {},
+            kind: OccupiedPairKind.archived,
+            onTap: () {},
           ),
         ),
       );

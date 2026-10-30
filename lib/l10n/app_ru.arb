@@ -675,6 +675,7 @@
   "intentionPickerPairLinked": "Уже связано",
   "intentionPickerPairArchived": "Связь в архиве",
   "intentionPickerPairOpensRelation": "нажатие откроет существующую связь",
+  "intentionPickerPairOffersRestore": "нажатие предложит восстановить связь",
   "intentionPickerOpenActionPage": "Открыть страницу действия «{title}»",
   "@intentionPickerOpenActionPage": {
     "placeholders": {"title": {"type": "String"}}
@@ -764,6 +765,11 @@
   "participantPickerCancel": "Отменить выбор намерения",
   "participantPickerEmpty": "Других намерений для выбора нет.",
   "participantPickerOpenDetails": "Открыть подробные данные намерения",
+  "participantPickerRestoreTitle": "Восстановить связь?",
+  "participantPickerRestoreTextBefore": "Вернётся связь «",
+  "participantPickerRestoreTextAfter": "» с приоритетом {priority}.",
+  "participantPickerRestoreCancel": "Отмена",
+  "participantPickerRestoreConfirm": "Восстановить",
   "participantPickerPurposeCreationSource": "Новая связь: исходное намерение",
   "participantPickerPurposeCreationRelated": "Новая связь: связанное намерение",
   "participantPickerPurposeChangeSource": "Изменение связи: исходное намерение",

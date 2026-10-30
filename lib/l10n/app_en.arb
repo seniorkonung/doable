@@ -1869,6 +1869,10 @@
   "@intentionPickerPairOpensRelation": {
     "description": "Действие нажатия на текст строки поиска участника с отметкой занятой пары в доступном названии строки"
   },
+  "intentionPickerPairOffersRestore": "tapping offers to restore the relation",
+  "@intentionPickerPairOffersRestore": {
+    "description": "Действие нажатия на текст строки поиска участника, когда при создании связи архивную занимающую связь можно восстановить, в доступном названии строки"
+  },
   "intentionPickerOpenActionPage": "Open the page of action {title}",
   "@intentionPickerOpenActionPage": {
     "description": "Доступное название стрелки строки экрана выбора, которая открывает страницу действия",
@@ -2076,6 +2080,27 @@
   "participantPickerEmpty": "No other intentions are available to select.",
   "@participantPickerEmpty": {
     "description": "Отсутствие намерений, доступных для выбора участником"
+  },
+  "participantPickerRestoreTitle": "Restore this relation?",
+  "@participantPickerRestoreTitle": {
+    "description": "Заголовок подтверждения восстановления занимающей связи из поиска участника"
+  },
+  "participantPickerRestoreTextBefore": "The relation “",
+  "@participantPickerRestoreTextBefore": {
+    "description": "Текст подтверждения восстановления до выделенной формулировки связи"
+  },
+  "participantPickerRestoreTextAfter": "” returns with priority {priority}.",
+  "@participantPickerRestoreTextAfter": {
+    "description": "Текст подтверждения восстановления после выделенной формулировки связи",
+    "placeholders": {"priority": {"type": "String"}}
+  },
+  "participantPickerRestoreCancel": "Cancel",
+  "@participantPickerRestoreCancel": {
+    "description": "Отмена восстановления занимающей связи из поиска участника"
+  },
+  "participantPickerRestoreConfirm": "Restore",
+  "@participantPickerRestoreConfirm": {
+    "description": "Подтверждение восстановления занимающей связи из поиска участника"
   },
   "participantPickerOpenDetails": "Open intention details",
   "@participantPickerOpenDetails": {

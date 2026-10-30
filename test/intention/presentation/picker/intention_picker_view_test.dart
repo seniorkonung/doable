@@ -15,6 +15,7 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_purp
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
+import 'package:doable/src/intention/presentation/picker/intention_picker_row.dart';
 import 'package:doable/src/intention/presentation/picker/intention_picker_view.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/relation_pair_probe.dart';
@@ -1024,7 +1025,13 @@ Future<_Harness> _open(
           onClose: () => h.closes++,
           onPick: h.picks.add,
           onOpenDetails: h.openedDetails.add,
-          onOpenOccupant: h.openedOccupants.add,
+          occupiedPairMark: (occupant) => OccupiedPairMark(
+            kind: switch (occupant.scope) {
+              RelationScope.active => OccupiedPairKind.linked,
+              RelationScope.archived => OccupiedPairKind.archived,
+            },
+            onTap: () => h.openedOccupants.add(occupant),
+          ),
         ),
       ),
     ),

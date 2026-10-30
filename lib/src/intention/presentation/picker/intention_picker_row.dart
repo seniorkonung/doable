@@ -3,22 +3,34 @@ import 'package:flutter/widgets.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../design_system/components/badge.dart';
 import '../../../design_system/components/picker_row.dart';
-import '../../../long_term_relation/domain/long_term_relation.dart';
 import '../../../tag/domain/tag_id.dart';
 import '../../application/intention_catalog.dart';
 import '../catalog/intention_catalog_purpose.dart';
 import '../search/intention_row_content.dart';
 import '../search/intention_search_kind.dart';
 
-/// Отметка занятой пары в строке поиска участника: архивное состояние
-/// занимающей связи и действие нажатия на текст строки.
+/// Вид отметки занятой пары: слово метки и то, что обещает нажатие на текст
+/// строки. Предложить восстановление можно только для архивной связи.
+enum OccupiedPairKind {
+  /// Пару занимает активная связь, нажатие её откроет.
+  linked,
+
+  /// Пару занимает архивная связь, нажатие её откроет.
+  archived,
+
+  /// Пару занимает архивная связь, нажатие предложит её восстановить.
+  restorable,
+}
+
+/// Отметка занятой пары в строке поиска участника: её вид и действие нажатия
+/// на текст строки.
 final class OccupiedPairMark {
-  const OccupiedPairMark({required this.scope, required this.onOpenRelation});
+  const OccupiedPairMark({required this.kind, required this.onTap});
 
-  final RelationScope scope;
+  final OccupiedPairKind kind;
 
-  /// Открывает занимающую связь вместо выбора намерения.
-  final VoidCallback onOpenRelation;
+  /// Выполняется вместо выбора намерения.
+  final VoidCallback onTap;
 }
 
 /// Строка экрана выбора для найденного намерения: название, начало описания,
@@ -26,7 +38,7 @@ final class OccupiedPairMark {
 /// обязательные для выдачи идут первыми.
 ///
 /// У строки с [occupiedPair] первой стоит метка-слово занятой пары, а нажатие
-/// на текст открывает занимающую связь и намерение не выбирает.
+/// на текст выполняет действие отметки и намерение не выбирает.
 final class IntentionPickerRow extends StatelessWidget {
   const IntentionPickerRow({
     required this.purpose,
@@ -62,10 +74,20 @@ final class IntentionPickerRow extends StatelessWidget {
       namesKind: IntentionSearchKind.of(purpose).namesKind,
     );
 
-    final pairWord = switch (occupiedPair?.scope) {
+    final pair = switch (occupiedPair?.kind) {
       null => null,
-      RelationScope.active => l10n.intentionPickerPairLinked,
-      RelationScope.archived => l10n.intentionPickerPairArchived,
+      OccupiedPairKind.linked => (
+        word: l10n.intentionPickerPairLinked,
+        action: l10n.intentionPickerPairOpensRelation,
+      ),
+      OccupiedPairKind.archived => (
+        word: l10n.intentionPickerPairArchived,
+        action: l10n.intentionPickerPairOpensRelation,
+      ),
+      OccupiedPairKind.restorable => (
+        word: l10n.intentionPickerPairArchived,
+        action: l10n.intentionPickerPairOffersRestore,
+      ),
     };
 
     return PickerRow(
@@ -73,18 +95,14 @@ final class IntentionPickerRow extends StatelessWidget {
       description: content.description,
       archived: content.archived,
       marks: [
-        if (pairWord != null) Badge.word(word: pairWord),
+        if (pair != null) Badge.word(word: pair.word),
         ...content.marks,
       ],
       tags: content.tags,
-      label: pairWord == null
+      label: pair == null
           ? content.label
-          : [
-              content.label,
-              pairWord,
-              l10n.intentionPickerPairOpensRelation,
-            ].join(', '),
-      onPick: occupiedPair?.onOpenRelation ?? onPick,
+          : [content.label, pair.word, pair.action].join(', '),
+      onPick: occupiedPair?.onTap ?? onPick,
       pageLabel: content.isAction
           ? l10n.intentionPickerOpenActionPage(content.name)
           : l10n.intentionPickerOpenIntentionPage(content.name),

@@ -2367,6 +2367,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'tapping opens the existing relation';
 
   @override
+  String get intentionPickerPairOffersRestore =>
+      'tapping offers to restore the relation';
+
+  @override
   String intentionPickerOpenActionPage(String title) {
     return 'Open the page of action $title';
   }
@@ -2568,6 +2572,23 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get participantPickerEmpty =>
       'No other intentions are available to select.';
+
+  @override
+  String get participantPickerRestoreTitle => 'Restore this relation?';
+
+  @override
+  String get participantPickerRestoreTextBefore => 'The relation “';
+
+  @override
+  String participantPickerRestoreTextAfter(String priority) {
+    return '” returns with priority $priority.';
+  }
+
+  @override
+  String get participantPickerRestoreCancel => 'Cancel';
+
+  @override
+  String get participantPickerRestoreConfirm => 'Restore';
 
   @override
   String get participantPickerOpenDetails => 'Open intention details';

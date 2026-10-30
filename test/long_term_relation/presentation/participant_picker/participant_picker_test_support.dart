@@ -35,10 +35,11 @@ final class ControlledRelationRestore implements RelationCreationRestore {
   @override
   bool canContinue = true;
 
+  /// Связи, которые поиск передал на восстановление, в порядке передачи.
+  final accepted = <LongTermRelationId>[];
+
   @override
-  void accept(LongTermRelationId relationId) => throw UnsupportedError(
-    'Восстановление не выполняется в тесте выбора участника.',
-  );
+  void accept(LongTermRelationId relationId) => accepted.add(relationId);
 }
 
 final class _NoRelationRestore implements RelationCreationRestore {
@@ -99,6 +100,10 @@ final class ControlledParticipantPickerRepository
   void complete(int index, Result<IntentionCatalogPage> result) {
     _requests[index].complete(answerCatalogQuery(queries[index], result));
   }
+
+  /// Отвечает на последнее чтение связи.
+  void answerRelationRead(LongTermRelationReadResult result) =>
+      _relationStreams.last.add(result);
 
   void dispose() {
     for (final controller in _intentionStreams) {
