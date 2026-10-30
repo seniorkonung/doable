@@ -199,7 +199,6 @@ final class ResultsScrollKeeper {
       // становится ближайшая строка ниже, а сдвиг внутри неё отрицателен.
       if (extent.end > currentOffset) {
         return _VisualAnchor(
-          query: state.query,
           candidateIds: _idsByDistance(items, index),
           itemStart: extent.start,
           offsetWithinItem: currentOffset - extent.start,
@@ -241,8 +240,7 @@ final class ResultsScrollKeeper {
     final state = _shown.value;
     if (anchor == null ||
         !controller.hasClients ||
-        state is! IntentionCatalogLoaded ||
-        !identical(state.query, anchor.query)) {
+        state is! IntentionCatalogLoaded) {
       return;
     }
 
@@ -349,7 +347,6 @@ typedef _ItemExtent = ({double start, double end});
 
 final class _VisualAnchor {
   const _VisualAnchor({
-    required this.query,
     required this.candidateIds,
     required this.itemStart,
     required this.offsetWithinItem,
@@ -359,8 +356,6 @@ final class _VisualAnchor {
   /// Предел кадров приближения к якорю за пределами построенной области.
   static const maxApproaches = 3;
 
-  /// Якорь действует только для выдачи того же запроса.
-  final IntentionCatalogQuery query;
   final List<IntentionId> candidateIds;
 
   /// Начало строки в содержимом списка, когда запомнен якорь.
@@ -372,7 +367,6 @@ final class _VisualAnchor {
   final int remainingApproaches;
 
   _VisualAnchor afterApproach() => _VisualAnchor(
-    query: query,
     candidateIds: candidateIds,
     itemStart: itemStart,
     offsetWithinItem: offsetWithinItem,

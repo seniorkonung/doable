@@ -247,7 +247,7 @@
   - **Предполагаемые файлы:** нет, только проверка и сборка.
   - **Размер:** XS.
 
-- [ ] 1.17 Убрать из `ResultsScrollKeeper` недостижимую сверку якоря с запросом выдачи при восстановлении, не меняя поведения
+- [x] 1.17 Убрать из `ResultsScrollKeeper` недостижимую сверку якоря с запросом выдачи при восстановлении, не меняя поведения
   - **Критерии приёмки:**
     - `_restoreVisualAnchor` не сверяет принадлежность якоря выдаче: условия `!identical(state.query, anchor.query)` нет, а проверки `anchor == null`, `!controller.hasClients` и `state is! IntentionCatalogLoaded` сохранены.
     - У `_VisualAnchor` нет поля `query`: удалены поле с его комментарием, параметр конструктора и передача запроса в `_captureVisualAnchor` и `afterApproach`.
