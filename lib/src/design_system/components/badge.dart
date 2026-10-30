@@ -14,8 +14,11 @@ final class Badge extends StatelessWidget {
   /// Метка-значок строки списка на заливке `fill`, поэтому её фон — `bg`.
   /// Узла экранного диктора у метки нет: факт называет доступное название
   /// строки.
-  const Badge.mark({required this.icon, required this.tone, super.key})
-    : word = null;
+  const Badge.mark({
+    required DoableIconData this.icon,
+    required this.tone,
+    super.key,
+  }) : word = null;
 
   /// Метка «Архив» после названия: слово [word] цвета `muted` на плоскости
   /// `fill` за коробкой архива. Диктор читает слово.
@@ -23,7 +26,16 @@ final class Badge extends StatelessWidget {
     : icon = DoableIconData.archive,
       tone = BadgeTone.muted;
 
-  final DoableIconData icon;
+  /// Метка-слово строки списка: только слово [word] цвета `ink` на заливке
+  /// `bg`, как у значковых меток строки, и оформленное одинаково при любом
+  /// слове. Узла экранного диктора у метки нет: слово называет доступное
+  /// название строки.
+  const Badge.word({required String this.word, super.key})
+    : icon = null,
+      tone = BadgeTone.ink;
+
+  /// Значок метки; у метки-слова его нет.
+  final DoableIconData? icon;
   final BadgeTone tone;
 
   /// Слово метки; без него метка — значок без слова.
@@ -32,9 +44,38 @@ final class Badge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).extension<DoableColors>()!;
-    final word = this.word;
-    if (word != null) {
-      return DecoratedBox(
+
+    return switch ((icon, word)) {
+      (final icon?, final word?) => _archived(colors, icon, word),
+      (null, final word?) => _word(colors, word),
+      (final icon?, null) => _mark(colors, icon),
+      (null, null) => throw StateError('У метки нет ни значка, ни слова'),
+    };
+  }
+
+  Widget _mark(DoableColors colors, DoableIconData icon) => SizedBox(
+    width: 22,
+    height: 20,
+    child: DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.bg,
+        borderRadius: BorderRadius.circular(DoableMetrics.radiusXs),
+      ),
+      child: Center(
+        child: DoableIcon(
+          icon,
+          size: 14,
+          color: switch (tone) {
+            BadgeTone.ink => colors.ink,
+            BadgeTone.muted => colors.muted,
+          },
+        ),
+      ),
+    ),
+  );
+
+  Widget _archived(DoableColors colors, DoableIconData icon, String word) =>
+      DecoratedBox(
         decoration: BoxDecoration(
           color: colors.fill,
           borderRadius: BorderRadius.circular(DoableMetrics.radiusXs),
@@ -56,27 +97,22 @@ final class Badge extends StatelessWidget {
           ),
         ),
       );
-    }
 
-    return SizedBox(
-      width: 22,
-      height: 20,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: colors.bg,
-          borderRadius: BorderRadius.circular(DoableMetrics.radiusXs),
-        ),
-        child: Center(
-          child: DoableIcon(
-            icon,
-            size: 14,
-            color: switch (tone) {
-              BadgeTone.ink => colors.ink,
-              BadgeTone.muted => colors.muted,
-            },
-          ),
+  Widget _word(DoableColors colors, String word) => ExcludeSemantics(
+    child: DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.bg,
+        borderRadius: BorderRadius.circular(DoableMetrics.radiusXs),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+        child: Text(
+          word,
+          maxLines: 1,
+          softWrap: false,
+          style: DoableType.caption.copyWith(color: colors.ink),
         ),
       ),
-    );
-  }
+    ),
+  );
 }
