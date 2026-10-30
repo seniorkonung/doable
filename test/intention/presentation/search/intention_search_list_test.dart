@@ -102,6 +102,54 @@ void main() {
       expect(_listState, findsNothing);
       expect(find.byType(CatalogHeader), findsNothing);
     });
+
+    testWidgets('пауза ввода во время прокрутки выдачи сразу стоит сверху', (
+      tester,
+    ) async {
+      final h = await _open(tester);
+      h.repository.complete(0, _firstPage(_actions(30)));
+      await _settle(tester);
+      await _flingDown(tester, h);
+
+      h.notifier.changeTitleFilter('бег');
+      await tester.pump();
+
+      expect(_loading('Загружаем действия…'), findsOneWidget);
+      expect(h.position.pixels, 0);
+      expect(tester.getTopLeft(_listState).dy, tester.getTopLeft(_list).dy);
+    });
+
+    testWidgets('загрузка и отказ первой порции во время прокрутки выдачи '
+        'сразу стоят сверху', (tester) async {
+      final h = await _open(tester);
+      h.repository.complete(0, _firstPage(_actions(30)));
+      await _settle(tester);
+      await _flingDown(tester, h);
+
+      h.notifier.changeTagFilter(
+        IntentionTagFilter(excludedTagIds: [_sport.id]),
+      );
+      await tester.pump();
+
+      expect(_loading('Загружаем действия…'), findsOneWidget);
+      expect(h.position.pixels, 0);
+      expect(tester.getTopLeft(_listState).dy, tester.getTopLeft(_list).dy);
+
+      await _waitForQueries(tester, h, 2);
+      h.repository.complete(
+        1,
+        const ResultFailure(IntentionUnavailableFailure()),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(
+        find.text('Не удалось загрузить действия. Повторите попытку.'),
+        findsOneWidget,
+      );
+      expect(h.position.pixels, 0);
+      expect(tester.getTopLeft(_listState).dy, tester.getTopLeft(_list).dy);
+    });
   });
 
   group('загруженная выдача', () {
@@ -389,6 +437,15 @@ Future<void> _assignSportToAction59(WidgetTester tester, _Harness h) async {
   );
   await acceptTagCommand(h.container, h.repository, command, result).future;
   await _settle(tester);
+}
+
+/// Бросает выдачу вниз и оставляет её прокручиваться по инерции: пока
+/// прокрутка движется, смещение не прижимается к краю сжавшегося содержимого.
+Future<void> _flingDown(WidgetTester tester, _Harness h) async {
+  await tester.fling(_list, const Offset(0, -300), 2000);
+  await tester.pump(const Duration(milliseconds: 50));
+  expect(h.position.pixels, greaterThan(0));
+  expect(h.position.activity!.velocity, isNot(0));
 }
 
 /// Ждёт чтения порции, которое модель начинает после кадра.

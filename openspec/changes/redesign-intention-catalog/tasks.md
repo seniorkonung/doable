@@ -138,7 +138,7 @@
     - проверка `test/intention/presentation/search/intention_search_list_test.dart`.
   - **Размер:** XS.
 
-- [ ] 1.10 Показывать паузу ввода, загрузку и отказы первой порции экрана выбора сверху сразу, без анимации прокрутки от смещения прежней выдачи
+- [x] 1.10 Показывать паузу ввода, загрузку и отказы первой порции экрана выбора сверху сразу, без анимации прокрутки от смещения прежней выдачи
   - **Критерии приёмки:**
     - `ResultsScrollKeeper.onCatalogChanged` при переходе модели к состоянию, которое `IntentionSearchList` показывает вместо строк, — пауза ввода `IntentionCatalogDebouncing`, отказы первой порции `IntentionCatalogUnavailable`, `IntentionCatalogCorruption`, `IntentionCatalogUnexpected`, а также загрузка и ошибка `AsyncValue`, — мгновенно переводит список наверх через `jumpTo(0)`, без анимации, и сбрасывает отложенный якорь.
     - Прокрутка остаётся одной для всех состояний: `IntentionSearchList` сохраняет единый `CustomScrollView` с контроллером хранителя, отдельный `ListView` для состояний не возвращается.

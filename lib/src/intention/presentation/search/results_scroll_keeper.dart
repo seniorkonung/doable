@@ -9,9 +9,10 @@ import '../catalog/intention_catalog_state.dart';
 /// Хранитель места в списке выдачи поиска намерений.
 ///
 /// Владеет прокруткой списка и ключами его строк. Новая выдача начинается с
-/// верхней позиции. При обновлении выдачи без смены параметров поиска
-/// хранитель сохраняет экранное положение видимого намерения, а если оно
-/// исчезло из выдачи — ближайшего соседа.
+/// верхней позиции, а пауза ввода, загрузка и отказы первой порции
+/// показываются вместо строк сразу сверху. При обновлении выдачи без смены
+/// параметров поиска хранитель сохраняет экранное положение видимого
+/// намерения, а если оно исчезло из выдачи — ближайшего соседа.
 ///
 /// Выдача сообщает хранителю каждое состояние модели через [onCatalogChanged]
 /// из `ref.listen`, до перестройки списка, и оборачивает каждую строку в
@@ -67,8 +68,14 @@ final class ResultsScrollKeeper {
       startsNewResults = _query != null;
       _query = query;
       if (startsNewResults) {
-        _startFromTop();
+        _jumpToTop();
       }
+    }
+    // Состояние заменяет строки в той же прокрутке. Пока прокрутка движется,
+    // смещение прежней выдачи не прижимается к краю сжавшегося содержимого,
+    // и состояние возвращалось бы к началу пружиной.
+    if (_showsStatusInsteadOfRows(next)) {
+      _jumpToTop();
     }
 
     final previousState = previous?.value;
@@ -90,15 +97,35 @@ final class ResultsScrollKeeper {
     controller.dispose();
   }
 
+  /// Повторяет выбор выдачи: загрузка и ошибка модели показываются вместо
+  /// данных.
+  static bool _showsStatusInsteadOfRows(
+    AsyncValue<IntentionCatalogState> catalog,
+  ) => catalog.when(
+    skipLoadingOnReload: false,
+    skipLoadingOnRefresh: false,
+    data: (state) => switch (state) {
+      IntentionCatalogDebouncing() ||
+      IntentionCatalogUnavailable() ||
+      IntentionCatalogCorruption() ||
+      IntentionCatalogUnexpected() => true,
+      IntentionCatalogInvalidFilter() ||
+      IntentionCatalogLoaded() ||
+      IntentionCatalogEmpty() => false,
+    },
+    error: (_, _) => true,
+    loading: () => true,
+  );
+
   static IntentionCatalogQuery? _confirmedQuery(IntentionCatalogState? state) =>
       switch (state) {
         IntentionCatalogConfirmedState(:final query) => query,
         _ => null,
       };
 
-  void _startFromTop() {
-    // Новая выдача начинается с верхней позиции: отложенный якорь прежней
-    // выдачи больше не действует.
+  void _jumpToTop() {
+    // Список начинается с верхней позиции: отложенный якорь прежней выдачи
+    // больше не действует.
     _pendingVisualAnchor = null;
     if (controller.hasClients) {
       controller.jumpTo(0);
