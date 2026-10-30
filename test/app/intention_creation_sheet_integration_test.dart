@@ -1187,15 +1187,11 @@ typedef _CatalogView = ({
   List<ShownIntentionCatalogRow> rows,
 });
 
-_CatalogView _catalogView(WidgetTester tester) {
-  final offsets = shownIntentionCatalogOffsets(tester);
-  return (
-    // Список вложен в остальные прокрутки и стоит в дереве страницы последним.
-    outer: offsets.sublist(0, offsets.length - 1),
-    list: offsets.last,
-    rows: _visibleCatalogRows(tester),
-  );
-}
+_CatalogView _catalogView(WidgetTester tester) => (
+  outer: shownIntentionCatalogOuterOffsets(tester),
+  list: intentionCatalogListPosition(tester).pixels,
+  rows: _visibleCatalogRows(tester),
+);
 
 /// Видимая область списка выдачи на странице каталога.
 Rect _visibleCatalogArea(WidgetTester tester) => tester

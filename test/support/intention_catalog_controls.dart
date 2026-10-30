@@ -70,7 +70,8 @@ final intentionCatalogTagFilterControl = find.byKey(
 /// Прокручиваемый список выдачи открытого каталога намерений.
 ///
 /// Для проверок его размещения и жестов по списку. Прокрутку читают шаги
-/// [intentionCatalogListPosition] и [shownIntentionCatalogOffsets].
+/// [intentionCatalogListPosition], [shownIntentionCatalogOffsets] и
+/// [shownIntentionCatalogOuterOffsets].
 final intentionCatalogList = find.byKey(
   const PageStorageKey<String>('intention-catalog-list'),
 );
@@ -222,10 +223,21 @@ void jumpIntentionCatalog(WidgetTester tester, double fraction) {
   }
 }
 
-/// Смещения всех прокруток страницы каталога в порядке дерева.
+/// Смещения всех прокруток страницы каталога, включая список выдачи.
 List<double> shownIntentionCatalogOffsets(WidgetTester tester) => [
   for (final position in _pagePositions(tester)) position.pixels,
 ];
+
+/// Смещения вертикальных прокруток страницы каталога, кроме списка выдачи.
+///
+/// Список выдачи читает [intentionCatalogListPosition].
+List<double> shownIntentionCatalogOuterOffsets(WidgetTester tester) {
+  final list = intentionCatalogListPosition(tester);
+  return [
+    for (final position in _pagePositions(tester))
+      if (position != list) position.pixels,
+  ];
+}
 
 /// Открытие и закрытие меню и панели короче этого времени.
 ///
