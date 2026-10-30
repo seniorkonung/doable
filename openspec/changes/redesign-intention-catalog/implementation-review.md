@@ -5,7 +5,7 @@
 **Format version:** 1
 **Result:** Changes needed
 **Coverage status:** Complete
-**Summary:** Фаза 3 достигла цели: сценарии проходят каталог через `test/support/intention_catalog_controls.dart`, а `lib/` не менялся. Остаются две находки низкой важности: сценарий создания выводит позицию списка из порядка прокруток в дереве, а проверка доступности берёт ожидаемое название поля из той же проверяемой семантики.
+**Summary:** Фаза 3 достигла цели: сценарии проходят каталог через `test/support/intention_catalog_controls.dart`, а `lib/` не менялся. Остаётся одна находка низкой важности: проверка доступности берёт ожидаемое название поля из той же проверяемой семантики.
 
 ## Review target
 
@@ -40,15 +40,6 @@
 | Code quality | Complete | Навык `code-review-and-quality` применён ко всем 23 путям: полный дифф каждого сценария сверен с базой, общий файл шагов прочитан целиком на голове. |
 
 ## Findings
-
-### F1 · Low — Сценарий создания выводит позицию списка из порядка прокруток в дереве
-
-- **Evidence:** `test/app/intention_creation_sheet_integration_test.dart:1190-1197`: `_catalogView` берёт `list: offsets.last` и `outer: offsets.sublist(0, offsets.length - 1)` из `shownIntentionCatalogOffsets`, а комментарий объясняет это тем, что список стоит в дереве страницы последним. Рядом, в строках 638 и 648, тот же файл читает список шагом `intentionCatalogListPosition`.
-- **Evidence revisions:** ["f30e1fe1d9df7991bcbc29c350340970c8dbeff3"]
-- **Impact:** Знание об устройстве страницы осталось в сценарии, хотя критерий задачи 3.1 оставляет его только общему файлу шагов. Если после списка появится ещё одна вертикальная прокрутка, `list` тихо прочитает чужую позицию, и проверка «список сдвинулся, остальные прокрутки на месте» перестанет проверять заявленное.
-- **Required outcome:** Сценарий читает позицию списка по самому списку и сравнивает остальные прокрутки без предположения о порядке прокруток в дереве.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** ["test/app/intention_creation_sheet_integration_test.dart", "test/support/intention_catalog_controls.dart"]
 
 ### F2 · Low — Проверка доступности берёт ожидаемое название поля из проверяемой семантики
 

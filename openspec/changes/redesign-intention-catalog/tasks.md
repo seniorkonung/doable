@@ -364,3 +364,18 @@
   - **Зависимости:** 3.1, 3.2, 3.3, 3.4, 3.5, 3.6.
   - **Предполагаемые файлы:** нет (только проверка).
   - **Размер:** XS.
+
+- [ ] 3.8 Читать в сценарии создания позицию списка выдачи по самому списку, а остальные прокрутки страницы — без предположения об их порядке в дереве
+  - **Критерии приёмки:**
+    - `test/support/intention_catalog_controls.dart` получает один новый шаг `shownIntentionCatalogOuterOffsets(tester)` — смещения вертикальных прокруток страницы каталога, кроме списка выдачи. Список исключается по самому положению `intentionCatalogListPosition`, а не по месту в дереве.
+    - `_catalogView` в `test/app/intention_creation_sheet_integration_test.dart` берёт `list` из `intentionCatalogListPosition(tester).pixels`, а `outer` — из нового шага. `offsets.last`, `offsets.sublist` и комментарий о том, что список стоит в дереве последним, удалены.
+    - Проверка «новая строка сдвинула список, а остальные прокрутки и видимые строки остались на своих местах» сохраняется без ослабления.
+    - Документация шага `shownIntentionCatalogOffsets` не упоминает порядок дерева: на порядок больше никто не опирается. Существующие вызовы этого шага не меняются.
+    - `lib/` не меняется, новых сценариев нет.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app/intention_creation_sheet_integration_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 3.1, 3.4.
+  - **Предполагаемые файлы:**
+    - меняются `test/support/intention_catalog_controls.dart`, `test/app/intention_creation_sheet_integration_test.dart`.
+  - **Размер:** XS.
