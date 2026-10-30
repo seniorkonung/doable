@@ -3,17 +3,17 @@
 ## Assessment
 
 **Format version:** 1
-**Result:** No unresolved findings
+**Result:** Changes needed
 **Coverage status:** Complete
-**Summary:** Исправления 1.9–1.13 работают, а `mise run check` на проверенной ревизии проходит. Регрессия задачи 1.10 остаётся в коде этой ревизии: новая выдача, начатая пока список закрыт страницей, после ещё одной подтверждённой операции открывается не сверху. Её устранение решено пользователем и закреплено незавершёнными задачами 1.15 и 1.16, поэтому готовность фазы 1 ещё не подтверждена. Активных находок и принятых рисков нет.
+**Summary:** Исправление 1.15 работает: новая выдача, начатая пока список закрыт страницей, после возврата стоит сверху при любых подтверждённых операциях, а условие «Ready to advance» фазы 1 подтверждено на проверенной ревизии, `mise run check` проходит. Осталась одна находка F1 низкой важности: после исправления проверка запроса в `_restoreVisualAnchor` недостижима. На поведение она не влияет. Принятых рисков нет.
 
 ## Review target
 
-- **Baseline ref:** e62d4e96c99e81733ce415a8d4558a6a6c5ce19b
-- **Base commit:** e62d4e96c99e81733ce415a8d4558a6a6c5ce19b
-- **Reviewed head:** 478d8c30464ebb7bd9c1860c8539f40e3aebbbdf
-- **Target commits:** ["88d6fcbc5df850fcc93c8e7c67ce6eba6ffe3179","54da4ccdd3a24f71f80370185c2908c34890a850","cb69869f758ff01e17382c7c224c3f886445e1b5","ea6ea82f32c33bec668bbe0b44e6f24b59e47058","56e9e5a1eff7a5d6c49088ea5b91f6eb227cccef","3b576a4af16c5540b93ac190531f73f996f59fc1","478d8c30464ebb7bd9c1860c8539f40e3aebbbdf"]
-- **Reviewable paths:** ["lib/src/design_system/components/badge.dart","lib/src/intention/presentation/catalog/intention_search_results.dart","lib/src/intention/presentation/search/intention_search_list.dart","lib/src/intention/presentation/search/results_scroll_keeper.dart","openspec/changes/mark-occupied-pairs-in-relation-participant-picker/task-profiles.md","openspec/changes/mark-occupied-pairs-in-relation-participant-picker/tasks.md","test/app/navigation/app_shell_pages_above_test.dart","test/design_system/badge_test.dart","test/design_system/page_head_test.dart","test/design_system/relation_row_test.dart","test/design_system/tag_line_test.dart","test/intention/presentation/catalog/catalog_reconciliation_test_support.dart","test/intention/presentation/catalog/intention_search_results_test.dart","test/intention/presentation/details/intention_details_head_test.dart","test/intention/presentation/picker/intention_picker_row_test.dart","test/intention/presentation/search/intention_search_list_test.dart"]
+- **Baseline ref:** 7f38401de67d1465d090a3e953b2625bc8a72224
+- **Base commit:** 7f38401de67d1465d090a3e953b2625bc8a72224
+- **Reviewed head:** 3de0dc9df86a4bf90e4228e0e5b25daa4aaada23
+- **Target commits:** ["bc4c7b97c31ec7c41060920d69006bb8699499b6","fc6897db9a089dd2ce9d7180d6f6d94061d2815f","3de0dc9df86a4bf90e4228e0e5b25daa4aaada23"]
+- **Reviewable paths:** ["lib/src/intention/presentation/search/results_scroll_keeper.dart","openspec/changes/mark-occupied-pairs-in-relation-participant-picker/task-profiles.md","openspec/changes/mark-occupied-pairs-in-relation-participant-picker/tasks.md","test/intention/presentation/search/intention_search_list_test.dart"]
 - **OpenSpec change:** mark-occupied-pairs-in-relation-participant-picker
 - **OpenSpec schema:** intent-driven
 - **Target scope:** User-requested bounded range
@@ -22,33 +22,17 @@
 
 ## Reviewed increment
 
-### U1 · Первая видимая строка выдачи остаётся на месте
+### U1 · Новая выдача, начатая под закрытой страницей, стоит сверху
 
-- **Work items:** ["1.10", "1.11", "1.12"]
-- **Requirements and scenarios:** ["intention-management: Сохранение состояния загруженного каталога", "intention-management: Сохранение позиции после локального согласования", "long-term-relation-management: Отметка занятой пары в поиске участника", "plan.md Phase 1: Подтверждённое изменение на странице, открытой из поиска, не сдвигает первую видимую строку", "plan.md Phase 1: Добавление порции не прерывает идущую прокрутку"]
-- **Affected boundary:** Человек, который прокручивает выдачу поиска намерений на экранах каталога и выбора; виджеты списка и поток состояний модели каталога.
-- **Implementation target:** ["lib/src/intention/presentation/catalog/intention_search_results.dart","lib/src/intention/presentation/search/intention_search_list.dart","lib/src/intention/presentation/search/results_scroll_keeper.dart","test/intention/presentation/catalog/catalog_reconciliation_test_support.dart","test/intention/presentation/catalog/intention_search_results_test.dart","test/intention/presentation/search/intention_search_list_test.dart"]
-- **Applicable constraints and non-goals:** Реальный сдвиг можно поправить ценой остановки инерции; вмешательство во внутреннее состояние прокрутки Flutter отклонено владельцем продукта. Модель каталога, проекция строки и линия меток не меняются, место под метку не резервируется. Общий каталог и поиски дневного выбора меняются только в удержании места. Обычные проверки не замеряют время.
+- **Work items:** ["1.15"]
+- **Requirements and scenarios:** ["intention-management: Сохранение состояния загруженного каталога", "intention-management: Сохранение позиции после локального согласования", "long-term-relation-management: Отметка занятой пары в поиске участника", "long-term-relation-management: Восстановленное намерение начинает выдачу поиска заново", "plan.md Phase 1: Подтверждённое изменение на странице, открытой из поиска, не сдвигает первую видимую строку", "plan.md Phase 1: Добавление порции не прерывает идущую прокрутку"]
+- **Affected boundary:** Человек, который возвращается к выдаче поиска намерений со страницы поверх неё; виджеты списка и поток состояний модели каталога на всех экранах поиска.
+- **Implementation target:** ["lib/src/intention/presentation/search/results_scroll_keeper.dart","test/intention/presentation/search/intention_search_list_test.dart"]
+- **Applicable constraints and non-goals:** Модель каталога, проекция строки, спецификации, `plan.md` и `design.md` не меняются. Общий каталог и поиски дневного выбора меняются только в удержании места. Реальный сдвиг можно поправить ценой остановки инерции; вмешательство во внутреннее состояние прокрутки Flutter отклонено владельцем продукта. Обычные проверки не замеряют время.
 
-### U2 · Метка без значка и слова непредставима
+### U2 · Подтверждение готовности фазы 1
 
-- **Work items:** ["1.13"]
-- **Requirements and scenarios:** ["design.md, Decision 5: вариант Badge «слово в строке списка»", "plan.md: компоненты дизайн-системы остаются представлениями без предметной логики"]
-- **Affected boundary:** Код приложения, создающий метки, и проверки дизайн-системы, которые их читают.
-- **Implementation target:** ["lib/src/design_system/components/badge.dart","test/design_system/badge_test.dart","test/design_system/page_head_test.dart","test/design_system/relation_row_test.dart","test/design_system/tag_line_test.dart","test/intention/presentation/details/intention_details_head_test.dart","test/intention/presentation/picker/intention_picker_row_test.dart"]
-- **Applicable constraints and non-goals:** Вызовы `Badge.mark`, `Badge.archived` и `Badge.word` не меняются и остаются const. Вид, цвета, размеры и узлы экранного диктора не меняются. Новых вариантов нет.
-
-### U3 · Сценарий ухода со страницы участника проверяет прежнее поведение
-
-- **Work items:** ["1.9"]
-- **Requirements and scenarios:** ["long-term-relation-management: Нажатие на отмеченную строку поиска участника", "сценарий app_shell_pages_above_test: выбор пункта N со страницы участника удаляет незавершённую форму связи без сохранения"]
-- **Affected boundary:** Набор проверок навигации приложения.
-- **Implementation target:** ["test/app/navigation/app_shell_pages_above_test.dart"]
-- **Applicable constraints and non-goals:** Код приложения и спецификации не меняются; прочие шаги сценария не меняются.
-
-### U4 · Подтверждение готовности фазы 1
-
-- **Work items:** ["1.14"]
+- **Work items:** ["1.16"]
 - **Requirements and scenarios:** ["plan.md Phase 1: Ready to advance"]
 - **Affected boundary:** Решение о завершении фазы 1 и переходе к фазе 2.
 - **Implementation target:** ["openspec/changes/mark-occupied-pairs-in-relation-participant-picker/tasks.md"]
@@ -59,24 +43,27 @@
 
 | Pass | Status | Evidence or limitation |
 |---|---|---|
-| Independent decision review | Complete | Три свежих проверяющих без истории и планирующих материалов получили нейтральные брифы и непересекающиеся наборы путей точного диапазона: U1 — 6 путей, U2 — 7, U3 — 1. U4 не содержит путей доставки. Проверяющий U1 раскрыл два отступления: один `git diff --stat` без списка путей показал только имена других изменённых файлов, а `git grep` по `lib` прошёл и по `badge.dart` вне его цели без совпадений. Содержимое запрещённых материалов не читалось, поэтому независимость сохранена. |
-| OpenSpec conformance | Complete | В рабочей копии при чистом дереве и HEAD = 478d8c30464ebb7bd9c1860c8539f40e3aebbbdf: `mise run check` — exit 0 (`dart format`, проверки скриптов, `flutter analyze` без замечаний, 3900 тестов и 18 процессных тестов прошли); `mise run codegen-check` — exit 0; `openspec validate --strict --no-interactive` — valid с ожидаемым INFO об архивации дельты `intention-management` после `redesign-intention-catalog` (Plan Constraints); `git grep excludedIntentionId` по путям задачи 1.14 — 0 совпадений. APK в этом обзоре не собирался; `build/app/outputs/flutter-apk/app-release.apk` от 17:13 старше коммита 478d8c30 (17:18), который меняет только `tasks.md`. Отметка задачи 1.14 о соответствии спецификации опровергнута дефектом, устранение которого ведут задачи 1.15 и 1.16. |
-| Code quality | Complete | В контексте оркестратора пять осей `code-review-and-quality` применены ко всем путям доставки на проверяемой ревизии: корректность и согласованность хранителя, читаемость, границы модулей, безопасность, производительность. Новых входов с недоверенными данными нет. Новые пробы в одноразовой копии проверяемой ревизии подтвердили дефект, переданный в задачу 1.15, и чувствительность регрессионных проверок. |
+| Independent decision review | Complete | Свежий проверяющий без истории получил нейтральный бриф и два пути точного диапазона U1. U2 не содержит путей доставки. Находок нет. Проверяющий не открывал планирующие материалы; `git diff --name-only` показал ему только имена путей под `openspec/`. Прежний отчёт оркестратор прочитал до его возврата, но проверяющему не передавал, поэтому независимость сохранена. Его довод о приостановке `ref.listen` неверен: в `flutter_riverpod` 3.4.2 приостанавливаются только подписки `ref.watch`, а `ref.listen` закрытого списка получает каждое событие. Оркестратор заново проследил поток с этой поправкой, вывод не изменился. |
+| OpenSpec conformance | Complete | В рабочей копии при чистом дереве и HEAD = 3de0dc9df86a4bf90e4228e0e5b25daa4aaada23: `mise run check` — exit 0 (`dart format`, проверки скриптов, `flutter analyze` без замечаний, 3901 тест и 18 процессных тестов прошли); `mise run codegen-check` — exit 0; `openspec validate --strict --no-interactive` — valid с ожидаемым INFO об архивации дельты `intention-management` после `redesign-intention-catalog` (Plan Constraints); `grep` по `excludedIntentionId` из задачи 1.16 — 0 совпадений. APK в этом обзоре не собирался; `build/app/outputs/flutter-apk/app-release.apk` от 18:12:16 новее коммита fc6897db (17:53:42) и старше 3de0dc9d, который меняет только `tasks.md`. |
+| Code quality | Complete | В контексте оркестратора пять осей `code-review-and-quality` применены к путям доставки на проверяемой ревизии: корректность хранителя и его обоих потребителей, читаемость, границы модулей, безопасность, производительность. Новых входов с недоверенными данными нет, добавленная проверка постоянна по времени. Проба в одноразовой копии подтвердила чувствительность новой регрессионной проверки и дала F1. |
 
 ## Findings
 
-No unresolved findings remain in the implementation review.
+### F1 · Low — После исправления 1.15 проверка запроса при восстановлении якоря недостижима
+
+- **Evidence:** Коммит fc6897db добавил условие `_isShownResultsOf` при запоминании якоря (`results_scroll_keeper.dart:91`). Теперь якорь создаётся только для выдачи, по которой построен `_shown`, а смена запроса и показ состояния вместо строк сбрасывают его через `_jumpToTop` (`:70-82`, `:139-146`). Поэтому в `_restoreVisualAnchor` условие `!identical(state.query, anchor.query)` (`:245`) не может сработать: `_shown` с другим запросом появляется только после публикации этого запроса, а она уже убрала якорь. Поле `_VisualAnchor.query` (`:352`, `:363`, `:375`) нужно только этому условию. До исправления условие было достижимо, когда якорь выдачи запоминался при отставшем `_shown`. Проба в одноразовой копии проверяемой ревизии: без условия `:245`, а заодно и без `:90`, 160 проверок из списка задачи 1.15 прошли. Условие `:90` в находку не входит: оно остаётся локальным предусловием чтения строк из `previousState`.
+- **Evidence revisions:** ["3de0dc9df86a4bf90e4228e0e5b25daa4aaada23"]
+- **Impact:** Читатель хранителя видит защиту от состояния, которого нет, и считает, что якорь может пережить смену выдачи. Хранитель несёт лишнее поле и лишний инвариант. Поведение не нарушено.
+- **Required outcome:** Хранитель не проверяет принадлежность якоря выдаче при восстановлении и не хранит данных только для этой проверки, а удержание места и начало новой выдачи сверху сохраняются.
+- **Earliest source of truth:** implementation/tests
+- **Affected artifacts:** ["lib/src/intention/presentation/search/results_scroll_keeper.dart"]
 
 ## Review coverage
 
-Проверены все 7 целевых коммитов. 88d6fcbc вносит только оценки профилей задач (планирующее свидетельство). 54da4ccd — U3 (1.9); cb69869f, ea6ea82f и 56e9e5a1 — U1 (1.10–1.12); 3b576a4a — U2 (1.13); 478d8c30 — U4 (1.14). Отметки 1.9–1.14 в `tasks.md` сверены с диапазоном; единственная отметка, опровергнутая кодом, — 1.14: её условие о соответствии спецификации нарушено дефектом, устранение которого ведут задачи 1.15 и 1.16.
+Проверены все 3 целевых коммита. bc4c7b97 вносит только оценки профилей задач 1.15 и 1.16 (планирующее свидетельство). fc6897db — U1 (1.15) и отметка задачи в `tasks.md`. 3de0dc9d — U2 (1.16) и отметка задачи в `tasks.md`. Обе отметки подтверждены диапазоном и проверками выше.
 
-**U1.** Прослежены потоки: несколько операций подряд под закрытой страницей, уход первой видимой строки и её соседей, вставка перед видимой строкой, подгрузка порции одновременно с операцией, разные причины перестройки у `IntentionSearchList` и `IntentionSearchResults`, переход к верху при новой выдаче. Семь регрессионных проверок задач 1.10–1.12 падают с хранителем и виджетами из e62d4e96. Обе проверки задачи 1.12 падают, если убрать сравнение `pairOccupants`, а у `PairOccupant` сравнение по значению. Спецификации и модель каталога в диапазоне не менялись, а `_idsByDistance` и карта индексов оправданы проверкой на уход соседей и линейной стоимостью поиска.
+**U1.** Прослежены потоки: одна и несколько операций после начала новой выдачи, операция до и после её начала, новая выдача при видимом списке, операция в том же кадре до перестройки, переход через пустую выдачу и через состояния вместо строк, ранее запомненный якорь. Оба потребителя хранителя не менялись: `IntentionSearchList` читает модель через `ref.watch`, `IntentionSearchResults` получает выдачу от страницы, и у обоих `_shown` отстаёт, пока список закрыт, а события модели приходят. Модель не публикует прежний объект запроса повторно, новые запросы создаются только при чтении первой порции (`intention_catalog_view_model.dart:128`, `:604`). Критерии 1.15 выполнены: якорь запоминается только при идентичных запросах `_shown` и нового состояния, спецификации, `plan.md` и `design.md` не менялись. Без условия `_isShownResultsOf` падает только новая регрессионная проверка, остальные 19 проверок файла проходят, а обратный порядок покрывает соседняя проверка «новая выдача, начатая после изменения строк». Отдельная проверка на несколько операций не нужна: каждое событие проходит одну и ту же ветку. Результаты 1.10–1.12 подтверждены полным прогоном.
 
-**U2.** `Badge` закрыт, варианты хранят обязательные поля, ветки `StateError` нет. Сравнение прежних приватных методов с новыми `build` не показало отличий размеров, отступов, цветов и `ExcludeSemantics`. Вызовы приложения не менялись, `find.byType(Badge)` в проверках не осталось, утверждения не ослаблены.
-
-**U3.** Пара «Читать» → «Бегать» занята связью фикстуры, «Гулять» свободна. Сценарий по-прежнему проверяет удаление формы без подтверждения, код приложения не менялся.
-
-**U4.** Подтверждены отсутствие `excludedIntentionId`, полные проверки, кодогенерация и валидность изменения на проверенной ревизии. Соответствие спецификации на этой ревизии не подтверждено: его подтверждает задача 1.16 после исправления 1.15.
+**U2.** Подтверждены отсутствие `excludedIntentionId`, полные проверки, кодогенерация и валидность изменения на проверенной ревизии. Прежний опровергающий дефект задачи 1.14 устранён в U1, поэтому условие «Ready to advance» фазы 1 выполнено. Общий каталог и поиски дневного выбора в диапазоне изменились только в удержании места: единственный путь доставки — общий хранитель.
 
 Ручные проверки на устройстве не выполнялись и остаются за пользователем: метки в светлой и тёмной темах, чтение отметки диктором, переход из отмеченной строки и возврат.
