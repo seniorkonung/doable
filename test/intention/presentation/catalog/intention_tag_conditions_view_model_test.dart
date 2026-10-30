@@ -9,7 +9,6 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_view
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/domain/tag.dart';
-import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -31,16 +30,15 @@ void main() {
     final h = _Harness();
     addTearDown(h.dispose);
 
-    h.cycle(_tag(1, 'Спорт', color: TagColor.green));
-    expect(h.shown, [(_id(1), _present, 'Спорт')]);
-    expect(h.colors, {_id(1): TagColor.green});
+    h.cycle(1);
+    expect(h.shown, [(_id(1), _present)]);
     expect(h.appliedFilter, IntentionTagFilter(requiredTagIds: [_id(1)]));
 
-    h.cycle(_tag(1, 'Спорт', color: TagColor.green));
-    expect(h.shown, [(_id(1), _absent, 'Спорт')]);
+    h.cycle(1);
+    expect(h.shown, [(_id(1), _absent)]);
     expect(h.appliedFilter, IntentionTagFilter(excludedTagIds: [_id(1)]));
 
-    h.cycle(_tag(1, 'Спорт', color: TagColor.green));
+    h.cycle(1);
     expect(h.conditions, isEmpty);
     expect(h.appliedFilter, IntentionTagFilter.empty);
   });
@@ -49,41 +47,24 @@ void main() {
       'условие встаёт в конец', () {
     final h = _Harness();
     addTearDown(h.dispose);
-    h.cycle(_tag(1, 'Здоровье'));
-    h.cycle(_tag(2, 'Спорт'));
-    h.cycle(_tag(3, 'Отдых'));
+    h.cycle(1);
+    h.cycle(2);
+    h.cycle(3);
 
-    h.cycle(_tag(2, 'Спорт'));
+    h.cycle(2);
     expect(h.shown, [
-      (_id(1), _present, 'Здоровье'),
-      (_id(2), _absent, 'Спорт'),
-      (_id(3), _present, 'Отдых'),
+      (_id(1), _present),
+      (_id(2), _absent),
+      (_id(3), _present),
     ]);
 
-    h.cycle(_tag(2, 'Спорт'));
-    h.cycle(_tag(2, 'Спорт'));
+    h.cycle(2);
+    h.cycle(2);
     expect(h.shown, [
-      (_id(1), _present, 'Здоровье'),
-      (_id(3), _present, 'Отдых'),
-      (_id(2), _present, 'Спорт'),
+      (_id(1), _present),
+      (_id(3), _present),
+      (_id(2), _present),
     ]);
-  });
-
-  test('переключение тегом из более раннего снимка не возвращает '
-      'подтверждённые название и цвет', () {
-    final h = _Harness();
-    addTearDown(h.dispose);
-    h.cycle(_tag(1, 'Здоровье'));
-    h.update(
-      2,
-      _tag(1, 'Здоровье'),
-      _tag(1, 'Самочувствие', color: TagColor.blue),
-    );
-
-    h.cycle(_tag(1, 'Здоровье'), revision: 1);
-
-    expect(h.shown, [(_id(1), _absent, 'Самочувствие')]);
-    expect(h.colors, {_id(1): TagColor.blue});
   });
 
   test('сброс снимает все условия одним чтением первой порции с сохранённой '
@@ -92,9 +73,9 @@ void main() {
     addTearDown(h.dispose);
     h.catalog.changeTitleFilter('ходить');
     await pumpEventQueue();
-    h.cycle(_tag(1, 'Здоровье'));
-    h.cycle(_tag(2, 'Спорт'));
-    h.cycle(_tag(2, 'Спорт'));
+    h.cycle(1);
+    h.cycle(2);
+    h.cycle(2);
     h.appliedFilter;
     final queries = h.repository.queries.length;
 
@@ -112,14 +93,14 @@ void main() {
       'условий и выдачи', () {
     final h = _Harness();
     addTearDown(h.dispose);
-    h.cycle(_tag(2, 'Спорт'));
+    h.cycle(2);
     h.delete(2, _id(1));
     h.appliedFilter;
     final queries = h.repository.queries.length;
 
-    h.cycle(_tag(1, 'Здоровье'), revision: 1);
+    h.cycle(1);
 
-    expect(h.shown, [(_id(2), _present, 'Спорт')]);
+    expect(h.shown, [(_id(2), _present)]);
     expect(h.appliedFilter, IntentionTagFilter(requiredTagIds: [_id(2)]));
     expect(h.repository.queries, hasLength(queries));
   });
@@ -129,45 +110,25 @@ void main() {
     final h = _Harness();
     addTearDown(h.dispose);
     final IntentionTagConditionSet conditionSet = h.model;
-    final published = <List<(TagId, IntentionTagRequirement, String)>>[];
+    final published = <List<(TagId, IntentionTagRequirement)>>[];
     final subscription = conditionSet.changes.listen(
       (state) => published.add(_shown(state)),
     );
     addTearDown(subscription.cancel);
 
-    conditionSet.cycle(
-      _tag(1, 'Здоровье'),
-      snapshotRevision: const _Revision(1),
-    );
-    conditionSet.cycle(_tag(2, 'Спорт'), snapshotRevision: const _Revision(1));
+    conditionSet.cycle(_id(1));
+    conditionSet.cycle(_id(2));
     h.delete(2, _id(1));
     conditionSet.clear();
     await pumpEventQueue();
 
     expect(published, [
-      [(_id(1), _present, 'Здоровье')],
-      [(_id(1), _present, 'Здоровье'), (_id(2), _present, 'Спорт')],
-      [(_id(2), _present, 'Спорт')],
-      <(TagId, IntentionTagRequirement, String)>[],
+      [(_id(1), _present)],
+      [(_id(1), _present), (_id(2), _present)],
+      [(_id(2), _present)],
+      <(TagId, IntentionTagRequirement)>[],
     ]);
     expect(conditionSet.current.conditions, isEmpty);
-  });
-
-  test('подтверждённое изменение только цвета обновляет условие без новой '
-      'выдачи', () {
-    final h = _Harness();
-    addTearDown(h.dispose);
-    h.cycle(_tag(1, 'Здоровье'));
-    expect(h.appliedFilter, IntentionTagFilter(requiredTagIds: [_id(1)]));
-    final queries = h.repository.queries.length;
-
-    h.update(2, _tag(1, 'Здоровье'), _tag(1, 'Здоровье', color: TagColor.blue));
-
-    expect(h.shown, [(_id(1), _present, 'Здоровье')]);
-    expect(h.colors, {_id(1): TagColor.blue});
-    // Идентичность и надобность условия прежние: новая выдача не начинается.
-    expect(h.appliedFilter, IntentionTagFilter(requiredTagIds: [_id(1)]));
-    expect(h.repository.queries, hasLength(queries));
   });
 
   test('подтверждённое удаление снимает обязательное и исключающее условия, '
@@ -175,19 +136,19 @@ void main() {
       'фильтра', () {
     final h = _Harness();
     addTearDown(h.dispose);
-    h.cycle(_tag(1, 'Здоровье'));
-    h.cycle(_tag(2, 'Спорт'));
-    h.cycle(_tag(2, 'Спорт'));
-    h.cycle(_tag(3, 'Отдых'));
-    h.cycle(_tag(4, 'Работа'));
-    h.cycle(_tag(4, 'Работа'));
+    h.cycle(1);
+    h.cycle(2);
+    h.cycle(2);
+    h.cycle(3);
+    h.cycle(4);
+    h.cycle(4);
     h.appliedFilter;
     final queries = h.repository.queries.length;
 
     h.delete(2, _id(1));
     h.delete(3, _id(4));
 
-    expect(h.shown, [(_id(2), _absent, 'Спорт'), (_id(3), _present, 'Отдых')]);
+    expect(h.shown, [(_id(2), _absent), (_id(3), _present)]);
     // Фильтр без снятых тегов применяет модель каталога по тому же пакету.
     h.appliedFilter;
     expect(h.repository.queries, hasLength(queries));
@@ -196,7 +157,7 @@ void main() {
   test('новый тег с прежним названием не восстанавливает снятое условие', () {
     final h = _Harness();
     addTearDown(h.dispose);
-    h.cycle(_tag(1, 'Здоровье'));
+    h.cycle(1);
     h.delete(2, _id(1));
 
     h.package(3, [
@@ -209,21 +170,6 @@ void main() {
     expect(h.conditions, isEmpty);
   });
 
-  test('переключение тегом из более нового снимка обновляет название и '
-      'цвет', () {
-    final h = _Harness();
-    addTearDown(h.dispose);
-    h.cycle(_tag(1, 'Здоровье'));
-    h.package(2, [
-      TagCreatedChange(revision: const _Revision(2), after: _tag(8, 'Быт')),
-    ]);
-
-    h.cycle(_tag(1, 'Самочувствие', color: TagColor.blue), revision: 2);
-
-    expect(h.shown, [(_id(1), _absent, 'Самочувствие')]);
-    expect(h.colors, {_id(1): TagColor.blue});
-  });
-
   test('условия разных назначений поиска независимы', () {
     final h = _Harness();
     addTearDown(h.dispose);
@@ -232,7 +178,7 @@ void main() {
     final subscription = h.container.listen(conditions, (_, _) {});
     addTearDown(subscription.close);
 
-    h.cycle(_tag(1, 'Здоровье'));
+    h.cycle(1);
     expect(h.container.read(conditions).conditions, isEmpty);
     expect(
       h.container
@@ -243,9 +189,9 @@ void main() {
     );
 
     h.container.read(conditions.notifier)
-      ..cycle(_tag(2, 'Спорт'), snapshotRevision: const _Revision(1))
-      ..cycle(_tag(2, 'Спорт'), snapshotRevision: const _Revision(1));
-    expect(h.shown, [(_id(1), _present, 'Здоровье')]);
+      ..cycle(_id(2))
+      ..cycle(_id(2));
+    expect(h.shown, [(_id(1), _present)]);
     expect(h.appliedFilter, IntentionTagFilter(requiredTagIds: [_id(1)]));
     expect(
       h.container
@@ -290,12 +236,7 @@ final class _Harness {
       container.read(provider.notifier);
   IntentionTagConditionsState get state => container.read(provider);
   List<IntentionTagCondition> get conditions => state.conditions;
-  List<(TagId, IntentionTagRequirement, String)> get shown => _shown(state);
-
-  /// Предъявляемые цвета условий; `null` — «Без цвета».
-  Map<TagId, TagColor?> get colors => {
-    for (final condition in conditions) condition.tagId: condition.color,
-  };
+  List<(TagId, IntentionTagRequirement)> get shown => _shown(state);
 
   IntentionCatalogViewModel get catalog =>
       container.read(intentionCatalogViewModelProvider(purpose).notifier);
@@ -308,19 +249,10 @@ final class _Harness {
     return filter;
   }
 
-  void cycle(Tag tag, {int revision = 1}) =>
-      model.cycle(tag, snapshotRevision: _Revision(revision));
+  void cycle(int number) => model.cycle(_id(number));
 
   void package(int revision, List<GraphChange> packageChanges) =>
       changes.add(_Package(_Revision(revision), packageChanges));
-
-  void update(int revision, Tag before, Tag after) => package(revision, [
-    TagUpdatedChange(
-      revision: _Revision(revision),
-      before: before,
-      after: after,
-    ),
-  ]);
 
   void delete(int revision, TagId tagId) => package(revision, [
     TagDeletedChange(revision: _Revision(revision), tagId: tagId),
@@ -353,20 +285,20 @@ final class _Revision implements GraphRevision {
   };
 }
 
-List<(TagId, IntentionTagRequirement, String)> _shown(
+List<(TagId, IntentionTagRequirement)> _shown(
   IntentionTagConditionsState state,
 ) => [
   for (final condition in state.conditions)
-    (condition.tagId, condition.requirement, condition.name.value),
+    (condition.tagId, condition.requirement),
 ];
 
 TagId _id(int number) => (TagId.decode(
   '00000000-0000-4000-8000-${number.toString().padLeft(12, '0')}',
 ) as TagIdDecodingSuccess).id;
 
-Tag _tag(int number, String name, {TagColor? color}) => Tag(
+Tag _tag(int number, String name) => Tag(
   id: _id(number),
   name: TagName.fromInput(name),
-  color: color,
+  color: null,
   position: tagPositionAt(number),
 );

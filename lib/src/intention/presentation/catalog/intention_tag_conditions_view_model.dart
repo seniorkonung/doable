@@ -7,17 +7,14 @@ import '../../../app/navigation/graph_generation.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_revision.dart';
 import '../../../tag/application/tag_change.dart';
-import '../../../tag/domain/tag.dart';
-import '../../../tag/domain/tag_color.dart';
 import '../../../tag/domain/tag_id.dart';
-import '../../../tag/domain/tag_name.dart';
 import '../../application/intention_catalog.dart';
 import 'intention_catalog_purpose.dart';
 import 'intention_catalog_view_model.dart';
 
 part 'intention_tag_conditions_view_model.g.dart';
 
-/// Узкая зависимость позволяет проверять предъявление условий без команд.
+/// Узкая зависимость позволяет проверять снятие условий без команд.
 final intentionTagConditionsChangesProvider =
     Provider<Stream<ConfirmedGraphChangePackage>>(
       (ref) => ref
@@ -34,42 +31,24 @@ enum IntentionTagRequirement {
   mustBePresent,
 
   /// Тег должен отсутствовать у искомого намерения.
-  mustBeAbsent;
-
-  IntentionTagRequirement get toggled => switch (this) {
-    mustBePresent => mustBeAbsent,
-    mustBeAbsent => mustBePresent,
-  };
+  mustBeAbsent,
 }
 
-/// Выбранное условие для предъявления: идентичность задаёт только [tagId].
-///
-/// Название и цвет в предикат поиска не входят.
+/// Выбранное условие: идентичность задаёт только [tagId].
 final class IntentionTagCondition {
-  const IntentionTagCondition({
-    required this.tagId,
-    required this.requirement,
-    required this.name,
-    required this.color,
-  });
+  const IntentionTagCondition({required this.tagId, required this.requirement});
 
   final TagId tagId;
   final IntentionTagRequirement requirement;
-  final TagName name;
-
-  /// `null` — «Без цвета».
-  final TagColor? color;
 
   @override
   bool operator ==(Object other) =>
       other is IntentionTagCondition &&
       other.tagId == tagId &&
-      other.requirement == requirement &&
-      other.name == name &&
-      other.color == color;
+      other.requirement == requirement;
 
   @override
-  int get hashCode => Object.hash(tagId, requirement, name, color);
+  int get hashCode => Object.hash(tagId, requirement);
 }
 
 /// Условия одного назначения поиска в порядке добавления, по одному на тег.
@@ -79,7 +58,7 @@ final class IntentionTagConditionsState {
 
   final List<IntentionTagCondition> conditions;
 
-  /// Предикат поиска: порядок добавления и предъявление в него не входят.
+  /// Предикат поиска: порядок добавления в него не входит.
   IntentionTagFilter get tagFilter => IntentionTagFilter(
     requiredTagIds: _tagIds(IntentionTagRequirement.mustBePresent),
     excludedTagIds: _tagIds(IntentionTagRequirement.mustBeAbsent),
@@ -102,14 +81,12 @@ abstract interface class IntentionTagConditionSet {
   /// Изменения условий, в том числе снятие условия при удалении тега.
   Stream<IntentionTagConditionsState> get changes;
 
-  /// Переключает условие по [tag] по кругу: без условия — «должен быть» в
-  /// конце порядка, «должен быть» — «должен отсутствовать» на прежнем месте,
-  /// «должен отсутствовать» — без условия.
+  /// Переключает условие по тегу [tagId] по кругу: без условия — «должен
+  /// быть» в конце порядка, «должен быть» — «должен отсутствовать» на прежнем
+  /// месте, «должен отсутствовать» — без условия.
   ///
-  /// Название и цвет берутся из [tag] снимка на [snapshotRevision], если он
-  /// не старше уже подтверждённого предъявления условия. Тег, удаление
-  /// которого уже подтверждено, ни условий, ни выдачи не меняет.
-  void cycle(Tag tag, {required GraphRevision snapshotRevision});
+  /// Тег, удаление которого уже подтверждено, ни условий, ни выдачи не меняет.
+  void cycle(TagId tagId);
 
   /// Снимает все условия по тегам одним изменением фильтра поиска.
   void clear();
@@ -118,8 +95,8 @@ abstract interface class IntentionTagConditionSet {
 /// Выбранные условия по тегам одного назначения поиска.
 ///
 /// Изменение условий сразу передаётся модели каталога того же назначения.
-/// Модель не выполняет команд тегов и ничего не читает: предъявление
-/// условий следует за подтверждёнными пакетами изменений.
+/// Модель не выполняет команд тегов и ничего не читает: снятие условия при
+/// удалении тега следует за подтверждёнными пакетами изменений.
 /// Условия живут, пока открыт их поиск, и между открытиями не сохраняются.
 @riverpod
 final class IntentionTagConditionsViewModel
@@ -129,7 +106,7 @@ final class IntentionTagConditionsViewModel
   StreamSubscription<ConfirmedGraphChangePackage>? _changes;
   final _conditionChanges =
       StreamController<IntentionTagConditionsState>.broadcast();
-  final _entries = <TagId, _ConditionEntry>{};
+  final _requirements = <TagId, IntentionTagRequirement>{};
 
   /// Теги, удаление которых подтверждено в текущем поколении графа.
   final _deletedTagIds = <TagId>{};
@@ -144,7 +121,7 @@ final class IntentionTagConditionsViewModel
     final graphGeneration = ref.watch(currentGraphGenerationProvider);
     if (graphGeneration != _graphGeneration) {
       _graphGeneration = graphGeneration;
-      _entries.clear();
+      _requirements.clear();
       _deletedTagIds.clear();
     }
     unawaited(_changes?.cancel());
@@ -166,65 +143,23 @@ final class IntentionTagConditionsViewModel
   Stream<IntentionTagConditionsState> get changes => _conditionChanges.stream;
 
   @override
-  void cycle(Tag tag, {required GraphRevision snapshotRevision}) {
-    if (_deletedTagIds.contains(tag.id)) return;
-    switch (_entries[tag.id]?.requirement) {
+  void cycle(TagId tagId) {
+    if (_deletedTagIds.contains(tagId)) return;
+    switch (_requirements[tagId]) {
       case null:
-        _put(tag, IntentionTagRequirement.mustBePresent, snapshotRevision);
+        _requirements[tagId] = IntentionTagRequirement.mustBePresent;
       case IntentionTagRequirement.mustBePresent:
-        _put(tag, IntentionTagRequirement.mustBeAbsent, snapshotRevision);
+        _requirements[tagId] = IntentionTagRequirement.mustBeAbsent;
       case IntentionTagRequirement.mustBeAbsent:
-        _entries.remove(tag.id);
+        _requirements.remove(tagId);
     }
     _publish();
   }
 
   @override
   void clear() {
-    if (_entries.isEmpty) return;
-    _entries.clear();
-    _publish();
-  }
-
-  /// Добавляет условие в конец порядка либо меняет надобность существующего
-  /// на прежнем месте.
-  void _put(
-    Tag tag,
-    IntentionTagRequirement requirement,
-    GraphRevision snapshotRevision,
-  ) {
-    final existing = _entries[tag.id];
-    if (existing == null) {
-      _entries[tag.id] = _ConditionEntry(
-        requirement: requirement,
-        name: tag.name,
-        color: tag.color,
-        revision: snapshotRevision,
-      );
-      return;
-    }
-    existing.requirement = requirement;
-    // Более ранний снимок не возвращает уже подтверждённое предъявление.
-    if (snapshotRevision.compareTo(existing.revision) ==
-        GraphRevisionOrder.newer) {
-      existing
-        ..name = tag.name
-        ..color = tag.color
-        ..revision = snapshotRevision;
-    }
-  }
-
-  /// Переключает «должен быть ↔ должен отсутствовать» на прежнем месте.
-  void toggleRequirement(TagId tagId) {
-    final entry = _entries[tagId];
-    if (entry == null) return;
-    entry.requirement = entry.requirement.toggled;
-    _publish();
-  }
-
-  /// Снимает условие.
-  void remove(TagId tagId) {
-    if (_entries.remove(tagId) == null) return;
+    if (_requirements.isEmpty) return;
+    _requirements.clear();
     _publish();
   }
 
@@ -233,21 +168,11 @@ final class IntentionTagConditionsViewModel
     var changed = false;
     for (final change in package.changes) {
       switch (change) {
-        case TagUpdatedChange(:final after):
-          final entry = _entries[after.id];
-          if (entry == null || !_supersedes(package.revision, entry.revision)) {
-            continue;
-          }
-          entry
-            ..name = after.name
-            ..color = after.color
-            ..revision = package.revision;
-          changed = true;
         // Модель каталога сама исключает тег из применённого фильтра в
         // этой же публикации пакета, поэтому фильтр не публикуется повторно.
         case TagDeletedChange(:final tagId):
           _deletedTagIds.add(tagId);
-          changed = _entries.remove(tagId) != null || changed;
+          changed = _requirements.remove(tagId) != null || changed;
         // Новый тег с прежним названием имеет другой идентификатор и
         // снятое условие не восстанавливает.
         case GraphChange():
@@ -266,35 +191,8 @@ final class IntentionTagConditionsViewModel
   }
 
   IntentionTagConditionsState _snapshot() => IntentionTagConditionsState([
-    for (final MapEntry(key: tagId, value: entry) in _entries.entries)
-      IntentionTagCondition(
-        tagId: tagId,
-        requirement: entry.requirement,
-        name: entry.name,
-        color: entry.color,
-      ),
+    for (final MapEntry(key: tagId, value: requirement)
+        in _requirements.entries)
+      IntentionTagCondition(tagId: tagId, requirement: requirement),
   ]);
-
-  bool _supersedes(GraphRevision revision, GraphRevision confirmed) =>
-      switch (revision.compareTo(confirmed)) {
-        GraphRevisionOrder.newer || GraphRevisionOrder.differentEpoch => true,
-        GraphRevisionOrder.older || GraphRevisionOrder.same => false,
-      };
-}
-
-/// Изменяемая запись условия; ключ [TagId] хранит порядок добавления.
-final class _ConditionEntry {
-  _ConditionEntry({
-    required this.requirement,
-    required this.name,
-    required this.color,
-    required this.revision,
-  });
-
-  IntentionTagRequirement requirement;
-  TagName name;
-  TagColor? color;
-
-  /// Ревизия, на которой подтверждены предъявляемые название и цвет.
-  GraphRevision revision;
 }

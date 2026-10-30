@@ -1974,7 +1974,7 @@ Future<void> _selectCondition(
         .notifier,
   );
   for (var i = 0; i < tagConditionCycles(requirement); i++) {
-    conditions.cycle(tag, snapshotRevision: const TestCatalogRevision(0));
+    conditions.cycle(tag.id);
     await tester.pump();
   }
 }

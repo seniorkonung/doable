@@ -1317,8 +1317,7 @@ final class _FilterSearch {
   _Panel open() =>
       _Panel(container, TagsPanelOpening(TagsPanelFilterContext(conditions)));
 
-  void cycle(Tag tag) =>
-      conditions.cycle(tag, snapshotRevision: const TagCatalogTestRevision());
+  void cycle(Tag tag) => conditions.cycle(tag.id);
 
   List<(TagId, IntentionTagRequirement)> get requirements => [
     for (final condition in conditions.current.conditions)

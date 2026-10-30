@@ -102,10 +102,7 @@ void main() {
           ? IntentionTagRequirement.mustBePresent
           : IntentionTagRequirement.mustBeAbsent;
       for (var i = 0; i < tagConditionCycles(requirement); i++) {
-        model.cycle(
-          _tags[index],
-          snapshotRevision: const TestCatalogRevision(0),
-        );
+        model.cycle(_tags[index].id);
         await tester.pump();
       }
     }
@@ -515,12 +512,7 @@ void _expectNotTruncated(WidgetTester tester, Finder finder) {
 IntentionTagCondition _condition(
   Tag tag,
   IntentionTagRequirement requirement,
-) => IntentionTagCondition(
-  tagId: tag.id,
-  requirement: requirement,
-  name: tag.name,
-  color: tag.color,
-);
+) => IntentionTagCondition(tagId: tag.id, requirement: requirement);
 
 Finder _panelRow(Tag tag) =>
     find.byKey(ValueKey('tags-panel-row-${tag.id.toCanonicalString()}'));

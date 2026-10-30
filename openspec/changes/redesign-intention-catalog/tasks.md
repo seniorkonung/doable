@@ -528,7 +528,7 @@
     - проверки: `test/intention/presentation/catalog/intention_catalog_page_test.dart`, `test/intention/presentation/intention_tag_search_accessibility_test.dart`, `test/app/navigation/app_shell_page_matrix.dart`, `test/app/intention_tag_search_app_flow_test.dart`, `test/app/tag_app_flow_test.dart`, `test/app/intention_creation_sheet_integration_test.dart`.
   - **Размер:** M.
 
-- [ ] 4.9 Убрать из модели условий по тегам предъявление, которое читал только раздел условий
+- [x] 4.9 Убрать из модели условий по тегам предъявление, которое читал только раздел условий
   - **Критерии приёмки:**
     - `IntentionTagCondition` несёт только `tagId` и `requirement`. Название и цвет условия, ревизия записи, ветка `TagUpdatedChange`, `toggleRequirement`, `remove` и `IntentionTagRequirement.toggled` удалены: после задачи 4.8 их никто не читает и не вызывает.
     - `IntentionTagConditionSet.cycle` принимает идентификатор тега без `snapshotRevision`, и панель тегов вызывает его так.
