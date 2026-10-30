@@ -49,7 +49,6 @@ final class IntentionSearchResults extends ConsumerStatefulWidget {
     required this.messages,
     required this.emptyMessage,
     required this.itemBuilder,
-    required this.totalCountLabel,
     super.key,
   });
 
@@ -68,9 +67,6 @@ final class IntentionSearchResults extends ConsumerStatefulWidget {
   final String Function(IntentionCatalogEmpty empty) emptyMessage;
 
   final IntentionSearchResultBuilder itemBuilder;
-
-  /// Подпись точного количества совпадений над списком.
-  final String Function(int totalCount) totalCountLabel;
 
   /// Показывает ли выдача [catalog] загруженный список, а не состояние вместо
   /// него: загрузку, отказ или пустую выдачу.
@@ -171,7 +167,7 @@ final class _IntentionSearchResultsState
   Widget _buildLoaded(IntentionCatalogLoaded results) {
     final hasContinuationStatus =
         results.continuation is! IntentionCatalogContinuationIdle;
-    final list = ListView.builder(
+    return ListView.builder(
       key: widget.listKey,
       controller: _scrollKeeper.controller,
       padding: EdgeInsets.zero,
@@ -190,19 +186,6 @@ final class _IntentionSearchResultsState
           child: widget.itemBuilder(context, results, summary),
         );
       },
-    );
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-          child: Text(
-            widget.totalCountLabel(results.totalCount),
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-        ),
-        Expanded(child: list),
-      ],
     );
   }
 

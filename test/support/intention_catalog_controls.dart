@@ -10,10 +10,14 @@
 library;
 
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/design_system/components/catalog_header.dart';
+import 'package:doable/src/design_system/components/order_button.dart';
+import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
     hide IntentionCatalogPage;
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_row.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter/material.dart';
@@ -25,6 +29,7 @@ import 'tag_condition_cycles.dart';
 /// Параметры поиска, которые показывает каталог намерений.
 typedef ShownIntentionCatalogParameters = ({
   IntentionScope scope,
+  IntentionTypeChoice type,
   IntentionCatalogOrder order,
   String titleFilter,
   int tagConditions,
@@ -36,8 +41,11 @@ typedef ShownIntentionCatalogParameters = ({
 typedef ShownIntentionCatalogRow = ({String title, String tags, Rect rect});
 
 final _page = find.byType(IntentionCatalogPage);
-final _scopeControl = find.byKey(const ValueKey('catalog-scope-control'));
-final _orderControl = find.byKey(const ValueKey('catalog-order-control'));
+final _header = find.descendant(
+  of: _page,
+  matching: find.byType(CatalogHeader),
+);
+final _sheet = find.byType(Sheet);
 
 /// Поле, в которое человек вводит название для поиска в каталоге намерений.
 ///
@@ -105,40 +113,69 @@ Finder intentionCatalogRow(String title) => find.descendant(
 );
 
 /// Точное количество [count] совпадений подтверждённой выдачи.
-Finder intentionCatalogTotal(int count) => find.descendant(
-  of: _page,
-  matching: find.byElementPredicate((element) {
-    final widget = element.widget;
-    return widget is Text &&
-        widget.data == AppLocalizations.of(element).catalogTotalCount(count);
-  }, description: 'количество совпадений каталога $count'),
-);
+Finder intentionCatalogTotal(int count) =>
+    find.descendant(of: _header, matching: find.text('$count'));
 
-/// Выбирает охват [scope]. [tap] — нажатие сценария; по умолчанию
-/// [tapWhenFound].
+/// Выбирает охват [scope] в листе «Показать и упорядочить» и закрывает лист.
+/// [tap] — нажатие сценария; по умолчанию [tapWhenFound].
 Future<void> selectIntentionCatalogScope(
   WidgetTester tester,
   IntentionScope scope, {
   RootPageTap tap = tapWhenFound,
-}) => _choose(
-  tester,
-  _scopeControl,
-  _scopeLabels(AppLocalizations.of(tester.element(_page)))[scope]!,
-  tap,
-);
+}) async {
+  final texts = AppLocalizations.of(tester.element(_page));
+  await _openShowAndSort(tester, tap);
+  await _choose(
+    tester,
+    texts.intentionPickerScopeCaption,
+    _scopeLabels(texts)[scope]!,
+  );
+  await _closeShowAndSort(tester);
+}
 
-/// Выбирает порядок [order]. [tap] — нажатие сценария; по умолчанию
-/// [tapWhenFound].
+/// Выбирает тип [type] в листе «Показать и упорядочить» и закрывает лист.
+/// [tap] — нажатие сценария; по умолчанию [tapWhenFound].
+Future<void> selectIntentionCatalogType(
+  WidgetTester tester,
+  IntentionTypeChoice type, {
+  RootPageTap tap = tapWhenFound,
+}) async {
+  final texts = AppLocalizations.of(tester.element(_page));
+  await _openShowAndSort(tester, tap);
+  await _choose(
+    tester,
+    texts.intentionPickerTypeCaption,
+    _typeLabels(texts)[type]!,
+  );
+  await _closeShowAndSort(tester);
+}
+
+/// Выбирает порядок [order] в листе «Показать и упорядочить» и закрывает лист:
+/// поле — в меню сортировки, направление — кнопкой рядом с ним. [tap] —
+/// нажатие сценария; по умолчанию [tapWhenFound].
 Future<void> selectIntentionCatalogOrder(
   WidgetTester tester,
   IntentionCatalogOrder order, {
   RootPageTap tap = tapWhenFound,
-}) => _choose(
-  tester,
-  _orderControl,
-  _orderLabels(AppLocalizations.of(tester.element(_page)))[order]!,
-  tap,
-);
+}) async {
+  final texts = AppLocalizations.of(tester.element(_page));
+  await _openShowAndSort(tester, tap);
+  await _choose(
+    tester,
+    texts.intentionPickerSortCaption,
+    _sortFieldLabels(texts)[order.field]!,
+  );
+  final direction = find.descendant(
+    of: _sheet,
+    matching: find.byType(OrderButton),
+  );
+  if (tester.widget<OrderButton>(direction).direction.name !=
+      order.direction.name) {
+    await tester.tap(direction);
+    await tester.pump();
+  }
+  await _closeShowAndSort(tester);
+}
 
 /// Вводит [title] фильтром названия.
 Future<void> enterIntentionCatalogTitle(WidgetTester tester, String title) =>
@@ -186,9 +223,20 @@ ShownIntentionCatalogParameters shownIntentionCatalogParameters(
   WidgetTester tester,
 ) {
   final texts = AppLocalizations.of(tester.element(_page));
+  final header = tester.widget<CatalogHeader>(_header);
+  final shown = [
+    for (final scope in IntentionScope.values)
+      for (final type in IntentionTypeChoice.values)
+        if (texts.intentionPickerScopeHeader(scope.name, type.name) ==
+            header.title)
+          (scope: scope, type: type),
+  ].single;
   return (
-    scope: _shownChoice(_scopeControl, _scopeLabels(texts)),
-    order: _shownChoice(_orderControl, _orderLabels(texts)),
+    scope: shown.scope,
+    type: shown.type,
+    order: _orderSummaries(texts).entries
+        .singleWhere((order) => order.value == header.summary)
+        .key,
     titleFilter: tester
         .widget<TextField>(intentionCatalogTitleField)
         .controller!
@@ -272,39 +320,67 @@ String _shownTags(IntentionCatalogRow row, AppLocalizations texts) {
         );
 }
 
-/// Выбирает вариант [label] в выпадающем списке [control].
-Future<void> _choose(
-  WidgetTester tester,
-  Finder control,
-  String label,
-  RootPageTap tap,
-) async {
-  await tap(tester, control);
+/// Открывает заголовком списка лист «Показать и упорядочить».
+Future<void> _openShowAndSort(WidgetTester tester, RootPageTap tap) async {
+  await tap(tester, _header);
   await tester.pump(_transition);
-  await tester.tap(find.text(label).last);
+}
+
+/// Закрывает лист: выбор уже применён, а «назад» только закрывает лист.
+Future<void> _closeShowAndSort(WidgetTester tester) async {
+  await tester.binding.handlePopRoute();
   await tester.pump();
   await tester.pump(_transition);
 }
 
-/// Вариант [labels], который показывает выпадающий список [control].
-T _shownChoice<T>(Finder control, Map<T, String> labels) {
-  final shown = [
-    for (final element
-        in find.descendant(of: control, matching: find.byType(Text)).evaluate())
-      (element.widget as Text).data,
-  ];
-  return labels.keys.singleWhere((choice) => shown.contains(labels[choice]));
+/// Открывает меню строки листа [row] и выбирает в нём вариант [label].
+///
+/// Лист уже открыт, а выдача за ним может получаться: нажатия не ждут покоя
+/// анимаций.
+Future<void> _choose(WidgetTester tester, String row, String label) async {
+  await tester.tap(
+    find.descendant(of: _sheet, matching: find.widgetWithText(InkWell, row)),
+  );
+  await tester.pump();
+  await tester.pump(_transition);
+  await tester.tap(
+    find.ancestor(of: find.text(label), matching: find.byType(MenuItemButton)),
+  );
+  await tester.pump();
+  await tester.pump(_transition);
 }
 
 Map<IntentionScope, String> _scopeLabels(AppLocalizations texts) => {
-  IntentionScope.active: texts.catalogScopeActive,
-  IntentionScope.archived: texts.catalogScopeArchived,
-  IntentionScope.all: texts.catalogScopeAll,
+  IntentionScope.active: texts.intentionPickerScopeActive,
+  IntentionScope.archived: texts.intentionPickerScopeArchived,
+  IntentionScope.all: texts.intentionPickerScopeAll,
 };
 
-Map<IntentionCatalogOrder, String> _orderLabels(AppLocalizations texts) => {
-  IntentionCatalogOrder.createdAtDescending: texts.catalogOrderCreatedNewest,
-  IntentionCatalogOrder.createdAtAscending: texts.catalogOrderCreatedOldest,
-  IntentionCatalogOrder.updatedAtDescending: texts.catalogOrderUpdatedNewest,
-  IntentionCatalogOrder.updatedAtAscending: texts.catalogOrderUpdatedOldest,
+Map<IntentionTypeChoice, String> _typeLabels(AppLocalizations texts) => {
+  IntentionTypeChoice.all: texts.intentionPickerTypeAll,
+  IntentionTypeChoice.intentions: texts.intentionPickerTypeIntentionsOnly,
+  IntentionTypeChoice.actions: texts.intentionPickerTypeActionsOnly,
+};
+
+Map<IntentionCatalogSortField, String> _sortFieldLabels(
+  AppLocalizations texts,
+) => {
+  IntentionCatalogSortField.createdAt: texts.intentionPickerSortCreated,
+  IntentionCatalogSortField.updatedAt: texts.intentionPickerSortChanged,
+  IntentionCatalogSortField.title: texts.intentionPickerSortName,
+};
+
+Map<IntentionCatalogOrder, String> _orderSummaries(AppLocalizations texts) => {
+  IntentionCatalogOrder.createdAtDescending:
+      texts.intentionPickerOrderCreatedNewest,
+  IntentionCatalogOrder.createdAtAscending:
+      texts.intentionPickerOrderCreatedOldest,
+  IntentionCatalogOrder.updatedAtDescending:
+      texts.intentionPickerOrderUpdatedNewest,
+  IntentionCatalogOrder.updatedAtAscending:
+      texts.intentionPickerOrderUpdatedOldest,
+  IntentionCatalogOrder.titleAscending:
+      texts.intentionPickerOrderTitleAscending,
+  IntentionCatalogOrder.titleDescending:
+      texts.intentionPickerOrderTitleDescending,
 };

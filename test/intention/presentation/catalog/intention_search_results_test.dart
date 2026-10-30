@@ -222,7 +222,6 @@ final class _Host extends ConsumerWidget {
         corruption: localizations.catalogCorruption,
         unexpected: localizations.catalogUnexpectedFailure,
       ),
-      totalCountLabel: localizations.catalogTotalCount,
       emptyMessage: (empty) => localizations.catalogActiveEmpty,
       itemBuilder: (context, results, summary) => SizedBox(
         key: ValueKey(summary.id),

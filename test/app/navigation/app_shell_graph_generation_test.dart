@@ -26,6 +26,7 @@ import 'package:doable/src/graph_snapshots/graph_snapshot_store.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
     hide IntentionCatalogPage;
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import 'package:doable/src/statistics/application/statistics_period.dart';
 import 'package:doable/src/statistics/application/statistics_read_contract.dart';
@@ -118,6 +119,7 @@ void main() {
     await _settle(tester);
     expect(shownIntentionCatalogParameters(tester), (
       scope: IntentionScope.active,
+      type: IntentionTypeChoice.all,
       order: IntentionCatalogOrder.createdAtDescending,
       titleFilter: '',
       tagConditions: 0,
@@ -221,11 +223,17 @@ String _previousTitle(int number) =>
 String _replacedTitle(int number) =>
     'Новое ${number.toString().padLeft(2, '0')}';
 
-/// Каталог намерений: все намерения, фильтр названия, условие по тегу,
-/// порядок от старых к новым и прокрученные выдача и страница.
+/// Каталог намерений: все намерения, только действия, фильтр названия, условие
+/// по тегу, порядок от старых к новым и прокрученные выдача и страница.
 Future<void> _prepareIntentionCatalog(WidgetTester tester) async {
   await _select(tester, AppDestination.intentionGraph);
   await selectIntentionCatalogScope(tester, IntentionScope.all, tap: _tap);
+  await _settle(tester);
+  await selectIntentionCatalogType(
+    tester,
+    IntentionTypeChoice.actions,
+    tap: _tap,
+  );
   await _settle(tester);
   await enterIntentionCatalogTitle(tester, 'Намерение');
   await _until(tester, intentionCatalogTotal(_intentionCount));
@@ -248,6 +256,7 @@ Future<void> _prepareIntentionCatalog(WidgetTester tester) async {
 
   expect(shownIntentionCatalogParameters(tester), (
     scope: IntentionScope.all,
+    type: IntentionTypeChoice.actions,
     order: IntentionCatalogOrder.createdAtAscending,
     titleFilter: 'Намерение',
     tagConditions: 1,

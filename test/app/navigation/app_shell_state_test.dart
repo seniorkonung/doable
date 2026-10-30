@@ -1038,12 +1038,18 @@ void _seed(sqlite.Database database) {
   database.execute('COMMIT');
 }
 
-/// Каталог намерений: архивный охват, фильтр названия, условие по тегу,
-/// порядок от старых к новым, две загруженные порции из трёх и прокрутка
-/// внутри второй порции.
+/// Каталог намерений: архивный охват, только действия, фильтр названия, условие
+/// по тегу, порядок от старых к новым, две загруженные порции из трёх и
+/// прокрутка внутри второй порции.
 Future<void> _prepareIntentionCatalog(WidgetTester tester, _App app) async {
   await _select(tester, AppDestination.intentionGraph);
   await selectIntentionCatalogScope(tester, IntentionScope.archived, tap: _tap);
+  await _settle(tester);
+  await selectIntentionCatalogType(
+    tester,
+    IntentionTypeChoice.actions,
+    tap: _tap,
+  );
   await _settle(tester);
   await _enterTitle(tester, 'Архив', total: _archivedCount + _untaggedCount);
   await addIntentionCatalogTagCondition(
@@ -1056,6 +1062,10 @@ Future<void> _prepareIntentionCatalog(WidgetTester tester, _App app) async {
   await _until(tester, intentionCatalogTotal(_archivedCount));
   await tester.pumpAndSettle();
   await _selectOldestFirst(tester);
+  // Лист не забирает фокус у поля названия, а поле с фокусом после возврата
+  // на страницу показало бы каретку и сдвинуло параметры над выдачей.
+  FocusManager.instance.primaryFocus?.unfocus();
+  await tester.pump();
 
   // Конец первой порции запрашивает вторую.
   jumpIntentionCatalog(tester, 1);
@@ -1077,6 +1087,10 @@ Future<void> _prepareIntentionCatalog(WidgetTester tester, _App app) async {
     const IntentionScopeOpen(IntentionScope.archived),
   );
   expect(catalog.selection.order, IntentionCatalogOrder.createdAtAscending);
+  expect(
+    shownIntentionCatalogParameters(tester).type,
+    IntentionTypeChoice.actions,
+  );
   expect(catalog.items.first.title, 'Архив 001');
   expect(shownIntentionCatalogParameters(tester).tagConditions, 1);
   expect(shownIntentionCatalogOffsets(tester), everyElement(greaterThan(0)));

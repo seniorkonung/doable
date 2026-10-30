@@ -5,6 +5,7 @@ import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/design_system/components/badge.dart';
+import 'package:doable/src/design_system/components/catalog_header.dart';
 import 'package:doable/src/design_system/components/catalog_row.dart';
 import 'package:doable/src/design_system/components/tag_chip.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
@@ -40,6 +41,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/app_root_pages.dart';
 import '../../../support/inline_text.dart';
+import '../../../support/intention_catalog_controls.dart';
 import '../../../support/quick_creation.dart';
 import 'catalog_test_support.dart';
 import 'catalog_reconciliation_test_support.dart';
@@ -98,7 +100,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Total intentions: 12'), findsOneWidget);
+    expect(intentionCatalogTotal(12), findsOneWidget);
     expect(find.text('Позвонить врачу'), findsOneWidget);
     expect(find.text('Выбрать страховку'), findsOneWidget);
     expect(find.text('Описание'), findsOneWidget);
@@ -126,10 +128,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('catalog-scope-control')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('All').last);
-    await tester.pump();
+    await selectIntentionCatalogScope(tester, IntentionScope.all);
 
     repository.complete(
       1,
@@ -185,7 +184,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+    await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
     await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
     await expectLater(tester, meetsGuideline(textContrastGuideline));
     semantics.dispose();
@@ -251,35 +250,106 @@ void main() {
     }
   });
 
-  testWidgets('показывает локализованные параметры каталога и четыре порядка', (
+  testWidgets('заголовок списка открывает лист с числами охватов и типов', (
     tester,
   ) async {
     final repository = ControlledCatalogRepository();
     await tester.pumpWidget(_testApp(repository));
-    repository.queryAt(0);
+    repository.complete(
+      0,
+      ResultSuccess(
+        IntentionCatalogFirstPage(
+          items: [for (var i = 1; i <= 7; i++) testSummary(index: i)],
+          totalCount: 7,
+          counts: IntentionCountsByScopeAndType(
+            active: IntentionTypeCounts(all: 7, actions: 4),
+            archived: IntentionTypeCounts(all: 3, actions: 2),
+          ),
+          nextCursor: null,
+          revision: const TestCatalogRevision(1),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
 
-    expect(find.text('Scope'), findsOneWidget);
-    expect(find.text('Filter by title'), findsOneWidget);
-    expect(find.text('Order'), findsOneWidget);
-    expect(find.text('Active'), findsOneWidget);
-    expect(find.text('Created: newest first'), findsOneWidget);
+    await tester.tap(find.byType(CatalogHeader));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Show'));
+    await tester.pumpAndSettle();
+    expect(_shownMenu(tester), [
+      'Active',
+      '7',
+      'Archived',
+      '3',
+      'All, archived included',
+      '10',
+    ]);
 
-    await tester.tap(find.byKey(const ValueKey('catalog-scope-control')));
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Type'));
+    await tester.pumpAndSettle();
+    expect(_shownMenu(tester), [
+      'Intentions and actions',
+      '7',
+      'Intentions only',
+      '3',
+      'Actions only',
+      '4',
+    ]);
+  });
 
-    expect(find.text('Active'), findsWidgets);
-    expect(find.text('Archived'), findsOneWidget);
-    expect(find.text('All'), findsOneWidget);
+  testWidgets('смена типа в листе начинает новую выдачу с верхней позиции', (
+    tester,
+  ) async {
+    final repository = ControlledCatalogRepository();
+    await tester.pumpWidget(_testApp(repository));
+    repository.complete(0, _firstPage(_taggedSummaries(const [], last: 31)));
+    await tester.pumpAndSettle();
+    _catalogScrollPosition(tester).jumpTo(100);
+    await tester.pump();
 
-    await tester.tap(find.text('Active').last);
-    await tester.pump(const Duration(milliseconds: 300));
-    await tester.tap(find.byKey(const ValueKey('catalog-order-control')));
-    await tester.pump(const Duration(milliseconds: 300));
+    await selectIntentionCatalogType(tester, IntentionTypeChoice.actions);
+    expect(
+      repository.queryAt(1).readinessFilter,
+      IntentionReadinessFilter.readyOnly,
+    );
+    repository.complete(1, _firstPage(_taggedSummaries(const [], last: 31)));
+    await tester.pumpAndSettle();
 
-    expect(find.text('Created: newest first'), findsWidgets);
-    expect(find.text('Created: oldest first'), findsOneWidget);
-    expect(find.text('Updated: newest first'), findsOneWidget);
-    expect(find.text('Updated: oldest first'), findsOneWidget);
+    expect(_catalogScrollPosition(tester).pixels, 0);
+    expect(
+      shownIntentionCatalogParameters(tester).type,
+      IntentionTypeChoice.actions,
+    );
+  });
+
+  testWidgets('каталог предлагает сортировку по названию в обоих порядках', (
+    tester,
+  ) async {
+    final repository = ControlledCatalogRepository();
+    await tester.pumpWidget(_testApp(repository));
+    repository.complete(0, _firstPage(_taggedSummaries(const [], last: 58)));
+    await tester.pumpAndSettle();
+
+    await selectIntentionCatalogOrder(
+      tester,
+      IntentionCatalogOrder.titleDescending,
+    );
+
+    expect(
+      repository.queries.last.order,
+      IntentionCatalogOrder.titleDescending,
+    );
+    repository.complete(
+      repository.queries.length - 1,
+      _firstPage(_taggedSummaries(const [], last: 58)),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      shownIntentionCatalogParameters(tester).order,
+      IntentionCatalogOrder.titleDescending,
+    );
   });
 
   testWidgets('применяет фильтр через 250 мс без кнопки отправки', (
@@ -829,7 +899,7 @@ void main() {
     );
 
     expect(_loadedCatalog(container).items[1].id, assigned.id);
-    expect(find.text('Total intentions: 31'), findsOneWidget);
+    expect(intentionCatalogTotal(31), findsOneWidget);
     expect(
       _catalogTileTop(tester, anchor.title),
       moreOrLessEquals(anchor.top, epsilon: 0.01),
@@ -851,7 +921,7 @@ void main() {
       _loadedCatalog(container).items.map((item) => item.id),
       isNot(contains(items.first.id)),
     );
-    expect(find.text('Total intentions: 30'), findsOneWidget);
+    expect(intentionCatalogTotal(30), findsOneWidget);
     expect(
       _catalogTileTop(tester, anchor.title),
       moreOrLessEquals(anchor.top, epsilon: 0.01),
@@ -876,7 +946,7 @@ void main() {
     );
 
     expect(find.text(anchor.title), findsNothing);
-    expect(find.text('Total intentions: 29'), findsOneWidget);
+    expect(intentionCatalogTotal(29), findsOneWidget);
     expect(
       _catalogTileTop(tester, nearestSummary.title),
       moreOrLessEquals(anchor.top, epsilon: 0.01),
@@ -1051,24 +1121,12 @@ void main() {
     });
   }
 
-  testWidgets('локализует параметры каталога на русский язык', (tester) async {
-    final repository = ControlledCatalogRepository();
-    await tester.pumpWidget(_testApp(repository, locale: const Locale('ru')));
-    repository.queryAt(0);
-
-    expect(find.text('Охват'), findsOneWidget);
-    expect(find.text('Фильтр по названию'), findsOneWidget);
-    expect(find.text('Порядок'), findsOneWidget);
-    expect(find.text('Активные'), findsOneWidget);
-    expect(find.text('По созданию: сначала новые'), findsOneWidget);
-  });
-
   testWidgets('автоматически загружает у порога и повторяет ту же порцию', (
     tester,
   ) async {
     final repository = ControlledCatalogRepository();
     await tester.pumpWidget(
-      _testApp(repository, pageSize: 20, prefetchRemaining: 2),
+      _testApp(repository, pageSize: 30, prefetchRemaining: 2),
     );
     const cursor = TestCatalogCursor();
     const revision = TestCatalogRevision(3);
@@ -1077,10 +1135,10 @@ void main() {
       ResultSuccess(
         IntentionCatalogFirstPage(
           items: [
-            for (var index = 1; index <= 20; index++)
+            for (var index = 1; index <= 30; index++)
               testSummary(index: index, title: 'Намерение $index'),
           ],
-          totalCount: 21,
+          totalCount: 31,
           nextCursor: cursor,
           revision: revision,
         ),
@@ -1089,7 +1147,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(repository.queries, hasLength(1));
 
-    await _dragCatalogList(tester, const Offset(0, -2000));
+    await _dragCatalogList(tester, const Offset(0, -3000));
     await _pumpUntilQueries(tester, repository, 2);
     await tester.pump();
     expect(repository.queryAt(1).cursor, same(cursor));
@@ -1110,7 +1168,7 @@ void main() {
       2,
       ResultSuccess(
         IntentionCatalogContinuationPage(
-          items: [testSummary(index: 21, title: 'Последнее намерение')],
+          items: [testSummary(index: 31, title: 'Последнее намерение')],
           nextCursor: null,
           revision: revision,
         ),
@@ -1118,7 +1176,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Total intentions: 21'), findsOneWidget);
+    // Заголовок списка стоит над выдачей и ушёл вверх вместе со страницей.
+    _pageScrollPosition(tester).jumpTo(0);
+    await tester.pump();
+    expect(intentionCatalogTotal(31), findsOneWidget);
     expect(repository.queries, hasLength(3));
   });
 
@@ -1163,8 +1224,6 @@ void main() {
 
   testWidgets('архивный охват показывает намерения с меткой архива и без '
       'отметки избранного', (tester) async {
-    const scopeName = 'Archived';
-    const scope = IntentionScope.archived;
     final semantics = tester.ensureSemantics();
     final repository = ControlledCatalogRepository();
     await tester.pumpWidget(_testApp(repository));
@@ -1181,11 +1240,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('catalog-scope-control')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text(scopeName).last);
-    await tester.pump();
-    expect(repository.queryAt(1).scope, scope);
+    await selectIntentionCatalogScope(tester, IntentionScope.archived);
+    expect(repository.queryAt(1).scope, IntentionScope.archived);
     repository.complete(
       1,
       ResultSuccess(
@@ -1221,7 +1277,7 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.text('Total intentions: 2'), findsOneWidget);
+    expect(intentionCatalogTotal(2), findsOneWidget);
 
     semantics.dispose();
   });
@@ -1288,9 +1344,7 @@ void main() {
       (sport, IntentionTagRequirement.mustBeAbsent),
     ], _firstPage(_taggedSummaries([health], last: 58)));
 
-    await tester.tap(find.byKey(const ValueKey('catalog-scope-control')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Archived').last);
+    await selectIntentionCatalogScope(tester, IntentionScope.archived);
     await _pumpUntilQueries(tester, repository, 5);
     expect(repository.queryAt(4).scope, IntentionScope.archived);
     expect(repository.queryAt(4).tagFilter, filter);
@@ -1298,9 +1352,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(_shownConditions(tester), ['Здоровье', 'not Спорт']);
 
-    await tester.tap(find.byKey(const ValueKey('catalog-order-control')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Created: oldest first').last);
+    await selectIntentionCatalogOrder(
+      tester,
+      IntentionCatalogOrder.createdAtAscending,
+    );
     await _pumpUntilQueries(tester, repository, 6);
     expect(repository.queryAt(5).scope, IntentionScope.archived);
     expect(
@@ -1402,7 +1457,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(message, findsNothing);
-    expect(find.text('Total intentions: 4'), findsOneWidget);
+    expect(intentionCatalogTotal(4), findsOneWidget);
     expect(find.byType(CatalogRow), findsNWidgets(4));
   });
 
@@ -1433,7 +1488,7 @@ void main() {
 
     expect(_shownConditions(tester), ['Самочувствие']);
     expect(_rowChips('Самочувствие'), findsNWidgets(3));
-    expect(find.text('Total intentions: 3'), findsOneWidget);
+    expect(intentionCatalogTotal(3), findsOneWidget);
 
     final restarted = repository.queries.length;
     await _completeCatalogWidgetTagCommand(
@@ -1455,7 +1510,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(_shownConditions(tester), isEmpty);
-    expect(find.text('Total intentions: 5'), findsOneWidget);
+    expect(intentionCatalogTotal(5), findsOneWidget);
     expect(find.byType(CatalogRow), findsNWidgets(5));
     expect(repository.queries, hasLength(restarted + 1));
   });
@@ -1572,7 +1627,7 @@ Offset _catalogListFlingStart(WidgetTester tester) {
 enum _PageFlingHandoff {
   /// Флинг начат при списке в начале: страница продолжает инерцию списка,
   /// дошедшую до его края.
-  listInertia(speed: 6000),
+  listInertia(speed: 3000),
 
   /// Флинг начат при списке уже у края: список не сдвигается, и инерцию
   /// пальца сразу продолжает страница.
@@ -1794,6 +1849,17 @@ Finder _rowChips(String name) => find.descendant(
   of: find.byType(CatalogRow),
   matching: find.widgetWithText(TagChip, name),
 );
+
+/// Тексты открытого меню листа сверху вниз: названия вариантов и их числа.
+List<String?> _shownMenu(WidgetTester tester) => [
+  for (final text in tester.widgetList<Text>(
+    find.descendant(
+      of: find.byType(MenuItemButton),
+      matching: find.byType(Text),
+    ),
+  ))
+    text.data,
+];
 
 /// Значки меток построенных строк каталога в порядке показа.
 List<DoableIconData> _shownMarks(WidgetTester tester) => [

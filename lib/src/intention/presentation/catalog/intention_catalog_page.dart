@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
 import '../../application/intention_catalog.dart';
+import '../search/intention_list_header.dart';
 import 'intention_catalog_purpose.dart';
 import 'intention_catalog_row.dart';
 import 'intention_catalog_state.dart';
@@ -58,14 +59,8 @@ final class _IntentionCatalogPageState
             : IntentionSearchResultsExtent.remainingWhenSufficient,
         controls: _CatalogControls(
           selection: selection,
-          scope: switch (selection.scope) {
-            IntentionScopeOpen(:final selected) => selected,
-            IntentionScopeFixed(:final scope) => scope,
-          },
           filterController: _filterController,
-          onScopeChanged: notifier.changeScope,
           onFilterChanged: notifier.changeTitleFilter,
-          onOrderChanged: notifier.changeOrder,
         ),
         results: IntentionSearchResults(
           purpose: _purpose,
@@ -78,7 +73,6 @@ final class _IntentionCatalogPageState
             unexpected: localizations.catalogUnexpectedFailure,
           ),
           emptyMessage: (empty) => _emptyMessage(localizations, empty.query),
-          totalCountLabel: localizations.catalogTotalCount,
           itemBuilder: (context, results, summary) => IntentionCatalogRow(
             summary: summary,
             requiredTagIds: results.query.tagFilter.requiredTagIds,
@@ -113,19 +107,13 @@ final class _IntentionCatalogPageState
 final class _CatalogControls extends StatelessWidget {
   const _CatalogControls({
     required this.selection,
-    required this.scope,
     required this.filterController,
-    required this.onScopeChanged,
     required this.onFilterChanged,
-    required this.onOrderChanged,
   });
 
   final IntentionCatalogSelection selection;
-  final IntentionScope scope;
   final TextEditingController filterController;
-  final ValueChanged<IntentionScope> onScopeChanged;
   final ValueChanged<String> onFilterChanged;
-  final ValueChanged<IntentionCatalogOrder> onOrderChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -134,27 +122,6 @@ final class _CatalogControls extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: Column(
         children: [
-          DropdownButtonFormField<IntentionScope>(
-            key: const ValueKey('catalog-scope-control'),
-            isExpanded: true,
-            initialValue: scope,
-            decoration: InputDecoration(
-              labelText: localizations.catalogScopeLabel,
-            ),
-            items: [
-              for (final scope in IntentionScope.values)
-                DropdownMenuItem(
-                  value: scope,
-                  child: Text(_scopeLabel(localizations, scope)),
-                ),
-            ],
-            onChanged: (scope) {
-              if (scope != null) {
-                onScopeChanged(scope);
-              }
-            },
-          ),
-          const SizedBox(height: 12),
           TextField(
             key: const ValueKey('catalog-filter-field'),
             controller: filterController,
@@ -170,26 +137,7 @@ final class _CatalogControls extends StatelessWidget {
             child: IntentionTagConditionsSection(purpose: _purpose),
           ),
           const SizedBox(height: 12),
-          DropdownButtonFormField<_OfferedCatalogOrder>(
-            key: const ValueKey('catalog-order-control'),
-            isExpanded: true,
-            initialValue: _OfferedCatalogOrder.of(selection.order),
-            decoration: InputDecoration(
-              labelText: localizations.catalogOrderLabel,
-            ),
-            items: [
-              for (final order in _OfferedCatalogOrder.values)
-                DropdownMenuItem(
-                  value: order,
-                  child: Text(_orderLabel(localizations, order)),
-                ),
-            ],
-            onChanged: (order) {
-              if (order != null) {
-                onOrderChanged(order.order);
-              }
-            },
-          ),
+          const IntentionListHeader(purpose: _purpose),
         ],
       ),
     );
@@ -203,47 +151,4 @@ final class _CatalogControls extends StatelessWidget {
           localizations.catalogFilterTooLong,
         null => null,
       };
-
-  String _scopeLabel(AppLocalizations localizations, IntentionScope scope) =>
-      switch (scope) {
-        IntentionScope.active => localizations.catalogScopeActive,
-        IntentionScope.archived => localizations.catalogScopeArchived,
-        IntentionScope.all => localizations.catalogScopeAll,
-      };
-
-  String _orderLabel(
-    AppLocalizations localizations,
-    _OfferedCatalogOrder order,
-  ) => switch (order) {
-    _OfferedCatalogOrder.createdNewest =>
-      localizations.catalogOrderCreatedNewest,
-    _OfferedCatalogOrder.createdOldest =>
-      localizations.catalogOrderCreatedOldest,
-    _OfferedCatalogOrder.updatedNewest =>
-      localizations.catalogOrderUpdatedNewest,
-    _OfferedCatalogOrder.updatedOldest =>
-      localizations.catalogOrderUpdatedOldest,
-  };
-}
-
-/// Порядки, которые предлагает каталог намерений, в порядке показа.
-///
-/// Порядок по названию допустим в запросе, но каталог его не предлагает.
-enum _OfferedCatalogOrder {
-  createdNewest(IntentionCatalogOrder.createdAtDescending),
-  createdOldest(IntentionCatalogOrder.createdAtAscending),
-  updatedNewest(IntentionCatalogOrder.updatedAtDescending),
-  updatedOldest(IntentionCatalogOrder.updatedAtAscending);
-
-  const _OfferedCatalogOrder(this.order);
-
-  final IntentionCatalogOrder order;
-
-  /// Предлагаемый вариант выбранного порядка, если каталог его предлагает.
-  static _OfferedCatalogOrder? of(IntentionCatalogOrder order) {
-    for (final offered in values) {
-      if (offered.order == order) return offered;
-    }
-    return null;
-  }
 }
