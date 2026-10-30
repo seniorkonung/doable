@@ -246,3 +246,19 @@
   - **Зависимости:** 1.15.
   - **Предполагаемые файлы:** нет, только проверка и сборка.
   - **Размер:** XS.
+
+- [ ] 1.17 Убрать из `ResultsScrollKeeper` недостижимую сверку якоря с запросом выдачи при восстановлении, не меняя поведения
+  - **Критерии приёмки:**
+    - `_restoreVisualAnchor` не сверяет принадлежность якоря выдаче: условия `!identical(state.query, anchor.query)` нет, а проверки `anchor == null`, `!controller.hasClients` и `state is! IntentionCatalogLoaded` сохранены.
+    - У `_VisualAnchor` нет поля `query`: удалены поле с его комментарием, параметр конструктора и передача запроса в `_captureVisualAnchor` и `afterApproach`.
+    - Не меняются: условие `identical(previousState.query, nextState.query)` в `onCatalogChanged`, оно остаётся локальным предусловием чтения строк из `previousState`; условие `_isShownResultsOf`; поле `_query`; сброс якоря в `_jumpToTop`. Удержание места внутри выдачи и начало новой выдачи сверху сохраняются.
+    - Новые проверки не добавляются, существующие не меняются: удаляемая ветка недостижима, а поведение покрыто проверками из списка задачи 1.15.
+    - Спецификации, `plan.md`, `design.md` и `adr.md` не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/search test/intention/presentation/catalog/intention_search_results_test.dart test/intention/presentation/picker test/long_term_relation/presentation/participant_picker`.
+    - Это последняя задача фазы 1: `mise run check` и `mise exec --no-deps -- openspec validate mark-occupied-pairs-in-relation-participant-picker --strict --no-interactive`.
+    - `mise exec --no-deps -- flutter build apk --release` с артефактом `build/app/outputs/flutter-apk/app-release.apk`, чтобы ручные проверки шли на итоговом коде. Эмулятор и устройство не запускаются.
+    - Сообщить путь к APK и оставшиеся ручные проверки из задачи 1.16.
+  - **Зависимости:** 1.16.
+  - **Предполагаемые файлы:** `lib/src/intention/presentation/search/results_scroll_keeper.dart`.
+  - **Размер:** XS.
