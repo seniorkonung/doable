@@ -262,3 +262,125 @@
   - **Зависимости:** 1.16.
   - **Предполагаемые файлы:** `lib/src/intention/presentation/search/results_scroll_keeper.dart`.
   - **Размер:** XS.
+
+## Phase 2: Создание связи завершается восстановлением занимающей архивной связи
+
+- [ ] 2.1 Принимать восстановление связи как отправку формы создания: под ключами формы и связи и с отказом, который сразу принадлежит оболочке
+  - **Критерии приёмки:**
+    - Новый метод `GraphCommandCoordinator` принимает `RestoreLongTermRelation` с `LongTermRelationCreationFormKey`. Пока команда выполняется, оба ключа заняты: вторая отправка этой формы и любая операция этой связи не принимаются и не ставятся в очередь, а операция другой связи принимается.
+    - Завершение имеет вид `restore` и цель `ExistingLongTermRelationOperationTarget`, поэтому подробный просмотр связи согласуется с ним, а оболочка предъявляет тексты восстановления. Успех принадлежит оболочке, как у создания из формы.
+    - Отказ сразу принадлежит оболочке: `claimInitiatorFailure` для него возвращает `null`.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph/application/graph_command_coordinator_relation_lifecycle_test.dart test/graph/application/graph_command_coordinator_relation_creation_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `lib/src/graph/application/graph_command_coordinator.dart`, `test/graph/application/graph_command_coordinator_relation_lifecycle_test.dart`.
+  - **Размер:** S.
+
+- [ ] 2.2 Выполнять восстановление в модели формы создания как её отправку: успех завершает поток, а отказ оставляет черновик
+  - **Критерии приёмки:**
+    - Метод `RelationEditorViewModel` принимает идентификатор связи только в форме создания и пока `canEdit`. Полнота черновика не требуется: участник, вид или приоритет могут быть ещё не выбраны.
+    - Пока команда выполняется, форма находится в `RelationEditorSubmitting`: поля заблокированы, отправка и второе восстановление не принимаются, а действие выхода — «Выйти из создания».
+    - Успех даёт `RelationEditorSucceeded` и событие `RelationEditorCreated` с идентификатором восстановленной связи, как у создания.
+    - Отказ возвращает `RelationEditorIdle`, черновик не меняется. `RelationEditorFailed` здесь не применяется: форма показала бы отказ второй раз после оболочки.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/editor/relation_editor_view_model_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 2.1.
+  - **Предполагаемые файлы:** `lib/src/long_term_relation/presentation/editor/relation_editor_view_model.dart`, `test/long_term_relation/presentation/editor/relation_editor_view_model_test.dart`, `test/long_term_relation/presentation/editor/editor_test_support.dart`.
+  - **Размер:** S.
+
+- [ ] 2.3 Передавать поиску дескриптор восстановления и при успехе закрывать поиск и форму, открывая восстановленную связь
+  - **Критерии приёмки:**
+    - `RelationCreationChoiceFlow` несёт `RelationCreationRestore` и снимок приоритета и описания черновика; вид уже есть в `RelationParticipantChoice.type` и не дублируется. Контракт объявлен рядом с поиском: принять восстановление связи и сообщать, может ли поток продолжаться. Это верно, только пока форма `canEdit`. У `RelationChangeChoiceFlow` дескриптора нет.
+    - Если сверху форма или поиск, открытый этой формой, `openCreatedRelation` удаляет поиск и заменяет форму подробным просмотром. Страницы, открытые до создания, не меняются, а поиска и формы нет в истории.
+    - Если сверху чужая страница или диалог, перехода нет: связь остаётся восстановленной, форма показывает завершённый выход, отправка недоступна, и дескриптор сообщает, что поток не продолжается.
+    - Если поток покинут до результата, поздний успех ничего не открывает, а результат предъявляется один раз.
+    - Отказ оставляет поиск открытым, сообщение оболочки видно над ним, а после закрытия поиска форма показывает прежний черновик и принимает отправку.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/editor test/long_term_relation/presentation/participant_picker`. Проверки навигации вызывают дескриптор из аргументов маршрута поиска: экран подключается в 2.5–2.7.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 2.2.
+  - **Предполагаемые файлы:** `lib/src/long_term_relation/presentation/participant_picker/relation_participant_choice.dart`, `lib/src/long_term_relation/presentation/editor/relation_editor_page.dart`, `lib/src/long_term_relation/presentation/editor/relation_creation_completion.dart`, `test/long_term_relation/presentation/editor/relation_creation_navigation_test.dart`, `test/long_term_relation/presentation/editor/relation_form_test_support.dart`; механически — `test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart`, `test/long_term_relation/presentation/participant_picker/participant_picker_test_support.dart`.
+  - **Размер:** M.
+
+- [ ] 2.4 Добавить в `ConfirmDialog` подтверждение действия, которое сохраняет данные: с основной кнопкой и необязательным предупреждением
+  - **Критерии приёмки:**
+    - Новая функция рядом с `showConfirmDialog` показывает quiet-кнопку отмены и основную кнопку действия. Первый абзац строится из `ConfirmDialogText`, а второй абзац цветом `ink` есть, только если передано предупреждение.
+    - Действие даёт true, а отмена, касание затемнения и системное «назад» — false. Заголовок называет маршрут для экранного диктора.
+    - Прежние диалоги не меняются, компонент не содержит предметной логики.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/confirm_dialog_test.dart`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `lib/src/design_system/components/confirm_dialog.dart`, `test/design_system/confirm_dialog_test.dart`.
+  - **Размер:** S.
+
+- [ ] 2.5 Не принимать в поиске выбор и нажатия на отмеченные строки, пока поток создания не может продолжаться
+  - **Критерии приёмки:**
+    - Пока дескриптор сообщает, что поток не продолжается, нажатие на текст любой строки ничего не делает: выбор не возвращается, занимающая связь не открывается. Когда продолжение снова возможно, например после отказа, строки работают как прежде.
+    - Стрелка, закрытие поиска и лист назначения работают в любом состоянии. Собственного индикатора у поиска нет: состояние отправки показывает форма (решение 6 design).
+    - Поиск при изменении связи не меняется.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/participant_picker`.
+  - **Зависимости:** 2.3.
+  - **Предполагаемые файлы:** `lib/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart`, `test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart`.
+  - **Размер:** XS.
+
+- [ ] 2.6 Открывать при создании по нажатию на строку «Связь в архиве» подтверждение и восстанавливать занимающую связь после согласия
+  - **Критерии приёмки:**
+    - Таблицу решения 5 разбирает только `RelationParticipantPickerPage`: создание и архивная связь — подтверждение, остальные случаи — подробный просмотр поверх поиска. Доступное название такой строки говорит, что нажатие предложит восстановить связь; остальные строки сохраняют прежнее. Это отличие приходит в `IntentionPickerRow` данными.
+    - Страница читает связь первым значением `watchRelation(id)` и открывает подтверждение с формулировкой и приоритетом связи. «Восстановить» передаёт идентификатор дескриптору, а отмена возвращает поиск без команды.
+    - Если чтение не дало связь, подтверждения нет: поверх поиска открывается подробный просмотр этой связи, и он показывает свои сообщения об отсутствии или отказе чтения. Своей поверхности сообщений у поиска нет: общая принадлежит оболочке.
+    - Ответ чтения после закрытия или перекрытия поиска подтверждение не открывает, а повторное нажатие не открывает второго подтверждения.
+    - Тексты есть на русском и английском.
+  - **Проверка:**
+    - `mise run codegen` — локализация пересоздана.
+    - `mise exec --no-deps -- flutter test test/intention/presentation/picker test/long_term_relation/presentation/participant_picker`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 2.4, 2.5.
+  - **Предполагаемые файлы:** `lib/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart`, `lib/src/intention/presentation/picker/intention_picker_view.dart`, `lib/src/intention/presentation/picker/intention_picker_row.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` и сгенерированная локализация; проверки: `test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart`, `test/intention/presentation/picker/intention_picker_view_test.dart`.
+  - **Размер:** M.
+
+- [ ] 2.7 Предупреждать в подтверждении восстановления о данных черновика, которые не сохранятся
+  - **Критерии приёмки:**
+    - Предупреждение есть, только если заданные в форме вид, приоритет или описание отличаются от данных связи. Невыбранные вид и приоритет и пустое описание отличием не считаются.
+    - Отличающийся вид назван словами: сценарий «Подтверждение называет вид, который не сохранится» проходит.
+    - Тексты есть на русском и английском.
+  - **Проверка:**
+    - `mise run codegen` — локализация пересоздана.
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/participant_picker`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 2.6.
+  - **Предполагаемые файлы:** `lib/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` и сгенерированная локализация, `test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart`.
+  - **Размер:** S.
+
+- [ ] 2.8 Подтвердить сценарием приложения на настоящем хранилище, что восстановление из поиска открывает связь с её собственными данными, а «назад» возвращает страницу начала создания
+  - **Критерии приёмки:**
+    - На локальной базе проходят сценарии «Восстановленная связь открывается вместо созданной» и «Восстановление сохраняет собственные данные связи»: при виде «можно» в форме та же связь активна с видом «нужно», приоритетом P2 и прежним описанием, а новая связь не создана.
+    - «Назад» из восстановленной связи возвращает страницу «Быть здоровым» без поиска и формы в истории, а страница учитывает восстановленную связь.
+    - Успех предъявлен один раз.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app/long_term_relation_app_flow_test.dart`.
+  - **Зависимости:** 2.3, 2.6, 2.7.
+  - **Предполагаемые файлы:** `test/app/long_term_relation_app_flow_test.dart`.
+  - **Размер:** S.
+
+- [ ] 2.9 Подтвердить готовность второй фазы: создание связи завершается восстановлением занимающей архивной связи
+  - **Критерии приёмки:**
+    - Выполнено условие «Ready to advance» второй фазы:
+      - восстановление из поиска ведёт себя по спецификации: при успехе, при отказе, при уходе из потока до результата и при отличиях черновика;
+      - «назад» из восстановленной связи возвращает страницу, с которой начато создание;
+      - полные проверки проекта проходят, и изменение готово к проверке реализации и архивации.
+    - При изменении связи восстановление из поиска по-прежнему не предлагается.
+    - Результаты проверок и путь к APK сообщены в сессии. Ручная проверка на устройстве остаётся за пользователем и не блокирует готовность фазы.
+  - **Проверка:**
+    - `mise run check` и `mise exec --no-deps -- openspec validate mark-occupied-pairs-in-relation-participant-picker --strict --no-interactive`; после фиксации изменений — `mise run codegen-check` на чистой рабочей копии.
+    - `mise exec --no-deps -- flutter build apk --release` с артефактом `build/app/outputs/flutter-apk/app-release.apk`. Если через DTD найдено запущенное приложение, выполнить hot restart и проверить `get_runtime_errors`. Эмулятор и устройство не запускаются.
+    - Сообщить оставшиеся ручные проверки:
+      - подтверждение восстановления с предупреждением и без него в светлой и тёмной темах;
+      - экранный диктор называет у строки «Связь в архиве» при создании предложение восстановить связь;
+      - сообщение об отказе видно над поиском;
+      - успех закрывает поиск и форму, а «назад» возвращает страницу начала создания.
+  - **Зависимости:** 2.1–2.8.
+  - **Предполагаемые файлы:** нет, только проверка и сборка.
+  - **Размер:** XS.
