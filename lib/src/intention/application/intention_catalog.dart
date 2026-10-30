@@ -559,11 +559,30 @@ sealed class IntentionCatalogPage {
     required List<IntentionSummary> items,
     required this.nextCursor,
     required this.revision,
-  }) : items = List.unmodifiable(items);
+    Map<IntentionId, PairOccupant>? pairOccupants,
+  }) : items = List.unmodifiable(items),
+       pairOccupants = _requireOccupantsOfItems(items, pairOccupants);
 
   final List<IntentionSummary> items;
   final IntentionCatalogCursor? nextCursor;
   final GraphRevision revision;
+
+  /// Связи, занимающие пары строк порции, по идентификатору строки. Карта есть
+  /// тогда и только тогда, когда запрос несёт пробу пары; строка без занятой
+  /// пары в ней отсутствует.
+  final Map<IntentionId, PairOccupant>? pairOccupants;
+
+  static Map<IntentionId, PairOccupant>? _requireOccupantsOfItems(
+    List<IntentionSummary> items,
+    Map<IntentionId, PairOccupant>? pairOccupants,
+  ) {
+    if (pairOccupants == null) return null;
+    final itemIds = {for (final item in items) item.id};
+    if (!itemIds.containsAll(pairOccupants.keys)) {
+      throw const IntentionCatalogPageValidationException();
+    }
+    return Map.unmodifiable(pairOccupants);
+  }
 }
 
 final class IntentionCatalogFirstPage extends IntentionCatalogPage {
@@ -573,6 +592,7 @@ final class IntentionCatalogFirstPage extends IntentionCatalogPage {
     this.counts = const IntentionCountsTotalOnly(),
     required super.nextCursor,
     required super.revision,
+    super.pairOccupants,
   }) : totalCount = _requireTotalCount(totalCount, items.length, counts);
 
   /// Количество совпадений со всеми условиями запроса, включая готовность.
@@ -681,5 +701,6 @@ final class IntentionCatalogContinuationPage extends IntentionCatalogPage {
     required super.items,
     required super.nextCursor,
     required super.revision,
+    super.pairOccupants,
   });
 }

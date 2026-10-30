@@ -9,6 +9,8 @@ import 'package:doable/src/intention/domain/intention_text.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_pair_probe.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_color.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
@@ -1104,6 +1106,39 @@ void main() {
     });
   });
 
+  group('занимающие связи порции каталога', () {
+    const revision = _TestGraphRevision(epoch: 'первая', sequence: 0);
+    final row = _summary(id: '00000000-0000-4000-8000-000000000001');
+    final occupant = PairOccupant(
+      relationId: _relationId('00000000-0000-4000-8000-0000000000a1'),
+      scope: RelationScope.archived,
+    );
+
+    test('порции отклоняют занимающую связь строки, которой нет в порции', () {
+      final foreignId = _intentionId('00000000-0000-4000-8000-000000000002');
+
+      expect(
+        () => IntentionCatalogFirstPage(
+          items: [row],
+          totalCount: 1,
+          nextCursor: null,
+          revision: revision,
+          pairOccupants: {foreignId: occupant},
+        ),
+        throwsA(isA<IntentionCatalogPageValidationException>()),
+      );
+      expect(
+        () => IntentionCatalogContinuationPage(
+          items: [row],
+          nextCursor: null,
+          revision: revision,
+          pairOccupants: {foreignId: occupant},
+        ),
+        throwsA(isA<IntentionCatalogPageValidationException>()),
+      );
+    });
+  });
+
   group('полное начальное состояние создания намерения', () {
     final home = _tagId('00000000-0000-4000-8000-000000000001');
     final weekend = _tagId('00000000-0000-4000-8000-000000000002');
@@ -1299,6 +1334,14 @@ IntentionId _intentionId(String value) => switch (IntentionId.decode(value)) {
   IntentionIdDecodingSuccess(:final id) => id,
   InvalidIntentionIdDecoding() => throw StateError('Ожидался корректный UUID.'),
 };
+
+LongTermRelationId _relationId(String value) =>
+    switch (LongTermRelationId.decode(value)) {
+      LongTermRelationIdDecodingSuccess(:final id) => id,
+      InvalidLongTermRelationIdDecoding() => throw StateError(
+        'Ожидался корректный UUID связи.',
+      ),
+    };
 
 TagId _tagId(String value) => switch (TagId.decode(value)) {
   TagIdDecodingSuccess(:final id) => id,

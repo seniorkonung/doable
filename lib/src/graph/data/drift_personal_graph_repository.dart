@@ -58,6 +58,7 @@ import '../../long_term_relation/application/long_term_relation_projection.dart'
 import '../../long_term_relation/application/long_term_relation_permissions.dart';
 import '../../long_term_relation/application/relation_counts.dart';
 import '../../long_term_relation/application/relation_group_page.dart';
+import '../../long_term_relation/application/relation_pair_probe.dart';
 import '../../long_term_relation/domain/long_term_relation.dart'
     as relation_domain;
 import '../../long_term_relation/domain/long_term_relation_description.dart';
@@ -1142,7 +1143,8 @@ final class DriftPersonalGraphRepository
         OrderingTerm.asc(intentions.id),
       ])
       ..limit(query.pageSize + 1);
-    final (items, nextCursor) = await _readCatalogPortion(
+    _joinPairOccupants(rowsQuery, query);
+    final (items, nextCursor, pairOccupants) = await _readCatalogPortion(
       await rowsQuery.get(),
       query,
     );
@@ -1153,6 +1155,7 @@ final class DriftPersonalGraphRepository
       counts: counts,
       nextCursor: nextCursor,
       revision: _currentRevision,
+      pairOccupants: pairOccupants,
     );
   }
 
@@ -1256,7 +1259,8 @@ final class DriftPersonalGraphRepository
         OrderingTerm.asc(intentions.id),
       ])
       ..limit(query.pageSize + 1);
-    final (items, nextCursor) = await _readCatalogPortion(
+    _joinPairOccupants(rowsQuery, query);
+    final (items, nextCursor, pairOccupants) = await _readCatalogPortion(
       await rowsQuery.get(),
       query,
     );
@@ -1265,6 +1269,7 @@ final class DriftPersonalGraphRepository
       items: items,
       nextCursor: nextCursor,
       revision: _currentRevision,
+      pairOccupants: pairOccupants,
     );
   }
 
@@ -1395,9 +1400,66 @@ final class DriftPersonalGraphRepository
     ),
   };
 
-  /// Сводки первых `pageSize` строк и курсор после последней из них, если
-  /// выборка нашла строку за пределами порции.
-  Future<(List<IntentionSummary>, _DriftIntentionCatalogCursor?)>
+  /// Присоединяет к строкам порции связь, занимающую направленную пару строки
+  /// по пробе запроса. Уникальность пары даёт не больше одной связи на строку,
+  /// поэтому строки не размножаются, а поиск идёт по уникальному индексу пары.
+  /// Запрос без пробы остаётся без присоединения.
+  void _joinPairOccupants(
+    JoinedSelectStatement<HasResultSet, dynamic> rowsQuery,
+    IntentionCatalogQuery query,
+  ) {
+    final probe = query.pairProbe;
+    if (probe == null) return;
+    final intentions = _database.intentions;
+    final relations = _database.longTermRelations;
+    final counterpartId = probe.counterpartId.toCanonicalString();
+    final ignoredRelationId = probe.ignoredRelationId;
+    final occupiesPair = switch (probe.candidateRole) {
+      RelationParticipantRole.related =>
+        relations.sourceIntentionId.equals(counterpartId) &
+            relations.relatedIntentionId.equalsExp(intentions.id),
+      RelationParticipantRole.source =>
+        relations.relatedIntentionId.equals(counterpartId) &
+            relations.sourceIntentionId.equalsExp(intentions.id),
+    };
+    rowsQuery
+      ..join([
+        leftOuterJoin(
+          relations,
+          ignoredRelationId == null
+              ? occupiesPair
+              : occupiesPair &
+                    relations.id
+                        .equals(ignoredRelationId.toCanonicalString())
+                        .not(),
+        ),
+      ])
+      ..addColumns([relations.id, relations.isArchived]);
+  }
+
+  /// Занимающая связь строки порции; `null` — пара строки свободна.
+  PairOccupant? _readPairOccupant(TypedResult row) {
+    final relations = _database.longTermRelations;
+    final relationId = row.read(relations.id);
+    if (relationId == null) return null;
+    return PairOccupant(
+      relationId: decodeStoredRelationId(relationId),
+      scope: row.read(relations.isArchived)!
+          ? relation_domain.RelationScope.archived
+          : relation_domain.RelationScope.active,
+    );
+  }
+
+  /// Сводки первых `pageSize` строк, курсор после последней из них, если
+  /// выборка нашла строку за пределами порции, и занимающие связи этих строк,
+  /// если запрос несёт пробу пары.
+  Future<
+    (
+      List<IntentionSummary>,
+      _DriftIntentionCatalogCursor?,
+      Map<IntentionId, PairOccupant>?,
+    )
+  >
   _readCatalogPortion(
     List<TypedResult> rows,
     IntentionCatalogQuery query,
@@ -1423,7 +1485,13 @@ final class DriftPersonalGraphRepository
           tags[intentionIds[index]] ?? (throw const StoredGraphCorruption()),
         ),
     ];
-    if (rows.length <= query.pageSize) return (items, null);
+    final pairOccupants = query.pairProbe == null
+        ? null
+        : {
+            for (var index = 0; index < itemRows.length; index++)
+              intentionIds[index]: ?_readPairOccupant(rows[index]),
+          };
+    if (rows.length <= query.pageSize) return (items, null, pairOccupants);
     final boundary = itemRows.last;
     return (
       items,
@@ -1441,6 +1509,7 @@ final class DriftPersonalGraphRepository
         },
         boundaryId: boundary.intention.id,
       ),
+      pairOccupants,
     );
   }
 
