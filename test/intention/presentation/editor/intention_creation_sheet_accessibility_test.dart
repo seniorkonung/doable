@@ -514,22 +514,11 @@ void main() {
           ),
           findsWidgets,
         );
-        // Обход содержит и узлы без подписи, поэтому пустое название поля
-        // прошло бы проверку.
-        final titleFieldName = tester
-            .getSemantics(
-              find.descendant(
-                of: intentionCatalogTitleField,
-                matching: find.byType(EditableText),
-              ),
-            )
-            .label;
-        expect(titleFieldName, isNotEmpty);
         expect(
           _traversal(tester),
           containsAll([
             '${l10n.quickCreationLabel}, ${l10n.quickCreationModeIntention}',
-            titleFieldName,
+            intentionCatalogTitleFieldLabel(tester),
           ]),
         );
         expect(tester.takeException(), isNull);
