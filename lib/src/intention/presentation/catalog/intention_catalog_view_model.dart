@@ -4,6 +4,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../app/navigation/graph_generation.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
+import '../../../graph/application/graph_change.dart';
 import '../../../graph/application/graph_revision.dart';
 import '../../../graph/application/personal_graph_repository.dart';
 import '../../../graph/application/personal_graph_repository_provider.dart';
@@ -18,6 +19,7 @@ import '../../domain/intention_id.dart';
 import 'catalog_paging_policy.dart';
 import 'intention_catalog_purpose.dart';
 import 'intention_catalog_state.dart';
+import 'pair_occupant_reconciliation.dart';
 
 part 'intention_catalog_view_model.g.dart';
 
@@ -761,8 +763,9 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   }
 
   /// Применяет пакет к подтверждённому содержимому; `null` означает, что
-  /// выдачу нужно начать заново с первой порции: пакет несогласуем либо
-  /// открывает совпадения, которых нет в загруженной части.
+  /// выдачу нужно начать заново с первой порции: пакет несогласуем, открывает
+  /// совпадения, которых нет в загруженной части, либо вводит в неё строку с
+  /// неизвестной занятостью пары.
   IntentionCatalogConfirmedState? _applyPackage(
     IntentionCatalogConfirmedState confirmed,
     _CatalogChangePackage package,
@@ -801,7 +804,40 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     for (final deletedTagId in package.deletedTagIds) {
       reconciled = _applyDeletedTagContent(reconciled, deletedTagId);
     }
+    reconciled = _applyRelationChanges(reconciled, package.relationChanges);
     return _withRevision(reconciled, package.revision);
+  }
+
+  /// Согласует занимающие связи загруженных строк с фактами о связях.
+  ///
+  /// Состав совпадений, порядок, число совпадений и курсор от занятости не
+  /// зависят и сохраняются.
+  IntentionCatalogConfirmedState _applyRelationChanges(
+    IntentionCatalogConfirmedState confirmed,
+    List<LongTermRelationChange> changes,
+  ) {
+    final probe = confirmed.query.pairProbe;
+    if (probe == null ||
+        changes.isEmpty ||
+        confirmed is! IntentionCatalogLoaded) {
+      return confirmed;
+    }
+    return IntentionCatalogLoaded(
+      selection: confirmed.selection,
+      query: confirmed.query,
+      items: confirmed.items,
+      totalCount: confirmed.totalCount,
+      counts: confirmed.counts,
+      nextCursor: confirmed.nextCursor,
+      revision: confirmed.revision,
+      pairOccupants: reconcilePairOccupants(
+        probe: probe,
+        occupants: confirmed.pairOccupants,
+        rowIds: confirmed.items.map((item) => item.id).toSet(),
+        changes: changes,
+      ),
+      continuation: confirmed.continuation,
+    );
   }
 
   /// Заменяет полное состояние отредактированного тега в загруженных строках.
@@ -930,14 +966,28 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       IntentionCatalogEmpty() => <IntentionSummary>[],
     };
     final changedId = mutation.after?.summary.id ?? mutation.before!.summary.id;
+    final wasLoaded = items.any((item) => item.id == changedId);
     items.removeWhere((item) => item.id == changedId);
+    final pairOccupants = switch (confirmed) {
+      IntentionCatalogLoaded(:final pairOccupants) => {...pairOccupants},
+      IntentionCatalogEmpty() => <IntentionId, PairOccupant>{},
+    };
 
     final after = mutation.after;
     if (afterMatches &&
         after != null &&
         _belongsToLoadedPrefix(confirmed, after.summary)) {
+      // Новое намерение ещё не участвует в связях, а занятость пары другой
+      // входящей строки неизвестна: её сообщает только порция.
+      if (!wasLoaded &&
+          mutation is! IntentionCatalogCreated &&
+          confirmed.query.pairProbe != null) {
+        return null;
+      }
       items.add(after.summary);
       items.sort(confirmed.query.compare);
+    } else {
+      pairOccupants.remove(changedId);
     }
 
     if (totalCount == 0 && items.isEmpty && confirmed.nextCursor == null) {
@@ -956,10 +1006,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       counts: counts,
       nextCursor: confirmed.nextCursor,
       revision: mutation.revision,
-      pairOccupants: switch (confirmed) {
-        IntentionCatalogLoaded(:final pairOccupants) => pairOccupants,
-        IntentionCatalogEmpty() => const {},
-      },
+      pairOccupants: pairOccupants,
       continuation: switch (confirmed) {
         IntentionCatalogLoaded(:final continuation) => continuation,
         IntentionCatalogEmpty() => const IntentionCatalogContinuationIdle(),
@@ -1061,7 +1108,8 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
 /// Каталожная часть подтверждённого пакета изменений графа.
 ///
 /// Пакет применяется целиком и ровно один раз: каталожные мутации задают
-/// состав загруженной части. Количества связей каталог не показывает, поэтому
+/// состав загруженной части, а факты о связях — занимающие связи её строк в
+/// поиске с пробой пары. Количества связей каталог не показывает, поэтому
 /// пакет, который меняет только их, лишь продвигает ревизию. Факт изменения
 /// назначения тега намерению сам принадлежность не меняет: её задаёт
 /// каталожная мутация того же намерения, поэтому число совпадений изменяется
@@ -1080,11 +1128,15 @@ final class _CatalogChangePackage {
     : mutations = List.unmodifiable(
         changes.whereType<IntentionCatalogMutation>(),
       ),
-      tagChanges = List.unmodifiable(changes.whereType<TagChange>());
+      tagChanges = List.unmodifiable(changes.whereType<TagChange>()),
+      relationChanges = List.unmodifiable(
+        changes.whereType<LongTermRelationChange>(),
+      );
 
   final GraphRevision revision;
   final List<IntentionCatalogMutation> mutations;
   final List<TagChange> tagChanges;
+  final List<LongTermRelationChange> relationChanges;
 
   /// Новые полные состояния тегов, отредактированных пакетом.
   Iterable<Tag> get updatedTags =>

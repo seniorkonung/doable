@@ -171,8 +171,9 @@ final class IntentionCatalogLoaded extends IntentionCatalogConfirmedState {
   final List<IntentionSummary> items;
 
   /// Связи, занимающие пары загруженных строк, по идентификатору строки; у
-  /// строки без записи пара свободна. Запись принадлежит поиску с пробой пары
-  /// и приходит с той же порцией, что и строка; без пробы карта пуста.
+  /// строки без записи пара свободна. Запись принадлежит поиску с пробой пары:
+  /// приходит с той же порцией, что и строка, а затем следует за
+  /// подтверждёнными фактами о связях; без пробы карта пуста.
   final Map<IntentionId, PairOccupant> pairOccupants;
   final IntentionCatalogContinuationState continuation;
 }

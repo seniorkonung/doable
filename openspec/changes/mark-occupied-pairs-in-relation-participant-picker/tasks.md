@@ -44,7 +44,7 @@
   - **Предполагаемые файлы:** `lib/src/intention/presentation/catalog/intention_catalog_state.dart`, `lib/src/intention/presentation/catalog/intention_catalog_view_model.dart`, `test/intention/presentation/catalog/intention_catalog_view_model_test.dart`, `test/intention/presentation/catalog/intention_catalog_revision_protocol_test.dart`.
   - **Размер:** S.
 
-- [ ] 1.4 Согласовывать занимающие связи загруженных строк с подтверждёнными изменениями связей и намерений, перечитывая выдачу только при входе строки по изменению намерения
+- [x] 1.4 Согласовывать занимающие связи загруженных строк с подтверждёнными изменениями связей и намерений, перечитывая выдачу только при входе строки по изменению намерения
   - **Критерии приёмки:**
     - Пакет изменений каталога берёт и `LongTermRelationChange`. Чистая функция кандидата по пробе (решение 4 design) обрабатывает оба состояния факта:
       - «до» снимает отметку кандидата, если она указывает на эту связь;

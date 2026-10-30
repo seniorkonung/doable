@@ -1,11 +1,18 @@
+import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
+import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
+import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
+import 'package:doable/src/long_term_relation/application/relation_pair_probe.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
@@ -1451,7 +1458,398 @@ void main() {
       });
     }
   });
+
+  group('занимающие связи поиска с пробой пары', () {
+    const cursor = TestCatalogCursor();
+    final counterpart = testSummary(index: 9);
+    final fourth = testSummary(index: 4);
+    final third = testSummary(index: 3);
+    final later = testSummary(index: 1);
+    final occupyingThird = testRelation(
+      sourceIntentionId: counterpart.id,
+      relatedIntentionId: third.id,
+      index: 3,
+    );
+    final occupyingFourth = testRelation(
+      sourceIntentionId: counterpart.id,
+      relatedIntentionId: fourth.id,
+      index: 4,
+    );
+
+    PairOccupant occupantOf(LongTermRelation relation) =>
+        PairOccupant(relationId: relation.id, scope: relation.scope);
+
+    /// Открывает поиск с пробой на первой порции [items]: при [nextCursor]
+    /// за её границей остаются ещё две строки.
+    Future<
+      ({
+        ProviderContainer container,
+        ControlledCatalogRepository repository,
+        IntentionCatalogLoaded Function() loaded,
+      })
+    >
+    openSearch({
+      required List<IntentionSummary> items,
+      IntentionCatalogCursor? nextCursor,
+      Map<IntentionId, PairOccupant> pairOccupants = const {},
+    }) async {
+      final repository = ControlledCatalogRepository();
+      final container = reconciliationCatalogContainer(
+        repository,
+        pageSize: 2,
+        prefetchRemaining: 0,
+      );
+      final provider = intentionCatalogViewModelProvider(
+        SelectRelationParticipant(
+          selectionContext: RelationParticipantSelectionContext.activeRelation,
+          session: IntentionSearchSession(),
+          pairProbe: RelationPairProbe(
+            counterpartId: counterpart.id,
+            candidateRole: RelationParticipantRole.related,
+          ),
+        ),
+      );
+      final subscription = container.listen(
+        provider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      addTearDown(container.dispose);
+
+      repository.complete(
+        0,
+        ResultSuccess(
+          IntentionCatalogFirstPage(
+            items: items,
+            totalCount: items.length + (nextCursor == null ? 0 : 2),
+            nextCursor: nextCursor,
+            revision: const TestCatalogRevision(1),
+            pairOccupants: pairOccupants,
+          ),
+        ),
+      );
+      await container.read(provider.future);
+      return (
+        container: container,
+        repository: repository,
+        loaded: () =>
+            container.read(provider).requireValue as IntentionCatalogLoaded,
+      );
+    }
+
+    test(
+      'факты связей меняют отметки, не трогая строки, число и курсор',
+      () async {
+        final search = await openSearch(
+          items: [fourth, third],
+          nextCursor: cursor,
+          pairOccupants: {third.id: occupantOf(occupyingThird)},
+        );
+
+        await completeRelationCommand(
+          search.container,
+          search.repository,
+          DeleteLongTermRelation(occupyingThird.id),
+          _relationSuccess(
+            const TestCatalogRevision(2),
+            LongTermRelationDeleted(
+              relation: occupyingThird,
+              changes: [
+                LongTermRelationDeletedChange(
+                  revision: const TestCatalogRevision(2),
+                  relation: occupyingThird,
+                ),
+              ],
+            ),
+          ),
+        );
+
+        expect(search.loaded().pairOccupants, isEmpty);
+
+        await completeRelationCommand(
+          search.container,
+          search.repository,
+          CreateLongTermRelation(
+            sourceIntentionId: counterpart.id,
+            relatedIntentionId: fourth.id,
+            type: occupyingFourth.type,
+            priority: occupyingFourth.priority,
+            description: null,
+          ),
+          _relationSuccess(
+            const TestCatalogRevision(3),
+            LongTermRelationCreated(
+              relation: occupyingFourth,
+              description: null,
+              changes: [
+                LongTermRelationCreatedChange(
+                  revision: const TestCatalogRevision(3),
+                  relation: occupyingFourth,
+                ),
+              ],
+            ),
+          ),
+        );
+
+        final current = search.loaded();
+        expect(current.pairOccupants, {fourth.id: occupantOf(occupyingFourth)});
+        expect(current.items.map((item) => item.id), [fourth.id, third.id]);
+        expect(current.totalCount, 4);
+        expect(current.nextCursor, same(cursor));
+        expect(search.repository.queries, hasLength(1));
+      },
+    );
+
+    test(
+      'каскадное архивирование участника другой роли архивирует отметки',
+      () async {
+        final search = await openSearch(
+          items: [fourth, third],
+          pairOccupants: {
+            fourth.id: occupantOf(occupyingFourth),
+            third.id: occupantOf(occupyingThird),
+          },
+        );
+
+        LongTermRelation archived(LongTermRelation relation) => testRelation(
+          sourceIntentionId: relation.sourceIntentionId,
+          relatedIntentionId: relation.relatedIntentionId,
+          index: relation.creationSequence.value,
+          scope: RelationScope.archived,
+        );
+        await completeCatalogCommand(
+          search.container,
+          search.repository,
+          ArchiveIntention(counterpart.id),
+          IntentionSaved(
+            testIntention(index: 9),
+            catalogMutation: IntentionCatalogUpdated(
+              revision: const TestCatalogRevision(2),
+              before: TestCatalogEntrySnapshot(counterpart),
+              after: TestCatalogEntrySnapshot(
+                testSummary(
+                  index: 9,
+                  archiveState: IntentionArchiveState.archived,
+                ),
+              ),
+            ),
+            additionalChanges: [
+              for (final relation in [occupyingFourth, occupyingThird])
+                LongTermRelationUpdatedChange(
+                  revision: const TestCatalogRevision(2),
+                  before: relation,
+                  after: archived(relation),
+                ),
+            ],
+          ),
+        );
+
+        expect(search.loaded().pairOccupants, {
+          fourth.id: occupantOf(archived(occupyingFourth)),
+          third.id: occupantOf(archived(occupyingThird)),
+        });
+        expect(search.repository.queries, hasLength(1));
+      },
+    );
+
+    test('оставшаяся строка сохраняет отметку, а ушедшая теряет её', () async {
+      final search = await openSearch(
+        items: [fourth, third],
+        pairOccupants: {
+          fourth.id: occupantOf(occupyingFourth),
+          third.id: occupantOf(occupyingThird),
+        },
+      );
+
+      final renamed = testSummary(index: 3, title: 'Новое название');
+      await completeCatalogCommand(
+        search.container,
+        search.repository,
+        UpdateIntention(id: third.id, title: renamed.title, description: null),
+        IntentionSaved(
+          testIntention(index: 3),
+          catalogMutation: IntentionCatalogUpdated(
+            revision: const TestCatalogRevision(2),
+            before: TestCatalogEntrySnapshot(third),
+            after: TestCatalogEntrySnapshot(renamed),
+          ),
+        ),
+      );
+      await completeCatalogCommand(
+        search.container,
+        search.repository,
+        ArchiveIntention(fourth.id),
+        IntentionSaved(
+          testIntention(index: 4),
+          catalogMutation: IntentionCatalogUpdated(
+            revision: const TestCatalogRevision(3),
+            before: TestCatalogEntrySnapshot(fourth),
+            after: TestCatalogEntrySnapshot(
+              testSummary(
+                index: 4,
+                archiveState: IntentionArchiveState.archived,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final current = search.loaded();
+      expect(current.items.map((item) => item.id), [third.id]);
+      expect(current.pairOccupants, {third.id: occupantOf(occupyingThird)});
+      expect(search.repository.queries, hasLength(1));
+    });
+
+    test(
+      'созданное намерение входит свободным и не сбрасывает выдачу',
+      () async {
+        final search = await openSearch(
+          items: [third],
+          pairOccupants: {third.id: occupantOf(occupyingThird)},
+        );
+
+        final created = testSummary(index: 5, title: 'Новое');
+        await completeCatalogCommand(
+          search.container,
+          search.repository,
+          const CreateIntention(title: 'Новое', description: null),
+          IntentionSaved(
+            testIntention(index: 5, title: 'Новое'),
+            catalogMutation: IntentionCatalogCreated(
+              revision: const TestCatalogRevision(2),
+              entry: TestCatalogEntrySnapshot(created),
+            ),
+          ),
+        );
+
+        final current = search.loaded();
+        expect(current.items.map((item) => item.id), [created.id, third.id]);
+        expect(current.pairOccupants, {third.id: occupantOf(occupyingThird)});
+        expect(search.repository.queries, hasLength(1));
+      },
+    );
+
+    test(
+      'строка, вошедшая по изменению намерения, начинает выдачу заново',
+      () async {
+        final search = await openSearch(items: [third]);
+
+        await completeCatalogCommand(
+          search.container,
+          search.repository,
+          RestoreIntention(fourth.id),
+          IntentionSaved(
+            testIntention(index: 4),
+            catalogMutation: IntentionCatalogUpdated(
+              revision: const TestCatalogRevision(2),
+              before: TestCatalogEntrySnapshot(
+                testSummary(
+                  index: 4,
+                  archiveState: IntentionArchiveState.archived,
+                ),
+              ),
+              after: TestCatalogEntrySnapshot(fourth),
+            ),
+          ),
+        );
+
+        await waitForCatalogQueries(search.repository, 2);
+        expect(search.repository.queryAt(1).cursor, isNull);
+        final archivedOccupant = PairOccupant(
+          relationId: occupyingFourth.id,
+          scope: RelationScope.archived,
+        );
+        search.repository.complete(
+          1,
+          ResultSuccess(
+            IntentionCatalogFirstPage(
+              items: [fourth, third],
+              totalCount: 2,
+              nextCursor: null,
+              revision: const TestCatalogRevision(2),
+              pairOccupants: {fourth.id: archivedOccupant},
+            ),
+          ),
+        );
+        await Future<void>.delayed(Duration.zero);
+
+        final current = search.loaded();
+        expect(current.items.map((item) => item.id), [fourth.id, third.id]);
+        expect(current.pairOccupants, {fourth.id: archivedOccupant});
+      },
+    );
+
+    test(
+      'строка, перешедшая внутрь загруженной границы, начинает выдачу заново',
+      () async {
+        final search = await openSearch(
+          items: [fourth, third],
+          nextCursor: cursor,
+        );
+
+        await completeCatalogCommand(
+          search.container,
+          search.repository,
+          UpdateIntention(id: later.id, title: later.title, description: null),
+          IntentionSaved(
+            testIntention(index: 1),
+            catalogMutation: IntentionCatalogUpdated(
+              revision: const TestCatalogRevision(2),
+              before: TestCatalogEntrySnapshot(later),
+              after: TestCatalogEntrySnapshot(
+                testSummary(index: 1, createdDay: 10),
+              ),
+            ),
+          ),
+        );
+
+        await waitForCatalogQueries(search.repository, 2);
+        expect(search.repository.queryAt(1).cursor, isNull);
+      },
+    );
+
+    test('строка за загруженной границей выдачу не сбрасывает', () async {
+      final search = await openSearch(
+        items: [fourth, third],
+        nextCursor: cursor,
+      );
+
+      await completeCatalogCommand(
+        search.container,
+        search.repository,
+        RestoreIntention(later.id),
+        IntentionSaved(
+          testIntention(index: 1),
+          catalogMutation: IntentionCatalogUpdated(
+            revision: const TestCatalogRevision(2),
+            before: TestCatalogEntrySnapshot(
+              testSummary(
+                index: 1,
+                archiveState: IntentionArchiveState.archived,
+              ),
+            ),
+            after: TestCatalogEntrySnapshot(later),
+          ),
+        ),
+      );
+
+      final current = search.loaded();
+      expect(current.items.map((item) => item.id), [fourth.id, third.id]);
+      expect(current.totalCount, 5);
+      expect(search.repository.queries, hasLength(1));
+    });
+  });
 }
+
+LongTermRelationCommandResult _relationSuccess(
+  GraphRevision revision,
+  LongTermRelationCommandSuccess success,
+) =>
+    GraphCommandSucceeded<
+      LongTermRelationCommandSuccess,
+      LongTermRelationCommandFailure
+    >(ConfirmedGraphResult(revision: revision, value: success));
 
 IntentionCatalogLoaded _loaded(ProviderContainer container) =>
     container
