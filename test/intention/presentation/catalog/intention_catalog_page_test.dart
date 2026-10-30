@@ -1258,7 +1258,7 @@ void main() {
     });
 
     testWidgets('«Сбросить фильтры» очищает поле и снимает условия, сохраняя '
-        'охват, тип и порядок', (tester) async {
+        'тип', (tester) async {
       final repository = ControlledCatalogRepository();
       final container = reconciliationCatalogContainer(repository);
       addTearDown(container.dispose);
