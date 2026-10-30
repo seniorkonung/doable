@@ -145,3 +145,19 @@
   - **Зависимости:** нет.
   - **Предполагаемые файлы:** `lib/src/intention/presentation/search/results_scroll_keeper.dart`, `lib/src/intention/presentation/search/intention_search_list.dart`, `lib/src/intention/presentation/catalog/intention_search_results.dart`, `test/intention/presentation/search/intention_search_list_test.dart`.
   - **Размер:** S.
+
+- [ ] 1.11 Не трогать прокрутку выдачи, если первая видимая строка не сместилась, чтобы добавление порции не обрывало инерцию и перетаскивание
+  - **Критерии приёмки:**
+    - Если первая видимая строка не сместилась, `ResultsScrollKeeper` вообще не трогает прокрутку, в том числе при добавлении порции. Инерция и перетаскивание продолжаются на границах порций.
+    - Хранитель определяет не «изменилась ли выдача», а «могла ли сместиться видимая строка». Добавление строк в конец при неизменном начале выдачи якорь не снимает.
+    - Восстановление не вызывает `jumpTo`, если строка уже на своём месте. Место определяется положением строки в содержимом списка, а не смещением прокрутки: пока хранитель ждёт кадра, идущая прокрутка сама уходит от запомненного смещения, и это не сдвиг строки.
+    - Реальный сдвиг поправляется прежним `jumpTo` и может остановить инерцию, если подтверждение операции пришло, пока человек прокручивает открытый список. Это обязательное условие решения пользователя, а не пробел: поправка без остановки жеста, с вмешательством во внутреннее состояние прокрутки Flutter, не делается.
+    - Удержание места при вставке перед видимой строкой, результат задачи 1.10 и переход к верху при новой выдаче не меняются.
+    - Регрессионная проверка в `test/intention/presentation/search/intention_search_list_test.dart`: идущая прокрутка не останавливается добавлением порции. Проверка не замеряет время. Без исправления она падает.
+    - Спецификации не меняются, ветка `change/redesign-intention-catalog` не меняется.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/search test/intention/presentation/catalog/intention_search_results_test.dart test/intention/presentation/picker test/long_term_relation/presentation/participant_picker`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.10.
+  - **Предполагаемые файлы:** `lib/src/intention/presentation/search/results_scroll_keeper.dart`, `test/intention/presentation/search/intention_search_list_test.dart`.
+  - **Размер:** S.
