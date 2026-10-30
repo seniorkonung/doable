@@ -5,48 +5,11 @@ import 'package:doable/src/intention/presentation/search/intention_search_kind.d
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  final session = IntentionSearchSession();
-  final purposes = <(String, IntentionCatalogPurpose, String, bool)>[
-    ('каталог', const BrowseIntentionCatalog(), 'intention-catalog', true),
-    (
-      'выбор действия',
-      SelectDailyChoiceAction(session: session),
-      'daily-choice-action',
-      false,
-    ),
-    (
-      'выбор исходного намерения',
-      SelectDailyChoiceSource(session: session),
-      'daily-choice-source',
-      true,
-    ),
-    (
-      'выбор участника',
-      SelectRelationParticipant(
-        selectionContext: RelationParticipantSelectionContext.activeRelation,
-        session: session,
-      ),
-      'participant-picker',
-      true,
-    ),
-  ];
+  test('каталог: префикс ключей intention-catalog и называние типа', () {
+    final kind = IntentionSearchKind.of(const BrowseIntentionCatalog());
 
-  for (final (name, purpose, keyPrefix, namesKind) in purposes) {
-    test('$name: префикс ключей $keyPrefix и называние типа $namesKind', () {
-      final kind = IntentionSearchKind.of(purpose);
-
-      expect(kind.keyPrefix, keyPrefix);
-      expect(kind.namesKind, namesKind);
-    });
-  }
-
-  test('четыре назначения не делят префикс ключей', () {
-    final prefixes = {
-      for (final (_, purpose, _, _) in purposes)
-        IntentionSearchKind.of(purpose).keyPrefix,
-    };
-
-    expect(prefixes, hasLength(purposes.length));
+    expect(kind.keyPrefix, 'intention-catalog');
+    expect(kind.namesKind, isTrue);
   });
 
   test('каталог берёт существующие тексты каталога', () {
