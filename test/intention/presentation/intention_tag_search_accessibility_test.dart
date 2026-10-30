@@ -9,8 +9,8 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_status_views.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_search_layout.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_section.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
@@ -77,11 +77,7 @@ void main() {
     expect(tester.takeException(), isNull);
 
     final conditionsProvider = intentionTagConditionsViewModelProvider(
-      tester
-          .widget<IntentionTagConditionsSection>(
-            find.byType(IntentionTagConditionsSection),
-          )
-          .purpose,
+      const BrowseIntentionCatalog(),
     );
 
     // Поле названия принимает ввод при открытой клавиатуре.
@@ -116,15 +112,13 @@ void main() {
     await _pumpFrames(tester);
     expect(tester.takeException(), isNull);
 
-    // Кнопка «+ Тег» открывает панель тегов в режиме фильтра.
-    final add = find.byKey(const ValueKey('intention-tag-conditions-add'));
-    await _reach(tester, add);
-    _expectTappable(tester, add);
-    expect(
-      find.bySemanticsLabel(l10n.intentionTagConditionsAddSemantics),
-      findsOneWidget,
-    );
-    await tester.tap(add);
+    // Кнопка фильтра называет число условий и открывает панель тегов в
+    // режиме фильтра.
+    final filter = intentionCatalogTagFilterControl;
+    await _reach(tester, filter);
+    _expectTappable(tester, filter);
+    _expectFilterAnnounced(tester, l10n, _initialConditions);
+    await tester.tap(filter);
     await _pumpFrames(tester);
     await _expectTagsPanelAccessible(tester, l10n);
 
@@ -153,59 +147,29 @@ void main() {
       _condition(_tags.last, IntentionTagRequirement.mustBeAbsent),
     ]);
 
-    // Каждый чип достижим и объявляет надобность, переключение и снятие.
-    for (final condition in container.read(conditionsProvider).conditions) {
-      final name = condition.name.value;
-      final toggle = _conditionToggle(condition.tagId);
-      await _reach(tester, toggle);
-      _expectTappable(tester, toggle);
-      final toggleNode = tester.getSemantics(toggle);
-      expect(toggleNode.label, switch (condition.requirement) {
-        IntentionTagRequirement.mustBePresent =>
-          l10n.intentionTagConditionPresentSemantics(name),
-        IntentionTagRequirement.mustBeAbsent =>
-          l10n.intentionTagConditionAbsentSemantics(name),
-      });
-      expect(toggleNode.hint, l10n.intentionTagConditionToggleHint);
-      expect(toggleNode, isSemantics(isButton: true, hasTapAction: true));
-      _expectNotTruncated(
-        tester,
-        find.descendant(
-          of: toggle,
-          matching: find.byKey(const ValueKey('intention-tag-condition-label')),
-        ),
-      );
-      final remove = _conditionRemove(condition.tagId);
-      await _reach(tester, remove);
-      _expectTappable(tester, remove);
-      expect(
-        tester.getSemantics(remove),
-        isSemantics(
-          tooltip: l10n.intentionTagConditionRemove(name),
-          isButton: true,
-          hasTapAction: true,
-        ),
-      );
-    }
-    await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
+    // Условия видны только по кнопке фильтра, а не под полем названия.
+    expect(find.textContaining(_tags.first.name.value), findsNothing);
+    _expectFilterAnnounced(tester, l10n, _initialConditions + 1);
     await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
     await expectLater(tester, meetsGuideline(textContrastGuideline));
 
-    // Переключение и снятие срабатывают касанием.
-    final firstToggle = _conditionToggle(_tags.first.id);
-    await _reach(tester, firstToggle);
-    await tester.tap(firstToggle);
+    // Надобность меняется и условие снимается нажатиями в панели.
+    await tester.tap(filter);
+    await _pumpFrames(tester);
+    final firstTagRow = _panelRow(_tags.first);
+    _expectTappable(tester, firstTagRow);
+    await tester.tap(firstTagRow);
     await tester.pump();
     expect(
       container.read(conditionsProvider).conditions.first.requirement,
       IntentionTagRequirement.mustBeAbsent,
     );
-    final lastRemove = _conditionRemove(_tags.last.id);
-    await _reach(tester, lastRemove);
-    await tester.tap(lastRemove);
-    await tester.pump();
-    final conditions = container.read(conditionsProvider).conditions;
-    expect(conditions, hasLength(_initialConditions));
+    await _reach(tester, lastTagRow, within: _panelList);
+    await tester.tap(lastTagRow);
+    await _pumpFrames(tester);
+    await tester.tap(find.text(l10n.tagsPanelDone));
+    await _pumpFrames(tester);
+    _expectFilterAnnounced(tester, l10n, _initialConditions);
     expect(tester.takeException(), isNull);
 
     // Выдача со строкой тегов у каждого результата и отказом продолжения.
@@ -245,7 +209,7 @@ void main() {
     await _pumpFrames(tester);
     expect(tester.takeException(), isNull);
 
-    // Первый тег нажатием стал исключённым, и обязательным остался второй из
+    // Первый тег в панели стал исключённым, и обязательным остался второй из
     // тегов строки: он называется впереди.
     final tagsLine = l10n.intentionSummaryTags(
       rowTags.reversed.map((tag) => tag.name.value).join(', '),
@@ -338,15 +302,36 @@ void main() {
     );
     await accepted.future;
     await _pumpFrames(tester);
-    expect(_conditionToggle(deleted.id), findsNothing);
     expect(
-      container.read(conditionsProvider).conditions,
-      hasLength(_initialConditions - 1),
+      shownIntentionCatalogParameters(tester).tagConditions,
+      _initialConditions - 1,
     );
 
     expect(tester.takeException(), isNull);
     semantics.dispose();
   });
+}
+
+/// Экранный диктор называет кнопку фильтра с числом условий [count], а
+/// сама кнопка показывает это число.
+void _expectFilterAnnounced(
+  WidgetTester tester,
+  AppLocalizations l10n,
+  int count,
+) {
+  final filter = intentionCatalogTagFilterControl;
+  expect(
+    find.descendant(of: filter, matching: find.text('$count')),
+    findsOneWidget,
+  );
+  expect(
+    tester.getSemantics(filter),
+    isSemantics(
+      label: l10n.intentionPickerFilterLabel(count),
+      isButton: true,
+      hasTapAction: true,
+    ),
+  );
 }
 
 /// Проверяет открытую панель тегов в режиме фильтра: поле поиска и строки
@@ -535,14 +520,6 @@ IntentionTagCondition _condition(
   requirement: requirement,
   name: tag.name,
   color: tag.color,
-);
-
-Finder _conditionToggle(TagId id) => find.byKey(
-  ValueKey('intention-tag-condition-toggle-${id.toCanonicalString()}'),
-);
-
-Finder _conditionRemove(TagId id) => find.byKey(
-  ValueKey('intention-tag-condition-remove-${id.toCanonicalString()}'),
 );
 
 Finder _panelRow(Tag tag) =>

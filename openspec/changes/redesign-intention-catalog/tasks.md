@@ -511,7 +511,7 @@
     - проверки `test/intention/presentation/catalog/intention_catalog_page_test.dart`, `test/intention/presentation/intention_tag_search_accessibility_test.dart`.
   - **Размер:** M.
 
-- [ ] 4.8 Убрать условия под полем поиска: условия видны по кнопке фильтра и меняются в панели тегов
+- [x] 4.8 Убрать условия под полем поиска: условия видны по кнопке фильтра и меняются в панели тегов
   - **Критерии приёмки:**
     - `IntentionTagConditionsSection` и `intention_tag_conditions_section_test.dart` удалены, под полем поиска условий нет.
     - `lib/src/tag/presentation/tag_phrase_text.dart` удалён вместе с последним вызовом `tagPhraseText`. Своих тестов у файла нет.

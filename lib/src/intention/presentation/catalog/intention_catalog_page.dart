@@ -12,7 +12,6 @@ import 'intention_catalog_row.dart';
 import 'intention_catalog_view_model.dart';
 import 'intention_search_layout.dart';
 import 'intention_search_results.dart';
-import 'intention_tag_conditions_section.dart';
 
 /// Назначение общего просмотра каталога намерений.
 ///
@@ -108,11 +107,6 @@ final class _CatalogControls extends StatelessWidget {
       child: Column(
         children: [
           IntentionSearchBar(purpose: _purpose, controller: filterController),
-          const SizedBox(height: 12),
-          const Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: IntentionTagConditionsSection(purpose: _purpose),
-          ),
           const SizedBox(height: 12),
           const IntentionListHeader(purpose: _purpose),
         ],

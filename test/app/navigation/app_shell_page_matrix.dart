@@ -459,13 +459,13 @@ void _registerPageMatrixTests() {
         _ => null,
       };
       if (variant != null) expect(variant, row.name);
-      for (final section in tester.widgetList<IntentionTagConditionsSection>(
+      for (final searchBar in tester.widgetList<IntentionSearchBar>(
         find.descendant(
           of: find.byType(row.page),
-          matching: find.byType(IntentionTagConditionsSection),
+          matching: find.byType(IntentionSearchBar),
         ),
       )) {
-        expect(_pageForCatalogPurpose(section.purpose), row.page);
+        expect(_pageForCatalogPurpose(searchBar.purpose), row.page);
       }
       if (row.page == IntentionEditorPage) {
         _expectCreationSheetAboveCatalog(tester);

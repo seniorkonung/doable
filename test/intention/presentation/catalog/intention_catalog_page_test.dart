@@ -24,7 +24,6 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_purp
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_search_layout.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_section.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
@@ -40,7 +39,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/app_root_pages.dart';
-import '../../../support/inline_text.dart';
 import '../../../support/intention_catalog_controls.dart';
 import '../../../support/quick_creation.dart';
 import 'catalog_test_support.dart';
@@ -1286,7 +1284,7 @@ void main() {
 
     await _scrollCatalogDown(tester);
 
-    await tester.tap(_addCondition);
+    await tester.tap(intentionCatalogTagFilterControl);
     await tester.pumpAndSettle();
     expect(find.text('Filter by tags'), findsOneWidget);
     await tester.tap(_panelRow(health));
@@ -1306,7 +1304,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expectIntentionGraphRootPage(router);
-    expect(_shownConditions(tester), ['Здоровье']);
+    expect(shownIntentionCatalogParameters(tester).tagConditions, 1);
     expect(_catalogScrollPosition(tester).pixels, 0);
     expect(find.text('Намерение 60'), findsOneWidget);
     expect(_rowChips('Здоровье'), findsWidgets);
@@ -1336,7 +1334,7 @@ void main() {
     expect(repository.queryAt(4).tagFilter, filter);
     repository.complete(4, _firstPage(_taggedSummaries([health], last: 59)));
     await tester.pumpAndSettle();
-    expect(_shownConditions(tester), ['Здоровье', 'not Спорт']);
+    expect(shownIntentionCatalogParameters(tester).tagConditions, 2);
 
     await selectIntentionCatalogOrder(
       tester,
@@ -1351,7 +1349,7 @@ void main() {
     expect(repository.queryAt(5).tagFilter, filter);
     repository.complete(5, _firstPage(_taggedSummaries([health], last: 59)));
     await tester.pumpAndSettle();
-    expect(_shownConditions(tester), ['Здоровье', 'not Спорт']);
+    expect(shownIntentionCatalogParameters(tester).tagConditions, 2);
   });
 
   testWidgets('пустая выдача при условиях по тегам сообщает об '
@@ -1447,9 +1445,9 @@ void main() {
     expect(find.byType(CatalogRow), findsNWidgets(4));
   });
 
-  testWidgets('после подтверждённого переименования тега строки и чипы '
-      'показывают новое название, а удаление снимает условие и показывает '
-      'выдачу по оставшимся условиям', (tester) async {
+  testWidgets('после подтверждённого переименования тега строки показывают '
+      'новое название, а удаление снимает условие и показывает выдачу по '
+      'оставшимся условиям', (tester) async {
     final repository = ControlledCatalogRepository();
     final container = reconciliationCatalogContainer(repository);
     addTearDown(container.dispose);
@@ -1472,7 +1470,7 @@ void main() {
       ),
     );
 
-    expect(_shownConditions(tester), ['Самочувствие']);
+    expect(shownIntentionCatalogParameters(tester).tagConditions, 1);
     expect(_rowChips('Самочувствие'), findsNWidgets(3));
     expect(intentionCatalogTotal(3), findsOneWidget);
 
@@ -1495,7 +1493,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(_shownConditions(tester), isEmpty);
+    expect(shownIntentionCatalogParameters(tester).tagConditions, 0);
     expect(intentionCatalogTotal(5), findsOneWidget);
     expect(find.byType(CatalogRow), findsNWidgets(5));
     expect(repository.queries, hasLength(restarted + 1));
@@ -1884,7 +1882,7 @@ typedef _VisibleCatalogAnchor = ({String title, double top, int index});
 
 /// Загружает страницу каталога с заданными условиями по тегам.
 ///
-/// Условия задаются сразу моделью каталога, минуя раздел условий страницы.
+/// Условия задаются сразу моделью каталога, минуя панель тегов.
 Future<void> _loadTaggedCatalog(
   WidgetTester tester,
   ProviderContainer container,
@@ -1942,23 +1940,8 @@ List<IntentionSummary> _taggedSummaries(
     testSummary(index: index, title: 'Намерение $index', tags: tags),
 ];
 
-final _addCondition = find.byKey(
-  const ValueKey('intention-tag-conditions-add'),
-);
-
 Finder _panelRow(Tag tag) =>
     find.byKey(ValueKey('tags-panel-row-${tag.id.toCanonicalString()}'));
-
-/// Тексты чипов раздела условий в порядке показа.
-List<String> _shownConditions(WidgetTester tester) => [
-  for (final text in tester.widgetList<Text>(
-    find.descendant(
-      of: find.byType(IntentionTagConditionsSection),
-      matching: find.byKey(const ValueKey('intention-tag-condition-label')),
-    ),
-  ))
-    textIgnoringInlineWidgets(text),
-];
 
 Result<IntentionCatalogFirstPage> _firstPage(
   List<IntentionSummary> items, {
@@ -1996,7 +1979,7 @@ Future<void> _selectCondition(
   }
 }
 
-/// Открывает каталог и задаёт условия через модель раздела условий.
+/// Открывает каталог и задаёт условия через модель условий.
 ///
 /// Каждое переключение сразу начинает новую выдачу; [page] отвечает на
 /// последнюю.

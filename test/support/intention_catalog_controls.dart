@@ -195,29 +195,31 @@ Future<void> addIntentionCatalogTagCondition(
   IntentionTagRequirement requirement, {
   RootPageTap tap = tapWhenFound,
   RootPageWait waitFor = pumpUntilFound,
-}) async {
-  await tap(tester, intentionCatalogTagFilterControl);
-  await tester.pump(_transition);
-  final row = find.byKey(ValueKey('tags-panel-row-${tag.toCanonicalString()}'));
-  for (var cycle = 0; cycle < tagConditionCycles(requirement); cycle++) {
-    await tap(tester, row);
-  }
-  // Панель фильтра применяет условие сразу, а «назад» только закрывает её.
-  await tester.binding.handlePopRoute();
-  await waitFor(tester, intentionCatalogTagFilterControl.hitTestable());
-}
+}) => _cycleTagCondition(
+  tester,
+  tag,
+  tagConditionCycles(requirement),
+  tap: tap,
+  waitFor: waitFor,
+);
 
-/// Снимает условие по тегу [tag], не дожидаясь выдачи без него. [tap] — нажатие
-/// сценария; по умолчанию [tapWhenFound].
+/// Снимает условие [requirement] по тегу [tag] в панели фильтра и закрывает
+/// её, не дожидаясь выдачи без него.
+///
+/// [tap] и [waitFor] — нажатие и ожидание сценария; по умолчанию
+/// [tapWhenFound] и [pumpUntilFound].
 Future<void> removeIntentionCatalogTagCondition(
   WidgetTester tester,
-  TagId tag, {
+  TagId tag,
+  IntentionTagRequirement requirement, {
   RootPageTap tap = tapWhenFound,
-}) => tap(
+  RootPageWait waitFor = pumpUntilFound,
+}) => _cycleTagCondition(
   tester,
-  find.byKey(
-    ValueKey('intention-tag-condition-remove-${tag.toCanonicalString()}'),
-  ),
+  tag,
+  _tagConditionCircle - tagConditionCycles(requirement),
+  tap: tap,
+  waitFor: waitFor,
 );
 
 /// Параметры поиска открытого каталога. Каталог, который показывает другие
@@ -244,13 +246,9 @@ ShownIntentionCatalogParameters shownIntentionCatalogParameters(
         .widget<TextField>(intentionCatalogTitleField)
         .controller!
         .text,
-    tagConditions: find
-        .descendant(
-          of: _page,
-          matching: find.byKey(const ValueKey('intention-tag-condition-label')),
-        )
-        .evaluate()
-        .length,
+    tagConditions: tester
+        .widget<FilterButton>(intentionCatalogTagFilterControl)
+        .count,
   );
 }
 
@@ -295,6 +293,10 @@ List<double> shownIntentionCatalogOuterOffsets(WidgetTester tester) {
 /// поэтому шаг продвигает время сам.
 const _transition = Duration(seconds: 1);
 
+/// Число нажатий, которыми строка панели фильтра проходит круг надобности и
+/// возвращается к тегу без условия.
+const _tagConditionCircle = 3;
+
 /// Вертикальные прокрутки страницы каталога: своя прокрутка есть и у поля.
 List<ScrollPosition> _pagePositions(WidgetTester tester) {
   final scrollables = find.descendant(
@@ -321,6 +323,26 @@ String _shownTags(IntentionCatalogRow row, AppLocalizations texts) {
       : texts.intentionSummaryTags(
           tags.map((tag) => tag.name.value).join(', '),
         );
+}
+
+/// Открывает панель фильтра, нажимает строку тега [tag] [cycles] раз и
+/// закрывает панель.
+Future<void> _cycleTagCondition(
+  WidgetTester tester,
+  TagId tag,
+  int cycles, {
+  required RootPageTap tap,
+  required RootPageWait waitFor,
+}) async {
+  await tap(tester, intentionCatalogTagFilterControl);
+  await tester.pump(_transition);
+  final row = find.byKey(ValueKey('tags-panel-row-${tag.toCanonicalString()}'));
+  for (var cycle = 0; cycle < cycles; cycle++) {
+    await tap(tester, row);
+  }
+  // Панель фильтра применяет условие сразу, а «назад» только закрывает её.
+  await tester.binding.handlePopRoute();
+  await waitFor(tester, intentionCatalogTagFilterControl.hitTestable());
 }
 
 /// Открывает заголовком списка лист «Показать и упорядочить».

@@ -13,6 +13,7 @@ import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
     show IntentionScope;
+import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_section.dart';
 import 'package:flutter/material.dart';
@@ -20,7 +21,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../support/app_root_pages.dart';
-import '../support/inline_text.dart';
 import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/intention_catalog_controls.dart';
@@ -123,42 +123,37 @@ void main() {
       await tester.pumpAndSettle();
       expect(shownIntentionCatalogParameters(tester).tagConditions, 3);
 
-      // Чип по-прежнему меняет надобность на прежнем месте.
-      await _tap(
-        tester,
-        find.byKey(
-          ValueKey('intention-tag-condition-toggle-${tagFixtureId(_sport)}'),
-        ),
-      );
-      expect(_conditions(tester), ['Здоровье', 'Отдых', 'Спорт']);
+      // Панель меняет надобность по кругу: исключённый тег снова становится
+      // обязательным через состояние без условия.
+      await _openFilterPanel(tester);
+      await _cycle(tester, _sport, TagRowFilterMark.none);
+      expect(shownIntentionCatalogParameters(tester).tagConditions, 2);
+      await _cycle(tester, _sport, TagRowFilterMark.mustBePresent);
+      expect(shownIntentionCatalogParameters(tester).tagConditions, 3);
       await _expectResults(tester, [('Ходить в зал', all)]);
-      await _tap(
-        tester,
-        find.byKey(
-          ValueKey('intention-tag-condition-toggle-${tagFixtureId(_sport)}'),
-        ),
-      );
-      expect(_conditions(tester), [
-        'Здоровье',
-        'Отдых',
-        l10n.intentionTagConditionAbsent('Спорт'),
-      ]);
+      await _cycle(tester, _sport, TagRowFilterMark.mustBeAbsent);
+      expect(shownIntentionCatalogParameters(tester).tagConditions, 3);
       await _expectResults(tester, [
         ('Ходить в парк', healthRest),
         ('Ходить в парк', healthRest),
       ]);
+      await _closeFilterPanel(tester, l10n);
 
       // Поиск только с исключением допускает намерение без тегов.
       await enterIntentionCatalogTitle(tester, '');
       await removeIntentionCatalogTagCondition(
         tester,
         _tagId(_health),
+        IntentionTagRequirement.mustBePresent,
         tap: _tap,
+        waitFor: _until,
       );
       await removeIntentionCatalogTagCondition(
         tester,
         _tagId(_rest),
+        IntentionTagRequirement.mustBePresent,
         tap: _tap,
+        waitFor: _until,
       );
       expect(shownIntentionCatalogParameters(tester).tagConditions, 1);
       await _expectResults(tester, [
@@ -170,12 +165,10 @@ void main() {
       ]);
 
       // Пустая выдача по условиям отличается от пустого охвата.
-      await _tap(
-        tester,
-        find.byKey(
-          ValueKey('intention-tag-condition-toggle-${tagFixtureId(_sport)}'),
-        ),
-      );
+      await _openFilterPanel(tester);
+      await _cycle(tester, _sport, TagRowFilterMark.none);
+      await _cycle(tester, _sport, TagRowFilterMark.mustBePresent);
+      await _closeFilterPanel(tester, l10n);
       await _addCondition(tester, l10n, _health, present: false);
       await _until(tester, find.text(l10n.catalogTagConditionsEmpty));
       expect(find.text(l10n.catalogActiveEmpty), findsNothing);
@@ -597,13 +590,6 @@ List<_Row> _actionResults(WidgetTester tester) {
       ),
   ];
 }
-
-/// Подписи чипов выбранных условий каталога в порядке добавления.
-List<String> _conditions(WidgetTester tester) => [
-  for (final label
-      in find.byKey(const ValueKey('intention-tag-condition-label')).evaluate())
-    textIgnoringInlineWidgets(label.widget as Text),
-];
 
 /// Дожидается результатов [expected]; по умолчанию читает выдачу каталога.
 Future<void> _expectResults(

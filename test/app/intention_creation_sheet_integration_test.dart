@@ -312,7 +312,13 @@ void main() {
           waitFor: _until,
         );
         await _waitForCatalogIds(tester, app, [created]);
-        await removeIntentionCatalogTagCondition(tester, sport, tap: _tap);
+        await removeIntentionCatalogTagCondition(
+          tester,
+          sport,
+          IntentionTagRequirement.mustBePresent,
+          tap: _tap,
+          waitFor: _until,
+        );
         await _waitForCatalogIds(tester, app, idsWithCreated);
         expectIntentionGraphRootPage(app.router);
 

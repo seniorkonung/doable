@@ -20,7 +20,6 @@ import '../support/app_root_pages.dart';
 import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
-import '../support/inline_text.dart';
 import '../support/intention_catalog_controls.dart';
 import '../support/tag_storage_fixture.dart';
 
@@ -78,9 +77,6 @@ void main() {
     expect(retainedTagFixtureGraph(raw), graphBefore);
 
     await _closePanelAndPage(tester);
-    await tester.ensureVisible(_conditionLabel);
-    await tester.pumpAndSettle();
-    await _expectBlueDot(tester, _conditionLabel);
     await _expectBlueDot(
       tester,
       find.descendant(
@@ -118,10 +114,10 @@ void main() {
 
     await _closePanelAndPage(tester);
     await _untilRowTagged(tester, 'Теги: Быт');
-    expect(
-      textIgnoringInlineWidgets(tester.widget<Text>(_conditionLabel)),
-      'Быт',
-    );
+    // Нажатие на результат прокрутило страницу: кнопка фильтра ушла за край.
+    jumpIntentionCatalog(tester, 0);
+    await tester.pump();
+    expect(shownIntentionCatalogParameters(tester).tagConditions, 1);
     expect(_rowTags(tester), isNot(contains('Теги: Дом')));
     expect(tester.takeException(), isNull);
   });
@@ -450,13 +446,6 @@ Finder _panelRow(String tagId) => find.byKey(ValueKey('tags-panel-row-$tagId'));
 
 Finder _assignmentRow(String tagId) =>
     find.byKey(ValueKey('tag-assignment-row-$tagId'));
-
-/// Подпись условия по тегу: нажатие на результат прокручивает каталог
-/// намерений, и условия уходят за верхний край страницы.
-final _conditionLabel = find.byKey(
-  const ValueKey('intention-tag-condition-label'),
-  skipOffstage: false,
-);
 
 /// Поле названия листа тега, открытого поверх панели.
 final _tagSheetName = find.descendant(
