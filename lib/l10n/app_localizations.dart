@@ -4085,6 +4085,36 @@ abstract class AppLocalizations {
   /// **'” returns with priority {priority}.'**
   String participantPickerRestoreTextAfter(String priority);
 
+  /// Предупреждение в подтверждении восстановления: данные черновика формы, которые не сохранятся; changes — перечень отличающихся данных через запятую
+  ///
+  /// In en, this message translates to:
+  /// **'What you set in the form won’t be kept: {changes}.'**
+  String participantPickerRestoreWarning(String changes);
+
+  /// Перечень предупреждения о восстановлении: выбранный в форме тип «нужно» не сохранится
+  ///
+  /// In en, this message translates to:
+  /// **'type “need”'**
+  String get participantPickerRestoreWarningNeedType;
+
+  /// Перечень предупреждения о восстановлении: выбранный в форме тип «можно» не сохранится
+  ///
+  /// In en, this message translates to:
+  /// **'type “can”'**
+  String get participantPickerRestoreWarningCanType;
+
+  /// Перечень предупреждения о восстановлении: выбранный в форме приоритет не сохранится
+  ///
+  /// In en, this message translates to:
+  /// **'priority'**
+  String get participantPickerRestoreWarningPriority;
+
+  /// Перечень предупреждения о восстановлении: введённое в форме описание не сохранится
+  ///
+  /// In en, this message translates to:
+  /// **'description'**
+  String get participantPickerRestoreWarningDescription;
+
   /// Отмена восстановления занимающей связи из поиска участника
   ///
   /// In en, this message translates to:

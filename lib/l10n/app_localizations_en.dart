@@ -2585,6 +2585,23 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String participantPickerRestoreWarning(String changes) {
+    return 'What you set in the form won’t be kept: $changes.';
+  }
+
+  @override
+  String get participantPickerRestoreWarningNeedType => 'type “need”';
+
+  @override
+  String get participantPickerRestoreWarningCanType => 'type “can”';
+
+  @override
+  String get participantPickerRestoreWarningPriority => 'priority';
+
+  @override
+  String get participantPickerRestoreWarningDescription => 'description';
+
+  @override
   String get participantPickerRestoreCancel => 'Cancel';
 
   @override

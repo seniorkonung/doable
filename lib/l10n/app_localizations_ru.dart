@@ -2610,6 +2610,23 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
+  String participantPickerRestoreWarning(String changes) {
+    return 'Заданное в форме не сохранится: $changes.';
+  }
+
+  @override
+  String get participantPickerRestoreWarningNeedType => 'вид «нужно»';
+
+  @override
+  String get participantPickerRestoreWarningCanType => 'вид «можно»';
+
+  @override
+  String get participantPickerRestoreWarningPriority => 'приоритет';
+
+  @override
+  String get participantPickerRestoreWarningDescription => 'описание';
+
+  @override
   String get participantPickerRestoreCancel => 'Отмена';
 
   @override

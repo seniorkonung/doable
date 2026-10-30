@@ -2094,6 +2094,27 @@
     "description": "Текст подтверждения восстановления после выделенной формулировки связи",
     "placeholders": {"priority": {"type": "String"}}
   },
+  "participantPickerRestoreWarning": "What you set in the form won’t be kept: {changes}.",
+  "@participantPickerRestoreWarning": {
+    "description": "Предупреждение в подтверждении восстановления: данные черновика формы, которые не сохранятся; changes — перечень отличающихся данных через запятую",
+    "placeholders": {"changes": {"type": "String"}}
+  },
+  "participantPickerRestoreWarningNeedType": "type “need”",
+  "@participantPickerRestoreWarningNeedType": {
+    "description": "Перечень предупреждения о восстановлении: выбранный в форме тип «нужно» не сохранится"
+  },
+  "participantPickerRestoreWarningCanType": "type “can”",
+  "@participantPickerRestoreWarningCanType": {
+    "description": "Перечень предупреждения о восстановлении: выбранный в форме тип «можно» не сохранится"
+  },
+  "participantPickerRestoreWarningPriority": "priority",
+  "@participantPickerRestoreWarningPriority": {
+    "description": "Перечень предупреждения о восстановлении: выбранный в форме приоритет не сохранится"
+  },
+  "participantPickerRestoreWarningDescription": "description",
+  "@participantPickerRestoreWarningDescription": {
+    "description": "Перечень предупреждения о восстановлении: введённое в форме описание не сохранится"
+  },
   "participantPickerRestoreCancel": "Cancel",
   "@participantPickerRestoreCancel": {
     "description": "Отмена восстановления занимающей связи из поиска участника"

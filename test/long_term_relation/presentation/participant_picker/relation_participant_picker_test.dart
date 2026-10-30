@@ -25,6 +25,7 @@ import 'package:doable/src/long_term_relation/application/long_term_relation_com
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/application/relation_pair_probe.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation_description.dart';
 import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_choice.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/domain/tag.dart';
@@ -375,19 +376,23 @@ void main() {
 }
 
 /// Описание выбора связанного участника при создании связи с дескриптором
-/// [restore].
-RelationParticipantChoice _creationChoice(RelationCreationRestore restore) =>
-    RelationParticipantChoice(
-      role: RelationParticipantRole.related,
-      flow: RelationCreationChoiceFlow(
-        restore: restore,
-        priority: null,
-        description: '',
-      ),
-      type: null,
-      source: _participant(_excludedIndex),
-      related: null,
-    );
+/// [restore]. Вид, приоритет и описание — черновик формы, по умолчанию пустой.
+RelationParticipantChoice _creationChoice(
+  RelationCreationRestore restore, {
+  LongTermRelationType? type,
+  RelationPriority? priority,
+  String description = '',
+}) => RelationParticipantChoice(
+  role: RelationParticipantRole.related,
+  flow: RelationCreationChoiceFlow(
+    restore: restore,
+    priority: priority,
+    description: description,
+  ),
+  type: type,
+  source: _participant(_excludedIndex),
+  related: null,
+);
 
 /// Завершает переход к выбору участника, не ожидая подтверждённой порции.
 ///
@@ -948,6 +953,9 @@ typedef _RestoreOffer = ({
 Future<_RestoreOffer> _openRestoreOffer(
   WidgetTester tester, {
   Locale locale = const Locale('en'),
+  LongTermRelationType? draftType,
+  RelationPriority? draftPriority,
+  String draftDescription = '',
 }) async {
   final repository = ControlledParticipantPickerRepository();
   addTearDown(repository.dispose);
@@ -958,7 +966,12 @@ Future<_RestoreOffer> _openRestoreOffer(
   unawaited(
     _pushPicker(
       router,
-      _creationChoice(restore),
+      _creationChoice(
+        restore,
+        type: draftType,
+        priority: draftPriority,
+        description: draftDescription,
+      ),
     ).whenComplete(() => selectionCompleted = true),
   );
   await _settleRoute(tester);
@@ -985,27 +998,30 @@ Future<_RestoreOffer> _openRestoreOffer(
   );
 }
 
-/// Успешное чтение архивной связи «быть здоровым» → «плавать» вида [type].
-LongTermRelationReadResult _archivedRelationRead(LongTermRelationType type) =>
-    LongTermRelationReadSuccess(
-      GraphSnapshot(
-        revision: const TestPickerRevision(1),
-        value: LongTermRelationDetails(
-          relation: LongTermRelation(
-            id: _archivedOccupant,
-            sourceIntentionId: _id(_excludedIndex),
-            relatedIntentionId: _id(2),
-            type: type,
-            priority: RelationPriority.p2,
-            scope: RelationScope.archived,
-            creationSequence: RelationCreationSequence(1),
-          ),
-          source: _named(_excludedIndex, 'быть здоровым'),
-          related: _named(2, 'плавать'),
-          description: null,
-        ),
+/// Успешное чтение архивной связи «быть здоровым» → «плавать» вида [type] с
+/// приоритетом P2 и описанием [description].
+LongTermRelationReadResult _archivedRelationRead(
+  LongTermRelationType type, {
+  String description = '',
+}) => LongTermRelationReadSuccess(
+  GraphSnapshot(
+    revision: const TestPickerRevision(1),
+    value: LongTermRelationDetails(
+      relation: LongTermRelation(
+        id: _archivedOccupant,
+        sourceIntentionId: _id(_excludedIndex),
+        relatedIntentionId: _id(2),
+        type: type,
+        priority: RelationPriority.p2,
+        scope: RelationScope.archived,
+        creationSequence: RelationCreationSequence(1),
       ),
-    );
+      source: _named(_excludedIndex, 'быть здоровым'),
+      related: _named(2, 'плавать'),
+      description: LongTermRelationDescription.fromInput(description),
+    ),
+  ),
+);
 
 /// Предложение восстановить архивную занимающую связь при создании.
 void _defineRestoreOfferTests() {
@@ -1053,6 +1069,117 @@ void _defineRestoreOfferTests() {
       expect(offer.router.current.matchId, offer.pickerId);
       expect(offer.selectionCompleted(), isFalse);
       semantics.dispose();
+    });
+  }
+
+  for (final (
+        name,
+        language,
+        type,
+        priority,
+        description,
+        storedDescription,
+        warning,
+      )
+      in <
+        (
+          String,
+          String,
+          LongTermRelationType?,
+          RelationPriority?,
+          String,
+          String,
+          String?,
+        )
+      >[
+        ('в форме ничего не задано', 'ru', null, null, '', 'Утром', null),
+        (
+          'форма совпадает со связью',
+          'ru',
+          LongTermRelationType.need,
+          RelationPriority.p2,
+          'Утром',
+          'Утром',
+          null,
+        ),
+        (
+          'пустое описание не отличается от описания связи',
+          'ru',
+          null,
+          null,
+          '  ',
+          'Утром',
+          null,
+        ),
+        (
+          'вид называется словами',
+          'ru',
+          LongTermRelationType.can,
+          null,
+          '',
+          '',
+          'Заданное в форме не сохранится: вид «можно».',
+        ),
+        (
+          'отличается только приоритет',
+          'en',
+          null,
+          RelationPriority.p3,
+          '',
+          '',
+          'What you set in the form won’t be kept: priority.',
+        ),
+        (
+          'отличается только описание',
+          'en',
+          null,
+          null,
+          'Вечером',
+          'Утром',
+          'What you set in the form won’t be kept: description.',
+        ),
+        (
+          'отличаются вид, приоритет и описание',
+          'en',
+          LongTermRelationType.can,
+          RelationPriority.p3,
+          'Вечером',
+          '',
+          'What you set in the form won’t be kept: type “can”, priority, '
+              'description.',
+        ),
+      ]) {
+    testWidgets('$language: подтверждение восстановления, когда $name, '
+        '${warning == null ? 'не предупреждает' : 'предупреждает'} о данных '
+        'черновика', (tester) async {
+      final offer = await _openRestoreOffer(
+        tester,
+        locale: Locale(language),
+        draftType: type,
+        draftPriority: priority,
+        draftDescription: description,
+      );
+
+      await tester.tap(find.text('Плавать'));
+      await tester.pump();
+      offer.repository.answerRelationRead(
+        _archivedRelationRead(
+          LongTermRelationType.need,
+          description: storedDescription,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining(
+          RegExp('не сохранится|be kept'),
+          findRichText: true,
+        ),
+        warning == null ? findsNothing : findsOneWidget,
+      );
+      if (warning != null) {
+        expect(find.text(warning, findRichText: true), findsOneWidget);
+      }
     });
   }
 

@@ -341,7 +341,7 @@
   - **Предполагаемые файлы:** `lib/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart`, `lib/src/intention/presentation/picker/intention_picker_view.dart`, `lib/src/intention/presentation/picker/intention_picker_row.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` и сгенерированная локализация; проверки: `test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart`, `test/intention/presentation/picker/intention_picker_view_test.dart`.
   - **Размер:** M.
 
-- [ ] 2.7 Предупреждать в подтверждении восстановления о данных черновика, которые не сохранятся
+- [x] 2.7 Предупреждать в подтверждении восстановления о данных черновика, которые не сохранятся
   - **Критерии приёмки:**
     - Предупреждение есть, только если заданные в форме вид, приоритет или описание отличаются от данных связи. Невыбранные вид и приоритет и пустое описание отличием не считаются.
     - Отличающийся вид назван словами: сценарий «Подтверждение называет вид, который не сохранится» проходит.

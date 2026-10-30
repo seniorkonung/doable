@@ -110,10 +110,10 @@ final class _RelationParticipantPickerPageState
     }
 
     return switch ((widget.choice.flow, occupant.scope)) {
-      (RelationCreationChoiceFlow(:final restore), RelationScope.archived) =>
+      (final RelationCreationChoiceFlow flow, RelationScope.archived) =>
         OccupiedPairMark(
           kind: OccupiedPairKind.restorable,
-          onTap: () => unawaited(_offerRestore(occupant.relationId, restore)),
+          onTap: () => unawaited(_offerRestore(occupant.relationId, flow)),
         ),
       (_, RelationScope.active) => OccupiedPairMark(
         kind: OccupiedPairKind.linked,
@@ -133,8 +133,9 @@ final class _RelationParticipantPickerPageState
   /// поверхности сообщений у поиска нет.
   Future<void> _offerRestore(
     LongTermRelationId id,
-    RelationCreationRestore restore,
+    RelationCreationChoiceFlow flow,
   ) async {
+    final restore = flow.restore;
     if (_offeringRestore || !restore.canContinue) return;
     _offeringRestore = true;
     try {
@@ -147,7 +148,7 @@ final class _RelationParticipantPickerPageState
       if (read case LongTermRelationReadSuccess(
         value: GraphSnapshot(value: final details?),
       )) {
-        if (await _confirmRestore(details)) restore.accept(id);
+        if (await _confirmRestore(details, flow)) restore.accept(id);
       } else {
         _openRelation(id);
       }
@@ -156,7 +157,41 @@ final class _RelationParticipantPickerPageState
     }
   }
 
-  Future<bool> _confirmRestore(LongTermRelationDetails details) {
+  /// Данные черновика, которые восстановление не перенесёт в связь, одной
+  /// строкой; `null`, если отличий нет.
+  ///
+  /// Отличием считается только заданное в форме: невыбранные вид и приоритет и
+  /// пустое описание ничего не теряют. Отличающийся вид называется словами.
+  String? _discardedDraftWarning(
+    AppLocalizations l10n,
+    LongTermRelationDetails details,
+    RelationCreationChoiceFlow flow,
+  ) {
+    final type = widget.choice.type;
+    final priority = flow.priority;
+    final description = flow.description;
+    final discarded = [
+      if (type != null && type != details.relation.type)
+        switch (type) {
+          LongTermRelationType.need =>
+            l10n.participantPickerRestoreWarningNeedType,
+          LongTermRelationType.can =>
+            l10n.participantPickerRestoreWarningCanType,
+        },
+      if (priority != null && priority != details.relation.priority)
+        l10n.participantPickerRestoreWarningPriority,
+      if (description.trim().isNotEmpty &&
+          description != details.description?.value)
+        l10n.participantPickerRestoreWarningDescription,
+    ];
+    if (discarded.isEmpty) return null;
+    return l10n.participantPickerRestoreWarning(discarded.join(', '));
+  }
+
+  Future<bool> _confirmRestore(
+    LongTermRelationDetails details,
+    RelationCreationChoiceFlow flow,
+  ) {
     final l10n = AppLocalizations.of(context);
     return showPreservingConfirmDialog(
       context: context,
@@ -177,6 +212,7 @@ final class _RelationParticipantPickerPageState
           details.relation.priority.name.toUpperCase(),
         ),
       ),
+      warning: _discardedDraftWarning(l10n, details, flow),
       cancelLabel: l10n.participantPickerRestoreCancel,
       actionLabel: l10n.participantPickerRestoreConfirm,
     );
