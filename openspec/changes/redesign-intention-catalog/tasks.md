@@ -239,6 +239,7 @@
   - **Критерии приёмки:**
     - Модель даёт `canResetShowParameters` и `resetShowParameters()`. Начальные параметры показа заданы в одном месте: охват «Активные» при открытом охвате, тип «Все» при открытом типе, `createdAtDescending`. Их же восстанавливает сброс при смене поколения графа.
     - Сброс меняет все отличающиеся параметры и начинает одну новую выдачу с первой порции. Фильтр названия и условия по тегам он не меняет, а в начальном состоянии ничего не делает.
+    - После смены поколения графа выбор параметров каталога и новый запрос первой порции несут начальные значения: охват «Активные», тип «Все», `createdAtDescending`, пустой фильтр названия. Этим сброс при смене поколения отличается от `resetShowParameters()`, который фильтр названия и условия по тегам сохраняет.
     - Лист «Показать и упорядочить» предлагает «Сбросить» по `canResetShowParameters` и вызывает `resetShowParameters()`. Сам признак он не считает и двух вызовов не делает. Поведение листа экранов выбора не меняется.
   - **Проверка:**
     - `mise exec --no-deps -- flutter test test/intention/presentation/catalog/intention_catalog_view_model_test.dart test/intention/presentation/search test/intention/presentation/picker`.
@@ -248,6 +249,7 @@
     - `lib/src/intention/presentation/catalog/intention_catalog_view_model.dart`, `lib/src/intention/presentation/search/show_and_sort_sheet.dart`;
     - проверки:
       - `test/intention/presentation/catalog/intention_catalog_view_model_test.dart` — сброс каталога. Исходно: охват «Все», тип «Действия», порядок по названию, фильтр «бег» и условие по тегу. Результат: один запрос с начальными параметрами, тем же фильтром и тем же условием;
+      - `test/intention/presentation/catalog/intention_catalog_view_model_test.dart` — смена поколения графа через `currentGraphGenerationProvider`. Исходно: охват «Все», тип «Действия», порядок по названию, фильтр «бег». Результат: выбор параметров и новый запрос первой порции с начальными значениями. Тип читается из модели, потому что прежняя страница его не показывает;
       - `test/intention/presentation/search/show_and_sort_sheet_test.dart` — без изменения ожиданий.
   - **Размер:** S.
 
