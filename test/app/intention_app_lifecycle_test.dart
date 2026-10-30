@@ -41,6 +41,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/app_root_pages.dart';
+import '../support/intention_type_counts.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/intention_options.dart';
 import '../support/tag_read_contract_test_fallback.dart';
@@ -890,7 +891,9 @@ final class _DelayedPersonalGraphRepository
   }
 
   void completePage(int index, IntentionCatalogPage page) {
-    _pages[index].complete(ResultSuccess(page));
+    _pages[index].complete(
+      answerCatalogQuery(pageQueries[index], ResultSuccess(page)),
+    );
   }
 
   void emitDetail(int index, Intention intention) {

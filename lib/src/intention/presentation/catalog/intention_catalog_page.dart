@@ -59,6 +59,10 @@ final class _IntentionCatalogPageState
             : IntentionSearchResultsExtent.remainingWhenSufficient,
         controls: _CatalogControls(
           selection: selection,
+          scope: switch (selection.scope) {
+            IntentionScopeOpen(:final selected) => selected,
+            IntentionScopeFixed(:final scope) => scope,
+          },
           filterController: _filterController,
           onScopeChanged: notifier.changeScope,
           onFilterChanged: notifier.changeTitleFilter,
@@ -110,6 +114,7 @@ final class _IntentionCatalogPageState
 final class _CatalogControls extends StatelessWidget {
   const _CatalogControls({
     required this.selection,
+    required this.scope,
     required this.filterController,
     required this.onScopeChanged,
     required this.onFilterChanged,
@@ -117,6 +122,7 @@ final class _CatalogControls extends StatelessWidget {
   });
 
   final IntentionCatalogSelection selection;
+  final IntentionScope scope;
   final TextEditingController filterController;
   final ValueChanged<IntentionScope> onScopeChanged;
   final ValueChanged<String> onFilterChanged;
@@ -132,7 +138,7 @@ final class _CatalogControls extends StatelessWidget {
           DropdownButtonFormField<IntentionScope>(
             key: const ValueKey('catalog-scope-control'),
             isExpanded: true,
-            initialValue: selection.scope,
+            initialValue: scope,
             decoration: InputDecoration(
               labelText: localizations.catalogScopeLabel,
             ),

@@ -1019,7 +1019,9 @@ void main() {
             IntentionCatalogFirstPage(
               items: [intention],
               totalCount: 1,
-              typeCounts: IntentionTypeCounts(all: 2, actions: 1),
+              counts: IntentionCountsByType(
+                IntentionTypeCounts(all: 2, actions: 1),
+              ),
               nextCursor: null,
               revision: const TestCatalogRevision(1),
             ),
@@ -1074,6 +1076,380 @@ void main() {
         expect(repository.queries, hasLength(2));
       },
     );
+  });
+
+  group('числа охватов и типов', () {
+    final provider = intentionCatalogViewModelProvider(
+      const BrowseIntentionCatalog(),
+    );
+
+    IntentionCountsByScopeAndType matrix(ProviderContainer container) =>
+        switch (container.read(provider).requireValue) {
+          IntentionCatalogConfirmedState(
+            counts: final IntentionCountsByScopeAndType counts,
+          ) =>
+            counts,
+          final state => fail('Нет матрицы чисел: $state'),
+        };
+
+    test('остаются точными после создания, изменения, смены готовности, '
+        'архивирования, восстановления и удаления', () async {
+      final repository = ControlledCatalogRepository();
+      final container = reconciliationCatalogContainer(repository);
+      final subscription = container.listen(
+        provider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      addTearDown(container.dispose);
+
+      final intention = testSummary(index: 1);
+      final action = testSummary(index: 2, readiness: IntentionReadiness.ready);
+      final archivedIntention = testSummary(
+        index: 3,
+        archiveState: IntentionArchiveState.archived,
+      );
+      repository.completeVerbatim(
+        0,
+        ResultSuccess(
+          IntentionCatalogFirstPage(
+            items: [action, intention],
+            totalCount: 2,
+            counts: IntentionCountsByScopeAndType(
+              active: IntentionTypeCounts(all: 2, actions: 1),
+              archived: IntentionTypeCounts(all: 1, actions: 0),
+            ),
+            nextCursor: null,
+            revision: const TestCatalogRevision(1),
+          ),
+        ),
+      );
+      await container.read(provider.future);
+      void expectCounts({
+        required int active,
+        required int activeActions,
+        required int archived,
+        required int archivedActions,
+      }) {
+        final counts = matrix(container);
+        expect(counts.active.all, active);
+        expect(counts.active.actions, activeActions);
+        expect(counts.archived.all, archived);
+        expect(counts.archived.actions, archivedActions);
+        final state = container.read(provider).requireValue;
+        expect((state as IntentionCatalogConfirmedState).totalCount, active);
+      }
+
+      final created = testSummary(
+        index: 4,
+        readiness: IntentionReadiness.ready,
+      );
+      await completeFullCreation(
+        container,
+        repository,
+        created,
+        revision: const TestCatalogRevision(2),
+      );
+      expectCounts(
+        active: 3,
+        activeActions: 2,
+        archived: 1,
+        archivedActions: 0,
+      );
+
+      await completeCatalogCommand(
+        container,
+        repository,
+        UpdateIntention(
+          id: intention.id,
+          title: 'Новое название',
+          description: null,
+        ),
+        IntentionSaved(
+          testIntention(index: 1, title: 'Новое название'),
+          catalogMutation: IntentionCatalogUpdated(
+            revision: const TestCatalogRevision(3),
+            before: TestCatalogEntrySnapshot(intention),
+            after: TestCatalogEntrySnapshot(
+              testSummary(index: 1, title: 'Новое название'),
+            ),
+          ),
+        ),
+      );
+      expectCounts(
+        active: 3,
+        activeActions: 2,
+        archived: 1,
+        archivedActions: 0,
+      );
+
+      await completeCatalogCommand(
+        container,
+        repository,
+        EnableIntentionReadiness(intention.id),
+        IntentionSaved(
+          testIntention(index: 1),
+          catalogMutation: IntentionCatalogUpdated(
+            revision: const TestCatalogRevision(4),
+            before: TestCatalogEntrySnapshot(intention),
+            after: TestCatalogEntrySnapshot(
+              testSummary(index: 1, readiness: IntentionReadiness.ready),
+            ),
+          ),
+        ),
+      );
+      expectCounts(
+        active: 3,
+        activeActions: 3,
+        archived: 1,
+        archivedActions: 0,
+      );
+
+      await completeCatalogCommand(
+        container,
+        repository,
+        ArchiveIntention(action.id),
+        IntentionSaved(
+          testIntention(index: 2),
+          catalogMutation: IntentionCatalogUpdated(
+            revision: const TestCatalogRevision(5),
+            before: TestCatalogEntrySnapshot(action),
+            after: TestCatalogEntrySnapshot(
+              testSummary(
+                index: 2,
+                readiness: IntentionReadiness.ready,
+                archiveState: IntentionArchiveState.archived,
+              ),
+            ),
+          ),
+        ),
+      );
+      expectCounts(
+        active: 2,
+        activeActions: 2,
+        archived: 2,
+        archivedActions: 1,
+      );
+
+      await completeCatalogCommand(
+        container,
+        repository,
+        RestoreIntention(archivedIntention.id),
+        IntentionSaved(
+          testIntention(index: 3),
+          catalogMutation: IntentionCatalogUpdated(
+            revision: const TestCatalogRevision(6),
+            before: TestCatalogEntrySnapshot(archivedIntention),
+            after: TestCatalogEntrySnapshot(testSummary(index: 3)),
+          ),
+        ),
+      );
+      expectCounts(
+        active: 3,
+        activeActions: 2,
+        archived: 1,
+        archivedActions: 1,
+      );
+
+      await completeCatalogCommand(
+        container,
+        repository,
+        DeleteIntention(created.id),
+        IntentionDeleted(
+          created.id,
+          catalogMutation: IntentionCatalogDeleted(
+            revision: const TestCatalogRevision(7),
+            entry: TestCatalogEntrySnapshot(created),
+          ),
+        ),
+      );
+      expectCounts(
+        active: 2,
+        activeActions: 1,
+        archived: 1,
+        archivedActions: 1,
+      );
+      expect(repository.queries, hasLength(1));
+    });
+
+    test(
+      'считают снимки по условиям выдачи вне текущих охвата и типа',
+      () async {
+        final repository = ControlledCatalogRepository();
+        final container = reconciliationCatalogContainer(
+          repository,
+          filterDebounce: Duration.zero,
+        );
+        final subscription = container.listen(
+          provider,
+          (_, _) {},
+          fireImmediately: true,
+        );
+        addTearDown(subscription.close);
+        addTearDown(container.dispose);
+        repository.complete(
+          0,
+          ResultSuccess(
+            IntentionCatalogFirstPage(
+              items: const [],
+              totalCount: 0,
+              nextCursor: null,
+              revision: const TestCatalogRevision(1),
+            ),
+          ),
+        );
+        await container.read(provider.future);
+        final notifier = container.read(provider.notifier);
+        notifier.changeType(IntentionTypeChoice.actions);
+        await waitForCatalogQueries(repository, 2);
+        notifier.changeTitleFilter('ходить');
+        await waitForCatalogQueries(repository, 3);
+        repository.completeVerbatim(
+          2,
+          ResultSuccess(
+            IntentionCatalogFirstPage(
+              items: const [],
+              totalCount: 0,
+              counts: IntentionCountsByScopeAndType(
+                active: IntentionTypeCounts(all: 1, actions: 0),
+                archived: IntentionTypeCounts(all: 0, actions: 0),
+              ),
+              nextCursor: null,
+              revision: const TestCatalogRevision(1),
+            ),
+          ),
+        );
+        await container.read(provider.future);
+
+        // Архивированное намерение входит в фильтр, а не в текущий охват.
+        final archivedBefore = testSummary(
+          index: 1,
+          title: 'Гулять',
+          archiveState: IntentionArchiveState.archived,
+        );
+        await completeCatalogCommand(
+          container,
+          repository,
+          UpdateIntention(
+            id: archivedBefore.id,
+            title: 'Ходить в парк',
+            description: null,
+          ),
+          IntentionSaved(
+            testIntention(index: 1, title: 'Ходить в парк'),
+            catalogMutation: IntentionCatalogUpdated(
+              revision: const TestCatalogRevision(2),
+              before: TestCatalogEntrySnapshot(archivedBefore),
+              after: TestCatalogEntrySnapshot(
+                testSummary(
+                  index: 1,
+                  title: 'Ходить в парк',
+                  archiveState: IntentionArchiveState.archived,
+                ),
+              ),
+            ),
+          ),
+        );
+
+        // Намерение вне фильтра не меняет числа.
+        final outsideFilter = testSummary(index: 2, title: 'Читать');
+        await completeCatalogCommand(
+          container,
+          repository,
+          ArchiveIntention(outsideFilter.id),
+          IntentionSaved(
+            testIntention(index: 2, title: 'Читать'),
+            catalogMutation: IntentionCatalogUpdated(
+              revision: const TestCatalogRevision(3),
+              before: TestCatalogEntrySnapshot(outsideFilter),
+              after: TestCatalogEntrySnapshot(
+                testSummary(
+                  index: 2,
+                  title: 'Читать',
+                  archiveState: IntentionArchiveState.archived,
+                ),
+              ),
+            ),
+          ),
+        );
+
+        final counts = matrix(container);
+        expect(counts.active.all, 1);
+        expect(counts.archived.all, 1);
+        expect(counts.archived.actions, 0);
+        expect(
+          (container.read(provider).requireValue as IntentionCatalogEmpty)
+              .totalCount,
+          0,
+        );
+        expect(repository.queries, hasLength(3));
+      },
+    );
+
+    for (final (name, counts, entry) in [
+      (
+        'отрицательные числа',
+        IntentionCountsByScopeAndType(
+          active: IntentionTypeCounts(all: 1, actions: 0),
+          archived: IntentionTypeCounts(all: 0, actions: 0),
+        ),
+        testSummary(index: 2, archiveState: IntentionArchiveState.archived),
+      ),
+      (
+        'действий больше всех намерений',
+        IntentionCountsByScopeAndType(
+          active: IntentionTypeCounts(all: 2, actions: 2),
+          archived: IntentionTypeCounts(all: 0, actions: 0),
+        ),
+        testSummary(index: 2),
+      ),
+    ]) {
+      test('$name начинают выдачу заново с первой порции', () async {
+        final repository = ControlledCatalogRepository();
+        final container = reconciliationCatalogContainer(repository);
+        final subscription = container.listen(
+          provider,
+          (_, _) {},
+          fireImmediately: true,
+        );
+        addTearDown(subscription.close);
+        addTearDown(container.dispose);
+        final total = counts.active.all;
+        repository.completeVerbatim(
+          0,
+          ResultSuccess(
+            IntentionCatalogFirstPage(
+              items: [
+                for (var index = 0; index < total; index++)
+                  testSummary(index: 10 + index),
+              ],
+              totalCount: total,
+              counts: counts,
+              nextCursor: null,
+              revision: const TestCatalogRevision(1),
+            ),
+          ),
+        );
+        await container.read(provider.future);
+
+        await completeCatalogCommand(
+          container,
+          repository,
+          DeleteIntention(entry.id),
+          IntentionDeleted(
+            entry.id,
+            catalogMutation: IntentionCatalogDeleted(
+              revision: const TestCatalogRevision(2),
+              entry: TestCatalogEntrySnapshot(entry),
+            ),
+          ),
+        );
+
+        await waitForCatalogQueries(repository, 2);
+        expect(repository.queryAt(1).cursor, isNull);
+      });
+    }
   });
 }
 

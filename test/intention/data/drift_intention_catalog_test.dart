@@ -410,10 +410,10 @@ void main() {
       expect(otherSameTitle.items.single.id, _id(_uuid(2)));
     });
 
-    test('первая порция отдаёт числа обоих типов по всем условиям, кроме готовности, только по просьбе', () async {
-      // Совпадают 1, 2 и 4. 3 — в архиве, 5 — исключённый участник,
-      // 6 — с запрещённым тегом, 7 — без обязательного тега, 8 — с другим
-      // названием.
+    test('первая порция отдаёт числа вида подсчёта по всем условиям, кроме готовности, тем же одним подсчётом', () async {
+      // В активном охвате совпадают 1, 2 и 4, в архивном — 3 и 9. 5 —
+      // исключённый участник, 6 — с запрещённым тегом, 7 — без обязательного
+      // тега, 8 — с другим названием.
       for (final (number, title, isActionReady, isArchived) in [
         (1, 'Гулять', true, false),
         (2, 'Гулять', false, false),
@@ -423,6 +423,7 @@ void main() {
         (6, 'Гулять', true, false),
         (7, 'Гулять', false, false),
         (8, 'Читать', true, false),
+        (9, 'Гулять', false, true),
       ]) {
         await _insertIntention(
           database,
@@ -440,7 +441,7 @@ void main() {
             [_uuid(number), name, tagPositionKey(number)],
           );
         }
-        for (final number in [1, 2, 3, 4, 5, 6, 8]) {
+        for (final number in [1, 2, 3, 4, 5, 6, 8, 9]) {
           raw.execute(
             'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
             [_uuid(101), _uuid(number)],
@@ -452,47 +453,85 @@ void main() {
         );
       });
       IntentionCatalogQuery query(
-        IntentionReadinessFilter readiness, {
-        required bool requestsTypeCounts,
-      }) => _tagQuery(
+        IntentionScope scope,
+        IntentionReadinessFilter readiness,
+        IntentionCatalogCounting counting,
+      ) => _tagQuery(
         tagFilter: IntentionTagFilter(
           requiredTagIds: [_tagId(101)],
           excludedTagIds: [_tagId(102)],
         ),
-        scope: IntentionScope.active,
+        scope: scope,
         readinessFilter: readiness,
         excludedIntentionId: _id(_uuid(5)),
         titleFilter: 'гулять',
-        requestsTypeCounts: requestsTypeCounts,
+        counting: counting,
       );
 
-      for (final (readiness, totalCount) in [
-        (IntentionReadinessFilter.all, 3),
-        (IntentionReadinessFilter.readyOnly, 1),
-        (IntentionReadinessFilter.notReadyOnly, 2),
+      // Числа охватов не зависят от охвата запроса: активных три, из них одно
+      // действие, архивных два, из них одно действие.
+      const ready = IntentionReadinessFilter.readyOnly;
+      const notReady = IntentionReadinessFilter.notReadyOnly;
+      for (final (scope, readiness, totalCount, scopeAll, scopeActions) in [
+        (IntentionScope.active, IntentionReadinessFilter.all, 3, 3, 1),
+        (IntentionScope.active, ready, 1, 3, 1),
+        (IntentionScope.active, notReady, 2, 3, 1),
+        (IntentionScope.archived, IntentionReadinessFilter.all, 2, 2, 1),
+        (IntentionScope.archived, ready, 1, 2, 1),
+        (IntentionScope.archived, notReady, 1, 2, 1),
+        (IntentionScope.all, IntentionReadinessFilter.all, 5, 5, 2),
+        (IntentionScope.all, ready, 2, 5, 2),
+        (IntentionScope.all, notReady, 3, 5, 2),
       ]) {
         trace.measured.clear();
-        final withoutCounts = _firstPage(
+        final totalOnly = _firstPage(
           await repository.getCatalogPage(
-            query(readiness, requestsTypeCounts: false),
+            query(scope, readiness, IntentionCatalogCounting.totalOnly),
           ),
         );
-        final readsWithoutCounts = trace.measured.length;
-        expect(withoutCounts.totalCount, totalCount);
-        expect(withoutCounts.typeCounts, isNull);
+        final readsTotalOnly = trace.measured.length;
+        expect(totalOnly.totalCount, totalCount);
+        expect(totalOnly.counts, isA<IntentionCountsTotalOnly>());
 
         trace.measured.clear();
-        final withCounts = _firstPage(
+        final byType = _firstPage(
           await repository.getCatalogPage(
-            query(readiness, requestsTypeCounts: true),
+            query(scope, readiness, IntentionCatalogCounting.byType),
           ),
         );
-        expect(withCounts.totalCount, totalCount);
-        expect(withCounts.typeCounts?.all, 3);
-        expect(withCounts.typeCounts?.actions, 1);
-        expect(withCounts.typeCounts?.intentions, 2);
+        final typeCounts = switch (byType.counts) {
+          IntentionCountsByType(:final counts) => counts,
+          _ => fail('Ожидались числа типов, получено ${byType.counts}.'),
+        };
+        expect(byType.totalCount, totalCount);
+        expect(typeCounts.all, scopeAll);
+        expect(typeCounts.actions, scopeActions);
         // Числа типов приходят тем же подсчётом, что и общее количество.
-        expect(trace.measured, hasLength(readsWithoutCounts));
+        expect(trace.measured, hasLength(readsTotalOnly));
+
+        trace.measured.clear();
+        final byScopeAndType = _firstPage(
+          await repository.getCatalogPage(
+            query(scope, readiness, IntentionCatalogCounting.byScopeAndType),
+          ),
+        );
+        final matrix = switch (byScopeAndType.counts) {
+          final IntentionCountsByScopeAndType counts => counts,
+          _ => fail(
+            'Ожидались числа по охватам, получено ${byScopeAndType.counts}.',
+          ),
+        };
+        expect(byScopeAndType.totalCount, totalCount);
+        expect(matrix.active.all, 3);
+        expect(matrix.active.actions, 1);
+        expect(matrix.archived.all, 2);
+        expect(matrix.archived.actions, 1);
+        // Строки порции и число чтений те же, что без чисел охватов.
+        expect(
+          byScopeAndType.items.map((item) => item.id),
+          totalOnly.items.map((item) => item.id),
+        );
+        expect(trace.measured, hasLength(readsTotalOnly));
       }
     });
 
@@ -2483,7 +2522,7 @@ IntentionCatalogQuery _tagQuery({
   IntentionId? excludedIntentionId,
   int pageSize = 1,
   IntentionCatalogCursor? cursor,
-  bool requestsTypeCounts = false,
+  IntentionCatalogCounting counting = IntentionCatalogCounting.totalOnly,
 }) => IntentionCatalogQuery(
   scope: scope,
   readinessFilter: readinessFilter,
@@ -2493,7 +2532,7 @@ IntentionCatalogQuery _tagQuery({
   order: IntentionCatalogOrder.createdAtAscending,
   pageSize: pageSize,
   cursor: cursor,
-  requestsTypeCounts: requestsTypeCounts,
+  counting: counting,
 );
 
 IntentionCatalogFirstPage _firstPage(Result<IntentionCatalogPage> result) {

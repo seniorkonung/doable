@@ -236,8 +236,6 @@ void defineIntentionPickerSessionTests({
           expect(selected, IntentionTypeChoice.actions);
         case IntentionTypePinnedToActions():
           expect(first, isA<SelectDailyChoiceAction>());
-        case IntentionTypeNotOffered():
-          fail('Поиск должен предлагать тип намерения.');
       }
 
       await router.maybePop();

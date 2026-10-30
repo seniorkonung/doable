@@ -2390,7 +2390,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get intentionPickerTypeCaption => 'Type';
 
   @override
-  String get intentionPickerTypeAll => 'All';
+  String get intentionPickerTypeAll => 'Intentions and actions';
 
   @override
   String get intentionPickerTypeIntentionsOnly => 'Intentions only';

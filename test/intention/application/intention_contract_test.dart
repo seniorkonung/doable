@@ -391,7 +391,7 @@ void main() {
         excludedIntentionId: otherParticipant,
         order: IntentionCatalogOrder.titleAscending,
         pageSize: 1,
-        requestsTypeCounts: true,
+        counting: IntentionCatalogCounting.byType,
       ).withAnyReadiness();
 
       expect(anyReadinessQuery.readinessFilter, IntentionReadinessFilter.all);
@@ -467,6 +467,67 @@ void main() {
         );
       }
     });
+
+    test(
+      'запрос без охвата и готовности сохраняет название, теги и исключение',
+      () {
+        final health = Tag(
+          id: _tagId('00000000-0000-4000-8000-000000000102'),
+          name: TagName.fromStored('Здоровье'),
+          color: null,
+          position: tagPositionAt(1002),
+        );
+        final sport = Tag(
+          id: _tagId('00000000-0000-4000-8000-000000000103'),
+          name: TagName.fromStored('Спорт'),
+          color: null,
+          position: tagPositionAt(1004),
+        );
+        const candidateId = '00000000-0000-4000-8000-000000000001';
+        final otherParticipant = _intentionId(
+          '00000000-0000-4000-8000-000000000002',
+        );
+        final anyCellQuery = IntentionCatalogQuery(
+          scope: IntentionScope.active,
+          readinessFilter: IntentionReadinessFilter.notReadyOnly,
+          titleFilter: 'ХОДИТЬ',
+          tagFilter: IntentionTagFilter(
+            requiredTagIds: [health.id],
+            excludedTagIds: [sport.id],
+          ),
+          excludedIntentionId: otherParticipant,
+          order: IntentionCatalogOrder.titleAscending,
+          pageSize: 1,
+          counting: IntentionCatalogCounting.byScopeAndType,
+        ).withAnyScopeAndReadiness();
+
+        for (final (id, title, tags, expected) in [
+          (candidateId, 'Ходить в парк', [health], true),
+          (candidateId, 'Читать', [health], false),
+          (candidateId, 'Ходить в парк', <Tag>[], false),
+          (candidateId, 'Ходить в парк', [health, sport], false),
+          (
+            otherParticipant.toCanonicalString(),
+            'Ходить в парк',
+            [health],
+            false,
+          ),
+        ]) {
+          expect(
+            anyCellQuery.includes(
+              _summary(
+                id: id,
+                title: title,
+                tags: tags,
+                readiness: IntentionReadiness.ready,
+                archiveState: IntentionArchiveState.archived,
+              ),
+            ),
+            expected,
+          );
+        }
+      },
+    );
 
     test('изменение только цвета тега заменяет его состояние в сводке', () {
       final firstId = _tagId('00000000-0000-4000-8000-000000000002');
@@ -980,7 +1041,9 @@ void main() {
         () => IntentionCatalogFirstPage(
           items: const [],
           totalCount: 2,
-          typeCounts: IntentionTypeCounts(all: 1, actions: 1),
+          counts: IntentionCountsByType(
+            IntentionTypeCounts(all: 1, actions: 1),
+          ),
           nextCursor: null,
           revision: revision,
         ),
@@ -990,12 +1053,43 @@ void main() {
       final page = IntentionCatalogFirstPage(
         items: const [],
         totalCount: 2,
-        typeCounts: IntentionTypeCounts(all: 2, actions: 2),
+        counts: IntentionCountsByType(IntentionTypeCounts(all: 2, actions: 2)),
         nextCursor: null,
         revision: revision,
       );
-      expect(page.typeCounts?.actions, 2);
-      expect(page.typeCounts?.intentions, 0);
+      final counts = (page.counts as IntentionCountsByType).counts;
+      expect(counts.actions, 2);
+      expect(counts.intentions, 0);
+    });
+
+    test('первая страница с числами по охватам сверяет количество с суммой охватов', () {
+      const revision = _TestGraphRevision(epoch: 'первая', sequence: 0);
+      final counts = IntentionCountsByScopeAndType(
+        active: IntentionTypeCounts(all: 2, actions: 1),
+        archived: IntentionTypeCounts(all: 1, actions: 0),
+      );
+
+      expect(counts.all, 3);
+      expect(
+        () => IntentionCatalogFirstPage(
+          items: const [],
+          totalCount: 4,
+          counts: counts,
+          nextCursor: null,
+          revision: revision,
+        ),
+        throwsA(isA<IntentionCatalogPageValidationException>()),
+      );
+      expect(
+        IntentionCatalogFirstPage(
+          items: const [],
+          totalCount: 3,
+          counts: counts,
+          nextCursor: null,
+          revision: revision,
+        ).totalCount,
+        3,
+      );
     });
   });
 

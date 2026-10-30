@@ -2414,7 +2414,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get intentionPickerTypeCaption => 'Тип';
 
   @override
-  String get intentionPickerTypeAll => 'Всё';
+  String get intentionPickerTypeAll => 'Намерения и действия';
 
   @override
   String get intentionPickerTypeIntentionsOnly => 'Только намерения';

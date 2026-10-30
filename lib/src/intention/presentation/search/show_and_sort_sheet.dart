@@ -10,11 +10,11 @@ import '../catalog/intention_catalog_purpose.dart';
 import '../catalog/intention_catalog_state.dart';
 import '../catalog/intention_catalog_view_model.dart';
 
-/// Показывает параметры того же поиска над корневым навигатором.
+/// Показывает параметры поиска назначения [purpose] над корневым навигатором.
 /// Выбор применяется сразу; закрытие листа сохраняет параметры страницы.
-Future<void> showIntentionPickerShowAndSortSheet(
+Future<void> showShowAndSortSheet(
   BuildContext context,
-  IntentionPickerPurpose purpose,
+  IntentionCatalogPurpose purpose,
 ) => showDoableSheet<void>(
   context: context,
   builder: (_, sheet) => _ShowAndSortSheet(sheet, purpose),
@@ -24,7 +24,7 @@ final class _ShowAndSortSheet extends ConsumerStatefulWidget {
   const _ShowAndSortSheet(this.sheet, this.purpose);
 
   final SheetPresentation sheet;
-  final IntentionPickerPurpose purpose;
+  final IntentionCatalogPurpose purpose;
 
   @override
   ConsumerState<_ShowAndSortSheet> createState() => _ShowAndSortSheetState();
@@ -88,26 +88,16 @@ final class _ShowAndSortSheetState extends ConsumerState<_ShowAndSortSheet> {
           (false, IntentionCatalogSortDirection.descending) =>
             l10n.intentionPickerOrderNewest,
         };
-    final canReset =
-        order != IntentionCatalogOrder.createdAtDescending ||
-        switch (selection.type) {
-          IntentionTypeOpen(:final selected) =>
-            selected != IntentionTypeChoice.all,
-          IntentionTypePinnedToActions() || IntentionTypeNotOffered() => false,
-        };
 
     return Sheet(
       widget.sheet,
       title: l10n.intentionPickerShowAndSortTitle,
       text: l10n.intentionPickerShowAndSortHint,
-      action: canReset
+      action: model.canResetShowParameters
           ? (
               label: l10n.intentionPickerShowAndSortReset,
               semanticLabel: l10n.intentionPickerShowAndSortReset,
-              onPressed: () {
-                model.changeType(IntentionTypeChoice.all);
-                model.changeOrder(IntentionCatalogOrder.createdAtDescending);
-              },
+              onPressed: model.resetShowParameters,
             )
           : null,
       child: Column(
