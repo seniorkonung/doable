@@ -176,3 +176,39 @@
   - **Зависимости:** 1.10, 1.11.
   - **Предполагаемые файлы:** `lib/src/intention/presentation/search/results_scroll_keeper.dart`, `test/intention/presentation/search/intention_search_list_test.dart`.
   - **Размер:** S.
+
+- [ ] 1.13 Выразить варианты метки `Badge` закрытым типом, чтобы состояние без значка и слова было непредставимо
+  - **Критерии приёмки:**
+    - `Badge` — закрытый (`sealed`) виджет, а его варианты объявлены в `badge.dart`: метка-значок хранит значок и тон, метка «Архив» и метка-слово хранят слово. Поле `Badge` с закрытым типом не подходит: const-конструктор не может собрать объект из своих параметров.
+    - Ветки `(null, null) => throw StateError(...)` и разбора пары полей в `build` нет: каждый вариант сам строит свой вид.
+    - `Badge.mark`, `Badge.archived` и `Badge.word` остаются const с теми же параметрами: это `const factory`, перенаправляющие на варианты. Код приложения, создающий метки, не меняется.
+    - Вид, цвета, размеры и узлы экранного диктора не меняются. Компонент остаётся представлением без предметной логики.
+    - `find.byType` сравнивает точный тип виджета, поэтому `find.byType(Badge)` в проверках меток заменён на `find.bySubtype<Badge>()`. Утверждения этих проверок не меняются.
+    - `relation_row_test.dart` читает `badge.icon` и `badge.tone`, а `intention_picker_row_test.dart` читает ещё и `word`. Сессия выбирает меньшую цену, не ослабляя проверку: сохранить эти геттеры, если это не возвращает необязательное поле в модель вариантов, либо перевести проверку на видимый результат.
+    - Новых тестов нет: состояние исключает компилятор, а поведение закрывает `test/design_system/badge_test.dart`.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/badge_test.dart test/design_system/relation_row_test.dart test/design_system/page_head_test.dart test/design_system/tag_line_test.dart test/intention/presentation/picker/intention_picker_row_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.5.
+  - **Предполагаемые файлы:** `lib/src/design_system/components/badge.dart`, `test/design_system/badge_test.dart`, `test/design_system/relation_row_test.dart`, `test/design_system/page_head_test.dart`, `test/design_system/tag_line_test.dart`, `test/intention/presentation/picker/intention_picker_row_test.dart`.
+  - **Размер:** S.
+
+- [ ] 1.14 Повторить проверки задачи 1.8 и подтвердить готовность первой фазы после исправлений 1.9–1.13
+  - **Критерии приёмки:**
+    - Выполнено условие «Ready to advance» первой фазы:
+      - отметки и переходы из отмеченных строк соответствуют спецификации в обоих потоках, включая отметки после изменений связей на страницах, открытых из поиска;
+      - общий каталог и поиски дневного выбора не изменились;
+      - полные проверки проекта проходят.
+    - В запросе каталога, назначении поиска участника и их проверках нет `excludedIntentionId`.
+    - Результаты проверок и путь к APK сообщены в сессии. Ручная проверка на устройстве остаётся за пользователем и не блокирует готовность фазы.
+  - **Проверка:**
+    - `grep -rn 'excludedIntentionId' lib/src/intention lib/src/long_term_relation lib/src/graph/data/drift_personal_graph_repository.dart test/intention test/long_term_relation test/graph/presentation` ничего не находит.
+    - `mise run check` и `mise exec --no-deps -- openspec validate mark-occupied-pairs-in-relation-participant-picker --strict --no-interactive`; после фиксации изменений — `mise run codegen-check` на чистой рабочей копии.
+    - `mise exec --no-deps -- flutter build apk --release` с артефактом `build/app/outputs/flutter-apk/app-release.apk`. Если через DTD найдено запущенное приложение, выполнить hot restart и проверить `get_runtime_errors`. Эмулятор и устройство не запускаются.
+    - Сообщить оставшиеся ручные проверки:
+      - метки «Уже связано» и «Связь в архиве» в поиске участника в светлой и тёмной темах;
+      - экранный диктор читает отметку и действие нажатия, а у метки нет отдельного узла;
+      - нажатие на текст отмеченной строки открывает связь, а «назад» возвращает в поиск.
+  - **Зависимости:** 1.9–1.13.
+  - **Предполагаемые файлы:** нет, только проверка и сборка.
+  - **Размер:** XS.
