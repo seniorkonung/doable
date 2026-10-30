@@ -193,7 +193,7 @@
   - **Предполагаемые файлы:** `lib/src/design_system/components/badge.dart`, `test/design_system/badge_test.dart`, `test/design_system/relation_row_test.dart`, `test/design_system/page_head_test.dart`, `test/design_system/tag_line_test.dart`, `test/intention/presentation/picker/intention_picker_row_test.dart`.
   - **Размер:** S.
 
-- [ ] 1.14 Повторить проверки задачи 1.8 и подтвердить готовность первой фазы после исправлений 1.9–1.13
+- [x] 1.14 Повторить проверки задачи 1.8 и подтвердить готовность первой фазы после исправлений 1.9–1.13
   - **Критерии приёмки:**
     - Выполнено условие «Ready to advance» первой фазы:
       - отметки и переходы из отмеченных строк соответствуют спецификации в обоих потоках, включая отметки после изменений связей на страницах, открытых из поиска;
