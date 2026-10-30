@@ -623,7 +623,7 @@ Future<void> _searchCatalog(WidgetTester tester, _Launch app) async {
   final catalog = _catalog(app);
   expect(catalog.totalCount, _sketchCount);
   expect(catalog.nextCursor, isNull);
-  expect(catalog.selection.scope, IntentionScope.all);
+  expect(catalog.selection.scope, const IntentionScopeOpen(IntentionScope.all));
   expect(catalog.selection.titleFilterText, _catalogFilter);
   expect(
     catalog.selection.tagFilter,

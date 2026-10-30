@@ -39,15 +39,37 @@ final class IntentionTypePinnedToActions extends IntentionTypeAvailability {
   int get hashCode => (IntentionTypePinnedToActions).hashCode;
 }
 
-/// Назначение поиска выбор типа не предлагает.
-final class IntentionTypeNotOffered extends IntentionTypeAvailability {
-  const IntentionTypeNotOffered();
+/// Доступность выбора охвата, которую задаёт назначение поиска.
+sealed class IntentionScopeAvailability {
+  const IntentionScopeAvailability();
+}
+
+/// Охват выбирается человеком; [selected] — выбранный охват.
+final class IntentionScopeOpen extends IntentionScopeAvailability {
+  const IntentionScopeOpen(this.selected);
+
+  final IntentionScope selected;
 
   @override
-  bool operator ==(Object other) => other is IntentionTypeNotOffered;
+  bool operator ==(Object other) =>
+      other is IntentionScopeOpen && other.selected == selected;
 
   @override
-  int get hashCode => (IntentionTypeNotOffered).hashCode;
+  int get hashCode => Object.hash(IntentionScopeOpen, selected);
+}
+
+/// Назначение поиска закрепляет охват за [scope].
+final class IntentionScopeFixed extends IntentionScopeAvailability {
+  const IntentionScopeFixed(this.scope);
+
+  final IntentionScope scope;
+
+  @override
+  bool operator ==(Object other) =>
+      other is IntentionScopeFixed && other.scope == scope;
+
+  @override
+  int get hashCode => Object.hash(IntentionScopeFixed, scope);
 }
 
 final class IntentionCatalogSelection {
@@ -60,7 +82,7 @@ final class IntentionCatalogSelection {
     required this.filterValidationFailure,
   });
 
-  final IntentionScope scope;
+  final IntentionScopeAvailability scope;
   final IntentionTypeAvailability type;
   final String titleFilterText;
   final IntentionTagFilter tagFilter;

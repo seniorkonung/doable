@@ -69,6 +69,7 @@ import '../../support/daily_choice_durability_fixture.dart';
 import '../../support/daily_choice_local_date.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
+import '../../support/intention_type_counts.dart';
 import '../../long_term_relation/presentation/relation_graph_test_support.dart';
 import '../../support/tag_read_contract_test_fallback.dart';
 import '../../support/statistics_read_contract_test_fallback.dart';
@@ -1867,7 +1868,9 @@ final class _CheckpointGraphRepository
       >{};
 
   void completeCatalogPage(int index, Result<IntentionCatalogPage> result) {
-    _catalogRequests[index].complete(result);
+    _catalogRequests[index].complete(
+      answerCatalogQuery(catalogQueries[index], result),
+    );
   }
 
   void completeGroupPage(int index, RelationGroupPage page) {

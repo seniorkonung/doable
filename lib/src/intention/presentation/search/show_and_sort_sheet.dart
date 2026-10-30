@@ -93,7 +93,7 @@ final class _ShowAndSortSheetState extends ConsumerState<_ShowAndSortSheet> {
         switch (selection.type) {
           IntentionTypeOpen(:final selected) =>
             selected != IntentionTypeChoice.all,
-          IntentionTypePinnedToActions() || IntentionTypeNotOffered() => false,
+          IntentionTypePinnedToActions() => false,
         };
 
     return Sheet(

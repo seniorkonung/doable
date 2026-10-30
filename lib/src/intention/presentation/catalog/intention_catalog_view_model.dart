@@ -30,6 +30,9 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
 
   /// Поколение графа, для которого заданы параметры просмотра.
   GraphGeneration? _graphGeneration;
+
+  /// Выбранный охват; действует, только когда назначение открывает выбор
+  /// охвата.
   late IntentionScope _scope;
 
   /// Выбранный тип; действует, только когда назначение открывает выбор типа.
@@ -50,14 +53,14 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
 
   IntentionCatalogSelection get selection => IntentionCatalogSelection(
     scope: switch (_purpose) {
-      BrowseIntentionCatalog() => _scope,
-      SelectRelationParticipant(:final scope) => scope,
-      SelectDailyChoiceAction() => IntentionScope.active,
-      SelectDailyChoiceSource() => IntentionScope.active,
+      BrowseIntentionCatalog() => IntentionScopeOpen(_scope),
+      SelectRelationParticipant(:final scope) => IntentionScopeFixed(scope),
+      SelectDailyChoiceAction() || SelectDailyChoiceSource() =>
+        const IntentionScopeFixed(IntentionScope.active),
     },
     type: switch (_purpose) {
-      BrowseIntentionCatalog() => const IntentionTypeNotOffered(),
       SelectDailyChoiceAction() => const IntentionTypePinnedToActions(),
+      BrowseIntentionCatalog() ||
       SelectDailyChoiceSource() ||
       SelectRelationParticipant() => IntentionTypeOpen(_type),
     },
@@ -106,14 +109,16 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       return Future.value(IntentionCatalogDebouncing(selection: selection));
     }
 
-    final catalogScope = selection.scope;
+    final catalogScope = switch (selection.scope) {
+      IntentionScopeOpen(:final selected) => selected,
+      IntentionScopeFixed(:final scope) => scope,
+    };
     final type = selection.type;
     late final IntentionCatalogQuery query;
     try {
       query = IntentionCatalogQuery(
         scope: catalogScope,
         readinessFilter: switch (type) {
-          IntentionTypeNotOffered() => IntentionReadinessFilter.all,
           IntentionTypePinnedToActions() => IntentionReadinessFilter.readyOnly,
           IntentionTypeOpen(selected: IntentionTypeChoice.all) =>
             IntentionReadinessFilter.all,
@@ -135,7 +140,6 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
         pageSize: _policy.pageSize,
         counting: switch (type) {
           IntentionTypeOpen() => IntentionCatalogCounting.byType,
-          IntentionTypeNotOffered() ||
           IntentionTypePinnedToActions() => IntentionCatalogCounting.totalOnly,
         },
       );
@@ -162,8 +166,9 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     );
   }
 
+  /// Применяет выбор охвата, только когда назначение открывает выбор охвата.
   void changeScope(IntentionScope scope) {
-    if (_purpose is! BrowseIntentionCatalog || _scope == scope) {
+    if (selection.scope is! IntentionScopeOpen || _scope == scope) {
       return;
     }
     _scope = scope;

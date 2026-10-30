@@ -45,8 +45,8 @@ final class _IntentionListHeaderState
     final catalog = ref.watch(provider);
     final selection = ref.read(provider.notifier).selection;
     final title = switch (selection.type) {
-      IntentionTypeOpen(selected: IntentionTypeChoice.all) ||
-      IntentionTypeNotOffered() => l10n.intentionPickerAllHeader,
+      IntentionTypeOpen(selected: IntentionTypeChoice.all) =>
+        l10n.intentionPickerAllHeader,
       IntentionTypeOpen(selected: IntentionTypeChoice.intentions) =>
         l10n.intentionPickerIntentionsHeader,
       IntentionTypeOpen(selected: IntentionTypeChoice.actions) ||

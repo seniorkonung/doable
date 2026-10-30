@@ -1096,7 +1096,10 @@ Future<void> _prepareIntentionCatalog(WidgetTester tester, _App app) async {
   expect(catalog.items, hasLength(2 * _intentionPageSize));
   expect(catalog.totalCount, _archivedCount);
   expect(catalog.nextCursor, isNotNull);
-  expect(catalog.selection.scope, IntentionScope.archived);
+  expect(
+    catalog.selection.scope,
+    const IntentionScopeOpen(IntentionScope.archived),
+  );
   expect(catalog.selection.order, IntentionCatalogOrder.createdAtAscending);
   expect(catalog.items.first.title, 'Архив 001');
   expect(_conditions(tester), ['Здоровье']);
