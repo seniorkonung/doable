@@ -1,0 +1,695 @@
+## Phase 1: Экраны выбора на общем модуле поиска
+
+- [x] 1.1 Собрать разбор назначения поиска в одном месте модуля поиска: тексты загрузки и отказов, префикс ключей и называние типа для любого назначения каталога
+  - **Критерии приёмки:**
+    - `IntentionSearchKind.of(IntentionCatalogPurpose)` в `search/` исчерпывающе разбирает все назначения, включая общий каталог. Он даёт заголовок экрана выбора, тексты загрузки, подгрузки и отказов, префикс ключей и признак, называет ли строка тип.
+    - Вариантов четыре: каталог, выбор действия, выбор исходного намерения, выбор участника. Они дают четыре разных префикса ключей: `intention-catalog`, `daily-choice-action`, `daily-choice-source`, `participant-picker`.
+    - Для экранов выбора тексты, заголовки и ключи остаются прежними, включая разные префиксы `daily-choice-source` и `participant-picker`. Выбор исходного намерения и выбор участника дают тексты, заголовок и признак называния типа нынешнего вида `intention`, выбор действия — нынешнего вида `action`. Общий каталог получает существующие тексты каталога.
+    - `IntentionPickerKind` и `intentionPickerKeyPrefix` удалены; экран выбора, его выдача и строка используют новый разбор.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/picker test/daily_choice/presentation/action_picker test/daily_choice/presentation/source_picker test/long_term_relation/presentation/participant_picker`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - новый `lib/src/intention/presentation/search/intention_search_kind.dart`; удаляется `lib/src/intention/presentation/picker/intention_picker_kind.dart`;
+    - меняются `lib/src/intention/presentation/picker/intention_picker_view.dart`, `intention_picker_results.dart`, `intention_picker_row.dart`.
+  - **Размер:** S.
+
+- [x] 1.2 Вынести правило содержания строки результата в модуль поиска: порядок тегов, метки архива и действия, выделение обязательных тегов и части доступного названия
+  - **Критерии приёмки:**
+    - Общее правило строки в `search/` по сводке намерения, обязательным тегам применённого запроса и признаку называния типа даёт:
+      - название и начало описания;
+      - метки с тоном по архивному состоянию;
+      - теги: обязательные первыми, внутри групп ручной порядок, в архивной строке без выделения;
+      - доступное название.
+    - `IntentionPickerRow` строится из этого правила и больше не повторяет его. Вид, доступное название и нажатия строки экрана выбора не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/picker test/design_system/picker_row_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.1 — признак называния типа даёт разбор назначения.
+  - **Предполагаемые файлы:**
+    - новый `lib/src/intention/presentation/search/intention_row_content.dart`;
+    - меняется `lib/src/intention/presentation/picker/intention_picker_row.dart`;
+    - проверка `test/intention/presentation/picker/intention_picker_row_test.dart` — без изменения ожиданий.
+  - **Размер:** S.
+
+- [x] 1.3 Вынести удержание видимой строки списка в общий хранитель места модуля поиска, не меняя поведения прежнего каталога
+  - **Критерии приёмки:**
+    - `ResultsScrollKeeper` в `search/` владеет контроллером прокрутки, ключами строк и исходным запросом выдачи. Он снимает якорь первой видимой строки до перестройки, восстанавливает его после кадра, переводит новую выдачу наверх и забывает ключи исчезнувших строк, как решение 5 design.
+    - Прежняя выдача каталога использует хранитель вместо собственной копии этой логики. Сохранение места после согласования, начало новой выдачи сверху и возврат со страницы намерения в каталоге работают как раньше.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog/intention_search_results_test.dart test/intention/presentation/catalog/intention_catalog_page_test.dart test/app/navigation/app_shell_state_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - новый `lib/src/intention/presentation/search/results_scroll_keeper.dart`;
+    - меняется `lib/src/intention/presentation/catalog/intention_search_results.dart`.
+  - **Размер:** M.
+
+- [x] 1.4 Перевести экраны выбора на общую выдачу модуля поиска, которая удерживает видимую строку при согласовании с подтверждёнными операциями
+  - **Критерии приёмки:**
+    - Общая выдача `IntentionSearchList` в `search/` принимает:
+      - назначение каталога;
+      - построение строки;
+      - содержание пустого охвата;
+      - сброс фильтров;
+      - нижний отступ.
+
+      Она сама показывает строки с подгрузкой, состояния загрузки и отказов, причины пустой выдачи по фильтрам и типу, а место в списке держит хранителем из 1.3.
+    - Экраны выбора используют общую выдачу со своей строкой, сообщением пустого охвата и отступом 40. `IntentionPickerResults` удалён.
+    - Подтверждённая операция, которая меняет строки перед видимой, оставляет первую видимую строку экрана выбора на месте. Новая выдача по-прежнему начинается сверху.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/search test/intention/presentation/picker test/daily_choice/presentation/action_picker test/daily_choice/presentation/source_picker test/long_term_relation/presentation/participant_picker`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.1, 1.2, 1.3.
+  - **Предполагаемые файлы:**
+    - новый `lib/src/intention/presentation/search/intention_search_list.dart`; удаляется `lib/src/intention/presentation/picker/intention_picker_results.dart`;
+    - меняется `lib/src/intention/presentation/picker/intention_picker_view.dart`;
+    - проверки: `test/intention/presentation/picker/intention_picker_results_test.dart` переносится в `test/intention/presentation/search/intention_search_list_test.dart` и получает случай сохранения видимой строки при согласовании.
+  - **Размер:** M.
+
+- [x] 1.5 Сделать лист «Показать и упорядочить» общей частью модуля поиска для любого назначения каталога
+  - **Критерии приёмки:**
+    - Лист в `search/` открывается для `IntentionCatalogPurpose` и показывает строки типа и сортировки по выбору параметров модели, как раньше. Закреплённый тип, переходы порядка, кнопка направления и «Сбросить» работают по-прежнему.
+    - Экраны выбора открывают общий лист; прежний лист экрана выбора удалён.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/search test/intention/presentation/picker`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - новый `lib/src/intention/presentation/search/show_and_sort_sheet.dart`; удаляется `lib/src/intention/presentation/picker/intention_picker_show_and_sort_sheet.dart`;
+    - меняется `lib/src/intention/presentation/picker/intention_picker_view.dart`;
+    - проверки: `test/intention/presentation/picker/intention_picker_show_and_sort_sheet_test.dart` переносится в `test/intention/presentation/search/show_and_sort_sheet_test.dart` без изменения ожиданий.
+  - **Размер:** S.
+
+- [x] 1.6 Собрать строку поиска с кнопкой фильтра и заголовок списка общими частями модуля поиска, из которых строится экран выбора
+  - **Критерии приёмки:**
+    - Строка поиска в `search/` показывает поле названия с ошибкой недопустимого фильтра и кнопку фильтра с числом условий. Кнопка открывает панель тегов в контексте фильтра того же назначения.
+    - Заголовок списка в `search/` показывает слова выбранного типа, количество подтверждённой выдачи, сводку сортировки и доступное название, а нажатием открывает общий лист.
+    - Сброс фильтров из пустой выдачи очищает поле и снимает условия.
+    - `IntentionPickerView` состоит из своей шапки и этих частей. Вид, ключи и поведение экранов выбора не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/picker test/daily_choice/presentation/action_picker test/daily_choice/presentation/source_picker test/long_term_relation/presentation/participant_picker test/daily_choice/presentation/daily_choice_creation_flow_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.1, 1.4, 1.5.
+  - **Предполагаемые файлы:**
+    - новые `lib/src/intention/presentation/search/intention_search_bar.dart` и `intention_list_header.dart`;
+    - меняется `lib/src/intention/presentation/picker/intention_picker_view.dart`.
+  - **Размер:** M.
+
+- [x] 1.7 Назвать вариант без ограничения типа в листе «Намерения и действия» / `Intentions and actions`
+  - **Критерии приёмки:**
+    - Строка «Тип» и её меню в листе показывают «Намерения и действия» на русском и `Intentions and actions` на английском. Заголовок списка по-прежнему называет этот тип «Все» / `All`.
+    - При крупном тексте подпись переносится в строке и меню без наложений.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/intention/presentation/search test/intention/presentation/picker test/app/localization/locale_resolution_test.dart`.
+  - **Зависимости:** 1.5 — проверки листа уже перенесены.
+  - **Предполагаемые файлы:**
+    - `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` и сгенерированная локализация;
+    - проверки `test/intention/presentation/search/show_and_sort_sheet_test.dart`, `test/intention/presentation/picker/intention_picker_view_test.dart`.
+  - **Размер:** XS.
+
+- [x] 1.8 Проверить готовность фазы 1: экраны выбора работают на общем модуле поиска, прежний каталог не изменился
+  - **Критерии приёмки:**
+    - Требования к экранам выбора, строке результата, заголовку списка, листу, меню и пустой выдаче выполняются через общий модуль.
+    - Автоматические проверки экранов выбора подтверждают новую подпись типа и сохранение видимой строки при согласовании.
+    - Прежняя страница каталога работает без изменений.
+    - Полная проверка проекта проходит.
+  - **Проверка:**
+    - `openspec validate redesign-intention-catalog --strict`.
+    - `mise run codegen-check`.
+    - `mise run check`.
+  - **Зависимости:** 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7.
+  - **Предполагаемые файлы:** нет (только проверка).
+  - **Размер:** XS.
+
+- [x] 1.9 Удерживать первую видимую строку экрана выбора и тогда, когда верх списка приходится на промежуток между строками
+  - **Критерии приёмки:**
+    - `ResultsScrollKeeper` снимает якорь у первой построенной строки выдачи, конец которой лежит ниже текущего смещения (`extent.end > currentOffset`), а не только у строки, содержащей смещение. Если смещение попало в промежуток между строками, сдвиг внутри строки отрицателен (`currentOffset - extent.start`), и восстановление ставит ту же строку в то же экранное положение.
+    - Соседние строки-кандидаты якоря и остальное поведение хранителя не меняются. Прежняя выдача каталога без промежутков между строками ведёт себя как раньше.
+    - Проверка в `intention_search_list_test.dart`: смещение установлено в промежуток между строками, подтверждённая операция добавляет или убирает строку выше видимой без смены запроса, и первая видимая строка сохраняет экранное положение.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/search test/intention/presentation/catalog/intention_search_results_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.3, 1.4.
+  - **Предполагаемые файлы:**
+    - меняется `lib/src/intention/presentation/search/results_scroll_keeper.dart`;
+    - проверка `test/intention/presentation/search/intention_search_list_test.dart`.
+  - **Размер:** XS.
+
+- [x] 1.10 Показывать паузу ввода, загрузку и отказы первой порции экрана выбора сверху сразу, без анимации прокрутки от смещения прежней выдачи
+  - **Критерии приёмки:**
+    - `ResultsScrollKeeper.onCatalogChanged` при переходе модели к состоянию, которое `IntentionSearchList` показывает вместо строк, — пауза ввода `IntentionCatalogDebouncing`, отказы первой порции `IntentionCatalogUnavailable`, `IntentionCatalogCorruption`, `IntentionCatalogUnexpected`, а также загрузка и ошибка `AsyncValue`, — мгновенно переводит список наверх через `jumpTo(0)`, без анимации, и сбрасывает отложенный якорь.
+    - Прокрутка остаётся одной для всех состояний: `IntentionSearchList` сохраняет единый `CustomScrollView` с контроллером хранителя, отдельный `ListView` для состояний не возвращается.
+    - Удержание видимой строки при согласовании выдачи того же запроса, начало новой выдачи сверху и поведение прежней выдачи каталога не меняются.
+    - Проверка в `intention_search_list_test.dart`: выдача прокручена вниз, модель переходит к паузе ввода или загрузке и к отказу первой порции, и уже в первом кадре после перехода смещение равно 0, а состояние стоит сверху.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/search test/intention/presentation/picker test/intention/presentation/catalog/intention_search_results_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.4, 1.9.
+  - **Предполагаемые файлы:**
+    - меняется `lib/src/intention/presentation/search/results_scroll_keeper.dart`;
+    - проверка `test/intention/presentation/search/intention_search_list_test.dart`.
+  - **Размер:** XS.
+
+- [x] 1.11 Убрать из проверок `IntentionSearchKind` случаи экранов выбора, которые повторяют существующие тесты
+  - **Критерии приёмки:**
+    - В `intention_search_kind_test.dart` нет случаев префикса ключей и называния типа для выбора действия, выбора исходного намерения и выбора участника и нет теста «четыре назначения не делят префикс ключей». Префиксы `daily-choice-action`, `daily-choice-source` и `participant-picker` закреплены тестами экранов выбора, которые находят элементы по этим ключам; называние типа по назначению закреплено доступными названиями в `test/intention/presentation/picker/intention_picker_row_test.dart`.
+    - Остаются проверка варианта каталога — префикс ключей `intention-catalog` и называние типа — и проверка существующих текстов каталога.
+    - Код приложения и поведение не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/search`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.1.
+  - **Предполагаемые файлы:**
+    - меняется `test/intention/presentation/search/intention_search_kind_test.dart`.
+  - **Размер:** XS.
+
+## Phase 2: Модель и чтение каталога с параметрами показа и точными числами
+
+- [x] 2.1 Читать первую порцию каталога с видом подсчёта из запроса: только общее количество, числа типов охвата или матрица охватов и типов одним запросом подсчёта
+  - **Критерии приёмки:**
+    - `IntentionCatalogQuery.counting` — перечисление `totalOnly`, `byType`, `byScopeAndType` вместо флага `requestsTypeCounts`. `IntentionCatalogFirstPage` несёт закрытый `IntentionCatalogCounts` вместо необязательных `typeCounts`. Варианты: только общее количество, `IntentionTypeCounts` текущего охвата или активные и архивные `IntentionTypeCounts` с суммой как числом всех намерений (решение 4 design). Порция отклоняет `totalCount` больше числа всех намерений в своих числах.
+    - Для `byScopeAndType` хранилище одним запросом подсчёта без условия охвата считает активные, активные действия, архивные и архивные действия. Остальные условия те же: исключение, теги и название. `totalCount` — число охвата и готовности запроса. Для `totalOnly` и `byType` числа и общее количество прежние. Запрос строк порции не меняется, и первая порция при любом виде читается одним запросом подсчёта.
+    - Модель запрашивает `byType`, когда тип открыт, иначе `totalOnly`. Порцию с другим видом чисел она отклоняет как `IntentionCatalogUnexpected`. Числа экранов выбора, общее количество каталога и их согласование не меняются. `answerCatalogQuery` отвечает тестовым адаптерам по виду подсчёта запроса.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/data/drift_intention_catalog_test.dart test/intention/application/intention_contract_test.dart test/intention/presentation test/long_term_relation/presentation/participant_picker test/daily_choice/presentation/action_picker test/daily_choice/presentation/source_picker test/long_term_relation/presentation/editor/relation_editor_page_test.dart test/long_term_relation/presentation/editor/relation_creation_navigation_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - `lib/src/intention/application/intention_catalog.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `lib/src/intention/presentation/catalog/intention_catalog_view_model.dart`;
+    - `test/support/intention_type_counts.dart`;
+    - проверки:
+      - `test/intention/data/drift_intention_catalog_test.dart` — числа матрицы и общее количество при каждом охвате и готовности, при тегах, названии и исключении, тем же одним подсчётом;
+      - `test/intention/application/intention_contract_test.dart`;
+      - порции с числами в `test/intention/presentation/catalog/intention_catalog_view_model_test.dart`, `intention_catalog_mutation_reconciliation_test.dart`, `test/intention/presentation/picker/` и `test/intention/presentation/search/show_and_sort_sheet_test.dart` переходят на новый тип.
+  - **Размер:** M.
+
+- [x] 2.2 Измерить бенчмарком первую порцию активного охвата с матрицей чисел охватов и типов рядом с подсчётом только общего количества
+  - **Критерии приёмки:**
+    - Бенчмарк каталога намерений получает случаи `intentionCatalog/active/counting/totalOnly/firstPage` и `intentionCatalog/active/counting/byScopeAndType/firstPage`. Они измеряют первую порцию активного охвата без фильтров на прежнем наборе из 50 000 намерений, половина которых в архиве, и сравнивают её с бюджетом 100 мс.
+    - Случаи проверяют результат: общее количество 25 000, а матрица — 25 000 активных и 25 000 архивных намерений без действий.
+    - p95 обоих случаев и статус бюджета приведены в отчёте сессии и в теле коммита задачи.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test --no-pub benchmark/intention/intention_catalog_benchmark.dart --concurrency=1 --reporter=expanded`.
+    - `mise exec --no-deps -- flutter test --no-pub benchmark/intention/intention_catalog_benchmark.dart --concurrency=1 --reporter=expanded --dart-define=BENCHMARK_CASE=intentionCatalog/active/counting --dart-define=BENCHMARK_SAMPLES=40 --dart-define=BENCHMARK_WARMUPS=3`.
+  - **Зависимости:** 2.1.
+  - **Предполагаемые файлы:** `benchmark/intention/intention_catalog_benchmark.dart`.
+  - **Размер:** XS.
+
+- [x] 2.3 Выразить охват и тип в выборе параметров доступностью и открыть каталогу выбор типа
+  - **Критерии приёмки:**
+    - `IntentionCatalogSelection.scope` — закрытый `IntentionScopeAvailability`: `IntentionScopeOpen(selected)` у каталога и `IntentionScopeFixed(scope)` у экранов выбора по их назначению. `changeScope` действует только при открытом охвате и назначение не разбирает.
+    - Каталог получает `IntentionTypeOpen`. `IntentionTypeNotOffered` удалён вместе с его ветками в заголовке списка, листе и тестовой поддержке. Смена типа каталога начинает новую выдачу с первой порции, а смена охвата сохраняет тип, фильтр и порядок.
+    - Прежняя страница каталога берёт охват из `IntentionScopeOpen` и выглядит и ведёт себя как раньше: тип не показывает и остаётся с типом «Все». Каталог с открытым типом запрашивает `byType`, поэтому тестовые адаптеры, которые отвечают каталогу, дают числа типов через `answerCatalogQuery`.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation test/long_term_relation/presentation/participant_picker test/daily_choice/presentation/action_picker test/daily_choice/presentation/source_picker test/graph/presentation test/app test/long_term_relation/presentation/editor/relation_editor_page_test.dart test/long_term_relation/presentation/editor/relation_creation_navigation_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 2.1 — тестовые адаптеры отвечают по виду подсчёта.
+  - **Предполагаемые файлы:**
+    - `lib/src/intention/presentation/catalog/intention_catalog_state.dart`, `intention_catalog_view_model.dart`, `intention_catalog_page.dart`;
+    - `lib/src/intention/presentation/search/intention_list_header.dart`, `show_and_sort_sheet.dart`;
+    - проверки:
+      - `test/intention/presentation/catalog/intention_catalog_view_model_test.dart` — доступность охвата и типа по назначению, сохранение типа каталога при смене охвата;
+      - `test/intention/presentation/catalog/intention_picker_session_test_support.dart`;
+      - тестовые адаптеры, которые отвечают каталогу первой порцией без `answerCatalogQuery`, например в `test/app/intention_app_lifecycle_test.dart` и `test/graph/presentation/graph_reconciliation_checkpoint_test.dart`.
+  - **Размер:** M.
+
+- [x] 2.4 Давать подтверждённой выдаче каталога точные числа охватов и типов при текущих фильтрах и сохранять их точными при каждой подтверждённой операции
+  - **Критерии приёмки:**
+    - Модель выбирает вид подсчёта по выбору параметров: открытые охват и тип — `byScopeAndType`, закреплённый охват с открытым типом — `byType`, закреплённый тип — `totalOnly`. Порцию она принимает, только если вид чисел совпадает с запросом, а `totalCount` равен числу текущих охвата и готовности. Иначе — `IntentionCatalogUnexpected`.
+    - Подтверждённое состояние хранит `IntentionCatalogCounts` и даёт производные: `typeCounts` — типы в текущем охвате, `scopeCounts` — охваты при текущем типе. Пока выдача получается и после отказа, чисел нет. Экраны выбора получают те же числа типов, что раньше, а лист и выдача читают производные.
+    - Поправка ±1 сравнивает снимки «до» и «после» с запросом без охвата и готовности (`withAnyScopeAndReadiness()`) и меняет ячейку по архивному состоянию и готовности снимка. Числа остаются точными после создания, изменения, смены готовности, архивирования, восстановления и удаления. Если числа становятся отрицательными или больше суммы, выдача начинается заново с первой порции. `answerCatalogQuery` выводит матрицу, где число охвата и готовности запроса равно общему количеству порции.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation test/intention/application test/long_term_relation/presentation/participant_picker test/daily_choice/presentation/action_picker test/daily_choice/presentation/source_picker test/graph/presentation test/app test/long_term_relation/presentation/editor/relation_editor_page_test.dart test/long_term_relation/presentation/editor/relation_creation_navigation_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 2.1, 2.3.
+  - **Предполагаемые файлы:**
+    - `lib/src/intention/application/intention_catalog.dart` — `withAnyScopeAndReadiness()`;
+    - `lib/src/intention/presentation/catalog/intention_catalog_state.dart`, `intention_catalog_view_model.dart`;
+    - `lib/src/intention/presentation/search/show_and_sort_sheet.dart`, `intention_search_list.dart` — если меняется доступ к числам типов;
+    - `test/support/intention_type_counts.dart`;
+    - проверки:
+      - `test/intention/presentation/catalog/intention_catalog_view_model_test.dart` — вид подсчёта по выбору, числа матрицы и инварианты первой порции;
+      - `intention_catalog_mutation_reconciliation_test.dart` — согласование матрицы при каждом виде операции, включая переход между охватами.
+  - **Размер:** M.
+
+- [x] 2.5 Сбрасывать параметры показа одним действием модели и одним новым чтением
+  - **Критерии приёмки:**
+    - Модель даёт `canResetShowParameters` и `resetShowParameters()`. Начальные параметры показа заданы в одном месте: охват «Активные» при открытом охвате, тип «Все» при открытом типе, `createdAtDescending`. Их же восстанавливает сброс при смене поколения графа.
+    - Сброс меняет все отличающиеся параметры и начинает одну новую выдачу с первой порции. Фильтр названия и условия по тегам он не меняет, а в начальном состоянии ничего не делает.
+    - После смены поколения графа выбор параметров каталога и новый запрос первой порции несут начальные значения: охват «Активные», тип «Все», `createdAtDescending`, пустой фильтр названия. Этим сброс при смене поколения отличается от `resetShowParameters()`, который фильтр названия и условия по тегам сохраняет.
+    - Лист «Показать и упорядочить» предлагает «Сбросить» по `canResetShowParameters` и вызывает `resetShowParameters()`. Сам признак он не считает и двух вызовов не делает. Поведение листа экранов выбора не меняется.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog/intention_catalog_view_model_test.dart test/intention/presentation/search test/intention/presentation/picker`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 2.3 — начальный охват зависит от доступности охвата.
+  - **Предполагаемые файлы:**
+    - `lib/src/intention/presentation/catalog/intention_catalog_view_model.dart`, `lib/src/intention/presentation/search/show_and_sort_sheet.dart`;
+    - проверки:
+      - `test/intention/presentation/catalog/intention_catalog_view_model_test.dart` — сброс каталога. Исходно: охват «Все», тип «Действия», порядок по названию, фильтр «бег» и условие по тегу. Результат: один запрос с начальными параметрами, тем же фильтром и тем же условием;
+      - `test/intention/presentation/catalog/intention_catalog_view_model_test.dart` — смена поколения графа через `currentGraphGenerationProvider`. Исходно: охват «Все», тип «Действия», порядок по названию, фильтр «бег». Результат: выбор параметров и новый запрос первой порции с начальными значениями. Тип читается из модели, потому что прежняя страница его не показывает;
+      - `test/intention/presentation/search/show_and_sort_sheet_test.dart` — без изменения ожиданий.
+  - **Размер:** S.
+
+- [x] 2.6 Проверить готовность фазы 2: модель и чтение каталога дают все параметры показа и точные числа, прежняя страница каталога не изменилась
+  - **Критерии приёмки:**
+    - Модельные проверки и проверки чтения подтверждают числа матрицы, их согласование при каждом виде подтверждённой операции, включая переход между охватами, и сброс одним новым чтением.
+    - Требования о точном количестве, порционности и согласовании каталога по-прежнему выполняются для всех назначений. Прежняя страница каталога работает как раньше и новых параметров не показывает.
+    - Результат бенчмарка зафиксирован в коммите задачи 2.2, полная проверка проекта проходит.
+  - **Проверка:**
+    - `openspec validate redesign-intention-catalog --strict`.
+    - `mise run codegen-check`.
+    - `mise run check`.
+  - **Зависимости:** 2.1, 2.2, 2.3, 2.4, 2.5.
+  - **Предполагаемые файлы:** нет (только проверка).
+  - **Размер:** XS.
+
+## Phase 3: Сценарии приложения проходят каталог через общие шаги
+
+- [x] 3.1 Собрать общие шаги каталога намерений в `test/support/intention_catalog_controls.dart` и провести через них сценарии состояния оболочки и замены графа
+  - **Критерии приёмки:**
+    - Файл по образцу `daily_choice_catalog_controls.dart` становится единственным местом в `test/`, которое знает способ управления каталогом. Сценарий называет намерение, а шаги действуют и наблюдают через интерфейс каталога и не обращаются к его модели. Действие не ждёт выдачи: её дожидается сценарий, а нажатие и ожидание шаг принимает параметрами, как `selectDailyChoiceCatalogDate` и `openIntentionGraph`.
+    - Первые шаги принимают и возвращают значения модели, а не подписи и ключи:
+      - `selectIntentionCatalogScope(IntentionScope)`, `selectIntentionCatalogOrder(IntentionCatalogOrder)`, `enterIntentionCatalogTitle(String)`, `addIntentionCatalogTagCondition(TagId, IntentionTagRequirement)`;
+      - `intentionCatalogRow(title)`, `intentionCatalogRows`, `intentionCatalogTotal(count)`;
+      - `shownIntentionCatalogParameters` — охват, порядок, фильтр названия и число условий по тегам;
+      - `intentionCatalogListPosition` — прокрутка списка выдачи;
+      - `jumpIntentionCatalog(доля)` и `shownIntentionCatalogOffsets` — все прокрутки страницы каталога, сколько бы их ни было.
+    - `app_shell_state_test.dart` и `app_shell_graph_generation_test.dart` управляют каталогом и читают его только этими шагами: локальных `_selectScope`, `_selectOrder`, `_enterTitleFilter`, `_catalogRow`, `_conditions`, `_catalogPosition`, `_catalogPagePosition` и ключей элементов каталога в них нет. Ожидания сценариев прежние, кроме условий по тегам: вместо названий сравнивается число условий, потому что новая страница показывает только его, а действие условия подтверждает выдача.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app/navigation/app_shell_state_test.dart test/app/navigation/app_shell_graph_generation_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - новый `test/support/intention_catalog_controls.dart`;
+    - меняются `test/app/navigation/app_shell_state_test.dart`, `app_shell_graph_generation_test.dart`.
+  - **Размер:** M.
+
+- [x] 3.2 Провести через общие шаги каталога сценарии оболочки: системное «назад», страницы поверх, сброс операции, вход в пункт и нижние вставки
+  - **Критерии приёмки:**
+    - Шаги получают `intentionCatalogTitleField`, `intentionCatalogTagFilterControl`, `intentionCatalogList` и `shownIntentionCatalogRows` — названия построенных строк сверху вниз.
+    - `app_shell_back_test.dart`, `app_shell_pages_above_test.dart` с `app_shell_page_matrix.dart`, `app_shell_operation_reset_test.dart`, `app_shell_test.dart` и `app_shell_layout_test.dart` находят поле, кнопку условий, список и строки только этими шагами: локальных `_titleFilter`, `_catalogList`, `_catalogRow`, `_catalogRows`, `_catalogOffset`, `_catalogListScroll` нет, а `_summary` ищет только строки экранов выбора. `app_shell_test.dart` проверяет вход в пункт по `shownIntentionCatalogParameters` и `intentionCatalogTitleField`, а не по строкам `catalogScopeLabel` и `catalogFilterLabel`.
+    - Все чтения количества в этих файлах идут через `intentionCatalogTotal`, включая литералы `find.text('Total intentions: …')` в `app_shell_back_test.dart:58,81` и `app_shell_layout_test.dart:164,169,207,211,261,267`.
+    - Ожидания сценариев прежние. Проверки компоновки прежней страницы остаются до фазы 4: `AppBar`, общая прокрутка `IntentionSearchLayout` (`_catalogPageScroll`) и разбор `IntentionTagConditionsSection` в матрице.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app/navigation/app_shell_back_test.dart test/app/navigation/app_shell_pages_above_test.dart test/app/navigation/app_shell_operation_reset_test.dart test/app/navigation/app_shell_test.dart test/app/navigation/app_shell_layout_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 3.1.
+  - **Предполагаемые файлы:**
+    - меняется `test/support/intention_catalog_controls.dart`;
+    - меняются в `test/app/navigation/`: `app_shell_back_test.dart`, `app_shell_pages_above_test.dart`, `app_shell_page_matrix.dart`, `app_shell_operation_reset_test.dart`, `app_shell_test.dart`, `app_shell_layout_test.dart`.
+  - **Размер:** M.
+
+- [x] 3.3 Провести через общие шаги каталога сценарии импорта и восстановления графа
+  - **Критерии приёмки:**
+    - `graph_import_app_flow_test.dart` и `graph_restore_app_flow_test.dart` задают условие `addIntentionCatalogTagCondition`, прокручивают каталог `jumpIntentionCatalog` и ищут выдачу `intentionCatalogList`. Локальных `_catalogList`, `_tagConditions`, `_positionOf`, `_catalogPosition`, `_catalogPagePosition` и ключей элементов каталога в них нет.
+    - До замены графа сценарии подтверждают одно условие и прокрученный каталог, после замены — ни одного условия и каталог с начала, через `shownIntentionCatalogParameters` и `shownIntentionCatalogOffsets`.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app/graph_import_app_flow_test.dart test/app/graph_restore_app_flow_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 3.1, 3.2 — `intentionCatalogList`.
+  - **Предполагаемые файлы:** `test/app/graph_import_app_flow_test.dart`, `test/app/graph_restore_app_flow_test.dart`.
+  - **Размер:** S.
+
+- [x] 3.4 Провести через общие шаги каталога сценарии создания намерения
+  - **Критерии приёмки:**
+    - Шаги получают `removeIntentionCatalogTagCondition(TagId)` и `intentionCatalogTitleFieldLabel(tester)` — доступную подпись поля названия каталога, а `shownIntentionCatalogRows` даёт ещё подпись тегов в виде `intentionSummaryTags` или `intentionSummaryNoTags` и прямоугольник строки на экране. Подпись поля шаг берёт из локализации по элементу поля, а не из семантики: под панелью создания поле скрыто от семантики.
+    - `intention_creation_sheet_integration_test.dart` задаёт охват, название, условия и порядок, снимает условие и читает строки и прокрутку только общими шагами: локальных `_selectOption`, `_addCondition`, `_catalogList`, `_catalogListPosition`, `_catalogPagePosition` и ключей элементов каталога нет. Проверка, что новая строка сдвинула список, а видимые строки остались на своих местах, сохраняется.
+    - `creation_flows_integration_test.dart` читает количество `intentionCatalogTotal`, `intention_editor_page_test.dart` находит поле `intentionCatalogTitleField`, а проверка `intention_editor_page_test.dart:1223` берёт подпись из `intentionCatalogTitleFieldLabel` вместо литерала `'Filter by title'`, так что смена подписи поля сохраняет смысл проверки. `intention_creation_sheet_accessibility_test.dart` берёт доступное название поля из семантики `intentionCatalogTitleField`, а не из строки `catalogFilterLabel`. `_catalogBar` редактора и `_outsideSheet` остаются до фазы 4: это шапка прежней страницы.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app/intention_creation_sheet_integration_test.dart test/app/creation_flows_integration_test.dart test/app/navigation/app_shell_back_test.dart test/intention/presentation/editor/intention_editor_page_test.dart test/intention/presentation/editor/intention_creation_sheet_accessibility_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 3.1, 3.2.
+  - **Предполагаемые файлы:**
+    - меняется `test/support/intention_catalog_controls.dart`;
+    - меняются `test/app/intention_creation_sheet_integration_test.dart`, `test/app/creation_flows_integration_test.dart`, `test/intention/presentation/editor/intention_editor_page_test.dart`, `test/intention/presentation/editor/intention_creation_sheet_accessibility_test.dart`.
+  - **Размер:** M.
+
+- [x] 3.5 Провести через общие шаги каталога сценарии поиска по тегам, тегов и их назначения
+  - **Критерии приёмки:**
+    - `intention_tag_search_app_flow_test.dart` вводит название, выбирает охват, снимает условия, читает строки каталога, количество и число условий общими шагами, а панель фильтра по умолчанию открывает `intentionCatalogTagFilterControl`. Локальных `_summaryResults`, `_selectScope`, `_removeCondition` и ключей `catalog-*` нет.
+    - `tag_app_flow_test.dart` задаёт условие `addIntentionCatalogTagCondition` и ждёт строку по подписи тегов из `shownIntentionCatalogRows`, а `tag_assignment_app_flow_test.dart` и `tag_accessibility_test.dart` ждут `intentionCatalogTagFilterControl`.
+    - Ожидания сценариев прежние, кроме условий, которые читаются вне чипов: вместо подписей сравнивается число условий, а надобность подтверждают выдача и отметки панели. Части прежней страницы остаются до фазы 4: нажатие чипа `intention-tag-condition-toggle-*` с его подписью, `_conditionLabel`, цвет тега в строке и сообщения пустой выдачи.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app/intention_tag_search_app_flow_test.dart test/app/tag_app_flow_test.dart test/app/tag_assignment_app_flow_test.dart test/tag/presentation/tag_accessibility_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 3.1, 3.2, 3.4 — снятие условия и подпись тегов строки.
+  - **Предполагаемые файлы:** `test/app/intention_tag_search_app_flow_test.dart`, `test/app/tag_app_flow_test.dart`, `test/app/tag_assignment_app_flow_test.dart`, `test/tag/presentation/tag_accessibility_test.dart`.
+  - **Размер:** M.
+
+- [x] 3.6 Провести через общие шаги каталога сценарии связей и жизненного цикла намерений
+  - **Критерии приёмки:**
+    - `long_term_relation_app_flow_test.dart` находит строки каталога `intentionCatalogRow`, а не `IntentionSummaryView`.
+    - `intention_app_lifecycle_test.dart` и `intention_details_page_test.dart` выбирают охват `selectIntentionCatalogScope` со значением `IntentionScope`, а не подписью и ключом. Локального `_selectScope` нет.
+    - Все чтения количества в этих файлах идут через `intentionCatalogTotal`, включая литералы `find.text('Total intentions: …')` в `intention_app_lifecycle_test.dart:131,384`.
+    - Ожидания сценариев не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app/long_term_relation_app_flow_test.dart test/app/intention_app_lifecycle_test.dart test/intention/presentation/details/intention_details_page_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 3.1.
+  - **Предполагаемые файлы:** `test/app/long_term_relation_app_flow_test.dart`, `test/app/intention_app_lifecycle_test.dart`, `test/intention/presentation/details/intention_details_page_test.dart`.
+  - **Размер:** S.
+
+- [x] 3.7 Проверить готовность фазы 3: сценарии проходят каталог через общие шаги на прежней странице
+  - **Критерии приёмки:**
+    - Сценарные проверки, которые проходят через каталог, обращаются к его управлению только через общие шаги, и все они проходят на прежней странице.
+    - Ключи управления каталогом, ключ списка, `IntentionSummaryView` и строки `Total intentions`, `Filter by title`, `catalogTotalCount`, `catalogFilterLabel` встречаются только в `test/support/intention_catalog_controls.dart` и проверках самой прежней страницы и её частей: `intention_catalog_page_test.dart`, `intention_search_results_test.dart`, `intention_tag_conditions_section_test.dart`, `intention_tag_search_accessibility_test.dart`, `intention_summary_view_test.dart`.
+    - Код приложения в фазе не менялся. Полная проверка проекта проходит.
+  - **Проверка:**
+    - `grep -rlE 'catalog-scope-control|catalog-order-control|catalog-filter-field|intention-tag-conditions-add|intention-catalog-list|IntentionSummaryView|Total intentions|Filter by title|catalogTotalCount|catalogFilterLabel' test --include='*.dart'`.
+    - `git diff --quiet d6de1fac77d46e512fde7ff981ac01e2aa535b6f -- lib`.
+    - `mise run check`.
+  - **Зависимости:** 3.1, 3.2, 3.3, 3.4, 3.5, 3.6.
+  - **Предполагаемые файлы:** нет (только проверка).
+  - **Размер:** XS.
+
+- [x] 3.8 Читать в сценарии создания позицию списка выдачи по самому списку, а остальные прокрутки страницы — без предположения об их порядке в дереве
+  - **Критерии приёмки:**
+    - `test/support/intention_catalog_controls.dart` получает один новый шаг `shownIntentionCatalogOuterOffsets(tester)` — смещения вертикальных прокруток страницы каталога, кроме списка выдачи. Список исключается по самому положению `intentionCatalogListPosition`, а не по месту в дереве.
+    - `_catalogView` в `test/app/intention_creation_sheet_integration_test.dart` берёт `list` из `intentionCatalogListPosition(tester).pixels`, а `outer` — из нового шага. `offsets.last`, `offsets.sublist` и комментарий о том, что список стоит в дереве последним, удалены.
+    - Проверка «новая строка сдвинула список, а остальные прокрутки и видимые строки остались на своих местах» сохраняется без ослабления.
+    - Документация шага `shownIntentionCatalogOffsets` не упоминает порядок дерева: на порядок больше никто не опирается. Существующие вызовы этого шага не меняются.
+    - `lib/` не меняется, новых сценариев нет.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app/intention_creation_sheet_integration_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 3.1, 3.4.
+  - **Предполагаемые файлы:**
+    - меняются `test/support/intention_catalog_controls.dart`, `test/app/intention_creation_sheet_integration_test.dart`.
+  - **Размер:** XS.
+
+- [x] 3.9 Сверять в проверке доступности название поля названия каталога с подписью из общего шага, а не с проверяемой семантикой
+  - **Критерии приёмки:**
+    - Задача отменяет предложение критерия задачи 3.4 о том, что `intention_creation_sheet_accessibility_test.dart` берёт доступное название поля из семантики `intentionCatalogTitleField`: теперь подпись читается шагом `intentionCatalogTitleFieldLabel`.
+    - В `intention_creation_sheet_accessibility_test.dart` удалены локальная `titleFieldName`, чтение семантики через `EditableText`, `expect(titleFieldName, isNotEmpty)` и поясняющий их комментарий. `containsAll` в `_traversal` сравнивает с `intentionCatalogTitleFieldLabel(tester)`.
+    - Смена подписи поля меняет только `test/support/intention_catalog_controls.dart`. Строка `catalogFilterLabel` в этом тесте напрямую не появляется, поэтому поиск из задачи 3.7 остаётся чистым.
+    - `lib/` не меняется, новых шагов и сценариев нет.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/editor/intention_creation_sheet_accessibility_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 3.4.
+  - **Предполагаемые файлы:**
+    - меняется `test/intention/presentation/editor/intention_creation_sheet_accessibility_test.dart`.
+  - **Размер:** XS.
+
+## Phase 4: «Граф намерений» по дизайну
+
+- [x] 4.1 Добавить в дизайн-систему `CatalogRow`: карточку с одной областью нажатия и той же колонкой текста, что у `PickerRow`
+  - **Критерии приёмки:**
+    - `CatalogRow` принимает `name`, `description?`, `archived`, `marks`, `tags`, `label` и `onOpen` и не знает предметных типов. Параметров выделения нет.
+    - Вся карточка `fill` с углами `radiusLg` — одна кнопка с названием `label`, а её содержимое скрыто от экранного диктора. Поля карточки: 16 по бокам, 11 сверху, 12 снизу, как в `CatalogParts.dc.html`.
+    - Название, описание до двух строк и линию меток и тегов `CatalogRow` и `PickerRow` берут из одного внутреннего виджета дизайн-системы. Вид и проверки `PickerRow` не меняются.
+    - `test/design_system/catalog_row_test.dart` по образцу `catalog_header_test.dart` проверяет в обеих темах карточку и стили, а также перенос названия, два ряда описания, отсутствие линии без меток и тегов, одну кнопку со скрытыми метками и системный масштаб текста.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/catalog_row_test.dart test/design_system/picker_row_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - новые `lib/src/design_system/components/catalog_row.dart` и общий внутренний виджет текста строки в той же папке;
+    - меняется `lib/src/design_system/components/picker_row.dart`;
+    - новая проверка `test/design_system/catalog_row_test.dart`.
+  - **Размер:** S.
+
+- [x] 4.2 Показывать в каталоге строки `CatalogRow`: начало описания, метки и теги вместо текстовых признаков, вся карточка открывает страницу намерения
+  - **Критерии приёмки:**
+    - `IntentionCatalogRow` в `catalog/` строится из `IntentionRowContent`. Тип он называет по `IntentionSearchKind`, а доступное название — новая строка «Открыть: {content}» / `Open: {content}`, где `content` — `IntentionRowContent.label`.
+    - Страница строит строки выдачи из `IntentionCatalogRow`, нажатие открывает страницу намерения, а метка архива стоит в любом охвате. `_IntentionSummaryTile` удалён.
+    - Шаги `intentionCatalogRows`, `intentionCatalogRow` и `shownIntentionCatalogRows` читают новую строку. Подпись тегов шаг собирает из всех тегов строки в прежнем виде `intentionSummaryTags` или `intentionSummaryNoTags`, поэтому сценарии, которые её читают, не меняются.
+    - `intention_catalog_row_test.dart` проверяет только отличия каталога: начало «Открыть: …», называние типа и одну кнопку. Правило содержания строки уже закреплено `intention_picker_row_test.dart`.
+    - Проверки страницы, которые читали текстовые признаки и отметку архива только в охвате «Все», ждут метку архива в любом охвате. `tag_app_flow_test.dart` проверяет цвет тега по чипу строки.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog test/intention/presentation/intention_tag_search_accessibility_test.dart test/app/tag_app_flow_test.dart test/app/intention_tag_search_app_flow_test.dart test/app/intention_creation_sheet_integration_test.dart test/app/long_term_relation_app_flow_test.dart test/app/navigation`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 4.1.
+  - **Предполагаемые файлы:**
+    - новый `lib/src/intention/presentation/catalog/intention_catalog_row.dart`; меняется `intention_catalog_page.dart`;
+    - `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` и сгенерированная локализация;
+    - меняется `test/support/intention_catalog_controls.dart`;
+    - проверки: новый `test/intention/presentation/catalog/intention_catalog_row_test.dart`, `intention_catalog_page_test.dart`, `test/intention/presentation/intention_tag_search_accessibility_test.dart`, `test/app/tag_app_flow_test.dart`.
+  - **Размер:** M.
+
+- [x] 4.3 Оставить в `IntentionSummaryView` только то, что показывает страница подробностей связи
+  - **Критерии приёмки:**
+    - Параметров `traits`, `confirmedTags` и `showArchiveState` нет: страница подробностей связи — единственный оставшийся потребитель, и она не передаёт признаков и тегов, а архивное состояние показывает всегда.
+    - Страница подробностей связи выглядит и ведёт себя как раньше.
+    - Случаи `intention_summary_view_test.dart` об удалённых параметрах удалены.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/intention_summary_view_test.dart test/long_term_relation/presentation/details`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 4.2 — каталог больше не использует это представление.
+  - **Предполагаемые файлы:**
+    - `lib/src/intention/presentation/intention_summary_view.dart`, `lib/src/long_term_relation/presentation/details/relation_details_page.dart`;
+    - проверка `test/intention/presentation/intention_summary_view_test.dart`.
+  - **Размер:** S.
+
+- [x] 4.4 Дать общему листу строку «Показать» с точными числами охватов при открытом охвате
+  - **Критерии приёмки:**
+    - При `IntentionScopeOpen` первой стоит строка «Показать» / `Show` с вариантами «Активные», «Архивные», «Все, включая архивные» / `Active`, `Archived`, `All, archived included`. Выбор вызывает `changeScope`. Строка показывается по разбору `selection.scope`, а не назначения; при `IntentionScopeFixed` её нет, и экраны выбора не меняются.
+    - Меню охвата показывает числа `scopeCounts` подтверждённой выдачи текущих параметров, а до неё и после отказа — названия без чисел, как меню типа.
+    - Открытие любого из трёх меню закрывает два других.
+    - `show_and_sort_sheet_test.dart` на `BrowseIntentionCatalog` проверяет сценарий «Меню охвата считает намерения выбранного типа» с числами 4, 2 и 6, меню без чисел до выдачи, «Сбросить», которое возвращает активный охват и сохраняет поиск, и перенос крупного текста в строке и меню охвата.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/intention/presentation/search test/intention/presentation/picker`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - `lib/src/intention/presentation/search/show_and_sort_sheet.dart`;
+    - `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` и сгенерированная локализация;
+    - проверка `test/intention/presentation/search/show_and_sort_sheet_test.dart`.
+  - **Размер:** S.
+
+- [x] 4.5 Показывать в заголовке списка при открытом охвате охват и тип словами и называть их в доступном названии
+  - **Критерии приёмки:**
+    - При `IntentionScopeOpen` слова заголовка дают девять вариантов одного ICU-сообщения с `select` по охвату и типу: «Активные», «Активные намерения», «Активные действия», «Архивные», «Архивные намерения», «Архивные действия», «Все», «Все намерения», «Все действия» и те же варианты на английском от `Active` до `All actions`. Значения `select` — имена `IntentionScope` и `IntentionTypeChoice`.
+    - Доступное название — «Показать и упорядочить. Показаны: {заголовок}, {количество}. Сортировка: {сводка}.» / `Show and sort. Showing: {title}, {count}. Sorted by: {summary}.` и вариант без количества.
+    - Слова выбираются по разбору `selection.scope`, а не назначения. При `IntentionScopeFixed` слова и доступное название прежние.
+    - Новый `intention_list_header_test.dart` на `BrowseIntentionCatalog` проверяет девять заголовков в обеих локалях, сценарий «Заголовок каталога называет охват и тип» и доступное название с количеством и без него.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/intention/presentation/search test/intention/presentation/picker test/daily_choice/presentation/action_picker test/daily_choice/presentation/source_picker test/long_term_relation/presentation/participant_picker`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - `lib/src/intention/presentation/search/intention_list_header.dart`;
+    - `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` и сгенерированная локализация;
+    - новая проверка `test/intention/presentation/search/intention_list_header_test.dart`.
+  - **Размер:** S.
+
+- [x] 4.6 Заменить выпадающие списки охвата и порядка каталога заголовком списка с листом «Показать и упорядочить»
+  - **Критерии приёмки:**
+    - Страница показывает `IntentionListHeader`. Выпадающих списков, `_OfferedCatalogOrder` и строки количества прежней выдачи нет. В каталоге доступны тип и сортировка по названию.
+    - Шаги `selectIntentionCatalogScope`, `selectIntentionCatalogOrder` и новый `selectIntentionCatalogType(IntentionTypeChoice)` открывают лист заголовком, выбирают вариант и закрывают лист. `selectIntentionCatalogOrder` принимает любой порядок: поле берёт из меню, направление — кнопкой.
+    - `shownIntentionCatalogParameters` читает охват и тип из слов заголовка, порядок из сводки и получает поле `type`. `intentionCatalogTotal` читает количество заголовка.
+    - `app_shell_state_test.dart` подтверждает, что тип сохраняется при переключении пунктов, а `app_shell_graph_generation_test.dart` — что после замены графа тип начальный.
+    - `intention_catalog_page_test.dart` подтверждает на странице лист с числами охватов и типов, новую выдачу сверху при смене типа и сортировку по названию. Случаи четырёх порядков и локализации выпадающих списков удалены.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog test/app/navigation test/app/graph_import_app_flow_test.dart test/app/graph_restore_app_flow_test.dart test/app/intention_app_lifecycle_test.dart test/app/intention_creation_sheet_integration_test.dart test/app/intention_tag_search_app_flow_test.dart test/app/creation_flows_integration_test.dart test/intention/presentation/details/intention_details_page_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 4.4, 4.5.
+  - **Предполагаемые файлы:**
+    - `lib/src/intention/presentation/catalog/intention_catalog_page.dart`, `intention_search_results.dart`;
+    - `test/support/intention_catalog_controls.dart`;
+    - проверки: `test/intention/presentation/catalog/intention_catalog_page_test.dart`, `intention_search_results_test.dart`, в `test/app/navigation/`: `app_shell_state_test.dart`, `app_shell_graph_generation_test.dart`, `app_shell_test.dart`.
+  - **Размер:** M.
+
+- [x] 4.7 Заменить поле фильтра каталога строкой поиска с кнопкой фильтра
+  - **Критерии приёмки:**
+    - Страница показывает `IntentionSearchBar`: поле «Поиск по названию» с ошибкой недопустимого фильтра и кнопку фильтра, которая открывает панель тегов. Прежнего `TextField` нет. Раздел условий под полем остаётся до задачи 4.8.
+    - Шаги `intentionCatalogTitleField`, `intentionCatalogTitleFieldLabel`, `intentionCatalogTagFilterControl` и чтение названия в `shownIntentionCatalogParameters` работают с новой строкой поиска. Сценарии не меняются.
+    - `intention_catalog_page_test.dart` и `intention_tag_search_accessibility_test.dart` находят поле общими шагами, а ошибку недопустимого фильтра проверяют в новом поле.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog test/intention/presentation/intention_tag_search_accessibility_test.dart test/intention/presentation/editor/intention_editor_page_test.dart test/intention/presentation/editor/intention_creation_sheet_accessibility_test.dart test/app/navigation test/app/tag_assignment_app_flow_test.dart test/tag/presentation/tag_accessibility_test.dart test/app/intention_tag_search_app_flow_test.dart test/app/creation_flows_integration_test.dart test/app/intention_creation_sheet_integration_test.dart test/app/graph_import_app_flow_test.dart test/app/graph_restore_app_flow_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 4.6 — та же раскладка параметров страницы.
+  - **Предполагаемые файлы:**
+    - `lib/src/intention/presentation/catalog/intention_catalog_page.dart`;
+    - `test/support/intention_catalog_controls.dart`;
+    - проверки `test/intention/presentation/catalog/intention_catalog_page_test.dart`, `test/intention/presentation/intention_tag_search_accessibility_test.dart`.
+  - **Размер:** M.
+
+- [x] 4.8 Убрать условия под полем поиска: условия видны по кнопке фильтра и меняются в панели тегов
+  - **Критерии приёмки:**
+    - `IntentionTagConditionsSection` и `intention_tag_conditions_section_test.dart` удалены, под полем поиска условий нет.
+    - `lib/src/tag/presentation/tag_phrase_text.dart` удалён вместе с последним вызовом `tagPhraseText`. Своих тестов у файла нет.
+    - `shownIntentionCatalogParameters.tagConditions` читает число кнопки фильтра. `removeIntentionCatalogTagCondition` получает надобность снимаемого условия и снимает его нажатиями в панели: оставшиеся из трёх переключений круга после `tagConditionCycles(requirement)`.
+    - Сценарии, которые нажимали чип `intention-tag-condition-toggle-*` или читали его подпись, меняют надобность в панели тегов, а подтверждают число условий, отметку панели и выдачу. Локальных `_conditions`, `_conditionLabel` и `_shownConditions` нет. Сообщения пустой выдачи остаются до задачи 4.12.
+    - `intention_tag_search_accessibility_test.dart` вместо чипов проверяет кнопку фильтра с числом условий и панель при открытой клавиатуре. `app_shell_page_matrix.dart` сверяет назначение по `IntentionSearchBar`.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog test/intention/presentation/intention_tag_search_accessibility_test.dart test/app/intention_tag_search_app_flow_test.dart test/app/tag_app_flow_test.dart test/app/intention_creation_sheet_integration_test.dart test/app/graph_import_app_flow_test.dart test/app/graph_restore_app_flow_test.dart test/app/navigation`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 4.3 — первый вызов `tagPhraseText` уже убран; 4.7 — кнопка фильтра уже на странице.
+  - **Предполагаемые файлы:**
+    - меняется `lib/src/intention/presentation/catalog/intention_catalog_page.dart`; удаляются `intention_tag_conditions_section.dart` и `lib/src/tag/presentation/tag_phrase_text.dart`;
+    - `test/support/intention_catalog_controls.dart`;
+    - проверки: `test/intention/presentation/catalog/intention_catalog_page_test.dart`, `test/intention/presentation/intention_tag_search_accessibility_test.dart`, `test/app/navigation/app_shell_page_matrix.dart`, `test/app/intention_tag_search_app_flow_test.dart`, `test/app/tag_app_flow_test.dart`, `test/app/intention_creation_sheet_integration_test.dart`.
+  - **Размер:** M.
+
+- [x] 4.9 Убрать из модели условий по тегам предъявление, которое читал только раздел условий
+  - **Критерии приёмки:**
+    - `IntentionTagCondition` несёт только `tagId` и `requirement`. Название и цвет условия, ревизия записи, ветка `TagUpdatedChange`, `toggleRequirement`, `remove` и `IntentionTagRequirement.toggled` удалены: после задачи 4.8 их никто не читает и не вызывает.
+    - `IntentionTagConditionSet.cycle` принимает идентификатор тега без `snapshotRevision`, и панель тегов вызывает его так.
+    - Отметки панели, снятие условия при подтверждённом удалении тега и отказ принимать уже удалённый тег не меняются.
+    - Случаи проверок о предъявлении условий удалены: название, цвет, снимки разных ревизий.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog test/intention/presentation/picker test/intention/presentation/intention_tag_search_accessibility_test.dart test/tag/presentation test/long_term_relation/presentation/participant_picker test/daily_choice/presentation/source_picker test/daily_choice/presentation/action_picker test/app/intention_tag_search_app_flow_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 4.8.
+  - **Предполагаемые файлы:**
+    - `lib/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart` и сгенерированный `intention_tag_conditions_view_model.g.dart`, `lib/src/tag/presentation/panel/tags_panel_view_model.dart`;
+    - проверки `test/intention/presentation/catalog/intention_tag_conditions_view_model_test.dart`, `intention_catalog_tag_filter_integration_test.dart`, `test/tag/presentation/panel/tags_panel_test.dart`, `tags_panel_view_model_test.dart`;
+    - остальные вызовы `cycle`: `test/intention/presentation/catalog/intention_catalog_page_test.dart`, `intention_picker_session_test_support.dart`, `test/intention/presentation/picker/intention_picker_view_test.dart`, `test/intention/presentation/intention_tag_search_accessibility_test.dart`, `test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart`, `test/daily_choice/presentation/daily_choice_picker_tag_search_test_support.dart`.
+  - **Размер:** M.
+
+- [x] 4.10 Собрать каркас страницы: крупный заголовок, закреплённые поиск и заголовок списка, прокрутка только у списка
+  - **Критерии приёмки:**
+    - Тело страницы — `Column` в `SafeArea` без нижней вставки: заголовок `IntentionSearchKind.title` стилем `DoableType.display` с семантикой заголовка, `IntentionSearchBar`, `IntentionListHeader` и выдача в `Expanded`. Отступы — из решения 2 design, верхний — 16 (`space4`) от края `SafeArea`. `AppBar` нет, стиль системной строки задаёт `AnnotatedRegion`, как у каталога дневных выборов.
+    - `IntentionSearchLayout`, `IntentionSearchResults.showsList` и проверки передачи жеста от списка странице удалены. Шаг `shownIntentionCatalogOuterOffsets` и значение `outer` в `_catalogView` тоже удалены: вертикальная прокрутка осталась одна, и сравнение стало бы пустым.
+    - Проверки подтверждают: при прокрутке заголовок, поле, кнопка фильтра и заголовок списка не сдвигаются; прокрученная до конца последняя строка стоит над панелью при всех вставках `app_shell_layout_test.dart`; при масштабе текста 2 и клавиатуре 336 на экране 320×844 нет переполнения, список получает высоту и прокручивается, а поле не сдвигается.
+    - Проверки, привязанные к `AppBar` страницы, сохраняют смысл на новом заголовке: `app_shell_test.dart`, `app_navigation_accessibility_test.dart`, `app_shell_pages_above_test.dart`, `app_shell_layout_test.dart` и `_catalogBar` в `intention_editor_page_test.dart`.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog test/intention/presentation/intention_tag_search_accessibility_test.dart test/intention/presentation/editor/intention_editor_page_test.dart test/intention/presentation/editor/intention_creation_sheet_accessibility_test.dart test/app/navigation test/app/intention_creation_sheet_integration_test.dart test/app/graph_import_app_flow_test.dart test/app/graph_restore_app_flow_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 4.6, 4.7, 4.8 — все закреплённые части уже на странице.
+  - **Предполагаемые файлы:**
+    - меняется `lib/src/intention/presentation/catalog/intention_catalog_page.dart`, `intention_search_results.dart`; удаляется `intention_search_layout.dart`;
+    - `test/support/intention_catalog_controls.dart`;
+    - проверки: `test/intention/presentation/catalog/intention_catalog_page_test.dart`, `test/intention/presentation/intention_tag_search_accessibility_test.dart` — его `_pageScrollable` и `_reach` держатся на `IntentionSearchLayout`, `test/intention/presentation/editor/intention_editor_page_test.dart`, `test/app/intention_creation_sheet_integration_test.dart`, в `test/app/navigation/`: `app_shell_layout_test.dart`, `app_shell_test.dart`, `app_shell_pages_above_test.dart`, `app_navigation_accessibility_test.dart`.
+  - **Размер:** M.
+
+- [x] 4.11 Называть охват в пустой выдаче выбранного типа при открытом охвате
+  - **Критерии приёмки:**
+    - При `IntentionScopeOpen` вторая причина пустой выдачи показывает заголовок по таблице решения 7 design: «Нет активных действий» / `No active actions`, «Нет действий в архиве» / `No actions in the archive`, «Действий пока нет» / `No actions yet` и так же для намерений. Охват и тип берутся из запроса пустой выдачи.
+    - Текст под заголовком: «Здесь появится намерение, отмеченное как действие.» / `An intention marked as an action is shown here.` для действий и «Здесь всё отмечено как действия.» / `Everything here is marked as an action.` для намерений. Значок — молния для действий и знак намерения для намерений. Действие «Показать оба типа» прежнее.
+    - При `IntentionScopeFixed` вторая причина не меняется.
+    - `intention_search_list_test.dart` на `BrowseIntentionCatalog` проверяет шесть заголовков в обеих локалях, значки и выбор типа «Все» действием «Показать оба типа».
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/intention/presentation/search test/intention/presentation/picker`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - `lib/src/intention/presentation/search/intention_search_list.dart`;
+    - `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` и сгенерированная локализация;
+    - проверка `test/intention/presentation/search/intention_search_list_test.dart`.
+  - **Размер:** S.
+
+- [x] 4.12 Перевести каталог на общую выдачу `IntentionSearchList` с пустыми состояниями каталога и убрать прежнюю выдачу
+  - **Критерии приёмки:**
+    - Страница показывает `IntentionSearchList` с `IntentionCatalogRow`, нижним отступом 24 (`space6`) и `onResetFilters`, который очищает поле, фильтр названия и условия по тегам. Заголовок списка показывает 0 над пустой выдачей.
+    - `emptyScope` страницы выбирает третью причину по решению 7 design:
+      - активный охват при `archived.all > 0` — «Нет активных намерений» / `No active intentions` и текст «Новое создаётся кнопкой с плюсом внизу, а архивированные показывает строка «Показать».» / `Tap the plus below to create a new one. The Show row brings up the archived ones.`;
+      - активный охват и охват всех без намерений — «Намерений пока нет» / `No intentions yet` и текст «Ваши намерения появятся здесь. Первое создаётся кнопкой с плюсом внизу.» / `Your intentions will appear here. Tap the plus below to create the first one.`;
+      - архивный охват — «В архиве ничего нет» / `Nothing in the archive` и текст «Архивированное намерение уходит из активного списка и остаётся здесь.» / `An intention you archive leaves the active list and stays here.`.
+
+      Значок — знак намерения, а у архива значок архива. Признак архива берётся из матрицы чисел, а не из `scopeCounts`: при выбранном типе `scopeCounts` не видит архивные намерения другого типа.
+    - `intention_search_results.dart`, `intention_catalog_status_views.dart` и `intention_search_results_test.dart` удалены. `ResultsScrollKeeper` теряет параметр `keepScrollOffset`, а `onCatalogChanged` — результат: их использовала только прежняя выдача.
+    - Случаи «первая после монтирования…» и «удаление исключённого тега…» перенесены в `intention_search_list_test.dart`: других проверок этих путей нет.
+    - `intention_catalog_page_test.dart` подтверждает сценарии пустой выдачи спецификации для каталога, включая активный охват с выбранным типом «Только действия» при архиве только из намерений. Загрузка, отказы, подгрузка, сохранение места при согласовании и под панелью создания проходят на новой выдаче с прежними ожиданиями. Проверка возврата со страницы намерения подтверждает то же смещение и ту же первую видимую строку.
+    - `test/app/intention_app_lifecycle_test.dart` ждёт сообщения третьей причины пустой выдачи: строка 239 `No active intentions yet.` → `No active intentions` (архив не пуст), строка 278 `No archived intentions yet.` → `Nothing in the archive` (архивный охват), строка 315 `No active intentions yet.` → `No intentions yet` (намерений нет совсем). Тестовый адаптер не меняется: `answerCatalogQuery` уже отдаёт матрицу чисел, а модель согласует её при архивировании и удалении.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/intention/presentation test/app/navigation test/app/intention_app_lifecycle_test.dart test/app/intention_tag_search_app_flow_test.dart test/app/intention_creation_sheet_tags_test.dart test/app/intention_creation_sheet_integration_test.dart test/app/graph_import_app_flow_test.dart test/app/graph_restore_app_flow_test.dart test/app/tag_app_flow_test.dart test/app/creation_flows_integration_test.dart test/app/long_term_relation_app_flow_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 4.2, 4.10, 4.11.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/intention/presentation/catalog/intention_catalog_page.dart`, `lib/src/intention/presentation/search/results_scroll_keeper.dart`, `intention_search_list.dart`; удаляются `lib/src/intention/presentation/catalog/intention_search_results.dart`, `intention_catalog_status_views.dart`;
+    - `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` и сгенерированная локализация;
+    - проверки: `test/intention/presentation/catalog/intention_catalog_page_test.dart`, `test/intention/presentation/search/intention_search_list_test.dart`, `test/app/navigation/app_shell_layout_test.dart`, `test/app/intention_app_lifecycle_test.dart`, `test/app/intention_tag_search_app_flow_test.dart`, `test/app/intention_creation_sheet_tags_test.dart`.
+  - **Размер:** M.
+
+- [x] 4.13 Удалить строки локализации, оставшиеся без использования после замены страницы
+  - **Критерии приёмки:**
+    - В обеих локалях нет ключей `catalogScope*`, `catalogFilterLabel`, `catalogOrder*`, `catalogTotalCount`, `catalogActiveEmpty`, `catalogArchivedEmpty`, `catalogAllEmpty`, `catalogTagConditionsEmpty`, `catalogLoadingMore`, `catalogReady`, `catalogNotReady`, `catalogHasDescription`, `catalogNoDescription` и строк условий `intentionTagCondition*`.
+    - Строки загрузки, отказов и ошибок фильтра по решению 8 design остаются: `catalogLoading`, `catalogUnavailable`, `catalogCorruption`, `catalogUnexpectedFailure`, `catalogFilterInvalidUnicode`, `catalogFilterTooLong`, `catalogLoadMore*`. Набор ключей ru и en симметричен.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `grep -rnE '(\.|")(catalogScope|catalogFilterLabel|catalogOrder|catalogTotalCount|catalogActiveEmpty|catalogArchivedEmpty|catalogAllEmpty|catalogTagConditionsEmpty|catalogLoadingMore|catalogReady|catalogNotReady|catalogHasDescription|catalogNoDescription|intentionTagCondition(Absent|Present|Toggle|Remove)|intentionTagConditionsAdd)' lib test --include='*.dart' --include='*.arb'` ничего не находит.
+    - `mise exec --no-deps -- flutter test test/app/localization/locale_resolution_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 4.2, 4.6, 4.7, 4.8, 4.12.
+  - **Предполагаемые файлы:** `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` и сгенерированная локализация.
+  - **Размер:** XS.
+
+- [x] 4.14 Проверить готовность фазы 4: «Граф намерений» соответствует дизайну, прежней страницы в приложении нет
+  - **Критерии приёмки:**
+    - Все требования delta-спецификаций выполняются на новой странице и экранах выбора.
+    - Автоматические проверки подтверждают закрепление и последнюю строку над панелью, раскладку при крупном тексте с клавиатурой, лист с числами, пустые состояния по причинам, сохранение места, сохранение и сброс параметров, включая тип.
+    - Компонентные проверки строки каталога проходят в обеих темах.
+    - Ссылок на удалённые части и строки нет, страница соответствует proposal, полная проверка проекта и сборка проходят. В отчёте сессии указано, что сравнение с макетом на устройстве остаётся ручной проверкой пользователя.
+  - **Проверка:**
+    - `mise exec --no-deps -- openspec validate redesign-intention-catalog --strict`.
+    - `mise run codegen-check`.
+    - `grep -rnE 'IntentionSearchLayout|IntentionSearchResults|IntentionTagConditionsSection|IntentionCatalogStatusView|IntentionCatalogInlineStatus|IntentionCatalogContinuationStatusView|_OfferedCatalogOrder|_IntentionSummaryTile|catalog-scope-control|catalog-order-control|catalog-filter-field|intention-tag-condition|tagPhraseText|tag_phrase_text' lib test --include='*.dart'` ничего не находит.
+    - `mise run check`.
+    - `mise exec --no-deps -- flutter build apk --release`.
+  - **Зависимости:** 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9, 4.10, 4.11, 4.12, 4.13.
+  - **Предполагаемые файлы:** нет (только проверка).
+  - **Размер:** XS.
+
+- [x] 4.15 Убрать порядок условий по тегам из документации их модели и из её проверок
+  - **Критерии приёмки:**
+    - Документация `IntentionTagConditionsState`, `tagFilter` и `cycle` в `intention_tag_conditions_view_model.dart` не упоминает порядок условий: ни порядок добавления, ни конец порядка, ни прежнее место.
+    - Меняются только комментарии: список `conditions` и словарь `_requirements` остаются, поведение приложения не меняется.
+    - В `intention_tag_conditions_view_model_test.dart` нет случая о сохранении места условия (:46-68).
+    - Случай о снятии условий при подтверждённом удалении тега сравнивает два оставшихся условия без учёта порядка (:151), а его название не говорит о местах условий.
+  - **Проверка:**
+    - `mise exec --no-deps -- openspec validate redesign-intention-catalog --strict`.
+    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog/intention_tag_conditions_view_model_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - меняется `lib/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart`;
+    - проверка `test/intention/presentation/catalog/intention_tag_conditions_view_model_test.dart`.
+  - **Размер:** XS.
+
+- [x] 4.16 Назвать в тесте сброса фильтров на странице каталога только то, что он проверяет
+  - **Критерии приёмки:**
+    - Тест в `intention_catalog_page_test.dart` (:1260) называется `«Сбросить фильтры» очищает поле и снимает условия, сохраняя тип`: название не обещает сохранения охвата и порядка.
+    - Шаги и проверки теста не меняются: неначальные охват и порядок в него не добавляются.
+    - Спецификации и код приложения не меняются, поведение приложения не меняется.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog/intention_catalog_page_test.dart`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - меняется `test/intention/presentation/catalog/intention_catalog_page_test.dart`.
+  - **Размер:** XS.
+
+- [x] 4.17 Убрать из сценария «Общее переименование» шаг прокрутки к закреплённой кнопке фильтра
+  - **Критерии приёмки:**
+    - В сценарии «Общее переименование» в `test/app/tag_app_flow_test.dart` (:117-119) нет комментария о кнопке фильтра за краем, вызова `jumpIntentionCatalog(tester, 0)` и следующего за ним `await tester.pump()`: кнопка закреплена, а `shownIntentionCatalogParameters` читает её число независимо от прокрутки.
+    - Остальные шаги и проверки сценария не меняются.
+    - Шаг `jumpIntentionCatalog` в `test/support/intention_catalog_controls.dart` остаётся: его используют другие тесты.
+    - Спецификации и код приложения не меняются, поведение приложения не меняется.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app/tag_app_flow_test.dart`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - меняется `test/app/tag_app_flow_test.dart`.
+  - **Размер:** XS.
+
+- [x] 4.18 Убрать зависимость от относительного порядка условий из проверок состояния с несколькими условиями по тегам
+  - **Критерии приёмки:**
+    - Ни одна проверка состояния с двумя и более условиями по тегам не зависит от их относительного порядка. Номера строк указаны на коммите `1e2ea1bd`; если они сдвинулись, места ищутся по содержимому.
+    - `test/intention/presentation/catalog/intention_tag_conditions_view_model_test.dart` (:101-106): снимок с двумя условиями сравнивается без учёта порядка условий, а порядок опубликованных снимков остаётся проверенным, потому что это реальная последовательность событий.
+    - `test/intention/presentation/intention_tag_search_accessibility_test.dart` (:134-143): семь условий сравниваются без учёта порядка.
+    - Там же (:158-161): вместо `conditions.first` условие находится по тегу `_tags.first`, и надобность `mustBeAbsent` проверяется у него.
+    - `test/intention/presentation/catalog/intention_catalog_tag_filter_integration_test.dart` (:714-717): два условия сравниваются без учёта порядка.
+    - `test/tag/presentation/panel/tags_panel_view_model_test.dart` (:1153-1156): два условия сравниваются без учёта порядка.
+    - Проверки с одним условием или пустым набором не меняются, новых тестов нет.
+    - Тип `conditions` и словарь `_requirements` модели условий не меняются. Файлы `lib/` и спецификации не меняются, поведение приложения не меняется.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog/intention_tag_conditions_view_model_test.dart test/intention/presentation/intention_tag_search_accessibility_test.dart test/intention/presentation/catalog/intention_catalog_tag_filter_integration_test.dart test/tag/presentation/panel/tags_panel_view_model_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+    - `mise exec --no-deps -- openspec validate redesign-intention-catalog --strict`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - меняется `test/intention/presentation/catalog/intention_tag_conditions_view_model_test.dart`;
+    - меняется `test/intention/presentation/intention_tag_search_accessibility_test.dart`;
+    - меняется `test/intention/presentation/catalog/intention_catalog_tag_filter_integration_test.dart`;
+    - меняется `test/tag/presentation/panel/tags_panel_view_model_test.dart`.
+  - **Размер:** XS.

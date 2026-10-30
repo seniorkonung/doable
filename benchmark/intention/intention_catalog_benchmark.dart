@@ -16,7 +16,7 @@ import '../support/benchmark.dart';
 const _intentions = 50000;
 
 void main() {
-  test('бенчмарк каталога намерений: короткие фильтры и порядок по названию', () async {
+  test('бенчмарк каталога намерений: короткие фильтры, подсчёт и порядок по названию', () async {
     final harness = await LocalDatabaseHarness.fileBacked();
     addTearDown(harness.dispose);
     final database = await harness.openReadyDatabase();
@@ -68,6 +68,36 @@ void main() {
           (page as IntentionCatalogFirstPage).totalCount,
           filter.startsWith('я') ? 0 : _intentions ~/ 2,
         );
+        if (sample >= 0) samples.add(watch.elapsed);
+      }
+      reportBenchmarkBudget(benchmarkCase, 'request', samples, 100);
+    }
+    for (final counting in [
+      IntentionCatalogCounting.totalOnly,
+      IntentionCatalogCounting.byScopeAndType,
+    ]) {
+      final benchmarkCase =
+          'intentionCatalog/active/counting/${counting.name}/firstPage';
+      if (!benchmarkIncludes(benchmarkCase)) continue;
+      final query = IntentionCatalogQuery(
+        scope: IntentionScope.active,
+        order: IntentionCatalogOrder.createdAtDescending,
+        titleFilter: null,
+        pageSize: 100,
+        counting: counting,
+      );
+      final samples = <Duration>[];
+      for (
+        var sample = -benchmarkWarmups;
+        sample < benchmarkSamples;
+        sample++
+      ) {
+        final watch = Stopwatch()..start();
+        final result = await repository.getCatalogPage(query);
+        watch.stop();
+        final page = _successfulPage(result) as IntentionCatalogFirstPage;
+        expect(page.items, hasLength(100));
+        _expectHalfArchivedCounts(page, counting);
         if (sample >= 0) samples.add(watch.elapsed);
       }
       reportBenchmarkBudget(benchmarkCase, 'request', samples, 100);
@@ -132,6 +162,27 @@ void main() {
       }
     }
   }, timeout: const Timeout(Duration(minutes: 3)));
+}
+
+/// Набор наполовину в архиве и без действий: общее количество активного охвата
+/// равно половине набора, матрица даёт половину в каждом охвате.
+void _expectHalfArchivedCounts(
+  IntentionCatalogFirstPage page,
+  IntentionCatalogCounting counting,
+) {
+  expect(page.totalCount, _intentions ~/ 2);
+  switch (page.counts) {
+    case IntentionCountsTotalOnly():
+      expect(counting, IntentionCatalogCounting.totalOnly);
+    case IntentionCountsByType():
+      fail('Бенчмарк не запрашивает числа типов одного охвата');
+    case IntentionCountsByScopeAndType(:final active, :final archived):
+      expect(counting, IntentionCatalogCounting.byScopeAndType);
+      expect(active.all, _intentions ~/ 2);
+      expect(active.actions, 0);
+      expect(archived.all, _intentions ~/ 2);
+      expect(archived.actions, 0);
+  }
 }
 
 IntentionCatalogPage _successfulPage(Result<IntentionCatalogPage> result) {

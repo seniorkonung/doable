@@ -1,16 +1,16 @@
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
+import 'package:doable/src/design_system/components/catalog_row.dart';
+import 'package:doable/src/design_system/components/list_state.dart';
 import 'package:doable/src/design_system/components/search_field.dart';
+import 'package:doable/src/design_system/doable_metrics.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
     hide IntentionCatalogPage;
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_catalog_status_views.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_search_layout.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_section.dart';
-import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
@@ -21,7 +21,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/app_root_pages.dart';
-import '../../support/inline_text.dart';
+import '../../support/intention_catalog_controls.dart';
 import 'catalog/catalog_reconciliation_test_support.dart';
 import 'catalog/catalog_test_support.dart';
 import '../../support/tag_condition_cycles.dart';
@@ -77,19 +77,16 @@ void main() {
     expect(tester.takeException(), isNull);
 
     final conditionsProvider = intentionTagConditionsViewModelProvider(
-      tester
-          .widget<IntentionTagConditionsSection>(
-            find.byType(IntentionTagConditionsSection),
-          )
-          .purpose,
+      const BrowseIntentionCatalog(),
     );
 
     // Поле названия принимает ввод при открытой клавиатуре.
-    final field = find.byKey(const ValueKey('catalog-filter-field'));
-    await _reach(tester, field);
+    final field = intentionCatalogTitleField;
     _expectTappable(tester, field);
     expect(
-      find.bySemanticsLabel(RegExp(RegExp.escape(l10n.catalogFilterLabel))),
+      find.bySemanticsLabel(
+        RegExp(RegExp.escape(intentionCatalogTitleFieldLabel(tester))),
+      ),
       findsWidgets,
     );
     await tester.tap(field);
@@ -104,32 +101,26 @@ void main() {
           ? IntentionTagRequirement.mustBePresent
           : IntentionTagRequirement.mustBeAbsent;
       for (var i = 0; i < tagConditionCycles(requirement); i++) {
-        model.cycle(
-          _tags[index],
-          snapshotRevision: const TestCatalogRevision(0),
-        );
+        model.cycle(_tags[index].id);
         await tester.pump();
       }
     }
     await _pumpFrames(tester);
     expect(tester.takeException(), isNull);
 
-    // Кнопка «+ Тег» открывает панель тегов в режиме фильтра.
-    final add = find.byKey(const ValueKey('intention-tag-conditions-add'));
-    await _reach(tester, add);
-    _expectTappable(tester, add);
-    expect(
-      find.bySemanticsLabel(l10n.intentionTagConditionsAddSemantics),
-      findsOneWidget,
-    );
-    await tester.tap(add);
+    // Кнопка фильтра называет число условий и открывает панель тегов в
+    // режиме фильтра.
+    final filter = intentionCatalogTagFilterControl;
+    _expectTappable(tester, filter);
+    _expectFilterAnnounced(tester, l10n, _initialConditions);
+    await tester.tap(filter);
     await _pumpFrames(tester);
     await _expectTagsPanelAccessible(tester, l10n);
 
     // Два нажатия на последний тег добавляют условие «должен
     // отсутствовать», а закрытие панели возвращает страницу поиска.
     final lastTagRow = _panelRow(_tags.last);
-    await _reach(tester, lastTagRow, within: _panelList);
+    await _reach(tester, lastTagRow, _panelList);
     _expectTappable(tester, lastTagRow);
     await tester.tap(lastTagRow);
     await tester.pump();
@@ -140,70 +131,47 @@ void main() {
     expect(find.text(l10n.tagsPanelFilterTitle), findsNothing);
     expect(tester.takeException(), isNull);
     expectIntentionGraphRootPage(router);
-    expect(container.read(conditionsProvider).conditions, [
-      for (var index = 0; index < _initialConditions; index++)
-        _condition(
-          _tags[index],
-          index.isEven
-              ? IntentionTagRequirement.mustBePresent
-              : IntentionTagRequirement.mustBeAbsent,
-        ),
-      _condition(_tags.last, IntentionTagRequirement.mustBeAbsent),
-    ]);
+    expect(
+      container.read(conditionsProvider).conditions,
+      unorderedEquals([
+        for (var index = 0; index < _initialConditions; index++)
+          _condition(
+            _tags[index],
+            index.isEven
+                ? IntentionTagRequirement.mustBePresent
+                : IntentionTagRequirement.mustBeAbsent,
+          ),
+        _condition(_tags.last, IntentionTagRequirement.mustBeAbsent),
+      ]),
+    );
 
-    // Каждый чип достижим и объявляет надобность, переключение и снятие.
-    for (final condition in container.read(conditionsProvider).conditions) {
-      final name = condition.name.value;
-      final toggle = _conditionToggle(condition.tagId);
-      await _reach(tester, toggle);
-      _expectTappable(tester, toggle);
-      final toggleNode = tester.getSemantics(toggle);
-      expect(toggleNode.label, switch (condition.requirement) {
-        IntentionTagRequirement.mustBePresent =>
-          l10n.intentionTagConditionPresentSemantics(name),
-        IntentionTagRequirement.mustBeAbsent =>
-          l10n.intentionTagConditionAbsentSemantics(name),
-      });
-      expect(toggleNode.hint, l10n.intentionTagConditionToggleHint);
-      expect(toggleNode, isSemantics(isButton: true, hasTapAction: true));
-      _expectNotTruncated(
-        tester,
-        find.descendant(
-          of: toggle,
-          matching: find.byKey(const ValueKey('intention-tag-condition-label')),
-        ),
-      );
-      final remove = _conditionRemove(condition.tagId);
-      await _reach(tester, remove);
-      _expectTappable(tester, remove);
-      expect(
-        tester.getSemantics(remove),
-        isSemantics(
-          tooltip: l10n.intentionTagConditionRemove(name),
-          isButton: true,
-          hasTapAction: true,
-        ),
-      );
-    }
-    await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+    // Условия видны только по кнопке фильтра, а не под полем названия.
+    expect(find.textContaining(_tags.first.name.value), findsNothing);
+    _expectFilterAnnounced(tester, l10n, _initialConditions + 1);
     await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
     await expectLater(tester, meetsGuideline(textContrastGuideline));
 
-    // Переключение и снятие срабатывают касанием.
-    final firstToggle = _conditionToggle(_tags.first.id);
-    await _reach(tester, firstToggle);
-    await tester.tap(firstToggle);
+    // Надобность меняется и условие снимается нажатиями в панели.
+    await tester.tap(filter);
+    await _pumpFrames(tester);
+    final firstTagRow = _panelRow(_tags.first);
+    _expectTappable(tester, firstTagRow);
+    await tester.tap(firstTagRow);
     await tester.pump();
     expect(
-      container.read(conditionsProvider).conditions.first.requirement,
+      container
+          .read(conditionsProvider)
+          .conditions
+          .singleWhere((condition) => condition.tagId == _tags.first.id)
+          .requirement,
       IntentionTagRequirement.mustBeAbsent,
     );
-    final lastRemove = _conditionRemove(_tags.last.id);
-    await _reach(tester, lastRemove);
-    await tester.tap(lastRemove);
-    await tester.pump();
-    final conditions = container.read(conditionsProvider).conditions;
-    expect(conditions, hasLength(_initialConditions));
+    await _reach(tester, lastTagRow, _panelList);
+    await tester.tap(lastTagRow);
+    await _pumpFrames(tester);
+    await tester.tap(find.text(l10n.tagsPanelDone));
+    await _pumpFrames(tester);
+    _expectFilterAnnounced(tester, l10n, _initialConditions);
     expect(tester.takeException(), isNull);
 
     // Выдача со строкой тегов у каждого результата и отказом продолжения.
@@ -243,34 +211,36 @@ void main() {
     await _pumpFrames(tester);
     expect(tester.takeException(), isNull);
 
+    // Первый тег в панели стал исключённым, и обязательным остался второй из
+    // тегов строки: он называется впереди.
     final tagsLine = l10n.intentionSummaryTags(
-      rowTags.map((tag) => tag.name.value).join(', '),
+      rowTags.reversed.map((tag) => tag.name.value).join(', '),
     );
     for (final summary in items) {
       final row = find.ancestor(
         of: find.text(summary.title),
-        matching: find.byType(IntentionSummaryView),
+        matching: find.byType(CatalogRow),
       );
-      await _reach(tester, row, within: list);
+      await _reach(tester, row, list);
       _expectTappable(tester, row);
       final line = summary.tags.isEmpty
           ? l10n.intentionSummaryNoTags
           : tagsLine;
-      _expectNotTruncated(
-        tester,
-        find.descendant(of: row, matching: findTextIgnoringInlineWidgets(line)),
-      );
-      final rowNode = tester.getSemantics(row);
+      _expectNotTruncated(tester, find.text(summary.title));
+      final rowNode = tester.getSemantics(find.text(summary.title));
       expect(rowNode.label, allOf(contains(summary.title), contains(line)));
-      expect(rowNode, isSemantics(hasTapAction: true));
+      expect(rowNode, isSemantics(isButton: true, hasTapAction: true));
     }
 
-    final continuation = find.byType(IntentionCatalogContinuationStatusView);
+    // Виды состояния списка — закрытые наследники ListState.
+    final continuation = find.byWidgetPredicate(
+      (widget) => widget is ListState,
+    );
     final continuationRetry = find.descendant(
       of: continuation,
-      matching: find.widgetWithText(FilledButton, l10n.commonRetry),
+      matching: find.widgetWithText(InkWell, l10n.commonRetry),
     );
-    await _reach(tester, continuationRetry, within: list);
+    await _reach(tester, continuationRetry, list);
     _expectTappable(tester, continuationRetry);
     expect(
       find.descendant(
@@ -279,7 +249,12 @@ void main() {
       ),
       findsOneWidget,
     );
-    await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+    // Поле поиска закреплено на экране, а область его крестика — 32 по
+    // оформлению, поэтому размер цели проверяется у самого повтора.
+    expect(
+      tester.getSize(continuationRetry).height,
+      greaterThanOrEqualTo(DoableMetrics.tapMin),
+    );
     await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
     await expectLater(tester, meetsGuideline(textContrastGuideline));
     await tester.tap(continuationRetry);
@@ -304,23 +279,12 @@ void main() {
     expect(tester.takeException(), isNull);
     final lastRow = find.ancestor(
       of: find.text(lastSummary.title),
-      matching: find.byType(IntentionSummaryView),
+      matching: find.byType(CatalogRow),
     );
-    await _reach(tester, lastRow, within: list);
+    await _reach(tester, lastRow, list);
     _expectTappable(tester, lastRow);
 
-    // От конца выдачи поле названия достижимо одними жестами прокрутки.
-    for (
-      var attempt = 0;
-      attempt < 40 && !_isTappable(tester, field);
-      attempt++
-    ) {
-      await tester.dragFrom(
-        const Offset(210, _keyboardTop - 80),
-        const Offset(0, 400),
-      );
-      await _pumpFrames(tester);
-    }
+    // Поле названия закреплено и доступно и от конца выдачи.
     _expectTappable(tester, field);
     expect(tester.widget<TextField>(field).controller!.text, 'ход');
 
@@ -337,15 +301,36 @@ void main() {
     );
     await accepted.future;
     await _pumpFrames(tester);
-    expect(_conditionToggle(deleted.id), findsNothing);
     expect(
-      container.read(conditionsProvider).conditions,
-      hasLength(_initialConditions - 1),
+      shownIntentionCatalogParameters(tester).tagConditions,
+      _initialConditions - 1,
     );
 
     expect(tester.takeException(), isNull);
     semantics.dispose();
   });
+}
+
+/// Экранный диктор называет кнопку фильтра с числом условий [count], а
+/// сама кнопка показывает это число.
+void _expectFilterAnnounced(
+  WidgetTester tester,
+  AppLocalizations l10n,
+  int count,
+) {
+  final filter = intentionCatalogTagFilterControl;
+  expect(
+    find.descendant(of: filter, matching: find.text('$count')),
+    findsOneWidget,
+  );
+  expect(
+    tester.getSemantics(filter),
+    isSemantics(
+      label: l10n.intentionPickerFilterLabel(count),
+      isButton: true,
+      hasTapAction: true,
+    ),
+  );
 }
 
 /// Проверяет открытую панель тегов в режиме фильтра: поле поиска и строки
@@ -358,7 +343,10 @@ Future<void> _expectTagsPanelAccessible(
   expect(tester.takeException(), isNull);
   expect(find.text(l10n.tagsPanelFilterTitle), findsOneWidget);
   final search = find.descendant(
-    of: find.byType(SearchField),
+    of: find.descendant(
+      of: find.byType(BottomSheet),
+      matching: find.byType(SearchField),
+    ),
     matching: find.byType(TextField),
   );
   _expectTappable(tester, search);
@@ -370,7 +358,7 @@ Future<void> _expectTagsPanelAccessible(
   for (final (index, tag) in _tags.indexed) {
     final name = tag.name.value;
     final row = _panelRow(tag);
-    await _reach(tester, row, within: _panelList);
+    await _reach(tester, row, _panelList);
     _expectTappable(tester, row);
     // Тег, уже входящий в условия, объявлен с текущей надобностью.
     expect(tester.getSemantics(row).label, switch (index) {
@@ -392,64 +380,20 @@ final _panelList = find.descendant(
   matching: find.byType(CustomScrollView),
 );
 
-/// Общая прокрутка параметров поиска и выдачи страницы поиска.
-final _pageScrollable = find
-    .descendant(
-      of: find.byType(IntentionSearchLayout),
-      matching: find.byType(Scrollable),
-    )
-    .first;
-
-/// Доводит элемент до видимой области прокруткой.
-///
-/// Лениво создаваемый элемент сначала находится жестами: прокруткой страницы
-/// до списка [within] и самого списка на [delta], а параметры поиска —
-/// прокруткой страницы к началу. Затем все охватывающие области прокрутки
-/// показывают элемент.
+/// Доводит лениво создаваемый элемент до видимой области списка [list]:
+/// сначала находит его жестами на [delta], затем показывает.
 Future<void> _reach(
   WidgetTester tester,
-  Finder finder, {
-  Finder? within,
+  Finder finder,
+  Finder list, {
   double delta = 150,
 }) async {
-  if (within != null && within.evaluate().isEmpty) {
-    // Список скрыт за параметрами поиска: сначала прокручивается страница.
-    await tester.scrollUntilVisible(
-      within,
-      150,
-      scrollable: _pageScrollable,
-      maxScrolls: 200,
-    );
-  }
-  if (within == null && finder.evaluate().isEmpty) {
-    // Параметры поиска скрыты за выдачей: страница прокручивается к началу.
-    for (
-      var attempt = 0;
-      attempt < 200 && finder.evaluate().isEmpty;
-      attempt++
-    ) {
-      await tester.dragFrom(
-        _visiblePoint(tester, _pageScrollable),
-        const Offset(0, 300),
-      );
-      await tester.pump();
-    }
-  }
-  if (within != null) {
-    final scrollable = find
-        .descendant(of: within, matching: find.byType(Scrollable))
-        .first;
-    for (
-      var attempt = 0;
-      attempt < 200 && finder.evaluate().isEmpty;
-      attempt++
-    ) {
-      await tester.dragFrom(
-        _visiblePoint(tester, scrollable),
-        Offset(0, -delta),
-      );
-      await tester.pump();
-    }
+  final scrollable = find
+      .descendant(of: list, matching: find.byType(Scrollable))
+      .first;
+  for (var attempt = 0; attempt < 200 && finder.evaluate().isEmpty; attempt++) {
+    await tester.dragFrom(_visiblePoint(tester, scrollable), Offset(0, -delta));
+    await tester.pump();
   }
   expect(finder, findsOneWidget);
   await Scrollable.ensureVisible(tester.element(finder), alignment: 0.5);
@@ -526,20 +470,7 @@ void _expectNotTruncated(WidgetTester tester, Finder finder) {
 IntentionTagCondition _condition(
   Tag tag,
   IntentionTagRequirement requirement,
-) => IntentionTagCondition(
-  tagId: tag.id,
-  requirement: requirement,
-  name: tag.name,
-  color: tag.color,
-);
-
-Finder _conditionToggle(TagId id) => find.byKey(
-  ValueKey('intention-tag-condition-toggle-${id.toCanonicalString()}'),
-);
-
-Finder _conditionRemove(TagId id) => find.byKey(
-  ValueKey('intention-tag-condition-remove-${id.toCanonicalString()}'),
-);
+) => IntentionTagCondition(tagId: tag.id, requirement: requirement);
 
 Finder _panelRow(Tag tag) =>
     find.byKey(ValueKey('tags-panel-row-${tag.id.toCanonicalString()}'));

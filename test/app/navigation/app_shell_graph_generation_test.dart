@@ -23,11 +23,16 @@ import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph_format/graph_format_records.dart';
 import 'package:doable/src/graph_snapshots/graph_snapshot_store.dart';
+import 'package:doable/src/intention/application/intention_catalog.dart'
+    hide IntentionCatalogPage;
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import 'package:doable/src/statistics/application/statistics_period.dart';
 import 'package:doable/src/statistics/application/statistics_read_contract.dart';
 import 'package:doable/src/statistics/presentation/home_statistics_state.dart';
 import 'package:doable/src/statistics/presentation/home_statistics_view_model.dart';
+import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -39,7 +44,7 @@ import '../../support/daily_choice_local_date.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
-import '../../support/inline_text.dart';
+import '../../support/intention_catalog_controls.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/temporary_graph_files.dart';
 import '../../support/tag_positions.dart';
@@ -110,22 +115,19 @@ void main() {
     );
 
     await _select(tester, AppDestination.intentionGraph);
-    await _until(tester, find.text(_l10n.catalogTotalCount(_intentionCount)));
+    await _until(tester, intentionCatalogTotal(_intentionCount));
     await _settle(tester);
-    expect(_intentionCatalogParameters(tester), {
-      'охват': [_l10n.catalogScopeActive, _l10n.catalogScopeLabel],
-      'фильтр названия': '',
-      'условия по тегам': isEmpty,
-      'порядок': [_l10n.catalogOrderCreatedNewest, _l10n.catalogOrderLabel],
-      'позиция прокрутки': 0,
-      'позиция прокрутки страницы': 0,
-    });
+    expect(shownIntentionCatalogParameters(tester), (
+      scope: IntentionScope.active,
+      type: IntentionTypeChoice.all,
+      order: IntentionCatalogOrder.createdAtDescending,
+      titleFilter: '',
+      tagConditions: 0,
+    ));
+    expect(shownIntentionCatalogOffsets(tester), everyElement(0));
     // Выдача нового графа начинается с первой строки начального порядка.
     expect(
-      find.descendant(
-        of: find.byType(IntentionCatalogPage),
-        matching: find.text(_replacedTitle(_intentionCount)),
-      ),
+      intentionCatalogRow(_replacedTitle(_intentionCount)),
       findsOneWidget,
     );
 
@@ -221,53 +223,45 @@ String _previousTitle(int number) =>
 String _replacedTitle(int number) =>
     'Новое ${number.toString().padLeft(2, '0')}';
 
-/// Каталог намерений: все намерения, фильтр названия, условие по тегу,
-/// порядок от старых к новым и прокрученные выдача и страница.
+/// Каталог намерений: все намерения, только действия, фильтр названия, условие
+/// по тегу, порядок от старых к новым и прокрученные выдача и страница.
 Future<void> _prepareIntentionCatalog(WidgetTester tester) async {
   await _select(tester, AppDestination.intentionGraph);
-  await _tap(tester, find.byKey(const ValueKey('catalog-scope-control')));
-  await tester.tap(find.text(_l10n.catalogScopeAll).last);
+  await selectIntentionCatalogScope(tester, IntentionScope.all, tap: _tap);
   await _settle(tester);
-  await tester.enterText(
-    find.byKey(const ValueKey('catalog-filter-field')),
-    'Намерение',
-  );
-  await _until(tester, find.text(_l10n.catalogTotalCount(_intentionCount)));
-  await _tap(
+  await selectIntentionCatalogType(
     tester,
-    find.byKey(const ValueKey('intention-tag-conditions-add')),
-  );
-  await _tap(
-    tester,
-    find.byKey(ValueKey('tags-panel-row-${tagFixtureId(_previousTag)}')),
-  );
-  // Панель фильтра применяет условие сразу, а «назад» только закрывает её.
-  await tester.binding.handlePopRoute();
-  await _waitFor(
-    tester,
-    () => find
-        .byKey(ValueKey('tags-panel-row-${tagFixtureId(_previousTag)}'))
-        .evaluate()
-        .isEmpty,
+    IntentionTypeChoice.actions,
+    tap: _tap,
   );
   await _settle(tester);
-  await _tap(tester, find.byKey(const ValueKey('catalog-order-control')));
-  await tester.tap(find.text(_l10n.catalogOrderCreatedOldest).last);
+  await enterIntentionCatalogTitle(tester, 'Намерение');
+  await _until(tester, intentionCatalogTotal(_intentionCount));
+  await addIntentionCatalogTagCondition(
+    tester,
+    (TagId.decode(tagFixtureId(_previousTag)) as TagIdDecodingSuccess).id,
+    IntentionTagRequirement.mustBePresent,
+    tap: _tap,
+    waitFor: _until,
+  );
   await _settle(tester);
-  final list = _catalogPosition(tester);
-  list.jumpTo(list.maxScrollExtent / 2);
-  final page = _catalogPagePosition(tester);
-  page.jumpTo(page.maxScrollExtent / 2);
+  await selectIntentionCatalogOrder(
+    tester,
+    IntentionCatalogOrder.createdAtAscending,
+    tap: _tap,
+  );
+  await _settle(tester);
+  jumpIntentionCatalog(tester, 0.5);
   await _settle(tester);
 
-  expect(_intentionCatalogParameters(tester), {
-    'охват': [_l10n.catalogScopeAll, _l10n.catalogScopeLabel],
-    'фильтр названия': 'Намерение',
-    'условия по тегам': ['Здоровье'],
-    'порядок': [_l10n.catalogOrderCreatedOldest, _l10n.catalogOrderLabel],
-    'позиция прокрутки': greaterThan(0),
-    'позиция прокрутки страницы': greaterThan(0),
-  });
+  expect(shownIntentionCatalogParameters(tester), (
+    scope: IntentionScope.all,
+    type: IntentionTypeChoice.actions,
+    order: IntentionCatalogOrder.createdAtAscending,
+    titleFilter: 'Намерение',
+    tagConditions: 1,
+  ));
+  expect(shownIntentionCatalogOffsets(tester), everyElement(greaterThan(0)));
 }
 
 /// Каталог дневных выборов: выбран прошлый день, а календарь раскрыт.
@@ -403,59 +397,6 @@ Future<UnregisteredGraphSnapshot> _writeReplacementSnapshot(
     counts: counts,
   );
 }
-
-/// Параметры и позиция каталога намерений, как их видит человек.
-Map<String, Object?> _intentionCatalogParameters(WidgetTester tester) => {
-  'охват': _texts(find.byKey(const ValueKey('catalog-scope-control'))),
-  'фильтр названия': tester
-      .widget<TextField>(find.byKey(const ValueKey('catalog-filter-field')))
-      .controller!
-      .text,
-  'условия по тегам': [
-    for (final label
-        in find
-            .descendant(
-              of: find.byType(IntentionCatalogPage),
-              matching: find.byKey(
-                const ValueKey('intention-tag-condition-label'),
-              ),
-            )
-            .evaluate())
-      textIgnoringInlineWidgets(label.widget as Text),
-  ],
-  'порядок': _texts(find.byKey(const ValueKey('catalog-order-control'))),
-  'позиция прокрутки': _catalogPosition(tester).pixels,
-  'позиция прокрутки страницы': _catalogPagePosition(tester).pixels,
-};
-
-/// Видимые тексты элемента [finder] в порядке дерева.
-List<String?> _texts(Finder finder) => [
-  for (final element
-      in find.descendant(of: finder, matching: find.byType(Text)).evaluate())
-    (element.widget as Text).data,
-];
-
-ScrollPosition _positionOf(WidgetTester tester, Finder scrollView) => tester
-    .state<ScrollableState>(
-      find.descendant(of: scrollView, matching: find.byType(Scrollable)).first,
-    )
-    .position;
-
-/// Позиция прокрутки выдачи каталога намерений.
-ScrollPosition _catalogPosition(WidgetTester tester) => _positionOf(
-  tester,
-  find.byKey(const PageStorageKey<String>('intention-catalog-list')),
-);
-
-/// Позиция прокрутки страницы каталога намерений: параметры поиска и выдача
-/// прокручиваются вместе.
-ScrollPosition _catalogPagePosition(WidgetTester tester) => _positionOf(
-  tester,
-  find.descendant(
-    of: find.byType(IntentionCatalogPage),
-    matching: find.byType(CustomScrollView),
-  ),
-);
 
 AppDestination _selected(WidgetTester tester) =>
     tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected;

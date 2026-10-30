@@ -61,7 +61,7 @@ void defineIntentionPickerSessionTests({
       (rest, IntentionTagRequirement.mustBeAbsent),
     ]) {
       for (var i = 0; i < tagConditionCycles(requirement); i++) {
-        conditions.cycle(tag, snapshotRevision: const TestCatalogRevision(1));
+        conditions.cycle(tag.id);
         await tester.pump();
       }
     }
@@ -119,10 +119,7 @@ void defineIntentionPickerSessionTests({
       (rest, IntentionTagRequirement.mustBePresent),
     ]) {
       for (var i = 0; i < tagConditionCycles(requirement); i++) {
-        secondConditions.cycle(
-          tag,
-          snapshotRevision: const TestCatalogRevision(1),
-        );
+        secondConditions.cycle(tag.id);
         await tester.pump();
       }
     }
@@ -236,8 +233,6 @@ void defineIntentionPickerSessionTests({
           expect(selected, IntentionTypeChoice.actions);
         case IntentionTypePinnedToActions():
           expect(first, isA<SelectDailyChoiceAction>());
-        case IntentionTypeNotOffered():
-          fail('Поиск должен предлагать тип намерения.');
       }
 
       await router.maybePop();

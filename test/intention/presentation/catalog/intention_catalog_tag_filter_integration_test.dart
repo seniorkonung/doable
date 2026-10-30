@@ -694,12 +694,11 @@ void main() {
         'условие не восстанавливает', () async {
       open(browse);
       await confirmed();
-      final snapshot = await _tagSnapshot(repository);
       final model = container.read(conditions.notifier);
-      snapshot
-        ..cycle(model, 301)
-        ..cycle(model, 302)
-        ..cycle(model, 302);
+      model
+        ..cycle(_tagId(301))
+        ..cycle(_tagId(302))
+        ..cycle(_tagId(302));
       expect((await confirmed()).totalCount, 5);
 
       await _completeTag(
@@ -712,14 +711,14 @@ void main() {
           ),
         ),
       );
-      expect(_shown(container, conditions), [
-        (_tagId(301), _present, 'Самочувствие'),
-        (_tagId(302), _absent, 'Спорт'),
-      ]);
+      expect(
+        _shown(container, conditions),
+        unorderedEquals([(_tagId(301), _present), (_tagId(302), _absent)]),
+      );
       expect((await confirmed()).totalCount, 5);
 
       await _deleteTag(container, _tagId(301));
-      expect(_shown(container, conditions), [(_tagId(302), _absent, 'Спорт')]);
+      expect(_shown(container, conditions), [(_tagId(302), _absent)]);
       final remaining = IntentionTagFilter(excludedTagIds: [_tagId(302)]);
       var state = await _awaitCatalog(
         container,
@@ -739,12 +738,12 @@ void main() {
           ),
         ),
       );
-      final recreated = (await _tagSnapshot(repository)).tags
+      final recreated = (await _tags(repository))
           .singleWhere((tag) => tag.name.value == 'Самочувствие');
       expect(recreated.id, isNot(_tagId(301)));
       await _assignTag(container, recreated.id, _intentionId(7));
       await pumpEventQueue();
-      expect(_shown(container, conditions), [(_tagId(302), _absent, 'Спорт')]);
+      expect(_shown(container, conditions), [(_tagId(302), _absent)]);
       state = await confirmed();
       expect(state.query.tagFilter, remaining);
       expect(state.totalCount, 7);
@@ -758,15 +757,14 @@ void main() {
       open(_actionSearchPurpose);
       await confirmed();
       await confirmed(action);
-      final snapshot = await _tagSnapshot(repository);
-      snapshot.cycle(container.read(conditions.notifier), 302);
+      container.read(conditions.notifier).cycle(_tagId(302));
       final actionConditions = container.read(
         intentionTagConditionsViewModelProvider(_actionSearchPurpose).notifier,
       );
-      snapshot
-        ..cycle(actionConditions, 301)
-        ..cycle(actionConditions, 302)
-        ..cycle(actionConditions, 302);
+      actionConditions
+        ..cycle(_tagId(301))
+        ..cycle(_tagId(302))
+        ..cycle(_tagId(302));
       final browseBefore = await confirmed();
       final actionBefore = await confirmed(action);
       expect(browseBefore.totalCount, 1);
@@ -803,7 +801,7 @@ void main() {
           container,
           intentionTagConditionsViewModelProvider(_actionSearchPurpose),
         ),
-        [(_tagId(301), _present, 'Здоровье')],
+        [(_tagId(301), _present)],
       );
       expect(browseAfter.query.tagFilter, IntentionTagFilter.empty);
       expect(browseAfter.totalCount, 8);
@@ -821,37 +819,20 @@ void main() {
 const _present = IntentionTagRequirement.mustBePresent;
 const _absent = IntentionTagRequirement.mustBeAbsent;
 
-/// Полный снимок каталога тегов, из которого пользователь выбирает условие.
-final class _TagSnapshot {
-  const _TagSnapshot(this.tags, this.revision);
-
-  final List<tag_domain.Tag> tags;
-  final GraphRevision revision;
-
-  List<String> get names => [for (final tag in tags) tag.name.value];
-
-  /// Переключает условие по тегу [number] так же, как нажатие в панели.
-  void cycle(IntentionTagConditionSet conditions, int number) =>
-      conditions.cycle(
-        tags.singleWhere((tag) => tag.id == _tagId(number)),
-        snapshotRevision: revision,
-      );
-}
-
-Future<_TagSnapshot> _tagSnapshot(
+/// Теги, которые сейчас есть в каталоге тегов.
+Future<List<tag_domain.Tag>> _tags(
   DriftPersonalGraphRepository repository,
 ) async {
   final result = await repository.getTagCatalog(const TagCatalogBrowseMode());
-  final snapshot = (result as TagCatalogSuccess).value;
-  return _TagSnapshot(snapshot.items, snapshot.revision);
+  return (result as TagCatalogSuccess).value.items;
 }
 
-List<(TagId, IntentionTagRequirement, String)> _shown(
+List<(TagId, IntentionTagRequirement)> _shown(
   ProviderContainer container,
   IntentionTagConditionsViewModelProvider provider,
 ) => [
   for (final condition in container.read(provider).conditions)
-    (condition.tagId, condition.requirement, condition.name.value),
+    (condition.tagId, condition.requirement),
 ];
 
 /// Ждёт подтверждённой выдачи, согласованной с изменением тегов.

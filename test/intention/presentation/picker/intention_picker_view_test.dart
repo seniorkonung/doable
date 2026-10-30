@@ -6,14 +6,17 @@ import 'package:doable/src/design_system/components/list_state.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/design_system/components/top_bar.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
+import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
+import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import 'package:doable/src/intention/presentation/picker/intention_picker_view.dart';
+import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
@@ -28,7 +31,6 @@ import '../../../support/tag_positions.dart';
 const _screen = Size(390, 844);
 const _closeLabel = 'Закрыть поиск';
 const _emptyScopeMessage = 'Доступных активных действий нет.';
-const _revision = TestCatalogRevision(1);
 
 final _actionField = find.byKey(const ValueKey('daily-choice-action-filter'));
 final _filterButton = find.byType(FilterButton);
@@ -103,7 +105,7 @@ void main() {
               typeRow.value,
               purpose is SelectDailyChoiceAction
                   ? (ru ? 'Только действия' : 'Actions only')
-                  : (ru ? 'Всё' : 'All'),
+                  : (ru ? 'Намерения и действия' : 'Intentions and actions'),
             );
             if (sortByName) {
               await tester.tap(
@@ -489,7 +491,7 @@ void main() {
         };
         await tester.enterText(find.byKey(ValueKey('$prefix-filter')), filter);
         if (required) {
-          h.conditions(purpose).cycle(sport, snapshotRevision: _revision);
+          h.conditions(purpose).cycle(sport.id);
         }
         await tester.pump(const Duration(milliseconds: 300));
         h.repository.complete(
@@ -543,10 +545,10 @@ void main() {
           final field = find.byKey(ValueKey('$prefix-filter'));
           await tester.enterText(field, 'бег');
           final conditions = h.conditions(purpose)
-            ..cycle(sport, snapshotRevision: _revision)
+            ..cycle(sport.id)
             // Второй шаг круга исключает тег.
-            ..cycle(work, snapshotRevision: _revision)
-            ..cycle(work, snapshotRevision: _revision);
+            ..cycle(work.id)
+            ..cycle(work.id);
           await tester.pump(const Duration(milliseconds: 300));
           h.repository.complete(
             h.repository.queries.length - 1,
@@ -782,6 +784,51 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('выбор передаёт сводку строки с ревизией выдачи, из которой '
+      'строка построена, а стрелка — идентификатор', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final h = await _open(tester);
+    final sport = _tag(1, 'Спорт');
+    final renamed = Tag(
+      id: sport.id,
+      name: TagName.fromInput('Бег'),
+      color: sport.color,
+      position: sport.position,
+    );
+    final summary = testSummary(
+      index: 1,
+      title: 'Бегать по утрам',
+      readiness: IntentionReadiness.ready,
+      tags: [sport],
+    );
+    h.repository.complete(0, _firstPage([summary]));
+    await tester.pumpAndSettle();
+
+    await acceptTagCommand(
+      h.container,
+      h.repository,
+      UpdateTag(tagId: sport.id, name: renamed.name, color: renamed.color),
+      tagRenameSuccess(
+        before: sport,
+        after: renamed,
+        revision: const TestCatalogRevision(2),
+      ),
+    ).future;
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Бегать по утрам'));
+    await tester.tap(find.bySemanticsLabel(RegExp('Открыть страницу')));
+
+    final pick = h.picks.single;
+    expect(pick.value.id, summary.id);
+    expect(pick.value.tags.single.name.value, 'Бег');
+    expect(
+      pick.revision.compareTo(const TestCatalogRevision(2)),
+      GraphRevisionOrder.same,
+    );
+    expect(h.openedDetails, [summary.id]);
+    semantics.dispose();
+  });
+
   for (final brightness in Brightness.values) {
     for (final locale in [const Locale('ru'), const Locale('en')]) {
       testWidgets(
@@ -840,7 +887,9 @@ Result<IntentionCatalogPage> _firstPage(
   IntentionCatalogFirstPage(
     items: items,
     totalCount: totalCount ?? items.length,
-    typeCounts: typeCounts,
+    counts: typeCounts == null
+        ? const IntentionCountsTotalOnly()
+        : IntentionCountsByType(typeCounts),
     nextCursor: (totalCount ?? items.length) > items.length
         ? const TestCatalogCursor()
         : null,
@@ -863,6 +912,8 @@ final class _Harness {
   final ProviderContainer container;
   final ControlledCatalogRepository repository;
   int closes = 0;
+  final picks = <GraphSnapshot<IntentionSummary>>[];
+  final openedDetails = <IntentionId>[];
 
   IntentionTagConditionsViewModel conditions(IntentionPickerPurpose purpose) =>
       container.read(intentionTagConditionsViewModelProvider(purpose).notifier);
@@ -898,8 +949,8 @@ Future<_Harness> _open(
           closeLabel: _closeLabel,
           emptyScopeMessage: _emptyScopeMessage,
           onClose: () => h.closes++,
-          onPick: (_) {},
-          onOpenDetails: (_) {},
+          onPick: h.picks.add,
+          onOpenDetails: h.openedDetails.add,
         ),
       ),
     ),

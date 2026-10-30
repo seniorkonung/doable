@@ -38,10 +38,10 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_page
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_options.dart';
 import 'package:doable/src/intention/presentation/edit/intention_edit_page.dart';
-import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_id_generator.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
@@ -66,7 +66,7 @@ import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
-import '../../support/inline_text.dart';
+import '../../support/intention_catalog_controls.dart';
 import '../../support/intention_edit_screen.dart';
 import '../../support/intention_options.dart';
 import '../../support/tag_positions.dart';
@@ -226,12 +226,12 @@ void main() {
       await _prepareDailyChoiceCatalog(tester, app);
       final dailyBefore = _dailyChoiceParameters(tester, app);
       await _select(tester, AppDestination.intentionGraph);
-      await _enterTitleFilter(tester, app, 'Намерение', total: _activeCount);
-      await _selectOrder(tester, app.l10n.catalogOrderCreatedOldest);
-      final catalogBefore = _intentionCatalogParameters(tester, app);
+      await _enterTitle(tester, 'Намерение', total: _activeCount);
+      await _selectOldestFirst(tester);
+      final catalogBefore = _intentionCatalogParameters(tester);
       final target = app.intentionCatalog.items.first;
       final router = app.container.read(appRouterProvider);
-      await tester.tap(_catalogRow(target.title).hitTestable());
+      await tester.tap(intentionCatalogRow(target.title).hitTestable());
       await _until(tester, find.byType(IntentionDetailsPage));
       await tester.pumpAndSettle();
       app.repository.holdNextCommand();
@@ -268,12 +268,9 @@ void main() {
       expect(app.repository.commands.single, isA<ArchiveIntention>());
 
       await _select(tester, AppDestination.intentionGraph);
-      expect(
-        find.text('Total intentions: ${_activeCount - 1}'),
-        findsOneWidget,
-      );
+      expect(intentionCatalogTotal(_activeCount - 1), findsOneWidget);
       expect(find.text(target.title), findsNothing);
-      expect(_intentionCatalogParameters(tester, app), catalogBefore);
+      expect(_intentionCatalogParameters(tester), catalogBefore);
       await _select(tester, AppDestination.dailyChoices);
       expect(_dailyChoiceParameters(tester, app), dailyBefore);
       expect(_builtMessages, findsNothing);
@@ -298,15 +295,7 @@ void main() {
         }
         await _select(tester, origin);
         final router = app.container.read(appRouterProvider);
-        await tester.tap(
-          find
-              .descendant(
-                of: find.byType(catalog_page.IntentionCatalogPage),
-                matching: find.byType(IntentionSummaryView),
-              )
-              .hitTestable()
-              .first,
-        );
+        await tester.tap(intentionCatalogRows.hitTestable().first);
         await _until(tester, find.byType(IntentionDetailsPage));
         await tester.pumpAndSettle();
         expect(_selected(tester), origin);
@@ -347,13 +336,13 @@ void main() {
       final renamed = _activeTitle(2);
       const newTitle = 'Намерение 02 после переименования';
       await _select(tester, AppDestination.intentionGraph);
-      await _enterTitleFilter(tester, app, 'Намерение', total: _activeCount);
-      await _selectOrder(tester, app.l10n.catalogOrderCreatedOldest);
+      await _enterTitle(tester, 'Намерение', total: _activeCount);
+      await _selectOldestFirst(tester);
       // Строка переименуемого намерения остаётся в видимой части.
-      _catalogPosition(tester).jumpTo(60);
+      intentionCatalogListPosition(tester).jumpTo(60);
       await tester.pumpAndSettle();
-      expect(_catalogRow(renamed), findsOneWidget);
-      final before = _intentionCatalogParameters(tester, app);
+      expect(intentionCatalogRow(renamed), findsOneWidget);
+      final before = _intentionCatalogParameters(tester);
 
       await _select(tester, AppDestination.dailyChoices);
       await _selectDay(tester, app, _choiceDate, total: _choiceCount);
@@ -379,9 +368,9 @@ void main() {
       );
       await _select(tester, AppDestination.intentionGraph);
 
-      expect(_catalogRow(newTitle), findsOneWidget);
-      expect(_catalogRow(renamed), findsNothing);
-      expect(_intentionCatalogParameters(tester, app), before);
+      expect(intentionCatalogRow(newTitle), findsOneWidget);
+      expect(intentionCatalogRow(renamed), findsNothing);
+      expect(_intentionCatalogParameters(tester), before);
       expect(tester.takeException(), isNull);
     });
 
@@ -413,8 +402,12 @@ void main() {
       );
 
       await _select(tester, AppDestination.intentionGraph);
-      await _enterTitleFilter(tester, app, _activeTitle(1), total: 1);
-      await _open(tester, _catalogRow(_activeTitle(1)), IntentionDetailsPage);
+      await _enterTitle(tester, _activeTitle(1), total: 1);
+      await _open(
+        tester,
+        intentionCatalogRow(_activeTitle(1)),
+        IntentionDetailsPage,
+      );
       await _tap(tester, find.text('Choices').first);
       await _open(
         tester,
@@ -775,7 +768,11 @@ void main() {
                   ).single['is_archived']
                   as int;
           await _select(tester, AppDestination.intentionGraph);
-          await _open(tester, _catalogRow(archived), IntentionDetailsPage);
+          await _open(
+            tester,
+            intentionCatalogRow(archived),
+            IntentionDetailsPage,
+          );
           app.repository.holdNextCommand();
           if (fails) app.faults.failNextArchiveWrite();
           await _chooseIntentionOption(tester, IntentionOption.archive);
@@ -818,14 +815,14 @@ void main() {
             expect(message, findsOneWidget);
             await _select(tester, AppDestination.intentionGraph);
             expect(find.byKey(_message), findsOneWidget);
-            expect(_catalogRow(archived), findsOneWidget);
+            expect(intentionCatalogRow(archived), findsOneWidget);
             await _closeMessage(tester);
           } else {
             // Успех виден в согласованных данных каталога, а не в сообщении.
             await _select(tester, AppDestination.intentionGraph);
             await _waitFor(
               tester,
-              () => _catalogRow(archived).evaluate().isEmpty,
+              () => intentionCatalogRow(archived).evaluate().isEmpty,
             );
             await tester.pumpAndSettle();
             expect(_builtMessages, findsNothing);
@@ -1041,67 +1038,62 @@ void _seed(sqlite.Database database) {
   database.execute('COMMIT');
 }
 
-/// Каталог намерений: архивный охват, фильтр названия, условие по тегу,
-/// порядок от старых к новым, две загруженные порции из трёх и прокрутка
-/// внутри второй порции.
+/// Каталог намерений: архивный охват, только действия, фильтр названия, условие
+/// по тегу, порядок от старых к новым, две загруженные порции из трёх и
+/// прокрутка внутри второй порции.
 Future<void> _prepareIntentionCatalog(WidgetTester tester, _App app) async {
   await _select(tester, AppDestination.intentionGraph);
-  await _selectScope(tester, app.l10n.catalogScopeArchived);
-  await _enterTitleFilter(
+  await selectIntentionCatalogScope(tester, IntentionScope.archived, tap: _tap);
+  await _settle(tester);
+  await selectIntentionCatalogType(
     tester,
-    app,
-    'Архив',
-    total: _archivedCount + _untaggedCount,
+    IntentionTypeChoice.actions,
+    tap: _tap,
   );
-  await _tap(
+  await _settle(tester);
+  await _enterTitle(tester, 'Архив', total: _archivedCount + _untaggedCount);
+  await addIntentionCatalogTagCondition(
     tester,
-    find.byKey(const ValueKey('intention-tag-conditions-add')),
+    (TagId.decode(tagFixtureId(_healthTag)) as TagIdDecodingSuccess).id,
+    IntentionTagRequirement.mustBePresent,
+    tap: _tap,
+    waitFor: _until,
   );
-  await _tap(
-    tester,
-    find.byKey(ValueKey('tags-panel-row-${tagFixtureId(_healthTag)}')),
-  );
-  // Панель фильтра применяет условие сразу, а «назад» только закрывает её.
-  await tester.binding.handlePopRoute();
-  await _waitFor(
-    tester,
-    () => find
-        .byKey(ValueKey('tags-panel-row-${tagFixtureId(_healthTag)}'))
-        .evaluate()
-        .isEmpty,
-  );
-  await _until(tester, find.text(app.l10n.catalogTotalCount(_archivedCount)));
+  await _until(tester, intentionCatalogTotal(_archivedCount));
   await tester.pumpAndSettle();
-  await _selectOrder(tester, app.l10n.catalogOrderCreatedOldest);
+  await _selectOldestFirst(tester);
+  // Лист не забирает фокус у поля названия, а поле с фокусом после возврата
+  // на страницу показало бы каретку.
+  FocusManager.instance.primaryFocus?.unfocus();
+  await tester.pump();
 
   // Конец первой порции запрашивает вторую.
-  final position = _catalogPosition(tester);
-  position.jumpTo(position.maxScrollExtent);
+  jumpIntentionCatalog(tester, 1);
   await _waitFor(
     tester,
     () => app.intentionCatalog.items.length == 2 * _intentionPageSize,
   );
   await tester.pumpAndSettle();
   // Середина второй порции далека от её конца: третья порция не нужна.
-  position.jumpTo(position.maxScrollExtent * 0.6);
-  await _settle(tester);
-
-  // Параметры поиска прокручиваются вместе с выдачей: страница стоит между
-  // ними и концом выдачи.
-  final page = _catalogPagePosition(tester);
-  page.jumpTo(page.maxScrollExtent / 2);
+  jumpIntentionCatalog(tester, 0.6);
   await _settle(tester);
 
   final catalog = app.intentionCatalog;
   expect(catalog.items, hasLength(2 * _intentionPageSize));
   expect(catalog.totalCount, _archivedCount);
   expect(catalog.nextCursor, isNotNull);
-  expect(catalog.selection.scope, IntentionScope.archived);
+  expect(
+    catalog.selection.scope,
+    const IntentionScopeOpen(IntentionScope.archived),
+  );
   expect(catalog.selection.order, IntentionCatalogOrder.createdAtAscending);
+  expect(
+    shownIntentionCatalogParameters(tester).type,
+    IntentionTypeChoice.actions,
+  );
   expect(catalog.items.first.title, 'Архив 001');
-  expect(_conditions(tester), ['Здоровье']);
-  expect(position.pixels, greaterThan(0));
-  expect(page.pixels, greaterThan(0));
+  expect(shownIntentionCatalogParameters(tester).tagConditions, 1);
+  expect(shownIntentionCatalogOffsets(tester), everyElement(greaterThan(0)));
 }
 
 /// Каталог дневных выборов: прошлый день и невыполненные, календарь раскрыт
@@ -1157,7 +1149,7 @@ Future<void> _prepareDailyChoiceCatalog(WidgetTester tester, _App app) async {
 Map<String, Object?> _intentionCatalogView(WidgetTester tester, _App app) {
   final catalog = app.intentionCatalog;
   return {
-    ..._intentionCatalogParameters(tester, app),
+    ..._intentionCatalogParameters(tester),
     'загруженные намерения': [for (final item in catalog.items) item.title],
     'всего': catalog.totalCount,
     'чтения выдачи': app.repository.catalogReads,
@@ -1166,19 +1158,9 @@ Map<String, Object?> _intentionCatalogView(WidgetTester tester, _App app) {
 }
 
 /// Параметры и позиция каталога намерений, как их видит человек.
-Map<String, Object?> _intentionCatalogParameters(
-  WidgetTester tester,
-  _App app,
-) => {
-  'охват': _texts(find.byKey(const ValueKey('catalog-scope-control'))),
-  'фильтр названия': tester
-      .widget<TextField>(find.byKey(const ValueKey('catalog-filter-field')))
-      .controller!
-      .text,
-  'условия по тегам': _conditions(tester),
-  'порядок': _texts(find.byKey(const ValueKey('catalog-order-control'))),
-  'позиция прокрутки': _catalogPosition(tester).pixels,
-  'позиция прокрутки страницы': _catalogPagePosition(tester).pixels,
+Map<String, Object?> _intentionCatalogParameters(WidgetTester tester) => {
+  'параметры': shownIntentionCatalogParameters(tester),
+  'прокрутка': shownIntentionCatalogOffsets(tester),
 };
 
 /// Наблюдаемое состояние каталога дневных выборов: страница, календарь и
@@ -1245,55 +1227,6 @@ final _calendarCommands = {
   Locale('en'): ['Previous month', 'Next month', 'Collapse calendar'],
 };
 
-/// Тексты элемента [finder] в порядке дерева; при [skipOffstage] — только
-/// видимые.
-List<String?> _texts(Finder finder, {bool skipOffstage = true}) => [
-  for (final element
-      in find
-          .descendant(
-            of: finder,
-            matching: find.byType(Text),
-            skipOffstage: skipOffstage,
-          )
-          .evaluate())
-    (element.widget as Text).data,
-];
-
-/// Подписи выбранных условий по тегам каталога намерений.
-List<String?> _conditions(WidgetTester tester) => [
-  for (final label
-      in find
-          .descendant(
-            of: find.byType(catalog_page.IntentionCatalogPage),
-            matching: find.byKey(
-              const ValueKey('intention-tag-condition-label'),
-            ),
-          )
-          .evaluate())
-    textIgnoringInlineWidgets(label.widget as Text),
-];
-
-ScrollPosition _positionOf(WidgetTester tester, Finder scrollView) => tester
-    .state<ScrollableState>(
-      find.descendant(of: scrollView, matching: find.byType(Scrollable)).first,
-    )
-    .position;
-
-ScrollPosition _catalogPosition(WidgetTester tester) => _positionOf(
-  tester,
-  find.byKey(const PageStorageKey<String>('intention-catalog-list')),
-);
-
-/// Позиция прокрутки страницы каталога намерений: параметры поиска и выдача
-/// прокручиваются вместе.
-ScrollPosition _catalogPagePosition(WidgetTester tester) => _positionOf(
-  tester,
-  find.descendant(
-    of: find.byType(catalog_page.IntentionCatalogPage),
-    matching: find.byType(CustomScrollView),
-  ),
-);
-
 /// Общая прокрутка страницы каталога дневных выборов: календарь, фильтры и
 /// выдача прокручиваются вместе.
 final _dailyChoiceScrollView = find.descendant(
@@ -1329,12 +1262,6 @@ final _dailyChoiceRows = find.byWidgetPredicate(
   },
 );
 
-/// Строка выдачи каталога намерений с названием [title].
-Finder _catalogRow(String title) => find.descendant(
-  of: find.byType(catalog_page.IntentionCatalogPage),
-  matching: find.widgetWithText(IntentionSummaryView, title),
-);
-
 String _completion(AppLocalizations l10n, bool completed) =>
     '${l10n.dailyChoiceDetailsDate(_choiceDate.toCanonicalString())} · '
     '${completed ? l10n.dailyChoiceDetailsCompleted : l10n.dailyChoiceDetailsNotCompleted}';
@@ -1345,33 +1272,24 @@ final _builtMessages = find.byKey(_message, skipOffstage: false);
 AppDestination _selected(WidgetTester tester) =>
     tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected;
 
-Future<void> _selectScope(WidgetTester tester, String label) async {
-  await _tap(tester, find.byKey(const ValueKey('catalog-scope-control')));
-  await tester.pumpAndSettle();
-  await tester.tap(find.text(label).last);
-  await tester.pumpAndSettle();
-}
-
-Future<void> _selectOrder(WidgetTester tester, String label) async {
-  await _tap(tester, find.byKey(const ValueKey('catalog-order-control')));
-  await tester.pumpAndSettle();
-  await tester.tap(find.text(label).last);
+/// Упорядочивает каталог намерений от старых к новым и ждёт выдачу.
+Future<void> _selectOldestFirst(WidgetTester tester) async {
+  await selectIntentionCatalogOrder(
+    tester,
+    IntentionCatalogOrder.createdAtAscending,
+    tap: _tap,
+  );
   await _settle(tester);
 }
 
-/// Вводит фильтр названия каталога намерений и ждёт выдачу с [total]
-/// совпадениями.
-Future<void> _enterTitleFilter(
+/// Вводит название в каталоге намерений и ждёт выдачу с [total] совпадениями.
+Future<void> _enterTitle(
   WidgetTester tester,
-  _App app,
-  String filter, {
+  String title, {
   required int total,
 }) async {
-  await tester.enterText(
-    find.byKey(const ValueKey('catalog-filter-field')),
-    filter,
-  );
-  await _until(tester, find.text(app.l10n.catalogTotalCount(total)));
+  await enterIntentionCatalogTitle(tester, title);
+  await _until(tester, intentionCatalogTotal(total));
   await tester.pumpAndSettle();
 }
 

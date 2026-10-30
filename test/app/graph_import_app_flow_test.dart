@@ -20,7 +20,7 @@ import 'package:doable/src/intention/application/intention_catalog.dart'
     show IntentionSaved;
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/domain/intention.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/statistics/application/statistics_period.dart';
@@ -39,7 +39,7 @@ import '../support/app_flow_wait.dart' as app_flow;
 import '../support/app_root_pages.dart';
 import '../support/graph_import_app_harness.dart';
 import '../support/graph_import_files.dart';
-import '../support/inline_text.dart';
+import '../support/intention_catalog_controls.dart';
 import '../support/quick_creation.dart';
 import '../support/temporary_import_document.dart';
 
@@ -85,7 +85,7 @@ void main() {
       ('Здоровье', findsNothing),
     ]) {
       expect(
-        find.descendant(of: _catalogList, matching: find.text(title)),
+        find.descendant(of: intentionCatalogList, matching: find.text(title)),
         finds,
       );
     }
@@ -220,11 +220,10 @@ void main() {
     await openIntentionGraph(
       tester,
       waitFor: app_flow.until,
-      content: _catalogList,
+      content: intentionCatalogList,
     );
-    expect(_tagConditions(), isEmpty);
-    expect(_catalogPosition(tester).pixels, 0);
-    expect(_catalogPagePosition(tester).pixels, 0);
+    expect(shownIntentionCatalogParameters(tester).tagConditions, 0);
+    expect(shownIntentionCatalogOffsets(tester), everyElement(0));
   });
 }
 
@@ -440,26 +439,15 @@ List<String?> _sheetBackups(WidgetTester tester) {
   return texts.sublist(2, texts.length - 1);
 }
 
-/// Выдача каталога намерений.
-final _catalogList = find.byKey(
-  const PageStorageKey<String>('intention-catalog-list'),
-);
-
 /// Открывает каталог намерений, задаёт условие «есть тег» [tag] и
 /// прокручивает выдачу и страницу.
 Future<void> _filterIntentionCatalogByTag(WidgetTester tester, Tag tag) async {
   await _applyTagCondition(tester, tag.id);
-  for (final position in [
-    _catalogPosition(tester),
-    _catalogPagePosition(tester),
-  ]) {
-    position.jumpTo(position.maxScrollExtent / 2);
-  }
+  jumpIntentionCatalog(tester, 0.5);
   await app_flow.advance(tester);
 
-  expect(_tagConditions(), [tag.name.value]);
-  expect(_catalogPosition(tester).pixels, isPositive);
-  expect(_catalogPagePosition(tester).pixels, isPositive);
+  expect(shownIntentionCatalogParameters(tester).tagConditions, 1);
+  expect(shownIntentionCatalogOffsets(tester), everyElement(isPositive));
 }
 
 /// Открывает каталог намерений и задаёт в панели фильтра условие «есть тег»
@@ -468,62 +456,18 @@ Future<void> _applyTagCondition(WidgetTester tester, TagId tag) async {
   await openIntentionGraph(
     tester,
     waitFor: app_flow.until,
-    content: _catalogList,
+    content: intentionCatalogList,
   );
-  await _tap(
+  await addIntentionCatalogTagCondition(
     tester,
-    find.byKey(const ValueKey('intention-tag-conditions-add')),
-  );
-  await _tap(
-    tester,
-    find.byKey(ValueKey('tags-panel-row-${tag.toCanonicalString()}')),
-  );
-  // Панель фильтра применяет условие сразу, а «назад» только закрывает её.
-  await tester.binding.handlePopRoute();
-  await app_flow.waitFor(
-    tester,
-    () => find
-        .byKey(ValueKey('tags-panel-row-${tag.toCanonicalString()}'))
-        .evaluate()
-        .isEmpty,
+    tag,
+    IntentionTagRequirement.mustBePresent,
+    tap: _tap,
+    waitFor: app_flow.until,
   );
   // Выдача с условием прочитана за эти шаги.
   await app_flow.settle(tester);
 }
-
-/// Названия тегов в условиях каталога намерений.
-List<String?> _tagConditions() => [
-  for (final label
-      in find
-          .descendant(
-            of: find.byType(IntentionCatalogPage),
-            matching: find.byKey(
-              const ValueKey('intention-tag-condition-label'),
-            ),
-          )
-          .evaluate())
-    textIgnoringInlineWidgets(label.widget as Text),
-];
-
-ScrollPosition _positionOf(WidgetTester tester, Finder scrollView) => tester
-    .state<ScrollableState>(
-      find.descendant(of: scrollView, matching: find.byType(Scrollable)).first,
-    )
-    .position;
-
-/// Позиция прокрутки выдачи каталога намерений.
-ScrollPosition _catalogPosition(WidgetTester tester) =>
-    _positionOf(tester, _catalogList);
-
-/// Позиция прокрутки страницы каталога намерений: параметры поиска и выдача
-/// прокручиваются вместе.
-ScrollPosition _catalogPagePosition(WidgetTester tester) => _positionOf(
-  tester,
-  find.descendant(
-    of: find.byType(IntentionCatalogPage),
-    matching: find.byType(CustomScrollView),
-  ),
-);
 
 /// Дожидается элемента [finder], доводит его до видимости и нажимает.
 Future<void> _tap(WidgetTester tester, Finder finder) async {

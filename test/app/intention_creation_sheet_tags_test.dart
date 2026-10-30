@@ -328,7 +328,7 @@ final class _App {
     final l10n = lookupAppLocalizations(locale);
     await tester.pumpWidget(MainApp(runtime: runtime));
     await openIntentionGraph(tester, waitFor: _until);
-    await _until(tester, find.text(l10n.catalogActiveEmpty));
+    await _until(tester, find.text(l10n.intentionCatalogNoIntentionsTitle));
     await tester.pumpAndSettle();
     return _App(
       raw,

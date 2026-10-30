@@ -37,10 +37,10 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_page
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_state.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_view_model.dart';
-import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_state.dart';
@@ -53,9 +53,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../support/app_root_pages.dart';
-import '../support/inline_text.dart';
 import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
+import '../support/intention_catalog_controls.dart';
 import '../support/intention_creation_origin.dart';
 import '../support/local_database_harness.dart';
 import '../support/tag_storage_fixture.dart';
@@ -120,9 +120,6 @@ const _creationTables = [
   'tag_assignments',
 ];
 
-final _catalogList = find.byKey(
-  const PageStorageKey<String>('intention-catalog-list'),
-);
 final _sheet = find.byKey(const ValueKey('intention-creation-sheet'));
 final _chooseTags = find.byKey(const ValueKey('intention-editor-choose-tags'));
 final _readiness = find.byKey(const ValueKey('intention-editor-readiness'));
@@ -292,41 +289,34 @@ void main() {
         // Новая строка встала над видимыми: список сдвинулся на неё, а
         // видимые строки остались на своих местах экрана.
         final viewAfter = _catalogView(tester);
-        expect(viewAfter.page, viewBefore.page);
         expect(viewAfter.rows, viewBefore.rows);
         expect(viewAfter.list, greaterThan(viewBefore.list));
 
         // Над прежними строками видна одна строка нового намерения.
         await _scrollCatalogToTop(tester);
-        final createdRows = find.descendant(
-          of: _catalogList,
-          matching: find.widgetWithText(IntentionSummaryView, _title),
-        );
-        expect(createdRows, findsOneWidget);
-        expect(_visibleCatalogRows(tester).first.title, _title);
-        expect(
-          find.descendant(
-            of: createdRows,
-            matching: findTextIgnoringInlineWidgets(
-              l10n.intentionSummaryTags('$_sport, Дом'),
-            ),
-          ),
-          findsOneWidget,
-        );
+        expect(intentionCatalogRow(_title), findsOneWidget);
+        final createdRow = _visibleCatalogRows(tester).first;
+        expect(createdRow.title, _title);
+        expect(createdRow.tags, l10n.intentionSummaryTags('$_sport, Дом'));
 
         // Выдача уже требует «Дом» и показывает новое намерение один раз.
         // Условие по второму выбранному тегу оставляет в ней только его, а
         // снятие условия возвращает прежнюю выдачу.
         final idsWithCreated = _ids(catalog);
-        await _addCondition(tester, sport, present: true);
-        await _waitForCatalogIds(tester, app, [created]);
-        await _tap(
+        await addIntentionCatalogTagCondition(
           tester,
-          find.byKey(
-            ValueKey(
-              'intention-tag-condition-remove-${sport.toCanonicalString()}',
-            ),
-          ),
+          sport,
+          IntentionTagRequirement.mustBePresent,
+          tap: _tap,
+          waitFor: _until,
+        );
+        await _waitForCatalogIds(tester, app, [created]);
+        await removeIntentionCatalogTagCondition(
+          tester,
+          sport,
+          IntentionTagRequirement.mustBePresent,
+          tap: _tap,
+          waitFor: _until,
         );
         await _waitForCatalogIds(tester, app, idsWithCreated);
         expectIntentionGraphRootPage(app.router);
@@ -591,20 +581,28 @@ Future<_Launch> _launch(
 /// оба охвата, текст, обязательный «Дом», исключённую «Работу» и порядок по
 /// изменению. Ждёт выдачу всех этюдов.
 Future<void> _searchCatalog(WidgetTester tester, _Launch app) async {
-  final l10n = app.l10n;
   await openIntentionGraph(tester, waitFor: _until);
   await _waitFor(tester, () => _catalogState(app) is IntentionCatalogLoaded);
-  await _selectOption(tester, 'catalog-scope-control', l10n.catalogScopeAll);
-  await tester.enterText(
-    find.byKey(const ValueKey('catalog-filter-field')),
-    _catalogFilter,
-  );
-  await _addCondition(tester, _tagId(_homeTag), present: true);
-  await _addCondition(tester, _tagId(_workTag), present: false);
-  await _selectOption(
+  await selectIntentionCatalogScope(tester, IntentionScope.all, tap: _tap);
+  await enterIntentionCatalogTitle(tester, _catalogFilter);
+  await addIntentionCatalogTagCondition(
     tester,
-    'catalog-order-control',
-    l10n.catalogOrderUpdatedNewest,
+    _tagId(_homeTag),
+    IntentionTagRequirement.mustBePresent,
+    tap: _tap,
+    waitFor: _until,
+  );
+  await addIntentionCatalogTagCondition(
+    tester,
+    _tagId(_workTag),
+    IntentionTagRequirement.mustBeAbsent,
+    tap: _tap,
+    waitFor: _until,
+  );
+  await selectIntentionCatalogOrder(
+    tester,
+    IntentionCatalogOrder.updatedAtDescending,
+    tap: _tap,
   );
   final sketchesByUpdate = [
     for (final number in _sketches.toList().reversed) _intentionId(number),
@@ -623,7 +621,7 @@ Future<void> _searchCatalog(WidgetTester tester, _Launch app) async {
   final catalog = _catalog(app);
   expect(catalog.totalCount, _sketchCount);
   expect(catalog.nextCursor, isNull);
-  expect(catalog.selection.scope, IntentionScope.all);
+  expect(catalog.selection.scope, const IntentionScopeOpen(IntentionScope.all));
   expect(catalog.selection.titleFilterText, _catalogFilter);
   expect(
     catalog.selection.tagFilter,
@@ -642,7 +640,7 @@ Future<void> _scrollCatalog(WidgetTester tester) async {
     const Offset(0, -300),
   );
   await tester.pumpAndSettle();
-  expect(_catalogListPosition(tester).pixels, greaterThan(0));
+  expect(intentionCatalogListPosition(tester).pixels, greaterThan(0));
 }
 
 /// Возвращает выдачу каталога к началу жестом в видимой области списка.
@@ -652,7 +650,7 @@ Future<void> _scrollCatalogToTop(WidgetTester tester) async {
     const Offset(0, 3000),
   );
   await tester.pumpAndSettle();
-  expect(_catalogListPosition(tester).pixels, 0);
+  expect(intentionCatalogListPosition(tester).pixels, 0);
 }
 
 /// Открывает панель создания через меню и кнопку общей панели.
@@ -822,45 +820,6 @@ Future<void> _waitForCatalogIds(
     },
     reason: () => '${_catalogState(app)}',
   );
-  await tester.pumpAndSettle();
-}
-
-/// Добавляет условие по тегу [tag] в панели фильтра: первое нажатие на тег
-/// требует его, второе исключает. Затем «назад» закрывает панель.
-Future<void> _addCondition(
-  WidgetTester tester,
-  TagId tag, {
-  required bool present,
-}) async {
-  await _tap(
-    tester,
-    find.byKey(const ValueKey('intention-tag-conditions-add')),
-  );
-  final id = tag.toCanonicalString();
-  final row = find.byKey(ValueKey('tags-panel-row-$id'));
-  await _tap(tester, row);
-  if (!present) await _tap(tester, row);
-  await _waitFor(
-    tester,
-    () => find
-        .byKey(ValueKey('intention-tag-condition-$id'))
-        .evaluate()
-        .isNotEmpty,
-  );
-  await tester.binding.handlePopRoute();
-  await _waitFor(tester, () => row.evaluate().isEmpty);
-  await tester.pumpAndSettle();
-}
-
-/// Выбирает пункт [label] выпадающего списка параметра [key] каталога.
-Future<void> _selectOption(
-  WidgetTester tester,
-  String key,
-  String label,
-) async {
-  await _tap(tester, find.byKey(ValueKey(key)));
-  await tester.pumpAndSettle();
-  await tester.tap(find.text(label).last);
   await tester.pumpAndSettle();
 }
 
@@ -1225,61 +1184,29 @@ void _expectSameSearch(
   expect(actual.continuation, isA<IntentionCatalogContinuationIdle>());
 }
 
-/// Видимая строка выдачи каталога: название и положение на экране.
-typedef _CatalogRow = ({String title, Rect rect});
-
-/// Позиция просмотра каталога: прокрутка страницы параметров, прокрутка
-/// списка выдачи и видимые строки на своих местах экрана.
-typedef _CatalogView = ({double page, double list, List<_CatalogRow> rows});
+/// Позиция просмотра каталога: прокрутка списка выдачи и видимые строки на
+/// своих местах экрана.
+typedef _CatalogView = ({double list, List<ShownIntentionCatalogRow> rows});
 
 _CatalogView _catalogView(WidgetTester tester) => (
-  page: _catalogPagePosition(tester).pixels,
-  list: _catalogListPosition(tester).pixels,
+  list: intentionCatalogListPosition(tester).pixels,
   rows: _visibleCatalogRows(tester),
 );
 
 /// Видимая область списка выдачи на странице каталога.
 Rect _visibleCatalogArea(WidgetTester tester) => tester
-    .getRect(_catalogList)
+    .getRect(intentionCatalogList)
     .intersect(tester.getRect(find.byType(IntentionCatalogPage)));
 
 /// Строки выдачи, видимые в области списка на странице каталога, сверху
 /// вниз.
-List<_CatalogRow> _visibleCatalogRows(WidgetTester tester) {
+List<ShownIntentionCatalogRow> _visibleCatalogRows(WidgetTester tester) {
   final area = _visibleCatalogArea(tester);
   return [
-    for (final element
-        in find
-            .descendant(
-              of: _catalogList,
-              matching: find.byType(IntentionSummaryView),
-            )
-            .evaluate())
-      if (_rectOf(element) case final rect when rect.overlaps(area))
-        (title: (element.widget as IntentionSummaryView).title, rect: rect),
+    for (final row in shownIntentionCatalogRows(tester))
+      if (row.rect.overlaps(area)) row,
   ];
 }
-
-Rect _rectOf(Element element) {
-  final box = element.renderObject! as RenderBox;
-  return box.localToGlobal(Offset.zero) & box.size;
-}
-
-ScrollPosition _catalogListPosition(WidgetTester tester) => tester
-    .state<ScrollableState>(
-      find
-          .descendant(of: _catalogList, matching: find.byType(Scrollable))
-          .first,
-    )
-    .position;
-
-/// Прокрутка страницы, в которой параметры поиска и выдача прокручиваются
-/// вместе.
-ScrollPosition _catalogPagePosition(WidgetTester tester) => tester
-    .state<ScrollableState>(
-      find.ancestor(of: _catalogList, matching: find.byType(Scrollable)).first,
-    )
-    .position;
 
 Finder _tagsPanel(AppLocalizations l10n) =>
     find.widgetWithText(Sheet, l10n.tagsPanelTitle);

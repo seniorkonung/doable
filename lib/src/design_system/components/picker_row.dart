@@ -3,10 +3,9 @@ import 'package:flutter/material.dart' hide Badge;
 import '../doable_colors.dart';
 import '../doable_icon.dart';
 import '../doable_metrics.dart';
-import '../doable_type.dart';
 import 'badge.dart';
+import 'row_text.dart';
 import 'tag_chip.dart';
-import 'tag_line.dart';
 
 /// Строка экрана выбора: нажатие на текст выбирает элемент, а стрелка справа
 /// открывает его страницу. Экранный диктор видит две кнопки с готовыми
@@ -71,29 +70,12 @@ final class PickerRow extends StatelessWidget {
                     0,
                     DoableMetrics.space3,
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        name,
-                        style: DoableType.action.copyWith(
-                          color: archived ? colors.muted : colors.ink,
-                        ),
-                      ),
-                      if (description case final description?) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          description,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: DoableType.note.copyWith(color: colors.muted),
-                        ),
-                      ],
-                      if (marks.isNotEmpty || tags.isNotEmpty) ...[
-                        const SizedBox(height: DoableMetrics.space2),
-                        TagLine(marks: marks, tags: tags),
-                      ],
-                    ],
+                  child: RowText(
+                    name: name,
+                    description: description,
+                    archived: archived,
+                    marks: marks,
+                    tags: tags,
                   ),
                 ),
               ),

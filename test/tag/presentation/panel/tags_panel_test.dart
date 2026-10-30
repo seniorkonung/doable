@@ -214,9 +214,9 @@ void main() {
         locale: locale,
         panelContext: (container) => TagsPanelFilterContext(
           _searchConditions(container)
-            ..cycle(_tag(1, 'Здоровье'), snapshotRevision: _revision)
-            ..cycle(_tag(2, 'Спорт'), snapshotRevision: _revision)
-            ..cycle(_tag(2, 'Спорт'), snapshotRevision: _revision),
+            ..cycle(_tag(1, 'Здоровье').id)
+            ..cycle(_tag(2, 'Спорт').id)
+            ..cycle(_tag(2, 'Спорт').id),
         ),
       );
       await h.open();
@@ -315,9 +315,9 @@ void main() {
       tester,
       panelContext: (container) => TagsPanelFilterContext(
         conditions = _searchConditions(container)
-          ..cycle(_tag(1, 'Здоровье'), snapshotRevision: _revision)
-          ..cycle(_tag(2, 'Спорт'), snapshotRevision: _revision)
-          ..cycle(_tag(2, 'Спорт'), snapshotRevision: _revision),
+          ..cycle(_tag(1, 'Здоровье').id)
+          ..cycle(_tag(2, 'Спорт').id)
+          ..cycle(_tag(2, 'Спорт').id),
       ),
     );
     await h.open();
@@ -1803,8 +1803,6 @@ Future<_Harness> _pumpApp(
   );
   return harness;
 }
-
-const _revision = TagCatalogTestRevision();
 
 /// Условия поиска каталога намерений, над которыми тестовая страница
 /// открывает панель фильтра.

@@ -15,13 +15,13 @@ import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_options.dart';
 import 'package:doable/src/intention/presentation/edit/intention_edit_page.dart';
-import 'package:doable/src/intention/presentation/intention_summary_view.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/app_root_pages.dart';
+import '../support/intention_catalog_controls.dart';
 import '../support/quick_creation.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
@@ -103,9 +103,9 @@ void main() {
         ),
       );
       final catalogRow = tester.getSemantics(
-        find.ancestor(
-          of: find.text('Беречь здоровье'),
-          matching: find.byType(IntentionSummaryView),
+        find.descendant(
+          of: intentionCatalogRow('Беречь здоровье'),
+          matching: find.text('Беречь здоровье'),
         ),
       );
       expect(catalogRow.label, contains('Беречь здоровье'));
@@ -351,13 +351,7 @@ void main() {
       await _dismissOperationMessage(tester);
       await _returnToCatalog(tester);
       await _pumpUntilFound(tester, find.text(sameTitle));
-      expect(
-        find.ancestor(
-          of: find.text(sameTitle),
-          matching: find.byType(IntentionSummaryView),
-        ),
-        findsOneWidget,
-      );
+      expect(intentionCatalogRow(sameTitle), findsOneWidget);
 
       final successfulRelationCommands = diagnostics.events
           .whereType<LongTermRelationCommandDiagnosticsEvent>()

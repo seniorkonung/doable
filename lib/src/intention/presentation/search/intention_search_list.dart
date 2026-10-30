@@ -8,67 +8,69 @@ import '../../../design_system/components/empty_state.dart';
 import '../../../design_system/components/list_state.dart';
 import '../../../design_system/doable_icon.dart';
 import '../../../design_system/doable_metrics.dart';
-import '../../../graph/application/graph_revision.dart';
 import '../../application/intention_catalog.dart';
-import '../../domain/intention_id.dart';
 import '../catalog/intention_catalog_purpose.dart';
 import '../catalog/intention_catalog_state.dart';
 import '../catalog/intention_catalog_view_model.dart';
-import 'intention_picker_kind.dart';
-import 'intention_picker_row.dart';
+import 'intention_search_kind.dart';
+import 'results_scroll_keeper.dart';
 
-/// Выдача экрана выбора назначения [purpose]: строки, подгрузка следующей
-/// порции, пустая выдача и отказы.
+/// Строит строку найденного намерения [summary] выдачи [results].
+typedef IntentionSearchRowBuilder = Widget Function(
+  BuildContext context,
+  IntentionCatalogLoaded results,
+  IntentionSummary summary,
+);
+
+/// Выдача поиска намерений назначения [purpose]: строки, подгрузка следующей
+/// порции, загрузка, отказы и пустая выдача.
 ///
-/// Пустая выдача называет выбранный тип и причину: фильтры можно сбросить,
-/// а пустой тип — расширить до обоих типов.
+/// Пустая выдача из-за фильтров предлагает их сбросить, а пустой выбранный
+/// тип — показать оба типа. Пустой допустимый охват описывает страница через
+/// [emptyScope].
 ///
-/// Элемент один владеет прокруткой списка и возвращает его к началу, когда
-/// модель подтверждает выдачу нового запроса.
-final class IntentionPickerResults extends ConsumerStatefulWidget {
-  const IntentionPickerResults({
+/// Место в списке держит [ResultsScrollKeeper]: новая выдача начинается с
+/// верхней позиции, а согласование выдачи с подтверждёнными операциями
+/// оставляет видимую строку на месте. Элемент один владеет прокруткой
+/// списка, а строки строит страница через [rowBuilder].
+final class IntentionSearchList extends ConsumerStatefulWidget {
+  const IntentionSearchList({
     required this.purpose,
-    required this.emptyScopeMessage,
+    required this.rowBuilder,
+    required this.emptyScope,
     required this.onResetFilters,
-    required this.onPick,
-    required this.onOpenDetails,
+    required this.bottomPadding,
     super.key,
   });
 
-  final IntentionPickerPurpose purpose;
+  final IntentionCatalogPurpose purpose;
 
-  /// Сообщение страницы о том, что допустимый охват пуст.
-  final String emptyScopeMessage;
+  final IntentionSearchRowBuilder rowBuilder;
+
+  /// Содержание пустой выдачи, когда пуст сам допустимый охват, а не
+  /// отобранное фильтрами или типом.
+  final EmptyState Function(IntentionCatalogEmpty empty) emptyScope;
 
   /// Снимает фильтр названия и все условия по тегам: полем названия владеет
-  /// экран.
+  /// страница.
   final VoidCallback onResetFilters;
 
-  /// Получает сводку строки с ревизией выдачи, из которой строка построена:
-  /// к моменту нажатия модель может держать уже другую выдачу.
-  final void Function(GraphSnapshot<IntentionSummary> pick) onPick;
-
-  final void Function(IntentionId id) onOpenDetails;
+  /// Отступ под последней строкой списка.
+  final double bottomPadding;
 
   @override
-  ConsumerState<IntentionPickerResults> createState() =>
-      _IntentionPickerResultsState();
+  ConsumerState<IntentionSearchList> createState() =>
+      _IntentionSearchListState();
 }
 
-final class _IntentionPickerResultsState
-    extends ConsumerState<IntentionPickerResults> {
-  static const _sidePadding = EdgeInsets.symmetric(
-    horizontal: DoableMetrics.space5,
-  );
+final class _IntentionSearchListState
+    extends ConsumerState<IntentionSearchList> {
+  static const _sideInset = DoableMetrics.space5;
 
-  // Список снимается с экрана на время загрузки новой выдачи и не должен
-  // возвращать смещение прежней.
-  final _scrollController = ScrollController(keepScrollOffset: false);
+  late final ResultsScrollKeeper _scrollKeeper;
 
-  /// Запрос последней подтверждённой выдачи. Модель сохраняет его объект,
-  /// пока согласует и продолжает ту же выдачу, а каждое чтение первой порции
-  /// несёт новый запрос.
-  IntentionCatalogQuery? _query;
+  /// Выдача, по которой построен список.
+  late AsyncValue<IntentionCatalogState> _shown;
 
   IntentionCatalogViewModel get _notifier =>
       ref.read(intentionCatalogViewModelProvider(widget.purpose).notifier);
@@ -76,40 +78,35 @@ final class _IntentionPickerResultsState
   @override
   void initState() {
     super.initState();
-    _query = _confirmedQuery(
-      ref.read(intentionCatalogViewModelProvider(widget.purpose)),
-    );
+    _shown = ref.read(intentionCatalogViewModelProvider(widget.purpose));
+    _scrollKeeper = ResultsScrollKeeper(shown: () => _shown);
   }
 
   @override
   void dispose() {
-    _scrollController.dispose();
+    _scrollKeeper.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final kind = IntentionPickerKind.of(widget.purpose);
-    ref.listen(
-      intentionCatalogViewModelProvider(widget.purpose),
-      (_, next) => _startNewResultsFromTop(next),
-    );
-    final catalog = ref.watch(
-      intentionCatalogViewModelProvider(widget.purpose),
-    );
-    return catalog.when(
+    final kind = IntentionSearchKind.of(widget.purpose);
+    final provider = intentionCatalogViewModelProvider(widget.purpose);
+    ref.listen(provider, _scrollKeeper.onCatalogChanged);
+    final catalog = _shown = ref.watch(provider);
+    final slivers = catalog.when(
       skipLoadingOnReload: false,
       skipLoadingOnRefresh: false,
       data: (state) => switch (state) {
         IntentionCatalogDebouncing() => _status(
           ListState.loading(text: kind.loading(l10n)),
         ),
-        IntentionCatalogInvalidFilter() => const SizedBox.shrink(),
+        IntentionCatalogInvalidFilter() => const <Widget>[],
         final IntentionCatalogLoaded loaded => _loaded(l10n, kind, loaded),
-        final IntentionCatalogEmpty empty => _list([
+        final IntentionCatalogEmpty empty => [
           SliverFillRemaining(hasScrollBody: false, child: _empty(l10n, empty)),
-        ]),
+        ],
         IntentionCatalogUnavailable() => _status(
           ListState.error(
             message: kind.unavailable(l10n),
@@ -129,16 +126,35 @@ final class _IntentionPickerResultsState
       error: (_, _) => _status(ListState.error(message: kind.unexpected(l10n))),
       loading: () => _status(ListState.loading(text: kind.loading(l10n))),
     );
+    return CustomScrollView(
+      key: PageStorageKey<String>('${kind.keyPrefix}-list'),
+      controller: _scrollKeeper.controller,
+      slivers: [
+        SliverPadding(
+          padding: EdgeInsets.fromLTRB(
+            _sideInset,
+            0,
+            _sideInset,
+            widget.bottomPadding,
+          ),
+          sliver: SliverMainAxisGroup(slivers: slivers),
+        ),
+      ],
+    );
   }
 
-  Widget _loaded(
+  /// Состояние вместо выдачи прокручивается, когда крупный текст не
+  /// помещается в оставшуюся высоту.
+  List<Widget> _status(ListState state) => [SliverToBoxAdapter(child: state)];
+
+  List<Widget> _loaded(
     AppLocalizations l10n,
-    IntentionPickerKind kind,
+    IntentionSearchKind kind,
     IntentionCatalogLoaded loaded,
   ) {
     final rows = loaded.items.length;
     final continuation = _continuation(l10n, kind, loaded);
-    return _list([
+    return [
       // Продолжение — последний элемент ленивого списка: кольцо подгрузки
       // строится, только когда конец выдачи подходит к экрану, иначе его
       // анимация требовала бы кадров непрерывно.
@@ -148,9 +164,18 @@ final class _IntentionPickerResultsState
             ? const SizedBox(height: DoableMetrics.space2)
             : const SizedBox.shrink(),
         itemBuilder: (context, index) =>
-            index < rows ? _row(loaded, index) : continuation!,
+            index < rows ? _row(context, loaded, index) : continuation!,
       ),
-    ]);
+    ];
+  }
+
+  Widget _row(BuildContext context, IntentionCatalogLoaded loaded, int index) {
+    _requestNextPage(index);
+    final summary = loaded.items[index];
+    return KeyedSubtree(
+      key: _scrollKeeper.keyFor(summary.id),
+      child: widget.rowBuilder(context, loaded, summary),
+    );
   }
 
   /// Причину пустой выдачи называет запрос, который её дал.
@@ -163,18 +188,8 @@ final class _IntentionPickerResultsState
       byTags: query.tagFilter != IntentionTagFilter.empty,
     )) {
       (byTitle: false, byTags: false) when (empty.typeCounts?.all ?? 0) > 0 =>
-        EmptyState(
-          title: l10n.intentionPickerEmptyTypeTitle,
-          text: l10n.intentionPickerEmptyTypeText,
-          action: (
-            label: l10n.intentionPickerShowBothTypes,
-            onPressed: () => _notifier.changeType(IntentionTypeChoice.all),
-          ),
-        ),
-      (byTitle: false, byTags: false) => EmptyState(
-        title: l10n.intentionPickerEmptyScopeTitle,
-        text: widget.emptyScopeMessage,
-      ),
+        _emptyType(l10n, empty, actionsOnly: actionsOnly),
+      (byTitle: false, byTags: false) => widget.emptyScope(empty),
       (byTitle: true, byTags: false) => _filteredEmpty(
         l10n,
         title: actionsOnly
@@ -199,6 +214,40 @@ final class _IntentionPickerResultsState
     };
   }
 
+  /// Пустой выбранный тип. При открытом охвате заголовок называет охват,
+  /// а текст и значок — тип; при закреплённом охвате текст общий.
+  EmptyState _emptyType(
+    AppLocalizations l10n,
+    IntentionCatalogEmpty empty, {
+    required bool actionsOnly,
+  }) {
+    final action = (
+      label: l10n.intentionPickerShowBothTypes,
+      onPressed: () => _notifier.changeType(IntentionTypeChoice.all),
+    );
+    return switch (empty.selection.scope) {
+      IntentionScopeOpen() => EmptyState(
+        icon: actionsOnly ? DoableIconData.bolt : DoableIconData.intention,
+        title: l10n.intentionPickerEmptyScopedTypeTitle(
+          empty.query.scope.name,
+          (actionsOnly
+                  ? IntentionTypeChoice.actions
+                  : IntentionTypeChoice.intentions)
+              .name,
+        ),
+        text: actionsOnly
+            ? l10n.intentionPickerEmptyActionsText
+            : l10n.intentionPickerEmptyIntentionsText,
+        action: action,
+      ),
+      IntentionScopeFixed() => EmptyState(
+        title: l10n.intentionPickerEmptyTypeTitle,
+        text: l10n.intentionPickerEmptyTypeText,
+        action: action,
+      ),
+    };
+  }
+
   EmptyState _filteredEmpty(
     AppLocalizations l10n, {
     required String title,
@@ -213,44 +262,9 @@ final class _IntentionPickerResultsState
     ),
   );
 
-  /// Состояние вместо выдачи прокручивается, когда крупный текст не
-  /// помещается в оставшуюся высоту.
-  Widget _status(ListState state) =>
-      ListView(padding: _sidePadding, children: [state]);
-
-  Widget _list(List<Widget> slivers) => CustomScrollView(
-    key: PageStorageKey<String>(
-      '${intentionPickerKeyPrefix(widget.purpose)}-list',
-    ),
-    controller: _scrollController,
-    slivers: [
-      SliverPadding(
-        padding: _sidePadding.copyWith(bottom: DoableMetrics.space10),
-        sliver: SliverMainAxisGroup(slivers: slivers),
-      ),
-    ],
-  );
-
-  Widget _row(IntentionCatalogLoaded results, int index) {
-    _requestNextPage(index);
-    final summary = results.items[index];
-    return IntentionPickerRow(
-      key: ValueKey(
-        '${intentionPickerKeyPrefix(widget.purpose)}-${summary.id.toCanonicalString()}',
-      ),
-      purpose: widget.purpose,
-      summary: summary,
-      requiredTagIds: results.query.tagFilter.requiredTagIds,
-      onPick: () => widget.onPick(
-        GraphSnapshot(value: summary, revision: results.revision),
-      ),
-      onOpenPage: () => widget.onOpenDetails(summary.id),
-    );
-  }
-
   Widget? _continuation(
     AppLocalizations l10n,
-    IntentionPickerKind kind,
+    IntentionSearchKind kind,
     IntentionCatalogLoaded results,
   ) => switch (results.continuation) {
     IntentionCatalogContinuationIdle() when results.nextCursor == null => null,
@@ -289,25 +303,4 @@ final class _IntentionPickerResultsState
       unawaited(_notifier.loadNextPageIfNeeded(visibleIndex: visibleIndex));
     });
   }
-
-  void _startNewResultsFromTop(AsyncValue<IntentionCatalogState> next) {
-    final query = _confirmedQuery(next);
-    if (query == null || identical(query, _query)) {
-      return;
-    }
-    final startsNewResults = _query != null;
-    _query = query;
-    // Список остаётся на экране, если новая выдача пришла раньше кадра,
-    // который показал бы её загрузку.
-    if (startsNewResults && _scrollController.hasClients) {
-      _scrollController.jumpTo(0);
-    }
-  }
-
-  static IntentionCatalogQuery? _confirmedQuery(
-    AsyncValue<IntentionCatalogState> catalog,
-  ) => switch (catalog.value) {
-    IntentionCatalogConfirmedState(:final query) => query,
-    _ => null,
-  };
 }

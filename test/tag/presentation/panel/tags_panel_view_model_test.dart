@@ -1150,10 +1150,13 @@ void main() {
       );
       await pumpEventQueue();
 
-      expect(search.requirements, [
-        (_id(1), IntentionTagRequirement.mustBePresent),
-        (_id(2), IntentionTagRequirement.mustBePresent),
-      ]);
+      expect(
+        search.requirements,
+        unorderedEquals([
+          (_id(1), IntentionTagRequirement.mustBePresent),
+          (_id(2), IntentionTagRequirement.mustBePresent),
+        ]),
+      );
       expect(_names(panel.loaded), ['парк', 'Дом', 'Дом 2']);
       expect(_filterMarks(panel), [
         _present,
@@ -1317,8 +1320,7 @@ final class _FilterSearch {
   _Panel open() =>
       _Panel(container, TagsPanelOpening(TagsPanelFilterContext(conditions)));
 
-  void cycle(Tag tag) =>
-      conditions.cycle(tag, snapshotRevision: const TagCatalogTestRevision());
+  void cycle(Tag tag) => conditions.cycle(tag.id);
 
   List<(TagId, IntentionTagRequirement)> get requirements => [
     for (final condition in conditions.current.conditions)

@@ -39,15 +39,47 @@ final class IntentionTypePinnedToActions extends IntentionTypeAvailability {
   int get hashCode => (IntentionTypePinnedToActions).hashCode;
 }
 
-/// Назначение поиска выбор типа не предлагает.
-final class IntentionTypeNotOffered extends IntentionTypeAvailability {
-  const IntentionTypeNotOffered();
+/// Доступность выбора охвата, которую задаёт назначение поиска.
+sealed class IntentionScopeAvailability {
+  const IntentionScopeAvailability();
+}
+
+/// Охват выбирается человеком; [selected] — выбранный охват.
+final class IntentionScopeOpen extends IntentionScopeAvailability {
+  const IntentionScopeOpen(this.selected);
+
+  final IntentionScope selected;
 
   @override
-  bool operator ==(Object other) => other is IntentionTypeNotOffered;
+  bool operator ==(Object other) =>
+      other is IntentionScopeOpen && other.selected == selected;
 
   @override
-  int get hashCode => (IntentionTypeNotOffered).hashCode;
+  int get hashCode => Object.hash(IntentionScopeOpen, selected);
+}
+
+/// Назначение поиска закрепляет охват за [scope].
+final class IntentionScopeFixed extends IntentionScopeAvailability {
+  const IntentionScopeFixed(this.scope);
+
+  final IntentionScope scope;
+
+  @override
+  bool operator ==(Object other) =>
+      other is IntentionScopeFixed && other.scope == scope;
+
+  @override
+  int get hashCode => Object.hash(IntentionScopeFixed, scope);
+}
+
+/// Точные числа намерений каждого охвата при одном условии готовности.
+final class IntentionScopeCounts {
+  const IntentionScopeCounts({required this.active, required this.archived});
+
+  final int active;
+  final int archived;
+
+  int get all => active + archived;
 }
 
 final class IntentionCatalogSelection {
@@ -60,7 +92,7 @@ final class IntentionCatalogSelection {
     required this.filterValidationFailure,
   });
 
-  final IntentionScope scope;
+  final IntentionScopeAvailability scope;
   final IntentionTypeAvailability type;
   final String titleFilterText;
   final IntentionTagFilter tagFilter;
@@ -87,7 +119,7 @@ sealed class IntentionCatalogConfirmedState extends IntentionCatalogState {
     required super.selection,
     required this.query,
     required this.totalCount,
-    required this.typeCounts,
+    required this.counts,
     required this.nextCursor,
     required this.revision,
   });
@@ -95,11 +127,29 @@ sealed class IntentionCatalogConfirmedState extends IntentionCatalogState {
   final IntentionCatalogQuery query;
   final int totalCount;
 
-  /// Точные числа обоих типов при условиях выдачи без условия готовности.
-  /// Есть тогда и только тогда, когда тип в [selection] открыт.
-  final IntentionTypeCounts? typeCounts;
+  /// Точные числа вида, который запросила выдача.
+  final IntentionCatalogCounts counts;
   final IntentionCatalogCursor? nextCursor;
   final GraphRevision revision;
+
+  /// Числа обоих типов в текущем охвате при условиях выдачи без условия
+  /// готовности. Есть тогда и только тогда, когда тип в [selection] открыт.
+  IntentionTypeCounts? get typeCounts => switch (counts) {
+    IntentionCountsTotalOnly() => null,
+    IntentionCountsByType(:final counts) => counts,
+    final IntentionCountsByScopeAndType counts => counts.inScope(query.scope),
+  };
+
+  /// Числа охватов при текущем типе и условиях выдачи без условия охвата.
+  /// Есть тогда и только тогда, когда охват в [selection] открыт.
+  IntentionScopeCounts? get scopeCounts => switch (counts) {
+    IntentionCountsTotalOnly() || IntentionCountsByType() => null,
+    IntentionCountsByScopeAndType(:final active, :final archived) =>
+      IntentionScopeCounts(
+        active: active.matching(query.readinessFilter),
+        archived: archived.matching(query.readinessFilter),
+      ),
+  };
 }
 
 final class IntentionCatalogLoaded extends IntentionCatalogConfirmedState {
@@ -108,7 +158,7 @@ final class IntentionCatalogLoaded extends IntentionCatalogConfirmedState {
     required super.query,
     required List<IntentionSummary> items,
     required super.totalCount,
-    required super.typeCounts,
+    required super.counts,
     required super.nextCursor,
     required super.revision,
     this.continuation = const IntentionCatalogContinuationIdle(),
@@ -151,7 +201,7 @@ final class IntentionCatalogEmpty extends IntentionCatalogConfirmedState {
   const IntentionCatalogEmpty({
     required super.selection,
     required super.query,
-    required super.typeCounts,
+    required super.counts,
     required super.revision,
   }) : super(totalCount: 0, nextCursor: null);
 

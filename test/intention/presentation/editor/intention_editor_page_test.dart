@@ -22,7 +22,6 @@ import 'package:doable/src/intention/application/intention_catalog.dart'
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_text.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_state.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_view_model.dart';
@@ -37,6 +36,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/app_root_pages.dart';
+import '../../../support/intention_catalog_controls.dart';
 import '../../../support/quick_creation.dart';
 import '../catalog/catalog_test_support.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
@@ -1168,11 +1168,16 @@ void main() {
         expect(sheet.bottom, _phone.height);
         expect(sheet.left, 0);
         expect(sheet.right, _phone.width);
-        // Над компактной панелью видны шапка и параметры каталога.
-        expect(tester.getRect(_catalogBar).top, 0);
+        // Над компактной панелью видны заголовок и параметры каталога.
+        expect(
+          tester.getRect(intentionCatalogHeading(tester)).top,
+          greaterThanOrEqualTo(_phoneInsets.safeTop),
+        );
         expect(
           sheet.top,
-          greaterThanOrEqualTo(tester.getRect(_catalogFilter).bottom),
+          greaterThanOrEqualTo(
+            tester.getRect(intentionCatalogTitleField).bottom,
+          ),
         );
 
         // Фокус — в пустом названии; пустое описание начинается одной
@@ -1205,8 +1210,8 @@ void main() {
         await _openEditor(tester, repository);
 
         final destinations = appNavigationDestinations();
-        expect(_catalogFilter, findsOneWidget);
-        expect(_catalogFilter.hitTestable(), findsNothing);
+        expect(intentionCatalogTitleField, findsOneWidget);
+        expect(intentionCatalogTitleField.hitTestable(), findsNothing);
         expect(quickCreationAction().hitTestable(), findsNothing);
         expect(destinations, findsNWidgets(3));
         expect(destinations.hitTestable(), findsNothing);
@@ -1220,7 +1225,12 @@ void main() {
           ),
           findsNothing,
         );
-        expect(find.semantics.byLabel('Filter by title'), findsNothing);
+        expect(
+          find.semantics.byLabel(
+            RegExp(RegExp.escape(intentionCatalogTitleFieldLabel(tester))),
+          ),
+          findsNothing,
+        );
         expect(find.semantics.byLabel(RegExp('New intention')), findsNothing);
         expect(find.semantics.byLabel('Title'), findsOneWidget);
 
@@ -2276,13 +2286,7 @@ String? _tooltipOf(WidgetTester tester, Key option) => tester
     )
     .message;
 
-final _catalogBar = find.descendant(
-  of: find.byType(IntentionCatalogPage),
-  matching: find.byType(AppBar),
-);
-final _catalogFilter = find.byKey(const ValueKey('catalog-filter-field'));
-
-/// Точка над панелью, где под модальным фоном лежит шапка каталога.
+/// Точка над панелью, где под модальным фоном лежит верх каталога.
 const _outsideSheet = Offset(400, 8);
 
 /// Экран телефона в портретной ориентации.

@@ -41,6 +41,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/app_root_pages.dart';
+import '../support/intention_catalog_controls.dart';
+import '../support/intention_type_counts.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/intention_options.dart';
 import '../support/tag_read_contract_test_fallback.dart';
@@ -127,7 +129,7 @@ void main() {
         findsOneWidget,
       );
       expect(find.text(created.title), findsOneWidget);
-      expect(find.text('Total intentions: 1'), findsOneWidget);
+      expect(intentionCatalogTotal(1), findsOneWidget);
       await tester.pump(const Duration(seconds: 5));
       await tester.pumpAndSettle();
       expect(
@@ -234,8 +236,8 @@ void main() {
 
       await tester.tap(find.bySemanticsLabel('Back'));
       await tester.pumpAndSettle();
-      expect(find.text('No active intentions yet.'), findsOneWidget);
-      await _selectScope(tester, 'Archived');
+      expect(find.text('No active intentions'), findsOneWidget);
+      await selectIntentionCatalogScope(tester, IntentionScope.archived);
       await _pumpUntil(tester, () => repository.pageQueries.length == 2);
       repository.completePage(
         1,
@@ -273,8 +275,8 @@ void main() {
 
       await tester.tap(find.bySemanticsLabel('Back'));
       await tester.pumpAndSettle();
-      expect(find.text('No archived intentions yet.'), findsOneWidget);
-      await _selectScope(tester, 'Active');
+      expect(find.text('Nothing in the archive'), findsOneWidget);
+      await selectIntentionCatalogScope(tester, IntentionScope.active);
       await _pumpUntil(tester, () => repository.pageQueries.length == 3);
       repository.completePage(
         2,
@@ -310,7 +312,7 @@ void main() {
         findsOneWidget,
       );
       expect(find.text(restored.title), findsNothing);
-      expect(find.text('No active intentions yet.'), findsOneWidget);
+      expect(find.text('No intentions yet'), findsOneWidget);
     },
   );
 
@@ -380,7 +382,7 @@ void main() {
       expect(repository.commands, hasLength(1));
       expect(find.byType(SnackBar, skipOffstage: false), findsNothing);
       await returnToIntentionGraphAfterCreation(tester, router);
-      expect(find.text('Total intentions: 1'), findsOneWidget);
+      expect(intentionCatalogTotal(1), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 
@@ -703,13 +705,6 @@ Future<void> _closeOperationMessage(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
-Future<void> _selectScope(WidgetTester tester, String label) async {
-  await tester.tap(find.byKey(const ValueKey('catalog-scope-control')));
-  await tester.pumpAndSettle();
-  await tester.tap(find.text(label).last);
-  await tester.pump();
-}
-
 Future<void> _scrollCurrentPageToTop(WidgetTester tester) async {
   final scrollable = tester.state<ScrollableState>(
     find.byType(Scrollable).first,
@@ -890,7 +885,9 @@ final class _DelayedPersonalGraphRepository
   }
 
   void completePage(int index, IntentionCatalogPage page) {
-    _pages[index].complete(ResultSuccess(page));
+    _pages[index].complete(
+      answerCatalogQuery(pageQueries[index], ResultSuccess(page)),
+    );
   }
 
   void emitDetail(int index, Intention intention) {

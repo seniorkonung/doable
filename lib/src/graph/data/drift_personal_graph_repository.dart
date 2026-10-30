@@ -1124,25 +1124,7 @@ final class DriftPersonalGraphRepository
   ) async {
     final intentions = _database.intentions;
     final condition = _catalogCondition(query);
-    // Один подсчёт без условия готовности даёт и числа обоих типов, и общее
-    // количество по условию готовности запроса.
-    final allExpression = countAll();
-    final actionsExpression = countAll(
-      filter: intentions.isActionReady.equals(true),
-    );
-    final countQuery = _database.selectOnly(intentions)
-      ..addColumns([allExpression, actionsExpression])
-      ..where(_catalogConditionExceptReadiness(query));
-    final countRow = await countQuery.getSingle();
-    final typeCounts = IntentionTypeCounts(
-      all: countRow.read(allExpression)!,
-      actions: countRow.read(actionsExpression)!,
-    );
-    final totalCount = switch (query.readinessFilter) {
-      IntentionReadinessFilter.all => typeCounts.all,
-      IntentionReadinessFilter.readyOnly => typeCounts.actions,
-      IntentionReadinessFilter.notReadyOnly => typeCounts.intentions,
-    };
+    final (totalCount, counts) = await _countCatalog(query);
     final rowsQuery = _database.selectOnly(intentions)
       ..addColumns([
         intentions.id,
@@ -1168,9 +1150,87 @@ final class DriftPersonalGraphRepository
     return IntentionCatalogFirstPage(
       items: items,
       totalCount: totalCount,
-      typeCounts: query.requestsTypeCounts ? typeCounts : null,
+      counts: counts,
       nextCursor: nextCursor,
       revision: _currentRevision,
+    );
+  }
+
+  /// Один подсчёт без условия готовности даёт и общее количество по условию
+  /// готовности запроса, и числа вида, который попросил запрос.
+  Future<(int, IntentionCatalogCounts)> _countCatalog(
+    IntentionCatalogQuery query,
+  ) async {
+    switch (query.counting) {
+      case IntentionCatalogCounting.totalOnly:
+        final typeCounts = await _countTypes(query);
+        return (
+          typeCounts.matching(query.readinessFilter),
+          const IntentionCountsTotalOnly(),
+        );
+      case IntentionCatalogCounting.byType:
+        final typeCounts = await _countTypes(query);
+        return (
+          typeCounts.matching(query.readinessFilter),
+          IntentionCountsByType(typeCounts),
+        );
+      case IntentionCatalogCounting.byScopeAndType:
+        final counts = await _countTypesByScope(query);
+        return (
+          counts.inScope(query.scope).matching(query.readinessFilter),
+          counts,
+        );
+    }
+  }
+
+  /// Числа типов в охвате запроса.
+  Future<IntentionTypeCounts> _countTypes(IntentionCatalogQuery query) async {
+    final intentions = _database.intentions;
+    final allExpression = countAll();
+    final actionsExpression = countAll(
+      filter: intentions.isActionReady.equals(true),
+    );
+    final countQuery = _database.selectOnly(intentions)
+      ..addColumns([allExpression, actionsExpression])
+      ..where(_catalogConditionExceptReadiness(query));
+    final countRow = await countQuery.getSingle();
+    return IntentionTypeCounts(
+      all: countRow.read(allExpression)!,
+      actions: countRow.read(actionsExpression)!,
+    );
+  }
+
+  /// Числа типов в активном и архивном охватах: условие охвата в запрос не
+  /// входит, его заменяют фильтры агрегатов.
+  Future<IntentionCountsByScopeAndType> _countTypesByScope(
+    IntentionCatalogQuery query,
+  ) async {
+    final intentions = _database.intentions;
+    final isActive = intentions.isArchived.equals(false);
+    final isArchived = intentions.isArchived.equals(true);
+    final isAction = intentions.isActionReady.equals(true);
+    final activeExpression = countAll(filter: isActive);
+    final activeActionsExpression = countAll(filter: isActive & isAction);
+    final archivedExpression = countAll(filter: isArchived);
+    final archivedActionsExpression = countAll(filter: isArchived & isAction);
+    final countQuery = _database.selectOnly(intentions)
+      ..addColumns([
+        activeExpression,
+        activeActionsExpression,
+        archivedExpression,
+        archivedActionsExpression,
+      ])
+      ..where(_catalogConditionExceptScopeAndReadiness(query));
+    final countRow = await countQuery.getSingle();
+    return IntentionCountsByScopeAndType(
+      active: IntentionTypeCounts(
+        all: countRow.read(activeExpression)!,
+        actions: countRow.read(activeActionsExpression)!,
+      ),
+      archived: IntentionTypeCounts(
+        all: countRow.read(archivedExpression)!,
+        actions: countRow.read(archivedActionsExpression)!,
+      ),
     );
   }
 
@@ -1227,11 +1287,23 @@ final class DriftPersonalGraphRepository
     IntentionCatalogQuery query,
   ) {
     final intentions = _database.intentions;
-    var condition = switch (query.scope) {
+    return _withCatalogFilters(switch (query.scope) {
       IntentionScope.active => intentions.isArchived.equals(false),
       IntentionScope.archived => intentions.isArchived.equals(true),
       IntentionScope.all => const Constant<bool>(true),
-    };
+    }, query);
+  }
+
+  Expression<bool> _catalogConditionExceptScopeAndReadiness(
+    IntentionCatalogQuery query,
+  ) => _withCatalogFilters(const Constant<bool>(true), query);
+
+  /// Присоединяет к [condition] исключение, теги и название запроса.
+  Expression<bool> _withCatalogFilters(
+    Expression<bool> condition,
+    IntentionCatalogQuery query,
+  ) {
+    final intentions = _database.intentions;
     final excludedIntentionId = query.excludedIntentionId;
     if (excludedIntentionId != null) {
       condition =

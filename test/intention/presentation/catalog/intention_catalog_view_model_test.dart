@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
@@ -9,6 +10,7 @@ import 'package:doable/src/intention/presentation/catalog/catalog_paging_policy.
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
+import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -595,7 +597,11 @@ void main() {
               'исходный фильтр',
               '  МОЛ  ',
             )
-            .having((value) => value.scope, 'охват', IntentionScope.archived)
+            .having(
+              (value) => value.scope,
+              'охват',
+              const IntentionScopeOpen(IntentionScope.archived),
+            )
             .having(
               (value) => value.order,
               'порядок',
@@ -856,7 +862,7 @@ void main() {
 
   group('тип намерения', () {
     test(
-      'назначение задаёт доступность типа, готовность запроса и просьбу чисел',
+      'назначение задаёт доступность охвата и типа, готовность и просьбу чисел',
       () async {
         final repository = ControlledCatalogRepository();
         final container = _catalogContainer(repository);
@@ -865,37 +871,48 @@ void main() {
             <
               (
                 IntentionCatalogPurpose,
+                IntentionScopeAvailability,
                 IntentionTypeAvailability,
                 IntentionReadinessFilter,
+                IntentionCatalogCounting,
               )
             >[
               (
                 const BrowseIntentionCatalog(),
-                const IntentionTypeNotOffered(),
+                const IntentionScopeOpen(IntentionScope.active),
+                const IntentionTypeOpen(IntentionTypeChoice.all),
                 IntentionReadinessFilter.all,
+                IntentionCatalogCounting.byScopeAndType,
               ),
               (
                 SelectDailyChoiceAction(session: IntentionSearchSession()),
+                const IntentionScopeFixed(IntentionScope.active),
                 const IntentionTypePinnedToActions(),
                 IntentionReadinessFilter.readyOnly,
+                IntentionCatalogCounting.totalOnly,
               ),
               (
                 SelectDailyChoiceSource(session: IntentionSearchSession()),
+                const IntentionScopeFixed(IntentionScope.active),
                 const IntentionTypeOpen(IntentionTypeChoice.all),
                 IntentionReadinessFilter.all,
+                IntentionCatalogCounting.byType,
               ),
               (
                 SelectRelationParticipant(
                   selectionContext:
-                      RelationParticipantSelectionContext.activeRelation,
+                      RelationParticipantSelectionContext.archivedRelation,
                   session: IntentionSearchSession(),
                 ),
+                const IntentionScopeFixed(IntentionScope.all),
                 const IntentionTypeOpen(IntentionTypeChoice.all),
                 IntentionReadinessFilter.all,
+                IntentionCatalogCounting.byType,
               ),
             ];
 
-        for (final (index, (purpose, type, readiness)) in cases.indexed) {
+        for (final (index, (purpose, scope, type, readiness, counting))
+            in cases.indexed) {
           final provider = intentionCatalogViewModelProvider(purpose);
           final subscription = container.listen(
             provider,
@@ -904,11 +921,17 @@ void main() {
           );
           addTearDown(subscription.close);
           final isOpen = type is IntentionTypeOpen;
+          final selection = container.read(provider.notifier).selection;
 
-          expect(container.read(provider.notifier).selection.type, type);
+          expect(selection.scope, scope);
+          expect(selection.type, type);
           final query = repository.queryAt(index);
+          expect(query.scope, switch (scope) {
+            IntentionScopeOpen(:final selected) => selected,
+            IntentionScopeFixed(:final scope) => scope,
+          });
           expect(query.readinessFilter, readiness);
-          expect(query.requestsTypeCounts, isOpen);
+          expect(query.counting, counting);
 
           repository.complete(
             index,
@@ -931,6 +954,63 @@ void main() {
             ),
           );
         }
+      },
+    );
+
+    test(
+      'смена типа каталога читает первую порцию, смена охвата сохраняет тип',
+      () async {
+        final repository = ControlledCatalogRepository();
+        final container = _catalogContainer(repository);
+        final provider = intentionCatalogViewModelProvider(
+          const BrowseIntentionCatalog(),
+        );
+        final subscription = container.listen(
+          provider,
+          (_, _) {},
+          fireImmediately: true,
+        );
+        addTearDown(subscription.close);
+        addTearDown(container.dispose);
+        Future<void> completeEmpty(int index) async {
+          repository.complete(
+            index,
+            ResultSuccess(
+              IntentionCatalogFirstPage(
+                items: const [],
+                totalCount: 0,
+                nextCursor: null,
+                revision: const TestCatalogRevision(1),
+              ),
+            ),
+          );
+          await container.read(provider.future);
+        }
+
+        await completeEmpty(0);
+        final notifier = container.read(provider.notifier);
+
+        notifier.changeType(IntentionTypeChoice.actions);
+        await _waitForQueries(repository, 2);
+        final typeQuery = repository.queryAt(1);
+        expect(typeQuery.readinessFilter, IntentionReadinessFilter.readyOnly);
+        expect(typeQuery.cursor, isNull);
+        await completeEmpty(1);
+
+        notifier.changeScope(IntentionScope.all);
+        await _waitForQueries(repository, 3);
+
+        final scopeQuery = repository.queryAt(2);
+        expect(scopeQuery.scope, IntentionScope.all);
+        expect(scopeQuery.readinessFilter, IntentionReadinessFilter.readyOnly);
+        expect(
+          notifier.selection.type,
+          const IntentionTypeOpen(IntentionTypeChoice.actions),
+        );
+        expect(
+          notifier.selection.scope,
+          const IntentionScopeOpen(IntentionScope.all),
+        );
       },
     );
 
@@ -977,7 +1057,7 @@ void main() {
           expect(notifier.selection.type, IntentionTypeOpen(type));
           final query = repository.queryAt(index + 1);
           expect(query.readinessFilter, readiness);
-          expect(query.requestsTypeCounts, isTrue);
+          expect(query.counting, IntentionCatalogCounting.byType);
           expect(query.cursor, isNull);
         }
 
@@ -991,69 +1071,259 @@ void main() {
       final repository = ControlledCatalogRepository();
       final container = _catalogContainer(repository);
       addTearDown(container.dispose);
-      final purposes = <IntentionCatalogPurpose>[
-        const BrowseIntentionCatalog(),
+      final provider = intentionCatalogViewModelProvider(
         SelectDailyChoiceAction(session: IntentionSearchSession()),
-      ];
+      );
+      final subscription = container.listen(
+        provider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      repository.complete(
+        0,
+        ResultSuccess(
+          IntentionCatalogFirstPage(
+            items: const [],
+            totalCount: 0,
+            nextCursor: null,
+            revision: const TestCatalogRevision(1),
+          ),
+        ),
+      );
+      await container.read(provider.future);
+      final notifier = container.read(provider.notifier);
+      final type = notifier.selection.type;
 
-      for (final (index, purpose) in purposes.indexed) {
-        final provider = intentionCatalogViewModelProvider(purpose);
+      notifier.changeType(IntentionTypeChoice.intentions);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(notifier.selection.type, type);
+      expect(repository.queries, hasLength(1));
+    });
+
+    test(
+      'числа типов при закреплённом типе нарушают контракт порции',
+      () async {
+        final repository = ControlledCatalogRepository();
+        final container = _catalogContainer(repository);
+        addTearDown(container.dispose);
+        final provider = intentionCatalogViewModelProvider(
+          SelectDailyChoiceAction(session: IntentionSearchSession()),
+        );
         final subscription = container.listen(
           provider,
           (_, _) {},
           fireImmediately: true,
         );
         addTearDown(subscription.close);
-        repository.complete(
-          index,
+
+        repository.completeVerbatim(
+          0,
           ResultSuccess(
             IntentionCatalogFirstPage(
-              items: const [],
-              totalCount: 0,
+              items: [testSummary(index: 1)],
+              totalCount: 1,
+              counts: IntentionCountsByType(
+                IntentionTypeCounts(all: 1, actions: 0),
+              ),
               nextCursor: null,
               revision: const TestCatalogRevision(1),
             ),
           ),
         );
-        await container.read(provider.future);
-        final notifier = container.read(provider.notifier);
-        final type = notifier.selection.type;
 
-        notifier.changeType(IntentionTypeChoice.intentions);
-        await Future<void>.delayed(Duration.zero);
+        expect(
+          await container.read(provider.future),
+          isA<IntentionCatalogUnexpected>(),
+        );
+      },
+    );
 
-        expect(notifier.selection.type, type);
-        expect(repository.queries, hasLength(index + 1));
+    test('пропущенные, чужого вида или противоречивые числа типов нарушают контракт порции', () async {
+      final repository = ControlledCatalogRepository();
+      final container = _catalogContainer(repository);
+      addTearDown(container.dispose);
+      final pages = [
+        // Запрошенных чисел нет.
+        IntentionCatalogFirstPage(
+          items: [testSummary(index: 1)],
+          totalCount: 1,
+          nextCursor: null,
+          revision: const TestCatalogRevision(1),
+        ),
+        // Общее количество типа «Все» расходится с числом всех.
+        IntentionCatalogFirstPage(
+          items: [testSummary(index: 1), testSummary(index: 2)],
+          totalCount: 2,
+          counts: IntentionCountsByType(
+            IntentionTypeCounts(all: 3, actions: 1),
+          ),
+          nextCursor: null,
+          revision: const TestCatalogRevision(1),
+        ),
+        // Подсчёт по охватам и типам модель не просила.
+        IntentionCatalogFirstPage(
+          items: [testSummary(index: 1)],
+          totalCount: 1,
+          counts: IntentionCountsByScopeAndType(
+            active: IntentionTypeCounts(all: 1, actions: 0),
+            archived: IntentionTypeCounts(all: 0, actions: 0),
+          ),
+          nextCursor: null,
+          revision: const TestCatalogRevision(1),
+        ),
+      ];
+
+      for (final (index, page) in pages.indexed) {
+        final provider = intentionCatalogViewModelProvider(
+          SelectDailyChoiceSource(session: IntentionSearchSession()),
+        );
+        final subscription = container.listen(
+          provider,
+          (_, _) {},
+          fireImmediately: true,
+        );
+        addTearDown(subscription.close);
+        repository.completeVerbatim(index, ResultSuccess(page));
+
+        expect(
+          await container.read(provider.future),
+          isA<IntentionCatalogUnexpected>(),
+        );
       }
     });
-
     test(
-      'пропущенные или противоречивые числа типов нарушают контракт порции',
+      'подтверждённая выдача каталога даёт числа текущего охвата и типа',
       () async {
         final repository = ControlledCatalogRepository();
         final container = _catalogContainer(repository);
         addTearDown(container.dispose);
-        final pages = [
-          // Запрошенных чисел нет.
-          IntentionCatalogFirstPage(
-            items: [testSummary(index: 1)],
-            totalCount: 1,
-            nextCursor: null,
-            revision: const TestCatalogRevision(1),
-          ),
-          // Общее количество типа «Все» расходится с числом всех.
+        final provider = intentionCatalogViewModelProvider(
+          const BrowseIntentionCatalog(),
+        );
+        final subscription = container.listen(
+          provider,
+          (_, _) {},
+          fireImmediately: true,
+        );
+        addTearDown(subscription.close);
+        final matrix = IntentionCountsByScopeAndType(
+          active: IntentionTypeCounts(all: 5, actions: 4),
+          archived: IntentionTypeCounts(all: 3, actions: 2),
+        );
+        IntentionCatalogFirstPage page(int totalCount) =>
+            IntentionCatalogFirstPage(
+              items: [testSummary(index: 1)],
+              totalCount: totalCount,
+              counts: matrix,
+              nextCursor: totalCount > 1 ? const TestCatalogCursor() : null,
+              revision: const TestCatalogRevision(1),
+            );
+
+        repository.completeVerbatim(0, ResultSuccess(page(5)));
+        final active = await container.read(provider.future);
+        expect(
+          active,
+          isA<IntentionCatalogConfirmedState>()
+              .having((state) => state.totalCount, 'количество', 5)
+              .having((state) => state.typeCounts?.all, 'все типы', 5)
+              .having((state) => state.typeCounts?.actions, 'действия', 4)
+              .having((state) => state.scopeCounts?.active, 'активные', 5)
+              .having((state) => state.scopeCounts?.archived, 'архивные', 3)
+              .having((state) => state.scopeCounts?.all, 'все охваты', 8),
+        );
+
+        final notifier = container.read(provider.notifier);
+        notifier.changeScope(IntentionScope.all);
+        notifier.changeType(IntentionTypeChoice.actions);
+        await _waitForQueries(repository, 2);
+        repository.completeVerbatim(1, ResultSuccess(page(6)));
+        expect(
+          await container.read(provider.future),
+          isA<IntentionCatalogConfirmedState>()
+              .having((state) => state.totalCount, 'количество', 6)
+              .having((state) => state.typeCounts?.all, 'все типы', 8)
+              .having((state) => state.typeCounts?.actions, 'действия', 6)
+              .having((state) => state.scopeCounts?.active, 'активные', 4)
+              .having((state) => state.scopeCounts?.archived, 'архивные', 2)
+              .having((state) => state.scopeCounts?.all, 'все охваты', 6),
+        );
+      },
+    );
+
+    test('экран выбора получает числа типов без чисел охватов', () async {
+      final repository = ControlledCatalogRepository();
+      final container = _catalogContainer(repository);
+      addTearDown(container.dispose);
+      final provider = intentionCatalogViewModelProvider(
+        SelectDailyChoiceSource(session: IntentionSearchSession()),
+      );
+      final subscription = container.listen(
+        provider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+
+      repository.completeVerbatim(
+        0,
+        ResultSuccess(
           IntentionCatalogFirstPage(
             items: [testSummary(index: 1), testSummary(index: 2)],
             totalCount: 2,
-            typeCounts: IntentionTypeCounts(all: 3, actions: 1),
+            counts: IntentionCountsByType(
+              IntentionTypeCounts(all: 2, actions: 1),
+            ),
+            nextCursor: null,
+            revision: const TestCatalogRevision(1),
+          ),
+        ),
+      );
+
+      expect(
+        await container.read(provider.future),
+        isA<IntentionCatalogConfirmedState>()
+            .having((state) => state.typeCounts?.all, 'все', 2)
+            .having((state) => state.typeCounts?.actions, 'действия', 1)
+            .having((state) => state.scopeCounts, 'охваты', isNull),
+      );
+    });
+
+    test(
+      'матрица, чьё число текущего охвата и типа расходится с общим '
+      'количеством или вид чисел не совпадает, нарушает контракт порции',
+      () async {
+        final pages = [
+          // Активных совпадений три, а общее количество — только строка порции.
+          IntentionCatalogFirstPage(
+            items: [testSummary(index: 1)],
+            totalCount: 1,
+            counts: IntentionCountsByScopeAndType(
+              active: IntentionTypeCounts(all: 3, actions: 0),
+              archived: IntentionTypeCounts(all: 0, actions: 0),
+            ),
+            nextCursor: null,
+            revision: const TestCatalogRevision(1),
+          ),
+          // Числа только текущего охвата вместо матрицы.
+          IntentionCatalogFirstPage(
+            items: [testSummary(index: 1)],
+            totalCount: 1,
+            counts: IntentionCountsByType(
+              IntentionTypeCounts(all: 1, actions: 0),
+            ),
             nextCursor: null,
             revision: const TestCatalogRevision(1),
           ),
         ];
 
-        for (final (index, page) in pages.indexed) {
+        for (final page in pages) {
+          final repository = ControlledCatalogRepository();
+          final container = _catalogContainer(repository);
+          addTearDown(container.dispose);
           final provider = intentionCatalogViewModelProvider(
-            SelectDailyChoiceSource(session: IntentionSearchSession()),
+            const BrowseIntentionCatalog(),
           );
           final subscription = container.listen(
             provider,
@@ -1061,7 +1331,7 @@ void main() {
             fireImmediately: true,
           );
           addTearDown(subscription.close);
-          repository.completeVerbatim(index, ResultSuccess(page));
+          repository.completeVerbatim(0, ResultSuccess(page));
 
           expect(
             await container.read(provider.future),
@@ -1070,6 +1340,131 @@ void main() {
         }
       },
     );
+  });
+
+  group('сброс параметров показа', () {
+    test('каталог возвращает охват, тип и порядок одной выдачей, сохраняя '
+        'фильтр названия и условие по тегу, а в начальном состоянии ничего '
+        'не делает', () async {
+      final repository = ControlledCatalogRepository();
+      final container = _catalogContainer(
+        repository,
+        filterDebounce: const Duration(milliseconds: 1),
+      );
+      final provider = intentionCatalogViewModelProvider(
+        const BrowseIntentionCatalog(),
+      );
+      final subscription = container.listen(
+        provider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      addTearDown(container.dispose);
+      final notifier = container.read(provider.notifier);
+      final tagFilter = IntentionTagFilter(requiredTagIds: [_tagId(1)]);
+
+      await _completeEmptyFirstPage(container, repository, 0);
+      expect(notifier.canResetShowParameters, isFalse);
+      notifier.resetShowParameters();
+      await pumpEventQueue();
+      expect(repository.queries, hasLength(1));
+
+      notifier
+        ..changeScope(IntentionScope.all)
+        ..changeType(IntentionTypeChoice.actions)
+        ..changeOrder(IntentionCatalogOrder.titleAscending)
+        ..changeTitleFilter('бег')
+        ..changeTagFilter(tagFilter);
+      await _waitForQueries(repository, 2);
+      await _completeEmptyFirstPage(container, repository, 1);
+      expect(notifier.canResetShowParameters, isTrue);
+
+      notifier.resetShowParameters();
+      await _waitForQueries(repository, 3);
+      await pumpEventQueue();
+
+      expect(repository.queries, hasLength(3));
+      final query = repository.queryAt(2);
+      expect(query.scope, IntentionScope.active);
+      expect(query.readinessFilter, IntentionReadinessFilter.all);
+      expect(query.order, IntentionCatalogOrder.createdAtDescending);
+      expect(query.titleFilter?.map((value) => value), 'бег');
+      expect(query.tagFilter, tagFilter);
+      expect(query.cursor, isNull);
+      await _completeEmptyFirstPage(container, repository, 2);
+      expect(notifier.canResetShowParameters, isFalse);
+      expect(
+        notifier.selection.scope,
+        const IntentionScopeOpen(IntentionScope.active),
+      );
+      expect(
+        notifier.selection.type,
+        const IntentionTypeOpen(IntentionTypeChoice.all),
+      );
+
+      notifier.resetShowParameters();
+      await pumpEventQueue();
+      expect(repository.queries, hasLength(3));
+    });
+
+    test('смена поколения графа возвращает начальный выбор и запрос, '
+        'включая фильтры', () async {
+      final repository = ControlledCatalogRepository();
+      final container = _catalogContainer(
+        repository,
+        filterDebounce: const Duration(milliseconds: 1),
+      );
+      final provider = intentionCatalogViewModelProvider(
+        const BrowseIntentionCatalog(),
+      );
+      final subscription = container.listen(
+        provider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      addTearDown(container.dispose);
+      final notifier = container.read(provider.notifier);
+
+      await _completeEmptyFirstPage(container, repository, 0);
+      notifier
+        ..changeScope(IntentionScope.all)
+        ..changeType(IntentionTypeChoice.actions)
+        ..changeOrder(IntentionCatalogOrder.titleAscending)
+        ..changeTitleFilter('бег');
+      await _waitForQueries(repository, 2);
+      await _completeEmptyFirstPage(container, repository, 1);
+      expect(repository.queryAt(1).titleFilter?.map((value) => value), 'бег');
+
+      final accepted =
+          container
+                  .read(graphCommandCoordinatorProvider.notifier)
+                  .acceptBackupRestore(
+                    (exclusive) => exclusive.replace(
+                      () async => ConfirmedGraphReplacement(
+                        const TestCatalogRevision(0, epoch: 1),
+                      ),
+                    ),
+                  )
+              as GraphBackupRestoreAccepted;
+      await accepted.future;
+      await _waitForQueries(repository, 3);
+      await pumpEventQueue();
+
+      expect(repository.queries, hasLength(3));
+      final query = repository.queryAt(2);
+      expect(query.scope, IntentionScope.active);
+      expect(query.readinessFilter, IntentionReadinessFilter.all);
+      expect(query.order, IntentionCatalogOrder.createdAtDescending);
+      expect(query.titleFilter, isNull);
+      expect(query.tagFilter, IntentionTagFilter.empty);
+      final selection = notifier.selection;
+      expect(selection.scope, const IntentionScopeOpen(IntentionScope.active));
+      expect(selection.type, const IntentionTypeOpen(IntentionTypeChoice.all));
+      expect(selection.order, IntentionCatalogOrder.createdAtDescending);
+      expect(selection.titleFilterText, isEmpty);
+    });
   });
 
   test('не забирает у оболочки право предъявить completion', () async {
@@ -1151,6 +1546,31 @@ Future<void> _waitForQueries(
   }
   fail('Не дождались $count запросов каталога.');
 }
+
+Future<IntentionCatalogState> _completeEmptyFirstPage(
+  ProviderContainer container,
+  ControlledCatalogRepository repository,
+  int index,
+) {
+  repository.complete(
+    index,
+    ResultSuccess(
+      IntentionCatalogFirstPage(
+        items: const [],
+        totalCount: 0,
+        nextCursor: null,
+        revision: const TestCatalogRevision(1),
+      ),
+    ),
+  );
+  return container.read(
+    intentionCatalogViewModelProvider(const BrowseIntentionCatalog()).future,
+  );
+}
+
+TagId _tagId(int number) => (TagId.decode(
+  '00000000-0000-4000-8000-${number.toString().padLeft(12, '0')}',
+) as TagIdDecodingSuccess).id;
 
 Future<T> _waitForState<T extends IntentionCatalogState>(
   ProviderContainer container,

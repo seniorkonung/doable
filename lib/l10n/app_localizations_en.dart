@@ -408,59 +408,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get catalogLoading => 'Loading intentions…';
 
   @override
-  String get catalogScopeLabel => 'Scope';
-
-  @override
-  String get catalogScopeActive => 'Active';
-
-  @override
-  String get catalogScopeArchived => 'Archived';
-
-  @override
-  String get catalogScopeAll => 'All';
-
-  @override
-  String get catalogFilterLabel => 'Filter by title';
-
-  @override
   String get catalogFilterInvalidUnicode =>
       'Enter valid Unicode text without NUL.';
 
   @override
   String get catalogFilterTooLong => 'Use no more than 255 characters.';
-
-  @override
-  String get catalogOrderLabel => 'Order';
-
-  @override
-  String get catalogOrderCreatedNewest => 'Created: newest first';
-
-  @override
-  String get catalogOrderCreatedOldest => 'Created: oldest first';
-
-  @override
-  String get catalogOrderUpdatedNewest => 'Updated: newest first';
-
-  @override
-  String get catalogOrderUpdatedOldest => 'Updated: oldest first';
-
-  @override
-  String catalogTotalCount(int count) {
-    return 'Total intentions: $count';
-  }
-
-  @override
-  String get catalogActiveEmpty => 'No active intentions yet.';
-
-  @override
-  String get catalogArchivedEmpty => 'No archived intentions yet.';
-
-  @override
-  String get catalogAllEmpty => 'No intentions yet.';
-
-  @override
-  String get catalogTagConditionsEmpty =>
-      'No intentions match the tag conditions.';
 
   @override
   String get catalogUnavailable => 'Intentions couldn’t be loaded. Try again.';
@@ -474,9 +426,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Intentions couldn’t be loaded because of an unexpected error.';
 
   @override
-  String get catalogLoadingMore => 'Loading more intentions…';
-
-  @override
   String get catalogLoadMoreUnavailable =>
       'More intentions couldn’t be loaded.';
 
@@ -487,18 +436,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get catalogLoadMoreUnexpected =>
       'More intentions couldn’t be loaded because of an unexpected error.';
-
-  @override
-  String get catalogReady => 'Ready for action';
-
-  @override
-  String get catalogNotReady => 'Not ready for action';
-
-  @override
-  String get catalogHasDescription => 'Has description';
-
-  @override
-  String get catalogNoDescription => 'No description';
 
   @override
   String intentionSummaryTags(String tags) {
@@ -1602,36 +1539,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dataImportConfirm => 'Import and replace';
 
   @override
-  String intentionTagConditionAbsent(String tagName) {
-    return 'not $tagName';
-  }
-
-  @override
-  String intentionTagConditionPresentSemantics(String tagName) {
-    return '$tagName, must be present';
-  }
-
-  @override
-  String intentionTagConditionAbsentSemantics(String tagName) {
-    return '$tagName, must be absent';
-  }
-
-  @override
-  String get intentionTagConditionToggleHint =>
-      'Toggle requirement: must be present or must be absent';
-
-  @override
-  String intentionTagConditionRemove(String tagName) {
-    return 'Remove condition: $tagName';
-  }
-
-  @override
-  String get intentionTagConditionsAdd => 'Tag';
-
-  @override
-  String get intentionTagConditionsAddSemantics => 'Add tag condition';
-
-  @override
   String get tagsPanelTitle => 'Tags';
 
   @override
@@ -2367,6 +2274,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String intentionCatalogRowLabel(String content) {
+    return 'Open: $content';
+  }
+
+  @override
   String get intentionPickerShowAndSortTitle => 'Show and sort';
 
   @override
@@ -2387,10 +2299,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get intentionPickerPurposeSheetBack => 'Back to the list';
 
   @override
+  String get intentionPickerScopeCaption => 'Show';
+
+  @override
+  String get intentionPickerScopeActive => 'Active';
+
+  @override
+  String get intentionPickerScopeArchived => 'Archived';
+
+  @override
+  String get intentionPickerScopeAll => 'All, archived included';
+
+  @override
   String get intentionPickerTypeCaption => 'Type';
 
   @override
-  String get intentionPickerTypeAll => 'All';
+  String get intentionPickerTypeAll => 'Intentions and actions';
 
   @override
   String get intentionPickerTypeIntentionsOnly => 'Intentions only';
@@ -2470,6 +2394,49 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String intentionPickerScopeHeader(String scope, String type) {
+    String _temp0 = intl.Intl.selectLogic(type, {
+      'all': 'Active',
+      'intentions': 'Active intentions',
+      'actions': 'Active actions',
+      'other': '',
+    });
+    String _temp1 = intl.Intl.selectLogic(type, {
+      'all': 'Archived',
+      'intentions': 'Archived intentions',
+      'actions': 'Archived actions',
+      'other': '',
+    });
+    String _temp2 = intl.Intl.selectLogic(type, {
+      'all': 'All',
+      'intentions': 'All intentions',
+      'actions': 'All actions',
+      'other': '',
+    });
+    String _temp3 = intl.Intl.selectLogic(scope, {
+      'active': '$_temp0',
+      'archived': '$_temp1',
+      'all': '$_temp2',
+      'other': '',
+    });
+    return '$_temp3';
+  }
+
+  @override
+  String intentionPickerScopeHeaderLabel(String title, String summary) {
+    return 'Show and sort. Showing: $title. Sorted by: $summary.';
+  }
+
+  @override
+  String intentionPickerScopeHeaderCountLabel(
+    String title,
+    int count,
+    String summary,
+  ) {
+    return 'Show and sort. Showing: $title, $count. Sorted by: $summary.';
+  }
+
+  @override
   String get intentionPickerActionsHeader => 'Actions';
 
   @override
@@ -2493,6 +2460,61 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get intentionPickerShowBothTypes => 'Show both types';
+
+  @override
+  String intentionPickerEmptyScopedTypeTitle(String scope, String type) {
+    String _temp0 = intl.Intl.selectLogic(type, {
+      'actions': 'No active actions',
+      'intentions': 'No active intentions',
+      'other': '',
+    });
+    String _temp1 = intl.Intl.selectLogic(type, {
+      'actions': 'No actions in the archive',
+      'intentions': 'No intentions in the archive',
+      'other': '',
+    });
+    String _temp2 = intl.Intl.selectLogic(type, {
+      'actions': 'No actions yet',
+      'intentions': 'No intentions yet',
+      'other': '',
+    });
+    String _temp3 = intl.Intl.selectLogic(scope, {
+      'active': '$_temp0',
+      'archived': '$_temp1',
+      'all': '$_temp2',
+      'other': '',
+    });
+    return '$_temp3';
+  }
+
+  @override
+  String get intentionPickerEmptyActionsText =>
+      'An intention marked as an action is shown here.';
+
+  @override
+  String get intentionPickerEmptyIntentionsText =>
+      'Everything here is marked as an action.';
+
+  @override
+  String get intentionCatalogNoActiveTitle => 'No active intentions';
+
+  @override
+  String get intentionCatalogNoActiveText =>
+      'Tap the plus below to create a new one. The Show row brings up the archived ones.';
+
+  @override
+  String get intentionCatalogNoIntentionsTitle => 'No intentions yet';
+
+  @override
+  String get intentionCatalogNoIntentionsText =>
+      'Your intentions will appear here. Tap the plus below to create the first one.';
+
+  @override
+  String get intentionCatalogEmptyArchiveTitle => 'Nothing in the archive';
+
+  @override
+  String get intentionCatalogEmptyArchiveText =>
+      'An intention you archive leaves the active list and stays here.';
 
   @override
   String get intentionPickerActionTitle => 'Choose an action';

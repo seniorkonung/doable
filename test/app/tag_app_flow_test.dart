@@ -4,11 +4,14 @@ import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
+import 'package:doable/src/design_system/components/tag_chip.dart';
 import 'package:doable/src/design_system/components/tag_dot.dart';
 import 'package:doable/src/design_system/components/tag_row.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/design_system/doable_colors.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
+import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -17,7 +20,7 @@ import '../support/app_root_pages.dart';
 import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
-import '../support/inline_text.dart';
+import '../support/intention_catalog_controls.dart';
 import '../support/tag_storage_fixture.dart';
 
 Future<void> _until(WidgetTester tester, Finder finder) async {
@@ -74,10 +77,13 @@ void main() {
     expect(retainedTagFixtureGraph(raw), graphBefore);
 
     await _closePanelAndPage(tester);
-    await tester.ensureVisible(_conditionLabel);
-    await tester.pumpAndSettle();
-    await _expectBlueDot(tester, _conditionLabel);
-    await _expectBlueDot(tester, findTextIgnoringInlineWidgets('Теги: Дом'));
+    await _expectBlueDot(
+      tester,
+      find.descendant(
+        of: intentionCatalogRow('Намерение 1'),
+        matching: find.widgetWithText(TagChip, 'Дом'),
+      ),
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -107,12 +113,9 @@ void main() {
     expect(retainedTagFixtureGraph(raw), graphBefore);
 
     await _closePanelAndPage(tester);
-    await _until(tester, findTextIgnoringInlineWidgets('Теги: Быт'));
-    expect(
-      textIgnoringInlineWidgets(tester.widget<Text>(_conditionLabel)),
-      'Быт',
-    );
-    expect(findTextIgnoringInlineWidgets('Теги: Дом'), findsNothing);
+    await _untilRowTagged(tester, 'Теги: Быт');
+    expect(shownIntentionCatalogParameters(tester).tagConditions, 1);
+    expect(_rowTags(tester), isNot(contains('Теги: Дом')));
     expect(tester.takeException(), isNull);
   });
 
@@ -343,29 +346,26 @@ Future<sqlite.Database> _launch(
 /// Ставит в поиске каталога намерений условие «должен быть Дом» и открывает
 /// панель тегов со страницы активного намерения с этим тегом.
 Future<void> _openRequiredHomeIntention(WidgetTester tester) async {
-  await _until(tester, findTextIgnoringInlineWidgets('Теги: Дом'));
-  await _tap(
+  await _untilRowTagged(tester, 'Теги: Дом');
+  await addIntentionCatalogTagCondition(
     tester,
-    find.byKey(const ValueKey('intention-tag-conditions-add')),
+    (TagId.decode(tagFixtureId(firstTagNumber)) as TagIdDecodingSuccess).id,
+    IntentionTagRequirement.mustBePresent,
+    tap: _tap,
+    waitFor: _until,
   );
-  await _tap(
-    tester,
-    find.byKey(ValueKey('tags-panel-row-${tagFixtureId(firstTagNumber)}')),
-  );
-  await _until(tester, _conditionLabel);
-  // Панель фильтра применяет условие сразу, а «назад» только закрывает её.
-  await tester.binding.handlePopRoute();
-  await _waitFor(
-    tester,
-    () => find
-        .byKey(ValueKey('tags-panel-row-${tagFixtureId(firstTagNumber)}'))
-        .evaluate()
-        .isEmpty,
-  );
-  await _until(tester, findTextIgnoringInlineWidgets('Теги: Дом'));
+  await _untilRowTagged(tester, 'Теги: Дом');
   await _tap(tester, find.text('Намерение 1'));
   await _openPanel(tester);
 }
+
+/// Подписи тегов строк каталога намерений.
+Iterable<String> _rowTags(WidgetTester tester) =>
+    shownIntentionCatalogRows(tester).map((row) => row.tags);
+
+/// Ждёт строку каталога намерений с подписью тегов [tags].
+Future<void> _untilRowTagged(WidgetTester tester, String tags) =>
+    _waitFor(tester, () => _rowTags(tester).contains(tags));
 
 Future<void> _openPanel(WidgetTester tester) async {
   await _tap(
@@ -443,13 +443,6 @@ Finder _panelRow(String tagId) => find.byKey(ValueKey('tags-panel-row-$tagId'));
 
 Finder _assignmentRow(String tagId) =>
     find.byKey(ValueKey('tag-assignment-row-$tagId'));
-
-/// Подпись условия по тегу: нажатие на результат прокручивает каталог
-/// намерений, и условия уходят за верхний край страницы.
-final _conditionLabel = find.byKey(
-  const ValueKey('intention-tag-condition-label'),
-  skipOffstage: false,
-);
 
 /// Поле названия листа тега, открытого поверх панели.
 final _tagSheetName = find.descendant(

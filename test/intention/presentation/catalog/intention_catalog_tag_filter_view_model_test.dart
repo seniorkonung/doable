@@ -382,7 +382,9 @@ void main() {
         notifier.changeScope(IntentionScope.archived);
         expect(
           notifier.selection.scope,
-          index == 4 ? IntentionScope.all : IntentionScope.active,
+          IntentionScopeFixed(
+            index == 4 ? IntentionScope.all : IntentionScope.active,
+          ),
         );
       }
       expect(repository.queries, hasLength(11));
