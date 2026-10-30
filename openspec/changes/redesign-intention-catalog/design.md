@@ -73,7 +73,7 @@
 |                                 v                                        |
 |  search/                                                                 |
 |  +--------------------------------------------------------------------+  |
-|  | IntentionSearchKind     texts, keys, header title, names kind      |  |
+|  | IntentionSearchKind     texts, keys, screen title, names kind      |  |
 |  | IntentionSearchBar      SearchField + FilterButton -> tags panel   |  |
 |  | IntentionListHeader     CatalogHeader + summary + a11y label       |  |
 |  | ShowAndSortSheet        Show? | Type | Sort + OrderButton | Reset   |  |
@@ -90,7 +90,7 @@
                 PersonalGraphRepository.getCatalogPage
 ```
 
-- `IntentionSearchKind.of(IntentionCatalogPurpose)` заменяет `IntentionPickerKind` и `intentionPickerKeyPrefix` и остаётся единственным исчерпывающим разбором назначения в `search/`. Один исчерпывающий `switch` даёт тексты загрузки, подгрузки и отказов, заголовок экрана выбора, префикс ключей, заголовок списка и признак `namesKind`, поэтому виджеты не разбирают назначения сами.
+- `IntentionSearchKind.of(IntentionCatalogPurpose)` заменяет `IntentionPickerKind` и `intentionPickerKeyPrefix` и остаётся единственным исчерпывающим разбором назначения в `search/`. Один исчерпывающий `switch` даёт тексты загрузки, подгрузки и отказов, заголовок страницы или экрана выбора, префикс ключей и признак `namesKind`, поэтому виджеты не разбирают назначения сами. Слова заголовка списка `IntentionSearchKind` не даёт: их выбирает разбор `selection.scope` и `selection.type` (решение 3).
   - Вариантов четыре, по одному на назначение: каталог, выбор действия, выбор исходного намерения для дневного выбора, выбор участника долговременной связи. Их префиксы ключей — `intention-catalog`, `daily-choice-action`, `daily-choice-source`, `participant-picker`. Три варианта не хватает: выбор исходного намерения и выбор участника различаются только префиксом, а слитые в один вариант они дали бы одному из экранов чужие ключи.
   - Выбор исходного намерения и выбор участника дают те же тексты, заголовок экрана выбора и `namesKind`, что нынешний вид `intention`; выбор действия — тексты нынешнего вида `action`; каталог — существующие тексты каталога.
 - `IntentionPickerView` остаётся на `IntentionPickerPurpose`: комментарий `intention_catalog_purpose.dart` запрещает передавать экрану выбора назначение каталога, и шапка с крестиком каталогу не нужна. Общей становится только начинка под шапкой.
