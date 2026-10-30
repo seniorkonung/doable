@@ -21,9 +21,9 @@ import '../catalog/intention_catalog_view_model.dart';
 import '../catalog/intention_tag_conditions_view_model.dart';
 import '../search/intention_search_kind.dart';
 import '../search/intention_search_list.dart';
+import '../search/show_and_sort_sheet.dart';
 import 'intention_picker_purpose_sheet.dart';
 import 'intention_picker_row.dart';
-import 'intention_picker_show_and_sort_sheet.dart';
 
 /// Экран выбора намерения назначения [purpose]: крестик с заголовком, поле
 /// поиска, фильтр по тегам и заголовок списка закреплены над выдачей.
@@ -77,7 +77,7 @@ final class _IntentionPickerViewState
 
   Future<void> _openShowAndSort() async {
     setState(() => _showAndSortExpanded = true);
-    await showIntentionPickerShowAndSortSheet(context, widget.purpose);
+    await showShowAndSortSheet(context, widget.purpose);
     if (mounted) setState(() => _showAndSortExpanded = false);
   }
 

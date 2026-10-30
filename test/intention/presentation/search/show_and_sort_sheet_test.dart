@@ -14,8 +14,8 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
-import 'package:doable/src/intention/presentation/picker/intention_picker_show_and_sort_sheet.dart';
 import 'package:doable/src/intention/presentation/picker/intention_picker_view.dart';
+import 'package:doable/src/intention/presentation/search/show_and_sort_sheet.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -870,7 +870,7 @@ void _header(WidgetTester tester, String title, String summary) {
 
 Future<void> _show(WidgetTester tester, IntentionPickerPurpose purpose) async {
   unawaited(
-    showIntentionPickerShowAndSortSheet(
+    showShowAndSortSheet(
       tester.element(find.byType(IntentionPickerView)),
       purpose,
     ),
