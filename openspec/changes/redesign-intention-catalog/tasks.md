@@ -265,3 +265,100 @@
   - **Зависимости:** 2.1, 2.2, 2.3, 2.4, 2.5.
   - **Предполагаемые файлы:** нет (только проверка).
   - **Размер:** XS.
+
+## Phase 3: Сценарии приложения проходят каталог через общие шаги
+
+- [ ] 3.1 Собрать общие шаги каталога намерений в `test/support/intention_catalog_controls.dart` и провести через них сценарии состояния оболочки и замены графа
+  - **Критерии приёмки:**
+    - Файл по образцу `daily_choice_catalog_controls.dart` становится единственным местом в `test/`, которое знает способ управления каталогом. Сценарий называет намерение, а шаги действуют и наблюдают через интерфейс каталога и не обращаются к его модели. Действие не ждёт выдачи: её дожидается сценарий, а нажатие и ожидание шаг принимает параметрами, как `selectDailyChoiceCatalogDate` и `openIntentionGraph`.
+    - Первые шаги принимают и возвращают значения модели, а не подписи и ключи:
+      - `selectIntentionCatalogScope(IntentionScope)`, `selectIntentionCatalogOrder(IntentionCatalogOrder)`, `enterIntentionCatalogTitle(String)`, `addIntentionCatalogTagCondition(TagId, IntentionTagRequirement)`;
+      - `intentionCatalogRow(title)`, `intentionCatalogRows`, `intentionCatalogTotal(count)`;
+      - `shownIntentionCatalogParameters` — охват, порядок, фильтр названия и число условий по тегам;
+      - `intentionCatalogListPosition` — прокрутка списка выдачи;
+      - `jumpIntentionCatalog(доля)` и `shownIntentionCatalogOffsets` — все прокрутки страницы каталога, сколько бы их ни было.
+    - `app_shell_state_test.dart` и `app_shell_graph_generation_test.dart` управляют каталогом и читают его только этими шагами: локальных `_selectScope`, `_selectOrder`, `_enterTitleFilter`, `_catalogRow`, `_conditions`, `_catalogPosition`, `_catalogPagePosition` и ключей элементов каталога в них нет. Ожидания сценариев прежние, кроме условий по тегам: вместо названий сравнивается число условий, потому что новая страница показывает только его, а действие условия подтверждает выдача.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app/navigation/app_shell_state_test.dart test/app/navigation/app_shell_graph_generation_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - новый `test/support/intention_catalog_controls.dart`;
+    - меняются `test/app/navigation/app_shell_state_test.dart`, `app_shell_graph_generation_test.dart`.
+  - **Размер:** M.
+
+- [ ] 3.2 Провести через общие шаги каталога сценарии оболочки: системное «назад», страницы поверх, сброс операции, вход в пункт и нижние вставки
+  - **Критерии приёмки:**
+    - Шаги получают `intentionCatalogTitleField`, `intentionCatalogTagFilterControl`, `intentionCatalogList` и `shownIntentionCatalogRows` — названия построенных строк сверху вниз.
+    - `app_shell_back_test.dart`, `app_shell_pages_above_test.dart` с `app_shell_page_matrix.dart`, `app_shell_operation_reset_test.dart`, `app_shell_test.dart` и `app_shell_layout_test.dart` находят поле, кнопку условий, список и строки только этими шагами: локальных `_titleFilter`, `_catalogList`, `_catalogRow`, `_catalogRows`, `_catalogOffset`, `_catalogListScroll` нет, а `_summary` ищет только строки экранов выбора. `app_shell_test.dart` проверяет вход в пункт по `shownIntentionCatalogParameters` и `intentionCatalogTitleField`, а не по строкам `catalogScopeLabel` и `catalogFilterLabel`.
+    - Ожидания сценариев прежние. Проверки компоновки прежней страницы остаются до фазы 4: `AppBar`, общая прокрутка `IntentionSearchLayout` (`_catalogPageScroll`) и разбор `IntentionTagConditionsSection` в матрице.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app/navigation/app_shell_back_test.dart test/app/navigation/app_shell_pages_above_test.dart test/app/navigation/app_shell_operation_reset_test.dart test/app/navigation/app_shell_test.dart test/app/navigation/app_shell_layout_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 3.1.
+  - **Предполагаемые файлы:**
+    - меняется `test/support/intention_catalog_controls.dart`;
+    - меняются в `test/app/navigation/`: `app_shell_back_test.dart`, `app_shell_pages_above_test.dart`, `app_shell_page_matrix.dart`, `app_shell_operation_reset_test.dart`, `app_shell_test.dart`, `app_shell_layout_test.dart`.
+  - **Размер:** M.
+
+- [ ] 3.3 Провести через общие шаги каталога сценарии импорта и восстановления графа
+  - **Критерии приёмки:**
+    - `graph_import_app_flow_test.dart` и `graph_restore_app_flow_test.dart` задают условие `addIntentionCatalogTagCondition`, прокручивают каталог `jumpIntentionCatalog` и ищут выдачу `intentionCatalogList`. Локальных `_catalogList`, `_tagConditions`, `_positionOf`, `_catalogPosition`, `_catalogPagePosition` и ключей элементов каталога в них нет.
+    - До замены графа сценарии подтверждают одно условие и прокрученный каталог, после замены — ни одного условия и каталог с начала, через `shownIntentionCatalogParameters` и `shownIntentionCatalogOffsets`.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app/graph_import_app_flow_test.dart test/app/graph_restore_app_flow_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 3.1, 3.2 — `intentionCatalogList`.
+  - **Предполагаемые файлы:** `test/app/graph_import_app_flow_test.dart`, `test/app/graph_restore_app_flow_test.dart`.
+  - **Размер:** S.
+
+- [ ] 3.4 Провести через общие шаги каталога сценарии создания намерения
+  - **Критерии приёмки:**
+    - Шаги получают `removeIntentionCatalogTagCondition(TagId)`, а `shownIntentionCatalogRows` даёт ещё подпись тегов в виде `intentionSummaryTags` или `intentionSummaryNoTags` и прямоугольник строки на экране.
+    - `intention_creation_sheet_integration_test.dart` задаёт охват, название, условия и порядок, снимает условие и читает строки и прокрутку только общими шагами: локальных `_selectOption`, `_addCondition`, `_catalogList`, `_catalogListPosition`, `_catalogPagePosition` и ключей элементов каталога нет. Проверка, что новая строка сдвинула список, а видимые строки остались на своих местах, сохраняется.
+    - `creation_flows_integration_test.dart` читает количество `intentionCatalogTotal`, `intention_editor_page_test.dart` находит поле `intentionCatalogTitleField`, а `intention_creation_sheet_accessibility_test.dart` берёт доступное название поля из семантики `intentionCatalogTitleField`, а не из строки `catalogFilterLabel`. `_catalogBar` редактора и `_outsideSheet` остаются до фазы 4: это шапка прежней страницы.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app/intention_creation_sheet_integration_test.dart test/app/creation_flows_integration_test.dart test/intention/presentation/editor/intention_editor_page_test.dart test/intention/presentation/editor/intention_creation_sheet_accessibility_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 3.1, 3.2.
+  - **Предполагаемые файлы:**
+    - меняется `test/support/intention_catalog_controls.dart`;
+    - меняются `test/app/intention_creation_sheet_integration_test.dart`, `test/app/creation_flows_integration_test.dart`, `test/intention/presentation/editor/intention_editor_page_test.dart`, `test/intention/presentation/editor/intention_creation_sheet_accessibility_test.dart`.
+  - **Размер:** M.
+
+- [ ] 3.5 Провести через общие шаги каталога сценарии поиска по тегам, тегов и их назначения
+  - **Критерии приёмки:**
+    - `intention_tag_search_app_flow_test.dart` вводит название, выбирает охват, снимает условия, читает строки каталога, количество и число условий общими шагами, а панель фильтра по умолчанию открывает `intentionCatalogTagFilterControl`. Локальных `_summaryResults`, `_selectScope`, `_removeCondition` и ключей `catalog-*` нет.
+    - `tag_app_flow_test.dart` задаёт условие `addIntentionCatalogTagCondition` и ждёт строку по подписи тегов из `shownIntentionCatalogRows`, а `tag_assignment_app_flow_test.dart` и `tag_accessibility_test.dart` ждут `intentionCatalogTagFilterControl`.
+    - Ожидания сценариев прежние, кроме условий, которые читаются вне чипов: вместо подписей сравнивается число условий, а надобность подтверждают выдача и отметки панели. Части прежней страницы остаются до фазы 4: нажатие чипа `intention-tag-condition-toggle-*` с его подписью, `_conditionLabel`, цвет тега в строке и сообщения пустой выдачи.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app/intention_tag_search_app_flow_test.dart test/app/tag_app_flow_test.dart test/app/tag_assignment_app_flow_test.dart test/tag/presentation/tag_accessibility_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 3.1, 3.2, 3.4 — снятие условия и подпись тегов строки.
+  - **Предполагаемые файлы:** `test/app/intention_tag_search_app_flow_test.dart`, `test/app/tag_app_flow_test.dart`, `test/app/tag_assignment_app_flow_test.dart`, `test/tag/presentation/tag_accessibility_test.dart`.
+  - **Размер:** M.
+
+- [ ] 3.6 Провести через общие шаги каталога сценарии связей и жизненного цикла намерений
+  - **Критерии приёмки:**
+    - `long_term_relation_app_flow_test.dart` находит строки каталога `intentionCatalogRow`, а не `IntentionSummaryView`.
+    - `intention_app_lifecycle_test.dart` и `intention_details_page_test.dart` выбирают охват `selectIntentionCatalogScope` со значением `IntentionScope`, а не подписью и ключом. Локального `_selectScope` нет.
+    - Ожидания сценариев не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app/long_term_relation_app_flow_test.dart test/app/intention_app_lifecycle_test.dart test/intention/presentation/details/intention_details_page_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 3.1.
+  - **Предполагаемые файлы:** `test/app/long_term_relation_app_flow_test.dart`, `test/app/intention_app_lifecycle_test.dart`, `test/intention/presentation/details/intention_details_page_test.dart`.
+  - **Размер:** S.
+
+- [ ] 3.7 Проверить готовность фазы 3: сценарии проходят каталог через общие шаги на прежней странице
+  - **Критерии приёмки:**
+    - Сценарные проверки, которые проходят через каталог, обращаются к его управлению только через общие шаги, и все они проходят на прежней странице.
+    - Ключи управления каталогом, ключ списка и `IntentionSummaryView` встречаются только в `test/support/intention_catalog_controls.dart` и проверках самой прежней страницы и её частей: `intention_catalog_page_test.dart`, `intention_tag_conditions_section_test.dart`, `intention_tag_search_accessibility_test.dart`, `intention_summary_view_test.dart`.
+    - Код приложения в фазе не менялся. Полная проверка проекта проходит.
+  - **Проверка:**
+    - `grep -rlE 'catalog-scope-control|catalog-order-control|catalog-filter-field|intention-tag-conditions-add|intention-catalog-list|IntentionSummaryView' test --include='*.dart'`.
+    - `git diff --quiet d6de1fac77d46e512fde7ff981ac01e2aa535b6f -- lib`.
+    - `mise run check`.
+  - **Зависимости:** 3.1, 3.2, 3.3, 3.4, 3.5, 3.6.
+  - **Предполагаемые файлы:** нет (только проверка).
+  - **Размер:** XS.
