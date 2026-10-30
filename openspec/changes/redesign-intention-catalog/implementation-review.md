@@ -3,9 +3,9 @@
 ## Assessment
 
 **Format version:** 1
-**Result:** Changes needed
+**Result:** No unresolved findings
 **Coverage status:** Complete
-**Summary:** Фаза 3 достигла цели: сценарии проходят каталог через `test/support/intention_catalog_controls.dart`, а `lib/` не менялся. Остаётся одна находка низкой важности: проверка доступности берёт ожидаемое название поля из той же проверяемой семантики.
+**Summary:** Фаза 3 достигла цели: сценарии проходят каталог через `test/support/intention_catalog_controls.dart`, а `lib/` не менялся. Активных находок нет: согласованные исправления ведут задачи 3.8 и 3.9 в `tasks.md`, и они ещё не выполнены.
 
 ## Review target
 
@@ -41,14 +41,7 @@
 
 ## Findings
 
-### F2 · Low — Проверка доступности берёт ожидаемое название поля из проверяемой семантики
-
-- **Evidence:** `test/intention/presentation/editor/intention_creation_sheet_accessibility_test.dart:517-535`: `titleFieldName` читается из семантики `EditableText` поля и затем ищется в обходе той же семантики. На базе ожидалось `l10n.catalogFilterLabel`. Так требует критерий задачи 3.4. При этом шаг `intentionCatalogTitleFieldLabel` уже даёт подпись из локализации и используется в `intention_editor_page_test.dart`.
-- **Evidence revisions:** ["f30e1fe1d9df7991bcbc29c350340970c8dbeff3"]
-- **Impact:** Здесь проходит любая непустая подпись поля, и проверка стала длиннее на чтение семантики через `EditableText`. Неверную подпись сейчас ловит `test/intention/presentation/intention_tag_search_accessibility_test.dart:92`, но это проверка прежней страницы, которая перестраивается в фазе 4.
-- **Required outcome:** Ожидаемое название поля в сценарии берётся из источника, который не зависит от проверяемой семантики, а смена подписи поля по-прежнему меняет только общий файл шагов.
-- **Earliest source of truth:** task/verification
-- **Affected artifacts:** ["tasks.md: 3.4", "test/intention/presentation/editor/intention_creation_sheet_accessibility_test.dart"]
+No unresolved findings remain in the implementation review.
 
 ## Review coverage
 

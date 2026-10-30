@@ -379,3 +379,17 @@
   - **Предполагаемые файлы:**
     - меняются `test/support/intention_catalog_controls.dart`, `test/app/intention_creation_sheet_integration_test.dart`.
   - **Размер:** XS.
+
+- [ ] 3.9 Сверять в проверке доступности название поля названия каталога с подписью из общего шага, а не с проверяемой семантикой
+  - **Критерии приёмки:**
+    - Задача отменяет предложение критерия задачи 3.4 о том, что `intention_creation_sheet_accessibility_test.dart` берёт доступное название поля из семантики `intentionCatalogTitleField`: теперь подпись читается шагом `intentionCatalogTitleFieldLabel`.
+    - В `intention_creation_sheet_accessibility_test.dart` удалены локальная `titleFieldName`, чтение семантики через `EditableText`, `expect(titleFieldName, isNotEmpty)` и поясняющий их комментарий. `containsAll` в `_traversal` сравнивает с `intentionCatalogTitleFieldLabel(tester)`.
+    - Смена подписи поля меняет только `test/support/intention_catalog_controls.dart`. Строка `catalogFilterLabel` в этом тесте напрямую не появляется, поэтому поиск из задачи 3.7 остаётся чистым.
+    - `lib/` не меняется, новых шагов и сценариев нет.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/editor/intention_creation_sheet_accessibility_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 3.4.
+  - **Предполагаемые файлы:**
+    - меняется `test/intention/presentation/editor/intention_creation_sheet_accessibility_test.dart`.
+  - **Размер:** XS.
