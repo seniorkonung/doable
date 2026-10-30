@@ -228,6 +228,29 @@ void main() {
       );
     });
 
+    testWidgets('добавление порции не останавливает идущую прокрутку', (
+      tester,
+    ) async {
+      final h = await _open(tester, pageSize: 20);
+      final all = _actions(40);
+      h.repository.complete(0, _firstPage(all.sublist(0, 20), totalCount: 40));
+      await _settle(tester);
+      await _flingDown(tester, h);
+      await _waitForQueries(tester, h, 2);
+
+      h.repository.complete(
+        1,
+        _continuationPage(all.sublist(20), hasMore: false),
+      );
+      await _settle(tester);
+
+      final confirmed = h.container
+          .read(intentionCatalogViewModelProvider(h.purpose))
+          .requireValue;
+      expect((confirmed as IntentionCatalogLoaded).items, hasLength(40));
+      await _expectScrollContinues(tester, h);
+    });
+
     testWidgets('выдача нового запроса открывается с начала списка', (
       tester,
     ) async {
@@ -277,6 +300,19 @@ void main() {
       await _assignSportToAction59(tester, h);
 
       expect(_rowTop(tester, 'Действие 48'), visibleTop);
+    });
+
+    testWidgets('изменение строк после видимой не останавливает идущую '
+        'прокрутку', (tester) async {
+      final h = await _openSportActions(tester);
+      await _flingDown(tester, h);
+
+      await _acceptSportRemoval(h, 2, revision: 2);
+      // Прокрутка уходит от смещения, запомненного при изменении, ещё до кадра
+      // с новыми строками.
+      await tester.pump(const Duration(milliseconds: 16));
+
+      await _expectScrollContinues(tester, h);
     });
 
     testWidgets('строка, добавленная перед первой видимой, пока список закрыт '
@@ -500,6 +536,16 @@ Future<void> _removeSportFromAction(
   int index, {
   required int revision,
 }) async {
+  await _acceptSportRemoval(h, index, revision: revision);
+  await _settle(tester);
+}
+
+/// Подтверждает снятие обязательного тега без следующего кадра.
+Future<void> _acceptSportRemoval(
+  _Harness h,
+  int index, {
+  required int revision,
+}) async {
   final (command, result) = intentionTagAssignment(
     state: TagAssignmentState.absent,
     tagId: _sport.id,
@@ -508,7 +554,6 @@ Future<void> _removeSportFromAction(
     revision: TestCatalogRevision(revision),
   );
   await acceptTagCommand(h.container, h.repository, command, result).future;
-  await _settle(tester);
 }
 
 /// Закрывает выдачу непрозрачной страницей: скрытый список не перестраивается
@@ -535,6 +580,14 @@ Future<void> _flingDown(WidgetTester tester, _Harness h) async {
   await tester.pump(const Duration(milliseconds: 50));
   expect(h.position.pixels, greaterThan(0));
   expect(h.position.activity!.velocity, isNot(0));
+}
+
+/// Проверяет, что инерция бросока не оборвана и список движется дальше.
+Future<void> _expectScrollContinues(WidgetTester tester, _Harness h) async {
+  expect(h.position.activity!.velocity, isNot(0));
+  final pixels = h.position.pixels;
+  await tester.pump(const Duration(milliseconds: 16));
+  expect(h.position.pixels, greaterThan(pixels));
 }
 
 /// Ждёт чтения порции, которое модель начинает после кадра.
