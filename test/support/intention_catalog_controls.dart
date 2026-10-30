@@ -48,6 +48,14 @@ final _header = find.descendant(
 );
 final _sheet = find.byType(Sheet);
 
+/// Заголовок страницы каталога намерений.
+Finder intentionCatalogHeading(WidgetTester tester) => find.descendant(
+  of: _page,
+  matching: find.text(
+    AppLocalizations.of(tester.element(_page)).appDestinationIntentionGraph,
+  ),
+);
+
 /// Поле, в которое человек вводит название для поиска в каталоге намерений.
 ///
 /// Для проверок его размещения и доступности: видимости, фокуса и соседства с
@@ -80,8 +88,7 @@ final intentionCatalogTagFilterControl = find.descendant(
 /// Прокручиваемый список выдачи открытого каталога намерений.
 ///
 /// Для проверок его размещения и жестов по списку. Прокрутку читают шаги
-/// [intentionCatalogListPosition], [shownIntentionCatalogOffsets] и
-/// [shownIntentionCatalogOuterOffsets].
+/// [intentionCatalogListPosition] и [shownIntentionCatalogOffsets].
 final intentionCatalogList = find.byKey(
   const PageStorageKey<String>('intention-catalog-list'),
 );
@@ -275,17 +282,6 @@ void jumpIntentionCatalog(WidgetTester tester, double fraction) {
 List<double> shownIntentionCatalogOffsets(WidgetTester tester) => [
   for (final position in _pagePositions(tester)) position.pixels,
 ];
-
-/// Смещения вертикальных прокруток страницы каталога, кроме списка выдачи.
-///
-/// Список выдачи читает [intentionCatalogListPosition].
-List<double> shownIntentionCatalogOuterOffsets(WidgetTester tester) {
-  final list = intentionCatalogListPosition(tester);
-  return [
-    for (final position in _pagePositions(tester))
-      if (position != list) position.pixels,
-  ];
-}
 
 /// Открытие и закрытие меню и панели короче этого времени.
 ///

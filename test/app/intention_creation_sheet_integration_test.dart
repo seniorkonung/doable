@@ -289,7 +289,6 @@ void main() {
         // Новая строка встала над видимыми: список сдвинулся на неё, а
         // видимые строки остались на своих местах экрана.
         final viewAfter = _catalogView(tester);
-        expect(viewAfter.outer, viewBefore.outer);
         expect(viewAfter.rows, viewBefore.rows);
         expect(viewAfter.list, greaterThan(viewBefore.list));
 
@@ -1185,16 +1184,11 @@ void _expectSameSearch(
   expect(actual.continuation, isA<IntentionCatalogContinuationIdle>());
 }
 
-/// Позиция просмотра каталога: прокрутки вокруг списка выдачи, прокрутка
-/// списка и видимые строки на своих местах экрана.
-typedef _CatalogView = ({
-  List<double> outer,
-  double list,
-  List<ShownIntentionCatalogRow> rows,
-});
+/// Позиция просмотра каталога: прокрутка списка выдачи и видимые строки на
+/// своих местах экрана.
+typedef _CatalogView = ({double list, List<ShownIntentionCatalogRow> rows});
 
 _CatalogView _catalogView(WidgetTester tester) => (
-  outer: shownIntentionCatalogOuterOffsets(tester),
   list: intentionCatalogListPosition(tester).pixels,
   rows: _visibleCatalogRows(tester),
 );

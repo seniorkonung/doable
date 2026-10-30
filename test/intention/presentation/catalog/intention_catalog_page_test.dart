@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.dart';
@@ -23,7 +21,6 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_page
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_search_layout.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
@@ -32,9 +29,8 @@ import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
-import 'package:flutter/foundation.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart' hide Badge;
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -390,316 +386,67 @@ void main() {
     expect(shownIntentionCatalogParameters(tester).titleFilter, invalidFilter);
   });
 
-  for (final (keyboard, variant) in [
-    (0.0, 'без клавиатуры'),
-    (300.0, 'при открытой клавиатуре'),
-  ]) {
-    testWidgets('жест по списку $variant прокручивает сначала список, а на его '
-        'краю — страницу с параметрами, и последняя строка достижима', (
-      tester,
-    ) async {
-      _usePhoneScreen(tester, keyboard: keyboard);
-      final repository = ControlledCatalogRepository();
-      await tester.pumpWidget(_testApp(repository));
-      repository.complete(
-        0,
-        _firstPage([
-          for (var index = 1; index <= 20; index++)
-            testSummary(index: index, title: 'Намерение $index'),
-        ]),
-      );
-      await tester.pumpAndSettle();
-      final list = find.byKey(
-        const PageStorageKey<String>('intention-catalog-list'),
-      );
-
-      expect(_pageScrollPosition(tester).pixels, 0);
-
-      await tester.dragFrom(
-        tester.getTopLeft(list) + const Offset(24, 24),
-        const Offset(0, -100),
-      );
-      await tester.pumpAndSettle();
-      expect(_catalogScrollPosition(tester).pixels, greaterThan(0));
-      expect(_pageScrollPosition(tester).pixels, 0);
-
-      await _dragCatalogToEnd(tester);
-
-      final page = _pageScrollPosition(tester);
-      expect(page.pixels, page.maxScrollExtent);
-      expect(page.maxScrollExtent, greaterThan(0));
-      // Выдача сохраняет порядок порции: последним стоит двадцатое намерение.
-      final lastRow = find.widgetWithText(CatalogRow, 'Намерение 20');
-      expect(lastRow.hitTestable(), findsOneWidget);
-
-      // Обратный жест тоже сначала прокручивает список, а страница остаётся
-      // в конце.
-      await tester.dragFrom(
-        tester.getTopLeft(list) + const Offset(24, 24),
-        const Offset(0, 100),
-      );
-      await tester.pumpAndSettle();
-      expect(_pageScrollPosition(tester).pixels, page.maxScrollExtent);
-      expect(
-        _catalogScrollPosition(tester).pixels,
-        lessThan(_catalogScrollPosition(tester).maxScrollExtent),
-      );
-      expect(tester.takeException(), isNull);
-    });
-
-    // Порция оболочки из 100 строк длиннее пути одного флинга, поэтому
-    // получение следующей порции после флинга проверяется здесь, на порции
-    // из 20 строк.
-    testWidgets('флинг $variant, начатый при списке и странице в начале, '
-        'доводит до конца список и страницу, и получение следующей порции '
-        'видно целиком до границы тела страницы, а обратный флинг возвращает '
-        'список и страницу к параметрам поиска', (tester) async {
-      _usePhoneScreen(tester, keyboard: keyboard);
-      final bodyBottom = _phone.height - keyboard;
-      final repository = ControlledCatalogRepository();
-      await tester.pumpWidget(
-        _testApp(repository, pageSize: 20, prefetchRemaining: 2),
-      );
-      repository.complete(
-        0,
-        ResultSuccess(
-          IntentionCatalogFirstPage(
-            items: [
-              for (var index = 1; index <= 20; index++)
-                testSummary(index: index, title: 'Намерение $index'),
-            ],
-            totalCount: 21,
-            nextCursor: const TestCatalogCursor(),
-            revision: const TestCatalogRevision(0),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      // Конец списка запрашивает следующую порцию; пока хранилище не
-      // ответило, её получение стоит в конце выдачи.
-      await _scrollCatalogToEnd(tester);
-      await _pumpUntilQueries(tester, repository, 2);
-      _catalogScrollPosition(tester).jumpTo(0);
-      await tester.pumpAndSettle();
-      expect(_catalogScrollPosition(tester).pixels, 0);
-      expect(_pageScrollPosition(tester).pixels, 0);
-
-      await _flingCatalogList(tester, const Offset(0, -300));
-
-      final list = _catalogScrollPosition(tester);
-      final page = _pageScrollPosition(tester);
-      expect(list.pixels, moreOrLessEquals(list.maxScrollExtent));
-      expect(page.pixels, moreOrLessEquals(page.maxScrollExtent));
-      expect(page.maxScrollExtent, greaterThan(0));
-      _expectFullyVisibleInList(
-        tester,
-        find.text('Loading more intentions…'),
-        bodyBottom: bodyBottom,
-      );
-      expect(repository.queries, hasLength(2));
-
-      await _flingCatalogList(tester, const Offset(0, 300));
-
-      expect(
-        _catalogScrollPosition(tester).pixels,
-        moreOrLessEquals(_catalogScrollPosition(tester).minScrollExtent),
-      );
-      expect(
-        _pageScrollPosition(tester).pixels,
-        moreOrLessEquals(_pageScrollPosition(tester).minScrollExtent),
-      );
-      final filter = intentionCatalogTitleField;
-      final shownFilter = tester.getRect(filter);
-      expect(
-        shownFilter.top,
-        greaterThanOrEqualTo(tester.getRect(find.byType(AppBar)).bottom),
-      );
-      expect(shownFilter.bottom, lessThanOrEqualTo(bodyBottom));
-      expect(filter.hitTestable(), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    });
-  }
-
-  testWidgets('флинг прокручивает страницу только от края списка: '
-      'слабый флинг внутри списка оставляет страницу на месте, а флинг при '
-      'списке уже в конце сдвигает страницу дальше хода пальца', (
-    tester,
-  ) async {
+  testWidgets('при прокрутке списка заголовок страницы, поиск и заголовок '
+      'списка остаются на месте', (tester) async {
     _usePhoneScreen(tester);
     final repository = ControlledCatalogRepository();
     await tester.pumpWidget(_testApp(repository));
-    repository.complete(
-      0,
-      _firstPage([
-        for (var index = 1; index <= 20; index++)
-          testSummary(index: index, title: 'Намерение $index'),
-      ]),
-    );
+    repository.complete(0, _firstPage(_twentySummaries()));
     await tester.pumpAndSettle();
+    final pinned = [
+      intentionCatalogHeading(tester),
+      intentionCatalogTitleField,
+      intentionCatalogTagFilterControl,
+      find.byType(CatalogHeader),
+    ];
+    final before = [for (final part in pinned) tester.getRect(part)];
 
-    await _flingCatalogList(tester, const Offset(0, -100), speed: 300);
+    // Жест уходит дальше конца списка: дальше прокручивать нечего.
+    await _dragCatalogList(tester, const Offset(0, -3000));
 
     final list = _catalogScrollPosition(tester);
-    expect(list.pixels, greaterThan(0));
-    expect(list.pixels, lessThan(list.maxScrollExtent));
-    expect(_pageScrollPosition(tester).pixels, 0);
-
-    list.jumpTo(list.maxScrollExtent);
-    await tester.pumpAndSettle();
-    expect(_pageScrollPosition(tester).pixels, 0);
-
-    const fingerTravel = 60.0;
-    await _flingCatalogList(
-      tester,
-      const Offset(0, -fingerTravel),
-      speed: 4000,
-    );
-
-    final page = _pageScrollPosition(tester);
-    expect(page.pixels, greaterThan(fingerTravel));
-    expect(page.pixels, lessThanOrEqualTo(page.maxScrollExtent));
-    expect(
-      _catalogScrollPosition(tester).pixels,
-      _catalogScrollPosition(tester).maxScrollExtent,
-    );
+    expect(list.pixels, list.maxScrollExtent);
+    expect([for (final part in pinned) tester.getRect(part)], before);
     expect(tester.takeException(), isNull);
   });
 
-  for (final (handoff, variant) in _pageFlingHandoffs) {
-    testWidgets('касание строки во время инерции к концу, которую странице '
-        'передала $variant, только останавливает страницу, а касание после '
-        'остановки открывает страницу намерения', (tester) async {
-      _usePhoneScreen(tester);
-      final items = [
-        for (var index = 1; index <= 20; index++)
-          testSummary(index: index, title: 'Намерение $index'),
-      ];
-      final router = await _openRoutedCatalog(tester, items);
-      if (handoff == _PageFlingHandoff.fromListEdge) {
-        _catalogScrollPosition(tester)
-            .jumpTo(_catalogScrollPosition(tester).maxScrollExtent);
-        await tester.pumpAndSettle();
-      }
-      expect(_pageScrollPosition(tester).pixels, 0);
+  testWidgets('при двукратном тексте и открытой клавиатуре на узком экране '
+      'страница не переполняется, а список прокручивается под неподвижным '
+      'полем поиска', (tester) async {
+    tester.view.physicalSize = const Size(320, 844);
+    tester.view.devicePixelRatio = 1;
+    tester.view.viewInsets = const FakeViewPadding(bottom: 336);
+    addTearDown(tester.view.reset);
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    final repository = ControlledCatalogRepository();
+    await tester.pumpWidget(_testApp(repository, locale: const Locale('ru')));
+    repository.complete(0, _firstPage(_twentySummaries()));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(tester.getSize(intentionCatalogList).height, greaterThan(0));
+    final field = tester.getRect(intentionCatalogTitleField);
 
-      await _releaseCatalogListFling(
-        tester,
-        const Offset(0, -_pageFlingTravel),
-        speed: handoff.speed,
-      );
-      await _pumpUntilPageInertia(tester, (page) => page.pixels > 0);
+    await _dragCatalogList(tester, const Offset(0, -60));
 
-      final list = _catalogScrollPosition(tester);
-      final page = _pageScrollPosition(tester);
-      expect(list.pixels, moreOrLessEquals(list.maxScrollExtent));
-      final stopped = page.pixels;
-      final (point, row) = _catalogRowAtListCenter(tester);
-      await tester.tapAt(point);
-      await tester.pumpAndSettle();
+    expect(_catalogScrollPosition(tester).pixels, greaterThan(0));
+    expect(tester.getRect(intentionCatalogTitleField), field);
+    expect(tester.takeException(), isNull);
+  });
 
-      expect(router.current.name, isNot(IntentionDetailsRoute.name));
-      expect(page.isScrollingNotifier.value, isFalse);
-      expect(page.pixels, stopped);
-      expect(page.pixels, lessThan(page.maxScrollExtent));
-      expect(list.pixels, moreOrLessEquals(list.maxScrollExtent));
-
-      await tester.tapAt(point);
-      await tester.pumpAndSettle();
-
-      expect(router.current.name, IntentionDetailsRoute.name);
-      expect(
-        router.current.argsAs<IntentionDetailsRouteArgs>().intentionId,
-        items.singleWhere((summary) => summary.title == row).id,
-      );
-    });
-
-    testWidgets('касание поля фильтра названия во время обратной инерции, '
-        'которую странице передала $variant, не ставит в него фокус и '
-        'останавливает страницу, а касание после остановки ставит', (
+  for (final (brightness, icons) in [
+    (Brightness.light, Brightness.dark),
+    (Brightness.dark, Brightness.light),
+  ]) {
+    testWidgets('значки системной строки контрастны теме ${brightness.name}', (
       tester,
     ) async {
-      _usePhoneScreen(tester);
-      await _openRoutedCatalog(tester, [
-        for (var index = 1; index <= 20; index++)
-          testSummary(index: index, title: 'Намерение $index'),
-      ]);
-      await _dragCatalogToEnd(tester);
-      if (handoff == _PageFlingHandoff.fromListEdge) {
-        _catalogScrollPosition(tester).jumpTo(0);
-        await tester.pumpAndSettle();
-      }
-      final page = _pageScrollPosition(tester);
-      expect(page.pixels, page.maxScrollExtent);
-      final filter = intentionCatalogTitleField;
-      final appBarBottom = tester.getRect(find.byType(AppBar)).bottom;
+      final repository = ControlledCatalogRepository();
+      await tester.pumpWidget(_testApp(repository, brightness: brightness));
+      repository.queryAt(0);
+      await tester.pump();
 
-      await _releaseCatalogListFling(
-        tester,
-        const Offset(0, _pageFlingTravel),
-        speed: handoff.speed,
-      );
-      // Касание приходится на видимую под шапкой часть поля, пока страница
-      // ещё не дошла до начала.
-      await _pumpUntilPageInertia(
-        tester,
-        (page) =>
-            page.pixels > 0 &&
-            tester.getRect(filter).bottom > appBarBottom + 16,
-      );
-
-      final stopped = page.pixels;
-      final shown = tester.getRect(filter);
-      final point = Offset(
-        shown.center.dx,
-        (math.max(shown.top, appBarBottom) + shown.bottom) / 2,
-      );
-      await tester.tapAt(point);
-      await tester.pumpAndSettle();
-
-      expect(_hasFocus(tester, filter), isFalse);
-      expect(page.isScrollingNotifier.value, isFalse);
-      expect(page.pixels, stopped);
-      expect(page.pixels, greaterThan(0));
-
-      await tester.tapAt(point);
-      await tester.pumpAndSettle();
-
-      expect(_hasFocus(tester, filter), isTrue);
-    });
-
-    // Собственная инерция страницы от трекпада пропускает касания к
-    // содержимому, поэтому и переданная странице — тоже.
-    testWidgets('щелчок во время инерции от трекпада, которую странице '
-        'передала $variant, срабатывает на строке, как во время собственной '
-        'инерции страницы от трекпада', (tester) async {
-      _usePhoneScreen(tester);
-      final items = [
-        for (var index = 1; index <= 20; index++)
-          testSummary(index: index, title: 'Намерение $index'),
-      ];
-      final router = await _openRoutedCatalog(tester, items);
-      if (handoff == _PageFlingHandoff.fromListEdge) {
-        _catalogScrollPosition(tester)
-            .jumpTo(_catalogScrollPosition(tester).maxScrollExtent);
-        await tester.pumpAndSettle();
-      }
-
-      await tester.trackpadFlingFrom(
-        _catalogListFlingStart(tester),
-        const Offset(0, -_pageFlingTravel),
-        handoff.speed,
-      );
-      await _pumpUntilPageInertia(tester, (page) => page.pixels > 0);
-
-      final (point, row) = _catalogRowAtListCenter(tester);
-      await tester.tapAt(point, kind: PointerDeviceKind.mouse);
-      await tester.pumpAndSettle();
-
-      expect(router.current.name, IntentionDetailsRoute.name);
-      expect(
-        router.current.argsAs<IntentionDetailsRouteArgs>().intentionId,
-        items.singleWhere((summary) => summary.title == row).id,
-      );
+      expect(SystemChrome.latestStyle?.statusBarIconBrightness, icons);
     });
   }
 
@@ -1028,15 +775,8 @@ void main() {
       moreOrLessEquals(beforePosition, epsilon: 0.01),
     );
 
-    // Нажатие вне неизменённой панели над шапкой каталога закрывает её.
-    await tester.tapAt(
-      tester.getCenter(
-        find.descendant(
-          of: find.byType(IntentionCatalogPage),
-          matching: find.byType(AppBar),
-        ),
-      ),
-    );
+    // Нажатие вне неизменённой панели над заголовком каталога закрывает её.
+    await tester.tapAt(tester.getCenter(intentionCatalogHeading(tester)));
     await tester.pumpAndSettle();
 
     final afterState =
@@ -1160,9 +900,6 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Заголовок списка стоит над выдачей и ушёл вверх вместе со страницей.
-    _pageScrollPosition(tester).jumpTo(0);
-    await tester.pump();
     expect(intentionCatalogTotal(31), findsOneWidget);
     expect(repository.queries, hasLength(3));
   });
@@ -1509,238 +1246,25 @@ ScrollPosition _catalogScrollPosition(WidgetTester tester) => tester
     )
     .position;
 
-/// Экран телефона, на котором параметры поиска и выдача делят высоту.
+/// Экран телефона, на котором двадцать строк выдачи не помещаются.
 const _phone = Size(400, 800);
 
-/// Открывает страницу на экране телефона с клавиатурой высотой [keyboard].
-void _usePhoneScreen(WidgetTester tester, {double keyboard = 0}) {
+/// Открывает страницу на экране телефона.
+void _usePhoneScreen(WidgetTester tester) {
   tester.view.physicalSize = _phone;
   tester.view.devicePixelRatio = 1;
-  tester.view.viewInsets = FakeViewPadding(bottom: keyboard);
   addTearDown(tester.view.reset);
 }
 
-/// Общая прокрутка параметров поиска и выдачи страницы.
-ScrollPosition _pageScrollPosition(WidgetTester tester) => tester
-    .state<ScrollableState>(
-      find
-          .descendant(
-            of: find.byType(IntentionSearchLayout),
-            matching: find.byType(Scrollable),
-          )
-          .first,
-    )
-    .position;
-
-/// Ведёт жест [offset] из середины видимой части списка выдачи: пока
-/// страница не прокручена, нижняя часть списка под параметрами поиска лежит
-/// за нижним краем экрана.
-Future<void> _dragCatalogList(WidgetTester tester, Offset offset) {
-  final list = tester.getRect(
-    find.byKey(const PageStorageKey<String>('intention-catalog-list')),
-  );
-  final screen = tester.view.physicalSize / tester.view.devicePixelRatio;
-  final top = math.max(list.top, tester.getRect(find.byType(AppBar)).bottom);
-  final bottom = math.min(list.bottom, screen.height);
-  return tester.dragFrom(Offset(list.center.dx, (top + bottom) / 2), offset);
-}
-
-/// Прокручивает жестами по списку выдачи до конца списка и страницы.
-Future<void> _dragCatalogToEnd(WidgetTester tester) async {
-  final list = find.byKey(
-    const PageStorageKey<String>('intention-catalog-list'),
-  );
-  for (var attempt = 0; attempt < 50; attempt++) {
-    final before = (
-      _catalogScrollPosition(tester).pixels,
-      _pageScrollPosition(tester).pixels,
-    );
-    final top = math.max(
-      tester.getRect(list).top,
-      tester.getRect(find.byType(AppBar)).bottom,
-    );
-    await tester.dragFrom(
-      Offset(tester.getRect(list).left + 24, top + 24),
-      const Offset(0, -200),
-    );
-    await tester.pumpAndSettle();
-    final after = (
-      _catalogScrollPosition(tester).pixels,
-      _pageScrollPosition(tester).pixels,
-    );
-    if (after == before) return;
-  }
-  fail('Список не дошёл до конца.');
-}
-
-/// Флинг на [offset] со скоростью [speed] из точки у верхнего левого края
-/// видимой части списка выдачи; скорости по умолчанию с запасом хватает на
-/// список и страницу.
-///
-/// Кадры идут с частотой экрана: в кадре, где список упирается в край, он
-/// уходит за край лишь на малую долю пути, и дальше страницу ведёт только
-/// переданная ей инерция флинга.
-Future<void> _flingCatalogList(
-  WidgetTester tester,
-  Offset offset, {
-  double speed = 6000,
-}) async {
-  await _releaseCatalogListFling(tester, offset, speed: speed);
-  await tester.pumpAndSettle(const Duration(milliseconds: 16));
-}
-
-/// Выполняет флинг [_flingCatalogList] и отпускает палец, не дожидаясь
-/// конца инерции.
-Future<void> _releaseCatalogListFling(
-  WidgetTester tester,
-  Offset offset, {
-  required double speed,
-}) => tester.flingFrom(_catalogListFlingStart(tester), offset, speed);
-
-/// Точка у верхнего левого края видимой части списка выдачи, из которой
-/// начинается флинг.
-Offset _catalogListFlingStart(WidgetTester tester) {
-  final list = tester.getRect(
-    find.byKey(const PageStorageKey<String>('intention-catalog-list')),
-  );
-  final top = math.max(list.top, tester.getRect(find.byType(AppBar)).bottom);
-  return Offset(list.left + 24, top + 24);
-}
-
-/// Путь, которым инерция флинга по списку выдачи переходит к странице.
-enum _PageFlingHandoff {
-  /// Флинг начат при списке в начале: страница продолжает инерцию списка,
-  /// дошедшую до его края.
-  listInertia(speed: 3000),
-
-  /// Флинг начат при списке уже у края: список не сдвигается, и инерцию
-  /// пальца сразу продолжает страница.
-  fromListEdge(speed: 2000);
-
-  const _PageFlingHandoff({required this.speed});
-
-  /// Скорость флинга, с которой страница ещё движется, когда касание
-  /// приходится на строку или поле фильтра.
-  final double speed;
-}
-
-/// Ход пальца флинга, инерцию которого продолжает страница: короткий ход
-/// оставляет странице путь и после флинга, начатого у края списка.
-const _pageFlingTravel = 60.0;
-
-const _pageFlingHandoffs = [
-  (_PageFlingHandoff.listInertia, 'инерция списка, дошедшая до его края'),
-  (_PageFlingHandoff.fromListEdge, 'флинг, начатый у края списка'),
+/// Двадцать строк выдачи: на экран телефона они не помещаются.
+List<IntentionSummary> _twentySummaries() => [
+  for (var index = 1; index <= 20; index++)
+    testSummary(index: index, title: 'Намерение $index'),
 ];
 
-/// Ведёт кадры с частотой экрана, пока страница не продолжает инерцию за
-/// списком выдачи и не выполнено [ready], и останавливается посреди
-/// инерции.
-Future<void> _pumpUntilPageInertia(
-  WidgetTester tester,
-  bool Function(ScrollPosition page) ready,
-) async {
-  for (var frame = 0; frame < 120; frame++) {
-    await tester.pump(const Duration(milliseconds: 16));
-    final page = _pageScrollPosition(tester);
-    if (page.isScrollingNotifier.value && ready(page)) return;
-  }
-  fail('Страница не продолжила инерцию списка выдачи.');
-}
-
-/// Середина видимой части списка выдачи и название строки под ней.
-(Offset, String) _catalogRowAtListCenter(WidgetTester tester) {
-  final list = tester.getRect(
-    find.byKey(const PageStorageKey<String>('intention-catalog-list')),
-  );
-  final screen = tester.view.physicalSize / tester.view.devicePixelRatio;
-  final top = math.max(list.top, tester.getRect(find.byType(AppBar)).bottom);
-  final bottom = math.min(list.bottom, screen.height);
-  final point = Offset(list.center.dx, (top + bottom) / 2);
-  final row = tester
-      .widgetList<CatalogRow>(find.byType(CatalogRow))
-      .singleWhere((row) => tester.getRect(find.byWidget(row)).contains(point));
-  return (point, row.name);
-}
-
-/// Стоит ли фокус ввода в текстовом поле [field].
-bool _hasFocus(WidgetTester tester, Finder field) => tester
-    .widget<EditableText>(
-      find.descendant(of: field, matching: find.byType(EditableText)),
-    )
-    .focusNode
-    .hasFocus;
-
-/// Открывает каталог намерений как корневую страницу приложения, в котором
-/// нажатие строки открывает страницу намерения, и показывает выдачу
-/// [items].
-Future<AppRouter> _openRoutedCatalog(
-  WidgetTester tester,
-  List<IntentionSummary> items,
-) async {
-  final repository = ControlledCatalogRepository();
-  final container = reconciliationCatalogContainer(repository);
-  final router = AppRouter();
-  addTearDown(container.dispose);
-  addTearDown(router.dispose);
-  await tester.pumpWidget(_routerTestAppWithContainer(container, router));
-  await tester.pump();
-  await openIntentionGraph(tester);
-  repository.complete(0, _firstPage(items));
-  await tester.pumpAndSettle();
-  return router;
-}
-
-/// Элемент [finder] виден целиком в видимой части списка выдачи.
-///
-/// Та же проверка, что у свидетельств раскладки оболочки: элемент лежит под
-/// шапкой, над нижним краем тела страницы [bodyBottom] и в видимой части
-/// каждой объемлющей прокрутки, а нажатия у его верхнего и нижнего края
-/// попадают в него.
-void _expectFullyVisibleInList(
-  WidgetTester tester,
-  Finder finder, {
-  required double bodyBottom,
-}) {
-  expect(finder, findsOneWidget);
-  final element = finder.evaluate().single;
-  final rect = tester.getRect(finder);
-  var visibleTop = tester.getRect(find.byType(AppBar)).bottom;
-  var visibleBottom = bodyBottom;
-  element.visitAncestorElements((ancestor) {
-    if (ancestor.widget is Scrollable) {
-      final viewport = ancestor.renderObject! as RenderBox;
-      final viewportTop = viewport.localToGlobal(Offset.zero).dy;
-      visibleTop = math.max(visibleTop, viewportTop);
-      visibleBottom = math.min(
-        visibleBottom,
-        viewportTop + viewport.size.height,
-      );
-    }
-    return true;
-  });
-  // Прокрутка до края даёт координаты с ошибкой округления.
-  expect(
-    rect.top,
-    greaterThanOrEqualTo(visibleTop - precisionErrorTolerance),
-    reason: '$finder: верхний край видимой части',
-  );
-  expect(
-    rect.bottom,
-    lessThanOrEqualTo(visibleBottom + precisionErrorTolerance),
-    reason: '$finder: нижний край видимой части',
-  );
-  // Нажатие ровно на границе элементу не принадлежит, поэтому точки
-  // отступают от краёв внутрь.
-  for (final y in [rect.top + 1, rect.bottom - 1]) {
-    final hit = tester.hitTestOnBinding(Offset(rect.center.dx, y));
-    expect(
-      [for (final entry in hit.path) entry.target],
-      contains(element.renderObject),
-      reason: '$finder: нажатие на высоте $y',
-    );
-  }
-}
+/// Ведёт жест [offset] из середины списка выдачи.
+Future<void> _dragCatalogList(WidgetTester tester, Offset offset) =>
+    tester.dragFrom(tester.getCenter(intentionCatalogList), offset);
 
 Future<void> _scrollCatalogToEnd(WidgetTester tester) async {
   for (var attempt = 0; attempt < 5; attempt++) {
@@ -1756,6 +1280,7 @@ Future<void> _scrollCatalogToEnd(WidgetTester tester) async {
 Widget _testApp(
   ControlledCatalogRepository repository, {
   Locale locale = const Locale('en'),
+  Brightness brightness = Brightness.light,
   int pageSize = 100,
   int prefetchRemaining = 30,
 }) => ProviderScope(
@@ -1771,7 +1296,7 @@ Widget _testApp(
   ],
   retry: (retryCount, error) => null,
   child: MaterialApp(
-    theme: doableTheme(Brightness.light),
+    theme: doableTheme(brightness),
     locale: locale,
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,

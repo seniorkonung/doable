@@ -23,7 +23,6 @@ import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_status_views.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_search_layout.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/long_term_relation/presentation/details/relation_details_page.dart';
@@ -192,56 +191,6 @@ void main() {
         _expectFullyVisible(tester, lastRow, insets);
         _expectCatalogEnd(tester, lastRow, insets);
         expect(lastRow.hitTestable(), findsOneWidget);
-        expect(tester.takeException(), isNull);
-      });
-
-      testWidgets('каталог намерений, ${insets.name}: один флинг от начала '
-          'выдачи, загруженной до конца, доводит до конца список и страницу, '
-          'и последняя строка занимает доступную область до панели, '
-          'а обратный флинг возвращает поле фильтра '
-          'названия', (tester) async {
-        // Двадцать строк одним флингом проходятся с запасом.
-        const count = 20;
-        await _start(tester, intentions: count, insets: insets);
-        await _select(tester, AppDestination.intentionGraph);
-        await _until(tester, intentionCatalogTotal(count));
-        if (insets.keyboard > 0) {
-          // Клавиатуру открывает поле фильтра в фокусе.
-          await enterIntentionCatalogTitle(tester, 'Намерение 00');
-          await _until(tester, intentionCatalogTotal(9));
-          await tester.pumpAndSettle();
-        }
-        expect(intentionCatalogListPosition(tester).pixels, 0);
-        expect(_catalogPageScroll(tester).pixels, 0);
-
-        await _flingCatalog(tester, const Offset(0, -300));
-
-        final list = intentionCatalogListPosition(tester);
-        final page = _catalogPageScroll(tester);
-        expect(list.pixels, moreOrLessEquals(list.maxScrollExtent));
-        expect(page.pixels, moreOrLessEquals(page.maxScrollExtent));
-        expect(page.maxScrollExtent, greaterThan(0));
-        // Порядок по умолчанию — от новых к старым: первое намерение стоит
-        // последним.
-        final lastRow = intentionCatalogRow(_intentionTitle(1));
-        _expectFullyVisible(tester, lastRow, insets);
-        _expectCatalogEnd(tester, lastRow, insets);
-        expect(lastRow.hitTestable(), findsOneWidget);
-
-        await _flingCatalog(tester, const Offset(0, 300));
-
-        expect(
-          intentionCatalogListPosition(tester).pixels,
-          moreOrLessEquals(
-            intentionCatalogListPosition(tester).minScrollExtent,
-          ),
-        );
-        expect(
-          _catalogPageScroll(tester).pixels,
-          moreOrLessEquals(_catalogPageScroll(tester).minScrollExtent),
-        );
-        _expectFullyVisible(tester, intentionCatalogTitleField, insets);
-        expect(intentionCatalogTitleField.hitTestable(), findsOneWidget);
         expect(tester.takeException(), isNull);
       });
     }
@@ -913,8 +862,7 @@ void _expectDailyChoiceEnd(WidgetTester tester, Finder last, _Insets insets) {
 /// в точке, доступной для нажатия. Прокрутка выдачи —
 /// самая вложенная прокрутка страницы: собственный список выдачи каталога
 /// намерений либо прокрутка, которую выдача каталога дневных выборов делит с
-/// фильтрами. Когда список дошёл до своего края, тот же жест продолжает
-/// прокрутку всей страницы.
+/// фильтрами.
 Future<void> _scrollToEnd(WidgetTester tester, Finder page) async {
   final list = find
       .descendant(
@@ -945,32 +893,6 @@ List<double> _scrollOffsets(WidgetTester tester, Finder page) => [
   ))
     scrollable.position.pixels,
 ];
-
-/// Флинг на [offset] по списку выдачи каталога намерений со скоростью, которой
-/// с запасом хватает на список и страницу.
-///
-/// Жест начинается у левого верхнего края видимой части списка, как в
-/// [_scrollToEnd]. Кадры идут с частотой экрана: в кадре, где список
-/// упирается в край, он уходит за край лишь на малую долю пути, и дальше
-/// страницу ведёт только переданная ей инерция флинга.
-Future<void> _flingCatalog(WidgetTester tester, Offset offset) async {
-  final list = tester.getRect(intentionCatalogList);
-  final top = math.max(list.top, tester.getRect(find.byType(AppBar)).bottom);
-  await tester.flingFrom(Offset(list.left + 24, top + 24), offset, 6000);
-  await tester.pumpAndSettle(const Duration(milliseconds: 16));
-}
-
-/// Общая прокрутка параметров поиска и выдачи каталога намерений.
-ScrollPosition _catalogPageScroll(WidgetTester tester) => tester
-    .state<ScrollableState>(
-      find
-          .descendant(
-            of: find.byType(IntentionSearchLayout),
-            matching: find.byType(Scrollable),
-          )
-          .first,
-    )
-    .position;
 
 /// Выбирает пункт панели и ждёт его корневую страницу.
 Future<void> _select(WidgetTester tester, AppDestination destination) async {

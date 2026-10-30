@@ -367,15 +367,13 @@ void _expectAboveShell(
 void _expectCreationSheetAboveCatalog(WidgetTester tester) {
   final catalog = find.byType(IntentionCatalogPage);
   expect(catalog, findsOneWidget);
-  // Панель стоит у нижнего края и оставляет шапку каталога видимой.
+  // Панель стоит у нижнего края и оставляет заголовок каталога видимым.
   final sheet = tester.getRect(
     find.byKey(const ValueKey('intention-creation-sheet')),
   );
-  final catalogBar = tester.getRect(
-    find.descendant(of: catalog, matching: find.byType(AppBar)),
-  );
+  final heading = tester.getRect(intentionCatalogHeading(tester));
   expect(sheet.bottom, _screen(tester).height);
-  expect(sheet.top, greaterThanOrEqualTo(catalogBar.bottom));
+  expect(sheet.top, greaterThanOrEqualTo(heading.bottom));
 
   final bar = find.byType(AppNavigationBar);
   expect(bar, findsOneWidget);

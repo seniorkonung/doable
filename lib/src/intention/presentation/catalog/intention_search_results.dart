@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
+import '../../../design_system/doable_metrics.dart';
 import '../../application/intention_catalog.dart';
 import '../search/results_scroll_keeper.dart';
 import 'intention_catalog_purpose.dart';
@@ -67,17 +68,6 @@ final class IntentionSearchResults extends ConsumerStatefulWidget {
   final String Function(IntentionCatalogEmpty empty) emptyMessage;
 
   final IntentionSearchResultBuilder itemBuilder;
-
-  /// Показывает ли выдача [catalog] загруженный список, а не состояние вместо
-  /// него: загрузку, отказ или пустую выдачу.
-  static bool showsList(AsyncValue<IntentionCatalogState> catalog) =>
-      catalog.when(
-        skipLoadingOnReload: false,
-        skipLoadingOnRefresh: false,
-        data: (state) => state is IntentionCatalogLoaded,
-        error: (_, _) => false,
-        loading: () => false,
-      );
 
   @override
   ConsumerState<IntentionSearchResults> createState() =>
@@ -170,7 +160,7 @@ final class _IntentionSearchResultsState
     return ListView.builder(
       key: widget.listKey,
       controller: _scrollKeeper.controller,
-      padding: EdgeInsets.zero,
+      padding: const EdgeInsets.symmetric(horizontal: DoableMetrics.space5),
       itemCount: results.items.length + (hasContinuationStatus ? 1 : 0),
       itemBuilder: (context, index) {
         if (index == results.items.length) {

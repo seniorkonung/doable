@@ -22,7 +22,6 @@ import 'package:doable/src/intention/application/intention_catalog.dart'
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_text.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_state.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_view_model.dart';
@@ -1169,8 +1168,11 @@ void main() {
         expect(sheet.bottom, _phone.height);
         expect(sheet.left, 0);
         expect(sheet.right, _phone.width);
-        // Над компактной панелью видны шапка и параметры каталога.
-        expect(tester.getRect(_catalogBar).top, 0);
+        // Над компактной панелью видны заголовок и параметры каталога.
+        expect(
+          tester.getRect(intentionCatalogHeading(tester)).top,
+          greaterThanOrEqualTo(_phoneInsets.safeTop),
+        );
         expect(
           sheet.top,
           greaterThanOrEqualTo(
@@ -2284,12 +2286,7 @@ String? _tooltipOf(WidgetTester tester, Key option) => tester
     )
     .message;
 
-final _catalogBar = find.descendant(
-  of: find.byType(IntentionCatalogPage),
-  matching: find.byType(AppBar),
-);
-
-/// Точка над панелью, где под модальным фоном лежит шапка каталога.
+/// Точка над панелью, где под модальным фоном лежит верх каталога.
 const _outsideSheet = Offset(400, 8);
 
 /// Экран телефона в портретной ориентации.

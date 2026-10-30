@@ -545,7 +545,7 @@
     - остальные вызовы `cycle`: `test/intention/presentation/catalog/intention_catalog_page_test.dart`, `intention_picker_session_test_support.dart`, `test/intention/presentation/picker/intention_picker_view_test.dart`, `test/intention/presentation/intention_tag_search_accessibility_test.dart`, `test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart`, `test/daily_choice/presentation/daily_choice_picker_tag_search_test_support.dart`.
   - **Размер:** M.
 
-- [ ] 4.10 Собрать каркас страницы: крупный заголовок, закреплённые поиск и заголовок списка, прокрутка только у списка
+- [x] 4.10 Собрать каркас страницы: крупный заголовок, закреплённые поиск и заголовок списка, прокрутка только у списка
   - **Критерии приёмки:**
     - Тело страницы — `Column` в `SafeArea` без нижней вставки: заголовок `IntentionSearchKind.title` стилем `DoableType.display` с семантикой заголовка, `IntentionSearchBar`, `IntentionListHeader` и выдача в `Expanded`. Отступы — из решения 2 design, верхний — 16 (`space4`) от края `SafeArea`. `AppBar` нет, стиль системной строки задаёт `AnnotatedRegion`, как у каталога дневных выборов.
     - `IntentionSearchLayout`, `IntentionSearchResults.showsList` и проверки передачи жеста от списка странице удалены. Шаг `shownIntentionCatalogOuterOffsets` и значение `outer` в `_catalogView` тоже удалены: вертикальная прокрутка осталась одна, и сравнение стало бы пустым.

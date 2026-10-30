@@ -89,17 +89,16 @@ void main() {
       await _start(tester, locale: locale);
       await _select(tester, AppDestination.intentionGraph);
 
-      final appBar = find.descendant(
-        of: find.byType(IntentionCatalogPage),
-        matching: find.byType(AppBar),
-      );
-      expect(appBar, findsOneWidget);
+      expect(intentionCatalogHeading(tester), findsOneWidget);
       for (final destination in [
         localizations.appDestinationDailyChoices,
         localizations.tagsPanelTitle,
       ]) {
         expect(
-          find.descendant(of: appBar, matching: find.byTooltip(destination)),
+          find.descendant(
+            of: find.byType(IntentionCatalogPage),
+            matching: find.byTooltip(destination),
+          ),
           findsNothing,
         );
       }

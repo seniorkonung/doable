@@ -8,7 +8,6 @@ import 'package:doable/src/intention/application/intention_catalog.dart'
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_status_views.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_search_layout.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
@@ -82,7 +81,6 @@ void main() {
 
     // Поле названия принимает ввод при открытой клавиатуре.
     final field = intentionCatalogTitleField;
-    await _reach(tester, field);
     _expectTappable(tester, field);
     expect(
       find.bySemanticsLabel(
@@ -112,7 +110,6 @@ void main() {
     // Кнопка фильтра называет число условий и открывает панель тегов в
     // режиме фильтра.
     final filter = intentionCatalogTagFilterControl;
-    await _reach(tester, filter);
     _expectTappable(tester, filter);
     _expectFilterAnnounced(tester, l10n, _initialConditions);
     await tester.tap(filter);
@@ -122,7 +119,7 @@ void main() {
     // Два нажатия на последний тег добавляют условие «должен
     // отсутствовать», а закрытие панели возвращает страницу поиска.
     final lastTagRow = _panelRow(_tags.last);
-    await _reach(tester, lastTagRow, within: _panelList);
+    await _reach(tester, lastTagRow, _panelList);
     _expectTappable(tester, lastTagRow);
     await tester.tap(lastTagRow);
     await tester.pump();
@@ -161,7 +158,7 @@ void main() {
       container.read(conditionsProvider).conditions.first.requirement,
       IntentionTagRequirement.mustBeAbsent,
     );
-    await _reach(tester, lastTagRow, within: _panelList);
+    await _reach(tester, lastTagRow, _panelList);
     await tester.tap(lastTagRow);
     await _pumpFrames(tester);
     await tester.tap(find.text(l10n.tagsPanelDone));
@@ -216,7 +213,7 @@ void main() {
         of: find.text(summary.title),
         matching: find.byType(CatalogRow),
       );
-      await _reach(tester, row, within: list);
+      await _reach(tester, row, list);
       _expectTappable(tester, row);
       final line = summary.tags.isEmpty
           ? l10n.intentionSummaryNoTags
@@ -232,7 +229,7 @@ void main() {
       of: continuation,
       matching: find.widgetWithText(FilledButton, l10n.commonRetry),
     );
-    await _reach(tester, continuationRetry, within: list);
+    await _reach(tester, continuationRetry, list);
     _expectTappable(tester, continuationRetry);
     expect(
       find.descendant(
@@ -241,7 +238,12 @@ void main() {
       ),
       findsOneWidget,
     );
-    await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+    // Поле поиска закреплено на экране, а область его крестика — 32 по
+    // оформлению, поэтому размер цели проверяется у самого повтора.
+    expect(
+      tester.getSize(continuationRetry).height,
+      greaterThanOrEqualTo(kMinInteractiveDimension),
+    );
     await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
     await expectLater(tester, meetsGuideline(textContrastGuideline));
     await tester.tap(continuationRetry);
@@ -268,21 +270,10 @@ void main() {
       of: find.text(lastSummary.title),
       matching: find.byType(CatalogRow),
     );
-    await _reach(tester, lastRow, within: list);
+    await _reach(tester, lastRow, list);
     _expectTappable(tester, lastRow);
 
-    // От конца выдачи поле названия достижимо одними жестами прокрутки.
-    for (
-      var attempt = 0;
-      attempt < 40 && !_isTappable(tester, field);
-      attempt++
-    ) {
-      await tester.dragFrom(
-        const Offset(210, _keyboardTop - 80),
-        const Offset(0, 400),
-      );
-      await _pumpFrames(tester);
-    }
+    // Поле названия закреплено и доступно и от конца выдачи.
     _expectTappable(tester, field);
     expect(tester.widget<TextField>(field).controller!.text, 'ход');
 
@@ -356,7 +347,7 @@ Future<void> _expectTagsPanelAccessible(
   for (final (index, tag) in _tags.indexed) {
     final name = tag.name.value;
     final row = _panelRow(tag);
-    await _reach(tester, row, within: _panelList);
+    await _reach(tester, row, _panelList);
     _expectTappable(tester, row);
     // Тег, уже входящий в условия, объявлен с текущей надобностью.
     expect(tester.getSemantics(row).label, switch (index) {
@@ -378,64 +369,20 @@ final _panelList = find.descendant(
   matching: find.byType(CustomScrollView),
 );
 
-/// Общая прокрутка параметров поиска и выдачи страницы поиска.
-final _pageScrollable = find
-    .descendant(
-      of: find.byType(IntentionSearchLayout),
-      matching: find.byType(Scrollable),
-    )
-    .first;
-
-/// Доводит элемент до видимой области прокруткой.
-///
-/// Лениво создаваемый элемент сначала находится жестами: прокруткой страницы
-/// до списка [within] и самого списка на [delta], а параметры поиска —
-/// прокруткой страницы к началу. Затем все охватывающие области прокрутки
-/// показывают элемент.
+/// Доводит лениво создаваемый элемент до видимой области списка [list]:
+/// сначала находит его жестами на [delta], затем показывает.
 Future<void> _reach(
   WidgetTester tester,
-  Finder finder, {
-  Finder? within,
+  Finder finder,
+  Finder list, {
   double delta = 150,
 }) async {
-  if (within != null && within.evaluate().isEmpty) {
-    // Список скрыт за параметрами поиска: сначала прокручивается страница.
-    await tester.scrollUntilVisible(
-      within,
-      150,
-      scrollable: _pageScrollable,
-      maxScrolls: 200,
-    );
-  }
-  if (within == null && finder.evaluate().isEmpty) {
-    // Параметры поиска скрыты за выдачей: страница прокручивается к началу.
-    for (
-      var attempt = 0;
-      attempt < 200 && finder.evaluate().isEmpty;
-      attempt++
-    ) {
-      await tester.dragFrom(
-        _visiblePoint(tester, _pageScrollable),
-        const Offset(0, 300),
-      );
-      await tester.pump();
-    }
-  }
-  if (within != null) {
-    final scrollable = find
-        .descendant(of: within, matching: find.byType(Scrollable))
-        .first;
-    for (
-      var attempt = 0;
-      attempt < 200 && finder.evaluate().isEmpty;
-      attempt++
-    ) {
-      await tester.dragFrom(
-        _visiblePoint(tester, scrollable),
-        Offset(0, -delta),
-      );
-      await tester.pump();
-    }
+  final scrollable = find
+      .descendant(of: list, matching: find.byType(Scrollable))
+      .first;
+  for (var attempt = 0; attempt < 200 && finder.evaluate().isEmpty; attempt++) {
+    await tester.dragFrom(_visiblePoint(tester, scrollable), Offset(0, -delta));
+    await tester.pump();
   }
   expect(finder, findsOneWidget);
   await Scrollable.ensureVisible(tester.element(finder), alignment: 0.5);

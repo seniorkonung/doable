@@ -1063,7 +1063,7 @@ Future<void> _prepareIntentionCatalog(WidgetTester tester, _App app) async {
   await tester.pumpAndSettle();
   await _selectOldestFirst(tester);
   // Лист не забирает фокус у поля названия, а поле с фокусом после возврата
-  // на страницу показало бы каретку и сдвинуло параметры над выдачей.
+  // на страницу показало бы каретку.
   FocusManager.instance.primaryFocus?.unfocus();
   await tester.pump();
 
