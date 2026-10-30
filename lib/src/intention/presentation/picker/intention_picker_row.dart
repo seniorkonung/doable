@@ -10,6 +10,7 @@ import '../../../tag/presentation/tag_color_presentation.dart';
 import '../../application/intention_catalog.dart';
 import '../../domain/intention.dart';
 import '../catalog/intention_catalog_purpose.dart';
+import '../search/intention_search_kind.dart';
 
 /// Строка экрана выбора для найденного намерения: название, начало описания,
 /// метка архива у архивированного намерения, молния у действия и теги, где
@@ -53,11 +54,7 @@ final class IntentionPickerRow extends StatelessWidget {
       ...summary.tags.where((tag) => !requiredTagIds.contains(tag.id)),
     ];
     final description = summary.descriptionPreview?.text;
-    // В поиске действия вид называть незачем: он выбирает только действия.
-    final namesKind = switch (purpose) {
-      SelectDailyChoiceAction() => false,
-      SelectDailyChoiceSource() || SelectRelationParticipant() => true,
-    };
+    final namesKind = IntentionSearchKind.of(purpose).namesKind;
 
     return PickerRow(
       name: summary.title,

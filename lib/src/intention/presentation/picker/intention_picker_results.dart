@@ -14,7 +14,7 @@ import '../../domain/intention_id.dart';
 import '../catalog/intention_catalog_purpose.dart';
 import '../catalog/intention_catalog_state.dart';
 import '../catalog/intention_catalog_view_model.dart';
-import 'intention_picker_kind.dart';
+import '../search/intention_search_kind.dart';
 import 'intention_picker_row.dart';
 
 /// Выдача экрана выбора назначения [purpose]: строки, подгрузка следующей
@@ -90,7 +90,7 @@ final class _IntentionPickerResultsState
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final kind = IntentionPickerKind.of(widget.purpose);
+    final kind = IntentionSearchKind.of(widget.purpose);
     ref.listen(
       intentionCatalogViewModelProvider(widget.purpose),
       (_, next) => _startNewResultsFromTop(next),
@@ -133,7 +133,7 @@ final class _IntentionPickerResultsState
 
   Widget _loaded(
     AppLocalizations l10n,
-    IntentionPickerKind kind,
+    IntentionSearchKind kind,
     IntentionCatalogLoaded loaded,
   ) {
     final rows = loaded.items.length;
@@ -220,7 +220,7 @@ final class _IntentionPickerResultsState
 
   Widget _list(List<Widget> slivers) => CustomScrollView(
     key: PageStorageKey<String>(
-      '${intentionPickerKeyPrefix(widget.purpose)}-list',
+      '${IntentionSearchKind.of(widget.purpose).keyPrefix}-list',
     ),
     controller: _scrollController,
     slivers: [
@@ -236,7 +236,7 @@ final class _IntentionPickerResultsState
     final summary = results.items[index];
     return IntentionPickerRow(
       key: ValueKey(
-        '${intentionPickerKeyPrefix(widget.purpose)}-${summary.id.toCanonicalString()}',
+        '${IntentionSearchKind.of(widget.purpose).keyPrefix}-${summary.id.toCanonicalString()}',
       ),
       purpose: widget.purpose,
       summary: summary,
@@ -250,7 +250,7 @@ final class _IntentionPickerResultsState
 
   Widget? _continuation(
     AppLocalizations l10n,
-    IntentionPickerKind kind,
+    IntentionSearchKind kind,
     IntentionCatalogLoaded results,
   ) => switch (results.continuation) {
     IntentionCatalogContinuationIdle() when results.nextCursor == null => null,

@@ -18,7 +18,7 @@ import '../catalog/intention_catalog_purpose.dart';
 import '../catalog/intention_catalog_state.dart';
 import '../catalog/intention_catalog_view_model.dart';
 import '../catalog/intention_tag_conditions_view_model.dart';
-import 'intention_picker_kind.dart';
+import '../search/intention_search_kind.dart';
 import 'intention_picker_purpose_sheet.dart';
 import 'intention_picker_results.dart';
 import 'intention_picker_show_and_sort_sheet.dart';
@@ -96,8 +96,8 @@ final class _IntentionPickerViewState
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final kind = IntentionPickerKind.of(widget.purpose);
-    final keyPrefix = intentionPickerKeyPrefix(widget.purpose);
+    final kind = IntentionSearchKind.of(widget.purpose);
+    final keyPrefix = kind.keyPrefix;
     final catalogProvider = intentionCatalogViewModelProvider(widget.purpose);
     final catalog = ref.watch(catalogProvider);
     final notifier = ref.read(catalogProvider.notifier);
