@@ -5,7 +5,7 @@
 
 ## Review Summary
 
-Решения [design.md](design.md) проверены по индексу `docs/adr/README.md` и записям о каталоге и ревизиях, количествах связей, потоках создания, предъявлении результатов и дизайн-системе. Учтено и активное изменение `redesign-intention-catalog`: его ADR-0049 пока есть только в его ветке.
+Решения [design.md](design.md) проверены по индексу `docs/adr/README.md` и записям о каталоге и ревизиях, количествах связей, потоках создания, предъявлении результатов и дизайн-системе. Учтено и активное изменение `redesign-intention-catalog`: его ADR-0049 пришла в эту ветку вместе с завершёнными фазами 1 и 2.
 
 Новая долговременная запись одна — [ADR-0050](../../../docs/adr/0050-mark-occupied-pairs-in-same-catalog-page.md). Она фиксирует пробу пары в запросе каталога, вычисление занимающей связи в снимке порции и согласование её фактами связей. Причины записи две: впервые чтение каталога получает сведения о связях, а отвергнутая альтернатива — прочитать все связи второго участника — неочевидна.
 
@@ -26,7 +26,7 @@ accepted ADRs are immutable.
 - [ADR-0050](../../../docs/adr/0050-mark-occupied-pairs-in-same-catalog-page.md) — proposed, originating change `mark-occupied-pairs-in-relation-participant-picker`. Принадлежит этому изменению: проба пары, занятость в порции, согласование фактами связей.
 - [ADR-0009](../../../docs/adr/0009-unify-personal-graph-module-and-revision.md) — accepted. **Ограничение:** ограниченные порции, единый снимок и ревизия, пакеты подтверждённых команд со сведениями о связях. ADR-0050 дополняет её, не меняя протокола.
 - [ADR-0043](../../../docs/adr/0043-read-relation-counts-only-for-intention-page.md) — proposed, originating change `redesign-intention-pickers`. **Ограничение:** каталог и поиски не получают количеств связей и не проверяют соседство. Отметка занятой пары — одна связь на строку, а не количество.
-- [ADR-0049](../../../docs/adr/0049-build-intention-catalog-and-pickers-from-one-search-module.md) — proposed, originating change `redesign-intention-catalog`. **Координация:** модуль поиска, строки через `rowBuilder` страницы, отличия контекстов данными. Запись есть пока только в ветке того изменения; реализация этого изменения начинается после его слияния.
+- [ADR-0049](../../../docs/adr/0049-build-intention-catalog-and-pickers-from-one-search-module.md) — proposed, originating change `redesign-intention-catalog`. **Координация:** модуль поиска, строки через `rowBuilder` страницы, отличия контекстов данными. Запись пришла с влитыми фазами 1 и 2 того изменения; это изменение сливается и архивируется после него.
 - [ADR-0022](../../../docs/adr/0022-complete-creation-flows-within-owned-route-boundaries.md) — proposed, originating change `add-quick-creation-and-persistent-navigation`. **Ограничение:** восстановление завершает поток создания связи по её правилам: удаление страниц потока до корня, переход только в актуальном потоке.
 - [ADR-0012](../../../docs/adr/0012-centralize-graph-operation-result-presentation.md) — accepted. **Ограничение:** владение предъявлением результата. Отказ восстановления из поиска сразу принадлежит оболочке.
 

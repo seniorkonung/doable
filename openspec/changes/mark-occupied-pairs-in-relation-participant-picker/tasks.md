@@ -8,7 +8,7 @@
   - **Проверка:**
     - `mise exec --no-deps -- flutter test test/intention/application/intention_contract_test.dart test/intention/data test/intention/presentation test/long_term_relation/presentation test/graph/presentation/graph_reconciliation_checkpoint_test.dart`.
     - `mise exec --no-deps -- flutter analyze`.
-  - **Зависимости:** нет. Работа начинается на `main` со слитым `redesign-intention-catalog`. До начала работы дельты спецификаций этого изменения заново сверяются с канонической спецификацией, вместе с `design.md` и ADR-0050 (Plan Constraints).
+  - **Зависимости:** нет. Работа идёт на ветке этого изменения с влитыми фазами 1 и 2 `redesign-intention-catalog` (Plan Constraints).
   - **Предполагаемые файлы:**
     - `lib/src/intention/application/intention_catalog.dart`, `lib/src/intention/presentation/catalog/intention_catalog_purpose.dart`, `lib/src/intention/presentation/catalog/intention_catalog_view_model.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`;
     - `lib/src/long_term_relation/presentation/participant_picker/relation_participant_choice.dart`, `lib/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart`, `lib/src/long_term_relation/presentation/editor/relation_editor_page.dart`;
