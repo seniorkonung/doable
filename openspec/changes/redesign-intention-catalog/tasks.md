@@ -291,6 +291,7 @@
   - **Критерии приёмки:**
     - Шаги получают `intentionCatalogTitleField`, `intentionCatalogTagFilterControl`, `intentionCatalogList` и `shownIntentionCatalogRows` — названия построенных строк сверху вниз.
     - `app_shell_back_test.dart`, `app_shell_pages_above_test.dart` с `app_shell_page_matrix.dart`, `app_shell_operation_reset_test.dart`, `app_shell_test.dart` и `app_shell_layout_test.dart` находят поле, кнопку условий, список и строки только этими шагами: локальных `_titleFilter`, `_catalogList`, `_catalogRow`, `_catalogRows`, `_catalogOffset`, `_catalogListScroll` нет, а `_summary` ищет только строки экранов выбора. `app_shell_test.dart` проверяет вход в пункт по `shownIntentionCatalogParameters` и `intentionCatalogTitleField`, а не по строкам `catalogScopeLabel` и `catalogFilterLabel`.
+    - Все чтения количества в этих файлах идут через `intentionCatalogTotal`, включая литералы `find.text('Total intentions: …')` в `app_shell_back_test.dart:58,81` и `app_shell_layout_test.dart:164,169,207,211,261,267`.
     - Ожидания сценариев прежние. Проверки компоновки прежней страницы остаются до фазы 4: `AppBar`, общая прокрутка `IntentionSearchLayout` (`_catalogPageScroll`) и разбор `IntentionTagConditionsSection` в матрице.
   - **Проверка:**
     - `mise exec --no-deps -- flutter test test/app/navigation/app_shell_back_test.dart test/app/navigation/app_shell_pages_above_test.dart test/app/navigation/app_shell_operation_reset_test.dart test/app/navigation/app_shell_test.dart test/app/navigation/app_shell_layout_test.dart`.
@@ -314,9 +315,9 @@
 
 - [ ] 3.4 Провести через общие шаги каталога сценарии создания намерения
   - **Критерии приёмки:**
-    - Шаги получают `removeIntentionCatalogTagCondition(TagId)`, а `shownIntentionCatalogRows` даёт ещё подпись тегов в виде `intentionSummaryTags` или `intentionSummaryNoTags` и прямоугольник строки на экране.
+    - Шаги получают `removeIntentionCatalogTagCondition(TagId)` и `intentionCatalogTitleFieldLabel(tester)` — доступную подпись поля названия каталога, а `shownIntentionCatalogRows` даёт ещё подпись тегов в виде `intentionSummaryTags` или `intentionSummaryNoTags` и прямоугольник строки на экране. Подпись поля шаг берёт из локализации по элементу поля, а не из семантики: под панелью создания поле скрыто от семантики.
     - `intention_creation_sheet_integration_test.dart` задаёт охват, название, условия и порядок, снимает условие и читает строки и прокрутку только общими шагами: локальных `_selectOption`, `_addCondition`, `_catalogList`, `_catalogListPosition`, `_catalogPagePosition` и ключей элементов каталога нет. Проверка, что новая строка сдвинула список, а видимые строки остались на своих местах, сохраняется.
-    - `creation_flows_integration_test.dart` читает количество `intentionCatalogTotal`, `intention_editor_page_test.dart` находит поле `intentionCatalogTitleField`, а `intention_creation_sheet_accessibility_test.dart` берёт доступное название поля из семантики `intentionCatalogTitleField`, а не из строки `catalogFilterLabel`. `_catalogBar` редактора и `_outsideSheet` остаются до фазы 4: это шапка прежней страницы.
+    - `creation_flows_integration_test.dart` читает количество `intentionCatalogTotal`, `intention_editor_page_test.dart` находит поле `intentionCatalogTitleField`, а проверка `intention_editor_page_test.dart:1223` берёт подпись из `intentionCatalogTitleFieldLabel` вместо литерала `'Filter by title'`, так что смена подписи поля сохраняет смысл проверки. `intention_creation_sheet_accessibility_test.dart` берёт доступное название поля из семантики `intentionCatalogTitleField`, а не из строки `catalogFilterLabel`. `_catalogBar` редактора и `_outsideSheet` остаются до фазы 4: это шапка прежней страницы.
   - **Проверка:**
     - `mise exec --no-deps -- flutter test test/app/intention_creation_sheet_integration_test.dart test/app/creation_flows_integration_test.dart test/intention/presentation/editor/intention_editor_page_test.dart test/intention/presentation/editor/intention_creation_sheet_accessibility_test.dart`.
     - `mise exec --no-deps -- flutter analyze`.
@@ -342,6 +343,7 @@
   - **Критерии приёмки:**
     - `long_term_relation_app_flow_test.dart` находит строки каталога `intentionCatalogRow`, а не `IntentionSummaryView`.
     - `intention_app_lifecycle_test.dart` и `intention_details_page_test.dart` выбирают охват `selectIntentionCatalogScope` со значением `IntentionScope`, а не подписью и ключом. Локального `_selectScope` нет.
+    - Все чтения количества в этих файлах идут через `intentionCatalogTotal`, включая литералы `find.text('Total intentions: …')` в `intention_app_lifecycle_test.dart:131,384`.
     - Ожидания сценариев не меняются.
   - **Проверка:**
     - `mise exec --no-deps -- flutter test test/app/long_term_relation_app_flow_test.dart test/app/intention_app_lifecycle_test.dart test/intention/presentation/details/intention_details_page_test.dart`.
@@ -353,10 +355,10 @@
 - [ ] 3.7 Проверить готовность фазы 3: сценарии проходят каталог через общие шаги на прежней странице
   - **Критерии приёмки:**
     - Сценарные проверки, которые проходят через каталог, обращаются к его управлению только через общие шаги, и все они проходят на прежней странице.
-    - Ключи управления каталогом, ключ списка и `IntentionSummaryView` встречаются только в `test/support/intention_catalog_controls.dart` и проверках самой прежней страницы и её частей: `intention_catalog_page_test.dart`, `intention_tag_conditions_section_test.dart`, `intention_tag_search_accessibility_test.dart`, `intention_summary_view_test.dart`.
+    - Ключи управления каталогом, ключ списка, `IntentionSummaryView` и строки `Total intentions`, `Filter by title`, `catalogTotalCount`, `catalogFilterLabel` встречаются только в `test/support/intention_catalog_controls.dart` и проверках самой прежней страницы и её частей: `intention_catalog_page_test.dart`, `intention_search_results_test.dart`, `intention_tag_conditions_section_test.dart`, `intention_tag_search_accessibility_test.dart`, `intention_summary_view_test.dart`.
     - Код приложения в фазе не менялся. Полная проверка проекта проходит.
   - **Проверка:**
-    - `grep -rlE 'catalog-scope-control|catalog-order-control|catalog-filter-field|intention-tag-conditions-add|intention-catalog-list|IntentionSummaryView' test --include='*.dart'`.
+    - `grep -rlE 'catalog-scope-control|catalog-order-control|catalog-filter-field|intention-tag-conditions-add|intention-catalog-list|IntentionSummaryView|Total intentions|Filter by title|catalogTotalCount|catalogFilterLabel' test --include='*.dart'`.
     - `git diff --quiet d6de1fac77d46e512fde7ff981ac01e2aa535b6f -- lib`.
     - `mise run check`.
   - **Зависимости:** 3.1, 3.2, 3.3, 3.4, 3.5, 3.6.
