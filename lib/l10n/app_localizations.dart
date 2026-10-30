@@ -3993,6 +3993,24 @@ abstract class AppLocalizations {
   /// **'Show both types'**
   String get intentionPickerShowBothTypes;
 
+  /// Заголовок пустого выбранного типа в каталоге с открытым охватом, который называет охват; значения select — имена IntentionScope и IntentionTypeChoice
+  ///
+  /// In en, this message translates to:
+  /// **'{scope, select, active{{type, select, actions{No active actions} intentions{No active intentions} other{}}} archived{{type, select, actions{No actions in the archive} intentions{No intentions in the archive} other{}}} all{{type, select, actions{No actions yet} intentions{No intentions yet} other{}}} other{}}'**
+  String intentionPickerEmptyScopedTypeTitle(String scope, String type);
+
+  /// Текст пустого выбранного типа «Только действия» в каталоге с открытым охватом
+  ///
+  /// In en, this message translates to:
+  /// **'An intention marked as an action is shown here.'**
+  String get intentionPickerEmptyActionsText;
+
+  /// Текст пустого выбранного типа «Только намерения» в каталоге с открытым охватом
+  ///
+  /// In en, this message translates to:
+  /// **'Everything here is marked as an action.'**
+  String get intentionPickerEmptyIntentionsText;
+
   /// Заголовок шапки экрана выбора действия
   ///
   /// In en, this message translates to:

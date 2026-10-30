@@ -2,6 +2,7 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/design_system/components/catalog_header.dart';
 import 'package:doable/src/design_system/components/empty_state.dart';
 import 'package:doable/src/design_system/components/list_state.dart';
+import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/design_system/doable_metrics.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
@@ -246,6 +247,106 @@ void main() {
     });
   });
 
+  group('пустой выбранный тип каталога при открытом охвате', () {
+    for (final (locale, texts) in [
+      (
+        const Locale('ru'),
+        (
+          actionsText: 'Здесь появится намерение, отмеченное как действие.',
+          intentionsText: 'Здесь всё отмечено как действия.',
+          titles: {
+            (IntentionScope.active, IntentionTypeChoice.actions):
+                'Нет активных действий',
+            (IntentionScope.active, IntentionTypeChoice.intentions):
+                'Нет активных намерений',
+            (IntentionScope.archived, IntentionTypeChoice.actions):
+                'Нет действий в архиве',
+            (IntentionScope.archived, IntentionTypeChoice.intentions):
+                'Нет намерений в архиве',
+            (IntentionScope.all, IntentionTypeChoice.actions):
+                'Действий пока нет',
+            (IntentionScope.all, IntentionTypeChoice.intentions):
+                'Намерений пока нет',
+          },
+        ),
+      ),
+      (
+        const Locale('en'),
+        (
+          actionsText: 'An intention marked as an action is shown here.',
+          intentionsText: 'Everything here is marked as an action.',
+          titles: {
+            (IntentionScope.active, IntentionTypeChoice.actions):
+                'No active actions',
+            (IntentionScope.active, IntentionTypeChoice.intentions):
+                'No active intentions',
+            (IntentionScope.archived, IntentionTypeChoice.actions):
+                'No actions in the archive',
+            (IntentionScope.archived, IntentionTypeChoice.intentions):
+                'No intentions in the archive',
+            (IntentionScope.all, IntentionTypeChoice.actions): 'No actions yet',
+            (IntentionScope.all, IntentionTypeChoice.intentions):
+                'No intentions yet',
+          },
+        ),
+      ),
+    ]) {
+      for (final MapEntry(key: (scope, type), value: title)
+          in texts.titles.entries) {
+        final actions = type == IntentionTypeChoice.actions;
+        testWidgets('${locale.languageCode}, ${scope.name}, ${type.name}: '
+            'заголовок «$title», текст и значок', (tester) async {
+          final h = await _openCatalog(tester, locale: locale);
+          h.notifier
+            ..changeScope(scope)
+            ..changeType(type);
+          await tester.pump();
+          h.repository.complete(
+            h.repository.queries.length - 1,
+            _otherTypeOnlyPage(shown: type),
+          );
+          await _settle(tester);
+
+          expect(_inEmptyState(find.text(title)), findsOneWidget);
+          expect(
+            _inEmptyState(
+              find.text(actions ? texts.actionsText : texts.intentionsText),
+            ),
+            findsOneWidget,
+          );
+          expect(
+            _inEmptyState(
+              _icon(actions ? DoableIconData.bolt : DoableIconData.intention),
+            ),
+            findsOneWidget,
+          );
+        });
+      }
+    }
+
+    testWidgets('«Показать оба типа» выбирает тип «Все» в выбранном охвате', (
+      tester,
+    ) async {
+      final h = await _openCatalog(tester, locale: const Locale('ru'));
+      h.notifier
+        ..changeScope(IntentionScope.archived)
+        ..changeType(IntentionTypeChoice.actions);
+      await tester.pump();
+      h.repository.complete(
+        h.repository.queries.length - 1,
+        _otherTypeOnlyPage(shown: IntentionTypeChoice.actions),
+      );
+      await _settle(tester);
+
+      await tester.tap(_inEmptyState(find.text('Показать оба типа')));
+      await tester.pump();
+
+      final query = h.repository.queries.last;
+      expect(query.readinessFilter, IntentionReadinessFilter.all);
+      expect(query.scope, IntentionScope.archived);
+    });
+  });
+
   group('согласование выдачи без смены параметров', () {
     testWidgets('строка, добавленная перед видимой, оставляет видимую строку '
         'на месте', (tester) async {
@@ -304,6 +405,13 @@ final _listState = find.byWidgetPredicate((widget) => widget is ListState);
 Finder _loading(String text) =>
     find.descendant(of: _listState, matching: find.text(text));
 
+Finder _inEmptyState(Finder finder) =>
+    find.descendant(of: find.byType(EmptyState), matching: finder);
+
+Finder _icon(DoableIconData icon) => find.byWidgetPredicate(
+  (widget) => widget is DoableIcon && widget.icon == icon,
+);
+
 IntentionSummary _action(int index, {List<Tag> tags = const []}) => testSummary(
   index: index,
   title: 'Действие $index',
@@ -334,6 +442,27 @@ Result<IntentionCatalogPage> _firstPage(
   );
 }
 
+/// Пустая первая порция, у которой в обоих охватах нет намерений типа
+/// [shown], а есть только другого типа.
+Result<IntentionCatalogPage> _otherTypeOnlyPage({
+  required IntentionTypeChoice shown,
+}) {
+  final counts = switch (shown) {
+    IntentionTypeChoice.actions => IntentionTypeCounts(all: 2, actions: 0),
+    IntentionTypeChoice.intentions => IntentionTypeCounts(all: 2, actions: 2),
+    IntentionTypeChoice.all => throw ArgumentError.value(shown, 'shown'),
+  };
+  return ResultSuccess(
+    IntentionCatalogFirstPage(
+      items: const [],
+      totalCount: 0,
+      counts: IntentionCountsByScopeAndType(active: counts, archived: counts),
+      nextCursor: null,
+      revision: const TestCatalogRevision(1),
+    ),
+  );
+}
+
 Result<IntentionCatalogPage> _continuationPage(
   List<IntentionSummary> items, {
   bool hasMore = true,
@@ -351,7 +480,7 @@ final class _Harness {
   final WidgetTester _tester;
   final ProviderContainer container;
   final ControlledCatalogRepository repository;
-  final IntentionPickerPurpose purpose;
+  final IntentionCatalogPurpose purpose;
 
   IntentionCatalogViewModel get notifier =>
       container.read(intentionCatalogViewModelProvider(purpose).notifier);
@@ -365,7 +494,8 @@ final class _Harness {
 
 Future<_Harness> _open(
   WidgetTester tester, {
-  IntentionPickerPurpose? purpose,
+  IntentionCatalogPurpose? purpose,
+  Locale locale = const Locale('ru'),
   int pageSize = 100,
 }) async {
   final repository = ControlledCatalogRepository();
@@ -387,7 +517,7 @@ Future<_Harness> _open(
       container: container,
       child: MaterialApp(
         theme: doableTheme(Brightness.light),
-        locale: const Locale('ru'),
+        locale: locale,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
@@ -408,6 +538,10 @@ Future<_Harness> _open(
   );
   return h;
 }
+
+/// Открывает выдачу каталога намерений с открытым охватом и типом.
+Future<_Harness> _openCatalog(WidgetTester tester, {required Locale locale}) =>
+    _open(tester, purpose: const BrowseIntentionCatalog(), locale: locale);
 
 /// Открывает выдачу с обязательным тегом «Спорт»: 30 строк, чётные действия
 /// от 60 до 2.

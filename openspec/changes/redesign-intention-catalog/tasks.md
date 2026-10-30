@@ -561,7 +561,7 @@
     - проверки: `test/intention/presentation/catalog/intention_catalog_page_test.dart`, `test/intention/presentation/intention_tag_search_accessibility_test.dart` — его `_pageScrollable` и `_reach` держатся на `IntentionSearchLayout`, `test/intention/presentation/editor/intention_editor_page_test.dart`, `test/app/intention_creation_sheet_integration_test.dart`, в `test/app/navigation/`: `app_shell_layout_test.dart`, `app_shell_test.dart`, `app_shell_pages_above_test.dart`, `app_navigation_accessibility_test.dart`.
   - **Размер:** M.
 
-- [ ] 4.11 Называть охват в пустой выдаче выбранного типа при открытом охвате
+- [x] 4.11 Называть охват в пустой выдаче выбранного типа при открытом охвате
   - **Критерии приёмки:**
     - При `IntentionScopeOpen` вторая причина пустой выдачи показывает заголовок по таблице решения 7 design: «Нет активных действий» / `No active actions`, «Нет действий в архиве» / `No actions in the archive`, «Действий пока нет» / `No actions yet` и так же для намерений. Охват и тип берутся из запроса пустой выдачи.
     - Текст под заголовком: «Здесь появится намерение, отмеченное как действие.» / `An intention marked as an action is shown here.` для действий и «Здесь всё отмечено как действия.» / `Everything here is marked as an action.` для намерений. Значок — молния для действий и знак намерения для намерений. Действие «Показать оба типа» прежнее.

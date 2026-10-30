@@ -2555,6 +2555,40 @@ class AppLocalizationsEn extends AppLocalizations {
   String get intentionPickerShowBothTypes => 'Show both types';
 
   @override
+  String intentionPickerEmptyScopedTypeTitle(String scope, String type) {
+    String _temp0 = intl.Intl.selectLogic(type, {
+      'actions': 'No active actions',
+      'intentions': 'No active intentions',
+      'other': '',
+    });
+    String _temp1 = intl.Intl.selectLogic(type, {
+      'actions': 'No actions in the archive',
+      'intentions': 'No intentions in the archive',
+      'other': '',
+    });
+    String _temp2 = intl.Intl.selectLogic(type, {
+      'actions': 'No actions yet',
+      'intentions': 'No intentions yet',
+      'other': '',
+    });
+    String _temp3 = intl.Intl.selectLogic(scope, {
+      'active': '$_temp0',
+      'archived': '$_temp1',
+      'all': '$_temp2',
+      'other': '',
+    });
+    return '$_temp3';
+  }
+
+  @override
+  String get intentionPickerEmptyActionsText =>
+      'An intention marked as an action is shown here.';
+
+  @override
+  String get intentionPickerEmptyIntentionsText =>
+      'Everything here is marked as an action.';
+
+  @override
   String get intentionPickerActionTitle => 'Choose an action';
 
   @override

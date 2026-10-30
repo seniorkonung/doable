@@ -2579,6 +2579,40 @@ class AppLocalizationsRu extends AppLocalizations {
   String get intentionPickerShowBothTypes => 'Показать оба типа';
 
   @override
+  String intentionPickerEmptyScopedTypeTitle(String scope, String type) {
+    String _temp0 = intl.Intl.selectLogic(type, {
+      'actions': 'Нет активных действий',
+      'intentions': 'Нет активных намерений',
+      'other': '',
+    });
+    String _temp1 = intl.Intl.selectLogic(type, {
+      'actions': 'Нет действий в архиве',
+      'intentions': 'Нет намерений в архиве',
+      'other': '',
+    });
+    String _temp2 = intl.Intl.selectLogic(type, {
+      'actions': 'Действий пока нет',
+      'intentions': 'Намерений пока нет',
+      'other': '',
+    });
+    String _temp3 = intl.Intl.selectLogic(scope, {
+      'active': '$_temp0',
+      'archived': '$_temp1',
+      'all': '$_temp2',
+      'other': '',
+    });
+    return '$_temp3';
+  }
+
+  @override
+  String get intentionPickerEmptyActionsText =>
+      'Здесь появится намерение, отмеченное как действие.';
+
+  @override
+  String get intentionPickerEmptyIntentionsText =>
+      'Здесь всё отмечено как действия.';
+
+  @override
   String get intentionPickerActionTitle => 'Выбор действия';
 
   @override
