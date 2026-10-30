@@ -152,3 +152,16 @@
     - меняется `lib/src/intention/presentation/search/results_scroll_keeper.dart`;
     - проверка `test/intention/presentation/search/intention_search_list_test.dart`.
   - **Размер:** XS.
+
+- [ ] 1.11 Убрать из проверок `IntentionSearchKind` случаи экранов выбора, которые повторяют существующие тесты
+  - **Критерии приёмки:**
+    - В `intention_search_kind_test.dart` нет случаев префикса ключей и называния типа для выбора действия, выбора исходного намерения и выбора участника и нет теста «четыре назначения не делят префикс ключей». Префиксы `daily-choice-action`, `daily-choice-source` и `participant-picker` закреплены тестами экранов выбора, которые находят элементы по этим ключам; называние типа по назначению закреплено доступными названиями в `test/intention/presentation/picker/intention_picker_row_test.dart`.
+    - Остаются проверка варианта каталога — префикс ключей `intention-catalog` и называние типа — и проверка существующих текстов каталога.
+    - Код приложения и поведение не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/search`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.1.
+  - **Предполагаемые файлы:**
+    - меняется `test/intention/presentation/search/intention_search_kind_test.dart`.
+  - **Размер:** XS.

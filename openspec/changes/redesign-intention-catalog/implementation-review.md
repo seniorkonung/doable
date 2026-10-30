@@ -3,9 +3,9 @@
 ## Assessment
 
 **Format version:** 1
-**Result:** Changes needed
+**Result:** No unresolved findings
 **Coverage status:** Complete
-**Summary:** Фаза 1 переносит экраны выбора на общий модуль поиска в соответствии с задачами 1.1–1.8. Часть проверок `IntentionSearchKind` повторяет уже существующие (F3).
+**Summary:** Фаза 1 переносит экраны выбора на общий модуль поиска в соответствии с задачами 1.1–1.8.
 
 ## Review target
 
@@ -75,14 +75,7 @@
 
 ## Findings
 
-### F3 · Low — Проверки `IntentionSearchKind` для экранов выбора повторяют существующие
-
-- **Evidence:** `intention_search_kind_test.dart:35-50` проверяет префикс ключей и `namesKind` для четырёх назначений и отдельно, что префиксы различны. Префиксы трёх экранов выбора уже закреплены тестами, которые находят элементы по ключам `daily-choice-action-…`, `daily-choice-source-…` и `participant-picker-…` (например, `test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart`, `test/daily_choice/presentation/action_picker/daily_choice_action_picker_page_test.dart`, `test/intention/presentation/picker/intention_picker_view_test.dart`). Называние типа по назначению закреплено доступными названиями в `test/intention/presentation/picker/intention_picker_row_test.dart:78-125`. Проверка различия префиксов следует из проверок точных значений. Новую регрессию ловят только проверки варианта каталога, у которого в этой фазе нет других проверок.
-- **Evidence revisions:** ["fdbfd885c4fd62d08e79d00d3b867d80df48c37a"]
-- **Impact:** Повторные проверки удваивают места правки при изменении назначений и не ловят регрессий сверх существующих, вопреки правилу обоснованной необходимости.
-- **Required outcome:** В `intention_search_kind_test.dart` остаются только проверки, которые ловят регрессию, не пойманную другими тестами.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** ["test/intention/presentation/search/intention_search_kind_test.dart"]
+No unresolved findings remain in the implementation review.
 
 ## Review coverage
 
