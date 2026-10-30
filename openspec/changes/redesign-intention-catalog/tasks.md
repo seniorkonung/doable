@@ -1,0 +1,124 @@
+## Phase 1: Экраны выбора на общем модуле поиска
+
+- [ ] 1.1 Собрать разбор назначения поиска в одном месте модуля поиска: тексты загрузки и отказов, префикс ключей и называние типа для любого назначения каталога
+  - **Критерии приёмки:**
+    - `IntentionSearchKind.of(IntentionCatalogPurpose)` в `search/` исчерпывающе разбирает все назначения, включая общий каталог. Он даёт заголовок экрана выбора, тексты загрузки, подгрузки и отказов, префикс ключей и признак, называет ли строка тип.
+    - Для экранов выбора тексты, заголовки и ключи остаются прежними. Общий каталог получает существующие тексты каталога и префикс `intention-catalog`.
+    - `IntentionPickerKind` и `intentionPickerKeyPrefix` удалены; экран выбора, его выдача и строка используют новый разбор.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/picker test/daily_choice/presentation/action_picker test/daily_choice/presentation/source_picker test/long_term_relation/presentation/participant_picker`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - новый `lib/src/intention/presentation/search/intention_search_kind.dart`; удаляется `lib/src/intention/presentation/picker/intention_picker_kind.dart`;
+    - меняются `lib/src/intention/presentation/picker/intention_picker_view.dart`, `intention_picker_results.dart`, `intention_picker_row.dart`.
+  - **Размер:** S.
+
+- [ ] 1.2 Вынести правило содержания строки результата в модуль поиска: порядок тегов, метки архива и действия, выделение обязательных тегов и части доступного названия
+  - **Критерии приёмки:**
+    - Общее правило строки в `search/` по сводке намерения, обязательным тегам применённого запроса и признаку называния типа даёт:
+      - название и начало описания;
+      - метки с тоном по архивному состоянию;
+      - теги: обязательные первыми, внутри групп ручной порядок, в архивной строке без выделения;
+      - доступное название.
+    - `IntentionPickerRow` строится из этого правила и больше не повторяет его. Вид, доступное название и нажатия строки экрана выбора не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/picker test/design_system/picker_row_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.1 — признак называния типа даёт разбор назначения.
+  - **Предполагаемые файлы:**
+    - новый `lib/src/intention/presentation/search/intention_row_content.dart`;
+    - меняется `lib/src/intention/presentation/picker/intention_picker_row.dart`;
+    - проверка `test/intention/presentation/picker/intention_picker_row_test.dart` — без изменения ожиданий.
+  - **Размер:** S.
+
+- [ ] 1.3 Вынести удержание видимой строки списка в общий хранитель места модуля поиска, не меняя поведения прежнего каталога
+  - **Критерии приёмки:**
+    - `ResultsScrollKeeper` в `search/` владеет контроллером прокрутки, ключами строк и исходным запросом выдачи. Он снимает якорь первой видимой строки до перестройки, восстанавливает его после кадра, переводит новую выдачу наверх и забывает ключи исчезнувших строк, как решение 5 design.
+    - Прежняя выдача каталога использует хранитель вместо собственной копии этой логики. Сохранение места после согласования, начало новой выдачи сверху и возврат со страницы намерения в каталоге работают как раньше.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog/intention_search_results_test.dart test/intention/presentation/catalog/intention_catalog_page_test.dart test/app/navigation/app_shell_state_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - новый `lib/src/intention/presentation/search/results_scroll_keeper.dart`;
+    - меняется `lib/src/intention/presentation/catalog/intention_search_results.dart`.
+  - **Размер:** M.
+
+- [ ] 1.4 Перевести экраны выбора на общую выдачу модуля поиска, которая удерживает видимую строку при согласовании с подтверждёнными операциями
+  - **Критерии приёмки:**
+    - Общая выдача `IntentionSearchList` в `search/` принимает:
+      - назначение каталога;
+      - построение строки;
+      - содержание пустого охвата;
+      - сброс фильтров;
+      - нижний отступ.
+
+      Она сама показывает строки с подгрузкой, состояния загрузки и отказов, причины пустой выдачи по фильтрам и типу, а место в списке держит хранителем из 1.3.
+    - Экраны выбора используют общую выдачу со своей строкой, сообщением пустого охвата и отступом 40. `IntentionPickerResults` удалён.
+    - Подтверждённая операция, которая меняет строки перед видимой, оставляет первую видимую строку экрана выбора на месте. Новая выдача по-прежнему начинается сверху.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/search test/intention/presentation/picker test/daily_choice/presentation/action_picker test/daily_choice/presentation/source_picker test/long_term_relation/presentation/participant_picker`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.1, 1.2, 1.3.
+  - **Предполагаемые файлы:**
+    - новый `lib/src/intention/presentation/search/intention_search_list.dart`; удаляется `lib/src/intention/presentation/picker/intention_picker_results.dart`;
+    - меняется `lib/src/intention/presentation/picker/intention_picker_view.dart`;
+    - проверки: `test/intention/presentation/picker/intention_picker_results_test.dart` переносится в `test/intention/presentation/search/intention_search_list_test.dart` и получает случай сохранения видимой строки при согласовании.
+  - **Размер:** M.
+
+- [ ] 1.5 Сделать лист «Показать и упорядочить» общей частью модуля поиска для любого назначения каталога
+  - **Критерии приёмки:**
+    - Лист в `search/` открывается для `IntentionCatalogPurpose` и показывает строки типа и сортировки по выбору параметров модели, как раньше. Закреплённый тип, переходы порядка, кнопка направления и «Сбросить» работают по-прежнему.
+    - Экраны выбора открывают общий лист; прежний лист экрана выбора удалён.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/search test/intention/presentation/picker`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - новый `lib/src/intention/presentation/search/show_and_sort_sheet.dart`; удаляется `lib/src/intention/presentation/picker/intention_picker_show_and_sort_sheet.dart`;
+    - меняется `lib/src/intention/presentation/picker/intention_picker_view.dart`;
+    - проверки: `test/intention/presentation/picker/intention_picker_show_and_sort_sheet_test.dart` переносится в `test/intention/presentation/search/show_and_sort_sheet_test.dart` без изменения ожиданий.
+  - **Размер:** S.
+
+- [ ] 1.6 Собрать строку поиска с кнопкой фильтра и заголовок списка общими частями модуля поиска, из которых строится экран выбора
+  - **Критерии приёмки:**
+    - Строка поиска в `search/` показывает поле названия с ошибкой недопустимого фильтра и кнопку фильтра с числом условий. Кнопка открывает панель тегов в контексте фильтра того же назначения.
+    - Заголовок списка в `search/` показывает слова выбранного типа, количество подтверждённой выдачи, сводку сортировки и доступное название, а нажатием открывает общий лист.
+    - Сброс фильтров из пустой выдачи очищает поле и снимает условия.
+    - `IntentionPickerView` состоит из своей шапки и этих частей. Вид, ключи и поведение экранов выбора не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/picker test/daily_choice/presentation/action_picker test/daily_choice/presentation/source_picker test/long_term_relation/presentation/participant_picker test/daily_choice/presentation/daily_choice_creation_flow_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.1, 1.4, 1.5.
+  - **Предполагаемые файлы:**
+    - новые `lib/src/intention/presentation/search/intention_search_bar.dart` и `intention_list_header.dart`;
+    - меняется `lib/src/intention/presentation/picker/intention_picker_view.dart`.
+  - **Размер:** M.
+
+- [ ] 1.7 Назвать вариант без ограничения типа в листе «Намерения и действия» / `Intentions and actions`
+  - **Критерии приёмки:**
+    - Строка «Тип» и её меню в листе показывают «Намерения и действия» на русском и `Intentions and actions` на английском. Заголовок списка по-прежнему называет этот тип «Все» / `All`.
+    - При крупном тексте подпись переносится в строке и меню без наложений.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/intention/presentation/search test/intention/presentation/picker test/app/localization/locale_resolution_test.dart`.
+  - **Зависимости:** 1.5 — проверки листа уже перенесены.
+  - **Предполагаемые файлы:**
+    - `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` и сгенерированная локализация;
+    - проверки `test/intention/presentation/search/show_and_sort_sheet_test.dart`, `test/intention/presentation/picker/intention_picker_view_test.dart`.
+  - **Размер:** XS.
+
+- [ ] 1.8 Проверить готовность фазы 1: экраны выбора работают на общем модуле поиска, прежний каталог не изменился
+  - **Критерии приёмки:**
+    - Требования к экранам выбора, строке результата, заголовку списка, листу, меню и пустой выдаче выполняются через общий модуль.
+    - Автоматические проверки экранов выбора подтверждают новую подпись типа и сохранение видимой строки при согласовании.
+    - Прежняя страница каталога работает без изменений.
+    - Полная проверка проекта проходит.
+  - **Проверка:**
+    - `openspec validate redesign-intention-catalog --strict`.
+    - `mise run codegen-check`.
+    - `mise run check`.
+  - **Зависимости:** 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7.
+  - **Предполагаемые файлы:** нет (только проверка).
+  - **Размер:** XS.
