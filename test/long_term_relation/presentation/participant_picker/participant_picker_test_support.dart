@@ -30,6 +30,17 @@ const testRelationCreationFlow = RelationCreationChoiceFlow(
   description: '',
 );
 
+/// Дескриптор восстановления, продолжение потока которого задаёт тест.
+final class ControlledRelationRestore implements RelationCreationRestore {
+  @override
+  bool canContinue = true;
+
+  @override
+  void accept(LongTermRelationId relationId) => throw UnsupportedError(
+    'Восстановление не выполняется в тесте выбора участника.',
+  );
+}
+
 final class _NoRelationRestore implements RelationCreationRestore {
   const _NoRelationRestore();
 

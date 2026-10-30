@@ -224,6 +224,100 @@ void main() {
     }
   }
 
+  // Пока форма создания не может продолжаться, например пока выполняется
+  // восстановление, поиск не принимает выбор и нажатия на отмеченные строки.
+  testWidgets('пока поток создания не может продолжаться, нажатия на текст '
+      'свободной и отмеченной строк ничего не делают, а после возобновления '
+      'работают', (tester) async {
+    final repository = ControlledParticipantPickerRepository();
+    addTearDown(repository.dispose);
+    final router = await _pumpAppWithCatalog(tester, repository);
+    addTearDown(router.dispose);
+    final restore = ControlledRelationRestore();
+
+    var selectionCompleted = false;
+    final selection = _pushPicker(router, _creationChoice(restore))
+      ..whenComplete(() => selectionCompleted = true);
+    await _settleRoute(tester);
+    final pickerId = router.current.matchId;
+    final occupied = testSummary(index: 2, title: 'Много ходить');
+    final free = testSummary(index: 1, title: 'Высыпаться');
+    _completePage(
+      repository,
+      1,
+      [occupied, free],
+      pairOccupants: {
+        occupied.id: PairOccupant(
+          relationId: testFormRelationId(5),
+          scope: RelationScope.active,
+        ),
+      },
+    );
+    await tester.pumpAndSettle();
+
+    restore.canContinue = false;
+    await tester.tap(find.text('Высыпаться'));
+    await tester.tap(find.text('Много ходить'));
+    await tester.pumpAndSettle();
+
+    expect(router.current.matchId, pickerId);
+    expect(selectionCompleted, isFalse);
+    expect(repository.watchedRelations, isEmpty);
+
+    restore.canContinue = true;
+    await tester.tap(find.text('Много ходить'));
+    await _settleRoute(tester);
+    expect(
+      router.current.argsAs<RelationDetailsRouteArgs>().relationId,
+      testFormRelationId(5),
+    );
+    await router.maybePop();
+    await _settleRoute(tester);
+
+    await tester.tap(find.text('Высыпаться'));
+    await tester.pumpAndSettle();
+    expect((await selection)?.value.id, free.id);
+  });
+
+  testWidgets('пока поток создания не может продолжаться, стрелка, лист '
+      'назначения и закрытие работают', (tester) async {
+    final repository = ControlledParticipantPickerRepository();
+    addTearDown(repository.dispose);
+    final router = await _pumpAppWithCatalog(tester, repository);
+    addTearDown(router.dispose);
+    final restore = ControlledRelationRestore();
+
+    final selection = _pushPicker(router, _creationChoice(restore));
+    await _settleRoute(tester);
+    final pickerId = router.current.matchId;
+    final summary = testSummary(index: 1, title: 'Высыпаться');
+    _completePage(repository, 1, [summary]);
+    await tester.pumpAndSettle();
+    restore.canContinue = false;
+
+    await tester.tap(intentionPickerArrow(intentionPickerRows.first));
+    await _settleRoute(tester);
+    expect(
+      router.current.argsAs<IntentionDetailsRouteArgs>().intentionId,
+      summary.id,
+    );
+    await router.maybePop();
+    await _settleRoute(tester);
+    expect(router.current.matchId, pickerId);
+
+    await tester.tap(find.text('New relation: related intention'));
+    await tester.pumpAndSettle();
+    expect(find.byType(Sheet), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byType(Sheet), findsNothing);
+
+    await tester.tap(_cancel);
+    await tester.pumpAndSettle();
+    expect(await selection, isNull);
+    expect(find.byType(IntentionPickerView), findsNothing);
+  });
+
   // Заменяемый участник выбираемой роли не исключается.
   for (final (name, choice, pairProbe) in [
     (
@@ -272,6 +366,21 @@ void main() {
     });
   }
 }
+
+/// Описание выбора связанного участника при создании связи с дескриптором
+/// [restore].
+RelationParticipantChoice _creationChoice(RelationCreationRestore restore) =>
+    RelationParticipantChoice(
+      role: RelationParticipantRole.related,
+      flow: RelationCreationChoiceFlow(
+        restore: restore,
+        priority: null,
+        description: '',
+      ),
+      type: null,
+      source: _participant(_excludedIndex),
+      related: null,
+    );
 
 /// Завершает переход к выбору участника, не ожидая подтверждённой порции.
 ///

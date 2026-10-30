@@ -22,10 +22,12 @@ import 'relation_participant_picker_purpose.dart';
 /// намерение пары исключает запрос каталога по идентификатору, поэтому
 /// одноимённые намерения остаются отдельными строками. Строки, выбор которых
 /// дал бы занятую пару, отмечены, не выбираются, а нажатие на их текст
-/// открывает занимающую связь поверх поиска. Выбор возвращает снимок
-/// участника с ревизией выдачи, из которой выбрана строка. Закрытие не
-/// возвращает ничего и не создаёт намерений. Подзаголовок шапки напоминает
-/// связь, из формы которой открыт поиск.
+/// открывает занимающую связь поверх поиска. Пока форма создания не может
+/// продолжаться, например пока выполняется восстановление, нажатия на текст
+/// строк ничего не делают. Выбор возвращает снимок участника с ревизией
+/// выдачи, из которой выбрана строка. Закрытие не возвращает ничего и не
+/// создаёт намерений. Подзаголовок шапки напоминает связь, из формы которой
+/// открыт поиск.
 @RoutePage()
 final class RelationParticipantPickerPage extends StatefulWidget {
   const RelationParticipantPickerPage({required this.choice, super.key});
@@ -76,6 +78,13 @@ final class _RelationParticipantPickerPageState
     );
   }
 
+  /// Может ли поток формы продолжаться. Дескриптора у изменения связи нет:
+  /// оно продолжается всегда.
+  bool get _canContinue => switch (widget.choice.flow) {
+    RelationCreationChoiceFlow(:final restore) => restore.canContinue,
+    RelationChangeChoiceFlow() => true,
+  };
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -85,26 +94,32 @@ final class _RelationParticipantPickerPageState
       closeLabel: l10n.participantPickerCancel,
       emptyScopeMessage: l10n.participantPickerEmpty,
       onClose: () => unawaited(context.router.maybePop()),
-      onPick: (pick) => unawaited(
-        context.router.maybePop(
-          GraphSnapshot(
-            revision: pick.revision,
-            value: RelationParticipantSummary(
-              id: pick.value.id,
-              title: pick.value.title,
-              archiveState: pick.value.archiveState,
+      onPick: (pick) {
+        if (!_canContinue) return;
+        unawaited(
+          context.router.maybePop(
+            GraphSnapshot(
+              revision: pick.revision,
+              value: RelationParticipantSummary(
+                id: pick.value.id,
+                title: pick.value.title,
+                archiveState: pick.value.archiveState,
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
       onOpenDetails: (id) => unawaited(
         context.router.push(IntentionDetailsRoute(intentionId: id)),
       ),
-      onOpenOccupant: (occupant) => unawaited(
-        context.router.push(
-          RelationDetailsRoute(relationId: occupant.relationId),
-        ),
-      ),
+      onOpenOccupant: (occupant) {
+        if (!_canContinue) return;
+        unawaited(
+          context.router.push(
+            RelationDetailsRoute(relationId: occupant.relationId),
+          ),
+        );
+      },
     );
   }
 }
