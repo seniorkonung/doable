@@ -114,9 +114,6 @@ void main() {
 
     await _closePanelAndPage(tester);
     await _untilRowTagged(tester, 'Теги: Быт');
-    // Нажатие на результат прокрутило страницу: кнопка фильтра ушла за край.
-    jumpIntentionCatalog(tester, 0);
-    await tester.pump();
     expect(shownIntentionCatalogParameters(tester).tagConditions, 1);
     expect(_rowTags(tester), isNot(contains('Теги: Дом')));
     expect(tester.takeException(), isNull);
