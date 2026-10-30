@@ -290,7 +290,7 @@
   - **Предполагаемые файлы:** `lib/src/long_term_relation/presentation/editor/relation_editor_view_model.dart`, `test/long_term_relation/presentation/editor/relation_editor_view_model_test.dart`, `test/long_term_relation/presentation/editor/editor_test_support.dart`.
   - **Размер:** S.
 
-- [ ] 2.3 Передавать поиску дескриптор восстановления и при успехе закрывать поиск и форму, открывая восстановленную связь
+- [x] 2.3 Передавать поиску дескриптор восстановления и при успехе закрывать поиск и форму, открывая восстановленную связь
   - **Критерии приёмки:**
     - `RelationCreationChoiceFlow` несёт `RelationCreationRestore` и снимок приоритета и описания черновика; вид уже есть в `RelationParticipantChoice.type` и не дублируется. Контракт объявлен рядом с поиском: принять восстановление связи и сообщать, может ли поток продолжаться. Это верно, только пока форма `canEdit`. У `RelationChangeChoiceFlow` дескриптора нет.
     - Если сверху форма или поиск, открытый этой формой, `openCreatedRelation` удаляет поиск и заменяет форму подробным просмотром. Страницы, открытые до создания, не меняются, а поиска и формы нет в истории.

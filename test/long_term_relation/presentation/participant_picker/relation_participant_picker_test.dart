@@ -230,7 +230,7 @@ void main() {
       'новой связи без участника другой роли',
       RelationParticipantChoice(
         role: RelationParticipantRole.source,
-        flow: const RelationCreationChoiceFlow(),
+        flow: testRelationCreationFlow,
         type: null,
         source: _participant(3),
         related: null,
@@ -607,7 +607,7 @@ typedef _ParticipantChoiceCase = ({
 final _ParticipantChoiceCase _activeRelation = (
   choice: RelationParticipantChoice(
     role: RelationParticipantRole.related,
-    flow: const RelationCreationChoiceFlow(),
+    flow: testRelationCreationFlow,
     type: null,
     source: _participant(_excludedIndex),
     related: null,
@@ -853,7 +853,7 @@ final List<_PurposeCase> _purposeCases = [
     name: 'лист показывает исходное намерение целиком',
     choice: RelationParticipantChoice(
       role: RelationParticipantRole.related,
-      flow: const RelationCreationChoiceFlow(),
+      flow: testRelationCreationFlow,
       type: LongTermRelationType.need,
       source: _named(3, _longSource),
       related: null,
@@ -916,7 +916,7 @@ final List<_PurposeCase> _purposeCases = [
     name: 'выбор исходного при пустом связанном и невыбранном виде',
     choice: const RelationParticipantChoice(
       role: RelationParticipantRole.source,
-      flow: RelationCreationChoiceFlow(),
+      flow: testRelationCreationFlow,
       type: null,
       source: null,
       related: null,

@@ -8,9 +8,32 @@ sealed class RelationParticipantChoiceFlow {
   const RelationParticipantChoiceFlow();
 }
 
+/// Дескриптор формы создания, открывшей поиск: через него поиск завершает
+/// создание восстановлением связи, которая занимает пару.
+abstract interface class RelationCreationRestore {
+  /// Может ли поток создания продолжаться: верно, только пока форма принимает
+  /// правки.
+  bool get canContinue;
+
+  /// Передаёт форме восстановление связи как её отправку.
+  void accept(LongTermRelationId relationId);
+}
+
 /// Создание новой связи: архивного состояния у неё ещё нет.
+///
+/// Приоритет и описание — значения черновика в момент открытия поиска.
 final class RelationCreationChoiceFlow extends RelationParticipantChoiceFlow {
-  const RelationCreationChoiceFlow();
+  const RelationCreationChoiceFlow({
+    required this.restore,
+    required this.priority,
+    required this.description,
+  });
+
+  final RelationCreationRestore restore;
+
+  /// Приоритет связи; `null`, пока он не выбран.
+  final RelationPriority? priority;
+  final String description;
 }
 
 /// Изменение существующей связи в её подтверждённом архивном состоянии.

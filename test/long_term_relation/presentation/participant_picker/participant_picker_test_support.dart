@@ -17,10 +17,30 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_choice.dart';
 
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/statistics_read_contract_test_fallback.dart';
 import '../../../support/intention_type_counts.dart';
+
+/// Поток создания без формы: экран поиска здесь проверяется отдельно от неё.
+const testRelationCreationFlow = RelationCreationChoiceFlow(
+  restore: _NoRelationRestore(),
+  priority: null,
+  description: '',
+);
+
+final class _NoRelationRestore implements RelationCreationRestore {
+  const _NoRelationRestore();
+
+  @override
+  bool get canContinue => true;
+
+  @override
+  void accept(LongTermRelationId relationId) => throw UnsupportedError(
+    'Восстановление не выполняется в тесте выбора участника.',
+  );
+}
 
 /// Репозиторий графа, управляемый тестом выбора участника.
 ///

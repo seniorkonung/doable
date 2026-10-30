@@ -45,7 +45,8 @@ final class RelationEditorPage extends ConsumerStatefulWidget {
   ConsumerState<RelationEditorPage> createState() => _RelationEditorPageState();
 }
 
-final class _RelationEditorPageState extends ConsumerState<RelationEditorPage> {
+final class _RelationEditorPageState extends ConsumerState<RelationEditorPage>
+    implements RelationCreationRestore {
   final _formKey = LongTermRelationCreationFormKey();
   final _replacementSubscriptions =
       <RelationParticipantRole, ProviderSubscription<IntentionDetailsState>>{};
@@ -120,11 +121,11 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage> {
       if (event == null) return;
       notifier.consumeEvent();
       // Сообщение предъявляет общий presenter независимо от перехода.
-      if (!_ownsTopRoute ||
-          next.sessionState == RelationEditorSessionState.left) {
+      if (!mounted || next.sessionState == RelationEditorSessionState.left) {
         return;
       }
       switch (event) {
+        // Право на переход проверяется по стеку: сверху может быть поиск формы.
         case RelationEditorCreated(:final relationId):
           openCreatedRelation(
             router: context.router,
@@ -132,7 +133,7 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage> {
             relationId: relationId,
           );
         case RelationEditorUpdated():
-          unawaited(context.router.maybePop());
+          if (_ownsTopRoute) unawaited(context.router.maybePop());
       }
     });
 
@@ -355,6 +356,28 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage> {
         .submit();
   }
 
+  // Поиск проверяет дескриптор, пока форма скрыта под ним, поэтому здесь нет
+  // условия о верхнем маршруте, как в _canEdit.
+  @override
+  bool get canContinue =>
+      mounted &&
+      ref
+          .read(relationEditorViewModelProvider(_formKey, widget.editorContext))
+          .canEdit;
+
+  @override
+  void accept(LongTermRelationId relationId) {
+    if (!canContinue) return;
+    ref
+        .read(
+          relationEditorViewModelProvider(
+            _formKey,
+            widget.editorContext,
+          ).notifier,
+        )
+        .restoreRelation(relationId);
+  }
+
   void _openDetails(PageRouteInfo route) {
     // Повторная проверка закрывает и быстрый вызов старого callback до кадра.
     if (!_canEdit) return;
@@ -380,7 +403,11 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage> {
               role: role,
               flow: switch (draft.context) {
                 RelationBlankCreationContext() ||
-                RelationCreationContext() => const RelationCreationChoiceFlow(),
+                RelationCreationContext() => RelationCreationChoiceFlow(
+                  restore: this,
+                  priority: draft.priority,
+                  description: draft.description,
+                ),
                 RelationEditingContext(:final details) =>
                   RelationChangeChoiceFlow(
                     relationId: details.relation.id,
