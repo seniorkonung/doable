@@ -3,17 +3,17 @@
 ## Assessment
 
 **Format version:** 1
-**Result:** No unresolved findings
+**Result:** Changes needed
 **Coverage status:** Complete
-**Summary:** Фаза 2 реализована: модель даёт каталогу охват, тип, сортировку и сброс одним действием, а чтение первой порции одним запросом подсчёта даёт матрицу охватов и типов. Числа согласуются при каждой подтверждённой операции, включая переход между охватами, а несогласуемые числа ведут к новому чтению. Прежняя страница каталога новых параметров не показывает. Находок нет. Все части `mise run check` прошли на рассматриваемой голове, но `check:process-tests` прошёл только со второго запуска: в первом запуске неизменённый диапазоном тест упал по таймауту, подробности в разделе покрытия.
+**Summary:** Фаза 3 достигла цели: сценарии проходят каталог через `test/support/intention_catalog_controls.dart`, а `lib/` не менялся. Остаются две находки низкой важности: сценарий создания выводит позицию списка из порядка прокруток в дереве, а проверка доступности берёт ожидаемое название поля из той же проверяемой семантики.
 
 ## Review target
 
-- **Baseline ref:** 2eb9ffd2e4ef5888482cd2ab980cec9449687ae7
-- **Base commit:** 2eb9ffd2e4ef5888482cd2ab980cec9449687ae7
-- **Reviewed head:** feb0116dd7bb69866376b4ef3ae7eabde6efafef
-- **Target commits:** ["bf68c782d5a09c7d5cadeafdcdcbb120722debe6", "6608076642bdfa922cd4f0df23fe2b11e5bafe00", "fd9046c744d62fcfda51cdf360067b3db9380528", "6fa71744216fdaecb73ed5f36ab5abf9aef23484", "3755cfedc7fc38f5fe9237782050073607ba8ed5", "dfdc85ff66108529b6d1136dd9e11ed12e18fa42", "feb0116dd7bb69866376b4ef3ae7eabde6efafef"]
-- **Reviewable paths:** ["benchmark/intention/intention_catalog_benchmark.dart", "lib/src/graph/data/drift_personal_graph_repository.dart", "lib/src/intention/application/intention_catalog.dart", "lib/src/intention/presentation/catalog/intention_catalog_page.dart", "lib/src/intention/presentation/catalog/intention_catalog_state.dart", "lib/src/intention/presentation/catalog/intention_catalog_view_model.dart", "lib/src/intention/presentation/catalog/intention_catalog_view_model.g.dart", "lib/src/intention/presentation/search/intention_list_header.dart", "lib/src/intention/presentation/search/show_and_sort_sheet.dart", "openspec/changes/redesign-intention-catalog/task-profiles.md", "openspec/changes/redesign-intention-catalog/tasks.md", "test/app/intention_app_lifecycle_test.dart", "test/app/intention_creation_sheet_integration_test.dart", "test/app/navigation/app_shell_state_test.dart", "test/graph/presentation/graph_reconciliation_checkpoint_test.dart", "test/intention/application/intention_contract_test.dart", "test/intention/data/drift_intention_catalog_test.dart", "test/intention/presentation/catalog/intention_catalog_mutation_reconciliation_test.dart", "test/intention/presentation/catalog/intention_catalog_tag_filter_view_model_test.dart", "test/intention/presentation/catalog/intention_catalog_view_model_test.dart", "test/intention/presentation/catalog/intention_picker_session_test_support.dart", "test/intention/presentation/picker/intention_picker_purpose_sheet_test.dart", "test/intention/presentation/picker/intention_picker_view_test.dart", "test/intention/presentation/search/show_and_sort_sheet_test.dart", "test/support/intention_type_counts.dart"]
+- **Baseline ref:** 6a3f6404ca0e4fd5d319bdb9008b7c0e5cf7ee51
+- **Base commit:** 6a3f6404ca0e4fd5d319bdb9008b7c0e5cf7ee51
+- **Reviewed head:** f30e1fe1d9df7991bcbc29c350340970c8dbeff3
+- **Target commits:** ["c9e50eae130d92a53f830304c84b1944c106e086", "a2021f2a97bdc402a29a1b9f2d76148178f18e4d", "191d8481affbef3b54181550b60720ad68368b6d", "db8706747831babf04df5e7e465ea7a3bf954e3a", "344e3825cdfb68b60d86463e442c91e44171a437", "c32d897587d8ae2f191e7b86490021076f99db0b", "e43bc7c0fc9367ce9bae8446f8705219e309ac1c", "f30e1fe1d9df7991bcbc29c350340970c8dbeff3"]
+- **Reviewable paths:** ["openspec/changes/redesign-intention-catalog/task-profiles.md", "openspec/changes/redesign-intention-catalog/tasks.md", "test/app/creation_flows_integration_test.dart", "test/app/graph_import_app_flow_test.dart", "test/app/graph_restore_app_flow_test.dart", "test/app/intention_app_lifecycle_test.dart", "test/app/intention_creation_sheet_integration_test.dart", "test/app/intention_tag_search_app_flow_test.dart", "test/app/long_term_relation_app_flow_test.dart", "test/app/navigation/app_shell_back_test.dart", "test/app/navigation/app_shell_graph_generation_test.dart", "test/app/navigation/app_shell_layout_test.dart", "test/app/navigation/app_shell_operation_reset_test.dart", "test/app/navigation/app_shell_page_matrix.dart", "test/app/navigation/app_shell_pages_above_test.dart", "test/app/navigation/app_shell_state_test.dart", "test/app/navigation/app_shell_test.dart", "test/app/navigation/app_shell_unnamed_page_scenarios.dart", "test/app/tag_app_flow_test.dart", "test/app/tag_assignment_app_flow_test.dart", "test/intention/presentation/details/intention_details_page_test.dart", "test/intention/presentation/editor/intention_creation_sheet_accessibility_test.dart", "test/intention/presentation/editor/intention_editor_page_test.dart", "test/support/intention_catalog_controls.dart", "test/tag/presentation/tag_accessibility_test.dart"]
 - **OpenSpec change:** redesign-intention-catalog
 - **OpenSpec schema:** intent-driven
 - **Target scope:** User-requested bounded range
@@ -22,75 +22,51 @@
 
 ## Reviewed increment
 
-### U1 · Первая порция каталога с видом подсчёта из запроса и замеренной стоимостью
+### U1 · Сценарии приложения управляют каталогом через общие шаги
 
-- **Work items:** ["2.1", "2.2"]
-- **Requirements and scenarios:** ["intention-management: Точное количество совпадений каталога", "intention-management: Параметры показа в поиске намерений (числа охватов и типов)", "design: решение 4", "ADR-0049: числа"]
-- **Affected boundary:** Чтение первой порции в локальном хранилище и контракт порции между хранилищем и моделью каталога.
-- **Implementation target:** ["benchmark/intention/intention_catalog_benchmark.dart", "lib/src/graph/data/drift_personal_graph_repository.dart", "lib/src/intention/application/intention_catalog.dart", "lib/src/intention/presentation/catalog/intention_catalog_view_model.dart", "test/intention/application/intention_contract_test.dart", "test/intention/data/drift_intention_catalog_test.dart", "test/intention/presentation/catalog/intention_catalog_mutation_reconciliation_test.dart", "test/intention/presentation/catalog/intention_catalog_view_model_test.dart", "test/intention/presentation/picker/intention_picker_purpose_sheet_test.dart", "test/intention/presentation/picker/intention_picker_view_test.dart", "test/intention/presentation/search/show_and_sort_sheet_test.dart", "test/support/intention_type_counts.dart"]
-- **Applicable constraints and non-goals:** Схема, индексы и формат графа не меняются. Запрос строк порции не меняется, первая порция читается одним запросом подсчёта. Время измеряется только в бенчмарке.
-
-### U2 · Охват и тип как доступность, открытый тип каталога
-
-- **Work items:** ["2.3"]
-- **Requirements and scenarios:** ["intention-management: Каталог намерений и его охват", "intention-management: Живое применение параметров каталога / Сохранение фильтра и порядка при смене охвата", "intention-management: Тип намерения в поиске намерений", "design: решение 3"]
-- **Affected boundary:** Выбор параметров модели каталога и его потребители: прежняя страница каталога, заголовок списка, лист «Показать и упорядочить», экраны выбора.
-- **Implementation target:** ["lib/src/intention/presentation/catalog/intention_catalog_page.dart", "lib/src/intention/presentation/catalog/intention_catalog_state.dart", "lib/src/intention/presentation/catalog/intention_catalog_view_model.dart", "lib/src/intention/presentation/search/intention_list_header.dart", "lib/src/intention/presentation/search/show_and_sort_sheet.dart", "test/app/intention_app_lifecycle_test.dart", "test/app/intention_creation_sheet_integration_test.dart", "test/app/navigation/app_shell_state_test.dart", "test/graph/presentation/graph_reconciliation_checkpoint_test.dart", "test/intention/presentation/catalog/intention_catalog_tag_filter_view_model_test.dart", "test/intention/presentation/catalog/intention_catalog_view_model_test.dart", "test/intention/presentation/catalog/intention_picker_session_test_support.dart"]
-- **Applicable constraints and non-goals:** Прежняя страница каталога выглядит и ведёт себя как раньше и новых параметров не показывает. Экраны выбора сохраняют закреплённые охват и тип.
-- **Excluded change scope:** Показ новых параметров и чисел в интерфейсе каталога, пустые состояния каталога и новая страница относятся к фазе 4, перевод сценарных проверок — к фазе 3.
-
-### U3 · Точные числа подтверждённой выдачи при каждой операции
-
-- **Work items:** ["2.4"]
-- **Requirements and scenarios:** ["intention-management: Точное количество совпадений каталога / Количество после подтверждённого изменения", "intention-management: Параметры показа в поиске намерений (количества только для подтверждённой выдачи)", "intention-management: Меню параметров показа в поиске намерений / Меню охвата считает намерения выбранного типа (на уровне модели)", "design: решение 4, согласование и хранение"]
-- **Affected boundary:** Подтверждённое состояние модели каталога и его согласование с пакетами подтверждённых изменений графа.
-- **Implementation target:** ["lib/src/intention/application/intention_catalog.dart", "lib/src/intention/presentation/catalog/intention_catalog_state.dart", "lib/src/intention/presentation/catalog/intention_catalog_view_model.dart", "test/intention/application/intention_contract_test.dart", "test/intention/presentation/catalog/intention_catalog_mutation_reconciliation_test.dart", "test/intention/presentation/catalog/intention_catalog_view_model_test.dart"]
-- **Applicable constraints and non-goals:** Числа согласуются подтверждёнными снимками на ревизии по ADR-0009. Экраны выбора получают те же числа типов, что раньше. Несогласуемые числа ведут к новому чтению с первой порции.
-
-### U4 · Сброс параметров показа одним действием модели
-
-- **Work items:** ["2.5"]
-- **Requirements and scenarios:** ["intention-management: Параметры показа в поиске намерений / «Сбросить» возвращает начальный показ", "intention-management: Параметры показа в поиске намерений / «Сбросить» в каталоге возвращает активный охват и сохраняет поиск (на уровне модели)", "app-navigation: Сохранение состояния корневых страниц / Замена графа сбрасывает корневые страницы (тип и параметры в модели)", "design: решение 3, сброс"]
-- **Affected boundary:** Модель каталога и лист «Показать и упорядочить», который предлагает и вызывает сброс.
-- **Implementation target:** ["lib/src/intention/presentation/catalog/intention_catalog_view_model.dart", "lib/src/intention/presentation/search/show_and_sort_sheet.dart", "test/intention/presentation/catalog/intention_catalog_view_model_test.dart"]
-- **Applicable constraints and non-goals:** Сброс сохраняет фильтр названия и условия по тегам и даёт одно новое чтение. Поведение листа экранов выбора не меняется.
-
-### U5 · Готовность фазы 2
-
-- **Work items:** ["2.6"]
-- **Requirements and scenarios:** ["plan.md: Phase 2 / Ready to advance"]
-- **Affected boundary:** Сгенерированный провайдер модели каталога и автоматические проверки проекта.
-- **Implementation target:** ["lib/src/intention/presentation/catalog/intention_catalog_view_model.g.dart"]
-- **Applicable constraints and non-goals:** Задача только проверочная; сгенерированный файл обновлён, чтобы прошёл `codegen-check`. Проверки на устройстве не требуются.
+- **Work items:** ["3.1", "3.2", "3.3", "3.4", "3.5", "3.6", "3.7"]
+- **Requirements and scenarios:** ["plan.md: Phase 3 / Ready to advance", "design: решение 10, сценарные шаги каталога"]
+- **Affected boundary:** Авторы сценарных тестов и защита от регрессий, которую эти тесты дают приложению. Поведение приложения не меняется.
+- **Implementation target:** ["test/app/creation_flows_integration_test.dart", "test/app/graph_import_app_flow_test.dart", "test/app/graph_restore_app_flow_test.dart", "test/app/intention_app_lifecycle_test.dart", "test/app/intention_creation_sheet_integration_test.dart", "test/app/intention_tag_search_app_flow_test.dart", "test/app/long_term_relation_app_flow_test.dart", "test/app/navigation/app_shell_back_test.dart", "test/app/navigation/app_shell_graph_generation_test.dart", "test/app/navigation/app_shell_layout_test.dart", "test/app/navigation/app_shell_operation_reset_test.dart", "test/app/navigation/app_shell_page_matrix.dart", "test/app/navigation/app_shell_pages_above_test.dart", "test/app/navigation/app_shell_state_test.dart", "test/app/navigation/app_shell_test.dart", "test/app/navigation/app_shell_unnamed_page_scenarios.dart", "test/app/tag_app_flow_test.dart", "test/app/tag_assignment_app_flow_test.dart", "test/intention/presentation/details/intention_details_page_test.dart", "test/intention/presentation/editor/intention_creation_sheet_accessibility_test.dart", "test/intention/presentation/editor/intention_editor_page_test.dart", "test/support/intention_catalog_controls.dart", "test/tag/presentation/tag_accessibility_test.dart"]
+- **Applicable constraints and non-goals:** `lib/` не меняется. Шаги действуют и наблюдают через интерфейс, а не через модель. Ожидания сценариев прежние, кроме условий по тегам, которые новая страница показывает только числом. Новых сценариев нет, проверки самой прежней страницы и её частей остаются до фазы 4.
+- **Excluded change scope:** Переключение шагов на новую страницу, управление типом и направлением сортировки, перестройка проверок прежней страницы — фаза 4.
 
 ## Pass coverage
 
 | Pass | Status | Evidence or limitation |
 |---|---|---|
-| Independent decision review | Complete | Один свежий изолированный ревьюер (Sonnet, high, `implementation-decision-review`) проверил группу перекрытия U1–U5: все пять единиц делят `intention_catalog_view_model.dart`, поэтому цель объединена из 23 путей реализации и тестов. Планирующие артефакты, история коммитов и прежний отчёт ему не передавались. Результат: `No substantive findings`, покрытие полное; остальные тестовые файлы он просмотрел только на предмет замеров времени. |
-| OpenSpec conformance | Complete | Проверки шли в рабочем дереве на голове feb0116dd7bb69866376b4ef3ae7eabde6efafef без незакоммиченных изменений. `dart format`, `test/tool`-проверки и `flutter analyze` прошли без замечаний, 3848 обычных тестов прошли, `mise run codegen-check` прошёл. `mise exec --no-deps -- openspec validate redesign-intention-catalog --strict --json` — valid. `mise run check:process-tests` в составе первого запуска `mise run check` завершился с кодом 1, повторный отдельный запуск прошёл, 18 из 18. |
-| Code quality | Complete | Навык `code-review-and-quality` применён ко всем путям реализации: чтение и подсчёт в `drift_personal_graph_repository.dart`, контракт в `intention_catalog.dart`, выбор, состояние и согласование модели, лист, заголовок, прежняя страница, бенчмарк и тестовая поддержка `answerCatalogQuery`. Контекст на голове: `_DriftIntentionCatalogEntrySnapshot.matches`, `IntentionCatalogMutation`, `intention_search_list.dart`. |
+| Independent decision review | Complete | Один свежий изолированный ревьюер (Sonnet, high, `implementation-decision-review`) проверил U1 по 23 путям тестов. Планирующие артефакты, история коммитов и прежний отчёт ему не передавались. Результат: `Changes needed`, покрытие полное. |
+| OpenSpec conformance | Complete | Проверки шли в рабочем дереве на голове f30e1fe1d9df7991bcbc29c350340970c8dbeff3; незакоммиченным был только этот отчёт. `mise run check` прошёл с первого запуска, код 0: `dart format`, `test/tool`-проверки и `flutter analyze` без замечаний, 3848 обычных тестов, 18 тестов процессов. `mise exec --no-deps -- openspec validate redesign-intention-catalog --strict --json` — valid. Поиск из задачи 3.7 нашёл ключи и строки только в `test/support/intention_catalog_controls.dart` и пяти разрешённых файлах проверок прежней страницы. `git diff --quiet d6de1fac77d46e512fde7ff981ac01e2aa535b6f f30e1fe1d9df7991bcbc29c350340970c8dbeff3 -- lib` — код 0. |
+| Code quality | Complete | Навык `code-review-and-quality` применён ко всем 23 путям: полный дифф каждого сценария сверен с базой, общий файл шагов прочитан целиком на голове. |
 
 ## Findings
 
-No unresolved findings remain in the implementation review.
+### F1 · Low — Сценарий создания выводит позицию списка из порядка прокруток в дереве
+
+- **Evidence:** `test/app/intention_creation_sheet_integration_test.dart:1190-1197`: `_catalogView` берёт `list: offsets.last` и `outer: offsets.sublist(0, offsets.length - 1)` из `shownIntentionCatalogOffsets`, а комментарий объясняет это тем, что список стоит в дереве страницы последним. Рядом, в строках 638 и 648, тот же файл читает список шагом `intentionCatalogListPosition`.
+- **Evidence revisions:** ["f30e1fe1d9df7991bcbc29c350340970c8dbeff3"]
+- **Impact:** Знание об устройстве страницы осталось в сценарии, хотя критерий задачи 3.1 оставляет его только общему файлу шагов. Если после списка появится ещё одна вертикальная прокрутка, `list` тихо прочитает чужую позицию, и проверка «список сдвинулся, остальные прокрутки на месте» перестанет проверять заявленное.
+- **Required outcome:** Сценарий читает позицию списка по самому списку и сравнивает остальные прокрутки без предположения о порядке прокруток в дереве.
+- **Earliest source of truth:** implementation/tests
+- **Affected artifacts:** ["test/app/intention_creation_sheet_integration_test.dart", "test/support/intention_catalog_controls.dart"]
+
+### F2 · Low — Проверка доступности берёт ожидаемое название поля из проверяемой семантики
+
+- **Evidence:** `test/intention/presentation/editor/intention_creation_sheet_accessibility_test.dart:517-535`: `titleFieldName` читается из семантики `EditableText` поля и затем ищется в обходе той же семантики. На базе ожидалось `l10n.catalogFilterLabel`. Так требует критерий задачи 3.4. При этом шаг `intentionCatalogTitleFieldLabel` уже даёт подпись из локализации и используется в `intention_editor_page_test.dart`.
+- **Evidence revisions:** ["f30e1fe1d9df7991bcbc29c350340970c8dbeff3"]
+- **Impact:** Здесь проходит любая непустая подпись поля, и проверка стала длиннее на чтение семантики через `EditableText`. Неверную подпись сейчас ловит `test/intention/presentation/intention_tag_search_accessibility_test.dart:92`, но это проверка прежней страницы, которая перестраивается в фазе 4.
+- **Required outcome:** Ожидаемое название поля в сценарии берётся из источника, который не зависит от проверяемой семантики, а смена подписи поля по-прежнему меняет только общий файл шагов.
+- **Earliest source of truth:** task/verification
+- **Affected artifacts:** ["tasks.md: 3.4", "test/intention/presentation/editor/intention_creation_sheet_accessibility_test.dart"]
 
 ## Review coverage
 
-Проверены все семь коммитов диапазона и все 25 изменённых путей. Каждая задача 2.1–2.6 привязана к единице обзора. Коммит bf68c782d5a09c7d5cadeafdcdcbb120722debe6 меняет только `task-profiles.md`, а отметки `tasks.md` — планирующие свидетельства.
+Проверены все восемь коммитов диапазона и все 25 изменённых путей. Каждая задача 3.1–3.7 привязана к U1: 3.1 — a2021f2a97bdc402a29a1b9f2d76148178f18e4d, 3.2 — 191d8481affbef3b54181550b60720ad68368b6d, 3.3 — db8706747831babf04df5e7e465ea7a3bf954e3a, 3.4 — 344e3825cdfb68b60d86463e442c91e44171a437, 3.5 — c32d897587d8ae2f191e7b86490021076f99db0b, 3.6 — e43bc7c0fc9367ce9bae8446f8705219e309ac1c, 3.7 — f30e1fe1d9df7991bcbc29c350340970c8dbeff3. Коммит c9e50eae130d92a53f830304c84b1944c106e086 меняет только `task-profiles.md`, а отметки `tasks.md` — планирующие свидетельства. Файл `app_shell_unnamed_page_scenarios.dart` не назван в предполагаемых файлах задачи 3.2, но без его правки сценарий сломался бы: `_summary` теперь ищет только строки экранов выбора.
 
-**U1.** `_countTypesByScope` считает четыре агрегата одним запросом с теми же условиями исключения, тегов и названия и без условия охвата. `drift_intention_catalog_test.dart` проверяет числа и общее количество при каждом охвате и готовности, те же строки порции и то же число чтений. Бенчмарк с 40 замерами дал в коммите fd9046c744d62fcfda51cdf360067b3db9380528 p95 от 21 до 22 мс для `totalOnly` и от 9 до 11 мс для `byScopeAndType` при бюджете 100 мс. Бенчмарк диапазона не покрывает фильтр названия, а каталог теперь всегда читает матрицу. Поэтому на одноразовой копии головы случаи `shortFilter` временно запрошены с `byScopeAndType`: p95 от 11 до 25 мс при 20 замерах. Результат только сравнительный (статус `smoke`), но бюджет не под угрозой.
+**Общие шаги.** Каждый публичный шаг и параметр имеет вызывающего, все шаги из критериев задач 3.1, 3.2 и 3.4 есть с заданными сигнатурами. Шаги читают значения через интерфейс и к модели не обращаются. Таблица `_orderLabels` не содержит порядка по названию, но прежняя страница его не предлагает, а новую страницу этот файл учитывает в фазе 4.
 
-**U2.** `IntentionScopeAvailability` заменяет открытый охват в выборе, `changeScope` не разбирает назначение. `IntentionTypeNotOffered` и `requestsTypeCounts` в `lib`, `test` и `benchmark` не осталось. Прежняя страница не вызывает `changeType` и `resetShowParameters`, значит, остаётся с типом «Все» и прежней готовностью запроса. Комментарий `intention_catalog_page.dart` о том, что каталог не предлагает порядок по названию, остаётся верным до фазы 4.
+**Сохранность проверок.** Дифф каждого сценария сверен с базой. Там, где название условия заменено числом, состав выдачи или отметки панели подтверждают тег и надобность либо сценарий проверяет только сброс условия заменой графа. В `tag_app_flow_test.dart` подпись условия по-прежнему читается через `_conditionLabel`. Сравнение строк в `app_shell_back_test.dart` стало строже: теперь оно учитывает подпись тегов и прямоугольник.
 
-**U3.** `_mapPage` принимает порцию, только если вид чисел совпадает с запросом, а `totalCount` равен числу текущих охвата и готовности. `totalCount` и ячейки матрицы согласуются по одним снимкам, поэтому после поправки не расходятся. Снимки вне текущих охвата и типа учитываются, перенос между охватами меняет две ячейки, отрицательные числа и действия сверх всех ведут к `_restartFromFirstPage`. Пакеты до первой порции идут тем же `_applyPackage`. Пока выдача получается и после отказа, лист чисел не берёт: `isLoading: false` и подтверждённое состояние. На одноразовой копии проверена чувствительность тестов группы «числа охватов и типов»: снятие условия архивного состояния ячейки уронило 2 из 4 тестов, замена `withAnyScopeAndReadiness()` исходным запросом — 3 из 4.
+**Замечания независимого ревьюера, которые не стали находками.** Фиксированные `pump` в шагах идут по тестовым часам, покрывают анимацию меню и панели, а выдачу не ждут, как и требует задача 3.1. Сценариев, которым нужно промежуточное состояние сразу после выбора, нет. Ожидание `hitTestable` после закрытия панели ни один сценарий не делает зависимым от полного удаления панели. Замена проверок в `app_shell_test.dart` и чтение `row.title` следуют задачам и не теряют проверку: подписи и строки проверяют `intention_catalog_page_test.dart` и `intention_summary_view_test.dart`. Приведение к `TagId` — принятая в тестах запись. Литералы `Теги: …` в `tag_app_flow_test.dart` были на базе, а сценарий идёт только в русской локали.
 
-**U4.** `_restoreInitialShowParameters` — единственное место начальных параметров. Его используют сброс и смена поколения графа, вторая дополнительно очищает фильтры. Тесты проверяют сценарии задачи: один новый запрос, сохранение фильтра и условия, отсутствие действия в начальном состоянии, начальные значения выбора и запроса после замены графа. Ожидания `show_and_sort_sheet_test.dart` не изменились, поменялся только помощник порции.
-
-**U5.** `.g.dart` обновил хэш провайдера. Сообщение коммита feb0116dd7bb69866376b4ef3ae7eabde6efafef перечисляет проверки без `mise run check`, поэтому полную проверку выполнил этот обзор.
-
-**Отказ при первом запуске.** В первом запуске `mise run check` упал `test/graph/data/drift_graph_replacement_process_durability_test.dart`: `TimeoutException: Процесс замены не достиг точки mid_insertion.` Диапазон этот тест и замену графа не меняет. Отдельный запуск файла прошёл за 14 секунд, повторный полный `check:process-tests` на той же голове прошёл 18 из 18. Причину таймаута этот обзор не установил. Единого непрерывного зелёного запуска `mise run check` нет: зелёны все его части по отдельности на одной голове. Проверки на устройстве не выполнялись.
-
-Безопасность: новых внешних входов нет, агрегаты строятся выражениями Drift с параметрами, данные и схема не меняются. Отклонение от правил процесса: тело коммита dfdc85ff66108529b6d1136dd9e11ed12e18fa42 написано по-русски вопреки требованию английских сообщений. История не переписывается, поведения это не меняет, поэтому находкой не записано.
-
-Задачи фаз 3 и 4 обязательствами диапазона не считались.
+Безопасность: диапазон меняет только тесты и планирующие файлы, новых входов, данных и зависимостей нет. Задачи фазы 4 обязательствами диапазона не считались. Проверки на устройстве не выполнялись и для этой фазы не нужны: поведение приложения не менялось.
