@@ -137,3 +137,18 @@
     - меняется `lib/src/intention/presentation/search/results_scroll_keeper.dart`;
     - проверка `test/intention/presentation/search/intention_search_list_test.dart`.
   - **Размер:** XS.
+
+- [ ] 1.10 Показывать паузу ввода, загрузку и отказы первой порции экрана выбора сверху сразу, без анимации прокрутки от смещения прежней выдачи
+  - **Критерии приёмки:**
+    - `ResultsScrollKeeper.onCatalogChanged` при переходе модели к состоянию, которое `IntentionSearchList` показывает вместо строк, — пауза ввода `IntentionCatalogDebouncing`, отказы первой порции `IntentionCatalogUnavailable`, `IntentionCatalogCorruption`, `IntentionCatalogUnexpected`, а также загрузка и ошибка `AsyncValue`, — мгновенно переводит список наверх через `jumpTo(0)`, без анимации, и сбрасывает отложенный якорь.
+    - Прокрутка остаётся одной для всех состояний: `IntentionSearchList` сохраняет единый `CustomScrollView` с контроллером хранителя, отдельный `ListView` для состояний не возвращается.
+    - Удержание видимой строки при согласовании выдачи того же запроса, начало новой выдачи сверху и поведение прежней выдачи каталога не меняются.
+    - Проверка в `intention_search_list_test.dart`: выдача прокручена вниз, модель переходит к паузе ввода или загрузке и к отказу первой порции, и уже в первом кадре после перехода смещение равно 0, а состояние стоит сверху.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/search test/intention/presentation/picker test/intention/presentation/catalog/intention_search_results_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.4, 1.9.
+  - **Предполагаемые файлы:**
+    - меняется `lib/src/intention/presentation/search/results_scroll_keeper.dart`;
+    - проверка `test/intention/presentation/search/intention_search_list_test.dart`.
+  - **Размер:** XS.

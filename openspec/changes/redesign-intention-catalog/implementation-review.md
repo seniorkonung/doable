@@ -5,7 +5,7 @@
 **Format version:** 1
 **Result:** Changes needed
 **Coverage status:** Complete
-**Summary:** Фаза 1 переносит экраны выбора на общий модуль поиска в соответствии с задачами 1.1–1.8. Состояния загрузки и отказов экрана выбора теперь «доезжают» пружиной от прежнего смещения (F2). Часть проверок `IntentionSearchKind` повторяет уже существующие (F3).
+**Summary:** Фаза 1 переносит экраны выбора на общий модуль поиска в соответствии с задачами 1.1–1.8. Часть проверок `IntentionSearchKind` повторяет уже существующие (F3).
 
 ## Review target
 
@@ -74,15 +74,6 @@
 | Code quality | Complete | Пять осей по всем путям поставки на голове fdbfd885c4fd62d08e79d00d3b867d80df48c37a с вызывающими `intention_catalog_page.dart` и тестами выдачи каталога. |
 
 ## Findings
-
-### F2 · Low — Загрузка и отказы экрана выбора возвращаются к началу пружиной от прежнего смещения
-
-- **Evidence:** В базе `_status` выдачи экрана выбора строил отдельный `ListView`, и состояние загрузки или отказа появлялось сразу сверху. На голове `intention_search_list.dart:103-148` строит пауза ввода, загрузку и отказы как `SliverToBoxAdapter` внутри того же `CustomScrollView` с тем же контроллером хранителя. Хранитель переводит список наверх только при новой подтверждённой выдаче (`results_scroll_keeper.dart:66-71`), а не при замене строк состоянием. Когда содержимое сжимается, смещение оказывается за `maxScrollExtent`; `IdleScrollActivity.applyNewDimensions` вызывает `goBallistic(0)`, и `ClampingScrollPhysics.createBallisticSimulation` (Flutter `scroll_physics.dart`) возвращает пружинную симуляцию к краю.
-- **Evidence revisions:** ["fdbfd885c4fd62d08e79d00d3b867d80df48c37a"]
-- **Impact:** Пользователь прокрутил выдачу экрана выбора далеко вниз и вводит название: вместо мгновенной замены списка состоянием загрузки текст загрузки несколько кадров въезжает сверху. Так же ведёт себя отказ первой порции. Фаза 1 обещает прежнее поведение экранов выбора, кроме двух названных изменений, а в фазе 4 то же получит каталог.
-- **Required outcome:** Пауза ввода, загрузка и отказ первой порции показываются сверху сразу, без анимации прокрутки от смещения прежней выдачи; это подтверждено проверкой из прокрученного состояния.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** ["lib/src/intention/presentation/search/intention_search_list.dart", "lib/src/intention/presentation/search/results_scroll_keeper.dart", "test/intention/presentation/search/intention_search_list_test.dart"]
 
 ### F3 · Low — Проверки `IntentionSearchKind` для экранов выбора повторяют существующие
 
