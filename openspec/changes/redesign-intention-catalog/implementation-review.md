@@ -3,9 +3,9 @@
 ## Assessment
 
 **Format version:** 1
-**Result:** Changes needed
+**Result:** No unresolved findings
 **Coverage status:** Complete
-**Summary:** Страница «Граф намерений» по коду и тестам соответствует delta-спецификациям, дефектов поведения не найдено. Остаётся F3 — мелкий недочёт теста.
+**Summary:** Страница «Граф намерений» по коду и тестам соответствует delta-спецификациям, дефектов поведения не найдено. Незакрытых находок нет, задачи 4.15–4.17 ждут выполнения.
 
 ## Review target
 
@@ -57,14 +57,7 @@
 
 ## Findings
 
-### F3 · Low — В сценарии переименования тега остался шаг для прокручивавшейся страницы
-
-- **Evidence:** `test/app/tag_app_flow_test.dart:117-119` содержит комментарий «Нажатие на результат прокрутило страницу: кнопка фильтра ушла за край» и вызов `jumpIntentionCatalog(tester, 0)`. Шаг появился в задаче 4.8, когда страница ещё прокручивалась. После задачи 4.10 кнопка закреплена (`lib/src/intention/presentation/catalog/intention_catalog_page.dart:80-88`), а `shownIntentionCatalogParameters` читает её число без зависимости от прокрутки.
-- **Evidence revisions:** ["03a965d169dea74f2481519b20b7d552104ca938"]
-- **Impact:** Комментарий описывает страницу, которой больше нет, а лишний шаг создаёт впечатление, что кнопка фильтра может уйти за край.
-- **Required outcome:** Сценарий не содержит шага и комментария про прокрутку закреплённой кнопки.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** ["test/app/tag_app_flow_test.dart"]
+No unresolved findings remain in the implementation review.
 
 ## Review coverage
 

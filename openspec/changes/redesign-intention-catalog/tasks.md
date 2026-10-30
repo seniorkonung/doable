@@ -658,3 +658,16 @@
   - **Предполагаемые файлы:**
     - меняется `test/intention/presentation/catalog/intention_catalog_page_test.dart`.
   - **Размер:** XS.
+
+- [ ] 4.17 Убрать из сценария «Общее переименование» шаг прокрутки к закреплённой кнопке фильтра
+  - **Критерии приёмки:**
+    - В сценарии «Общее переименование» в `test/app/tag_app_flow_test.dart` (:117-119) нет комментария о кнопке фильтра за краем, вызова `jumpIntentionCatalog(tester, 0)` и следующего за ним `await tester.pump()`: кнопка закреплена, а `shownIntentionCatalogParameters` читает её число независимо от прокрутки.
+    - Остальные шаги и проверки сценария не меняются.
+    - Шаг `jumpIntentionCatalog` в `test/support/intention_catalog_controls.dart` остаётся: его используют другие тесты.
+    - Спецификации и код приложения не меняются, поведение приложения не меняется.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app/tag_app_flow_test.dart`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - меняется `test/app/tag_app_flow_test.dart`.
+  - **Размер:** XS.
