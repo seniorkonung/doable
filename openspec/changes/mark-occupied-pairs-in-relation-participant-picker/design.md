@@ -190,7 +190,7 @@ candidate(relation) =
 ### 6. Восстановление как отправка формы
 
 **Описание выбора.**
-- `RelationCreationChoiceFlow` несёт `RelationCreationRestore` — дескриптор сессии формы — и снимок черновика: вид, приоритет и описание.
+- `RelationCreationChoiceFlow` несёт `RelationCreationRestore` — дескриптор сессии формы — и снимок приоритета и описания черновика. Вид для предупреждения берётся из `RelationParticipantChoice.type` и не дублируется.
 - `RelationChangeChoiceFlow` дескриптора не несёт, поэтому восстановление из поиска при изменении непредставимо.
 
 **Подтверждение.**
