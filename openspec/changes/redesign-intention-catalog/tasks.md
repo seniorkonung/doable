@@ -3,7 +3,8 @@
 - [ ] 1.1 Собрать разбор назначения поиска в одном месте модуля поиска: тексты загрузки и отказов, префикс ключей и называние типа для любого назначения каталога
   - **Критерии приёмки:**
     - `IntentionSearchKind.of(IntentionCatalogPurpose)` в `search/` исчерпывающе разбирает все назначения, включая общий каталог. Он даёт заголовок экрана выбора, тексты загрузки, подгрузки и отказов, префикс ключей и признак, называет ли строка тип.
-    - Для экранов выбора тексты, заголовки и ключи остаются прежними. Общий каталог получает существующие тексты каталога и префикс `intention-catalog`.
+    - Вариантов четыре: каталог, выбор действия, выбор исходного намерения, выбор участника. Они дают четыре разных префикса ключей: `intention-catalog`, `daily-choice-action`, `daily-choice-source`, `participant-picker`.
+    - Для экранов выбора тексты, заголовки и ключи остаются прежними, включая разные префиксы `daily-choice-source` и `participant-picker`. Выбор исходного намерения и выбор участника дают тексты, заголовок и признак называния типа нынешнего вида `intention`, выбор действия — нынешнего вида `action`. Общий каталог получает существующие тексты каталога.
     - `IntentionPickerKind` и `intentionPickerKeyPrefix` удалены; экран выбора, его выдача и строка используют новый разбор.
   - **Проверка:**
     - `mise exec --no-deps -- flutter test test/intention/presentation/picker test/daily_choice/presentation/action_picker test/daily_choice/presentation/source_picker test/long_term_relation/presentation/participant_picker`.
