@@ -304,7 +304,7 @@
   - **Предполагаемые файлы:** `lib/src/long_term_relation/presentation/participant_picker/relation_participant_choice.dart`, `lib/src/long_term_relation/presentation/editor/relation_editor_page.dart`, `lib/src/long_term_relation/presentation/editor/relation_creation_completion.dart`, `test/long_term_relation/presentation/editor/relation_creation_navigation_test.dart`, `test/long_term_relation/presentation/editor/relation_form_test_support.dart`; механически — `test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart`, `test/long_term_relation/presentation/participant_picker/participant_picker_test_support.dart`.
   - **Размер:** M.
 
-- [ ] 2.4 Добавить в `ConfirmDialog` подтверждение действия, которое сохраняет данные: с основной кнопкой и необязательным предупреждением
+- [x] 2.4 Добавить в `ConfirmDialog` подтверждение действия, которое сохраняет данные: с основной кнопкой и необязательным предупреждением
   - **Критерии приёмки:**
     - Новая функция рядом с `showConfirmDialog` показывает quiet-кнопку отмены и основную кнопку действия. Первый абзац строится из `ConfirmDialogText`, а второй абзац цветом `ink` есть, только если передано предупреждение.
     - Действие даёт true, а отмена, касание затемнения и системное «назад» — false. Заголовок называет маршрут для экранного диктора.
