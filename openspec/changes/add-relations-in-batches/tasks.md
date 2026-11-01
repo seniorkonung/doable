@@ -446,12 +446,12 @@
     - «Открыть существующую связь» в форме и занятая активная связь в поиске открывают панель над ними, а возврат сохраняет черновик формы и выдачу поиска.
     - В `lib/src` у `RelationDetailsRoute` остаётся только объявление маршрута.
   - **Проверка:**
-    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/editor test/long_term_relation/presentation/participant_picker test/app/creation_flows_integration_test.dart`.
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/editor test/long_term_relation/presentation/participant_picker test/app/creation_flows_integration_test.dart test/app/long_term_relation_app_flow_test.dart`.
     - `mise exec --no-deps -- flutter analyze`.
   - **Зависимости:** 2.11.
   - **Предполагаемые файлы:**
     - меняются `lib/src/long_term_relation/presentation/editor/relation_creation_completion.dart`, `relation_editor_page.dart`, `lib/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart`;
-    - меняются `test/long_term_relation/presentation/editor/relation_creation_navigation_test.dart`, `test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart`, `test/app/creation_flows_test_support.dart`, `test/app/creation_flows_integration_test.dart`.
+    - меняются `test/long_term_relation/presentation/editor/relation_creation_navigation_test.dart`, `relation_editor_page_test.dart`, `test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart`, `test/app/creation_flows_test_support.dart`, `test/app/creation_flows_integration_test.dart`, `test/app/long_term_relation_app_flow_test.dart`.
   - **Размер:** M.
 
 - [ ] 2.13 Проверки оболочки навигации опираются на панель вместо страницы связи
@@ -470,6 +470,7 @@
   - **Критерии приёмки:**
     - `RelationDetailsPage` и `RelationDetailsRoute` удалены, а `app_router.gr.dart` создан заново. Кнопка «Редактировать связь» уходит вместе со страницей, поэтому у существующей связи нет пути в форму.
     - Сценарии `relation_details_widget_test.dart` и `relation_details_tags_test.dart`, которые описывают продукт, выражены на панели, остальные удалены. `relation_details_navigation_test.dart` удалён: панели навигации над листом нет.
+    - В `test/long_term_relation/presentation/editor/relation_editor_page_test.dart` сценарии изменения через форму удалены вместе с `_openDetailsForEditing` и всеми обращениями к `RelationDetailsRoute` и `relation-details-edit-relation`, а сценарий запасной локали проверяет форму создания.
     - Строки, которые читала только прежняя страница, удалены на обоих языках.
   - **Проверка:**
     - `mise run codegen`.
@@ -479,14 +480,15 @@
   - **Предполагаемые файлы:**
     - удаляется `lib/src/long_term_relation/presentation/details/relation_details_page.dart`;
     - меняются `lib/src/app/routing/app_router.dart`, `app_router.gr.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
-    - меняются или удаляются три тестовых файла из критериев.
+    - меняются или удаляются `test/long_term_relation/presentation/details/relation_details_widget_test.dart`, `relation_details_tags_test.dart`, `relation_details_navigation_test.dart`;
+    - меняется `test/long_term_relation/presentation/editor/relation_editor_page_test.dart`.
   - **Размер:** M.
 
 - [ ] 2.15 Форма связи остаётся только формой создания
   - **Критерии приёмки:**
     - `RelationEditingContext` удалён вместе с `editingBasis`, `withConfirmedDetails`, `refreshConfirmedDetails` и `RelationEditorUpdated`. Форма не читает подробный просмотр связи.
     - Отказы, которых у создания нет, и строки `relationEditorEditTitle`, `relationEditorSaveAction`, `relationEditorSaving` удалены на обоих языках. `relationEditorUpdate*` остаются: их читает панель.
-    - Создание из группы и из быстрого создания работает как прежде, а тесты изменения через форму удалены вместе с проверкой, что форма не заменяет участников: это закрепляет сценарий «Панель не предлагает заменить участника».
+    - Создание из группы и из быстрого создания работает как прежде, а тесты режима изменения в модели формы удалены вместе с проверкой, что форма не заменяет участников: это закрепляет сценарий «Панель не предлагает заменить участника».
   - **Проверка:**
     - `mise run codegen`.
     - `mise exec --no-deps -- flutter test test/long_term_relation/presentation test/app/navigation/app_shell_pages_above_test.dart`.
@@ -494,7 +496,7 @@
   - **Зависимости:** 2.14 — у режима изменения не остаётся вызывающего.
   - **Предполагаемые файлы:**
     - меняются `lib/src/long_term_relation/presentation/editor/relation_editor_state.dart`, `relation_editor_view_model.dart`, `relation_editor_view_model.g.dart`, `relation_editor_page.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
-    - меняются `test/long_term_relation/presentation/editor/relation_editor_page_test.dart`, `relation_editor_view_model_test.dart`, `test/app/navigation/app_shell_page_matrix.dart`.
+    - меняются `test/long_term_relation/presentation/editor/relation_editor_view_model_test.dart`, `test/app/navigation/app_shell_page_matrix.dart`.
   - **Размер:** M.
 
 - [ ] 2.16 Проверить готовность фазы: существующая связь открывается и меняется только в панели
