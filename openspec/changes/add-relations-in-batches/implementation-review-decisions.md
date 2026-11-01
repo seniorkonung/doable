@@ -1,0 +1,10 @@
+# Решения по findings OpenSpec implementation review
+
+<!-- paseo-openspec-orchestrator:finding-decisions:v1 -->
+
+Файл ведёт оркестратор. Решения приняты пользователем в сессии решений и исполняются автономно, по одной finding за сессию. Сессия исполнения удаляет раздел своей finding в коммите её устранения.
+
+## F1 · Low — Подробный просмотр связи хранит данные разрешений без читателя
+
+- **Решение:** Устранить
+- **Как устранить:** Добавить в конец tasks.md после 1.18 новую задачу 1.19 фазы 1; plan.md, design и спецификации не менять, новых фаз не создавать. Исход: состояние подробного просмотра долговременной связи содержит только то, что читает рабочий код, поведение для человека не меняется. Удалить `permissionRevision` из `RelationDetailsLoaded` (поле, параметр конструктора, параметр и присваивание в `copyWith`) и его запись в `_handleCompletion` в `relation_details_view_model.dart`; удалить геттер `editingDetails`, а `relation_details_page.dart` передаёт в `RelationEditingContext` `loaded.details`; удалить `LongTermRelationDetails.withPermissions` из `long_term_relation_projection.dart`. Поле `permissions` в `RelationDetailsLoaded` и его обновление из подтверждённого изменения сохранить: их читают кнопка удаления, объяснение запрета, `_isLifecycleChangeApplicable`. В `graph_reconciliation_checkpoint_test.dart` ожидание после удаления дневного выбора заменить наблюдаемым результатом: `relation(101).permissions.canDelete` и `relation(102).permissions.canDelete` истинны, `relation(105).permissions.canDelete` ложно; проверки после ожидания не менять. В `relation_details_widget_test.dart:89` второй снимок собирать через `testRelationDetails(..., permissions: ...)` с теми же идентификаторами. Проверка задачи: `mise exec --no-deps -- flutter test test/long_term_relation/presentation test/long_term_relation/application/long_term_relation_projection_test.dart test/graph/presentation/graph_reconciliation_checkpoint_test.dart` и `mise exec --no-deps -- flutter analyze`. Критерий приёмки: в `lib/` и `test/` нет `permissionRevision` в подробном просмотре, `editingDetails` и `withPermissions`.
