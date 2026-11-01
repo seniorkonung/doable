@@ -357,10 +357,6 @@ final class RelationEditorViewModel extends _$RelationEditorViewModel {
   static RelationEditorFailure _editorFailure(
     LongTermRelationCommandFailure failure,
   ) => switch (failure) {
-    LongTermRelationCommandValidationFailure(
-      reason: CreateLongTermRelationValidationFailure.sameIntention,
-    ) =>
-      const RelationEditorSameParticipants(),
     LongTermRelationPairOccupiedFailure(:final existingRelationId) =>
       RelationEditorPairOccupied(existingRelationId),
     LongTermRelationNotFoundFailure() => const RelationEditorRelationNotFound(),

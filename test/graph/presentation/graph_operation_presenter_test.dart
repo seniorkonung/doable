@@ -1648,13 +1648,6 @@ String _relationDeleteOutcome(String outcome) =>
 final _relationFailures =
     <({String name, LongTermRelationCommandFailure failure, String outcome})>[
       (
-        name: 'validation',
-        failure: const LongTermRelationCommandValidationFailure(
-          CreateLongTermRelationValidationFailure.sameIntention,
-        ),
-        outcome: 'Check the selected intentions and relation details.',
-      ),
-      (
         name: 'conflict',
         failure: LongTermRelationPairOccupiedFailure(_relationId),
         outcome:
@@ -1696,21 +1689,15 @@ final _relationFailures =
       ),
     ];
 
+const _relationUpdateUnexpected =
+    'The relation couldn’t be updated because of an unexpected error.';
+
 final _relationUpdateFailures =
     <({String name, LongTermRelationCommandFailure failure, String outcome})>[
       (
-        name: 'validation',
-        failure: const LongTermRelationCommandValidationFailure(
-          CreateLongTermRelationValidationFailure.sameIntention,
-        ),
-        outcome: 'Check the selected intentions and relation changes.',
-      ),
-      (
         name: 'pair conflict',
         failure: LongTermRelationPairOccupiedFailure(_otherRelationId),
-        outcome:
-            'A relation with this direction already exists between the '
-            'selected intentions.',
+        outcome: _relationUpdateUnexpected,
       ),
       (
         name: 'relation not found',
@@ -1723,7 +1710,7 @@ final _relationUpdateFailures =
           role: RelationParticipantRole.related,
           intentionId: testDetailsIntentionId(2),
         ),
-        outcome: 'One of the selected intentions no longer exists.',
+        outcome: _relationUpdateUnexpected,
       ),
       (
         name: 'participant archived',
@@ -1731,7 +1718,7 @@ final _relationUpdateFailures =
           role: RelationParticipantRole.source,
           intentionId: testDetailsIntentionId(1),
         ),
-        outcome: 'An active relation can only link active intentions.',
+        outcome: _relationUpdateUnexpected,
       ),
       (
         name: 'unavailable',
@@ -1746,19 +1733,15 @@ final _relationUpdateFailures =
       (
         name: 'unexpected',
         failure: const LongTermRelationUnexpectedFailure(),
-        outcome:
-            'The relation couldn’t be updated because of an unexpected '
-            'error.',
+        outcome: _relationUpdateUnexpected,
       ),
     ];
 
 final _relationDeleteFailures =
     <({String name, LongTermRelationCommandFailure failure, String outcome})>[
       (
-        name: 'validation',
-        failure: const LongTermRelationCommandValidationFailure(
-          CreateLongTermRelationValidationFailure.sameIntention,
-        ),
+        name: 'pair conflict',
+        failure: LongTermRelationPairOccupiedFailure(_otherRelationId),
         outcome:
             'The relation couldn’t be deleted because its current state '
             'conflicts with the operation.',

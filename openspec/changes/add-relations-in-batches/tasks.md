@@ -78,7 +78,7 @@
     - меняются `test/graph/data/drift_relation_update_test.dart`, `drift_daily_path_protection_test.dart`.
   - **Размер:** M.
 
-- [ ] 1.7 Убрать отказы, которых у изменения связи больше нет
+- [x] 1.7 Убрать отказы, которых у изменения связи больше нет
   - **Критерии приёмки:**
     - `LongTermRelationCommandValidationFailure` и `_LongTermRelationSameParticipants` удалены: без замены участников их некому создать.
     - Изменение связи не называет занятую пару, отсутствующего или архивированного участника. Такие ветви исчерпывающих разборов отказов ведут к тексту неожиданной ошибки, а строки `relationEditorUpdatePairOccupied`, `relationEditorUpdateParticipantNotFound`, `relationEditorUpdateParticipantArchived`, `relationEditorUpdateInvalidInput` и `relationEditorCreateInvalidInput` удалены на обоих языках.

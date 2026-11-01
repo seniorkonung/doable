@@ -1899,10 +1899,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get relationEditorCreated => 'Relation created.';
 
   @override
-  String get relationEditorCreateInvalidInput =>
-      'Check the selected intentions and relation details.';
-
-  @override
   String get relationEditorCreatePairOccupied =>
       'A relation with this direction already exists between the selected intentions.';
 
@@ -1930,23 +1926,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get relationEditorUpdated => 'Relation updated.';
 
   @override
-  String get relationEditorUpdateInvalidInput =>
-      'Check the selected intentions and relation changes.';
-
-  @override
-  String get relationEditorUpdatePairOccupied =>
-      'A relation with this direction already exists between the selected intentions.';
-
-  @override
   String get relationEditorUpdateNotFound => 'This relation no longer exists.';
-
-  @override
-  String get relationEditorUpdateParticipantNotFound =>
-      'One of the selected intentions no longer exists.';
-
-  @override
-  String get relationEditorUpdateParticipantArchived =>
-      'An active relation can only link active intentions.';
 
   @override
   String get relationEditorUpdateReferencedByDailyPath =>

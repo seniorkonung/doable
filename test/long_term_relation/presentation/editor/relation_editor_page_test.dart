@@ -783,7 +783,7 @@ void main() {
   });
 
   testWidgets(
-    'открытая форма получает подтверждённые снимки без потери черновика и ошибки пары',
+    'открытая форма получает подтверждённые снимки без потери черновика и ошибки изменения',
     (tester) async {
       final repository = ControlledRelationFormRepository();
       addTearDown(repository.dispose);
@@ -813,7 +813,7 @@ void main() {
       await tester.pump();
       repository.failRelationCommand(
         0,
-        LongTermRelationPairOccupiedFailure(testFormRelationId(94)),
+        const LongTermRelationUnexpectedFailure(),
       );
       await tester.pumpAndSettle();
 
@@ -850,8 +850,7 @@ void main() {
       expect(find.text('Archived'), findsOneWidget);
       expect(
         find.text(
-          'A relation with this direction already exists between the selected '
-          'intentions.',
+          'The relation couldn’t be updated because of an unexpected error.',
         ),
         findsOneWidget,
       );

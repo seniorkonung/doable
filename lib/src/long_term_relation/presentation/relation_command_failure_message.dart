@@ -9,8 +9,6 @@ String longTermRelationCommandFailureMessage(
   LongTermRelationCommandFailure failure,
 ) => switch (kind) {
   LongTermRelationCommandKind.create => switch (failure) {
-    LongTermRelationCommandValidationFailure() =>
-      localizations.relationEditorCreateInvalidInput,
     LongTermRelationPairOccupiedFailure() =>
       localizations.relationEditorCreatePairOccupied,
     LongTermRelationNotFoundFailure() =>
@@ -29,22 +27,19 @@ String longTermRelationCommandFailureMessage(
       localizations.relationEditorCreateUnexpected,
   },
   LongTermRelationCommandKind.update => switch (failure) {
-    LongTermRelationCommandValidationFailure() =>
-      localizations.relationEditorUpdateInvalidInput,
-    LongTermRelationPairOccupiedFailure() =>
-      localizations.relationEditorUpdatePairOccupied,
     LongTermRelationNotFoundFailure() =>
       localizations.relationEditorUpdateNotFound,
     LongTermRelationReferencedByDailyPathFailure() =>
       localizations.relationEditorUpdateReferencedByDailyPath,
-    LongTermRelationParticipantNotFoundFailure() =>
-      localizations.relationEditorUpdateParticipantNotFound,
-    LongTermRelationParticipantArchivedFailure() =>
-      localizations.relationEditorUpdateParticipantArchived,
     LongTermRelationUnavailableFailure() =>
       localizations.relationEditorUpdateUnavailable,
     LongTermRelationCorruptionFailure() =>
       localizations.relationEditorUpdateCorruption,
+    // Изменение связи не называет пару и участников, поэтому такие отказы
+    // для него неожиданны.
+    LongTermRelationPairOccupiedFailure() ||
+    LongTermRelationParticipantNotFoundFailure() ||
+    LongTermRelationParticipantArchivedFailure() ||
     LongTermRelationUnexpectedFailure() =>
       localizations.relationEditorUpdateUnexpected,
   },
@@ -54,7 +49,6 @@ String longTermRelationCommandFailureMessage(
       localizations.relationArchiveUnavailable,
     LongTermRelationCorruptionFailure() =>
       localizations.relationArchiveCorruption,
-    LongTermRelationCommandValidationFailure() ||
     LongTermRelationPairOccupiedFailure() ||
     LongTermRelationReferencedByDailyPathFailure() ||
     LongTermRelationParticipantNotFoundFailure() ||
@@ -81,7 +75,6 @@ String longTermRelationCommandFailureMessage(
       localizations.relationRestoreUnavailable,
     LongTermRelationCorruptionFailure() =>
       localizations.relationRestoreCorruption,
-    LongTermRelationCommandValidationFailure() ||
     LongTermRelationPairOccupiedFailure() =>
       localizations.relationRestoreConflict,
     LongTermRelationReferencedByDailyPathFailure() =>
@@ -97,7 +90,6 @@ String longTermRelationCommandFailureMessage(
       localizations.relationDeleteUnavailable,
     LongTermRelationCorruptionFailure() =>
       localizations.relationDeleteCorruption,
-    LongTermRelationCommandValidationFailure() ||
     LongTermRelationPairOccupiedFailure() ||
     LongTermRelationParticipantNotFoundFailure() ||
     LongTermRelationParticipantArchivedFailure() =>

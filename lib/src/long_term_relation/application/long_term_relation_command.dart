@@ -147,16 +147,6 @@ sealed class LongTermRelationCommandFailure implements GraphCommandFailure {
   const LongTermRelationCommandFailure();
 }
 
-final class LongTermRelationCommandValidationFailure
-    extends LongTermRelationCommandFailure {
-  const LongTermRelationCommandValidationFailure(this.reason);
-
-  final CreateLongTermRelationValidationFailure reason;
-
-  @override
-  GraphFailureCategory get category => GraphFailureCategory.validation;
-}
-
 final class LongTermRelationPairOccupiedFailure
     extends LongTermRelationCommandFailure {
   const LongTermRelationPairOccupiedFailure(this.existingRelationId);

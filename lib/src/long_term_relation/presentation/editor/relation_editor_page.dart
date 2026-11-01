@@ -539,16 +539,16 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage>
           switch (rejection) {
             RelationParticipantRejection.missing =>
               isEditing
-                  ? localizations.relationEditorUpdateParticipantNotFound
+                  ? localizations.relationEditorUpdateUnexpected
                   : localizations.relationEditorCreateParticipantNotFound,
             RelationParticipantRejection.archived =>
               isEditing
-                  ? localizations.relationEditorUpdateParticipantArchived
+                  ? localizations.relationEditorUpdateUnexpected
                   : localizations.relationEditorCreateParticipantArchived,
           },
         RelationEditorPairOccupied() =>
           isEditing
-              ? localizations.relationEditorUpdatePairOccupied
+              ? localizations.relationEditorUpdateUnexpected
               : localizations.relationEditorCreatePairOccupied,
         RelationEditorSameParticipants() =>
           localizations.relationEditorCreateSameParticipants,

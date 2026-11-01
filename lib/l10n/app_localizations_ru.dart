@@ -1923,10 +1923,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get relationEditorCreated => 'Связь создана.';
 
   @override
-  String get relationEditorCreateInvalidInput =>
-      'Проверьте выбранные намерения и данные связи.';
-
-  @override
   String get relationEditorCreatePairOccupied =>
       'Связь этого направления между выбранными намерениями уже есть.';
 
@@ -1954,23 +1950,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get relationEditorUpdated => 'Связь изменена.';
 
   @override
-  String get relationEditorUpdateInvalidInput =>
-      'Проверьте выбранные намерения и изменения связи.';
-
-  @override
-  String get relationEditorUpdatePairOccupied =>
-      'Связь этого направления между выбранными намерениями уже есть.';
-
-  @override
   String get relationEditorUpdateNotFound => 'Эта связь больше не существует.';
-
-  @override
-  String get relationEditorUpdateParticipantNotFound =>
-      'Одно из выбранных намерений больше не существует.';
-
-  @override
-  String get relationEditorUpdateParticipantArchived =>
-      'Активная связь может соединять только активные намерения.';
 
   @override
   String get relationEditorUpdateReferencedByDailyPath =>

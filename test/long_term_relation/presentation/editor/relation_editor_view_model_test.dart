@@ -444,55 +444,30 @@ void main() {
   });
 
   group('Отдельные причины отказа', () {
-    final pairFailureCases =
-        <
-          ({
-            String name,
-            LongTermRelationCommandFailure repositoryFailure,
-            Matcher editorFailure,
-          })
-        >[
-          (
-            name: 'занятая пара',
-            repositoryFailure: LongTermRelationPairOccupiedFailure(
-              testRelationId(7),
-            ),
-            editorFailure: isA<RelationEditorPairOccupied>().having(
-              (value) => value.existingRelationId,
-              'существующая связь',
-              testRelationId(7),
-            ),
-          ),
-          (
-            name: 'совпадающие участники',
-            repositoryFailure: const LongTermRelationCommandValidationFailure(
-              CreateLongTermRelationValidationFailure.sameIntention,
-            ),
-            editorFailure: isA<RelationEditorSameParticipants>(),
-          ),
-        ];
+    final repositoryFailure = LongTermRelationPairOccupiedFailure(
+      testRelationId(7),
+    );
+    final editorFailure = isA<RelationEditorPairOccupied>().having(
+      (value) => value.existingRelationId,
+      'существующая связь',
+      testRelationId(7),
+    );
 
-    // Обе причины исправляются сменой участника одинаково, а роль меняет лишь
-    // поле, которое обновляется: каждую причину и роль достаточно взять раз.
-    for (final (failureCase, role) in [
-      (pairFailureCases[0], RelationParticipantRole.source),
-      (pairFailureCases[1], RelationParticipantRole.related),
-    ]) {
+    // Занятость пары исправляется сменой любого участника одинаково, а роль
+    // меняет лишь поле, которое обновляется: достаточно взять каждую роль раз.
+    for (final role in RelationParticipantRole.values) {
       final roleName = switch (role) {
         RelationParticipantRole.source => 'исходного участника',
         RelationParticipantRole.related => 'связанного участника',
       };
 
       test(
-        '${failureCase.name}: снимок $roleName не исправляет прежнюю пару',
+        'занятая пара: снимок $roleName не исправляет прежнюю пару',
         () async {
           final harness = _EditorHarness.outgoing()..fillDraft();
 
           harness.viewModel.submit();
-          harness.repository.failRelationCommand(
-            0,
-            failureCase.repositoryFailure,
-          );
+          harness.repository.failRelationCommand(0, repositoryFailure);
           await harness.settle();
 
           final presentation = harness.state.failurePresentation;
@@ -502,7 +477,7 @@ void main() {
             isA<RelationEditorFailed>().having(
               (value) => value.failure,
               'причина',
-              failureCase.editorFailure,
+              editorFailure,
             ),
           );
 
@@ -537,7 +512,7 @@ void main() {
             isA<RelationEditorFailed>().having(
               (value) => value.failure,
               'причина',
-              failureCase.editorFailure,
+              editorFailure,
             ),
           );
           expect(harness.state.canSubmit, isFalse);
