@@ -42,6 +42,8 @@ const _secondStep = '018f0b5d-6b2e-7c80-8000-000000000042';
 const _directStep = '018f0b5d-6b2e-7c80-8000-000000000043';
 
 final _createdAt = DateTime.utc(2026, 10, 17, 9);
+final _relationCreatedAt = DateTime.utc(2026, 10, 17, 9, 30);
+final _relationUpdatedAt = DateTime.utc(2026, 10, 17, 10, 15, 0, 250);
 final _updatedAt = DateTime.utc(2026, 10, 17, 10, 30, 0, 0, 1);
 
 void main() {
@@ -96,9 +98,16 @@ void main() {
 
   Future<void> addRelation(String id, String source, String related) => write(
     'INSERT INTO long_term_relations '
-    '(id, source_intention_id, related_intention_id, type, priority) '
-    "VALUES (?, ?, ?, 'need', 1)",
-    [id, source, related],
+    '(id, source_intention_id, related_intention_id, type, priority, '
+    'created_at, updated_at) '
+    "VALUES (?, ?, ?, 'need', 1, ?, ?)",
+    [
+      id,
+      source,
+      related,
+      _relationCreatedAt.microsecondsSinceEpoch,
+      _relationUpdatedAt.microsecondsSinceEpoch,
+    ],
   );
 
   Future<void> addTag(String id, String name, String position) => write(
@@ -490,6 +499,8 @@ LongTermRelationRecord _relationRecord(
   priority: RelationPriority.p1,
   description: null,
   scope: archived ? RelationScope.archived : RelationScope.active,
+  createdAt: RelationTimestamp(_relationCreatedAt),
+  updatedAt: RelationTimestamp(_relationUpdatedAt),
 );
 
 DailyChoiceRecord _choiceRecord(List<ChoicePathStep> path) => DailyChoiceRecord(

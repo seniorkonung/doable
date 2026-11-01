@@ -23,6 +23,8 @@ LongTermRelationRecord storedRelationRecord(StoredLongTermRelation relation) =>
       priority: relation.priority,
       description: relation.description,
       scope: relation.scope,
+      createdAt: relation.createdAt,
+      updatedAt: relation.updatedAt,
     );
 
 /// Шаги путей дневных выборов и концы связей этих шагов.

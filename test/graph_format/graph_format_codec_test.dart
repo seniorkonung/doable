@@ -105,6 +105,8 @@ void main() {
           '"actionReady":false,"archived":false';
       const createdAt = '"createdAt":"2026-03-29T00:00:00.000000Z"';
       const updatedAt = '"updatedAt":"2026-10-17T21:04:05.123456Z"';
+      const relationRest =
+          '"type":"need","priority":"P1","description":null,"archived":false';
       final relation =
           '$created,"kind":"longTermRelation","id":"${_relationIds[0]}",'
           '"sourceIntentionId":"${_intentionIds[0]}",'
@@ -128,8 +130,7 @@ void main() {
         '{$tag,"name":"Дом","color":"blue","position":"a0"}',
         '{$tag,"name":"Дом","color":null,"position":"Zz0V"}',
         '{$intention,$createdAt,$updatedAt}',
-        '{$relation,"type":"need","priority":"P1","description":null,'
-            '"archived":false}',
+        '{$relation,$relationRest,$createdAt,$updatedAt}',
         validChoice(path: path),
         '{"fact":"deleted","entity":"tag","id":"${_tagIds[0]}"}',
       ];
@@ -195,13 +196,17 @@ void main() {
             '$updatedAt}',
         'неизвестный тип связи':
             '{$relation,"type":"must","priority":"P1","description":null,'
-            '"archived":false}',
+            '"archived":false,$createdAt,$updatedAt}',
         'неизвестный приоритет':
             '{$relation,"type":"need","priority":"P5","description":null,'
-            '"archived":false}',
+            '"archived":false,$createdAt,$updatedAt}',
         'пробельное описание связи':
             '{$relation,"type":"need","priority":"P1","description":"  ",'
-            '"archived":false}',
+            '"archived":false,$createdAt,$updatedAt}',
+        // Так записаны связи в файлах до появления их показаний времени.
+        'связь без времени создания': '{$relation,$relationRest,$updatedAt}',
+        'связь без времени последнего изменения':
+            '{$relation,$relationRest,$createdAt}',
         'несуществующая дата дневного выбора': validChoice(
           date: '"date":"2026-02-30"',
           path: path,
@@ -383,6 +388,8 @@ List<GraphFact> _expectedGoldenFacts() {
         priority: RelationPriority.p1,
         description: null,
         scope: RelationScope.active,
+        createdAt: RelationTimestamp(DateTime.utc(2026, 10, 17, 8)),
+        updatedAt: RelationTimestamp(DateTime.utc(2026, 10, 17, 8)),
       ),
     ),
     GraphEntityChanged(
@@ -396,6 +403,10 @@ List<GraphFact> _expectedGoldenFacts() {
           '\n Темп\nлёгкий \n',
         ),
         scope: RelationScope.archived,
+        createdAt: RelationTimestamp(DateTime.utc(2026, 3, 29)),
+        updatedAt: RelationTimestamp(
+          DateTime.utc(2026, 10, 17, 21, 4, 5, 123, 456),
+        ),
       ),
     ),
     GraphEntityCreated(
