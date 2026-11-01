@@ -48,10 +48,7 @@ void main() {
     );
   });
 
-  testWidgets('защищённый путь оставляет описание и приоритет доступными', (
-    tester,
-  ) async {
-    final semantics = tester.ensureSemantics();
+  testWidgets('связь из сохранённого пути меняет тип', (tester) async {
     final repository = ControlledRelationFormRepository();
     addTearDown(repository.dispose);
     final details = testRelationDetails(
@@ -66,114 +63,18 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final reason = find.byKey(
-      const ValueKey('relation-editor-path-protection'),
-    );
-    expect(reason, findsOneWidget);
-    expect(tester.getSemantics(reason).label, contains('daily path'));
-    expect(
-      tester
-          .widget<ChoiceChip>(
-            find.byKey(const ValueKey('relation-editor-type-can')),
-          )
-          .onSelected,
-      isNull,
-    );
-    expect(
-      tester
-          .widget<TextField>(
-            find.byKey(const ValueKey('relation-editor-description')),
-          )
-          .enabled,
-      isTrue,
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey('relation-editor-description')),
-      'Описание пути',
-    );
-    await tester.pump();
-    expect(
-      tester
-          .widget<FilledButton>(
-            find.byKey(const ValueKey('relation-editor-submit')),
-          )
-          .onPressed,
-      isNotNull,
-    );
+    await _selectType(tester, 'can');
     await tester.tap(find.byKey(const ValueKey('relation-editor-submit')));
     await tester.pump();
+
     expect(repository.relationUpdateCommands, hasLength(1));
-    expect(tester.takeException(), isNull);
-    semantics.dispose();
-  });
-
-  testWidgets('изменение разрешения открытой формы сохраняет исправимый ввод', (
-    tester,
-  ) async {
-    final repository = ControlledRelationFormRepository();
-    addTearDown(repository.dispose);
-    final relationId = testFormRelationId(152);
-    final details = testRelationDetails(
-      relationId: relationId,
-      sourceId: testSummary(index: 1).id,
-      relatedId: testSummary(index: 2).id,
-    );
-    await _openDetailsForEditing(tester, repository, details);
-    await tester.tap(
-      find.byKey(const ValueKey('relation-details-edit-relation')),
-    );
-    await tester.pumpAndSettle();
-    await tester.enterText(
-      find.byKey(const ValueKey('relation-editor-description')),
-      'Исправимый ввод',
-    );
-    repository
-        .watchAt(0)
-        .emitDetails(
-          details.withPermissions(
-            const LongTermRelationPermissions.referencedByDailyPath(),
-          ),
-          revision: const TestCatalogRevision(3),
-        );
-    await tester.pumpAndSettle();
     expect(
-      find.byKey(const ValueKey('relation-editor-path-protection')),
-      findsOneWidget,
-    );
-    expect(
-      tester
-          .widget<TextField>(
-            find.byKey(const ValueKey('relation-editor-description')),
-          )
-          .controller
-          ?.text,
-      'Исправимый ввод',
-    );
-    expect(
-      tester
-          .widget<FilledButton>(
-            find.byKey(const ValueKey('relation-editor-submit')),
-          )
-          .onPressed,
-      isNotNull,
-    );
-
-    repository
-        .watchAt(0)
-        .emitDetails(details, revision: const TestCatalogRevision(4));
-    await tester.pumpAndSettle();
-    expect(
-      find.byKey(const ValueKey('relation-editor-path-protection')),
-      findsNothing,
-    );
-    expect(
-      tester
-          .widget<TextField>(
-            find.byKey(const ValueKey('relation-editor-description')),
-          )
-          .controller
-          ?.text,
-      'Исправимый ввод',
+      repository.relationUpdateCommands.single.patch.type,
+      isA<LongTermRelationFieldSet<LongTermRelationType>>().having(
+        (field) => field.value,
+        'тип',
+        LongTermRelationType.can,
+      ),
     );
   });
 
@@ -615,9 +516,8 @@ void main() {
     },
   );
 
-  testWidgets('из подробного просмотра редактирует все поля архивной связи', (
-    tester,
-  ) async {
+  testWidgets('из подробного просмотра редактирует приоритет и описание '
+      'архивной связи, а тип не предлагает', (tester) async {
     final repository = ControlledRelationFormRepository();
     addTearDown(repository.dispose);
     final details = testRelationDetails(
@@ -673,7 +573,16 @@ void main() {
       );
     }
 
-    await _selectType(tester, 'need');
+    for (final type in LongTermRelationType.values) {
+      expect(
+        tester
+            .widget<ChoiceChip>(
+              find.byKey(ValueKey('relation-editor-type-${type.name}')),
+            )
+            .onSelected,
+        isNull,
+      );
+    }
     await _selectPriority(tester, 'p4');
     await tester.enterText(
       find.byKey(const ValueKey('relation-editor-description')),
@@ -681,21 +590,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('To Исходное, you need Связанное'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('relation-editor-submit')));
     await tester.pump();
 
     expect(repository.relationUpdateCommands, hasLength(1));
     final command = repository.updateCommandAt(0);
     expect(command.relationId, details.relation.id);
-    expect(
-      command.patch.type,
-      isA<LongTermRelationFieldSet<LongTermRelationType>>().having(
-        (field) => field.value,
-        'тип',
-        LongTermRelationType.need,
-      ),
-    );
+    expect(command.patch.type, isA<LongTermRelationFieldUnchanged>());
     expect(
       command.patch.priority,
       isA<LongTermRelationFieldSet<RelationPriority>>().having(
@@ -717,7 +618,7 @@ void main() {
       id: details.relation.id,
       sourceIntentionId: details.relation.sourceIntentionId,
       relatedIntentionId: details.relation.relatedIntentionId,
-      type: LongTermRelationType.need,
+      type: LongTermRelationType.can,
       priority: RelationPriority.p4,
       scope: RelationScope.archived,
       creationSequence: details.relation.creationSequence,
@@ -751,7 +652,7 @@ void main() {
         );
     await tester.pumpAndSettle();
 
-    expect(find.text('To Исходное, you need Связанное'), findsOneWidget);
+    expect(find.text('To Исходное, you can Связанное'), findsOneWidget);
     expect(find.text('Новое описание'), findsOneWidget);
   });
 
@@ -796,7 +697,6 @@ void main() {
         relatedId: relatedId,
         sourceTitle: 'Исходное',
         relatedTitle: 'Связанное',
-        scope: RelationScope.archived,
         description: 'Прежнее описание',
       );
       await _openDetailsForEditing(tester, repository, details);
@@ -824,7 +724,6 @@ void main() {
         sourceTitle: 'Исходное после переименования',
         relatedTitle: 'Связанное после переименования',
         relatedArchiveState: IntentionArchiveState.archived,
-        scope: RelationScope.archived,
         description: 'Чужое описание',
       );
       repository

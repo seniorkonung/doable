@@ -1953,20 +1953,8 @@ class AppLocalizationsRu extends AppLocalizations {
   String get relationEditorUpdateNotFound => 'Эта связь больше не существует.';
 
   @override
-  String get relationEditorUpdateReferencedByDailyPath =>
-      'Связь используется в сохранённом дневном пути. Её тип и участников нельзя изменить.';
-
-  @override
   String get relationEditorUpdateArchivedTypeChange =>
       'Связь архивирована, поэтому её тип нельзя изменить. Верните прежний тип, чтобы сохранить остальные изменения.';
-
-  @override
-  String get relationEditorPathProtection =>
-      'Связь используется в сохранённом дневном пути. Её тип и участников нельзя изменить. Описание и приоритет остаются доступными.';
-
-  @override
-  String get relationEditorPathProtectionWithDraft =>
-      'Связь используется в сохранённом дневном пути. Верните прежние тип и участников, чтобы сохранить изменения описания и приоритета.';
 
   @override
   String get relationEditorUpdateUnavailable =>
@@ -2139,7 +2127,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get relationDetailsPathProtection =>
-      'Связь используется в сохранённом дневном пути. Удалить её или изменить тип и участников нельзя. Описание, приоритет и архивное состояние остаются доступными.';
+      'Связь используется в сохранённом дневном пути, поэтому удалить её нельзя.';
 
   @override
   String get relationDetailsDeletionChecking =>

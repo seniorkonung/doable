@@ -16,7 +16,6 @@ import '../../../intention/domain/intention_id.dart';
 import '../../../shared/presentation/creation_exit_action.dart';
 import '../../application/long_term_relation_command.dart';
 import '../../application/long_term_relation_projection.dart';
-import '../../application/long_term_relation_permissions.dart';
 import '../../domain/long_term_relation.dart';
 import '../../domain/long_term_relation_description.dart';
 import '../../domain/long_term_relation_id.dart';
@@ -143,13 +142,6 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage>
         ? _generalFailure(localizations, editor)
         : null;
     final occupiedPair = _occupiedPair(editor);
-    final basis = editor.editingBasis?.relation;
-    final pathProtected =
-        editor.permissions.restriction ==
-        LongTermRelationPermissionRestriction.referencedByDailyPath;
-    final meaningDraftChanged = basis != null && editor.type != basis.type;
-    final meaningControlsEnabled =
-        controlsEnabled && (!pathProtected || meaningDraftChanged);
     return Scaffold(
       appBar: AppBar(
         title: Text(switch (editor.context) {
@@ -212,22 +204,10 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage>
                 ),
               ),
             ],
-            if (pathProtected) ...[
-              const SizedBox(height: 16),
-              Semantics(
-                container: true,
-                child: Text(
-                  meaningDraftChanged
-                      ? localizations.relationEditorPathProtectionWithDraft
-                      : localizations.relationEditorPathProtection,
-                  key: const ValueKey('relation-editor-path-protection'),
-                ),
-              ),
-            ],
             const SizedBox(height: 24),
             _TypeChoice(
               selected: editor.type,
-              enabled: meaningControlsEnabled,
+              enabled: controlsEnabled && editor.canChangeType,
               onSelected: notifier.selectType,
             ),
             const SizedBox(height: 24),
@@ -554,8 +534,6 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage>
           localizations.relationEditorCreateSameParticipants,
         RelationEditorRelationNotFound() =>
           localizations.relationEditorUpdateNotFound,
-        RelationEditorReferencedByDailyPath() =>
-          localizations.relationEditorUpdateReferencedByDailyPath,
         RelationEditorArchivedTypeChange() =>
           localizations.relationEditorUpdateArchivedTypeChange,
         RelationEditorUnavailable() =>

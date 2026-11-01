@@ -1929,20 +1929,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get relationEditorUpdateNotFound => 'This relation no longer exists.';
 
   @override
-  String get relationEditorUpdateReferencedByDailyPath =>
-      'This relation is used by a saved daily path. Its type and participants can’t be changed.';
-
-  @override
   String get relationEditorUpdateArchivedTypeChange =>
       'This relation is archived, so its type can’t be changed. Restore the original type to save the other changes.';
-
-  @override
-  String get relationEditorPathProtection =>
-      'This relation is used in a saved daily path. Its type and participants cannot be changed. Its description and priority remain editable.';
-
-  @override
-  String get relationEditorPathProtectionWithDraft =>
-      'This relation is used in a saved daily path. Restore the original type and participants to save description and priority changes.';
 
   @override
   String get relationEditorUpdateUnavailable =>
@@ -2115,7 +2103,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get relationDetailsPathProtection =>
-      'This relation is used in a saved daily path. It cannot be deleted, and its type and participants cannot be changed. Its description, priority, and archive state remain editable.';
+      'This relation is used in a saved daily path, so it cannot be deleted.';
 
   @override
   String get relationDetailsDeletionChecking =>

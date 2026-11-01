@@ -108,7 +108,6 @@ final class _RelationDetailsPageState
                               editorContext: RelationEditingContext(
                                 loaded.editingDetails,
                                 revision: loaded.revision,
-                                permissionRevision: loaded.permissionRevision,
                               ),
                             ),
                           ),

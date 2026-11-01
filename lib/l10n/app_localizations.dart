@@ -2987,29 +2987,11 @@ abstract class AppLocalizations {
   /// **'This relation no longer exists.'**
   String get relationEditorUpdateNotFound;
 
-  /// Конфликт изменения смысла используемой дневным путём связи
-  ///
-  /// In en, this message translates to:
-  /// **'This relation is used by a saved daily path. Its type and participants can’t be changed.'**
-  String get relationEditorUpdateReferencedByDailyPath;
-
   /// Конфликт изменения типа архивированной связи
   ///
   /// In en, this message translates to:
   /// **'This relation is archived, so its type can’t be changed. Restore the original type to save the other changes.'**
   String get relationEditorUpdateArchivedTypeChange;
-
-  /// Ограничение смысла связи сохранённым дневным путём
-  ///
-  /// In en, this message translates to:
-  /// **'This relation is used in a saved daily path. Its type and participants cannot be changed. Its description and priority remain editable.'**
-  String get relationEditorPathProtection;
-
-  /// Исправление черновика при новом ограничении пути
-  ///
-  /// In en, this message translates to:
-  /// **'This relation is used in a saved daily path. Restore the original type and participants to save description and priority changes.'**
-  String get relationEditorPathProtectionWithDraft;
 
   /// Устранимая недоступность изменения связи
   ///
@@ -3296,7 +3278,7 @@ abstract class AppLocalizations {
   /// Причина недоступности удаления связи в подробностях
   ///
   /// In en, this message translates to:
-  /// **'This relation is used in a saved daily path. It cannot be deleted, and its type and participants cannot be changed. Its description, priority, and archive state remain editable.'**
+  /// **'This relation is used in a saved daily path, so it cannot be deleted.'**
   String get relationDetailsPathProtection;
 
   /// Неизвестные разрешения на удаление связи

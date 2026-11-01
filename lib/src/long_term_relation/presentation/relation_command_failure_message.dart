@@ -30,16 +30,15 @@ String longTermRelationCommandFailureMessage(
   LongTermRelationCommandKind.update => switch (failure) {
     LongTermRelationNotFoundFailure() =>
       localizations.relationEditorUpdateNotFound,
-    LongTermRelationReferencedByDailyPathFailure() =>
-      localizations.relationEditorUpdateReferencedByDailyPath,
     LongTermRelationArchivedTypeChangeFailure() =>
       localizations.relationEditorUpdateArchivedTypeChange,
     LongTermRelationUnavailableFailure() =>
       localizations.relationEditorUpdateUnavailable,
     LongTermRelationCorruptionFailure() =>
       localizations.relationEditorUpdateCorruption,
-    // Изменение связи не называет пару и участников, поэтому такие отказы
-    // для него неожиданны.
+    // Изменение связи не называет пару и участников и не проверяет шаги пути,
+    // поэтому такие отказы для него неожиданны.
+    LongTermRelationReferencedByDailyPathFailure() ||
     LongTermRelationPairOccupiedFailure() ||
     LongTermRelationParticipantNotFoundFailure() ||
     LongTermRelationParticipantArchivedFailure() ||

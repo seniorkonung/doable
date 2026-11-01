@@ -3,12 +3,10 @@ import 'dart:async';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../graph/application/graph_command_coordinator.dart';
-import '../../../graph/application/graph_change.dart';
 import '../../../graph/application/graph_revision.dart';
 import '../../../graph/application/graph_command_result.dart';
 import '../../application/long_term_relation_command.dart';
 import '../../application/long_term_relation_projection.dart';
-import '../../application/long_term_relation_permissions.dart';
 import '../../domain/long_term_relation.dart';
 import '../../domain/long_term_relation_description.dart';
 import '../../domain/long_term_relation_id.dart';
@@ -29,7 +27,6 @@ final class RelationEditorViewModel extends _$RelationEditorViewModel {
   late LongTermRelationCreationFormKey _formKey;
   late RelationEditorContext _context;
   LongTermRelationOperationToken? _activeToken;
-  StreamSubscription<GraphCommandCompletion>? _completionSubscription;
 
   @override
   RelationEditorState build(
@@ -39,45 +36,13 @@ final class RelationEditorViewModel extends _$RelationEditorViewModel {
     _formKey = formKey;
     _context = context;
     _coordinator = ref.watch(graphCommandCoordinatorProvider.notifier);
-    if (context case RelationEditingContext()) {
-      _completionSubscription = _coordinator.completions.listen(
-        _handleCompletion,
-      );
-    }
     ref.onDispose(() {
-      unawaited(_completionSubscription?.cancel());
       final activeToken = _activeToken;
       if (activeToken != null) {
         _coordinator.releaseInitiatorPresentation(activeToken);
       }
     });
     return RelationEditorState.initial(context);
-  }
-
-  void _handleCompletion(GraphCommandCompletion completion) {
-    if (!ref.mounted || _context is! RelationEditingContext) return;
-    final confirmed = completion.confirmedChange;
-    if (confirmed == null) return;
-    final relationId = (_context as RelationEditingContext).details.relation.id;
-    LongTermRelationPermissions? confirmedPermissions;
-    for (final change in confirmed.changes) {
-      switch (change) {
-        case DailyChoiceChange(:final relationPermissions):
-          confirmedPermissions =
-              relationPermissions[relationId] ?? confirmedPermissions;
-        case LongTermRelationChange(
-              :final id,
-              permissions: final relationPermissions,
-            )
-            when id == relationId && relationPermissions?.isConfirmed == true:
-          confirmedPermissions = relationPermissions;
-        case GraphChange():
-          break;
-      }
-    }
-    if (confirmedPermissions != null) {
-      state = state.withPermissions(confirmedPermissions, confirmed.revision);
-    }
   }
 
   /// Принимает участника в черновик создания.
@@ -360,8 +325,6 @@ final class RelationEditorViewModel extends _$RelationEditorViewModel {
     LongTermRelationPairOccupiedFailure(:final existingRelationId) =>
       RelationEditorPairOccupied(existingRelationId),
     LongTermRelationNotFoundFailure() => const RelationEditorRelationNotFound(),
-    LongTermRelationReferencedByDailyPathFailure() =>
-      const RelationEditorReferencedByDailyPath(),
     LongTermRelationArchivedTypeChangeFailure() =>
       const RelationEditorArchivedTypeChange(),
     LongTermRelationParticipantNotFoundFailure(
@@ -384,6 +347,8 @@ final class RelationEditorViewModel extends _$RelationEditorViewModel {
       ),
     LongTermRelationUnavailableFailure() => const RelationEditorUnavailable(),
     LongTermRelationCorruptionFailure() => const RelationEditorCorruption(),
+    // Изменение и создание связи не проверяют шаги пути: такой отказ им чужд.
+    LongTermRelationReferencedByDailyPathFailure() ||
     LongTermRelationUnexpectedFailure() => const RelationEditorUnexpected(),
   };
 }

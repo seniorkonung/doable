@@ -6,7 +6,13 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
+import 'package:doable/src/graph/application/personal_graph_repository.dart';
+import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart'
     as catalog_page;
 import 'package:doable/src/design_system/components/archived_fold.dart';
@@ -19,6 +25,7 @@ import 'package:doable/src/intention/presentation/details/intention_details_page
 import 'package:doable/src/intention/presentation/details/intention_options.dart';
 import 'package:doable/src/intention/presentation/edit/intention_edit_page.dart';
 import 'package:doable/src/intention/presentation/picker/intention_picker_row.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_page.dart';
 import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
@@ -29,6 +36,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../support/app_root_pages.dart';
+import '../support/daily_choice_catalog_controls.dart';
+import '../support/daily_choice_durability_fixture.dart';
+import '../support/daily_choice_local_date.dart';
 import '../support/graph_seed.dart';
 import '../support/intention_catalog_controls.dart';
 import '../support/quick_creation.dart';
@@ -218,12 +228,17 @@ void main() {
         'Archived relation',
       );
 
+      // Архивированная связь меняет приоритет и описание, а тип сохраняет.
       const lifecycleDescription = '  Литеральный текст\n🧭  ';
       const lifecyclePhrase = 'To Укреплять здоровье, you can Много ходить';
-      await _editRelation(tester, description: lifecycleDescription);
+      await _editRelation(
+        tester,
+        description: lifecycleDescription,
+        changeType: false,
+      );
       await _dismissOperationMessage(tester);
-      expect(_textByKey(tester, 'relation-details-phrase'), lifecyclePhrase);
-      expect(_textByKey(tester, 'relation-details-type'), 'Can');
+      expect(_textByKey(tester, 'relation-details-phrase'), renamedPhrase);
+      expect(_textByKey(tester, 'relation-details-type'), 'Need');
       expect(_textByKey(tester, 'relation-details-priority'), 'P4');
       expect(
         _textByKey(tester, 'relation-details-description'),
@@ -231,8 +246,14 @@ void main() {
       );
       expect(_textByKey(tester, 'relation-details-scope'), 'Archived relation');
 
+      // Активная связь меняет тип и переходит в другую группу.
       await _restoreCurrentRelation(tester);
       await _dismissOperationMessage(tester);
+      await _editRelation(tester, description: lifecycleDescription);
+      await _dismissOperationMessage(tester);
+      expect(_textByKey(tester, 'relation-details-phrase'), lifecyclePhrase);
+      expect(_textByKey(tester, 'relation-details-type'), 'Can');
+      expect(_textByKey(tester, 'relation-details-scope'), 'Active relation');
       await _archiveCurrentRelation(tester);
       await _dismissOperationMessage(tester);
 
@@ -612,6 +633,163 @@ void main() {
       semantics.dispose();
     },
   );
+  testWidgets(
+    'форма переводит связь из пути сохранённого выбора в другую группу, а подробный просмотр выбора показывает новый тип с прежним составом пути',
+    (tester) async {
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      tester.binding.platformDispatcher.localesTestValue = const [Locale('ru')];
+      addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
+      final l10n = lookupAppLocalizations(const Locale('ru'));
+
+      tester.view.physicalSize = const Size(1200, 6000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      final storage = (await tester.runAsync(LocalDatabaseHarness.fileBacked))!;
+      addTearDown(storage.dispose);
+      await tester.runAsync(() async {
+        final database = await storage.openReadyDatabase();
+        await seedDurabilityGraph(database);
+        expect(
+          await durabilityRepository(database).execute(durabilityCreate()),
+          isA<GraphCommandSucceeded>(),
+        );
+        await storage.closePersistenceObjectGraph();
+      });
+      final localDate = ControlledDailyChoiceLocalDate(durabilityChoiceDate);
+      late sqlite.Database raw;
+      final runtime = AppRuntime(
+        quickCreationModeStore: InMemoryQuickCreationModeStore(),
+        connectionFactory: () => openFileBackedLocalDatabase(
+          storage.databaseFile,
+          setup: (database) => raw = database,
+        ),
+        diagnosticsSink: InMemoryDiagnosticsSink(),
+        dailyChoiceLocalDateSource: localDate.read,
+      );
+      addTearDown(() async {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await runtime.shutdown();
+      });
+
+      await tester.pumpWidget(MainApp(runtime: runtime));
+      await openIntentionGraph(tester, waitFor: _pumpUntilFound);
+      final repository = (await runtime.bootstrap() as AppRuntimeReady)
+          .container
+          .read(personalGraphRepositoryProvider);
+      final choiceId = durabilityChoice(201);
+      final before = await _readDailyChoice(repository, choiceId);
+      expect(before.path.map((step) => step.relation.type), [
+        LongTermRelationType.need,
+        LongTermRelationType.can,
+      ]);
+
+      // Связь «нужно» из пути переводится формой в группу «можно».
+      await _pumpUntilFound(tester, find.text('Намерение 1'));
+      await _openIntention(tester, 'Намерение 1');
+      await _chooseDetailsTab(tester, l10n.detailsRelationsTab);
+      await _tapWhenFound(
+        tester,
+        _relationRow(
+          l10n.relationNeighborhoodNeedPhrase('Намерение 1', 'Намерение 2'),
+        ),
+      );
+      final edit = find.byKey(const ValueKey('relation-details-edit-relation'));
+      await _pumpUntilFound(tester, edit);
+      await _ensureVisible(tester, edit);
+      await tester.tap(edit);
+      final canType = find.byKey(const ValueKey('relation-editor-type-can'));
+      await _pumpUntilFound(tester, canType);
+      await _ensureVisible(tester, canType);
+      await tester.tap(canType);
+      await tester.pump();
+      final submit = find.byKey(const ValueKey('relation-editor-submit'));
+      await _ensureVisible(tester, submit);
+      await tester.tap(submit);
+      await _pumpUntilAbsent(tester, submit);
+      await _pumpUntilFound(
+        tester,
+        find.byKey(const ValueKey('relation-details-phrase')),
+      );
+      await tester.pumpAndSettle(const Duration(milliseconds: 1));
+      expect(
+        _textByKey(tester, 'relation-details-type'),
+        l10n.relationNeighborhoodTypeCan,
+      );
+      expect(
+        raw.select(
+          'SELECT source_intention_id, related_intention_id, type '
+          'FROM long_term_relations WHERE id = ?',
+          [durabilityUuid(101)],
+        ),
+        [
+          {
+            'source_intention_id': durabilityUuid(1),
+            'related_intention_id': durabilityUuid(2),
+            'type': 'can',
+          },
+        ],
+      );
+
+      // Подробный просмотр выбора показывает новый тип связи.
+      await tester.binding.handlePopRoute();
+      await _pumpUntilDetailsTitle(tester, 'Намерение 1');
+      await tester.binding.handlePopRoute();
+      await _pumpUntilFound(
+        tester,
+        find.byType(catalog_page.IntentionCatalogPage),
+      );
+      await _dismissOperationMessage(tester);
+      await openDailyChoices(tester, tap: _tapWhenFound);
+      await _pumpUntilFound(
+        tester,
+        find.byKey(
+          const ValueKey('daily-choice-section-true'),
+          skipOffstage: false,
+        ),
+      );
+      await showDailyChoiceCatalogSection(tester, true);
+      await _tapWhenFound(
+        tester,
+        find.byKey(const ValueKey('daily-choice-row-1')),
+      );
+      await _pumpUntilFound(tester, find.byType(DailyChoiceDetailsPage));
+      await tester.pumpAndSettle(const Duration(milliseconds: 1));
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('daily-choice-relation-1')),
+          matching: find.text(
+            '${l10n.relationNeighborhoodTypeCan}: '
+            '${l10n.relationNeighborhoodCanPhrase('Намерение 1', 'Намерение 2')}',
+            skipOffstage: false,
+          ),
+        ),
+        findsOneWidget,
+      );
+
+      // Состав пути, дата и выполнение прежние, меняется только тип.
+      final after = await _readDailyChoice(repository, choiceId);
+      expect(after.choice.date, before.choice.date);
+      expect(after.choice.isCompleted, before.choice.isCompleted);
+      expect(
+        after.path.map((step) => (step.step.id, step.relation.id)),
+        before.path.map((step) => (step.step.id, step.relation.id)),
+      );
+      expect(after.path.map((step) => step.relation.type), [
+        LongTermRelationType.can,
+        LongTermRelationType.can,
+      ]);
+    },
+  );
+}
+
+Future<DailyChoiceDetails> _readDailyChoice(
+  PersonalGraphRepository repository,
+  DailyChoiceId id,
+) async {
+  final result = await repository.getDailyChoice(id);
+  expect(result, isA<DailyChoiceReadSuccess>());
+  return (result as DailyChoiceReadSuccess).value.value!;
 }
 
 const _healthy = 'Быть здоровым';
@@ -859,6 +1037,7 @@ Future<void> _createNeedRelation(
 Future<void> _editRelation(
   WidgetTester tester, {
   required String description,
+  bool changeType = true,
 }) async {
   final edit = find.byKey(const ValueKey('relation-details-edit-relation'));
   await _ensureVisible(tester, edit);
@@ -868,9 +1047,11 @@ Future<void> _editRelation(
     find.byKey(const ValueKey('relation-editor-open-source-details')),
   );
 
-  final type = find.byKey(const ValueKey('relation-editor-type-can'));
-  await _ensureVisible(tester, type);
-  await tester.tap(type);
+  if (changeType) {
+    final type = find.byKey(const ValueKey('relation-editor-type-can'));
+    await _ensureVisible(tester, type);
+    await tester.tap(type);
+  }
   final priority = find.byKey(const ValueKey('relation-editor-priority-p4'));
   await _ensureVisible(tester, priority);
   await tester.tap(priority);

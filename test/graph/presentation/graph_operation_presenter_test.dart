@@ -853,32 +853,6 @@ void main() {
     );
   }
 
-  const pathDependency = (
-    locale: Locale('ru'),
-    message:
-        'Изменение — «связь»: Связь используется в сохранённом дневном '
-        'пути. Её тип и участников нельзя изменить.',
-  );
-  testWidgets(
-    'конфликт зависимости пути объяснён для ${pathDependency.locale.languageCode}',
-    (tester) async {
-      final harness = await _pumpPresenterApp(
-        tester,
-        locale: pathDependency.locale,
-      );
-      final update = harness.startRelationUpdate();
-      harness.completeRelationFailure(
-        update,
-        LongTermRelationReferencedByDailyPathFailure(_relationId),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text(pathDependency.message), findsOneWidget);
-      await _closeMessage(tester);
-      expect(find.byType(SnackBar), findsNothing);
-    },
-  );
-
   for (final scenario in <({Locale locale, String message})>[
     (
       locale: const Locale('ru'),
