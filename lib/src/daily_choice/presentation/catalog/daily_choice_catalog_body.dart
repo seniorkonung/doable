@@ -388,7 +388,7 @@ final class _DailyChoiceCatalogBodyState
               index == 0 || section.items[index - 1].schedule != item.schedule;
           final showGroup =
               startsGroup &&
-              (item.schedule is DailyChoiceTime || section.hasTimedChoices);
+              (item.schedule is DailyChoiceTime || state.hasTimedChoices);
           return _CompletionSurface(
             key: ValueKey(item.id),
             id: item.id,

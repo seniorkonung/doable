@@ -311,13 +311,16 @@ final class CatalogPageRepository
   }
 
   /// Завершает запрос первой порции номер [index] строками [items] из
-  /// [total] записей; [cursor] — продолжение выдачи.
+  /// [total] записей; [cursor] — продолжение выдачи. Признаки времени секций
+  /// [hasTimedChoices] и [completedHasTimedChoices] по умолчанию следуют за
+  /// строками, а явное значение выражает время в ещё не полученной порции.
   void completeFirst(
     int index,
     List<DailyChoiceCatalogItem> items, {
     required int total,
     DailyChoiceCatalogCursor? cursor,
     bool? hasTimedChoices,
+    bool? completedHasTimedChoices,
     int revision = 0,
   }) {
     final completed = items.where((item) => item.isCompleted).toList();
@@ -326,9 +329,9 @@ final class CatalogPageRepository
     _completedPages[queries[index].date] = DailyChoiceCatalogFirstPage(
       items: completed,
       totalCount: completedOnly ? total : completed.length,
-      hasTimedChoices: completed.any(
-        (item) => item.schedule is DailyChoiceTime,
-      ),
+      hasTimedChoices:
+          completedHasTimedChoices ??
+          completed.any((item) => item.schedule is DailyChoiceTime),
       nextCursor: completedOnly ? cursor : null,
       revision: _Revision(revision),
     );

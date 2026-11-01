@@ -56,14 +56,16 @@ void main() {
           find.byKey(const ValueKey('daily-choice-section-false')),
         );
         await tester.pumpAndSettle();
-        await tester.tap(
-          find.byKey(const ValueKey('daily-choice-section-true')),
-        );
-        await tester.pumpAndSettle();
-        // Выполненные относятся ко всему дню: собственной дополнительной группы нет.
+        // Время есть в невыполненных, поэтому выполненные на весь день тоже
+        // стоят под своей подписью.
         expect(
-          find.semantics.byLabel(l10n.dailyChoiceAllDay).evaluate(),
-          isEmpty,
+          find.semantics
+              .byLabel(l10n.dailyChoiceAllDay)
+              .evaluate()
+              .single
+              .flagsCollection
+              .isHeader,
+          isTrue,
         );
         await tester.tap(
           find.byKey(const ValueKey('daily-choice-section-false')),
@@ -115,6 +117,107 @@ void main() {
           isTrue,
         );
         expect(tester.takeException(), isNull);
+        semantics.dispose();
+      },
+    );
+
+    testWidgets(
+      'время среди выполненных подписывает невыполненные на весь день (${locale.languageCode})',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        final repository = CatalogPageRepository();
+        final day = date(2026, 10, 8);
+        await pumpCatalogPage(
+          tester,
+          repository,
+          today: day,
+          locale: locale,
+          size: const Size(360, 900),
+        );
+        repository.completeFirst(0, [
+          catalogPageItem(1, date: day),
+          catalogPageItem(2, date: day),
+          catalogPageItem(
+            201,
+            date: day,
+            isCompleted: true,
+            schedule: DailyChoiceTime(hour: 18, minute: 0),
+          ),
+        ], total: 3);
+        await tester.pumpAndSettle();
+        final context = tester.element(find.byType(DailyChoiceCalendar));
+        final l10n = AppLocalizations.of(context);
+        // Выбор на весь день есть только среди невыполненных.
+        expect(_headers(l10n.dailyChoiceAllDay), 1);
+        expect(
+          _headers(const TimeOfDay(hour: 18, minute: 0).format(context)),
+          1,
+        );
+        semantics.dispose();
+      },
+    );
+
+    testWidgets(
+      'время в неполученной порции выполненных подписывает оба набора на весь день (${locale.languageCode})',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        final repository = CatalogPageRepository();
+        final day = date(2026, 10, 8);
+        await pumpCatalogPage(
+          tester,
+          repository,
+          today: day,
+          locale: locale,
+          size: const Size(360, 900),
+        );
+        repository.completeFirst(
+          0,
+          [
+            catalogPageItem(1, date: day),
+            catalogPageItem(201, date: day, isCompleted: true),
+          ],
+          total: 2,
+          completedHasTimedChoices: true,
+        );
+        await tester.pumpAndSettle();
+        final l10n = AppLocalizations.of(
+          tester.element(find.byType(DailyChoiceCalendar)),
+        );
+        expect(_headers(l10n.dailyChoiceAllDay), 2);
+        semantics.dispose();
+      },
+    );
+
+    testWidgets(
+      'без времени во всём дне подписи на весь день нет ни в одной секции (${locale.languageCode})',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        final repository = CatalogPageRepository();
+        final day = date(2026, 10, 8);
+        await pumpCatalogPage(
+          tester,
+          repository,
+          today: day,
+          locale: locale,
+          size: const Size(360, 900),
+        );
+        repository.completeFirst(0, [
+          catalogPageItem(1, date: day),
+          catalogPageItem(201, date: day, isCompleted: true),
+        ], total: 2);
+        await tester.pumpAndSettle();
+        final l10n = AppLocalizations.of(
+          tester.element(find.byType(DailyChoiceCalendar)),
+        );
+        expect(
+          find.byKey(const ValueKey('daily-choice-row-1')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('daily-choice-row-2')),
+          findsOneWidget,
+        );
+        expect(_headers(l10n.dailyChoiceAllDay), 0);
         semantics.dispose();
       },
     );
@@ -185,3 +288,10 @@ void main() {
     );
   }
 }
+
+/// Число подписей групп с названием [label] в дереве семантики.
+int _headers(String label) => find.semantics
+    .byLabel(label)
+    .evaluate()
+    .where((node) => node.flagsCollection.isHeader)
+    .length;

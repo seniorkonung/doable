@@ -258,6 +258,11 @@ final class DailyChoiceCatalogLoaded extends DailyChoiceCatalogState {
   final bool needsRebase;
 
   int get totalCount => incomplete.totalCount + completed.totalCount;
+
+  /// Время есть у выбора дня в любой секции, в том числе в неполученной порции.
+  bool get hasTimedChoices =>
+      incomplete.hasTimedChoices || completed.hasTimedChoices;
+
   Iterable<DailyChoiceCatalogItem> get items => [
     ...incomplete.items,
     ...completed.items,
