@@ -26,7 +26,7 @@
   - **Предполагаемые файлы:** `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart`, `daily_choice_catalog_body.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_cards_test.dart`.
   - **Размер:** S.
 
-- [ ] 1.3 Модуль основ даёт одно перечисление приоритета для всех компонентов
+- [x] 1.3 Модуль основ даёт одно перечисление приоритета для всех компонентов
   - **Критерии приёмки:**
     - `DoablePriority` модуля основ заменяет `RelationRowPriority` и сам выбирает цвет P1–P4, поэтому компоненты не повторяют это сопоставление.
     - Домен переводится в перечисление на границе экрана. `RelationRow` выглядит как прежде.

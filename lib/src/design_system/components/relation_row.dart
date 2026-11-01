@@ -3,15 +3,13 @@ import 'package:flutter/material.dart' hide Badge;
 import '../doable_colors.dart';
 import '../doable_icon.dart';
 import '../doable_metrics.dart';
+import '../doable_priority.dart';
 import '../doable_type.dart';
 import 'badge.dart';
 import 'relation_stroke.dart';
 
 /// Вид связи на строке: сплошная метка — «нужно», пунктирная — «можно».
 enum RelationRowKind { need, can }
-
-/// Приоритет связи: от него зависят подкраска строки и цвет метки вида.
-enum RelationRowPriority { p1, p2, p3, p4 }
 
 /// Строка связи на странице намерения: вид и приоритет словами, название
 /// намерения на другом конце и заметка.
@@ -42,7 +40,9 @@ final class RelationRow extends StatelessWidget {
   }) : assert(note != '');
 
   final RelationRowKind kind;
-  final RelationRowPriority priority;
+
+  /// Приоритет связи: от него зависят подкраска строки и цвет метки вида.
+  final DoablePriority priority;
 
   /// Готовая подпись вида и приоритета, например «Нужно · P1».
   final String label;
@@ -78,14 +78,9 @@ final class RelationRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).extension<DoableColors>()!;
-    final priorityColor = switch (priority) {
-      RelationRowPriority.p1 => colors.p1,
-      RelationRowPriority.p2 => colors.p2,
-      RelationRowPriority.p3 => colors.p3,
-      RelationRowPriority.p4 => colors.p4,
-    };
+    final priorityColor = priority.color(colors);
     // Без подкраски остаются архивированная связь и p4.
-    final plain = archived || priority == RelationRowPriority.p4;
+    final plain = archived || priority == DoablePriority.p4;
     final dim = archived || intentionArchived;
     final markColor = plain ? colors.grip : priorityColor;
     final note = this.note;
