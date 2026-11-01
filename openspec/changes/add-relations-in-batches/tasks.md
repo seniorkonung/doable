@@ -1,0 +1,258 @@
+## Phase 1: Связь определяется неизменной парой намерений
+
+- [ ] 1.1 Закрепить в глоссарии неизменность участников, изменяемый тип и показания времени долговременной связи
+  - **Критерии приёмки:**
+    - `CONTEXT.md` говорит, что исходное и связанное намерения долговременной связи неизменны, а другая направленная пара является другой связью. Замена участников связи «я сегодня» не меняется.
+    - Тип активной связи меняется и при шагах пути выбора, сохранённый путь показывает текущий тип, а архивированная связь сохраняет тип до восстановления. Определение архивирования этому не противоречит.
+    - Долговременная связь имеет показания времени создания и последнего изменения, которые служат только для показа. Назначение P4 при добавлении сюда не входит: оно появляется с командой пачки в фазе 3.
+  - **Проверка:**
+    - Сверка изменённых определений с [ADR-0051](../../../docs/adr/0051-identify-long-term-relation-by-immutable-pair.md) и требованием «Изменение типа, приоритета и описания связи».
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `CONTEXT.md`.
+  - **Размер:** XS.
+
+- [ ] 1.2 Форма изменения связи показывает участников без возможности заменить их
+  - **Критерии приёмки:**
+    - При изменении связи слоты участников показывают название и переход на страницу намерения, но не открывают поиск участника.
+    - Черновик изменения не принимает другого участника. Форма создания работает как прежде.
+    - Тесты замены участника через форму удалены, а один тест подтверждает отсутствие замены.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/editor`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/long_term_relation/presentation/editor/relation_editor_page.dart`, `relation_editor_view_model.dart`;
+    - меняются `test/long_term_relation/presentation/editor/relation_editor_page_test.dart`, `relation_editor_view_model_test.dart`, `relation_participant_selection_scenarios.dart`.
+  - **Размер:** S.
+
+- [ ] 1.3 Убрать из поиска участника поток изменения связи
+  - **Критерии приёмки:**
+    - `RelationChangeChoiceFlow` удалён, а в поиске участника и форме нет ветвей по потоку изменения. Подзаголовок, занятость и предложение восстановления для создания не меняются.
+    - Поиск участника всегда ограничен активными намерениями: `RelationParticipantSelectionContext` удалён вместе с архивным охватом.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/participant_picker test/long_term_relation/presentation/editor test/intention/presentation/catalog/intention_catalog_mutation_reconciliation_test.dart test/intention/presentation/catalog/intention_catalog_revision_protocol_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.2 — у потока изменения не должно остаться вызывающего.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/long_term_relation/presentation/participant_picker/relation_participant_choice.dart`, `relation_participant_picker_page.dart`, `relation_participant_picker_purpose.dart`;
+    - меняются `lib/src/long_term_relation/presentation/editor/relation_editor_page.dart`, `lib/src/intention/presentation/catalog/intention_catalog_purpose.dart`;
+    - меняются тесты поиска участника и двух файлов каталога из проверки.
+  - **Размер:** M.
+
+- [ ] 1.4 Проба пары перестаёт знать об изменяемой связи
+  - **Критерии приёмки:**
+    - `RelationPairProbe` не имеет `ignoredRelationId`, а чтение занятости и `pair_occupant_reconciliation.dart` не исключают ни одной связи.
+    - Занятость строк при создании связи не меняется. Тип занимающей связи сюда не входит: он появляется в фазе 3.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog/pair_occupant_reconciliation_test.dart test/intention/data/drift_intention_catalog_test.dart test/long_term_relation/presentation/participant_picker`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.3 — поиск перестаёт передавать это поле.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/long_term_relation/application/relation_pair_probe.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `lib/src/intention/presentation/catalog/pair_occupant_reconciliation.dart`;
+    - меняются тесты из проверки.
+  - **Размер:** S.
+
+- [ ] 1.5 Проверки согласования, статистики и лога фактов перестают опираться на замену участников
+  - **Критерии приёмки:**
+    - Ни один из семи тестовых файлов ниже не заменяет участников связи.
+    - Сценарий, который проверял согласование через замену, выражен изменением типа, архивированием или удалением с новой связью. Сценарий, проверявший только саму замену, удалён.
+    - `lib/` не меняется.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph/data/drift_relation_watch_test.dart test/graph/data/drift_statistics_relation_snapshot_test.dart test/graph/data/tag_assignment_graph_lifecycle_test.dart test/graph/data/drift_graph_fact_log_completeness_test.dart test/graph/presentation/graph_reconciliation_checkpoint_test.dart test/app/home_statistics_app_flow_test.dart`.
+    - `mise exec --no-deps -- flutter test --concurrency=1 test/graph/data/file_backed_graph_durability_test.dart`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** файлы первой проверки и `test/support/graph_operation_process_worker.dart`.
+  - **Размер:** M.
+
+- [ ] 1.6 Операция изменения связи перестаёт принимать участников
+  - **Критерии приёмки:**
+    - `LongTermRelationPatch` не имеет полей участников, поэтому замену нельзя собрать.
+    - `_updateLongTermRelation` не проверяет участников и пару, а `_findRelationForPair` теряет `excludingId`. Абсолютные счётчики читаются для двух неизменных участников.
+    - Незапрошенные поля, архивное состояние и последовательность создания сохраняются, а изменение удалённой связи сообщает об её отсутствии.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph/data/drift_relation_update_test.dart test/graph/data/drift_daily_path_protection_test.dart test/long_term_relation/presentation/editor`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.2, 1.5.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/long_term_relation/application/long_term_relation_command.dart`, `lib/src/graph/data/drift_personal_graph_repository_relation_commands.dart`, `lib/src/long_term_relation/presentation/editor/relation_editor_state.dart`;
+    - меняются `test/graph/data/drift_relation_update_test.dart`, `drift_daily_path_protection_test.dart`.
+  - **Размер:** M.
+
+- [ ] 1.7 Убрать отказы, которых у изменения связи больше нет
+  - **Критерии приёмки:**
+    - `LongTermRelationCommandValidationFailure` и `_LongTermRelationSameParticipants` удалены: без замены участников их некому создать.
+    - Изменение связи не называет занятую пару, отсутствующего или архивированного участника. Такие ветви исчерпывающих разборов отказов ведут к тексту неожиданной ошибки, а строки `relationEditorUpdatePairOccupied`, `relationEditorUpdateParticipantNotFound`, `relationEditorUpdateParticipantArchived`, `relationEditorUpdateInvalidInput` и `relationEditorCreateInvalidInput` удалены на обоих языках.
+    - Создание связи сохраняет свои отказы и тексты.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation test/graph/presentation/graph_operation_presenter_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.6.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/long_term_relation/application/long_term_relation_command.dart`, `lib/src/graph/data/drift_personal_graph_repository_relation_commands.dart`, `lib/src/long_term_relation/presentation/relation_command_failure_message.dart`;
+    - меняются `lib/src/long_term_relation/presentation/editor/relation_editor_view_model.dart`, `relation_editor_page.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
+    - меняется `test/graph/presentation/graph_operation_presenter_test.dart`.
+  - **Размер:** M.
+
+- [ ] 1.8 Базовая схема 7 делает участников частью неизменяемой идентичности связи
+  - **Критерии приёмки:**
+    - Триггер `long_term_relations_immutable_identity` отклоняет изменение обоих участников. Триггер активных участников при обновлении реагирует только на `is_archived`.
+    - `AppDatabase.currentSchemaVersion` равен 7, снимок `drift_schemas/drift_schema_v7.json` заменяет снимок версии 6, а пути обновления нет, как у прежних базовых версий. База с меньшей версией определяется как повреждённая.
+    - Тесты, менявшие участников сырым SQL, проверяют отказ или лишаются этого случая.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/data/local test/graph/data/drift_choice_path_continuations_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.6 — запись связи больше не передаёт участников.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/data/local/schema/long_term_relation_schema.drift`, `lib/src/data/local/app_database.dart`, `app_database.g.dart`, `lib/src/data/local/migrations/migration_strategy.dart`;
+    - `drift_schemas/drift_schema_v7.json` заменяет `drift_schema_v6.json`;
+    - меняются `test/data/local/app_database_schema_test.dart`, `daily_choice_schema_test.dart`, `test/graph/data/drift_choice_path_continuations_test.dart`.
+  - **Размер:** M.
+
+- [ ] 1.9 Тип связи перестаёт зависеть от шагов пути выбора в команде и схеме
+  - **Критерии приёмки:**
+    - Триггер `long_term_relations_protect_daily_choice_path` удалён, а изменение связи не проверяет разрешения. Тип активной связи с шагами пути меняется, а состав пути, дата и выполнение дневного выбора сохраняются.
+    - Удаление связи с шагами пути блокируется как прежде.
+    - Сверка типа в снимке незавершённого выбора (`actual.type` в чтении продолжений и команде дневного выбора) остаётся: она относится к черновику, а не к сохранённому пути.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/data/local/daily_choice_schema_test.dart test/graph/data/drift_daily_path_protection_test.dart test/graph/data/drift_relation_update_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.8 — участников защищает триггер идентичности.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/data/local/schema/daily_choice_schema.drift`, `lib/src/data/local/app_database.g.dart`, `drift_schemas/drift_schema_v7.json`;
+    - меняется `lib/src/graph/data/drift_personal_graph_repository_relation_commands.dart`;
+    - меняются тесты из проверки.
+  - **Размер:** S.
+
+- [ ] 1.10 Изменение типа архивированной связи отклоняется отдельным типизированным отказом
+  - **Критерии приёмки:**
+    - `LongTermRelationArchivedTypeChangeFailure` с категорией конфликта отклоняет весь набор правок архивированной связи, если он меняет тип. Все поля сохраняются.
+    - Приоритет и описание архивированной связи меняются как прежде, а указание прежнего типа изменением не считается.
+    - Отказ доходит до формы, если каскад архивировал связь за открытой формой, и назван русской и английской строкой.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/graph/data/drift_relation_update_test.dart test/long_term_relation/presentation/editor test/graph/presentation/graph_operation_presenter_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.9.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/long_term_relation/application/long_term_relation_command.dart`, `lib/src/graph/data/drift_personal_graph_repository_relation_commands.dart`, `lib/src/long_term_relation/presentation/relation_command_failure_message.dart`;
+    - меняются `lib/src/long_term_relation/presentation/editor/relation_editor_view_model.dart`, `relation_editor_state.dart`, `relation_editor_page.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
+    - меняются тесты из проверки.
+  - **Размер:** M.
+
+- [ ] 1.11 Форма переводит связь из пути в другую группу, а архивированной связи тип не предлагает
+  - **Критерии приёмки:**
+    - Выбор типа доступен у активной связи и в сохранённом пути, а у архивированной связи недоступен. Предупреждения о защите пути в форме нет.
+    - Форма больше не хранит разрешения: удалены `permissions`, `permissionRevision`, `RelationEditorReferencedByDailyPath`, подписка на завершения ради них и строки `relationEditorPathProtection`, `relationEditorPathProtectionWithDraft`, `relationEditorUpdateReferencedByDailyPath`. `relationDetailsPathProtection` называет запретом только удаление.
+    - Сквозной тест на настоящем хранилище: связь из пути сохранённого дневного выбора переведена формой в другую группу, подробный просмотр дневного выбора показывает её новый тип, а состав пути, дата и выполнение прежние.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation test/app/long_term_relation_app_flow_test.dart test/daily_choice/presentation/details`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.10.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/long_term_relation/presentation/editor/relation_editor_page.dart`, `relation_editor_state.dart`, `relation_editor_view_model.dart`;
+    - меняются `lib/src/long_term_relation/presentation/details/relation_details_page.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
+    - меняются `test/long_term_relation/presentation/editor/relation_editor_page_test.dart`, `relation_editor_view_model_test.dart`, `test/app/long_term_relation_app_flow_test.dart`.
+  - **Размер:** M.
+
+- [ ] 1.12 Удалить разрешение на изменение смысла связи
+  - **Критерии приёмки:**
+    - `LongTermRelationPermissions.canChangeMeaning` удалён. Проверки, которые его читали, используют `canDelete` или удалены, если проверяли только его.
+    - Разрешения на удаление, изменение описания, приоритета и архивного состояния не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/long_term_relation/application/long_term_relation_projection_test.dart test/long_term_relation/presentation/details/relation_details_view_model_test.dart test/graph/data/drift_relation_watch_test.dart test/graph/data/drift_statistics_relation_snapshot_test.dart test/graph/data/drift_relation_count_aggregates_test.dart test/daily_choice/application/daily_choice_change_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.11 — у разрешения не остаётся чтений в `lib/`.
+  - **Предполагаемые файлы:** `lib/src/long_term_relation/application/long_term_relation_permissions.dart` и тесты из проверки.
+  - **Размер:** S.
+
+- [ ] 1.13 Команды связи записывают показания времени создания и последнего изменения
+  - **Критерии приёмки:**
+    - Таблица `long_term_relations` получает `created_at` и `updated_at` (`INTEGER NOT NULL`) с временным `DEFAULT 0`, которое снимает 1.17. Индексов по ним нет.
+    - Создание записывает в оба столбца одно показание источника времени команды, как у намерения. Фактическое изменение типа, приоритета или описания, архивирование и восстановление обновляют только `updated_at`.
+    - Каскад обновляет `updated_at` только у связей, которые он архивирует, тем же показанием, что и у намерения. Повтор прежнего значения и отклонённая операция показания не меняют, а порядок связей от них не зависит.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/graph/data/drift_relation_timestamps_test.dart test/graph/data/drift_relation_update_test.dart test/graph/data/drift_relation_archive_restore_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.9, 1.10 — изменение связи уже имеет итоговый вид.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/data/local/schema/long_term_relation_schema.drift`, `lib/src/data/local/app_database.g.dart`, `drift_schemas/drift_schema_v7.json`;
+    - меняются `lib/src/graph/data/drift_personal_graph_repository_relation_commands.dart`, `drift_personal_graph_repository.dart`;
+    - новый `test/graph/data/drift_relation_timestamps_test.dart`.
+  - **Размер:** M.
+
+- [ ] 1.14 Чтения связи из хранилища получают показания времени
+  - **Критерии приёмки:**
+    - `StoredLongTermRelation` несёт `createdAt` и `updatedAt` типа показания времени связи, устроенного как `IntentionTimestamp`. Отсутствующее или нечисловое значение становится `StoredGraphCorruption`.
+    - Все девять чтений, декодирующих `StoredLongTermRelation`, выбирают оба столбца.
+    - Поведение чтений не меняется.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph/data test/daily_choice/application test/long_term_relation/application`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.13.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/long_term_relation/domain/long_term_relation.dart`, `lib/src/graph/data/stored_graph_rows.dart`;
+    - по одному запросу меняется в `graph_fact_capture.dart`, `drift_personal_graph_repository.dart` и в частях репозитория `_relation_commands`, `_relation_details`, `_relation_groups`, `_fact_log`, `_daily_choice_reads`, `_choice_path_reads` из `lib/src/graph/data/`.
+  - **Размер:** M: по одной строке в большинстве файлов.
+
+- [ ] 1.15 Файл экспорта сохраняет показания времени долговременной связи
+  - **Критерии приёмки:**
+    - Запись связи содержит обязательные `createdAt` и `updatedAt` в том же виде, что у намерения. Версия формата не меняется, а запись без них считается повреждённой. Взаимный порядок показаний не проверяется.
+    - Замена графа записывает показания из записи, а лог фактов и снимки несут их.
+    - Граф, экспортированный из одной установки и импортированный в другую, содержит связи с теми же показаниями. Образцы `test/graph_format/golden/` обновлены.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph_format test/graph_snapshots test/graph_backups test/data_transfer test/graph/data/graph_fact_capture_test.dart test/graph/data/drift_graph_fact_log_write_test.dart test/data/local/graph_log_schema_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.14.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/graph_format/graph_format_records.dart`, `graph_format_codec.dart`;
+    - меняются `lib/src/graph/data/graph_record_rows.dart`, `drift_personal_graph_repository_replacement.dart`;
+    - меняются образцы, `test/support/graph_log_completeness_reference.dart` и тесты, создающие `LongTermRelationRecord`.
+  - **Размер:** M.
+
+- [ ] 1.16 Модель связи несёт подтверждённые показания времени
+  - **Критерии приёмки:**
+    - `LongTermRelation` требует `createdAt` и `updatedAt`. Результаты команд и изменения графа, включая каскад, несут подтверждённые значения.
+    - Наличие изменения определяется по типу, приоритету, описанию и архивному состоянию, поэтому повтор значений остаётся без изменения.
+    - Вызовы конструктора в тестах получают показания без изменения проверок: это 51 вызов в 32 файлах. Обязательные поля ломают компиляцию всех файлов сразу, поэтому правка не делится на части.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter analyze`.
+    - `mise exec --no-deps -- flutter test test/long_term_relation test/graph test/daily_choice test/intention test/app/routing`.
+  - **Зависимости:** 1.14.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/long_term_relation/domain/long_term_relation.dart`, `lib/src/graph/data/stored_graph_rows.dart`, `drift_personal_graph_repository_relation_commands.dart`;
+    - механически меняются тесты с вызовом конструктора, например `test/graph/presentation/graph_operation_presenter_test.dart`.
+  - **Размер:** M по логике: файлов больше нормы только из-за механической правки вызовов.
+
+- [ ] 1.17 Снять временное умолчание показаний времени
+  - **Критерии приёмки:**
+    - У `created_at` и `updated_at` нет `DEFAULT`, поэтому вставка без показаний не компилируется и не выполняется.
+    - 55 файлов с вставкой связи (52 теста и 3 фикстуры бенчмарков) задают показания. В сыром SQL значения дописываются литералами, аргументы запросов не меняются.
+    - Проверки тестов не меняются. Правка не делится на части: снятие умолчания ломает все вставки сразу.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter analyze`.
+    - `mise exec --no-deps -- flutter test test/graph test/data test/intention test/daily_choice test/app`.
+    - `mise run benchmark`.
+  - **Зависимости:** 1.15 — замена графа пишет показания сама.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/data/local/schema/long_term_relation_schema.drift`, `lib/src/data/local/app_database.g.dart`, `drift_schemas/drift_schema_v7.json`;
+    - механически меняются файлы с `INSERT INTO long_term_relations` и `LongTermRelationsCompanion` в `test/` и `benchmark/support/`.
+  - **Размер:** M по логике: файлов больше нормы только из-за механической правки вставок.
+
+- [ ] 1.18 Проверить готовность фазы: неизменная пара, свободный тип и сохранённые показания времени
+  - **Критерии приёмки:**
+    - Связь в пути переводится в другую группу, и её новый тип виден в подробном просмотре дневного выбора.
+    - Новая установка открывает базовую схему, а показания времени переживают экспорт и импорт.
+    - В `lib/` и `test/` нет `canChangeMeaning`, `long_term_relations_protect_daily_choice_path`, `ignoredRelationId`, `RelationChangeChoiceFlow` и замены участников в `LongTermRelationPatch`.
+  - **Проверка:**
+    - `mise run codegen-check`.
+    - `mise run check`.
+    - `mise exec --no-deps -- openspec validate add-relations-in-batches --strict`.
+  - **Зависимости:** 1.1–1.17.
+  - **Предполагаемые файлы:** нет (только проверка).
+  - **Размер:** XS.
