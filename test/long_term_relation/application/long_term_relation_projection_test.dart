@@ -9,11 +9,10 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('прикладные проекции долговременной связи', () {
-    test('неизвестное разрешение не допускает удаление или смену смысла', () {
+    test('неизвестное разрешение не допускает удаление', () {
       const permissions = LongTermRelationPermissions.unknown();
       expect(permissions.isConfirmed, isFalse);
       expect(permissions.canDelete, isFalse);
-      expect(permissions.canChangeMeaning, isFalse);
       expect(permissions.canEditDescriptionAndPriority, isFalse);
     });
     test('подробная связь передаёт полный проверенный текст описания', () {

@@ -24,8 +24,6 @@ final class LongTermRelationPermissions {
 
   bool get canDelete => _state == _PermissionState.unrestricted;
 
-  bool get canChangeMeaning => _state == _PermissionState.unrestricted;
-
   bool get canEditDescriptionAndPriority => isConfirmed;
 
   bool get canChangeArchiveState => isConfirmed;

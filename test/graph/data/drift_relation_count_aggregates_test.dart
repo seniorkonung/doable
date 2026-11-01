@@ -219,7 +219,6 @@ void main() {
           LongTermRelationPermissionRestriction.referencedByDailyPath,
         );
         expect(value.canDelete, isFalse);
-        expect(value.canChangeMeaning, isFalse);
         expect(value.canEditDescriptionAndPriority, isTrue);
         expect(value.canChangeArchiveState, isTrue);
       }

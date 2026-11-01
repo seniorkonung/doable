@@ -369,7 +369,6 @@ void main() {
       expect(change.after.scope, RelationScope.archived);
       expect(change.permissions.isConfirmed, isTrue);
       expect(change.permissions.canDelete, !referenced);
-      expect(change.permissions.canChangeMeaning, !referenced);
       expect(change.permissions.canEditDescriptionAndPriority, isTrue);
       expect(change.permissions.canChangeArchiveState, isTrue);
     }

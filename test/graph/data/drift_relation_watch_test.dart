@@ -186,7 +186,7 @@ void main() {
           .whereType<LongTermRelationUpdatedChange>()
           .single
           .permissions
-          .canChangeMeaning,
+          .canDelete,
       isFalse,
     );
 

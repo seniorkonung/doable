@@ -159,7 +159,7 @@
     - меняются `test/long_term_relation/presentation/editor/relation_editor_page_test.dart`, `relation_editor_view_model_test.dart`, `test/app/long_term_relation_app_flow_test.dart`.
   - **Размер:** M.
 
-- [ ] 1.12 Удалить разрешение на изменение смысла связи
+- [x] 1.12 Удалить разрешение на изменение смысла связи
   - **Критерии приёмки:**
     - `LongTermRelationPermissions.canChangeMeaning` удалён. Проверки, которые его читали, используют `canDelete` или удалены, если проверяли только его.
     - Разрешения на удаление, изменение описания, приоритета и архивного состояния не меняются.

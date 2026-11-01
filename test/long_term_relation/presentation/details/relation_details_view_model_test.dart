@@ -72,7 +72,6 @@ void main() {
 
       final loaded = harness.state as RelationDetailsLoaded;
       expect(loaded.permissions.canDelete, number == 5);
-      expect(loaded.permissions.canChangeMeaning, number == 5);
       expect(loaded.permissions.canEditDescriptionAndPriority, isTrue);
       expect(loaded.permissions.canChangeArchiveState, isTrue);
       if (number == 2) {

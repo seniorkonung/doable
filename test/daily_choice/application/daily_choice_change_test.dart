@@ -67,11 +67,8 @@ void main() {
 
       expect(change.previousParticipants, {_source, _selected});
       expect(change.currentParticipants, {_replacement, _selected});
-      expect(change.relationPermissions[_relation]!.canChangeMeaning, isTrue);
-      expect(
-        change.relationPermissions[_newRelation]!.canChangeMeaning,
-        isFalse,
-      );
+      expect(change.relationPermissions[_relation]!.canDelete, isTrue);
+      expect(change.relationPermissions[_newRelation]!.canDelete, isFalse);
       expect(change.intentionCounts[_source]!.dailyTotal, 0);
     },
   );
