@@ -508,6 +508,8 @@ void main() {
           priority: RelationPriority.p1,
           scope: initial.relation.scope,
           creationSequence: initial.relation.creationSequence,
+          createdAt: RelationTimestamp(DateTime.utc(2026)),
+          updatedAt: RelationTimestamp(DateTime.utc(2026)),
         ),
         revision: const TestGraphRevision(5),
       );

@@ -475,6 +475,8 @@ RelationGroupEntry testDetailsRelationRow({
       priority: RelationPriority.p2,
       scope: scope,
       creationSequence: RelationCreationSequence(index),
+      createdAt: RelationTimestamp(DateTime.utc(2026)),
+      updatedAt: RelationTimestamp(DateTime.utc(2026)),
     ),
     neighbor: RelationNeighbor(
       id: neighborId,

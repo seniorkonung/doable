@@ -782,6 +782,8 @@ DailyChoiceDetails _details({
       priority: relationPriority,
       scope: scope,
       creationSequence: RelationCreationSequence(n),
+      createdAt: RelationTimestamp(DateTime.utc(2026)),
+      updatedAt: RelationTimestamp(DateTime.utc(2026)),
     ),
     description: relationDescription == null
         ? null

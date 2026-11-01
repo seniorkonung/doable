@@ -96,6 +96,8 @@ final class ControlledRelationEditorRepository
       priority: command.priority,
       scope: RelationScope.active,
       creationSequence: RelationCreationSequence(1),
+      createdAt: RelationTimestamp(DateTime.utc(2026)),
+      updatedAt: RelationTimestamp(DateTime.utc(2026)),
     );
     completeRelationCommand(
       index,
@@ -132,6 +134,8 @@ final class ControlledRelationEditorRepository
       priority: RelationPriority.p2,
       scope: scope,
       creationSequence: RelationCreationSequence(1),
+      createdAt: RelationTimestamp(DateTime.utc(2026)),
+      updatedAt: RelationTimestamp(DateTime.utc(2026)),
     );
     final before = relationIn(RelationScope.archived);
     final after = relationIn(RelationScope.active);
@@ -290,6 +294,8 @@ LongTermRelationDetails testEditorRelationDetails({
     priority: priority,
     scope: scope,
     creationSequence: RelationCreationSequence(1),
+    createdAt: RelationTimestamp(DateTime.utc(2026)),
+    updatedAt: RelationTimestamp(DateTime.utc(2026)),
   );
   return LongTermRelationDetails(
     relation: relation,

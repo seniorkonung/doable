@@ -622,6 +622,8 @@ void main() {
       priority: RelationPriority.p4,
       scope: RelationScope.archived,
       creationSequence: details.relation.creationSequence,
+      createdAt: RelationTimestamp(DateTime.utc(2026)),
+      updatedAt: RelationTimestamp(DateTime.utc(2026)),
     );
     repository.completeRelationUpdated(
       0,

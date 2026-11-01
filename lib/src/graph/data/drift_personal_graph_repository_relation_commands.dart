@@ -1,11 +1,17 @@
 part of 'drift_personal_graph_repository.dart';
 
-/// Состояние связи до каскада и её неизменившиеся разрешения из той же
-/// транзакции. Изменение получает ревизию только после подтверждения каскада.
+/// Состояние связи до каскада, показание времени, записанное каскадом, и
+/// неизменившиеся разрешения из той же транзакции. Изменение получает ревизию
+/// только после подтверждения каскада.
 final class _CascadedRelationArchive {
-  const _CascadedRelationArchive(this.before, this.permissions);
+  const _CascadedRelationArchive(
+    this.before,
+    this.archivedAt,
+    this.permissions,
+  );
 
   final relation_domain.LongTermRelation before;
+  final relation_domain.RelationTimestamp archivedAt;
   final LongTermRelationPermissions permissions;
 
   LongTermRelationUpdatedChange toChange(GraphRevision revision) =>
@@ -20,6 +26,8 @@ final class _CascadedRelationArchive {
           priority: before.priority,
           scope: relation_domain.RelationScope.archived,
           creationSequence: before.creationSequence,
+          createdAt: before.createdAt,
+          updatedAt: archivedAt,
         ),
         permissions: permissions,
       );
@@ -98,7 +106,8 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
     }
 
     final id = _relationIdGenerator.generate();
-    final createdAt = clock.read().microsecondsSinceEpoch;
+    final createdAt = relation_domain.RelationTimestamp(clock.read());
+    final storedCreatedAt = createdAt.value.microsecondsSinceEpoch;
     final creationSequence = await _database
         .into(_database.longTermRelations)
         .insert(
@@ -118,8 +127,8 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
             },
             description: Value(command.description?.value),
             isArchived: const Value(false),
-            createdAt: Value(createdAt),
-            updatedAt: Value(createdAt),
+            createdAt: Value(storedCreatedAt),
+            updatedAt: Value(storedCreatedAt),
           ),
         );
     final created = relation_domain.LongTermRelation(
@@ -132,6 +141,8 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
       creationSequence: relation_domain.RelationCreationSequence(
         creationSequence,
       ),
+      createdAt: createdAt,
+      updatedAt: createdAt,
     );
     final affectedCounts = await _readVerifiedRelationCountsFor([
       command.sourceIntentionId,
@@ -176,6 +187,8 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
       priority: priority,
       scope: before.scope,
       creationSequence: before.creationSequence,
+      createdAt: before.createdAt,
+      updatedAt: before.updatedAt,
     );
     final didMutate = !_sameStoredRelation(
       before: before,
@@ -283,6 +296,8 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
       priority: before.priority,
       scope: scope,
       creationSequence: before.creationSequence,
+      createdAt: before.createdAt,
+      updatedAt: before.updatedAt,
     );
     if (before.scope == scope) {
       return _CommittedLongTermRelationUpdate(

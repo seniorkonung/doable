@@ -1,6 +1,8 @@
 import 'package:doable/src/data/local/app_database.dart'
     hide Intention, LongTermRelation;
+import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
+import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
@@ -165,6 +167,77 @@ void main() {
     expect(await _timestamps(database, relationId), archived);
   });
 
+  test('результаты команд несут записанные показания времени', () async {
+    final createdAt = DateTime.utc(2026, 9, 23, 8, 30, 15, 123, 456);
+    clock = createdAt;
+    final created = _relationOf(await _create(repository, sourceId, relatedId));
+    expect(created.createdAt, RelationTimestamp(createdAt));
+    expect(created.updatedAt, RelationTimestamp(createdAt));
+
+    clock = DateTime.utc(2026, 9, 24, 9, 1, 2, 3, 4);
+    final updated = _updatedOf(
+      await repository.execute(
+        UpdateLongTermRelation(
+          relationId: relationId,
+          patch: const LongTermRelationPatch(
+            priority: LongTermRelationFieldSet(RelationPriority.p4),
+          ),
+        ),
+      ),
+    );
+    expect(updated.before.updatedAt, RelationTimestamp(createdAt));
+    expect(updated.relation.createdAt, RelationTimestamp(createdAt));
+    expect(updated.relation.updatedAt, RelationTimestamp(clock));
+
+    final archivedAt = clock = DateTime.utc(2026, 9, 25, 10);
+    final archived = _updatedOf(
+      await repository.execute(ArchiveLongTermRelation(relationId)),
+    );
+    expect(archived.relation.createdAt, RelationTimestamp(createdAt));
+    expect(archived.relation.updatedAt, RelationTimestamp(archivedAt));
+
+    clock = DateTime.utc(2026, 9, 26, 11);
+    final restored = _updatedOf(
+      await repository.execute(RestoreLongTermRelation(relationId)),
+    );
+    expect(restored.before.updatedAt, RelationTimestamp(archivedAt));
+    expect(restored.relation.createdAt, RelationTimestamp(createdAt));
+    expect(restored.relation.updatedAt, RelationTimestamp(clock));
+  });
+
+  test('повтор значений возвращает показания без изменения', () async {
+    clock = DateTime.utc(2026, 9, 23);
+    await _create(repository, sourceId, relatedId);
+    clock = DateTime.utc(2026, 9, 24);
+
+    final repeated = _updatedOf(
+      await repository.execute(
+        UpdateLongTermRelation(
+          relationId: relationId,
+          patch: const LongTermRelationPatch(
+            type: LongTermRelationFieldSet(LongTermRelationType.need),
+            priority: LongTermRelationFieldSet(RelationPriority.p2),
+          ),
+        ),
+      ),
+    );
+    final repeatedArchive = _updatedOf(
+      await repository.execute(RestoreLongTermRelation(relationId)),
+    );
+
+    for (final result in [repeated, repeatedArchive]) {
+      expect(
+        result.relation.createdAt,
+        RelationTimestamp(DateTime.utc(2026, 9, 23)),
+      );
+      expect(
+        result.relation.updatedAt,
+        RelationTimestamp(DateTime.utc(2026, 9, 23)),
+      );
+      expect(result.changes.single, isA<LongTermRelationUnchangedChange>());
+    }
+  });
+
   test('отклонённая операция показаний не меняет', () async {
     await _create(repository, sourceId, relatedId);
     await repository.execute(ArchiveLongTermRelation(relationId));
@@ -229,6 +302,22 @@ void main() {
     expect(await _timestamps(database, secondRelationId), otherRelation);
   });
 
+  test('изменение каскада несёт показание часов команды намерения', () async {
+    final createdAt = clock;
+    await _create(repository, sourceId, relatedId);
+
+    clock = DateTime.utc(2026, 9, 25, 7, 45, 12, 345, 678);
+    final result = await repository.execute(ArchiveIntention(sourceId));
+
+    final change = _changesOf(result)
+        .whereType<LongTermRelationUpdatedChange>()
+        .single;
+    expect(change.before.updatedAt, RelationTimestamp(createdAt));
+    expect(change.after.scope, RelationScope.archived);
+    expect(change.after.createdAt, RelationTimestamp(createdAt));
+    expect(change.after.updatedAt, RelationTimestamp(clock));
+  });
+
   test('порядок связей в группе не зависит от показаний времени', () async {
     clock = DateTime.utc(2026, 9, 22, 12);
     await _create(repository, sourceId, relatedId);
@@ -285,13 +374,13 @@ void main() {
   });
 }
 
-Future<void> _create(
+Future<LongTermRelationCommandResult> _create(
   DriftPersonalGraphRepository repository,
   IntentionId sourceId,
   IntentionId relatedId, {
   String? description,
-}) => _expectSucceeded(
-  repository.execute(
+}) async {
+  final result = await repository.execute(
     CreateLongTermRelation(
       sourceIntentionId: sourceId,
       relatedIntentionId: relatedId,
@@ -301,8 +390,32 @@ Future<void> _create(
           ? null
           : LongTermRelationDescription.fromInput(description),
     ),
-  ),
-);
+  );
+  expect(result, isA<GraphCommandSucceeded>());
+  return result;
+}
+
+LongTermRelation _relationOf(LongTermRelationCommandResult result) =>
+    switch (result) {
+      GraphResultSuccess(:final value) =>
+        (value.value as LongTermRelationCreated).relation,
+      GraphResultFailure() => throw TestFailure('Команда связи отклонена'),
+    };
+
+LongTermRelationUpdated _updatedOf(LongTermRelationCommandResult result) =>
+    switch (result) {
+      GraphResultSuccess(:final value) =>
+        value.value as LongTermRelationUpdated,
+      GraphResultFailure() => throw TestFailure('Команда связи отклонена'),
+    };
+
+Iterable<GraphChange> _changesOf<
+  T extends GraphCommandOutcome,
+  F extends GraphCommandFailure
+>(GraphCommandResult<T, F> result) => switch (result) {
+  GraphResultSuccess(:final value) => value.value.changes,
+  GraphResultFailure() => throw TestFailure('Команда отклонена'),
+};
 
 Future<void> _expectSucceeded(Future<GraphCommandResult> result) async {
   expect(await result, isA<GraphCommandSucceeded>());

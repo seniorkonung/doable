@@ -244,6 +244,8 @@ final class _Repository
             priority: RelationPriority.p1,
             scope: RelationScope.archived,
             creationSequence: RelationCreationSequence(1),
+            createdAt: RelationTimestamp(DateTime.utc(2026)),
+            updatedAt: RelationTimestamp(DateTime.utc(2026)),
           ),
           description: null,
           source: source,

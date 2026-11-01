@@ -78,6 +78,8 @@ final class LongTermRelation {
     required RelationPriority priority,
     required RelationScope scope,
     required RelationCreationSequence creationSequence,
+    required RelationTimestamp createdAt,
+    required RelationTimestamp updatedAt,
   }) {
     if (sourceIntentionId == relatedIntentionId) {
       throw const LongTermRelationValidationException(
@@ -92,6 +94,8 @@ final class LongTermRelation {
       priority: priority,
       scope: scope,
       creationSequence: creationSequence,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
     );
   }
 
@@ -103,6 +107,8 @@ final class LongTermRelation {
     required this.priority,
     required this.scope,
     required this.creationSequence,
+    required this.createdAt,
+    required this.updatedAt,
   });
 
   final LongTermRelationId id;
@@ -112,4 +118,6 @@ final class LongTermRelation {
   final RelationPriority priority;
   final RelationScope scope;
   final RelationCreationSequence creationSequence;
+  final RelationTimestamp createdAt;
+  final RelationTimestamp updatedAt;
 }

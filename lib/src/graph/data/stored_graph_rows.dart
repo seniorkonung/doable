@@ -319,6 +319,8 @@ final class StoredLongTermRelation {
         priority: priority,
         scope: scope,
         creationSequence: RelationCreationSequence(creationSequence),
+        createdAt: createdAt,
+        updatedAt: updatedAt,
       );
     } on LongTermRelationValidationException {
       throw const StoredGraphCorruption();

@@ -2328,6 +2328,8 @@ final class _PresenterHarness {
       priority: RelationPriority.p2,
       scope: RelationScope.active,
       creationSequence: RelationCreationSequence(1),
+      createdAt: RelationTimestamp(DateTime.utc(2026)),
+      updatedAt: RelationTimestamp(DateTime.utc(2026)),
     );
     repository.completeRelationCommand(
       _relationIndexes[accepted]!,
@@ -2359,6 +2361,8 @@ final class _PresenterHarness {
       priority: RelationPriority.p2,
       scope: RelationScope.active,
       creationSequence: RelationCreationSequence(1),
+      createdAt: RelationTimestamp(DateTime.utc(2026)),
+      updatedAt: RelationTimestamp(DateTime.utc(2026)),
     );
     final after = LongTermRelation(
       id: _relationId,
@@ -2368,6 +2372,8 @@ final class _PresenterHarness {
       priority: RelationPriority.p1,
       scope: RelationScope.active,
       creationSequence: RelationCreationSequence(1),
+      createdAt: RelationTimestamp(DateTime.utc(2026)),
+      updatedAt: RelationTimestamp(DateTime.utc(2026)),
     );
     repository.completeRelationCommand(
       _relationIndexes[accepted]!,
@@ -2417,6 +2423,8 @@ final class _PresenterHarness {
       priority: RelationPriority.p2,
       scope: RelationScope.active,
       creationSequence: RelationCreationSequence(1),
+      createdAt: RelationTimestamp(DateTime.utc(2026)),
+      updatedAt: RelationTimestamp(DateTime.utc(2026)),
     );
     repository.completeRelationCommand(
       _relationIndexes[accepted]!,
@@ -2452,6 +2460,8 @@ final class _PresenterHarness {
       priority: RelationPriority.p2,
       scope: beforeScope,
       creationSequence: RelationCreationSequence(1),
+      createdAt: RelationTimestamp(DateTime.utc(2026)),
+      updatedAt: RelationTimestamp(DateTime.utc(2026)),
     );
     final after = LongTermRelation(
       id: _relationId,
@@ -2461,6 +2471,8 @@ final class _PresenterHarness {
       priority: RelationPriority.p2,
       scope: afterScope,
       creationSequence: RelationCreationSequence(1),
+      createdAt: RelationTimestamp(DateTime.utc(2026)),
+      updatedAt: RelationTimestamp(DateTime.utc(2026)),
     );
     repository.completeRelationCommand(
       _relationIndexes[accepted]!,

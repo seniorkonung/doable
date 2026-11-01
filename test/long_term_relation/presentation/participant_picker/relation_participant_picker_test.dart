@@ -990,6 +990,8 @@ LongTermRelationReadResult _archivedRelationRead(
         priority: RelationPriority.p2,
         scope: RelationScope.archived,
         creationSequence: RelationCreationSequence(1),
+        createdAt: RelationTimestamp(DateTime.utc(2026)),
+        updatedAt: RelationTimestamp(DateTime.utc(2026)),
       ),
       source: _named(_excludedIndex, 'быть здоровым'),
       related: _named(2, 'плавать'),

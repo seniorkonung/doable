@@ -1024,10 +1024,12 @@ final class DriftPersonalGraphRepository
           },
         )
         .get();
+    final archivedAt = relation_domain.RelationTimestamp(clock.read());
     final archived = [
       for (final row in rows)
         _CascadedRelationArchive(
           StoredLongTermRelation.decode(row.data).toDomain(),
+          archivedAt,
           switch (requiredStoredInteger(row.data, 'is_referenced')) {
             0 => const LongTermRelationPermissions.unrestricted(),
             1 => const LongTermRelationPermissions.referencedByDailyPath(),
@@ -1044,7 +1046,7 @@ final class DriftPersonalGraphRepository
           (source_intention_id = ? OR related_intention_id = ?)
       ''',
       variables: [
-        Variable<int>(clock.read().microsecondsSinceEpoch),
+        Variable<int>(archivedAt.value.microsecondsSinceEpoch),
         Variable<String>(serializedId),
         Variable<String>(serializedId),
       ],

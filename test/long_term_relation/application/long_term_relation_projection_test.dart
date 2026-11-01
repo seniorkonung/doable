@@ -89,6 +89,8 @@ LongTermRelation _relation() => LongTermRelation(
   priority: RelationPriority.p2,
   scope: RelationScope.active,
   creationSequence: RelationCreationSequence(1),
+  createdAt: RelationTimestamp(DateTime.utc(2026)),
+  updatedAt: RelationTimestamp(DateTime.utc(2026)),
 );
 
 LongTermRelationId _relationId(String value) =>

@@ -1143,6 +1143,8 @@ void main() {
       priority: relationBefore.priority,
       scope: relationBefore.scope,
       creationSequence: relationBefore.creationSequence,
+      createdAt: RelationTimestamp(DateTime.utc(2026)),
+      updatedAt: RelationTimestamp(DateTime.utc(2026)),
     );
     final coordinator = container.read(
       graphCommandCoordinatorProvider.notifier,

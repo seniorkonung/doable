@@ -339,6 +339,8 @@ LongTermRelation _relation(
   priority: priority,
   scope: scope,
   creationSequence: RelationCreationSequence(1),
+  createdAt: RelationTimestamp(DateTime.utc(2026)),
+  updatedAt: RelationTimestamp(DateTime.utc(2026)),
 );
 
 final class _ControlledPersonalGraphRepository
