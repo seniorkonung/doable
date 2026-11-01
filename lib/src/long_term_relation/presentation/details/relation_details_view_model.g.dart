@@ -167,7 +167,7 @@ final class RelationDetailsViewModelProvider
 }
 
 String _$relationDetailsViewModelHash() =>
-    r'66b696d04985983ed0cbe51360a1ef8cf293f774';
+    r'11dbe095db4104e080681cc7168763a8d65eb2fd';
 
 /// Подробные данные одной связи с актуальными участниками.
 ///
