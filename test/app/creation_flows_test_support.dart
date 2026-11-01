@@ -300,8 +300,7 @@ Future<_App> _start(
   await tester.pumpAndSettle();
   container.read(openedDailyChoiceCatalogProvider(container).notifier)
     ..selectDate(CalendarDate.fromParts(2026, 10, 7))
-    ..toggleSection(false)
-    ..toggleSection(true);
+    ..toggleSection(false);
   await tester.pumpAndSettle();
   return _App(router, container, database, observer);
 }

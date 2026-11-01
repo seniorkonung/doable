@@ -122,11 +122,6 @@ void main() {
           revision: 1,
         );
         await tester.pumpAndSettle();
-        expect(checkbox, findsNothing);
-        await tester.tap(
-          find.byKey(const ValueKey('daily-choice-section-true')),
-        );
-        await tester.pumpAndSettle();
         expect(tester.widget<Checkbox>(checkbox).value, isTrue);
         await tester.tap(checkbox);
         await tester.pump();
@@ -392,8 +387,9 @@ void main() {
       );
       expect(
         tester.getSemantics(completed).flagsCollection.isExpanded,
-        Tristate.isFalse,
+        Tristate.isTrue,
       );
+      expect(find.text('Чтобы Основание, я сегодня Действие'), findsOneWidget);
       await tester.tap(incomplete);
       await tester.tap(completed);
       await tester.pumpAndSettle();
@@ -406,7 +402,7 @@ void main() {
       );
       expect(
         tester.getSemantics(completed).flagsCollection.isExpanded,
-        Tristate.isTrue,
+        Tristate.isFalse,
       );
       final next = date(2026, 9, 25);
       await tester.tap(calendarDay(next));
@@ -419,7 +415,7 @@ void main() {
       );
       expect(
         tester.getSemantics(completed).flagsCollection.isExpanded,
-        Tristate.isTrue,
+        Tristate.isFalse,
       );
       expect(find.text('Чтобы Основание, я сегодня Действие'), findsNothing);
       semantics.dispose();
@@ -436,8 +432,6 @@ void main() {
       );
       await _open(tester, repository);
       repository.completeFirst([_item(1)], total: 2, cursor: const _Cursor());
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('daily-choice-section-true')));
       await tester.pumpAndSettle();
       expect(
         find.text('Чтобы Основание, я сегодня Действие'),

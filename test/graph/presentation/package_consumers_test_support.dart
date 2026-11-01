@@ -357,12 +357,16 @@ final class PackageConsumerProbes {
   /// Каталог дневных выборов загружен для явно выбранного дня выбора
   /// фикстуры и охвата выполненных.
   bool get dailyCatalogSelected =>
-      dailyCatalogSelection == (durabilityChoiceDate, true) &&
+      dailyCatalogSelection == (durabilityChoiceDate, false, true) &&
       _container.read(dailyCatalogProvider) is DailyChoiceCatalogLoaded;
 
-  (Object?, bool?) get dailyCatalogSelection {
+  (Object?, bool, bool) get dailyCatalogSelection {
     final selection = _container.read(dailyCatalogProvider).selection;
-    return (selection.date, selection.completedExpanded);
+    return (
+      selection.date,
+      selection.incompleteExpanded,
+      selection.completedExpanded,
+    );
   }
 
   /// Выбранная группа вкладки «Связи» и раскрытие её архива.

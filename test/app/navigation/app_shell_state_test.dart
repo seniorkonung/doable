@@ -633,12 +633,15 @@ void main() {
       await _until(tester, find.byType(DailyChoiceDetailsPage));
       await tester.pumpAndSettle();
       await _closeTop(tester, DailyChoiceDetailsPage);
-      await _tap(
-        tester,
-        find.byKey(
-          ValueKey('daily-choice-completion-${tagFixtureId(changed)}'),
-        ),
+      // Флажок нажимается там, где он есть: прокрутка к нему изменила бы
+      // позицию, которую проверяет тест.
+      final completion = find.byKey(
+        ValueKey('daily-choice-completion-${tagFixtureId(changed)}'),
       );
+      await _until(tester, completion);
+      await tester.pumpAndSettle();
+      await tester.tap(completion);
+      await tester.pump();
       final marksProvider = openedDailyChoiceDayMarksProvider(app.container);
       await _waitFor(tester, () {
         expect(app.container.exists(marksProvider), isTrue);

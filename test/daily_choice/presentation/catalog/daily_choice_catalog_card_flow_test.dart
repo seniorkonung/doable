@@ -77,20 +77,15 @@ void main() {
         await tester.tap(checkbox);
         await _until(
           tester,
-          () => done.evaluate().isNotEmpty && checkbox.evaluate().isEmpty,
+          () =>
+              done.evaluate().isNotEmpty &&
+              checkbox.evaluate().isNotEmpty &&
+              tester.widget<Checkbox>(checkbox).value == true,
         );
         expect(router.current.name, route);
         expect(find.byType(DailyChoiceDetailsPage), findsNothing);
         expect(shownDailyChoiceCatalogDate(tester), durabilityChoiceDate);
         expect(shownDailyChoiceCatalogViewport(tester), viewport);
-        final completedSection = find.byKey(
-          const ValueKey('daily-choice-section-true'),
-        );
-        await tester.ensureVisible(completedSection);
-        await tester.pumpAndSettle();
-        await tester.tap(completedSection);
-        await tester.pumpAndSettle();
-        expect(tester.widget<Checkbox>(checkbox).value, isTrue);
         await tester.ensureVisible(
           find.byKey(const ValueKey('daily-choice-row-1')),
         );

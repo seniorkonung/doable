@@ -311,9 +311,6 @@ void main() {
         await tester.tap(
           find.byKey(const ValueKey('daily-choice-section-false')),
         );
-        await tester.tap(
-          find.byKey(const ValueKey('daily-choice-section-true')),
-        );
         await tester.pumpAndSettle();
         final body = tester.widget<DailyChoiceCatalogBody>(
           find.byType(DailyChoiceCatalogBody),

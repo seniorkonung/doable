@@ -37,7 +37,7 @@ void _catalogNavigationScenarios() {
           app,
           CalendarDate.fromParts(2026, 10, 7),
         );
-        expect(_catalogData(app, catalog).selection.completedExpanded, isFalse);
+        expect(_catalogData(app, catalog).selection.completedExpanded, isTrue);
         expect(_catalogData(app, catalog).completed.items, hasLength(50));
         expect(find.text('Не выполненные'), findsOneWidget);
         expect(

@@ -121,7 +121,6 @@ void main() {
       final otherModel = container.read(otherProvider.notifier);
       otherModel.selectDate(sourceDay);
       otherModel.toggleSection(false);
-      otherModel.toggleSection(true);
       DailyChoiceCatalogLoaded otherCatalog() =>
           container.read(otherProvider) as DailyChoiceCatalogLoaded;
       final coordinator = container.read(
@@ -185,7 +184,7 @@ void main() {
         });
         expect(catalog().selection.date, sourceDay);
         expect(catalog().selection.incompleteExpanded, isTrue);
-        expect(catalog().selection.completedExpanded, isFalse);
+        expect(catalog().selection.completedExpanded, isTrue);
         expect(otherCatalog().selection.date, sourceDay);
         expect(otherCatalog().selection.incompleteExpanded, isFalse);
         expect(otherCatalog().selection.completedExpanded, isTrue);
@@ -488,9 +487,8 @@ void main() {
       expect(catalog().incomplete.totalCount, 51);
       expect(ids(), isNot(contains(_choice(401))));
 
-      // Раскрытие выполненных сохраняет обе прочитанные секции того же дня.
+      // Раскрытые выполненные сохраняют обе прочитанные секции того же дня.
       includeCompleted = true;
-      model.toggleSection(true);
       await _until(() => shows(day, null));
       expect(catalog().totalCount, 52);
       expect(ids().last, _choice(253));

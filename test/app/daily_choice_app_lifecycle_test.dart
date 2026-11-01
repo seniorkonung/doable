@@ -747,7 +747,7 @@ void main() {
           mode: DailyChoiceCalendarMode.week,
         ),
         'раскрытие невыполненных': true,
-        'раскрытие выполненных': false,
+        'раскрытие выполненных': true,
         'сегодня': _nextToday,
         'загруженные записи': [durabilityUuid(_nextTodayChoice)],
         'позиция прокрутки': 0.0,

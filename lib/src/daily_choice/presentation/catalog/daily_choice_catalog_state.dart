@@ -11,7 +11,7 @@ final class DailyChoiceCatalogSelection {
   const DailyChoiceCatalogSelection({
     required this.date,
     this.incompleteExpanded = true,
-    this.completedExpanded = false,
+    this.completedExpanded = true,
   });
 
   final CalendarDate date;

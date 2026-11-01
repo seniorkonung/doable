@@ -127,8 +127,7 @@ void main() {
     probes.openIntentionEdit(observed).changeTitle('Черновик названия');
     container.read(probes.dailyCatalogProvider.notifier)
       ..selectDate(durabilityChoiceDate)
-      ..toggleSection(false)
-      ..toggleSection(true);
+      ..toggleSection(false);
     await settlePackageConsumersUntil(
       () => probes.allLoaded && probes.dailyCatalogSelected,
       diagnostics: probes.describe,

@@ -60,12 +60,6 @@ void main() {
         repository.completeFirst(0, [item], total: 1);
         await tester.pumpAndSettle();
         final l10n = _l10n(tester);
-        if (completed) {
-          tester.semantics.tap(
-            find.semantics.byLabel(l10n.dailyChoiceCatalogCompleted),
-          );
-          await tester.pumpAndSettle();
-        }
         final checkbox = find.semantics.byLabel(_completionLabel(l10n, 1));
         final initial = checkbox.evaluate().single;
         expect(
@@ -168,7 +162,7 @@ void main() {
 
         for (final section in [
           (label: l10n.dailyChoiceCatalogIncomplete, expanded: true),
-          (label: l10n.dailyChoiceCatalogCompleted, expanded: false),
+          (label: l10n.dailyChoiceCatalogCompleted, expanded: true),
         ]) {
           final command = find.semantics.byLabel(section.label);
           for (final expanded in [section.expanded, !section.expanded]) {
