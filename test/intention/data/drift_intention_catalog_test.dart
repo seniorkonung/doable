@@ -1124,17 +1124,11 @@ void main() {
     PairOccupant occupant(int relation, RelationScope scope) =>
         PairOccupant(relationId: _relationId(relation), scope: scope);
 
-    RelationPairProbe probe(
-      int counterpart,
-      RelationParticipantRole role, {
-      int? ignoredRelation,
-    }) => RelationPairProbe(
-      counterpartId: _id(_uuid(counterpart)),
-      candidateRole: role,
-      ignoredRelationId: ignoredRelation == null
-          ? null
-          : _relationId(ignoredRelation),
-    );
+    RelationPairProbe probe(int counterpart, RelationParticipantRole role) =>
+        RelationPairProbe(
+          counterpartId: _id(_uuid(counterpart)),
+          candidateRole: role,
+        );
 
     Future<IntentionCatalogFirstPage> firstPage(
       RelationPairProbe? pairProbe, {
@@ -1196,39 +1190,6 @@ void main() {
         _id(_uuid(sleeping)): occupant(sleepingToHealthy, RelationScope.active),
       });
     });
-
-    test(
-      'изменяемая связь свою пару не занимает, а остальные занимают',
-      () async {
-        final asRelated = await firstPage(
-          probe(
-            healthy,
-            RelationParticipantRole.related,
-            ignoredRelation: healthyToWalking,
-          ),
-        );
-        final asSource = await firstPage(
-          probe(
-            walking,
-            RelationParticipantRole.source,
-            ignoredRelation: healthyToWalking,
-          ),
-        );
-
-        expect(asRelated.pairOccupants, {
-          _id(_uuid(swimming)): occupant(
-            healthyToSwimming,
-            RelationScope.archived,
-          ),
-        });
-        expect(asSource.pairOccupants, {
-          _id(_uuid(resting)): occupant(
-            restingToWalking,
-            RelationScope.archived,
-          ),
-        });
-      },
-    );
 
     test('запрос без пробы приходит без карты занятости', () async {
       final page = await firstPage(null);

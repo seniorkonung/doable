@@ -1413,7 +1413,6 @@ final class DriftPersonalGraphRepository
     final intentions = _database.intentions;
     final relations = _database.longTermRelations;
     final counterpartId = probe.counterpartId.toCanonicalString();
-    final ignoredRelationId = probe.ignoredRelationId;
     final occupiesPair = switch (probe.candidateRole) {
       RelationParticipantRole.related =>
         relations.sourceIntentionId.equals(counterpartId) &
@@ -1423,17 +1422,7 @@ final class DriftPersonalGraphRepository
             relations.sourceIntentionId.equalsExp(intentions.id),
     };
     rowsQuery
-      ..join([
-        leftOuterJoin(
-          relations,
-          ignoredRelationId == null
-              ? occupiesPair
-              : occupiesPair &
-                    relations.id
-                        .equals(ignoredRelationId.toCanonicalString())
-                        .not(),
-        ),
-      ])
+      ..join([leftOuterJoin(relations, occupiesPair)])
       ..addColumns([relations.id, relations.isArchived]);
   }
 
