@@ -1094,6 +1094,26 @@
             "default_dart": "const CustomExpression('FALSE')",
             "default_client_dart": null,
             "dsl_features": []
+          },
+          {
+            "name": "created_at",
+            "getter_name": "createdAt",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL DEFAULT 0",
+            "default_dart": "const CustomExpression('0')",
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "updated_at",
+            "getter_name": "updatedAt",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL DEFAULT 0",
+            "default_dart": "const CustomExpression('0')",
+            "default_client_dart": null,
+            "dsl_features": []
           }
         ],
         "is_virtual": false,
@@ -2294,7 +2314,7 @@
       "sql": [
         {
           "dialect": "sqlite",
-          "sql": "CREATE TABLE IF NOT EXISTS \"long_term_relations\" (\"creation_sequence\" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT CHECK (creation_sequence > 0), \"id\" TEXT NOT NULL UNIQUE, \"source_intention_id\" TEXT NOT NULL REFERENCES intentions(id)ON UPDATE RESTRICT ON DELETE RESTRICT, \"related_intention_id\" TEXT NOT NULL REFERENCES intentions(id)ON UPDATE RESTRICT ON DELETE RESTRICT, \"type\" TEXT NOT NULL CHECK (typeof(type) = 'text' AND type IN ('need', 'can')), \"priority\" INTEGER NOT NULL CHECK (typeof(priority) = 'integer' AND priority BETWEEN 1 AND 4), \"description\" TEXT CHECK (description IS NULL OR(typeof(description) = 'text' AND instr(CAST(description AS BLOB), X'00') = 0)), \"is_archived\" INTEGER NOT NULL DEFAULT FALSE CHECK (typeof(is_archived) = 'integer' AND is_archived IN (0, 1)), UNIQUE(source_intention_id, related_intention_id), CHECK(source_intention_id <> related_intention_id));"
+          "sql": "CREATE TABLE IF NOT EXISTS \"long_term_relations\" (\"creation_sequence\" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT CHECK (creation_sequence > 0), \"id\" TEXT NOT NULL UNIQUE, \"source_intention_id\" TEXT NOT NULL REFERENCES intentions(id)ON UPDATE RESTRICT ON DELETE RESTRICT, \"related_intention_id\" TEXT NOT NULL REFERENCES intentions(id)ON UPDATE RESTRICT ON DELETE RESTRICT, \"type\" TEXT NOT NULL CHECK (typeof(type) = 'text' AND type IN ('need', 'can')), \"priority\" INTEGER NOT NULL CHECK (typeof(priority) = 'integer' AND priority BETWEEN 1 AND 4), \"description\" TEXT CHECK (description IS NULL OR(typeof(description) = 'text' AND instr(CAST(description AS BLOB), X'00') = 0)), \"is_archived\" INTEGER NOT NULL DEFAULT FALSE CHECK (typeof(is_archived) = 'integer' AND is_archived IN (0, 1)), \"created_at\" INTEGER NOT NULL DEFAULT 0, \"updated_at\" INTEGER NOT NULL DEFAULT 0, UNIQUE(source_intention_id, related_intention_id), CHECK(source_intention_id <> related_intention_id));"
         }
       ]
     },

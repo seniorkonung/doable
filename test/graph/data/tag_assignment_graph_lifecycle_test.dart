@@ -127,6 +127,9 @@ void main() {
         row('long_term_relations', 101),
         row('long_term_relations', 103),
       ];
+      // Каскад архива меняет показание изменения прямых связей один раз;
+      // восстановление намерения связи не восстанавливает.
+      var directRelationUpdatedAt = activeDirectRelations[0]['updated_at'];
 
       Future<void> expectStep(
         IntentionCommand command, {
@@ -146,13 +149,16 @@ void main() {
         expect(intention['is_archived'], archived);
         expect(intention['created_at'], createdAt);
         expect(intention['updated_at'], now.microsecondsSinceEpoch);
+        if (archived == 1) directRelationUpdatedAt = now.microsecondsSinceEpoch;
         expect(row('long_term_relations', 101), {
           ...activeDirectRelations[0],
           'is_archived': directRelationArchive,
+          'updated_at': directRelationUpdatedAt,
         });
         expect(row('long_term_relations', 103), {
           ...activeDirectRelations[1],
           'is_archived': directRelationArchive,
+          'updated_at': directRelationUpdatedAt,
         });
         expect(row('long_term_relations', 102), alreadyArchivedRelation);
         expect([row('intentions', 2), row('intentions', 3)], otherIntentions);
@@ -316,7 +322,11 @@ void main() {
       ) async {
         final before = row('long_term_relations', 103);
         expect(await repository.execute(command), isA<GraphCommandSucceeded>());
-        expect(row('long_term_relations', 103), {...before, ...expectedChange});
+        expect(row('long_term_relations', 103), {
+          ...before,
+          ...expectedChange,
+          'updated_at': now.microsecondsSinceEpoch,
+        });
         expect(assignments(), originalAssignments);
         expect(rows('intentions'), intentions);
         expect([
@@ -415,6 +425,7 @@ void main() {
         ...relationBefore,
         'priority': 4,
         'description': 'Обновлено',
+        'updated_at': now.microsecondsSinceEpoch,
       });
       expect(assignments(), assignmentsBeforeEdit);
       expect(rows('daily_choices'), choicesBefore);

@@ -34,16 +34,18 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
 
     try {
       final success = await _writeGraph<LongTermRelationCommandSuccess>(
-        (_) => switch (command) {
-          CreateLongTermRelation() => _createLongTermRelation(command),
-          UpdateLongTermRelation() => _updateLongTermRelation(command),
+        (clock) => switch (command) {
+          CreateLongTermRelation() => _createLongTermRelation(command, clock),
+          UpdateLongTermRelation() => _updateLongTermRelation(command, clock),
           ArchiveLongTermRelation() => _setLongTermRelationScope(
             relationId: command.relationId,
             scope: relation_domain.RelationScope.archived,
+            clock: clock,
           ),
           RestoreLongTermRelation() => _setLongTermRelationScope(
             relationId: command.relationId,
             scope: relation_domain.RelationScope.active,
+            clock: clock,
           ),
           DeleteLongTermRelation() => _deleteLongTermRelation(
             command.relationId,
@@ -74,6 +76,7 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
 
   Future<_CommittedLongTermRelationCreation> _createLongTermRelation(
     CreateLongTermRelation command,
+    _GraphWriteClock clock,
   ) async {
     await _requireRelationParticipant(
       command.sourceIntentionId,
@@ -95,6 +98,7 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
     }
 
     final id = _relationIdGenerator.generate();
+    final createdAt = clock.read().microsecondsSinceEpoch;
     final creationSequence = await _database
         .into(_database.longTermRelations)
         .insert(
@@ -114,6 +118,8 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
             },
             description: Value(command.description?.value),
             isArchived: const Value(false),
+            createdAt: Value(createdAt),
+            updatedAt: Value(createdAt),
           ),
         );
     final created = relation_domain.LongTermRelation(
@@ -141,6 +147,7 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
 
   Future<_CommittedLongTermRelationUpdate> _updateLongTermRelation(
     UpdateLongTermRelation command,
+    _GraphWriteClock clock,
   ) async {
     final storedBefore = await _readStoredRelation(command.relationId);
     if (storedBefore == null) {
@@ -213,6 +220,7 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
                     value.value,
                   ),
                 },
+                updatedAt: Value(clock.read().microsecondsSinceEpoch),
               ),
             );
     if (updatedRows != 1) {
@@ -246,6 +254,7 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
   Future<_CommittedLongTermRelationUpdate> _setLongTermRelationScope({
     required LongTermRelationId relationId,
     required relation_domain.RelationScope scope,
+    required _GraphWriteClock clock,
   }) async {
     final storedBefore = await _readStoredRelation(relationId);
     if (storedBefore == null) {
@@ -292,6 +301,7 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
         )..where((row) => row.id.equals(relationId.toCanonicalString()))).write(
           local.LongTermRelationsCompanion(
             isArchived: Value(scope == relation_domain.RelationScope.archived),
+            updatedAt: Value(clock.read().microsecondsSinceEpoch),
           ),
         );
     if (updatedRows != 1) {

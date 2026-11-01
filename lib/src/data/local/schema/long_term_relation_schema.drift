@@ -27,6 +27,8 @@ CREATE TABLE long_term_relations (
     typeof(is_archived) = 'integer' AND
     is_archived IN (0, 1)
   ),
+  created_at INTEGER NOT NULL DEFAULT 0,
+  updated_at INTEGER NOT NULL DEFAULT 0,
   UNIQUE (source_intention_id, related_intention_id),
   CHECK (source_intention_id <> related_intention_id)
 );

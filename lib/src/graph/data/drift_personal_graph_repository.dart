@@ -930,7 +930,7 @@ final class DriftPersonalGraphRepository
         ? await _readActiveRelationNeighborIds(id)
         : const <IntentionId>[];
     final archivedRelations = cascadedNeighborIds.isNotEmpty
-        ? await _archiveActiveRelations(id)
+        ? await _archiveActiveRelations(id, clock)
         : const <_CascadedRelationArchive>[];
 
     final updated = domain.Intention(
@@ -1000,6 +1000,7 @@ final class DriftPersonalGraphRepository
 
   Future<List<_CascadedRelationArchive>> _archiveActiveRelations(
     IntentionId id,
+    _GraphWriteClock clock,
   ) async {
     final serializedId = id.toCanonicalString();
     final rows = await _database
@@ -1036,12 +1037,13 @@ final class DriftPersonalGraphRepository
     await _database.customUpdate(
       '''
         UPDATE long_term_relations
-        SET is_archived = 1
+        SET is_archived = 1, updated_at = ?
         WHERE
           is_archived = 0 AND
           (source_intention_id = ? OR related_intention_id = ?)
       ''',
       variables: [
+        Variable<int>(clock.read().microsecondsSinceEpoch),
         Variable<String>(serializedId),
         Variable<String>(serializedId),
       ],
