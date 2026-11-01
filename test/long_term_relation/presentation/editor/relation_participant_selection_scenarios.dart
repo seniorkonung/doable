@@ -6,7 +6,6 @@ import 'package:doable/src/long_term_relation/application/long_term_relation_com
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/relation_pair_probe.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_choice.dart';
 import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart';
 import 'package:flutter/material.dart';
@@ -346,17 +345,6 @@ void defineRelationParticipantSelectionTests({
 }
 
 final isRelationCreationFlow = isA<RelationCreationChoiceFlow>();
-
-Matcher isRelationChangeFlow(
-  LongTermRelationId relationId,
-  RelationScope relationScope,
-) => isA<RelationChangeChoiceFlow>()
-    .having((flow) => flow.relationId, 'изменяемая связь', relationId)
-    .having(
-      (flow) => flow.relationScope,
-      'архивное состояние изменяемой связи',
-      relationScope,
-    );
 
 /// Проверяет описание выбора, которое получила открытая страница поиска.
 void expectOpenedParticipantChoice(

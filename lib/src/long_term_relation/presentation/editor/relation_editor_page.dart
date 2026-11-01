@@ -13,8 +13,6 @@ import '../../../graph/presentation/operation_failure_presentation.dart';
 import '../../../intention/application/intention_result.dart';
 import '../../../intention/domain/intention.dart';
 import '../../../intention/domain/intention_id.dart';
-import '../../../intention/presentation/details/intention_details_state.dart';
-import '../../../intention/presentation/details/intention_details_view_model.dart';
 import '../../../shared/presentation/creation_exit_action.dart';
 import '../../application/long_term_relation_command.dart';
 import '../../application/long_term_relation_projection.dart';
@@ -31,9 +29,10 @@ import 'relation_editor_view_model.dart';
 
 /// Форма создания или изменения долговременной связи.
 ///
-/// Типизированный контекст задаёт исходный черновик. Подтверждённые данные
-/// участников поступают через наблюдение подробного просмотра связи и
-/// выбранных на замену намерений; черновик и результат принадлежат ViewModel,
+/// Типизированный контекст задаёт исходный черновик. Участников выбирает
+/// только форма создания: у существующей связи они неизменны и показываются
+/// без поиска, а их подтверждённые данные поступают через наблюдение
+/// подробного просмотра связи. Черновик и результат принадлежат ViewModel,
 /// а успех предъявляет presenter оболочки.
 @RoutePage()
 final class RelationEditorPage extends ConsumerStatefulWidget {
@@ -48,8 +47,6 @@ final class RelationEditorPage extends ConsumerStatefulWidget {
 final class _RelationEditorPageState extends ConsumerState<RelationEditorPage>
     implements RelationCreationRestore {
   final _formKey = LongTermRelationCreationFormKey();
-  final _replacementSubscriptions =
-      <RelationParticipantRole, ProviderSubscription<IntentionDetailsState>>{};
   final _basisReads = <RelationParticipantRole, IntentionId>{};
   late final TextEditingController _descriptionController;
 
@@ -100,9 +97,6 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage>
 
   @override
   void dispose() {
-    for (final subscription in _replacementSubscriptions.values) {
-      subscription.close();
-    }
     _descriptionController.dispose();
     super.dispose();
   }
@@ -153,11 +147,7 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage>
     final pathProtected =
         editor.permissions.restriction ==
         LongTermRelationPermissionRestriction.referencedByDailyPath;
-    final meaningDraftChanged =
-        basis != null &&
-        (editor.type != basis.type ||
-            editor.sourceIntentionId != basis.sourceIntentionId ||
-            editor.relatedIntentionId != basis.relatedIntentionId);
+    final meaningDraftChanged = basis != null && editor.type != basis.type;
     final meaningControlsEnabled =
         controlsEnabled && (!pathProtected || meaningDraftChanged);
     return Scaffold(
@@ -175,9 +165,12 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage>
             _ParticipantSlot(
               role: RelationParticipantRole.source,
               participant: editor.sourceParticipant,
-              enabled: meaningControlsEnabled,
-              onSelect: () =>
-                  unawaited(_selectParticipant(RelationParticipantRole.source)),
+              enabled: controlsEnabled,
+              onSelect: editor.context.isCreating
+                  ? () => unawaited(
+                      _selectParticipant(RelationParticipantRole.source),
+                    )
+                  : null,
               onOpenDetails:
                   !controlsEnabled || editor.sourceParticipant == null
                   ? null
@@ -191,10 +184,12 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage>
             _ParticipantSlot(
               role: RelationParticipantRole.related,
               participant: editor.relatedParticipant,
-              enabled: meaningControlsEnabled,
-              onSelect: () => unawaited(
-                _selectParticipant(RelationParticipantRole.related),
-              ),
+              enabled: controlsEnabled,
+              onSelect: editor.context.isCreating
+                  ? () => unawaited(
+                      _selectParticipant(RelationParticipantRole.related),
+                    )
+                  : null,
               onOpenDetails:
                   !controlsEnabled || editor.relatedParticipant == null
                   ? null
@@ -387,7 +382,8 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage>
   /// Открывает выбор участника и применяет только явно выбранное намерение.
   ///
   /// Поиск получает описание выбора из черновика в момент открытия. Отмена
-  /// оставляет черновик прежним.
+  /// оставляет черновик прежним. У существующей связи участников выбирать
+  /// нельзя, поэтому её форма поиск не открывает.
   Future<void> _selectParticipant(RelationParticipantRole role) async {
     if (!_canEdit) return;
     final provider = relationEditorViewModelProvider(
@@ -396,24 +392,22 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage>
     );
     final notifier = ref.read(provider.notifier);
     final draft = ref.read(provider);
+    final flow = switch (draft.context) {
+      RelationBlankCreationContext() ||
+      RelationCreationContext() => RelationCreationChoiceFlow(
+        restore: this,
+        priority: draft.priority,
+        description: draft.description,
+      ),
+      RelationEditingContext() => null,
+    };
+    if (flow == null) return;
     final selected = await context.router
         .push<GraphSnapshot<RelationParticipantSummary>>(
           RelationParticipantPickerRoute(
             choice: RelationParticipantChoice(
               role: role,
-              flow: switch (draft.context) {
-                RelationBlankCreationContext() ||
-                RelationCreationContext() => RelationCreationChoiceFlow(
-                  restore: this,
-                  priority: draft.priority,
-                  description: draft.description,
-                ),
-                RelationEditingContext(:final details) =>
-                  RelationChangeChoiceFlow(
-                    relationId: details.relation.id,
-                    relationScope: details.relation.scope,
-                  ),
-              },
+              flow: flow,
               type: draft.type,
               source: draft.sourceParticipant,
               related: draft.relatedParticipant,
@@ -424,58 +418,9 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage>
       return;
     }
     final needsNewBasis = notifier.selectParticipant(role, selected);
-    _watchReplacement(role, selected.value.id);
     if (needsNewBasis) {
       unawaited(_refreshParticipantBasis(role, selected.value.id));
     }
-  }
-
-  void _watchReplacement(RelationParticipantRole role, IntentionId id) {
-    _replacementSubscriptions.remove(role)?.close();
-    final editing = widget.editorContext;
-    if (editing is! RelationEditingContext) {
-      return;
-    }
-    final originalId = switch (role) {
-      RelationParticipantRole.source =>
-        editing.details.relation.sourceIntentionId,
-      RelationParticipantRole.related =>
-        editing.details.relation.relatedIntentionId,
-    };
-    if (id == originalId) {
-      return;
-    }
-    final editorProvider = relationEditorViewModelProvider(
-      _formKey,
-      widget.editorContext,
-    );
-    void refresh(IntentionDetailsState next) {
-      if (!mounted || next is! IntentionDetailsLoaded) {
-        return;
-      }
-      final intention = next.intention;
-      final needsNewBasis = ref
-          .read(editorProvider.notifier)
-          .refreshConfirmedParticipant(
-            role,
-            RelationParticipantSummary(
-              id: intention.id,
-              title: intention.title,
-              archiveState: intention.archiveState,
-            ),
-            next.revision,
-          );
-      if (needsNewBasis) {
-        unawaited(_refreshParticipantBasis(role, id));
-      }
-    }
-
-    final subscription = ref.listenManual(
-      intentionDetailsViewModelProvider(id),
-      (previous, next) => refresh(next),
-    );
-    _replacementSubscriptions[role] = subscription;
-    refresh(subscription.read());
   }
 
   Future<void> _refreshParticipantBasis(
@@ -648,7 +593,10 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage>
       };
 }
 
-/// Роль участника связи и переход к его выбору.
+/// Роль участника связи и переход к его странице.
+///
+/// Выбор участника предлагает только слот с [onSelect]; у существующей связи
+/// участник неизменен, и слот лишь показывает его.
 final class _ParticipantSlot extends StatelessWidget {
   const _ParticipantSlot({
     required this.role,
@@ -661,7 +609,7 @@ final class _ParticipantSlot extends StatelessWidget {
   final RelationParticipantRole role;
   final RelationParticipantSummary? participant;
   final bool enabled;
-  final VoidCallback onSelect;
+  final VoidCallback? onSelect;
   final VoidCallback? onOpenDetails;
 
   @override
@@ -734,22 +682,24 @@ final class _ParticipantSlot extends StatelessWidget {
             ),
             const SizedBox(height: 4),
           ],
-          Text(
-            isSelected
-                ? localizations.relationEditorParticipantSelected
-                : localizations.relationEditorParticipantNotSelected,
-          ),
+          if (onSelect != null)
+            Text(
+              isSelected
+                  ? localizations.relationEditorParticipantSelected
+                  : localizations.relationEditorParticipantNotSelected,
+            ),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              OutlinedButton(
-                key: actionKey,
-                onPressed: enabled ? onSelect : null,
-                child: Text(action),
-              ),
+              if (onSelect case final select?)
+                OutlinedButton(
+                  key: actionKey,
+                  onPressed: enabled ? select : null,
+                  child: Text(action),
+                ),
               if (isSelected)
                 IconButton(
                   key: detailsKey,

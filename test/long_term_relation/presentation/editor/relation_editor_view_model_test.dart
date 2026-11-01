@@ -1,6 +1,5 @@
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
-import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
@@ -371,62 +370,23 @@ void main() {
       },
     );
 
-    test(
-      'отказ сохраняет обе ссылки, а исправленная отправка уходит снова',
-      () async {
-        final harness = _EditorHarness.editing(testEditorRelationDetails());
+    test('черновик изменения не принимает другого участника', () {
+      final harness = _EditorHarness.editing(testEditorRelationDetails());
 
-        harness.viewModel
-          ..selectParticipant(
-            RelationParticipantRole.related,
-            testEditorSelection(3),
-          )
-          ..submit();
-        harness.repository.failRelationCommand(
-          0,
-          LongTermRelationParticipantArchivedFailure(
-            role: RelationParticipantRole.related,
-            intentionId: testEditorIntentionId(3),
-          ),
-        );
-        await harness.settle();
-
-        expect(harness.state.sourceParticipant?.id, testEditorIntentionId(1));
-        expect(harness.state.relatedParticipant?.id, testEditorIntentionId(3));
-
-        harness.viewModel
-          ..selectParticipant(
-            RelationParticipantRole.related,
-            testEditorSelection(4),
-          )
-          ..submit();
-        expect(harness.repository.commandCount, 2);
-        expect(
-          harness.repository.updateCommandAt(1).patch.relatedIntentionId,
-          isA<LongTermRelationFieldSet<IntentionId>>().having(
-            (field) => field.value,
-            'исправленный участник',
-            testEditorIntentionId(4),
-          ),
+      for (final role in RelationParticipantRole.values) {
+        final needsNewBasis = harness.viewModel.selectParticipant(
+          role,
+          testEditorSelection(3),
         );
 
-        harness.repository.failRelationCommand(
-          1,
-          const LongTermRelationUnavailableFailure(),
-        );
-        await harness.settle();
+        expect(needsNewBasis, isFalse);
+      }
 
-        expect(
-          harness.state.operation,
-          isA<RelationEditorFailed>().having(
-            (operation) => operation.failure,
-            'причина',
-            isA<RelationEditorUnavailable>(),
-          ),
-        );
-        expect(harness.state.relatedParticipant?.id, testEditorIntentionId(4));
-      },
-    );
+      expect(harness.state.sourceParticipant?.id, testEditorIntentionId(1));
+      expect(harness.state.relatedParticipant?.id, testEditorIntentionId(2));
+      expect(harness.state.hasChanges, isFalse);
+      expect(harness.state.canSubmit, isFalse);
+    });
 
     test(
       'отсутствующая связь сохраняет черновик и блокирует тот же контекст',

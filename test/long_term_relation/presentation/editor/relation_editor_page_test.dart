@@ -18,7 +18,6 @@ import 'package:doable/src/long_term_relation/application/intention_relation_gro
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_permissions.dart';
-import 'package:doable/src/long_term_relation/application/relation_pair_probe.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_description.dart';
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_page.dart';
@@ -28,9 +27,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../intention/presentation/catalog/catalog_test_support.dart'
-    show TestCatalogRevision, testRelationCounts, testSummary;
-import '../../../intention/presentation/details/details_test_support.dart'
-    show testDetailsIntention;
+    show TestCatalogRevision, testSummary;
 import '../../../support/app_root_pages.dart';
 import '../details/relation_details_test_support.dart' show testRelationDetails;
 import 'relation_form_test_support.dart';
@@ -74,14 +71,6 @@ void main() {
     );
     expect(reason, findsOneWidget);
     expect(tester.getSemantics(reason).label, contains('daily path'));
-    expect(
-      tester
-          .widget<OutlinedButton>(
-            find.byKey(const ValueKey('relation-editor-change-source')),
-          )
-          .onPressed,
-      isNull,
-    );
     expect(
       tester
           .widget<ChoiceChip>(
@@ -153,14 +142,6 @@ void main() {
     );
     expect(
       tester
-          .widget<OutlinedButton>(
-            find.byKey(const ValueKey('relation-editor-change-related')),
-          )
-          .onPressed,
-      isNull,
-    );
-    expect(
-      tester
           .widget<TextField>(
             find.byKey(const ValueKey('relation-editor-description')),
           )
@@ -187,14 +168,6 @@ void main() {
     );
     expect(
       tester
-          .widget<OutlinedButton>(
-            find.byKey(const ValueKey('relation-editor-change-related')),
-          )
-          .onPressed,
-      isNotNull,
-    );
-    expect(
-      tester
           .widget<TextField>(
             find.byKey(const ValueKey('relation-editor-description')),
           )
@@ -203,147 +176,6 @@ void main() {
       'Исправимый ввод',
     );
   });
-
-  for (final role in RelationParticipantRole.values) {
-    testWidgets('повторный выбор ${role.name} не откатывается снимком связи', (
-      tester,
-    ) async {
-      final repository = ControlledRelationFormRepository();
-      addTearDown(repository.dispose);
-      final relationId = testFormRelationId(115);
-      final sourceId = testSummary(index: 1).id;
-      final relatedId = testSummary(index: 2).id;
-      final details = testRelationDetails(
-        relationId: relationId,
-        sourceId: sourceId,
-        relatedId: relatedId,
-        sourceTitle: 'Исходное',
-        relatedTitle: 'Связанное',
-        scope: RelationScope.archived,
-      );
-      await _openDetailsForEditing(tester, repository, details);
-      await tester.tap(
-        find.byKey(const ValueKey('relation-details-edit-relation')),
-      );
-      await tester.pumpAndSettle();
-      await tester.enterText(
-        find.byKey(const ValueKey('relation-editor-description')),
-        'Черновик',
-      );
-      await _selectParticipant(
-        tester,
-        repository,
-        actionKey: role == RelationParticipantRole.source
-            ? 'relation-editor-change-source'
-            : 'relation-editor-change-related',
-        catalogIndex: 1,
-        title: 'Название из каталога',
-        index: role == RelationParticipantRole.source ? 1 : 2,
-        revision: const TestCatalogRevision(5),
-        archiveState: IntentionArchiveState.archived,
-      );
-
-      repository
-          .watchAt(0)
-          .emitDetails(
-            testRelationDetails(
-              relationId: relationId,
-              sourceId: sourceId,
-              relatedId: relatedId,
-              sourceTitle: role == RelationParticipantRole.source
-                  ? 'Старое исходное'
-                  : 'Исходное',
-              relatedTitle: role == RelationParticipantRole.related
-                  ? 'Старое связанное'
-                  : 'Связанное',
-              scope: RelationScope.archived,
-            ),
-            revision: const TestCatalogRevision(3),
-          );
-      await tester.pumpAndSettle();
-      expect(find.text('Название из каталога'), findsOneWidget);
-      expect(
-        tester
-            .widget<Text>(
-              find.byKey(
-                ValueKey(
-                  'relation-editor-participant-archive-state-${role.name}',
-                ),
-              ),
-            )
-            .data,
-        'Archived',
-      );
-      expect(
-        find.text(
-          'To ${role == RelationParticipantRole.source ? 'Название из каталога' : 'Исходное'}, you need ${role == RelationParticipantRole.related ? 'Название из каталога' : 'Связанное'}',
-        ),
-        findsOneWidget,
-      );
-
-      repository
-          .watchAt(0)
-          .emitDetails(
-            testRelationDetails(
-              relationId: relationId,
-              sourceId: sourceId,
-              relatedId: relatedId,
-              sourceTitle: role == RelationParticipantRole.source
-                  ? 'Новое исходное'
-                  : 'Исходное',
-              relatedTitle: role == RelationParticipantRole.related
-                  ? 'Новое связанное'
-                  : 'Связанное',
-              scope: RelationScope.archived,
-            ),
-            revision: const TestCatalogRevision(6),
-          );
-      await tester.pumpAndSettle();
-      expect(
-        find.text(
-          role == RelationParticipantRole.source
-              ? 'Новое исходное'
-              : 'Новое связанное',
-        ),
-        findsOneWidget,
-      );
-      expect(find.text('Название из каталога'), findsNothing);
-      expect(
-        tester
-            .widget<Text>(
-              find.byKey(
-                ValueKey(
-                  'relation-editor-participant-archive-state-${role.name}',
-                ),
-              ),
-            )
-            .data,
-        'Active',
-      );
-      expect(
-        tester
-            .widget<TextField>(
-              find.byKey(const ValueKey('relation-editor-description')),
-            )
-            .controller
-            ?.text,
-        'Черновик',
-      );
-      await tester.tap(find.byKey(const ValueKey('relation-editor-submit')));
-      await tester.pump();
-      expect(repository.relationUpdateCommands, hasLength(1));
-      final command = repository.updateCommandAt(0);
-      expect(command.relationId, relationId);
-      expect(
-        command.patch.sourceIntentionId,
-        isA<LongTermRelationFieldUnchanged>(),
-      );
-      expect(
-        command.patch.relatedIntentionId,
-        isA<LongTermRelationFieldUnchanged>(),
-      );
-    });
-  }
 
   testWidgets(
     'исходящая группа «Можно использовать» предвыбирает намерение исходным '
@@ -825,41 +657,22 @@ void main() {
     // Участники в редакторе связи — представление без поиска: тегов и условий в нём нет.
     expect(find.textContaining('Tags:'), findsNothing);
     expect(find.text('No tags'), findsNothing);
+    // Участники существующей связи неизменны: слоты предлагают только переход.
+    for (final role in RelationParticipantRole.values) {
+      expect(
+        find.byKey(ValueKey('relation-editor-select-${role.name}')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(ValueKey('relation-editor-change-${role.name}')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(ValueKey('relation-editor-open-${role.name}-details')),
+        findsOneWidget,
+      );
+    }
 
-    await _selectParticipant(
-      tester,
-      repository,
-      actionKey: 'relation-editor-change-source',
-      catalogIndex: 1,
-      title: 'Новое исходное',
-      index: 3,
-      whilePickerOpen: () => expectOpenedParticipantChoice(
-        tester,
-        role: RelationParticipantRole.source,
-        flow: isRelationChangeFlow(details.relation.id, RelationScope.archived),
-        type: LongTermRelationType.can,
-        sourceId: testSummary(index: 1).id,
-        relatedId: testSummary(index: 2).id,
-      ),
-    );
-    expect(repository.catalogQueries[1].scope, IntentionScope.all);
-    // Поиск второй роли получает уже заменённого в черновике участника.
-    await _selectParticipant(
-      tester,
-      repository,
-      actionKey: 'relation-editor-change-related',
-      catalogIndex: 2,
-      title: 'Новое связанное',
-      index: 4,
-      whilePickerOpen: () => expectOpenedParticipantChoice(
-        tester,
-        role: RelationParticipantRole.related,
-        flow: isRelationChangeFlow(details.relation.id, RelationScope.archived),
-        type: LongTermRelationType.can,
-        sourceId: testSummary(index: 3).id,
-        relatedId: testSummary(index: 2).id,
-      ),
-    );
     await _selectType(tester, 'need');
     await _selectPriority(tester, 'p4');
     await tester.enterText(
@@ -868,10 +681,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(
-      find.text('To Новое исходное, you need Новое связанное'),
-      findsOneWidget,
-    );
+    expect(find.text('To Исходное, you need Связанное'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('relation-editor-submit')));
     await tester.pump();
 
@@ -880,19 +690,11 @@ void main() {
     expect(command.relationId, details.relation.id);
     expect(
       command.patch.sourceIntentionId,
-      isA<LongTermRelationFieldSet<IntentionId>>().having(
-        (field) => field.value,
-        'исходный участник',
-        testSummary(index: 3).id,
-      ),
+      isA<LongTermRelationFieldUnchanged>(),
     );
     expect(
       command.patch.relatedIntentionId,
-      isA<LongTermRelationFieldSet<IntentionId>>().having(
-        (field) => field.value,
-        'связанный участник',
-        testSummary(index: 4).id,
-      ),
+      isA<LongTermRelationFieldUnchanged>(),
     );
     expect(
       command.patch.type,
@@ -921,8 +723,8 @@ void main() {
 
     final updated = LongTermRelation(
       id: details.relation.id,
-      sourceIntentionId: testSummary(index: 3).id,
-      relatedIntentionId: testSummary(index: 4).id,
+      sourceIntentionId: details.relation.sourceIntentionId,
+      relatedIntentionId: details.relation.relatedIntentionId,
       type: LongTermRelationType.need,
       priority: RelationPriority.p4,
       scope: RelationScope.archived,
@@ -945,8 +747,8 @@ void main() {
             relationId: updated.id,
             sourceId: updated.sourceIntentionId,
             relatedId: updated.relatedIntentionId,
-            sourceTitle: 'Новое исходное',
-            relatedTitle: 'Новое связанное',
+            sourceTitle: 'Исходное',
+            relatedTitle: 'Связанное',
             type: updated.type,
             priority: updated.priority,
             scope: updated.scope,
@@ -957,52 +759,8 @@ void main() {
         );
     await tester.pumpAndSettle();
 
-    expect(
-      find.text('To Новое исходное, you need Новое связанное'),
-      findsOneWidget,
-    );
+    expect(find.text('To Исходное, you need Связанное'), findsOneWidget);
     expect(find.text('Новое описание'), findsOneWidget);
-  });
-
-  testWidgets('поиск участника активной изменяемой связи получает описание '
-      'выбора из черновика', (tester) async {
-    final repository = ControlledRelationFormRepository();
-    addTearDown(repository.dispose);
-    final details = testRelationDetails(
-      relationId: testFormRelationId(91),
-      sourceId: testSummary(index: 1).id,
-      relatedId: testSummary(index: 2).id,
-      sourceTitle: 'Быть здоровым',
-      relatedTitle: 'Много ходить',
-    );
-    await _openDetailsForEditing(tester, repository, details);
-    await tester.tap(
-      find.byKey(const ValueKey('relation-details-edit-relation')),
-    );
-    await tester.pumpAndSettle();
-    await _selectType(tester, 'can');
-
-    await tester.tap(
-      find.byKey(const ValueKey('relation-editor-change-related')),
-    );
-    await _settlePicker(tester);
-    expectOpenedParticipantChoice(
-      tester,
-      role: RelationParticipantRole.related,
-      flow: isRelationChangeFlow(details.relation.id, RelationScope.active),
-      type: LongTermRelationType.can,
-      sourceId: testSummary(index: 1).id,
-      relatedId: testSummary(index: 2).id,
-    );
-    // Изменяемая связь попадает в пробу, чтобы не занимать собственную пару.
-    expect(
-      repository.catalogQueries.last.pairProbe,
-      RelationPairProbe(
-        counterpartId: testSummary(index: 1).id,
-        candidateRole: RelationParticipantRole.related,
-        ignoredRelationId: details.relation.id,
-      ),
-    );
   });
 
   testWidgets('отмена редактирования не отправляет команду', (tester) async {
@@ -1115,305 +873,6 @@ void main() {
         'Черновик пользователя',
       );
       expect(repository.relationUpdateCommands, hasLength(1));
-
-      await _selectParticipant(
-        tester,
-        repository,
-        actionKey: 'relation-editor-change-related',
-        catalogIndex: 1,
-        title: 'Новое связанное',
-        index: 3,
-      );
-      repository
-          .watchAt(0)
-          .emitDetails(
-            testRelationDetails(
-              relationId: relationId,
-              sourceId: sourceId,
-              relatedId: relatedId,
-              sourceTitle: 'Актуальное исходное',
-              relatedTitle: 'Старое связанное после замены',
-              scope: RelationScope.archived,
-            ),
-            revision: const TestCatalogRevision(4),
-          );
-      await tester.pumpAndSettle();
-      repository
-          .watchAt(0)
-          .emitDetails(details, revision: const TestCatalogRevision(2));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Актуальное исходное'), findsOneWidget);
-      expect(find.text('Новое связанное'), findsOneWidget);
-      expect(find.text('Старое связанное после замены'), findsNothing);
-      expect(find.text('Исходное'), findsNothing);
-      expect(
-        find.text('To Актуальное исходное, you can Новое связанное'),
-        findsOneWidget,
-      );
-      expect(repository.relationUpdateCommands, hasLength(1));
-      await tester.tap(find.byKey(const ValueKey('relation-editor-submit')));
-      await tester.pump();
-      expect(repository.relationUpdateCommands, hasLength(2));
-      final patch = repository.updateCommandAt(1).patch;
-      expect(patch.sourceIntentionId, isA<LongTermRelationFieldUnchanged>());
-      expect(
-        patch.relatedIntentionId,
-        isA<LongTermRelationFieldSet<IntentionId>>().having(
-          (field) => field.value,
-          'выбранный участник',
-          testSummary(index: 3).id,
-        ),
-      );
-      expect(
-        patch.description,
-        isA<LongTermRelationDescriptionReplaced>().having(
-          (field) => field.value.value,
-          'черновик описания',
-          'Черновик пользователя',
-        ),
-      );
-    },
-  );
-
-  testWidgets(
-    'заменённый участник обновляется по подписке без потери ошибки и черновика',
-    (tester) async {
-      final repository = ControlledRelationFormRepository();
-      addTearDown(repository.dispose);
-      final relationId = testFormRelationId(95);
-      final sourceId = testSummary(index: 1).id;
-      final oldRelatedId = testSummary(index: 2).id;
-      final replacementId = testSummary(index: 3).id;
-      final details = testRelationDetails(
-        relationId: relationId,
-        sourceId: sourceId,
-        relatedId: oldRelatedId,
-        sourceTitle: 'Исходное',
-        relatedTitle: 'Прежнее связанное',
-        scope: RelationScope.archived,
-        description: 'Исходное описание',
-      );
-      await _openDetailsForEditing(tester, repository, details);
-      await tester.tap(
-        find.byKey(const ValueKey('relation-details-edit-relation')),
-      );
-      await tester.pumpAndSettle();
-      await _selectParticipant(
-        tester,
-        repository,
-        actionKey: 'relation-editor-change-related',
-        catalogIndex: 1,
-        title: 'Новый участник',
-        index: 3,
-      );
-      await _selectType(tester, 'can');
-      await tester.enterText(
-        find.byKey(const ValueKey('relation-editor-description')),
-        'Черновик пользователя',
-      );
-      await tester.tap(find.byKey(const ValueKey('relation-editor-submit')));
-      await tester.pump();
-      repository.failRelationCommand(
-        0,
-        LongTermRelationPairOccupiedFailure(testFormRelationId(96)),
-      );
-      await tester.pumpAndSettle();
-
-      repository.emitIntention(
-        testDetailsIntention(
-          index: 3,
-          title: 'Новый участник после переименования',
-          archiveState: IntentionArchiveState.archived,
-        ),
-        counts: testRelationCounts(),
-        revision: const TestCatalogRevision(3),
-      );
-      await tester.pumpAndSettle();
-      repository
-          .watchAt(0)
-          .emitDetails(
-            testRelationDetails(
-              relationId: relationId,
-              sourceId: sourceId,
-              relatedId: oldRelatedId,
-              sourceTitle: 'Исходное после переименования',
-              relatedTitle: 'Прежнее связанное после переименования',
-              scope: RelationScope.archived,
-            ),
-            revision: const TestCatalogRevision(4),
-          );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Исходное после переименования'), findsOneWidget);
-      expect(find.text('Новый участник после переименования'), findsOneWidget);
-      expect(find.text('Прежнее связанное после переименования'), findsNothing);
-      expect(
-        find.text(
-          'To Исходное после переименования, you can '
-          'Новый участник после переименования',
-        ),
-        findsOneWidget,
-      );
-      expect(
-        tester
-            .widget<Text>(
-              find.byKey(
-                const ValueKey(
-                  'relation-editor-participant-archive-state-related',
-                ),
-              ),
-            )
-            .data,
-        'Archived',
-      );
-      expect(
-        find.text(
-          'A relation with this direction already exists between the selected '
-          'intentions.',
-        ),
-        findsOneWidget,
-      );
-      expect(
-        tester
-            .widget<TextField>(
-              find.byKey(const ValueKey('relation-editor-description')),
-            )
-            .controller
-            ?.text,
-        'Черновик пользователя',
-      );
-      expect(repository.relationUpdateCommands, hasLength(1));
-      expect(
-        repository.updateCommandAt(0).patch.relatedIntentionId,
-        isA<LongTermRelationFieldSet<IntentionId>>().having(
-          (field) => field.value,
-          'выбранный участник',
-          replacementId,
-        ),
-      );
-    },
-  );
-
-  testWidgets(
-    'снимок нового исходного участника сохраняет основу правки и команду',
-    (tester) async {
-      final repository = ControlledRelationFormRepository();
-      addTearDown(repository.dispose);
-      final relationId = testFormRelationId(97);
-      final oldSourceId = testSummary(index: 1).id;
-      final relatedId = testSummary(index: 2).id;
-      final replacementId = testSummary(index: 3).id;
-      final details = testRelationDetails(
-        relationId: relationId,
-        sourceId: oldSourceId,
-        relatedId: relatedId,
-        sourceTitle: 'Прежнее исходное',
-        relatedTitle: 'Связанное',
-        scope: RelationScope.archived,
-        description: 'Исходное описание',
-      );
-      await _openDetailsForEditing(tester, repository, details);
-      await tester.tap(
-        find.byKey(const ValueKey('relation-details-edit-relation')),
-      );
-      await tester.pumpAndSettle();
-      await _selectParticipant(
-        tester,
-        repository,
-        actionKey: 'relation-editor-change-source',
-        catalogIndex: 1,
-        title: 'Новое исходное',
-        index: 3,
-      );
-      await tester.enterText(
-        find.byKey(const ValueKey('relation-editor-description')),
-        'Моё описание',
-      );
-
-      repository.emitIntention(
-        testDetailsIntention(
-          index: 3,
-          title: 'Новое исходное после переименования',
-          archiveState: IntentionArchiveState.archived,
-        ),
-        counts: testRelationCounts(),
-        revision: const TestCatalogRevision(3),
-      );
-      await tester.pumpAndSettle();
-      repository
-          .watchAt(0)
-          .emitDetails(
-            testRelationDetails(
-              relationId: relationId,
-              sourceId: oldSourceId,
-              relatedId: relatedId,
-              sourceTitle: 'Прежнее исходное после переименования',
-              relatedTitle: 'Связанное',
-              scope: RelationScope.archived,
-              description: 'Чужое описание',
-            ),
-            revision: const TestCatalogRevision(4),
-          );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Новое исходное после переименования'), findsOneWidget);
-      expect(find.text('Прежнее исходное после переименования'), findsNothing);
-      expect(find.text('Связанное'), findsOneWidget);
-      expect(
-        find.text('To Новое исходное после переименования, you need Связанное'),
-        findsOneWidget,
-      );
-      expect(
-        tester
-            .widget<Text>(
-              find.byKey(
-                const ValueKey(
-                  'relation-editor-participant-archive-state-source',
-                ),
-              ),
-            )
-            .data,
-        'Archived',
-      );
-      expect(
-        tester
-            .widget<TextField>(
-              find.byKey(const ValueKey('relation-editor-description')),
-            )
-            .controller
-            ?.text,
-        'Моё описание',
-      );
-      expect(repository.relationUpdateCommands, isEmpty);
-      await tester.tap(find.byKey(const ValueKey('relation-editor-submit')));
-      await tester.pump();
-
-      expect(repository.relationUpdateCommands, hasLength(1));
-      final command = repository.updateCommandAt(0);
-      expect(command.relationId, relationId);
-      expect(
-        command.patch.sourceIntentionId,
-        isA<LongTermRelationFieldSet<IntentionId>>().having(
-          (field) => field.value,
-          'новое исходное намерение',
-          replacementId,
-        ),
-      );
-      expect(
-        command.patch.relatedIntentionId,
-        isA<LongTermRelationFieldUnchanged<IntentionId>>(),
-      );
-      expect(command.patch.type, isA<LongTermRelationFieldUnchanged>());
-      expect(command.patch.priority, isA<LongTermRelationFieldUnchanged>());
-      expect(
-        command.patch.description,
-        isA<LongTermRelationDescriptionReplaced>().having(
-          (field) => field.value.value,
-          'черновик описания',
-          'Моё описание',
-        ),
-      );
     },
   );
 

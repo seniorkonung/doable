@@ -80,11 +80,17 @@ final class RelationEditorViewModel extends _$RelationEditorViewModel {
     }
   }
 
+  /// Принимает участника в черновик создания.
+  ///
+  /// Участники существующей связи неизменны, поэтому черновик изменения
+  /// другого участника не принимает.
   bool selectParticipant(
     RelationParticipantRole role,
     GraphSnapshot<RelationParticipantSummary> selected,
   ) {
-    if (!ref.mounted || state.sessionState == RelationEditorSessionState.left) {
+    if (!ref.mounted ||
+        !_context.isCreating ||
+        state.sessionState == RelationEditorSessionState.left) {
       return false;
     }
     final needsNewBasis = state.needsNewBasis(
@@ -146,24 +152,6 @@ final class RelationEditorViewModel extends _$RelationEditorViewModel {
         RelationParticipantRole.related,
     };
     final refreshed = state.withConfirmedDetails(details, revision);
-    if (!identical(refreshed, state)) {
-      state = refreshed;
-    }
-    return needsNewBasis;
-  }
-
-  /// Обновляет только показ выбранного участника по его наблюдению.
-  bool refreshConfirmedParticipant(
-    RelationParticipantRole role,
-    RelationParticipantSummary participant,
-    GraphRevision revision,
-  ) {
-    final needsNewBasis = state.needsNewBasis(role, participant.id, revision);
-    final refreshed = state.withConfirmedParticipant(
-      role,
-      participant,
-      revision,
-    );
     if (!identical(refreshed, state)) {
       state = refreshed;
     }

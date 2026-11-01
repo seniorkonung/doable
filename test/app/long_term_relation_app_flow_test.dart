@@ -85,19 +85,6 @@ void main() {
         description: 'Описание участника',
       );
       await _dismissOperationMessage(tester);
-      const sameTitle = 'Одинаковое намерение';
-      await _createIntention(
-        tester,
-        title: sameTitle,
-        description: 'Первый одноимённый участник',
-      );
-      await _dismissOperationMessage(tester);
-      await _createIntention(
-        tester,
-        title: sameTitle,
-        description: 'Второй одноимённый участник',
-      );
-      await _dismissOperationMessage(tester);
 
       expect(
         tester.getSemantics(quickCreationAction()),
@@ -232,14 +219,8 @@ void main() {
       );
 
       const lifecycleDescription = '  Литеральный текст\n🧭  ';
-      const lifecyclePhrase =
-          'To Одинаковое намерение, you can Одинаковое намерение';
-      await _editRelation(
-        tester,
-        sourceTitle: sameTitle,
-        relatedTitle: sameTitle,
-        description: lifecycleDescription,
-      );
+      const lifecyclePhrase = 'To Укреплять здоровье, you can Много ходить';
+      await _editRelation(tester, description: lifecycleDescription);
       await _dismissOperationMessage(tester);
       expect(_textByKey(tester, 'relation-details-phrase'), lifecyclePhrase);
       expect(_textByKey(tester, 'relation-details-type'), 'Can');
@@ -263,10 +244,10 @@ void main() {
         ..also(runtimes.add);
       await tester.pumpWidget(MainApp(runtime: lifecycleRuntime));
       await openIntentionGraph(tester, waitFor: _pumpUntilFound);
-      await _pumpUntilFound(tester, find.text(sameTitle));
+      await _pumpUntilFound(tester, find.text('Укреплять здоровье'));
       await _openArchivedCanRelation(
         tester,
-        participantTitle: sameTitle,
+        participantTitle: 'Укреплять здоровье',
         phrase: lifecyclePhrase,
       );
       expect(
@@ -280,7 +261,7 @@ void main() {
       await tester.tap(
         find.byKey(const ValueKey('relation-details-source-participant')),
       );
-      await _pumpUntilDetailsTitle(tester, sameTitle);
+      await _pumpUntilDetailsTitle(tester, 'Укреплять здоровье');
 
       await _openIntentionOptions(tester);
       final blockedDeletion = tester.widget<OptionRow>(
@@ -311,8 +292,9 @@ void main() {
       await _pumpUntilAbsent(tester, find.byType(IntentionDetailsPage));
       await _dismissOperationMessage(tester);
       await _returnToCatalog(tester);
-      await _pumpUntilFound(tester, find.text(sameTitle));
-      expect(intentionCatalogRow(sameTitle), findsOneWidget);
+      await _pumpUntilFound(tester, find.text('Много ходить'));
+      expect(intentionCatalogRow('Укреплять здоровье'), findsNothing);
+      expect(intentionCatalogRow('Много ходить'), findsOneWidget);
 
       final successfulRelationCommands = diagnostics.events
           .whereType<LongTermRelationCommandDiagnosticsEvent>()
@@ -876,8 +858,6 @@ Future<void> _createNeedRelation(
 
 Future<void> _editRelation(
   WidgetTester tester, {
-  required String sourceTitle,
-  required String relatedTitle,
   required String description,
 }) async {
   final edit = find.byKey(const ValueKey('relation-details-edit-relation'));
@@ -885,18 +865,7 @@ Future<void> _editRelation(
   await tester.tap(edit);
   await _pumpUntilFound(
     tester,
-    find.byKey(const ValueKey('relation-editor-change-source')),
-  );
-
-  await _selectParticipant(
-    tester,
-    actionKey: 'relation-editor-change-source',
-    title: sourceTitle,
-  );
-  await _selectParticipant(
-    tester,
-    actionKey: 'relation-editor-change-related',
-    title: relatedTitle,
+    find.byKey(const ValueKey('relation-editor-open-source-details')),
   );
 
   final type = find.byKey(const ValueKey('relation-editor-type-can'));
@@ -918,27 +887,6 @@ Future<void> _editRelation(
     tester,
     find.byKey(const ValueKey('relation-details-phrase')),
   );
-}
-
-Future<void> _selectParticipant(
-  WidgetTester tester, {
-  required String actionKey,
-  required String title,
-}) async {
-  final action = find.byKey(ValueKey(actionKey));
-  await _ensureVisible(tester, action);
-  await tester.tap(action);
-  await _pumpUntilFound(
-    tester,
-    find.byKey(const ValueKey('participant-picker-filter')),
-  );
-
-  final matchingTitles = find.text(title);
-  await _pumpUntilFound(tester, matchingTitles);
-  final selected = matchingTitles.first;
-  await _ensureVisible(tester, selected);
-  await tester.tap(selected);
-  await _pumpUntilFound(tester, find.byKey(ValueKey(actionKey)));
 }
 
 Future<void> _archiveCurrentRelation(WidgetTester tester) async {
@@ -972,21 +920,11 @@ Future<void> _openArchivedCanRelation(
 }) async {
   await _openIntention(tester, participantTitle);
   await _chooseDetailsTab(tester, 'Relations');
-  // Одноимённые намерения неразличимы в каталоге: открытое может быть и
-  // исходным, и связанным участником связи.
   final canUse = find.byKey(const ValueKey('intention-relations-group-canUse'));
   await _pumpUntilFound(tester, canUse);
   await _ensureVisible(tester, canUse);
   await tester.tap(canUse);
   await tester.pumpAndSettle(const Duration(milliseconds: 1));
-  if (!tester.getSemantics(canUse).label.contains('some archived')) {
-    final canBeUsedFor = find.byKey(
-      const ValueKey('intention-relations-group-canBeUsedFor'),
-    );
-    await _ensureVisible(tester, canBeUsedFor);
-    await tester.tap(canBeUsedFor);
-    await tester.pumpAndSettle(const Duration(milliseconds: 1));
-  }
   await _expandArchive(tester);
 
   await _tapWhenFound(tester, _relationRow(phrase));
