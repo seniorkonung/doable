@@ -3,9 +3,9 @@
 ## Assessment
 
 **Format version:** 1
-**Result:** Changes needed
+**Result:** No unresolved findings
 **Coverage status:** Complete
-**Summary:** Фаза 1 выполнена: пара связи неизменна на всех уровнях, тип активной связи не зависит от шагов пути, показания времени хранятся и переживают экспорт и импорт. Осталась одна находка низкой значимости F1: после удаления разрешений из формы в состоянии подробного просмотра связи остались данные без читателя в рабочем коде. Принятых рисков нет.
+**Summary:** Фаза 1 выполнена: пара связи неизменна на всех уровнях, тип активной связи не зависит от шагов пути, показания времени хранятся и переживают экспорт и импорт. Активных находок и принятых рисков нет. Задача 1.19 фазы 1 ещё не выполнена и в проверенный диапазон не входит.
 
 ## Review target
 
@@ -59,14 +59,7 @@
 
 ## Findings
 
-### F1 · Low — Подробный просмотр связи хранит данные разрешений без читателя
-
-- **Evidence:** Задача 1.11 убрала разрешения из формы, а вместе с ними единственного рабочего читателя `permissionRevision`. Поле, параметр конструктора и `copyWith` остались в `lib/src/long_term_relation/presentation/details/relation_details_state.dart:35,39,46,59,68`, запись — в `relation_details_view_model.dart:363`, а читает его только условие ожидания в `test/graph/presentation/graph_reconciliation_checkpoint_test.dart:564`. Так же потерял смысл `editingDetails` (`relation_details_state.dart:47`): `relation_details_page.dart:109` передаёт его форме, но `lib/src/long_term_relation/presentation/editor` больше не читает разрешения. Других вызовов `LongTermRelationDetails.withPermissions` (`long_term_relation_projection.dart:167`) в `lib/` нет.
-- **Evidence revisions:** ["e2f96a7ef96dd419578c7e8403299a4ca79568e9"]
-- **Impact:** Читатель видит вторую ревизию разрешений и производные данные формы, которые ни на что не влияют, и должен выяснять, зачем они согласуются. D8 сохраняет эту модель для нижней панели, поэтому без правки этот лишний слой перейдёт в фазу 2.
-- **Required outcome:** Состояние подробного просмотра содержит только то, что читает рабочий код, а тест согласования ждёт наблюдаемый результат, а не служебное поле.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** ["lib/src/long_term_relation/presentation/details/relation_details_state.dart", "lib/src/long_term_relation/presentation/details/relation_details_view_model.dart", "lib/src/long_term_relation/presentation/details/relation_details_page.dart", "lib/src/long_term_relation/application/long_term_relation_projection.dart", "test/graph/presentation/graph_reconciliation_checkpoint_test.dart"]
+No unresolved findings remain in the implementation review.
 
 ## Review coverage
 

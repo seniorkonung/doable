@@ -257,3 +257,22 @@
   - **Зависимости:** 1.1–1.17.
   - **Предполагаемые файлы:** нет (только проверка).
   - **Размер:** XS.
+
+- [ ] 1.19 Убрать из подробного просмотра связи данные разрешений без читателя
+  - **Критерии приёмки:**
+    - Состояние подробного просмотра долговременной связи содержит только то, что читает рабочий код. Поведение для человека не меняется.
+    - `RelationDetailsLoaded` не имеет `permissionRevision`: удалены поле, параметр конструктора, параметр и присваивание в `copyWith`, а `_handleCompletion` его не записывает.
+    - Геттер `editingDetails` удалён, а `relation_details_page.dart` передаёт в `RelationEditingContext` `loaded.details`. `LongTermRelationDetails.withPermissions` удалён.
+    - Поле `permissions` в `RelationDetailsLoaded` и его обновление из подтверждённого изменения сохранены: их читают кнопка удаления, объяснение запрета и `_isLifecycleChangeApplicable`.
+    - В `graph_reconciliation_checkpoint_test.dart` ожидание после удаления дневного выбора проверяет наблюдаемый результат вместо ревизии разрешений: `relation(101).permissions.canDelete` и `relation(102).permissions.canDelete` истинны, `relation(105).permissions.canDelete` ложно. Проверки после ожидания не меняются.
+    - В `relation_details_widget_test.dart` второй снимок собирается через `testRelationDetails(..., permissions: ...)` с теми же идентификаторами.
+    - В `lib/` и `test/` нет `permissionRevision` в подробном просмотре, `editingDetails` и `withPermissions`.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation test/long_term_relation/application/long_term_relation_projection_test.dart test/graph/presentation/graph_reconciliation_checkpoint_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.11 — форма больше не читает разрешения.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/long_term_relation/presentation/details/relation_details_state.dart`, `relation_details_view_model.dart`, `relation_details_page.dart`;
+    - меняется `lib/src/long_term_relation/application/long_term_relation_projection.dart`;
+    - меняются `test/graph/presentation/graph_reconciliation_checkpoint_test.dart`, `test/long_term_relation/presentation/details/relation_details_widget_test.dart`.
+  - **Размер:** S.
