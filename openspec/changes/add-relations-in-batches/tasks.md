@@ -115,15 +115,16 @@
     - Триггер `long_term_relations_protect_daily_choice_path` удалён, а изменение связи не проверяет разрешения. Тип активной связи с шагами пути меняется, а состав пути, дата и выполнение дневного выбора сохраняются.
     - Удаление связи с шагами пути блокируется как прежде.
     - Сверка типа в снимке незавершённого выбора (`actual.type` в чтении продолжений и команде дневного выбора) остаётся: она относится к черновику, а не к сохранённому пути.
+    - Пересечение создания дневного выбора со сменой типа даёт оба исхода сценария «Создание пересекается с изменением типа связи». Порядок «выбор первым» покрывает проверка смены типа связи с шагами пути: смена подтверждается, а путь показывает новый тип. Порядок «тип первым» покрывает тест «изменённый смысл маршрута возвращает конфликт без записи»: создание отклоняется конфликтом.
   - **Проверка:**
     - `mise run codegen`.
-    - `mise exec --no-deps -- flutter test test/data/local/daily_choice_schema_test.dart test/graph/data/drift_daily_path_protection_test.dart test/graph/data/drift_relation_update_test.dart`.
+    - `mise exec --no-deps -- flutter test test/data/local/daily_choice_schema_test.dart test/graph/data/drift_daily_path_protection_test.dart test/graph/data/drift_relation_update_test.dart test/graph/data/drift_daily_choice_create_test.dart`.
     - `mise exec --no-deps -- flutter analyze`.
   - **Зависимости:** 1.8 — участников защищает триггер идентичности.
   - **Предполагаемые файлы:**
     - меняются `lib/src/data/local/schema/daily_choice_schema.drift`, `lib/src/data/local/app_database.g.dart`, `drift_schemas/drift_schema_v7.json`;
     - меняется `lib/src/graph/data/drift_personal_graph_repository_relation_commands.dart`;
-    - меняются тесты из проверки.
+    - меняются тесты из проверки, кроме `test/graph/data/drift_daily_choice_create_test.dart`: он уже покрывает порядок «тип первым».
   - **Размер:** S.
 
 - [ ] 1.10 Изменение типа архивированной связи отклоняется отдельным типизированным отказом
