@@ -88,8 +88,8 @@ void main() {
       }
       raw.execute(
         '''INSERT INTO long_term_relations
-         (id, source_intention_id, related_intention_id, type, priority, is_archived)
-         VALUES (?, ?, ?, 'need', 2, 0)''',
+         (id, source_intention_id, related_intention_id, type, priority, is_archived, created_at, updated_at)
+         VALUES (?, ?, ?, 'need', 2, 0, 0, 0)''',
         [_uuid(101), _uuid(1), _uuid(2)],
       );
     });

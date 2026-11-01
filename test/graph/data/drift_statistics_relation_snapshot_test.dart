@@ -298,8 +298,8 @@ void main() {
     await seedGraph(database, () async {
       await database.customStatement(
         '''INSERT INTO long_term_relations
-         (id, source_intention_id, related_intention_id, type, priority)
-         VALUES (?, ?, ?, 'need', 4)''',
+         (id, source_intention_id, related_intention_id, type, priority, created_at, updated_at)
+         VALUES (?, ?, ?, 'need', 4, 0, 0)''',
         [durabilityUuid(105), durabilityUuid(4), durabilityUuid(2)],
       );
       await database.customStatement(
@@ -427,8 +427,8 @@ Future<void> _addRelations(AppDatabase database, int count) async {
       );
       await database.customStatement(
         '''INSERT INTO long_term_relations
-           (id, source_intention_id, related_intention_id, type, priority)
-           VALUES (?, ?, ?, 'need', 2)''',
+           (id, source_intention_id, related_intention_id, type, priority, created_at, updated_at)
+           VALUES (?, ?, ?, 'need', 2, 0, 0)''',
         [durabilityUuid(2000 + i), durabilityUuid(1), durabilityUuid(1000 + i)],
       );
     }

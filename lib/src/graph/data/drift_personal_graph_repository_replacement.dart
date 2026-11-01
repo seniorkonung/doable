@@ -289,8 +289,8 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
                 isArchived: Value(
                   record.scope == relation_domain.RelationScope.archived,
                 ),
-                createdAt: Value(record.createdAt.value.microsecondsSinceEpoch),
-                updatedAt: Value(record.updatedAt.value.microsecondsSinceEpoch),
+                createdAt: record.createdAt.value.microsecondsSinceEpoch,
+                updatedAt: record.updatedAt.value.microsecondsSinceEpoch,
               ),
             );
           case DailyChoiceRecord(:final choice, :final path):

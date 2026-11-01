@@ -4069,9 +4069,8 @@ class LongTermRelations extends Table
     aliasedName,
     false,
     type: DriftSqlType.int,
-    requiredDuringInsert: false,
-    $customConstraints: 'NOT NULL DEFAULT 0',
-    defaultValue: const CustomExpression('0'),
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
   );
   static const VerificationMeta _updatedAtMeta = const VerificationMeta(
     'updatedAt',
@@ -4081,9 +4080,8 @@ class LongTermRelations extends Table
     aliasedName,
     false,
     type: DriftSqlType.int,
-    requiredDuringInsert: false,
-    $customConstraints: 'NOT NULL DEFAULT 0',
-    defaultValue: const CustomExpression('0'),
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
   );
   @override
   List<GeneratedColumn> get $columns => [
@@ -4182,12 +4180,16 @@ class LongTermRelations extends Table
         _createdAtMeta,
         createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
       );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
     }
     if (data.containsKey('updated_at')) {
       context.handle(
         _updatedAtMeta,
         updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
       );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
     }
     return context;
   }
@@ -4483,13 +4485,15 @@ class LongTermRelationsCompanion extends UpdateCompanion<LongTermRelation> {
     required int priority,
     this.description = const Value.absent(),
     this.isArchived = const Value.absent(),
-    this.createdAt = const Value.absent(),
-    this.updatedAt = const Value.absent(),
+    required int createdAt,
+    required int updatedAt,
   }) : id = Value(id),
        sourceIntentionId = Value(sourceIntentionId),
        relatedIntentionId = Value(relatedIntentionId),
        type = Value(type),
-       priority = Value(priority);
+       priority = Value(priority),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
   static Insertable<LongTermRelation> custom({
     Expression<int>? creationSequence,
     Expression<String>? id,
@@ -9190,8 +9194,8 @@ typedef $LongTermRelationsCreateCompanionBuilder =
       required int priority,
       Value<String?> description,
       Value<bool> isArchived,
-      Value<int> createdAt,
-      Value<int> updatedAt,
+      required int createdAt,
+      required int updatedAt,
     });
 typedef $LongTermRelationsUpdateCompanionBuilder =
     LongTermRelationsCompanion Function({
@@ -9662,8 +9666,8 @@ class $LongTermRelationsTableManager
                 required int priority,
                 Value<String?> description = const Value.absent(),
                 Value<bool> isArchived = const Value.absent(),
-                Value<int> createdAt = const Value.absent(),
-                Value<int> updatedAt = const Value.absent(),
+                required int createdAt,
+                required int updatedAt,
               }) => LongTermRelationsCompanion.insert(
                 creationSequence: creationSequence,
                 id: id,

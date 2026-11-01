@@ -80,8 +80,8 @@ void main() {
     seedRawGraph(raw, () {
       raw.execute(
         '''INSERT INTO long_term_relations
-         (id, source_intention_id, related_intention_id, type, priority, description, is_archived)
-         VALUES (?, ?, ?, ?, 2, ?, ?)''',
+         (id, source_intention_id, related_intention_id, type, priority, description, is_archived, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 2, ?, ?, 0, 0)''',
         [
           _uuid(number),
           _uuid(source),

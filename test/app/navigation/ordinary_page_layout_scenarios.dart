@@ -278,7 +278,7 @@ void _seedOrdinaryLayout(sqlite.Database database) {
     // Вместе со связью из основного засева у первого намерения 52 связи.
     for (var number = 3; number <= _lastLayoutRelation; number++) {
       database.execute(
-        'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
+        'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 0, 0)',
         [
           tagFixtureId(5000 + number),
           tagFixtureId(1),

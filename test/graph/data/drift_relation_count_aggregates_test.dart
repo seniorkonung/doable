@@ -308,8 +308,10 @@ void main() {
             type,
             priority,
             description,
-            is_archived
-          ) VALUES (?, ?, ?, 'need', 1, CAST(x'80' AS TEXT), 0)
+            is_archived,
+            created_at,
+            updated_at
+          ) VALUES (?, ?, ?, 'need', 1, CAST(x'80' AS TEXT), 0, 0, 0)
         ''',
           [
             _uuid(906),
@@ -429,8 +431,10 @@ Future<void> _insertRelation(
       related_intention_id,
       type,
       priority,
-      is_archived
-    ) VALUES (?, ?, ?, ?, ?, ?)
+      is_archived,
+      created_at,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, 0, 0)
   ''',
     [id, sourceId, relatedId, type, 1, isArchived ? 1 : 0],
   ),
@@ -489,8 +493,10 @@ Future<void> _insertRawRelation(
       type,
       priority,
       description,
-      is_archived
-    ) VALUES (?, ?, ?, 'need', 1, ?, 0)
+      is_archived,
+      created_at,
+      updated_at
+    ) VALUES (?, ?, ?, 'need', 1, ?, 0, 0, 0)
   ''',
     [id, sourceId, relatedId, description],
   ),

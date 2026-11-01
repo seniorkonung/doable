@@ -127,8 +127,8 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
             },
             description: Value(command.description?.value),
             isArchived: const Value(false),
-            createdAt: Value(storedCreatedAt),
-            updatedAt: Value(storedCreatedAt),
+            createdAt: storedCreatedAt,
+            updatedAt: storedCreatedAt,
           ),
         );
     final created = relation_domain.LongTermRelation(

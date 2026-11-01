@@ -823,7 +823,7 @@ Future<void> _seedOccupiedPairs(AppDatabase database) =>
         (103, 4, 1, 0),
       ]) {
         await database.customStatement(
-          'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
+          'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 0, 0)',
           [_id(number), _id(source), _id(related), 'need', 2, archived],
         );
       }
@@ -843,7 +843,7 @@ Future<void> _seedArchivedSwimRelation(AppDatabase database) =>
         );
       }
       await database.customStatement(
-        'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, description, is_archived) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, description, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0)',
         [
           _id(_swimRelationNumber),
           _id(1),

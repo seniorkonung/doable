@@ -711,8 +711,10 @@ Future<void> _insertLongTermRelation(
       type,
       priority,
       description,
-      is_archived
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      is_archived,
+      created_at,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0)
   ''',
     [id, sourceId, relatedId, type, priority, description, isArchived],
   ),

@@ -208,7 +208,7 @@ Future<void> _seed(LocalDatabaseHarness harness) async {
       await database.customInsert(
         '''INSERT INTO long_term_relations
            (id, source_intention_id, related_intention_id, type, priority,
-            is_archived) VALUES (?, ?, ?, ?, 2, 0)''',
+            is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, 2, 0, 0, 0)''',
         variables: [
           Variable.withString(_uuid(number)),
           Variable.withString(_uuid(source)),

@@ -510,6 +510,8 @@ Future<void> _insertRelation(
           priority: 2,
           description: Value(description),
           isArchived: const Value(false),
+          createdAt: 0,
+          updatedAt: 0,
         ),
       ),
 );

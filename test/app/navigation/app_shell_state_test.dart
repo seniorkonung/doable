@@ -1006,8 +1006,8 @@ void _seed(sqlite.Database database) {
     }
     database.execute(
       'INSERT INTO long_term_relations (id, source_intention_id, '
-      'related_intention_id, type, priority, is_archived) '
-      'VALUES (?, ?, ?, ?, ?, ?)',
+      'related_intention_id, type, priority, is_archived, created_at, updated_at) '
+      'VALUES (?, ?, ?, ?, ?, ?, 0, 0)',
       [tagFixtureId(_relation), tagFixtureId(1), tagFixtureId(2), 'need', 2, 0],
     );
     for (var index = 0; index < _choiceCount; index++) {

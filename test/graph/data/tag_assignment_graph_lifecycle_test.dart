@@ -96,7 +96,7 @@ void main() {
     () async {
       seedRawGraph(raw, () {
         raw.execute(
-          'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority) VALUES (?, ?, ?, ?, ?)',
+          'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 0, 0)',
           [tagFixtureId(103), tagFixtureId(3), tagFixtureId(1), 'can', 3],
         );
       });
@@ -277,7 +277,7 @@ void main() {
           );
         }
         raw.execute(
-          'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, description) VALUES (?, ?, ?, ?, ?, ?)',
+          'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 0, 0)',
           [
             tagFixtureId(103),
             tagFixtureId(3),
