@@ -1670,23 +1670,6 @@
     {
       "id": 45,
       "references": [
-        22,
-        30
-      ],
-      "type": "trigger",
-      "data": {
-        "on": 22,
-        "references_in_body": [
-          22,
-          30
-        ],
-        "name": "long_term_relations_protect_daily_choice_path",
-        "sql": "CREATE TRIGGER long_term_relations_protect_daily_choice_path\nBEFORE UPDATE OF type, source_intention_id, related_intention_id\nON long_term_relations\nWHEN\n  (\n    new.type <> old.type OR\n    new.source_intention_id <> old.source_intention_id OR\n    new.related_intention_id <> old.related_intention_id\n  ) AND\n  EXISTS (\n    SELECT 1 FROM daily_choice_path_steps\n    WHERE long_term_relation_id = old.id\n  )\nBEGIN\n  SELECT RAISE(ABORT, 'long-term relation is used by a daily choice path');\nEND;"
-      }
-    },
-    {
-      "id": 46,
-      "references": [
         22
       ],
       "type": "index",
@@ -1699,7 +1682,7 @@
       }
     },
     {
-      "id": 47,
+      "id": 46,
       "references": [
         22
       ],
@@ -1713,7 +1696,7 @@
       }
     },
     {
-      "id": 48,
+      "id": 47,
       "references": [
         22
       ],
@@ -1728,7 +1711,7 @@
       }
     },
     {
-      "id": 49,
+      "id": 48,
       "references": [
         22,
         14
@@ -1745,7 +1728,7 @@
       }
     },
     {
-      "id": 50,
+      "id": 49,
       "references": [
         22,
         14
@@ -1762,7 +1745,7 @@
       }
     },
     {
-      "id": 51,
+      "id": 50,
       "references": [
         14,
         22
@@ -1779,7 +1762,7 @@
       }
     },
     {
-      "id": 52,
+      "id": 51,
       "references": [],
       "type": "table",
       "data": {
@@ -1804,58 +1787,58 @@
       }
     },
     {
-      "id": 53,
+      "id": 52,
       "references": [
         14,
-        52
+        51
       ],
       "type": "trigger",
       "data": {
         "on": 14,
         "references_in_body": [
           14,
-          52
+          51
         ],
         "name": "intentions_fts_after_insert",
         "sql": "CREATE TRIGGER intentions_fts_after_insert\nAFTER INSERT ON intentions\nBEGIN\n  INSERT INTO intention_titles_fts(rowid, title_search_key)\n  VALUES (new.rowid, new.title_search_key);\nEND;"
       }
     },
     {
-      "id": 54,
+      "id": 53,
       "references": [
         14,
-        52
+        51
       ],
       "type": "trigger",
       "data": {
         "on": 14,
         "references_in_body": [
           14,
-          52
+          51
         ],
         "name": "intentions_fts_after_update_search_content",
         "sql": "CREATE TRIGGER intentions_fts_after_update_search_content\nAFTER UPDATE ON intentions\nBEGIN\n  INSERT INTO intention_titles_fts(\n    intention_titles_fts, rowid, title_search_key\n  ) VALUES ('delete', old.rowid, old.title_search_key);\n  INSERT INTO intention_titles_fts(rowid, title_search_key)\n  VALUES (new.rowid, new.title_search_key);\nEND;"
       }
     },
     {
-      "id": 55,
+      "id": 54,
       "references": [
         14,
-        52
+        51
       ],
       "type": "trigger",
       "data": {
         "on": 14,
         "references_in_body": [
           14,
-          52
+          51
         ],
         "name": "intentions_fts_after_delete",
         "sql": "CREATE TRIGGER intentions_fts_after_delete\nAFTER DELETE ON intentions\nBEGIN\n  INSERT INTO intention_titles_fts(\n    intention_titles_fts, rowid, title_search_key\n  ) VALUES ('delete', old.rowid, old.title_search_key);\nEND;"
       }
     },
     {
-      "id": 56,
+      "id": 55,
       "references": [
         14
       ],
@@ -1869,7 +1852,7 @@
       }
     },
     {
-      "id": 57,
+      "id": 56,
       "references": [
         14
       ],
@@ -1883,7 +1866,7 @@
       }
     },
     {
-      "id": 58,
+      "id": 57,
       "references": [
         14
       ],
@@ -1897,7 +1880,7 @@
       }
     },
     {
-      "id": 59,
+      "id": 58,
       "references": [
         14
       ],
@@ -1911,7 +1894,7 @@
       }
     },
     {
-      "id": 60,
+      "id": 59,
       "references": [
         14
       ],
@@ -1925,7 +1908,7 @@
       }
     },
     {
-      "id": 61,
+      "id": 60,
       "references": [
         14
       ],
@@ -1939,7 +1922,7 @@
       }
     },
     {
-      "id": 62,
+      "id": 61,
       "references": [
         14
       ],
@@ -1953,7 +1936,7 @@
       }
     },
     {
-      "id": 63,
+      "id": 62,
       "references": [
         14
       ],
@@ -1967,7 +1950,7 @@
       }
     },
     {
-      "id": 64,
+      "id": 63,
       "references": [
         14
       ],
@@ -1981,7 +1964,7 @@
       }
     },
     {
-      "id": 65,
+      "id": 64,
       "references": [
         14
       ],
@@ -1995,7 +1978,7 @@
       }
     },
     {
-      "id": 66,
+      "id": 65,
       "references": [
         14
       ],
@@ -2009,7 +1992,7 @@
       }
     },
     {
-      "id": 67,
+      "id": 66,
       "references": [
         14
       ],
@@ -2023,7 +2006,7 @@
       }
     },
     {
-      "id": 68,
+      "id": 67,
       "references": [
         14
       ],
@@ -2037,7 +2020,7 @@
       }
     },
     {
-      "id": 69,
+      "id": 68,
       "references": [
         14
       ],
@@ -2051,7 +2034,7 @@
       }
     },
     {
-      "id": 70,
+      "id": 69,
       "references": [
         14
       ],
@@ -2065,7 +2048,7 @@
       }
     },
     {
-      "id": 71,
+      "id": 70,
       "references": [
         14
       ],
@@ -2079,7 +2062,7 @@
       }
     },
     {
-      "id": 72,
+      "id": 71,
       "references": [
         14
       ],
@@ -2093,7 +2076,7 @@
       }
     },
     {
-      "id": 73,
+      "id": 72,
       "references": [
         14
       ],
@@ -2510,15 +2493,6 @@
         {
           "dialect": "sqlite",
           "sql": "CREATE INDEX daily_choice_path_steps_relation ON daily_choice_path_steps (long_term_relation_id)"
-        }
-      ]
-    },
-    {
-      "name": "long_term_relations_protect_daily_choice_path",
-      "sql": [
-        {
-          "dialect": "sqlite",
-          "sql": "CREATE TRIGGER long_term_relations_protect_daily_choice_path BEFORE UPDATE OF type, source_intention_id, related_intention_id ON long_term_relations WHEN(new.type <> old.type OR new.source_intention_id <> old.source_intention_id OR new.related_intention_id <> old.related_intention_id)AND EXISTS (SELECT 1 FROM daily_choice_path_steps WHERE long_term_relation_id = old.id) BEGIN SELECT RAISE (ABORT, 'long-term relation is used by a daily choice path');END"
         }
       ]
     },

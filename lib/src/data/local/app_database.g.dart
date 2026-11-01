@@ -5777,10 +5777,6 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'daily_choice_path_steps_relation',
     'CREATE INDEX daily_choice_path_steps_relation ON daily_choice_path_steps (long_term_relation_id)',
   );
-  late final Trigger longTermRelationsProtectDailyChoicePath = Trigger(
-    'CREATE TRIGGER long_term_relations_protect_daily_choice_path BEFORE UPDATE OF type, source_intention_id, related_intention_id ON long_term_relations WHEN(new.type <> old.type OR new.source_intention_id <> old.source_intention_id OR new.related_intention_id <> old.related_intention_id)AND EXISTS (SELECT 1 FROM daily_choice_path_steps WHERE long_term_relation_id = old.id) BEGIN SELECT RAISE (ABORT, \'long-term relation is used by a daily choice path\');END',
-    'long_term_relations_protect_daily_choice_path',
-  );
   late final Index longTermRelationsSourceGroupOrder = Index(
     'long_term_relations_source_group_order',
     'CREATE INDEX long_term_relations_source_group_order ON long_term_relations (source_intention_id, type, is_archived, priority, creation_sequence)',
@@ -5942,7 +5938,6 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     dailyChoicePathStepsOneRoot,
     dailyChoicePathStepsOneSuccessor,
     dailyChoicePathStepsRelation,
-    longTermRelationsProtectDailyChoicePath,
     longTermRelationsSourceGroupOrder,
     longTermRelationsRelatedGroupOrder,
     longTermRelationsImmutableIdentity,
@@ -6177,13 +6172,6 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     WritePropagation(
       on: TableUpdateQuery.onTableName(
         'daily_choices',
-        limitUpdateKind: UpdateKind.update,
-      ),
-      result: [],
-    ),
-    WritePropagation(
-      on: TableUpdateQuery.onTableName(
-        'long_term_relations',
         limitUpdateKind: UpdateKind.update,
       ),
       result: [],

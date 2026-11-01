@@ -149,12 +149,6 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
     final before = storedBefore.toDomain();
 
     final type = _applyRelationFieldPatch(before.type, command.patch.type);
-    if (type != before.type) {
-      final permissions = await _readRelationPermissions(before.id);
-      if (!permissions.canChangeMeaning) {
-        throw _LongTermRelationReferencedByDailyPath(before.id);
-      }
-    }
     final priority = _applyRelationFieldPatch(
       before.priority,
       command.patch.priority,
