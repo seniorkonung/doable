@@ -276,3 +276,236 @@
     - меняется `lib/src/long_term_relation/application/long_term_relation_projection.dart`;
     - меняются `test/graph/presentation/graph_reconciliation_checkpoint_test.dart`, `test/long_term_relation/presentation/details/relation_details_widget_test.dart`.
   - **Размер:** S.
+
+## Phase 2: Связь просматривается и меняется в нижней панели
+
+- [ ] 2.1 Закрепить тестом, что страница намерения над листом не теряет лист в стеке навигации
+  - **Критерии приёмки:**
+    - Тест идёт на настоящем `AppRouter`: лист `showDoableSheet` над страницей намерения открывает через `context.router.push` страницу другого намерения, и она встаёт над листом.
+    - «Назад» на этой странице и системное «назад» возвращают тот же лист с его состоянием, а следующее «назад» закрывает лист и показывает исходную страницу.
+    - Выбор пункта панели навигации на странице над листом убирает страницы и лист из истории. Быстрое создание на этой странице запускается, а возврат с созданного намерения ведёт на неё и затем на лист.
+    - `lib/` не меняется. Если лист не удерживается, работа над фазой останавливается: по разделу рисков `design.md` D8 возвращается к решению с закрытием листа и обновлённым сценарием.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app/navigation/app_shell_sheet_stack_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** новый `test/app/navigation/app_shell_sheet_stack_test.dart`.
+  - **Размер:** S.
+
+- [ ] 2.2 Успех изменения, архивирования и восстановления связи больше не объявляется сообщением
+  - **Критерии приёмки:**
+    - `acceptRelationUpdate`, `acceptRelationArchive` и `acceptRelationRestore` следуют политике «успех без сообщения» из [ADR-0046](../../../docs/adr/0046-keep-edit-failures-on-screen-without-success-message.md): успех публикуется для согласования и не образует права предъявления, а отказ принадлежит инициатору и переходит оболочке, когда инициатор ушёл.
+    - Создание и удаление остаются на общей политике. `acceptRelationRestoreFromCreation` тоже: до фазы 3 он завершает поток формы, и его успех предъявляет оболочка.
+    - Строки `relationEditorUpdated` и `relationArchived` удалены на обоих языках: показывать их больше нечему. `relationRestored` остаётся ради восстановления из поиска.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/graph/application/graph_command_coordinator_relation_lifecycle_test.dart test/graph/presentation/graph_operation_presenter_test.dart test/long_term_relation/presentation test/app/long_term_relation_app_flow_test.dart test/app/creation_flows_integration_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/graph/application/graph_command_coordinator.dart`, `lib/src/graph/presentation/graph_operation_presenter.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
+    - меняются тесты координатора и presenter и сценарии из проверки, ждавшие этих сообщений.
+  - **Размер:** M.
+
+- [ ] 2.3 Модель подробного просмотра принимает изменение типа, приоритета и описания связи
+  - **Критерии приёмки:**
+    - `RelationDetailsViewModel` отправляет через `acceptRelationUpdate` правку только названного поля. Значение, равное подтверждённому, команды не порождает, поэтому показание времени изменения остаётся прежним. Пока операция этой связи выполняется, новая не принимается и не встаёт в очередь.
+    - Смену типа архивированной связи модель не отправляет. Если каскад архивировал связь за открытой панелью, `LongTermRelationArchivedTypeChangeFailure` становится отказом панели.
+    - Текст описания проверяется `LongTermRelationDescription.fromInput`. Отказ проверки и отказ команды — разные типизированные исходы. Пробельный текст очищает описание, а текст, который после проверки равен сохранённому, команды не порождает. Вызывающий узнаёт об успехе собственной команды, как при `delete`.
+    - Отказ правки хранится в состоянии с правом предъявления, поля остаются последним подтверждённым снимком, а следующая принятая правка снимает отказ.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/details/relation_details_view_model_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/long_term_relation/presentation/details/relation_details_view_model.dart`, `relation_details_view_model.g.dart`, `relation_details_state.dart`;
+    - меняется `test/long_term_relation/presentation/details/relation_details_view_model_test.dart`.
+  - **Размер:** M.
+
+- [ ] 2.4 В модуле основ появляется `PriorityPicker`
+  - **Критерии приёмки:**
+    - Четыре пилюли P1–P4 с кольцом цвета приоритета по README компонента: выбранная лежит на `fill`, а цвет приоритета не заливает пилюлю и не красит подпись. Выбрана всегда одна, а нажатие на выбранную ничего не делает. Без `onChange` пилюли недоступны.
+    - Компонент не знает предметной модели: значение принадлежит модулю основ, а подписи и доступные названия задаёт потребитель. Диктор слышит порядок приоритетов и выбранную пилюлю, а фокус с клавиатуры обводит пилюлю.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/priority_picker_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** новые `lib/src/design_system/components/priority_picker.dart`, `test/design_system/priority_picker_test.dart`.
+  - **Размер:** S.
+
+- [ ] 2.5 В модуле основ появляется `RelationHead`
+  - **Критерии приёмки:**
+    - Три строки не ниже `tapMin` по README компонента: исходное намерение с ромбом, тип, связанное намерение с кольцом. Линия сплошная у «нужно» и пунктирная у «можно», цвета следуют приоритету, а у архивированной связи — `grip`. Компонент строится на `RelationStroke`, `PathGlyph` и `Badge.archived`.
+    - С `onKind` средняя строка — переключатель двух типов с отметкой типа, без него — плитка со значком и слово типа. Без `onMenu` кнопки параметров нет.
+    - Длинное название переносится и не обрезается. Название участника — кнопка с доступным названием от потребителя, а архивированный участник приглушён и несёт метку. Под архивированной связью стоит строка, которую задаёт потребитель.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/relation_head_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** новые `lib/src/design_system/components/relation_head.dart`, `test/design_system/relation_head_test.dart`.
+  - **Размер:** M по логике: файла два, но вариантов состояния много.
+
+- [ ] 2.6 `Sheet` получает вариант без заголовка и полный размер с полосой редактирования
+  - **Критерии приёмки:**
+    - Лист без заголовка начинает тело в 14 под ручкой и называет себя диктору доступным названием от потребителя.
+    - С полосой `bar` лист занимает весь экран под строкой состояния без скругления и тени, полоса стоит на месте ручки, а тело — под ней и над открытой клавиатурой. Смена размера идёт 180 мс с `easeOut`, а при уменьшении движения происходит сразу. Снятие полосы возвращает размер по содержимому.
+    - В полном размере лист не перетаскивается, а `hostsMessages` не укорачивает его. Существующие варианты листа не меняются: их тесты в `sheet_test.dart` проходят без правок.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/sheet_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** меняются `lib/src/design_system/components/sheet.dart`, `test/design_system/sheet_test.dart`.
+  - **Размер:** M.
+
+- [ ] 2.7 Панель показывает связь, её участников и даты, а название участника ведёт на его страницу
+  - **Критерии приёмки:**
+    - `showRelationDetailsSheet` показывает через `showDoableSheet` с `hostsMessages` лист без заголовка высотой по содержимому: шапка сохраняет исходное направление связи, затем идут описание или подсказка «Добавить описание», приоритет и строка дат.
+    - Строка дат следует требованию «Время создания и изменения связи». Правило `intentionDatesLine` становится общим для намерения и связи, а не копируется.
+    - Архивированная связь показывает отметку архива и строку «Архивные связи остаются в сохранённых путях и не предлагаются в новых», а архивированный участник — свою метку.
+    - Загрузка, отсутствие связи, отказ чтения с повтором и отказ обновления с прежним снимком различимы внутри панели, как на прежней странице.
+    - Нажатие на название открывает поверх панели страницу намерения, а возврат показывает ту же панель. Поиска участника и иного способа заменить его нет.
+    - Входа из приложения ещё нет: он появляется в 2.11, а старая страница работает до 2.14. Строки появляются на русском и английском.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/details/relation_details_sheet_test.dart test/intention/presentation/details`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 2.4, 2.5, 2.6.
+  - **Предполагаемые файлы:**
+    - новый `lib/src/long_term_relation/presentation/details/relation_details_sheet.dart`;
+    - `lib/src/intention/presentation/details/intention_dates.dart` с тестом переносится в `lib/src/shared/presentation/`, меняется `intention_details_page.dart`;
+    - меняются `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
+    - новый `test/long_term_relation/presentation/details/relation_details_sheet_test.dart`, меняется `relation_details_test_support.dart`.
+  - **Размер:** M.
+
+- [ ] 2.8 Тип и приоритет связи меняются в панели сразу, а отказ остаётся внутри неё
+  - **Критерии приёмки:**
+    - У активной связи нажатие на другой тип и выбор P1–P4 сразу принимают изменение: после подтверждения линия и цвет шапки следуют новым значениям, сообщения нет, а панель остаётся открытой. Нажатие на уже выбранный приоритет ничего не меняет.
+    - У архивированной связи вместо переключателя стоит слово типа, а приоритет меняется.
+    - Пока операция выполняется, в том числе начатая до повторного открытия панели, панель показывает её состояние и последнее подтверждённое содержание, а управление недоступно.
+    - При отказе панель показывает прежние значения и сообщение внутри себя: сценарий «Отказ оставляет подтверждённый приоритет».
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/details/relation_details_sheet_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 2.3, 2.7.
+  - **Предполагаемые файлы:** меняются `lib/src/long_term_relation/presentation/details/relation_details_sheet.dart`, `test/long_term_relation/presentation/details/relation_details_sheet_test.dart`.
+  - **Размер:** S.
+
+- [ ] 2.9 Описание связи меняется в полном размере панели с подтверждением ухода
+  - **Критерии приёмки:**
+    - Нажатие на поле описания открывает полный размер под полосой со стрелкой назад, словом «Описание» и кнопкой «Сохранить». Шапка связи остаётся над полем со словом типа вместо переключателя и без кнопки параметров, а строки архива и дат скрыты.
+    - «Сохранить» недоступна, пока текст не изменён. Успех возвращает панель в размер по содержимому с новым описанием и без сообщения.
+    - Слишком длинный текст и отказ записи оставляют введённый текст и объясняются внутри панели.
+    - При изменённом тексте стрелка назад и закрытие панели спрашивают подтверждение через `showDiscardDialog`, а отказ от сброса возвращает то же изменение с текстом. Без изменений стрелка возвращает панель, а системное «назад» закрывает её по `bottom-sheets`.
+    - Пока сохранение выполняется, уход не спрашивает подтверждения: принятая команда продолжается, а её отказ предъявляет оболочка. Сброс истории пунктом панели со страницы над панелью идёт без подтверждения.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/details/relation_details_sheet_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 2.3, 2.6, 2.7.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/long_term_relation/presentation/details/relation_details_sheet.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
+    - меняется `test/long_term_relation/presentation/details/relation_details_sheet_test.dart`.
+  - **Размер:** M.
+
+- [ ] 2.10 Меню панели архивирует, восстанавливает и удаляет связь
+  - **Критерии приёмки:**
+    - Три точки открывают `OptionsMenu` с двумя пунктами: архивирование или восстановление и удаление. Пункта изменения описания из макета нет: спецификация называет только эти действия.
+    - Действие начинается после закрытия меню, а поздний выбор отбрасывается, если панель уже перекрыта или уходит.
+    - Недоступный пункт остаётся в меню с причиной: удаление — пока связь входит в путь дневного выбора, восстановление — пока архивирован участник.
+    - Архивирование и восстановление сразу отражаются в панели без сообщения, а отказ и устранимый повтор остаются внутри неё.
+    - Удаление подтверждается через `showConfirmDialog`, который называет эту связь и необратимость. Успех закрывает только панель, принявшую команду, и сообщение называет «Связь удалена». Сценарии отказа и повтора удаления из `relation_details_widget_test.dart` выражены на панели.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/details/relation_details_sheet_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 2.2, 2.7.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/long_term_relation/presentation/details/relation_details_sheet.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
+    - меняется `test/long_term_relation/presentation/details/relation_details_sheet_test.dart`.
+  - **Размер:** M.
+
+- [ ] 2.11 Группа страницы намерения и путь дневного выбора открывают панель
+  - **Критерии приёмки:**
+    - Нажатие на строку связи и на шаг пути в подробном просмотре дневного выбора открывает панель над страницей, а панель навигации и страница под ней недоступны для взаимодействия.
+    - Сквозные сценарии на настоящем хранилище: смена типа переводит связь в другую группу того же направления, а связь из пути сохранённого дневного выбора переведена панелью, и подробный просмотр показывает новый тип при прежних составе пути, дате и выполнении.
+    - `app_shell_sheet_stack_test.dart` из 2.1 работает с настоящей панелью: название участника, страница над панелью, возврат и сброс пунктом панели.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/details test/daily_choice/presentation/details test/long_term_relation/presentation/intention_relations test/app/long_term_relation_app_flow_test.dart test/app/navigation/app_shell_sheet_stack_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 2.1, 2.8, 2.9, 2.10.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/intention/presentation/details/intention_details_page.dart`, `lib/src/daily_choice/presentation/details/daily_choice_details_page.dart`;
+    - меняются `test/intention/presentation/details/intention_details_relations_test.dart`, `test/daily_choice/presentation/details/daily_choice_details_page_test.dart`, `test/app/long_term_relation_app_flow_test.dart`, `test/app/navigation/app_shell_sheet_stack_test.dart`.
+  - **Размер:** M.
+
+- [ ] 2.12 Форма создания и прежний поиск участника открывают связь той же панелью
+  - **Критерии приёмки:**
+    - После создания связи или её восстановления из поиска форма и поиск уходят из истории, а панель открывается над исходной страницей. Она показывается только после того, как навигатор удалил форму, потому что безымянный маршрут уходит вместе со страницей под ним. Сообщение об успехе предъявляется один раз.
+    - Поздний успех покинутой формы панель не открывает и текущую страницу не меняет.
+    - «Открыть существующую связь» в форме и занятая активная связь в поиске открывают панель над ними, а возврат сохраняет черновик формы и выдачу поиска.
+    - В `lib/src` у `RelationDetailsRoute` остаётся только объявление маршрута.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/editor test/long_term_relation/presentation/participant_picker test/app/creation_flows_integration_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 2.11.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/long_term_relation/presentation/editor/relation_creation_completion.dart`, `relation_editor_page.dart`, `lib/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart`;
+    - меняются `test/long_term_relation/presentation/editor/relation_creation_navigation_test.dart`, `test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart`, `test/app/creation_flows_test_support.dart`, `test/app/creation_flows_integration_test.dart`.
+  - **Размер:** M.
+
+- [ ] 2.13 Проверки оболочки навигации опираются на панель вместо страницы связи
+  - **Критерии приёмки:**
+    - Матрица страниц и сценарии сброса, возврата и раскладки открывают подробный просмотр нажатием на строку связи, а не маршрутом. Подробный просмотр связи больше не считается обычной страницей.
+    - Сценарий «Выбранный пункт возвращает в корень» и сброс при принятой операции покрыты с панелью в истории, а удаление идёт через меню панели.
+    - `lib/` не меняется.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app/navigation test/app/routing/app_router_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 2.11, 2.12.
+  - **Предполагаемые файлы:** меняются `test/app/navigation/app_shell_page_matrix.dart`, `app_shell_pages_above_test.dart`, `app_shell_operation_reset_test.dart`, `ordinary_page_layout_scenarios.dart`, `app_navigation_accessibility_test.dart`, `test/app/routing/app_router_test.dart`.
+  - **Размер:** M по логике: меняются только способ открытия и ожидания.
+
+- [ ] 2.14 Удалить страницу подробного просмотра связи и её маршрут
+  - **Критерии приёмки:**
+    - `RelationDetailsPage` и `RelationDetailsRoute` удалены, а `app_router.gr.dart` создан заново. Кнопка «Редактировать связь» уходит вместе со страницей, поэтому у существующей связи нет пути в форму.
+    - Сценарии `relation_details_widget_test.dart` и `relation_details_tags_test.dart`, которые описывают продукт, выражены на панели, остальные удалены. `relation_details_navigation_test.dart` удалён: панели навигации над листом нет.
+    - Строки, которые читала только прежняя страница, удалены на обоих языках.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/long_term_relation test/app/routing/app_router_test.dart test/graph/presentation/graph_reconciliation_checkpoint_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 2.12, 2.13.
+  - **Предполагаемые файлы:**
+    - удаляется `lib/src/long_term_relation/presentation/details/relation_details_page.dart`;
+    - меняются `lib/src/app/routing/app_router.dart`, `app_router.gr.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
+    - меняются или удаляются три тестовых файла из критериев.
+  - **Размер:** M.
+
+- [ ] 2.15 Форма связи остаётся только формой создания
+  - **Критерии приёмки:**
+    - `RelationEditingContext` удалён вместе с `editingBasis`, `withConfirmedDetails`, `refreshConfirmedDetails` и `RelationEditorUpdated`. Форма не читает подробный просмотр связи.
+    - Отказы, которых у создания нет, и строки `relationEditorEditTitle`, `relationEditorSaveAction`, `relationEditorSaving` удалены на обоих языках. `relationEditorUpdate*` остаются: их читает панель.
+    - Создание из группы и из быстрого создания работает как прежде, а тесты изменения через форму удалены вместе с проверкой, что форма не заменяет участников: это закрепляет сценарий «Панель не предлагает заменить участника».
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation test/app/navigation/app_shell_pages_above_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 2.14 — у режима изменения не остаётся вызывающего.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/long_term_relation/presentation/editor/relation_editor_state.dart`, `relation_editor_view_model.dart`, `relation_editor_view_model.g.dart`, `relation_editor_page.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
+    - меняются `test/long_term_relation/presentation/editor/relation_editor_page_test.dart`, `relation_editor_view_model_test.dart`, `test/app/navigation/app_shell_page_matrix.dart`.
+  - **Размер:** M.
+
+- [ ] 2.16 Проверить готовность фазы: существующая связь открывается и меняется только в панели
+  - **Критерии приёмки:**
+    - Переход с панели на страницу намерения и возврат работают в настоящем стеке навигации либо приняты альтернативой из [design](design.md).
+    - У существующей связи нет пути в форму: в `lib/` и `test/` нет `RelationDetailsPage`, `RelationDetailsRoute` и `RelationEditingContext`.
+    - Из группы страницы намерения и из пути дневного выбора открывается панель с обоими участниками и строкой дат. Тип, приоритет и описание меняются на месте, архивирование, восстановление и удаление доступны из меню, правки не объявляются сообщением, а отказы показываются внутри панели.
+  - **Проверка:**
+    - `mise run codegen-check`.
+    - `mise run check`.
+    - `mise exec --no-deps -- openspec validate add-relations-in-batches --strict`.
+  - **Зависимости:** 2.1–2.15.
+  - **Предполагаемые файлы:** нет (только проверка).
+  - **Размер:** XS.
