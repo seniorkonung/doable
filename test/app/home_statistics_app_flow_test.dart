@@ -74,40 +74,22 @@ void main() {
     await _until(tester, find.text(app.texts.statisticsTotalItems(4)));
     expect(find.text('Намерение 5'), findsOneWidget);
 
-    await app.relation(
-      tester,
-      UpdateLongTermRelation(
-        relationId: relation.id,
-        patch: LongTermRelationPatch(
-          sourceIntentionId: LongTermRelationFieldSet(durabilityIntention(4)),
-        ),
-      ),
-    );
-    await _until(tester, find.text('Намерение 4'));
-    expect(find.text('Намерение 5'), findsNothing);
-    await app.relation(
-      tester,
-      UpdateLongTermRelation(
-        relationId: relation.id,
-        patch: LongTermRelationPatch(
-          relatedIntentionId: LongTermRelationFieldSet(durabilityIntention(5)),
-        ),
-      ),
-    );
+    await app.relation(tester, DeleteLongTermRelation(relation.id));
     await _until(tester, find.text(app.texts.statisticsTotalItems(3)));
-    expect(find.text('Намерение 4'), findsNothing);
-    await app.relation(
+    expect(find.text('Намерение 5'), findsNothing);
+    final otherPair = await app.relation(
       tester,
-      UpdateLongTermRelation(
-        relationId: relation.id,
-        patch: LongTermRelationPatch(
-          relatedIntentionId: LongTermRelationFieldSet(durabilityIntention(2)),
-        ),
+      CreateLongTermRelation(
+        sourceIntentionId: durabilityIntention(4),
+        relatedIntentionId: durabilityIntention(2),
+        type: LongTermRelationType.need,
+        priority: RelationPriority.p2,
+        description: null,
       ),
     );
     await _until(tester, find.text(app.texts.statisticsTotalItems(4)));
     expect(find.text('Намерение 4'), findsOneWidget);
-    await app.relation(tester, DeleteLongTermRelation(relation.id));
+    await app.relation(tester, DeleteLongTermRelation(otherPair.id));
     await _until(tester, find.text(app.texts.statisticsTotalItems(3)));
     expect(find.text('Намерение 4'), findsNothing);
     await app.relation(

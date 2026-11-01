@@ -44,24 +44,6 @@ void main() {
       ),
     ),
     (
-      'смена исходного намерения',
-      UpdateLongTermRelation(
-        relationId: durabilityRelation(101),
-        patch: LongTermRelationPatch(
-          sourceIntentionId: LongTermRelationFieldSet(durabilityIntention(5)),
-        ),
-      ),
-    ),
-    (
-      'смена связанного намерения',
-      UpdateLongTermRelation(
-        relationId: durabilityRelation(101),
-        patch: LongTermRelationPatch(
-          relatedIntentionId: LongTermRelationFieldSet(durabilityIntention(3)),
-        ),
-      ),
-    ),
-    (
       'смена типа',
       UpdateLongTermRelation(
         relationId: durabilityRelation(101),

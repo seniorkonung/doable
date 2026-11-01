@@ -261,7 +261,7 @@ void main() {
   );
 
   test(
-    'правки участников, типа и архива связи сохраняют назначения намерениям',
+    'правки типа, описания и архива связи сохраняют назначения намерениям',
     () async {
       seedRawGraph(raw, () {
         for (final number in [4, 5]) {
@@ -342,24 +342,6 @@ void main() {
         UpdateLongTermRelation(
           relationId: _relation(103),
           patch: LongTermRelationPatch(
-            sourceIntentionId: LongTermRelationFieldSet(_intention(1)),
-          ),
-        ),
-        {'source_intention_id': tagFixtureId(1)},
-      );
-      await expectRelationStep(
-        UpdateLongTermRelation(
-          relationId: _relation(103),
-          patch: LongTermRelationPatch(
-            relatedIntentionId: LongTermRelationFieldSet(_intention(5)),
-          ),
-        ),
-        {'related_intention_id': tagFixtureId(5)},
-      );
-      await expectRelationStep(
-        UpdateLongTermRelation(
-          relationId: _relation(103),
-          patch: LongTermRelationPatch(
             description: LongTermRelationDescriptionPatch.fromInput(
               'Новое описание',
             ),
@@ -386,14 +368,8 @@ void main() {
   );
 
   test(
-    'теги участников дневного пути меняются без обхода защиты смысла связи',
+    'теги участников дневного пути меняются независимо от связи и пути',
     () async {
-      seedRawGraph(raw, () {
-        raw.execute(
-          'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, 0, 0, 100, 200)',
-          [tagFixtureId(4), 'Новое намерение'],
-        );
-      });
       final relationBefore = row('long_term_relations', 101);
       final intentionsBefore = rows('intentions');
       final choicesBefore = rows('daily_choices');
@@ -420,30 +396,7 @@ void main() {
       expect(rows('daily_choice_path_steps'), pathBefore);
       expect(assignedTags(1), [tagFixtureId(lastTagNumber)]);
 
-      final beforeRejectedEdits = graph();
-      for (final patch in [
-        const LongTermRelationPatch(
-          type: LongTermRelationFieldSet(LongTermRelationType.can),
-          priority: LongTermRelationFieldSet(RelationPriority.p4),
-        ),
-        LongTermRelationPatch(
-          sourceIntentionId: LongTermRelationFieldSet(_intention(4)),
-        ),
-        LongTermRelationPatch(
-          relatedIntentionId: LongTermRelationFieldSet(_intention(4)),
-        ),
-      ]) {
-        final result = await repository.execute(
-          UpdateLongTermRelation(relationId: _relation(101), patch: patch),
-        );
-        expect(result, isA<GraphCommandFailed>());
-        expect(
-          (result as GraphCommandFailed).failure,
-          isA<LongTermRelationReferencedByDailyPathFailure>(),
-        );
-        expect(graph(), beforeRejectedEdits);
-      }
-
+      final assignmentsBeforeEdit = assignments();
       expect(
         await repository.execute(
           UpdateLongTermRelation(
@@ -463,7 +416,7 @@ void main() {
         'priority': 4,
         'description': 'Обновлено',
       });
-      expect(assignments(), beforeRejectedEdits['tag_assignments']);
+      expect(assignments(), assignmentsBeforeEdit);
       expect(rows('daily_choices'), choicesBefore);
       expect(rows('daily_choice_path_steps'), pathBefore);
     },

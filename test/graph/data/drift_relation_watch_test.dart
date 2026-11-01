@@ -297,16 +297,10 @@ void main() {
     expect(details.related.archiveState, IntentionArchiveState.active);
   });
 
-  test('отражает замену участников и жизненный цикл связи', () async {
-    final thirdId = _intentionId(_uuid(3));
-    final fourthId = _intentionId(_uuid(4));
-    final seventhId = _intentionId(_uuid(7));
+  test('отражает изменение типа и жизненный цикл связи', () async {
     final eighthId = _intentionId(_uuid(8));
     final ninthId = _intentionId(_uuid(9));
     for (final entry in <(IntentionId, String)>[
-      (thirdId, 'Новый исходный участник'),
-      (fourthId, 'Первый новый связанный участник'),
-      (seventhId, 'Второй новый связанный участник'),
       (eighthId, 'Посторонний исходный участник'),
       (ninthId, 'Посторонний связанный участник'),
     ]) {
@@ -343,33 +337,16 @@ void main() {
     await repository.execute(
       UpdateLongTermRelation(
         relationId: relationId,
-        patch: LongTermRelationPatch(
-          sourceIntentionId: LongTermRelationFieldSet(thirdId),
-          relatedIntentionId: LongTermRelationFieldSet(fourthId),
+        patch: const LongTermRelationPatch(
+          type: LongTermRelationFieldSet(LongTermRelationType.can),
         ),
       ),
     );
 
-    final moved = (await _nextDetails(relationEvents))!;
-    expect(moved.source.id, thirdId);
-    expect(moved.source.title, 'Новый исходный участник');
-    expect(moved.related.id, fourthId);
-    expect(moved.related.title, 'Первый новый связанный участник');
-
-    await repository.execute(
-      UpdateLongTermRelation(
-        relationId: relationId,
-        patch: LongTermRelationPatch(
-          relatedIntentionId: LongTermRelationFieldSet(seventhId),
-        ),
-      ),
-    );
-
-    final movedAgain = (await _nextDetails(relationEvents))!;
-    expect(movedAgain.source.id, thirdId);
-    expect(movedAgain.source.title, 'Новый исходный участник');
-    expect(movedAgain.related.id, seventhId);
-    expect(movedAgain.related.title, 'Второй новый связанный участник');
+    final retyped = (await _nextDetails(relationEvents))!;
+    expect(retyped.relation.type, LongTermRelationType.can);
+    expect(retyped.source.id, sourceId);
+    expect(retyped.related.id, relatedId);
 
     await repository.execute(ArchiveLongTermRelation(relationId));
     final archived = (await _nextDetails(relationEvents))!;

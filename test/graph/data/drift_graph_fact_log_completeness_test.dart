@@ -279,11 +279,10 @@ void main() {
     await confirm(
       UpdateLongTermRelation(
         relationId: relation.id,
-        patch: LongTermRelationPatch(
-          type: const LongTermRelationFieldSet(LongTermRelationType.can),
-          priority: const LongTermRelationFieldSet(RelationPriority.p1),
-          sourceIntentionId: LongTermRelationFieldSet(swimming.id),
-          description: const LongTermRelationDescriptionCleared(),
+        patch: const LongTermRelationPatch(
+          type: LongTermRelationFieldSet(LongTermRelationType.can),
+          priority: LongTermRelationFieldSet(RelationPriority.p1),
+          description: LongTermRelationDescriptionCleared(),
         ),
       ),
     );
