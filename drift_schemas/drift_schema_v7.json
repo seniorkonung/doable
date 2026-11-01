@@ -1724,7 +1724,7 @@
           22
         ],
         "name": "long_term_relations_immutable_identity",
-        "sql": "CREATE TRIGGER long_term_relations_immutable_identity\nAFTER UPDATE OF creation_sequence, id ON long_term_relations\nWHEN\n  new.creation_sequence <> old.creation_sequence OR\n  new.id <> old.id\nBEGIN\n  SELECT RAISE(ABORT, 'long-term relation identity is immutable');\nEND;"
+        "sql": "CREATE TRIGGER long_term_relations_immutable_identity\nAFTER UPDATE OF\n  creation_sequence,\n  id,\n  source_intention_id,\n  related_intention_id\nON long_term_relations\nWHEN\n  new.creation_sequence <> old.creation_sequence OR\n  new.id <> old.id OR\n  new.source_intention_id <> old.source_intention_id OR\n  new.related_intention_id <> old.related_intention_id\nBEGIN\n  SELECT RAISE(ABORT, 'long-term relation identity is immutable');\nEND;"
       }
     },
     {
@@ -1758,7 +1758,7 @@
           14
         ],
         "name": "long_term_relations_active_participants_after_update",
-        "sql": "CREATE TRIGGER long_term_relations_active_participants_after_update\nAFTER UPDATE OF source_intention_id, related_intention_id, is_archived\nON long_term_relations\nWHEN\n  new.is_archived = 0 AND\n  (\n    NOT EXISTS (\n      SELECT 1\n      FROM intentions\n      WHERE id = new.source_intention_id AND is_archived = 0\n    ) OR\n    NOT EXISTS (\n      SELECT 1\n      FROM intentions\n      WHERE id = new.related_intention_id AND is_archived = 0\n    )\n  )\nBEGIN\n  SELECT RAISE(ABORT, 'active relation requires active intentions');\nEND;"
+        "sql": "CREATE TRIGGER long_term_relations_active_participants_after_update\nAFTER UPDATE OF is_archived ON long_term_relations\nWHEN\n  new.is_archived = 0 AND\n  (\n    NOT EXISTS (\n      SELECT 1\n      FROM intentions\n      WHERE id = new.source_intention_id AND is_archived = 0\n    ) OR\n    NOT EXISTS (\n      SELECT 1\n      FROM intentions\n      WHERE id = new.related_intention_id AND is_archived = 0\n    )\n  )\nBEGIN\n  SELECT RAISE(ABORT, 'active relation requires active intentions');\nEND;"
       }
     },
     {
@@ -2545,7 +2545,7 @@
       "sql": [
         {
           "dialect": "sqlite",
-          "sql": "CREATE TRIGGER long_term_relations_immutable_identity AFTER UPDATE OF creation_sequence, id ON long_term_relations WHEN new.creation_sequence <> old.creation_sequence OR new.id <> old.id BEGIN SELECT RAISE (ABORT, 'long-term relation identity is immutable');END"
+          "sql": "CREATE TRIGGER long_term_relations_immutable_identity AFTER UPDATE OF creation_sequence, id, source_intention_id, related_intention_id ON long_term_relations WHEN new.creation_sequence <> old.creation_sequence OR new.id <> old.id OR new.source_intention_id <> old.source_intention_id OR new.related_intention_id <> old.related_intention_id BEGIN SELECT RAISE (ABORT, 'long-term relation identity is immutable');END"
         }
       ]
     },
@@ -2563,7 +2563,7 @@
       "sql": [
         {
           "dialect": "sqlite",
-          "sql": "CREATE TRIGGER long_term_relations_active_participants_after_update AFTER UPDATE OF source_intention_id, related_intention_id, is_archived ON long_term_relations WHEN new.is_archived = 0 AND(NOT EXISTS (SELECT 1 FROM intentions WHERE id = new.source_intention_id AND is_archived = 0) OR NOT EXISTS (SELECT 1 FROM intentions WHERE id = new.related_intention_id AND is_archived = 0))BEGIN SELECT RAISE (ABORT, 'active relation requires active intentions');END"
+          "sql": "CREATE TRIGGER long_term_relations_active_participants_after_update AFTER UPDATE OF is_archived ON long_term_relations WHEN new.is_archived = 0 AND(NOT EXISTS (SELECT 1 FROM intentions WHERE id = new.source_intention_id AND is_archived = 0) OR NOT EXISTS (SELECT 1 FROM intentions WHERE id = new.related_intention_id AND is_archived = 0))BEGIN SELECT RAISE (ABORT, 'active relation requires active intentions');END"
         }
       ]
     },

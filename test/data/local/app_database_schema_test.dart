@@ -519,7 +519,7 @@ void main() {
       );
     });
 
-    test('запрещает изменять идентичность и последовательность создания', () async {
+    test('запрещает изменять идентичность, участников и последовательность создания', () async {
       await _insertRelationParticipants(database);
       const relationId = '018f0b5d-6b2e-7c80-8000-000000000161';
       await _insertLongTermRelation(
@@ -529,6 +529,14 @@ void main() {
         relatedId: '018f0b5d-6b2e-7c80-8000-000000000132',
         type: 'need',
         priority: 1,
+      );
+      await _insertIntention(
+        database,
+        id: '018f0b5d-6b2e-7c80-8000-000000000133',
+        title: 'Другое намерение',
+        description: null,
+        createdAt: 3000000,
+        updatedAt: 3000000,
       );
       final original = await database
           .customSelect(
@@ -557,11 +565,35 @@ void main() {
         ),
         throwsA(isA<sqlite.SqliteException>()),
       );
+      for (final column in ['source_intention_id', 'related_intention_id']) {
+        await expectLater(
+          seedGraph(
+            database,
+            () => database.customStatement(
+              'UPDATE long_term_relations SET $column = ? WHERE id = ?',
+              ['018f0b5d-6b2e-7c80-8000-000000000133', relationId],
+            ),
+          ),
+          throwsA(isA<sqlite.SqliteException>()),
+          reason: column,
+        );
+      }
 
       final stored = await database
-          .customSelect('SELECT creation_sequence, id FROM long_term_relations')
+          .customSelect(
+            'SELECT creation_sequence, id, source_intention_id, '
+            'related_intention_id FROM long_term_relations',
+          )
           .getSingle();
       expect(stored.read<String>('id'), relationId);
+      expect(
+        stored.read<String>('source_intention_id'),
+        '018f0b5d-6b2e-7c80-8000-000000000131',
+      );
+      expect(
+        stored.read<String>('related_intention_id'),
+        '018f0b5d-6b2e-7c80-8000-000000000132',
+      );
       expect(
         stored.read<int>('creation_sequence'),
         original.read<int>('creation_sequence'),

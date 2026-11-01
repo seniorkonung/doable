@@ -256,7 +256,6 @@ void main() {
       fixture.intention(1);
       fixture.intention(2);
       fixture.intention(3, ready: true);
-      fixture.intention(4);
       fixture.relation(101, 1, 2);
       fixture.relation(102, 2, 3);
       final draft = fixture.bottomProgress(3, [(102, 2, 3), (101, 1, 2)]);
@@ -271,11 +270,6 @@ void main() {
           'UPDATE long_term_relations SET is_archived = ? WHERE id = ?',
           <Object>[1, _uuid(101)],
           <Object>[0, _uuid(101)],
-        ),
-        (
-          'UPDATE long_term_relations SET source_intention_id = ? WHERE id = ?',
-          <Object>[_uuid(4), _uuid(101)],
-          <Object>[_uuid(1), _uuid(101)],
         ),
         (
           'UPDATE intentions SET is_action_ready = ? WHERE id = ?',

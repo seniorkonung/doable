@@ -12,23 +12,24 @@ The product model is maintained in
 
 ## Local data before launch and rollback
 
-The SQLite schema is version 6 (`user_version = 6`), a new baseline that a fresh
+The SQLite schema is version 7 (`user_version = 7`), a new baseline that a fresh
 installation creates in one step. Pre-release builds created schema versions 1
-to 5; version 6 adds indexes for ordering intention catalogs by title. No data
-migration from them is provided: the app reports such a database as damaged
-local data and does not change, delete, or recreate it.
+to 6; version 7 makes the source and related intentions part of a long-term
+relation's immutable identity. No data migration from them is provided: the app
+reports such a database as damaged local data and does not change, delete, or
+recreate it.
 
 Before first launching this build over an installation with schema version 1,
-2, 3, 4, or 5, stop Doable and manually clear its local app data. The database,
-the graph fact log, the graph snapshot files, and the backups belong to one
-schema, so the cleanup removes all of them together. On Android, clear Doable's
-storage through the system app settings. This permanently deletes the
+2, 3, 4, 5, or 6, stop Doable and manually clear its local app data. The
+database, the graph fact log, the graph snapshot files, and the backups belong
+to one schema, so the cleanup removes all of them together. On Android, clear
+Doable's storage through the system app settings. This permanently deletes the
 installation's local data; the next launch creates a fresh database with schema
-version 6.
+version 7.
 
-Before rolling back to any build without schema version 6, stop Doable and
+Before rolling back to any build without schema version 7, stop Doable and
 manually clear local app data the same way if this build has created a
-database: earlier builds do not open schema version 6. Rolling back the build
+database: earlier builds do not open schema version 7. Rolling back the build
 cannot restore data already deleted during either cleanup.
 
 ## Reproducible generation

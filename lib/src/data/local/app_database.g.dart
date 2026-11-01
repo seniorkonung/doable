@@ -5790,7 +5790,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'CREATE INDEX long_term_relations_related_group_order ON long_term_relations (related_intention_id, type, is_archived, priority, creation_sequence)',
   );
   late final Trigger longTermRelationsImmutableIdentity = Trigger(
-    'CREATE TRIGGER long_term_relations_immutable_identity AFTER UPDATE OF creation_sequence, id ON long_term_relations WHEN new.creation_sequence <> old.creation_sequence OR new.id <> old.id BEGIN SELECT RAISE (ABORT, \'long-term relation identity is immutable\');END',
+    'CREATE TRIGGER long_term_relations_immutable_identity AFTER UPDATE OF creation_sequence, id, source_intention_id, related_intention_id ON long_term_relations WHEN new.creation_sequence <> old.creation_sequence OR new.id <> old.id OR new.source_intention_id <> old.source_intention_id OR new.related_intention_id <> old.related_intention_id BEGIN SELECT RAISE (ABORT, \'long-term relation identity is immutable\');END',
     'long_term_relations_immutable_identity',
   );
   late final Trigger longTermRelationsActiveParticipantsAfterInsert = Trigger(
@@ -5798,7 +5798,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'long_term_relations_active_participants_after_insert',
   );
   late final Trigger longTermRelationsActiveParticipantsAfterUpdate = Trigger(
-    'CREATE TRIGGER long_term_relations_active_participants_after_update AFTER UPDATE OF source_intention_id, related_intention_id, is_archived ON long_term_relations WHEN new.is_archived = 0 AND(NOT EXISTS (SELECT 1 FROM intentions WHERE id = new.source_intention_id AND is_archived = 0) OR NOT EXISTS (SELECT 1 FROM intentions WHERE id = new.related_intention_id AND is_archived = 0))BEGIN SELECT RAISE (ABORT, \'active relation requires active intentions\');END',
+    'CREATE TRIGGER long_term_relations_active_participants_after_update AFTER UPDATE OF is_archived ON long_term_relations WHEN new.is_archived = 0 AND(NOT EXISTS (SELECT 1 FROM intentions WHERE id = new.source_intention_id AND is_archived = 0) OR NOT EXISTS (SELECT 1 FROM intentions WHERE id = new.related_intention_id AND is_archived = 0))BEGIN SELECT RAISE (ABORT, \'active relation requires active intentions\');END',
     'long_term_relations_active_participants_after_update',
   );
   late final Trigger intentionsArchiveRequiresNoActiveRelations = Trigger(
