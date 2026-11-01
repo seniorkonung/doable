@@ -113,6 +113,20 @@ void main() {
     expect(_failure(corrupted), isA<LongTermRelationReadCorruptionFailure>());
   });
 
+  test('нечисловое показание времени связи даёт повреждение чтения', () async {
+    await seedGraph(
+      database,
+      () => database.customStatement(
+        'UPDATE long_term_relations SET updated_at = ? WHERE id = ?',
+        ['не число', relationId.toCanonicalString()],
+      ),
+    );
+
+    final corrupted = await repository.watchRelation(relationId).first;
+
+    expect(_failure(corrupted), isA<LongTermRelationReadCorruptionFailure>());
+  });
+
   test('подробности вычисляют запрет по шагу сохранённого пути', () async {
     final choiceId = _uuid(201);
     await seedGraph(database, () async {

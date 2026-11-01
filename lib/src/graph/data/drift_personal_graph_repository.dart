@@ -1008,6 +1008,7 @@ final class DriftPersonalGraphRepository
           '''SELECT relation.creation_sequence, relation.id,
                 relation.source_intention_id, relation.related_intention_id,
                 relation.type, relation.priority, relation.is_archived,
+                relation.created_at, relation.updated_at,
                 EXISTS(SELECT 1 FROM daily_choice_path_steps AS step
                        WHERE step.long_term_relation_id = relation.id) AS is_referenced
          FROM long_term_relations AS relation

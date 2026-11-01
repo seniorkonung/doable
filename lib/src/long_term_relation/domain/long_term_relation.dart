@@ -46,6 +46,21 @@ final class RelationCreationSequence
   String toString() => 'RelationCreationSequence';
 }
 
+/// Показание часов устройства о создании или последнем изменении связи.
+/// Служит только для показа и не задаёт порядок связей.
+final class RelationTimestamp {
+  RelationTimestamp(DateTime value) : value = value.toUtc();
+
+  final DateTime value;
+
+  @override
+  bool operator ==(Object other) =>
+      other is RelationTimestamp && other.value == value;
+
+  @override
+  int get hashCode => value.hashCode;
+}
+
 enum LongTermRelationValidationFailure { sameIntention }
 
 final class LongTermRelationValidationException implements Exception {

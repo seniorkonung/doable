@@ -186,7 +186,7 @@
     - новый `test/graph/data/drift_relation_timestamps_test.dart`.
   - **Размер:** M.
 
-- [ ] 1.14 Чтения связи из хранилища получают показания времени
+- [x] 1.14 Чтения связи из хранилища получают показания времени
   - **Критерии приёмки:**
     - `StoredLongTermRelation` несёт `createdAt` и `updatedAt` типа показания времени связи, устроенного как `IntentionTimestamp`. Отсутствующее или нечисловое значение становится `StoredGraphCorruption`.
     - Все девять чтений, декодирующих `StoredLongTermRelation`, выбирают оба столбца.
