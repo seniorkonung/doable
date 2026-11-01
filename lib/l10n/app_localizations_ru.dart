@@ -1957,6 +1957,10 @@ class AppLocalizationsRu extends AppLocalizations {
       'Связь используется в сохранённом дневном пути. Её тип и участников нельзя изменить.';
 
   @override
+  String get relationEditorUpdateArchivedTypeChange =>
+      'Связь архивирована, поэтому её тип нельзя изменить. Верните прежний тип, чтобы сохранить остальные изменения.';
+
+  @override
   String get relationEditorPathProtection =>
       'Связь используется в сохранённом дневном пути. Её тип и участников нельзя изменить. Описание и приоритет остаются доступными.';
 

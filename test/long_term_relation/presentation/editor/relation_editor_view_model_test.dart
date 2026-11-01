@@ -370,6 +370,51 @@ void main() {
       },
     );
 
+    test('отказ смены типа архивированной связи сохраняет черновик и снимается '
+        'возвратом прежнего типа', () async {
+      final harness = _EditorHarness.editing(testEditorRelationDetails());
+
+      harness.viewModel
+        ..selectType(LongTermRelationType.can)
+        ..selectPriority(RelationPriority.p4)
+        ..submit();
+      harness.repository.failRelationCommand(
+        0,
+        LongTermRelationArchivedTypeChangeFailure(testRelationId(1)),
+      );
+      await harness.settle();
+
+      expect(
+        harness.state.operation,
+        isA<RelationEditorFailed>().having(
+          (operation) => operation.failure,
+          'отказ',
+          isA<RelationEditorArchivedTypeChange>(),
+        ),
+      );
+      expect(harness.state.type, LongTermRelationType.can);
+      expect(harness.state.priority, RelationPriority.p4);
+      expect(harness.state.canSubmit, isFalse);
+
+      harness.viewModel.selectType(LongTermRelationType.need);
+      expect(harness.state.operation, isA<RelationEditorIdle>());
+      expect(harness.state.priority, RelationPriority.p4);
+
+      harness.viewModel.submit();
+
+      expect(harness.repository.commandCount, 2);
+      final patch = harness.repository.updateCommandAt(1).patch;
+      expect(patch.type, isA<LongTermRelationFieldUnchanged>());
+      expect(
+        patch.priority,
+        isA<LongTermRelationFieldSet<RelationPriority>>().having(
+          (field) => field.value,
+          'приоритет',
+          RelationPriority.p4,
+        ),
+      );
+    });
+
     test('черновик изменения не принимает другого участника', () {
       final harness = _EditorHarness.editing(testEditorRelationDetails());
 

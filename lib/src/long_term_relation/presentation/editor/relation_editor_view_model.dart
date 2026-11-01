@@ -362,6 +362,8 @@ final class RelationEditorViewModel extends _$RelationEditorViewModel {
     LongTermRelationNotFoundFailure() => const RelationEditorRelationNotFound(),
     LongTermRelationReferencedByDailyPathFailure() =>
       const RelationEditorReferencedByDailyPath(),
+    LongTermRelationArchivedTypeChangeFailure() =>
+      const RelationEditorArchivedTypeChange(),
     LongTermRelationParticipantNotFoundFailure(
       :final role,
       :final intentionId,

@@ -13,7 +13,8 @@ String longTermRelationCommandFailureMessage(
       localizations.relationEditorCreatePairOccupied,
     LongTermRelationNotFoundFailure() =>
       localizations.relationEditorCreateUnexpected,
-    LongTermRelationReferencedByDailyPathFailure() =>
+    LongTermRelationReferencedByDailyPathFailure() ||
+    LongTermRelationArchivedTypeChangeFailure() =>
       localizations.relationEditorCreateUnexpected,
     LongTermRelationParticipantNotFoundFailure() =>
       localizations.relationEditorCreateParticipantNotFound,
@@ -31,6 +32,8 @@ String longTermRelationCommandFailureMessage(
       localizations.relationEditorUpdateNotFound,
     LongTermRelationReferencedByDailyPathFailure() =>
       localizations.relationEditorUpdateReferencedByDailyPath,
+    LongTermRelationArchivedTypeChangeFailure() =>
+      localizations.relationEditorUpdateArchivedTypeChange,
     LongTermRelationUnavailableFailure() =>
       localizations.relationEditorUpdateUnavailable,
     LongTermRelationCorruptionFailure() =>
@@ -51,6 +54,7 @@ String longTermRelationCommandFailureMessage(
       localizations.relationArchiveCorruption,
     LongTermRelationPairOccupiedFailure() ||
     LongTermRelationReferencedByDailyPathFailure() ||
+    LongTermRelationArchivedTypeChangeFailure() ||
     LongTermRelationParticipantNotFoundFailure() ||
     LongTermRelationParticipantArchivedFailure() =>
       localizations.relationArchiveConflict,
@@ -77,7 +81,8 @@ String longTermRelationCommandFailureMessage(
       localizations.relationRestoreCorruption,
     LongTermRelationPairOccupiedFailure() =>
       localizations.relationRestoreConflict,
-    LongTermRelationReferencedByDailyPathFailure() =>
+    LongTermRelationReferencedByDailyPathFailure() ||
+    LongTermRelationArchivedTypeChangeFailure() =>
       localizations.relationRestoreConflict,
     LongTermRelationUnexpectedFailure() =>
       localizations.relationRestoreUnexpected,
@@ -91,6 +96,7 @@ String longTermRelationCommandFailureMessage(
     LongTermRelationCorruptionFailure() =>
       localizations.relationDeleteCorruption,
     LongTermRelationPairOccupiedFailure() ||
+    LongTermRelationArchivedTypeChangeFailure() ||
     LongTermRelationParticipantNotFoundFailure() ||
     LongTermRelationParticipantArchivedFailure() =>
       localizations.relationDeleteConflict,

@@ -2993,6 +2993,12 @@ abstract class AppLocalizations {
   /// **'This relation is used by a saved daily path. Its type and participants can’t be changed.'**
   String get relationEditorUpdateReferencedByDailyPath;
 
+  /// Конфликт изменения типа архивированной связи
+  ///
+  /// In en, this message translates to:
+  /// **'This relation is archived, so its type can’t be changed. Restore the original type to save the other changes.'**
+  String get relationEditorUpdateArchivedTypeChange;
+
   /// Ограничение смысла связи сохранённым дневным путём
   ///
   /// In en, this message translates to:

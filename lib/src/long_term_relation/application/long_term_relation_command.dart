@@ -167,6 +167,20 @@ final class LongTermRelationReferencedByDailyPathFailure
   GraphFailureCategory get category => GraphFailureCategory.conflict;
 }
 
+/// Набор правок архивированной связи меняет её тип.
+///
+/// Архивированная связь сохраняет тип до восстановления, поэтому отклоняется
+/// весь набор, а не только изменение типа.
+final class LongTermRelationArchivedTypeChangeFailure
+    extends LongTermRelationCommandFailure {
+  const LongTermRelationArchivedTypeChangeFailure(this.relationId);
+
+  final LongTermRelationId relationId;
+
+  @override
+  GraphFailureCategory get category => GraphFailureCategory.conflict;
+}
+
 final class LongTermRelationNotFoundFailure
     extends LongTermRelationCommandFailure {
   const LongTermRelationNotFoundFailure(this.relationId);

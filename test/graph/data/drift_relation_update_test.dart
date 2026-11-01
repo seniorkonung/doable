@@ -291,6 +291,120 @@ void main() {
     expect(updated.relation.creationSequence.value, 1);
     expect((await _storedIntention(database, relatedId))['is_archived'], 1);
   });
+
+  group('изменение типа архивированной связи', () {
+    Future<void> archiveRelation() async {
+      await _create(repository, sourceId, relatedId, description: 'Описание');
+      expect(
+        await repository.execute(ArchiveLongTermRelation(relationId)),
+        isA<GraphCommandSucceeded>(),
+      );
+    }
+
+    test(
+      'отклоняется конфликтом целиком вместе с приоритетом и описанием',
+      () async {
+        await archiveRelation();
+        final storedBefore = await _storedRelation(database, relationId);
+        final revisionBefore = await _revision(repository, sourceId);
+
+        final failure = _failure(
+          await repository.execute(
+            UpdateLongTermRelation(
+              relationId: relationId,
+              patch: LongTermRelationPatch(
+                type: const LongTermRelationFieldSet(LongTermRelationType.can),
+                priority: const LongTermRelationFieldSet(RelationPriority.p1),
+                description: LongTermRelationDescriptionReplaced(
+                  LongTermRelationDescription.fromInput('Новое описание')!,
+                ),
+              ),
+            ),
+          ),
+        );
+
+        expect(
+          failure,
+          isA<LongTermRelationArchivedTypeChangeFailure>().having(
+            (value) => value.relationId,
+            'relationId',
+            relationId,
+          ),
+        );
+        expect(failure.category, GraphFailureCategory.conflict);
+        expect(await _storedRelation(database, relationId), storedBefore);
+        expect(
+          revisionBefore.compareTo(await _revision(repository, sourceId)),
+          GraphRevisionOrder.same,
+        );
+      },
+    );
+
+    test('приоритет и описание меняются как прежде', () async {
+      await archiveRelation();
+
+      final updated = _updated(
+        await repository.execute(
+          UpdateLongTermRelation(
+            relationId: relationId,
+            patch: LongTermRelationPatch(
+              priority: const LongTermRelationFieldSet(RelationPriority.p1),
+              description: LongTermRelationDescriptionReplaced(
+                LongTermRelationDescription.fromInput('Новое описание')!,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(updated.relation.scope, RelationScope.archived);
+      expect(updated.relation.type, LongTermRelationType.need);
+      expect(updated.relation.priority, RelationPriority.p1);
+      expect(updated.description?.value, 'Новое описание');
+    });
+
+    test('указание прежнего типа не считается изменением типа', () async {
+      await archiveRelation();
+
+      final updated = _updated(
+        await repository.execute(
+          UpdateLongTermRelation(
+            relationId: relationId,
+            patch: const LongTermRelationPatch(
+              type: LongTermRelationFieldSet(LongTermRelationType.need),
+              priority: LongTermRelationFieldSet(RelationPriority.p1),
+            ),
+          ),
+        ),
+      );
+
+      expect(updated.relation.scope, RelationScope.archived);
+      expect(updated.relation.type, LongTermRelationType.need);
+      expect(updated.relation.priority, RelationPriority.p1);
+    });
+
+    test('после восстановления тип меняется', () async {
+      await archiveRelation();
+      expect(
+        await repository.execute(RestoreLongTermRelation(relationId)),
+        isA<GraphCommandSucceeded>(),
+      );
+
+      final updated = _updated(
+        await repository.execute(
+          UpdateLongTermRelation(
+            relationId: relationId,
+            patch: const LongTermRelationPatch(
+              type: LongTermRelationFieldSet(LongTermRelationType.can),
+            ),
+          ),
+        ),
+      );
+
+      expect(updated.relation.scope, RelationScope.active);
+      expect(updated.relation.type, LongTermRelationType.can);
+    });
+  });
 }
 
 Future<LongTermRelationCreated> _create(

@@ -867,6 +867,46 @@ void main() {
     },
   );
 
+  testWidgets('отказ смены типа архивированной связи назван и снимается '
+      'возвратом прежнего типа', (tester) async {
+    final repository = ControlledRelationFormRepository();
+    addTearDown(repository.dispose);
+    final details = testRelationDetails(
+      relationId: testFormRelationId(93),
+      sourceId: testSummary(index: 1).id,
+      relatedId: testSummary(index: 2).id,
+      type: LongTermRelationType.need,
+    );
+    await _openDetailsForEditing(tester, repository, details);
+    await tester.tap(
+      find.byKey(const ValueKey('relation-details-edit-relation')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('relation-editor-type-can')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('relation-editor-submit')));
+    await tester.pump();
+    expect(repository.relationUpdateCommands, hasLength(1));
+
+    repository.failRelationCommand(
+      0,
+      LongTermRelationArchivedTypeChangeFailure(testFormRelationId(93)),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    const message =
+        'This relation is archived, so its type can’t be changed. Restore '
+        'the original type to save the other changes.';
+    expect(find.text(message), findsOneWidget);
+    expect(_isChipSelected(tester, 'relation-editor-type-can'), isTrue);
+
+    await tester.tap(find.byKey(const ValueKey('relation-editor-type-need')));
+    await tester.pumpAndSettle();
+
+    expect(find.text(message), findsNothing);
+  });
+
   testWidgets('ошибка изменения сохраняет исправляемый черновик', (
     tester,
   ) async {

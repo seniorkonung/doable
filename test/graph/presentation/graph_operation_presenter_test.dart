@@ -879,6 +879,38 @@ void main() {
     },
   );
 
+  for (final scenario in <({Locale locale, String message})>[
+    (
+      locale: const Locale('ru'),
+      message:
+          'Изменение — «связь»: Связь архивирована, поэтому её тип нельзя '
+          'изменить. Верните прежний тип, чтобы сохранить остальные '
+          'изменения.',
+    ),
+    (
+      locale: const Locale('en'),
+      message: _relationUpdateOutcome(
+        'This relation is archived, so its type can’t be changed. Restore '
+        'the original type to save the other changes.',
+      ),
+    ),
+  ]) {
+    testWidgets('отказ смены типа архивированной связи назван для '
+        '${scenario.locale.languageCode}', (tester) async {
+      final harness = await _pumpPresenterApp(tester, locale: scenario.locale);
+      final update = harness.startRelationUpdate();
+      harness.completeRelationFailure(
+        update,
+        LongTermRelationArchivedTypeChangeFailure(_relationId),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text(scenario.message), findsOneWidget);
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+    });
+  }
+
   // Все состояния, кроме resumed, удерживают результат одной ветвью; берём
   // полный уход в фон и возврат через промежуточные состояния.
   const lifecycle = (

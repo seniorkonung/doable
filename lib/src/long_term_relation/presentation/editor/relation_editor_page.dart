@@ -556,6 +556,8 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage>
           localizations.relationEditorUpdateNotFound,
         RelationEditorReferencedByDailyPath() =>
           localizations.relationEditorUpdateReferencedByDailyPath,
+        RelationEditorArchivedTypeChange() =>
+          localizations.relationEditorUpdateArchivedTypeChange,
         RelationEditorUnavailable() =>
           isEditing
               ? localizations.relationEditorUpdateUnavailable

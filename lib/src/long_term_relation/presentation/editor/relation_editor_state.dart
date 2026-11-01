@@ -211,6 +211,11 @@ final class RelationEditorReferencedByDailyPath extends RelationEditorFailure {
   const RelationEditorReferencedByDailyPath();
 }
 
+/// Связь архивирована за открытой формой, а черновик меняет её тип.
+final class RelationEditorArchivedTypeChange extends RelationEditorFailure {
+  const RelationEditorArchivedTypeChange();
+}
+
 /// Доказанно устранимая недоступность хранилища.
 final class RelationEditorUnavailable extends RelationEditorFailure {
   const RelationEditorUnavailable();
@@ -519,8 +524,21 @@ final class RelationEditorState {
   RelationEditorState withType(LongTermRelationType value) => _copyWith(
     type: value,
     operation: _operationAfter(
-      (failure) =>
-          failure is RelationEditorReferencedByDailyPath && value != type,
+      (failure) => switch (failure) {
+        RelationEditorReferencedByDailyPath() => value != type,
+        // Исправляет только возврат к сохранённому типу: тогда в правке нет
+        // изменения типа.
+        RelationEditorArchivedTypeChange() =>
+          value == editingBasis?.relation.type,
+        RelationEditorDescriptionInvalid() ||
+        RelationEditorParticipantRejected() ||
+        RelationEditorPairOccupied() ||
+        RelationEditorSameParticipants() ||
+        RelationEditorRelationNotFound() ||
+        RelationEditorUnavailable() ||
+        RelationEditorCorruption() ||
+        RelationEditorUnexpected() => false,
+      },
     ),
   );
 
@@ -792,6 +810,7 @@ final class RelationEditorState {
         RelationEditorSameParticipants() ||
         RelationEditorRelationNotFound() ||
         RelationEditorReferencedByDailyPath() ||
+        RelationEditorArchivedTypeChange() ||
         RelationEditorUnavailable() ||
         RelationEditorCorruption() ||
         RelationEditorUnexpected() => false,
@@ -808,6 +827,7 @@ final class RelationEditorState {
     RelationEditorSameParticipants() => identityChanged,
     RelationEditorReferencedByDailyPath() => identityChanged,
     RelationEditorDescriptionInvalid() ||
+    RelationEditorArchivedTypeChange() ||
     RelationEditorRelationNotFound() ||
     RelationEditorUnavailable() ||
     RelationEditorCorruption() ||

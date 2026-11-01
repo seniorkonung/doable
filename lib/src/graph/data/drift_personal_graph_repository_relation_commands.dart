@@ -153,6 +153,10 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
       before.priority,
       command.patch.priority,
     );
+    if (before.scope == relation_domain.RelationScope.archived &&
+        type != before.type) {
+      throw _LongTermRelationArchivedTypeChange(before.id);
+    }
     final description = _applyRelationDescriptionPatch(
       storedBefore.description,
       command.patch.description,
@@ -549,6 +553,9 @@ LongTermRelationCommandFailure _classifyLongTermRelationCommandFailure(
   if (error case _LongTermRelationPairOccupied(:final relationId)) {
     return LongTermRelationPairOccupiedFailure(relationId);
   }
+  if (error case _LongTermRelationArchivedTypeChange(:final relationId)) {
+    return LongTermRelationArchivedTypeChangeFailure(relationId);
+  }
   if (error case _LongTermRelationNotFound(:final relationId)) {
     return LongTermRelationNotFoundFailure(relationId);
   }
@@ -603,6 +610,12 @@ DiagnosticsFailureCode _graphCommandDiagnosticsFailureCode(
 
 final class _LongTermRelationPairOccupied implements Exception {
   const _LongTermRelationPairOccupied(this.relationId);
+
+  final LongTermRelationId relationId;
+}
+
+final class _LongTermRelationArchivedTypeChange implements Exception {
+  const _LongTermRelationArchivedTypeChange(this.relationId);
 
   final LongTermRelationId relationId;
 }

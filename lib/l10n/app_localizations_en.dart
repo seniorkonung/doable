@@ -1933,6 +1933,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'This relation is used by a saved daily path. Its type and participants can’t be changed.';
 
   @override
+  String get relationEditorUpdateArchivedTypeChange =>
+      'This relation is archived, so its type can’t be changed. Restore the original type to save the other changes.';
+
+  @override
   String get relationEditorPathProtection =>
       'This relation is used in a saved daily path. Its type and participants cannot be changed. Its description and priority remain editable.';
 

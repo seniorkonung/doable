@@ -1451,6 +1451,10 @@
     "description": "Отсутствие изменяемой связи"
   },
   "relationEditorUpdateReferencedByDailyPath": "This relation is used by a saved daily path. Its type and participants can’t be changed.",
+  "relationEditorUpdateArchivedTypeChange": "This relation is archived, so its type can’t be changed. Restore the original type to save the other changes.",
+  "@relationEditorUpdateArchivedTypeChange": {
+    "description": "Конфликт изменения типа архивированной связи"
+  },
   "relationEditorPathProtection": "This relation is used in a saved daily path. Its type and participants cannot be changed. Its description and priority remain editable.",
   "@relationEditorPathProtection": {"description": "Ограничение смысла связи сохранённым дневным путём"},
   "relationEditorPathProtectionWithDraft": "This relation is used in a saved daily path. Restore the original type and participants to save description and priority changes.",
