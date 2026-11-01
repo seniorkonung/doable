@@ -360,9 +360,6 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
     state = switch (current) {
       RelationDetailsLoaded() => current.copyWith(
         permissions: confirmedPermissions,
-        permissionRevision: confirmedPermissions == null
-            ? null
-            : confirmedChange.revision,
         isOperationRunning: _isOperationRunning,
         refreshStatus: const RelationDetailsRefreshing(),
       ),

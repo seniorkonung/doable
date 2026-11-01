@@ -86,8 +86,12 @@ void main() {
     repository
         .watchAt(0)
         .emitDetails(
-          details.withPermissions(
-            const LongTermRelationPermissions.referencedByDailyPath(),
+          testRelationDetails(
+            relationId: relationId,
+            sourceId: testIntentionId(1),
+            relatedId: testIntentionId(2),
+            permissions:
+                const LongTermRelationPermissions.referencedByDailyPath(),
           ),
           revision: const TestGraphRevision(2),
         );

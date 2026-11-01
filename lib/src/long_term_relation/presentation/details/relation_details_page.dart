@@ -106,7 +106,7 @@ final class _RelationDetailsPageState
                           context.router.push(
                             RelationEditorRoute(
                               editorContext: RelationEditingContext(
-                                loaded.editingDetails,
+                                loaded.details,
                                 revision: loaded.revision,
                               ),
                             ),

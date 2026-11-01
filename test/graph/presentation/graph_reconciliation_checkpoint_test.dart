@@ -561,9 +561,9 @@ void main() {
             catalog().totalCount == 1 &&
             container.read(choicesProvider(1)) is IntentionChoicesEmpty &&
             container.read(choicesProvider(3)) is IntentionChoicesEmpty &&
-            relation(101).permissionRevision.compareTo(deletionRevision) ==
-                GraphRevisionOrder.same &&
-            relation(105).permissions.canDelete == false,
+            relation(101).permissions.canDelete &&
+            relation(102).permissions.canDelete &&
+            !relation(105).permissions.canDelete,
       );
       expect(catalog().items.single.id, firstId);
       expect(relation(101).permissions.canDelete, isTrue);

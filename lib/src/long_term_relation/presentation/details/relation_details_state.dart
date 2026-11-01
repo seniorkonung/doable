@@ -32,20 +32,15 @@ final class RelationDetailsLoaded extends RelationDetailsState {
     required this.revision,
     required super.isOperationRunning,
     LongTermRelationPermissions? permissions,
-    GraphRevision? permissionRevision,
     this.refreshStatus = const RelationDetailsFresh(),
     this.lifecycleChange,
-  }) : permissions = permissions ?? details.permissions,
-       permissionRevision = permissionRevision ?? revision;
+  }) : permissions = permissions ?? details.permissions;
 
   final LongTermRelationDetails details;
   final GraphRevision revision;
 
   /// Подтверждённое разрешение с собственного пакета графа или полного чтения.
   final LongTermRelationPermissions permissions;
-  final GraphRevision permissionRevision;
-  LongTermRelationDetails get editingDetails =>
-      details.withPermissions(permissions);
   final RelationDetailsRefreshStatus refreshStatus;
   final RelationDetailsLifecycleChange? lifecycleChange;
 
@@ -56,7 +51,6 @@ final class RelationDetailsLoaded extends RelationDetailsState {
     LongTermRelationDetails? details,
     GraphRevision? revision,
     LongTermRelationPermissions? permissions,
-    GraphRevision? permissionRevision,
     bool? isOperationRunning,
     RelationDetailsRefreshStatus? refreshStatus,
     RelationDetailsLifecycleChange? lifecycleChange,
@@ -65,7 +59,6 @@ final class RelationDetailsLoaded extends RelationDetailsState {
     details: details ?? this.details,
     revision: revision ?? this.revision,
     permissions: permissions ?? this.permissions,
-    permissionRevision: permissionRevision ?? this.permissionRevision,
     isOperationRunning: isOperationRunning ?? this.isOperationRunning,
     refreshStatus: refreshStatus ?? this.refreshStatus,
     lifecycleChange: clearLifecycleChange
