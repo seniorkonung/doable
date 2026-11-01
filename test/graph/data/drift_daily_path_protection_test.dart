@@ -164,37 +164,28 @@ void main() {
     },
   );
 
-  test('составная смена типа или участника отклоняет все поля', () async {
+  test('составная смена типа отклоняет все поля', () async {
     addChoice(201);
     final before = storedRelation(101);
-    final patches = [
-      LongTermRelationPatch(
-        type: const LongTermRelationFieldSet(LongTermRelationType.can),
-        priority: const LongTermRelationFieldSet(RelationPriority.p4),
-        description: LongTermRelationDescriptionPatch.fromInput('Новое'),
-      ),
-      LongTermRelationPatch(
-        relatedIntentionId: LongTermRelationFieldSet(_intention(5)),
-        priority: const LongTermRelationFieldSet(RelationPriority.p4),
-      ),
-      LongTermRelationPatch(
-        sourceIntentionId: LongTermRelationFieldSet(_intention(5)),
-        priority: const LongTermRelationFieldSet(RelationPriority.p4),
-      ),
-    ];
 
-    for (final patch in patches) {
-      final result = await repository.execute(
-        UpdateLongTermRelation(relationId: _relation(101), patch: patch),
-      );
-      expect(result, isA<GraphCommandFailed>());
-      expect(
-        (result as GraphCommandFailed).failure,
-        isA<LongTermRelationReferencedByDailyPathFailure>(),
-      );
-      expect(storedRelation(101), before);
-      expectAssignments();
-    }
+    final result = await repository.execute(
+      UpdateLongTermRelation(
+        relationId: _relation(101),
+        patch: LongTermRelationPatch(
+          type: const LongTermRelationFieldSet(LongTermRelationType.can),
+          priority: const LongTermRelationFieldSet(RelationPriority.p4),
+          description: LongTermRelationDescriptionPatch.fromInput('Новое'),
+        ),
+      ),
+    );
+
+    expect(result, isA<GraphCommandFailed>());
+    expect(
+      (result as GraphCommandFailed).failure,
+      isA<LongTermRelationReferencedByDailyPathFailure>(),
+    );
+    expect(storedRelation(101), before);
+    expectAssignments();
   });
 
   test('прежние значения смысла допускают описание и приоритет', () async {
@@ -205,8 +196,6 @@ void main() {
         relationId: _relation(101),
         patch: LongTermRelationPatch(
           type: const LongTermRelationFieldSet(LongTermRelationType.need),
-          sourceIntentionId: LongTermRelationFieldSet(_intention(1)),
-          relatedIntentionId: LongTermRelationFieldSet(_intention(2)),
           priority: const LongTermRelationFieldSet(RelationPriority.p4),
           description: LongTermRelationDescriptionPatch.fromInput('Новое'),
         ),

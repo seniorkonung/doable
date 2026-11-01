@@ -689,14 +689,6 @@ void main() {
     final command = repository.updateCommandAt(0);
     expect(command.relationId, details.relation.id);
     expect(
-      command.patch.sourceIntentionId,
-      isA<LongTermRelationFieldUnchanged>(),
-    );
-    expect(
-      command.patch.relatedIntentionId,
-      isA<LongTermRelationFieldUnchanged>(),
-    );
-    expect(
       command.patch.type,
       isA<LongTermRelationFieldSet<LongTermRelationType>>().having(
         (field) => field.value,

@@ -147,42 +147,9 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
       throw _LongTermRelationNotFound(command.relationId);
     }
     final before = storedBefore.toDomain();
-    final sourceId = _applyRelationFieldPatch(
-      before.sourceIntentionId,
-      command.patch.sourceIntentionId,
-    );
-    final relatedId = _applyRelationFieldPatch(
-      before.relatedIntentionId,
-      command.patch.relatedIntentionId,
-    );
-    if (sourceId == relatedId) {
-      throw const _LongTermRelationSameParticipants();
-    }
-
-    final mustBeActive = before.scope == relation_domain.RelationScope.active;
-    await _requireRelationParticipant(
-      sourceId,
-      RelationParticipantRole.source,
-      mustBeActive: mustBeActive,
-    );
-    await _requireRelationParticipant(
-      relatedId,
-      RelationParticipantRole.related,
-      mustBeActive: mustBeActive,
-    );
-    final occupiedRelationId = await _findRelationForPair(
-      sourceId,
-      relatedId,
-      excludingId: command.relationId,
-    );
-    if (occupiedRelationId != null) {
-      throw _LongTermRelationPairOccupied(occupiedRelationId);
-    }
 
     final type = _applyRelationFieldPatch(before.type, command.patch.type);
-    if (sourceId != before.sourceIntentionId ||
-        relatedId != before.relatedIntentionId ||
-        type != before.type) {
+    if (type != before.type) {
       final permissions = await _readRelationPermissions(before.id);
       if (!permissions.canChangeMeaning) {
         throw _LongTermRelationReferencedByDailyPath(before.id);
@@ -198,8 +165,8 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
     );
     final after = relation_domain.LongTermRelation(
       id: before.id,
-      sourceIntentionId: sourceId,
-      relatedIntentionId: relatedId,
+      sourceIntentionId: before.sourceIntentionId,
+      relatedIntentionId: before.relatedIntentionId,
       type: type,
       priority: priority,
       scope: before.scope,
@@ -228,18 +195,6 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
             ))
             .write(
               local.LongTermRelationsCompanion(
-                sourceIntentionId: switch (command.patch.sourceIntentionId) {
-                  LongTermRelationFieldUnchanged() => const Value.absent(),
-                  LongTermRelationFieldSet(:final value) => Value(
-                    value.toCanonicalString(),
-                  ),
-                },
-                relatedIntentionId: switch (command.patch.relatedIntentionId) {
-                  LongTermRelationFieldUnchanged() => const Value.absent(),
-                  LongTermRelationFieldSet(:final value) => Value(
-                    value.toCanonicalString(),
-                  ),
-                },
                 type: switch (command.patch.type) {
                   LongTermRelationFieldUnchanged() => const Value.absent(),
                   LongTermRelationFieldSet(:final value) => Value(
@@ -279,8 +234,6 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
     final affectedCounts = await _readVerifiedRelationCountsFor({
       before.sourceIntentionId,
       before.relatedIntentionId,
-      verifiedAfter.sourceIntentionId,
-      verifiedAfter.relatedIntentionId,
     });
     return _CommittedLongTermRelationUpdate(
       before: before,
@@ -450,23 +403,18 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
 
   Future<LongTermRelationId?> _findRelationForPair(
     IntentionId sourceId,
-    IntentionId relatedId, {
-    LongTermRelationId? excludingId,
-  }) async {
-    final exclusion = excludingId == null ? '' : 'AND id <> ?';
+    IntentionId relatedId,
+  ) async {
     final row = await _database
         .customSelect(
           '''
             SELECT id
             FROM long_term_relations
             WHERE source_intention_id = ? AND related_intention_id = ?
-              $exclusion
           ''',
           variables: [
             Variable<String>(sourceId.toCanonicalString()),
             Variable<String>(relatedId.toCanonicalString()),
-            if (excludingId != null)
-              Variable<String>(excludingId.toCanonicalString()),
           ],
           readsFrom: {_database.longTermRelations},
         )
@@ -613,11 +561,6 @@ LongTermRelationCommandFailure _classifyLongTermRelationCommandFailure(
   if (error case _LongTermRelationReferencedByDailyPath(:final relationId)) {
     return LongTermRelationReferencedByDailyPathFailure(relationId);
   }
-  if (error is _LongTermRelationSameParticipants) {
-    return const LongTermRelationCommandValidationFailure(
-      CreateLongTermRelationValidationFailure.sameIntention,
-    );
-  }
   if (error case _LongTermRelationParticipantNotFound(:final role, :final id)) {
     return LongTermRelationParticipantNotFoundFailure(
       role: role,
@@ -680,10 +623,6 @@ final class _LongTermRelationReferencedByDailyPath implements Exception {
   const _LongTermRelationReferencedByDailyPath(this.relationId);
 
   final LongTermRelationId relationId;
-}
-
-final class _LongTermRelationSameParticipants implements Exception {
-  const _LongTermRelationSameParticipants();
 }
 
 final class _LongTermRelationParticipantNotFound implements Exception {

@@ -108,17 +108,11 @@ final class LongTermRelationPatch {
   const LongTermRelationPatch({
     this.type = const LongTermRelationFieldUnchanged<LongTermRelationType>(),
     this.priority = const LongTermRelationFieldUnchanged<RelationPriority>(),
-    this.sourceIntentionId =
-        const LongTermRelationFieldUnchanged<IntentionId>(),
-    this.relatedIntentionId =
-        const LongTermRelationFieldUnchanged<IntentionId>(),
     this.description = const LongTermRelationDescriptionUnchanged(),
   });
 
   final LongTermRelationFieldPatch<LongTermRelationType> type;
   final LongTermRelationFieldPatch<RelationPriority> priority;
-  final LongTermRelationFieldPatch<IntentionId> sourceIntentionId;
-  final LongTermRelationFieldPatch<IntentionId> relatedIntentionId;
   final LongTermRelationDescriptionPatch description;
 }
 

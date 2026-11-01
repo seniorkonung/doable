@@ -100,13 +100,6 @@ final class RelationEditingContext extends RelationEditorContext {
       priority: draft.priority == relation.priority
           ? const LongTermRelationFieldUnchanged<RelationPriority>()
           : LongTermRelationFieldSet(draft.priority),
-      sourceIntentionId: draft.sourceIntentionId == relation.sourceIntentionId
-          ? const LongTermRelationFieldUnchanged<IntentionId>()
-          : LongTermRelationFieldSet(draft.sourceIntentionId),
-      relatedIntentionId:
-          draft.relatedIntentionId == relation.relatedIntentionId
-          ? const LongTermRelationFieldUnchanged<IntentionId>()
-          : LongTermRelationFieldSet(draft.relatedIntentionId),
       description: _descriptionPatchFor(validatedDescription),
     );
   }
