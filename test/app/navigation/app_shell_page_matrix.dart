@@ -486,53 +486,46 @@ void _registerPageMatrixTests() {
     });
   }
 
-  for (final scope in RelationScope.values) {
-    final name = switch (scope) {
-      RelationScope.active => 'активной связи',
-      RelationScope.archived => 'архивной связи',
-    };
-    testWidgets('поиск участника $name без панели', (tester) async {
-      final router = await _start(tester);
-      final choice = RelationParticipantChoice(
-        role: RelationParticipantRole.related,
-        flow: RelationChangeChoiceFlow(
-          relationId: testFormRelationId(1),
-          relationScope: scope,
-        ),
-        type: LongTermRelationType.need,
-        source: RelationParticipantSummary(
-          id: _intentionId(_read),
-          title: 'Читать',
-          archiveState: IntentionArchiveState.active,
-        ),
-        related: RelationParticipantSummary(
-          id: _intentionId(_run),
-          title: 'Бегать',
-          archiveState: IntentionArchiveState.active,
-        ),
-      );
-      unawaited(router.push(RelationParticipantPickerRoute(choice: choice)));
-      await _until(tester, _summary(RelationParticipantPickerPage, 'Бегать'));
-      await tester.pumpAndSettle();
-      _expectAboveShell(
-        tester,
-        RelationParticipantPickerPage,
-        AppDestination.home,
-        expectedPanel: false,
-      );
-      expect(
-        tester
-            .widget<RelationParticipantPickerPage>(
-              find.byType(RelationParticipantPickerPage),
-            )
-            .choice,
-        same(choice),
-      );
-      await _close(tester, RelationParticipantPickerPage);
-      _expectRootPage(tester, router, AppDestination.home);
-      expect(tester.takeException(), isNull);
-    });
-  }
+  testWidgets('поиск участника без панели', (tester) async {
+    final router = await _start(tester);
+    final choice = RelationParticipantChoice(
+      role: RelationParticipantRole.related,
+      restore: testRelationRestore,
+      type: LongTermRelationType.need,
+      priority: null,
+      description: '',
+      source: RelationParticipantSummary(
+        id: _intentionId(_read),
+        title: 'Читать',
+        archiveState: IntentionArchiveState.active,
+      ),
+      related: RelationParticipantSummary(
+        id: _intentionId(_run),
+        title: 'Бегать',
+        archiveState: IntentionArchiveState.active,
+      ),
+    );
+    unawaited(router.push(RelationParticipantPickerRoute(choice: choice)));
+    await _until(tester, _summary(RelationParticipantPickerPage, 'Бегать'));
+    await tester.pumpAndSettle();
+    _expectAboveShell(
+      tester,
+      RelationParticipantPickerPage,
+      AppDestination.home,
+      expectedPanel: false,
+    );
+    expect(
+      tester
+          .widget<RelationParticipantPickerPage>(
+            find.byType(RelationParticipantPickerPage),
+          )
+          .choice,
+      same(choice),
+    );
+    await _close(tester, RelationParticipantPickerPage);
+    _expectRootPage(tester, router, AppDestination.home);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('матрица: создание связи без участников — задача без панели', (
     tester,

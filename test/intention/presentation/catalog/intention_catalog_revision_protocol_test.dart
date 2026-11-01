@@ -461,7 +461,6 @@ void main() {
     );
     final provider = intentionCatalogViewModelProvider(
       SelectRelationParticipant(
-        selectionContext: RelationParticipantSelectionContext.activeRelation,
         session: IntentionSearchSession(),
         pairProbe: RelationPairProbe(
           counterpartId: testSummary(index: 9).id,

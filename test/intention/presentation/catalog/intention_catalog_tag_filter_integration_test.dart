@@ -86,30 +86,15 @@ void main() {
         ('каталог', const BrowseIntentionCatalog(), [10, 2, 1]),
         ('действие', _actionSearchPurpose, [10, 1]),
         (
-          'участник активной связи',
+          'участник связи',
           SelectRelationParticipant(
             session: IntentionSearchSession(),
             pairProbe: RelationPairProbe(
               counterpartId: _intentionId(2),
               candidateRole: RelationParticipantRole.related,
             ),
-            selectionContext:
-                RelationParticipantSelectionContext.activeRelation,
           ),
           [10, 1],
-        ),
-        (
-          'участник архивной связи',
-          SelectRelationParticipant(
-            session: IntentionSearchSession(),
-            pairProbe: RelationPairProbe(
-              counterpartId: _intentionId(2),
-              candidateRole: RelationParticipantRole.related,
-            ),
-            selectionContext:
-                RelationParticipantSelectionContext.archivedRelation,
-          ),
-          [10, 9, 3, 1],
         ),
       ]) {
     test('реальный совместный поиск сохраняет ограничения: $name', () async {

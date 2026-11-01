@@ -4089,29 +4089,11 @@ abstract class AppLocalizations {
   /// **'New relation: related intention'**
   String get participantPickerPurposeCreationRelated;
 
-  /// Подзаголовок поиска исходного намерения при изменении связи
-  ///
-  /// In en, this message translates to:
-  /// **'Relation change: source intention'**
-  String get participantPickerPurposeChangeSource;
-
-  /// Подзаголовок поиска связанного намерения при изменении связи
-  ///
-  /// In en, this message translates to:
-  /// **'Relation change: related intention'**
-  String get participantPickerPurposeChangeRelated;
-
   /// Строка листа назначения: создание связи
   ///
   /// In en, this message translates to:
   /// **'New relation'**
   String get participantPickerFlowCreation;
-
-  /// Строка листа назначения: изменение связи
-  ///
-  /// In en, this message translates to:
-  /// **'Relation change'**
-  String get participantPickerFlowChange;
 
   /// Пояснение выбираемой роли исходного намерения в листе назначения
   ///

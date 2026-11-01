@@ -2641,18 +2641,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'New relation: related intention';
 
   @override
-  String get participantPickerPurposeChangeSource =>
-      'Relation change: source intention';
-
-  @override
-  String get participantPickerPurposeChangeRelated =>
-      'Relation change: related intention';
-
-  @override
   String get participantPickerFlowCreation => 'New relation';
-
-  @override
-  String get participantPickerFlowChange => 'Relation change';
 
   @override
   String get participantPickerRoleSourceNote =>

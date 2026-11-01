@@ -63,9 +63,11 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   IntentionCatalogSelection get selection => IntentionCatalogSelection(
     scope: switch (_purpose) {
       BrowseIntentionCatalog() => IntentionScopeOpen(_scope),
-      SelectRelationParticipant(:final scope) => IntentionScopeFixed(scope),
-      SelectDailyChoiceAction() || SelectDailyChoiceSource() =>
-        const IntentionScopeFixed(IntentionScope.active),
+      SelectDailyChoiceAction() ||
+      SelectDailyChoiceSource() ||
+      SelectRelationParticipant() => const IntentionScopeFixed(
+        IntentionScope.active,
+      ),
     },
     type: switch (_purpose) {
       SelectDailyChoiceAction() => const IntentionTypePinnedToActions(),

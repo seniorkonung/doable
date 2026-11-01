@@ -2667,18 +2667,7 @@ class AppLocalizationsRu extends AppLocalizations {
       'Новая связь: связанное намерение';
 
   @override
-  String get participantPickerPurposeChangeSource =>
-      'Изменение связи: исходное намерение';
-
-  @override
-  String get participantPickerPurposeChangeRelated =>
-      'Изменение связи: связанное намерение';
-
-  @override
   String get participantPickerFlowCreation => 'Новая связь';
-
-  @override
-  String get participantPickerFlowChange => 'Изменение связи';
 
   @override
   String get participantPickerRoleSourceNote =>

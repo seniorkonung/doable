@@ -27,12 +27,12 @@ import 'relation_participant_picker_purpose.dart';
 /// намерение пары исключает запрос каталога по идентификатору, поэтому
 /// одноимённые намерения остаются отдельными строками. Строки, выбор которых
 /// дал бы занятую пару, отмечены и не выбираются. Нажатие на их текст открывает
-/// занимающую связь поверх поиска, а при создании архивную связь предлагает
-/// восстановить с подтверждением. Пока форма создания не может продолжаться,
-/// например пока выполняется восстановление, нажатия на текст строк ничего не
-/// делают. Выбор возвращает снимок участника с ревизией выдачи, из которой
-/// выбрана строка. Закрытие не возвращает ничего и не создаёт намерений.
-/// Подзаголовок шапки напоминает связь, из формы которой открыт поиск.
+/// занимающую активную связь поверх поиска, а архивную предлагает восстановить
+/// с подтверждением. Пока форма создания не может продолжаться, например пока
+/// выполняется восстановление, нажатия на текст строк ничего не делают. Выбор
+/// возвращает снимок участника с ревизией выдачи, из которой выбрана строка.
+/// Закрытие не возвращает ничего и не создаёт намерений. Подзаголовок шапки
+/// напоминает связь, из формы которой открыт поиск.
 @RoutePage()
 final class RelationParticipantPickerPage extends ConsumerStatefulWidget {
   const RelationParticipantPickerPage({required this.choice, super.key});
@@ -46,26 +46,13 @@ final class RelationParticipantPickerPage extends ConsumerStatefulWidget {
 
 final class _RelationParticipantPickerPageState
     extends ConsumerState<RelationParticipantPickerPage> {
-  late final _purpose = _purposeFor(widget.choice);
+  late final _purpose = SelectRelationParticipant(
+    session: IntentionSearchSession(),
+    pairProbe: _pairProbeFor(widget.choice),
+  );
 
   /// Восстановление уже предложено: от нажатия до ответа на подтверждение.
   bool _offeringRestore = false;
-
-  /// Оба состояния участников допускает только изменение архивной связи.
-  static SelectRelationParticipant _purposeFor(
-    RelationParticipantChoice choice,
-  ) => SelectRelationParticipant(
-    session: IntentionSearchSession(),
-    pairProbe: _pairProbeFor(choice),
-    selectionContext: switch (choice.flow) {
-      RelationChangeChoiceFlow(relationScope: RelationScope.archived) =>
-        RelationParticipantSelectionContext.archivedRelation,
-      RelationCreationChoiceFlow() ||
-      RelationChangeChoiceFlow(
-        relationScope: RelationScope.active,
-      ) => RelationParticipantSelectionContext.activeRelation,
-    },
-  );
 
   /// Проба есть, пока участник другой роли выбран.
   static RelationPairProbe? _pairProbeFor(RelationParticipantChoice choice) {
@@ -79,19 +66,11 @@ final class _RelationParticipantPickerPageState
     return RelationPairProbe(
       counterpartId: counterpart.id,
       candidateRole: choice.role,
-      ignoredRelationId: switch (choice.flow) {
-        RelationCreationChoiceFlow() => null,
-        RelationChangeChoiceFlow(:final relationId) => relationId,
-      },
     );
   }
 
-  /// Может ли поток формы продолжаться. Дескриптора у изменения связи нет:
-  /// оно продолжается всегда.
-  bool get _canContinue => switch (widget.choice.flow) {
-    RelationCreationChoiceFlow(:final restore) => restore.canContinue,
-    RelationChangeChoiceFlow() => true,
-  };
+  /// Может ли поток формы продолжаться.
+  bool get _canContinue => widget.choice.restore.canContinue;
 
   bool get _ownsTopRoute =>
       mounted &&
@@ -102,40 +81,29 @@ final class _RelationParticipantPickerPageState
   void _openRelation(LongTermRelationId id) =>
       unawaited(context.router.push(RelationDetailsRoute(relationId: id)));
 
-  /// Что значит занятая пара в этом потоке: предложение восстановить архивную
-  /// связь есть только при создании.
-  OccupiedPairMark _occupiedPairMark(PairOccupant occupant) {
-    void open() {
-      if (_canContinue) _openRelation(occupant.relationId);
-    }
-
-    return switch ((widget.choice.flow, occupant.scope)) {
-      (final RelationCreationChoiceFlow flow, RelationScope.archived) =>
-        OccupiedPairMark(
-          kind: OccupiedPairKind.restorable,
-          onTap: () => unawaited(_offerRestore(occupant.relationId, flow)),
+  /// Что значит занятая пара: активная связь открывается, а архивную можно
+  /// восстановить.
+  OccupiedPairMark _occupiedPairMark(PairOccupant occupant) =>
+      switch (occupant.scope) {
+        RelationScope.active => OccupiedPairMark(
+          kind: OccupiedPairKind.linked,
+          onTap: () {
+            if (_canContinue) _openRelation(occupant.relationId);
+          },
         ),
-      (_, RelationScope.active) => OccupiedPairMark(
-        kind: OccupiedPairKind.linked,
-        onTap: open,
-      ),
-      (_, RelationScope.archived) => OccupiedPairMark(
-        kind: OccupiedPairKind.archived,
-        onTap: open,
-      ),
-    };
-  }
+        RelationScope.archived => OccupiedPairMark(
+          kind: OccupiedPairKind.restorable,
+          onTap: () => unawaited(_offerRestore(occupant.relationId)),
+        ),
+      };
 
   /// Спрашивает, восстановить ли связь [id], и передаёт согласие форме.
   ///
   /// Подтверждению нужны данные связи, а строка выдачи их не несёт. Если чтение
   /// их не дало, сообщения об этом показывает подробный просмотр связи: своей
   /// поверхности сообщений у поиска нет.
-  Future<void> _offerRestore(
-    LongTermRelationId id,
-    RelationCreationChoiceFlow flow,
-  ) async {
-    final restore = flow.restore;
+  Future<void> _offerRestore(LongTermRelationId id) async {
+    final restore = widget.choice.restore;
     if (_offeringRestore || !restore.canContinue) return;
     _offeringRestore = true;
     try {
@@ -148,7 +116,7 @@ final class _RelationParticipantPickerPageState
       if (read case LongTermRelationReadSuccess(
         value: GraphSnapshot(value: final details?),
       )) {
-        if (await _confirmRestore(details, flow)) restore.accept(id);
+        if (await _confirmRestore(details)) restore.accept(id);
       } else {
         _openRelation(id);
       }
@@ -165,11 +133,9 @@ final class _RelationParticipantPickerPageState
   String? _discardedDraftWarning(
     AppLocalizations l10n,
     LongTermRelationDetails details,
-    RelationCreationChoiceFlow flow,
   ) {
-    final type = widget.choice.type;
-    final priority = flow.priority;
-    final description = flow.description;
+    final RelationParticipantChoice(:type, :priority, :description) =
+        widget.choice;
     final discarded = [
       if (type != null && type != details.relation.type)
         switch (type) {
@@ -188,10 +154,7 @@ final class _RelationParticipantPickerPageState
     return l10n.participantPickerRestoreWarning(discarded.join(', '));
   }
 
-  Future<bool> _confirmRestore(
-    LongTermRelationDetails details,
-    RelationCreationChoiceFlow flow,
-  ) {
+  Future<bool> _confirmRestore(LongTermRelationDetails details) {
     final l10n = AppLocalizations.of(context);
     return showPreservingConfirmDialog(
       context: context,
@@ -212,7 +175,7 @@ final class _RelationParticipantPickerPageState
           details.relation.priority.name.toUpperCase(),
         ),
       ),
-      warning: _discardedDraftWarning(l10n, details, flow),
+      warning: _discardedDraftWarning(l10n, details),
       cancelLabel: l10n.participantPickerRestoreCancel,
       actionLabel: l10n.participantPickerRestoreConfirm,
     );

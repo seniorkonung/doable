@@ -25,7 +25,7 @@
     - меняются `test/long_term_relation/presentation/editor/relation_editor_page_test.dart`, `relation_editor_view_model_test.dart`, `relation_participant_selection_scenarios.dart`.
   - **Размер:** S.
 
-- [ ] 1.3 Убрать из поиска участника поток изменения связи
+- [x] 1.3 Убрать из поиска участника поток изменения связи
   - **Критерии приёмки:**
     - `RelationChangeChoiceFlow` удалён, а в поиске участника и форме нет ветвей по потоку изменения. Подзаголовок, занятость и предложение восстановления для создания не меняются.
     - Поиск участника всегда ограничен активными намерениями: `RelationParticipantSelectionContext` удалён вместе с архивным охватом.

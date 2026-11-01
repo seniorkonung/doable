@@ -392,23 +392,15 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage>
     );
     final notifier = ref.read(provider.notifier);
     final draft = ref.read(provider);
-    final flow = switch (draft.context) {
-      RelationBlankCreationContext() ||
-      RelationCreationContext() => RelationCreationChoiceFlow(
-        restore: this,
-        priority: draft.priority,
-        description: draft.description,
-      ),
-      RelationEditingContext() => null,
-    };
-    if (flow == null) return;
     final selected = await context.router
         .push<GraphSnapshot<RelationParticipantSummary>>(
           RelationParticipantPickerRoute(
             choice: RelationParticipantChoice(
               role: role,
-              flow: flow,
+              restore: this,
               type: draft.type,
+              priority: draft.priority,
+              description: draft.description,
               source: draft.sourceParticipant,
               related: draft.relatedParticipant,
             ),

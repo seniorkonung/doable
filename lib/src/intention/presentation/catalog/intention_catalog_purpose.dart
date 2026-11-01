@@ -1,5 +1,4 @@
 import '../../../long_term_relation/application/relation_pair_probe.dart';
-import '../../application/intention_catalog.dart';
 
 /// Идентичность одного поиска на всё время жизни его страницы.
 ///
@@ -73,53 +72,28 @@ final class SelectDailyChoiceSource extends IntentionPickerPurpose {
       Object.hash(SelectDailyChoiceSource, identityHashCode(session));
 }
 
-/// Выбор существующего намерения участником долговременной связи.
+/// Выбор существующего активного намерения участником долговременной связи.
 ///
 /// Участник другой роли из [pairProbe] исключается по идентификатору: прямая
 /// самосвязь запрещена, а одноимённые намерения остаются разными участниками.
-/// Без пробы ничего не исключается: второй участник ещё не выбран. Контекст
-/// редактируемой связи задаёт допустимый архивный охват и не позволяет
-/// вызывающей стороне составить режим выбора только архивных намерений.
+/// Без пробы ничего не исключается: второй участник ещё не выбран.
 final class SelectRelationParticipant extends IntentionPickerPurpose {
-  const SelectRelationParticipant({
-    required this.selectionContext,
-    required this.session,
-    this.pairProbe,
-  });
+  const SelectRelationParticipant({required this.session, this.pairProbe});
 
   final RelationPairProbe? pairProbe;
-  final RelationParticipantSelectionContext selectionContext;
 
   final IntentionSearchSession session;
-
-  IntentionScope get scope => selectionContext.catalogScope;
 
   @override
   bool operator ==(Object other) =>
       other is SelectRelationParticipant &&
       other.pairProbe == pairProbe &&
-      other.selectionContext == selectionContext &&
       identical(other.session, session);
 
   @override
   int get hashCode => Object.hash(
     SelectRelationParticipant,
     pairProbe,
-    selectionContext,
     identityHashCode(session),
   );
-}
-
-/// Допустимый охват каталога при выборе участника связи.
-///
-/// Создаваемая и активная связи соединяют только активные намерения.
-/// Архивная связь может сохранить либо явно выбрать как активного, так и
-/// архивированного участника; отдельный режим «только архивные» ей не нужен.
-enum RelationParticipantSelectionContext {
-  activeRelation(IntentionScope.active),
-  archivedRelation(IntentionScope.all);
-
-  const RelationParticipantSelectionContext(this.catalogScope);
-
-  final IntentionScope catalogScope;
 }

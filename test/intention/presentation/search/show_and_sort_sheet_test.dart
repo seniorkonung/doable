@@ -185,7 +185,6 @@ void main() {
       '${locale.languageCode}: повторный тип сохраняет выдачу и прокрутку, новый возвращает список к началу',
       (tester) async {
         final purpose = SelectRelationParticipant(
-          selectionContext: RelationParticipantSelectionContext.activeRelation,
           session: IntentionSearchSession(),
         );
         final h = await _open(tester, purpose, locale);
@@ -235,7 +234,6 @@ void main() {
       '${locale.languageCode}: закрытие любого меню сохраняет выдачу и прокрутку, направление применяется отдельным нажатием',
       (tester) async {
         final purpose = SelectRelationParticipant(
-          selectionContext: RelationParticipantSelectionContext.activeRelation,
           session: IntentionSearchSession(),
         );
         final h = await _open(tester, purpose, locale);
@@ -625,7 +623,6 @@ void main() {
       (tester) async {
         final semantics = tester.ensureSemantics();
         final purpose = SelectRelationParticipant(
-          selectionContext: RelationParticipantSelectionContext.activeRelation,
           session: IntentionSearchSession(),
         );
         final h = await _open(tester, purpose, locale);

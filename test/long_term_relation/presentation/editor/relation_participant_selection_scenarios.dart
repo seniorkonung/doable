@@ -6,7 +6,6 @@ import 'package:doable/src/long_term_relation/application/long_term_relation_com
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/relation_pair_probe.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
-import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_choice.dart';
 import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -78,7 +77,6 @@ void defineRelationBlankCreationTests({
       expectOpenedParticipantChoice(
         tester,
         role: RelationParticipantRole.values.byName(firstRole),
-        flow: isRelationCreationFlow,
         type: LongTermRelationType.need,
         sourceId: null,
         relatedId: null,
@@ -119,7 +117,6 @@ void defineRelationBlankCreationTests({
       expectOpenedParticipantChoice(
         tester,
         role: RelationParticipantRole.values.byName(secondRole),
-        flow: isRelationCreationFlow,
         type: LongTermRelationType.need,
         sourceId: firstRole == 'source' ? first.id : null,
         relatedId: firstRole == 'source' ? null : first.id,
@@ -236,7 +233,6 @@ void defineRelationParticipantSelectionTests({
         expectOpenedParticipantChoice(
           tester,
           role: RelationParticipantRole.values.byName(firstRole),
-          flow: isRelationCreationFlow,
           type: LongTermRelationType.can,
           sourceId: firstRole == 'source' ? current.id : null,
           relatedId: firstRole == 'source' ? null : current.id,
@@ -279,7 +275,6 @@ void defineRelationParticipantSelectionTests({
         expectOpenedParticipantChoice(
           tester,
           role: RelationParticipantRole.values.byName(firstRole),
-          flow: isRelationCreationFlow,
           type: LongTermRelationType.can,
           sourceId: firstRole == 'source' ? current.id : sameTitle.id,
           relatedId: firstRole == 'source' ? sameTitle.id : current.id,
@@ -303,7 +298,6 @@ void defineRelationParticipantSelectionTests({
         expectOpenedParticipantChoice(
           tester,
           role: RelationParticipantRole.values.byName(secondRole),
-          flow: isRelationCreationFlow,
           type: LongTermRelationType.need,
           sourceId: firstRole == 'source' ? current.id : sameTitle.id,
           relatedId: firstRole == 'source' ? sameTitle.id : current.id,
@@ -344,13 +338,10 @@ void defineRelationParticipantSelectionTests({
   }
 }
 
-final isRelationCreationFlow = isA<RelationCreationChoiceFlow>();
-
 /// Проверяет описание выбора, которое получила открытая страница поиска.
 void expectOpenedParticipantChoice(
   WidgetTester tester, {
   required RelationParticipantRole role,
-  required Matcher flow,
   required LongTermRelationType? type,
   required IntentionId? sourceId,
   required IntentionId? relatedId,
@@ -361,7 +352,6 @@ void expectOpenedParticipantChoice(
       )
       .choice;
   expect(choice.role, role);
-  expect(choice.flow, flow);
   expect(choice.type, type);
   expect(choice.source?.id, sourceId);
   expect(choice.related?.id, relatedId);

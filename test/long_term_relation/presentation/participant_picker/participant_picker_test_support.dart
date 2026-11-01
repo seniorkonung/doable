@@ -23,12 +23,8 @@ import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/statistics_read_contract_test_fallback.dart';
 import '../../../support/intention_type_counts.dart';
 
-/// Поток создания без формы: экран поиска здесь проверяется отдельно от неё.
-const testRelationCreationFlow = RelationCreationChoiceFlow(
-  restore: _NoRelationRestore(),
-  priority: null,
-  description: '',
-);
+/// Дескриптор без формы: экран поиска здесь проверяется отдельно от неё.
+const RelationCreationRestore testRelationRestore = _NoRelationRestore();
 
 /// Дескриптор восстановления, продолжение потока которого задаёт тест.
 final class ControlledRelationRestore implements RelationCreationRestore {

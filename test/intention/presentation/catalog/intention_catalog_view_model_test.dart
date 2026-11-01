@@ -902,12 +902,8 @@ void main() {
                 IntentionCatalogCounting.byType,
               ),
               (
-                SelectRelationParticipant(
-                  selectionContext:
-                      RelationParticipantSelectionContext.archivedRelation,
-                  session: IntentionSearchSession(),
-                ),
-                const IntentionScopeFixed(IntentionScope.all),
+                SelectRelationParticipant(session: IntentionSearchSession()),
+                const IntentionScopeFixed(IntentionScope.active),
                 const IntentionTypeOpen(IntentionTypeChoice.all),
                 IntentionReadinessFilter.all,
                 IntentionCatalogCounting.byType,
@@ -1472,7 +1468,6 @@ void main() {
 
   group('занимающие связи строк поиска участника', () {
     final purpose = SelectRelationParticipant(
-      selectionContext: RelationParticipantSelectionContext.activeRelation,
       session: IntentionSearchSession(),
       pairProbe: RelationPairProbe(
         counterpartId: testSummary(index: 9).id,

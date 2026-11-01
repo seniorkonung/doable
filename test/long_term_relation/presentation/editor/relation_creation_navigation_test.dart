@@ -342,13 +342,13 @@ void main() {
     await _openForm(tester, app, IntentionRelationGroup.needs);
     await _tap(tester, 'relation-editor-priority-p1');
     await tester.enterText(_key('relation-editor-description'), 'Черновик');
-    final flow = await _openPicker(
+    final choice = await _openPicker(
       tester,
       app,
       'relation-editor-select-related',
     );
-    expect(flow.priority, RelationPriority.p1);
-    expect(flow.description, 'Черновик');
+    expect(choice.priority, RelationPriority.p1);
+    expect(choice.description, 'Черновик');
   });
 
   testWidgets(
@@ -359,12 +359,12 @@ void main() {
           .map((route) => route.matchId)
           .toList();
       await _openForm(tester, app, IntentionRelationGroup.needs);
-      final flow = await _openPicker(
+      final choice = await _openPicker(
         tester,
         app,
         'relation-editor-select-related',
       );
-      flow.restore.accept(testFormRelationId(5));
+      choice.restore.accept(testFormRelationId(5));
       await tester.pump();
       expect(
         app.repository.relationRestoreCommands.single.relationId,
@@ -422,12 +422,12 @@ void main() {
       final app = await _launch(tester);
       await _openForm(tester, app, IntentionRelationGroup.needs);
       await _fill(tester, app);
-      final flow = await _openPicker(
+      final choice = await _openPicker(
         tester,
         app,
         'relation-editor-change-related',
       );
-      flow.restore.accept(testFormRelationId(5));
+      choice.restore.accept(testFormRelationId(5));
       cover(tester, app);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
@@ -438,7 +438,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
       expect(app.router.stackData.map((route) => route.matchId), covered);
-      expect(flow.restore.canContinue, isFalse);
+      expect(choice.restore.canContinue, isFalse);
       expect(find.textContaining('Relation restored.'), findsOneWidget);
       while (app.router.current.name != RelationEditorRoute.name) {
         await tester.binding.handlePopRoute();
@@ -458,18 +458,18 @@ void main() {
     (tester) async {
       final app = await _launch(tester);
       await _openForm(tester, app, IntentionRelationGroup.needs);
-      final flow = await _openPicker(
+      final choice = await _openPicker(
         tester,
         app,
         'relation-editor-select-related',
       );
-      flow.restore.accept(testFormRelationId(5));
+      choice.restore.accept(testFormRelationId(5));
       await tester.pump();
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       await tester.tap(find.text('Leave creation'));
       await tester.pumpAndSettle();
-      expect(flow.restore.canContinue, isFalse);
+      expect(choice.restore.canContinue, isFalse);
       final history = app.router.stackData
           .map((route) => route.matchId)
           .toList();
@@ -491,16 +491,16 @@ void main() {
       _key('relation-editor-description'),
       'Прежний черновик',
     );
-    final flow = await _openPicker(
+    final choice = await _openPicker(
       tester,
       app,
       'relation-editor-change-related',
     );
     final picker = app.router.stackData.last.matchId;
-    expect(flow.restore.canContinue, isTrue);
-    flow.restore.accept(testFormRelationId(5));
+    expect(choice.restore.canContinue, isTrue);
+    choice.restore.accept(testFormRelationId(5));
     await tester.pump();
-    expect(flow.restore.canContinue, isFalse);
+    expect(choice.restore.canContinue, isFalse);
     app.repository.failRelationCommand(
       0,
       const LongTermRelationUnavailableFailure(),
@@ -511,7 +511,7 @@ void main() {
       find.textContaining('The relation couldn’t be restored. Try again.'),
       findsOneWidget,
     );
-    expect(flow.restore.canContinue, isTrue);
+    expect(choice.restore.canContinue, isTrue);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(_description(tester), 'Прежний черновик');
@@ -583,9 +583,9 @@ Future<void> _fill(WidgetTester tester, _App app) async {
   await _tap(tester, 'relation-editor-priority-p1');
 }
 
-/// Открывает поиск участника и возвращает поток из аргументов его маршрута:
-/// экран поиска подключает восстановление в следующих задачах.
-Future<RelationCreationChoiceFlow> _openPicker(
+/// Открывает поиск участника и возвращает описание выбора из аргументов его
+/// маршрута: экран поиска подключает восстановление в следующих задачах.
+Future<RelationParticipantChoice> _openPicker(
   WidgetTester tester,
   _App app,
   String actionKey,
@@ -598,9 +598,9 @@ Future<RelationCreationChoiceFlow> _openPicker(
     const [],
   );
   await tester.pumpAndSettle();
-  final args = app.router.stackData.last
-      .argsAs<RelationParticipantPickerRouteArgs>();
-  return args.choice.flow as RelationCreationChoiceFlow;
+  return app.router.stackData.last
+      .argsAs<RelationParticipantPickerRouteArgs>()
+      .choice;
 }
 
 final class _App {

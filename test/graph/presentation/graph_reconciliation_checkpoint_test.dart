@@ -689,7 +689,6 @@ void main() {
             counterpartId: ids[3],
             candidateRole: RelationParticipantRole.related,
           ),
-          selectionContext: RelationParticipantSelectionContext.activeRelation,
         ),
       );
       final subscriptions = [

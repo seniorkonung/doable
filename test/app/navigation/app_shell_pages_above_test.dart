@@ -51,8 +51,8 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
-import '../../long_term_relation/presentation/editor/relation_form_test_support.dart'
-    show testFormRelationId;
+import '../../long_term_relation/presentation/participant_picker/participant_picker_test_support.dart'
+    show testRelationRestore;
 import '../../support/app_root_pages.dart';
 import '../../support/daily_choice_local_date.dart';
 import '../../support/graph_seed.dart';

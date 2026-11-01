@@ -61,10 +61,7 @@ void main() {
         'daily-choice-source',
       ),
       (
-        SelectRelationParticipant(
-          selectionContext: RelationParticipantSelectionContext.activeRelation,
-          session: IntentionSearchSession(),
-        ),
+        SelectRelationParticipant(session: IntentionSearchSession()),
         intention,
         'participant-picker',
       ),
@@ -528,8 +525,6 @@ void main() {
       ),
       (
         SelectRelationParticipant(
-          selectionContext:
-              RelationParticipantSelectionContext.archivedRelation,
           pairProbe: RelationPairProbe(
             counterpartId: _action(9).id,
             candidateRole: RelationParticipantRole.related,
@@ -620,8 +615,6 @@ void main() {
         (tester) async {
           final ru = locale.languageCode == 'ru';
           final purpose = SelectRelationParticipant(
-            selectionContext:
-                RelationParticipantSelectionContext.activeRelation,
             pairProbe: RelationPairProbe(
               counterpartId: _action(9).id,
               candidateRole: RelationParticipantRole.related,
@@ -849,7 +842,6 @@ void main() {
     final h = await _open(
       tester,
       purpose: SelectRelationParticipant(
-        selectionContext: RelationParticipantSelectionContext.activeRelation,
         session: IntentionSearchSession(),
         pairProbe: RelationPairProbe(
           counterpartId: testSummary(index: 9).id,
@@ -1027,7 +1019,7 @@ Future<_Harness> _open(
           occupiedPairMark: (occupant) => OccupiedPairMark(
             kind: switch (occupant.scope) {
               RelationScope.active => OccupiedPairKind.linked,
-              RelationScope.archived => OccupiedPairKind.archived,
+              RelationScope.archived => OccupiedPairKind.restorable,
             },
             onTap: () => h.openedOccupants.add(occupant),
           ),
