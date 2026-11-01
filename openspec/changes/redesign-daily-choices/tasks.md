@@ -1,0 +1,187 @@
+## Phase 1: Экран дня показывает выборы по дизайну
+
+- [ ] 1.1 Обе секции каталога раскрыты при первом открытии
+  - **Критерии приёмки:**
+    - Корневой каталог и каталог на дату начинают с раскрытыми «Невыполненными» и «Выполненными», в том числе в новом поколении графа.
+    - Сворачивание, смена даты и возврат из другого раздела сохраняют выбор пользователя по прежним правилам.
+    - Тесты, которые раскрывали выполненные нажатием или `toggleSection(true)`, выражают то же намерение при новом начальном состоянии. Проверка сохранения состояния по-прежнему меняет его относительно начального.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation test/app test/graph/presentation`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - меняется `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart`;
+    - меняются `test/daily_choice/presentation/catalog/daily_choice_catalog_view_model_test.dart`, `daily_choice_date_catalog_page_test.dart`, `daily_choice_catalog_details_integration_test.dart`;
+    - меняются `test/app/navigation/app_shell_state_test.dart`, `test/app/creation_flows_test_support.dart`, `test/app/intention_statistics_catalog_scenarios.dart`;
+    - меняются остальные тесты `test/daily_choice/presentation/catalog`, `test/app` и `test/graph/presentation`, которые зависят от свёрнутых выполненных.
+  - **Размер:** M по логике: меняется одно значение, а файлов больше нормы, потому что их ожидания нельзя поправить отдельно от него.
+
+- [ ] 1.2 Подпись «Весь день» зависит от всего дня, а не от секции
+  - **Критерии приёмки:**
+    - `DailyChoiceCatalogLoaded` даёт признак времени всего дня как дизъюнкцию признаков обеих секций, а подпись группы читает его вместо признака своей секции.
+    - Если все невыполненные выборы на весь день, а среди выполненных есть выбор на 18:00, невыполненные стоят под подписью «Весь день». Время в ещё не полученной порции даёт тот же результат.
+    - Если во всём дне нет выборов со временем, подписи «Весь день» нет ни в одной секции.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/catalog/daily_choice_catalog_cards_test.dart`.
+  - **Зависимости:** 1.1.
+  - **Предполагаемые файлы:** `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart`, `daily_choice_catalog_body.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_cards_test.dart`.
+  - **Размер:** S.
+
+- [ ] 1.3 Модуль основ даёт одно перечисление приоритета для всех компонентов
+  - **Критерии приёмки:**
+    - `DoablePriority` модуля основ заменяет `RelationRowPriority` и сам выбирает цвет P1–P4, поэтому компоненты не повторяют это сопоставление.
+    - Домен переводится в перечисление на границе экрана. `RelationRow` выглядит как прежде.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/relation_row_test.dart test/long_term_relation/presentation/intention_relations`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - добавляется `lib/src/design_system/doable_priority.dart`;
+    - меняются `lib/src/design_system/components/relation_row.dart`, `lib/src/long_term_relation/presentation/intention_relations/intention_relations_sliver.dart`;
+    - меняются `test/design_system/relation_row_test.dart`, `test/long_term_relation/presentation/intention_relations/intention_relations_sliver_test.dart`.
+  - **Размер:** S.
+
+- [ ] 1.4 Кольцо и цепочка выбора показывают приоритет и выполнение
+  - **Критерии приёмки:**
+    - `ChoiceCheck` без области нажатия и имени показывает кольцо цвета приоритета и выполненное состояние по своему README.
+    - `ReasonChain` без узла экранного диктора получает число шагов, приоритет и признак `off` и показывает ромб, по кольцу на промежуточное намерение и круг.
+    - До семи шагов цепочка рисуется целиком, а от восьми имеет постоянную длину с многоточием, поэтому длинный путь не меняет ширину.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/choice_check_test.dart test/design_system/reason_chain_test.dart`.
+  - **Зависимости:** 1.3.
+  - **Предполагаемые файлы:**
+    - добавляются `lib/src/design_system/components/choice_check.dart`, `reason_chain.dart`;
+    - меняется `lib/src/design_system/doable_metrics.dart`;
+    - добавляются `test/design_system/choice_check_test.dart`, `reason_chain_test.dart`.
+  - **Размер:** M.
+
+- [ ] 1.5 Компонент `ChoiceRow` показывает один дневной выбор
+  - **Критерии приёмки:**
+    - Исходное намерение занимает одну строку с многоточием, выбранное действие переносится, описание занимает не больше двух строк. У выполненного выбора цепочка серая, а действие зачёркнуто.
+    - Строка состоит из двух кнопок: флажка по README и текста, который открывает выбор. Нажатие на флажок не открывает выбор, а без `onToggle` флажок выключен и раскладка не меняется.
+    - Тексты, доступные названия и ключи обеих кнопок задаёт потребитель. Предметных типов и параметров множественного выделения у компонента нет.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/choice_row_test.dart`.
+  - **Зависимости:** 1.4.
+  - **Предполагаемые файлы:** `lib/src/design_system/components/choice_row.dart`, `test/design_system/choice_row_test.dart`.
+  - **Размер:** S.
+
+- [ ] 1.6 Каталог показывает выборы карточками `ChoiceRow`
+  - **Критерии приёмки:**
+    - Карточка показывает флажок, исходное намерение, цепочку с числом шагов `pathIntentionCount - 1`, выбранное действие и описание. Даты, времени, слова приоритета, числа намерений и формулировки «Чтобы…» в ней нет.
+    - Нажатие на карточку открывает прежний подробный просмотр, а флажок меняет выполнение и его не открывает. Доступное имя строки называет время и число шагов, а имя флажка — приоритет.
+    - Подпись группы остаётся элементом ленивого списка и оформлена по README `TimeGroup`, а под последней строкой выдачи есть свободное место из этого README.
+    - Ключи `daily-choice-row-*` и `daily-choice-completion-*` сохранены. Тесты читают состояние флажка одним шагом в `test/support/daily_choice_catalog_controls.dart`, а не виджетом `Checkbox`.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation test/app test/graph/presentation`.
+  - **Зависимости:** 1.2, 1.5.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb`;
+    - меняется `test/support/daily_choice_catalog_controls.dart`;
+    - меняются `test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`, `daily_choice_date_catalog_page_test.dart`, `daily_choice_catalog_card_flow_test.dart`, `daily_choice_catalog_cards_test.dart`, `daily_choice_catalog_layout_test.dart`, `daily_choice_catalog_accessibility_test.dart`;
+    - меняются `test/app/daily_choice_app_flow_test.dart`, `daily_choice_completion_lifecycle_scenarios.dart`, `intention_statistics_catalog_scenarios.dart`, `navigation/app_shell_state_test.dart`, `navigation/app_shell_layout_test.dart`.
+  - **Размер:** M по логике: файлов больше нормы только из-за перевода тестов на общий шаг.
+
+- [ ] 1.7 Заголовки секций показывают счётчик и шеврон
+  - **Критерии приёмки:**
+    - `SectionHeader` — одна кнопка с названием, счётчиком и шевроном, который показывает раскрытие.
+    - Счётчик равен числу выборов секции за день, включая неполученные порции. Секция без выборов показывает 0 и не показывает карточек.
+    - Ключ `daily-choice-section-*` и состояния заголовка и раскрытия для экранного диктора сохранены. Верхняя секция называется «Невыполненные», как в спецификации.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/section_header_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_cards_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_accessibility_test.dart`.
+  - **Зависимости:** 1.1.
+  - **Предполагаемые файлы:**
+    - добавляются `lib/src/design_system/components/section_header.dart`, `test/design_system/section_header_test.dart`;
+    - меняются `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`, `lib/l10n/app_ru.arb`, `test/daily_choice/presentation/catalog/daily_choice_catalog_cards_test.dart`.
+  - **Размер:** M.
+
+- [ ] 1.8 Первая загрузка, отказ и пустой день показаны состояниями дизайн-системы
+  - **Критерии приёмки:**
+    - При первой загрузке и её отказе под заголовком дня стоит `ListState`, а заголовков секций нет. Доказанно временный отказ предлагает повтор для выбранной даты, и другой день остаётся доступным.
+    - Пустой день показывает `EmptyState` с текстами дизайна в `SliverFillRemaining` вместо секций.
+    - Строка общего количества, её локализация и `_SliverStatus` удалены. Ветви `toggleSection` для состояний без данных удалены, потому что заголовков там больше нет.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/catalog test/app/navigation test/app/intention_statistics_app_flow_test.dart`.
+  - **Зависимости:** 1.7.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`, `daily_choice_catalog_view_model.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb`;
+    - меняются `test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`, `daily_choice_catalog_cards_test.dart`, `daily_choice_catalog_layout_test.dart`, `daily_choice_catalog_accessibility_test.dart`;
+    - меняются `test/app/intention_statistics_catalog_scenarios.dart`, `navigation/app_shell_layout_test.dart`, `navigation/app_shell_state_test.dart`.
+  - **Размер:** M по логике: файлов больше нормы, потому что тесты ждут загрузку по удаляемой строке количества.
+
+- [ ] 1.9 Обновление выдачи не сдвигает строки
+  - **Критерии приёмки:**
+    - `ListState` получает вариант `refreshing` по своему README и объявляет его как статус.
+    - Строка обновления стоит на линии заголовка дня и не занимает места в выдаче. Позиции заголовков и карточек не меняются при её появлении и исчезновении, в том числе при обновлении после записи выполнения.
+    - Устаревшая выдача показывает `Notice`, а повтор предлагает только при доказанно временном отказе.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/list_state_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`.
+  - **Зависимости:** 1.8.
+  - **Предполагаемые файлы:** `lib/src/design_system/components/list_state.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`, `test/design_system/list_state_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`.
+  - **Размер:** M.
+
+- [ ] 1.10 Следующая порция секции подгружается сама
+  - **Критерии приёмки:**
+    - Подвал секции с продолжением — последний элемент её ленивого `SliverList`: он показывает `ListState.more` и после кадра вызывает `loadMore` той же секции. `SliverToBoxAdapter` для него не подходит, потому что строит содержимое сразу и загрузил бы все порции при открытии.
+    - Порция запрашивается, только когда конец загруженной части приближается к видимой области, и встаёт перед секцией выполненных. Секция, конец которой далеко, порцию не запрашивает.
+    - При неактуальной выдаче или занятой порции запроса нет. Подвал на виду запрашивает порцию, когда выдача снова актуальна.
+    - Отказ показывает `ListState.error` на месте подвала, а повтор предлагает только при доказанно временном отказе.
+    - Кнопка «Показать ещё», ключ `daily-choice-load-more-*`, её строка и `_Status` удалены. Тесты подгружают порцию общим шагом прокрутки в `test/support/daily_choice_catalog_controls.dart`.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/catalog test/app/navigation test/app/intention_statistics_app_flow_test.dart`.
+  - **Зависимости:** 1.6, 1.9.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb`;
+    - меняется `test/support/daily_choice_catalog_controls.dart`;
+    - меняются `test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`, `daily_choice_date_catalog_page_test.dart`, `daily_choice_catalog_accessibility_test.dart`, `daily_choice_catalog_cards_test.dart`, `daily_choice_catalog_layout_test.dart`;
+    - меняются `test/app/intention_statistics_catalog_scenarios.dart`, `navigation/app_shell_layout_test.dart`, `navigation/app_shell_state_test.dart`.
+  - **Размер:** M по логике: файлов больше нормы только из-за перевода тестов на общий шаг.
+
+- [ ] 1.11 Запись выполнения не показывает текст под карточкой
+  - **Критерии приёмки:**
+    - Пока запись и согласование идут, флажок недоступен, под карточкой ничего нет, а её позиция не меняется.
+    - Отказ показан в `Notice` у карточки с `OperationFailurePresentation` и одним действием: повтором при доказанно временном отказе, иначе «Обновить выбор». Вернувшаяся карточка без открытой сессии сохраняет только действие актуализации.
+    - Успех объявляется как раньше. `_Banner` и строки хода записи удалены.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/catalog test/app/daily_choice_app_lifecycle_test.dart`.
+  - **Зависимости:** 1.9.
+  - **Предполагаемые файлы:** `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb`, `test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`, `daily_choice_date_catalog_page_test.dart`.
+  - **Размер:** M.
+
+- [ ] 1.12 Компонент `ScrollTopButton` возвращает список к началу
+  - **Критерии приёмки:**
+    - Компонент оформлен по своему README, а доступное имя и обработчик задаёт потребитель.
+    - Значок стрелки к линии взят из `Main.dc.html` и добавлен по правилам `lib/src/design_system/icons/README.md` вместе с обновлённым эталоном таблицы иконок.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/scroll_top_button_test.dart test/design_system/doable_icon_test.dart`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - добавляются `lib/src/design_system/components/scroll_top_button.dart`, `lib/src/design_system/icons/assets/to_top.svg`, `test/design_system/scroll_top_button_test.dart`;
+    - меняются `lib/src/design_system/doable_icon.dart`, `lib/src/design_system/icons/README.md`, `test/design_system/goldens/doable_icons.png`.
+  - **Размер:** S по логике: один компонент и один значок.
+
+- [ ] 1.13 Длинная выдача возвращается к началу кнопкой на обоих каталогах
+  - **Критерии приёмки:**
+    - Кнопка появляется, когда выдача прокручена дальше высоты своей видимой области, и исчезает в её пределах, в том числе при смене дня.
+    - Нажатие плавно возвращает к заголовку дня, а при уменьшении движения — сразу. Выбранная дата и состояния секций не меняются.
+    - Кнопка стоит в слоте `floatingActionButton` страницы со своей `FloatingActionButtonLocation` на месте из README на обоих каталогах. Показанное сообщение стоит над ней и её не перекрывает.
+    - `DailyChoiceCatalogBody` принимает каркас функцией от тела и кнопки, а `OrdinaryPageScaffold` — параметр `floatingActionButton`. Вложенного `Scaffold` нет.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart test/daily_choice/presentation/catalog/daily_choice_date_catalog_page_test.dart test/app/navigation/ordinary_page_scaffold_test.dart`.
+  - **Зависимости:** 1.12.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`, `daily_choice_catalog_page.dart`, `daily_choice_date_catalog_page.dart`, `lib/src/app/navigation/ordinary_page_scaffold.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb`;
+    - меняются `test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`, `daily_choice_date_catalog_page_test.dart`.
+  - **Размер:** M по логике: файлов больше нормы только из-за двух страниц и двух файлов локализации.
+
+- [ ] 1.14 Проверить готовность фазы: экран дня по дизайну на обоих каталогах
+  - **Критерии приёмки:**
+    - Сценарии секций, групп, карточки, пустого дня и подгрузки подтверждены на обоих каталогах.
+    - Прежние гарантии календаря и позиции прокрутки сохранились: их тесты проходят без ослабления ожиданий.
+    - Прежний способ показа выдачи удалён: в `lib/` и `test/` нет `_Banner`, `_SliverStatus`, `daily-choice-load-more`, `dailyChoiceCatalogLoadMore`, `dailyChoiceCatalogTotalCount`, `dailyChoiceCompletionSaving`, `dailyChoiceCompletionSynchronizing` и `RelationRowPriority`.
+  - **Проверка:**
+    - `mise run codegen-check`.
+    - `mise run check`.
+    - `mise exec --no-deps -- openspec validate redesign-daily-choices --strict`.
+    - `mise exec --no-deps -- flutter build apk --debug`: сборка для ручных проверок на устройстве, которые остаются за владельцем продукта.
+  - **Зависимости:** 1.1–1.13.
+  - **Предполагаемые файлы:** нет (только проверка).
+  - **Размер:** XS.
