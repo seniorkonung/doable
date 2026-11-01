@@ -40,4 +40,4 @@ accepted ADRs are immutable.
 
 ## ADRs Owned by This Change
 
-- [ADR-0053](../../../docs/adr/0053-show-and-change-daily-choice-in-one-routeless-sheet.md) — proposed. Лист без маршрута как единственное место просмотра и изменения, создание без открытия сущности и страницы поверх листа.
+- [ADR-0053](../../../docs/adr/0053-show-and-change-daily-choice-in-one-routeless-sheet.md) — proposed. Лист без маршрута как единственное место просмотра и изменения, кроме флажка выполнения в карточке, создание без открытия сущности и страницы поверх листа.
