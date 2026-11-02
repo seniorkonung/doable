@@ -571,7 +571,7 @@
     - меняются вызовы конструктора в `test/daily_choice/presentation/catalog/daily_choice_catalog_details_integration_test.dart` (до слияния из 3.1 строки 149 и 566) и `test/graph/presentation/graph_reconciliation_checkpoint_test.dart` (до слияния строка 357): оба передают в `DailyChoiceDetailsViewModel` координатор из уже имеющегося `ProviderContainer`.
   - **Размер:** M по логике: файлов больше нормы только из-за вызовов конструктора в тестах.
 
-- [ ] 3.9 `showDailyChoiceSheet` показывает выбор в панели с шапкой, вкладками и «Обзором»
+- [x] 3.9 `showDailyChoiceSheet` показывает выбор в панели с шапкой, вкладками и «Обзором»
   - **Критерии приёмки:**
     - Функция показывает `Sheet.expandableUntitled` через `showDoableSheet` с `hostsMessages: true`. Панель владеет моделью. Доступное название и подписи ручки — постоянные строки, не зависящие от данных выбора.
     - Первый срез тела — `HalfPinnedSliver` с непрозрачным фоном, а в нём `ChoiceHead` и `Tabs`. Цепочка получает `details.path.length` шагов, как на карточке, а архивированные исходное намерение и действие несут отметку архива.
