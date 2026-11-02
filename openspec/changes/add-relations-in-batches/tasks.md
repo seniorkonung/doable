@@ -518,3 +518,43 @@
   - **Зависимости:** 2.1–2.15.
   - **Предполагаемые файлы:** нет (только проверка).
   - **Размер:** XS.
+
+- [ ] 2.17 `Sheet.untitled` раскрывается на весь экран и сохраняет размер под полосой редактирования
+  - **Критерии приёмки:**
+    - `Sheet.untitled` требует `expandLabel` и `collapseLabel`, а заголовка и нижней кнопки у него по-прежнему нет. Компактная высота следует содержимому как `SheetCompactHeight.content`, рост содержимого лист не раскрывает, а тело остаётся в 14 под ручкой.
+    - Перетаскивание, передача жеста телу, ручка `_SizeButton` с областью нажатия над телом и её объявление диктору следуют `bottom-sheets` так же, как у `Sheet.expandable`, в том числе когда всё помещается в компактный размер. `hostsMessages` не укорачивает лист.
+    - С `bar` лист ведёт себя как в 2.6, а снятие `bar` возвращает размер, в котором она появилась: компактный или полный. Верхний край не скачет при появлении и снятии полосы.
+    - Единственный вызов в `relation_details_sheet.dart` передаёт строки «Раскрыть панель связи» и «Свернуть панель связи» на русском и английском: без них проект не собирается. Тесты `Sheet` и `Sheet.expandable` в `sheet_test.dart` проходят без правок.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/design_system/sheet_test.dart test/long_term_relation/presentation/details test/app/navigation/app_shell_sheet_stack_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/design_system/components/sheet.dart`, `test/design_system/sheet_test.dart`;
+    - меняются `lib/src/long_term_relation/presentation/details/relation_details_sheet.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации.
+  - **Размер:** M.
+
+- [ ] 2.18 Панель связи раскрывается ручкой и возвращается из изменения описания в прежний размер
+  - **Критерии приёмки:**
+    - `relation_details_sheet_test.dart` подтверждает сценарий «Панель раскрывается, даже когда связь помещается» через ручку с доступными названиями на русском языке. Жесты панели здесь не проверяются повторно: их закрепляет `sheet_test.dart`.
+    - Подтверждён сценарий «Выход из изменения описания возвращает полный размер». Изменение, открытое из компактного размера, возвращает компактный размер.
+    - Комментарий `showRelationDetailsSheet` описывает компактный размер, раскрытие и отдельный размер изменения описания.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/details/relation_details_sheet_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 2.17.
+  - **Предполагаемые файлы:** меняются `lib/src/long_term_relation/presentation/details/relation_details_sheet.dart`, `test/long_term_relation/presentation/details/relation_details_sheet_test.dart`.
+  - **Размер:** S.
+
+- [ ] 2.19 Новый отказ любой операции панели становится видимым без ручной прокрутки
+  - **Критерии приёмки:**
+    - Появление другого объекта `editFailure` или `RelationDetailsLifecycleFailed` после кадра прокручивает тело через `Scrollable.ensureVisible` к концу содержимого в обычном режиме и в изменении описания. Размер панели не меняется, а показанный ранее отказ при обновлении панели прокрутку не повторяет.
+    - Прокрутка при сохранении описания работает как прежде, включая снятие фокуса и отказ проверки текста: тест «отказ записи виден над клавиатурой» проходит без правок.
+    - `relation_details_sheet_test.dart` подтверждает сценарии «Отказ действия из шапки виден без раскрытия» и «Повторный отказ снова виден в полном размере». Первый идёт через `editFailure`, второй через `RelationDetailsLifecycleFailed`, а остальные операции используют эти же два пути.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/details/relation_details_sheet_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 2.18.
+  - **Предполагаемые файлы:** меняются `lib/src/long_term_relation/presentation/details/relation_details_sheet.dart`, `test/long_term_relation/presentation/details/relation_details_sheet_test.dart`.
+  - **Размер:** S.
