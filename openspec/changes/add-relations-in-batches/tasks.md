@@ -1174,7 +1174,25 @@
     - новый `test/app/choice_path_dead_end_app_flow_test.dart`, меняется `test/daily_choice/presentation/path/choice_path_page_test.dart`.
   - **Размер:** M.
 
-- [ ] 4.12 Проверить готовность фазы: все сценарии изменения подтверждены без устройства
+- [ ] 4.12 Второй пошаговый выбор от того же намерения не меняет путь первого
+  - **Критерии приёмки:**
+    - `ChoicePathViewModel` выбирается также по ключу экземпляра с равенством по идентичности, как модели страницы намерения по `IntentionPageInstance`. `ChoicePathPage` создаёт ключ и удерживает его до закрытия, поэтому модель живёт и освобождается вместе со своей страницей.
+    - Второй выбор от того же намерения и направления начинает с пустого пути и не меняет черновик первого. Это верно для обоих запусков со страницы из тупика: вкладки «Выборы» и быстрой кнопки панели через `DailyChoiceCreationLauncher`. Оба запуска и панель на этой странице остаются.
+    - Пересчёт перед созданием остаётся частью своего потока: его страница работает с ключом корня этого потока, а `ref.invalidate` в `daily_choice_creation_page.dart` остаётся и обращается к этому ключу. Пересчёт по-прежнему начинается с начала пути, а «назад» из подтверждения показывает пошаговый выбор с уже уточнённым путём: сценарий «Назад из подтверждения возвращает на шаг».
+    - Страница замены пути работает со своим ключом, поэтому `ref.invalidate` из `daily_choice_path_replace_page.dart` удалён. Новое построение по-прежнему начинается с начала пути, а закрытие построения возвращает к замене с прежней связью и прежним путём.
+  - **Проверка:**
+    - `mise run codegen`.
+    - Сквозные тесты на настоящем хранилище в `choice_path_dead_end_app_flow_test.dart`: второй выбор, начатый из настоящего тупика вкладкой «Выборы» и быстрой кнопкой панели, делает шаг, а после возврата первый выбор показывает прежний путь.
+    - `daily_choice_creation_flow_test.dart` подтверждает, что после пересчёта «назад» из подтверждения показывает уточнённый путь.
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation test/app/navigation test/app/choice_path_dead_end_app_flow_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 4.10, 4.11.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/daily_choice/presentation/path/choice_path_view_model.dart` с созданным файлом, `choice_path_page.dart`, `lib/src/daily_choice/presentation/daily_choice_creation_flow_session.dart`, `lib/src/daily_choice/presentation/editor/daily_choice_creation_page.dart`, `daily_choice_path_replace_page.dart`;
+    - меняются `test/daily_choice/presentation/path/choice_path_view_model_test.dart`, `choice_path_page_test.dart`, `test/daily_choice/presentation/daily_choice_creation_flow_test.dart`, `test/daily_choice/presentation/editor/daily_choice_creation_page_test.dart`, `daily_choice_path_replace_page_test.dart`, `test/app/navigation/app_shell_unnamed_page_scenarios.dart`, `test/app/choice_path_dead_end_app_flow_test.dart`.
+  - **Размер:** M.
+
+- [ ] 4.13 Проверить готовность фазы: все сценарии изменения подтверждены без устройства
   - **Критерии приёмки:**
     - Каждый сценарий дельт спецификаций изменения подтверждён автоматической проверкой.
     - «Добавленная связь становится продолжением» подтверждён по исходу, а несколько изменений на странице из тупика не дают конфликта. Изменение пути, пока выбор стоит в тупике или показывает строки, даёт конфликт с кнопкой обновления.
@@ -1185,6 +1203,6 @@
     - `mise run codegen-check`.
     - `mise run check`.
     - `mise exec --no-deps -- openspec validate add-relations-in-batches --strict`.
-  - **Зависимости:** 4.1–4.11.
+  - **Зависимости:** 4.1–4.12.
   - **Предполагаемые файлы:** нет (только проверка).
   - **Размер:** XS.
