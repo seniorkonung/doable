@@ -22,9 +22,6 @@ void _registerQuickCreationFlowTests() {
             // Выбор тегов — панель над формой, а не следующий маршрут.
             await _tap(tester, _key('intention-editor-choose-tags'));
             expect(find.byType(Sheet), findsOneWidget);
-          case _Flow.relation:
-            await _reveal(tester, _key('relation-editor-change-source'));
-            await _tap(tester, _key('relation-editor-change-source'));
           case _Flow.topDown || _Flow.bottomUp:
             await tester.binding.handlePopRoute();
             await tester.pumpAndSettle();
@@ -61,7 +58,7 @@ void _registerQuickCreationFlowTests() {
               ],
             );
         }
-        if (flow == _Flow.intention || flow == _Flow.relation) {
+        if (flow == _Flow.intention) {
           await tester.binding.handlePopRoute();
           await tester.pumpAndSettle();
           expect(find.byType(Sheet), findsNothing);
@@ -71,13 +68,7 @@ void _registerQuickCreationFlowTests() {
           );
           expect(
             tester
-                .widget<TextField>(
-                  _key(
-                    flow == _Flow.intention
-                        ? 'intention-editor-description'
-                        : 'relation-editor-description',
-                  ),
-                )
+                .widget<TextField>(_key('intention-editor-description'))
                 .controller!
                 .text,
             'Сохранённое описание',
@@ -197,29 +188,6 @@ void _registerQuickCreationFlowTests() {
             expect(app.router.current.name, IntentionEditorRoute.name);
             expect(find.text(app.l10n.editorTitleEmpty), findsOneWidget);
             await _tap(tester, _key('intention-editor-close'));
-          case _Flow.relation:
-            expect(
-              tester.widget<FilledButton>(_key(flow.submit)).onPressed,
-              isNull,
-            );
-            expect(
-              tester
-                  .widget<TextField>(_key('relation-editor-description'))
-                  .controller!
-                  .text,
-              isEmpty,
-            );
-            for (final role in ['source', 'related']) {
-              await _tap(tester, _key('relation-editor-select-$role'));
-              expect(find.byType(PickerRow), findsNothing);
-              expect(
-                find.text(app.l10n.participantPickerEmpty),
-                findsOneWidget,
-              );
-              await tester.binding.handlePopRoute();
-              await tester.pumpAndSettle();
-            }
-            await _tap(tester, find.text(app.l10n.creationCancelAction));
           case _Flow.topDown || _Flow.bottomUp:
             expect(find.byType(PickerRow), findsNothing);
             expect(
@@ -258,7 +226,7 @@ void _registerQuickCreationFlowTests() {
 }
 
 void _registerNestedQuickCreationTests() {
-  for (final flow in [_Flow.relation, _Flow.topDown, _Flow.bottomUp]) {
+  for (final flow in [_Flow.topDown, _Flow.bottomUp]) {
     testWidgets('${flow.label}: вложенный запуск изолирует фильтры, теги, '
         'порции и прокрутку обоих поисков', (tester) async {
       final app = await _start(tester, seed: _seedSearchGraph);
@@ -272,7 +240,6 @@ void _registerNestedQuickCreationTests() {
       );
       final before = await tester.runAsync(() => durabilityState(app.database));
       final filterKey = switch (flow) {
-        _Flow.relation => 'participant-picker-filter',
         _Flow.topDown => 'daily-choice-source-filter',
         _Flow.bottomUp => 'daily-choice-action-filter',
         _Flow.intention => throw StateError(
@@ -280,7 +247,6 @@ void _registerNestedQuickCreationTests() {
         ),
       };
       final listKey = switch (flow) {
-        _Flow.relation => 'participant-picker-list',
         _Flow.topDown => 'daily-choice-source-list',
         _Flow.bottomUp => 'daily-choice-action-list',
         _Flow.intention => throw StateError(
@@ -289,9 +255,6 @@ void _registerNestedQuickCreationTests() {
       };
       Future<void> openSearch() async {
         await flow.open(tester, app, origin);
-        if (flow == _Flow.relation) {
-          await _tap(tester, _key('relation-editor-select-source'));
-        }
       }
 
       IntentionPickerPurpose purpose() => tester
@@ -392,9 +355,6 @@ void _registerNestedQuickCreationTests() {
       );
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      if (flow == _Flow.relation) {
-        await _tap(tester, find.text(app.l10n.creationCancelAction));
-      }
       expect(app.router.current.matchId, ordinary);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
@@ -408,9 +368,6 @@ void _registerNestedQuickCreationTests() {
       expect(tester.widget<FilterButton>(openFilter).count, 2);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      if (flow == _Flow.relation) {
-        await _tap(tester, find.text(app.l10n.creationCancelAction));
-      }
       history.expectRestored(tester, app.router);
       expect(
         await tester.runAsync(() => durabilityState(app.database)),

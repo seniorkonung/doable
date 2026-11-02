@@ -348,12 +348,6 @@ class AppLocalizationsRu extends AppLocalizations {
       'То, что вы хотите сделать или изменить';
 
   @override
-  String get quickCreationModeRelation => 'Новая связь';
-
-  @override
-  String get quickCreationModeRelationHint => 'Чтобы …, нужно или можно …';
-
-  @override
   String get quickCreationModeDailyChoice => 'Новый дневной выбор';
 
   @override

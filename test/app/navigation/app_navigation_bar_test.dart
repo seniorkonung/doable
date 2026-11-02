@@ -133,7 +133,7 @@ void main() {
     await tester.pumpWidget(
       _testApp(
         locale: const Locale('ru'),
-        quickCreationMode: QuickCreationMode.relation,
+        quickCreationMode: QuickCreationMode.dailyChoice,
         onQuickCreate: () => launches++,
         onChangeQuickCreationMode: () => menus++,
         onSelected: selections.add,

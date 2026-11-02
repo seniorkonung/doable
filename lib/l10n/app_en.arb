@@ -164,14 +164,6 @@
   "@quickCreationModeIntentionHint": {
     "description": "Пояснение режима создания намерения"
   },
-  "quickCreationModeRelation": "New relation",
-  "@quickCreationModeRelation": {
-    "description": "Название режима создания долговременной связи"
-  },
-  "quickCreationModeRelationHint": "To …, you need or can …",
-  "@quickCreationModeRelationHint": {
-    "description": "Пояснение режима создания долговременной связи"
-  },
   "quickCreationModeDailyChoice": "New daily choice",
   "@quickCreationModeDailyChoice": {
     "description": "Название режима и заголовок листа нового дневного выбора"

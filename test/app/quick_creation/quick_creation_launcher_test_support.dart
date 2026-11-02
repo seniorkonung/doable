@@ -16,7 +16,6 @@ enum _Origin {
 String _label(QuickCreationMode mode, ChoicePathDraftDirection? direction) =>
     switch (mode) {
       QuickCreationMode.intention => 'Намерение',
-      QuickCreationMode.relation => 'Связь',
       QuickCreationMode.dailyChoice =>
         'Дневной выбор: ${_directionLabel(direction!)}',
     };
@@ -32,7 +31,6 @@ String _firstRoute(
   ChoicePathDraftDirection? direction,
 ) => switch (mode) {
   QuickCreationMode.intention => IntentionEditorRoute.name,
-  QuickCreationMode.relation => RelationEditorRoute.name,
   QuickCreationMode.dailyChoice => switch (direction!) {
     ChoicePathDraftDirection.topDown => DailyChoiceSourcePickerRoute.name,
     ChoicePathDraftDirection.bottomUp => DailyChoiceActionPickerRoute.name,

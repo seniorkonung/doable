@@ -1,6 +1,6 @@
 part of 'creation_flows_integration_test.dart';
 
-/// Четыре потока общей кнопки с настоящим локальным графом.
+/// Три потока общей кнопки с настоящим локальным графом.
 enum _Flow {
   intention(
     'намерение',
@@ -8,13 +8,6 @@ enum _Flow {
     5,
     'intention-editor-submit',
     IntentionDetailsRoute.name,
-  ),
-  relation(
-    'пустая связь',
-    'long_term_relations',
-    4,
-    'relation-editor-submit',
-    null,
   ),
   topDown(
     'дневной выбор от намерения',
@@ -43,7 +36,7 @@ enum _Flow {
   final int initialRows;
   final String submit;
 
-  /// Маршрут созданной сущности; панель связи открывается без маршрута.
+  /// Маршрут созданной сущности.
   final String? resultRoute;
 
   Future<void> open(
@@ -60,12 +53,10 @@ enum _Flow {
       tester,
       switch (this) {
         intention => QuickCreationMode.intention,
-        relation => QuickCreationMode.relation,
         topDown || bottomUp => QuickCreationMode.dailyChoice,
       },
       openedPage: switch (this) {
         intention => _key('intention-editor-title'),
-        relation => _key('relation-editor-description'),
         topDown || bottomUp => find.byType(QuickCreationDailyChoiceStartSheet),
       },
       wait: (tester, finder) =>
@@ -98,7 +89,6 @@ enum _Flow {
     );
     expect(app.router.current.name, switch (this) {
       intention => IntentionEditorRoute.name,
-      relation => RelationEditorRoute.name,
       topDown => DailyChoiceSourcePickerRoute.name,
       bottomUp => DailyChoiceActionPickerRoute.name,
     });
@@ -113,20 +103,6 @@ enum _Flow {
         await tester.enterText(_key('intention-editor-title'), 'Новое');
         await tester.enterText(
           _key('intention-editor-description'),
-          'Сохранённое описание',
-        );
-      case relation:
-        for (final (role, number) in [('source', 5), ('related', 4)]) {
-          await _tap(tester, _key('relation-editor-select-$role'));
-          await _tap(
-            tester,
-            _key('participant-picker-${durabilityUuid(number)}'),
-          );
-        }
-        await _tap(tester, _key('relation-editor-type-need'));
-        await _tap(tester, _key('relation-editor-priority-p1'));
-        await tester.enterText(
-          _key('relation-editor-description'),
           'Сохранённое описание',
         );
       case topDown || bottomUp:
@@ -160,11 +136,6 @@ enum _Flow {
     switch (this) {
       case intention:
         expect(row['title'], 'Новое');
-      case relation:
-        expect(row['source_intention_id'], durabilityUuid(5));
-        expect(row['related_intention_id'], durabilityUuid(4));
-        expect(row['type'], 'need');
-        expect(row['priority'], 1);
       case topDown || bottomUp:
         expect(row['source_intention_id'], durabilityUuid(1));
         expect(row['selected_intention_id'], durabilityUuid(4));

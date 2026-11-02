@@ -85,8 +85,6 @@
   "quickCreationLongPressHint": "Нажмите и удерживайте, чтобы сменить режим",
   "quickCreationModeIntention": "Новое намерение",
   "quickCreationModeIntentionHint": "То, что вы хотите сделать или изменить",
-  "quickCreationModeRelation": "Новая связь",
-  "quickCreationModeRelationHint": "Чтобы …, нужно или можно …",
   "quickCreationModeDailyChoice": "Новый дневной выбор",
   "quickCreationModeDailyChoiceHint": "Действие для намерения в выбранный день",
   "quickCreationDailyChoiceStartPrompt": "С чего начать",

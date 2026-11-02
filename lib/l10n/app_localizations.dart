@@ -512,18 +512,6 @@ abstract class AppLocalizations {
   /// **'Something you want to do or change'**
   String get quickCreationModeIntentionHint;
 
-  /// Название режима создания долговременной связи
-  ///
-  /// In en, this message translates to:
-  /// **'New relation'**
-  String get quickCreationModeRelation;
-
-  /// Пояснение режима создания долговременной связи
-  ///
-  /// In en, this message translates to:
-  /// **'To …, you need or can …'**
-  String get quickCreationModeRelationHint;
-
   /// Название режима и заголовок листа нового дневного выбора
   ///
   /// In en, this message translates to:

@@ -831,7 +831,7 @@
     - меняются `test/app/long_term_relation_app_flow_test.dart`, `test/app/routing/app_router_test.dart`, `test/app/navigation/app_shell_page_matrix.dart`, `app_shell_pages_above_test.dart`, `test/intention/presentation/details/intention_details_relations_test.dart`.
   - **Размер:** M.
 
-- [ ] 3.16 Быстрое создание получает два режима
+- [x] 3.16 Быстрое создание получает два режима
   - **Критерии приёмки:**
     - `QuickCreationMode.relation`, его ключ, запуск, подписи и пояснение удалены, поэтому меню показывает только «Новое намерение» и «Новый дневной выбор»: сценарий «Связи нет среди режимов». Сохранённое значение `relation` читается как неизвестное без особого случая, как велит D10.
     - Значки уходят только без читателей. `DoableIconData.relationMini` остаётся: с 2.5 его читает `RelationHead`. `DoableIconData.relation` остаётся: это отметка занятой строки.

@@ -11,7 +11,6 @@ void main() {
   group('Режим быстрого создания', () {
     const storedModes = {
       'intention': QuickCreationMode.intention,
-      'relation': QuickCreationMode.relation,
       'daily-choice': QuickCreationMode.dailyChoice,
     };
 
@@ -25,6 +24,7 @@ void main() {
       for (final key in [
         '',
         'unknown',
+        'relation',
         '0',
         '3',
         'dailyChoice',
@@ -41,7 +41,7 @@ void main() {
 
   group('Контроллер режима быстрого создания', () {
     // Начальный режим не ветвит код, поэтому берём не начальный по умолчанию.
-    const initialMode = QuickCreationMode.relation;
+    const initialMode = QuickCreationMode.dailyChoice;
     test('использует явно переданный начальный режим $initialMode', () {
       final store = _ControlledModeStore();
       final container = _container(store, initialMode: initialMode);
@@ -68,20 +68,20 @@ void main() {
 
         final saving = container
             .read(quickCreationModeControllerProvider.notifier)
-            .select(QuickCreationMode.relation);
+            .select(QuickCreationMode.dailyChoice);
 
         expect(
           container.read(quickCreationModeControllerProvider),
-          QuickCreationMode.relation,
+          QuickCreationMode.dailyChoice,
         );
-        expect(firstObserver, [QuickCreationMode.relation]);
-        expect(secondObserver, [QuickCreationMode.relation]);
-        expect(_acceptedModes(store), [QuickCreationMode.relation]);
+        expect(firstObserver, [QuickCreationMode.dailyChoice]);
+        expect(secondObserver, [QuickCreationMode.dailyChoice]);
+        expect(_acceptedModes(store), [QuickCreationMode.dailyChoice]);
 
         store.completeNext(const QuickCreationModeSaved());
         expect(await saving, isA<QuickCreationModeSaved>());
-        expect(firstObserver, [QuickCreationMode.relation]);
-        expect(secondObserver, [QuickCreationMode.relation]);
+        expect(firstObserver, [QuickCreationMode.dailyChoice]);
+        expect(secondObserver, [QuickCreationMode.dailyChoice]);
       },
     );
 
@@ -99,30 +99,30 @@ void main() {
       final controller = container.read(
         quickCreationModeControllerProvider.notifier,
       );
-      final first = controller.select(QuickCreationMode.relation);
-      final second = controller.select(QuickCreationMode.dailyChoice);
+      final first = controller.select(QuickCreationMode.dailyChoice);
+      final second = controller.select(QuickCreationMode.intention);
 
       expect(_acceptedModes(store), [
-        QuickCreationMode.relation,
         QuickCreationMode.dailyChoice,
+        QuickCreationMode.intention,
       ]);
       expect(
         container.read(quickCreationModeControllerProvider),
-        QuickCreationMode.dailyChoice,
+        QuickCreationMode.intention,
       );
 
       store.completeNext(firstOutcome);
       expect(await first, isA<QuickCreationModeSaveFailed>());
       expect(
         container.read(quickCreationModeControllerProvider),
-        QuickCreationMode.dailyChoice,
+        QuickCreationMode.intention,
       );
 
       store.completeNext(secondOutcome);
       expect(await second, isA<QuickCreationModeSaveFailed>());
       expect(
         container.read(quickCreationModeControllerProvider),
-        QuickCreationMode.dailyChoice,
+        QuickCreationMode.intention,
       );
     });
 
@@ -135,14 +135,14 @@ void main() {
           quickCreationModeControllerProvider.notifier,
         );
 
-        final first = controller.select(QuickCreationMode.relation);
-        final second = controller.select(QuickCreationMode.dailyChoice);
-        final third = controller.select(QuickCreationMode.relation);
+        final first = controller.select(QuickCreationMode.dailyChoice);
+        final second = controller.select(QuickCreationMode.intention);
+        final third = controller.select(QuickCreationMode.dailyChoice);
 
         expect(_acceptedModes(store), [
-          QuickCreationMode.relation,
           QuickCreationMode.dailyChoice,
-          QuickCreationMode.relation,
+          QuickCreationMode.intention,
+          QuickCreationMode.dailyChoice,
         ]);
 
         store.completeNext(
@@ -153,7 +153,7 @@ void main() {
         await second;
         expect(
           container.read(quickCreationModeControllerProvider),
-          QuickCreationMode.relation,
+          QuickCreationMode.dailyChoice,
         );
         store.completeNext(const QuickCreationModeSaved());
         await third;
@@ -219,13 +219,13 @@ void main() {
       final container = _container(store);
       final saving = container
           .read(quickCreationModeControllerProvider.notifier)
-          .select(QuickCreationMode.relation);
+          .select(QuickCreationMode.intention);
 
       container.dispose();
       store.completeNext(outcome);
 
       expect(await saving, isA<QuickCreationModeSaveFailed>());
-      expect(_acceptedModes(store), [QuickCreationMode.relation]);
+      expect(_acceptedModes(store), [QuickCreationMode.intention]);
     });
   });
 }

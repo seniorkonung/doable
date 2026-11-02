@@ -344,12 +344,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Something you want to do or change';
 
   @override
-  String get quickCreationModeRelation => 'New relation';
-
-  @override
-  String get quickCreationModeRelationHint => 'To …, you need or can …';
-
-  @override
   String get quickCreationModeDailyChoice => 'New daily choice';
 
   @override
