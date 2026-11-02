@@ -3,17 +3,17 @@
 ## Assessment
 
 **Format version:** 1
-**Result:** No unresolved findings
+**Result:** Changes needed
 **Coverage status:** Complete
-**Summary:** Фаза 1 выполнена и соответствует задачам 1.1–1.14, полные проверки на проверенной ревизии проходят. Активных находок нет: согласованные исправления закреплены за невыполненными задачами 1.15–1.18 и в коде ещё не проверены. Принятых рисков нет.
+**Summary:** Задачи 1.15–1.18 выполнены по критериям приёмки, а две находки низкой серьёзности остаются открытыми: постоянный слот при крупном шрифте разрывает длинный день недели посреди слова, а правило повтора отказа обновления повторено в трёх местах. Принятых рисков нет.
 
 ## Review target
 
-- **Baseline ref:** 5f68c63fdb2fa28a40bbd56b506279eed51ad38b
-- **Base commit:** 5f68c63fdb2fa28a40bbd56b506279eed51ad38b
-- **Reviewed head:** bc3d8b2f03a4d7fe390dab77afc100241965c685
-- **Target commits:** ["e3016dfe2104087a44835e3d2259896319c62238", "fe18db7ad08be6928c95e985cb186fcf849c906d", "2ecbdb41d27bbf9841449310127747327e810f35", "20f1fff21e2b2ce35e55907de969a91471491175", "27752d5472e5ea9e00cddd5b863682824099c395", "3927899396029ef9f09f0b217da5f9b5e09d171b", "edd355d6ab241832cceadd2f0384da7c81783576", "f98f03217ca64c0feea00683d64cc5aafbc49121", "268e6f746abe00e173b3a67e91d0c61ac891c1ba", "62b93f636d98417ae817b592787759b10e3866f6", "0002b82ab88212437da9f6d5b2b55c5e39355c9f", "60ff3ae5e1a725e033cccf567e92451b01fa9c31", "99fa1f6a4534b3ac59d5ad406136377ecf8661cf", "7ba5a41501cfd685ea8184ca5331f23d58eb1c35", "c1f8f0746f76e996e9ee6104094efbe5f785ef4f", "b4baa2777499aaeb8d1d3a7155ceec2ccefb209d", "bc3d8b2f03a4d7fe390dab77afc100241965c685"]
-- **Reviewable paths:** ["lib/l10n/app_en.arb", "lib/l10n/app_localizations.dart", "lib/l10n/app_localizations_en.dart", "lib/l10n/app_localizations_ru.dart", "lib/l10n/app_ru.arb", "lib/src/app/navigation/ordinary_page_scaffold.dart", "lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart", "lib/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart", "lib/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart", "lib/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart", "lib/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.g.dart", "lib/src/daily_choice/presentation/catalog/daily_choice_date_catalog_page.dart", "lib/src/design_system/components/choice_check.dart", "lib/src/design_system/components/choice_row.dart", "lib/src/design_system/components/list_state.dart", "lib/src/design_system/components/reason_chain.dart", "lib/src/design_system/components/relation_row.dart", "lib/src/design_system/components/scroll_top_button.dart", "lib/src/design_system/components/section_header.dart", "lib/src/design_system/doable_icon.dart", "lib/src/design_system/doable_metrics.dart", "lib/src/design_system/doable_priority.dart", "lib/src/design_system/icons/README.md", "lib/src/design_system/icons/assets/to_top.svg", "lib/src/long_term_relation/presentation/intention_relations/intention_relations_sliver.dart", "openspec/changes/redesign-daily-choices/task-profiles.md", "openspec/changes/redesign-daily-choices/tasks.md", "test/app/creation_flows_test_support.dart", "test/app/daily_choice_app_flow_test.dart", "test/app/daily_choice_app_lifecycle_test.dart", "test/app/daily_choice_completion_lifecycle_scenarios.dart", "test/app/graph_export_app_flow_test.dart", "test/app/intention_statistics_catalog_scenarios.dart", "test/app/navigation/app_shell_layout_test.dart", "test/app/navigation/app_shell_state_test.dart", "test/daily_choice/presentation/catalog/daily_choice_calendar_period_picker_test.dart", "test/daily_choice/presentation/catalog/daily_choice_catalog_accessibility_test.dart", "test/daily_choice/presentation/catalog/daily_choice_catalog_card_flow_test.dart", "test/daily_choice/presentation/catalog/daily_choice_catalog_cards_test.dart", "test/daily_choice/presentation/catalog/daily_choice_catalog_day_marks_test.dart", "test/daily_choice/presentation/catalog/daily_choice_catalog_details_integration_test.dart", "test/daily_choice/presentation/catalog/daily_choice_catalog_layout_test.dart", "test/daily_choice/presentation/catalog/daily_choice_catalog_lifecycle_test.dart", "test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart", "test/daily_choice/presentation/catalog/daily_choice_catalog_page_test_support.dart", "test/daily_choice/presentation/catalog/daily_choice_catalog_supported_layout_test.dart", "test/daily_choice/presentation/catalog/daily_choice_catalog_view_model_test.dart", "test/daily_choice/presentation/catalog/daily_choice_date_catalog_page_test.dart", "test/design_system/choice_check_test.dart", "test/design_system/choice_row_test.dart", "test/design_system/doable_icon_test.dart", "test/design_system/goldens/doable_icons.png", "test/design_system/list_state_test.dart", "test/design_system/reason_chain_test.dart", "test/design_system/relation_row_test.dart", "test/design_system/scroll_top_button_test.dart", "test/design_system/section_header_test.dart", "test/graph/presentation/package_consumers_test_support.dart", "test/graph/presentation/tag_package_catalog_consumers_test.dart", "test/long_term_relation/presentation/intention_relations/intention_relations_sliver_test.dart", "test/support/daily_choice_catalog_controls.dart"]
+- **Baseline ref:** c499430a6f98e95fde6ee2285e0f7b2489bcd65f
+- **Base commit:** c499430a6f98e95fde6ee2285e0f7b2489bcd65f
+- **Reviewed head:** 702ff26f9996e647fa6e9a76bfbc530ae9e81618
+- **Target commits:** ["4ad528b9f62eda9294cd79b4ccf0e31520b2ec21", "a7d1534993aa5e13db53c2314e89b50333d9f3b3", "5564f454ec77ac1713ab0d42a6b8ef731b8a7968", "1e531a97df6270ad9796196d98c79aa7f09b493d", "702ff26f9996e647fa6e9a76bfbc530ae9e81618"]
+- **Reviewable paths:** ["lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart", "lib/src/design_system/components/day_heading.dart", "openspec/changes/redesign-daily-choices/task-profiles.md", "openspec/changes/redesign-daily-choices/tasks.md", "test/app/daily_choice_app_lifecycle_test.dart", "test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart", "test/design_system/choice_check_test.dart", "test/design_system/day_heading_test.dart", "test/design_system/scroll_top_button_test.dart"]
 - **OpenSpec change:** redesign-daily-choices
 - **OpenSpec schema:** intent-driven
 - **Target scope:** User-requested bounded range
@@ -22,42 +22,73 @@
 
 ## Reviewed increment
 
-### U1 · Экран дня показывает выборы по дизайну на обоих каталогах
+### U1 · Устаревшая выдача показывает отказ на месте продолжения
 
-- **Work items:** ["1.1", "1.2", "1.6", "1.7", "1.8", "1.9", "1.10", "1.11", "1.13", "1.14"]
-- **Requirements and scenarios:** ["Краткая карточка дневного выбора", "Секции выполнения дневных выборов", "Группировка и порядок дневных выборов", "Каталог дневных выборов по дате и секциям", "Подтверждённые результаты и безопасные ошибки дневного выбора: флажок карточки", "Начальное состояние и сохранение календаря каталога", "Возврат к началу выдачи каталога"]
-- **Affected boundary:** Человек в корневом каталоге и каталоге на дату, в том числе с экранным диктором, крупным шрифтом и уменьшением движения
-- **Implementation target:** ["lib/l10n/app_en.arb", "lib/l10n/app_localizations.dart", "lib/l10n/app_localizations_en.dart", "lib/l10n/app_localizations_ru.dart", "lib/l10n/app_ru.arb", "lib/src/app/navigation/ordinary_page_scaffold.dart", "lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart", "lib/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart", "lib/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart", "lib/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart", "lib/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.g.dart", "lib/src/daily_choice/presentation/catalog/daily_choice_date_catalog_page.dart", "test/app/creation_flows_test_support.dart", "test/app/daily_choice_app_flow_test.dart", "test/app/daily_choice_app_lifecycle_test.dart", "test/app/daily_choice_completion_lifecycle_scenarios.dart", "test/app/graph_export_app_flow_test.dart", "test/app/intention_statistics_catalog_scenarios.dart", "test/app/navigation/app_shell_layout_test.dart", "test/app/navigation/app_shell_state_test.dart", "test/daily_choice/presentation/catalog/daily_choice_calendar_period_picker_test.dart", "test/daily_choice/presentation/catalog/daily_choice_catalog_accessibility_test.dart", "test/daily_choice/presentation/catalog/daily_choice_catalog_card_flow_test.dart", "test/daily_choice/presentation/catalog/daily_choice_catalog_cards_test.dart", "test/daily_choice/presentation/catalog/daily_choice_catalog_day_marks_test.dart", "test/daily_choice/presentation/catalog/daily_choice_catalog_details_integration_test.dart", "test/daily_choice/presentation/catalog/daily_choice_catalog_layout_test.dart", "test/daily_choice/presentation/catalog/daily_choice_catalog_lifecycle_test.dart", "test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart", "test/daily_choice/presentation/catalog/daily_choice_catalog_page_test_support.dart", "test/daily_choice/presentation/catalog/daily_choice_catalog_supported_layout_test.dart", "test/daily_choice/presentation/catalog/daily_choice_catalog_view_model_test.dart", "test/daily_choice/presentation/catalog/daily_choice_date_catalog_page_test.dart", "test/graph/presentation/package_consumers_test_support.dart", "test/graph/presentation/tag_package_catalog_consumers_test.dart", "test/support/daily_choice_catalog_controls.dart"]
-- **Applicable constraints and non-goals:** Схема, формат данных, чтение, команды, календарь и его отметки не меняются. Запись идёт через координатор, отказ предъявляется через `OperationFailurePresentation`, повтор только при доказанно временном отказе. Сохранение состояния каталога в процессе прежнее, строки есть на обоих языках. Успех флажка в этой фазе объявляется как раньше, карточка открывает прежний подробный просмотр.
-- **Excluded change scope:** Фазы 2–4: замена пути, завершение создания, нижняя панель, изменение на месте, сценарий «Успех флажка карточки не объявляется сообщением» и сверка с `add-relations-in-batches`.
+- **Work items:** ["1.15"]
+- **Requirements and scenarios:** ["Каталог дневных выборов по дате и секциям: Отказ обновления виден на месте продолжения", "Подтверждённые результаты и безопасные ошибки дневного выбора"]
+- **Affected boundary:** Человек в корневом каталоге и каталоге на дату, в том числе с экранным диктором
+- **Implementation target:** ["lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart", "test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart"]
+- **Applicable constraints and non-goals:** Модель, чтение и схема не меняются. `Notice` в начале выдачи остаётся. Повтор предлагается только при доказанно временном отказе.
 
-### U2 · Модуль основ даёт компоненты дня и одно перечисление приоритета
+### U2 · Строка обновления не ложится на заголовок дня и ничего не двигает
 
-- **Work items:** ["1.3", "1.4", "1.5", "1.7", "1.9", "1.12"]
-- **Requirements and scenarios:** ["Краткая карточка дневного выбора", "Секции выполнения дневных выборов", "Возврат к началу выдачи каталога"]
-- **Affected boundary:** Экранный код, потребляющий модуль основ, и доступность его элементов
-- **Implementation target:** ["lib/src/design_system/components/choice_check.dart", "lib/src/design_system/components/choice_row.dart", "lib/src/design_system/components/list_state.dart", "lib/src/design_system/components/reason_chain.dart", "lib/src/design_system/components/relation_row.dart", "lib/src/design_system/components/scroll_top_button.dart", "lib/src/design_system/components/section_header.dart", "lib/src/design_system/doable_icon.dart", "lib/src/design_system/doable_metrics.dart", "lib/src/design_system/doable_priority.dart", "lib/src/design_system/icons/README.md", "lib/src/design_system/icons/assets/to_top.svg", "lib/src/long_term_relation/presentation/intention_relations/intention_relations_sliver.dart", "test/design_system/choice_check_test.dart", "test/design_system/choice_row_test.dart", "test/design_system/doable_icon_test.dart", "test/design_system/goldens/doable_icons.png", "test/design_system/list_state_test.dart", "test/design_system/reason_chain_test.dart", "test/design_system/relation_row_test.dart", "test/design_system/scroll_top_button_test.dart", "test/design_system/section_header_test.dart", "test/long_term_relation/presentation/intention_relations/intention_relations_sliver_test.dart"]
-- **Applicable constraints and non-goals:** Компоненты остаются представлениями без предметных типов по ADR-0030 и появляются вместе с потребителем. Значки следуют `lib/src/design_system/icons/README.md`. Параметров множественного выделения нет.
-- **Excluded change scope:** `ChoiceHead`, `ChoicePath`, `DetailRow`, `DateGrid`, `TimeDial`: они относятся к следующим фазам.
+- **Work items:** ["1.16"]
+- **Requirements and scenarios:** ["Задача 1.9: обновление выдачи не сдвигает строки", "Каталог дневных выборов по дате и секциям"]
+- **Affected boundary:** Человек в каталоге дня, в том числе с экранным диктором и крупным шрифтом, и потребители `DayHeading`
+- **Implementation target:** ["lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart", "lib/src/design_system/components/day_heading.dart", "test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart", "test/design_system/day_heading_test.dart"]
+- **Applicable constraints and non-goals:** Компоненты модуля основ остаются представлениями без предметных типов по ADR-0030. При масштабе шрифта 1 вид заголовка не меняется. Спецификация и design не меняются.
+
+### U3 · Проверка перезапуска подтверждает строку выбора именно этого дня
+
+- **Work items:** ["1.17"]
+- **Requirements and scenarios:** ["Начальное состояние и сохранение календаря каталога: Перезапуск на следующий день", "Краткая карточка дневного выбора"]
+- **Affected boundary:** Защита от регрессий долговечности каталога при перезапуске
+- **Implementation target:** ["test/app/daily_choice_app_lifecycle_test.dart"]
+- **Applicable constraints and non-goals:** Дата в карточку не возвращается. Производственный код не меняется, остальные ожидания теста не ослаблены.
+
+### U4 · В тестах компонентов нет тестов без отдельной регрессии
+
+- **Work items:** ["1.18"]
+- **Requirements and scenarios:** ["Правило proven-necessity: тест ловит отдельную регрессию"]
+- **Affected boundary:** Защита от регрессий компонентов модуля основ
+- **Implementation target:** ["test/design_system/choice_check_test.dart", "test/design_system/scroll_top_button_test.dart"]
+- **Applicable constraints and non-goals:** Производственный код, спецификация и design не меняются.
 
 ## Pass coverage
 
 | Pass | Status | Evidence or limitation |
 |---|---|---|
-| Independent decision review | Complete | Единицы U1 и U2 делят потребление компонентов, поэтому у них одно задание на точные 59 путей поставки и тестов без артефактов планирования. Три свежих изолированных проверяющих разделили его: `lib/src`; локализация и тесты каталога и приложения; `test/design_system`, тест среза связей и эталон значков |
-| OpenSpec conformance | Complete | `mise exec --no-deps -- openspec validate redesign-daily-choices --strict` проходит. `mise run check`, `mise run codegen-check` и `flutter build apk --debug` завершились с кодом 0 в этом worktree на чистом `bc3d8b2f03a4d7fe390dab77afc100241965c685`. Задачи 1.1–1.14 и выбранные сценарии сопоставлены с кодом и тестами |
+| Independent decision review | Complete | Свежие изолированные проверяющие получили нейтральные задания без артефактов планирования. U1 и U2 делят пути, поэтому у них один проверяющий и объединённое задание на четыре пути. U4 проверена отдельно на двух путях. Для U3 первый проверяющий прочитал изменённый вне границы путь и вернул неполное покрытие, поэтому его результат заменён: новый свежий проверяющий получил тест и `daily_choice_catalog_body.dart` как контекст ключа и вернул полное покрытие. Контекстные пути проверяющих вне цели не менялись в диапазоне |
+| OpenSpec conformance | Complete | `mise exec --no-deps -- openspec validate redesign-daily-choices --strict --json` проходит. Единственное сообщение уровня `INFO` о `Сброс истории пунктом панели` ожидаемо по D12. Целевые тесты изменённых модулей: 340 прошли. `mise run check` завершился с кодом 0 в этом worktree на `702ff26f9996e647fa6e9a76bfbc530ae9e81618`; менялся только этот отчёт, который проверки не читают. Задачи 1.15–1.18 и их сценарии сопоставлены с кодом и тестами |
 | Code quality | Complete | Линзы `code-review-and-quality` применены ко всем путям поставки на проверенной ревизии: корректность, читаемость, архитектура, безопасность, производительность. Новых зависимостей, секретов и внешних границ в диапазоне нет |
 
 ## Findings
 
-No unresolved findings remain in the implementation review.
+### F1 · Low — Постоянный слот разрывает длинный день недели посреди слова при крупном шрифте
+
+- **Evidence:** `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart:222` всегда передаёт строку обновления в слот, а `lib/src/design_system/components/day_heading.dart:90-100` отдаёт ей до половины ширины заголовка. Измерение в одноразовой копии проверенной ревизии со шрифтом Inter из пакета приложения: при окне 360 и масштабе 1,75 слот занимает 160, дню недели остаётся 152, и «Понедельник» и «Воскресенье» стоят на двух строках как одно слово. При масштабе 2 то же происходит с «Wednesday», а также при окнах 390 и 412. Без слота при тех же условиях слово стоит на одной строке, а при масштабе 1,5 разрыва нет. Тест при масштабе 200% проверяет только непересечение и не видит разрыва.
+- **Evidence revisions:** ["702ff26f9996e647fa6e9a76bfbc530ae9e81618"]
+- **Impact:** Человек с крупным системным шрифтом в поддерживаемых окнах от 360 постоянно читает заголовок вида «Понедельни / к», хотя обновление на экране редко. Текст не теряется, страдает читаемость именно у тех, кто увеличил шрифт ради неё.
+- **Required outcome:** В поддерживаемых окнах при масштабе до 200% день недели не разрывается внутри слова, либо человек явно принимает этот разрыв как часть следствия задачи 1.16.
+- **Earliest source of truth:** implementation/tests
+- **Affected artifacts:** ["lib/src/design_system/components/day_heading.dart", "lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart", "test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart"]
+- **Decision needed:** Задача 1.16 принимает, что день недели и отметка «Сегодня» раньше переносятся на вторую строку, но не называет разрыв внутри слова. Нужно решить, устранять его или принять как остаточный риск: от этого зависит, остаётся ли слот шириной до половины заголовка.
+
+### F2 · Low — Правило повтора отказа обновления повторено в трёх местах
+
+- **Evidence:** `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart:439` и `:716` одинаково решают, есть ли повтор, проверкой `failure is DailyChoiceCatalogUnavailableFailure`. `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart:105-111` проверяет то же условие и иначе молча возвращает `Future.value()`. Отказы первой загрузки и порции несут готовое свойство `canRetry` (`daily_choice_catalog_state.dart:99`, `:174`), а подвал стал вторым потребителем правила без такого общего ответа.
+- **Evidence revisions:** ["702ff26f9996e647fa6e9a76bfbc530ae9e81618"]
+- **Impact:** Если правило доказанной временности изменится, забытая копия даст кнопку «Повторить», нажатие на которую ничего не делает, либо скроет действующий повтор. Подвал закрепил это расхождение вторым местом показа.
+- **Required outcome:** Решение о том, допускает ли отказ обновления повтор, принимается в одном месте, а оба места показа опираются на него.
+- **Earliest source of truth:** implementation/tests
+- **Affected artifacts:** ["lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart"]
 
 ## Review coverage
 
-Прочитаны артефакты графа `intent-driven`: proposal, дельта `daily-choice-management`, design, adr, plan, tasks, а также ADR-манифест. Правила компонентов сверены с README `ChoiceRow`, `ChoiceCheck`, `ReasonChain`, `SectionHeader`, `TimeGroup`, `ScrollTopButton`, `ListState`, `EmptyState` из `context/` основного checkout: эта папка не хранится в git, поэтому ревизия её текста неизвестна.
+Прочитаны proposal, дельта `daily-choice-management`, design, adr, plan и tasks на проверенной ревизии. Покрыты все пять целевых коммитов: `4ad528b9f62eda9294cd79b4ccf0e31520b2ec21` относится только к планированию и добавляет профили задач, `a7d1534993aa5e13db53c2314e89b50333d9f3b3`, `5564f454ec77ac1713ab0d42a6b8ef731b8a7968`, `1e531a97df6270ad9796196d98c79aa7f09b493d` и `702ff26f9996e647fa6e9a76bfbc530ae9e81618` соответствуют задачам 1.15–1.18 один к одному. Изменения `tasks.md` в диапазоне — только отметки выполнения. Посторонних изменений нет.
 
-Покрыты все 17 целевых коммитов. Коммит `e3016dfe2104087a44835e3d2259896319c62238` относится только к планированию, `c1f8f0746f76e996e9ee6104094efbe5f785ef4f` обновляет хеш провайдера, `b4baa2777499aaeb8d1d3a7155ceec2ccefb209d` убирает лишний импорт в тесте, `bc3d8b2f03a4d7fe390dab77afc100241965c685` отмечает задачу 1.14, остальные соответствуют задачам 1.1–1.13 один к одному. Изменения `tasks.md` в диапазоне — только отметки выполнения. Посторонних изменений в диапазоне нет.
+Проверены сброс `refreshFailure` при запуске обновления и возврат кольца в подвал, сохранение `_requestPage`, скрытие строки обновления от нажатий и семантики, остановка кольца вне обновления, живая область во время обновления, совпадение `durabilityUuid` с ключом `daily-choice-completion-<id>` и достаточность оставшихся тестов после удалений. Вид заголовка при масштабе 1 в окнах 360 и 390 измерен со слотом: день недели с отметкой «Сегодня» стоит на одной строке. Окна уже 360 не входят в область поддержки `app-appearance`.
 
-Проверены подгрузка из построения подвала с защитой от автоповтора отказа, порог и размещение кнопки над панелью и сообщением, восстановление прокрутки, поверхность отказа выполнения, семантика строки и заголовка, полнота ключей локализации и удаление всех имён из задачи 1.14 (`git grep` пуст). Тело каталога одно на обе страницы и не ветвится по странице, поэтому сценарии групп и подгрузки, доказанные на корневом каталоге, распространяются и на каталог на дату; поведение, зависящее от каркаса, тесты проверяют на обоих.
+Замечание проверяющего о том, что тест кольца не заметит галочку у невыполненного выбора, опровергнуто мутацией в одноразовой копии: при всегда рисуемой галочке падают тесты кольца в обеих темах. Удаление теста «выбор без выполнения не рисует галочку» обосновано.
 
-Ручные проверки на устройстве остаются за владельцем продукта.
+Ручные проверки на устройстве остаются за владельцем продукта. Папка `context/` с README дизайна в этом worktree отсутствует, поэтому вид заголовка сверен с тестами, а не с README `DayHeading`.
