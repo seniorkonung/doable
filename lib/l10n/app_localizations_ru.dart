@@ -2696,9 +2696,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get relationEditorTitle => 'Новая связь';
 
   @override
-  String get relationEditorEditTitle => 'Редактирование связи';
-
-  @override
   String get relationEditorPhraseLabel => 'Формулировка связи';
 
   @override
@@ -2776,12 +2773,6 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get relationEditorCreating => 'Создаём…';
-
-  @override
-  String get relationEditorSaveAction => 'Сохранить изменения';
-
-  @override
-  String get relationEditorSaving => 'Сохраняем…';
 
   @override
   String relationEditorPriorityOption(String priority) {

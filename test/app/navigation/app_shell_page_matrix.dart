@@ -474,7 +474,6 @@ void _registerPageMatrixTests() {
             RelationDirection.outgoing => 'создание исходящей связи',
             RelationDirection.incoming => 'создание входящей связи',
           },
-          RelationEditingContext() => 'изменение связи',
         },
         _ => null,
       };

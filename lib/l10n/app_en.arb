@@ -2132,10 +2132,6 @@
   "@relationEditorTitle": {
     "description": "Заголовок формы создания долговременной связи"
   },
-  "relationEditorEditTitle": "Edit relation",
-  "@relationEditorEditTitle": {
-    "description": "Заголовок формы изменения долговременной связи"
-  },
   "relationEditorPhraseLabel": "Relation phrase",
   "@relationEditorPhraseLabel": {
     "description": "Доступная подпись текущей формулировки связи"
@@ -2235,14 +2231,6 @@
   "relationEditorCreating": "Creating…",
   "@relationEditorCreating": {
     "description": "Выполняемое создание долговременной связи"
-  },
-  "relationEditorSaveAction": "Save changes",
-  "@relationEditorSaveAction": {
-    "description": "Команда сохранения изменений долговременной связи"
-  },
-  "relationEditorSaving": "Saving…",
-  "@relationEditorSaving": {
-    "description": "Выполняемое изменение долговременной связи"
   },
   "relationEditorPriorityOption": "Priority {priority}",
   "@relationEditorPriorityOption": {

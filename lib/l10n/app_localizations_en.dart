@@ -2670,9 +2670,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get relationEditorTitle => 'New relation';
 
   @override
-  String get relationEditorEditTitle => 'Edit relation';
-
-  @override
   String get relationEditorPhraseLabel => 'Relation phrase';
 
   @override
@@ -2751,12 +2748,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get relationEditorCreating => 'Creating…';
-
-  @override
-  String get relationEditorSaveAction => 'Save changes';
-
-  @override
-  String get relationEditorSaving => 'Saving…';
 
   @override
   String relationEditorPriorityOption(String priority) {

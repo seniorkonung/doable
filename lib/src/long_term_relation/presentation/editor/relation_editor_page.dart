@@ -20,20 +20,16 @@ import '../../domain/long_term_relation.dart';
 import '../../domain/long_term_relation_description.dart';
 import '../../domain/long_term_relation_id.dart';
 import '../details/relation_details_sheet.dart';
-import '../details/relation_details_state.dart';
-import '../details/relation_details_view_model.dart';
 import '../participant_picker/relation_participant_choice.dart';
 import 'relation_creation_completion.dart';
 import 'relation_editor_state.dart';
 import 'relation_editor_view_model.dart';
 
-/// Форма создания или изменения долговременной связи.
+/// Форма создания долговременной связи.
 ///
-/// Типизированный контекст задаёт исходный черновик. Участников выбирает
-/// только форма создания: у существующей связи они неизменны и показываются
-/// без поиска, а их подтверждённые данные поступают через наблюдение
-/// подробного просмотра связи. Черновик и результат принадлежат ViewModel,
-/// а успех предъявляет presenter оболочки.
+/// Типизированный контекст задаёт исходный черновик. Существующую связь
+/// просматривает и меняет нижняя панель, а не эта форма. Черновик и результат
+/// принадлежат ViewModel, а успех предъявляет presenter оболочки.
 @RoutePage()
 final class RelationEditorPage extends ConsumerStatefulWidget {
   const RelationEditorPage({required this.editorContext, super.key});
@@ -53,46 +49,7 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage>
   @override
   void initState() {
     super.initState();
-    _descriptionController = TextEditingController(
-      text: switch (widget.editorContext) {
-        RelationBlankCreationContext() || RelationCreationContext() => '',
-        RelationEditingContext(:final details) =>
-          details.description?.value ?? '',
-      },
-    );
-    if (widget.editorContext case RelationEditingContext(:final details)) {
-      final editorProvider = relationEditorViewModelProvider(
-        _formKey,
-        widget.editorContext,
-      );
-      void refresh(RelationDetailsState next) {
-        if (next case RelationDetailsLoaded(
-          refreshStatus: RelationDetailsFresh(),
-          :final details,
-          :final revision,
-        )) {
-          final needsNewBasis = ref
-              .read(editorProvider.notifier)
-              .refreshConfirmedDetails(details, revision);
-          for (final role in needsNewBasis) {
-            final id = role == RelationParticipantRole.source
-                ? details.source.id
-                : details.related.id;
-            unawaited(_refreshParticipantBasis(role, id));
-          }
-        }
-      }
-
-      final subscription = ref.listenManual(
-        relationDetailsViewModelProvider(details.relation.id),
-        (previous, next) => refresh(next),
-      );
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          refresh(subscription.read());
-        }
-      });
-    }
+    _descriptionController = TextEditingController();
   }
 
   @override
@@ -126,8 +83,6 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage>
             formMatchId: context.routeData.matchId,
             relationId: relationId,
           );
-        case RelationEditorUpdated():
-          if (_ownsTopRoute) unawaited(context.router.maybePop());
       }
     });
 
@@ -144,13 +99,7 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage>
         : null;
     final occupiedPair = _occupiedPair(editor);
     return Scaffold(
-      appBar: AppBar(
-        title: Text(switch (editor.context) {
-          RelationBlankCreationContext() ||
-          RelationCreationContext() => localizations.relationEditorTitle,
-          RelationEditingContext() => localizations.relationEditorEditTitle,
-        }),
-      ),
+      appBar: AppBar(title: Text(localizations.relationEditorTitle)),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(16),
@@ -159,11 +108,8 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage>
               role: RelationParticipantRole.source,
               participant: editor.sourceParticipant,
               enabled: controlsEnabled,
-              onSelect: editor.context.isCreating
-                  ? () => unawaited(
-                      _selectParticipant(RelationParticipantRole.source),
-                    )
-                  : null,
+              onSelect: () =>
+                  unawaited(_selectParticipant(RelationParticipantRole.source)),
               onOpenDetails:
                   !controlsEnabled || editor.sourceParticipant == null
                   ? null
@@ -178,11 +124,9 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage>
               role: RelationParticipantRole.related,
               participant: editor.relatedParticipant,
               enabled: controlsEnabled,
-              onSelect: editor.context.isCreating
-                  ? () => unawaited(
-                      _selectParticipant(RelationParticipantRole.related),
-                    )
-                  : null,
+              onSelect: () => unawaited(
+                _selectParticipant(RelationParticipantRole.related),
+              ),
               onOpenDetails:
                   !controlsEnabled || editor.relatedParticipant == null
                   ? null
@@ -208,7 +152,7 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage>
             const SizedBox(height: 24),
             _TypeChoice(
               selected: editor.type,
-              enabled: controlsEnabled && editor.canChangeType,
+              enabled: controlsEnabled,
               onSelected: notifier.selectType,
             ),
             const SizedBox(height: 24),
@@ -269,20 +213,17 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage>
               onPressed: editor.canSubmit ? _submit : null,
               child: Text(_submitLabel(localizations, editor)),
             ),
-            if (editor.context.isCreating) ...[
-              const SizedBox(height: 16),
-              CreationExitAction(
-                state: switch ((editor.sessionState, editor.operation)) {
-                  (_, RelationEditorSubmitting()) =>
-                    CreationExitState.submitting,
-                  (RelationEditorSessionState.left, _) ||
-                  (_, RelationEditorSucceeded()) => CreationExitState.terminal,
-                  (_, RelationEditorIdle() || RelationEditorFailed()) =>
-                    CreationExitState.cancellable,
-                },
-                onExit: _leaveCreation,
-              ),
-            ],
+            const SizedBox(height: 16),
+            CreationExitAction(
+              state: switch ((editor.sessionState, editor.operation)) {
+                (_, RelationEditorSubmitting()) => CreationExitState.submitting,
+                (RelationEditorSessionState.left, _) ||
+                (_, RelationEditorSucceeded()) => CreationExitState.terminal,
+                (_, RelationEditorIdle() || RelationEditorFailed()) =>
+                  CreationExitState.cancellable,
+              },
+              onExit: _leaveCreation,
+            ),
           ],
         ),
       ),
@@ -304,7 +245,7 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage>
   }
 
   void _leaveCreation() {
-    if (!_ownsTopRoute || !widget.editorContext.isCreating) return;
+    if (!_ownsTopRoute) return;
     final router = context.router;
     final matchId = context.routeData.matchId;
     ref
@@ -367,8 +308,7 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage>
   /// Открывает выбор участника и применяет только явно выбранное намерение.
   ///
   /// Поиск получает описание выбора из черновика в момент открытия. Отмена
-  /// оставляет черновик прежним. У существующей связи участников выбирать
-  /// нельзя, поэтому её форма поиск не открывает.
+  /// оставляет черновик прежним.
   Future<void> _selectParticipant(RelationParticipantRole role) async {
     if (!_canEdit) return;
     final provider = relationEditorViewModelProvider(
@@ -455,19 +395,12 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage>
   String _submitLabel(
     AppLocalizations localizations,
     RelationEditorState editor,
-  ) => switch ((editor.context, editor.operation)) {
-    (RelationEditingContext(), RelationEditorSubmitting()) =>
-      localizations.relationEditorSaving,
-    (
-      RelationBlankCreationContext() || RelationCreationContext(),
-      RelationEditorSubmitting(),
-    ) =>
-      localizations.relationEditorCreating,
-    (_, RelationEditorFailed()) when editor.canRetry =>
-      localizations.commonRetry,
-    (RelationEditingContext(), _) => localizations.relationEditorSaveAction,
-    (RelationBlankCreationContext() || RelationCreationContext(), _) =>
-      localizations.relationEditorSubmitAction,
+  ) => switch (editor.operation) {
+    RelationEditorSubmitting() => localizations.relationEditorCreating,
+    RelationEditorFailed() when editor.canRetry => localizations.commonRetry,
+    RelationEditorIdle() ||
+    RelationEditorSucceeded() ||
+    RelationEditorFailed() => localizations.relationEditorSubmitAction,
   };
 
   String? _relationPhrase(
@@ -512,7 +445,6 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage>
     AppLocalizations localizations,
     RelationEditorState editor,
   ) {
-    final isEditing = !editor.context.isCreating;
     return switch (editor.operation) {
       RelationEditorIdle() ||
       RelationEditorSubmitting() ||
@@ -523,36 +455,20 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage>
         RelationEditorParticipantRejected(:final rejection) =>
           switch (rejection) {
             RelationParticipantRejection.missing =>
-              isEditing
-                  ? localizations.relationEditorUpdateUnexpected
-                  : localizations.relationEditorCreateParticipantNotFound,
+              localizations.relationEditorCreateParticipantNotFound,
             RelationParticipantRejection.archived =>
-              isEditing
-                  ? localizations.relationEditorUpdateUnexpected
-                  : localizations.relationEditorCreateParticipantArchived,
+              localizations.relationEditorCreateParticipantArchived,
           },
         RelationEditorPairOccupied() =>
-          isEditing
-              ? localizations.relationEditorUpdateUnexpected
-              : localizations.relationEditorCreatePairOccupied,
+          localizations.relationEditorCreatePairOccupied,
         RelationEditorSameParticipants() =>
           localizations.relationEditorCreateSameParticipants,
-        RelationEditorRelationNotFound() =>
-          localizations.relationEditorUpdateNotFound,
-        RelationEditorArchivedTypeChange() =>
-          localizations.relationEditorUpdateArchivedTypeChange,
         RelationEditorUnavailable() =>
-          isEditing
-              ? localizations.relationEditorUpdateUnavailable
-              : localizations.relationEditorCreateUnavailable,
+          localizations.relationEditorCreateUnavailable,
         RelationEditorCorruption() =>
-          isEditing
-              ? localizations.relationEditorUpdateCorruption
-              : localizations.relationEditorCreateCorruption,
+          localizations.relationEditorCreateCorruption,
         RelationEditorUnexpected() =>
-          isEditing
-              ? localizations.relationEditorUpdateUnexpected
-              : localizations.relationEditorCreateUnexpected,
+          localizations.relationEditorCreateUnexpected,
       },
     };
   }
@@ -570,10 +486,7 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage>
       };
 }
 
-/// Роль участника связи и переход к его странице.
-///
-/// Выбор участника предлагает только слот с [onSelect]; у существующей связи
-/// участник неизменен, и слот лишь показывает его.
+/// Роль участника связи, выбор участника и переход к его странице.
 final class _ParticipantSlot extends StatelessWidget {
   const _ParticipantSlot({
     required this.role,
@@ -586,7 +499,7 @@ final class _ParticipantSlot extends StatelessWidget {
   final RelationParticipantRole role;
   final RelationParticipantSummary? participant;
   final bool enabled;
-  final VoidCallback? onSelect;
+  final VoidCallback onSelect;
   final VoidCallback? onOpenDetails;
 
   @override
@@ -659,24 +572,22 @@ final class _ParticipantSlot extends StatelessWidget {
             ),
             const SizedBox(height: 4),
           ],
-          if (onSelect != null)
-            Text(
-              isSelected
-                  ? localizations.relationEditorParticipantSelected
-                  : localizations.relationEditorParticipantNotSelected,
-            ),
+          Text(
+            isSelected
+                ? localizations.relationEditorParticipantSelected
+                : localizations.relationEditorParticipantNotSelected,
+          ),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              if (onSelect case final select?)
-                OutlinedButton(
-                  key: actionKey,
-                  onPressed: enabled ? select : null,
-                  child: Text(action),
-                ),
+              OutlinedButton(
+                key: actionKey,
+                onPressed: enabled ? onSelect : null,
+                child: Text(action),
+              ),
               if (isSelected)
                 IconButton(
                   key: detailsKey,

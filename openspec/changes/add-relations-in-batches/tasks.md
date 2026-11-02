@@ -491,7 +491,7 @@
     - меняется `test/long_term_relation/presentation/editor/relation_editor_page_test.dart`.
   - **Размер:** M.
 
-- [ ] 2.15 Форма связи остаётся только формой создания
+- [x] 2.15 Форма связи остаётся только формой создания
   - **Критерии приёмки:**
     - `RelationEditingContext` удалён вместе с `editingBasis`, `withConfirmedDetails`, `refreshConfirmedDetails` и `RelationEditorUpdated`. Форма не читает подробный просмотр связи.
     - Отказы, которых у создания нет, и строки `relationEditorEditTitle`, `relationEditorSaveAction`, `relationEditorSaving` удалены на обоих языках. `relationEditorUpdate*` остаются: их читает панель.

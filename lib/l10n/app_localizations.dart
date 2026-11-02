@@ -4138,12 +4138,6 @@ abstract class AppLocalizations {
   /// **'New relation'**
   String get relationEditorTitle;
 
-  /// Заголовок формы изменения долговременной связи
-  ///
-  /// In en, this message translates to:
-  /// **'Edit relation'**
-  String get relationEditorEditTitle;
-
   /// Доступная подпись текущей формулировки связи
   ///
   /// In en, this message translates to:
@@ -4293,18 +4287,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Creating…'**
   String get relationEditorCreating;
-
-  /// Команда сохранения изменений долговременной связи
-  ///
-  /// In en, this message translates to:
-  /// **'Save changes'**
-  String get relationEditorSaveAction;
-
-  /// Выполняемое изменение долговременной связи
-  ///
-  /// In en, this message translates to:
-  /// **'Saving…'**
-  String get relationEditorSaving;
 
   /// Вариант приоритета P1–P4 в форме создания связи
   ///

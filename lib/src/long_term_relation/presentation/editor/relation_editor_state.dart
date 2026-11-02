@@ -11,11 +11,6 @@ import '../../domain/long_term_relation_id.dart';
 /// Типизированный источник черновика формы связи.
 sealed class RelationEditorContext {
   const RelationEditorContext();
-
-  bool get isCreating => switch (this) {
-    RelationBlankCreationContext() || RelationCreationContext() => true,
-    RelationEditingContext() => false,
-  };
 }
 
 /// Самостоятельное создание связи без заранее выбранных участников.
@@ -69,47 +64,6 @@ final class RelationCreationContext extends RelationEditorContext {
     participant.archiveState,
     group,
   );
-}
-
-/// Подтверждённая основа черновика изменения существующей связи.
-///
-/// Основа остаётся неизменной в течение экранной сессии и позволяет отличить
-/// явные правки от полей, которые форма не должна перезаписывать.
-final class RelationEditingContext extends RelationEditorContext {
-  const RelationEditingContext(this.details, {required this.revision})
-    : super();
-
-  final LongTermRelationDetails details;
-  final GraphRevision revision;
-
-  /// Строит частичную правку только из значений, отличающихся от основы.
-  LongTermRelationPatch patchFor(
-    RelationDraftComplete draft,
-    LongTermRelationDescription? validatedDescription,
-  ) {
-    final relation = details.relation;
-    return LongTermRelationPatch(
-      type: draft.type == relation.type
-          ? const LongTermRelationFieldUnchanged<LongTermRelationType>()
-          : LongTermRelationFieldSet(draft.type),
-      priority: draft.priority == relation.priority
-          ? const LongTermRelationFieldUnchanged<RelationPriority>()
-          : LongTermRelationFieldSet(draft.priority),
-      description: _descriptionPatchFor(validatedDescription),
-    );
-  }
-
-  LongTermRelationDescriptionPatch _descriptionPatchFor(
-    LongTermRelationDescription? validatedDescription,
-  ) {
-    if (validatedDescription == details.description) {
-      return const LongTermRelationDescriptionUnchanged();
-    }
-    if (validatedDescription == null) {
-      return const LongTermRelationDescriptionCleared();
-    }
-    return LongTermRelationDescriptionReplaced(validatedDescription);
-  }
 }
 
 /// Выбор, без которого команда создания связи не может быть составлена.
@@ -196,16 +150,6 @@ final class RelationEditorSameParticipants extends RelationEditorFailure {
   const RelationEditorSameParticipants();
 }
 
-/// Редактируемая связь больше не существует.
-final class RelationEditorRelationNotFound extends RelationEditorFailure {
-  const RelationEditorRelationNotFound();
-}
-
-/// Связь архивирована за открытой формой, а черновик меняет её тип.
-final class RelationEditorArchivedTypeChange extends RelationEditorFailure {
-  const RelationEditorArchivedTypeChange();
-}
-
 /// Доказанно устранимая недоступность хранилища.
 final class RelationEditorUnavailable extends RelationEditorFailure {
   const RelationEditorUnavailable();
@@ -268,14 +212,7 @@ final class RelationEditorCreated extends RelationEditorEvent {
   final LongTermRelationId relationId;
 }
 
-/// Изменение подтверждено: форма может вернуться к той же связи.
-final class RelationEditorUpdated extends RelationEditorEvent {
-  const RelationEditorUpdated(this.relationId);
-
-  final LongTermRelationId relationId;
-}
-
-/// Черновик одной открытой формы создания или изменения связи.
+/// Черновик одной открытой формы создания связи.
 ///
 /// Черновик хранит только выбор пользователя и исход последней отправки.
 /// Подтверждённой связью он не становится: успех отмечается отдельным
@@ -322,18 +259,6 @@ final class RelationEditorState {
           operation: const RelationEditorIdle(),
           event: null,
         ),
-        final RelationEditingContext editing => RelationEditorState(
-          context: context,
-          sourceParticipant: editing.details.source,
-          relatedParticipant: editing.details.related,
-          sourceRevision: editing.revision,
-          relatedRevision: editing.revision,
-          type: editing.details.relation.type,
-          priority: editing.details.relation.priority,
-          description: editing.details.description?.value ?? '',
-          operation: const RelationEditorIdle(),
-          event: null,
-        ),
       };
 
   final RelationEditorContext context;
@@ -342,11 +267,6 @@ final class RelationEditorState {
   bool get canEdit =>
       sessionState == RelationEditorSessionState.active &&
       (operation is RelationEditorIdle || operation is RelationEditorFailed);
-
-  LongTermRelationDetails? get editingBasis => switch (context) {
-    RelationBlankCreationContext() || RelationCreationContext() => null,
-    RelationEditingContext(:final details) => details,
-  };
 
   final RelationParticipantSummary? sourceParticipant;
   final RelationParticipantSummary? relatedParticipant;
@@ -434,32 +354,12 @@ final class RelationEditorState {
           type != creation.initialType ||
           priority != null ||
           description.isNotEmpty,
-    RelationEditingContext(:final details) =>
-      sourceIntentionId != details.relation.sourceIntentionId ||
-          relatedIntentionId != details.relation.relatedIntentionId ||
-          type != details.relation.type ||
-          priority != details.relation.priority ||
-          _descriptionDiffersFrom(details.description),
   };
 
   bool get canSubmit =>
       sessionState == RelationEditorSessionState.active &&
       completeness is RelationDraftComplete &&
-      (switch (context) {
-        RelationBlankCreationContext() || RelationCreationContext() => true,
-        RelationEditingContext() => hasChanges,
-      }) &&
       (operation is RelationEditorIdle || canRetry);
-
-  /// Предлагает ли форма выбор типа.
-  ///
-  /// Тип активной связи меняется независимо от шагов пути выбора, а
-  /// архивированная связь сохраняет его до восстановления.
-  bool get canChangeType => switch (context) {
-    RelationBlankCreationContext() || RelationCreationContext() => true,
-    RelationEditingContext(:final details) =>
-      details.relation.scope == RelationScope.active,
-  };
 
   RelationEditorState withParticipant(
     RelationParticipantRole role,
@@ -496,25 +396,8 @@ final class RelationEditorState {
     );
   }
 
-  RelationEditorState withType(LongTermRelationType value) => _copyWith(
-    type: value,
-    operation: _operationAfter(
-      (failure) => switch (failure) {
-        // Исправляет только возврат к сохранённому типу: тогда в правке нет
-        // изменения типа.
-        RelationEditorArchivedTypeChange() =>
-          value == editingBasis?.relation.type,
-        RelationEditorDescriptionInvalid() ||
-        RelationEditorParticipantRejected() ||
-        RelationEditorPairOccupied() ||
-        RelationEditorSameParticipants() ||
-        RelationEditorRelationNotFound() ||
-        RelationEditorUnavailable() ||
-        RelationEditorCorruption() ||
-        RelationEditorUnexpected() => false,
-      },
-    ),
-  );
+  RelationEditorState withType(LongTermRelationType value) =>
+      _copyWith(type: value, operation: operation);
 
   RelationEditorState withPriority(RelationPriority value) =>
       _copyWith(priority: value, operation: operation);
@@ -523,67 +406,6 @@ final class RelationEditorState {
     description: value,
     operation: _operationAfter(_isCorrectedByDescription),
   );
-
-  /// Освежает отображаемые снимки участников с прежними id.
-  ///
-  /// Исходная основа, введённые поля, выбранные идентификаторы и ошибка
-  /// остаются прежними. Поэтому фоновое чтение не превращается в неявную
-  /// правку и не снимает ошибку занятой пары.
-  RelationEditorState withConfirmedDetails(
-    LongTermRelationDetails details,
-    GraphRevision revision,
-  ) {
-    final basis = editingBasis;
-    if (basis == null || details.relation.id != basis.relation.id) {
-      return this;
-    }
-    return withConfirmedParticipant(
-      RelationParticipantRole.source,
-      details.source,
-      revision,
-    ).withConfirmedParticipant(
-      RelationParticipantRole.related,
-      details.related,
-      revision,
-    );
-  }
-
-  /// Освежает выбранного участника только пока его идентичность не изменилась.
-  RelationEditorState withConfirmedParticipant(
-    RelationParticipantRole role,
-    RelationParticipantSummary participant,
-    GraphRevision revision,
-  ) {
-    final current = switch (role) {
-      RelationParticipantRole.source => sourceParticipant,
-      RelationParticipantRole.related => relatedParticipant,
-    };
-    if (current?.id != participant.id || !_isNewer(role, revision)) {
-      return this;
-    }
-    return RelationEditorState(
-      context: context,
-      sessionState: sessionState,
-      sourceParticipant: role == RelationParticipantRole.source
-          ? participant
-          : sourceParticipant,
-      relatedParticipant: role == RelationParticipantRole.related
-          ? participant
-          : relatedParticipant,
-      sourceRevision: role == RelationParticipantRole.source
-          ? revision
-          : sourceRevision,
-      relatedRevision: role == RelationParticipantRole.related
-          ? revision
-          : relatedRevision,
-      type: type,
-      priority: priority,
-      description: description,
-      operation: operation,
-      event: event,
-      failurePresentation: failurePresentation,
-    );
-  }
 
   /// Новое чтение, запущенное после обнаружения другой эпохи, задаёт основу.
   RelationEditorState withNewBasis(
@@ -717,8 +539,6 @@ final class RelationEditorState {
         RelationEditorParticipantRejected() ||
         RelationEditorPairOccupied() ||
         RelationEditorSameParticipants() ||
-        RelationEditorRelationNotFound() ||
-        RelationEditorArchivedTypeChange() ||
         RelationEditorUnavailable() ||
         RelationEditorCorruption() ||
         RelationEditorUnexpected() => false,
@@ -734,17 +554,8 @@ final class RelationEditorState {
     RelationEditorPairOccupied() ||
     RelationEditorSameParticipants() => identityChanged,
     RelationEditorDescriptionInvalid() ||
-    RelationEditorArchivedTypeChange() ||
-    RelationEditorRelationNotFound() ||
     RelationEditorUnavailable() ||
     RelationEditorCorruption() ||
     RelationEditorUnexpected() => false,
   };
-
-  bool _descriptionDiffersFrom(LongTermRelationDescription? original) {
-    if (description == original?.value) {
-      return false;
-    }
-    return original != null || description.trim().isNotEmpty;
-  }
 }

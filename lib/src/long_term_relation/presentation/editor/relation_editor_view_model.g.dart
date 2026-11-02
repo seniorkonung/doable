@@ -8,7 +8,7 @@ part of 'relation_editor_view_model.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Черновик одной формы создания или изменения долговременной связи.
+/// Черновик одной формы создания долговременной связи.
 ///
 /// ViewModel не хранит связь: он собирает выбор пользователя, проверяет его до
 /// отправки и передаёт готовую команду общему coordinator графа. Пока принятая
@@ -19,7 +19,7 @@ part of 'relation_editor_view_model.dart';
 @ProviderFor(RelationEditorViewModel)
 final relationEditorViewModelProvider = RelationEditorViewModelFamily._();
 
-/// Черновик одной формы создания или изменения долговременной связи.
+/// Черновик одной формы создания долговременной связи.
 ///
 /// ViewModel не хранит связь: он собирает выбор пользователя, проверяет его до
 /// отправки и передаёт готовую команду общему coordinator графа. Пока принятая
@@ -28,7 +28,7 @@ final relationEditorViewModelProvider = RelationEditorViewModelFamily._();
 /// различимого результата.
 final class RelationEditorViewModelProvider
     extends $NotifierProvider<RelationEditorViewModel, RelationEditorState> {
-  /// Черновик одной формы создания или изменения долговременной связи.
+  /// Черновик одной формы создания долговременной связи.
   ///
   /// ViewModel не хранит связь: он собирает выбор пользователя, проверяет его до
   /// отправки и передаёт готовую команду общему coordinator графа. Пока принятая
@@ -82,9 +82,9 @@ final class RelationEditorViewModelProvider
 }
 
 String _$relationEditorViewModelHash() =>
-    r'6066a3a4f0a1fa96acaff6b67a0fbfc55c404450';
+    r'd9ebe8f91d43e0285b0f3f8d6f3c8dcff029cf45';
 
-/// Черновик одной формы создания или изменения долговременной связи.
+/// Черновик одной формы создания долговременной связи.
 ///
 /// ViewModel не хранит связь: он собирает выбор пользователя, проверяет его до
 /// отправки и передаёт готовую команду общему coordinator графа. Пока принятая
@@ -110,7 +110,7 @@ final class RelationEditorViewModelFamily extends $Family
         isAutoDispose: true,
       );
 
-  /// Черновик одной формы создания или изменения долговременной связи.
+  /// Черновик одной формы создания долговременной связи.
   ///
   /// ViewModel не хранит связь: он собирает выбор пользователя, проверяет его до
   /// отправки и передаёт готовую команду общему coordinator графа. Пока принятая
@@ -130,7 +130,7 @@ final class RelationEditorViewModelFamily extends $Family
   String toString() => r'relationEditorViewModelProvider';
 }
 
-/// Черновик одной формы создания или изменения долговременной связи.
+/// Черновик одной формы создания долговременной связи.
 ///
 /// ViewModel не хранит связь: он собирает выбор пользователя, проверяет его до
 /// отправки и передаёт готовую команду общему coordinator графа. Пока принятая
