@@ -1028,10 +1028,11 @@
     - Поправка не начинает новую выдачу и сохраняет позицию: единственным исключением остаётся требование «Причина занятой пары в поиске участника».
     - Подтверждено: переименование в подстроку убирает предложение, архивирование, удаление или переименование единственного совпадения возвращает его, уход одного из двух одноимённых не возвращает, а пакет ревизии, уже отражённой порцией, не считается второй раз.
   - **Проверка:**
+    - `mise run codegen`.
     - `mise exec --no-deps -- flutter test test/intention/presentation/catalog test/intention/presentation/search test/intention/presentation/picker`.
     - `mise exec --no-deps -- flutter analyze`.
   - **Зависимости:** 4.1.
-  - **Предполагаемые файлы:** меняются `lib/src/intention/application/intention_catalog.dart`, `lib/src/intention/presentation/catalog/intention_catalog_state.dart`, `intention_catalog_view_model.dart`, `test/intention/presentation/catalog/intention_catalog_mutation_reconciliation_test.dart`.
+  - **Предполагаемые файлы:** меняются `lib/src/intention/application/intention_catalog.dart`, `lib/src/intention/presentation/catalog/intention_catalog_state.dart`, `intention_catalog_view_model.dart`, `intention_catalog_view_model.g.dart`, `test/intention/presentation/catalog/intention_catalog_mutation_reconciliation_test.dart`.
   - **Размер:** S.
 
 - [ ] 4.3 Панель создания намерения запускается закрытым контекстом и завершается по его варианту
@@ -1148,12 +1149,13 @@
     - Смена эпохи графа и утрата активности или готовности начального намерения по-прежнему дают конфликт.
     - Тесты, ждавшие конфликта от самой ревизии, в `choice_path_view_model_test.dart` и `choice_path_page_test.dart` выражены новым правилом. Покрыты две ревизии подряд во время чтения, обе причины перечитывания из `loadMore` и замена содержания шагов в обоих направлениях, в том числе через `refresh()`.
   - **Проверка:**
+    - `mise run codegen`.
     - `drift_choice_path_continuations_test.dart` на настоящем хранилище покрывает новые название и приоритет в сводках шагов обоих направлений.
     - `mise exec --no-deps -- flutter test test/daily_choice/presentation test/daily_choice/application/choice_path_continuations_test.dart test/graph/data/drift_choice_path_continuations_test.dart`.
     - `mise exec --no-deps -- flutter analyze`.
   - **Зависимости:** нет.
   - **Предполагаемые файлы:**
-    - меняются `lib/src/daily_choice/application/choice_path_continuations.dart`, `lib/src/graph/data/drift_personal_graph_repository_choice_path_reads.dart`, `lib/src/daily_choice/presentation/path/choice_path_view_model.dart`;
+    - меняются `lib/src/daily_choice/application/choice_path_continuations.dart`, `lib/src/graph/data/drift_personal_graph_repository_choice_path_reads.dart`, `lib/src/daily_choice/presentation/path/choice_path_view_model.dart`, `choice_path_view_model.g.dart`;
     - меняются `test/daily_choice/application/choice_path_continuations_test.dart`, `test/graph/data/drift_choice_path_continuations_test.dart`, `test/daily_choice/presentation/path/choice_path_view_model_test.dart`, `choice_path_page_test.dart`.
   - **Размер:** M.
 
