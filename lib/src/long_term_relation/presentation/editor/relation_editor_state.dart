@@ -337,25 +337,6 @@ final class RelationEditorState {
     RelationEditorSucceeded() => false,
   };
 
-  /// Есть ли явная правка относительно исходного снимка формы.
-  ///
-  /// Недопустимый текст считается правкой, чтобы отправка могла показать
-  /// точную ошибку валидации и сохранить введённое значение.
-  bool get hasChanges => switch (context) {
-    RelationBlankCreationContext() =>
-      sourceParticipant != null ||
-          relatedParticipant != null ||
-          type != null ||
-          priority != null ||
-          description.isNotEmpty,
-    final RelationCreationContext creation =>
-      sourceParticipant != creation.initialSourceParticipant ||
-          relatedParticipant != creation.initialRelatedParticipant ||
-          type != creation.initialType ||
-          priority != null ||
-          description.isNotEmpty,
-  };
-
   bool get canSubmit =>
       sessionState == RelationEditorSessionState.active &&
       completeness is RelationDraftComplete &&

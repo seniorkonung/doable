@@ -559,7 +559,7 @@
   - **Предполагаемые файлы:** меняются `lib/src/long_term_relation/presentation/details/relation_details_sheet.dart`, `test/long_term_relation/presentation/details/relation_details_sheet_test.dart`.
   - **Размер:** S.
 
-- [ ] 2.20 Убрать из состояния формы создания признак `hasChanges` без читателя
+- [x] 2.20 Убрать из состояния формы создания признак `hasChanges` без читателя
   - **Критерии приёмки:**
     - Геттер `RelationEditorState.hasChanges` удалён вместе с комментарием, поэтому в `lib/` и `test/` нет `hasChanges`.
     - Тест «только что открытая форма не изменена, смена типа её изменяет» удалён вместе с опустевшей группой «Создание связи из группы». Отдельный тест начального типа не добавляется: тип из группы проверяет `relation_editor_page_test.dart`.

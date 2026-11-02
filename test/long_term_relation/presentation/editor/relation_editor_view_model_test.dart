@@ -110,26 +110,6 @@ void main() {
     }
   });
 
-  group('Создание связи из группы', () {
-    test('только что открытая форма не изменена, смена типа её изменяет', () {
-      final harness = _EditorHarness(
-        RelationCreationContext(
-          participant: testEditorParticipant(1),
-          group: IntentionRelationGroup.canUse,
-        ),
-      );
-
-      expect(harness.state.type, LongTermRelationType.can);
-      expect(harness.state.hasChanges, isFalse);
-
-      harness.viewModel.selectType(LongTermRelationType.need);
-      expect(harness.state.hasChanges, isTrue);
-
-      harness.viewModel.selectType(LongTermRelationType.can);
-      expect(harness.state.hasChanges, isFalse);
-    });
-  });
-
   group('Отправка черновика', () {
     test('отправляет проверенную команду ровно один раз', () async {
       final harness = _EditorHarness.outgoing()..fillDraft(description: '  ');
