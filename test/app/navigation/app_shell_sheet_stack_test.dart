@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:auto_route/auto_route.dart';
+import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/home/home_page.dart';
@@ -13,6 +13,8 @@ import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openInMemoryLocalDatabase;
 import 'package:doable/src/design_system/components/page_head.dart';
+import 'package:doable/src/design_system/components/relation_head.dart';
+import 'package:doable/src/design_system/components/relation_row.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
@@ -29,30 +31,37 @@ import '../../support/in_memory_quick_creation_mode_store.dart';
 import '../../support/quick_creation.dart';
 import '../../support/tag_storage_fixture.dart';
 
-/// Намерение страницы, над которой открыт лист.
+/// Намерение страницы, над которой открыта панель связи.
 const _origin = 1;
 
-/// Намерение страницы, которую лист открывает поверх себя.
+/// Намерение страницы, которую панель открывает поверх себя.
 const _other = 2;
+
+/// Связь «чтобы другое, нужно исходное», которую открывает панель на странице
+/// исходного намерения: готовое к действию намерение открывается на группе
+/// «Нужно для».
+const _relation = 10;
 
 const _originTitle = 'Исходное';
 const _otherTitle = 'Другое';
 const _createdTitle = 'Созданное';
+
+final _l10n = lookupAppLocalizations(const Locale('en'));
 
 void main() {
   for (final (name, back) in [
     ('кнопка «Назад»', _tapBackButton),
     ('системное «назад»', _systemBack),
   ]) {
-    testWidgets('$name со страницы над листом возвращает тот же лист с его '
-        'состоянием, а следующее «назад» показывает исходную страницу', (
+    testWidgets('$name со страницы над панелью связи возвращает ту же панель '
+        'с её состоянием, а следующее «назад» показывает исходную страницу', (
       tester,
     ) async {
       await _openPageAboveSheet(tester, await _start(tester));
 
       await back(tester);
 
-      expect(find.text('Нажатий: 1').hitTestable(), findsOneWidget);
+      expect(_descriptionSave.hitTestable(), findsOneWidget);
       expect(_shownIntention(tester), _originTitle);
 
       await _systemBack(tester);
@@ -64,8 +73,8 @@ void main() {
     });
   }
 
-  testWidgets('выбор пункта панели на странице над листом убирает страницы и '
-      'лист из истории', (tester) async {
+  testWidgets('выбор пункта панели навигации на странице над панелью связи '
+      'убирает страницы и панель из истории', (tester) async {
     final router = await _start(tester);
     await _openPageAboveSheet(tester, router);
 
@@ -87,8 +96,10 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('быстрое создание на странице над листом запускается, а возврат '
-      'с созданного намерения ведёт на неё и затем на лист', (tester) async {
+  testWidgets('быстрое создание на странице над панелью связи запускается, а '
+      'возврат с созданного намерения ведёт на неё и затем на панель', (
+    tester,
+  ) async {
     await _openPageAboveSheet(tester, await _start(tester));
 
     await openQuickCreation(
@@ -115,14 +126,18 @@ void main() {
 
     await _systemBack(tester);
 
-    expect(find.text('Нажатий: 1').hitTestable(), findsOneWidget);
+    expect(_descriptionSave.hitTestable(), findsOneWidget);
     expect(_shownIntention(tester), _originTitle);
     expect(tester.takeException(), isNull);
   });
 }
 
-/// Лист вместе с закрытым страницей над ним.
+/// Панель вместе с закрытой страницей над ней.
 final _allSheets = find.byType(Sheet, skipOffstage: false);
+
+/// Кнопка сохранения описания: есть только у панели, открытой на изменении
+/// описания.
+final _descriptionSave = find.text(_l10n.relationSheetDescriptionSave);
 
 /// Страницы намерений вместе с закрытыми страницей над ними.
 final _allIntentionPages = find.byType(
@@ -140,8 +155,9 @@ String _shownIntention(WidgetTester tester) =>
 IntentionId _intentionId(int number) =>
     (IntentionId.decode(tagFixtureId(number)) as IntentionIdDecodingSuccess).id;
 
-/// Открывает над страницей [_origin] лист, меняет его состояние и переходит
-/// из листа на страницу [_other], которая встаёт над листом.
+/// Открывает над страницей [_origin] панель её связи, открывает в панели
+/// изменение описания и переходит из панели на страницу [_other], которая
+/// встаёт над панелью.
 Future<void> _openPageAboveSheet(WidgetTester tester, AppRouter router) async {
   unawaited(
     router.push(IntentionDetailsRoute(intentionId: _intentionId(_origin))),
@@ -150,16 +166,23 @@ Future<void> _openPageAboveSheet(WidgetTester tester, AppRouter router) async {
   await _until(tester, _intentionTitle);
   await tester.pumpAndSettle();
 
-  unawaited(
-    showDoableSheet<void>(
-      context: tester.element(find.byType(IntentionDetailsPage)),
-      builder: (_, sheet) =>
-          Sheet(sheet, title: 'Лист', child: const _SheetBody()),
+  await _tap(tester, find.text('Relations').first);
+  await _tap(tester, _relationRow);
+  await _until(tester, find.byType(RelationHead));
+  await tester.pumpAndSettle();
+  expect(_allSheets, findsOneWidget);
+
+  // Изменение описания отличает ту же панель от построенной заново.
+  await _tap(tester, find.text(_l10n.detailsAddDescription));
+  await tester.pumpAndSettle();
+  expect(_descriptionSave, findsOneWidget);
+  await _tap(
+    tester,
+    find.descendant(
+      of: find.byType(RelationHead),
+      matching: find.text(_otherTitle),
     ),
   );
-  await _tap(tester, find.text('Нажатий: 0'));
-  await tester.pumpAndSettle();
-  await _tap(tester, find.text('Открыть другое намерение'));
   await _waitFor(tester, () => _allIntentionPages.evaluate().length == 2);
   await _until(tester, _intentionTitle);
   await tester.pumpAndSettle();
@@ -170,43 +193,21 @@ Future<void> _openPageAboveSheet(WidgetTester tester, AppRouter router) async {
   expect(appNavigationDestinations().hitTestable(), findsExactly(3));
 }
 
-/// Тело листа с собственным состоянием: счётчик отличает тот же лист от
-/// построенного заново.
-final class _SheetBody extends StatefulWidget {
-  const _SheetBody();
-
-  @override
-  State<_SheetBody> createState() => _SheetBodyState();
-}
-
-final class _SheetBodyState extends State<_SheetBody> {
-  var _presses = 0;
-
-  @override
-  Widget build(BuildContext context) => Column(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      TextButton(
-        onPressed: () => setState(() => _presses += 1),
-        child: Text('Нажатий: $_presses'),
-      ),
-      TextButton(
-        onPressed: () => unawaited(
-          context.router.push(
-            IntentionDetailsRoute(intentionId: _intentionId(_other)),
-          ),
-        ),
-        child: const Text('Открыть другое намерение'),
-      ),
-    ],
-  );
-}
+/// Строка связи на вкладке «Связи» страницы [_origin].
+final _relationRow = find.byWidgetPredicate(
+  (widget) => widget is RelationRow,
+  description: 'строка связи',
+);
 
 /// Запускает приложение на засеянном хранилище и ждёт Главную.
 Future<AppRouter> _start(WidgetTester tester) async {
   tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
   tester.binding.platformDispatcher.localesTestValue = const [Locale('en')];
   addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
+  // Высокий экран строит строку связи без прокрутки вкладки.
+  tester.view.physicalSize = const Size(1200, 6000);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
   late sqlite.Database raw;
   final runtime = AppRuntime(
     quickCreationModeStore: InMemoryQuickCreationModeStore(),
@@ -230,6 +231,21 @@ Future<AppRouter> _start(WidgetTester tester) async {
         [tagFixtureId(number), title, 1, 0, number, number],
       );
     }
+    raw.execute(
+      'INSERT INTO long_term_relations (id, source_intention_id, '
+      'related_intention_id, type, priority, is_archived, created_at, '
+      'updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        tagFixtureId(_relation),
+        tagFixtureId(_other),
+        tagFixtureId(_origin),
+        'need',
+        2,
+        0,
+        _relation,
+        _relation,
+      ],
+    );
   });
   await tester.pumpWidget(MainApp(runtime: runtime));
   await _until(tester, find.byType(HomePage));

@@ -32,6 +32,7 @@ import '../../domain/intention_id.dart';
 import '../edit/intention_edit_page.dart';
 import '../../../long_term_relation/application/long_term_relation_projection.dart';
 import '../../../long_term_relation/application/relation_counts.dart';
+import '../../../long_term_relation/presentation/details/relation_details_sheet.dart';
 import '../../../long_term_relation/presentation/editor/relation_editor_state.dart';
 import '../../../long_term_relation/presentation/intention_relations/intention_relations_sliver.dart';
 import '../../../long_term_relation/presentation/intention_relations/intention_relations_state.dart';
@@ -802,11 +803,8 @@ final class _LoadedDetails extends StatelessWidget {
               IntentionRelationsSliver(
                 details: state.details,
                 pageInstance: pageInstance,
-                onOpenRelation: (relationId) => unawaited(
-                  context.router.push(
-                    RelationDetailsRoute(relationId: relationId),
-                  ),
-                ),
+                onOpenRelation: (relationId) =>
+                    unawaited(showRelationDetailsSheet(context, relationId)),
                 onWalk: (neighborId, group) => unawaited(
                   context.router.push(
                     IntentionDetailsRoute(
