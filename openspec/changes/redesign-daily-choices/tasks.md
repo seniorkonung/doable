@@ -345,9 +345,12 @@
     - Шаг замены убран там, где проверял саму замену: в `drift_daily_choice_read_cost_test.dart`, `drift_graph_fact_log_completeness_test.dart`, `drift_graph_fact_log_write_test.dart`, `drift_statistics_relation_snapshot_test.dart`, в конце теста «меняет зависимости наблюдаемого пути вместе со снимком» и вместе с тестом «замена обоих участников переключает наблюдение на новый путь». Данные, нужные только этому шагу, убраны.
     - Состояние, которое замена только готовила, получено удалением и созданием в тестах «согласует счётчики прежнего и нового действия при замене пути», «замена и удаление дубликата снимают только последние ссылки» и «замена пути убирает прежние опорные намерения на новой ревизии». Названия говорят о новых шагах, а ожидания не ослаблены, кроме совпадения ревизий, которого у двух команд быть не может.
     - Цикл в `file_backed_daily_choice_durability_test.dart` теряет шаг замены и проверяет, что изменение полей и повторное открытие сохраняют путь созданного выбора.
+    - Новые названия получают и три теста, которые после удаления шага обещают больше, чем проверяют. Названия говорят о проверяемом: «команды дневных выборов: создание, изменение полей, замена пути и удаление вместе с шагами» в `drift_graph_fact_log_completeness_test.dart`, «повторное открытие сохраняет создание, замену пути и независимые правки» в `file_backed_daily_choice_durability_test.dart` и «меняет зависимости наблюдаемого пути вместе со снимком» в `drift_daily_choice_watch_test.dart`.
+    - `test/graph/data/graph_fact_capture_test.dart` не меняется: тест на строке 377 записывает смену пути прямым SQL и проверяет чтение прежних данных, от команды замены он не зависит.
     - Производственный код не меняется.
   - **Проверка:**
     - `mise exec --no-deps -- flutter test test/graph/data`.
+    - `grep -nE 'замена пути и|замену пути и независимые|меняет зависимости наблюдаемого' test/graph/data/drift_graph_fact_log_completeness_test.dart test/graph/data/file_backed_daily_choice_durability_test.dart test/graph/data/drift_daily_choice_watch_test.dart` ничего не находит.
   - **Зависимости:** нет.
   - **Предполагаемые файлы:** в `test/graph/data/` меняются `drift_daily_choice_read_cost_test.dart`, `drift_daily_choice_watch_test.dart`, `drift_daily_path_protection_test.dart`, `drift_graph_fact_log_completeness_test.dart`, `drift_graph_fact_log_write_test.dart`, `drift_statistics_relation_snapshot_test.dart`, `drift_statistics_seed_groups_test.dart`, `file_backed_daily_choice_durability_test.dart`.
   - **Размер:** M по логике: в каждом файле правка в одном месте.
@@ -368,14 +371,16 @@
   - **Критерии приёмки:**
     - Удалены `ReplaceDailyChoicePath`, `DailyChoicePathReplaced`, `acceptDailyChoiceReplace`, `DailyChoiceCommandKind.replace`, `_replaceDailyChoicePath`, ветви презентера и строка `dailyChoicePathReplaced`. Создание, изменение полей, удаление и их сообщения работают как прежде, а подтверждённый путь по-прежнему проверяется при создании.
     - Ветвь пересечения `released` и `occupied` в `DailyChoiceChange` удалена: обе дельты были непусты только у замены.
-    - Удалены `drift_daily_choice_replace_test.dart`, тест замены в `daily_choice_change_test.dart`, сценарий и вспомогательные ветви замены в `graph_operation_presenter_test.dart`, проверка и `_replace` в `graph_command_coordinator_daily_choice_test.dart`, ветви `switch` в `home_statistics_app_flow_test.dart` и `intention_statistics_app_flow_test.dart`.
-    - Комментарии в `lib/src/daily_choice` и `lib/src/graph` не упоминают замену пути.
+    - Поля `previousParticipants` и `currentParticipants` удалены из `DailyChoiceChange`: в `lib/` их читает только сама фабрика, потребителя нет. Проверка `missingCounts` остаётся и использует локальные значения участников `before` и `after`.
+    - Удалены `drift_daily_choice_replace_test.dart`, тест замены в `daily_choice_change_test.dart`, сценарий и вспомогательные ветви замены в `graph_operation_presenter_test.dart`, проверка и `_replace` в `graph_command_coordinator_daily_choice_test.dart`, ветви `switch` в `home_statistics_app_flow_test.dart` и `intention_statistics_app_flow_test.dart`. Из `daily_choice_change_test.dart` убраны и ожидания полей `previousParticipants` и `currentParticipants`.
+    - Комментарии во всём `lib/src` не упоминают замену пути и участников дневного выбора, а комментарий `SelectDailyChoiceSource` описывает выбор основания для создания. Замена участников долговременной связи, замена графа и «замена значения» остаются: это живое поведение.
   - **Проверка:**
     - `mise exec --no-deps -- flutter test test/daily_choice/application test/graph test/app/home_statistics_app_flow_test.dart test/app/intention_statistics_app_flow_test.dart`.
     - `mise run codegen-check`.
+    - `grep -rnE 'замен[а-я]* пути|заменяет обоих' lib/src` ничего не находит.
   - **Зависимости:** 2.3, 2.5, 2.6.
   - **Предполагаемые файлы:**
-    - меняются `lib/src/daily_choice/application/daily_choice_command.dart`, `daily_choice_result.dart`, `lib/src/graph/application/graph_command_coordinator.dart`, `graph_change.dart`, `lib/src/graph/data/drift_personal_graph_repository_daily_choice_commands.dart`, `lib/src/graph/presentation/graph_operation_presenter.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb`;
+    - меняются `lib/src/daily_choice/application/daily_choice_command.dart`, `daily_choice_result.dart`, `lib/src/daily_choice/presentation/daily_choice_creation_flow_session.dart`, `source_picker/daily_choice_source_picker_page.dart`, `lib/src/graph/application/graph_command_coordinator.dart`, `graph_change.dart`, `lib/src/graph/data/drift_personal_graph_repository_daily_choice_commands.dart`, `lib/src/graph/presentation/graph_operation_presenter.dart`, `lib/src/intention/presentation/catalog/intention_catalog_purpose.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb`;
     - удаляется `test/graph/data/drift_daily_choice_replace_test.dart`;
     - меняются `test/daily_choice/application/daily_choice_change_test.dart`, `test/graph/presentation/graph_operation_presenter_test.dart`, `test/graph/application/graph_command_coordinator_daily_choice_test.dart`, `test/app/home_statistics_app_flow_test.dart`, `intention_statistics_app_flow_test.dart`.
   - **Размер:** M по логике: удаление без нового поведения.
