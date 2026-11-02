@@ -524,21 +524,12 @@ class AppLocalizationsRu extends AppLocalizations {
       'Все связи этой группы загружены.';
 
   @override
-  String get relationNeighborhoodRelationActive => 'Активная связь';
-
-  @override
   String get relationNeighborhoodRelationArchived => 'Связь в архиве';
 
   @override
   String relationNeighborhoodPriority(String priority) {
     return 'Приоритет $priority';
   }
-
-  @override
-  String get relationNeighborhoodSourceParticipant => 'Исходное намерение';
-
-  @override
-  String get relationNeighborhoodRelatedParticipant => 'Связанное намерение';
 
   @override
   String relationNeighborhoodNeedPhrase(String source, String related) {
@@ -2074,9 +2065,6 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось загрузить связь из-за непредвиденной ошибки.';
 
   @override
-  String get relationDetailsRefreshing => 'Обновляем подробные данные связи…';
-
-  @override
   String get relationDetailsRefreshUnavailable =>
       'Не удалось обновить подробные данные связи. Ранее подтверждённые данные по-прежнему показаны.';
 
@@ -2095,62 +2083,8 @@ class AppLocalizationsRu extends AppLocalizations {
   String get relationDetailsPriorityLabel => 'Приоритет';
 
   @override
-  String get relationDetailsScopeLabel => 'Состояние связи';
-
-  @override
-  String get relationDetailsDescriptionLabel => 'Описание';
-
-  @override
-  String get relationDetailsNoDescription => 'Описания нет';
-
-  @override
-  String get relationDetailsOpenParticipant =>
-      'Открывает намерение и его собственные связи';
-
-  @override
-  String get relationDetailsEditAction => 'Редактировать связь';
-
-  @override
-  String get relationDetailsArchiveAction => 'Архивировать связь';
-
-  @override
-  String get relationDetailsRestoreAction => 'Восстановить связь';
-
-  @override
-  String get relationDetailsDeleteAction => 'Удалить связь навсегда';
-
-  @override
   String get relationDetailsPathProtection =>
       'Связь используется в сохранённом дневном пути, поэтому удалить её нельзя.';
-
-  @override
-  String get relationDetailsDeletionChecking =>
-      'Удаление недоступно, пока не подтверждены зависимости связи.';
-
-  @override
-  String get relationDetailsDeleteConfirmationTitle =>
-      'Удалить связь навсегда?';
-
-  @override
-  String relationDetailsDeleteConfirmationMessage(
-    String phrase,
-    String sourceTitle,
-    String relatedTitle,
-    String scope,
-  ) {
-    return 'Связь: $phrase\nИсходное намерение: $sourceTitle\nСвязанное намерение: $relatedTitle\nСостояние связи: $scope\n\nЭто действие нельзя отменить. Связь и её описание будут удалены навсегда. Сами теги, все их назначения намерениям, оба намерения и все остальные связи сохранятся.';
-  }
-
-  @override
-  String get relationDetailsConfirmDeleteAction => 'Удалить навсегда';
-
-  @override
-  String get relationDetailsOpenSourceParticipantAction =>
-      'Открыть исходное намерение';
-
-  @override
-  String get relationDetailsOpenRelatedParticipantAction =>
-      'Открыть связанное намерение';
 
   @override
   String relationSheetArchivedLabel(String phrase) {

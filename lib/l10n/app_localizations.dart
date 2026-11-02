@@ -806,12 +806,6 @@ abstract class AppLocalizations {
   /// **'All relations in this group are loaded.'**
   String get relationNeighborhoodConfirmedEnd;
 
-  /// Активное состояние строки связи
-  ///
-  /// In en, this message translates to:
-  /// **'Active relation'**
-  String get relationNeighborhoodRelationActive;
-
   /// Архивное состояние строки связи
   ///
   /// In en, this message translates to:
@@ -823,18 +817,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Priority {priority}'**
   String relationNeighborhoodPriority(String priority);
-
-  /// Подпись исходного участника связи
-  ///
-  /// In en, this message translates to:
-  /// **'Source intention'**
-  String get relationNeighborhoodSourceParticipant;
-
-  /// Подпись связанного участника связи
-  ///
-  /// In en, this message translates to:
-  /// **'Related intention'**
-  String get relationNeighborhoodRelatedParticipant;
 
   /// No description provided for @relationNeighborhoodNeedPhrase.
   ///
@@ -3179,12 +3161,6 @@ abstract class AppLocalizations {
   /// **'The relation couldn’t be loaded because of an unexpected error.'**
   String get relationDetailsUnexpected;
 
-  /// Согласование сохранённого подробного просмотра связи с новой ревизией
-  ///
-  /// In en, this message translates to:
-  /// **'Refreshing relation details…'**
-  String get relationDetailsRefreshing;
-
   /// Устранимая ошибка обновления при сохранённых подробных данных связи
   ///
   /// In en, this message translates to:
@@ -3215,100 +3191,11 @@ abstract class AppLocalizations {
   /// **'Priority'**
   String get relationDetailsPriorityLabel;
 
-  /// Подпись собственного архивного состояния связи
-  ///
-  /// In en, this message translates to:
-  /// **'Relation state'**
-  String get relationDetailsScopeLabel;
-
-  /// Подпись полного описания связи
-  ///
-  /// In en, this message translates to:
-  /// **'Description'**
-  String get relationDetailsDescriptionLabel;
-
-  /// Отсутствие описания у связи
-  ///
-  /// In en, this message translates to:
-  /// **'No description'**
-  String get relationDetailsNoDescription;
-
-  /// Назначение перехода к участнику связи
-  ///
-  /// In en, this message translates to:
-  /// **'Opens the intention and its own relations'**
-  String get relationDetailsOpenParticipant;
-
-  /// Переход из подробного просмотра к изменению связи
-  ///
-  /// In en, this message translates to:
-  /// **'Edit relation'**
-  String get relationDetailsEditAction;
-
-  /// Действие самостоятельного архивирования связи
-  ///
-  /// In en, this message translates to:
-  /// **'Archive relation'**
-  String get relationDetailsArchiveAction;
-
-  /// Действие самостоятельного восстановления связи
-  ///
-  /// In en, this message translates to:
-  /// **'Restore relation'**
-  String get relationDetailsRestoreAction;
-
-  /// Действие начала физического удаления конкретной долговременной связи
-  ///
-  /// In en, this message translates to:
-  /// **'Delete relation permanently'**
-  String get relationDetailsDeleteAction;
-
   /// Причина недоступности удаления связи в подробностях
   ///
   /// In en, this message translates to:
   /// **'This relation is used in a saved daily path, so it cannot be deleted.'**
   String get relationDetailsPathProtection;
-
-  /// Неизвестные разрешения на удаление связи
-  ///
-  /// In en, this message translates to:
-  /// **'Deletion is unavailable until this relation’s dependencies are confirmed.'**
-  String get relationDetailsDeletionChecking;
-
-  /// Заголовок подтверждения необратимого удаления конкретной связи
-  ///
-  /// In en, this message translates to:
-  /// **'Delete relation permanently?'**
-  String get relationDetailsDeleteConfirmationTitle;
-
-  /// Контекст и объяснение необратимости удаления конкретной связи
-  ///
-  /// In en, this message translates to:
-  /// **'Relation: {phrase}\nSource intention: {sourceTitle}\nRelated intention: {relatedTitle}\nRelation state: {scope}\n\nThis can’t be undone. The relation and its description will be permanently deleted. The tags, all their assignments to intentions, both intentions and all other relations will remain.'**
-  String relationDetailsDeleteConfirmationMessage(
-    String phrase,
-    String sourceTitle,
-    String relatedTitle,
-    String scope,
-  );
-
-  /// Явное подтверждение физического удаления конкретной связи
-  ///
-  /// In en, this message translates to:
-  /// **'Delete permanently'**
-  String get relationDetailsConfirmDeleteAction;
-
-  /// Переход к архивному исходному участнику, блокирующему восстановление связи
-  ///
-  /// In en, this message translates to:
-  /// **'Open source intention'**
-  String get relationDetailsOpenSourceParticipantAction;
-
-  /// Переход к архивному связанному участнику, блокирующему восстановление связи
-  ///
-  /// In en, this message translates to:
-  /// **'Open related intention'**
-  String get relationDetailsOpenRelatedParticipantAction;
 
   /// Доступное название панели архивированной связи; phrase — полная формулировка связи
   ///

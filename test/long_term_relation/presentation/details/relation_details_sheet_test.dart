@@ -75,6 +75,10 @@ void main() {
       isSemantics(isSelected: true),
     );
     expect(find.text('Создано 14 мар.'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel('Открыть страницу намерения: быть здоровым'),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
     semantics.dispose();
   });
@@ -203,22 +207,30 @@ void main() {
     expect(find.text('быть здоровым'), findsOneWidget);
   });
 
-  testWidgets('повреждение данных не предлагает бесполезный повтор', (
-    tester,
-  ) async {
-    final repository = await _openSheet(tester);
+  for (final (name, failure, message) in const [
+    (
+      'повреждение данных',
+      LongTermRelationReadCorruptionFailure(),
+      'Сохранённые данные связи повреждены и не могут быть показаны.',
+    ),
+    (
+      'неожиданный отказ',
+      LongTermRelationReadUnexpectedFailure(),
+      'Не удалось загрузить связь из-за непредвиденной ошибки.',
+    ),
+  ]) {
+    testWidgets('$name называет себя и не предлагает бесполезный повтор', (
+      tester,
+    ) async {
+      final repository = await _openSheet(tester);
 
-    repository.watchAt(0).fail(const LongTermRelationReadCorruptionFailure());
-    await tester.pumpAndSettle();
+      repository.watchAt(0).fail(failure);
+      await tester.pumpAndSettle();
 
-    expect(
-      find.text(
-        'Сохранённые данные связи повреждены и не могут быть показаны.',
-      ),
-      findsOneWidget,
-    );
-    expect(find.text('Повторить'), findsNothing);
-  });
+      expect(find.text(message), findsOneWidget);
+      expect(find.text('Повторить'), findsNothing);
+    });
+  }
 
   testWidgets('отказ обновления оставляет прежний снимок и предлагает повтор', (
     tester,
@@ -265,6 +277,48 @@ void main() {
 
     expect(find.text('быть здоровым заново'), findsOneWidget);
     expect(find.text('Повторить'), findsNothing);
+  });
+
+  testWidgets('переименование и каскадное архивирование участника обновляют '
+      'открытую панель', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final repository = await _openSheet(tester);
+    final watch = repository.watchAt(0);
+    watch.emitDetails(
+      testRelationDetails(
+        relationId: relationId,
+        sourceId: testIntentionId(1),
+        relatedId: testIntentionId(2),
+        sourceTitle: 'быть здоровым',
+        relatedTitle: 'прежнее название',
+      ),
+      revision: revision,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('прежнее название'), findsOneWidget);
+
+    watch.emitDetails(
+      testRelationDetails(
+        relationId: relationId,
+        sourceId: testIntentionId(1),
+        relatedId: testIntentionId(2),
+        sourceTitle: 'быть здоровым',
+        relatedTitle: 'новое название',
+        relatedArchiveState: IntentionArchiveState.archived,
+        scope: RelationScope.archived,
+      ),
+      revision: const TestGraphRevision(2),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('прежнее название'), findsNothing);
+    expect(find.text('новое название'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel('Чтобы быть здоровым, нужно новое название. Архив'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Архивные связи остаются'), findsOneWidget);
+    semantics.dispose();
   });
 
   testWidgets('название участника открывает его страницу поверх панели, а '
@@ -1092,6 +1146,30 @@ void main() {
 
       expect(repository.relationCommands, isEmpty);
       expect(find.text('Параметры связи'), findsNothing);
+      expect(find.text('много ходить').hitTestable(), findsOneWidget);
+      semantics.dispose();
+    });
+
+    testWidgets('зависимость, появившаяся при открытом подтверждении, не даёт '
+        'отправить удаление', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final repository = await openPanel(tester, relation());
+
+      await choose(tester, 'Удалить');
+      repository
+          .watchAt(0)
+          .emitDetails(
+            relation(
+              permissions:
+                  const LongTermRelationPermissions.referencedByDailyPath(),
+            ),
+            revision: const TestGraphRevision(2),
+          );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Удалить'));
+      await tester.pumpAndSettle();
+
+      expect(repository.relationCommands, isEmpty);
       expect(find.text('много ходить').hitTestable(), findsOneWidget);
       semantics.dispose();
     });

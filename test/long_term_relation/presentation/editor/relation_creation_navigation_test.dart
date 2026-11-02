@@ -9,11 +9,11 @@ import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
+import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
-import 'package:doable/src/long_term_relation/presentation/details/relation_details_page.dart';
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_page.dart';
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_state.dart';
 import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_choice.dart';
@@ -125,7 +125,7 @@ void main() {
     expect(node.hint, contains('продолжится'));
     await tester.tap(button);
     await tester.pumpAndSettle();
-    expect(find.byType(RelationDetailsPage), findsOneWidget);
+    expect(find.byType(IntentionDetailsPage), findsOneWidget);
     expect(app.repository.relationCommands, hasLength(1));
     semantics.dispose();
     expect(tester.takeException(), isNull);
@@ -213,7 +213,7 @@ void main() {
       expect(find.text('Cancel creation'), findsOneWidget);
       await tester.tap(find.text('Cancel creation'));
       await tester.pumpAndSettle();
-      expect(find.byType(RelationDetailsPage), findsOneWidget);
+      expect(find.byType(IntentionDetailsPage), findsOneWidget);
       expect(app.repository.relationCommands, hasLength(1));
     },
   );
@@ -251,7 +251,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(_relationSheet, findsNothing);
       expect(app.router.stackData.map((route) => route.matchId), history);
-      expect(find.byType(RelationDetailsPage), findsOneWidget);
+      expect(find.byType(IntentionDetailsPage), findsOneWidget);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(_description(tester), 'Нижний черновик');
@@ -660,17 +660,13 @@ Future<_App> _launch(
     _key('relation-editor-description'),
     'Нижний черновик',
   );
-  unawaited(
-    router.push(RelationDetailsRoute(relationId: testFormRelationId(99))),
-  );
+  final lowerPage = testIntention(index: 8);
+  unawaited(router.push(IntentionDetailsRoute(intentionId: lowerPage.id)));
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 400));
-  repository.relationWatches.last.emitDetails(
-    testRelationDetails(
-      relationId: testFormRelationId(99),
-      sourceId: testSummary(index: 8).id,
-      relatedId: testSummary(index: 9).id,
-    ),
+  repository.emitIntention(
+    lowerPage,
+    counts: testRelationCounts(),
     revision: const TestCatalogRevision(1),
   );
   await tester.pumpAndSettle();

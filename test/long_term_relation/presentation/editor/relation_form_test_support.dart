@@ -77,11 +77,6 @@ final class ControlledRelationFormRepository
 
   CreateLongTermRelation commandAt(int index) => relationCommands[index];
 
-  UpdateLongTermRelation updateCommandAt(int index) =>
-      relationUpdateCommands[index];
-
-  ControlledRelationWatch watchAt(int index) => relationWatches[index];
-
   void emitIntention(
     Intention intention, {
     required RelationCounts counts,

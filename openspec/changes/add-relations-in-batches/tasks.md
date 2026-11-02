@@ -473,7 +473,7 @@
   - **Предполагаемые файлы:** меняются `test/app/navigation/app_shell_page_matrix.dart`, `app_shell_pages_above_test.dart`, `app_shell_operation_reset_test.dart`, `ordinary_page_layout_scenarios.dart`, `app_navigation_accessibility_test.dart`, `test/app/routing/app_router_test.dart`.
   - **Размер:** M по логике: меняются только способ открытия и ожидания.
 
-- [ ] 2.14 Удалить страницу подробного просмотра связи и её маршрут
+- [x] 2.14 Удалить страницу подробного просмотра связи и её маршрут
   - **Критерии приёмки:**
     - `RelationDetailsPage` и `RelationDetailsRoute` удалены, а `app_router.gr.dart` создан заново. Кнопка «Редактировать связь» уходит вместе со страницей, поэтому у существующей связи нет пути в форму.
     - Сценарии `relation_details_widget_test.dart` и `relation_details_tags_test.dart`, которые описывают продукт, выражены на панели, остальные удалены. `relation_details_navigation_test.dart` удалён: панели навигации над листом нет.

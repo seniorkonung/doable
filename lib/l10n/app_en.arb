@@ -308,14 +308,11 @@
   "relationNeighborhoodRefreshing": "Refreshing relations…",
   "relationNeighborhoodRefreshFailed": "The relations couldn’t be refreshed. Previously loaded data is still shown.",
   "relationNeighborhoodConfirmedEnd": "All relations in this group are loaded.",
-  "relationNeighborhoodRelationActive": "Active relation",
   "relationNeighborhoodRelationArchived": "Archived relation",
   "relationNeighborhoodPriority": "Priority {priority}",
   "@relationNeighborhoodPriority": {
     "placeholders": {"priority": {"type": "String"}}
   },
-  "relationNeighborhoodSourceParticipant": "Source intention",
-  "relationNeighborhoodRelatedParticipant": "Related intention",
   "relationNeighborhoodNeedPhrase": "To {source}, you need {related}",
   "@relationNeighborhoodNeedPhrase": {
     "placeholders": {
@@ -381,17 +378,8 @@
   "@relationNeighborhoodConfirmedEnd": {
     "description": "Подтверждённый конец выбранной группы"
   },
-  "@relationNeighborhoodRelationActive": {
-    "description": "Активное состояние строки связи"
-  },
   "@relationNeighborhoodRelationArchived": {
     "description": "Архивное состояние строки связи"
-  },
-  "@relationNeighborhoodSourceParticipant": {
-    "description": "Подпись исходного участника связи"
-  },
-  "@relationNeighborhoodRelatedParticipant": {
-    "description": "Подпись связанного участника связи"
   },
   "detailsTabsLabel": "Intention sections",
   "@detailsTabsLabel": {"description": "Доступное название полосы вкладок страницы намерения"},
@@ -1576,10 +1564,6 @@
   "@relationDetailsUnexpected": {
     "description": "Безопасный непредвиденный отказ чтения подробных данных связи"
   },
-  "relationDetailsRefreshing": "Refreshing relation details…",
-  "@relationDetailsRefreshing": {
-    "description": "Согласование сохранённого подробного просмотра связи с новой ревизией"
-  },
   "relationDetailsRefreshUnavailable": "The relation details couldn’t be refreshed. Previously confirmed data is still shown.",
   "@relationDetailsRefreshUnavailable": {
     "description": "Устранимая ошибка обновления при сохранённых подробных данных связи"
@@ -1600,68 +1584,8 @@
   "@relationDetailsPriorityLabel": {
     "description": "Подпись приоритета связи в подробном просмотре"
   },
-  "relationDetailsScopeLabel": "Relation state",
-  "@relationDetailsScopeLabel": {
-    "description": "Подпись собственного архивного состояния связи"
-  },
-  "relationDetailsDescriptionLabel": "Description",
-  "@relationDetailsDescriptionLabel": {
-    "description": "Подпись полного описания связи"
-  },
-  "relationDetailsNoDescription": "No description",
-  "@relationDetailsNoDescription": {
-    "description": "Отсутствие описания у связи"
-  },
-  "relationDetailsOpenParticipant": "Opens the intention and its own relations",
-  "@relationDetailsOpenParticipant": {
-    "description": "Назначение перехода к участнику связи"
-  },
-  "relationDetailsEditAction": "Edit relation",
-  "@relationDetailsEditAction": {
-    "description": "Переход из подробного просмотра к изменению связи"
-  },
-  "relationDetailsArchiveAction": "Archive relation",
-  "@relationDetailsArchiveAction": {
-    "description": "Действие самостоятельного архивирования связи"
-  },
-  "relationDetailsRestoreAction": "Restore relation",
-  "@relationDetailsRestoreAction": {
-    "description": "Действие самостоятельного восстановления связи"
-  },
-  "relationDetailsDeleteAction": "Delete relation permanently",
   "relationDetailsPathProtection": "This relation is used in a saved daily path, so it cannot be deleted.",
   "@relationDetailsPathProtection": {"description": "Причина недоступности удаления связи в подробностях"},
-  "relationDetailsDeletionChecking": "Deletion is unavailable until this relation’s dependencies are confirmed.",
-  "@relationDetailsDeletionChecking": {"description": "Неизвестные разрешения на удаление связи"},
-  "@relationDetailsDeleteAction": {
-    "description": "Действие начала физического удаления конкретной долговременной связи"
-  },
-  "relationDetailsDeleteConfirmationTitle": "Delete relation permanently?",
-  "@relationDetailsDeleteConfirmationTitle": {
-    "description": "Заголовок подтверждения необратимого удаления конкретной связи"
-  },
-  "relationDetailsDeleteConfirmationMessage": "Relation: {phrase}\nSource intention: {sourceTitle}\nRelated intention: {relatedTitle}\nRelation state: {scope}\n\nThis can’t be undone. The relation and its description will be permanently deleted. The tags, all their assignments to intentions, both intentions and all other relations will remain.",
-  "@relationDetailsDeleteConfirmationMessage": {
-    "description": "Контекст и объяснение необратимости удаления конкретной связи",
-    "placeholders": {
-      "phrase": {"type": "String"},
-      "sourceTitle": {"type": "String"},
-      "relatedTitle": {"type": "String"},
-      "scope": {"type": "String"}
-    }
-  },
-  "relationDetailsConfirmDeleteAction": "Delete permanently",
-  "@relationDetailsConfirmDeleteAction": {
-    "description": "Явное подтверждение физического удаления конкретной связи"
-  },
-  "relationDetailsOpenSourceParticipantAction": "Open source intention",
-  "@relationDetailsOpenSourceParticipantAction": {
-    "description": "Переход к архивному исходному участнику, блокирующему восстановление связи"
-  },
-  "relationDetailsOpenRelatedParticipantAction": "Open related intention",
-  "@relationDetailsOpenRelatedParticipantAction": {
-    "description": "Переход к архивному связанному участнику, блокирующему восстановление связи"
-  },
   "relationSheetArchivedLabel": "{phrase}. Archived",
   "@relationSheetArchivedLabel": {
     "description": "Доступное название панели архивированной связи; phrase — полная формулировка связи",

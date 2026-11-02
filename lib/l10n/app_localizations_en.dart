@@ -521,21 +521,12 @@ class AppLocalizationsEn extends AppLocalizations {
       'All relations in this group are loaded.';
 
   @override
-  String get relationNeighborhoodRelationActive => 'Active relation';
-
-  @override
   String get relationNeighborhoodRelationArchived => 'Archived relation';
 
   @override
   String relationNeighborhoodPriority(String priority) {
     return 'Priority $priority';
   }
-
-  @override
-  String get relationNeighborhoodSourceParticipant => 'Source intention';
-
-  @override
-  String get relationNeighborhoodRelatedParticipant => 'Related intention';
 
   @override
   String relationNeighborhoodNeedPhrase(String source, String related) {
@@ -2050,9 +2041,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'The relation couldn’t be loaded because of an unexpected error.';
 
   @override
-  String get relationDetailsRefreshing => 'Refreshing relation details…';
-
-  @override
   String get relationDetailsRefreshUnavailable =>
       'The relation details couldn’t be refreshed. Previously confirmed data is still shown.';
 
@@ -2071,62 +2059,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get relationDetailsPriorityLabel => 'Priority';
 
   @override
-  String get relationDetailsScopeLabel => 'Relation state';
-
-  @override
-  String get relationDetailsDescriptionLabel => 'Description';
-
-  @override
-  String get relationDetailsNoDescription => 'No description';
-
-  @override
-  String get relationDetailsOpenParticipant =>
-      'Opens the intention and its own relations';
-
-  @override
-  String get relationDetailsEditAction => 'Edit relation';
-
-  @override
-  String get relationDetailsArchiveAction => 'Archive relation';
-
-  @override
-  String get relationDetailsRestoreAction => 'Restore relation';
-
-  @override
-  String get relationDetailsDeleteAction => 'Delete relation permanently';
-
-  @override
   String get relationDetailsPathProtection =>
       'This relation is used in a saved daily path, so it cannot be deleted.';
-
-  @override
-  String get relationDetailsDeletionChecking =>
-      'Deletion is unavailable until this relation’s dependencies are confirmed.';
-
-  @override
-  String get relationDetailsDeleteConfirmationTitle =>
-      'Delete relation permanently?';
-
-  @override
-  String relationDetailsDeleteConfirmationMessage(
-    String phrase,
-    String sourceTitle,
-    String relatedTitle,
-    String scope,
-  ) {
-    return 'Relation: $phrase\nSource intention: $sourceTitle\nRelated intention: $relatedTitle\nRelation state: $scope\n\nThis can’t be undone. The relation and its description will be permanently deleted. The tags, all their assignments to intentions, both intentions and all other relations will remain.';
-  }
-
-  @override
-  String get relationDetailsConfirmDeleteAction => 'Delete permanently';
-
-  @override
-  String get relationDetailsOpenSourceParticipantAction =>
-      'Open source intention';
-
-  @override
-  String get relationDetailsOpenRelatedParticipantAction =>
-      'Open related intention';
 
   @override
   String relationSheetArchivedLabel(String phrase) {
