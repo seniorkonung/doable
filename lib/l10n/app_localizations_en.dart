@@ -2995,12 +2995,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dailyChoiceCatalogCompleted => 'Completed';
 
   @override
-  String dailyChoiceCatalogTotalCount(int count) {
-    return 'Total daily choices: $count';
-  }
+  String get dailyChoiceCatalogEmptyTitle => 'No choices for this date';
 
   @override
-  String get dailyChoiceCatalogEmpty => 'No daily choices for this day.';
+  String get dailyChoiceCatalogEmptyText =>
+      'Create a choice from an action and set this date. It will appear here.';
 
   @override
   String get dailyChoiceCatalogRefreshing => 'Refreshing daily choices…';
@@ -3012,8 +3011,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dailyChoiceCatalogLoadMore => 'Show more daily choices';
 
   @override
-  String get dailyChoiceCatalogUnavailable =>
-      'Could not load daily choices. Try again.';
+  String get dailyChoiceCatalogUnavailable => 'Could not load daily choices.';
 
   @override
   String get dailyChoiceCatalogCorruption =>

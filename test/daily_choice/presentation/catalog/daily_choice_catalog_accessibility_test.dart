@@ -103,7 +103,7 @@ void main() {
       });
 
       testWidgets('обе секции доступны при переходе по заголовкам; '
-          'читает дни календаря, заголовок дня, секции, количество, '
+          'читает дни календаря, заголовок дня, секции, '
           'строки и подгрузку по порядку, затем общую панель, '
           'без отдельных чисел дней', (tester) async {
         final semantics = tester.ensureSemantics();
@@ -130,7 +130,6 @@ void main() {
           l10n.dailyChoiceCalendarExpand,
           '${texts.weekday}\n${texts.badge}',
           texts.selectedToday,
-          l10n.dailyChoiceCatalogTotalCount(3),
           _sectionLabel(l10n, completed: false, count: 3),
           _completionLabel(l10n, 1),
           _rowLabel(l10n, 1),
@@ -211,15 +210,10 @@ void main() {
           size: _phone,
         );
         final l10n = _l10n(tester);
-        final filters = [
-          _sectionLabel(l10n, completed: false, count: 0),
-          _sectionLabel(l10n, completed: true, count: 0),
-        ];
 
         repository.failUnavailable(0);
         await tester.pumpAndSettle();
         expect(_afterDayHeading(tester), [
-          ...filters,
           l10n.dailyChoiceCatalogUnavailable,
           l10n.commonRetry,
         ]);
@@ -239,7 +233,6 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(_afterDayHeading(tester), [
-          l10n.dailyChoiceCatalogTotalCount(2),
           _sectionLabel(l10n, completed: false, count: 2),
           _completionLabel(l10n, 1),
           _rowLabel(l10n, 1),
@@ -258,7 +251,6 @@ void main() {
         await tester.pumpAndSettle();
         // Отказ подгрузки читается после загруженной строки.
         expect(_afterDayHeading(tester), [
-          l10n.dailyChoiceCatalogTotalCount(2),
           _sectionLabel(l10n, completed: false, count: 2),
           _completionLabel(l10n, 1),
           _rowLabel(l10n, 1),
@@ -276,7 +268,6 @@ void main() {
         repository.completeMore(3, [catalogPageItem(2, date: _today)]);
         await tester.pumpAndSettle();
         expect(_afterDayHeading(tester), [
-          l10n.dailyChoiceCatalogTotalCount(2),
           _sectionLabel(l10n, completed: false, count: 2),
           _completionLabel(l10n, 1),
           _rowLabel(l10n, 1),
@@ -299,7 +290,6 @@ void main() {
         await tester.pumpAndSettle();
         expect(repository.queries, hasLength(4));
         expect(_afterDayHeading(tester), [
-          l10n.dailyChoiceCatalogTotalCount(2),
           _sectionLabel(l10n, completed: false, count: 2),
           _sectionLabel(l10n, completed: true, count: 0),
         ]);
@@ -335,7 +325,6 @@ void main() {
         final page = [
           '${texts.weekday}\n${texts.badge}',
           texts.selectedToday,
-          l10n.dailyChoiceCatalogTotalCount(21),
           _sectionLabel(l10n, completed: false, count: 21),
           for (var number = 1; number <= 20; number++) ...[
             _completionLabel(l10n, number),

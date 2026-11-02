@@ -4695,17 +4695,17 @@ abstract class AppLocalizations {
   /// **'Completed'**
   String get dailyChoiceCatalogCompleted;
 
-  /// Полное количество подходящих дневных выборов
+  /// Заголовок пустого состояния дня без дневных выборов
   ///
   /// In en, this message translates to:
-  /// **'Total daily choices: {count}'**
-  String dailyChoiceCatalogTotalCount(int count);
+  /// **'No choices for this date'**
+  String get dailyChoiceCatalogEmptyTitle;
 
-  /// Пустой дневной каталог
+  /// Текст пустого состояния дня без дневных выборов
   ///
   /// In en, this message translates to:
-  /// **'No daily choices for this day.'**
-  String get dailyChoiceCatalogEmpty;
+  /// **'Create a choice from an action and set this date. It will appear here.'**
+  String get dailyChoiceCatalogEmptyText;
 
   /// Обновление подтверждённого снимка каталога
   ///
@@ -4728,7 +4728,7 @@ abstract class AppLocalizations {
   /// Временная ошибка чтения дневного каталога
   ///
   /// In en, this message translates to:
-  /// **'Could not load daily choices. Try again.'**
+  /// **'Could not load daily choices.'**
   String get dailyChoiceCatalogUnavailable;
 
   /// Повреждение данных дневного каталога

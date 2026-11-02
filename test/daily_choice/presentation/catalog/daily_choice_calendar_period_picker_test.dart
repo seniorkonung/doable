@@ -699,7 +699,6 @@ void main() {
       expect(visibleWeeks(tester), weeksFrom(date(2047, 2, 25), 6));
       expect(find.text('8 октября 2026'), findsOneWidget);
       expect(find.text('Невыполненные'), findsOneWidget);
-      expect(find.text('Всего дневных выборов: 1'), findsOneWidget);
       expect(repository.queries, hasLength(1));
       expect(repository.queries.last.date, selected);
       expect(repository.queries.last.isCompleted, isFalse);

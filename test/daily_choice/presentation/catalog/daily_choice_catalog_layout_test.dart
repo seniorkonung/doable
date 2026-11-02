@@ -465,7 +465,7 @@ void main() {
           // Выдача сдвигается ровно на прирост высоты календаря.
           final grown = month.calendar.height - week.calendar.height;
           expect(grown, greaterThan(0));
-          expect(month.countOffset - week.countOffset, moreOrLessEquals(grown));
+          expect(month.listOffset - week.listOffset, moreOrLessEquals(grown));
           // Месяц раскрывается внутри страницы: прокрутка остаётся одной.
           expect(_pageScroll, findsOneWidget);
           _expectColumns(tester, shown.weeks);
@@ -507,7 +507,7 @@ void main() {
             moreOrLessEquals(grown),
           );
           expect(
-            selected.countOffset - collapsed.countOffset,
+            selected.listOffset - collapsed.listOffset,
             moreOrLessEquals(grown),
           );
           expect(tester.takeException(), isNull);
@@ -653,11 +653,7 @@ void main() {
         final repository = CatalogPageRepository();
         await _open(tester, repository, locale, today: _today);
         final l10n = _l10n(tester);
-        final retry = find.widgetWithText(
-          TextButton,
-          l10n.commonRetry,
-          skipOffstage: false,
-        );
+        final retry = find.text(l10n.commonRetry, skipOffstage: false);
 
         await _dragUntilReachable(
           tester,
@@ -682,11 +678,11 @@ void main() {
         await tester.pumpAndSettle();
         await _dragUntilReachable(
           tester,
-          find.text(l10n.dailyChoiceCatalogTotalCount(0), skipOffstage: false),
+          find.text(l10n.dailyChoiceCatalogEmptyTitle, skipOffstage: false),
         );
         await _dragUntilReachable(
           tester,
-          find.text(l10n.dailyChoiceCatalogEmpty, skipOffstage: false),
+          find.text(l10n.dailyChoiceCatalogEmptyText, skipOffstage: false),
         );
         await _expectWholeTexts(tester);
         await _dragUntilReachable(tester, calendarDay(date(2026, 10, 1)));
@@ -698,7 +694,10 @@ void main() {
         (tester) async {
           final repository = CatalogPageRepository();
           await _open(tester, repository, locale, today: _today);
-          repository.completeFirst(0, [], total: 0);
+          repository.completeFirst(0, [
+            catalogPageItem(1, date: _today),
+            catalogPageItem(2, date: _today, isCompleted: true),
+          ], total: 2);
           await tester.pumpAndSettle();
           for (final completed in [false, true]) {
             final header = find.byKey(
@@ -946,13 +945,13 @@ void _expectHit(WidgetTester tester, Finder finder, Offset position) {
 
 /// Положение календаря и выдачи под ним в общей прокрутке.
 ///
-/// [countOffset] — расстояние от верха календаря до количества выдачи; оно не
-/// зависит от прокрутки страницы.
+/// [listOffset] — расстояние от верха календаря до заголовка первой секции; оно
+/// не зависит от прокрутки страницы.
 typedef _Layout = ({
   Rect calendar,
   int rows,
   double rowHeight,
-  double countOffset,
+  double listOffset,
 });
 
 _Layout _measure(WidgetTester tester) {
@@ -965,10 +964,10 @@ _Layout _measure(WidgetTester tester) {
     tester,
     calendarDay(weeks.first.firstWhere((day) => day != null)!),
   );
-  final count = _rect(
+  final list = _rect(
     tester,
-    find.text(
-      _l10n(tester).dailyChoiceCatalogTotalCount(1),
+    find.byKey(
+      const ValueKey('daily-choice-section-false'),
       skipOffstage: false,
     ),
   );
@@ -976,7 +975,7 @@ _Layout _measure(WidgetTester tester) {
     calendar: calendar,
     rows: weeks.length,
     rowHeight: firstDay.height,
-    countOffset: count.top - calendar.top,
+    listOffset: list.top - calendar.top,
   );
 }
 

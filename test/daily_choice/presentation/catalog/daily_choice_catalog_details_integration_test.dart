@@ -120,7 +120,6 @@ void main() {
       addTearDown(otherSubscription.close);
       final otherModel = container.read(otherProvider.notifier);
       otherModel.selectDate(sourceDay);
-      otherModel.toggleSection(false);
       DailyChoiceCatalogLoaded otherCatalog() =>
           container.read(otherProvider) as DailyChoiceCatalogLoaded;
       final coordinator = container.read(
@@ -133,6 +132,7 @@ void main() {
             container.read(catalogProvider) is DailyChoiceCatalogLoaded &&
             container.read(otherProvider) is DailyChoiceCatalogLoaded,
       );
+      otherModel.toggleSection(false);
       expect(catalog().selection.date, sourceDay);
       expect(catalog().totalCount, 51);
       expect(catalog().items, hasLength(51));

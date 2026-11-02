@@ -272,8 +272,9 @@ void main() {
         await _select(tester, AppDestination.dailyChoices);
         await _until(
           tester,
-          find.text(
-            l10n.dailyChoiceCatalogTotalCount(count),
+          dailyChoiceSectionWithCount(
+            completed: false,
+            count: count,
             skipOffstage: false,
           ),
         );
@@ -342,8 +343,9 @@ void main() {
         await _select(tester, AppDestination.dailyChoices);
         await _until(
           tester,
-          find.text(
-            l10n.dailyChoiceCatalogTotalCount(count),
+          dailyChoiceSectionWithCount(
+            completed: false,
+            count: count,
             skipOffstage: false,
           ),
         );

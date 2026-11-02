@@ -367,3 +367,34 @@ Future<void> showDailyChoiceCatalogSection(
   );
   semantics.dispose();
 }
+
+/// Заголовок секции со счётчиком [count].
+Finder dailyChoiceSectionWithCount({
+  required bool completed,
+  required int count,
+  bool skipOffstage = true,
+}) => find.descendant(
+  of: find.byKey(
+    ValueKey('daily-choice-section-$completed'),
+    skipOffstage: skipOffstage,
+  ),
+  matching: find.text('$count', skipOffstage: skipOffstage),
+);
+
+/// Число в счётчике заголовка секции; заголовок должен быть построен.
+String dailyChoiceSectionCount(WidgetTester tester, {required bool completed}) {
+  final header = find.byKey(ValueKey('daily-choice-section-$completed'));
+  return tester
+      .widget<Text>(
+        find.descendant(
+          of: header,
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is Text &&
+                widget.data != null &&
+                int.tryParse(widget.data!) != null,
+          ),
+        ),
+      )
+      .data!;
+}

@@ -3016,12 +3016,11 @@ class AppLocalizationsRu extends AppLocalizations {
   String get dailyChoiceCatalogCompleted => 'Выполненные';
 
   @override
-  String dailyChoiceCatalogTotalCount(int count) {
-    return 'Всего дневных выборов: $count';
-  }
+  String get dailyChoiceCatalogEmptyTitle => 'Выборов на эту дату нет';
 
   @override
-  String get dailyChoiceCatalogEmpty => 'На этот день нет дневных выборов.';
+  String get dailyChoiceCatalogEmptyText =>
+      'Создайте выбор из действия и назначьте эту дату. Он появится здесь.';
 
   @override
   String get dailyChoiceCatalogRefreshing => 'Обновляем дневные выборы…';
@@ -3034,7 +3033,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get dailyChoiceCatalogUnavailable =>
-      'Не удалось загрузить дневные выборы. Повторите попытку.';
+      'Не удалось загрузить дневные выборы.';
 
   @override
   String get dailyChoiceCatalogCorruption =>

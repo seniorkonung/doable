@@ -341,7 +341,7 @@ void main() {
     );
   }
 
-  testWidgets('показывает все записи, количество и открывает дубликат по id', (
+  testWidgets('показывает все записи и открывает дубликат по id', (
     tester,
   ) async {
     final repository = _Repository();
@@ -349,7 +349,7 @@ void main() {
     expect(find.text('Загружаем дневные выборы…'), findsOneWidget);
     repository.completeFirst([_item(1), _item(2)], total: 2);
     await tester.pumpAndSettle();
-    expect(find.text('Всего дневных выборов: 2'), findsOneWidget);
+    expect(dailyChoiceSectionCount(tester, completed: false), '2');
     expect(find.text('Действие'), findsNWidgets(2));
     final semantics = tester.ensureSemantics();
     expect(
@@ -394,7 +394,7 @@ void main() {
       await tester.tap(completed);
       await tester.pumpAndSettle();
       expect(find.text('Действие'), findsNothing);
-      expect(find.text('На этот день нет дневных выборов.'), findsNothing);
+      expect(find.text('Выборов на эту дату нет'), findsNothing);
       expect(repository.queries, hasLength(1));
       expect(
         tester.getSemantics(incomplete).flagsCollection.isExpanded,
@@ -453,7 +453,8 @@ void main() {
       repository.completeMore(1, [_item(2)]);
       await tester.pumpAndSettle();
       expect(find.text('Действие'), findsNWidgets(4));
-      expect(find.text('Всего дневных выборов: 4'), findsOneWidget);
+      expect(dailyChoiceSectionCount(tester, completed: false), '2');
+      expect(dailyChoiceSectionCount(tester, completed: true), '2');
     },
   );
 
@@ -528,7 +529,10 @@ void main() {
       _expectSelected(tester, nextDay);
       expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 21), 1));
       expect(find.text('Загружаем дневные выборы…'), findsOneWidget);
-      expect(find.text('Всего дневных выборов: 3'), findsNothing);
+      expect(
+        find.byKey(const ValueKey('daily-choice-section-false')),
+        findsNothing,
+      );
       expect(find.byKey(const ValueKey('daily-choice-row-1')), findsNothing);
       expect(
         find.byKey(const ValueKey('daily-choice-load-more-false')),
@@ -537,7 +541,7 @@ void main() {
 
       repository.completeFirst([_item(3, date: nextDay)], index: 2, total: 1);
       await tester.pumpAndSettle();
-      expect(find.text('Всего дневных выборов: 1'), findsOneWidget);
+      expect(dailyChoiceSectionCount(tester, completed: false), '1');
       expect(find.byKey(const ValueKey('daily-choice-row-1')), findsOneWidget);
       expect(repository.queries, hasLength(3));
     });
@@ -604,8 +608,8 @@ void main() {
         _item(2, date: today),
       ], total: 2);
       await tester.pumpAndSettle();
-      final count = find.text('Всего дневных выборов: 2');
-      expect(count, findsOneWidget);
+      final count = find.byKey(const ValueKey('daily-choice-section-false'));
+      expect(dailyChoiceSectionCount(tester, completed: false), '2');
 
       // Неделя с датой просмотра в ноябре раскрывается в ноябрь, сдвигая
       // выдачу вниз.
@@ -661,7 +665,7 @@ void main() {
       expect(dayCell(tester, selected).isSelected, isTrue);
       _expectSelected(tester, selected);
       expect(find.text('Невыполненные'), findsOneWidget);
-      expect(find.text('Всего дневных выборов: 1'), findsOneWidget);
+      expect(dailyChoiceSectionCount(tester, completed: false), '1');
       expect(find.byKey(const ValueKey('daily-choice-row-1')), findsOneWidget);
       expect(repository.queries, hasLength(1));
       expect(repository.queries.last.date, selected);
@@ -689,7 +693,7 @@ void main() {
       expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 21), 1));
 
       expect(repository.queries, hasLength(1));
-      expect(find.text('Всего дневных выборов: 1'), findsOneWidget);
+      expect(dailyChoiceSectionCount(tester, completed: false), '1');
       expect(find.byKey(const ValueKey('daily-choice-row-1')), findsOneWidget);
     });
 
@@ -704,6 +708,10 @@ void main() {
       repository.failFirst(index: 1);
       await tester.pumpAndSettle();
       expect(find.text(l10n.dailyChoiceCatalogUnavailable), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('daily-choice-section-false')),
+        findsNothing,
+      );
       _expectSelected(tester, futureDay);
 
       await tester.tap(calendarDay(futureDay));
@@ -711,7 +719,7 @@ void main() {
       expect(repository.queries, hasLength(2));
       expect(find.text(l10n.dailyChoiceCatalogUnavailable), findsOneWidget);
 
-      await tester.tap(find.widgetWithText(TextButton, l10n.commonRetry));
+      await tester.tap(find.text(l10n.commonRetry));
       await tester.pump();
       expect(repository.queries, hasLength(3));
       expect(repository.queries[2].date, futureDay);
@@ -758,7 +766,7 @@ void main() {
       await tester.pumpAndSettle();
 
       _expectSelected(tester, secondDay);
-      expect(find.text('Всего дневных выборов: 1'), findsOneWidget);
+      expect(dailyChoiceSectionCount(tester, completed: false), '1');
       expect(find.byKey(const ValueKey('daily-choice-row-1')), findsOneWidget);
       expect(find.byKey(const ValueKey('daily-choice-row-2')), findsNothing);
       expect(
@@ -795,7 +803,7 @@ void main() {
         cursor: const _Cursor(),
       );
       await _settleCalendar(tester);
-      expect(find.text('Всего дневных выборов: 2'), findsOneWidget);
+      expect(dailyChoiceSectionCount(tester, completed: false), '2');
       expect(find.byKey(const ValueKey('daily-choice-row-1')), findsOneWidget);
 
       // Подгрузка выбранного дня ещё читается.
@@ -827,7 +835,7 @@ void main() {
       final repository = _Repository();
       await _open(tester, repository);
       final l10n = lookupAppLocalizations(const Locale('ru'));
-      final retry = find.widgetWithText(TextButton, l10n.commonRetry);
+      final retry = find.text(l10n.commonRetry);
       final loadMore = find.byKey(
         const ValueKey('daily-choice-load-more-false'),
       );
@@ -894,7 +902,15 @@ void main() {
       await _open(tester, repository);
       repository.completeFirst([], total: 0);
       await tester.pumpAndSettle();
-      expect(find.text('На этот день нет дневных выборов.'), findsOneWidget);
+      expect(find.text('Выборов на эту дату нет'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('daily-choice-section-false')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('daily-choice-section-true')),
+        findsNothing,
+      );
       _expectSelected(tester, _today);
 
       final otherDay = date(2026, 9, 23);
@@ -914,10 +930,7 @@ void main() {
     await _open(tester, repository, locale: const Locale('en'));
     repository.failFirst();
     await tester.pumpAndSettle();
-    expect(
-      find.text('Could not load daily choices. Try again.'),
-      findsOneWidget,
-    );
+    expect(find.text('Could not load daily choices.'), findsOneWidget);
     await tester.tap(find.text('Try again'));
     await tester.pump();
     repository.completeFirst([_item(1)], index: 1, total: 1);

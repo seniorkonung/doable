@@ -345,7 +345,7 @@ void main() {
       final before = _intentionCatalogParameters(tester);
 
       await _select(tester, AppDestination.dailyChoices);
-      await _selectDay(tester, app, _choiceDate, total: _choiceCount);
+      await _selectDay(tester, app, _choiceDate, incomplete: _choiceCount ~/ 2);
       await _open(tester, _dailyChoiceRows.first, DailyChoiceDetailsPage);
       await _open(
         tester,
@@ -500,8 +500,9 @@ void main() {
       await tester.pumpAndSettle();
       expect(_dailyChoiceParameters(tester, app), before);
       expect(
-        find.text(
-          app.l10n.dailyChoiceCatalogTotalCount(_choiceCount - 1),
+        dailyChoiceSectionWithCount(
+          completed: false,
+          count: _choiceCount ~/ 2 - 1,
           skipOffstage: false,
         ),
         findsOneWidget,
@@ -541,8 +542,9 @@ void main() {
         expected,
       );
       expect(
-        find.text(
-          app.l10n.dailyChoiceCatalogTotalCount(_choiceCount - 1),
+        dailyChoiceSectionWithCount(
+          completed: false,
+          count: _choiceCount ~/ 2 - 1,
           skipOffstage: false,
         ),
         findsOneWidget,
@@ -596,7 +598,7 @@ void main() {
       });
       const wasCompleted = false;
       await _select(tester, AppDestination.dailyChoices);
-      await _selectDay(tester, app, _choiceDate, total: _choiceCount);
+      await _selectDay(tester, app, _choiceDate, incomplete: 1);
       await _until(tester, dailyChoiceCatalogDayMark(_choiceDate));
       expect(
         dailyChoiceCatalogDayMark(_choiceDate, mark: DayMark.todo),
@@ -1098,7 +1100,7 @@ Future<void> _prepareIntentionCatalog(WidgetTester tester, _App app) async {
 Future<void> _prepareDailyChoiceCatalog(WidgetTester tester, _App app) async {
   final incomplete = _choiceCount ~/ 2;
   await _select(tester, AppDestination.dailyChoices);
-  await _selectDay(tester, app, _choiceDate, total: _choiceCount);
+  await _selectDay(tester, app, _choiceDate, incomplete: incomplete);
   await showDailyChoiceCatalogSection(tester, false);
 
   // Неделя даты просмотра раскрывается в её месяц.
@@ -1194,26 +1196,16 @@ Map<String, Object?> _languageIndependent(Map<String, Object?> view) =>
     Map.of(view)..remove('секции');
 
 /// Системные подписи подготовленного каталога дневных выборов на каждом
-/// языке: выбранный день, месяц и дни недели календаря, название фильтра
-/// выполнения и количество.
+/// языке: выбранный день, месяц и дни недели календаря и название секции
+/// выполнения.
 final _catalogLabels = {
   Locale('ru'): (
     calendar: ['Август 2026', 'Пн', 'Вс'],
-    content: [
-      'Пятница',
-      '25 сентября 2026',
-      'Невыполненные',
-      'Всего дневных выборов: 240',
-    ],
+    content: ['Пятница', '25 сентября 2026', 'Невыполненные'],
   ),
   Locale('en'): (
     calendar: ['August 2026', 'Mon', 'Sun'],
-    content: [
-      'Friday',
-      '25 September 2026',
-      'Not completed',
-      'Total daily choices: 240',
-    ],
+    content: ['Friday', '25 September 2026', 'Not completed'],
   ),
 };
 
@@ -1286,16 +1278,20 @@ Future<void> _enterTitle(
 }
 
 /// Выбирает [date] днём каталога дневных выборов, когда выдача начального
-/// дня уже получена, и ждёт выдачу выбранного дня с [total] записями.
+/// дня уже получена, и ждёт выдачу выбранного дня с [incomplete] невыполненными
+/// записями.
 Future<void> _selectDay(
   WidgetTester tester,
   _App app,
   CalendarDate date, {
-  required int total,
+  required int incomplete,
 }) async {
   await _waitFor(tester, () => app.hasDailyChoiceCatalogResult);
   await selectDailyChoiceCatalogDate(tester, date, tap: _tap);
-  await _until(tester, find.text(app.l10n.dailyChoiceCatalogTotalCount(total)));
+  await _until(
+    tester,
+    dailyChoiceSectionWithCount(completed: false, count: incomplete),
+  );
   await tester.pumpAndSettle();
 }
 

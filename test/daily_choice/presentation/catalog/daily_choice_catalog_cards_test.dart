@@ -13,6 +13,7 @@ import 'package:doable/src/design_system/doable_type.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/daily_choice_catalog_controls.dart';
 import 'daily_choice_calendar_test_support.dart';
 import 'daily_choice_catalog_page_test_support.dart';
 
@@ -46,10 +47,7 @@ void main() {
           hasTimedChoices: true,
         );
         await tester.pumpAndSettle();
-        expect(
-          find.text(l10n.dailyChoiceCatalogTotalCount(103)),
-          findsOneWidget,
-        );
+        expect(dailyChoiceSectionCount(tester, completed: false), '102');
         expect(
           find.semantics
               .byLabel(l10n.dailyChoiceAllDay)
@@ -337,8 +335,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(_count(tester, completed: false), '5');
-    expect(_count(tester, completed: true), '1');
+    expect(dailyChoiceSectionCount(tester, completed: false), '5');
+    expect(dailyChoiceSectionCount(tester, completed: true), '1');
     expect(find.byType(ChoiceRow), findsNWidgets(3));
 
     await tester.tap(find.byKey(const ValueKey('daily-choice-section-false')));
@@ -351,7 +349,7 @@ void main() {
           .open,
       isFalse,
     );
-    expect(_count(tester, completed: false), '5');
+    expect(dailyChoiceSectionCount(tester, completed: false), '5');
     expect(find.byType(ChoiceRow), findsOneWidget);
   });
 
@@ -371,8 +369,8 @@ void main() {
     ], total: 1);
     await tester.pumpAndSettle();
 
-    expect(_count(tester, completed: false), '0');
-    expect(_count(tester, completed: true), '1');
+    expect(dailyChoiceSectionCount(tester, completed: false), '0');
+    expect(dailyChoiceSectionCount(tester, completed: true), '1');
     expect(find.byType(ChoiceRow), findsOneWidget);
     expect(
       tester
@@ -469,21 +467,3 @@ int _headers(String label) => find.semantics
     .evaluate()
     .where((node) => node.flagsCollection.isHeader)
     .length;
-
-/// Число в счётчике заголовка секции.
-String _count(WidgetTester tester, {required bool completed}) {
-  final header = find.byKey(ValueKey('daily-choice-section-$completed'));
-  return tester
-      .widget<Text>(
-        find.descendant(
-          of: header,
-          matching: find.byWidgetPredicate(
-            (widget) =>
-                widget is Text &&
-                widget.data != null &&
-                int.tryParse(widget.data!) != null,
-          ),
-        ),
-      )
-      .data!;
-}

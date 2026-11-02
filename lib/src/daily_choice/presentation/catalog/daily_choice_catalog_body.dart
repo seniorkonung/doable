@@ -9,8 +9,11 @@ import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
 import '../../../design_system/components/choice_row.dart';
 import '../../../design_system/components/day_heading.dart';
+import '../../../design_system/components/empty_state.dart';
+import '../../../design_system/components/list_state.dart';
 import '../../../design_system/components/section_header.dart';
 import '../../../design_system/doable_colors.dart';
+import '../../../design_system/doable_icon.dart';
 import '../../../design_system/doable_metrics.dart';
 import '../../../design_system/doable_priority.dart';
 import '../../../design_system/doable_type.dart';
@@ -276,40 +279,75 @@ final class _DailyChoiceCatalogBodyState
   }
 
   /// Слайверы согласованной пары под заголовком дня.
+  ///
+  /// Заголовки секций стоят только над подтверждёнными данными: пока их нет
+  /// или день пуст, под заголовком дня стоит одно состояние.
   List<Widget> _content(
     DailyChoiceCatalogState state,
     DailyChoiceCatalogViewModel model,
     AppLocalizations l10n,
-  ) {
-    final loaded = state is DailyChoiceCatalogLoaded ? state : null;
-    return [
-      if (loaded != null)
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            child: Semantics(
-              liveRegion: true,
-              child: Text(l10n.dailyChoiceCatalogTotalCount(loaded.totalCount)),
-            ),
-          ),
+  ) => switch (state) {
+    DailyChoiceCatalogInitialLoad() => [
+      _listState(ListState.loading(text: l10n.dailyChoiceCatalogLoading)),
+    ],
+    DailyChoiceCatalogInitialFailure(:final failure, :final canRetry) => [
+      _listState(
+        ListState.error(
+          message: _failureMessage(failure, l10n),
+          retry: canRetry
+              ? (label: l10n.commonRetry, onPressed: model.retryFirstPage)
+              : null,
         ),
-      if (loaded?.freshness == DailyChoiceCatalogFreshness.refreshing)
-        SliverToBoxAdapter(
-          child: _Banner(
-            message: l10n.dailyChoiceCatalogRefreshing,
-            loading: true,
-          ),
+      ),
+    ],
+    final DailyChoiceCatalogLoaded loaded => _loadedContent(
+      loaded,
+      model,
+      l10n,
+    ),
+  };
+
+  SliverPadding _listState(ListState state) => SliverPadding(
+    padding: const EdgeInsets.fromLTRB(
+      DoableMetrics.space5,
+      DoableMetrics.space4,
+      DoableMetrics.space5,
+      0,
+    ),
+    sliver: SliverToBoxAdapter(child: state),
+  );
+
+  List<Widget> _loadedContent(
+    DailyChoiceCatalogLoaded state,
+    DailyChoiceCatalogViewModel model,
+    AppLocalizations l10n,
+  ) => [
+    if (state.freshness == DailyChoiceCatalogFreshness.refreshing)
+      SliverToBoxAdapter(
+        child: _Banner(
+          message: l10n.dailyChoiceCatalogRefreshing,
+          loading: true,
         ),
-      if (loaded?.freshness == DailyChoiceCatalogFreshness.stale)
-        SliverToBoxAdapter(
-          child: _Banner(
-            message: _failureMessage(loaded!.refreshFailure!, l10n),
-            onRetry:
-                loaded.refreshFailure is DailyChoiceCatalogUnavailableFailure
-                ? model.retryRefresh
-                : null,
-          ),
+      ),
+    if (state.freshness == DailyChoiceCatalogFreshness.stale)
+      SliverToBoxAdapter(
+        child: _Banner(
+          message: _failureMessage(state.refreshFailure!, l10n),
+          onRetry: state.refreshFailure is DailyChoiceCatalogUnavailableFailure
+              ? model.retryRefresh
+              : null,
         ),
+      ),
+    if (state.totalCount == 0)
+      SliverFillRemaining(
+        hasScrollBody: false,
+        child: EmptyState(
+          icon: DoableIconData.calendar,
+          title: l10n.dailyChoiceCatalogEmptyTitle,
+          text: l10n.dailyChoiceCatalogEmptyText,
+        ),
+      )
+    else ...[
       for (final isCompleted in [false, true]) ...[
         SliverToBoxAdapter(
           child: Padding(
@@ -325,36 +363,18 @@ final class _DailyChoiceCatalogBodyState
               title: isCompleted
                   ? l10n.dailyChoiceCatalogCompleted
                   : l10n.dailyChoiceCatalogIncomplete,
-              // Пока данных дня нет, число выборов секции неизвестно.
-              count: loaded?.section(isCompleted).totalCount ?? 0,
+              count: state.section(isCompleted).totalCount,
               open: state.selection.isExpanded(isCompleted),
               onToggle: () => model.toggleSection(isCompleted),
             ),
           ),
         ),
-        if (loaded != null && state.selection.isExpanded(isCompleted))
-          ..._section(loaded, isCompleted, model, l10n),
+        if (state.selection.isExpanded(isCompleted))
+          ..._section(state, isCompleted, model, l10n),
       ],
-      if (state is DailyChoiceCatalogInitialLoad)
-        _SliverStatus(
-          _Status(message: l10n.dailyChoiceCatalogLoading, loading: true),
-        ),
-      if (state case DailyChoiceCatalogInitialFailure(
-        :final failure,
-        :final canRetry,
-      ))
-        _SliverStatus(
-          _Status(
-            message: _failureMessage(failure, l10n),
-            onRetry: canRetry ? model.retryFirstPage : null,
-          ),
-        ),
-      if (loaded?.totalCount == 0)
-        _SliverStatus(_Status(message: l10n.dailyChoiceCatalogEmpty))
-      else if (loaded != null)
-        const SliverToBoxAdapter(child: SizedBox(height: _listEndSpace)),
-    ];
-  }
+      const SliverToBoxAdapter(child: SizedBox(height: _listEndSpace)),
+    ],
+  ];
 
   List<Widget> _section(
     DailyChoiceCatalogLoaded state,
@@ -668,17 +688,6 @@ bool _hasSameSectionContent(
     before.totalCount == after.totalCount &&
     (before.nextCursor != null) == (after.nextCursor != null) &&
     before.pageStatus == after.pageStatus;
-
-/// Состояние без строк выдачи занимает остаток высоты под секциями.
-final class _SliverStatus extends StatelessWidget {
-  const _SliverStatus(this.status);
-
-  final _Status status;
-
-  @override
-  Widget build(BuildContext context) =>
-      SliverFillRemaining(hasScrollBody: false, child: status);
-}
 
 final class _Status extends StatelessWidget {
   const _Status({required this.message, this.loading = false, this.onRetry});

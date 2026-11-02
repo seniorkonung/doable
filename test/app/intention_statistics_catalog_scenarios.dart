@@ -104,10 +104,7 @@ void _catalogNavigationScenarios() {
         _catalogScroll(tester).position.jumpTo(0);
         await tester.pumpAndSettle();
         expect(find.text('Невыполненные'), findsOneWidget);
-        expect(
-          find.text(app.texts.dailyChoiceCatalogTotalCount(121)),
-          findsOneWidget,
-        );
+        expect(dailyChoiceSectionCount(tester, completed: false), '121');
         expect(
           find.bySemanticsLabel(app.texts.dailyChoiceCalendarCollapse),
           findsOneWidget,
@@ -406,7 +403,7 @@ void _catalogNavigationScenarios() {
       expect(app.probe.computations, computations);
       await _catalogBack(tester);
       await _catalogReady(tester, app, catalog, total: 0);
-      expect(find.text(app.texts.dailyChoiceCatalogEmpty), findsOneWidget);
+      expect(find.text(app.texts.dailyChoiceCatalogEmptyTitle), findsOneWidget);
       expect(app.probe.sourceReads, reads);
 
       await _catalogBack(tester);
