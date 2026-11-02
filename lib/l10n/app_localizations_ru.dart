@@ -1857,20 +1857,21 @@ class AppLocalizationsRu extends AppLocalizations {
   String get dailyChoiceDeleteAction => 'Удалить дневной выбор навсегда';
 
   @override
-  String get dailyChoiceDeleteConfirmationTitle =>
-      'Удалить дневной выбор навсегда?';
+  String get dailyChoiceSheetOptionDelete => 'Удалить дневной выбор';
 
   @override
-  String dailyChoiceDeleteConfirmationMessage(
-    String phrase,
-    String date,
-    String choiceId,
-  ) {
-    return 'Выбор: $phrase\nДата: $date\nИдентификатор выбора: $choiceId\n\nЭто действие нельзя отменить. Намерения, долговременные связи и другие дневные выборы сохранятся.';
+  String get dailyChoiceDeleteDialogTitle => 'Удалить дневной выбор?';
+
+  @override
+  String get dailyChoiceDeleteDialogBefore => 'Выбор ';
+
+  @override
+  String dailyChoiceDeleteDialogAfter(String date) {
+    return ' на $date будет удалён. Это действие нельзя отменить.';
   }
 
   @override
-  String get dailyChoiceDeleteConfirmAction => 'Удалить навсегда';
+  String get dailyChoiceDeleteDialogAction => 'Удалить';
 
   @override
   String get dailyChoiceSourceInvalid =>

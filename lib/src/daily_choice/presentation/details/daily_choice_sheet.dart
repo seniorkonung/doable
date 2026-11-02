@@ -13,6 +13,8 @@ import '../../../design_system/components/detail_row.dart';
 import '../../../design_system/components/half_pinned_sliver.dart';
 import '../../../design_system/components/list_state.dart';
 import '../../../design_system/components/notice.dart';
+import '../../../design_system/components/option_row.dart';
+import '../../../design_system/components/options_menu.dart';
 import '../../../design_system/components/priority_picker.dart';
 import '../../../design_system/components/reason_chain.dart';
 import '../../../design_system/components/sheet.dart';
@@ -35,6 +37,7 @@ import '../../domain/daily_choice_id.dart';
 import '../catalog/daily_choice_local_date_provider.dart';
 import '../catalog/daily_choice_local_day_observer.dart';
 import '../daily_choice_command_failure_message.dart';
+import 'daily_choice_delete_confirmation.dart';
 import 'daily_choice_details_state.dart';
 import 'daily_choice_details_view_model.dart';
 import 'daily_choice_field_labels.dart';
@@ -62,6 +65,8 @@ Future<void> showDailyChoiceSheet(
 );
 
 enum _ChoiceTab { overview, path }
+
+enum _ChoiceOption { edit, delete }
 
 final class _DailyChoiceSheet extends ConsumerStatefulWidget {
   const _DailyChoiceSheet(this.sheet, {required this.choiceId});
@@ -101,6 +106,56 @@ final class _DailyChoiceSheetState extends ConsumerState<_DailyChoiceSheet> {
     _localDay.dispose();
     _model.dispose();
     super.dispose();
+  }
+
+  Future<void> _showOptions() async {
+    final l10n = AppLocalizations.of(context);
+    final option = await showDoableSheet<_ChoiceOption>(
+      context: context,
+      builder: (_, sheet) => OptionsMenu<_ChoiceOption>(
+        sheet,
+        title: l10n.dailyChoiceDetailsTitle,
+        items: [
+          OptionsMenuItem(
+            value: _ChoiceOption.edit,
+            icon: DoableIconData.edit,
+            name: l10n.dailyChoiceEditTitle,
+          ),
+          OptionsMenuItem(
+            value: _ChoiceOption.delete,
+            icon: DoableIconData.delete,
+            name: l10n.dailyChoiceSheetOptionDelete,
+            tone: OptionRowTone.danger,
+          ),
+        ],
+      ),
+    );
+    if (!mounted || !(ModalRoute.isCurrentOf(context) ?? false)) return;
+    if (_model.operation is DailyChoiceDetailsOperationWriting) return;
+    final state = _model.state;
+    if (state is! DailyChoiceDetailsLoaded || state.details.path.isEmpty) {
+      return;
+    }
+    switch (option) {
+      case _ChoiceOption.edit:
+        await context.router.push(DailyChoiceEditRoute(details: state.details));
+      case _ChoiceOption.delete:
+        final confirmed = await confirmDailyChoiceDeletion(
+          context,
+          state.details,
+        );
+        if (!confirmed ||
+            !mounted ||
+            !(ModalRoute.isCurrentOf(context) ?? false)) {
+          return;
+        }
+        final deleted = await _model.delete();
+        if (deleted && mounted && (ModalRoute.isCurrentOf(context) ?? false)) {
+          Navigator.of(context).pop();
+        }
+      case null:
+        break;
+    }
   }
 
   @override
@@ -153,6 +208,10 @@ final class _DailyChoiceSheetState extends ConsumerState<_DailyChoiceSheet> {
                 details: details,
                 tab: _tab,
                 onTabChange: (tab) => setState(() => _tab = tab),
+                onOptions:
+                    _model.operation is DailyChoiceDetailsOperationWriting
+                    ? null
+                    : () => unawaited(_showOptions()),
                 onToggle: _model.operation is DailyChoiceDetailsOperationWriting
                     ? null
                     : () => _model.change(
@@ -262,6 +321,7 @@ final class _ChoiceHeader extends StatelessWidget {
     required this.tab,
     required this.onTabChange,
     required this.onToggle,
+    required this.onOptions,
   });
 
   final DailyChoiceDetails details;
@@ -270,6 +330,7 @@ final class _ChoiceHeader extends StatelessWidget {
 
   /// Переключает выполнение; без него флажок выключен.
   final VoidCallback? onToggle;
+  final VoidCallback? onOptions;
 
   @override
   Widget build(BuildContext context) {
@@ -308,9 +369,14 @@ final class _ChoiceHeader extends StatelessWidget {
               onToggle: onToggle,
               goalBadge: _archiveBadge(localizations, details.source),
               actionBadge: _archiveBadge(localizations, details.selected),
-              options: ChoiceHeadOptions.unavailable(
-                label: localizations.dailyChoiceSheetOptionsLabel,
-              ),
+              options: onOptions == null
+                  ? ChoiceHeadOptions.unavailable(
+                      label: localizations.dailyChoiceSheetOptionsLabel,
+                    )
+                  : ChoiceHeadOptions.available(
+                      label: localizations.dailyChoiceSheetOptionsLabel,
+                      onOpen: onOptions!,
+                    ),
             ),
           ),
           Tabs(

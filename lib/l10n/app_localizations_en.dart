@@ -1833,20 +1833,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dailyChoiceDeleteAction => 'Delete daily choice permanently';
 
   @override
-  String get dailyChoiceDeleteConfirmationTitle =>
-      'Delete daily choice permanently?';
+  String get dailyChoiceSheetOptionDelete => 'Delete daily choice';
 
   @override
-  String dailyChoiceDeleteConfirmationMessage(
-    String phrase,
-    String date,
-    String choiceId,
-  ) {
-    return 'Choice: $phrase\nDate: $date\nChoice ID: $choiceId\n\nThis cannot be undone. Intentions, long-term relations, and other daily choices will remain.';
+  String get dailyChoiceDeleteDialogTitle => 'Delete daily choice?';
+
+  @override
+  String get dailyChoiceDeleteDialogBefore => 'The choice ';
+
+  @override
+  String dailyChoiceDeleteDialogAfter(String date) {
+    return ' for $date will be deleted. This cannot be undone.';
   }
 
   @override
-  String get dailyChoiceDeleteConfirmAction => 'Delete permanently';
+  String get dailyChoiceDeleteDialogAction => 'Delete';
 
   @override
   String get dailyChoiceSourceInvalid =>

@@ -92,7 +92,7 @@ void _registerOrdinaryLayoutTests() {
       expect(tester.getRect(body).bottom, expectedBottom);
       await tester.tap(delete);
       await tester.pumpAndSettle();
-      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.text('Удалить дневной выбор?'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 

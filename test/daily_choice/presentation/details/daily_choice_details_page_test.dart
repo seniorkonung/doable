@@ -503,21 +503,23 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('daily-choice-delete-open')));
     await tester.pumpAndSettle();
-    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(find.text('Удалить дневной выбор?'), findsOneWidget);
     expect(
-      find.textContaining('Чтобы Основа, я сегодня Действие'),
+      find.textContaining(
+        'Чтобы Основа, я сегодня Действие',
+        findRichText: true,
+      ),
       findsWidgets,
     );
-    expect(find.textContaining('2026-09-24'), findsWidgets);
-    expect(find.textContaining('нельзя отменить'), findsOneWidget);
+    expect(find.textContaining('2026-09-24', findRichText: true), findsWidgets);
+    expect(
+      find.textContaining('нельзя отменить', findRichText: true),
+      findsOneWidget,
+    );
     final semantics = tester.ensureSemantics();
     expect(
-      tester
-          .getSemantics(
-            find.byKey(const ValueKey('daily-choice-delete-confirm')),
-          )
-          .label,
-      contains('Удалить навсегда'),
+      tester.getSemantics(find.text('Удалить')).label,
+      contains('Удалить'),
     );
     semantics.dispose();
   });
@@ -533,9 +535,7 @@ void main() {
 
       await tester.tap(find.byKey(const ValueKey('daily-choice-delete-open')));
       await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const ValueKey('daily-choice-delete-confirm')),
-      );
+      await tester.tap(find.text('Удалить'));
       await tester.pump();
       expect(repository.deleteCommands, hasLength(1));
       expect(repository.deleteCommands.single.choiceId, _choice(1));
@@ -564,9 +564,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('daily-choice-delete-open')));
       await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const ValueKey('daily-choice-delete-confirm')),
-      );
+      await tester.tap(find.text('Удалить'));
       await tester.pump();
       repository.failDelete();
       await tester.pumpAndSettle();
@@ -612,9 +610,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('daily-choice-delete-open')));
       await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const ValueKey('daily-choice-delete-confirm')),
-      );
+      await tester.tap(find.text('Удалить'));
       await tester.pump();
       repository.succeedDelete();
       await tester.pumpAndSettle();
@@ -660,7 +656,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('daily-choice-delete-open')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('daily-choice-delete-confirm')));
+    await tester.tap(find.text('Delete'));
     await tester.pump();
     await router.maybePop();
     await tester.pumpAndSettle();
@@ -713,9 +709,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('daily-choice-delete-open')));
       await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const ValueKey('daily-choice-delete-confirm')),
-      );
+      await tester.tap(find.text('Delete'));
       await tester.pump();
       unawaited(
         router.push(IntentionDetailsRoute(intentionId: _intentionId(1))),

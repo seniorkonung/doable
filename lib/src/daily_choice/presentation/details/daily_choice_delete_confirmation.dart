@@ -1,50 +1,29 @@
 import 'package:flutter/material.dart';
 
 import '../../../../l10n/app_localizations.dart';
+import '../../../design_system/components/confirm_dialog.dart';
 import '../../application/daily_choice_details.dart';
 
-/// Отдельное подтверждение относится к идентичности открытого выбора.
+/// Подтверждение называет выбор и его дату.
 Future<bool> confirmDailyChoiceDeletion(
   BuildContext context,
   DailyChoiceDetails details,
-) async {
+) {
   final l10n = AppLocalizations.of(context);
-  final choice = details.choice;
-  final confirmed = await showDialog<bool>(
+  return showConfirmDialog(
     context: context,
-    builder: (dialogContext) => AlertDialog(
-      scrollable: true,
-      title: Text(l10n.dailyChoiceDeleteConfirmationTitle),
-      content: Semantics(
-        container: true,
-        child: Text(
-          l10n.dailyChoiceDeleteConfirmationMessage(
-            l10n.dailyChoiceDetailsPhrase(
-              details.source.title,
-              details.selected.title,
-            ),
-            choice.date.toCanonicalString(),
-            choice.id.toCanonicalString(),
-          ),
-        ),
+    title: l10n.dailyChoiceDeleteDialogTitle,
+    text: ConfirmDialogText(
+      before: l10n.dailyChoiceDeleteDialogBefore,
+      name: l10n.dailyChoiceDetailsPhrase(
+        details.source.title,
+        details.selected.title,
       ),
-      actions: [
-        TextButton(
-          key: const ValueKey('daily-choice-delete-cancel'),
-          onPressed: () => Navigator.of(dialogContext).pop(false),
-          child: Text(l10n.detailsCancelEditAction),
-        ),
-        FilledButton(
-          key: const ValueKey('daily-choice-delete-confirm'),
-          onPressed: () => Navigator.of(dialogContext).pop(true),
-          style: FilledButton.styleFrom(
-            backgroundColor: Theme.of(dialogContext).colorScheme.error,
-            foregroundColor: Theme.of(dialogContext).colorScheme.onError,
-          ),
-          child: Text(l10n.dailyChoiceDeleteConfirmAction),
-        ),
-      ],
+      after: l10n.dailyChoiceDeleteDialogAfter(
+        details.choice.date.toCanonicalString(),
+      ),
     ),
+    cancelLabel: l10n.detailsCancelEditAction,
+    actionLabel: l10n.dailyChoiceDeleteDialogAction,
   );
-  return confirmed ?? false;
 }

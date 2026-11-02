@@ -457,10 +457,7 @@ void main() {
         tester,
         find.byKey(const ValueKey('daily-choice-delete-open')),
       );
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('daily-choice-delete-confirm')),
-      );
+      await _tap(tester, find.text('Удалить'));
       await _until(tester, dailyChoiceCatalogDateControl);
       await selectDailyChoiceCatalogDate(tester, _formChoiceDate, tap: _tap);
       await showDailyChoiceCatalogSection(tester, true);

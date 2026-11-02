@@ -2833,27 +2833,35 @@ abstract class AppLocalizations {
   /// **'Delete daily choice permanently'**
   String get dailyChoiceDeleteAction;
 
-  /// Заголовок отдельного подтверждения удаления дневного выбора
+  /// Пункт удаления дневного выбора
   ///
   /// In en, this message translates to:
-  /// **'Delete daily choice permanently?'**
-  String get dailyChoiceDeleteConfirmationTitle;
+  /// **'Delete daily choice'**
+  String get dailyChoiceSheetOptionDelete;
 
-  /// Конкретный выбор, дата, идентификатор и необратимость удаления
+  /// Вопрос перед удалением дневного выбора
   ///
   /// In en, this message translates to:
-  /// **'Choice: {phrase}\nDate: {date}\nChoice ID: {choiceId}\n\nThis cannot be undone. Intentions, long-term relations, and other daily choices will remain.'**
-  String dailyChoiceDeleteConfirmationMessage(
-    String phrase,
-    String date,
-    String choiceId,
-  );
+  /// **'Delete daily choice?'**
+  String get dailyChoiceDeleteDialogTitle;
 
-  /// Отправить подтверждённое удаление дневного выбора
+  /// Текст перед названием выбора
   ///
   /// In en, this message translates to:
-  /// **'Delete permanently'**
-  String get dailyChoiceDeleteConfirmAction;
+  /// **'The choice '**
+  String get dailyChoiceDeleteDialogBefore;
+
+  /// Дата и необратимость удаления
+  ///
+  /// In en, this message translates to:
+  /// **' for {date} will be deleted. This cannot be undone.'**
+  String dailyChoiceDeleteDialogAfter(String date);
+
+  /// Подтвердить удаление дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get dailyChoiceDeleteDialogAction;
 
   /// Ошибка исходного намерения дневного выбора
   ///

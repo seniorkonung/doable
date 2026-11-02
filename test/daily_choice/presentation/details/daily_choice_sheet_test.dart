@@ -57,6 +57,89 @@ void main() {
     );
   });
 
+  testWidgets('меню открывает подтверждение удаления, отмена сохраняет выбор', (
+    tester,
+  ) async {
+    final harness = await _openSheet(tester);
+    harness.repository.emit(_details());
+    await tester.pumpAndSettle();
+    await tester.tap(_options);
+    await tester.pumpAndSettle();
+    expect(find.text('Дневной выбор'), findsWidgets);
+    await tester.tap(find.text('Удалить дневной выбор'));
+    await tester.pumpAndSettle();
+    expect(find.text('Удалить дневной выбор?'), findsOneWidget);
+    expect(
+      find.textContaining('2026-10-08', findRichText: true),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Отмена'));
+    await tester.pumpAndSettle();
+    expect(find.text('Действие'), findsOneWidget);
+  });
+
+  testWidgets(
+    'меню открывает форму, а после возврата панель показывает изменения',
+    (tester) async {
+      final (repository, router) = await _openOnRouter(tester);
+      repository.emit(_details());
+      await tester.pumpAndSettle();
+      await tester.tap(_options);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Редактировать дневной выбор'));
+      await tester.pumpAndSettle();
+      expect(router.current.name, DailyChoiceEditRoute.name);
+      await tester.enterText(
+        find.byKey(const ValueKey('daily-choice-edit-description')),
+        'Новое описание',
+      );
+      await tester.pump();
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('daily-choice-edit-submit')),
+      );
+      await tester.tap(find.byKey(const ValueKey('daily-choice-edit-submit')));
+      await tester.pump();
+      repository.emit(_details(description: 'Новое описание'));
+      repository.succeedUpdate();
+      await tester.pumpAndSettle();
+      expect(find.text('Новое описание'), findsOneWidget);
+    },
+  );
+
+  testWidgets('подтверждённое удаление закрывает панель и сообщает об успехе', (
+    tester,
+  ) async {
+    final harness = await _openSheet(tester);
+    harness.repository.emit(_details());
+    await tester.pumpAndSettle();
+    await tester.tap(_options);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Удалить дневной выбор'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Удалить'));
+    await tester.pump();
+    harness.repository.succeedDelete();
+    await tester.pumpAndSettle();
+    expect(find.byType(Sheet), findsNothing);
+    expect(find.textContaining('Дневной выбор удалён.'), findsOneWidget);
+  });
+
+  testWidgets('отказ удаления остаётся в панели', (tester) async {
+    final harness = await _openSheet(tester);
+    harness.repository.emit(_details());
+    await tester.pumpAndSettle();
+    await tester.tap(_options);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Удалить дневной выбор'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Удалить'));
+    await tester.pump();
+    harness.repository.failCommand(const DailyChoiceUnavailableFailure());
+    await tester.pumpAndSettle();
+    expect(find.text(_commandFailure), findsOneWidget);
+    expect(find.text('Действие'), findsOneWidget);
+  });
+
   testWidgets(
     'путь показывает текущие названия, виды связей и архив с доступными ролями',
     (tester) async {
@@ -983,7 +1066,9 @@ final class _Repository
     TSuccess extends GraphCommandOutcome,
     TFailure extends GraphCommandFailure
   >(GraphCommand<TSuccess, TFailure> command) async {
-    _commands.add(command as UpdateDailyChoiceFields);
+    if (command is UpdateDailyChoiceFields) {
+      _commands.add(command as UpdateDailyChoiceFields);
+    }
     final request = Completer<DailyChoiceCommandResult>();
     _requests.add(request);
     return await request.future as GraphCommandResult<TSuccess, TFailure>;
@@ -991,6 +1076,21 @@ final class _Repository
 
   void failCommand(DailyChoiceCommandFailure failure) =>
       _requests.last.complete(GraphCommandFailed(failure));
+
+  void succeedDelete() {
+    final details = _details();
+    _requests.last.complete(
+      GraphCommandSucceeded(
+        ConfirmedGraphResult(
+          revision: _Revision(++_revision),
+          value: DailyChoiceDeleted(
+            choice: details.choice,
+            changes: [_Change(_Revision(_revision))],
+          ),
+        ),
+      ),
+    );
+  }
 
   /// Подтверждает запись; новое значение приходит отдельно через [emit].
   void succeedUpdate() {
