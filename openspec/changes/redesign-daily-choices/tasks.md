@@ -420,3 +420,19 @@
   - **Зависимости:** 2.1–2.9.
   - **Предполагаемые файлы:** нет (только проверка).
   - **Размер:** XS.
+
+- [ ] 2.11 Повторное завершение создания останавливает проверка истории, а не отдельная защита
+  - **Критерии приёмки:**
+    - Поле `_completionAttempted` и метод `claimCompletion` с его комментарием удалены из `DailyChoiceCreationFlowSession`. Эта задача заменяет критерий задачи 2.1 об одной попытке завершения.
+    - Условие `completeDailyChoiceCreation` больше не вызывает `claimCompletion`, а комментарий функции не говорит об одной попытке.
+    - Из теста «успех фиксируется до навигации и не сбрасывается поздним возвратом» удалены только две строки с `claimCompletion`.
+    - Проверки состояния `DailyChoiceCreationFlowSaved`, полной истории, принадлежности подтверждения сессии и верхнего безымянного маршрута не меняются, включая проверки перед каждым снятием в `_removeFlowRoutes`.
+    - Тесты «повторное завершение … не меняет исходную историю и новую сессию» проходят без изменений.
+    - Поведение продукта и спецификация не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/daily_choice_creation_completion_test.dart test/daily_choice/presentation/daily_choice_creation_flow_session_test.dart`.
+    - `mise exec --no-deps -- openspec validate redesign-daily-choices --strict`.
+    - `grep -rnE 'claimCompletion|_completionAttempted' lib test` ничего не находит.
+  - **Зависимости:** 2.1.
+  - **Предполагаемые файлы:** `lib/src/daily_choice/presentation/daily_choice_creation_flow_session.dart`, `lib/src/daily_choice/presentation/daily_choice_creation_completion.dart`, `test/daily_choice/presentation/daily_choice_creation_flow_session_test.dart`.
+  - **Размер:** XS.
