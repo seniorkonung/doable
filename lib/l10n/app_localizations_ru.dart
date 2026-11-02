@@ -3148,6 +3148,10 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
+  String get dailyChoiceSheetPathArchivedNote =>
+      'В пути есть архивированные намерения или связи.';
+
+  @override
   String get dailyChoiceFieldDate => 'Дата';
 
   @override

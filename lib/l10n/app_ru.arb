@@ -904,6 +904,7 @@
   "dailyChoiceSheetPathTab": "Путь",
   "dailyChoiceSheetPathTabLabel": "{count, plural, one{Путь, {count} шаг} few{Путь, {count} шага} many{Путь, {count} шагов} other{Путь, {count} шага}}",
   "dailyChoiceSheetPathTabArchivedLabel": "{count, plural, one{Путь, {count} шаг, в пути есть архив} few{Путь, {count} шага, в пути есть архив} many{Путь, {count} шагов, в пути есть архив} other{Путь, {count} шага, в пути есть архив}}",
+  "dailyChoiceSheetPathArchivedNote": "В пути есть архивированные намерения или связи.",
   "dailyChoiceFieldDate": "Дата",
   "dailyChoiceFieldTime": "Время",
   "dailyChoiceFieldDateLabel": "Дата: {date}",

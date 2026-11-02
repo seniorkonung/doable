@@ -1,5 +1,9 @@
 import 'dart:async';
 
+import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/app/navigation/app_navigation_bar.dart';
+import 'package:doable/src/app/routing/app_router.dart';
+import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
@@ -11,31 +15,198 @@ import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_sheet.dart';
 import 'package:doable/src/design_system/components/badge.dart';
+import 'package:doable/src/design_system/components/choice_path.dart' as ui;
 import 'package:doable/src/design_system/components/priority_picker.dart';
 import 'package:doable/src/design_system/components/reason_chain.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/design_system/components/tabs.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/design_system/doable_priority.dart';
+import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/domain/intention.dart';
+import 'package:doable/src/intention/application/intention_details.dart'
+    as application;
+import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/daily_choice_local_date.dart';
 import '../../../support/ordinary_page_test_app.dart';
+import '../../../support/in_memory_quick_creation_mode_store.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 
 void main() {
   setUp(() {
     WidgetsBinding.instance.handleAppLifecycleStateChanged(
       AppLifecycleState.resumed,
+    );
+  });
+
+  testWidgets(
+    'путь показывает текущие названия, виды связей и архив с доступными ролями',
+    (tester) async {
+      tester.view.physicalSize = const Size(1200, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final semantics = tester.ensureSemantics();
+      final harness = await _openSheet(tester);
+      harness.repository.emit(
+        _details(archived: {_Archived.source, _Archived.relation}),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Путь'));
+      await tester.pumpAndSettle();
+
+      final path = tester.widget<ui.ChoicePath>(find.byType(ui.ChoicePath));
+      expect(path.source.name, 'Основа');
+      expect(path.intermediate.single.step.name, 'Середина');
+      expect(
+        path.intermediate.single.relation.kind,
+        ui.ChoicePathRelationKind.need,
+      );
+      expect(path.action.step.name, 'Действие');
+      expect(path.action.relation.kind, ui.ChoicePathRelationKind.can);
+      expect(
+        tester
+            .getSemantics(
+              find.byKey(const ValueKey('daily-choice-intention-1')),
+            )
+            .label,
+        contains('Основание, Основа, Архивировано'),
+      );
+      expect(
+        tester
+            .getSemantics(find.byKey(const ValueKey('daily-choice-relation-1')))
+            .label,
+        contains('Нужно'),
+      );
+      expect(
+        tester
+            .getSemantics(find.byKey(const ValueKey('daily-choice-relation-1')))
+            .label,
+        contains('Архивировано'),
+      );
+      expect(
+        tester
+            .getSemantics(
+              find.byKey(const ValueKey('daily-choice-intention-3')),
+            )
+            .label,
+        contains('Выбранное действие'),
+      );
+      expect(
+        find.text('В пути есть архивированные намерения или связи.'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Готово к действию'), findsNothing);
+
+      harness.repository.emit(_details(middleTitle: 'Новое название'));
+      await tester.pumpAndSettle();
+      expect(find.text('Новое название'), findsOneWidget);
+      expect(find.text('Середина'), findsNothing);
+      expect(
+        find.text('В пути есть архивированные намерения или связи.'),
+        findsNothing,
+      );
+      semantics.dispose();
+    },
+  );
+
+  testWidgets(
+    'возврат со страницы намерения и панели связи показывает вкладку пути',
+    (tester) async {
+      tester.view.physicalSize = const Size(1200, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final repository = _Repository();
+      final router = AppRouter();
+      addTearDown(() async {
+        router.dispose();
+        await repository.dispose();
+      });
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            inMemoryQuickCreationModeOverride,
+            personalGraphRepositoryProvider.overrideWithValue(repository),
+          ],
+          retry: (count, error) => null,
+          child: MaterialApp.router(
+            theme: doableTheme(Brightness.light),
+            locale: const Locale('ru'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            routerConfig: router.config(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      unawaited(
+        showDailyChoiceSheet(
+          tester.element(find.byType(AppNavigationBar)),
+          _choice,
+        ),
+      );
+      await tester.pump();
+      repository.emit(_details());
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Путь'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('daily-choice-relation-2')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(repository.watchedRelations, [_relationId(2)]);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(ui.ChoicePath), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('daily-choice-intention-2')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(router.current.name, IntentionDetailsRoute.name);
+      expect(
+        router.current.argsAs<IntentionDetailsRouteArgs>().intentionId,
+        _intentionId(2),
+      );
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(ui.ChoicePath), findsOneWidget);
+      expect(
+        tester
+            .widget<ui.ChoicePath>(find.byType(ui.ChoicePath))
+            .intermediate
+            .single
+            .step
+            .name,
+        'Середина',
+      );
+    },
+  );
+
+  testWidgets('путь из одной связи ведёт сразу к выбранному действию', (
+    tester,
+  ) async {
+    final harness = await _openSheet(tester);
+    harness.repository.emit(_details(oneStep: true));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Путь'));
+    await tester.pumpAndSettle();
+
+    final path = tester.widget<ui.ChoicePath>(find.byType(ui.ChoicePath));
+    expect(path.intermediate, isEmpty);
+    expect(path.action.step.name, 'Действие');
+    expect(path.action.relation.kind, ui.ChoicePathRelationKind.need);
+    expect(
+      find.byKey(const ValueKey('daily-choice-intention-2')),
+      findsOneWidget,
     );
   });
 
@@ -418,7 +589,9 @@ DailyChoiceDetails _details({
   String description = 'Пояснение',
   bool isCompleted = false,
   bool emptyPath = false,
+  bool oneStep = false,
   Set<_Archived> archived = const {},
+  String middleTitle = 'Середина',
 }) {
   final source = _intention(
     1,
@@ -427,7 +600,7 @@ DailyChoiceDetails _details({
   );
   final middle = _intention(
     2,
-    'Середина',
+    middleTitle,
     archived: archived.contains(_Archived.middle),
   );
   final selected = _intention(
@@ -461,7 +634,7 @@ DailyChoiceDetails _details({
       id: _relationId(n),
       sourceIntentionId: from.id,
       relatedIntentionId: to.id,
-      type: LongTermRelationType.need,
+      type: n == 1 ? LongTermRelationType.need : LongTermRelationType.can,
       priority: RelationPriority.p2,
       scope: scope,
       creationSequence: RelationCreationSequence(n),
@@ -478,6 +651,8 @@ DailyChoiceDetails _details({
     selected: selected,
     path: emptyPath
         ? const []
+        : oneStep
+        ? [step(1, source, selected, RelationScope.active)]
         : [
             step(
               1,
@@ -516,6 +691,18 @@ final class _Repository
   );
   var watchCount = 0;
   var _revision = 0;
+  final watchedRelations = <LongTermRelationId>[];
+
+  @override
+  Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) {
+    watchedRelations.add(id);
+    return const Stream.empty();
+  }
+
+  @override
+  Stream<Result<GraphSnapshot<application.IntentionDetails?>>> watchIntention(
+    IntentionId id,
+  ) => const Stream.empty();
 
   @override
   Stream<DailyChoiceReadResult> watchDailyChoice(DailyChoiceId id) {

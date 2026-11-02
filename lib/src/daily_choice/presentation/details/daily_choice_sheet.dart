@@ -1,9 +1,14 @@
+import 'dart:async';
+
+import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart' hide Badge, TextField;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
+import '../../../app/routing/app_router.gr.dart';
 import '../../../design_system/components/badge.dart';
 import '../../../design_system/components/choice_head.dart';
+import '../../../design_system/components/choice_path.dart';
 import '../../../design_system/components/detail_row.dart';
 import '../../../design_system/components/half_pinned_sliver.dart';
 import '../../../design_system/components/list_state.dart';
@@ -15,10 +20,12 @@ import '../../../design_system/components/text_field.dart';
 import '../../../design_system/doable_colors.dart';
 import '../../../design_system/doable_icon.dart';
 import '../../../design_system/doable_metrics.dart';
+import '../../../design_system/doable_priority.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/personal_graph_repository_provider.dart';
 import '../../../intention/domain/intention.dart';
 import '../../../long_term_relation/domain/long_term_relation.dart';
+import '../../../long_term_relation/presentation/details/relation_details_sheet.dart';
 import '../../application/daily_choice_details.dart';
 import '../../domain/calendar_date.dart';
 import '../../domain/daily_choice_id.dart';
@@ -144,7 +151,7 @@ final class _DailyChoiceSheetState extends ConsumerState<_DailyChoiceSheet> {
               _ChoiceTab.overview => [
                 _Overview(details: details, today: _localDay.today),
               ],
-              _ChoiceTab.path => const <Widget>[],
+              _ChoiceTab.path => [_Path(details: details)],
             },
           ],
         },
@@ -272,6 +279,100 @@ bool _hasArchive(DailyChoiceDetails details) =>
           _isArchived(step.related) ||
           step.relation.scope == RelationScope.archived,
     );
+
+/// Сохранённые ссылки показывают текущие данные намерений и связей.
+final class _Path extends StatelessWidget {
+  const _Path({required this.details});
+
+  final DailyChoiceDetails details;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    ChoicePathStep intention(Intention value, String role, int position) {
+      final archived = _isArchived(value);
+      final state = archived
+          ? l10n.dailyChoiceDetailsArchived
+          : l10n.dailyChoiceDetailsActive;
+      return ChoicePathStep(
+        name: value.title,
+        semanticLabel: '$role, ${value.title}, $state',
+        archived: archived,
+        buttonKey: ValueKey('daily-choice-intention-$position'),
+        onOpen: () => unawaited(
+          context.router.push(IntentionDetailsRoute(intentionId: value.id)),
+        ),
+      );
+    }
+
+    ChoicePathLink link(DailyChoicePathStepDetails step, int index) {
+      final relation = step.relation;
+      final archived = relation.scope == RelationScope.archived;
+      final kind = switch (relation.type) {
+        LongTermRelationType.need => ChoicePathRelationKind.need,
+        LongTermRelationType.can => ChoicePathRelationKind.can,
+      };
+      final word = switch (kind) {
+        ChoicePathRelationKind.need => l10n.relationNeighborhoodTypeNeed,
+        ChoicePathRelationKind.can => l10n.relationNeighborhoodTypeCan,
+      };
+      final state = archived
+          ? l10n.dailyChoiceDetailsArchived
+          : l10n.dailyChoiceDetailsActive;
+      final priority = switch (relation.priority) {
+        RelationPriority.p1 => DoablePriority.p1,
+        RelationPriority.p2 => DoablePriority.p2,
+        RelationPriority.p3 => DoablePriority.p3,
+        RelationPriority.p4 => DoablePriority.p4,
+      };
+      final role = index == details.path.length - 1
+          ? l10n.dailyChoiceDetailsSelectedAction
+          : l10n.dailyChoiceDetailsIntermediate;
+      return ChoicePathLink(
+        relation: ChoicePathRelation(
+          kind: kind,
+          priority: priority,
+          semanticLabel:
+              '${l10n.dailyChoiceDetailsStep(index + 1)}, $word, '
+              '${step.source.title}, ${step.related.title}, '
+              '${dailyChoicePriorityName(priority)}, $state',
+          archived: archived,
+          buttonKey: ValueKey('daily-choice-relation-${index + 1}'),
+          onOpen: () =>
+              unawaited(showRelationDetailsSheet(context, relation.id)),
+        ),
+        step: intention(step.related, role, index + 2),
+      );
+    }
+
+    final links = [
+      for (final (index, step) in details.path.indexed) link(step, index),
+    ];
+    return SliverPadding(
+      padding: const EdgeInsets.fromLTRB(
+        DoableMetrics.space5,
+        2,
+        DoableMetrics.space5,
+        0,
+      ),
+      sliver: SliverToBoxAdapter(
+        child: ChoicePath(
+          source: intention(details.source, l10n.dailyChoiceDetailsSource, 1),
+          intermediate: links.sublist(0, links.length - 1),
+          action: links.last,
+          priority: dailyChoiceDesignPriority(details.choice.priority),
+          done: details.choice.isCompleted,
+          kindWord: (kind) => switch (kind) {
+            ChoicePathRelationKind.need => l10n.relationNeighborhoodTypeNeed,
+            ChoicePathRelationKind.can => l10n.relationNeighborhoodTypeCan,
+          },
+          archivedBadge: Badge.archived(word: l10n.detailsArchivedBadge),
+          archivedNote: l10n.dailyChoiceSheetPathArchivedNote,
+        ),
+      ),
+    );
+  }
+}
 
 /// Вкладка «Обзор»: описание целиком и поля, которые пока только показывают
 /// значения.

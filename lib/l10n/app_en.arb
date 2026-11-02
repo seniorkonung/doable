@@ -2426,6 +2426,8 @@
   "@dailyChoiceSheetPathTabLabel": {"description": "Доступное название вкладки пути с числом шагов", "placeholders": {"count": {"type": "int"}}},
   "dailyChoiceSheetPathTabArchivedLabel": "{count, plural, one{Path, {count} step, something in it is archived} other{Path, {count} steps, something in it is archived}}",
   "@dailyChoiceSheetPathTabArchivedLabel": {"description": "Доступное название вкладки пути, в котором что-то архивировано", "placeholders": {"count": {"type": "int"}}},
+  "dailyChoiceSheetPathArchivedNote": "The path contains archived intentions or relations.",
+  "@dailyChoiceSheetPathArchivedNote": {"description": "Пояснение под путём с архивированными намерениями или связями"},
   "dailyChoiceFieldDate": "Date",
   "@dailyChoiceFieldDate": {"description": "Название поля даты дневного выбора"},
   "dailyChoiceFieldTime": "Time",

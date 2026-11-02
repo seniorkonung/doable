@@ -3120,6 +3120,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get dailyChoiceSheetPathArchivedNote =>
+      'The path contains archived intentions or relations.';
+
+  @override
   String get dailyChoiceFieldDate => 'Date';
 
   @override

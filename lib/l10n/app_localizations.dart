@@ -4862,6 +4862,12 @@ abstract class AppLocalizations {
   /// **'{count, plural, one{Path, {count} step, something in it is archived} other{Path, {count} steps, something in it is archived}}'**
   String dailyChoiceSheetPathTabArchivedLabel(int count);
 
+  /// Пояснение под путём с архивированными намерениями или связями
+  ///
+  /// In en, this message translates to:
+  /// **'The path contains archived intentions or relations.'**
+  String get dailyChoiceSheetPathArchivedNote;
+
   /// Название поля даты дневного выбора
   ///
   /// In en, this message translates to:
