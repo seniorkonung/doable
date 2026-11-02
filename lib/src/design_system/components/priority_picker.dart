@@ -38,8 +38,9 @@ final class PriorityPicker extends StatelessWidget {
   final String Function(DoablePriority priority) name;
 
   /// Доступное название пилюли: оно называет порядок приоритетов, например
-  /// «Приоритет P1, высший».
-  final String Function(DoablePriority priority, bool chosen) itemLabel;
+  /// «Приоритет P1, высший». Выбор диктору объявляет состояние `selected`,
+  /// поэтому название от него не зависит.
+  final String Function(DoablePriority priority) itemLabel;
 
   @override
   Widget build(BuildContext context) => Semantics(
@@ -54,7 +55,7 @@ final class PriorityPicker extends StatelessWidget {
             priority: priority,
             chosen: priority == value,
             name: name(priority),
-            semanticLabel: itemLabel(priority, priority == value),
+            semanticLabel: itemLabel(priority),
             onChange: onChange,
           ),
       ],

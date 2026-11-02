@@ -562,7 +562,7 @@ final class _LoadedRelation extends ConsumerWidget {
                               onChangePriority(_relationPriority(priority)),
                     label: localizations.relationDetailsPriorityLabel,
                     name: _priorityName,
-                    itemLabel: (priority, _) =>
+                    itemLabel: (priority) =>
                         _priorityItemLabel(localizations, priority),
                   ),
                 ),

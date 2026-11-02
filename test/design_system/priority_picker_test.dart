@@ -167,7 +167,7 @@ void main() {
       Matcher pill(DoablePriority priority, {required bool enabled}) {
         final chosen = priority == DoablePriority.p2;
         return matchesSemantics(
-          label: _itemLabel(priority, chosen),
+          label: _itemLabel(priority),
           isButton: true,
           hasEnabledState: true,
           isEnabled: enabled,
@@ -262,8 +262,7 @@ String _name(DoablePriority priority) => switch (priority) {
   DoablePriority.p4 => 'P4',
 };
 
-String _itemLabel(DoablePriority priority, bool chosen) =>
-    '${_pillLabels[priority]}${chosen ? ', выбран' : ''}';
+String _itemLabel(DoablePriority priority) => _pillLabels[priority]!;
 
 /// Цвет, на котором стоит пикер в тестах: не совпадает с `bg` ни одной темы,
 /// поэтому заливка плоскости пилюли и зазор focus-ring различимы.

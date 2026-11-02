@@ -571,7 +571,7 @@
   - **Предполагаемые файлы:** меняются `lib/src/long_term_relation/presentation/editor/relation_editor_state.dart`, `test/long_term_relation/presentation/editor/relation_editor_view_model_test.dart`.
   - **Размер:** XS.
 
-- [ ] 2.21 Доступное название пилюли `PriorityPicker` зависит только от приоритета
+- [x] 2.21 Доступное название пилюли `PriorityPicker` зависит только от приоритета
   - **Критерии приёмки:**
     - `PriorityPicker.itemLabel` имеет тип `String Function(DoablePriority priority)`: состояние выбора в него не передаётся, а выбор объявляется диктору один раз через `selected`.
     - `priority_picker.dart` передаёт в `itemLabel` только приоритет, данные `_Pill` собираются без этого аргумента, а `chosen` остаётся у `_Pill` для вида пилюли и `selected`.
