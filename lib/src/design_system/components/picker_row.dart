@@ -12,7 +12,7 @@ import 'tag_chip.dart';
 /// открывает его страницу. Названия областей для экранного диктора задаёт
 /// потребитель.
 final class PickerRow extends StatelessWidget {
-  const PickerRow({
+  PickerRow({
     required this.name,
     required String label,
     required VoidCallback onPick,
@@ -23,15 +23,9 @@ final class PickerRow extends StatelessWidget {
     this.marks = const [],
     this.tags = const [],
     super.key,
-  }) : // Имена параметров остаются открытыми при закрытых полях вариантов.
-       // ignore: prefer_initializing_formals
-       _label = label,
-       // ignore: prefer_initializing_formals
-       _onPick = onPick,
-       _chosen = null,
-       _reason = null;
+  }) : _behavior = _Pick(label, onPick);
 
-  const PickerRow.checkable({
+  PickerRow.checkable({
     required this.name,
     required String label,
     required bool chosen,
@@ -43,16 +37,9 @@ final class PickerRow extends StatelessWidget {
     this.marks = const [],
     this.tags = const [],
     super.key,
-  }) : // Публичные параметры сохраняют свои имена.
-       // ignore: prefer_initializing_formals
-       _label = label,
-       // ignore: prefer_initializing_formals
-       _onPick = onPick,
-       // ignore: prefer_initializing_formals
-       _chosen = chosen,
-       _reason = null;
+  }) : _behavior = _Check(label, onPick, chosen);
 
-  const PickerRow.occupied({
+  PickerRow.occupied({
     required this.name,
     required String reason,
     required this.pageLabel,
@@ -62,11 +49,7 @@ final class PickerRow extends StatelessWidget {
        archived = false,
        marks = const [],
        tags = const [],
-       _label = null,
-       _onPick = null,
-       _chosen = null,
-       // ignore: prefer_initializing_formals
-       _reason = reason;
+       _behavior = _Occupied(reason);
 
   /// Название переносится и не обрезается.
   final String name;
@@ -83,20 +66,7 @@ final class PickerRow extends StatelessWidget {
   final List<Badge> marks;
   final List<TagChip> tags;
 
-  final String? _label;
-  final VoidCallback? _onPick;
-  final bool? _chosen;
-  final String? _reason;
-
-  /// Название и действие области выбора у незанятых строк.
-  String get label => _label!;
-  VoidCallback get onPick => _onPick!;
-
-  _PickerBehavior get _behavior => switch ((_reason, _chosen)) {
-    (final reason?, _) => _Occupied(reason),
-    (_, final chosen?) => _Check(_label!, _onPick!, chosen),
-    _ => _Pick(_label!, _onPick!),
-  };
+  final _PickerBehavior _behavior;
 
   /// Доступное название стрелки.
   final String pageLabel;

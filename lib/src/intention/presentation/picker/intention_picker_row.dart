@@ -12,35 +12,33 @@ import '../search/intention_search_kind.dart';
 /// метка архива у архивированного намерения, молния у действия и теги, где
 /// обязательные для выдачи идут первыми.
 final class IntentionPickerRow extends StatelessWidget {
-  const IntentionPickerRow({
+  IntentionPickerRow({
     required this.purpose,
     required this.summary,
     required this.requiredTagIds,
-    required this.onPick,
+    required VoidCallback onPick,
     required this.onOpenPage,
     super.key,
-  }) : chosen = null,
-       reason = null;
+  }) : _behavior = _Pick(onPick);
 
-  const IntentionPickerRow.checkable({
+  IntentionPickerRow.checkable({
     required this.purpose,
     required this.summary,
     required this.requiredTagIds,
-    required bool this.chosen,
-    required this.onPick,
+    required bool chosen,
+    required VoidCallback onPick,
     required this.onOpenPage,
     super.key,
-  }) : reason = null;
+  }) : _behavior = _Check(onPick, chosen);
 
-  const IntentionPickerRow.occupied({
+  IntentionPickerRow.occupied({
     required this.purpose,
     required this.summary,
-    required String this.reason,
+    required String reason,
     required this.onOpenPage,
     super.key,
   }) : requiredTagIds = const {},
-       onPick = null,
-       chosen = null;
+       _behavior = _Occupied(reason);
 
   final IntentionPickerPurpose purpose;
   final IntentionSummary summary;
@@ -50,9 +48,7 @@ final class IntentionPickerRow extends StatelessWidget {
   /// другими.
   final Set<TagId> requiredTagIds;
 
-  final VoidCallback? onPick;
-  final bool? chosen;
-  final String? reason;
+  final _PickerBehavior _behavior;
   final VoidCallback onOpenPage;
 
   @override
@@ -68,16 +64,14 @@ final class IntentionPickerRow extends StatelessWidget {
     final pageLabel = content.isAction
         ? l10n.intentionPickerOpenActionPage(content.name)
         : l10n.intentionPickerOpenIntentionPage(content.name);
-    if (reason case final reason?) {
-      return PickerRow.occupied(
+    return switch (_behavior) {
+      _Occupied(:final reason) => PickerRow.occupied(
         name: content.name,
         reason: reason,
         pageLabel: pageLabel,
         onOpenPage: onOpenPage,
-      );
-    }
-    if (chosen case final chosen?) {
-      return PickerRow.checkable(
+      ),
+      _Check(:final onPick, :final chosen) => PickerRow.checkable(
         name: content.name,
         description: content.description,
         archived: content.archived,
@@ -85,22 +79,41 @@ final class IntentionPickerRow extends StatelessWidget {
         tags: content.tags,
         label: content.label,
         chosen: chosen,
-        onPick: onPick!,
+        onPick: onPick,
         pageLabel: pageLabel,
         onOpenPage: onOpenPage,
-      );
-    }
-
-    return PickerRow(
-      name: content.name,
-      description: content.description,
-      archived: content.archived,
-      marks: content.marks,
-      tags: content.tags,
-      label: content.label,
-      onPick: onPick!,
-      pageLabel: pageLabel,
-      onOpenPage: onOpenPage,
-    );
+      ),
+      _Pick(:final onPick) => PickerRow(
+        name: content.name,
+        description: content.description,
+        archived: content.archived,
+        marks: content.marks,
+        tags: content.tags,
+        label: content.label,
+        onPick: onPick,
+        pageLabel: pageLabel,
+        onOpenPage: onOpenPage,
+      ),
+    };
   }
+}
+
+sealed class _PickerBehavior {
+  const _PickerBehavior();
+}
+
+final class _Pick extends _PickerBehavior {
+  const _Pick(this.onPick);
+  final VoidCallback onPick;
+}
+
+final class _Check extends _PickerBehavior {
+  const _Check(this.onPick, this.chosen);
+  final VoidCallback onPick;
+  final bool chosen;
+}
+
+final class _Occupied extends _PickerBehavior {
+  const _Occupied(this.reason);
+  final String reason;
 }
