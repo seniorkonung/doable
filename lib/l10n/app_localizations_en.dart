@@ -1887,6 +1887,47 @@ class AppLocalizationsEn extends AppLocalizations {
       'The daily choice operation failed because of an unexpected error.';
 
   @override
+  String get graphOperationAddRelations => 'Add';
+
+  @override
+  String get graphOperationRelations => 'relations';
+
+  @override
+  String relationsAdded(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count relations added.',
+      one: '$count relation added.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get relationsAdditionPairOccupied =>
+      'A relation already exists between some selected intentions. No relations were created.';
+
+  @override
+  String get relationsAdditionParticipantNotFound =>
+      'A selected intention no longer exists. No relations were created.';
+
+  @override
+  String get relationsAdditionParticipantArchived =>
+      'Only active intentions can be linked. No relations were created.';
+
+  @override
+  String get relationsAdditionUnavailable =>
+      'No relations were created. Try again.';
+
+  @override
+  String get relationsAdditionCorruption =>
+      'Stored data is damaged. No relations were created.';
+
+  @override
+  String get relationsAdditionUnexpected =>
+      'No relations were created because of an unexpected error.';
+
+  @override
   String get relationEditorCreated => 'Relation created.';
 
   @override

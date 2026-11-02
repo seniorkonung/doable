@@ -149,8 +149,9 @@ LongTermRelationCommandAccepted acceptRelationCommand(
       LongTermRelationCreationFormKey(),
       command,
     ),
-    AddLongTermRelations() => fail(
-      'Добавление пачки появится в координаторе с задачей 3.3.',
+    AddLongTermRelations() => coordinator.acceptRelationsAddition(
+      RelationsAdditionSearchKey(),
+      command,
     ),
     UpdateLongTermRelation() => coordinator.acceptRelationUpdate(command),
     ArchiveLongTermRelation() => coordinator.acceptRelationArchive(command),

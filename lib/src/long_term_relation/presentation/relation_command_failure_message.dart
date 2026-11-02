@@ -8,6 +8,23 @@ String longTermRelationCommandFailureMessage(
   LongTermRelationCommandKind kind,
   LongTermRelationCommandFailure failure,
 ) => switch (kind) {
+  LongTermRelationCommandKind.add => switch (failure) {
+    LongTermRelationPairOccupiedFailure() =>
+      localizations.relationsAdditionPairOccupied,
+    LongTermRelationParticipantNotFoundFailure() =>
+      localizations.relationsAdditionParticipantNotFound,
+    LongTermRelationParticipantArchivedFailure() =>
+      localizations.relationsAdditionParticipantArchived,
+    LongTermRelationUnavailableFailure() =>
+      localizations.relationsAdditionUnavailable,
+    LongTermRelationCorruptionFailure() =>
+      localizations.relationsAdditionCorruption,
+    LongTermRelationNotFoundFailure() ||
+    LongTermRelationReferencedByDailyPathFailure() ||
+    LongTermRelationArchivedTypeChangeFailure() ||
+    LongTermRelationUnexpectedFailure() =>
+      localizations.relationsAdditionUnexpected,
+  },
   LongTermRelationCommandKind.create => switch (failure) {
     LongTermRelationPairOccupiedFailure() =>
       localizations.relationEditorCreatePairOccupied,

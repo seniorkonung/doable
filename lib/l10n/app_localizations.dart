@@ -2915,6 +2915,60 @@ abstract class AppLocalizations {
   /// **'The daily choice operation failed because of an unexpected error.'**
   String get dailyChoiceOperationUnexpected;
 
+  /// Вид операции добавления связей
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get graphOperationAddRelations;
+
+  /// Обозначение добавляемой пачки связей
+  ///
+  /// In en, this message translates to:
+  /// **'relations'**
+  String get graphOperationRelations;
+
+  /// Число добавленных связей
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{{count} relation added.} other{{count} relations added.}}'**
+  String relationsAdded(int count);
+
+  /// Занятая пара при добавлении связей
+  ///
+  /// In en, this message translates to:
+  /// **'A relation already exists between some selected intentions. No relations were created.'**
+  String get relationsAdditionPairOccupied;
+
+  /// Отсутствующий участник при добавлении связей
+  ///
+  /// In en, this message translates to:
+  /// **'A selected intention no longer exists. No relations were created.'**
+  String get relationsAdditionParticipantNotFound;
+
+  /// Архивированный участник при добавлении связей
+  ///
+  /// In en, this message translates to:
+  /// **'Only active intentions can be linked. No relations were created.'**
+  String get relationsAdditionParticipantArchived;
+
+  /// Недоступность добавления связей
+  ///
+  /// In en, this message translates to:
+  /// **'No relations were created. Try again.'**
+  String get relationsAdditionUnavailable;
+
+  /// Повреждение данных при добавлении связей
+  ///
+  /// In en, this message translates to:
+  /// **'Stored data is damaged. No relations were created.'**
+  String get relationsAdditionCorruption;
+
+  /// Неожиданный отказ добавления связей
+  ///
+  /// In en, this message translates to:
+  /// **'No relations were created because of an unexpected error.'**
+  String get relationsAdditionUnexpected;
+
   /// Подтверждение успешного создания долговременной связи
   ///
   /// In en, this message translates to:

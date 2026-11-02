@@ -1911,6 +1911,49 @@ class AppLocalizationsRu extends AppLocalizations {
       'Действие с дневным выбором не выполнено из-за непредвиденной ошибки.';
 
   @override
+  String get graphOperationAddRelations => 'Добавление';
+
+  @override
+  String get graphOperationRelations => 'связи';
+
+  @override
+  String relationsAdded(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Добавлено $count связи.',
+      many: 'Добавлено $count связей.',
+      few: 'Добавлено $count связи.',
+      one: 'Добавлена $count связь.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get relationsAdditionPairOccupied =>
+      'Между некоторыми выбранными намерениями уже есть связь. Связи не созданы.';
+
+  @override
+  String get relationsAdditionParticipantNotFound =>
+      'Одно из выбранных намерений больше не существует. Связи не созданы.';
+
+  @override
+  String get relationsAdditionParticipantArchived =>
+      'Связать можно только активные намерения. Связи не созданы.';
+
+  @override
+  String get relationsAdditionUnavailable =>
+      'Связи не созданы. Повторите попытку.';
+
+  @override
+  String get relationsAdditionCorruption =>
+      'Сохранённые данные повреждены. Связи не созданы.';
+
+  @override
+  String get relationsAdditionUnexpected =>
+      'Связи не созданы из-за непредвиденной ошибки.';
+
+  @override
   String get relationEditorCreated => 'Связь создана.';
 
   @override

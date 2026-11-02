@@ -1402,6 +1402,24 @@
   "@graphOperationRelation": {
     "description": "Безопасное обозначение существующей связи"
   },
+  "graphOperationAddRelations": "Add",
+  "@graphOperationAddRelations": {"description": "Вид операции добавления связей"},
+  "graphOperationRelations": "relations",
+  "@graphOperationRelations": {"description": "Обозначение добавляемой пачки связей"},
+  "relationsAdded": "{count, plural, one{{count} relation added.} other{{count} relations added.}}",
+  "@relationsAdded": {"description": "Число добавленных связей", "placeholders": {"count": {"type": "int"}}},
+  "relationsAdditionPairOccupied": "A relation already exists between some selected intentions. No relations were created.",
+  "@relationsAdditionPairOccupied": {"description": "Занятая пара при добавлении связей"},
+  "relationsAdditionParticipantNotFound": "A selected intention no longer exists. No relations were created.",
+  "@relationsAdditionParticipantNotFound": {"description": "Отсутствующий участник при добавлении связей"},
+  "relationsAdditionParticipantArchived": "Only active intentions can be linked. No relations were created.",
+  "@relationsAdditionParticipantArchived": {"description": "Архивированный участник при добавлении связей"},
+  "relationsAdditionUnavailable": "No relations were created. Try again.",
+  "@relationsAdditionUnavailable": {"description": "Недоступность добавления связей"},
+  "relationsAdditionCorruption": "Stored data is damaged. No relations were created.",
+  "@relationsAdditionCorruption": {"description": "Повреждение данных при добавлении связей"},
+  "relationsAdditionUnexpected": "No relations were created because of an unexpected error.",
+  "@relationsAdditionUnexpected": {"description": "Неожиданный отказ добавления связей"},
   "relationEditorCreated": "Relation created.",
   "@relationEditorCreated": {
     "description": "Подтверждение успешного создания долговременной связи"

@@ -58,6 +58,11 @@ final class LongTermRelationCreationFormKey extends GraphCommandKey {
   LongTermRelationCreationFormKey();
 }
 
+/// Ключ отдельного экземпляра поиска участников.
+final class RelationsAdditionSearchKey extends GraphCommandKey {
+  RelationsAdditionSearchKey();
+}
+
 final class ExistingLongTermRelationKey extends GraphCommandKey {
   const ExistingLongTermRelationKey(this.relationId);
 
@@ -259,7 +264,14 @@ final class IntentionUnannouncedSuccessCompletion
   }) : super._(confirmedResult: result);
 }
 
-enum LongTermRelationCommandKind { create, update, archive, restore, delete }
+enum LongTermRelationCommandKind {
+  create,
+  add,
+  update,
+  archive,
+  restore,
+  delete,
+}
 
 sealed class LongTermRelationCommandCompletion extends GraphCommandCompletion {
   const LongTermRelationCommandCompletion._({
@@ -679,6 +691,11 @@ final class CreatingLongTermRelationOperationTarget
   const CreatingLongTermRelationOperationTarget();
 }
 
+final class AddingLongTermRelationsOperationTarget
+    extends LongTermRelationOperationTarget {
+  const AddingLongTermRelationsOperationTarget();
+}
+
 final class ExistingLongTermRelationOperationTarget
     extends LongTermRelationOperationTarget {
   const ExistingLongTermRelationOperationTarget(this.relationId);
@@ -976,6 +993,16 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     command: command,
     kind: LongTermRelationCommandKind.create,
     target: const CreatingLongTermRelationOperationTarget(),
+  );
+
+  LongTermRelationCommandStart acceptRelationsAddition(
+    RelationsAdditionSearchKey searchKey,
+    AddLongTermRelations command,
+  ) => _acceptRelation(
+    keys: {searchKey},
+    command: command,
+    kind: LongTermRelationCommandKind.add,
+    target: const AddingLongTermRelationsOperationTarget(),
   );
 
   /// Принимает изменение связи с политикой «успех без сообщения» по ADR-0046.
