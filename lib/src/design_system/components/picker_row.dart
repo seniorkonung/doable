@@ -166,20 +166,24 @@ final class PickerRow extends StatelessWidget {
                       color: colors.grip,
                     ),
                   ),
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        name,
-                        style: DoableType.action.copyWith(color: colors.muted),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        reason,
-                        style: DoableType.label.copyWith(color: colors.muted),
-                      ),
-                    ],
+                  MergeSemantics(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          style: DoableType.action.copyWith(
+                            color: colors.muted,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          reason,
+                          style: DoableType.label.copyWith(color: colors.muted),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               },

@@ -332,7 +332,11 @@ void main() {
         (DoableIconData.relation, 18, colors.grip),
       );
       final nameSemantics = tester.getSemantics(find.text('Бег'));
-      expect(nameSemantics, isSemantics(label: 'Бег'));
+      expect(nameSemantics, isSemantics(label: 'Бег\nУже добавлено'));
+      expect(
+        tester.getSemantics(find.bySemanticsLabel(_pageLabel)),
+        isSemantics(label: _pageLabel, isButton: true, hasTapAction: true),
+      );
       await tester.tap(find.text('Бег'));
       expect(openings, 0);
       await tester.tap(_arrowArea());
