@@ -17,6 +17,7 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_view
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import 'package:doable/src/intention/presentation/picker/intention_picker_row.dart';
 import 'package:doable/src/intention/presentation/picker/intention_picker_view.dart';
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/relation_pair_probe.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
@@ -893,6 +894,112 @@ void main() {
     semantics.dispose();
   });
 
+  for (final (locale, reasons) in [
+    (
+      const Locale('ru'),
+      [
+        'Уже добавлено',
+        'Уже добавлено, в архиве',
+        'Уже в группе "Можно использовать"',
+        'Уже в группе "Можно использовать", в архиве',
+      ],
+    ),
+    (
+      const Locale('en'),
+      [
+        'Already added',
+        'Already added, archived',
+        'Already in group "Can use"',
+        'Already in group "Can use", archived',
+      ],
+    ),
+  ]) {
+    testWidgets(
+      '${locale.languageCode}: отметка свободной строки и причины занятых строк сохраняют выдачу',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        final h = await _open(
+          tester,
+          locale: locale,
+          checkable: true,
+          purpose: SelectRelationParticipant(
+            session: IntentionSearchSession(),
+            pairProbe: RelationPairProbe(
+              counterpartId: testSummary(index: 9).id,
+              candidateRole: RelationParticipantRole.related,
+            ),
+          ),
+        );
+        final items = _actions(6);
+        h.repository.complete(
+          0,
+          _firstPage(
+            items,
+            pairOccupants: {
+              for (var i = 0; i < 4; i++)
+                items[i].id: PairOccupant(
+                  relationId: testFormRelationId(i + 1),
+                  type: i < 2
+                      ? LongTermRelationType.need
+                      : LongTermRelationType.can,
+                  scope: i.isEven
+                      ? RelationScope.active
+                      : RelationScope.archived,
+                ),
+            },
+          ),
+        );
+        await tester.pumpAndSettle();
+        for (final reason in reasons) {
+          expect(find.text(reason), findsOneWidget);
+          expect(
+            find.bySemanticsLabel(RegExp("${RegExp.escape(reason)}\$")),
+            findsOneWidget,
+          );
+        }
+        expect(
+          _header(locale.languageCode == 'ru' ? 'Все' : 'All', 6),
+          findsOneWidget,
+        );
+        await tester.tap(find.text(items.first.title));
+        expect(h.picks, isEmpty);
+        await tester.tap(find.text(items.last.title));
+        expect(h.picks.single.value.id, items.last.id);
+        expect(
+          tester.getSemantics(
+            find.bySemanticsLabel(
+              RegExp("^${RegExp.escape(items.last.title)},"),
+            ),
+          ),
+          isSemantics(
+            hasCheckedState: true,
+            isChecked: false,
+            hasTapAction: true,
+          ),
+        );
+        expect(
+          tester.getSemantics(
+            find.bySemanticsLabel(RegExp("^${RegExp.escape(items[4].title)},")),
+          ),
+          isSemantics(
+            hasCheckedState: true,
+            isChecked: true,
+            hasTapAction: true,
+          ),
+        );
+        await tester.tap(
+          find.bySemanticsLabel(
+            locale.languageCode == 'ru'
+                ? 'Открыть страницу действия «${items.first.title}»'
+                : 'Open the page of action ${items.first.title}',
+          ),
+        );
+        expect(h.openedDetails, [items.first.id]);
+        semantics.dispose();
+      },
+    );
+  }
+
   for (final brightness in Brightness.values) {
     for (final locale in [const Locale('ru'), const Locale('en')]) {
       testWidgets(
@@ -992,6 +1099,7 @@ Future<_Harness> _open(
   Brightness brightness = Brightness.light,
   IntentionPickerPurpose? purpose,
   List<Tag>? tags,
+  bool checkable = false,
 }) async {
   tester.view
     ..physicalSize = _screen
@@ -1016,15 +1124,23 @@ Future<_Harness> _open(
           closeLabel: _closeLabel,
           emptyScopeMessage: _emptyScopeMessage,
           onClose: () => h.closes++,
-          onPick: h.picks.add,
+          rowBehavior: checkable
+              ? IntentionPickerCheckable(
+                  group: IntentionRelationGroup.needs,
+                  selectedIds: {_action(2).id},
+                  onToggle: h.picks.add,
+                )
+              : IntentionPickerSingle(
+                  onPick: h.picks.add,
+                  occupiedPairMark: (occupant) => OccupiedPairMark(
+                    kind: switch (occupant.scope) {
+                      RelationScope.active => OccupiedPairKind.linked,
+                      RelationScope.archived => OccupiedPairKind.restorable,
+                    },
+                    onTap: () => h.openedOccupants.add(occupant),
+                  ),
+                ),
           onOpenDetails: h.openedDetails.add,
-          occupiedPairMark: (occupant) => OccupiedPairMark(
-            kind: switch (occupant.scope) {
-              RelationScope.active => OccupiedPairKind.linked,
-              RelationScope.archived => OccupiedPairKind.restorable,
-            },
-            onTap: () => h.openedOccupants.add(occupant),
-          ),
         ),
       ),
     ),

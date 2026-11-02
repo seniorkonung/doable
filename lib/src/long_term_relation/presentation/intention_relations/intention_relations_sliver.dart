@@ -20,6 +20,7 @@ import '../../application/long_term_relation_projection.dart';
 import '../../application/relation_counts.dart';
 import '../../domain/long_term_relation.dart';
 import '../../domain/long_term_relation_id.dart';
+import '../relation_group_name.dart';
 import '../relation_list_reconciliation.dart';
 import '../relation_list_status.dart';
 import 'intention_relations_state.dart';
@@ -240,7 +241,7 @@ final class _IntentionRelationsSliverState
           count: fold.count,
           open: fold.open,
           label: localizations.detailsRelationsArchiveFoldSemantic(
-            _groupName(localizations, state.group),
+            relationGroupName(localizations, state.group),
             fold.count,
           ),
           onToggle: fold.open
@@ -467,7 +468,7 @@ final class _GroupTiles extends StatelessWidget {
     AppLocalizations l10n,
     IntentionRelationGroup group,
   ) {
-    final name = _groupName(l10n, group);
+    final name = relationGroupName(l10n, group);
     int countIn(RelationScope scope) => counts.forGroup(
       scope: scope,
       type: group.type,
@@ -701,15 +702,6 @@ final class _GroupFooter extends StatelessWidget {
     };
   }
 }
-
-String _groupName(AppLocalizations l10n, IntentionRelationGroup group) =>
-    switch (group) {
-      IntentionRelationGroup.needs => l10n.detailsRelationsGroupNeeds,
-      IntentionRelationGroup.canUse => l10n.detailsRelationsGroupCanUse,
-      IntentionRelationGroup.neededFor => l10n.detailsRelationsGroupNeededFor,
-      IntentionRelationGroup.canBeUsedFor =>
-        l10n.detailsRelationsGroupCanBeUsedFor,
-    };
 
 /// Порядок тела списка под строкой «Добавить»: активные строки, строка
 /// свёрнутого архива, строки раскрытого архива и один нижний статус.

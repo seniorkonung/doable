@@ -854,6 +854,30 @@ abstract class AppLocalizations {
   /// **'Relations: {active} active, {archived} archived'**
   String detailsRelationsTabSemantic(int active, int archived);
 
+  /// Причина занятости пары в поиске участника
+  ///
+  /// In en, this message translates to:
+  /// **'Already added'**
+  String get relationPairAlreadyAdded;
+
+  /// Причина занятости пары в поиске участника
+  ///
+  /// In en, this message translates to:
+  /// **'Already added, archived'**
+  String get relationPairAlreadyAddedArchived;
+
+  /// Причина занятости пары в поиске участника
+  ///
+  /// In en, this message translates to:
+  /// **'Already in group \"{group}\"'**
+  String relationPairOtherGroup(String group);
+
+  /// Причина занятости пары в поиске участника
+  ///
+  /// In en, this message translates to:
+  /// **'Already in group \"{group}\", archived'**
+  String relationPairOtherGroupArchived(String group);
+
   /// Доступное название плиток групп связей на вкладке «Связи»
   ///
   /// In en, this message translates to:

@@ -553,6 +553,22 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get relationPairAlreadyAdded => 'Already added';
+
+  @override
+  String get relationPairAlreadyAddedArchived => 'Already added, archived';
+
+  @override
+  String relationPairOtherGroup(String group) {
+    return 'Already in group \"$group\"';
+  }
+
+  @override
+  String relationPairOtherGroupArchived(String group) {
+    return 'Already in group \"$group\", archived';
+  }
+
+  @override
   String get detailsRelationsGroupsLabel => 'Relation groups';
 
   @override

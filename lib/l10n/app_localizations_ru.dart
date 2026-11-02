@@ -556,6 +556,22 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
+  String get relationPairAlreadyAdded => 'Уже добавлено';
+
+  @override
+  String get relationPairAlreadyAddedArchived => 'Уже добавлено, в архиве';
+
+  @override
+  String relationPairOtherGroup(String group) {
+    return 'Уже в группе \"$group\"';
+  }
+
+  @override
+  String relationPairOtherGroupArchived(String group) {
+    return 'Уже в группе \"$group\", в архиве';
+  }
+
+  @override
   String get detailsRelationsGroupsLabel => 'Группы связей';
 
   @override

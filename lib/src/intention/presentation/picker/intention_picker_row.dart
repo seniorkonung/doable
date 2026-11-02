@@ -45,7 +45,30 @@ final class IntentionPickerRow extends StatelessWidget {
     required this.onOpenPage,
     this.occupiedPair,
     super.key,
-  });
+  }) : chosen = null,
+       reason = null;
+
+  const IntentionPickerRow.checkable({
+    required this.purpose,
+    required this.summary,
+    required this.requiredTagIds,
+    required bool this.chosen,
+    required this.onPick,
+    required this.onOpenPage,
+    super.key,
+  }) : occupiedPair = null,
+       reason = null;
+
+  const IntentionPickerRow.occupied({
+    required this.purpose,
+    required this.summary,
+    required String this.reason,
+    required this.onOpenPage,
+    super.key,
+  }) : requiredTagIds = const {},
+       onPick = null,
+       occupiedPair = null,
+       chosen = null;
 
   final IntentionPickerPurpose purpose;
   final IntentionSummary summary;
@@ -55,7 +78,9 @@ final class IntentionPickerRow extends StatelessWidget {
   /// другими.
   final Set<TagId> requiredTagIds;
 
-  final VoidCallback onPick;
+  final VoidCallback? onPick;
+  final bool? chosen;
+  final String? reason;
   final VoidCallback onOpenPage;
 
   /// Отметка занятой пары; без неё строка выбирается как обычно.
@@ -70,6 +95,32 @@ final class IntentionPickerRow extends StatelessWidget {
       requiredTagIds: requiredTagIds,
       namesKind: IntentionSearchKind.of(purpose).namesKind,
     );
+
+    final pageLabel = content.isAction
+        ? l10n.intentionPickerOpenActionPage(content.name)
+        : l10n.intentionPickerOpenIntentionPage(content.name);
+    if (reason case final reason?) {
+      return PickerRow.occupied(
+        name: content.name,
+        reason: reason,
+        pageLabel: pageLabel,
+        onOpenPage: onOpenPage,
+      );
+    }
+    if (chosen case final chosen?) {
+      return PickerRow.checkable(
+        name: content.name,
+        description: content.description,
+        archived: content.archived,
+        marks: content.marks,
+        tags: content.tags,
+        label: content.label,
+        chosen: chosen,
+        onPick: onPick!,
+        pageLabel: pageLabel,
+        onOpenPage: onOpenPage,
+      );
+    }
 
     final pair = switch (occupiedPair?.kind) {
       null => null,
@@ -95,10 +146,8 @@ final class IntentionPickerRow extends StatelessWidget {
       label: pair == null
           ? content.label
           : [content.label, pair.word, pair.action].join(', '),
-      onPick: occupiedPair?.onTap ?? onPick,
-      pageLabel: content.isAction
-          ? l10n.intentionPickerOpenActionPage(content.name)
-          : l10n.intentionPickerOpenIntentionPage(content.name),
+      onPick: occupiedPair?.onTap ?? onPick!,
+      pageLabel: pageLabel,
       onOpenPage: onOpenPage,
     );
   }

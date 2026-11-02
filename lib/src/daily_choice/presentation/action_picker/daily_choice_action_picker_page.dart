@@ -63,7 +63,9 @@ final class _DailyChoiceActionPickerPageState
         },
         emptyScopeMessage: l10n.actionPickerEmpty,
         onClose: () => unawaited(_close()),
-        onPick: (pick) => unawaited(_close(pick.value.id)),
+        rowBehavior: IntentionPickerSingle(
+          onPick: (pick) => unawaited(_close(pick.value.id)),
+        ),
         onOpenDetails: (id) {
           if (!_canSelect) return;
           unawaited(

@@ -1272,7 +1272,7 @@ _open(
           closeLabel: 'Закрыть поиск',
           emptyScopeMessage: 'Выбрать не из чего',
           onClose: () {},
-          onPick: (_) {},
+          rowBehavior: IntentionPickerSingle(onPick: (_) {}),
           onOpenDetails: (_) {},
         ),
       ),

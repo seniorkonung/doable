@@ -191,25 +191,27 @@ final class _RelationParticipantPickerPageState
       closeLabel: l10n.participantPickerCancel,
       emptyScopeMessage: l10n.participantPickerEmpty,
       onClose: () => unawaited(context.router.maybePop()),
-      onPick: (pick) {
-        if (!_canContinue) return;
-        unawaited(
-          context.router.maybePop(
-            GraphSnapshot(
-              revision: pick.revision,
-              value: RelationParticipantSummary(
-                id: pick.value.id,
-                title: pick.value.title,
-                archiveState: pick.value.archiveState,
+      rowBehavior: IntentionPickerSingle(
+        occupiedPairMark: _occupiedPairMark,
+        onPick: (pick) {
+          if (!_canContinue) return;
+          unawaited(
+            context.router.maybePop(
+              GraphSnapshot(
+                revision: pick.revision,
+                value: RelationParticipantSummary(
+                  id: pick.value.id,
+                  title: pick.value.title,
+                  archiveState: pick.value.archiveState,
+                ),
               ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
       onOpenDetails: (id) => unawaited(
         context.router.push(IntentionDetailsRoute(intentionId: id)),
       ),
-      occupiedPairMark: _occupiedPairMark,
     );
   }
 }
