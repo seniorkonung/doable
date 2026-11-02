@@ -921,7 +921,7 @@
   - **Предполагаемые файлы:** механически меняются пять файлов `test/graph_snapshots/` и пять перечисленных файлов приложения и переноса данных.
   - **Размер:** M по логике: файлов больше нормы только из-за механической замены команды.
 
-- [ ] 3.22 Удалить `CreateLongTermRelation`: у него не осталось вызывающих
+- [x] 3.22 Удалить `CreateLongTermRelation`: у него не осталось вызывающих
   - **Критерии приёмки:**
     - Оставшиеся тесты координатора, presenter, контрольной точки согласования и каталога используют `AddLongTermRelations`, `acceptRelationsAddition` и `LongTermRelationsAdded`.
     - Удалены `CreateLongTermRelation` с отказами проверки, `LongTermRelationCreated`, `_createLongTermRelation`, `_CommittedLongTermRelationCreation`, `acceptRelationCreation`, `LongTermRelationCreationFormKey`, `LongTermRelationCommandKind.create`, `CreatingLongTermRelationOperationTarget` и ветки presenter и текстов отказа для них, а также ветви `CreateLongTermRelation` и `LongTermRelationCreated` в разборах `catalog_reconciliation_test_support.dart` и `home_statistics_app_flow_test.dart`.

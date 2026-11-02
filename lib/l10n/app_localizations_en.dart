@@ -1146,9 +1146,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get graphOperationNewRelation => 'new relation';
-
-  @override
   String get graphOperationRelation => 'relation';
 
   @override
@@ -1935,33 +1932,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'No relations were created because of an unexpected error.';
 
   @override
-  String get relationEditorCreated => 'Relation created.';
-
-  @override
-  String get relationEditorCreatePairOccupied =>
-      'A relation with this direction already exists between the selected intentions.';
-
-  @override
-  String get relationEditorCreateParticipantNotFound =>
-      'One of the selected intentions no longer exists.';
-
-  @override
-  String get relationEditorCreateParticipantArchived =>
-      'Only active intentions can be linked.';
-
-  @override
-  String get relationEditorCreateUnavailable =>
-      'The relation couldn’t be created. Try again.';
-
-  @override
-  String get relationEditorCreateCorruption =>
-      'Stored data is damaged. The relation wasn’t created.';
-
-  @override
-  String get relationEditorCreateUnexpected =>
-      'The relation couldn’t be created because of an unexpected error.';
-
-  @override
   String get relationEditorUpdateNotFound => 'This relation no longer exists.';
 
   @override
@@ -2632,10 +2602,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get relationEditorDescriptionInvalidUnicode =>
       'Enter valid Unicode text without NUL.';
-
-  @override
-  String get relationEditorCreateSameParticipants =>
-      'An intention can’t be related to itself.';
 
   @override
   String get choicePathTitle => 'Choose a path to an action';

@@ -54,10 +54,6 @@ final class ExistingIntentionKey extends GraphCommandKey {
   int get hashCode => intentionId.hashCode;
 }
 
-final class LongTermRelationCreationFormKey extends GraphCommandKey {
-  LongTermRelationCreationFormKey();
-}
-
 /// Ключ отдельного экземпляра поиска участников.
 final class RelationsAdditionSearchKey extends GraphCommandKey {
   RelationsAdditionSearchKey();
@@ -264,14 +260,7 @@ final class IntentionUnannouncedSuccessCompletion
   }) : super._(confirmedResult: result);
 }
 
-enum LongTermRelationCommandKind {
-  create,
-  add,
-  update,
-  archive,
-  restore,
-  delete,
-}
+enum LongTermRelationCommandKind { add, update, archive, restore, delete }
 
 sealed class LongTermRelationCommandCompletion extends GraphCommandCompletion {
   const LongTermRelationCommandCompletion._({
@@ -686,11 +675,6 @@ sealed class LongTermRelationOperationTarget {
   const LongTermRelationOperationTarget();
 }
 
-final class CreatingLongTermRelationOperationTarget
-    extends LongTermRelationOperationTarget {
-  const CreatingLongTermRelationOperationTarget();
-}
-
 final class AddingLongTermRelationsOperationTarget
     extends LongTermRelationOperationTarget {
   const AddingLongTermRelationsOperationTarget();
@@ -983,17 +967,6 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
       intentionId: command.id,
       title: presentationTitle,
     ),
-  );
-
-  LongTermRelationCommandStart acceptRelationCreation(
-    LongTermRelationCreationFormKey formKey,
-    CreateLongTermRelation command,
-  ) => _acceptRelation(
-    keys: {formKey},
-    command: command,
-    kind: LongTermRelationCommandKind.create,
-    target: const CreatingLongTermRelationOperationTarget(),
-    policy: _PresentationPolicy.standard,
   );
 
   LongTermRelationCommandStart acceptRelationsAddition(

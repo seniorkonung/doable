@@ -1153,9 +1153,6 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get graphOperationNewRelation => 'новая связь';
-
-  @override
   String get graphOperationRelation => 'связь';
 
   @override
@@ -1961,33 +1958,6 @@ class AppLocalizationsRu extends AppLocalizations {
       'Связи не созданы из-за непредвиденной ошибки.';
 
   @override
-  String get relationEditorCreated => 'Связь создана.';
-
-  @override
-  String get relationEditorCreatePairOccupied =>
-      'Связь этого направления между выбранными намерениями уже есть.';
-
-  @override
-  String get relationEditorCreateParticipantNotFound =>
-      'Одно из выбранных намерений больше не существует.';
-
-  @override
-  String get relationEditorCreateParticipantArchived =>
-      'Связать можно только активные намерения.';
-
-  @override
-  String get relationEditorCreateUnavailable =>
-      'Не удалось создать связь. Повторите попытку.';
-
-  @override
-  String get relationEditorCreateCorruption =>
-      'Сохранённые данные повреждены. Связь не создана.';
-
-  @override
-  String get relationEditorCreateUnexpected =>
-      'Не удалось создать связь из-за непредвиденной ошибки.';
-
-  @override
   String get relationEditorUpdateNotFound => 'Эта связь больше не существует.';
 
   @override
@@ -2658,10 +2628,6 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get relationEditorDescriptionInvalidUnicode =>
       'Введите корректный Unicode-текст без NUL.';
-
-  @override
-  String get relationEditorCreateSameParticipants =>
-      'Намерение нельзя связать с самим собой.';
 
   @override
   String get choicePathTitle => 'Выбор пути к действию';

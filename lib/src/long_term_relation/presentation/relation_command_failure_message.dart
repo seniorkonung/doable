@@ -25,25 +25,6 @@ String longTermRelationCommandFailureMessage(
     LongTermRelationUnexpectedFailure() =>
       localizations.relationsAdditionUnexpected,
   },
-  LongTermRelationCommandKind.create => switch (failure) {
-    LongTermRelationPairOccupiedFailure() =>
-      localizations.relationEditorCreatePairOccupied,
-    LongTermRelationNotFoundFailure() =>
-      localizations.relationEditorCreateUnexpected,
-    LongTermRelationReferencedByDailyPathFailure() ||
-    LongTermRelationArchivedTypeChangeFailure() =>
-      localizations.relationEditorCreateUnexpected,
-    LongTermRelationParticipantNotFoundFailure() =>
-      localizations.relationEditorCreateParticipantNotFound,
-    LongTermRelationParticipantArchivedFailure() =>
-      localizations.relationEditorCreateParticipantArchived,
-    LongTermRelationUnavailableFailure() =>
-      localizations.relationEditorCreateUnavailable,
-    LongTermRelationCorruptionFailure() =>
-      localizations.relationEditorCreateCorruption,
-    LongTermRelationUnexpectedFailure() =>
-      localizations.relationEditorCreateUnexpected,
-  },
   LongTermRelationCommandKind.update => switch (failure) {
     LongTermRelationNotFoundFailure() =>
       localizations.relationEditorUpdateNotFound,

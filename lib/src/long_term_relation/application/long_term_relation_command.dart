@@ -16,51 +16,6 @@ sealed class LongTermRelationCommand
   const LongTermRelationCommand();
 }
 
-enum CreateLongTermRelationValidationFailure { sameIntention }
-
-final class CreateLongTermRelationValidationException implements Exception {
-  const CreateLongTermRelationValidationException(this.failure);
-
-  final CreateLongTermRelationValidationFailure failure;
-}
-
-final class CreateLongTermRelation extends LongTermRelationCommand {
-  factory CreateLongTermRelation({
-    required IntentionId sourceIntentionId,
-    required IntentionId relatedIntentionId,
-    required LongTermRelationType type,
-    required RelationPriority priority,
-    required LongTermRelationDescription? description,
-  }) {
-    if (sourceIntentionId == relatedIntentionId) {
-      throw const CreateLongTermRelationValidationException(
-        CreateLongTermRelationValidationFailure.sameIntention,
-      );
-    }
-    return CreateLongTermRelation._(
-      sourceIntentionId: sourceIntentionId,
-      relatedIntentionId: relatedIntentionId,
-      type: type,
-      priority: priority,
-      description: description,
-    );
-  }
-
-  const CreateLongTermRelation._({
-    required this.sourceIntentionId,
-    required this.relatedIntentionId,
-    required this.type,
-    required this.priority,
-    required this.description,
-  });
-
-  final IntentionId sourceIntentionId;
-  final IntentionId relatedIntentionId;
-  final LongTermRelationType type;
-  final RelationPriority priority;
-  final LongTermRelationDescription? description;
-}
-
 enum AddLongTermRelationsValidationFailure {
   noCandidates,
   duplicateCandidates,
@@ -308,19 +263,6 @@ sealed class LongTermRelationCommandSuccess implements GraphCommandOutcome {
 
   @override
   final List<GraphChange> changes;
-}
-
-final class LongTermRelationCreated extends LongTermRelationCommandSuccess {
-  LongTermRelationCreated({
-    required this.relation,
-    required this.description,
-    this.permissions = const LongTermRelationPermissions.unknown(),
-    required super.changes,
-  });
-
-  final LongTermRelation relation;
-  final LongTermRelationDescription? description;
-  final LongTermRelationPermissions permissions;
 }
 
 /// Связи пачки в порядке набора команды.

@@ -801,7 +801,6 @@ final class _App {
     final relation = await tester.runAsync(() async {
       final coordinator = runtime.commandCoordinator;
       final start = switch (command) {
-        CreateLongTermRelation() => fail('Используйте команду пачки'),
         AddLongTermRelations() => coordinator.acceptRelationsAddition(
           RelationsAdditionSearchKey(),
           command,
@@ -821,9 +820,6 @@ final class _App {
         ) => relation,
         GraphResultSuccess(value: LongTermRelationsAdded(:final relations)) =>
           relations.single,
-        GraphResultSuccess(value: LongTermRelationCreated()) => fail(
-          'Ожидался результат команды пачки',
-        ),
         GraphResultFailure(:final failure) => fail('Отказ команды: $failure'),
       };
     });

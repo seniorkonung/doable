@@ -462,7 +462,6 @@ String _relationMessage(
   LongTermRelationPresentableCompletion completion,
 ) {
   final operation = switch (completion.kind) {
-    LongTermRelationCommandKind.create => localizations.graphOperationCreate,
     LongTermRelationCommandKind.add => localizations.graphOperationAddRelations,
     LongTermRelationCommandKind.update => localizations.graphOperationUpdate,
     LongTermRelationCommandKind.archive => localizations.graphOperationArchive,
@@ -470,8 +469,6 @@ String _relationMessage(
     LongTermRelationCommandKind.delete => localizations.graphOperationDelete,
   };
   final target = switch (completion.target) {
-    CreatingLongTermRelationOperationTarget() =>
-      localizations.graphOperationNewRelation,
     AddingLongTermRelationsOperationTarget() =>
       localizations.graphOperationRelations,
     ExistingLongTermRelationOperationTarget() =>
@@ -496,14 +493,6 @@ String _relationOutcomeFor(
       localizations.relationsAdded(relations.length),
     (LongTermRelationCommandKind.add, _) =>
       localizations.relationsAdditionUnexpected,
-    (LongTermRelationCommandKind.create, LongTermRelationCreated()) =>
-      localizations.relationEditorCreated,
-    (LongTermRelationCommandKind.create, LongTermRelationUpdated()) ||
-    (LongTermRelationCommandKind.create, LongTermRelationDeleted()) ||
-    (
-      LongTermRelationCommandKind.create,
-      LongTermRelationsAdded(),
-    ) => localizations.relationEditorCreateUnexpected,
     (
       LongTermRelationCommandKind.update ||
           LongTermRelationCommandKind.archive ||
@@ -515,7 +504,6 @@ String _relationOutcomeFor(
       ),
     (LongTermRelationCommandKind.delete, LongTermRelationDeleted()) =>
       localizations.relationDeleted,
-    (LongTermRelationCommandKind.delete, LongTermRelationCreated()) ||
     (LongTermRelationCommandKind.delete, LongTermRelationUpdated()) ||
     (
       LongTermRelationCommandKind.delete,

@@ -1,3 +1,4 @@
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 
@@ -241,11 +242,11 @@ void main() {
         final claims = <GraphAppPresentationClaim?>[];
         unawaited(registration.nextClaim().then(claims.add));
 
-        final creation = coordinator.acceptRelationCreation(
-          LongTermRelationCreationFormKey(),
+        final creation = coordinator.acceptRelationsAddition(
+          RelationsAdditionSearchKey(),
           _createRelation(),
         ) as LongTermRelationCommandAccepted;
-        repository.completeRelationUpdated(0, _relationId);
+        repository.completeRelationsAdded(0, _relationId);
         final created = await creation.future;
         await pumpEventQueue();
 
@@ -268,12 +269,10 @@ void main() {
   });
 }
 
-CreateLongTermRelation _createRelation() => CreateLongTermRelation(
-  sourceIntentionId: _intentionId(_sourceUuid),
-  relatedIntentionId: _intentionId(_relatedUuid),
-  type: LongTermRelationType.need,
-  priority: RelationPriority.p2,
-  description: null,
+AddLongTermRelations _createRelation() => AddLongTermRelations(
+  pageIntentionId: _intentionId(_sourceUuid),
+  candidateIds: [_intentionId(_relatedUuid)],
+  group: IntentionRelationGroup.needs,
 );
 
 GraphCommandCoordinator _coordinator(PersonalGraphRepository repository) {
@@ -361,6 +360,30 @@ final class _ControlledPersonalGraphRepository
       IntentionUnavailableFailure(),
     ),
   );
+
+  void completeRelationsAdded(int index, LongTermRelationId id) {
+    const revision = _TestRevision(1);
+    final relation = _relation(id, RelationPriority.p4);
+    _results[index].complete(
+      GraphCommandSucceeded<
+        LongTermRelationCommandSuccess,
+        LongTermRelationCommandFailure
+      >(
+        ConfirmedGraphResult(
+          revision: revision,
+          value: LongTermRelationsAdded(
+            relations: [relation],
+            changes: [
+              LongTermRelationCreatedChange(
+                revision: revision,
+                relation: relation,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   void completeRelationUpdated(int index, LongTermRelationId id) {
     const revision = _TestRevision(1);

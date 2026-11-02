@@ -1838,12 +1838,6 @@ abstract class AppLocalizations {
   /// **'{message} · {count} more'**
   String graphOperationMessageWithOthers(String message, int count);
 
-  /// Безопасное обозначение создаваемой связи до подтверждения
-  ///
-  /// In en, this message translates to:
-  /// **'new relation'**
-  String get graphOperationNewRelation;
-
   /// Безопасное обозначение существующей связи
   ///
   /// In en, this message translates to:
@@ -2975,48 +2969,6 @@ abstract class AppLocalizations {
   /// **'No relations were created because of an unexpected error.'**
   String get relationsAdditionUnexpected;
 
-  /// Подтверждение успешного создания долговременной связи
-  ///
-  /// In en, this message translates to:
-  /// **'Relation created.'**
-  String get relationEditorCreated;
-
-  /// Конфликт занятой направленной пары при создании связи
-  ///
-  /// In en, this message translates to:
-  /// **'A relation with this direction already exists between the selected intentions.'**
-  String get relationEditorCreatePairOccupied;
-
-  /// Отсутствие участника при создании связи
-  ///
-  /// In en, this message translates to:
-  /// **'One of the selected intentions no longer exists.'**
-  String get relationEditorCreateParticipantNotFound;
-
-  /// Конфликт архивного состояния участника при создании связи
-  ///
-  /// In en, this message translates to:
-  /// **'Only active intentions can be linked.'**
-  String get relationEditorCreateParticipantArchived;
-
-  /// Устранимая недоступность создания связи
-  ///
-  /// In en, this message translates to:
-  /// **'The relation couldn’t be created. Try again.'**
-  String get relationEditorCreateUnavailable;
-
-  /// Терминальное повреждение данных при создании связи
-  ///
-  /// In en, this message translates to:
-  /// **'Stored data is damaged. The relation wasn’t created.'**
-  String get relationEditorCreateCorruption;
-
-  /// Терминальная непредвиденная ошибка создания связи
-  ///
-  /// In en, this message translates to:
-  /// **'The relation couldn’t be created because of an unexpected error.'**
-  String get relationEditorCreateUnexpected;
-
   /// Отсутствие изменяемой связи
   ///
   /// In en, this message translates to:
@@ -4053,12 +4005,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Enter valid Unicode text without NUL.'**
   String get relationEditorDescriptionInvalidUnicode;
-
-  /// Отказ создания связи намерения с самим собой
-  ///
-  /// In en, this message translates to:
-  /// **'An intention can’t be related to itself.'**
-  String get relationEditorCreateSameParticipants;
 
   /// Заголовок верхнего обхода
   ///

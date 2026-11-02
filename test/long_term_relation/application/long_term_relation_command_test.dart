@@ -8,27 +8,6 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  group('команда создания долговременной связи', () {
-    test('не допускает прямую самосвязь', () {
-      expect(
-        () => CreateLongTermRelation(
-          sourceIntentionId: _sourceId,
-          relatedIntentionId: _sourceId,
-          type: LongTermRelationType.can,
-          priority: RelationPriority.p4,
-          description: null,
-        ),
-        throwsA(
-          isA<CreateLongTermRelationValidationException>().having(
-            (error) => error.failure,
-            'failure',
-            CreateLongTermRelationValidationFailure.sameIntention,
-          ),
-        ),
-      );
-    });
-  });
-
   group('команда добавления пачки долговременных связей', () {
     test('сохраняет порядок набора', () {
       final command = AddLongTermRelations(

@@ -1,3 +1,5 @@
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
+
 import 'dart:async';
 
 import 'package:doable/l10n/app_localizations.dart';
@@ -823,6 +825,7 @@ IntentionCatalogLoaded _loadedOf(_Harness h) =>
 LongTermRelation _occupyingRelation(IntentionSummary candidate) => testRelation(
   sourceIntentionId: _counterpart.id,
   relatedIntentionId: candidate.id,
+  priority: RelationPriority.p4,
 );
 
 /// Подтверждение команды связи на ревизии 2: первая порция читалась на первой.
@@ -849,17 +852,16 @@ Future<void> _createOccupyingRelation(
   await acceptRelationCommand(
     h.container,
     h.repository,
-    CreateLongTermRelation(
-      sourceIntentionId: relation.sourceIntentionId,
-      relatedIntentionId: relation.relatedIntentionId,
-      type: relation.type,
-      priority: relation.priority,
-      description: null,
+    AddLongTermRelations(
+      pageIntentionId: relation.sourceIntentionId,
+      candidateIds: [relation.relatedIntentionId],
+      group: (relation.type == LongTermRelationType.need
+          ? IntentionRelationGroup.needs
+          : IntentionRelationGroup.canUse),
     ),
     _confirmedRelation(
-      LongTermRelationCreated(
-        relation: relation,
-        description: null,
+      LongTermRelationsAdded(
+        relations: [relation],
         changes: [
           LongTermRelationCreatedChange(
             revision: const TestCatalogRevision(2),

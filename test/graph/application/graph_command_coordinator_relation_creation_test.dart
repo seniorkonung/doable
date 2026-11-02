@@ -20,7 +20,6 @@ import 'package:doable/src/long_term_relation/application/long_term_relation_com
 import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -104,9 +103,9 @@ void main() {
           ..nextError = StateError('внутренняя ошибка');
         final coordinator = _coordinator(repository);
 
-        final accepted = coordinator.acceptRelationCreation(
-          LongTermRelationCreationFormKey(),
-          _createRelation(),
+        final accepted = coordinator.acceptRelationsAddition(
+          RelationsAdditionSearchKey(),
+          _addition(),
         ) as LongTermRelationCommandAccepted;
         final completion = await accepted.future;
 
@@ -137,14 +136,6 @@ GraphCommandCoordinator _coordinator(PersonalGraphRepository repository) {
   addTearDown(container.dispose);
   return container.read(graphCommandCoordinatorProvider.notifier);
 }
-
-CreateLongTermRelation _createRelation() => CreateLongTermRelation(
-  sourceIntentionId: _id(_sourceUuid),
-  relatedIntentionId: _id(_relatedUuid),
-  type: LongTermRelationType.need,
-  priority: RelationPriority.p2,
-  description: null,
-);
 
 AddLongTermRelations _addition() => AddLongTermRelations(
   pageIntentionId: _id(_sourceUuid),

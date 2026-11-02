@@ -995,10 +995,6 @@
       }
     }
   },
-  "graphOperationNewRelation": "new relation",
-  "@graphOperationNewRelation": {
-    "description": "Безопасное обозначение создаваемой связи до подтверждения"
-  },
   "graphOperationRelation": "relation",
   "graphOperationDailyChoice": "daily choice",
   "@graphOperationDailyChoice": {
@@ -1416,34 +1412,6 @@
   "@relationsAdditionCorruption": {"description": "Повреждение данных при добавлении связей"},
   "relationsAdditionUnexpected": "No relations were created because of an unexpected error.",
   "@relationsAdditionUnexpected": {"description": "Неожиданный отказ добавления связей"},
-  "relationEditorCreated": "Relation created.",
-  "@relationEditorCreated": {
-    "description": "Подтверждение успешного создания долговременной связи"
-  },
-  "relationEditorCreatePairOccupied": "A relation with this direction already exists between the selected intentions.",
-  "@relationEditorCreatePairOccupied": {
-    "description": "Конфликт занятой направленной пары при создании связи"
-  },
-  "relationEditorCreateParticipantNotFound": "One of the selected intentions no longer exists.",
-  "@relationEditorCreateParticipantNotFound": {
-    "description": "Отсутствие участника при создании связи"
-  },
-  "relationEditorCreateParticipantArchived": "Only active intentions can be linked.",
-  "@relationEditorCreateParticipantArchived": {
-    "description": "Конфликт архивного состояния участника при создании связи"
-  },
-  "relationEditorCreateUnavailable": "The relation couldn’t be created. Try again.",
-  "@relationEditorCreateUnavailable": {
-    "description": "Устранимая недоступность создания связи"
-  },
-  "relationEditorCreateCorruption": "Stored data is damaged. The relation wasn’t created.",
-  "@relationEditorCreateCorruption": {
-    "description": "Терминальное повреждение данных при создании связи"
-  },
-  "relationEditorCreateUnexpected": "The relation couldn’t be created because of an unexpected error.",
-  "@relationEditorCreateUnexpected": {
-    "description": "Терминальная непредвиденная ошибка создания связи"
-  },
   "relationEditorUpdateNotFound": "This relation no longer exists.",
   "@relationEditorUpdateNotFound": {
     "description": "Отсутствие изменяемой связи"
@@ -2070,10 +2038,6 @@
   "relationEditorDescriptionInvalidUnicode": "Enter valid Unicode text without NUL.",
   "@relationEditorDescriptionInvalidUnicode": {
     "description": "Недопустимый Unicode в описании связи"
-  },
-  "relationEditorCreateSameParticipants": "An intention can’t be related to itself.",
-  "@relationEditorCreateSameParticipants": {
-    "description": "Отказ создания связи намерения с самим собой"
   },
   "choicePathTitle": "Choose a path to an action",
   "@choicePathTitle": {"description": "Заголовок верхнего обхода"},

@@ -1,3 +1,4 @@
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -1470,6 +1471,7 @@ void main() {
       sourceIntentionId: counterpart.id,
       relatedIntentionId: fourth.id,
       index: 4,
+      priority: RelationPriority.p4,
     );
 
     PairOccupant occupantOf(LongTermRelation relation) => PairOccupant(
@@ -1568,18 +1570,17 @@ void main() {
         await completeRelationCommand(
           search.container,
           search.repository,
-          CreateLongTermRelation(
-            sourceIntentionId: counterpart.id,
-            relatedIntentionId: fourth.id,
-            type: occupyingFourth.type,
-            priority: occupyingFourth.priority,
-            description: null,
+          AddLongTermRelations(
+            pageIntentionId: counterpart.id,
+            candidateIds: [fourth.id],
+            group: (occupyingFourth.type == LongTermRelationType.need
+                ? IntentionRelationGroup.needs
+                : IntentionRelationGroup.canUse),
           ),
           _relationSuccess(
             const TestCatalogRevision(3),
-            LongTermRelationCreated(
-              relation: occupyingFourth,
-              description: null,
+            LongTermRelationsAdded(
+              relations: [occupyingFourth],
               changes: [
                 LongTermRelationCreatedChange(
                   revision: const TestCatalogRevision(3),
@@ -1615,6 +1616,7 @@ void main() {
           relatedIntentionId: relation.relatedIntentionId,
           index: relation.creationSequence.value,
           scope: RelationScope.archived,
+          priority: relation.priority,
         );
         await completeCatalogCommand(
           search.container,
