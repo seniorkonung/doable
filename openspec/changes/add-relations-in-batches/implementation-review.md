@@ -5,7 +5,7 @@
 **Format version:** 1
 **Result:** Changes needed
 **Coverage status:** Complete
-**Summary:** Фаза 2 выполнена: существующая связь открывается и меняется только в панели, все критерии задач 2.1–2.16 подтверждены кодом или тестами, `mise run check` проходит. Осталось три находки низкой важности, ни одна не ломает сценарии спецификаций. Принятых рисков нет.
+**Summary:** Фаза 2 выполнена: существующая связь открывается и меняется только в панели, все критерии задач 2.1–2.16 подтверждены кодом или тестами, `mise run check` проходит. Осталось две находки низкой важности, ни одна не ломает сценарии спецификаций. Принятых рисков нет.
 
 ## Review target
 
@@ -48,15 +48,6 @@
 | Code quality | Complete | Пять линз `code-review-and-quality` применены ко всем рабочим путям U1 и U2 на `9229d2fc…`. Вне правок учтены `app_navigation.dart`, `operation_failure_presentation.dart`, `presentation_frame_evidence.dart`, `text_field.dart` и выполнение команд координатора. Новых зависимостей, границ доверия и неограниченных чтений в диапазоне нет. |
 
 ## Findings
-
-### F2 · Low — В состоянии формы создания остался признак `hasChanges` без потребителя
-
-- **Evidence:** `RelationEditorState.hasChanges` (`relation_editor_state.dart:344`) на базе читал только `canSubmit` режима изменения (`2306d495…`, `relation_editor_state.dart:450`). Задача 2.15 убрала режим, а признак остался: в `lib/` чтений нет, его держит только `relation_editor_view_model_test.dart:123-129`.
-- **Evidence revisions:** ["9229d2fcce5dc14a269ecb3a22de24e8adfbc5a1"]
-- **Impact:** Код и тест охраняют поведение, которого в продукте нет, а сопровождать их приходится до удаления формы в фазе 3.
-- **Required outcome:** Состояние формы создания содержит только то, что читает поток создания, а тест без продуктового смысла удалён.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** ["lib/src/long_term_relation/presentation/editor/relation_editor_state.dart","test/long_term_relation/presentation/editor/relation_editor_view_model_test.dart"]
 
 ### F3 · Low — Параметр `chosen` у `PriorityPicker.itemLabel` не нужен ни одному потребителю
 
