@@ -864,6 +864,8 @@
   - **Критерии приёмки:**
     - Удалены `occupiedPairMark`, `OccupiedPairMark`, `OccupiedPairKind` и строки `intentionPickerPair*`, а также `Badge.word`, если у него не осталось читателей.
     - Удалены `TopBarPurposeMark`, `TopBarPurpose.mark`, `IntentionPickerPurposeDescription.subtitleMark` и `RelationStrokeKind.undetermined`: строка назначения новой шапки отметки не имеет, а вид связи в листе всегда определён.
+    - Удалены `lib/src/design_system/components/path_rail.dart` с `PathRail`, `PathRailMark` и его вариантами `PathRailGlyph` и `PathRailStroke` и `test/design_system/path_rail_test.dart`: единственного читателя удалила 3.17, а `RelationBatch` рисует линию сам.
+    - Удалены `showPreservingConfirmDialog`, вариант `_Preserving` и абзац предупреждения, который показывал только он, а из `test/design_system/confirm_dialog_test.dart` — тесты этого диалога с помощником `_showPreserving` и его опорами `_preservingTitle`, `_warning` и `_preservingParagraph`. Диалоги `showConfirmDialog` и `showDiscardDialog` и их тесты не меняются.
     - `SelectRelationParticipant.pairProbe` обязателен, поэтому поиска участника без пробы собрать нельзя. Поиски дневного выбора ведут себя как прежде.
   - **Проверка:**
     - `mise run codegen`.
@@ -871,8 +873,9 @@
     - `mise exec --no-deps -- flutter analyze`.
   - **Зависимости:** 3.17.
   - **Предполагаемые файлы:**
-    - меняются `lib/src/intention/presentation/picker/intention_picker_view.dart`, `intention_picker_row.dart`, `intention_picker_purpose_sheet.dart`, `lib/src/intention/presentation/catalog/intention_catalog_purpose.dart`, `lib/src/design_system/components/top_bar.dart`, `badge.dart`, `relation_stroke.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
-    - меняются тесты этих компонентов и вызовы `SelectRelationParticipant` без пробы в `test/intention/presentation/`.
+    - меняются `lib/src/intention/presentation/picker/intention_picker_view.dart`, `intention_picker_row.dart`, `intention_picker_purpose_sheet.dart`, `lib/src/intention/presentation/catalog/intention_catalog_purpose.dart`, `lib/src/design_system/components/top_bar.dart`, `badge.dart`, `relation_stroke.dart`, `confirm_dialog.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
+    - удаляются `lib/src/design_system/components/path_rail.dart` и `test/design_system/path_rail_test.dart`;
+    - меняются тесты этих компонентов, включая `test/design_system/confirm_dialog_test.dart`, и вызовы `SelectRelationParticipant` без пробы в `test/intention/presentation/`.
   - **Размер:** M.
 
 - [ ] 3.19 Восстановление из поиска удаляется, а политику предъявления команд связи задаёт один закрытый тип
