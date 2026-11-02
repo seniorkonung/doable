@@ -1723,6 +1723,46 @@
   "@relationSheetDescriptionContinueAction": {
     "description": "Действие, которое возвращает к изменению описания связи"
   },
+  "relationSheetOptionsLabel": "Relation options",
+  "@relationSheetOptionsLabel": {
+    "description": "Доступное название кнопки параметров в шапке панели связи"
+  },
+  "relationSheetOptionArchive": "Archive",
+  "@relationSheetOptionArchive": {
+    "description": "Пункт параметров панели активной связи: архивировать"
+  },
+  "relationSheetOptionRestore": "Restore from archive",
+  "@relationSheetOptionRestore": {
+    "description": "Пункт параметров панели архивированной связи: восстановить"
+  },
+  "relationSheetOptionDelete": "Delete",
+  "@relationSheetOptionDelete": {
+    "description": "Пункт параметров панели связи: удалить"
+  },
+  "relationSheetOptionRestoreBothArchived": "Restore the source and related intentions before restoring this relation.",
+  "@relationSheetOptionRestoreBothArchived": {
+    "description": "Причина недоступности восстановления связи, когда архивированы оба участника"
+  },
+  "relationSheetDeleteDialogTitle": "Delete relation?",
+  "@relationSheetDeleteDialogTitle": {
+    "description": "Вопрос подтверждения удаления связи из параметров панели"
+  },
+  "relationSheetDeleteDialogTextBefore": "This removes the relation “",
+  "@relationSheetDeleteDialogTextBefore": {
+    "description": "Текст подтверждения удаления связи до выделенной формулировки связи"
+  },
+  "relationSheetDeleteDialogTextAfter": "” with its description and cannot be undone. Both intentions stay.",
+  "@relationSheetDeleteDialogTextAfter": {
+    "description": "Текст подтверждения удаления связи после выделенной формулировки связи"
+  },
+  "relationSheetDeleteDialogCancel": "Cancel",
+  "@relationSheetDeleteDialogCancel": {
+    "description": "Отмена удаления связи"
+  },
+  "relationSheetDeleteDialogConfirm": "Delete",
+  "@relationSheetDeleteDialogConfirm": {
+    "description": "Подтверждение удаления связи"
+  },
   "actionPickerCancel": "Cancel action selection",
   "@actionPickerCancel": {"description": "Отмена выбора действия"},
   "actionPickerLoading": "Loading actions…",

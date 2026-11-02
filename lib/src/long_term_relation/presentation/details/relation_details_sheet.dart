@@ -27,6 +27,7 @@ import '../../domain/long_term_relation.dart';
 import '../../domain/long_term_relation_description.dart';
 import '../../domain/long_term_relation_id.dart';
 import '../relation_command_failure_message.dart';
+import 'relation_details_options.dart';
 import 'relation_details_state.dart';
 import 'relation_details_view_model.dart';
 
@@ -38,6 +39,7 @@ import 'relation_details_view_model.dart';
 ///
 /// Описание меняется в полном размере панели, а изменённый текст уходит только
 /// после ответа на вопрос: панель не закрывается сама, пока он не сохраняется.
+/// Архивирование, восстановление и удаление связи выбираются в её параметрах.
 Future<void> showRelationDetailsSheet(
   BuildContext context,
   LongTermRelationId relationId,
@@ -159,6 +161,78 @@ final class _RelationDetailsSheetState
     }
   }
 
+  /// Лист параметров закрывается до начала действия, поэтому оно начинается уже
+  /// на панели (ADR-0042). Выбор приходит после анимации закрытия, когда панель
+  /// уже принимает нажатия, поэтому поздний выбор отбрасывается, если над
+  /// панелью уже что-то открыто или она уходит.
+  Future<void> _openOptions() async {
+    final provider = _provider;
+    final option = await showDoableSheet<RelationOption>(
+      context: context,
+      builder: (_, sheet) =>
+          RelationOptionsSheet(sheet: sheet, provider: provider),
+    );
+    if (option == null ||
+        !mounted ||
+        !(ModalRoute.isCurrentOf(context) ?? false)) {
+      return;
+    }
+    final viewModel = ref.read(provider.notifier);
+    switch (option) {
+      case RelationOption.archive:
+        viewModel.archive();
+      case RelationOption.restore:
+        viewModel.restore();
+      case RelationOption.delete:
+        await _confirmDeletion();
+    }
+  }
+
+  Future<void> _confirmDeletion() async {
+    final loaded = ref.read(_provider);
+    if (loaded is! RelationDetailsLoaded) return;
+    final localizations = AppLocalizations.of(context);
+    final confirmed = await showConfirmDialog(
+      context: context,
+      title: localizations.relationSheetDeleteDialogTitle,
+      text: ConfirmDialogText(
+        before: localizations.relationSheetDeleteDialogTextBefore,
+        name: _relationPhrase(localizations, loaded.details),
+        after: localizations.relationSheetDeleteDialogTextAfter,
+      ),
+      cancelLabel: localizations.relationSheetDeleteDialogCancel,
+      actionLabel: localizations.relationSheetDeleteDialogConfirm,
+    );
+    if (confirmed && mounted) await _delete();
+  }
+
+  Future<void> _delete() async {
+    final deleted = await ref.read(_provider.notifier).delete();
+    // Закрытие принадлежит принявшей команду панели, а не общему Deleted. После
+    // ожидания сброшенный или перекрытый маршрут теряет это право.
+    // https://api.flutter.dev/flutter/widgets/Route/isCurrent.html
+    // pop синхронен: после проверки нет новой асинхронной границы.
+    // https://api.flutter.dev/flutter/widgets/NavigatorState/pop.html
+    if (deleted && mounted && (ModalRoute.of(context)?.isCurrent ?? false)) {
+      Navigator.of(context).pop();
+    }
+  }
+
+  /// Повтор удаления закрывает панель так же, как первое удаление.
+  void _retryLifecycleChange() {
+    final current = ref.read(_provider);
+    if (current case RelationDetailsLoaded(
+      lifecycleChange: RelationDetailsLifecycleFailed(
+        kind: RelationDetailsLifecycleKind.delete,
+        canRetry: true,
+      ),
+    )) {
+      unawaited(_delete());
+    } else {
+      ref.read(_provider.notifier).retryLifecycleChange();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
@@ -227,6 +301,8 @@ final class _RelationDetailsSheetState
               onRetry: viewModel.retry,
               onChangeType: viewModel.changeType,
               onChangePriority: viewModel.changePriority,
+              onOpenOptions: () => unawaited(_openOptions()),
+              onRetryLifecycleChange: _retryLifecycleChange,
             ),
             RelationDetailsNotFound() || RelationDetailsDeleted() =>
               ListState.error(message: localizations.relationDetailsNotFound),
@@ -277,20 +353,27 @@ final class _DescriptionEditing extends _DescriptionMode {
 }
 
 /// Полная формулировка связи в исходном направлении.
+String _relationPhrase(
+  AppLocalizations localizations,
+  LongTermRelationDetails details,
+) => switch (details.relation.type) {
+  LongTermRelationType.need => localizations.relationNeighborhoodNeedPhrase(
+    details.source.title,
+    details.related.title,
+  ),
+  LongTermRelationType.can => localizations.relationNeighborhoodCanPhrase(
+    details.source.title,
+    details.related.title,
+  ),
+};
+
+/// Доступное название панели: формулировка, а у архивированной связи ещё и
+/// пометка архива.
 String _sheetLabel(
   AppLocalizations localizations,
   LongTermRelationDetails details,
 ) {
-  final phrase = switch (details.relation.type) {
-    LongTermRelationType.need => localizations.relationNeighborhoodNeedPhrase(
-      details.source.title,
-      details.related.title,
-    ),
-    LongTermRelationType.can => localizations.relationNeighborhoodCanPhrase(
-      details.source.title,
-      details.related.title,
-    ),
-  };
+  final phrase = _relationPhrase(localizations, details);
   return switch (details.relation.scope) {
     RelationScope.active => phrase,
     RelationScope.archived => localizations.relationSheetArchivedLabel(phrase),
@@ -304,6 +387,8 @@ final class _LoadedRelation extends ConsumerWidget {
     required this.onRetry,
     required this.onChangeType,
     required this.onChangePriority,
+    required this.onOpenOptions,
+    required this.onRetryLifecycleChange,
   });
 
   final RelationDetailsLoaded state;
@@ -311,6 +396,8 @@ final class _LoadedRelation extends ConsumerWidget {
   final VoidCallback onRetry;
   final ValueChanged<LongTermRelationType> onChangeType;
   final ValueChanged<RelationPriority> onChangePriority;
+  final VoidCallback onOpenOptions;
+  final VoidCallback onRetryLifecycleChange;
 
   /// Последняя пилюля приоритета выходит за край содержимого.
   static const double _pickerShift = 2;
@@ -385,6 +472,14 @@ final class _LoadedRelation extends ConsumerWidget {
               note: localizations.relationSheetArchivedNote,
             ),
           },
+          // Изменение описания занимает панель целиком, и параметры в это время
+          // недоступны.
+          menu: isEditing
+              ? null
+              : RelationHeadMenu(
+                  label: localizations.relationSheetOptionsLabel,
+                  onOpen: onOpenOptions,
+                ),
           kindName: (kind) => switch (kind) {
             RelationHeadKind.need => localizations.relationNeighborhoodTypeNeed,
             RelationHeadKind.can => localizations.relationNeighborhoodTypeCan,
@@ -472,6 +567,31 @@ final class _LoadedRelation extends ConsumerWidget {
             ),
           ),
         ],
+        if (state.lifecycleChange case RelationDetailsLifecycleFailed(
+          :final kind,
+          :final failure,
+          :final failurePresentation,
+          :final canRetry,
+        )) ...[
+          const SizedBox(height: DoableMetrics.space2),
+          Notice.content(
+            message: OperationFailurePresentation(
+              claim: failurePresentation,
+              message: longTermRelationCommandFailureMessage(
+                localizations,
+                _commandKind(kind),
+                failure,
+              ),
+              inheritsColor: true,
+            ),
+            action: canRetry && !isOperationRunning
+                ? (
+                    label: localizations.commonRetry,
+                    onPressed: onRetryLifecycleChange,
+                  )
+                : null,
+          ),
+        ],
         const SizedBox(height: DoableMetrics.space2),
         switch (description) {
           // Правка длится мгновения: статус стоит рядом с датами, поэтому не
@@ -522,6 +642,14 @@ final class _LoadedRelation extends ConsumerWidget {
     );
   }
 }
+
+LongTermRelationCommandKind _commandKind(
+  RelationDetailsLifecycleKind kind,
+) => switch (kind) {
+  RelationDetailsLifecycleKind.archive => LongTermRelationCommandKind.archive,
+  RelationDetailsLifecycleKind.restore => LongTermRelationCommandKind.restore,
+  RelationDetailsLifecycleKind.delete => LongTermRelationCommandKind.delete,
+};
 
 LongTermRelationType _relationType(RelationHeadKind kind) => switch (kind) {
   RelationHeadKind.need => LongTermRelationType.need,

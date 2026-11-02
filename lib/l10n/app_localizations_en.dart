@@ -2183,6 +2183,39 @@ class AppLocalizationsEn extends AppLocalizations {
   String get relationSheetDescriptionContinueAction => 'Keep editing';
 
   @override
+  String get relationSheetOptionsLabel => 'Relation options';
+
+  @override
+  String get relationSheetOptionArchive => 'Archive';
+
+  @override
+  String get relationSheetOptionRestore => 'Restore from archive';
+
+  @override
+  String get relationSheetOptionDelete => 'Delete';
+
+  @override
+  String get relationSheetOptionRestoreBothArchived =>
+      'Restore the source and related intentions before restoring this relation.';
+
+  @override
+  String get relationSheetDeleteDialogTitle => 'Delete relation?';
+
+  @override
+  String get relationSheetDeleteDialogTextBefore =>
+      'This removes the relation “';
+
+  @override
+  String get relationSheetDeleteDialogTextAfter =>
+      '” with its description and cannot be undone. Both intentions stay.';
+
+  @override
+  String get relationSheetDeleteDialogCancel => 'Cancel';
+
+  @override
+  String get relationSheetDeleteDialogConfirm => 'Delete';
+
+  @override
   String get actionPickerCancel => 'Cancel action selection';
 
   @override

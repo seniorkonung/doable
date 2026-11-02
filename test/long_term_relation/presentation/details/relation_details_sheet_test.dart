@@ -10,6 +10,7 @@ import 'package:doable/src/graph/application/personal_graph_repository_provider.
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_permissions.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_description.dart';
@@ -838,6 +839,469 @@ void main() {
 
       expect(find.text('Отменить изменения?'), findsNothing);
       expect(find.text('Открыть').hitTestable(), findsOneWidget);
+    });
+  });
+
+  group('параметры связи', () {
+    const phrase = 'Чтобы быть здоровым, нужно много ходить';
+    final snackBar = find.byType(SnackBar);
+
+    LongTermRelationDetails relation({
+      RelationScope scope = RelationScope.active,
+      IntentionArchiveState sourceArchiveState = IntentionArchiveState.active,
+      IntentionArchiveState relatedArchiveState = IntentionArchiveState.active,
+      LongTermRelationPermissions permissions =
+          const LongTermRelationPermissions.unrestricted(),
+    }) => testRelationDetails(
+      relationId: relationId,
+      sourceId: testIntentionId(1),
+      relatedId: testIntentionId(2),
+      sourceTitle: 'быть здоровым',
+      relatedTitle: 'много ходить',
+      scope: scope,
+      sourceArchiveState: sourceArchiveState,
+      relatedArchiveState: relatedArchiveState,
+      permissions: permissions,
+    );
+
+    Future<ControlledRelationDetailsRepository> openPanel(
+      WidgetTester tester,
+      LongTermRelationDetails details,
+    ) async {
+      final repository = await _openSheet(tester);
+      repository.watchAt(0).emitDetails(details, revision: revision);
+      await tester.pumpAndSettle();
+      return repository;
+    }
+
+    Future<void> openMenu(WidgetTester tester) async {
+      await tester.tap(find.bySemanticsLabel('Параметры связи'));
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> choose(WidgetTester tester, String item) async {
+      await openMenu(tester);
+      await tester.tap(find.text(item));
+      await tester.pumpAndSettle();
+    }
+
+    /// Подтверждённое изменение: отвечает на команду и отдаёт новый снимок.
+    Future<void> confirmUpdate(
+      WidgetTester tester,
+      ControlledRelationDetailsRepository repository, {
+      required LongTermRelationDetails before,
+      required LongTermRelationDetails after,
+    }) async {
+      repository.completeRelationUpdate(
+        0,
+        before: before.relation,
+        after: after.relation,
+        revision: const TestGraphRevision(2),
+      );
+      await tester.pump();
+      repository.relationWatches.last.emitDetails(
+        after,
+        revision: const TestGraphRevision(2),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('у активной связи меню предлагает архивирование и удаление, а '
+        'изменения описания в нём нет', (tester) async {
+      final semantics = tester.ensureSemantics();
+      await openPanel(tester, relation());
+
+      await openMenu(tester);
+
+      expect(find.text('Архивировать').hitTestable(), findsOneWidget);
+      expect(find.text('Удалить').hitTestable(), findsOneWidget);
+      expect(find.text('Восстановить из архива'), findsNothing);
+      expect(find.textContaining('Изменить'), findsNothing);
+      semantics.dispose();
+    });
+
+    testWidgets('архивирование начинается после закрытия меню и отражается в '
+        'панели без сообщения', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final before = relation();
+      final repository = await openPanel(tester, before);
+
+      await choose(tester, 'Архивировать');
+
+      expect(
+        repository.relationCommands.single,
+        isA<ArchiveLongTermRelation>(),
+      );
+      expect(find.text('Восстановить из архива'), findsNothing);
+      expect(find.text('Сохранение изменений…'), findsOneWidget);
+
+      await confirmUpdate(
+        tester,
+        repository,
+        before: before,
+        after: relation(scope: RelationScope.archived),
+      );
+
+      expect(find.text('Сохранение изменений…'), findsNothing);
+      expect(
+        find.bySemanticsLabel('Чтобы быть здоровым, нужно много ходить. Архив'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Архивные связи остаются'), findsOneWidget);
+      expect(snackBar, findsNothing);
+      semantics.dispose();
+    });
+
+    testWidgets('восстановление отражается в панели без сообщения', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      final before = relation(scope: RelationScope.archived);
+      final repository = await openPanel(tester, before);
+
+      await openMenu(tester);
+      expect(find.text('Архивировать'), findsNothing);
+      await tester.tap(find.text('Восстановить из архива'));
+      await tester.pumpAndSettle();
+
+      expect(
+        repository.relationCommands.single,
+        isA<RestoreLongTermRelation>(),
+      );
+
+      await confirmUpdate(
+        tester,
+        repository,
+        before: before,
+        after: relation(),
+      );
+
+      expect(find.textContaining('Архивные связи остаются'), findsNothing);
+      expect(find.text('Можно'), findsOneWidget);
+      expect(snackBar, findsNothing);
+      semantics.dispose();
+    });
+
+    for (final (title, source, related, reason) in const [
+      (
+        'исходный',
+        IntentionArchiveState.archived,
+        IntentionArchiveState.active,
+        'Сначала восстановите исходное намерение, затем восстановите эту '
+            'связь.',
+      ),
+      (
+        'связанный',
+        IntentionArchiveState.active,
+        IntentionArchiveState.archived,
+        'Сначала восстановите связанное намерение, затем восстановите эту '
+            'связь.',
+      ),
+      (
+        'оба',
+        IntentionArchiveState.archived,
+        IntentionArchiveState.archived,
+        'Сначала восстановите исходное и связанное намерения, затем '
+            'восстановите эту связь.',
+      ),
+    ]) {
+      testWidgets('восстановление остаётся в меню с причиной, пока архивирован '
+          '$title участник', (tester) async {
+        final semantics = tester.ensureSemantics();
+        final repository = await openPanel(
+          tester,
+          relation(
+            scope: RelationScope.archived,
+            sourceArchiveState: source,
+            relatedArchiveState: related,
+          ),
+        );
+
+        await openMenu(tester);
+        expect(find.text('Восстановить из архива'), findsOneWidget);
+        expect(find.text(reason), findsOneWidget);
+
+        await tester.tap(find.text('Восстановить из архива'));
+        await tester.pumpAndSettle();
+
+        expect(repository.relationCommands, isEmpty);
+        expect(find.text(reason), findsOneWidget);
+        semantics.dispose();
+      });
+    }
+
+    testWidgets('удаление остаётся в меню с причиной, пока связь входит в путь '
+        'дневного выбора', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final repository = await openPanel(
+        tester,
+        relation(
+          permissions:
+              const LongTermRelationPermissions.referencedByDailyPath(),
+        ),
+      );
+
+      await openMenu(tester);
+      expect(
+        find.text(
+          'Связь используется в сохранённом дневном пути, поэтому удалить её '
+          'нельзя.',
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Удалить'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Удалить связь?'), findsNothing);
+      expect(repository.relationCommands, isEmpty);
+      semantics.dispose();
+    });
+
+    testWidgets('пока операция выполняется, пункты просят дождаться её '
+        'окончания', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final repository = await openPanel(tester, relation());
+      await tester.tap(find.text('P1'));
+      await tester.pump();
+
+      await openMenu(tester);
+      expect(
+        find.text('Дождитесь окончания текущего изменения'),
+        findsNWidgets(2),
+      );
+      await tester.tap(find.text('Архивировать'));
+      await tester.pumpAndSettle();
+
+      expect(repository.relationCommands, hasLength(1));
+      semantics.dispose();
+    });
+
+    testWidgets('удаление спрашивает подтверждение с названием связи и '
+        'необратимостью, а отмена не отправляет команду', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final repository = await openPanel(tester, relation());
+
+      await choose(tester, 'Удалить');
+
+      expect(find.text('Удалить связь?'), findsOneWidget);
+      expect(find.textContaining(phrase), findsOneWidget);
+      expect(find.textContaining('безвозвратно удалена'), findsOneWidget);
+
+      await tester.tap(find.text('Отмена'));
+      await tester.pumpAndSettle();
+
+      expect(repository.relationCommands, isEmpty);
+      expect(find.text('Параметры связи'), findsNothing);
+      expect(find.text('много ходить').hitTestable(), findsOneWidget);
+      semantics.dispose();
+    });
+
+    testWidgets('подтверждённое удаление закрывает панель, а сообщение '
+        'называет удаление', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final details = relation();
+      final repository = await openPanel(tester, details);
+
+      await choose(tester, 'Удалить');
+      await tester.tap(find.text('Удалить'));
+      await tester.pump();
+
+      expect(repository.relationCommands.single, isA<DeleteLongTermRelation>());
+
+      repository.completeRelationDelete(
+        0,
+        relation: details.relation,
+        revision: const TestGraphRevision(2),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(find.text('Открыть').hitTestable(), findsOneWidget);
+      expect(find.textContaining('Связь удалена.'), findsOneWidget);
+      semantics.dispose();
+    });
+
+    testWidgets('удаление закрывает только панель, принявшую команду', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      final details = relation();
+      final repository = await openPanel(tester, details);
+
+      await choose(tester, 'Удалить');
+      await tester.tap(find.text('Удалить'));
+      await tester.pump();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Открыть'));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      repository.relationWatches.last.emitDetails(details, revision: revision);
+      await tester.pumpAndSettle();
+
+      repository.completeRelationDelete(
+        0,
+        relation: details.relation,
+        revision: const TestGraphRevision(2),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Эта связь больше не существует.'), findsOneWidget);
+      semantics.dispose();
+    });
+
+    testWidgets('отказ удаления остаётся в панели с данными, а повтор '
+        'закрывает панель до позднего снимка', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final details = relation();
+      final repository = await openPanel(tester, details);
+
+      await choose(tester, 'Удалить');
+      await tester.tap(find.text('Удалить'));
+      await tester.pump();
+      repository.failRelationCommand(
+        0,
+        const LongTermRelationUnavailableFailure(),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Не удалось удалить связь. Повторите попытку.'),
+        findsOneWidget,
+      );
+      expect(find.text('много ходить').hitTestable(), findsOneWidget);
+
+      await tester.tap(find.text('Повторить'));
+      await tester.pump();
+      repository.completeRelationDelete(
+        1,
+        relation: details.relation,
+        revision: const TestGraphRevision(2),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(find.text('Открыть').hitTestable(), findsOneWidget);
+      expect(repository.relationCommands, hasLength(2));
+      expect(
+        repository.relationCommands,
+        everyElement(isA<DeleteLongTermRelation>()),
+      );
+
+      repository
+          .watchAt(0)
+          .emitDetails(details, revision: const TestGraphRevision(3));
+      await tester.pump();
+      expect(find.text('много ходить'), findsNothing);
+      semantics.dispose();
+    });
+
+    testWidgets('устранимый отказ архивирования остаётся в панели, а повтор '
+        'отправляет ту же команду', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final repository = await openPanel(tester, relation());
+
+      await choose(tester, 'Архивировать');
+      repository.failRelationCommand(
+        0,
+        const LongTermRelationUnavailableFailure(),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Не удалось архивировать связь. Повторите попытку.'),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('Повторить'));
+      await tester.pump();
+
+      expect(repository.relationCommands, hasLength(2));
+      expect(
+        repository.relationCommands,
+        everyElement(isA<ArchiveLongTermRelation>()),
+      );
+      expect(
+        find.text('Не удалось архивировать связь. Повторите попытку.'),
+        findsNothing,
+      );
+      semantics.dispose();
+    });
+
+    testWidgets('отказ восстановления из-за участника объясняется в панели '
+        'без повтора', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final details = relation(scope: RelationScope.archived);
+      final repository = await openPanel(tester, details);
+
+      await choose(tester, 'Восстановить из архива');
+      repository.failRelationCommand(
+        0,
+        LongTermRelationParticipantArchivedFailure(
+          role: RelationParticipantRole.related,
+          intentionId: details.related.id,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'Сначала восстановите связанное намерение, затем восстановите эту '
+          'связь.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Повторить'), findsNothing);
+      expect(find.textContaining('Архивные связи остаются'), findsOneWidget);
+      semantics.dispose();
+    });
+
+    testWidgets('поздний выбор отбрасывается, если панель уже перекрыта', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      final repository = await openPanel(tester, relation());
+
+      await openMenu(tester);
+      await tester.tap(find.text('Архивировать'));
+      unawaited(
+        Navigator.of(
+          tester.element(find.text('Открыть')),
+          rootNavigator: true,
+        ).push(
+          MaterialPageRoute<void>(
+            builder: (_) => const Scaffold(body: Text('Над панелью')),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Над панелью'), findsOneWidget);
+      expect(repository.relationCommands, isEmpty);
+      semantics.dispose();
+    });
+
+    testWidgets('меню закрывается, когда связи больше нет', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final repository = await openPanel(tester, relation());
+
+      await openMenu(tester);
+      repository.watchAt(0).emitMissing(revision: const TestGraphRevision(2));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Архивировать'), findsNothing);
+      expect(find.text('Эта связь больше не существует.'), findsOneWidget);
+      semantics.dispose();
+    });
+
+    testWidgets('при изменении описания кнопки параметров нет', (tester) async {
+      final semantics = tester.ensureSemantics();
+      await openPanel(tester, relation());
+      await tester.tap(find.text('Добавить описание'));
+      await tester.pumpAndSettle();
+
+      expect(find.bySemanticsLabel('Параметры связи'), findsNothing);
+      semantics.dispose();
     });
   });
 

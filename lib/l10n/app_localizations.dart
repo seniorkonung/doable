@@ -3394,6 +3394,66 @@ abstract class AppLocalizations {
   /// **'Keep editing'**
   String get relationSheetDescriptionContinueAction;
 
+  /// Доступное название кнопки параметров в шапке панели связи
+  ///
+  /// In en, this message translates to:
+  /// **'Relation options'**
+  String get relationSheetOptionsLabel;
+
+  /// Пункт параметров панели активной связи: архивировать
+  ///
+  /// In en, this message translates to:
+  /// **'Archive'**
+  String get relationSheetOptionArchive;
+
+  /// Пункт параметров панели архивированной связи: восстановить
+  ///
+  /// In en, this message translates to:
+  /// **'Restore from archive'**
+  String get relationSheetOptionRestore;
+
+  /// Пункт параметров панели связи: удалить
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get relationSheetOptionDelete;
+
+  /// Причина недоступности восстановления связи, когда архивированы оба участника
+  ///
+  /// In en, this message translates to:
+  /// **'Restore the source and related intentions before restoring this relation.'**
+  String get relationSheetOptionRestoreBothArchived;
+
+  /// Вопрос подтверждения удаления связи из параметров панели
+  ///
+  /// In en, this message translates to:
+  /// **'Delete relation?'**
+  String get relationSheetDeleteDialogTitle;
+
+  /// Текст подтверждения удаления связи до выделенной формулировки связи
+  ///
+  /// In en, this message translates to:
+  /// **'This removes the relation “'**
+  String get relationSheetDeleteDialogTextBefore;
+
+  /// Текст подтверждения удаления связи после выделенной формулировки связи
+  ///
+  /// In en, this message translates to:
+  /// **'” with its description and cannot be undone. Both intentions stay.'**
+  String get relationSheetDeleteDialogTextAfter;
+
+  /// Отмена удаления связи
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get relationSheetDeleteDialogCancel;
+
+  /// Подтверждение удаления связи
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get relationSheetDeleteDialogConfirm;
+
   /// Отмена выбора действия
   ///
   /// In en, this message translates to:

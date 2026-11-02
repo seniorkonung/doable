@@ -2207,6 +2207,38 @@ class AppLocalizationsRu extends AppLocalizations {
   String get relationSheetDescriptionContinueAction => 'Продолжить правку';
 
   @override
+  String get relationSheetOptionsLabel => 'Параметры связи';
+
+  @override
+  String get relationSheetOptionArchive => 'Архивировать';
+
+  @override
+  String get relationSheetOptionRestore => 'Восстановить из архива';
+
+  @override
+  String get relationSheetOptionDelete => 'Удалить';
+
+  @override
+  String get relationSheetOptionRestoreBothArchived =>
+      'Сначала восстановите исходное и связанное намерения, затем восстановите эту связь.';
+
+  @override
+  String get relationSheetDeleteDialogTitle => 'Удалить связь?';
+
+  @override
+  String get relationSheetDeleteDialogTextBefore => 'Связь «';
+
+  @override
+  String get relationSheetDeleteDialogTextAfter =>
+      '» будет безвозвратно удалена вместе с описанием. Оба намерения сохранятся.';
+
+  @override
+  String get relationSheetDeleteDialogCancel => 'Отмена';
+
+  @override
+  String get relationSheetDeleteDialogConfirm => 'Удалить';
+
+  @override
   String get actionPickerCancel => 'Отменить выбор действия';
 
   @override
