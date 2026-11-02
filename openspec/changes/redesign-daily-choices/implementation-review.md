@@ -3,9 +3,9 @@
 ## Assessment
 
 **Format version:** 1
-**Result:** Changes needed
+**Result:** No unresolved findings
 **Coverage status:** Complete
-**Summary:** Задачи 1.15–1.18 выполнены по критериям приёмки, а одна находка низкой серьёзности остаётся открытой: правило повтора отказа обновления повторено в трёх местах. Принятых рисков нет.
+**Summary:** Задачи 1.15–1.18 выполнены по критериям приёмки, активных находок нет. Единое правило повтора отказа обновления передано в задачу 1.20 и ещё не реализовано. Принятых рисков нет.
 
 ## Review target
 
@@ -64,14 +64,7 @@
 
 ## Findings
 
-### F2 · Low — Правило повтора отказа обновления повторено в трёх местах
-
-- **Evidence:** `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart:439` и `:716` одинаково решают, есть ли повтор, проверкой `failure is DailyChoiceCatalogUnavailableFailure`. `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart:105-111` проверяет то же условие и иначе молча возвращает `Future.value()`. Отказы первой загрузки и порции несут готовое свойство `canRetry` (`daily_choice_catalog_state.dart:99`, `:174`), а подвал стал вторым потребителем правила без такого общего ответа.
-- **Evidence revisions:** ["702ff26f9996e647fa6e9a76bfbc530ae9e81618"]
-- **Impact:** Если правило доказанной временности изменится, забытая копия даст кнопку «Повторить», нажатие на которую ничего не делает, либо скроет действующий повтор. Подвал закрепил это расхождение вторым местом показа.
-- **Required outcome:** Решение о том, допускает ли отказ обновления повтор, принимается в одном месте, а оба места показа опираются на него.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** ["lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart"]
+No unresolved findings remain in the implementation review.
 
 ## Review coverage
 
