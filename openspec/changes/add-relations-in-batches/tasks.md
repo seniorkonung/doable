@@ -506,7 +506,7 @@
     - меняются `test/long_term_relation/presentation/editor/relation_editor_view_model_test.dart`, `test/app/navigation/app_shell_page_matrix.dart`.
   - **Размер:** M.
 
-- [ ] 2.16 Проверить готовность фазы: существующая связь открывается и меняется только в панели
+- [x] 2.16 Проверить готовность фазы: существующая связь открывается и меняется только в панели
   - **Критерии приёмки:**
     - Переход с панели на страницу намерения и возврат работают в настоящем стеке навигации либо приняты альтернативой из [design](design.md).
     - У существующей связи нет пути в форму: в `lib/` и `test/` нет `RelationDetailsPage`, `RelationDetailsRoute` и `RelationEditingContext`.
