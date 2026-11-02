@@ -56,8 +56,6 @@ void main() {
       expect(harness.submit(session), isNull);
       expect(session.state, isA<DailyChoiceCreationFlowSaved>());
       expect(session.canContinue, isFalse);
-      expect(session.claimCompletion(), isTrue);
-      expect(session.claimCompletion(), isFalse);
     },
   );
 

@@ -70,7 +70,6 @@ final class DailyChoiceCreationFlowSession {
     const DailyChoiceCreationFlowEditing(),
   );
   var _accepting = false;
-  var _completionAttempted = false;
 
   DailyChoiceCreationFlowState get state => _state.value;
   ValueListenable<DailyChoiceCreationFlowState> get changes => _state;
@@ -80,16 +79,6 @@ final class DailyChoiceCreationFlowSession {
   /// в [acceptSubmission]. Ошибки полей и допустимость повтора остаются у формы.
   bool get canContinue =>
       !_accepting && state is DailyChoiceCreationFlowEditing;
-
-  /// Одна попытка завершения подтверждённого результата на весь поток.
-  /// Удаление отдельных страниц не разрешает повтор.
-  bool claimCompletion() {
-    if (_completionAttempted || state is! DailyChoiceCreationFlowSaved) {
-      return false;
-    }
-    _completionAttempted = true;
-    return true;
-  }
 
   /// Синхронно вызывает принятие команды координатором только у живого
   /// редактируемого потока. Отклонённый вызов не выполняется и не ставится

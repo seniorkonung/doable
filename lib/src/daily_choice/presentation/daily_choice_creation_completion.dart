@@ -34,7 +34,7 @@ void leaveDailyChoiceCreation({
   );
 }
 
-/// Закрывает поток сохранённого выбора одной попыткой, удерживая сессию
+/// Закрывает поток сохранённого выбора, удерживая сессию
 /// независимо от виджетов. Удаляет только конкретное подтверждение и его корень,
 /// поэтому наверху остаётся страница, с которой начато создание.
 void completeDailyChoiceCreation({
@@ -54,8 +54,7 @@ void completeDailyChoiceCreation({
   if (!isSaved() ||
       !_hasStack(router, session, suffix) ||
       !ownsConfirmation ||
-      router.pagelessRoutesObserver.hasPagelessTopRoute ||
-      !session.claimCompletion()) {
+      router.pagelessRoutesObserver.hasPagelessTopRoute) {
     return;
   }
   _removeFlowRoutes(
