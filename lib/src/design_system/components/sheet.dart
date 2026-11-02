@@ -35,8 +35,9 @@ final class SheetPresentation {
 /// Показывает лист над корневым навигатором, перекрывая всю страницу и
 /// панель.
 ///
-/// [builder] строит [Sheet], [Sheet.expandable], [Sheet.untitled] или композицию
-/// на их основе с переданной возможностью. Потребитель закрывает лист через Navigator.pop с
+/// [builder] строит [Sheet], [Sheet.expandable], [Sheet.expandableUntitled],
+/// [Sheet.untitled] или композицию на их основе с переданной возможностью.
+/// Потребитель закрывает лист через Navigator.pop с
 /// результатом типа [T], и показ отдаёт его в момент закрытия, или через
 /// [SheetPresentation.closeWithChoice], и показ отдаёт его после анимации
 /// закрытия; закрытие без выбора даёт null. Лист перетаскивает сам [Sheet], а
@@ -594,15 +595,41 @@ final class Sheet extends StatelessWidget {
     SheetAction? action,
     super.key,
   }) : _parts = _ExpandableParts(
-         title: title,
-         text: text,
+         head: _TitledHead(
+           title: title,
+           text: text,
+           pinned: pinned,
+           action: action,
+         ),
          compactHeight: compactHeight,
-         pinned: pinned,
          slivers: slivers,
          footer: footer,
          expandLabel: expandLabel,
          collapseLabel: collapseLabel,
-         action: action,
+       );
+
+  /// Раскрываемый лист без заголовка и нижней части, содержимое которого
+  /// говорит само за себя.
+  ///
+  /// [label] называет лист диктору. Лист движется как [Sheet.expandable], а его
+  /// компактная высота — весь предел. Над [slivers] стоит только ручка: список
+  /// начинается в 6 под её линией, а область нажатия ручки лежит над первым
+  /// срезом и принимает касания. [expandLabel] и [collapseLabel] — доступные
+  /// названия ручки.
+  Sheet.expandableUntitled(
+    this._presentation, {
+    required String label,
+    required List<Widget> slivers,
+    required String expandLabel,
+    required String collapseLabel,
+    super.key,
+  }) : _parts = _ExpandableParts(
+         head: _LabeledHead(label: label),
+         compactHeight: SheetCompactHeight.limit,
+         slivers: slivers,
+         footer: null,
+         expandLabel: expandLabel,
+         collapseLabel: collapseLabel,
        );
 
   /// Лист без заголовка, содержимое которого говорит само за себя.
@@ -932,6 +959,10 @@ const _compactLimit = 534.0;
 /// началом заголовка.
 const _titleTop = 26.0;
 
+/// Отступ тела раскрываемого листа без заголовка от верхнего края: 6 под
+/// линией ручки, потому что первая строка такого тела — область нажатия.
+const _untitledBodyTop = DoableMetrics.space2 + 4 + 6;
+
 /// Части листа одного из его вариантов.
 sealed class _SheetParts {
   const _SheetParts();
@@ -957,28 +988,49 @@ final class _ContentParts extends _SheetParts {
 /// Части раскрываемого листа.
 final class _ExpandableParts extends _SheetParts {
   const _ExpandableParts({
-    required this.title,
-    required this.text,
+    required this.head,
     required this.compactHeight,
-    required this.pinned,
     required this.slivers,
     required this.footer,
     required this.expandLabel,
     required this.collapseLabel,
+  });
+
+  final _ExpandableHead head;
+  final SheetCompactHeight compactHeight;
+
+  /// Срезы прокручиваемого списка тела.
+  final List<Widget> slivers;
+  final Widget? footer;
+  final String expandLabel;
+  final String collapseLabel;
+}
+
+/// То, что стоит над списком раскрываемого листа, кроме ручки.
+sealed class _ExpandableHead {
+  const _ExpandableHead();
+}
+
+/// Заголовок с пояснением и необязательными действием и закреплённой частью.
+final class _TitledHead extends _ExpandableHead {
+  const _TitledHead({
+    required this.title,
+    required this.text,
+    required this.pinned,
     required this.action,
   });
 
   final String title;
   final String text;
-  final SheetCompactHeight compactHeight;
   final Widget? pinned;
-
-  /// Срезы прокручиваемого списка тела.
-  final List<Widget> slivers;
-  final Widget footer;
-  final String expandLabel;
-  final String collapseLabel;
   final SheetAction? action;
+}
+
+/// Только название листа для диктора: на экране над списком одна ручка.
+final class _LabeledHead extends _ExpandableHead {
+  const _LabeledHead({required this.label});
+
+  final String label;
 }
 
 /// Части листа без заголовка.
@@ -1041,25 +1093,7 @@ final class _ExpandableSheetState extends State<_ExpandableSheet>
       label: _isFull ? parts.collapseLabel : parts.expandLabel,
       onTap: () => _resize(full: !_isFull),
     );
-    final titleBlock = _TitleBlock(
-      title: parts.title,
-      text: parts.text,
-      action: parts.action,
-    );
-    // Ручка стоит над началом заголовка, чтобы область нажатия была не меньше
-    // 44 при прежнем положении ручки и заголовка. Шапка одна в обоих
-    // размерах, поэтому смена размера её не двигает.
-    final header = Stack(
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(top: _titleTop),
-          child: titleBlock,
-        ),
-        Align(alignment: Alignment.topCenter, child: handle),
-      ],
-    );
 
-    final pinned = parts.pinned;
     final shrinkWrap = switch (parts.compactHeight) {
       SheetCompactHeight.limit => false,
       // Список высотой по содержимому даёт листу компактную высоту.
@@ -1075,27 +1109,57 @@ final class _ExpandableSheetState extends State<_ExpandableSheet>
       );
       return _SheetLayout(
         minimum: const EdgeInsets.symmetric(horizontal: DoableMetrics.space3),
-        head: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(bottom: DoableMetrics.space3),
-              child: header,
-            ),
-            if (pinned != null) ...[
+        head: switch (parts.head) {
+          final _TitledHead head => Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
               Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: DoableMetrics.space2,
+                padding: const EdgeInsets.only(bottom: DoableMetrics.space3),
+                // Ручка стоит над началом заголовка, чтобы область нажатия
+                // была не меньше 44 при прежнем положении ручки и заголовка.
+                // Шапка одна в обоих размерах, поэтому смена размера её не
+                // двигает.
+                child: Stack(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(top: _titleTop),
+                      child: _TitleBlock(
+                        title: head.title,
+                        text: head.text,
+                        action: head.action,
+                      ),
+                    ),
+                    Align(alignment: Alignment.topCenter, child: handle),
+                  ],
                 ),
-                child: pinned,
               ),
-              const SizedBox(height: DoableMetrics.space2),
+              if (head.pinned case final pinned?) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: DoableMetrics.space2,
+                  ),
+                  child: pinned,
+                ),
+                const SizedBox(height: DoableMetrics.space2),
+              ],
+              if (shrinkWrap) Flexible(child: list) else Expanded(child: list),
             ],
-            if (shrinkWrap) Flexible(child: list) else Expanded(child: list),
-          ],
-        ),
-        footer: _Footer(child: parts.footer),
+          ),
+          _LabeledHead() => Stack(
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: _untitledBodyTop),
+                child: list,
+              ),
+              Align(alignment: Alignment.topCenter, child: handle),
+            ],
+          ),
+        },
+        footer: switch (parts.footer) {
+          final footer? => _Footer(child: footer),
+          null => null,
+        },
       );
     }
 
@@ -1109,18 +1173,46 @@ final class _ExpandableSheetState extends State<_ExpandableSheet>
         isFull: _isFull,
         resize: _resize,
       ),
-      builder: (body) => AnimatedBuilder(
-        animation: _expansion,
-        builder: (context, child) => _ExpandableFrame(
-          compactHeight: parts.compactHeight,
-          progress: _expansion.value,
-          extents: _extents,
-          child: _ResizingSurface(progress: _expansion.value, child: child!),
-        ),
-        child: content(body),
-      ),
+      builder: (body) {
+        final sheet = AnimatedBuilder(
+          animation: _expansion,
+          builder: (context, child) => _ExpandableFrame(
+            compactHeight: parts.compactHeight,
+            progress: _expansion.value,
+            extents: _extents,
+            child: _ResizingSurface(progress: _expansion.value, child: child!),
+          ),
+          child: content(body),
+        );
+        return switch (parts.head) {
+          _TitledHead() => sheet,
+          _LabeledHead(:final label) => _SheetName(label: label, child: sheet),
+        };
+      },
     );
   }
+}
+
+/// Называет лист без заголовка диктору.
+///
+/// Вложенный узел называет лист вместо общего названия модальной панели, как у
+/// диалога Material:
+/// https://api.flutter.dev/flutter/material/AlertDialog/semanticLabel.html
+final class _SheetName extends StatelessWidget {
+  const _SheetName({required this.label, required this.child});
+
+  final String label;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    container: true,
+    scopesRoute: true,
+    namesRoute: true,
+    explicitChildNodes: true,
+    label: label,
+    child: child,
+  );
 }
 
 /// Поверхность листа, у которой скругление верхних углов и тень уходят по мере
@@ -1215,14 +1307,7 @@ final class _UntitledSheetState extends State<_UntitledSheet>
       route: widget.route,
       expansion: null,
       isFixed: bar != null,
-      // Вложенный узел называет лист вместо общего названия модальной панели,
-      // как у диалога Material:
-      // https://api.flutter.dev/flutter/material/AlertDialog/semanticLabel.html
-      builder: (body) => Semantics(
-        container: true,
-        scopesRoute: true,
-        namesRoute: true,
-        explicitChildNodes: true,
+      builder: (body) => _SheetName(
         label: parts.label,
         child: AnimatedBuilder(
           animation: _fullness,

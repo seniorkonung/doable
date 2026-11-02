@@ -1895,6 +1895,72 @@ void main() {
     semantics.dispose();
   });
 
+  for (final hostsMessages in [false, true]) {
+    testWidgets('раскрываемый лист без заголовка'
+        '${hostsMessages ? ' с сообщениями поверх' : ''} занимает весь предел, '
+        'начинает тело в 6 под линией ручки, кончается телом и называет себя '
+        'диктору', (tester) async {
+      final semantics = tester.ensureSemantics();
+      await _openExpandableUntitledSheet(tester, hostsMessages: hostsMessages);
+
+      final sheet = tester.getRect(find.byType(Sheet));
+      expect(sheet.height, _compact);
+      expect(sheet.bottom, _screen.height);
+      expect(
+        tester.getRect(find.text('Шапка')).top,
+        sheet.top + DoableMetrics.space2 + 4 + 6,
+      );
+      expect(
+        tester.getRect(find.byType(CustomScrollView)).bottom,
+        sheet.bottom - _homeIndicator - DoableMetrics.space4,
+      );
+      expect(find.byType(Button), findsNothing);
+      expect(
+        tester.getSemantics(find.bySemanticsLabel(_untitledLabel)),
+        isSemantics(label: _untitledLabel, scopesRoute: true, namesRoute: true),
+      );
+
+      await tester.tap(find.bySemanticsLabel(_expandLabel));
+      await tester.pumpAndSettle();
+
+      expect(_sheetHeight(tester), _full);
+      semantics.dispose();
+    });
+  }
+
+  testWidgets('область ручки листа без заголовка стоит над первым срезом: '
+      'нажатие в ней меняет размер, а ниже неё достаётся срезу', (
+    tester,
+  ) async {
+    var headTaps = 0;
+    await _openExpandableUntitledSheet(tester, onHeadTap: () => headTaps++);
+
+    final head = tester.getRect(find.text('Шапка'));
+    final handleBottom =
+        tester.getTopLeft(find.byType(Sheet)).dy + DoableMetrics.tapMin - 2;
+    expect(handleBottom, greaterThan(head.top));
+
+    await tester.tapAt(Offset(head.center.dx, handleBottom));
+    await tester.pumpAndSettle();
+
+    expect(_sheetHeight(tester), _full);
+    expect(headTaps, 0);
+
+    await tester.tapAt(
+      Offset(head.center.dx, _statusBar + DoableMetrics.tapMin - 2),
+    );
+    await tester.pumpAndSettle();
+
+    expect(_sheetHeight(tester), _compact);
+    expect(headTaps, 0);
+
+    await tester.tapAt(head.bottomCenter - const Offset(0, 2));
+    await tester.pump();
+
+    expect(_sheetHeight(tester), _compact);
+    expect(headTaps, 1);
+  });
+
   testWidgets('лист без заголовка следует за содержимым, и с сообщениями '
       'поверх тоже, в том числе после снятия полосы', (tester) async {
     final editing = ValueNotifier(false);
@@ -2435,6 +2501,35 @@ Future<_OpenedSheet> _openUntitledSheet(
             : null,
         child: body(isEditing),
       ),
+    ),
+  ),
+);
+
+/// Раскрываемый лист без заголовка, первый срез которого — строка высотой 44,
+/// как шапка панели выбора.
+Future<_OpenedSheet> _openExpandableUntitledSheet(
+  WidgetTester tester, {
+  bool hostsMessages = false,
+  VoidCallback onHeadTap = _ignore,
+}) => _openSheet(
+  tester,
+  (context) => showDoableSheet<void>(
+    context: context,
+    hostsMessages: hostsMessages,
+    builder: (context, sheet) => Sheet.expandableUntitled(
+      sheet,
+      label: _untitledLabel,
+      expandLabel: _expandLabel,
+      collapseLabel: _collapseLabel,
+      slivers: [
+        SliverToBoxAdapter(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onHeadTap,
+            child: const SizedBox(height: 44, child: Text('Шапка')),
+          ),
+        ),
+      ],
     ),
   ),
 );
