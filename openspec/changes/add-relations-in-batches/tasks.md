@@ -910,7 +910,7 @@
   - **Предполагаемые файлы:** механически меняются 13 файлов `test/graph/data/` с вызовом команды и `test/support/graph_operation_process_worker.dart`, удаляется `test/graph/data/drift_personal_graph_repository_create_relation_test.dart`.
   - **Размер:** M по логике: файлов больше нормы только из-за механической замены команды.
 
-- [ ] 3.21 Тесты снимков, переноса данных и приложения создают связи командой пачки
+- [x] 3.21 Тесты снимков, переноса данных и приложения создают связи командой пачки
   - **Критерии приёмки:**
     - Файлы `test/graph_snapshots/`, `test/data_transfer/graph_export_test.dart`, `test/app/bootstrap/app_runtime_graph_export_test.dart`, `test/app/graph_export_app_flow_test.dart`, `test/app/graph_import_app_flow_test.dart` и `test/app/home_statistics_app_flow_test.dart` вызывают `AddLongTermRelations` и читают `LongTermRelationsAdded`.
     - Проверки экспорта и снимков по-прежнему видят приоритет и описание, отличные от значений по умолчанию: их задаёт `UpdateLongTermRelation` после добавления.

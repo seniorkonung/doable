@@ -18,6 +18,7 @@ import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
@@ -52,12 +53,10 @@ void main() {
 
     final relation = await app.relation(
       tester,
-      CreateLongTermRelation(
-        sourceIntentionId: durabilityIntention(5),
-        relatedIntentionId: durabilityIntention(3),
-        type: LongTermRelationType.need,
-        priority: RelationPriority.p2,
-        description: null,
+      AddLongTermRelations(
+        pageIntentionId: durabilityIntention(5),
+        candidateIds: [durabilityIntention(3)],
+        group: IntentionRelationGroup.needs,
       ),
     );
     await _until(tester, find.text(app.texts.statisticsTotalItems(4)));
@@ -79,12 +78,10 @@ void main() {
     expect(find.text('Намерение 5'), findsNothing);
     final otherPair = await app.relation(
       tester,
-      CreateLongTermRelation(
-        sourceIntentionId: durabilityIntention(4),
-        relatedIntentionId: durabilityIntention(2),
-        type: LongTermRelationType.need,
-        priority: RelationPriority.p2,
-        description: null,
+      AddLongTermRelations(
+        pageIntentionId: durabilityIntention(4),
+        candidateIds: [durabilityIntention(2)],
+        group: IntentionRelationGroup.needs,
       ),
     );
     await _until(tester, find.text(app.texts.statisticsTotalItems(4)));
@@ -94,12 +91,10 @@ void main() {
     expect(find.text('Намерение 4'), findsNothing);
     await app.relation(
       tester,
-      CreateLongTermRelation(
-        sourceIntentionId: durabilityIntention(5),
-        relatedIntentionId: durabilityIntention(2),
-        type: LongTermRelationType.can,
-        priority: RelationPriority.p2,
-        description: null,
+      AddLongTermRelations(
+        pageIntentionId: durabilityIntention(5),
+        candidateIds: [durabilityIntention(2)],
+        group: IntentionRelationGroup.canUse,
       ),
     );
     await _until(tester, find.text(app.texts.statisticsTotalItems(4)));
@@ -806,10 +801,7 @@ final class _App {
     final relation = await tester.runAsync(() async {
       final coordinator = runtime.commandCoordinator;
       final start = switch (command) {
-        CreateLongTermRelation() => coordinator.acceptRelationCreation(
-          LongTermRelationCreationFormKey(),
-          command,
-        ),
+        CreateLongTermRelation() => fail('Используйте команду пачки'),
         AddLongTermRelations() => coordinator.acceptRelationsAddition(
           RelationsAdditionSearchKey(),
           command,
@@ -823,13 +815,15 @@ final class _App {
         fail('Команда связи не принята: $start');
       }
       return switch ((await start.future).result) {
-        GraphResultSuccess(value: LongTermRelationCreated(:final relation)) ||
         GraphResultSuccess(value: LongTermRelationUpdated(:final relation)) ||
         GraphResultSuccess(
           value: LongTermRelationDeleted(:final relation),
         ) => relation,
         GraphResultSuccess(value: LongTermRelationsAdded(:final relations)) =>
           relations.single,
+        GraphResultSuccess(value: LongTermRelationCreated()) => fail(
+          'Ожидался результат команды пачки',
+        ),
         GraphResultFailure(:final failure) => fail('Отказ команды: $failure'),
       };
     });

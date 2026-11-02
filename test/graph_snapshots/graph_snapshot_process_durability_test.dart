@@ -19,6 +19,7 @@ import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention.dart';
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
@@ -42,7 +43,7 @@ import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
 
 /// Позиция снимка, записанного до запуска дочернего процесса.
-const _previousPosition = 5;
+const _previousPosition = 6;
 
 /// Позиция снимка, который пишет сжатие дочернего процесса: после прежнего
 /// снимка записано больше порога пакетов.
@@ -197,14 +198,24 @@ Future<void> _seedGraph(DriftPersonalGraphRepository repository) async {
       tagIds: {home.id},
     ),
   )).intention;
-  await _confirm<LongTermRelationCreated>(
+  final added = await _confirm<LongTermRelationsAdded>(
     repository,
-    CreateLongTermRelation(
-      sourceIntentionId: health.id,
-      relatedIntentionId: running.id,
-      type: LongTermRelationType.need,
-      priority: RelationPriority.p2,
-      description: null,
+    AddLongTermRelations(
+      pageIntentionId: health.id,
+      candidateIds: [running.id],
+      group: IntentionRelationGroup.needs,
+    ),
+  );
+  await _confirm<LongTermRelationUpdated>(
+    repository,
+    UpdateLongTermRelation(
+      relationId: added.relations.single.id,
+      patch: LongTermRelationPatch(
+        priority: const LongTermRelationFieldSet(RelationPriority.p2),
+        description: LongTermRelationDescriptionPatch.fromInput(
+          'Описание связи',
+        ),
+      ),
     ),
   );
   await _confirm<TagAssignmentChanged>(

@@ -24,6 +24,7 @@ import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention.dart';
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
@@ -215,13 +216,22 @@ void main() {
     final running = await createIntention(
       const CreateIntention(title: 'Бегать', description: null),
     );
-    await confirm<LongTermRelationCreated>(
-      CreateLongTermRelation(
-        sourceIntentionId: health.id,
-        relatedIntentionId: running.id,
-        type: LongTermRelationType.need,
-        priority: RelationPriority.p2,
-        description: null,
+    final added = await confirm<LongTermRelationsAdded>(
+      AddLongTermRelations(
+        pageIntentionId: health.id,
+        candidateIds: [running.id],
+        group: IntentionRelationGroup.needs,
+      ),
+    );
+    await confirm<LongTermRelationUpdated>(
+      UpdateLongTermRelation(
+        relationId: added.relations.single.id,
+        patch: LongTermRelationPatch(
+          priority: const LongTermRelationFieldSet(RelationPriority.p2),
+          description: LongTermRelationDescriptionPatch.fromInput(
+            'Описание связи',
+          ),
+        ),
       ),
     );
     await confirm(ArchiveIntention(running.id));
