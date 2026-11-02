@@ -105,7 +105,7 @@ final class DailyChoiceCatalogViewModel extends _$DailyChoiceCatalogViewModel {
     final loaded = state;
     if (loaded is DailyChoiceCatalogLoaded &&
         loaded.freshness == DailyChoiceCatalogFreshness.stale &&
-        loaded.refreshFailure is DailyChoiceCatalogUnavailableFailure) {
+        loaded.canRetryRefresh) {
       return _assemble(base: loaded);
     }
     return Future.value();

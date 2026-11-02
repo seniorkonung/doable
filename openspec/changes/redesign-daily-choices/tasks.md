@@ -258,7 +258,7 @@
   - **Предполагаемые файлы:** `lib/src/design_system/components/list_state.dart`, при необходимости комментария `lib/src/design_system/components/day_heading.dart`, `test/design_system/list_state_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`.
   - **Размер:** S.
 
-- [ ] 1.20 Решение о повторе отказа обновления принимается в одном месте
+- [x] 1.20 Решение о повторе отказа обновления принимается в одном месте
   - **Критерии приёмки:**
     - `DailyChoiceCatalogLoaded` получает свойство `canRetryRefresh`, истинное при `refreshFailure is DailyChoiceCatalogUnavailableFailure`, по образцу `canRetry` у отказов первой загрузки и порции.
     - `Notice` в начале выдачи и подвал секции в `daily_choice_catalog_body.dart` и `retryRefresh` в `daily_choice_catalog_view_model.dart` читают `canRetryRefresh`. Прямых проверок типа отказа обновления для решения о повторе в них не остаётся.

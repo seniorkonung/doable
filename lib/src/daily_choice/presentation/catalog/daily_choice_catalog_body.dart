@@ -436,7 +436,7 @@ final class _DailyChoiceCatalogBodyState
             liveRegion: true,
             child: Text(_failureMessage(failure, l10n)),
           ),
-          action: failure is DailyChoiceCatalogUnavailableFailure
+          action: state.canRetryRefresh
               ? (label: l10n.commonRetry, onPressed: model.retryRefresh)
               : null,
         ),
@@ -713,7 +713,7 @@ final class _DailyChoiceCatalogBodyState
     )) {
       (final failure?, _) => ListState.error(
         message: _failureMessage(failure, l10n),
-        retry: failure is DailyChoiceCatalogUnavailableFailure
+        retry: state.canRetryRefresh
             ? (label: l10n.commonRetry, onPressed: model.retryRefresh)
             : null,
       ),
