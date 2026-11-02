@@ -758,7 +758,6 @@
   "participantPickerEmpty": "Других намерений для выбора нет.",
   "relationEditorTypeNeed": "Нужно",
   "relationEditorTypeCan": "Можно",
-  "relationEditorDescriptionLabel": "Описание (необязательно)",
   "relationEditorDescriptionTooLong": "Используйте не более 4096 символов.",
   "relationEditorDescriptionInvalidUnicode": "Введите корректный Unicode-текст без NUL.",
   "choicePathTitle": "Выбор пути к действию",

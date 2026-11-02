@@ -2027,10 +2027,6 @@
   "@relationEditorTypeCan": {
     "description": "Тип связи «можно» в форме создания"
   },
-  "relationEditorDescriptionLabel": "Description (optional)",
-  "@relationEditorDescriptionLabel": {
-    "description": "Подпись описания создаваемой связи"
-  },
   "relationEditorDescriptionTooLong": "Use no more than 4096 characters.",
   "@relationEditorDescriptionTooLong": {
     "description": "Превышение предела описания связи"

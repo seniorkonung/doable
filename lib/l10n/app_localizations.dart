@@ -3988,12 +3988,6 @@ abstract class AppLocalizations {
   /// **'Can'**
   String get relationEditorTypeCan;
 
-  /// Подпись описания создаваемой связи
-  ///
-  /// In en, this message translates to:
-  /// **'Description (optional)'**
-  String get relationEditorDescriptionLabel;
-
   /// Превышение предела описания связи
   ///
   /// In en, this message translates to:

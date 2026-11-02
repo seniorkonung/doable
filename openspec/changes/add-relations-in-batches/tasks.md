@@ -992,7 +992,7 @@
   - **Предполагаемые файлы:** меняются `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации, `test/long_term_relation/presentation/batch_picker/relation_batch_picker_page_test.dart`, `test/graph/presentation/graph_operation_presenter_test.dart`.
   - **Размер:** XS.
 
-- [ ] 3.27 Удалить строку `relationEditorDescriptionLabel`: у неё не осталось читателя
+- [x] 3.27 Удалить строку `relationEditorDescriptionLabel`: у неё не осталось читателя
   - **Критерии приёмки:**
     - Ключ `relationEditorDescriptionLabel` удалён из `lib/l10n/app_ru.arb`, а ключ с блоком описания `@relationEditorDescriptionLabel` — из `lib/l10n/app_en.arb`.
     - `app_localizations.dart`, `app_localizations_ru.dart` и `app_localizations_en.dart` пересозданы через `mise run codegen`, а не правкой вручную.

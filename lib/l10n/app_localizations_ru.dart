@@ -2619,9 +2619,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get relationEditorTypeCan => 'Можно';
 
   @override
-  String get relationEditorDescriptionLabel => 'Описание (необязательно)';
-
-  @override
   String get relationEditorDescriptionTooLong =>
       'Используйте не более 4096 символов.';
 

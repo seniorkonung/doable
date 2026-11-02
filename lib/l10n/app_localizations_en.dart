@@ -2593,9 +2593,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get relationEditorTypeCan => 'Can';
 
   @override
-  String get relationEditorDescriptionLabel => 'Description (optional)';
-
-  @override
   String get relationEditorDescriptionTooLong =>
       'Use no more than 4096 characters.';
 
