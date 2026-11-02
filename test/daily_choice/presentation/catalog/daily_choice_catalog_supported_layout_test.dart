@@ -6,7 +6,6 @@ import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart';
 import 'package:doable/src/design_system/components/calendar_handle.dart';
 import 'package:doable/src/design_system/components/day_heading.dart';
 import 'package:doable/src/design_system/components/month_grid_day.dart';
@@ -117,7 +116,7 @@ Future<void> _expectUsableCatalog(
   repository.failDayStatuses(0);
   await tester.pumpAndSettle();
 
-  final body = find.byType(DailyChoiceCatalogBody);
+  final body = _catalogContent;
   final media = MediaQuery.of(tester.element(body));
   expect(media.size, const Size(360, 720));
   expect(media.devicePixelRatio, 1);
@@ -377,12 +376,19 @@ void _expectTransitionLayout(
   expect(tester.takeException(), isNull);
 }
 
+/// Содержимое каталога в области тела страницы: под `AppBar` и над панелью.
+final _catalogContent = find
+    .ancestor(
+      of: find.byType(DailyChoiceCalendar),
+      matching: find.byType(SafeArea),
+    )
+    .first;
+
 /// Отступ и ручка сохраняют прежние 52 dp во всех представлениях каталогов.
 void _expectCalendarSpacing(WidgetTester tester) {
-  final body = find.byType(DailyChoiceCatalogBody);
   final safeTop =
-      tester.getTopLeft(body).dy +
-      MediaQuery.paddingOf(tester.element(body)).top;
+      tester.getTopLeft(_catalogContent).dy +
+      MediaQuery.paddingOf(tester.element(_catalogContent)).top;
   final calendarTop = tester.getTopLeft(find.byType(DailyChoiceCalendar)).dy;
   final topPadding = calendarTop - safeTop;
   expect(topPadding, 16);

@@ -4713,6 +4713,12 @@ abstract class AppLocalizations {
   /// **'Refreshing…'**
   String get dailyChoiceCatalogRefreshing;
 
+  /// Доступное название кнопки возврата выдачи к заголовку дня
+  ///
+  /// In en, this message translates to:
+  /// **'Back to top'**
+  String get dailyChoiceCatalogScrollToTop;
+
   /// Загрузка следующей порции
   ///
   /// In en, this message translates to:

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
+import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode_presentation.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
@@ -16,9 +17,12 @@ import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
+import 'package:doable/src/design_system/components/calendar_handle.dart';
 import 'package:doable/src/design_system/components/day_heading.dart';
 import 'package:doable/src/design_system/components/list_state.dart';
 import 'package:doable/src/design_system/components/notice.dart';
+import 'package:doable/src/design_system/components/scroll_top_button.dart';
+import 'package:doable/src/design_system/components/section_header.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/presentation/operation_failure_presentation.dart';
@@ -702,6 +706,196 @@ void main() {
       await tester.pump();
       expect(repository.queries, hasLength(3));
       expect(repository.queries[2].cursor, isA<CatalogPageCursor>());
+    });
+  });
+
+  group('возврат к началу выдачи', () {
+    const size = Size(360, 780);
+    final day = date(2026, 10, 4);
+    final rows = [
+      for (var number = 1; number <= 30; number++)
+        catalogPageItem(number, date: day),
+    ];
+    final button = find.byType(ScrollTopButton);
+
+    Future<ScrollPosition> openLongDay(
+      WidgetTester tester,
+      CatalogPageRepository repository, {
+      bool onDate = false,
+    }) async {
+      await pumpCatalogPage(
+        tester,
+        repository,
+        today: day,
+        locale: const Locale('ru'),
+        size: size,
+        catalogDate: onDate ? day : null,
+      );
+      repository.completeFirst(0, rows, total: rows.length);
+      await tester.pumpAndSettle();
+      return tester
+          .state<ScrollableState>(
+            find.descendant(
+              of: find.byType(CustomScrollView),
+              matching: find.byWidgetPredicate(
+                (widget) =>
+                    widget is Scrollable &&
+                    widget.axisDirection == AxisDirection.down,
+              ),
+            ),
+          )
+          .position;
+    }
+
+    Future<void> scrollPastViewport(
+      WidgetTester tester,
+      ScrollPosition position,
+    ) async {
+      position.jumpTo(position.viewportDimension + 1);
+      await tester.pumpAndSettle();
+      expect(button, findsOneWidget);
+    }
+
+    for (final onDate in [false, true]) {
+      final catalog = onDate ? 'каталог на дату' : 'корневой каталог';
+
+      testWidgets('$catalog показывает кнопку за высотой видимой области на '
+          'месте из макета, а нажатие плавно возвращает к заголовку дня и '
+          'сохраняет дату и секции', (tester) async {
+        final position = await openLongDay(
+          tester,
+          CatalogPageRepository(),
+          onDate: onDate,
+        );
+        expect(button, findsNothing);
+
+        position.jumpTo(position.viewportDimension);
+        await tester.pumpAndSettle();
+        expect(button, findsNothing);
+
+        await scrollPastViewport(tester, position);
+        final rect = tester.getRect(button);
+        expect(rect.right, size.width - 20);
+        expect(
+          rect.bottom,
+          tester.getRect(find.byType(AppNavigationBar)).top - 12,
+        );
+        final start = position.pixels;
+
+        await tester.tap(button);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 50));
+        expect(position.pixels, inExclusiveRange(0, start));
+
+        await tester.pumpAndSettle();
+        expect(position.pixels, 0);
+        expect(find.byType(DayHeading), findsOneWidget);
+        expect(button, findsNothing);
+        expect(shownDailyChoiceCatalogDate(tester), day);
+        expect(
+          tester
+              .widget<SectionHeader>(
+                find.byKey(const ValueKey('daily-choice-section-false')),
+              )
+              .open,
+          isTrue,
+        );
+        expect(
+          find.byKey(const ValueKey('daily-choice-row-1')),
+          findsOneWidget,
+        );
+      });
+
+      testWidgets('$catalog ставит показанное сообщение над кнопкой', (
+        tester,
+      ) async {
+        final position = await openLongDay(
+          tester,
+          CatalogPageRepository(),
+          onDate: onDate,
+        );
+        await scrollPastViewport(tester, position);
+        final rect = tester.getRect(button);
+
+        ScaffoldMessenger.of(tester.element(button))
+            .showSnackBar(const SnackBar(content: Text('Сообщение')));
+        await tester.pumpAndSettle();
+
+        expect(tester.getRect(button), rect);
+        expect(
+          tester.getRect(find.byType(SnackBar)).bottom,
+          lessThanOrEqualTo(rect.top),
+        );
+      });
+    }
+
+    testWidgets('при уменьшении движения нажатие возвращает к началу сразу', (
+      tester,
+    ) async {
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(
+        tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+      );
+      final position = await openLongDay(tester, CatalogPageRepository());
+      await scrollPastViewport(tester, position);
+
+      await tester.tap(button);
+      await tester.pump();
+
+      expect(position.pixels, 0);
+    });
+
+    testWidgets('смена дня убирает кнопку', (tester) async {
+      final repository = CatalogPageRepository();
+      final position = await openLongDay(tester, repository);
+      await scrollPastViewport(tester, position);
+
+      await selectDailyChoiceCatalogDate(tester, date(2026, 10, 5));
+      repository.completeFirst(1, rows, total: rows.length);
+      await tester.pumpAndSettle();
+
+      expect(position.pixels, 0);
+      expect(button, findsNothing);
+    });
+
+    testWidgets('изменение высоты видимой области без прокрутки сдвигает '
+        'границу показа кнопки', (tester) async {
+      final position = await openLongDay(tester, CatalogPageRepository());
+      position.jumpTo(position.viewportDimension);
+      await tester.pumpAndSettle();
+      expect(button, findsNothing);
+
+      await tester.tap(find.byType(CalendarHandle));
+      await tester.pumpAndSettle();
+      expect(button, findsOneWidget);
+
+      await tester.tap(find.byType(CalendarHandle));
+      await tester.pumpAndSettle();
+      expect(button, findsNothing);
+    });
+
+    testWidgets('конец перехода календаря не отменяет возврат к началу', (
+      tester,
+    ) async {
+      final position = await openLongDay(tester, CatalogPageRepository());
+      await scrollPastViewport(tester, position);
+
+      final hold = await tester.startGesture(
+        tester.getCenter(find.byType(CalendarHandle)),
+      );
+      await hold.moveBy(const Offset(0, 20));
+      await hold.moveBy(
+        const Offset(0, 20),
+        timeStamp: const Duration(seconds: 1),
+      );
+      await tester.pump();
+      await tester.tap(button);
+      await hold.up(timeStamp: const Duration(seconds: 2));
+      await tester.pumpAndSettle();
+
+      expect(position.pixels, 0);
+      expect(button, findsNothing);
     });
   });
 

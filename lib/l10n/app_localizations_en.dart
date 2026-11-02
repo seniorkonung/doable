@@ -3005,6 +3005,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dailyChoiceCatalogRefreshing => 'Refreshing…';
 
   @override
+  String get dailyChoiceCatalogScrollToTop => 'Back to top';
+
+  @override
   String get dailyChoiceCatalogLoadingMore => 'Loading more daily choices…';
 
   @override

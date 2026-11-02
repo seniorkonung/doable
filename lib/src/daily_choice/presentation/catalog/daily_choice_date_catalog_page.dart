@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../../../app/navigation/ordinary_page_scaffold.dart';
+import '../../../design_system/components/scroll_top_button.dart';
 import '../../domain/calendar_date.dart';
 import 'daily_choice_catalog_body.dart';
 import 'daily_choice_catalog_instance.dart';
@@ -29,13 +30,16 @@ final class _DailyChoiceDateCatalogPageState
   }
 
   @override
-  Widget build(BuildContext context) => OrdinaryPageScaffold(
-    appBar: AppBar(
-      title: Text(AppLocalizations.of(context).appDestinationDailyChoices),
-    ),
-    body: DailyChoiceCatalogBody(
-      key: ObjectKey(_instance),
-      instance: _instance,
+  Widget build(BuildContext context) => DailyChoiceCatalogBody(
+    key: ObjectKey(_instance),
+    instance: _instance,
+    scaffoldBuilder: (body, scrollTopButton) => OrdinaryPageScaffold(
+      appBar: AppBar(
+        title: Text(AppLocalizations.of(context).appDestinationDailyChoices),
+      ),
+      body: body,
+      floatingActionButton: scrollTopButton,
+      floatingActionButtonLocation: const ScrollTopButtonLocation(),
     ),
   );
 }

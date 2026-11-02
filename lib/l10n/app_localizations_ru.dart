@@ -3026,6 +3026,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get dailyChoiceCatalogRefreshing => 'Обновляем…';
 
   @override
+  String get dailyChoiceCatalogScrollToTop => 'Вернуться к началу';
+
+  @override
   String get dailyChoiceCatalogLoadingMore => 'Загружаем ещё дневные выборы…';
 
   @override

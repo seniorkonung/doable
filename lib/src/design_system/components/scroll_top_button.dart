@@ -9,7 +9,8 @@ import '../doable_shadows.dart';
 ///
 /// Потребитель решает, когда её показывать и где ставить, задаёт доступное
 /// название [label] и команду [onPressed]. Плавное или мгновенное движение
-/// списка тоже остаётся за потребителем.
+/// списка тоже остаётся за потребителем. Над нижней панелью её ставит
+/// [ScrollTopButtonLocation].
 ///
 /// Круг 44 цвета `raised` с обводкой `hairline` и тенью `shadow-float`,
 /// внутри стрелка к линии размером 20 цвета `ink`.
@@ -66,6 +67,26 @@ final class ScrollTopButton extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Место [ScrollTopButton] в слоте плавающей кнопки `Scaffold`: `space5` от
+/// правого края и `space3` над нижней панелью.
+///
+/// Плавающее сообщение `Scaffold` сам ставит над кнопкой этого слота.
+final class ScrollTopButtonLocation extends FloatingActionButtonLocation {
+  const ScrollTopButtonLocation();
+
+  @override
+  Offset getOffset(ScaffoldPrelayoutGeometry scaffoldGeometry) {
+    final size = scaffoldGeometry.floatingActionButtonSize;
+    return Offset(
+      scaffoldGeometry.scaffoldSize.width -
+          scaffoldGeometry.minInsets.right -
+          DoableMetrics.space5 -
+          size.width,
+      scaffoldGeometry.contentBottom - DoableMetrics.space3 - size.height,
     );
   }
 }

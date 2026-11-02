@@ -14,6 +14,7 @@ import '../../../design_system/components/day_heading.dart';
 import '../../../design_system/components/empty_state.dart';
 import '../../../design_system/components/list_state.dart';
 import '../../../design_system/components/notice.dart';
+import '../../../design_system/components/scroll_top_button.dart';
 import '../../../design_system/components/section_header.dart';
 import '../../../design_system/doable_colors.dart';
 import '../../../design_system/doable_icon.dart';
@@ -36,15 +37,30 @@ import 'daily_choice_catalog_view_model.dart';
 import 'daily_choice_local_date_provider.dart';
 import 'daily_choice_local_day_observer.dart';
 
-/// Содержимое каталога без каркаса страницы.
+/// Строит каркас страницы вокруг [body] и кнопки возврата к началу.
+///
+/// [scrollTopButton] равна `null`, пока кнопка не нужна. Она стоит в слоте
+/// плавающей кнопки `Scaffold` страницы: тогда сообщение встаёт над ней, а
+/// вложенный `Scaffold` показал бы сообщение второй раз.
+typedef DailyChoiceCatalogScaffoldBuilder = Widget Function(
+  Widget body,
+  Widget? scrollTopButton,
+);
+
+/// Содержимое каталога; каркас страницы строит [scaffoldBuilder].
 ///
 /// Страница создаёт и удерживает [instance], передавая его также в [ObjectKey].
 /// Тело владеет просмотром календаря, наблюдателем местного дня и хранилищем
 /// прокрутки; модели выбранного дня, выдачи и отметок живут с этим экземпляром.
 final class DailyChoiceCatalogBody extends ConsumerStatefulWidget {
-  const DailyChoiceCatalogBody({required this.instance, super.key});
+  const DailyChoiceCatalogBody({
+    required this.instance,
+    required this.scaffoldBuilder,
+    super.key,
+  });
 
   final DailyChoiceCatalogInstance instance;
+  final DailyChoiceCatalogScaffoldBuilder scaffoldBuilder;
 
   @override
   ConsumerState<DailyChoiceCatalogBody> createState() =>
@@ -70,6 +86,12 @@ final class _DailyChoiceCatalogBodyState
   final _scrollController = ScrollController();
 
   _CalendarTransitionScrollSnapshot? _scrollSnapshot;
+
+  /// Выдача прокручена дальше высоты своей видимой области.
+  var _isPastViewport = false;
+
+  /// Плавный возврат к началу выдачи.
+  static const _returnToStartDuration = Duration(milliseconds: 300);
 
   /// Свободное место под последней строкой выдачи.
   static const double _listEndSpace = 72;
@@ -135,7 +157,7 @@ final class _DailyChoiceCatalogBodyState
     final dayMarks = ref.watch(
       dailyChoiceCalendarDayMarksViewModelProvider(widget.instance),
     );
-    return PageStorage(
+    final body = PageStorage(
       bucket: _pageStorage,
       child: SafeArea(
         // Календарь определяет свою высоту; выдаче остаётся остальное место:
@@ -164,71 +186,89 @@ final class _DailyChoiceCatalogBodyState
               ),
             ),
             Expanded(
-              child: NotificationListener<ScrollNotification>(
-                onNotification: _onScrollNotification,
-                child: CustomScrollView(
-                  controller: _scrollController,
-                  physics: const _CalendarResizeScrollPhysics(),
-                  // https://api.flutter.dev/flutter/widgets/ScrollView/scrollCacheExtent.html
-                  scrollCacheExtent: const ScrollCacheExtent.pixels(
-                    _pageRequestDistance,
-                  ),
-                  key: const PageStorageKey<String>('daily-choice-catalog'),
-                  slivers: [
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(
-                          DoableMetrics.space5,
-                          DoableMetrics.space4,
-                          DoableMetrics.space5,
-                          0,
-                        ),
-                        // Высоту задаёт только заголовок, поэтому строка
-                        // обновления не сдвигает выдачу:
-                        // https://api.flutter.dev/flutter/widgets/Stack-class.html
-                        child: Stack(
-                          fit: StackFit.passthrough,
-                          children: [
-                            DayHeading(
-                              weekday:
-                                  weekday[0].toUpperCase() +
-                                  weekday.substring(1),
-                              // Явный формат сохраняет порядок и не добавляет
-                              // «г.»:
-                              // https://pub.dev/documentation/intl/latest/intl/DateFormat-class.html
-                              date: DateFormat('d MMMM y', locale).format(date),
-                              todayLabel: selectedDate == _localDay.today
-                                  ? l10n.dailyChoiceCalendarToday
-                                  : null,
-                            ),
-                            if (state case DailyChoiceCatalogLoaded(
-                              freshness: DailyChoiceCatalogFreshness.refreshing,
-                            ))
-                              // Строка высотой 18 стоит по центру строки дня
-                              // высотой 24.
-                              PositionedDirectional(
-                                top: 3,
-                                start: 0,
-                                end: 0,
-                                child: Align(
-                                  alignment: AlignmentDirectional.topEnd,
-                                  child: ListState.refreshing(
-                                    text: l10n.dailyChoiceCatalogRefreshing,
+              // Календарь и новая выдача двигают границу и без прокрутки:
+              // https://api.flutter.dev/flutter/widgets/ScrollMetricsNotification-class.html
+              child: NotificationListener<ScrollMetricsNotification>(
+                onNotification: _onScrollMetricsNotification,
+                child: NotificationListener<ScrollNotification>(
+                  onNotification: _onScrollNotification,
+                  child: CustomScrollView(
+                    controller: _scrollController,
+                    physics: const _CalendarResizeScrollPhysics(),
+                    // https://api.flutter.dev/flutter/widgets/ScrollView/scrollCacheExtent.html
+                    scrollCacheExtent: const ScrollCacheExtent.pixels(
+                      _pageRequestDistance,
+                    ),
+                    key: const PageStorageKey<String>('daily-choice-catalog'),
+                    slivers: [
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                            DoableMetrics.space5,
+                            DoableMetrics.space4,
+                            DoableMetrics.space5,
+                            0,
+                          ),
+                          // Высоту задаёт только заголовок, поэтому строка
+                          // обновления не сдвигает выдачу:
+                          // https://api.flutter.dev/flutter/widgets/Stack-class.html
+                          child: Stack(
+                            fit: StackFit.passthrough,
+                            children: [
+                              DayHeading(
+                                weekday:
+                                    weekday[0].toUpperCase() +
+                                    weekday.substring(1),
+                                // Явный формат сохраняет порядок и не добавляет
+                                // «г.»:
+                                // https://pub.dev/documentation/intl/latest/intl/DateFormat-class.html
+                                date: DateFormat(
+                                  'd MMMM y',
+                                  locale,
+                                ).format(date),
+                                todayLabel: selectedDate == _localDay.today
+                                    ? l10n.dailyChoiceCalendarToday
+                                    : null,
+                              ),
+                              if (state case DailyChoiceCatalogLoaded(
+                                freshness: DailyChoiceCatalogFreshness
+                                    .refreshing,
+                              ))
+                                // Строка высотой 18 стоит по центру строки дня
+                                // высотой 24.
+                                PositionedDirectional(
+                                  top: 3,
+                                  start: 0,
+                                  end: 0,
+                                  child: Align(
+                                    alignment: AlignmentDirectional.topEnd,
+                                    child: ListState.refreshing(
+                                      text: l10n.dailyChoiceCatalogRefreshing,
+                                    ),
                                   ),
                                 ),
-                              ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                    ..._content(state, model, l10n),
-                  ],
+                      ..._content(state, model, l10n),
+                    ],
+                  ),
                 ),
               ),
             ),
           ],
         ),
       ),
+    );
+    return widget.scaffoldBuilder(
+      body,
+      _isPastViewport
+          ? ScrollTopButton(
+              label: l10n.dailyChoiceCatalogScrollToTop,
+              onPressed: _returnToStart,
+            )
+          : null,
     );
   }
 
@@ -264,9 +304,42 @@ final class _DailyChoiceCatalogBodyState
         : null;
   }
 
+  /// Новая цель, как и прокрутка пользователя, отменяет отложенное
+  /// восстановление позиции после перехода календаря.
+  void _returnToStart() {
+    _scrollSnapshot = null;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _scrollController.jumpTo(0);
+    } else {
+      unawaited(
+        _scrollController.animateTo(
+          0,
+          duration: _returnToStartDuration,
+          curve: Curves.easeOut,
+        ),
+      );
+    }
+  }
+
+  void _updatePastViewport(ScrollMetrics metrics) {
+    final isPastViewport = metrics.pixels > metrics.viewportDimension;
+    if (isPastViewport != _isPastViewport) {
+      setState(() => _isPastViewport = isPastViewport);
+    }
+  }
+
+  bool _onScrollMetricsNotification(ScrollMetricsNotification notification) {
+    if (notification.depth == 0) _updatePastViewport(notification.metrics);
+    return false;
+  }
+
   bool _onScrollNotification(ScrollNotification notification) {
+    if (notification.depth != 0) return false;
+    if (notification is ScrollUpdateNotification) {
+      _updatePastViewport(notification.metrics);
+    }
     final snapshot = _scrollSnapshot;
-    if (notification.depth != 0 || snapshot == null) return false;
+    if (snapshot == null) return false;
     // Коррекция геометрии не является пользовательской прокруткой:
     // https://api.flutter.dev/flutter/widgets/UserScrollNotification-class.html
     final isUserScroll = switch (notification) {

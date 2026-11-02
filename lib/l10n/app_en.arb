@@ -2385,6 +2385,8 @@
   "@dailyChoiceCatalogEmptyText": {"description": "Текст пустого состояния дня без дневных выборов"},
   "dailyChoiceCatalogRefreshing": "Refreshing…",
   "@dailyChoiceCatalogRefreshing": {"description": "Обновление подтверждённого снимка каталога"},
+  "dailyChoiceCatalogScrollToTop": "Back to top",
+  "@dailyChoiceCatalogScrollToTop": {"description": "Доступное название кнопки возврата выдачи к заголовку дня"},
   "dailyChoiceCatalogLoadingMore": "Loading more daily choices…",
   "@dailyChoiceCatalogLoadingMore": {"description": "Загрузка следующей порции"},
   "dailyChoiceCatalogUnavailable": "Could not load daily choices.",
