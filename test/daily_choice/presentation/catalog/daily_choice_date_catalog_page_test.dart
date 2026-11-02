@@ -480,7 +480,7 @@ void main() {
       expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
       expect(dayCell(tester, selected).isSelected, isTrue);
       expect(find.bySemanticsLabel('Развернуть календарь'), findsOneWidget);
-      expect(find.text('Не выполненные'), findsOneWidget);
+      expect(find.text('Невыполненные'), findsOneWidget);
       await _back(tester);
       expect(find.text('2029'), findsOneWidget);
       await _calendarCommand(tester, 'Вернуться к дням месяца');
@@ -620,6 +620,8 @@ void main() {
 
     final footer = find.byKey(const ValueKey('daily-choice-load-more-true'));
     await tester.scrollUntilVisible(footer, 500, scrollable: _verticalScroll);
+    await tester.ensureVisible(footer);
+    await tester.pumpAndSettle();
     await tester.tap(footer);
     await tester.pump();
     repository.completeMore(1, [
@@ -656,7 +658,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
     expect(dayCell(tester, selected).isSelected, isTrue);
-    expect(find.text('Не выполненные'), findsOneWidget);
+    expect(find.text('Невыполненные'), findsOneWidget);
     expect(find.text('Отметки дней не загружены.'), findsOneWidget);
     expect(find.text('Всего дневных выборов: 1'), findsOneWidget);
 
@@ -709,7 +711,7 @@ void main() {
     await tester.pumpAndSettle();
     expectDailyChoicesRootPage(router);
     expect(dayCell(tester, today).isSelected, isTrue);
-    expect(find.text('Не выполненные'), findsOneWidget);
+    expect(find.text('Невыполненные'), findsOneWidget);
     expect(find.bySemanticsLabel('Свернуть календарь'), findsOneWidget);
     await tester.scrollUntilVisible(
       find.text('Всего дневных выборов: 1'),
@@ -728,7 +730,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
     expect(dayCell(tester, selected).isSelected, isTrue);
-    expect(find.text('Не выполненные'), findsOneWidget);
+    expect(find.text('Невыполненные'), findsOneWidget);
     expect(find.text('На этот день нет дневных выборов.'), findsOneWidget);
     expect(
       tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected,

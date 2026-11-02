@@ -131,13 +131,13 @@ void main() {
           '${texts.weekday}\n${texts.badge}',
           texts.selectedToday,
           l10n.dailyChoiceCatalogTotalCount(3),
-          l10n.dailyChoiceCatalogIncomplete,
+          _sectionLabel(l10n, completed: false, count: 3),
           _completionLabel(l10n, 1),
           _rowLabel(l10n, 1),
           _completionLabel(l10n, 2),
           _rowLabel(l10n, 2),
           l10n.dailyChoiceCatalogLoadMore,
-          l10n.dailyChoiceCatalogCompleted,
+          _sectionLabel(l10n, completed: true, count: 0),
         ];
         final announced = _announced(tester);
         expect(announced.take(page.length), page);
@@ -159,8 +159,14 @@ void main() {
         _expectEveryActionNamed(tester);
 
         for (final section in [
-          (label: l10n.dailyChoiceCatalogIncomplete, expanded: true),
-          (label: l10n.dailyChoiceCatalogCompleted, expanded: true),
+          (
+            label: _sectionLabel(l10n, completed: false, count: 3),
+            expanded: true,
+          ),
+          (
+            label: _sectionLabel(l10n, completed: true, count: 0),
+            expanded: true,
+          ),
         ]) {
           final command = find.semantics.byLabel(section.label);
           for (final expanded in [section.expanded, !section.expanded]) {
@@ -206,8 +212,8 @@ void main() {
         );
         final l10n = _l10n(tester);
         final filters = [
-          l10n.dailyChoiceCatalogIncomplete,
-          l10n.dailyChoiceCatalogCompleted,
+          _sectionLabel(l10n, completed: false, count: 0),
+          _sectionLabel(l10n, completed: true, count: 0),
         ];
 
         repository.failUnavailable(0);
@@ -234,11 +240,11 @@ void main() {
         await tester.pumpAndSettle();
         expect(_afterDayHeading(tester), [
           l10n.dailyChoiceCatalogTotalCount(2),
-          l10n.dailyChoiceCatalogIncomplete,
+          _sectionLabel(l10n, completed: false, count: 2),
           _completionLabel(l10n, 1),
           _rowLabel(l10n, 1),
           l10n.dailyChoiceCatalogLoadMore,
-          l10n.dailyChoiceCatalogCompleted,
+          _sectionLabel(l10n, completed: true, count: 0),
         ]);
 
         tester.semantics.tap(
@@ -253,12 +259,12 @@ void main() {
         // Отказ подгрузки читается после загруженной строки.
         expect(_afterDayHeading(tester), [
           l10n.dailyChoiceCatalogTotalCount(2),
-          l10n.dailyChoiceCatalogIncomplete,
+          _sectionLabel(l10n, completed: false, count: 2),
           _completionLabel(l10n, 1),
           _rowLabel(l10n, 1),
           l10n.dailyChoiceCatalogUnavailable,
           l10n.commonRetry,
-          l10n.dailyChoiceCatalogCompleted,
+          _sectionLabel(l10n, completed: true, count: 0),
         ]);
         _expectLiveRegion(tester, l10n.dailyChoiceCatalogUnavailable);
 
@@ -271,27 +277,31 @@ void main() {
         await tester.pumpAndSettle();
         expect(_afterDayHeading(tester), [
           l10n.dailyChoiceCatalogTotalCount(2),
-          l10n.dailyChoiceCatalogIncomplete,
+          _sectionLabel(l10n, completed: false, count: 2),
           _completionLabel(l10n, 1),
           _rowLabel(l10n, 1),
           _completionLabel(l10n, 2),
           _rowLabel(l10n, 2),
-          l10n.dailyChoiceCatalogCompleted,
+          _sectionLabel(l10n, completed: true, count: 0),
         ]);
 
         tester.semantics.tap(
-          find.semantics.byLabel(l10n.dailyChoiceCatalogIncomplete),
+          find.semantics.byLabel(
+            _sectionLabel(l10n, completed: false, count: 2),
+          ),
         );
         await tester.pumpAndSettle();
         tester.semantics.tap(
-          find.semantics.byLabel(l10n.dailyChoiceCatalogCompleted),
+          find.semantics.byLabel(
+            _sectionLabel(l10n, completed: true, count: 0),
+          ),
         );
         await tester.pumpAndSettle();
         expect(repository.queries, hasLength(4));
         expect(_afterDayHeading(tester), [
           l10n.dailyChoiceCatalogTotalCount(2),
-          l10n.dailyChoiceCatalogIncomplete,
-          l10n.dailyChoiceCatalogCompleted,
+          _sectionLabel(l10n, completed: false, count: 2),
+          _sectionLabel(l10n, completed: true, count: 0),
         ]);
         expect(_announced(tester), contains(texts.selectedToday));
         semantics.dispose();
@@ -326,7 +336,7 @@ void main() {
           '${texts.weekday}\n${texts.badge}',
           texts.selectedToday,
           l10n.dailyChoiceCatalogTotalCount(21),
-          l10n.dailyChoiceCatalogIncomplete,
+          _sectionLabel(l10n, completed: false, count: 21),
           for (var number = 1; number <= 20; number++) ...[
             _completionLabel(l10n, number),
             _rowLabel(l10n, number),
@@ -460,6 +470,14 @@ String _rowLabel(AppLocalizations l10n, int number, [bool completed = false]) =>
           ? l10n.dailyChoiceDetailsCompleted
           : l10n.dailyChoiceDetailsNotCompleted,
     ].join('\n');
+
+/// Доступное название заголовка секции: название и число выборов.
+String _sectionLabel(
+  AppLocalizations l10n, {
+  required bool completed,
+  required int count,
+}) =>
+    '${completed ? l10n.dailyChoiceCatalogCompleted : l10n.dailyChoiceCatalogIncomplete}\n$count';
 
 String _completionLabel(AppLocalizations l10n, int number) =>
     l10n.localeName == 'ru'

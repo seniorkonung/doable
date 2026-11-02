@@ -6,6 +6,7 @@ import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calend
 import 'package:doable/src/design_system/components/choice_check.dart';
 import 'package:doable/src/design_system/components/choice_row.dart';
 import 'package:doable/src/design_system/components/reason_chain.dart';
+import 'package:doable/src/design_system/components/section_header.dart';
 import 'package:doable/src/design_system/doable_colors.dart';
 import 'package:doable/src/design_system/doable_priority.dart';
 import 'package:doable/src/design_system/doable_type.dart';
@@ -311,6 +312,105 @@ void main() {
     );
   }
 
+  testWidgets('заголовок секции показывает число её выборов за день, '
+      'включая неполученные порции, а свёрнутая секция его сохраняет', (
+    tester,
+  ) async {
+    final repository = CatalogPageRepository();
+    final day = date(2026, 10, 8);
+    await pumpCatalogPage(
+      tester,
+      repository,
+      today: day,
+      locale: const Locale('ru'),
+      size: const Size(360, 900),
+    );
+    repository.completeFirst(
+      0,
+      [
+        catalogPageItem(1, date: day),
+        catalogPageItem(2, date: day),
+        catalogPageItem(201, date: day, isCompleted: true),
+      ],
+      total: 6,
+      cursor: const CatalogPageCursor(),
+    );
+    await tester.pumpAndSettle();
+
+    expect(_count(tester, completed: false), '5');
+    expect(_count(tester, completed: true), '1');
+    expect(find.byType(ChoiceRow), findsNWidgets(3));
+
+    await tester.tap(find.byKey(const ValueKey('daily-choice-section-false')));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<SectionHeader>(
+            find.byKey(const ValueKey('daily-choice-section-false')),
+          )
+          .open,
+      isFalse,
+    );
+    expect(_count(tester, completed: false), '5');
+    expect(find.byType(ChoiceRow), findsOneWidget);
+  });
+
+  testWidgets('секция без выборов сохраняет заголовок с числом 0 и не '
+      'показывает карточек', (tester) async {
+    final repository = CatalogPageRepository();
+    final day = date(2026, 10, 8);
+    await pumpCatalogPage(
+      tester,
+      repository,
+      today: day,
+      locale: const Locale('ru'),
+      size: const Size(360, 900),
+    );
+    repository.completeFirst(0, [
+      catalogPageItem(201, date: day, isCompleted: true),
+    ], total: 1);
+    await tester.pumpAndSettle();
+
+    expect(_count(tester, completed: false), '0');
+    expect(_count(tester, completed: true), '1');
+    expect(find.byType(ChoiceRow), findsOneWidget);
+    expect(
+      tester
+          .widget<SectionHeader>(
+            find.byKey(const ValueKey('daily-choice-section-false')),
+          )
+          .open,
+      isTrue,
+    );
+  });
+
+  testWidgets('верхняя секция называется «Невыполненные», а нижняя — '
+      '«Выполненные»', (tester) async {
+    final repository = CatalogPageRepository();
+    final day = date(2026, 10, 8);
+    await pumpCatalogPage(
+      tester,
+      repository,
+      today: day,
+      locale: const Locale('ru'),
+      size: const Size(360, 900),
+    );
+    repository.completeFirst(0, [catalogPageItem(1, date: day)], total: 1);
+    await tester.pumpAndSettle();
+
+    expect(
+      [
+        for (final completed in [false, true])
+          tester
+              .widget<SectionHeader>(
+                find.byKey(ValueKey('daily-choice-section-$completed')),
+              )
+              .title,
+      ],
+      ['Невыполненные', 'Выполненные'],
+    );
+  });
+
   testWidgets('подпись группы стоит на 6 над первой строкой, строки группы — '
       'через 8, группы — через 16, а первая группа идёт сразу за заголовком '
       'секции', (tester) async {
@@ -369,3 +469,21 @@ int _headers(String label) => find.semantics
     .evaluate()
     .where((node) => node.flagsCollection.isHeader)
     .length;
+
+/// Число в счётчике заголовка секции.
+String _count(WidgetTester tester, {required bool completed}) {
+  final header = find.byKey(ValueKey('daily-choice-section-$completed'));
+  return tester
+      .widget<Text>(
+        find.descendant(
+          of: header,
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is Text &&
+                widget.data != null &&
+                int.tryParse(widget.data!) != null,
+          ),
+        ),
+      )
+      .data!;
+}

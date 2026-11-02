@@ -18,7 +18,6 @@ import 'package:intl/intl.dart';
 
 import 'daily_choice_calendar_test_support.dart';
 import 'daily_choice_catalog_page_test_support.dart';
-import '../../../support/daily_choice_catalog_controls.dart';
 
 /// Узкий экран телефона.
 const _screen = Size(360, 780);
@@ -843,7 +842,8 @@ void _expectAtEnd(WidgetTester tester, Finder finder) {
   final lastHeader = tester.getRect(
     find.byKey(const ValueKey('daily-choice-section-true')),
   );
-  expect(rect.bottom, moreOrLessEquals(lastHeader.top, epsilon: _epsilon));
+  // Второй заголовок стоит на 2 ниже строк первой секции.
+  expect(rect.bottom, moreOrLessEquals(lastHeader.top - 2, epsilon: _epsilon));
   expect(
     lastHeader.bottom,
     moreOrLessEquals(area.bottom - 72, epsilon: _epsilon),

@@ -3010,7 +3010,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get dailyChoiceCalendarNextYear => 'Следующий год';
 
   @override
-  String get dailyChoiceCatalogIncomplete => 'Не выполненные';
+  String get dailyChoiceCatalogIncomplete => 'Невыполненные';
 
   @override
   String get dailyChoiceCatalogCompleted => 'Выполненные';

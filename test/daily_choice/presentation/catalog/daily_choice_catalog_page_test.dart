@@ -660,7 +660,7 @@ void main() {
       expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 12), 1));
       expect(dayCell(tester, selected).isSelected, isTrue);
       _expectSelected(tester, selected);
-      expect(find.text('Не выполненные'), findsOneWidget);
+      expect(find.text('Невыполненные'), findsOneWidget);
       expect(find.text('Всего дневных выборов: 1'), findsOneWidget);
       expect(find.byKey(const ValueKey('daily-choice-row-1')), findsOneWidget);
       expect(repository.queries, hasLength(1));

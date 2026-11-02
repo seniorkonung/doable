@@ -80,7 +80,7 @@
     - меняются `test/app/daily_choice_app_flow_test.dart`, `daily_choice_completion_lifecycle_scenarios.dart`, `intention_statistics_catalog_scenarios.dart`, `navigation/app_shell_state_test.dart`, `navigation/app_shell_layout_test.dart`.
   - **Размер:** M по логике: файлов больше нормы только из-за перевода тестов на общий шаг.
 
-- [ ] 1.7 Заголовки секций показывают счётчик и шеврон
+- [x] 1.7 Заголовки секций показывают счётчик и шеврон
   - **Критерии приёмки:**
     - `SectionHeader` — одна кнопка с названием, счётчиком и шевроном, который показывает раскрытие.
     - Счётчик равен числу выборов секции за день, включая неполученные порции. Секция без выборов показывает 0 и не показывает карточек.

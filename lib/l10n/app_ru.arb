@@ -872,7 +872,7 @@
   "dailyChoiceCalendarNextYears": "Следующие годы",
   "dailyChoiceCalendarPreviousYear": "Предыдущий год",
   "dailyChoiceCalendarNextYear": "Следующий год",
-  "dailyChoiceCatalogIncomplete": "Не выполненные",
+  "dailyChoiceCatalogIncomplete": "Невыполненные",
   "dailyChoiceCatalogCompleted": "Выполненные",
   "dailyChoiceCatalogTotalCount": "Всего дневных выборов: {count}",
   "dailyChoiceCatalogEmpty": "На этот день нет дневных выборов.",

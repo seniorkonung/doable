@@ -9,6 +9,7 @@ import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
 import '../../../design_system/components/choice_row.dart';
 import '../../../design_system/components/day_heading.dart';
+import '../../../design_system/components/section_header.dart';
 import '../../../design_system/doable_colors.dart';
 import '../../../design_system/doable_metrics.dart';
 import '../../../design_system/doable_priority.dart';
@@ -311,22 +312,23 @@ final class _DailyChoiceCatalogBodyState
         ),
       for (final isCompleted in [false, true]) ...[
         SliverToBoxAdapter(
-          child: Semantics(
-            header: true,
-            expanded: state.selection.isExpanded(isCompleted),
-            child: ListTile(
+          child: Padding(
+            // Второй заголовок стоит на 2 ниже строк первой секции.
+            padding: EdgeInsets.fromLTRB(
+              DoableMetrics.space5,
+              isCompleted ? 2 : 0,
+              DoableMetrics.space5,
+              0,
+            ),
+            child: SectionHeader(
               key: ValueKey('daily-choice-section-$isCompleted'),
-              title: Text(
-                isCompleted
-                    ? l10n.dailyChoiceCatalogCompleted
-                    : l10n.dailyChoiceCatalogIncomplete,
-              ),
-              trailing: Icon(
-                state.selection.isExpanded(isCompleted)
-                    ? Icons.expand_less
-                    : Icons.expand_more,
-              ),
-              onTap: () => model.toggleSection(isCompleted),
+              title: isCompleted
+                  ? l10n.dailyChoiceCatalogCompleted
+                  : l10n.dailyChoiceCatalogIncomplete,
+              // Пока данных дня нет, число выборов секции неизвестно.
+              count: loaded?.section(isCompleted).totalCount ?? 0,
+              open: state.selection.isExpanded(isCompleted),
+              onToggle: () => model.toggleSection(isCompleted),
             ),
           ),
         ),

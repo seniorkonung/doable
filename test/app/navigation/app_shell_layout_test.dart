@@ -851,9 +851,10 @@ void _expectDateControlAboveKeyboard(WidgetTester tester, _Insets insets) {
 /// клавиатуры.
 void _expectDailyChoiceEnd(WidgetTester tester, Finder last, _Insets insets) {
   final completed = find.byKey(const ValueKey('daily-choice-section-true'));
+  // Второй заголовок стоит на 2 ниже строк первой секции.
   expect(
     tester.getRect(last).bottom,
-    moreOrLessEquals(tester.getRect(completed).top),
+    moreOrLessEquals(tester.getRect(completed).top - 2),
   );
   expect(
     tester.getRect(completed).bottom,

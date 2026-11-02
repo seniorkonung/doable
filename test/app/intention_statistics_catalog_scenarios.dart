@@ -15,7 +15,7 @@ void _catalogNavigationScenarios() {
         tester,
         app,
         root,
-        completed: 'Не выполненные',
+        completed: 'Невыполненные',
         total: 121,
       );
       final offset = _catalogScroll(tester).position.pixels;
@@ -39,7 +39,7 @@ void _catalogNavigationScenarios() {
         );
         expect(_catalogData(app, catalog).selection.completedExpanded, isTrue);
         expect(_catalogData(app, catalog).completed.items, hasLength(50));
-        expect(find.text('Не выполненные'), findsOneWidget);
+        expect(find.text('Невыполненные'), findsOneWidget);
         expect(
           find.bySemanticsLabel(app.texts.dailyChoiceCalendarExpand),
           findsOneWidget,
@@ -103,7 +103,7 @@ void _catalogNavigationScenarios() {
         ), viewport);
         _catalogScroll(tester).position.jumpTo(0);
         await tester.pumpAndSettle();
-        expect(find.text('Не выполненные'), findsOneWidget);
+        expect(find.text('Невыполненные'), findsOneWidget);
         expect(
           find.text(app.texts.dailyChoiceCatalogTotalCount(121)),
           findsOneWidget,
@@ -134,7 +134,7 @@ void _catalogNavigationScenarios() {
         tester,
         app,
         root,
-        completed: 'Не выполненные',
+        completed: 'Невыполненные',
         total: 121,
       );
       final rootOffset = _catalogScroll(tester).position.pixels;
@@ -473,7 +473,7 @@ Future<void> _prepareCatalog(
   await _catalogReady(tester, app, provider);
   _catalogScroll(tester).position.jumpTo(0);
   await tester.pumpAndSettle();
-  final isCompleted = completed != 'Не выполненные';
+  final isCompleted = completed != 'Невыполненные';
   await showDailyChoiceCatalogSection(tester, isCompleted);
   await _catalogReady(tester, app, provider, total: total);
   await tester.tap(find.bySemanticsLabel(app.texts.dailyChoiceCalendarExpand));

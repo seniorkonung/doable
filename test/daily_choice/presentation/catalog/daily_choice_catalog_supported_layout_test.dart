@@ -406,7 +406,8 @@ Future<void> _scrollToLastRow(WidgetTester tester, Finder list) async {
   final completedHeader = tester.getRect(
     find.byKey(const ValueKey('daily-choice-section-true')),
   );
-  expect(last.bottom, closeTo(completedHeader.top, 0.01));
+  // Второй заголовок стоит на 2 ниже строк первой секции.
+  expect(last.bottom, closeTo(completedHeader.top - 2, 0.01));
   expect(completedHeader.bottom, closeTo(viewport.bottom - 72, 0.01));
   // Свободное место и заголовок выше этой области, поэтому строка видна чуть
   // раньше конца выдачи.
