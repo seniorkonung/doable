@@ -3,6 +3,7 @@ import '../../../graph/application/graph_revision.dart';
 import '../../application/long_term_relation_command.dart';
 import '../../application/long_term_relation_projection.dart';
 import '../../application/long_term_relation_permissions.dart';
+import '../../domain/long_term_relation_description.dart';
 
 /// Состояние подробного просмотра одной долговременной связи.
 ///
@@ -34,6 +35,7 @@ final class RelationDetailsLoaded extends RelationDetailsState {
     LongTermRelationPermissions? permissions,
     this.refreshStatus = const RelationDetailsFresh(),
     this.lifecycleChange,
+    this.editFailure,
   }) : permissions = permissions ?? details.permissions;
 
   final LongTermRelationDetails details;
@@ -43,6 +45,10 @@ final class RelationDetailsLoaded extends RelationDetailsState {
   final LongTermRelationPermissions permissions;
   final RelationDetailsRefreshStatus refreshStatus;
   final RelationDetailsLifecycleChange? lifecycleChange;
+
+  /// Отказ правки живёт до следующей принятой операции, а поля остаются
+  /// последним подтверждённым снимком.
+  final RelationDetailsEditFailure? editFailure;
 
   @override
   bool get canRetry => refreshStatus.canRetry;
@@ -55,6 +61,8 @@ final class RelationDetailsLoaded extends RelationDetailsState {
     RelationDetailsRefreshStatus? refreshStatus,
     RelationDetailsLifecycleChange? lifecycleChange,
     bool clearLifecycleChange = false,
+    RelationDetailsEditFailure? editFailure,
+    bool clearEditFailure = false,
   }) => RelationDetailsLoaded(
     details: details ?? this.details,
     revision: revision ?? this.revision,
@@ -64,7 +72,48 @@ final class RelationDetailsLoaded extends RelationDetailsState {
     lifecycleChange: clearLifecycleChange
         ? null
         : lifecycleChange ?? this.lifecycleChange,
+    editFailure: clearEditFailure ? null : editFailure ?? this.editFailure,
   );
+}
+
+/// Отказ правки типа, приоритета или описания связи.
+final class RelationDetailsEditFailure {
+  const RelationDetailsEditFailure(this.failure, {this.failurePresentation});
+
+  final LongTermRelationCommandFailure failure;
+
+  /// Право открытого просмотра предъявить ошибку по видимому кадру.
+  final GraphInitiatorPresentationClaim? failurePresentation;
+}
+
+/// Исход сохранения описания для вызывающего.
+sealed class RelationDescriptionSaveOutcome {
+  const RelationDescriptionSaveOutcome();
+}
+
+/// Собственная команда подтверждена.
+final class RelationDescriptionSaved extends RelationDescriptionSaveOutcome {
+  const RelationDescriptionSaved();
+}
+
+/// Текст после проверки равен сохранённому, поэтому команды не было.
+final class RelationDescriptionUnchanged
+    extends RelationDescriptionSaveOutcome {
+  const RelationDescriptionUnchanged();
+}
+
+/// Текст не прошёл проверку, поэтому команды не было.
+final class RelationDescriptionInvalid extends RelationDescriptionSaveOutcome {
+  const RelationDescriptionInvalid(this.reason);
+
+  final LongTermRelationTextValidationReason reason;
+}
+
+/// Команда не принята, потому что операция этой связи уже выполняется, либо
+/// завершилась отказом, который хранит состояние просмотра.
+final class RelationDescriptionSaveFailed
+    extends RelationDescriptionSaveOutcome {
+  const RelationDescriptionSaveFailed();
 }
 
 /// Самостоятельное изменение жизненного цикла конкретной связи.
