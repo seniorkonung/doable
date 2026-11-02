@@ -1480,6 +1480,109 @@ void main() {
     });
   });
 
+  group('новый отказ', () {
+    const updateFailure = 'Не удалось изменить связь. Повторите попытку.';
+    const archiveFailure = 'Не удалось архивировать связь. Повторите попытку.';
+
+    /// Описание не помещается и в полный размер панели.
+    final details = testRelationDetails(
+      relationId: relationId,
+      sourceId: testIntentionId(1),
+      relatedId: testIntentionId(2),
+      description: List.filled(60, 'Хотя бы раз в неделю').join('\n'),
+    );
+
+    Future<ControlledRelationDetailsRepository> openLong(
+      WidgetTester tester,
+    ) async {
+      tester.view
+        ..devicePixelRatio = 1
+        ..physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+      final repository = await _openSheet(tester);
+      repository.watchAt(0).emitDetails(details, revision: revision);
+      await tester.pumpAndSettle();
+      return repository;
+    }
+
+    testWidgets('отказ смены типа виден без раскрытия, а панель остаётся в '
+        'компактном размере', (tester) async {
+      final repository = await openLong(tester);
+      final compact = tester.getRect(find.byType(Sheet));
+
+      await tester.tap(find.text('Можно'));
+      await tester.pump();
+      repository.failRelationCommand(
+        0,
+        const LongTermRelationUnavailableFailure(),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text(updateFailure).hitTestable(), findsOneWidget);
+      expect(tester.getRect(find.byType(Sheet)), compact);
+    });
+
+    testWidgets('повторный отказ архивирования снова виден в полном '
+        'размере', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final repository = await openLong(tester);
+      await tester.tap(find.bySemanticsLabel('Раскрыть панель связи'));
+      await tester.pumpAndSettle();
+      final full = tester.getRect(find.byType(Sheet));
+
+      await tester.tap(find.bySemanticsLabel('Параметры связи'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Архивировать'));
+      await tester.pumpAndSettle();
+      repository.failRelationCommand(
+        0,
+        const LongTermRelationUnavailableFailure(),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text(archiveFailure).hitTestable(), findsOneWidget);
+
+      await tester.tap(find.text('Повторить'));
+      await tester.pump();
+      repository.failRelationCommand(
+        1,
+        const LongTermRelationUnavailableFailure(),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text(archiveFailure).hitTestable(), findsOneWidget);
+      expect(tester.getRect(find.byType(Sheet)), full);
+      semantics.dispose();
+    });
+
+    testWidgets('обновление панели с прежним отказом не отнимает ручную '
+        'прокрутку', (tester) async {
+      final repository = await openLong(tester);
+      await tester.tap(find.text('Можно'));
+      await tester.pump();
+      repository.failRelationCommand(
+        0,
+        const LongTermRelationUnavailableFailure(),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.drag(
+        find.byType(SingleChildScrollView),
+        const Offset(0, 300),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text(updateFailure).hitTestable(), findsNothing);
+
+      repository.relationWatches.last.emitDetails(
+        details,
+        revision: const TestGraphRevision(2),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text(updateFailure), findsOneWidget);
+      expect(find.text(updateFailure).hitTestable(), findsNothing);
+    });
+  });
+
   testWidgets('сообщение появляется над панелью, а не за её затемнением', (
     tester,
   ) async {

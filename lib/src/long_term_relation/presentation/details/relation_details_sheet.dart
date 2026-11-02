@@ -46,6 +46,9 @@ import 'relation_details_view_model.dart';
 /// открыто: компактный или раскрытый. Изменённый текст уходит только после
 /// ответа на вопрос: панель не закрывается сама, пока он не сохраняется.
 /// Архивирование, восстановление и удаление связи выбираются в её параметрах.
+///
+/// Новый отказ любой операции панель показывает сама: прокручивает тело к концу
+/// содержимого, где стоят уведомления, и не меняет размер.
 Future<void> showRelationDetailsSheet(
   BuildContext context,
   LongTermRelationId relationId,
@@ -79,8 +82,8 @@ final class _RelationDetailsSheetState
   final _descriptionController = TextEditingController();
   final _descriptionFocus = FocusNode();
 
-  /// Конец содержимого изменения: под полем и его отказами.
-  final _editEndKey = GlobalKey();
+  /// Конец содержимого: под полями и отказами.
+  final _endKey = GlobalKey();
 
   _DescriptionEdit? _edit;
 
@@ -118,19 +121,21 @@ final class _RelationDetailsSheetState
       case RelationDescriptionInvalid(:final reason):
         setState(() => _edit = (opened: edit.opened, invalid: reason));
         _revealFailure();
+      // Отказ команды панель показывает как отказ любой другой операции.
       case RelationDescriptionSaveFailed():
-        _revealFailure();
+        break;
     }
   }
 
-  /// Прокручивает к отказу под полем после его кадра: над клавиатурой он
-  /// оказался бы вне видимой части, и кадр не подтвердил бы его предъявление.
+  /// Прокручивает к отказу после его кадра: под длинным описанием или над
+  /// клавиатурой он оказался бы вне видимой части, и кадр не подтвердил бы его
+  /// предъявление.
   ///
   /// Фокус снимается, иначе вернувшаяся клавиатура прокрутит обратно к каретке.
   void _revealFailure() {
     _descriptionFocus.unfocus();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final end = _editEndKey.currentContext;
+      final end = _endKey.currentContext;
       if (!mounted || end == null) return;
       unawaited(
         Scrollable.ensureVisible(
@@ -241,6 +246,9 @@ final class _RelationDetailsSheetState
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(_provider, (previous, next) {
+      if (_hasNewFailure(previous, next)) _revealFailure();
+    });
     final localizations = AppLocalizations.of(context);
     final state = ref.watch(_provider);
     final viewModel = ref.read(_provider.notifier);
@@ -301,11 +309,11 @@ final class _RelationDetailsSheetState
                   controller: _descriptionController,
                   focusNode: _descriptionFocus,
                   invalid: edit.invalid,
-                  endKey: _editEndKey,
                   onChanged: (_) => _changeDescription(edit),
                 ),
                 null => _DescriptionSaved(onOpen: _openDescription),
               },
+              endKey: _endKey,
               onRetry: viewModel.retry,
               onChangeType: viewModel.changeType,
               onChangePriority: viewModel.changePriority,
@@ -349,15 +357,35 @@ final class _DescriptionEditing extends _DescriptionMode {
     required this.controller,
     required this.focusNode,
     required this.invalid,
-    required this.endKey,
     required this.onChanged,
   });
 
   final TextEditingController controller;
   final FocusNode focusNode;
   final LongTermRelationTextValidationReason? invalid;
-  final Key endKey;
   final ValueChanged<String> onChanged;
+}
+
+/// Отказы операций, которые показывает панель с данными связи.
+(RelationDetailsEditFailure?, RelationDetailsLifecycleFailed?) _failuresOf(
+  RelationDetailsState? state,
+) => switch (state) {
+  RelationDetailsLoaded(
+    :final editFailure,
+    lifecycleChange: final RelationDetailsLifecycleFailed lifecycleFailure,
+  ) =>
+    (editFailure, lifecycleFailure),
+  RelationDetailsLoaded(:final editFailure) => (editFailure, null),
+  _ => (null, null),
+};
+
+/// Новым отказ делает другой объект: обновление панели переносит прежний, а
+/// повтор операции создаёт новый.
+bool _hasNewFailure(RelationDetailsState? previous, RelationDetailsState next) {
+  final (shownEdit, shownLifecycle) = _failuresOf(previous);
+  final (edit, lifecycle) = _failuresOf(next);
+  return (edit != null && !identical(edit, shownEdit)) ||
+      (lifecycle != null && !identical(lifecycle, shownLifecycle));
 }
 
 /// Полная формулировка связи в исходном направлении.
@@ -392,6 +420,7 @@ final class _LoadedRelation extends ConsumerWidget {
   const _LoadedRelation({
     required this.state,
     required this.description,
+    required this.endKey,
     required this.onRetry,
     required this.onChangeType,
     required this.onChangePriority,
@@ -401,6 +430,7 @@ final class _LoadedRelation extends ConsumerWidget {
 
   final RelationDetailsLoaded state;
   final _DescriptionMode description;
+  final Key endKey;
   final VoidCallback onRetry;
   final ValueChanged<LongTermRelationType> onChangeType;
   final ValueChanged<RelationPriority> onChangePriority;
@@ -601,31 +631,31 @@ final class _LoadedRelation extends ConsumerWidget {
           ),
         ],
         const SizedBox(height: DoableMetrics.space2),
-        switch (description) {
-          // Правка длится мгновения: статус стоит рядом с датами, поэтому не
-          // дёргает панель по высоте при каждом нажатии.
-          _DescriptionSaved() => Wrap(
-            spacing: DoableMetrics.space3,
-            children: [
-              timestampDatesLine(
-                localizations: localizations,
-                locale: Localizations.localeOf(context).toLanguageTag(),
-                createdAt: relation.createdAt.value,
-                updatedAt: relation.updatedAt.value,
-                // Строка называет год по дню показа панели.
-                currentYear: ref
-                    .watch(dailyChoiceLocalDateSourceProvider)()
-                    .date
-                    .year,
-              ),
-              ?operationStatus,
-            ],
-          ),
-          _DescriptionEditing(:final endKey) => KeyedSubtree(
-            key: endKey,
-            child: operationStatus ?? const SizedBox.shrink(),
-          ),
-        },
+        KeyedSubtree(
+          key: endKey,
+          child: switch (description) {
+            // Правка длится мгновения: статус стоит рядом с датами, поэтому не
+            // дёргает панель по высоте при каждом нажатии.
+            _DescriptionSaved() => Wrap(
+              spacing: DoableMetrics.space3,
+              children: [
+                timestampDatesLine(
+                  localizations: localizations,
+                  locale: Localizations.localeOf(context).toLanguageTag(),
+                  createdAt: relation.createdAt.value,
+                  updatedAt: relation.updatedAt.value,
+                  // Строка называет год по дню показа панели.
+                  currentYear: ref
+                      .watch(dailyChoiceLocalDateSourceProvider)()
+                      .date
+                      .year,
+                ),
+                ?operationStatus,
+              ],
+            ),
+            _DescriptionEditing() => operationStatus ?? const SizedBox.shrink(),
+          },
+        ),
       ],
     );
   }
