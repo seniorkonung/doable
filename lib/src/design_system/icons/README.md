@@ -12,6 +12,7 @@
 «⋯», малый крестик и восстановление из архива — из `IntentionPage.dc.html`,
 добавлены **28.10.2026**.
 Стрелка к линии — из `Main.dc.html`, добавлена **02.11.2026**.
+Часы — из `ChoiceDetails.dc.html`, добавлены **02.11.2026**.
 
 Сохранены размеры, `viewBox`, геометрия, заливки, `fill-rule`, ширина, окончания
 и соединения линий, а также `currentColor`. Добавлено пространство имён SVG;
@@ -66,6 +67,7 @@
 | [close_small.svg](assets/close_small.svg) | `IntentionPage.dc.html` | Чип тега `tags` → кнопка `tag.remove`, SVG |
 | [unarchive.svg](assets/unarchive.svg) | `IntentionPage.dc.html` | `menuSheet` → кнопка `arch.go`, SVG при `archived` |
 | [to_top.svg](assets/to_top.svg) | `Main.dc.html` | Кнопка `toTop` с `aria-label="Back to top"`, SVG |
+| [clock.svg](assets/clock.svg) | `ChoiceDetails.dc.html` | Кнопка `openTime`, SVG |
 
 Мини-значки имеют линию 2 при размере 14, значки меню — линию 1,75 при размере 22.
 Календарь навигации содержит отметки дней, календарь меню и мини-значок — нет.

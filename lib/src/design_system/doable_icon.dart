@@ -48,7 +48,8 @@ enum DoableIconData {
   more('more'),
   closeSmall('close_small'),
   unarchive('unarchive'),
-  toTop('to_top');
+  toTop('to_top'),
+  clock('clock');
 
   const DoableIconData(this._assetName);
 
