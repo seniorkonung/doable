@@ -4719,12 +4719,6 @@ abstract class AppLocalizations {
   /// **'Loading more daily choices…'**
   String get dailyChoiceCatalogLoadingMore;
 
-  /// Открыть следующую порцию
-  ///
-  /// In en, this message translates to:
-  /// **'Show more daily choices'**
-  String get dailyChoiceCatalogLoadMore;
-
   /// Временная ошибка чтения дневного каталога
   ///
   /// In en, this message translates to:

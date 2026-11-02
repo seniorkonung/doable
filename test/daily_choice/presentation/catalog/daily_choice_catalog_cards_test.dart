@@ -76,15 +76,7 @@ void main() {
           find.byKey(const ValueKey('daily-choice-section-false')),
         );
         await tester.pumpAndSettle();
-        final scrollable = find
-            .descendant(
-              of: find.byType(CustomScrollView),
-              matching: find.byType(Scrollable),
-            )
-            .first;
-        final more = find.byKey(const ValueKey('daily-choice-load-more-false'));
-        await tester.scrollUntilVisible(more, 1000, scrollable: scrollable);
-        await tester.tap(more);
+        await scrollToDailyChoiceCatalogPageEnd(tester, false);
         repository.completeMore(1, [
           for (var number = 51; number <= 100; number++)
             catalogPageItem(number, date: day, schedule: morning),
@@ -100,8 +92,7 @@ void main() {
               .isHeader,
           isTrue,
         );
-        await tester.scrollUntilVisible(more, 1000, scrollable: scrollable);
-        await tester.tap(more);
+        await scrollToDailyChoiceCatalogPageEnd(tester, false);
         repository.completeMore(2, [
           catalogPageItem(101, date: day, schedule: morning),
           catalogPageItem(
@@ -333,7 +324,8 @@ void main() {
       total: 6,
       cursor: const CatalogPageCursor(),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump();
 
     expect(dailyChoiceSectionCount(tester, completed: false), '5');
     expect(dailyChoiceSectionCount(tester, completed: true), '1');

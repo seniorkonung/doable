@@ -554,41 +554,126 @@ void main() {
     },
   );
 
-  testWidgets(
-    'подгрузка невыполненных сохраняет доступ к выполненным и их продолжению',
-    (tester) async {
-      final repository = _Repository(
-        completedItems: [_item(3, completed: true)],
-        completedTotal: 2,
-        completedCursor: const _Cursor(),
+  testWidgets('подгрузка невыполненных не мешает подгрузке выполненных', (
+    tester,
+  ) async {
+    final repository = _Repository(
+      completedItems: [_item(3, completed: true)],
+      completedTotal: 2,
+      completedCursor: const _Cursor(),
+    );
+    await _open(tester, repository);
+    repository.completeFirst([_item(1)], total: 2, cursor: const _Cursor());
+    await _settleCalendar(tester);
+    expect(find.text('Действие'), findsNWidgets(2));
+    expect(dailyChoiceCatalogPageFooter(completed: false), findsOneWidget);
+    expect(dailyChoiceCatalogPageFooter(completed: true), findsOneWidget);
+    repository.completeMore(2, [_item(4, completed: true)]);
+    repository.completeMore(1, [_item(2)]);
+    await tester.pumpAndSettle();
+    expect(find.text('Действие'), findsNWidgets(4));
+    expect(dailyChoiceSectionCount(tester, completed: false), '2');
+    expect(dailyChoiceSectionCount(tester, completed: true), '2');
+  });
+
+  group('подгрузка порции секции', () {
+    const size = Size(360, 780);
+    final day = date(2026, 10, 4);
+    final rows = [
+      for (var number = 1; number <= 20; number++)
+        catalogPageItem(number, date: day),
+    ];
+
+    testWidgets('конец загруженной части сам запрашивает одну порцию, и она '
+        'встаёт перед выполненными, а далёкий конец порцию не запрашивает', (
+      tester,
+    ) async {
+      final repository = CatalogPageRepository();
+      await pumpCatalogPage(
+        tester,
+        repository,
+        today: day,
+        locale: const Locale('ru'),
+        size: size,
       );
-      await _open(tester, repository);
-      repository.completeFirst([_item(1)], total: 2, cursor: const _Cursor());
+      repository.completeFirst(
+        0,
+        [...rows, catalogPageItem(101, date: day, isCompleted: true)],
+        total: 22,
+        cursor: const CatalogPageCursor(),
+      );
       await tester.pumpAndSettle();
-      expect(find.text('Действие'), findsNWidgets(2));
-      await tester.tap(
-        find.byKey(const ValueKey('daily-choice-load-more-false')),
-      );
-      await tester.pump();
-      expect(
-        find.text(
-          lookupAppLocalizations(const Locale('ru'))
-              .dailyChoiceCatalogLoadingMore,
+      expect(repository.queries, hasLength(1));
+
+      await scrollToDailyChoiceCatalogPageEnd(tester, false);
+      expect(repository.queries, hasLength(2));
+      expect(repository.queries[1].date, day);
+      expect(repository.queries[1].isCompleted, isFalse);
+      expect(repository.queries[1].cursor, isA<CatalogPageCursor>());
+
+      repository.completeMore(1, [catalogPageItem(21, date: day)]);
+      await tester.pumpAndSettle();
+      expect(repository.queries, hasLength(2));
+      await tester.ensureVisible(
+        find.byKey(
+          const ValueKey('daily-choice-section-true'),
+          skipOffstage: false,
         ),
-        findsOneWidget,
       );
-      await tester.tap(
-        find.byKey(const ValueKey('daily-choice-load-more-true')),
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .getRect(find.byKey(const ValueKey('daily-choice-row-21')))
+            .bottom,
+        lessThan(
+          tester
+              .getRect(find.byKey(const ValueKey('daily-choice-section-true')))
+              .top,
+        ),
+      );
+    });
+
+    testWidgets('при неактуальной выдаче подвал порцию не запрашивает, а на '
+        'виду запрашивает её, когда выдача снова актуальна', (tester) async {
+      final repository = CatalogPageRepository();
+      await pumpCatalogPage(
+        tester,
+        repository,
+        today: day,
+        locale: const Locale('ru'),
+        size: size,
+      );
+      repository.completeFirst(
+        0,
+        rows,
+        total: 21,
+        cursor: const CatalogPageCursor(),
+      );
+      await tester.pumpAndSettle();
+
+      await confirmOutsideChoiceChange(
+        tester,
+        repository,
+        rows.first,
+        revision: 1,
+      );
+      expect(repository.queries, hasLength(2));
+      await scrollToDailyChoiceCatalogPageEnd(tester, false);
+      expect(repository.queries, hasLength(2));
+
+      repository.completeFirst(
+        1,
+        rows,
+        total: 21,
+        cursor: const CatalogPageCursor(),
+        revision: 1,
       );
       await tester.pump();
-      repository.completeMore(2, [_item(4, completed: true)]);
-      repository.completeMore(1, [_item(2)]);
-      await tester.pumpAndSettle();
-      expect(find.text('Действие'), findsNWidgets(4));
-      expect(dailyChoiceSectionCount(tester, completed: false), '2');
-      expect(dailyChoiceSectionCount(tester, completed: true), '2');
-    },
-  );
+      await tester.pump();
+      expect(repository.queries, hasLength(3));
+      expect(repository.queries[2].cursor, isA<CatalogPageCursor>());
+    });
+  });
 
   group('встроенный календарь', () {
     testWidgets('первое открытие выбирает сегодня в свёрнутой неделе и читает '
@@ -637,11 +722,7 @@ void main() {
       final repository = _Repository();
       await _open(tester, repository);
       repository.completeFirst([_item(1)], total: 2, cursor: const _Cursor());
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const ValueKey('daily-choice-load-more-false')),
-      );
-      await tester.pump();
+      await _settleCalendar(tester);
       repository.completeMore(1, [_item(2)]);
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('daily-choice-section-true')));
@@ -666,10 +747,7 @@ void main() {
         findsNothing,
       );
       expect(find.byKey(const ValueKey('daily-choice-row-1')), findsNothing);
-      expect(
-        find.byKey(const ValueKey('daily-choice-load-more-false')),
-        findsNothing,
-      );
+      expect(dailyChoiceCatalogPageFooter(completed: false), findsNothing);
 
       repository.completeFirst([_item(3, date: nextDay)], index: 2, total: 1);
       await tester.pumpAndSettle();
@@ -901,10 +979,7 @@ void main() {
       expect(dailyChoiceSectionCount(tester, completed: false), '1');
       expect(find.byKey(const ValueKey('daily-choice-row-1')), findsOneWidget);
       expect(find.byKey(const ValueKey('daily-choice-row-2')), findsNothing);
-      expect(
-        find.byKey(const ValueKey('daily-choice-load-more-false')),
-        findsNothing,
-      );
+      expect(dailyChoiceCatalogPageFooter(completed: false), findsNothing);
       expect(find.text(l10n.dailyChoiceCatalogUnavailable), findsNothing);
       expect(repository.queries, hasLength(3));
     });
@@ -939,10 +1014,6 @@ void main() {
       expect(find.byKey(const ValueKey('daily-choice-row-1')), findsOneWidget);
 
       // Подгрузка выбранного дня ещё читается.
-      await tester.tap(
-        find.byKey(const ValueKey('daily-choice-load-more-false')),
-      );
-      await tester.pump();
       expect(repository.queries, hasLength(3));
       expect(repository.queries[2].date, selectedDay);
       expect(repository.queries[2].cursor, isA<_Cursor>());
@@ -950,13 +1021,13 @@ void main() {
       await _tapCalendarCommand(tester, l10n.dailyChoiceCalendarCollapse);
       await _swipeCalendar(tester, toNext: false);
       expect(visibleWeeks(tester), weeksFrom(date(2026, 9, 21), 1));
-      expect(find.text(l10n.dailyChoiceCatalogLoadingMore), findsOneWidget);
+      expect(dailyChoiceCatalogPageFooter(completed: false), findsOneWidget);
       expect(repository.queries, hasLength(3));
       repository.completeMore(2, [_item(2, date: selectedDay)]);
       await _settleCalendar(tester);
 
       expect(find.byKey(const ValueKey('daily-choice-row-2')), findsOneWidget);
-      expect(find.text(l10n.dailyChoiceCatalogLoadingMore), findsNothing);
+      expect(dailyChoiceCatalogPageFooter(completed: false), findsNothing);
       _expectSelected(tester, selectedDay);
       expect(repository.queries, hasLength(3));
     });
@@ -968,9 +1039,6 @@ void main() {
       await _open(tester, repository);
       final l10n = lookupAppLocalizations(const Locale('ru'));
       final retry = find.text(l10n.commonRetry);
-      final loadMore = find.byKey(
-        const ValueKey('daily-choice-load-more-false'),
-      );
 
       repository.fail(0, const DailyChoiceCatalogCorruptionFailure());
       await tester.pumpAndSettle();
@@ -988,9 +1056,7 @@ void main() {
         total: 2,
         cursor: const _Cursor(),
       );
-      await tester.pumpAndSettle();
-      await tester.tap(loadMore);
-      await tester.pump();
+      await _settleCalendar(tester);
       repository.fail(2, const DailyChoiceCatalogUnexpectedFailure());
       await tester.pumpAndSettle();
       expect(find.text(l10n.dailyChoiceCatalogUnexpected), findsOneWidget);
@@ -1008,10 +1074,8 @@ void main() {
         total: 2,
         cursor: const _Cursor(),
       );
-      await tester.pumpAndSettle();
+      await _settleCalendar(tester);
       expect(find.text(l10n.dailyChoiceCatalogUnexpected), findsNothing);
-      await tester.tap(loadMore);
-      await tester.pump();
       repository.failFirst(index: 4);
       await tester.pumpAndSettle();
       expect(find.text(l10n.dailyChoiceCatalogUnavailable), findsOneWidget);

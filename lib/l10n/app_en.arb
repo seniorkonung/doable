@@ -2387,8 +2387,6 @@
   "@dailyChoiceCatalogRefreshing": {"description": "Обновление подтверждённого снимка каталога"},
   "dailyChoiceCatalogLoadingMore": "Loading more daily choices…",
   "@dailyChoiceCatalogLoadingMore": {"description": "Загрузка следующей порции"},
-  "dailyChoiceCatalogLoadMore": "Show more daily choices",
-  "@dailyChoiceCatalogLoadMore": {"description": "Открыть следующую порцию"},
   "dailyChoiceCatalogUnavailable": "Could not load daily choices.",
   "@dailyChoiceCatalogUnavailable": {"description": "Временная ошибка чтения дневного каталога"},
   "dailyChoiceCatalogCorruption": "Stored daily choice data is damaged and cannot be shown.",

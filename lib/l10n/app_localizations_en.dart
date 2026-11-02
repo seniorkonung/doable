@@ -3008,9 +3008,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dailyChoiceCatalogLoadingMore => 'Loading more daily choices…';
 
   @override
-  String get dailyChoiceCatalogLoadMore => 'Show more daily choices';
-
-  @override
   String get dailyChoiceCatalogUnavailable => 'Could not load daily choices.';
 
   @override

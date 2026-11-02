@@ -878,7 +878,6 @@
   "dailyChoiceCatalogEmptyText": "Создайте выбор из действия и назначьте эту дату. Он появится здесь.",
   "dailyChoiceCatalogRefreshing": "Обновляем…",
   "dailyChoiceCatalogLoadingMore": "Загружаем ещё дневные выборы…",
-  "dailyChoiceCatalogLoadMore": "Показать ещё дневные выборы",
   "dailyChoiceCatalogUnavailable": "Не удалось загрузить дневные выборы.",
   "dailyChoiceCatalogCorruption": "Сохранённые данные дневных выборов повреждены и не могут быть показаны.",
   "dailyChoiceCatalogExpired": "Каталог изменился. Обновите его, чтобы продолжить.",

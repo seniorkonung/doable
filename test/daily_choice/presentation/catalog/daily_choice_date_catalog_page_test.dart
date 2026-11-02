@@ -335,11 +335,7 @@ void main() {
             )
             .first;
         final position = tester.state<ScrollableState>(scrollable).position;
-        final footer = find.byKey(
-          const ValueKey('daily-choice-load-more-true'),
-        );
-        await tester.scrollUntilVisible(footer, 1000, scrollable: scrollable);
-        await tester.tap(footer);
+        await scrollToDailyChoiceCatalogPageEnd(tester, true);
         repository.completeMore(1, [
           for (var number = 51; number <= 60; number++)
             catalogPageItem(number, date: selected, isCompleted: true),
@@ -622,12 +618,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(dayCell(tester, marked).status, DailyChoiceDayStatus.allCompleted);
 
-    final footer = find.byKey(const ValueKey('daily-choice-load-more-true'));
-    await tester.scrollUntilVisible(footer, 500, scrollable: _verticalScroll);
-    await tester.ensureVisible(footer);
-    await tester.pumpAndSettle();
-    await tester.tap(footer);
-    await tester.pump();
+    await scrollToDailyChoiceCatalogPageEnd(tester, true);
     repository.completeMore(1, [
       catalogPageItem(51, date: selected, isCompleted: true),
     ]);

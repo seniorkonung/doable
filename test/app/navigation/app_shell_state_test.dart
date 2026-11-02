@@ -516,19 +516,7 @@ void main() {
 
       // Продолжение новой ревизии дополняет выдачу без пропусков и повторов.
       await _closeMessage(tester);
-      final position = _dailyChoicePosition(tester);
-      position.jumpTo(position.maxScrollExtent);
-      await tester.pumpAndSettle();
-      expect(
-        find
-            .byKey(const ValueKey('daily-choice-load-more-false'))
-            .hitTestable(),
-        findsOneWidget,
-      );
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('daily-choice-load-more-false')),
-      );
+      await scrollToDailyChoiceCatalogPageEnd(tester, false);
       await _waitFor(
         tester,
         () => app.dailyChoiceCatalog.incomplete.items.length == expected.length,
@@ -550,7 +538,7 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.byKey(const ValueKey('daily-choice-load-more-false')),
+        dailyChoiceCatalogPageFooter(completed: false, skipOffstage: false),
         findsNothing,
       );
       await showDailyChoiceCatalogPeriod(tester, _viewedDate, tap: _tap);
@@ -1106,13 +1094,7 @@ Future<void> _prepareDailyChoiceCatalog(WidgetTester tester, _App app) async {
   // Неделя даты просмотра раскрывается в её месяц.
   await showDailyChoiceCatalogPeriod(tester, _viewedDate, tap: _tap);
   await expandDailyChoiceCatalogCalendar(tester, tap: _tap);
-  final position = _dailyChoicePosition(tester);
-  position.jumpTo(position.maxScrollExtent);
-  await tester.pumpAndSettle();
-  await _tap(
-    tester,
-    find.byKey(const ValueKey('daily-choice-load-more-false')),
-  );
+  await scrollToDailyChoiceCatalogPageEnd(tester, false);
   await _waitFor(
     tester,
     () =>
@@ -1121,6 +1103,7 @@ Future<void> _prepareDailyChoiceCatalog(WidgetTester tester, _App app) async {
         app.dailyChoiceCatalog.freshness == DailyChoiceCatalogFreshness.current,
   );
   await tester.pumpAndSettle();
+  final position = _dailyChoicePosition(tester);
   position.jumpTo(position.maxScrollExtent / 2);
   await _settle(tester);
 

@@ -326,25 +326,76 @@ final dailyChoiceCompletionControl = find.byType(ChoiceCheck);
   return (completed: row.done, enabled: row.onToggle != null);
 }
 
+/// Вертикальная прокрутка выдачи открытого каталога дневных выборов.
+Finder _catalogScroll() => find.descendant(
+  of: find.byType(DailyChoiceCatalogBody).last,
+  matching: find.byWidgetPredicate(
+    (widget) =>
+        widget is Scrollable && widget.axisDirection == AxisDirection.down,
+  ),
+);
+
+/// Подвал секции с ещё не полученными порциями: подгрузка или её отказ.
+///
+/// Лениво построенный подвал находится, только когда конец загруженной части
+/// секции подошёл к видимой области.
+Finder dailyChoiceCatalogPageFooter({
+  required bool completed,
+  bool skipOffstage = true,
+}) => find.descendant(
+  of: find.byType(DailyChoiceCatalogBody).last,
+  matching: find.byKey(
+    ValueKey('daily-choice-page-footer-$completed'),
+    skipOffstage: skipOffstage,
+  ),
+  skipOffstage: skipOffstage,
+);
+
+/// Наибольшее число жестов прокрутки до конца загруженной части секции.
+const _maxScrolls = 60;
+
+/// Прокручивает выдачу жестами, пока конец загруженной части секции не
+/// подойдёт к видимой области: тогда каталог сам запрашивает следующую порцию.
+///
+/// Шаг останавливается на подвале, который увидел первым, и ответа на запрос
+/// не ждёт: его завершает сам сценарий.
+Future<void> scrollToDailyChoiceCatalogPageEnd(
+  WidgetTester tester,
+  bool isCompleted,
+) async {
+  final footer = dailyChoiceCatalogPageFooter(
+    completed: isCompleted,
+    skipOffstage: false,
+  );
+  for (var scroll = 0; footer.evaluate().isEmpty; scroll++) {
+    if (scroll == _maxScrolls) {
+      fail('Каталог не показал конец загруженной части секции.');
+    }
+    await tester.drag(_catalogScroll(), const Offset(0, -300));
+    await tester.pump();
+  }
+  await tester.pump();
+}
+
 /// Показывает только выбранную секцию, сохраняя дату и загруженные порции.
 Future<void> showDailyChoiceCatalogSection(
   WidgetTester tester,
   bool isCompleted,
 ) async {
   final body = find.byType(DailyChoiceCatalogBody).last;
-  final scroll = find.descendant(
-    of: body,
-    matching: find.byWidgetPredicate(
-      (widget) =>
-          widget is Scrollable && widget.axisDirection == AxisDirection.down,
-    ),
-  );
+  final scroll = _catalogScroll();
   Finder header(bool completed) => find.descendant(
     of: body,
     matching: find.byKey(ValueKey('daily-choice-section-$completed')),
   );
   final semantics = tester.ensureSemantics();
-  for (final completed in [false, true]) {
+  // Невыполненные сворачиваются первыми: иначе прокрутка к заголовку
+  // выполненных дошла бы до конца их порции и получила бы следующую.
+  for (final (completed, expand) in [
+    (false, false),
+    (true, isCompleted),
+    (false, !isCompleted),
+  ]) {
     await tester.scrollUntilVisible(
       header(completed),
       completed ? 500 : -500,
@@ -355,7 +406,7 @@ Future<void> showDailyChoiceCatalogSection(
         .getSemantics(header(completed))
         .flagsCollection
         .isExpanded;
-    if ((expanded == Tristate.isTrue) != (completed == isCompleted)) {
+    if ((expanded == Tristate.isTrue) != expand) {
       await tester.tap(header(completed));
       await tester.pump();
     }

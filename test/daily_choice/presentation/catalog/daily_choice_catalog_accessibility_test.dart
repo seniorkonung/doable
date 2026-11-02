@@ -115,12 +115,10 @@ void main() {
           locale: texts.locale,
           size: _phone,
         );
-        repository.completeFirst(
-          0,
-          [catalogPageItem(1, date: _today), catalogPageItem(2, date: _today)],
-          total: 3,
-          cursor: const CatalogPageCursor(),
-        );
+        repository.completeFirst(0, [
+          catalogPageItem(1, date: _today),
+          catalogPageItem(2, date: _today),
+        ], total: 2);
         await tester.pumpAndSettle();
         final l10n = _l10n(tester);
 
@@ -130,12 +128,11 @@ void main() {
           l10n.dailyChoiceCalendarExpand,
           '${texts.weekday}\n${texts.badge}',
           texts.selectedToday,
-          _sectionLabel(l10n, completed: false, count: 3),
+          _sectionLabel(l10n, completed: false, count: 2),
           _completionLabel(l10n, 1),
           _rowLabel(l10n, 1),
           _completionLabel(l10n, 2),
           _rowLabel(l10n, 2),
-          l10n.dailyChoiceCatalogLoadMore,
           _sectionLabel(l10n, completed: true, count: 0),
         ];
         final announced = _announced(tester);
@@ -159,7 +156,7 @@ void main() {
 
         for (final section in [
           (
-            label: _sectionLabel(l10n, completed: false, count: 3),
+            label: _sectionLabel(l10n, completed: false, count: 2),
             expanded: true,
           ),
           (
@@ -197,9 +194,9 @@ void main() {
       // страницы по языкам проверяет тест выше.
       if (texts != _texts.first) return;
 
-      testWidgets('читает отказы с повтором на месте выдачи и выполняет '
-          'повтор, подгрузку, раскрытие секций доступной '
-          'активацией для выбранного дня', (tester) async {
+      testWidgets('читает подгрузку и отказы с повтором на месте выдачи и '
+          'выполняет повтор и раскрытие секций доступной активацией для '
+          'выбранного дня', (tester) async {
         final semantics = tester.ensureSemantics();
         final repository = CatalogPageRepository();
         await pumpCatalogPage(
@@ -231,19 +228,17 @@ void main() {
           total: 2,
           cursor: const CatalogPageCursor(),
         );
-        await tester.pumpAndSettle();
+        await tester.pump();
+        await tester.pump();
         expect(_afterDayHeading(tester), [
           _sectionLabel(l10n, completed: false, count: 2),
           _completionLabel(l10n, 1),
           _rowLabel(l10n, 1),
-          l10n.dailyChoiceCatalogLoadMore,
+          l10n.dailyChoiceCatalogLoadingMore,
           _sectionLabel(l10n, completed: true, count: 0),
         ]);
+        _expectLiveRegion(tester, l10n.dailyChoiceCatalogLoadingMore);
 
-        tester.semantics.tap(
-          find.semantics.byLabel(l10n.dailyChoiceCatalogLoadMore),
-        );
-        await tester.pump();
         expect(repository.queries, hasLength(3));
         expect(repository.queries[2].date, _today);
         expect(repository.queries[2].cursor, isA<CatalogPageCursor>());
@@ -298,8 +293,8 @@ void main() {
       });
 
       testWidgets('прокрутка страницы диктором '
-          'проходит заголовок дня, секции, строки и подгрузку по порядку, '
-          'и подгрузка выполняется', (tester) async {
+          'проходит заголовок дня, секции, строки и подгрузку по порядку '
+          'и сама запрашивает порцию', (tester) async {
         final semantics = tester.ensureSemantics();
         final repository = CatalogPageRepository();
         await pumpCatalogPage(
@@ -330,7 +325,7 @@ void main() {
             _completionLabel(l10n, number),
             _rowLabel(l10n, number),
           ],
-          l10n.dailyChoiceCatalogLoadMore,
+          l10n.dailyChoiceCatalogLoadingMore,
         ];
 
         // Диктор продвигается по странице командой прокрутки, как при
@@ -340,23 +335,22 @@ void main() {
           for (final name in _announcedInScroll(tester)) {
             if (!visited.contains(name)) visited.add(name);
           }
-          if (visited.contains(l10n.dailyChoiceCatalogLoadMore)) break;
+          if (visited.contains(l10n.dailyChoiceCatalogLoadingMore)) break;
           tester.semantics.scrollUp(
             scrollable: find.semantics.scrollable(axis: Axis.vertical),
           );
-          await tester.pumpAndSettle();
+          // Кольцо подгрузки не даёт дождаться покоя всех анимаций.
+          await tester.pump();
+          await tester.pump(const Duration(seconds: 1));
+          await tester.pump();
         }
 
         final start = visited.indexOf(page.first);
-        final end = visited.indexOf(l10n.dailyChoiceCatalogLoadMore);
+        final end = visited.indexOf(l10n.dailyChoiceCatalogLoadingMore);
         expect(start, isNonNegative);
         expect(end, greaterThan(start));
         expect(visited.sublist(start, end + 1), page);
 
-        tester.semantics.tap(
-          find.semantics.byLabel(l10n.dailyChoiceCatalogLoadMore),
-        );
-        await tester.pump();
         expect(repository.queries, hasLength(2));
         expect(repository.queries[1].date, _today);
         expect(repository.queries[1].cursor, isA<CatalogPageCursor>());

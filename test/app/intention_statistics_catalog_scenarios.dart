@@ -45,18 +45,8 @@ void _catalogNavigationScenarios() {
           findsOneWidget,
         );
         await showDailyChoiceCatalogSection(tester, true);
-        final footer = find.byKey(
-          const ValueKey('daily-choice-load-more-true'),
-        );
-        await tester.scrollUntilVisible(
-          footer,
-          500,
-          scrollable: _catalogScrollable,
-        );
-        await tester.ensureVisible(footer);
-        await tester.pumpAndSettle();
         final held = app.probe.holdNextCatalogRead();
-        await tester.tap(footer);
+        await scrollToDailyChoiceCatalogPageEnd(tester, true);
         await _wait(tester, () => held.started.isCompleted);
         final finished = _finishedCatalogReads(app);
 
@@ -475,10 +465,7 @@ Future<void> _prepareCatalog(
   await _catalogReady(tester, app, provider, total: total);
   await tester.tap(find.bySemanticsLabel(app.texts.dailyChoiceCalendarExpand));
   await tester.pumpAndSettle();
-  final footer = find.byKey(ValueKey('daily-choice-load-more-$isCompleted'));
-  await tester.scrollUntilVisible(footer, 500, scrollable: _catalogScrollable);
-  await tester.pumpAndSettle();
-  await tester.tap(footer);
+  await scrollToDailyChoiceCatalogPageEnd(tester, isCompleted);
   await _wait(
     tester,
     () => _catalogData(app, provider).section(isCompleted).items.length == 100,

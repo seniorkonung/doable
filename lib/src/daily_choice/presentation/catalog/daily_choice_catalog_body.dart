@@ -1,7 +1,9 @@
+import 'dart:async';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart' show ScrollDirection;
+import 'package:flutter/rendering.dart' show ScrollCacheExtent, ScrollDirection;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
@@ -71,6 +73,11 @@ final class _DailyChoiceCatalogBodyState
 
   /// Свободное место под последней строкой выдачи.
   static const double _listEndSpace = 72;
+
+  /// Запас построения строк за краем выдачи: подвал секции строится и
+  /// запрашивает порцию, когда конец её загруженной части подошёл на это
+  /// расстояние.
+  static const double _pageRequestDistance = 160;
 
   /// Текущий местный день, отмеченный в календаре и заголовке дня.
   ///
@@ -162,6 +169,10 @@ final class _DailyChoiceCatalogBodyState
                 child: CustomScrollView(
                   controller: _scrollController,
                   physics: const _CalendarResizeScrollPhysics(),
+                  // https://api.flutter.dev/flutter/widgets/ScrollView/scrollCacheExtent.html
+                  scrollCacheExtent: const ScrollCacheExtent.pixels(
+                    _pageRequestDistance,
+                  ),
                   key: const PageStorageKey<String>('daily-choice-catalog'),
                   slivers: [
                     SliverToBoxAdapter(
@@ -413,11 +424,15 @@ final class _DailyChoiceCatalogBodyState
     };
     return [
       SliverList.builder(
-        itemCount: section.items.length,
+        itemCount: section.items.length + (section.nextCursor == null ? 0 : 1),
         // При смене порядка Flutter находит карточку по идентификатору:
         // https://api.flutter.dev/flutter/widgets/SliverChildBuilderDelegate/findChildIndexCallback.html
         findChildIndexCallback: (key) => indices[key],
         itemBuilder: (context, index) {
+          if (index == section.items.length) {
+            _requestPage(model, isCompleted);
+            return _pageFooter(section, isCompleted, model, l10n);
+          }
           final item = section.items[index];
           final number =
               index + 1 + (isCompleted ? state.incomplete.items.length : 0);
@@ -537,8 +552,6 @@ final class _DailyChoiceCatalogBodyState
           );
         },
       ),
-      if (section.nextCursor != null)
-        SliverToBoxAdapter(child: _pageFooter(state, isCompleted, model, l10n)),
     ];
   }
 
@@ -594,32 +607,46 @@ final class _DailyChoiceCatalogBodyState
     DailyChoiceCompletionFailed() => const SizedBox.shrink(),
   };
 
+  /// Подвал — последний элемент ленивого списка, поэтому его построение
+  /// означает, что конец загруженной части подошёл к видимой области. Модель
+  /// сама пропускает запрос при неактуальной выдаче или занятой порции, а
+  /// каждая новая выдача заново строит подвал на виду.
+  void _requestPage(DailyChoiceCatalogViewModel model, bool isCompleted) {
+    // https://api.flutter.dev/flutter/scheduler/SchedulerBinding/addPostFrameCallback.html
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(model.loadMore(isCompleted: isCompleted));
+    });
+  }
+
   Widget _pageFooter(
-    DailyChoiceCatalogLoaded state,
+    DailyChoiceCatalogSectionState section,
     bool isCompleted,
     DailyChoiceCatalogViewModel model,
     AppLocalizations l10n,
-  ) => switch (state.section(isCompleted).pageStatus) {
-    DailyChoiceCatalogPageLoading() => _Status(
-      message: l10n.dailyChoiceCatalogLoadingMore,
-      loading: true,
+  ) => Padding(
+    key: ValueKey('daily-choice-page-footer-$isCompleted'),
+    padding: const EdgeInsets.fromLTRB(
+      DoableMetrics.space5,
+      DoableMetrics.space4,
+      DoableMetrics.space5,
+      0,
     ),
-    DailyChoiceCatalogPageFailure(:final failure, :final canRetry) => _Status(
-      message: _failureMessage(failure, l10n),
-      onRetry: canRetry
-          ? () => model.retryLoadMore(isCompleted: isCompleted)
-          : null,
-    ),
-    DailyChoiceCatalogPageIdle() => Center(
-      child: TextButton(
-        key: ValueKey('daily-choice-load-more-$isCompleted'),
-        onPressed: state.freshness == DailyChoiceCatalogFreshness.current
-            ? () => model.loadMore(isCompleted: isCompleted)
-            : null,
-        child: Text(l10n.dailyChoiceCatalogLoadMore),
-      ),
-    ),
-  };
+    child: switch (section.pageStatus) {
+      DailyChoiceCatalogPageFailure(:final failure, :final canRetry) =>
+        ListState.error(
+          message: _failureMessage(failure, l10n),
+          retry: canRetry
+              ? (
+                  label: l10n.commonRetry,
+                  onPressed: () =>
+                      unawaited(model.retryLoadMore(isCompleted: isCompleted)),
+                )
+              : null,
+        ),
+      DailyChoiceCatalogPageIdle() || DailyChoiceCatalogPageLoading() =>
+        ListState.more(text: l10n.dailyChoiceCatalogLoadingMore),
+    },
+  );
 
   String _failureMessage(
     DailyChoiceCatalogReadFailure failure,
@@ -712,36 +739,6 @@ bool _hasSameSectionContent(
     before.totalCount == after.totalCount &&
     (before.nextCursor != null) == (after.nextCursor != null) &&
     before.pageStatus == after.pageStatus;
-
-final class _Status extends StatelessWidget {
-  const _Status({required this.message, this.loading = false, this.onRetry});
-
-  final String message;
-  final bool loading;
-  final VoidCallback? onRetry;
-
-  @override
-  Widget build(BuildContext context) => Center(
-    child: Semantics(
-      liveRegion: true,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (loading) const CircularProgressIndicator(),
-            Text(message, textAlign: TextAlign.center),
-            if (onRetry != null)
-              TextButton(
-                onPressed: onRetry,
-                child: Text(AppLocalizations.of(context).commonRetry),
-              ),
-          ],
-        ),
-      ),
-    ),
-  );
-}
 
 final class _Banner extends StatelessWidget {
   const _Banner({required this.message, this.loading = false});

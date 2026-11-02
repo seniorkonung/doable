@@ -3029,9 +3029,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get dailyChoiceCatalogLoadingMore => 'Загружаем ещё дневные выборы…';
 
   @override
-  String get dailyChoiceCatalogLoadMore => 'Показать ещё дневные выборы';
-
-  @override
   String get dailyChoiceCatalogUnavailable =>
       'Не удалось загрузить дневные выборы.';
 

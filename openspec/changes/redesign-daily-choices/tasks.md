@@ -118,7 +118,7 @@
   - **Предполагаемые файлы:** `lib/src/design_system/components/list_state.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`, `test/design_system/list_state_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`.
   - **Размер:** M.
 
-- [ ] 1.10 Следующая порция секции подгружается сама
+- [x] 1.10 Следующая порция секции подгружается сама
   - **Критерии приёмки:**
     - Подвал секции с продолжением — последний элемент её ленивого `SliverList`: он показывает `ListState.more` и после кадра вызывает `loadMore` той же секции. `SliverToBoxAdapter` для него не подходит, потому что строит содержимое сразу и загрузил бы все порции при открытии.
     - Порция запрашивается, только когда конец загруженной части приближается к видимой области, и встаёт перед секцией выполненных. Секция, конец которой далеко, порцию не запрашивает.

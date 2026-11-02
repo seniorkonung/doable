@@ -16,6 +16,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
 
+import '../../../support/daily_choice_catalog_controls.dart';
 import 'daily_choice_calendar_test_support.dart';
 import 'daily_choice_catalog_page_test_support.dart';
 
@@ -588,13 +589,7 @@ void main() {
             find.byKey(ValueKey(key), skipOffstage: false),
           );
         }
-        final loadMore = find.byKey(
-          const ValueKey('daily-choice-load-more-false'),
-          skipOffstage: false,
-        );
-        await _dragUntilReachable(tester, loadMore);
-        await tester.tap(loadMore);
-        await tester.pump();
+        await scrollToDailyChoiceCatalogPageEnd(tester, false);
         repository.completeMore(1, [catalogPageItem(21, date: _today)]);
         await tester.pumpAndSettle();
 
