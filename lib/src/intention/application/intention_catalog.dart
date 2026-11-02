@@ -319,6 +319,14 @@ final class IntentionTitleFilter {
     return titleSearchKey(title).contains(titleSearchKey(_normalizedValue));
   }
 
+  bool matchesExactTitle(String title) {
+    IntentionText.ensureValidUnicodeRepertoire(
+      title,
+      field: IntentionTextField.title,
+    );
+    return titleSearchKey(title) == titleSearchKey(_normalizedValue);
+  }
+
   T map<T>(T Function(String normalizedValue) transform) =>
       transform(_normalizedValue);
 }
