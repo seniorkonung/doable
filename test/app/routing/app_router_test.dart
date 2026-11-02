@@ -22,8 +22,7 @@ import 'package:doable/src/long_term_relation/application/long_term_relation_pro
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
-import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_page.dart';
-import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_state.dart';
+import 'package:doable/src/long_term_relation/presentation/batch_picker/relation_batch_picker_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -231,7 +230,7 @@ void main() {
   });
 
   testWidgets(
-    'создание из группы соседства открывает форму с группой выбранных типа и направления',
+    'добавление из группы открывает поиск с намерением и выбранной группой',
     (tester) async {
       final repository = ControlledRelationDetailsRepository();
       addTearDown(repository.dispose);
@@ -266,17 +265,14 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('intention-relations-add')));
       await tester.pumpAndSettle();
 
-      expect(
-        tester
-            .widget<RelationEditorPage>(find.byType(RelationEditorPage))
-            .editorContext,
-        RelationCreationContext(
-          participant: testParticipant(ownerId, title: 'А'),
-          group: IntentionRelationGroup.needs,
-        ),
+      final pickerNeeds = tester.widget<RelationBatchPickerPage>(
+        find.byType(RelationBatchPickerPage),
       );
+      expect(pickerNeeds.pageIntentionId, ownerId);
+      expect(pickerNeeds.pageTitle, 'А');
+      expect(pickerNeeds.group, IntentionRelationGroup.needs);
 
-      await tester.pageBack();
+      await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(const ValueKey('intention-relations-group-neededFor')),
@@ -301,17 +297,14 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('intention-relations-add')));
       await tester.pumpAndSettle();
 
-      expect(
-        tester
-            .widget<RelationEditorPage>(find.byType(RelationEditorPage))
-            .editorContext,
-        RelationCreationContext(
-          participant: testParticipant(ownerId, title: 'А'),
-          group: IntentionRelationGroup.neededFor,
-        ),
+      final pickerNeededFor = tester.widget<RelationBatchPickerPage>(
+        find.byType(RelationBatchPickerPage),
       );
+      expect(pickerNeededFor.pageIntentionId, ownerId);
+      expect(pickerNeededFor.pageTitle, 'А');
+      expect(pickerNeededFor.group, IntentionRelationGroup.neededFor);
 
-      await tester.pageBack();
+      await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(const ValueKey('intention-relations-group-canBeUsedFor')),
@@ -336,15 +329,12 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('intention-relations-add')));
       await tester.pumpAndSettle();
 
-      expect(
-        tester
-            .widget<RelationEditorPage>(find.byType(RelationEditorPage))
-            .editorContext,
-        RelationCreationContext(
-          participant: testParticipant(ownerId, title: 'А'),
-          group: IntentionRelationGroup.canBeUsedFor,
-        ),
+      final pickerCanBeUsedFor = tester.widget<RelationBatchPickerPage>(
+        find.byType(RelationBatchPickerPage),
       );
+      expect(pickerCanBeUsedFor.pageIntentionId, ownerId);
+      expect(pickerCanBeUsedFor.pageTitle, 'А');
+      expect(pickerCanBeUsedFor.group, IntentionRelationGroup.canBeUsedFor);
     },
   );
 }

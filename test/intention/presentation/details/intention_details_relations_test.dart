@@ -23,8 +23,7 @@ import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
-import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_page.dart';
-import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_state.dart';
+import 'package:doable/src/long_term_relation/presentation/batch_picker/relation_batch_picker_page.dart';
 import 'package:doable/src/long_term_relation/presentation/relation_group_paging_policy.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -241,19 +240,12 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('intention-relations-add')));
     await tester.pumpAndSettle();
-    expect(
-      tester
-          .widget<RelationEditorPage>(find.byType(RelationEditorPage))
-          .editorContext,
-      RelationCreationContext(
-        participant: RelationParticipantSummary(
-          id: owner.id,
-          title: owner.title,
-          archiveState: owner.archiveState,
-        ),
-        group: IntentionRelationGroup.canUse,
-      ),
+    final picker = tester.widget<RelationBatchPickerPage>(
+      find.byType(RelationBatchPickerPage),
     );
+    expect(picker.pageIntentionId, owner.id);
+    expect(picker.pageTitle, owner.title);
+    expect(picker.group, IntentionRelationGroup.canUse);
 
     // Созданная связь подтверждается после возвращения на страницу.
     await router.maybePop();

@@ -29,9 +29,7 @@ enum _MatrixEntry {
   editChoice,
   createRelation,
   outgoingRelations,
-  incomingRelations,
-  changeSource,
-  selectRelated;
+  incomingRelations;
 
   Finder get finder => switch (this) {
     _MatrixEntry.intention => intentionCatalogRow('Читать'),
@@ -77,12 +75,6 @@ enum _MatrixEntry {
     _MatrixEntry.outgoingRelations => _outgoingNeedGroup,
     _MatrixEntry.incomingRelations => find.byKey(
       const ValueKey('intention-relations-group-neededFor'),
-    ),
-    _MatrixEntry.changeSource => find.byKey(
-      const ValueKey('relation-editor-change-source'),
-    ),
-    _MatrixEntry.selectRelated => find.byKey(
-      const ValueKey('relation-editor-select-related'),
     ),
   };
 }
@@ -377,8 +369,8 @@ void _registerPageMatrixTests() {
       entries: [daily, _MatrixEntry.editChoice],
     ),
     (
-      name: 'создание исходящей связи',
-      page: RelationEditorPage,
+      name: 'поиск участника исходящей группы',
+      page: RelationBatchPickerPage,
       panel: false,
       entries: [
         read,
@@ -387,35 +379,13 @@ void _registerPageMatrixTests() {
       ],
     ),
     (
-      name: 'создание входящей связи',
-      page: RelationEditorPage,
+      name: 'поиск участника входящей группы',
+      page: RelationBatchPickerPage,
       panel: false,
       entries: [
         read,
         _MatrixEntry.incomingRelations,
         _MatrixEntry.createRelation,
-      ],
-    ),
-    (
-      name: 'поиск исходного участника',
-      page: RelationParticipantPickerPage,
-      panel: false,
-      entries: [
-        read,
-        _MatrixEntry.outgoingRelations,
-        _MatrixEntry.createRelation,
-        _MatrixEntry.changeSource,
-      ],
-    ),
-    (
-      name: 'поиск связанного участника',
-      page: RelationParticipantPickerPage,
-      panel: false,
-      entries: [
-        read,
-        _MatrixEntry.outgoingRelations,
-        _MatrixEntry.createRelation,
-        _MatrixEntry.selectRelated,
       ],
     ),
   ];
@@ -467,17 +437,6 @@ void _registerPageMatrixTests() {
       }
       await _until(tester, find.byType(row.page));
       await tester.pumpAndSettle();
-      final variant = switch (tester.widget(find.byType(row.page))) {
-        RelationEditorPage(:final editorContext) => switch (editorContext) {
-          RelationBlankCreationContext() => 'создание связи без участников',
-          RelationCreationContext(:final group) => switch (group.direction) {
-            RelationDirection.outgoing => 'создание исходящей связи',
-            RelationDirection.incoming => 'создание входящей связи',
-          },
-        },
-        _ => null,
-      };
-      if (variant != null) expect(variant, row.name);
       for (final searchBar in tester.widgetList<IntentionSearchBar>(
         find.descendant(
           of: find.byType(row.page),
@@ -504,77 +463,6 @@ void _registerPageMatrixTests() {
       expect(tester.takeException(), isNull);
     });
   }
-
-  testWidgets('поиск участника без панели', (tester) async {
-    final router = await _start(tester);
-    final choice = RelationParticipantChoice(
-      role: RelationParticipantRole.related,
-      restore: testRelationRestore,
-      type: LongTermRelationType.need,
-      priority: null,
-      description: '',
-      source: RelationParticipantSummary(
-        id: _intentionId(_read),
-        title: 'Читать',
-        archiveState: IntentionArchiveState.active,
-      ),
-      related: RelationParticipantSummary(
-        id: _intentionId(_run),
-        title: 'Бегать',
-        archiveState: IntentionArchiveState.active,
-      ),
-    );
-    unawaited(router.push(RelationParticipantPickerRoute(choice: choice)));
-    await _until(tester, _summary(RelationParticipantPickerPage, 'Бегать'));
-    await tester.pumpAndSettle();
-    _expectAboveShell(
-      tester,
-      RelationParticipantPickerPage,
-      AppDestination.home,
-      expectedPanel: false,
-    );
-    expect(
-      tester
-          .widget<RelationParticipantPickerPage>(
-            find.byType(RelationParticipantPickerPage),
-          )
-          .choice,
-      same(choice),
-    );
-    await _close(tester, RelationParticipantPickerPage);
-    _expectRootPage(tester, router, AppDestination.home);
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('матрица: создание связи без участников — задача без панели', (
-    tester,
-  ) async {
-    final router = await _start(tester);
-    unawaited(
-      router.push(
-        RelationEditorRoute(
-          editorContext: const RelationBlankCreationContext(),
-        ),
-      ),
-    );
-    await _until(tester, find.byType(RelationEditorPage));
-    await tester.pumpAndSettle();
-    expect(
-      tester
-          .widget<RelationEditorPage>(find.byType(RelationEditorPage))
-          .editorContext,
-      isA<RelationBlankCreationContext>(),
-    );
-    _expectAboveShell(
-      tester,
-      RelationEditorPage,
-      AppDestination.home,
-      expectedPanel: false,
-    );
-    await _close(tester, RelationEditorPage);
-    _expectRootPage(tester, router, AppDestination.home);
-    expect(tester.takeException(), isNull);
-  });
 }
 
 /// Новый вариант назначения требует явно указать проверяемую страницу.
@@ -583,5 +471,5 @@ Type _pageForCatalogPurpose(IntentionCatalogPurpose purpose) =>
       BrowseIntentionCatalog() => IntentionCatalogPage,
       SelectDailyChoiceAction() => DailyChoiceActionPickerPage,
       SelectDailyChoiceSource() => DailyChoiceSourcePickerPage,
-      SelectRelationParticipant() => RelationParticipantPickerPage,
+      SelectRelationParticipant() => RelationBatchPickerPage,
     };
