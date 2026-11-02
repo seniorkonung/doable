@@ -23,6 +23,7 @@ import 'package:doable/src/design_system/components/choice_check.dart';
 import 'package:doable/src/design_system/components/choice_row.dart';
 import 'package:doable/src/design_system/components/day_heading.dart';
 import 'package:doable/src/design_system/components/day_mark.dart';
+import 'package:doable/src/design_system/components/notice.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
@@ -325,6 +326,13 @@ final dailyChoiceCompletionControl = find.byType(ChoiceCheck);
   );
   return (completed: row.done, enabled: row.onToggle != null);
 }
+
+/// Действие уведомления об отказе записи выполнения с подписью [label].
+///
+/// Уведомление стоит у карточки и несёт одно действие: повтор или
+/// актуализацию выбора.
+Finder dailyChoiceCompletionNoticeAction(String label) =>
+    find.descendant(of: find.byType(Notice), matching: find.text(label));
 
 /// Вертикальная прокрутка выдачи открытого каталога дневных выборов.
 Finder _catalogScroll() => find.descendant(

@@ -3043,13 +3043,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get dailyChoiceCompletionSaving => 'Saving completion…';
-
-  @override
-  String get dailyChoiceCompletionSynchronizing =>
-      'Completion saved. Refreshing the catalog…';
-
-  @override
   String get dailyChoiceCompletionRefresh => 'Refresh choice';
 
   @override

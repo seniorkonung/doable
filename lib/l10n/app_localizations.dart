@@ -4759,18 +4759,6 @@ abstract class AppLocalizations {
     String priority,
   );
 
-  /// Ожидание подтверждения записи выполнения рядом с карточкой
-  ///
-  /// In en, this message translates to:
-  /// **'Saving completion…'**
-  String get dailyChoiceCompletionSaving;
-
-  /// Запись подтверждена, флажок ожидает согласованного снимка секций
-  ///
-  /// In en, this message translates to:
-  /// **'Completion saved. Refreshing the catalog…'**
-  String get dailyChoiceCompletionSynchronizing;
-
   /// Актуализация карточки после отказа без явного повтора перед новым подтверждением выполнения
   ///
   /// In en, this message translates to:

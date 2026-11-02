@@ -13,6 +13,7 @@ import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalo
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart';
 import 'package:doable/src/design_system/components/day_heading.dart';
+import 'package:doable/src/design_system/components/notice.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_date_catalog_page.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/design_system/components/calendar_handle.dart';
@@ -82,6 +83,8 @@ void main() {
         expect(checkbox.completed, isFalse);
         expect(checkbox.enabled, isTrue);
         expect(find.byType(OperationFailurePresentation), findsNothing);
+        // Повтор принадлежит только сессии, получившей отказ.
+        expect(find.byType(Notice), findsNothing);
         expect(find.byType(SnackBar), findsNothing);
         expect(repository.completionCommands, hasLength(1));
         expect(tester.takeException(), isNull);
@@ -279,7 +282,10 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(OperationFailurePresentation), findsNothing);
       expect(dailyChoiceCompletionState(tester, checkbox).enabled, isFalse);
-      await tester.tap(find.widgetWithText(TextButton, 'Обновить выбор'));
+      // Вернувшаяся карточка сохраняет в уведомлении только актуализацию.
+      expect(find.byType(Notice), findsOneWidget);
+      expect(dailyChoiceCompletionNoticeAction('Повторить'), findsNothing);
+      await tester.tap(dailyChoiceCompletionNoticeAction('Обновить выбор'));
       await tester.pump();
       repository.completeFirst(1, [item], total: 1);
       await tester.pumpAndSettle();

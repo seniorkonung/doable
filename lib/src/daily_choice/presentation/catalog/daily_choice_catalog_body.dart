@@ -538,14 +538,22 @@ final class _DailyChoiceCatalogBodyState
                     ],
                   ),
                 ),
-                if (state.completionOperations[item.id] case final operation?)
-                  _completionFeedback(
-                    item.id,
-                    item.isCompleted,
-                    operation,
-                    model,
-                    l10n,
-                    changeCompletion,
+                if (_completionNotice(
+                      item,
+                      state.completionOperations[item.id],
+                      model,
+                      l10n,
+                      changeCompletion,
+                    )
+                    case final notice?)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      DoableMetrics.space5,
+                      DoableMetrics.space2,
+                      DoableMetrics.space5,
+                      0,
+                    ),
+                    child: notice,
                   ),
               ],
             ),
@@ -555,57 +563,54 @@ final class _DailyChoiceCatalogBodyState
     ];
   }
 
-  Widget _completionFeedback(
-    DailyChoiceId id,
-    bool isCompleted,
-    DailyChoiceCompletionOperation operation,
+  /// Уведомление у карточки при отказе записи выполнения.
+  ///
+  /// Пока запись и согласование идут, под карточкой ничего нет: флажок
+  /// недоступен, а строки не сдвигаются. Уведомление несёт одно действие:
+  /// повтор при доказанно временном отказе, иначе актуализацию. Сообщение и
+  /// повтор принадлежат только сессии, получившей отказ; вернувшейся карточке
+  /// остаётся действие, без которого флажок недоступен.
+  Widget? _completionNotice(
+    DailyChoiceCatalogItem item,
+    DailyChoiceCompletionOperation? operation,
     DailyChoiceCatalogViewModel model,
     AppLocalizations l10n,
     ValueChanged<bool> changeCompletion,
-  ) => switch (operation) {
-    DailyChoiceCompletionSubmitting() => _Banner(
-      message: l10n.dailyChoiceCompletionSaving,
-      loading: true,
-    ),
-    DailyChoiceCompletionAwaitingSnapshot() => _Banner(
-      message: l10n.dailyChoiceCompletionSynchronizing,
-      loading: true,
-    ),
-    // Сообщение и его повтор принадлежат только сессии, получившей отказ;
-    // вернувшейся карточке остаётся действие, без которого флажок недоступен.
-    DailyChoiceCompletionFailed(
-      :final failure,
-      :final inline,
-      :final canRetry,
-      :final requiresRefresh,
-    )
-        when (inline?.session.isOpen ?? false) || requiresRefresh =>
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (inline != null && inline.session.isOpen) ...[
-              OperationFailurePresentation(
-                claim: inline.claim,
-                message: dailyChoiceCommandFailureMessage(l10n, failure),
-              ),
-              if (canRetry)
-                TextButton(
-                  onPressed: () => changeCompletion(!isCompleted),
-                  child: Text(l10n.commonRetry),
-                ),
-            ],
-            if (requiresRefresh)
-              TextButton(
-                onPressed: () => model.refreshCompletion(id),
-                child: Text(l10n.dailyChoiceCompletionRefresh),
-              ),
-          ],
+  ) {
+    final refresh = (
+      label: l10n.dailyChoiceCompletionRefresh,
+      onPressed: () => model.refreshCompletion(item.id),
+    );
+    return switch (operation) {
+      null ||
+      DailyChoiceCompletionSubmitting() ||
+      DailyChoiceCompletionAwaitingSnapshot() => null,
+      DailyChoiceCompletionFailed(
+        :final failure,
+        :final inline,
+        :final canRetry,
+      )
+          when inline != null && inline.session.isOpen =>
+        Notice.content(
+          message: OperationFailurePresentation(
+            claim: inline.claim,
+            message: dailyChoiceCommandFailureMessage(l10n, failure),
+            inheritsColor: true,
+          ),
+          action: canRetry
+              ? (
+                  label: l10n.commonRetry,
+                  onPressed: () => changeCompletion(!item.isCompleted),
+                )
+              : refresh,
         ),
+      DailyChoiceCompletionFailed(requiresRefresh: true) => Notice.content(
+        message: const SizedBox.shrink(),
+        action: refresh,
       ),
-    DailyChoiceCompletionFailed() => const SizedBox.shrink(),
-  };
+      DailyChoiceCompletionFailed() => null,
+    };
+  }
 
   /// Подвал — последний элемент ленивого списка, поэтому его построение
   /// означает, что конец загруженной части подошёл к видимой области. Модель
@@ -725,7 +730,7 @@ bool _hasSameScrollContent(
           _hasSameSectionContent(before.completed, after.completed) &&
           // Строка обновления стоит над прокруткой, а отказ — внутри неё.
           before.refreshFailure == after.refreshFailure &&
-          // Ход и отказ изменения выполнения выводятся внутри карточек.
+          // Отказ изменения выполнения выводится внутри карточки.
           mapEquals(before.completionOperations, after.completionOperations),
     _ => identical(previous, next),
   };
@@ -739,33 +744,6 @@ bool _hasSameSectionContent(
     before.totalCount == after.totalCount &&
     (before.nextCursor != null) == (after.nextCursor != null) &&
     before.pageStatus == after.pageStatus;
-
-final class _Banner extends StatelessWidget {
-  const _Banner({required this.message, this.loading = false});
-
-  final String message;
-  final bool loading;
-
-  @override
-  Widget build(BuildContext context) => Semantics(
-    liveRegion: true,
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        children: [
-          if (loading)
-            const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-          const SizedBox(width: 8),
-          Expanded(child: Text(message)),
-        ],
-      ),
-    ),
-  );
-}
 
 /// Карточка удерживает только право будущей ошибки в своей экранной сессии;
 /// команда живёт в координаторе.

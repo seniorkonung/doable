@@ -3067,13 +3067,6 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get dailyChoiceCompletionSaving => 'Сохраняем выполнение…';
-
-  @override
-  String get dailyChoiceCompletionSynchronizing =>
-      'Выполнение сохранено. Обновляем каталог…';
-
-  @override
   String get dailyChoiceCompletionRefresh => 'Обновить выбор';
 
   @override

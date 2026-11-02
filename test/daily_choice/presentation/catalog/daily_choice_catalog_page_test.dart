@@ -73,6 +73,13 @@ void main() {
           ValueKey('daily-choice-completion-${second.id.toCanonicalString()}'),
         );
         expect(checkbox, findsOneWidget);
+        final rows = [
+          find.byKey(const ValueKey('daily-choice-section-false')),
+          find.byKey(const ValueKey('daily-choice-row-1')),
+          find.byKey(const ValueKey('daily-choice-row-2')),
+          find.byKey(const ValueKey('daily-choice-section-true')),
+        ];
+        final before = [for (final row in rows) tester.getRect(row)];
         await tester.tap(checkbox);
         await tester.pump();
         expect(router.current.name, route);
@@ -87,7 +94,9 @@ void main() {
         );
         expect(dailyChoiceCompletionState(tester, checkbox).completed, isFalse);
         expect(dailyChoiceCompletionState(tester, checkbox).enabled, isFalse);
-        expect(find.text('Сохраняем выполнение…'), findsOneWidget);
+        expect(find.byType(Notice), findsNothing);
+        expect(find.byType(OperationFailurePresentation), findsNothing);
+        expect([for (final row in rows) tester.getRect(row)], before);
         expect(
           dailyChoiceCompletionState(
             tester,
@@ -112,10 +121,8 @@ void main() {
         repository.confirmCompletion(0, second, isCompleted: true, revision: 1);
         await tester.pump();
         await tester.pump();
-        expect(
-          find.text('Выполнение сохранено. Обновляем каталог…'),
-          findsOneWidget,
-        );
+        expect(find.byType(Notice), findsNothing);
+        expect([for (final row in rows) tester.getRect(row)], before);
         expect(dailyChoiceCompletionState(tester, checkbox).completed, isFalse);
         expect(dailyChoiceCompletionState(tester, checkbox).enabled, isFalse);
         repository.completeFirst(
@@ -302,7 +309,13 @@ void main() {
       await tester.pump();
       repository.failCompletion(0, const DailyChoiceUnavailableFailure());
       await tester.pumpAndSettle();
-      expect(find.text(l10n.dailyChoiceOperationUnavailable), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(Notice),
+          matching: find.text(l10n.dailyChoiceOperationUnavailable),
+        ),
+        findsOneWidget,
+      );
       expect(
         tester
             .widget<OperationFailurePresentation>(
@@ -312,8 +325,14 @@ void main() {
         isNotNull,
       );
       expect(dailyChoiceCompletionState(tester, checkbox).completed, isFalse);
-      await tester.tap(find.widgetWithText(TextButton, l10n.commonRetry));
+      expect(dailyChoiceCompletionNoticeAction(l10n.commonRetry), findsOne);
+      expect(
+        dailyChoiceCompletionNoticeAction(l10n.dailyChoiceCompletionRefresh),
+        findsNothing,
+      );
+      await tester.tap(dailyChoiceCompletionNoticeAction(l10n.commonRetry));
       await tester.pump();
+      expect(find.byType(Notice), findsNothing);
       expect(repository.completionCommands, hasLength(2));
       repository.failCompletion(
         1,
@@ -322,18 +341,26 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text(l10n.dailyChoiceOperationConflict), findsOneWidget);
-      expect(find.text(l10n.commonRetry), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byType(Notice),
+          matching: find.text(l10n.dailyChoiceOperationConflict),
+        ),
+        findsOneWidget,
+      );
+      expect(dailyChoiceCompletionNoticeAction(l10n.commonRetry), findsNothing);
+      expect(
+        dailyChoiceCompletionNoticeAction(l10n.dailyChoiceCompletionRefresh),
+        findsOne,
+      );
       expect(dailyChoiceCompletionState(tester, checkbox).enabled, isFalse);
       await tester.tap(
-        find.widgetWithText(
-          TextButton,
-          locale.languageCode == 'ru' ? 'Обновить выбор' : 'Refresh choice',
-        ),
+        dailyChoiceCompletionNoticeAction(l10n.dailyChoiceCompletionRefresh),
       );
       await tester.pump();
       repository.completeFirst(1, [item], total: 1);
       await tester.pumpAndSettle();
+      expect(find.byType(Notice), findsNothing);
       expect(find.text(l10n.dailyChoiceOperationConflict), findsNothing);
       expect(dailyChoiceCompletionState(tester, checkbox).enabled, isTrue);
       expect(repository.completionCommands, hasLength(2));
@@ -360,15 +387,18 @@ void main() {
       await tester.pump();
       repository.failCompletion(0, const DailyChoiceUnexpectedFailure());
       await tester.pumpAndSettle();
-      expect(find.text(l10n.dailyChoiceOperationUnexpected), findsOneWidget);
-      expect(find.text(l10n.commonRetry), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byType(Notice),
+          matching: find.text(l10n.dailyChoiceOperationUnexpected),
+        ),
+        findsOneWidget,
+      );
+      expect(dailyChoiceCompletionNoticeAction(l10n.commonRetry), findsNothing);
       expect(dailyChoiceCompletionState(tester, checkbox).enabled, isFalse);
 
       await tester.tap(
-        find.widgetWithText(
-          TextButton,
-          locale.languageCode == 'ru' ? 'Обновить выбор' : 'Refresh choice',
-        ),
+        dailyChoiceCompletionNoticeAction(l10n.dailyChoiceCompletionRefresh),
       );
       await tester.pump();
       expect(repository.completionCommands, hasLength(1));
