@@ -57,7 +57,6 @@ import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
 import '../support/quick_creation.dart';
-import '../support/daily_choice_catalog_controls.dart';
 
 part 'daily_choice_completion_lifecycle_scenarios.dart';
 
