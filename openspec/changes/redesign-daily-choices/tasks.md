@@ -559,12 +559,13 @@
     - `delete()` возвращает `true` только после подтверждённого удаления этого выбора.
     - Страница подробного просмотра передаёт координатор в модель и работает как прежде.
   - **Проверка:**
-    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/details test/graph/presentation/tag_package_catalog_consumers_test.dart`.
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/details test/daily_choice/presentation/catalog/daily_choice_catalog_details_integration_test.dart test/graph/presentation/graph_reconciliation_checkpoint_test.dart test/graph/presentation/tag_package_catalog_consumers_test.dart`.
   - **Зависимости:** нет.
   - **Предполагаемые файлы:**
     - меняются `lib/src/daily_choice/presentation/details/daily_choice_details_view_model.dart`, `daily_choice_details_state.dart`, `daily_choice_details_page.dart`;
-    - меняются `test/daily_choice/presentation/details/daily_choice_details_view_model_test.dart`, `test/graph/presentation/package_consumers_test_support.dart`.
-  - **Размер:** M.
+    - меняются `test/daily_choice/presentation/details/daily_choice_details_view_model_test.dart`, `test/graph/presentation/package_consumers_test_support.dart`;
+    - меняются вызовы конструктора в `test/daily_choice/presentation/catalog/daily_choice_catalog_details_integration_test.dart` (до слияния из 3.1 строки 149 и 566) и `test/graph/presentation/graph_reconciliation_checkpoint_test.dart` (до слияния строка 357): оба передают в `DailyChoiceDetailsViewModel` координатор из уже имеющегося `ProviderContainer`.
+  - **Размер:** M по логике: файлов больше нормы только из-за вызовов конструктора в тестах.
 
 - [ ] 3.9 `showDailyChoiceSheet` показывает выбор в панели с шапкой, вкладками и «Обзором»
   - **Критерии приёмки:**
