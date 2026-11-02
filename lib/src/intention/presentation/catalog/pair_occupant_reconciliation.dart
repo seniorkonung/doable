@@ -29,6 +29,7 @@ Map<IntentionId, PairOccupant> reconcilePairOccupants({
       if (candidate != null && rowIds.contains(candidate)) {
         reconciled[candidate] = PairOccupant(
           relationId: relation.id,
+          type: relation.type,
           scope: relation.scope,
         );
       }

@@ -652,7 +652,7 @@
     - меняются `test/graph/application/graph_command_coordinator_relation_creation_test.dart`, `test/graph/presentation/graph_operation_presenter_test.dart`, `test/intention/presentation/catalog/catalog_reconciliation_test_support.dart`, `test/app/home_statistics_app_flow_test.dart`.
   - **Размер:** M.
 
-- [ ] 3.4 Занимающая связь несёт тип, а причина занятости выводится закрытым типом из группы поиска
+- [x] 3.4 Занимающая связь несёт тип, а причина занятости выводится закрытым типом из группы поиска
   - **Критерии приёмки:**
     - `PairOccupant` несёт тип занимающей связи. Порция каталога читает его в том же снимке, а `reconcilePairOccupants` обновляет занятость и при смене типа, поэтому открытый поиск не показывает прежнюю причину.
     - Закрытый тип причины выводится из `IntentionRelationGroup` и `PairOccupant`: своя группа или другая группа того же направления, активная либо архивная связь. Слова из строк не собираются.

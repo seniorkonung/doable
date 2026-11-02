@@ -481,6 +481,7 @@ void main() {
         sourceIntentionId: testSummary(index: 9).id,
         relatedIntentionId: testSummary(index: 1).id,
       ).id,
+      type: LongTermRelationType.need,
       scope: RelationScope.archived,
     );
     repository.complete(

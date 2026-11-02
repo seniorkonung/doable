@@ -573,6 +573,7 @@ void main() {
           pairOccupants: {
             _action(28).id: PairOccupant(
               relationId: relation.id,
+              type: relation.type,
               scope: relation.scope,
             ),
           },

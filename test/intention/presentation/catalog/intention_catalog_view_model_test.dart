@@ -1482,6 +1482,7 @@ void main() {
         relatedIntentionId: testSummary(index: rowIndex).id,
         index: rowIndex,
       ).id,
+      type: LongTermRelationType.need,
       scope: scope,
     );
 

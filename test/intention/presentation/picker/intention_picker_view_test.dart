@@ -854,6 +854,7 @@ void main() {
     final sleep = _action(1);
     final walkOccupant = PairOccupant(
       relationId: testFormRelationId(1),
+      type: LongTermRelationType.need,
       scope: RelationScope.active,
     );
     h.repository.complete(
@@ -864,6 +865,7 @@ void main() {
           walk.id: walkOccupant,
           swim.id: PairOccupant(
             relationId: testFormRelationId(2),
+            type: LongTermRelationType.need,
             scope: RelationScope.archived,
           ),
         },

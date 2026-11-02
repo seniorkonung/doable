@@ -1428,7 +1428,7 @@ final class DriftPersonalGraphRepository
     };
     rowsQuery
       ..join([leftOuterJoin(relations, occupiesPair)])
-      ..addColumns([relations.id, relations.isArchived]);
+      ..addColumns([relations.id, relations.type, relations.isArchived]);
   }
 
   /// Занимающая связь строки порции; `null` — пара строки свободна.
@@ -1438,6 +1438,11 @@ final class DriftPersonalGraphRepository
     if (relationId == null) return null;
     return PairOccupant(
       relationId: decodeStoredRelationId(relationId),
+      type: switch (row.read(relations.type)) {
+        'need' => relation_domain.LongTermRelationType.need,
+        'can' => relation_domain.LongTermRelationType.can,
+        _ => throw const StoredGraphCorruption(),
+      },
       scope: row.read(relations.isArchived)!
           ? relation_domain.RelationScope.archived
           : relation_domain.RelationScope.active,

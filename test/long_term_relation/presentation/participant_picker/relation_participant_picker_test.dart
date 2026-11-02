@@ -186,6 +186,7 @@ void main() {
       pairOccupants: {
         occupied.id: PairOccupant(
           relationId: occupantId,
+          type: LongTermRelationType.need,
           scope: RelationScope.active,
         ),
       },
@@ -250,6 +251,7 @@ void main() {
       pairOccupants: {
         occupied.id: PairOccupant(
           relationId: testFormRelationId(5),
+          type: LongTermRelationType.need,
           scope: RelationScope.active,
         ),
       },
@@ -954,6 +956,7 @@ Future<_RestoreOffer> _openRestoreOffer(
     pairOccupants: {
       occupied.id: PairOccupant(
         relationId: _archivedOccupant,
+        type: LongTermRelationType.need,
         scope: RelationScope.archived,
       ),
     },

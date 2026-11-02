@@ -1121,8 +1121,11 @@ void main() {
       });
     });
 
-    PairOccupant occupant(int relation, RelationScope scope) =>
-        PairOccupant(relationId: _relationId(relation), scope: scope);
+    PairOccupant occupant(int relation, RelationScope scope) => PairOccupant(
+      relationId: _relationId(relation),
+      type: LongTermRelationType.need,
+      scope: scope,
+    );
 
     RelationPairProbe probe(int counterpart, RelationParticipantRole role) =>
         RelationPairProbe(
@@ -1175,6 +1178,27 @@ void main() {
         _id(_uuid(healthy)): occupant(healthyToWalking, RelationScope.active),
         _id(_uuid(resting)): occupant(restingToWalking, RelationScope.archived),
       });
+    });
+
+    test('порция читает текущий тип занимающей связи', () async {
+      seedRawGraph(raw, () {
+        raw.execute(
+          "UPDATE long_term_relations SET type = 'can' WHERE id = ?",
+          [_uuid(healthyToWalking)],
+        );
+      });
+      final page = await firstPage(
+        probe(healthy, RelationParticipantRole.related),
+      );
+
+      expect(
+        page.pairOccupants![_id(_uuid(walking))]!.type,
+        LongTermRelationType.can,
+      );
+      expect(
+        page.pairOccupants![_id(_uuid(swimming))]!.type,
+        LongTermRelationType.need,
+      );
     });
 
     test('связь обратного направления пару не занимает', () async {

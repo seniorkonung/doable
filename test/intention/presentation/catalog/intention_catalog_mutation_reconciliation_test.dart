@@ -1472,8 +1472,11 @@ void main() {
       index: 4,
     );
 
-    PairOccupant occupantOf(LongTermRelation relation) =>
-        PairOccupant(relationId: relation.id, scope: relation.scope);
+    PairOccupant occupantOf(LongTermRelation relation) => PairOccupant(
+      relationId: relation.id,
+      type: relation.type,
+      scope: relation.scope,
+    );
 
     /// Открывает поиск с пробой на первой порции [items]: при [nextCursor]
     /// за её границей остаются ещё две строки.
@@ -1753,6 +1756,7 @@ void main() {
         expect(search.repository.queryAt(1).cursor, isNull);
         final archivedOccupant = PairOccupant(
           relationId: occupyingFourth.id,
+          type: occupyingFourth.type,
           scope: RelationScope.archived,
         );
         search.repository.complete(
