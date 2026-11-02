@@ -54,6 +54,77 @@ void main() {
 
   tearDown(() => database.close());
 
+  test('первая порция поиска считает все активные точные названия', () async {
+    seedRawGraph(raw, () {
+      raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
+        _uuid(100),
+        'Тег',
+        tagPositionKey(100),
+      ]);
+      for (final (number, title, ready, archived) in [
+        (1, 'Читать', 1, 0),
+        (2, 'ЧИТАТЬ', 1, 0),
+        (3, 'читать', 0, 0),
+        (4, 'Читать', 1, 0),
+        (5, 'Читать', 1, 1),
+        (6, 'Читать книгу', 1, 0),
+        (7, 'Читать', 1, 0),
+      ]) {
+        raw.execute(
+          'INSERT INTO intentions '
+          '(id, title, is_action_ready, is_archived, created_at, updated_at) '
+          'VALUES (?, ?, ?, ?, ?, ?)',
+          [_uuid(number), title, ready, archived, number, number],
+        );
+      }
+      for (final number in [2, 3, 4, 5, 6]) {
+        raw.execute(
+          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+          [_uuid(100), _uuid(number)],
+        );
+      }
+    });
+
+    final query = _tagQuery(
+      scope: IntentionScope.active,
+      readinessFilter: IntentionReadinessFilter.readyOnly,
+      titleFilter: '  чИтАтЬ  ',
+      tagFilter: IntentionTagFilter(requiredTagIds: [_tagId(100)]),
+      pairProbe: _excluding(_id(_uuid(1))),
+    );
+    final page = _firstPage(await repository.getCatalogPage(query));
+    expect(page.items.single.id, _id(_uuid(2)));
+    expect(page.nextCursor, isNotNull);
+    expect(page.exactTitleCount, 5);
+
+    final partialTitle = _firstPage(
+      await repository.getCatalogPage(
+        _tagQuery(
+          tagFilter: IntentionTagFilter.empty,
+          titleFilter: 'чита',
+          pairProbe: _excluding(_id(_uuid(1))),
+        ),
+      ),
+    );
+    expect(partialTitle.exactTitleCount, 0);
+
+    final withoutProbe = _firstPage(
+      await repository.getCatalogPage(
+        _tagQuery(tagFilter: IntentionTagFilter.empty, titleFilter: 'читать'),
+      ),
+    );
+    expect(withoutProbe.exactTitleCount, isNull);
+    final withoutTitle = _firstPage(
+      await repository.getCatalogPage(
+        _tagQuery(
+          tagFilter: IntentionTagFilter.empty,
+          pairProbe: _excluding(_id(_uuid(1))),
+        ),
+      ),
+    );
+    expect(withoutTitle.exactTitleCount, isNull);
+  });
+
   group('Совместный запрос каталога', () {
     final originalFilter = IntentionTagFilter(
       requiredTagIds: [_tagId(firstTagNumber)],

@@ -1131,6 +1131,18 @@ final class DriftPersonalGraphRepository
     final intentions = _database.intentions;
     final condition = _catalogCondition(query);
     final (totalCount, counts) = await _countCatalog(query);
+    final titleFilter = query.titleFilter;
+    int? exactTitleCount;
+    if (query.pairProbe != null && titleFilter != null) {
+      final count = countAll();
+      final countQuery = _database.selectOnly(intentions)
+        ..addColumns([count])
+        ..where(
+          intentions.isArchived.equals(false) &
+              intentions.titleSearchKey.equals(titleFilter.map(titleSearchKey)),
+        );
+      exactTitleCount = (await countQuery.getSingle()).read(count)!;
+    }
     final rowsQuery = _database.selectOnly(intentions)
       ..addColumns([
         intentions.id,
@@ -1158,6 +1170,7 @@ final class DriftPersonalGraphRepository
       items: items,
       totalCount: totalCount,
       counts: counts,
+      exactTitleCount: exactTitleCount,
       nextCursor: nextCursor,
       revision: _currentRevision,
       pairOccupants: pairOccupants,
