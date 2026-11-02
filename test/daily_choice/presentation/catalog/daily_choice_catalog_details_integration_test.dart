@@ -518,12 +518,6 @@ void main() {
     await database.open();
     addTearDown(database.close);
     await _seedGraph(database);
-    await seedGraph(database, () async {
-      await database.customStatement(
-        "INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, 'can', 1, 0)",
-        [_uuid(103), _uuid(1), _uuid(3)],
-      );
-    });
     for (var number = 201; number <= 251; number++) {
       await _insertChoice(database, number, day);
       await _insertChoice(database, number + 100, day, completed: true);
@@ -605,26 +599,19 @@ void main() {
       DailyChoiceTime(hour: 18, minute: 0),
     );
 
-    final replace = coordinator.acceptDailyChoiceReplace(
-      ReplaceDailyChoicePath(
+    final secondUpdate = coordinator.acceptDailyChoiceUpdate(
+      UpdateDailyChoiceFields(
         choiceId: _choice(201),
-        sourceIntentionId: _intention(1),
-        selectedIntentionId: _intention(3),
-        path: ConfirmedChoicePath([
-          ConfirmedChoicePathStep(
-            relationId: _relation(103),
-            sourceIntentionId: _intention(1),
-            type: LongTermRelationType.can,
-            relatedIntentionId: _intention(3),
-          ),
-        ]),
+        patch: const DailyChoiceFieldsPatch(
+          priority: DailyChoiceFieldSet(DailyChoicePriority.p1),
+        ),
       ),
     ) as DailyChoiceCommandAccepted;
-    expect((await replace.future).isFailure, isFalse);
+    expect((await secondUpdate.future).isFailure, isFalse);
     await _until(
       () =>
           catalog().freshness == DailyChoiceCatalogFreshness.current &&
-          opened().details.path.length == 1,
+          opened().details.choice.priority == DailyChoicePriority.p1,
     );
     expect(
       (catalog().incomplete.items.length, catalog().completed.items.length),
@@ -638,8 +625,8 @@ void main() {
     final moved = catalog().incomplete.items.last;
     expect(moved.id, _choice(201));
     expect(moved.schedule, DailyChoiceTime(hour: 18, minute: 0));
-    expect(moved.priority, DailyChoicePriority.p2);
-    expect(moved.pathIntentionCount, 2);
+    expect(moved.priority, DailyChoicePriority.p1);
+    expect(moved.pathIntentionCount, 3);
 
     model.changeCompletion(moved.id, true);
     await _until(
@@ -654,7 +641,7 @@ void main() {
       isFalse,
     );
     expect(catalog().completed.items.first.id, moved.id);
-    expect(catalog().completed.items.first.pathIntentionCount, 2);
+    expect(catalog().completed.items.first.pathIntentionCount, 3);
     expect(catalog().completed.items, hasLength(52));
   });
 }

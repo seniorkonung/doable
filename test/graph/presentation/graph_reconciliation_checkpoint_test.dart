@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
-import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
@@ -284,7 +283,7 @@ void main() {
   });
 
   test(
-    'повтор и замена согласуют открытые представления одной ревизией',
+    'повтор и удаление согласуют открытые представления одной ревизией',
     () async {
       final database = AppDatabase(openInMemoryLocalDatabase());
       await database.open();
@@ -474,69 +473,18 @@ void main() {
       expect(intention(2).details.relationCounts.dailySource, 0);
       expect(intention(2).details.relationCounts.dailySelected, 0);
 
-      final replacement = coordinator.acceptDailyChoiceReplace(
-        ReplaceDailyChoicePath(
-          choiceId: firstId,
-          sourceIntentionId: durabilityIntention(5),
-          selectedIntentionId: durabilityIntention(4),
-          path: ConfirmedChoicePath([
-            ConfirmedChoicePathStep(
-              relationId: durabilityRelation(105),
-              sourceIntentionId: durabilityIntention(5),
-              type: LongTermRelationType.need,
-              relatedIntentionId: durabilityIntention(4),
-            ),
-          ]),
-        ),
-      );
-      expect(replacement, isA<DailyChoiceCommandAccepted>());
-      final replaced = await (replacement as DailyChoiceCommandAccepted).future;
-      expect(replaced.isFailure, isFalse);
-      final replacementRevision = replaced.revision!;
-      await _settleUntil(
-        () =>
-            catalog().freshness == DailyChoiceCatalogFreshness.current &&
-            catalog().revision.compareTo(replacementRevision) ==
-                GraphRevisionOrder.same &&
-            (details.state is DailyChoiceDetailsLoaded) &&
-            (details.state as DailyChoiceDetailsLoaded).revision.compareTo(
-                  replacementRevision,
-                ) ==
-                GraphRevisionOrder.same &&
-            [1, 3, 4, 5].every(
-              (number) =>
-                  choices(number).revision.compareTo(replacementRevision) ==
-                  GraphRevisionOrder.same,
-            ),
-      );
-      final opened = (details.state as DailyChoiceDetailsLoaded).details;
-      expect(opened.source.id, durabilityIntention(5));
-      expect(opened.selected.id, durabilityIntention(4));
-      expect(opened.path.map((step) => step.relation.id), [
-        durabilityRelation(105),
-      ]);
       expect(
-        catalog().items.singleWhere((item) => item.id == firstId).source.id,
-        durabilityIntention(5),
+        (container.read(
+          choicesProvider(4),
+        ) as IntentionChoicesEmpty).counts.dailySelected,
+        0,
       );
-      expect(choices(1).items.map((item) => item.id), [repeatId]);
-      expect(choices(3).items.map((item) => item.id), [repeatId]);
-      expect(choices(4).items.map((item) => item.id), [firstId]);
-      expect(choices(5).items.map((item) => item.id), [firstId]);
       expect(
-        [
-          choices(1).counts.dailySource,
-          choices(3).counts.dailySelected,
-          choices(4).counts.dailySelected,
-          choices(5).counts.dailySource,
-        ],
-        [1, 1, 1, 1],
+        (container.read(
+          choicesProvider(5),
+        ) as IntentionChoicesEmpty).counts.dailySource,
+        0,
       );
-      expect(relation(101).permissions.canDelete, isFalse);
-      expect(relation(102).permissions.canDelete, isFalse);
-      expect(relation(105).permissions.canDelete, isFalse);
-      expect(intention(2).details.relationCounts.dailySource, 0);
-      expect(intention(2).details.relationCounts.dailySelected, 0);
       for (final number in [1, 2, 3, 4, 5]) {
         final before = initialIntentions[number]!;
         final after = intention(number).intention;
@@ -559,24 +507,24 @@ void main() {
             catalog().revision.compareTo(deletionRevision) ==
                 GraphRevisionOrder.same &&
             catalog().totalCount == 1 &&
-            container.read(choicesProvider(1)) is IntentionChoicesEmpty &&
-            container.read(choicesProvider(3)) is IntentionChoicesEmpty &&
+            choices(1).items.length == 1 &&
+            choices(3).items.length == 1 &&
             relation(101).permissionRevision.compareTo(deletionRevision) ==
-                GraphRevisionOrder.same &&
-            relation(105).permissions.canDelete == false,
+                GraphRevisionOrder.same,
       );
       expect(catalog().items.single.id, firstId);
-      expect(relation(101).permissions.canDelete, isTrue);
-      expect(relation(102).permissions.canDelete, isTrue);
-      expect(relation(105).permissions.canDelete, isFalse);
+      expect(choices(1).items.map((item) => item.id), [firstId]);
+      expect(choices(3).items.map((item) => item.id), [firstId]);
+      expect(choices(1).counts.dailySource, 1);
+      expect(choices(3).counts.dailySelected, 1);
+      expect(relation(101).permissions.canDelete, isFalse);
+      expect(relation(102).permissions.canDelete, isFalse);
+      expect(relation(105).permissions.canDelete, isTrue);
       expect(
-        (details.state as DailyChoiceDetailsLoaded)
-            .details
-            .path
-            .single
-            .relation
-            .id,
-        durabilityRelation(105),
+        (details.state as DailyChoiceDetailsLoaded).details.path.map(
+          (step) => step.relation.id,
+        ),
+        [durabilityRelation(101), durabilityRelation(102)],
       );
     },
   );

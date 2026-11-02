@@ -355,7 +355,7 @@
   - **Предполагаемые файлы:** в `test/graph/data/` меняются `drift_daily_choice_read_cost_test.dart`, `drift_daily_choice_watch_test.dart`, `drift_daily_path_protection_test.dart`, `drift_graph_fact_log_completeness_test.dart`, `drift_graph_fact_log_write_test.dart`, `drift_statistics_relation_snapshot_test.dart`, `drift_statistics_seed_groups_test.dart`, `file_backed_daily_choice_durability_test.dart`.
   - **Размер:** M по логике: в каждом файле правка в одном месте.
 
-- [ ] 2.6 Тесты согласования и приложения не зависят от команды замены пути
+- [x] 2.6 Тесты согласования и приложения не зависят от команды замены пути
   - **Критерии приёмки:**
     - Тест «повтор и замена согласуют открытые представления одной ревизией» теряет шаг замены, а шаг удаления проверяется от состояния после повтора. Название говорит о повторе и удалении.
     - В `home_statistics_app_flow_test.dart` выбор с путём к намерению 4 получен удалением прежнего выбора и созданием нового. Ожидания показа и числа чтений не меняются.
