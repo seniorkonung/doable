@@ -3049,14 +3049,14 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось загрузить дневные выборы из-за непредвиденной ошибки.';
 
   @override
-  String dailyChoiceCatalogPathIntentionCount(int count) {
+  String dailyChoiceCatalogPathStepCount(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count намерения в пути',
-      many: '$count намерений в пути',
-      few: '$count намерения в пути',
-      one: '$count намерение в пути',
+      other: '$count шага в пути',
+      many: '$count шагов в пути',
+      few: '$count шага в пути',
+      one: '$count шаг в пути',
     );
     return '$_temp0';
   }
@@ -3064,10 +3064,10 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String dailyChoiceCatalogCompletionLabel(
     int number,
-    String phrase,
-    String date,
+    String action,
+    String priority,
   ) {
-    return 'Выполнение выбора № $number. $phrase. $date';
+    return 'Выполнение выбора № $number. $action. $priority';
   }
 
   @override
@@ -3081,13 +3081,18 @@ class AppLocalizationsRu extends AppLocalizations {
   String get dailyChoiceCompletionRefresh => 'Обновить выбор';
 
   @override
-  String dailyChoiceCatalogRowLabel(
-    int number,
-    String phrase,
-    String date,
-    String completion,
-  ) {
-    return 'Выбор № $number. $phrase. $date. $completion';
+  String dailyChoiceCatalogRowLabel(int number, String action) {
+    return 'Выбор № $number. $action';
+  }
+
+  @override
+  String dailyChoiceCatalogRowSource(String source) {
+    return 'Исходное намерение: $source';
+  }
+
+  @override
+  String dailyChoiceCatalogRowTime(String time) {
+    return 'В $time';
   }
 
   @override

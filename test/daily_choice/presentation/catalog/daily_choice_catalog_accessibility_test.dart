@@ -89,9 +89,7 @@ void main() {
         repository.failCompletion(0, const DailyChoiceUnavailableFailure());
         await tester.pumpAndSettle();
         _expectLiveRegion(tester, l10n.dailyChoiceOperationUnavailable);
-        final opening = find.semantics.byLabel(
-          _rowLabel(l10n, 1, null, completed),
-        );
+        final opening = find.semantics.byLabel(_rowLabel(l10n, 1, completed));
         expect(opening.evaluate().single.flagsCollection.isButton, isTrue);
         tester.semantics.tap(opening);
         await tester.pump();
@@ -134,10 +132,10 @@ void main() {
           texts.selectedToday,
           l10n.dailyChoiceCatalogTotalCount(3),
           l10n.dailyChoiceCatalogIncomplete,
-          _rowLabel(l10n, 1),
           _completionLabel(l10n, 1),
-          _rowLabel(l10n, 2),
+          _rowLabel(l10n, 1),
           _completionLabel(l10n, 2),
+          _rowLabel(l10n, 2),
           l10n.dailyChoiceCatalogLoadMore,
           l10n.dailyChoiceCatalogCompleted,
         ];
@@ -237,8 +235,8 @@ void main() {
         expect(_afterDayHeading(tester), [
           l10n.dailyChoiceCatalogTotalCount(2),
           l10n.dailyChoiceCatalogIncomplete,
-          _rowLabel(l10n, 1),
           _completionLabel(l10n, 1),
+          _rowLabel(l10n, 1),
           l10n.dailyChoiceCatalogLoadMore,
           l10n.dailyChoiceCatalogCompleted,
         ]);
@@ -256,8 +254,8 @@ void main() {
         expect(_afterDayHeading(tester), [
           l10n.dailyChoiceCatalogTotalCount(2),
           l10n.dailyChoiceCatalogIncomplete,
-          _rowLabel(l10n, 1),
           _completionLabel(l10n, 1),
+          _rowLabel(l10n, 1),
           l10n.dailyChoiceCatalogUnavailable,
           l10n.commonRetry,
           l10n.dailyChoiceCatalogCompleted,
@@ -274,10 +272,10 @@ void main() {
         expect(_afterDayHeading(tester), [
           l10n.dailyChoiceCatalogTotalCount(2),
           l10n.dailyChoiceCatalogIncomplete,
-          _rowLabel(l10n, 1),
           _completionLabel(l10n, 1),
-          _rowLabel(l10n, 2),
+          _rowLabel(l10n, 1),
           _completionLabel(l10n, 2),
+          _rowLabel(l10n, 2),
           l10n.dailyChoiceCatalogCompleted,
         ]);
 
@@ -330,8 +328,8 @@ void main() {
           l10n.dailyChoiceCatalogTotalCount(21),
           l10n.dailyChoiceCatalogIncomplete,
           for (var number = 1; number <= 20; number++) ...[
-            _rowLabel(l10n, number),
             _completionLabel(l10n, number),
+            _rowLabel(l10n, number),
           ],
           l10n.dailyChoiceCatalogLoadMore,
         ];
@@ -451,31 +449,19 @@ String _fullDate(WidgetTester tester, CalendarDate value) =>
     MaterialLocalizations.of(tester.element(find.byType(DailyChoiceCalendar)))
         .formatFullDate(DateTime.utc(value.year, value.month, value.day));
 
-/// Доступное название строки выдачи [number] за [day], по умолчанию — за
-/// сегодняшний день.
-String _rowLabel(
-  AppLocalizations l10n,
-  int number, [
-  CalendarDate? day,
-  bool completed = false,
-]) => [
-  l10n.dailyChoiceCatalogRowLabel(
-    number,
-    l10n.dailyChoiceDetailsPhrase('Основание', 'Действие'),
-    (day ?? _today).toCanonicalString(),
-    completed
-        ? l10n.dailyChoiceDetailsCompleted
-        : l10n.dailyChoiceDetailsNotCompleted,
-  ),
-  l10n.dailyChoiceAllDay,
-  l10n.dailyChoicePriorityOption('P4'),
-  l10n.dailyChoiceCatalogPathIntentionCount(2),
-].join('\n');
+/// Доступное название строки выдачи [number].
+String _rowLabel(AppLocalizations l10n, int number, [bool completed = false]) =>
+    [
+      l10n.dailyChoiceCatalogRowLabel(number, 'Действие'),
+      l10n.dailyChoiceCatalogRowSource('Основание'),
+      l10n.dailyChoiceCatalogPathStepCount(1),
+      l10n.dailyChoiceAllDay,
+      completed
+          ? l10n.dailyChoiceDetailsCompleted
+          : l10n.dailyChoiceDetailsNotCompleted,
+    ].join('\n');
 
-String _completionLabel(AppLocalizations l10n, int number) {
-  final phrase = l10n.dailyChoiceDetailsPhrase('Основание', 'Действие');
-  final day = _today.toCanonicalString();
-  return l10n.localeName == 'ru'
-      ? 'Выполнение выбора № $number. $phrase. $day'
-      : 'Completion of choice #$number. $phrase. $day';
-}
+String _completionLabel(AppLocalizations l10n, int number) =>
+    l10n.localeName == 'ru'
+    ? 'Выполнение выбора № $number. Действие. Приоритет P4'
+    : 'Completion of choice #$number. Действие. Priority P4';

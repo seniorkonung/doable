@@ -3,7 +3,9 @@ import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_edit_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/design_system/components/choice_row.dart';
 import 'package:doable/src/design_system/components/day_mark.dart';
+import 'package:doable/src/design_system/doable_priority.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -47,13 +49,12 @@ void main() {
         );
         await _until(
           tester,
-          () => find.text('Приоритет P2').evaluate().isNotEmpty,
+          () => _rowWith(DoablePriority.p2).evaluate().isNotEmpty,
         );
         final text = find.text(description);
         expect(tester.widget<Text>(text).maxLines, 2);
         expect(tester.widget<Text>(text).overflow, TextOverflow.ellipsis);
-        expect(find.text('18:00'), findsNWidgets(2));
-        expect(find.text('3 намерения в пути'), findsOneWidget);
+        expect(find.text('18:00'), findsOneWidget);
         await expandDailyChoiceCatalogCalendar(tester);
         final viewport = shownDailyChoiceCatalogViewport(tester);
         final route = router.current.name;
@@ -62,7 +63,7 @@ void main() {
             'daily-choice-completion-${durabilityChoice(201).toCanonicalString()}',
           ),
         );
-        expect(tester.widget<Checkbox>(checkbox).value, isFalse);
+        expect(dailyChoiceCompletionState(tester, checkbox).completed, isFalse);
         final done = dailyChoiceCatalogDayMark(
           durabilityChoiceDate,
           mark: DayMark.done,
@@ -80,7 +81,7 @@ void main() {
           () =>
               done.evaluate().isNotEmpty &&
               checkbox.evaluate().isNotEmpty &&
-              tester.widget<Checkbox>(checkbox).value == true,
+              dailyChoiceCompletionState(tester, checkbox).completed,
         );
         expect(router.current.name, route);
         expect(find.byType(DailyChoiceDetailsPage), findsNothing);
@@ -145,12 +146,11 @@ void main() {
         await tester.pumpAndSettle();
         await _until(
           tester,
-          () => find.text('Приоритет P1').evaluate().isNotEmpty,
+          () => _rowWith(DoablePriority.p1).evaluate().isNotEmpty,
         );
-        expect(find.text('18:00'), findsNWidgets(2));
-        expect(find.text('3 намерения в пути'), findsOneWidget);
+        expect(find.text('18:00'), findsOneWidget);
         expect(find.text(description), findsOneWidget);
-        expect(tester.widget<Checkbox>(checkbox).value, isTrue);
+        expect(dailyChoiceCompletionState(tester, checkbox).completed, isTrue);
         expect(done, findsOneWidget);
         expect(shownDailyChoiceCatalogDate(tester), durabilityChoiceDate);
         expect(shownDailyChoiceCatalogViewport(tester), viewport);
@@ -162,11 +162,10 @@ void main() {
           () =>
               todo.evaluate().isNotEmpty &&
               checkbox.evaluate().isNotEmpty &&
-              !tester.widget<Checkbox>(checkbox).value!,
+              !dailyChoiceCompletionState(tester, checkbox).completed,
         );
         expect(done, findsNothing);
-        expect(find.text('Приоритет P1'), findsOneWidget);
-        expect(find.text('3 намерения в пути'), findsOneWidget);
+        expect(_rowWith(DoablePriority.p1), findsOneWidget);
         expect(find.text(description), findsOneWidget);
         expect(router.current.name, route);
         expect(shownDailyChoiceCatalogViewport(tester), viewport);
@@ -176,6 +175,11 @@ void main() {
     );
   }
 }
+
+/// Карточка с приоритетом [priority].
+Finder _rowWith(DoablePriority priority) => find.byWidgetPredicate(
+  (widget) => widget is ChoiceRow && widget.priority == priority,
+);
 
 Future<void> _until(WidgetTester tester, bool Function() condition) async {
   for (var attempt = 0; attempt < 200 && !condition(); attempt++) {

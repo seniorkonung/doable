@@ -3028,12 +3028,12 @@ class AppLocalizationsEn extends AppLocalizations {
       'Could not load daily choices because of an unexpected error.';
 
   @override
-  String dailyChoiceCatalogPathIntentionCount(int count) {
+  String dailyChoiceCatalogPathStepCount(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count intentions in path',
-      one: '$count intention in path',
+      other: '$count steps in path',
+      one: '$count step in path',
     );
     return '$_temp0';
   }
@@ -3041,10 +3041,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String dailyChoiceCatalogCompletionLabel(
     int number,
-    String phrase,
-    String date,
+    String action,
+    String priority,
   ) {
-    return 'Completion of choice #$number. $phrase. $date';
+    return 'Completion of choice #$number. $action. $priority';
   }
 
   @override
@@ -3058,13 +3058,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dailyChoiceCompletionRefresh => 'Refresh choice';
 
   @override
-  String dailyChoiceCatalogRowLabel(
-    int number,
-    String phrase,
-    String date,
-    String completion,
-  ) {
-    return 'Choice #$number. $phrase. $date. $completion';
+  String dailyChoiceCatalogRowLabel(int number, String action) {
+    return 'Choice #$number. $action';
+  }
+
+  @override
+  String dailyChoiceCatalogRowSource(String source) {
+    return 'Source intention: $source';
+  }
+
+  @override
+  String dailyChoiceCatalogRowTime(String time) {
+    return 'At $time';
   }
 
   @override

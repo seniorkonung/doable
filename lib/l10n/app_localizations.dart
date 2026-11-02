@@ -4749,20 +4749,20 @@ abstract class AppLocalizations {
   /// **'Could not load daily choices because of an unexpected error.'**
   String get dailyChoiceCatalogUnexpected;
 
-  /// Число намерений сохранённого пути в карточке
+  /// Число шагов сохранённого пути в доступном названии карточки
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, one{{count} intention in path} other{{count} intentions in path}}'**
-  String dailyChoiceCatalogPathIntentionCount(int count);
+  /// **'{count, plural, one{{count} step in path} other{{count} steps in path}}'**
+  String dailyChoiceCatalogPathStepCount(int count);
 
-  /// Доступное название отдельного флажка с принадлежностью выбору; состояние сообщает сам флажок
+  /// Доступное название отдельного флажка с принадлежностью выбору и приоритетом; состояние сообщает сам флажок
   ///
   /// In en, this message translates to:
-  /// **'Completion of choice #{number}. {phrase}. {date}'**
+  /// **'Completion of choice #{number}. {action}. {priority}'**
   String dailyChoiceCatalogCompletionLabel(
     int number,
-    String phrase,
-    String date,
+    String action,
+    String priority,
   );
 
   /// Ожидание подтверждения записи выполнения рядом с карточкой
@@ -4783,16 +4783,23 @@ abstract class AppLocalizations {
   /// **'Refresh choice'**
   String get dailyChoiceCompletionRefresh;
 
-  /// Доступная подпись строки с порядковым номером текущей выдачи
+  /// Начало доступного названия строки с порядковым номером текущей выдачи
   ///
   /// In en, this message translates to:
-  /// **'Choice #{number}. {phrase}. {date}. {completion}'**
-  String dailyChoiceCatalogRowLabel(
-    int number,
-    String phrase,
-    String date,
-    String completion,
-  );
+  /// **'Choice #{number}. {action}'**
+  String dailyChoiceCatalogRowLabel(int number, String action);
+
+  /// Исходное намерение в доступном названии карточки
+  ///
+  /// In en, this message translates to:
+  /// **'Source intention: {source}'**
+  String dailyChoiceCatalogRowSource(String source);
+
+  /// Запланированное время в доступном названии карточки
+  ///
+  /// In en, this message translates to:
+  /// **'At {time}'**
+  String dailyChoiceCatalogRowTime(String time);
 
   /// Заголовок подробностей дневного выбора
   ///

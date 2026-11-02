@@ -390,18 +390,32 @@ void _expectCalendarSpacing(WidgetTester tester) {
 }
 
 Future<void> _scrollToLastRow(WidgetTester tester, Finder list) async {
-  final lastRow = find.byKey(const ValueKey('daily-choice-row-20'));
+  final lastRow = find.byKey(
+    const ValueKey('daily-choice-row-20'),
+    skipOffstage: false,
+  );
   expect(lastRow.hitTestable(), findsNothing);
   final viewport = tester.getRect(list);
-  await tester.dragFrom(viewport.center, const Offset(0, -10000));
-  await tester.pumpAndSettle();
+  // Длину ещё не построенных строк список оценивает, поэтому первый жест может
+  // остановиться раньше конца.
+  for (var drag = 0; drag < 2; drag++) {
+    await tester.dragFrom(viewport.center, const Offset(0, -10000));
+    await tester.pumpAndSettle();
+  }
   final last = tester.getRect(lastRow);
-  expect(last.intersect(viewport).height, greaterThan(0));
   final completedHeader = tester.getRect(
     find.byKey(const ValueKey('daily-choice-section-true')),
   );
   expect(last.bottom, closeTo(completedHeader.top, 0.01));
-  expect(completedHeader.bottom, closeTo(viewport.bottom, 0.01));
+  expect(completedHeader.bottom, closeTo(viewport.bottom - 72, 0.01));
+  // Свободное место и заголовок выше этой области, поэтому строка видна чуть
+  // раньше конца выдачи.
+  await tester.dragFrom(
+    viewport.center,
+    Offset(0, viewport.bottom - last.bottom),
+  );
+  await tester.pumpAndSettle();
+  expect(lastRow.hitTestable(), findsOneWidget);
 }
 
 void _expectCalendarTextsWhole(

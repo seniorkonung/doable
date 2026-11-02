@@ -68,7 +68,7 @@ void _completionLifecycleScenarios() {
       await tester.tap(checkbox);
       await tester.pump();
       await _until(tester, () => gate.hasEntered);
-      expect(tester.widget<Checkbox>(checkbox).value, isFalse);
+      expect(dailyChoiceCompletionState(tester, checkbox).completed, isFalse);
       await tester.binding.handlePopRoute();
       await _until(
         tester,
@@ -83,7 +83,7 @@ void _completionLifecycleScenarios() {
         tester,
         () =>
             checkbox.evaluate().isNotEmpty &&
-            tester.widget<Checkbox>(checkbox).value == true,
+            dailyChoiceCompletionState(tester, checkbox).completed,
       );
       final loaded =
           ready.container.read(rootProvider) as DailyChoiceCatalogLoaded;
@@ -118,7 +118,7 @@ void _completionLifecycleScenarios() {
       await openHome(tester);
       await openDailyChoices(tester, tap: _tap);
       await tester.pumpAndSettle();
-      expect(tester.widget<Checkbox>(checkbox).value, isTrue);
+      expect(dailyChoiceCompletionState(tester, checkbox).completed, isTrue);
       expect(message, findsNothing);
       expect(graph.commands, hasLength(1));
       expect(tester.takeException(), isNull);

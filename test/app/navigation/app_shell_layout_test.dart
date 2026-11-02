@@ -847,7 +847,8 @@ void _expectDateControlAboveKeyboard(WidgetTester tester, _Insets insets) {
   expect(find.byType(FloatingActionButton), findsNothing);
 }
 
-/// Выдача дневных выборов заканчивается у панели либо клавиатуры без зазора.
+/// Выдача дневных выборов заканчивается свободным местом в 72 у панели либо
+/// клавиатуры.
 void _expectDailyChoiceEnd(WidgetTester tester, Finder last, _Insets insets) {
   final completed = find.byKey(const ValueKey('daily-choice-section-true'));
   expect(
@@ -856,7 +857,7 @@ void _expectDailyChoiceEnd(WidgetTester tester, Finder last, _Insets insets) {
   );
   expect(
     tester.getRect(completed).bottom,
-    moreOrLessEquals(insets.contentBottom),
+    moreOrLessEquals(insets.contentBottom - 72),
   );
   expect(find.byType(FloatingActionButton), findsNothing);
 }

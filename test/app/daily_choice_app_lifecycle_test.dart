@@ -57,6 +57,7 @@ import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
 import '../support/quick_creation.dart';
+import '../support/daily_choice_catalog_controls.dart';
 
 part 'daily_choice_completion_lifecycle_scenarios.dart';
 
@@ -322,6 +323,7 @@ void main() {
       // Новый выбор относится к другому дню: человек выбирает этот день.
       await selectDailyChoiceCatalogDate(tester, createdDate, tap: _tap);
       await _tap(tester, find.byKey(const ValueKey('daily-choice-row-1')));
+      await tester.pumpAndSettle();
       expect(
         find.textContaining(createdDate.toCanonicalString()),
         findsWidgets,
@@ -761,7 +763,10 @@ void main() {
         findsOneWidget,
       );
       await showDailyChoiceCatalogSection(tester, true);
-      expect(_rowLabel(tester, 1), contains(_nextToday.toCanonicalString()));
+      expect(
+        find.byKey(const ValueKey('daily-choice-row-1'), skipOffstage: false),
+        findsOneWidget,
+      );
       expect(durabilityFileState(harness.databaseFile), stored);
 
       // Сохранённые прошлый и будущий выборы доступны выбором их дня.
@@ -781,7 +786,10 @@ void main() {
           tester,
           result.items.single.isCompleted,
         );
-        expect(_rowLabel(tester, 1), contains(date.toCanonicalString()));
+        expect(
+          find.byKey(const ValueKey('daily-choice-row-1'), skipOffstage: false),
+          findsOneWidget,
+        );
       }
       expect(second.catalogQueries.map(_conditions), [
         (_nextToday, false, false),
@@ -904,15 +912,6 @@ ScrollPosition _catalogPosition(WidgetTester tester) => tester
           .first,
     )
     .position;
-
-/// Подпись строки [number] выдачи каталога дневных выборов для экранного
-/// диктора.
-String _rowLabel(WidgetTester tester, int number) => tester
-    .widget<Semantics>(
-      find.byKey(ValueKey('daily-choice-row-$number'), skipOffstage: false),
-    )
-    .properties
-    .label!;
 
 /// Реальный адаптер, который записывает условия чтений выдачи каталога
 /// дневных выборов и дошедшие до хранилища команды.

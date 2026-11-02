@@ -19,6 +19,8 @@ import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calend
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_day.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
+import 'package:doable/src/design_system/components/choice_check.dart';
+import 'package:doable/src/design_system/components/choice_row.dart';
 import 'package:doable/src/design_system/components/day_heading.dart';
 import 'package:doable/src/design_system/components/day_mark.dart';
 import 'package:flutter/material.dart';
@@ -303,6 +305,26 @@ Future<void> _runCommand(
 /// календарный.
 bool _isBefore(CalendarDate a, CalendarDate b) =>
     a.toCanonicalString().compareTo(b.toCanonicalString()) < 0;
+
+/// Флажок выполнения на карточке каталога, когда карточка одна.
+///
+/// Карточку из нескольких шаг находит по её ключу выполнения.
+final dailyChoiceCompletionControl = find.byType(ChoiceCheck);
+
+/// Что показывает флажок выполнения [control]: выполнен ли выбор и можно ли
+/// сейчас изменить выполнение.
+///
+/// Шаг читает карточку вокруг флажка, поэтому сценарии не знают, каким
+/// виджетом каталог рисует флажок.
+({bool completed, bool enabled}) dailyChoiceCompletionState(
+  WidgetTester tester,
+  Finder control,
+) {
+  final row = tester.widget<ChoiceRow>(
+    find.ancestor(of: control, matching: find.byType(ChoiceRow)),
+  );
+  return (completed: row.done, enabled: row.onToggle != null);
+}
 
 /// Показывает только выбранную секцию, сохраняя дату и загруженные порции.
 Future<void> showDailyChoiceCatalogSection(

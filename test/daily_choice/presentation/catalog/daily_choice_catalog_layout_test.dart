@@ -18,6 +18,7 @@ import 'package:intl/intl.dart';
 
 import 'daily_choice_calendar_test_support.dart';
 import 'daily_choice_catalog_page_test_support.dart';
+import '../../../support/daily_choice_catalog_controls.dart';
 
 /// Узкий экран телефона.
 const _screen = Size(360, 780);
@@ -386,29 +387,22 @@ void main() {
           28,
         );
         await _expectWholeTexts(tester);
-        final checkbox = find.byType(Checkbox, skipOffstage: false);
+        final checkbox = find.byKey(
+          ValueKey('daily-choice-completion-${item.id.toCanonicalString()}'),
+          skipOffstage: false,
+        );
         await _dragUntilReachable(tester, checkbox);
         final rect = tester.getRect(checkbox);
         expect(rect.width, greaterThanOrEqualTo(kMinInteractiveDimension));
         expect(rect.height, greaterThanOrEqualTo(kMinInteractiveDimension));
-        expect(
-          find.text(_l10n(tester).dailyChoicePriorityOption('P2')),
-          findsOneWidget,
-        );
-        expect(
-          find.text(_l10n(tester).dailyChoiceCatalogPathIntentionCount(4)),
-          findsOneWidget,
-        );
         expect(find.text('Пояснение'), findsOneWidget);
         await tester.tap(checkbox);
         await tester.pump();
         expect(repository.completionCommands.single.choiceId, item.id);
         await _expectWholeTexts(tester);
-        final phrase = find.text(
-          _l10n(tester).dailyChoiceDetailsPhrase('Основание', 'Действие'),
-        );
-        await _dragUntilReachable(tester, phrase);
-        _expectTappable(tester, phrase);
+        final action = find.text('Действие');
+        await _dragUntilReachable(tester, action);
+        _expectTappable(tester, action);
         expect(tester.takeException(), isNull);
       });
 
@@ -840,8 +834,8 @@ void _expectReachable(WidgetTester tester, Finder finder) {
 }
 
 /// Последний элемент выдачи [finder] на прокрученной до конца странице
-/// заканчивается у верхнего края панели, и касание его видимой
-/// части достигает его. Длинная строка выше видимой части
+/// заканчивается над свободным местом в 72 у верхнего края панели, и касание
+/// его видимой части достигает его. Длинная строка выше видимой части
 /// страницы, поэтому целиком она видна только по частям при прокрутке.
 void _expectAtEnd(WidgetTester tester, Finder finder) {
   final area = _visibleArea(tester);
@@ -850,7 +844,10 @@ void _expectAtEnd(WidgetTester tester, Finder finder) {
     find.byKey(const ValueKey('daily-choice-section-true')),
   );
   expect(rect.bottom, moreOrLessEquals(lastHeader.top, epsilon: _epsilon));
-  expect(lastHeader.bottom, moreOrLessEquals(area.bottom, epsilon: _epsilon));
+  expect(
+    lastHeader.bottom,
+    moreOrLessEquals(area.bottom - 72, epsilon: _epsilon),
+  );
   expect(rect.bottom, greaterThan(area.top));
   _expectHit(tester, finder, rect.intersect(area).center);
 }

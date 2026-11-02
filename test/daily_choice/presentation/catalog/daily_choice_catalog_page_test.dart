@@ -43,6 +43,7 @@ import 'daily_choice_catalog_page_test_support.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
 import '../../../support/quick_creation.dart';
 import '../../../support/intention_type_counts.dart';
+import '../../../support/daily_choice_catalog_controls.dart';
 
 void main() {
   for (final onDate in [false, true]) {
@@ -81,20 +82,19 @@ void main() {
             true,
           ),
         );
-        expect(tester.widget<Checkbox>(checkbox).value, isFalse);
-        expect(tester.widget<Checkbox>(checkbox).onChanged, isNull);
+        expect(dailyChoiceCompletionState(tester, checkbox).completed, isFalse);
+        expect(dailyChoiceCompletionState(tester, checkbox).enabled, isFalse);
         expect(find.text('Сохраняем выполнение…'), findsOneWidget);
         expect(
-          tester
-              .widget<Checkbox>(
-                find.byKey(
-                  ValueKey(
-                    'daily-choice-completion-${first.id.toCanonicalString()}',
-                  ),
-                ),
-              )
-              .onChanged,
-          isNotNull,
+          dailyChoiceCompletionState(
+            tester,
+            find.byKey(
+              ValueKey(
+                'daily-choice-completion-${first.id.toCanonicalString()}',
+              ),
+            ),
+          ).enabled,
+          isTrue,
         );
         await tester.tap(checkbox);
         await tester.pump();
@@ -113,8 +113,8 @@ void main() {
           find.text('Выполнение сохранено. Обновляем каталог…'),
           findsOneWidget,
         );
-        expect(tester.widget<Checkbox>(checkbox).value, isFalse);
-        expect(tester.widget<Checkbox>(checkbox).onChanged, isNull);
+        expect(dailyChoiceCompletionState(tester, checkbox).completed, isFalse);
+        expect(dailyChoiceCompletionState(tester, checkbox).enabled, isFalse);
         repository.completeFirst(
           1,
           [first, catalogPageItem(2, date: day, isCompleted: true)],
@@ -122,7 +122,7 @@ void main() {
           revision: 1,
         );
         await tester.pumpAndSettle();
-        expect(tester.widget<Checkbox>(checkbox).value, isTrue);
+        expect(dailyChoiceCompletionState(tester, checkbox).completed, isTrue);
         await tester.tap(checkbox);
         await tester.pump();
         expect(repository.completionCommands.last.choiceId, second.id);
@@ -135,7 +135,7 @@ void main() {
             false,
           ),
         );
-        expect(tester.widget<Checkbox>(checkbox).value, isTrue);
+        expect(dailyChoiceCompletionState(tester, checkbox).completed, isTrue);
         await tester.tap(find.byKey(const ValueKey('daily-choice-row-2')));
         await tester.pump();
         expect(router.current.name, DailyChoiceDetailsRoute.name);
@@ -165,7 +165,7 @@ void main() {
       repository.completeFirst(0, [item], total: 1);
       await tester.pumpAndSettle();
       final l10n = lookupAppLocalizations(locale);
-      final checkbox = find.byType(Checkbox);
+      final checkbox = dailyChoiceCompletionControl;
       await tester.tap(checkbox);
       await tester.pump();
       repository.failCompletion(0, const DailyChoiceUnavailableFailure());
@@ -179,7 +179,7 @@ void main() {
             .claim,
         isNotNull,
       );
-      expect(tester.widget<Checkbox>(checkbox).value, isFalse);
+      expect(dailyChoiceCompletionState(tester, checkbox).completed, isFalse);
       await tester.tap(find.widgetWithText(TextButton, l10n.commonRetry));
       await tester.pump();
       expect(repository.completionCommands, hasLength(2));
@@ -192,7 +192,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text(l10n.dailyChoiceOperationConflict), findsOneWidget);
       expect(find.text(l10n.commonRetry), findsNothing);
-      expect(tester.widget<Checkbox>(checkbox).onChanged, isNull);
+      expect(dailyChoiceCompletionState(tester, checkbox).enabled, isFalse);
       await tester.tap(
         find.widgetWithText(
           TextButton,
@@ -203,7 +203,7 @@ void main() {
       repository.completeFirst(1, [item], total: 1);
       await tester.pumpAndSettle();
       expect(find.text(l10n.dailyChoiceOperationConflict), findsNothing);
-      expect(tester.widget<Checkbox>(checkbox).onChanged, isNotNull);
+      expect(dailyChoiceCompletionState(tester, checkbox).enabled, isTrue);
       expect(repository.completionCommands, hasLength(2));
     });
 
@@ -223,14 +223,14 @@ void main() {
       repository.completeFirst(0, [item], total: 1);
       await tester.pumpAndSettle();
       final l10n = lookupAppLocalizations(locale);
-      final checkbox = find.byType(Checkbox);
+      final checkbox = dailyChoiceCompletionControl;
       await tester.tap(checkbox);
       await tester.pump();
       repository.failCompletion(0, const DailyChoiceUnexpectedFailure());
       await tester.pumpAndSettle();
       expect(find.text(l10n.dailyChoiceOperationUnexpected), findsOneWidget);
       expect(find.text(l10n.commonRetry), findsNothing);
-      expect(tester.widget<Checkbox>(checkbox).onChanged, isNull);
+      expect(dailyChoiceCompletionState(tester, checkbox).enabled, isFalse);
 
       await tester.tap(
         find.widgetWithText(
@@ -243,8 +243,8 @@ void main() {
       repository.completeFirst(1, [item], total: 1);
       await tester.pumpAndSettle();
       expect(find.text(l10n.dailyChoiceOperationUnexpected), findsNothing);
-      expect(tester.widget<Checkbox>(checkbox).value, isFalse);
-      expect(tester.widget<Checkbox>(checkbox).onChanged, isNotNull);
+      expect(dailyChoiceCompletionState(tester, checkbox).completed, isFalse);
+      expect(dailyChoiceCompletionState(tester, checkbox).enabled, isTrue);
 
       await tester.tap(checkbox);
       await tester.pump();
@@ -350,7 +350,7 @@ void main() {
     repository.completeFirst([_item(1), _item(2)], total: 2);
     await tester.pumpAndSettle();
     expect(find.text('Всего дневных выборов: 2'), findsOneWidget);
-    expect(find.text('Чтобы Основание, я сегодня Действие'), findsNWidgets(2));
+    expect(find.text('Действие'), findsNWidgets(2));
     final semantics = tester.ensureSemantics();
     expect(
       tester
@@ -389,11 +389,11 @@ void main() {
         tester.getSemantics(completed).flagsCollection.isExpanded,
         Tristate.isTrue,
       );
-      expect(find.text('Чтобы Основание, я сегодня Действие'), findsOneWidget);
+      expect(find.text('Действие'), findsOneWidget);
       await tester.tap(incomplete);
       await tester.tap(completed);
       await tester.pumpAndSettle();
-      expect(find.text('Чтобы Основание, я сегодня Действие'), findsNothing);
+      expect(find.text('Действие'), findsNothing);
       expect(find.text('На этот день нет дневных выборов.'), findsNothing);
       expect(repository.queries, hasLength(1));
       expect(
@@ -417,7 +417,7 @@ void main() {
         tester.getSemantics(completed).flagsCollection.isExpanded,
         Tristate.isFalse,
       );
-      expect(find.text('Чтобы Основание, я сегодня Действие'), findsNothing);
+      expect(find.text('Действие'), findsNothing);
       semantics.dispose();
     },
   );
@@ -433,10 +433,7 @@ void main() {
       await _open(tester, repository);
       repository.completeFirst([_item(1)], total: 2, cursor: const _Cursor());
       await tester.pumpAndSettle();
-      expect(
-        find.text('Чтобы Основание, я сегодня Действие'),
-        findsNWidgets(2),
-      );
+      expect(find.text('Действие'), findsNWidgets(2));
       await tester.tap(
         find.byKey(const ValueKey('daily-choice-load-more-false')),
       );
@@ -455,10 +452,7 @@ void main() {
       repository.completeMore(2, [_item(4, completed: true)]);
       repository.completeMore(1, [_item(2)]);
       await tester.pumpAndSettle();
-      expect(
-        find.text('Чтобы Основание, я сегодня Действие'),
-        findsNWidgets(4),
-      );
+      expect(find.text('Действие'), findsNWidgets(4));
       expect(find.text('Всего дневных выборов: 4'), findsOneWidget);
     },
   );
@@ -768,11 +762,6 @@ void main() {
       expect(find.byKey(const ValueKey('daily-choice-row-1')), findsOneWidget);
       expect(find.byKey(const ValueKey('daily-choice-row-2')), findsNothing);
       expect(
-        find.textContaining(secondDay.toCanonicalString()),
-        findsOneWidget,
-      );
-      expect(find.textContaining(firstDay.toCanonicalString()), findsNothing);
-      expect(
         find.byKey(const ValueKey('daily-choice-load-more-false')),
         findsNothing,
       );
@@ -933,7 +922,7 @@ void main() {
     await tester.pump();
     repository.completeFirst([_item(1)], index: 1, total: 1);
     await tester.pumpAndSettle();
-    expect(find.text('To Основание, today I Действие'), findsOneWidget);
+    expect(find.text('Действие'), findsOneWidget);
   });
 }
 

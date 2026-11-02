@@ -458,7 +458,7 @@ void main() {
         ValueKey('daily-choice-completion-${tagFixtureId(changed)}'),
       );
       await _until(tester, completion);
-      expect(tester.widget<Checkbox>(completion).value, isFalse);
+      expect(dailyChoiceCompletionState(tester, completion).completed, isFalse);
       await _tap(tester, completion);
       // Существующая модель скрытого каталога согласуется до возврата.
       await _waitFor(tester, () {
@@ -619,12 +619,12 @@ void main() {
           mode: DailyChoiceCalendarMode.month,
         ),
       );
+      final completion = find.byKey(
+        ValueKey('daily-choice-completion-${tagFixtureId(changed)}'),
+      );
       expect(
-        find.descendant(
-          of: find.byKey(const ValueKey('daily-choice-row-1')),
-          matching: find.text(_completion(app.l10n, wasCompleted)),
-        ),
-        findsOneWidget,
+        dailyChoiceCompletionState(tester, completion).completed,
+        wasCompleted,
       );
       final before = _dailyChoiceParameters(tester, app);
 
@@ -635,9 +635,6 @@ void main() {
       await _closeTop(tester, DailyChoiceDetailsPage);
       // Флажок нажимается там, где он есть: прокрутка к нему изменила бы
       // позицию, которую проверяет тест.
-      final completion = find.byKey(
-        ValueKey('daily-choice-completion-${tagFixtureId(changed)}'),
-      );
       await _until(tester, completion);
       await tester.pumpAndSettle();
       await tester.tap(completion);
@@ -728,15 +725,11 @@ void main() {
             );
           }
         }
-        // Формулировка строки собирается из системных слов языка и прежних
-        // названий намерений.
+        // Карточка показывает прежние названия намерений на любом языке.
         expect(
           find.descendant(
             of: _dailyChoiceRows.hitTestable().first,
-            matching: find.text(
-              lookupAppLocalizations(resolved)
-                  .dailyChoiceDetailsPhrase(_activeTitle(1), _activeTitle(2)),
-            ),
+            matching: find.text(_activeTitle(2)),
           ),
           findsOneWidget,
           reason: reason,
@@ -1264,10 +1257,6 @@ final _dailyChoiceRows = find.byWidgetPredicate(
     _ => false,
   },
 );
-
-String _completion(AppLocalizations l10n, bool completed) =>
-    '${l10n.dailyChoiceDetailsDate(_choiceDate.toCanonicalString())} · '
-    '${completed ? l10n.dailyChoiceDetailsCompleted : l10n.dailyChoiceDetailsNotCompleted}';
 
 /// Сообщения общей поверхности в дереве, включая невыбранные вкладки.
 final _builtMessages = find.byKey(_message, skipOffstage: false);

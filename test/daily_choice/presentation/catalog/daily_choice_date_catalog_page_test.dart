@@ -55,7 +55,7 @@ void main() {
         repository.completeFirst(0, [item], total: 1);
         repository.completeDayStatuses(0, {});
         await tester.pumpAndSettle();
-        await tester.tap(find.byType(Checkbox));
+        await tester.tap(dailyChoiceCompletionControl);
         await tester.pump();
         if (closePage) {
           await _back(tester);
@@ -75,9 +75,12 @@ void main() {
           await openDailyChoices(tester);
         }
         await tester.pumpAndSettle();
-        final checkbox = tester.widget<Checkbox>(find.byType(Checkbox));
-        expect(checkbox.value, isFalse);
-        expect(checkbox.onChanged, isNotNull);
+        final checkbox = dailyChoiceCompletionState(
+          tester,
+          dailyChoiceCompletionControl,
+        );
+        expect(checkbox.completed, isFalse);
+        expect(checkbox.enabled, isTrue);
         expect(find.byType(OperationFailurePresentation), findsNothing);
         expect(find.byType(SnackBar), findsNothing);
         expect(repository.completionCommands, hasLength(1));
@@ -117,7 +120,7 @@ void main() {
         ], total: 1);
         repository.completeDayStatuses(0, {});
         await tester.pumpAndSettle();
-        await tester.tap(find.byType(Checkbox));
+        await tester.tap(dailyChoiceCompletionControl);
         await tester.pump();
         if (!presented) {
           tester.binding.handleAppLifecycleStateChanged(
@@ -157,8 +160,11 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.byType(OperationFailurePresentation), findsNothing);
         expect(
-          tester.widget<Checkbox>(find.byType(Checkbox)).onChanged,
-          isNotNull,
+          dailyChoiceCompletionState(
+            tester,
+            dailyChoiceCompletionControl,
+          ).enabled,
+          isTrue,
         );
         expect(find.byType(SnackBar), findsNothing);
         expect(repository.completionCommands, hasLength(1));
@@ -191,7 +197,7 @@ void main() {
         repository.completeFirst(0, [item], total: 1);
         repository.completeDayStatuses(0, {});
         await tester.pumpAndSettle();
-        await tester.tap(find.byType(Checkbox));
+        await tester.tap(dailyChoiceCompletionControl);
         await tester.pump();
         if (changeDate) {
           await tester.tap(calendarDay(next));
@@ -203,7 +209,7 @@ void main() {
           );
         }
         await tester.pumpAndSettle();
-        expect(find.byType(Checkbox), findsNothing);
+        expect(dailyChoiceCompletionControl, findsNothing);
         repository.failCompletion(0, const DailyChoiceUnavailableFailure());
         await tester.pumpAndSettle();
         expect(find.byType(SnackBar), findsOneWidget);
@@ -224,9 +230,12 @@ void main() {
           );
         }
         await tester.pumpAndSettle();
-        final checkbox = tester.widget<Checkbox>(find.byType(Checkbox));
-        expect(checkbox.value, isFalse);
-        expect(checkbox.onChanged, isNotNull);
+        final checkbox = dailyChoiceCompletionState(
+          tester,
+          dailyChoiceCompletionControl,
+        );
+        expect(checkbox.completed, isFalse);
+        expect(checkbox.enabled, isTrue);
         expect(find.byType(OperationFailurePresentation), findsNothing);
         expect(find.byType(SnackBar), findsNothing);
         expect(repository.completionCommands, hasLength(1));
@@ -252,7 +261,7 @@ void main() {
       repository.completeFirst(0, [item], total: 1);
       repository.completeDayStatuses(0, {});
       await tester.pumpAndSettle();
-      final checkbox = find.byType(Checkbox);
+      final checkbox = dailyChoiceCompletionControl;
       await tester.tap(checkbox);
       await tester.pump();
       await openHome(tester);
@@ -269,13 +278,13 @@ void main() {
       await openDailyChoices(tester);
       await tester.pumpAndSettle();
       expect(find.byType(OperationFailurePresentation), findsNothing);
-      expect(tester.widget<Checkbox>(checkbox).onChanged, isNull);
+      expect(dailyChoiceCompletionState(tester, checkbox).enabled, isFalse);
       await tester.tap(find.widgetWithText(TextButton, 'Обновить выбор'));
       await tester.pump();
       repository.completeFirst(1, [item], total: 1);
       await tester.pumpAndSettle();
-      expect(tester.widget<Checkbox>(checkbox).value, isFalse);
-      expect(tester.widget<Checkbox>(checkbox).onChanged, isNotNull);
+      expect(dailyChoiceCompletionState(tester, checkbox).completed, isFalse);
+      expect(dailyChoiceCompletionState(tester, checkbox).enabled, isTrue);
       expect(find.byType(OperationFailurePresentation), findsNothing);
       expect(find.byType(SnackBar), findsNothing);
       expect(repository.completionCommands, hasLength(1));
@@ -617,7 +626,10 @@ void main() {
       catalogPageItem(51, date: selected, isCompleted: true),
     ]);
     await tester.pumpAndSettle();
-    final row = find.byKey(const ValueKey('daily-choice-row-50'));
+    final row = find.byKey(
+      const ValueKey('daily-choice-row-50'),
+      skipOffstage: false,
+    );
     await tester.ensureVisible(row);
     await tester.pumpAndSettle();
     final position = tester.getTopLeft(row).dy;

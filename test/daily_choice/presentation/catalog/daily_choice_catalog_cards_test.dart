@@ -3,6 +3,12 @@ import 'package:doable/src/daily_choice/domain/daily_choice_description.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
+import 'package:doable/src/design_system/components/choice_check.dart';
+import 'package:doable/src/design_system/components/choice_row.dart';
+import 'package:doable/src/design_system/components/reason_chain.dart';
+import 'package:doable/src/design_system/doable_colors.dart';
+import 'package:doable/src/design_system/doable_priority.dart';
+import 'package:doable/src/design_system/doable_type.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -223,14 +229,23 @@ void main() {
     );
 
     testWidgets(
-      'крупная карточка показывает время, приоритет и размер пути, ограничивая только описание (${locale.languageCode})',
+      'крупная карточка показывает путь цепочкой и только свои тексты, а время, шаги и приоритет называет диктору (${locale.languageCode})',
       (tester) async {
+        final semantics = tester.ensureSemantics();
         tester.platformDispatcher.textScaleFactorTestValue = 2;
         addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
         final repository = CatalogPageRepository();
         final day = date(2026, 10, 8);
         final description = DailyChoiceDescription.fromInput(
           List.filled(60, 'Полное описание выбора').join(' '),
+        );
+        final item = catalogPageItem(
+          1,
+          date: day,
+          schedule: DailyChoiceTime(hour: 18, minute: 0),
+          priority: DailyChoicePriority.p2,
+          description: description,
+          pathIntentionCount: 4,
         );
         await pumpCatalogPage(
           tester,
@@ -239,16 +254,7 @@ void main() {
           locale: locale,
           size: const Size(360, 900),
         );
-        repository.completeFirst(0, [
-          catalogPageItem(
-            1,
-            date: day,
-            schedule: DailyChoiceTime(hour: 18, minute: 0),
-            priority: DailyChoicePriority.p2,
-            description: description,
-            pathIntentionCount: 4,
-          ),
-        ], total: 1);
+        repository.completeFirst(0, [item], total: 1);
         await tester.pumpAndSettle();
         final context = tester.element(find.byType(DailyChoiceCalendar));
         final l10n = AppLocalizations.of(context);
@@ -262,31 +268,99 @@ void main() {
         await tester.scrollUntilVisible(text, 300, scrollable: scrollable);
         expect(tester.widget<Text>(text).maxLines, 2);
         expect(tester.widget<Text>(text).overflow, TextOverflow.ellipsis);
-        expect(find.text(l10n.dailyChoicePriorityOption('P2')), findsOneWidget);
         expect(
-          find.text(
-            locale.languageCode == 'ru'
-                ? '4 намерения в пути'
-                : '4 intentions in path',
-          ),
-          findsOneWidget,
+          tester
+              .widgetList<Text>(
+                find.descendant(
+                  of: find.byType(ChoiceRow),
+                  matching: find.byType(Text),
+                ),
+              )
+              .map((text) => text.data),
+          ['Основание', 'Действие', description.value],
         );
-        final row = tester.widget<Semantics>(
-          find.byKey(const ValueKey('daily-choice-row-1')),
-        );
+        final chain = tester.widget<ReasonChain>(find.byType(ReasonChain));
+        expect(chain.reasons, 3);
+        expect(chain.priority, DoablePriority.p2);
         expect(
-          row.properties.label,
-          contains(const TimeOfDay(hour: 18, minute: 0).format(context)),
+          tester.widget<ChoiceCheck>(find.byType(ChoiceCheck)).priority,
+          DoablePriority.p2,
         );
+        final row = tester
+            .getSemantics(find.byKey(const ValueKey('daily-choice-row-1')))
+            .label;
+        final time = const TimeOfDay(hour: 18, minute: 0).format(context);
+        expect(row, contains(l10n.dailyChoiceCatalogRowTime(time)));
+        expect(row, contains(l10n.dailyChoiceCatalogPathStepCount(3)));
+        expect(row, contains(description.value));
         expect(
-          row.properties.label,
+          tester
+              .getSemantics(
+                find.byKey(
+                  ValueKey(
+                    'daily-choice-completion-${item.id.toCanonicalString()}',
+                  ),
+                ),
+              )
+              .label,
           contains(l10n.dailyChoicePriorityOption('P2')),
         );
-        expect(row.properties.label, contains(description.value));
         expect(tester.takeException(), isNull);
+        semantics.dispose();
       },
     );
   }
+
+  testWidgets('подпись группы стоит на 6 над первой строкой, строки группы — '
+      'через 8, группы — через 16, а первая группа идёт сразу за заголовком '
+      'секции', (tester) async {
+    final repository = CatalogPageRepository();
+    final day = date(2026, 10, 8);
+    final morning = DailyChoiceTime(hour: 9, minute: 0);
+    final evening = DailyChoiceTime(hour: 18, minute: 0);
+    await pumpCatalogPage(
+      tester,
+      repository,
+      today: day,
+      locale: const Locale('ru'),
+      size: const Size(360, 900),
+    );
+    repository.completeFirst(0, [
+      catalogPageItem(1, date: day, schedule: morning),
+      catalogPageItem(2, date: day, schedule: morning),
+      catalogPageItem(3, date: day, schedule: evening),
+    ], total: 3);
+    await tester.pumpAndSettle();
+    final context = tester.element(find.byType(DailyChoiceCalendar));
+    final morningLabel = find.text(
+      const TimeOfDay(hour: 9, minute: 0).format(context),
+    );
+    final eveningLabel = find.text(
+      const TimeOfDay(hour: 18, minute: 0).format(context),
+    );
+    Rect row(int number) =>
+        tester.getRect(find.byKey(ValueKey('daily-choice-row-$number')));
+
+    expect(
+      tester.getTopLeft(morningLabel).dy,
+      tester
+          .getBottomLeft(
+            find.byKey(const ValueKey('daily-choice-section-false')),
+          )
+          .dy,
+    );
+    expect(row(1).top - tester.getBottomLeft(morningLabel).dy, 6);
+    expect(row(2).top - row(1).bottom, 8);
+    expect(tester.getTopLeft(eveningLabel).dy - row(2).bottom, 16);
+    expect(row(3).top - tester.getBottomLeft(eveningLabel).dy, 6);
+
+    final style = tester.widget<Text>(morningLabel).style!;
+    expect(style.fontSize, DoableType.label.fontSize);
+    expect(style.fontWeight, DoableType.label.fontWeight);
+    expect(style.height, DoableType.label.height);
+    expect(style.color, DoableColors.light.muted);
+    expect(style.fontFeatures, const [FontFeature.tabularFigures()]);
+  });
 }
 
 /// Число подписей групп с названием [label] в дереве семантики.

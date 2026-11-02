@@ -57,6 +57,8 @@ void main() {
       ValueKey('daily-choice-completion-${app.choice.toCanonicalString()}'),
     );
     await _until(tester, completion);
+    // Флажок стоит у левого края и уходит за него, пока идёт переход страницы.
+    await tester.pump(const Duration(seconds: 1));
     await tester.tap(completion);
     await _until(tester, dailyChoiceCatalogDayMark(_today, mark: DayMark.done));
 

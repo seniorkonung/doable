@@ -182,12 +182,7 @@ void _catalogNavigationScenarios() {
       // Выбор по прямому пути 1 → 4 не засчитан намерению 2, но доступен в каталоге дня.
       await showDailyChoiceCatalogSection(tester, true);
       await tester.pumpAndSettle();
-      expect(
-        find.text(
-          app.texts.dailyChoiceDetailsPhrase('Намерение 1', 'Намерение 4'),
-        ),
-        findsOneWidget,
-      );
+      expect(find.text('Намерение 4'), findsOneWidget);
       await _openChoiceRow(tester, 1);
       expect(
         find.text('${app.texts.dailyChoiceDetailsSelectedAction}: Намерение 4'),
@@ -207,7 +202,7 @@ void _catalogNavigationScenarios() {
       await tester.ensureVisible(completion);
       await tester.pumpAndSettle();
       final secondOffset = _catalogScroll(tester).position.pixels;
-      expect(tester.widget<Checkbox>(completion).value, isTrue);
+      expect(dailyChoiceCompletionState(tester, completion).completed, isTrue);
       await tester.tap(completion);
       for (final (provider, count) in [
         (root, 121),
@@ -379,7 +374,7 @@ void _catalogNavigationScenarios() {
       final completion = find.byKey(
         ValueKey('daily-choice-completion-${durabilityUuid(201)}'),
       );
-      expect(tester.widget<Checkbox>(completion).value, isTrue);
+      expect(dailyChoiceCompletionState(tester, completion).completed, isTrue);
       await tester.tap(completion);
       await _wait(
         tester,

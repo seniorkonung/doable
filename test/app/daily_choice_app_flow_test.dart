@@ -296,11 +296,11 @@ void main() {
         ValueKey('daily-choice-completion-${editedId.toCanonicalString()}'),
       );
       await _until(tester, completion);
-      expect(tester.widget<Checkbox>(completion).value, isTrue);
+      expect(dailyChoiceCompletionState(tester, completion).completed, isTrue);
       await _tap(tester, completion);
       await showDailyChoiceCatalogSection(tester, false);
       await _until(tester, completion);
-      expect(tester.widget<Checkbox>(completion).value, isFalse);
+      expect(dailyChoiceCompletionState(tester, completion).completed, isFalse);
       await _tap(tester, find.byKey(const ValueKey('daily-choice-row-1')));
       await _until(tester, find.byType(DailyChoiceDetailsPage));
       final changed = await _read(repository, editedId);
