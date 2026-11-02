@@ -1005,3 +1005,180 @@
   - **Зависимости:** нет.
   - **Предполагаемые файлы:** меняются `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации.
   - **Размер:** XS.
+
+## Phase 4: Человек достраивает связи, не теряя контекста
+
+- [ ] 4.1 Первая порция поиска участника считает активные намерения с точно таким названием
+  - **Критерии приёмки:**
+    - `IntentionCatalogFirstPage` несёт `exactTitleCount` в ответ на запрос с пробой пары и фильтром названия. Другие запросы подсчёта не делают, а их порция числа не несёт.
+    - Подсчёт идёт в снимке этой порции по `title_search_key` среди активных намерений и не зависит от условий по тегам, типа, исключения намерения страницы и границы порции. Архивированное намерение не считается.
+    - Число нужно вместо признака: уход одного из одноимённых намерений иначе нельзя согласовать без нового чтения.
+  - **Проверка:**
+    - `drift_intention_catalog_test.dart` на настоящем хранилище покрывает совпадение без учёта регистра, за границей порции, скрытое условиями и у намерения страницы, а также архивированное намерение.
+    - `mise exec --no-deps -- flutter test test/intention/data/drift_intention_catalog_test.dart test/intention/application/intention_contract_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** меняются `lib/src/intention/application/intention_catalog.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `test/intention/data/drift_intention_catalog_test.dart`.
+  - **Размер:** S.
+
+- [ ] 4.2 Выдача поиска участника знает, предлагать ли создание, и следует подтверждённым изменениям
+  - **Критерии приёмки:**
+    - `IntentionCatalogConfirmedState` хранит число из порции и отдаёт название для строки «Создать» без окружающих пробелов, только пока фильтр названия непуст, а число равно нулю. Все состояния, которые модель собирает заново, включая `IntentionCatalogEmpty`, число сохраняют.
+    - `IntentionTitleFilter` сравнивает название целиком тем же `titleSearchKey`. Модель поправляет число на каждую мутацию по снимкам «до» и «после»: активное намерение с точно этим названием считается независимо от соответствия выдаче, поэтому переименование намерения страницы тоже учитывается.
+    - Поправка не начинает новую выдачу и сохраняет позицию: единственным исключением остаётся требование «Причина занятой пары в поиске участника».
+    - Подтверждено: переименование в подстроку убирает предложение, архивирование, удаление или переименование единственного совпадения возвращает его, уход одного из двух одноимённых не возвращает, а пакет ревизии, уже отражённой порцией, не считается второй раз.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog test/intention/presentation/search test/intention/presentation/picker`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 4.1.
+  - **Предполагаемые файлы:** меняются `lib/src/intention/application/intention_catalog.dart`, `lib/src/intention/presentation/catalog/intention_catalog_state.dart`, `intention_catalog_view_model.dart`, `test/intention/presentation/catalog/intention_catalog_mutation_reconciliation_test.dart`.
+  - **Размер:** S.
+
+- [ ] 4.3 Панель создания намерения запускается закрытым контекстом и завершается по его варианту
+  - **Критерии приёмки:**
+    - `IntentionEditorRoute` принимает закрытый тип запуска. Самостоятельный вариант стоит по умолчанию и ведёт себя как прежде: существующие проверки панели не меняются. Вариант для поиска несёт начальное название и обработчик созданного намерения, а флагов нет.
+    - Начальное название стоит в поле и черновике и считается начальным значением: без правок панель закрывается сразу, а сохранение доступно. Под заголовком варианта для поиска стоит «Сразу отмечается для новых связей» на обоих языках. Остальной вид панели не меняется.
+    - Успех живой сессии варианта для поиска удаляет только маршрут панели вместе с её подтверждением ухода и один раз передаёт обработчику идентификатор и название. Страница намерения не открывается, а история под панелью сохраняется.
+    - После подтверждённого ухода поздний успех обработчик не вызывает и текущую страницу не меняет.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/intention/presentation/editor test/app/quick_creation test/app/intention_creation_sheet_integration_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - новый `lib/src/intention/presentation/editor/intention_creation_launch.dart`;
+    - меняются `intention_editor_page.dart`, `intention_editor_state.dart`, `intention_editor_view_model.dart` с созданным файлом, `lib/src/app/routing/app_router.gr.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
+    - меняются `test/intention/presentation/editor/intention_editor_page_test.dart`, `intention_editor_view_model_test.dart`.
+  - **Размер:** M.
+
+- [ ] 4.4 Живая сессия панели из поиска объявляет «Намерение создано и отмечено»
+  - **Критерии приёмки:**
+    - Сессия варианта для поиска сообщает координатору о своём запуске при `acceptCreation`. Завершение определяет сообщение в момент успеха: пока право инициатора не освобождено, цель операции — создание для поиска, а после `releaseInitiatorPresentation` — обычное создание. Различие задаёт закрытый вариант цели, а не флаг.
+    - Общий шаблон сообщения называет исход «Намерение создано и отмечено.» и «Intention created and chosen.». Самостоятельное создание и поздний успех покинутой панели называют прежний `editorCreated`. Сообщение предъявляется один раз.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `graph_operation_presenter_test.dart` на настоящем координаторе покрывает успех живой сессии и успех после освобождения права на обоих языках.
+    - `mise exec --no-deps -- flutter test test/graph/presentation/graph_operation_presenter_test.dart test/graph/application test/intention/presentation/editor/intention_editor_view_model_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 4.3.
+  - **Предполагаемые файлы:** меняются `lib/src/graph/application/graph_command_coordinator.dart`, `lib/src/graph/presentation/graph_operation_presenter.dart`, `lib/src/intention/presentation/editor/intention_editor_view_model.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации, `test/graph/presentation/graph_operation_presenter_test.dart`.
+  - **Размер:** S.
+
+- [ ] 4.5 Модель отметок принимает созданное намерение, а подтверждение закрытия называет созданные намерения
+  - **Критерии приёмки:**
+    - `RelationBatchViewModel` ставит созданное намерение отмеченным последним и снимает показанный отказ добавления. С этого момента состояние помнит до конца поиска, что в нём создавались намерения, даже если отметку потом сняли. Поздний успех покинутой панели модель не меняет.
+    - Подтверждение закрытия после числа связей называет «Созданные намерения останутся в каталоге.» и английский текст только в этом случае: сценарий «Подтверждение называет связи и созданные намерения», включая «Продолжить выбор» с теми же отметками.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/batch_picker`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** меняются `lib/src/long_term_relation/presentation/batch_picker/relation_batch_view_model.dart`, `relation_batch_state.dart`, `relation_batch_picker_page.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации, тесты `test/long_term_relation/presentation/batch_picker/`.
+  - **Размер:** S.
+
+- [ ] 4.6 Экран выбора с отметками показывает плюс в шапке и строку «Создать» над выдачей
+  - **Критерии приёмки:**
+    - `TopBar.withPurpose` принимает `action`, а `TopBarAction` — мини-значок: плюс с `intentionMini` как в `NavBar` по README `TopBar`, область нажатия 44. Заголовок и строка назначения не меняются.
+    - `IntentionPickerCheckable` несёт обработчик создания, поэтому плюс и строка есть только в варианте отметок. У поисков дневного выбора их нет, а их тесты не меняются.
+    - `IntentionSearchList` показывает первым элементом `TagCreateRow` «Создать «название»» выше строк и пустого состояния, пока подтверждённая выдача из 4.2 предлагает создание. В паузе ввода, при загрузке и отказе строки нет. Длинное название переносится, тексты есть на обоих языках.
+    - Экран по просьбе страницы очищает поле и фильтр названия одним действием и сохраняет условия по тегам.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/design_system/top_bar_test.dart test/intention/presentation/picker test/intention/presentation/search test/daily_choice/presentation/action_picker test/daily_choice/presentation/source_picker`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 4.2.
+  - **Предполагаемые файлы:** меняются `lib/src/design_system/components/top_bar.dart`, `lib/src/intention/presentation/search/intention_search_list.dart`, `lib/src/intention/presentation/picker/intention_picker_view.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации, `test/design_system/top_bar_test.dart`, `test/intention/presentation/search/intention_search_list_test.dart`, `test/intention/presentation/picker/intention_picker_view_test.dart`.
+  - **Размер:** M.
+
+- [ ] 4.7 Намерение создаётся прямо в поиске участника и сразу отмечено
+  - **Критерии приёмки:**
+    - Плюс открывает панель с пустым названием, а строка «Создать» — с названием из подстроки. Повторное нажатие до закрытия панели второй панели не открывает. Пока добавление выполняется, панель не открывается.
+    - Обработчик созданного намерения ставит отметку через 4.5 и очищает подстроку через 4.6. Поздний успех покинутой панели отметку не ставит и подстроку не меняет.
+    - Сквозные сценарии на настоящем хранилище подтверждают «Намерение из подстроки сразу отмечено» и «Точное совпадение убирает строку создания». Намерение, созданное в поиске, остаётся в каталоге после сброса отметок.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/batch_picker test/app/long_term_relation_app_flow_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 4.3, 4.4, 4.5, 4.6.
+  - **Предполагаемые файлы:** меняются `lib/src/long_term_relation/presentation/batch_picker/relation_batch_picker_page.dart`, `test/long_term_relation/presentation/batch_picker/relation_batch_picker_page_test.dart`, `test/app/long_term_relation_app_flow_test.dart`.
+  - **Размер:** S.
+
+- [ ] 4.8 Над поиском участника нет панели навигации, «Добавить» и запуска дневного выбора
+  - **Критерии приёмки:**
+    - Одна функция в `lib/src/app/navigation/` определяет при построении, лежит ли `RelationBatchPickerRoute` в корневом стеке ниже маршрута самой страницы, сравнивая `matchId`. Подписки на стек и передачи контекста через переходы нет.
+    - `OrdinaryPageScaffold` над поиском панель не показывает: это подтверждено для страницы намерения, подробного просмотра дневного выбора и каталога на дату.
+    - Страница намерения над поиском не показывает «Добавить» групп и оба запуска дневного выбора. Группа показывает подсказку без действия, как у архивированного намерения.
+    - Страница под поиском, которая перестроилась при открытом поиске, показывает панель и «Добавить» и после успешного добавления, и после закрытия поиска крестиком.
+    - Подтверждено отсутствие панели и действий в сценариях «Страницы над поиском участника скрывают панель» и «Страница глубже первой не даёт потерять отметки», а «назад» возвращает через обе страницы в поиск с прежними отметками.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app/navigation test/intention/presentation/details test/daily_choice/presentation/details test/daily_choice/presentation/catalog test/long_term_relation/presentation/intention_relations test/long_term_relation/presentation/batch_picker`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - новый `lib/src/app/navigation/relation_picker_position.dart`;
+    - меняются `lib/src/app/navigation/ordinary_page_scaffold.dart`, `lib/src/intention/presentation/details/intention_details_page.dart`, `lib/src/long_term_relation/presentation/intention_relations/intention_relations_sliver.dart`;
+    - меняются `test/app/navigation/app_shell_page_matrix.dart`, `app_shell_pages_above_test.dart`.
+  - **Размер:** M.
+
+- [ ] 4.9 Страница, открытая стрелкой поиска, ставит и снимает отметку
+  - **Критерии приёмки:**
+    - `IntentionDetailsRoute` принимает необязательный контекст строки: модель отметок, группу, пробу и занимающую связь. Его передаёт только стрелка поиска участника. На месте панели такая страница показывает `DockedFooter`, а без данных намерения кнопки нет.
+    - Свободное неотмеченное намерение получает основную «Добавить к выбранным», отмеченное — тихую «Убрать из выбранных». Нажатие меняет отметку и возвращает поиск с прежними параметрами и позицией: сценарий «Отметка со страницы намерения».
+    - Занятое намерение получает недоступную кнопку с причиной: сценарий «Занятая строка показывает причину на кнопке». Причина следует подтверждённым фактам своей подпиской через `reconcilePairOccupants`, а не загруженной выдаче: переименование, уводящее строку из выдачи, причину не снимает, а удаление связи снимает.
+    - Пока намерение архивировано, кнопка недоступна и называет «Намерение в архиве», в том числе у занятого: сценарий «Архивированное намерение нельзя отметить со страницы». После восстановления на этой же странице она снова предлагает «Добавить к выбранным» или причину занятости, а снятая отметка не возвращается.
+    - Страница глубже первой кнопки не имеет. Тексты есть на обоих языках.
+  - **Проверка:**
+    - `mise run codegen`.
+    - Сквозной тест на настоящем хранилище подтверждает архивирование и восстановление на странице из поиска.
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/batch_picker test/intention/presentation/details test/app/navigation test/app/long_term_relation_app_flow_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 4.8 — кнопка стоит на месте снятой панели.
+  - **Предполагаемые файлы:**
+    - новый `lib/src/long_term_relation/presentation/batch_picker/relation_batch_page_footer.dart`;
+    - меняются `relation_batch_picker_page.dart`, `lib/src/intention/presentation/details/intention_details_page.dart`, `lib/src/app/navigation/ordinary_page_scaffold.dart`, `lib/src/app/routing/app_router.gr.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
+    - меняются `test/long_term_relation/presentation/batch_picker/relation_batch_picker_page_test.dart`, `test/app/long_term_relation_app_flow_test.dart`.
+  - **Размер:** M.
+
+- [ ] 4.10 Модель пути перечитывает продолжения при новой ревизии, а конфликт даёт только изменённый путь
+  - **Критерии приёмки:**
+    - При более новой ревизии `ChoicePathEmpty` и `ChoicePathData` без действия человека переходят в `ChoicePathLoading` с прежними черновиком и видимым путём и читают первую порцию, поэтому до ответа прежний снимок подтвердить нельзя. Работает своя подписка модели, в том числе когда выбор закрыт страницей сверху.
+    - Успешный ответ показывает продолжения или тупик с прежним путём, а `ChoicePathContinuationSnapshotExpired` первой порции даёт `ChoicePathConflict` с кнопкой обновления.
+    - Ответ первой порции старше известной ревизии начинает чтение заново. Порция продолжения с другой ревизией или с истёкшим курсором тоже начинает чтение первой порции, и конфликт решает только её ответ: завершение могло прийти позже записи.
+    - Смена эпохи графа и утрата активности или готовности начального намерения по-прежнему дают конфликт.
+    - Тесты, ждавшие конфликта от самой ревизии, в `choice_path_view_model_test.dart` и `choice_path_page_test.dart` выражены новым правилом. Покрыты две ревизии подряд во время чтения и обе причины перечитывания из `loadMore`.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** меняются `lib/src/daily_choice/presentation/path/choice_path_view_model.dart`, `test/daily_choice/presentation/path/choice_path_view_model_test.dart`, `choice_path_page_test.dart`.
+  - **Размер:** M.
+
+- [ ] 4.11 Тупик пошагового выбора ведёт на нужную группу связей, а добавленные связи становятся продолжениями
+  - **Критерии приёмки:**
+    - `ChoicePathEmpty` при всех назначениях страницы показывает под объяснением кнопку «Открыть связи» и английский текст. Она открывает обычную страницу намерения `current` на вкладке «Связи»: при выборе сверху вниз с группой «Нужно», снизу вверх — «Нужно для». «Назад» возвращает выбор с прежним путём.
+    - Сквозные тесты на настоящем хранилище подтверждают «Добавленная связь становится продолжением» по исходу: после возврата без действий человека продолжение предложено с прежним путём, а не только получена ревизия. Подтверждён сценарий «Тупик выбора снизу вверх открывает группу «Нужно для»».
+    - После нескольких изменений на странице из тупика (связь добавлена и ей задан приоритет, добавлена вторая связь или добавленная удалена) возврат без действий человека показывает актуальные продолжения либо тупик с прежним путём и без конфликта.
+    - Изменение пути, пока выбор стоит в тупике или показывает строки, даёт конфликт с кнопкой обновления.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/path test/app/choice_path_dead_end_app_flow_test.dart test/app/daily_choice_app_flow_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 4.10.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/daily_choice/presentation/path/choice_path_page.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
+    - новый `test/app/choice_path_dead_end_app_flow_test.dart`, меняется `test/daily_choice/presentation/path/choice_path_page_test.dart`.
+  - **Размер:** M.
+
+- [ ] 4.12 Проверить готовность фазы: все сценарии изменения подтверждены без устройства
+  - **Критерии приёмки:**
+    - Каждый сценарий дельт спецификаций изменения подтверждён автоматической проверкой.
+    - «Добавленная связь становится продолжением» подтверждён по исходу, а несколько изменений на странице из тупика не дают конфликта. Изменение пути, пока выбор стоит в тупике или показывает строки, даёт конфликт с кнопкой обновления.
+    - Страница под поиском, которая перестроилась при открытом поиске, показывает панель и «Добавить» и после успешного добавления, и после закрытия поиска крестиком.
+    - Намерение, архивированное на странице из поиска, показывает недоступную кнопку «Намерение в архиве» и не отмечается, а после восстановления кнопка снова предлагает «Добавить к выбранным» без возврата снятой отметки.
+    - Ручные проверки на устройстве остаются за владельцем продукта.
+  - **Проверка:**
+    - `mise run codegen-check`.
+    - `mise run check`.
+    - `mise exec --no-deps -- openspec validate add-relations-in-batches --strict`.
+  - **Зависимости:** 4.1–4.11.
+  - **Предполагаемые файлы:** нет (только проверка).
+  - **Размер:** XS.
