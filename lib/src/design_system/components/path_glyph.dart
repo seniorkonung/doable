@@ -4,8 +4,9 @@ import 'package:flutter/material.dart';
 
 import 'relation_stroke.dart';
 
-/// Форма глифа пути: ромб — исходное намерение связи, кольцо — связанное.
-enum PathGlyphShape { diamond, ring }
+/// Форма глифа пути: ромб — исходное намерение связи, кольцо — связанное,
+/// круг — выбранное действие.
+enum PathGlyphShape { diamond, ring, circle }
 
 /// Контур глифа: сплошной — место заполнено, пунктирный — ещё не выбрано.
 enum PathGlyphOutline { solid, dashed }
@@ -73,7 +74,11 @@ final class _PathGlyphPainter extends CustomPainter {
             ..strokeWidth = _outlineWidth * scale
             ..strokeJoin = StrokeJoin.round,
         );
-      case (PathGlyphShape.ring, PathGlyphOutline.dashed):
+      // Пунктирная окружность одна: внешний диаметр и у кольца, и у круга — 12.
+      case (
+        PathGlyphShape.ring || PathGlyphShape.circle,
+        PathGlyphOutline.dashed,
+      ):
         // Окружность — многоугольник из 72 сторон: Skia измеряет конические
         // дуги с погрешностью в несколько процентов, и штрихи вышли бы
         // неровными, а отклонение сторон от окружности меньше 0,01.
@@ -113,6 +118,13 @@ final class _PathGlyphPainter extends CustomPainter {
           paint
             ..style = PaintingStyle.stroke
             ..strokeWidth = _outlineWidth * scale,
+        );
+      case (PathGlyphShape.circle, PathGlyphOutline.solid):
+        // Круг диаметром 12.
+        canvas.drawCircle(
+          _center * scale,
+          6 * scale,
+          paint..style = PaintingStyle.fill,
         );
     }
   }
