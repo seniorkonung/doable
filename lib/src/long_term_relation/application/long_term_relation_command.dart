@@ -4,6 +4,7 @@ import '../../intention/domain/intention_id.dart';
 import '../domain/long_term_relation.dart';
 import '../domain/long_term_relation_description.dart';
 import '../domain/long_term_relation_id.dart';
+import 'intention_relation_group.dart';
 import 'long_term_relation_permissions.dart';
 
 sealed class LongTermRelationCommand
@@ -58,6 +59,64 @@ final class CreateLongTermRelation extends LongTermRelationCommand {
   final LongTermRelationType type;
   final RelationPriority priority;
   final LongTermRelationDescription? description;
+}
+
+enum AddLongTermRelationsValidationFailure {
+  noCandidates,
+  duplicateCandidates,
+  pageIntentionAmongCandidates,
+}
+
+final class AddLongTermRelationsValidationException implements Exception {
+  const AddLongTermRelationsValidationException(this.failure);
+
+  final AddLongTermRelationsValidationFailure failure;
+}
+
+/// Добавляет в группу страницы намерения связи с упорядоченным набором
+/// намерений.
+///
+/// Группа задаёт тип и направление, поэтому приоритет и описание команда не
+/// принимает: каждая связь получает P4 и не имеет описания. Порядок набора
+/// становится порядком последовательности создания.
+final class AddLongTermRelations extends LongTermRelationCommand {
+  factory AddLongTermRelations({
+    required IntentionId pageIntentionId,
+    required IntentionRelationGroup group,
+    required Iterable<IntentionId> candidateIds,
+  }) {
+    final candidates = List<IntentionId>.unmodifiable(candidateIds);
+    if (candidates.isEmpty) {
+      throw const AddLongTermRelationsValidationException(
+        AddLongTermRelationsValidationFailure.noCandidates,
+      );
+    }
+    if (candidates.toSet().length != candidates.length) {
+      throw const AddLongTermRelationsValidationException(
+        AddLongTermRelationsValidationFailure.duplicateCandidates,
+      );
+    }
+    if (candidates.contains(pageIntentionId)) {
+      throw const AddLongTermRelationsValidationException(
+        AddLongTermRelationsValidationFailure.pageIntentionAmongCandidates,
+      );
+    }
+    return AddLongTermRelations._(
+      pageIntentionId: pageIntentionId,
+      group: group,
+      candidateIds: candidates,
+    );
+  }
+
+  const AddLongTermRelations._({
+    required this.pageIntentionId,
+    required this.group,
+    required this.candidateIds,
+  });
+
+  final IntentionId pageIntentionId;
+  final IntentionRelationGroup group;
+  final List<IntentionId> candidateIds;
 }
 
 sealed class LongTermRelationFieldPatch<T extends Object> {
@@ -262,6 +321,16 @@ final class LongTermRelationCreated extends LongTermRelationCommandSuccess {
   final LongTermRelation relation;
   final LongTermRelationDescription? description;
   final LongTermRelationPermissions permissions;
+}
+
+/// Связи пачки в порядке набора команды.
+final class LongTermRelationsAdded extends LongTermRelationCommandSuccess {
+  LongTermRelationsAdded({
+    required Iterable<LongTermRelation> relations,
+    required super.changes,
+  }) : relations = List.unmodifiable(relations);
+
+  final List<LongTermRelation> relations;
 }
 
 final class LongTermRelationUpdated extends LongTermRelationCommandSuccess {

@@ -44,6 +44,7 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
       final success = await _writeGraph<LongTermRelationCommandSuccess>(
         (clock) => switch (command) {
           CreateLongTermRelation() => _createLongTermRelation(command, clock),
+          AddLongTermRelations() => _addLongTermRelations(command, clock),
           UpdateLongTermRelation() => _updateLongTermRelation(command, clock),
           ArchiveLongTermRelation() => _setLongTermRelationScope(
             relationId: command.relationId,
@@ -153,6 +154,94 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
       description: command.description,
       affectedCounts: affectedCounts,
       permissions: const LongTermRelationPermissions.unrestricted(),
+    );
+  }
+
+  /// Создаёт связи пачки в порядке набора. Вызывается внутри транзакции
+  /// команды: отказ на любом месте набора откатывает всю пачку.
+  ///
+  /// Группа задаёт участников, поэтому намерение страницы и каждый кандидат
+  /// проверяются в своей роли. Все связи получают одно показание времени, а
+  /// последовательность создания растёт в порядке набора.
+  Future<_CommittedLongTermRelationsAddition> _addLongTermRelations(
+    AddLongTermRelations command,
+    _GraphWriteClock clock,
+  ) async {
+    final pageIsSource =
+        command.group.direction == relation_domain.RelationDirection.outgoing;
+    final (pageRole, candidateRole) = pageIsSource
+        ? (RelationParticipantRole.source, RelationParticipantRole.related)
+        : (RelationParticipantRole.related, RelationParticipantRole.source);
+    await _requireRelationParticipant(
+      command.pageIntentionId,
+      pageRole,
+      mustBeActive: true,
+    );
+
+    final pairs = <({IntentionId source, IntentionId related})>[];
+    for (final candidateId in command.candidateIds) {
+      await _requireRelationParticipant(
+        candidateId,
+        candidateRole,
+        mustBeActive: true,
+      );
+      final pair = pageIsSource
+          ? (source: command.pageIntentionId, related: candidateId)
+          : (source: candidateId, related: command.pageIntentionId);
+      final occupiedRelationId = await _findRelationForPair(
+        pair.source,
+        pair.related,
+      );
+      if (occupiedRelationId != null) {
+        throw _LongTermRelationPairOccupied(occupiedRelationId);
+      }
+      pairs.add(pair);
+    }
+
+    final createdAt = relation_domain.RelationTimestamp(clock.read());
+    final storedCreatedAt = createdAt.value.microsecondsSinceEpoch;
+    final relations = <relation_domain.LongTermRelation>[];
+    for (final pair in pairs) {
+      final id = _relationIdGenerator.generate();
+      final creationSequence = await _database
+          .into(_database.longTermRelations)
+          .insert(
+            local.LongTermRelationsCompanion.insert(
+              id: id.toCanonicalString(),
+              sourceIntentionId: pair.source.toCanonicalString(),
+              relatedIntentionId: pair.related.toCanonicalString(),
+              type: _storedRelationType(command.group.type),
+              priority: _storedRelationPriority(
+                relation_domain.RelationPriority.p4,
+              ),
+              isArchived: const Value(false),
+              createdAt: storedCreatedAt,
+              updatedAt: storedCreatedAt,
+            ),
+          );
+      relations.add(
+        relation_domain.LongTermRelation(
+          id: id,
+          sourceIntentionId: pair.source,
+          relatedIntentionId: pair.related,
+          type: command.group.type,
+          priority: relation_domain.RelationPriority.p4,
+          scope: relation_domain.RelationScope.active,
+          creationSequence: relation_domain.RelationCreationSequence(
+            creationSequence,
+          ),
+          createdAt: createdAt,
+          updatedAt: createdAt,
+        ),
+      );
+    }
+    final affectedCounts = await _readVerifiedRelationCountsFor([
+      command.pageIntentionId,
+      ...command.candidateIds,
+    ]);
+    return _CommittedLongTermRelationsAddition(
+      relations: relations,
+      affectedCounts: affectedCounts,
     );
   }
 
@@ -493,6 +582,41 @@ final class _CommittedLongTermRelationCreation
       );
 }
 
+final class _CommittedLongTermRelationsAddition
+    extends _CommittedLongTermRelationCommand {
+  _CommittedLongTermRelationsAddition({
+    required Iterable<relation_domain.LongTermRelation> relations,
+    required Map<IntentionId, RelationCounts> affectedCounts,
+  }) : relations = List.unmodifiable(relations),
+       affectedCounts = Map.unmodifiable(affectedCounts);
+
+  final List<relation_domain.LongTermRelation> relations;
+  final Map<IntentionId, RelationCounts> affectedCounts;
+
+  @override
+  bool get didMutate => true;
+
+  @override
+  LongTermRelationsAdded toSuccess(GraphRevision revision) =>
+      LongTermRelationsAdded(
+        relations: relations,
+        changes: [
+          for (final entry in affectedCounts.entries)
+            IntentionRelationCountsChanged(
+              revision: revision,
+              intentionId: entry.key,
+              counts: entry.value,
+            ),
+          for (final relation in relations)
+            LongTermRelationCreatedChange(
+              revision: revision,
+              relation: relation,
+              permissions: const LongTermRelationPermissions.unrestricted(),
+            ),
+        ],
+      );
+}
+
 final class _CommittedLongTermRelationUpdate
     extends _CommittedLongTermRelationCommand {
   _CommittedLongTermRelationUpdate({
@@ -617,7 +741,8 @@ LongTermRelationCommandFailure _classifyLongTermRelationCommandFailure(
 LongTermRelationCommandDiagnosticsType _longTermRelationCommandDiagnosticsType(
   LongTermRelationCommand command,
 ) => switch (command) {
-  CreateLongTermRelation() => LongTermRelationCommandDiagnosticsType.create,
+  CreateLongTermRelation() ||
+  AddLongTermRelations() => LongTermRelationCommandDiagnosticsType.create,
   UpdateLongTermRelation() => LongTermRelationCommandDiagnosticsType.update,
   ArchiveLongTermRelation() => LongTermRelationCommandDiagnosticsType.archive,
   RestoreLongTermRelation() => LongTermRelationCommandDiagnosticsType.restore,

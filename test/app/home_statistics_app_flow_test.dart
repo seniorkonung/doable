@@ -810,6 +810,9 @@ final class _App {
           LongTermRelationCreationFormKey(),
           command,
         ),
+        AddLongTermRelations() => fail(
+          'Добавление пачки появится в координаторе с задачей 3.3.',
+        ),
         UpdateLongTermRelation() => coordinator.acceptRelationUpdate(command),
         ArchiveLongTermRelation() => coordinator.acceptRelationArchive(command),
         RestoreLongTermRelation() => coordinator.acceptRelationRestore(command),
@@ -824,6 +827,9 @@ final class _App {
         GraphResultSuccess(
           value: LongTermRelationDeleted(:final relation),
         ) => relation,
+        GraphResultSuccess(value: LongTermRelationsAdded()) => fail(
+          'Добавление пачки появится в координаторе с задачей 3.3.',
+        ),
         GraphResultFailure(:final failure) => fail('Отказ команды: $failure'),
       };
     });

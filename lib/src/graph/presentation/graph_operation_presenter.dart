@@ -488,10 +488,12 @@ String _relationOutcomeFor(
   GraphResultSuccess(:final value) => switch ((completion.kind, value)) {
     (LongTermRelationCommandKind.create, LongTermRelationCreated()) =>
       localizations.relationEditorCreated,
-    (LongTermRelationCommandKind.create, LongTermRelationUpdated()) =>
-      localizations.relationEditorCreateUnexpected,
-    (LongTermRelationCommandKind.create, LongTermRelationDeleted()) =>
-      localizations.relationEditorCreateUnexpected,
+    (LongTermRelationCommandKind.create, LongTermRelationUpdated()) ||
+    (LongTermRelationCommandKind.create, LongTermRelationDeleted()) ||
+    (
+      LongTermRelationCommandKind.create,
+      LongTermRelationsAdded(),
+    ) => localizations.relationEditorCreateUnexpected,
     (
       LongTermRelationCommandKind.update || LongTermRelationCommandKind.archive,
       _,
@@ -501,16 +503,19 @@ String _relationOutcomeFor(
       ),
     (LongTermRelationCommandKind.restore, LongTermRelationUpdated()) =>
       localizations.relationRestored,
-    (LongTermRelationCommandKind.restore, LongTermRelationCreated()) =>
-      localizations.relationRestoreUnexpected,
-    (LongTermRelationCommandKind.restore, LongTermRelationDeleted()) =>
-      localizations.relationRestoreUnexpected,
+    (LongTermRelationCommandKind.restore, LongTermRelationCreated()) ||
+    (LongTermRelationCommandKind.restore, LongTermRelationDeleted()) ||
+    (
+      LongTermRelationCommandKind.restore,
+      LongTermRelationsAdded(),
+    ) => localizations.relationRestoreUnexpected,
     (LongTermRelationCommandKind.delete, LongTermRelationDeleted()) =>
       localizations.relationDeleted,
     (LongTermRelationCommandKind.delete, LongTermRelationCreated()) ||
+    (LongTermRelationCommandKind.delete, LongTermRelationUpdated()) ||
     (
       LongTermRelationCommandKind.delete,
-      LongTermRelationUpdated(),
+      LongTermRelationsAdded(),
     ) => localizations.relationDeleteUnexpected,
   },
   GraphResultFailure(:final failure) => longTermRelationCommandFailureMessage(
