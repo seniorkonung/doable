@@ -813,13 +813,14 @@
     - Сквозные сценарии на настоящем хранилище подтверждают «Вход из исходящей группы», «Вход из входящей группы», «Отмеченные намерения становятся связями группы», «Добавленные связи стоят в порядке отметок», «Добавление обновляет всех участников» и «Другая пара создаётся новой связью». Связи сохраняются после повторного открытия файла базы.
     - Сквозные сценарии подтверждают «Удаление связи на странице из поиска снимает причину», «Восстановленное намерение начинает выдачу поиска заново» и «Архивирование намерения снимает отметку».
     - Матрица страниц вместо строк формы и поисков по ролям проверяет поиск участника группы. Сценарий восстановления из поиска в `long_term_relation_app_flow_test.dart` удалён: в продукт к нему больше нет пути.
+    - Импорт `show testRelationRestore` в `app_shell_pages_above_test.dart` снят вместе с поиском по роли в матрице: `app_shell_page_matrix.dart` — часть этого теста и читает импорт в тесте «поиск участника без панели».
   - **Проверка:**
     - `mise exec --no-deps -- flutter test test/app/long_term_relation_app_flow_test.dart test/app/routing/app_router_test.dart test/app/navigation test/intention/presentation/details test/long_term_relation/presentation/intention_relations`.
     - `mise exec --no-deps -- flutter analyze`.
   - **Зависимости:** 3.10, 3.12, 3.13, 3.14.
   - **Предполагаемые файлы:**
     - меняется `lib/src/intention/presentation/details/intention_details_page.dart`;
-    - меняются `test/app/long_term_relation_app_flow_test.dart`, `test/app/routing/app_router_test.dart`, `test/app/navigation/app_shell_page_matrix.dart`, `test/intention/presentation/details/intention_details_relations_test.dart`.
+    - меняются `test/app/long_term_relation_app_flow_test.dart`, `test/app/routing/app_router_test.dart`, `test/app/navigation/app_shell_page_matrix.dart`, `app_shell_pages_above_test.dart`, `test/intention/presentation/details/intention_details_relations_test.dart`.
   - **Размер:** M.
 
 - [ ] 3.16 Быстрое создание получает два режима
@@ -841,16 +842,19 @@
   - **Критерии приёмки:**
     - Удалены `RelationEditorPage`, его состояние и модель, `relation_creation_completion.dart`, `RelationParticipantPickerPage`, `RelationParticipantChoice`, `relationParticipantPickerPurpose`, `RelationForm` и маршруты `RelationEditorRoute` и `RelationParticipantPickerRoute`, а `app_router.gr.dart` создан заново.
     - Перед удалением тестов `test/long_term_relation/presentation/editor/`, `participant_picker/` и `test/design_system/relation_form_test.dart` их сценарии, которые описывают продукт сейчас, подтверждены тестами поиска участника группы: панель тегов, отказ новой выдачи и доступность экрана. Сценарии формы и восстановления удалены вместе с ней.
+    - До удаления этих каталогов `ControlledParticipantPickerRepository`, `TestPickerCursor` и `TestPickerRevision` перенесены из `participant_picker_test_support.dart` в `test/support/controlled_participant_picker_repository.dart`, и эту опору импортируют `daily_choice_action_picker_page_test.dart` и `daily_choice_source_picker_page_test.dart`. `testRelationRestore`, `ControlledRelationRestore` и импорт `relation_participant_choice.dart` не переносятся: в опоре нет типов старого потока.
+    - `testFormRelationId` не переносится: `intention_picker_view_test.dart` переходит на существующий `testRelationId` из `test/long_term_relation/presentation/relation_graph_test_support.dart`.
     - Строки без читателей удалены на обоих языках. Остаются `relationEditorUpdate*`, `relationEditorDescription*`, `relationEditorCreate*` до 3.22 и `participantPicker*`, которые читает новый поиск.
   - **Проверка:**
     - `mise run codegen`.
-    - `mise exec --no-deps -- flutter test test/long_term_relation test/app/routing/app_router_test.dart test/app/navigation test/design_system`.
+    - `mise exec --no-deps -- flutter test test/long_term_relation test/app/routing/app_router_test.dart test/app/navigation test/design_system test/daily_choice/presentation/action_picker test/daily_choice/presentation/source_picker test/intention/presentation/picker`.
     - `mise exec --no-deps -- flutter analyze`.
   - **Зависимости:** 3.16 — у формы не остаётся входов.
   - **Предполагаемые файлы:**
     - удаляются `lib/src/long_term_relation/presentation/editor/`, `lib/src/long_term_relation/presentation/participant_picker/`, `lib/src/design_system/components/relation_form.dart`;
     - меняются `lib/src/app/routing/app_router.dart`, `app_router.gr.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
-    - удаляются соответствующие тесты, меняется `test/long_term_relation/presentation/batch_picker/relation_batch_picker_page_test.dart`.
+    - создаётся `test/support/controlled_participant_picker_repository.dart`;
+    - удаляются соответствующие тесты, меняются `test/long_term_relation/presentation/batch_picker/relation_batch_picker_page_test.dart`, `test/daily_choice/presentation/action_picker/daily_choice_action_picker_page_test.dart`, `test/daily_choice/presentation/source_picker/daily_choice_source_picker_page_test.dart`, `test/intention/presentation/picker/intention_picker_view_test.dart`.
   - **Размер:** M по логике: удаление без нового поведения.
 
 - [ ] 3.18 Общие части поиска теряют то, что читал только прежний поток

@@ -4,11 +4,6 @@
 
 Файл ведёт оркестратор. Решения приняты пользователем в сессии решений и исполняются автономно, по одной finding за сессию. Сессия исполнения удаляет раздел своей finding в коммите её устранения.
 
-## F1 · Medium — Задача 3.17 удаляет тестовую опору тестов, которые остаются
-
-- **Решение:** Устранить
-- **Как устранить:** Исправить в tasks.md задачи 3.17 и 3.15, без новых задач и без смены порядка. В 3.17 до удаления каталогов test/long_term_relation/presentation/editor/ и participant_picker/ перенести ControlledParticipantPickerRepository, TestPickerCursor и TestPickerRevision из participant_picker_test_support.dart в новую живую опору в test/support/ без типов старого потока: testRelationRestore, ControlledRelationRestore и импорт relation_participant_choice.dart не переносятся. testFormRelationId не переносится: intention_picker_view_test.dart переходит на существующий testRelationId из test/long_term_relation/presentation/relation_graph_test_support.dart. В файлы 3.17 добавить daily_choice_action_picker_page_test.dart, daily_choice_source_picker_page_test.dart и intention_picker_view_test.dart, а в её проверку — test/daily_choice/presentation/action_picker, test/daily_choice/presentation/source_picker и test/intention/presentation/picker. Импорт show testRelationRestore в test/app/navigation/app_shell_pages_above_test.dart снимает 3.15, а не 3.14: app_shell_page_matrix.dart является part этого теста и читает импорт в тесте «поиск участника без панели» до 3.15; добавить этот файл в файлы 3.15. Отчёт ошибочно приписывал это 3.14. Поведение продукта не меняется.
-
 ## F2 · Low — Задача 3.2 ломает исчерпывающие разборы в тестах, а метод для них появляется только в 3.3
 
 - **Решение:** Устранить
