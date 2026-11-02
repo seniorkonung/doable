@@ -269,6 +269,8 @@ LongTermRelationDetails testRelationDetails({
   String? description,
   LongTermRelationPermissions permissions =
       const LongTermRelationPermissions.unrestricted(),
+  DateTime? createdAt,
+  DateTime? updatedAt,
 }) => LongTermRelationDetails(
   relation: LongTermRelation(
     id: relationId,
@@ -278,8 +280,8 @@ LongTermRelationDetails testRelationDetails({
     priority: priority,
     scope: scope,
     creationSequence: RelationCreationSequence(creationSequence),
-    createdAt: RelationTimestamp(DateTime.utc(2026)),
-    updatedAt: RelationTimestamp(DateTime.utc(2026)),
+    createdAt: RelationTimestamp(createdAt ?? DateTime.utc(2026)),
+    updatedAt: RelationTimestamp(updatedAt ?? DateTime.utc(2026)),
   ),
   source: testParticipant(
     sourceId,

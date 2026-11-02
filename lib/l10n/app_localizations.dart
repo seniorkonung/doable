@@ -1280,13 +1280,13 @@ abstract class AppLocalizations {
   /// **'Edit the name: {title}'**
   String detailsEditTitleLabel(String title);
 
-  /// Доступное название описания на вкладке «Обзор», которое открывает экран изменения с курсором в описании; описание намерения не переводится
+  /// Доступное название сохранённого описания намерения на вкладке «Обзор» и описания на панели связи; нажатие открывает его изменение, а само описание не переводится
   ///
   /// In en, this message translates to:
   /// **'Edit the description: {description}'**
   String detailsEditDescriptionLabel(String description);
 
-  /// Приглашение добавить описание на вкладке «Обзор» намерения без описания; открывает экран изменения с курсором в описании
+  /// Приглашение добавить описание на вкладке «Обзор» намерения и на панели связи без описания; нажатие открывает его изменение
   ///
   /// In en, this message translates to:
   /// **'Add a description'**
@@ -3309,6 +3309,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open related intention'**
   String get relationDetailsOpenRelatedParticipantAction;
+
+  /// Доступное название панели архивированной связи; phrase — полная формулировка связи
+  ///
+  /// In en, this message translates to:
+  /// **'{phrase}. Archived'**
+  String relationSheetArchivedLabel(String phrase);
+
+  /// Строка о смысле архива под шапкой панели архивированной связи
+  ///
+  /// In en, this message translates to:
+  /// **'Archived relations stay in saved paths and are not offered in new ones.'**
+  String get relationSheetArchivedNote;
+
+  /// Доступное название кнопки-названия участника в шапке панели связи; название намерения не переводится
+  ///
+  /// In en, this message translates to:
+  /// **'Open the page of the intention: {title}'**
+  String relationSheetOpenParticipant(String title);
+
+  /// Доступное название кнопки-названия архивированного участника в шапке панели связи; название намерения не переводится
+  ///
+  /// In en, this message translates to:
+  /// **'Open the page of the intention: {title}. Archived'**
+  String relationSheetOpenArchivedParticipant(String title);
+
+  /// Доступное название пилюли высшего приоритета на панели связи
+  ///
+  /// In en, this message translates to:
+  /// **'Priority {priority}, the highest'**
+  String relationSheetPriorityHighest(String priority);
+
+  /// Доступное название пилюли низшего приоритета на панели связи
+  ///
+  /// In en, this message translates to:
+  /// **'Priority {priority}, the lowest'**
+  String relationSheetPriorityLowest(String priority);
 
   /// Отмена выбора действия
   ///

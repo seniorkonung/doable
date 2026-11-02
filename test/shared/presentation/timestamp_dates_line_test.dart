@@ -1,7 +1,5 @@
 import 'package:doable/l10n/app_localizations.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
-import 'package:doable/src/intention/domain/intention.dart';
-import 'package:doable/src/intention/presentation/details/intention_dates.dart';
+import 'package:doable/src/shared/presentation/timestamp_dates_line.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -11,15 +9,15 @@ void main() {
 
   final ru = lookupAppLocalizations(const Locale('ru'));
   final en = lookupAppLocalizations(const Locale('en'));
-  final today = CalendarDate.fromParts(2026, 10, 29);
+  const currentYear = 2026;
 
   test('изменение в день создания оставляет одну дату создания', () {
-    final line = intentionDatesLine(
+    final line = timestampDatesLine(
       localizations: ru,
       locale: 'ru',
-      createdAt: IntentionTimestamp(DateTime(2026, 10, 6, 0, 5)),
-      updatedAt: IntentionTimestamp(DateTime(2026, 10, 6, 23, 55)),
-      today: today,
+      createdAt: DateTime(2026, 10, 6, 0, 5),
+      updatedAt: DateTime(2026, 10, 6, 23, 55),
+      currentYear: currentYear,
     );
 
     expect(line.created, (label: 'Создано', date: '6 окт.'));
@@ -27,12 +25,12 @@ void main() {
   });
 
   test('изменение в другой день добавляет дату изменения', () {
-    final line = intentionDatesLine(
+    final line = timestampDatesLine(
       localizations: en,
       locale: 'en',
-      createdAt: IntentionTimestamp(DateTime(2026, 3, 27, 23, 55)),
-      updatedAt: IntentionTimestamp(DateTime(2026, 3, 28, 0, 5)),
-      today: today,
+      createdAt: DateTime(2026, 3, 27, 23, 55),
+      updatedAt: DateTime(2026, 3, 28, 0, 5),
+      currentYear: currentYear,
     );
 
     expect(line.created, (label: 'Created', date: '27 Mar'));
@@ -54,12 +52,12 @@ void main() {
     ),
   ]) {
     test('год называет только дата не текущего года: $locale', () {
-      final line = intentionDatesLine(
+      final line = timestampDatesLine(
         localizations: localizations,
         locale: locale,
-        createdAt: IntentionTimestamp(DateTime(2025, 3, 14, 12)),
-        updatedAt: IntentionTimestamp(DateTime(2026, 10, 3, 12)),
-        today: CalendarDate.fromParts(2026, 10, 29),
+        createdAt: DateTime(2025, 3, 14, 12),
+        updatedAt: DateTime(2026, 10, 3, 12),
+        currentYear: currentYear,
       );
 
       expect(line.created, created);

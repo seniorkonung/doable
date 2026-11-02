@@ -2153,6 +2153,35 @@ class AppLocalizationsRu extends AppLocalizations {
       'Открыть связанное намерение';
 
   @override
+  String relationSheetArchivedLabel(String phrase) {
+    return '$phrase. Архив';
+  }
+
+  @override
+  String get relationSheetArchivedNote =>
+      'Архивные связи остаются в сохранённых путях и не предлагаются в новых.';
+
+  @override
+  String relationSheetOpenParticipant(String title) {
+    return 'Открыть страницу намерения: $title';
+  }
+
+  @override
+  String relationSheetOpenArchivedParticipant(String title) {
+    return 'Открыть страницу намерения: $title. Архив';
+  }
+
+  @override
+  String relationSheetPriorityHighest(String priority) {
+    return 'Приоритет $priority, высший';
+  }
+
+  @override
+  String relationSheetPriorityLowest(String priority) {
+    return 'Приоритет $priority, низший';
+  }
+
+  @override
   String get actionPickerCancel => 'Отменить выбор действия';
 
   @override

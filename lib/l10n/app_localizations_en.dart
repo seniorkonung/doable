@@ -2129,6 +2129,35 @@ class AppLocalizationsEn extends AppLocalizations {
       'Open related intention';
 
   @override
+  String relationSheetArchivedLabel(String phrase) {
+    return '$phrase. Archived';
+  }
+
+  @override
+  String get relationSheetArchivedNote =>
+      'Archived relations stay in saved paths and are not offered in new ones.';
+
+  @override
+  String relationSheetOpenParticipant(String title) {
+    return 'Open the page of the intention: $title';
+  }
+
+  @override
+  String relationSheetOpenArchivedParticipant(String title) {
+    return 'Open the page of the intention: $title. Archived';
+  }
+
+  @override
+  String relationSheetPriorityHighest(String priority) {
+    return 'Priority $priority, the highest';
+  }
+
+  @override
+  String relationSheetPriorityLowest(String priority) {
+    return 'Priority $priority, the lowest';
+  }
+
+  @override
   String get actionPickerCancel => 'Cancel action selection';
 
   @override

@@ -36,12 +36,12 @@ import '../../../long_term_relation/presentation/editor/relation_editor_state.da
 import '../../../long_term_relation/presentation/intention_relations/intention_relations_sliver.dart';
 import '../../../long_term_relation/presentation/intention_relations/intention_relations_state.dart';
 import '../../../long_term_relation/presentation/intention_relations/intention_relations_view_model.dart';
+import '../../../shared/presentation/timestamp_dates_line.dart';
 import '../../../tag/presentation/assignments/tag_assignments_section.dart';
 import '../../../tag/presentation/panel/tags_panel.dart';
 import '../../../tag/presentation/panel/tags_panel_context.dart';
 import '../../../statistics/presentation/intention_statistics_section.dart';
 import '../../../statistics/presentation/intention_statistics_view_model.dart';
-import 'intention_dates.dart';
 import 'intention_details_state.dart';
 import 'intention_details_view_model.dart';
 import 'intention_details_tabs.dart';
@@ -760,12 +760,12 @@ final class _LoadedDetails extends StatelessWidget {
                   DoableMetrics.space4,
                 ),
                 sliver: SliverToBoxAdapter(
-                  child: intentionDatesLine(
+                  child: timestampDatesLine(
                     localizations: localizations,
                     locale: Localizations.localeOf(context).toLanguageTag(),
-                    createdAt: intention.createdAt,
-                    updatedAt: intention.updatedAt,
-                    today: today,
+                    createdAt: intention.createdAt.value,
+                    updatedAt: intention.updatedAt.value,
+                    currentYear: today.year,
                   ),
                 ),
               ),

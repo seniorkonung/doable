@@ -598,12 +598,12 @@
   },
   "detailsEditDescriptionLabel": "Edit the description: {description}",
   "@detailsEditDescriptionLabel": {
-    "description": "Доступное название описания на вкладке «Обзор», которое открывает экран изменения с курсором в описании; описание намерения не переводится",
+    "description": "Доступное название сохранённого описания намерения на вкладке «Обзор» и описания на панели связи; нажатие открывает его изменение, а само описание не переводится",
     "placeholders": {"description": {"type": "String"}}
   },
   "detailsAddDescription": "Add a description",
   "@detailsAddDescription": {
-    "description": "Приглашение добавить описание на вкладке «Обзор» намерения без описания; открывает экран изменения с курсором в описании"
+    "description": "Приглашение добавить описание на вкладке «Обзор» намерения и на панели связи без описания; нажатие открывает его изменение"
   },
   "detailsCreatedLabel": "Created",
   "@detailsCreatedLabel": {
@@ -1661,6 +1661,35 @@
   "relationDetailsOpenRelatedParticipantAction": "Open related intention",
   "@relationDetailsOpenRelatedParticipantAction": {
     "description": "Переход к архивному связанному участнику, блокирующему восстановление связи"
+  },
+  "relationSheetArchivedLabel": "{phrase}. Archived",
+  "@relationSheetArchivedLabel": {
+    "description": "Доступное название панели архивированной связи; phrase — полная формулировка связи",
+    "placeholders": {"phrase": {"type": "String"}}
+  },
+  "relationSheetArchivedNote": "Archived relations stay in saved paths and are not offered in new ones.",
+  "@relationSheetArchivedNote": {
+    "description": "Строка о смысле архива под шапкой панели архивированной связи"
+  },
+  "relationSheetOpenParticipant": "Open the page of the intention: {title}",
+  "@relationSheetOpenParticipant": {
+    "description": "Доступное название кнопки-названия участника в шапке панели связи; название намерения не переводится",
+    "placeholders": {"title": {"type": "String"}}
+  },
+  "relationSheetOpenArchivedParticipant": "Open the page of the intention: {title}. Archived",
+  "@relationSheetOpenArchivedParticipant": {
+    "description": "Доступное название кнопки-названия архивированного участника в шапке панели связи; название намерения не переводится",
+    "placeholders": {"title": {"type": "String"}}
+  },
+  "relationSheetPriorityHighest": "Priority {priority}, the highest",
+  "@relationSheetPriorityHighest": {
+    "description": "Доступное название пилюли высшего приоритета на панели связи",
+    "placeholders": {"priority": {"type": "String"}}
+  },
+  "relationSheetPriorityLowest": "Priority {priority}, the lowest",
+  "@relationSheetPriorityLowest": {
+    "description": "Доступное название пилюли низшего приоритета на панели связи",
+    "placeholders": {"priority": {"type": "String"}}
   },
   "actionPickerCancel": "Cancel action selection",
   "@actionPickerCancel": {"description": "Отмена выбора действия"},
