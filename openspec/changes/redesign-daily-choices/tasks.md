@@ -367,7 +367,7 @@
   - **Предполагаемые файлы:** `test/graph/presentation/graph_reconciliation_checkpoint_test.dart`, `test/app/home_statistics_app_flow_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_details_integration_test.dart`.
   - **Размер:** S.
 
-- [ ] 2.7 Команда замены пути удалена из всех слоёв
+- [x] 2.7 Команда замены пути удалена из всех слоёв
   - **Критерии приёмки:**
     - Удалены `ReplaceDailyChoicePath`, `DailyChoicePathReplaced`, `acceptDailyChoiceReplace`, `DailyChoiceCommandKind.replace`, `_replaceDailyChoicePath`, ветви презентера и строка `dailyChoicePathReplaced`. Создание, изменение полей, удаление и их сообщения работают как прежде, а подтверждённый путь по-прежнему проверяется при создании.
     - Ветвь пересечения `released` и `occupied` в `DailyChoiceChange` удалена: обе дельты были непусты только у замены.
