@@ -367,7 +367,11 @@ final class _ChoiceHeader extends StatelessWidget {
                 ),
               ),
               onToggle: onToggle,
-              goalBadge: _archiveBadge(localizations, details.source),
+              goalBadge: _isArchived(details.source)
+                  ? Badge.archivedInline(
+                      word: localizations.detailsArchivedBadge,
+                    )
+                  : null,
               actionBadge: _archiveBadge(localizations, details.selected),
               options: onOptions == null
                   ? ChoiceHeadOptions.unavailable(

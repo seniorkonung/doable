@@ -258,7 +258,7 @@ void main() {
         _head(
           goal: goal,
           action: action,
-          goalBadge: const Badge.archived(word: 'Архив'),
+          goalBadge: const Badge.archivedInline(word: 'Архив'),
           actionBadge: const Badge.archived(word: 'Архив'),
           options: const ChoiceHeadOptions.available(
             label: 'Параметры',
@@ -301,7 +301,7 @@ void main() {
         _head(
           goal: 'Цель',
           action: 'Действие',
-          goalBadge: const Badge.archived(word: 'Архив'),
+          goalBadge: const Badge.archivedInline(word: 'Архив'),
           actionBadge: const Badge.archived(word: 'Архив'),
         ),
       ),

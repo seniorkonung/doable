@@ -1,10 +1,11 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Badge;
 
 import '../doable_colors.dart';
 import '../doable_icon.dart';
 import '../doable_metrics.dart';
 import '../doable_priority.dart';
 import '../doable_type.dart';
+import 'badge.dart';
 import 'choice_check.dart';
 import 'edge_overhang.dart';
 
@@ -116,8 +117,8 @@ final class ChoiceHead extends StatelessWidget {
   /// Переключает выполнение; без него флажок выключен.
   final VoidCallback? onToggle;
 
-  /// Метка архива после исходного намерения. Строка исходного намерения
-  /// остаётся высотой 18, поэтому метка ниже своей обычной высоты.
+  /// Метка архива после исходного намерения: [Badge.archivedInline], поэтому
+  /// строка исходного намерения не становится выше своего текста.
   final Widget? goalBadge;
 
   /// Метка архива после действия, своей высоты.
@@ -136,12 +137,9 @@ final class ChoiceHead extends StatelessWidget {
   /// Насколько область кнопки параметров выходит за правый край шапки.
   static const double _optionsOverhang = 14;
 
-  static const double _goalBadgeHeight = 18;
-
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).extension<DoableColors>()!;
-    final goalBadge = this.goalBadge;
     final actionBadge = this.actionBadge;
     final strike = done ? TextDecoration.lineThrough : null;
     final options = this.options;
@@ -186,8 +184,7 @@ final class ChoiceHead extends StatelessWidget {
                           decoration: strike,
                         ),
                       ),
-                      if (goalBadge != null)
-                        SizedBox(height: _goalBadgeHeight, child: goalBadge),
+                      ?goalBadge,
                     ],
                   ),
                   // Цепочка отстоит от действия на 5: 2 между элементами и 3

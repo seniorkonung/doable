@@ -9,9 +9,10 @@ import '../doable_type.dart';
 /// выбранная лежит на `fill`. Выбрана всегда одна пилюля: нажатие на выбранную
 /// ничего не делает, поэтому приоритет нельзя снять.
 ///
-/// Цвет приоритета не заливает пилюлю и не красит подпись. Видимые подписи
-/// пилюль, название группы и доступное название каждой пилюли задаёт
-/// потребитель.
+/// Цвет приоритета не заливает пилюлю и не красит подпись. Пилюли, которым не
+/// хватает ширины, например при крупном шрифте, переносятся и прижаты к концу
+/// строки. Видимые подписи пилюль, название группы и доступное название каждой
+/// пилюли задаёт потребитель.
 final class PriorityPicker extends StatelessWidget {
   const PriorityPicker({
     required this.value,
@@ -44,8 +45,8 @@ final class PriorityPicker extends StatelessWidget {
     container: true,
     explicitChildNodes: true,
     label: label,
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
+    child: Wrap(
+      alignment: WrapAlignment.end,
       children: [
         for (final priority in DoablePriority.values)
           _Pill(
