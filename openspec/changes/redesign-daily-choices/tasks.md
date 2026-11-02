@@ -683,7 +683,7 @@
     - меняются `test/daily_choice/presentation/catalog/daily_choice_catalog_accessibility_test.dart`, `daily_choice_catalog_card_flow_test.dart`, `daily_choice_catalog_page_test.dart`, `daily_choice_date_catalog_page_test.dart`, `test/daily_choice/presentation/daily_choice_creation_flow_test.dart`.
   - **Размер:** M по логике: 16 файлов, из них в `lib/` меняются только два вызова. Смена входа и перевод сценариев проходят проверку только вместе.
 
-- [ ] 3.16 Страница подробного просмотра удалена вместе с маршрутом
+- [x] 3.16 Страница подробного просмотра удалена вместе с маршрутом
   - **Критерии приёмки:**
     - Удалены `daily_choice_details_page.dart`, `DailyChoiceDetailsRoute` и `daily_choice_details_page_test.dart`. Каждый сценарий удалённого теста, кроме двух сценариев формы из следующего пункта, уже подтверждён панелью либо описывал показ страницы, которого больше нет.
     - Сценарии формы «редактор открывается из подробностей и меняет только выбранные поля» и «отмена и неверный ввод не отправляют правку» удаляются и не переносятся в `daily_choice_edit_page_test.dart`. Их покрывают `test/daily_choice/presentation/editor/daily_choice_edit_state_test.dart` (только выбранные поля и пробельное описание), `test/daily_choice/domain/daily_choice_description_test.dart` (граница 4097 графем) и тест задачи 3.12 (вход в форму из панели и сохранение). Показ ошибки даты и кнопка «Отмена» этой формы остаются без теста, пока форма не удалена в фазе 4: её код в фазе 3 не меняется. Владелец продукта принял этот пробел осознанно.

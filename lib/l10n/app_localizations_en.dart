@@ -3047,12 +3047,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dailyChoiceDetailsNotCompleted => 'Not completed';
 
   @override
-  String get dailyChoiceDetailsDescription => 'Description';
-
-  @override
-  String get dailyChoiceDetailsPath => 'Stored path';
-
-  @override
   String get dailyChoiceDetailsSource => 'Source intention';
 
   @override
@@ -3066,12 +3060,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dailyChoiceDetailsActive => 'Active';
-
-  @override
-  String get dailyChoiceDetailsReady => 'Ready for action';
-
-  @override
-  String get dailyChoiceDetailsNotReady => 'Not ready for action';
 
   @override
   String dailyChoiceDetailsStep(int number) {

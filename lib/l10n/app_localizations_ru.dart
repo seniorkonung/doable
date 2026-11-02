@@ -3071,12 +3071,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get dailyChoiceDetailsNotCompleted => 'Не выполнено';
 
   @override
-  String get dailyChoiceDetailsDescription => 'Описание';
-
-  @override
-  String get dailyChoiceDetailsPath => 'Сохранённый путь';
-
-  @override
   String get dailyChoiceDetailsSource => 'Основание';
 
   @override
@@ -3090,12 +3084,6 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get dailyChoiceDetailsActive => 'Активно';
-
-  @override
-  String get dailyChoiceDetailsReady => 'Готово к действию';
-
-  @override
-  String get dailyChoiceDetailsNotReady => 'Не готово к действию';
 
   @override
   String dailyChoiceDetailsStep(int number) {

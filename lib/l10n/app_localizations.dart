@@ -4762,18 +4762,6 @@ abstract class AppLocalizations {
   /// **'Not completed'**
   String get dailyChoiceDetailsNotCompleted;
 
-  /// Описание дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Description'**
-  String get dailyChoiceDetailsDescription;
-
-  /// Заголовок сохранённого пути
-  ///
-  /// In en, this message translates to:
-  /// **'Stored path'**
-  String get dailyChoiceDetailsPath;
-
   /// Роль исходного намерения
   ///
   /// In en, this message translates to:
@@ -4803,18 +4791,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Active'**
   String get dailyChoiceDetailsActive;
-
-  /// Готовность конечного действия
-  ///
-  /// In en, this message translates to:
-  /// **'Ready for action'**
-  String get dailyChoiceDetailsReady;
-
-  /// Утрата готовности конечного действия
-  ///
-  /// In en, this message translates to:
-  /// **'Not ready for action'**
-  String get dailyChoiceDetailsNotReady;
 
   /// Порядковый номер перехода пути
   ///

@@ -28,7 +28,7 @@ enum _Flow {
     'daily_choices',
     0,
     'daily-choice-submit',
-    DailyChoiceDetailsRoute.name,
+    null,
   );
 
   const _Flow(

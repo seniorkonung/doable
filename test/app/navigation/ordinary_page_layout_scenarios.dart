@@ -56,46 +56,6 @@ void _registerOrdinaryLayoutTests() {
       }
     });
 
-    testWidgets('подробный просмотр дневного выбора, $conditions: последние '
-        'действия доступны над панелью без двойного нижнего отступа', (
-      tester,
-    ) async {
-      final app = await _start(
-        tester,
-        locale: locale,
-        screen: screen,
-        insets: insets,
-      );
-      unawaited(
-        app.router.push(
-          DailyChoiceDetailsRoute(choiceId: _dailyChoiceId(_firstChoice)),
-        ),
-      );
-      await _until(
-        tester,
-        find.byKey(const ValueKey('daily-choice-delete-open')),
-      );
-      await tester.pumpAndSettle();
-      await _scrollToEnd(tester, find.byType(DailyChoiceDetailsPage));
-      final last = find.byKey(const ValueKey('daily-choice-intention-2'));
-      _expectFullyVisible(tester, last, insets);
-      expect(last.hitTestable(), findsOneWidget);
-      final delete = find.byKey(const ValueKey('daily-choice-delete-open'));
-      _expectFullyVisible(tester, delete, insets);
-      expect(delete.hitTestable(), findsOneWidget);
-      final page = find.byType(DailyChoiceDetailsPage);
-      final body = find
-          .descendant(of: page, matching: find.byType(SafeArea))
-          .first;
-      final expectedBottom =
-          screen.height - math.max(insets.keyboard, insets.barExtent);
-      expect(tester.getRect(body).bottom, expectedBottom);
-      await tester.tap(delete);
-      await tester.pumpAndSettle();
-      expect(find.text('Удалить дневной выбор?'), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    });
-
     testWidgets('дневной выбор, $conditions: общее сообщение видно над '
         'панелью до и после перехода', (tester) async {
       final app = await _start(
@@ -107,12 +67,13 @@ void _registerOrdinaryLayoutTests() {
       _acceptDelete(app, intention: 3);
       await _until(tester, _messageOf(3));
       await tester.pumpAndSettle();
-      unawaited(
-        app.router.push(
-          DailyChoiceDetailsRoute(choiceId: _dailyChoiceId(_firstChoice)),
-        ),
-      );
-      await _until(tester, find.byType(DailyChoiceDetailsPage));
+      _expectLayoutMessage(tester, insets);
+      await _select(tester, AppDestination.dailyChoices);
+      await _until(tester, _dailyChoiceRow(1));
+      await tester.tap(_dailyChoiceRow(1));
+      await _until(tester, dailyChoiceDetailsReady);
+      await openDailyChoicePathIntention(tester, 2);
+      await _until(tester, find.byType(IntentionDetailsPage));
       await tester.pumpAndSettle();
       _expectLayoutMessage(tester, insets);
       await _closeMessage(tester);

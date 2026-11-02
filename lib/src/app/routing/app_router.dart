@@ -38,7 +38,6 @@ final class AppRouter extends RootStackRouter {
     AutoRoute(page: DailyChoiceDateCatalogRoute.page),
     AutoRoute(page: ChoicePathRoute.page),
     AutoRoute(page: DailyChoiceCreationRoute.page),
-    AutoRoute(page: DailyChoiceDetailsRoute.page),
     AutoRoute(page: DailyChoiceEditRoute.page),
     AutoRoute(page: RelationEditorRoute.page),
     AutoRoute(page: RelationParticipantPickerRoute.page),
