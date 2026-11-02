@@ -545,7 +545,7 @@
   "graphOperationAddRelations": "Добавление",
   "graphOperationRelations": "связи",
   "relationsAdded": "{count, plural, one{Добавлена {count} связь.} few{Добавлено {count} связи.} many{Добавлено {count} связей.} other{Добавлено {count} связи.}}",
-  "relationsAdditionPairOccupied": "Между некоторыми выбранными намерениями уже есть связь. Связи не созданы.",
+  "relationsAdditionPairOccupied": "Некоторые выбранные намерения уже связаны с этим намерением. Связи не созданы.",
   "relationsAdditionParticipantNotFound": "Одно из выбранных намерений больше не существует. Связи не созданы.",
   "relationsAdditionParticipantArchived": "Связать можно только активные намерения. Связи не созданы.",
   "relationsAdditionUnavailable": "Связи не созданы. Повторите попытку.",

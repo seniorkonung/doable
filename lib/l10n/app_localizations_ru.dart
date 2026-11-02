@@ -1935,7 +1935,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get relationsAdditionPairOccupied =>
-      'Между некоторыми выбранными намерениями уже есть связь. Связи не созданы.';
+      'Некоторые выбранные намерения уже связаны с этим намерением. Связи не созданы.';
 
   @override
   String get relationsAdditionParticipantNotFound =>

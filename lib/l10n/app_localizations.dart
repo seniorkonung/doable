@@ -2936,7 +2936,7 @@ abstract class AppLocalizations {
   /// Занятая пара при добавлении связей
   ///
   /// In en, this message translates to:
-  /// **'A relation already exists between some selected intentions. No relations were created.'**
+  /// **'Some selected intentions are already linked to this intention. No relations were created.'**
   String get relationsAdditionPairOccupied;
 
   /// Отсутствующий участник при добавлении связей

@@ -406,7 +406,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.runAsync(() => occupyPair(3, 1));
       const failure =
-          'Между некоторыми выбранными намерениями уже есть связь. '
+          'Некоторые выбранные намерения уже связаны с этим намерением. '
           'Связи не созданы.';
 
       await tester.tap(addButton);
@@ -572,7 +572,7 @@ void main() {
     expect(find.byType(RelationBatchPickerPage), findsNothing);
     expect(
       find.textContaining(
-        'Между некоторыми выбранными намерениями уже есть связь. '
+        'Некоторые выбранные намерения уже связаны с этим намерением. '
         'Связи не созданы.',
       ),
       findsOneWidget,

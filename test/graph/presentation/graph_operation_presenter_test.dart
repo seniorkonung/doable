@@ -1251,8 +1251,8 @@ void main() {
     final scenarios = [
       (
         failure: LongTermRelationPairOccupiedFailure(_relationId),
-        ru: 'Между некоторыми выбранными намерениями уже есть связь. Связи не созданы.',
-        en: 'A relation already exists between some selected intentions. No relations were created.',
+        ru: 'Некоторые выбранные намерения уже связаны с этим намерением. Связи не созданы.',
+        en: 'Some selected intentions are already linked to this intention. No relations were created.',
       ),
       (
         failure: LongTermRelationParticipantNotFoundFailure(

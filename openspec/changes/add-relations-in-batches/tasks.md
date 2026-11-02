@@ -978,7 +978,7 @@
   - **Предполагаемые файлы:** меняются `lib/src/design_system/components/picker_row.dart`, `lib/src/intention/presentation/picker/intention_picker_row.dart`, `test/intention/presentation/picker/intention_picker_test_support.dart`.
   - **Размер:** S.
 
-- [ ] 3.26 Отказ занятой пары говорит о связи с намерением страницы
+- [x] 3.26 Отказ занятой пары говорит о связи с намерением страницы
   - **Критерии приёмки:**
     - `relationsAdditionPairOccupied` дословно равна «Некоторые выбранные намерения уже связаны с этим намерением. Связи не созданы.» в `lib/l10n/app_ru.arb` и «Some selected intentions are already linked to this intention. No relations were created.» в `lib/l10n/app_en.arb`. Конкретные намерения сообщение не называет.
     - `app_localizations.dart`, `app_localizations_ru.dart` и `app_localizations_en.dart` пересозданы через `mise run codegen`, а не правкой вручную.

@@ -1400,7 +1400,7 @@
   "@graphOperationRelations": {"description": "Обозначение добавляемой пачки связей"},
   "relationsAdded": "{count, plural, one{{count} relation added.} other{{count} relations added.}}",
   "@relationsAdded": {"description": "Число добавленных связей", "placeholders": {"count": {"type": "int"}}},
-  "relationsAdditionPairOccupied": "A relation already exists between some selected intentions. No relations were created.",
+  "relationsAdditionPairOccupied": "Some selected intentions are already linked to this intention. No relations were created.",
   "@relationsAdditionPairOccupied": {"description": "Занятая пара при добавлении связей"},
   "relationsAdditionParticipantNotFound": "A selected intention no longer exists. No relations were created.",
   "@relationsAdditionParticipantNotFound": {"description": "Отсутствующий участник при добавлении связей"},

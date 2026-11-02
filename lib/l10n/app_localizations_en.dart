@@ -1909,7 +1909,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get relationsAdditionPairOccupied =>
-      'A relation already exists between some selected intentions. No relations were created.';
+      'Some selected intentions are already linked to this intention. No relations were created.';
 
   @override
   String get relationsAdditionParticipantNotFound =>
