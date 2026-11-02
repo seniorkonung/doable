@@ -707,6 +707,82 @@ void main() {
       expect(repository.queries, hasLength(3));
       expect(repository.queries[2].cursor, isA<CatalogPageCursor>());
     });
+
+    testWidgets('устаревшая выдача показывает в подвале отказ вместо кольца, '
+        'а повтор предлагает только при доказанно временном отказе', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      final repository = CatalogPageRepository();
+      await pumpCatalogPage(
+        tester,
+        repository,
+        today: day,
+        locale: const Locale('ru'),
+        size: size,
+      );
+      repository.completeFirst(
+        0,
+        rows,
+        total: 21,
+        cursor: const CatalogPageCursor(),
+      );
+      await tester.pumpAndSettle();
+      final l10n = lookupAppLocalizations(const Locale('ru'));
+      final footer = dailyChoiceCatalogPageFooter(completed: false);
+      Finder inFooter(Finder finder) =>
+          find.descendant(of: footer, matching: finder);
+      // Подвал строится за краем выдачи, а проверки читают видимый.
+      Future<void> showFooter() async {
+        await scrollToDailyChoiceCatalogPageEnd(tester, false);
+        await tester.ensureVisible(
+          dailyChoiceCatalogPageFooter(completed: false, skipOffstage: false),
+        );
+        await tester.pump();
+      }
+
+      final ring = inFooter(
+        find.bySemanticsLabel(l10n.dailyChoiceCatalogLoadingMore),
+      );
+
+      // На время обновления подвал показывает кольцо.
+      await confirmOutsideChoiceChange(
+        tester,
+        repository,
+        rows.first,
+        revision: 1,
+      );
+      await showFooter();
+      expect(ring, findsOneWidget);
+
+      repository.failUnavailable(1);
+      await tester.pumpAndSettle();
+      await showFooter();
+      expect(ring, findsNothing);
+      expect(
+        inFooter(find.text(l10n.dailyChoiceCatalogUnavailable)),
+        findsOneWidget,
+      );
+      expect(inFooter(find.text(l10n.commonRetry)), findsOneWidget);
+      expect(repository.queries, hasLength(2));
+
+      await tester.tap(inFooter(find.text(l10n.commonRetry)));
+      await tester.pump();
+      expect(repository.queries, hasLength(3));
+      await showFooter();
+      expect(ring, findsOneWidget);
+
+      repository.fail(2, const DailyChoiceCatalogCorruptionFailure());
+      await tester.pumpAndSettle();
+      await showFooter();
+      expect(ring, findsNothing);
+      expect(
+        inFooter(find.text(l10n.dailyChoiceCatalogCorruption)),
+        findsOneWidget,
+      );
+      expect(inFooter(find.text(l10n.commonRetry)), findsNothing);
+      semantics.dispose();
+    });
   });
 
   group('возврат к началу выдачи', () {

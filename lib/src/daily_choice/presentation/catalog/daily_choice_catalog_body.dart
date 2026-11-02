@@ -504,7 +504,7 @@ final class _DailyChoiceCatalogBodyState
         itemBuilder: (context, index) {
           if (index == section.items.length) {
             _requestPage(model, isCompleted);
-            return _pageFooter(section, isCompleted, model, l10n);
+            return _pageFooter(state, isCompleted, model, l10n);
           }
           final item = section.items[index];
           final number =
@@ -696,8 +696,11 @@ final class _DailyChoiceCatalogBodyState
     });
   }
 
+  /// Устаревшая выдача не запрашивает порцию и не обновляется сама, поэтому
+  /// кольцо в её подвале вращалось бы вечно: пока есть отказ обновления,
+  /// подвал показывает его, а повтор несёт только доказанно временный.
   Widget _pageFooter(
-    DailyChoiceCatalogSectionState section,
+    DailyChoiceCatalogLoaded state,
     bool isCompleted,
     DailyChoiceCatalogViewModel model,
     AppLocalizations l10n,
@@ -709,8 +712,17 @@ final class _DailyChoiceCatalogBodyState
       DoableMetrics.space5,
       0,
     ),
-    child: switch (section.pageStatus) {
-      DailyChoiceCatalogPageFailure(:final failure, :final canRetry) =>
+    child: switch ((
+      state.refreshFailure,
+      state.section(isCompleted).pageStatus,
+    )) {
+      (final failure?, _) => ListState.error(
+        message: _failureMessage(failure, l10n),
+        retry: failure is DailyChoiceCatalogUnavailableFailure
+            ? (label: l10n.commonRetry, onPressed: model.retryRefresh)
+            : null,
+      ),
+      (null, DailyChoiceCatalogPageFailure(:final failure, :final canRetry)) =>
         ListState.error(
           message: _failureMessage(failure, l10n),
           retry: canRetry
@@ -721,7 +733,7 @@ final class _DailyChoiceCatalogBodyState
                 )
               : null,
         ),
-      DailyChoiceCatalogPageIdle() || DailyChoiceCatalogPageLoading() =>
+      (null, DailyChoiceCatalogPageIdle() || DailyChoiceCatalogPageLoading()) =>
         ListState.more(text: l10n.dailyChoiceCatalogLoadingMore),
     },
   );
