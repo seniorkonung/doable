@@ -385,7 +385,7 @@
     - меняются `test/daily_choice/application/daily_choice_change_test.dart`, `test/graph/presentation/graph_operation_presenter_test.dart`, `test/graph/application/graph_command_coordinator_daily_choice_test.dart`, `test/app/home_statistics_app_flow_test.dart`, `intention_statistics_app_flow_test.dart`.
   - **Размер:** M по логике: удаление без нового поведения.
 
-- [ ] 2.8 Диагностика дневного выбора знает только оставшиеся команды
+- [x] 2.8 Диагностика дневного выбора знает только оставшиеся команды
   - **Критерии приёмки:**
     - `DailyChoiceCommandDiagnosticsType.replacePath` и `DailyChoicePathCommandDiagnosticsType` удалены. `DailyChoicePathValidationDiagnosticsEvent` относится только к созданию и не имеет `commandType`, а `developer_diagnostics_sink.dart` пишет его без этого поля.
     - Тесты диагностики создания проходят без изменения ожиданий к кодам отказа.
