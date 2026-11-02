@@ -1,8 +1,9 @@
-import 'dart:ui' show ImageByteFormat;
+import 'dart:ui' show ImageByteFormat, lerpDouble;
 
 import 'package:doable/src/design_system/components/button.dart';
 import 'package:doable/src/design_system/components/search_field.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
+import 'package:doable/src/design_system/components/top_bar.dart';
 import 'package:doable/src/design_system/doable_metrics.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:flutter/foundation.dart';
@@ -21,6 +22,7 @@ const _expandLabel = 'Раскрыть на весь экран';
 const _collapseLabel = 'Свернуть';
 const _homeIndicator = 34.0;
 const _resetLabel = 'Сбросить условия по тегам';
+const _untitledLabel = 'Чтобы быть здоровым, нужно много ходить';
 
 void main() {
   testWidgets('на отрезке раскрытия верхний край стоит под пальцем, «Готово» '
@@ -1874,6 +1876,235 @@ void main() {
     expect(find.byType(Sheet), findsNothing);
     expect(sheet.isClosed, isTrue);
   });
+
+  testWidgets('лист без заголовка начинает тело в 14 под ручкой и называет '
+      'себя диктору названием потребителя', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await _openUntitledSheet(tester);
+
+    final sheet = tester.getRect(find.byType(Sheet));
+    expect(
+      tester.getRect(find.text('Тело')).top,
+      sheet.top + DoableMetrics.space2 + 4 + 14,
+    );
+    expect(sheet.bottom, _screen.height);
+    expect(
+      tester.getSemantics(find.bySemanticsLabel(_untitledLabel)),
+      isSemantics(label: _untitledLabel, scopesRoute: true, namesRoute: true),
+    );
+    semantics.dispose();
+  });
+
+  testWidgets('лист без заголовка следует за содержимым, и с сообщениями '
+      'поверх тоже, в том числе после снятия полосы', (tester) async {
+    final editing = ValueNotifier(false);
+    addTearDown(editing.dispose);
+    final hasError = ValueNotifier(false);
+    addTearDown(hasError.dispose);
+    await _openUntitledSheet(
+      tester,
+      editing: editing,
+      hostsMessages: true,
+      body: (_) => ValueListenableBuilder(
+        valueListenable: hasError,
+        builder: (context, hasError, _) =>
+            SizedBox(height: hasError ? 160 : 120),
+      ),
+    );
+    final height = _sheetHeight(tester);
+
+    hasError.value = true;
+    await tester.pumpAndSettle();
+    expect(_sheetHeight(tester), height + 40);
+
+    editing.value = true;
+    await tester.pumpAndSettle();
+    editing.value = false;
+    await tester.pumpAndSettle();
+    expect(_sheetHeight(tester), height + 40);
+
+    hasError.value = false;
+    await tester.pumpAndSettle();
+    expect(_sheetHeight(tester), height);
+  });
+
+  for (final hostsMessages in [false, true]) {
+    testWidgets('с полосой лист${hostsMessages ? ' с сообщениями поверх' : ''} '
+        'занимает весь экран под строкой состояния без скругления и тени, '
+        'полоса стоит на месте ручки, а тело — под ней', (tester) async {
+      final editing = ValueNotifier(false);
+      addTearDown(editing.dispose);
+      await _openUntitledSheet(
+        tester,
+        editing: editing,
+        hostsMessages: hostsMessages,
+      );
+
+      editing.value = true;
+      await tester.pumpAndSettle();
+
+      final sheet = tester.getRect(find.byType(Sheet));
+      expect(
+        sheet,
+        Rect.fromLTRB(0, _statusBar, _screen.width, _screen.height),
+      );
+      expect(_topRadius(tester), 0);
+      expect(_hasShadow(tester), isFalse);
+      final bar = tester.getRect(find.byType(TopBar));
+      expect(bar.top, sheet.top);
+      expect(bar.width, _screen.width);
+      final body = tester.getRect(find.text('Тело'));
+      expect(body.top, bar.bottom + DoableMetrics.space1);
+      expect(body.left, DoableMetrics.space3);
+      expect(body.right, _screen.width - DoableMetrics.space3);
+    });
+  }
+
+  testWidgets('размер меняется 180 мс с easeOut от прежней высоты без скачка, '
+      'а снятие полосы возвращает высоту по содержимому', (tester) async {
+    final editing = ValueNotifier(false);
+    addTearDown(editing.dispose);
+    await _openUntitledSheet(
+      tester,
+      editing: editing,
+      body: (isEditing) =>
+          SizedBox(height: isEditing ? 400 : 120, child: const Text('Тело')),
+    );
+    final compact = _sheetHeight(tester);
+    final halfway = Curves.easeOut.transform(0.5);
+
+    editing.value = true;
+    await tester.pump();
+    expect(_sheetHeight(tester), compact);
+    expect(_topRadius(tester), DoableMetrics.radiusXl);
+    await tester.pump(const Duration(milliseconds: 90));
+    expect(
+      _sheetHeight(tester),
+      closeTo(lerpDouble(compact, _full, halfway)!, 1),
+    );
+    await tester.pump(const Duration(milliseconds: 90));
+    expect(_sheetHeight(tester), _full);
+
+    editing.value = false;
+    await tester.pump();
+    expect(_sheetHeight(tester), _full);
+    await tester.pump(const Duration(milliseconds: 90));
+    expect(
+      _sheetHeight(tester),
+      closeTo(lerpDouble(_full, compact, halfway)!, 1),
+    );
+    await tester.pump(const Duration(milliseconds: 90));
+    expect(_sheetHeight(tester), compact);
+    expect(_topRadius(tester), DoableMetrics.radiusXl);
+    expect(_hasShadow(tester), isTrue);
+  });
+
+  testWidgets('при уменьшении движения размер меняется сразу', (tester) async {
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        const FakeAccessibilityFeatures(disableAnimations: true);
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+    final editing = ValueNotifier(false);
+    addTearDown(editing.dispose);
+    await _openUntitledSheet(tester, editing: editing);
+    final compact = _sheetHeight(tester);
+
+    editing.value = true;
+    await tester.pump();
+    expect(_sheetHeight(tester), _full);
+
+    editing.value = false;
+    await tester.pump();
+    expect(_sheetHeight(tester), compact);
+  });
+
+  testWidgets('с полосой тело стоит над открытой клавиатурой, а лист — под '
+      'строкой состояния', (tester) async {
+    final editing = ValueNotifier(false);
+    addTearDown(editing.dispose);
+    await _openUntitledSheet(tester, editing: editing, body: (_) => _longBody);
+    const keyboard = 400.0;
+    editing.value = true;
+    tester.view
+      ..viewInsets = const FakeViewPadding(bottom: keyboard)
+      ..padding = const FakeViewPadding(top: _statusBar);
+    await tester.pumpAndSettle();
+
+    final sheet = tester.getRect(find.byType(Sheet));
+    expect(sheet.top, _statusBar);
+    expect(sheet.bottom, _screen.height - keyboard);
+    expect(
+      tester.getRect(find.byType(SingleChildScrollView)).bottom,
+      _screen.height - keyboard - DoableMetrics.space4,
+    );
+  });
+
+  testWidgets('клавиатура, которая открывается вместе с полосой, не уводит '
+      'высокий лист под себя', (tester) async {
+    final editing = ValueNotifier(false);
+    addTearDown(editing.dispose);
+    await _openUntitledSheet(
+      tester,
+      editing: editing,
+      body: (_) => const SizedBox(height: 600, child: Text('Тело')),
+    );
+    const keyboard = 400.0;
+
+    editing.value = true;
+    tester.view
+      ..viewInsets = const FakeViewPadding(bottom: keyboard)
+      ..padding = const FakeViewPadding(top: _statusBar);
+    do {
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(
+        tester.getRect(find.byType(SingleChildScrollView)).bottom,
+        lessThanOrEqualTo(_screen.height - keyboard),
+      );
+    } while (tester.binding.hasScheduledFrame);
+  });
+
+  testWidgets('в полном размере лист не перетаскивается ни за полосу, ни за '
+      'тело, которое только прокручивается, а после снятия полосы жест снова '
+      'закрывает лист', (tester) async {
+    final editing = ValueNotifier(false);
+    addTearDown(editing.dispose);
+    final sheet = await _openUntitledSheet(
+      tester,
+      editing: editing,
+      body: (_) => _longBody,
+    );
+    editing.value = true;
+    await tester.pumpAndSettle();
+    final full = tester.getRect(find.byType(Sheet));
+    final body = _bodyPosition(tester);
+
+    final gesture = await _SlowGesture.start(tester, find.byType(TopBar));
+    await gesture.moveTo(300);
+    expect(tester.getRect(find.byType(Sheet)), full);
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    await tester.fling(find.byType(TopBar), const Offset(0, 60), 1000);
+    await tester.pumpAndSettle();
+    expect(tester.getRect(find.byType(Sheet)), full);
+
+    body.jumpTo(100);
+    await tester.pump();
+    await tester.fling(find.text('Строка 5'), const Offset(0, 300), 1000);
+    await tester.pumpAndSettle();
+    expect(body.pixels, 0);
+    expect(tester.getRect(find.byType(Sheet)), full);
+
+    await tester.fling(find.text('Строка 5'), const Offset(0, 60), 1000);
+    await tester.pumpAndSettle();
+    expect(tester.getRect(find.byType(Sheet)), full);
+    expect(sheet.isClosed, isFalse);
+
+    editing.value = false;
+    await tester.pumpAndSettle();
+    await tester.fling(find.text('Строка 5'), const Offset(0, 60), 1000);
+    await tester.pumpAndSettle();
+    expect(sheet.isClosed, isTrue);
+  });
 }
 
 final _header = find.text('Выберите сколько нужно');
@@ -1906,6 +2137,19 @@ double _topRadius(WidgetTester tester) => tester
     .resolve(TextDirection.ltr)
     .topLeft
     .x;
+
+/// Есть ли у листа тень.
+bool _hasShadow(WidgetTester tester) {
+  final surface = tester.widget<DecoratedBox>(
+    find
+        .descendant(of: find.byType(Sheet), matching: find.byType(DecoratedBox))
+        .first,
+  );
+  final shadows = (surface.decoration as BoxDecoration).boxShadow!;
+  return shadows.any(
+    (shadow) => shadow.blurRadius > 0 || shadow.offset != Offset.zero,
+  );
+}
 
 /// Тело листа по содержимому, которое не помещается в лист.
 final _longBody = Column(
@@ -2133,6 +2377,41 @@ Future<_OpenedSheet> _openContentSheet(
     ),
   ),
   settle: settle,
+);
+
+Widget _untitledBody(bool isEditing) =>
+    const SizedBox(height: 120, child: Text('Тело'));
+
+/// Лист без заголовка, у которого есть полоса, пока истинно [editing].
+Future<_OpenedSheet> _openUntitledSheet(
+  WidgetTester tester, {
+  ValueListenable<bool> editing = const AlwaysStoppedAnimation(false),
+  bool hostsMessages = false,
+  Widget Function(bool isEditing) body = _untitledBody,
+}) => _openSheet(
+  tester,
+  (context) => showDoableSheet<void>(
+    context: context,
+    hostsMessages: hostsMessages,
+    builder: (context, sheet) => ValueListenableBuilder(
+      valueListenable: editing,
+      builder: (context, isEditing, _) => Sheet.untitled(
+        sheet,
+        label: _untitledLabel,
+        bar: isEditing
+            ? TopBar.withButton(
+                context,
+                title: 'Описание',
+                backLabel: 'Назад',
+                onBack: _ignore,
+                buttonLabel: 'Сохранить',
+                onButtonPressed: _ignore,
+              )
+            : null,
+        child: body(isEditing),
+      ),
+    ),
+  ),
 );
 
 /// Касание шапки, которое движется медленно: шаги разделены паузой длиннее
