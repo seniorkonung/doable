@@ -168,6 +168,21 @@ void main() {
     final refreshLine = find.byWidgetPredicate((widget) => widget is ListState);
     const size = Size(390, 1000);
 
+    /// Строка занимает место всегда, поэтому вне обновления она только скрыта:
+    /// не принимает нажатий и отсутствует в семантике.
+    void expectRefreshLineHidden() {
+      expect(refreshLine.hitTestable(), findsNothing);
+      expect(find.semantics.byLabel('Обновляем…'), findsNothing);
+    }
+
+    void expectRefreshLineShown(WidgetTester tester) {
+      expect(refreshLine.hitTestable(), findsOneWidget);
+      expect(
+        tester.getSemantics(find.text('Обновляем…')),
+        isSemantics(label: 'Обновляем…', isLiveRegion: true),
+      );
+    }
+
     /// Положения всего, что не должно сдвигаться при обновлении.
     List<Offset> positions(WidgetTester tester) => [
       for (final finder in [
@@ -184,6 +199,7 @@ void main() {
         'появление и исчезновение не двигают заголовки и карточки', (
       tester,
     ) async {
+      final semantics = tester.ensureSemantics();
       final repository = CatalogPageRepository();
       await pumpCatalogPage(
         tester,
@@ -195,11 +211,11 @@ void main() {
       repository.completeFirst(0, [open, done], total: 2);
       await tester.pumpAndSettle();
       final before = positions(tester);
-      expect(refreshLine, findsNothing);
+      expectRefreshLineHidden();
 
       await confirmOutsideChoiceChange(tester, repository, open, revision: 1);
 
-      expect(find.text('Обновляем…'), findsOneWidget);
+      expectRefreshLineShown(tester);
       expect(positions(tester), before);
       final heading = tester.getRect(find.byType(DayHeading));
       final line = tester.getRect(refreshLine);
@@ -210,12 +226,56 @@ void main() {
 
       repository.completeFirst(1, [open, done], total: 2, revision: 1);
       await tester.pumpAndSettle();
-      expect(refreshLine, findsNothing);
+      expectRefreshLineHidden();
       expect(positions(tester), before);
+      semantics.dispose();
+    });
+
+    testWidgets('при масштабе 200% строка обновления не ложится на текст '
+        'заголовка дня, а её появление и исчезновение ничего не двигают', (
+      tester,
+    ) async {
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final semantics = tester.ensureSemantics();
+      final repository = CatalogPageRepository();
+      await pumpCatalogPage(
+        tester,
+        repository,
+        today: day,
+        locale: const Locale('ru'),
+        size: const Size(360, 2000),
+      );
+      repository.completeFirst(0, [open, done], total: 2);
+      await tester.pumpAndSettle();
+      final before = positions(tester);
+      final heading = tester.getSize(find.byType(DayHeading));
+      expectRefreshLineHidden();
+
+      await confirmOutsideChoiceChange(tester, repository, open, revision: 1);
+
+      expectRefreshLineShown(tester);
+      expect(positions(tester), before);
+      expect(tester.getSize(find.byType(DayHeading)), heading);
+      final line = tester.getRect(refreshLine);
+      for (final text in [
+        find.textContaining('Воскресенье'),
+        find.text('4 октября 2026'),
+      ]) {
+        expect(line.overlaps(tester.getRect(text)), isFalse);
+      }
+
+      repository.completeFirst(1, [open, done], total: 2, revision: 1);
+      await tester.pumpAndSettle();
+      expectRefreshLineHidden();
+      expect(positions(tester), before);
+      expect(tester.getSize(find.byType(DayHeading)), heading);
+      semantics.dispose();
     });
 
     testWidgets('обновление после записи выполнения не двигает заголовки и '
         'карточки', (tester) async {
+      final semantics = tester.ensureSemantics();
       final repository = CatalogPageRepository();
       await pumpCatalogPage(
         tester,
@@ -235,18 +295,20 @@ void main() {
       );
       await tester.pump();
       final before = positions(tester);
-      expect(refreshLine, findsNothing);
+      expectRefreshLineHidden();
 
       repository.confirmCompletion(0, done, isCompleted: false, revision: 1);
       await tester.pump();
       await tester.pump();
 
-      expect(refreshLine, findsOneWidget);
+      expectRefreshLineShown(tester);
       expect(positions(tester), before);
+      semantics.dispose();
     });
 
     testWidgets('устаревшая выдача показывает Notice с повтором только при '
         'доказанно временном отказе и сохраняет карточки', (tester) async {
+      final semantics = tester.ensureSemantics();
       final repository = CatalogPageRepository();
       await pumpCatalogPage(
         tester,
@@ -269,13 +331,13 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(refreshLine, findsNothing);
+      expectRefreshLineHidden();
       expect(find.byKey(const ValueKey('daily-choice-row-2')), findsOneWidget);
 
       await tester.tap(find.text(l10n.commonRetry));
       await tester.pump();
       expect(find.byType(Notice), findsNothing);
-      expect(refreshLine, findsOneWidget);
+      expectRefreshLineShown(tester);
 
       repository.fail(2, const DailyChoiceCatalogCorruptionFailure());
       await tester.pumpAndSettle();
@@ -287,6 +349,7 @@ void main() {
         findsOneWidget,
       );
       expect(find.text(l10n.commonRetry), findsNothing);
+      semantics.dispose();
     });
   });
 

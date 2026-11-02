@@ -209,45 +209,17 @@ final class _DailyChoiceCatalogBodyState
                             DoableMetrics.space5,
                             0,
                           ),
-                          // Высоту задаёт только заголовок, поэтому строка
-                          // обновления не сдвигает выдачу:
-                          // https://api.flutter.dev/flutter/widgets/Stack-class.html
-                          child: Stack(
-                            fit: StackFit.passthrough,
-                            children: [
-                              DayHeading(
-                                weekday:
-                                    weekday[0].toUpperCase() +
-                                    weekday.substring(1),
-                                // Явный формат сохраняет порядок и не добавляет
-                                // «г.»:
-                                // https://pub.dev/documentation/intl/latest/intl/DateFormat-class.html
-                                date: DateFormat(
-                                  'd MMMM y',
-                                  locale,
-                                ).format(date),
-                                todayLabel: selectedDate == _localDay.today
-                                    ? l10n.dailyChoiceCalendarToday
-                                    : null,
-                              ),
-                              if (state case DailyChoiceCatalogLoaded(
-                                freshness: DailyChoiceCatalogFreshness
-                                    .refreshing,
-                              ))
-                                // Строка высотой 18 стоит по центру строки дня
-                                // высотой 24.
-                                PositionedDirectional(
-                                  top: 3,
-                                  start: 0,
-                                  end: 0,
-                                  child: Align(
-                                    alignment: AlignmentDirectional.topEnd,
-                                    child: ListState.refreshing(
-                                      text: l10n.dailyChoiceCatalogRefreshing,
-                                    ),
-                                  ),
-                                ),
-                            ],
+                          child: DayHeading(
+                            weekday:
+                                weekday[0].toUpperCase() + weekday.substring(1),
+                            // Явный формат сохраняет порядок и не добавляет
+                            // «г.»:
+                            // https://pub.dev/documentation/intl/latest/intl/DateFormat-class.html
+                            date: DateFormat('d MMMM y', locale).format(date),
+                            todayLabel: selectedDate == _localDay.today
+                                ? l10n.dailyChoiceCalendarToday
+                                : null,
+                            trailing: _refreshLine(state, l10n),
                           ),
                         ),
                       ),
@@ -269,6 +241,29 @@ final class _DailyChoiceCatalogBodyState
               onPressed: _returnToStart,
             )
           : null,
+    );
+  }
+
+  /// Строка обновления занимает место всегда, поэтому её появление не меняет
+  /// заголовок дня и не двигает выдачу.
+  ///
+  /// Сохранение размера требует сохранить анимацию, поэтому вне обновления
+  /// кольцо останавливает отдельный [TickerMode]: иначе скрытая строка
+  /// запрашивала бы кадры постоянно.
+  /// https://api.flutter.dev/flutter/widgets/Visibility/maintainSize.html
+  Widget _refreshLine(DailyChoiceCatalogState state, AppLocalizations l10n) {
+    final isRefreshing =
+        state is DailyChoiceCatalogLoaded &&
+        state.freshness == DailyChoiceCatalogFreshness.refreshing;
+    return Visibility(
+      visible: isRefreshing,
+      maintainState: true,
+      maintainAnimation: true,
+      maintainSize: true,
+      child: TickerMode(
+        enabled: isRefreshing,
+        child: ListState.refreshing(text: l10n.dailyChoiceCatalogRefreshing),
+      ),
     );
   }
 
@@ -813,7 +808,7 @@ bool _hasSameScrollContent(
     (DailyChoiceCatalogLoaded before, DailyChoiceCatalogLoaded after) =>
       _hasSameSectionContent(before.incomplete, after.incomplete) &&
           _hasSameSectionContent(before.completed, after.completed) &&
-          // Строка обновления стоит над прокруткой, а отказ — внутри неё.
+          // Место строки обновления занято всегда, а отказ добавляет карточку.
           before.refreshFailure == after.refreshFailure &&
           // Отказ изменения выполнения выводится внутри карточки.
           mapEquals(before.completionOperations, after.completionOperations),
