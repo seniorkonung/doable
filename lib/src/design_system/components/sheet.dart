@@ -614,8 +614,10 @@ final class Sheet extends StatelessWidget {
   /// [label] называет лист диктору. Лист движется как [Sheet.expandable], а его
   /// компактная высота — весь предел. Над [slivers] стоит только ручка: список
   /// начинается в 6 под её линией, а область нажатия ручки лежит над первым
-  /// срезом и принимает касания. [expandLabel] и [collapseLabel] — доступные
-  /// названия ручки.
+  /// срезом и принимает касания. Срезы идут от края до края листа: поля задаёт
+  /// потребитель, потому что области нажатия шапки выбора и полоса вкладок
+  /// выходят за поле содержимого, а список обрезал бы их и нажатия по ним.
+  /// [expandLabel] и [collapseLabel] — доступные названия ручки.
   Sheet.expandableUntitled(
     this._presentation, {
     required String label,
@@ -1108,7 +1110,12 @@ final class _ExpandableSheetState extends State<_ExpandableSheet>
         slivers: parts.slivers,
       );
       return _SheetLayout(
-        minimum: const EdgeInsets.symmetric(horizontal: DoableMetrics.space3),
+        minimum: switch (parts.head) {
+          _TitledHead() => const EdgeInsets.symmetric(
+            horizontal: DoableMetrics.space3,
+          ),
+          _LabeledHead() => EdgeInsets.zero,
+        },
         head: switch (parts.head) {
           final _TitledHead head => Column(
             mainAxisSize: MainAxisSize.min,

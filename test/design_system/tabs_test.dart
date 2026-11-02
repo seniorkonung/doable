@@ -142,6 +142,55 @@ void main() {
       semantics.dispose();
     });
 
+    testWidgets('в $themeName теме полоса на листе лежит на его плоскости и '
+        'затухает в неё', (tester) async {
+      await tester.pumpWidget(
+        _app(
+          brightness,
+          Tabs(
+            items: _items,
+            value: _Section.overview,
+            label: 'Разделы',
+            plane: TabsPlane.sheet,
+            onChange: (_) {},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final plane = tester.widget<Material>(
+        find
+            .descendant(
+              of: find.byType(Tabs<_Section>),
+              matching: find.byType(Material),
+            )
+            .first,
+      );
+      expect(plane.color, colors.raised);
+      final fades = tester
+          .widgetList<DecoratedBox>(
+            find.descendant(
+              of: find.byType(Tabs<_Section>),
+              matching: find.byWidgetPredicate(
+                (widget) =>
+                    widget is DecoratedBox &&
+                    widget.decoration is BoxDecoration &&
+                    (widget.decoration as BoxDecoration).gradient != null,
+              ),
+            ),
+          )
+          .map(
+            (fade) =>
+                ((fade.decoration as BoxDecoration).gradient as LinearGradient)
+                    .colors,
+          );
+      final clear = colors.raised.withValues(alpha: 0);
+      expect(fades, [
+        [colors.raised, clear],
+        [clear, colors.raised],
+      ]);
+    });
+
     testWidgets('в $themeName теме полоса затухает по краям и показывает '
         'hairline только при закреплении без изменения высоты', (tester) async {
       for (final stuck in [false, true]) {

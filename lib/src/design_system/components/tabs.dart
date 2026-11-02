@@ -26,6 +26,9 @@ final class TabItem<T extends Object> {
   final DoableIconData? icon;
 }
 
+/// Плоскость под полосой вкладок: фон полосы и цвет, в который затухают её края.
+enum TabsPlane { page, sheet }
+
 /// Прокручиваемая полоса вкладок. Выбором и закреплением управляет страница.
 final class Tabs<T extends Object> extends StatefulWidget {
   const Tabs({
@@ -34,6 +37,7 @@ final class Tabs<T extends Object> extends StatefulWidget {
     required this.onChange,
     required this.label,
     this.stuck = false,
+    this.plane = TabsPlane.page,
     super.key,
   });
 
@@ -42,6 +46,7 @@ final class Tabs<T extends Object> extends StatefulWidget {
   final ValueChanged<T> onChange;
   final String label;
   final bool stuck;
+  final TabsPlane plane;
 
   /// Высота закреплённой полосы для `SliverPersistentHeader`: 52 при обычном
   /// тексте, с ростом пилюль при увеличении системного масштаба.
@@ -113,8 +118,12 @@ final class _TabsState<T extends Object> extends State<Tabs<T>> {
     );
     final colors = Theme.of(context).extension<DoableColors>()!;
     final pillHeight = Tabs._pillHeight(context);
+    final (plane, fade) = switch (widget.plane) {
+      TabsPlane.page => (colors.bg, colors.bgFade),
+      TabsPlane.sheet => (colors.raised, colors.raised.withValues(alpha: 0)),
+    };
     return Material(
-      color: colors.bg,
+      color: plane,
       child: DecoratedBox(
         position: DecorationPosition.foreground,
         decoration: BoxDecoration(
@@ -172,9 +181,7 @@ final class _TabsState<T extends Object> extends State<Tabs<T>> {
                     child: IgnorePointer(
                       child: DecoratedBox(
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [colors.bg, colors.bgFade],
-                          ),
+                          gradient: LinearGradient(colors: [plane, fade]),
                         ),
                       ),
                     ),
@@ -187,9 +194,7 @@ final class _TabsState<T extends Object> extends State<Tabs<T>> {
                     child: IgnorePointer(
                       child: DecoratedBox(
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [colors.bgFade, colors.bg],
-                          ),
+                          gradient: LinearGradient(colors: [fade, plane]),
                         ),
                       ),
                     ),

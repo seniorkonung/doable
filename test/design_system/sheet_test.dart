@@ -1898,8 +1898,8 @@ void main() {
   for (final hostsMessages in [false, true]) {
     testWidgets('раскрываемый лист без заголовка'
         '${hostsMessages ? ' с сообщениями поверх' : ''} занимает весь предел, '
-        'начинает тело в 6 под линией ручки, кончается телом и называет себя '
-        'диктору', (tester) async {
+        'начинает тело в 6 под линией ручки, ведёт его от края до края, '
+        'кончается телом и называет себя диктору', (tester) async {
       final semantics = tester.ensureSemantics();
       await _openExpandableUntitledSheet(tester, hostsMessages: hostsMessages);
 
@@ -1910,10 +1910,9 @@ void main() {
         tester.getRect(find.text('Шапка')).top,
         sheet.top + DoableMetrics.space2 + 4 + 6,
       );
-      expect(
-        tester.getRect(find.byType(CustomScrollView)).bottom,
-        sheet.bottom - _homeIndicator - DoableMetrics.space4,
-      );
+      final list = tester.getRect(find.byType(CustomScrollView));
+      expect(list.bottom, sheet.bottom - _homeIndicator - DoableMetrics.space4);
+      expect((list.left, list.right), (sheet.left, sheet.right));
       expect(find.byType(Button), findsNothing);
       expect(
         tester.getSemantics(find.bySemanticsLabel(_untitledLabel)),
