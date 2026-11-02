@@ -1,5 +1,6 @@
 import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
+import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -312,7 +313,8 @@ void main() {
     expectAssignments();
   });
 
-  test('замена и удаление дубликата снимают только последние ссылки', () async {
+  test('удаление выбора, создание нового и удаление дубликата снимают только '
+      'последние ссылки', () async {
     addChoice(201);
     addChoice(202);
     seedRawGraph(raw, () {
@@ -327,9 +329,12 @@ void main() {
       );
     });
 
-    final replacement = await repository.execute(
-      ReplaceDailyChoicePath(
-        choiceId: _choice(201),
+    expect(
+      await repository.execute(DeleteDailyChoice(_choice(201))),
+      isA<GraphCommandSucceeded>(),
+    );
+    final created = await repository.execute(
+      CreateDailyChoice(
         sourceIntentionId: _intention(5),
         selectedIntentionId: _intention(4),
         path: ConfirmedChoicePath([
@@ -340,14 +345,21 @@ void main() {
             relatedIntentionId: _intention(4),
           ),
         ]),
+        date: CalendarDate.fromParts(2026, 9, 23),
+        description: null,
+        isCompleted: false,
       ),
     );
-    expect(replacement, isA<GraphCommandSucceeded>());
+    expect(created, isA<GraphCommandSucceeded>());
     expect(
-      raw.select(
-        'SELECT long_term_relation_id FROM daily_choice_path_steps WHERE daily_choice_id = ?',
-        [_uuid(201)],
-      ).single['long_term_relation_id'],
+      raw
+          .select(
+            '''SELECT long_term_relation_id FROM daily_choice_path_steps
+           WHERE daily_choice_id =
+             (SELECT id FROM daily_choices WHERE source_intention_id = ?)''',
+            [_uuid(5)],
+          )
+          .single['long_term_relation_id'],
       _uuid(104),
     );
     expect(count('daily_choice_path_steps'), 3);
