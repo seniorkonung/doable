@@ -2558,5 +2558,13 @@
   "batchAddNone": "Add relations",
   "@batchAddNone": {"description": "Недоступная кнопка поиска участника группы без отметок"},
   "batchAdding": "Adding…",
-  "@batchAdding": {"description": "Кнопка поиска участника группы во время добавления"}
+  "@batchAdding": {"description": "Кнопка поиска участника группы во время добавления"},
+  "batchDiscardTitle": "Discard selected intentions?",
+  "@batchDiscardTitle": {"description": "Вопрос перед сбросом отметок поиска"},
+  "batchDiscardMessage": "{count, plural, one{{count} relation will not be added.} other{{count} relations will not be added.}}",
+  "@batchDiscardMessage": {"description": "Число связей при сбросе отметок поиска", "placeholders": {"count": {"type": "int"}}},
+  "batchDiscardAction": "Discard",
+  "@batchDiscardAction": {"description": "Сбросить отметки поиска"},
+  "batchContinueAction": "Continue selecting",
+  "@batchContinueAction": {"description": "Продолжить отмечать намерения"}
 }

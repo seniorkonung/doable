@@ -987,5 +987,9 @@
   "@batchRemove": {"placeholders": {"name": {"type": "String"}}},
   "batchAddCount": "{count, plural, one{Добавить {count} связь} few{Добавить {count} связи} many{Добавить {count} связей} other{Добавить {count} связи}}",
   "batchAddNone": "Добавить связи",
-  "batchAdding": "Добавляем…"
+  "batchAdding": "Добавляем…",
+  "batchDiscardTitle": "Сбросить выбранные намерения?",
+  "batchDiscardMessage": "{count, plural, one{{count} связь не будет добавлена.} few{{count} связи не будут добавлены.} many{{count} связей не будут добавлены.} other{{count} связи не будут добавлены.}}",
+  "batchDiscardAction": "Сбросить",
+  "batchContinueAction": "Продолжить выбор"
 }

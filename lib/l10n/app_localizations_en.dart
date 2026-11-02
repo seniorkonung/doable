@@ -3354,4 +3354,24 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get batchAdding => 'Adding…';
+
+  @override
+  String get batchDiscardTitle => 'Discard selected intentions?';
+
+  @override
+  String batchDiscardMessage(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count relations will not be added.',
+      one: '$count relation will not be added.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get batchDiscardAction => 'Discard';
+
+  @override
+  String get batchContinueAction => 'Continue selecting';
 }

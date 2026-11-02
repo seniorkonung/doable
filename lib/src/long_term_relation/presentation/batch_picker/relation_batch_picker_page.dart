@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
 import '../../../design_system/components/button.dart';
+import '../../../design_system/components/confirm_dialog.dart';
 import '../../../design_system/components/docked_footer.dart';
 import '../../../design_system/components/notice.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
@@ -43,6 +44,7 @@ final class RelationBatchPickerPage extends ConsumerStatefulWidget {
 final class _RelationBatchPickerPageState
     extends ConsumerState<RelationBatchPickerPage> {
   final _session = IntentionSearchSession();
+  bool _confirmingClose = false;
 
   late final _purpose = SelectRelationParticipant(
     session: _session,
@@ -71,8 +73,29 @@ final class _RelationBatchPickerPageState
       }
     });
     return PopScope<void>(
+      canPop: batch.selected.isEmpty || !batch.canEdit,
       onPopInvokedWithResult: (didPop, _) {
-        if (didPop) ref.read(provider.notifier).leave();
+        if (didPop) {
+          ref.read(provider.notifier).leave();
+        } else if (batch.selected.isNotEmpty &&
+            batch.canEdit &&
+            !_confirmingClose) {
+          _confirmingClose = true;
+          unawaited(() async {
+            final discard = await showDiscardDialog(
+              context: context,
+              title: l10n.batchDiscardTitle,
+              text: l10n.batchDiscardMessage(batch.selected.length),
+              discardLabel: l10n.batchDiscardAction,
+              keepLabel: l10n.batchContinueAction,
+            );
+            _confirmingClose = false;
+            if (discard && context.mounted) {
+              ref.read(provider.notifier).leave();
+              context.router.removeRoute(context.routeData);
+            }
+          }());
+        }
       },
       child: IntentionPickerView(
         purpose: _purpose,

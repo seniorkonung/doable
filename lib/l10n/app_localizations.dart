@@ -5250,6 +5250,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Adding…'**
   String get batchAdding;
+
+  /// Вопрос перед сбросом отметок поиска
+  ///
+  /// In en, this message translates to:
+  /// **'Discard selected intentions?'**
+  String get batchDiscardTitle;
+
+  /// Число связей при сбросе отметок поиска
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{{count} relation will not be added.} other{{count} relations will not be added.}}'**
+  String batchDiscardMessage(int count);
+
+  /// Сбросить отметки поиска
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get batchDiscardAction;
+
+  /// Продолжить отмечать намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Continue selecting'**
+  String get batchContinueAction;
 }
 
 class _AppLocalizationsDelegate

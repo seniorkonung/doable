@@ -185,6 +185,77 @@ void main() {
     matching: find.byType(FilledButton),
   );
 
+  testWidgets(
+    'крестик спрашивает о сбросе и сохраняет отметки при продолжении',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      await open(tester, IntentionRelationGroup.neededFor);
+      await tester.tap(find.text('Плавать'));
+      await tester.tap(find.text('Бегать'));
+      await tester.tap(find.text('Высыпаться'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('participant-picker-cancel')));
+      await tester.pumpAndSettle();
+      expect(find.text('Сбросить выбранные намерения?'), findsOneWidget);
+      expect(find.text('3 связи не будут добавлены.'), findsOneWidget);
+      final l10n = AppLocalizations.of(
+        tester.element(find.byType(RelationBatchPickerPage)),
+      );
+      expect(l10n.batchDiscardMessage(5), '5 связей не будут добавлены.');
+      expect(l10n.batchDiscardMessage(11), '11 связей не будут добавлены.');
+      expect(l10n.batchDiscardMessage(21), '21 связь не будет добавлена.');
+      await tester.tap(find.text('Продолжить выбор'));
+      await tester.pumpAndSettle();
+      expect(find.text('Добавить 3 связи'), findsOneWidget);
+      expect(
+        tester.getSemantics(find.text('Плавать')).flagsCollection.isChecked,
+        CheckedState.isTrue,
+      );
+      semantics.dispose();
+    },
+  );
+
+  testWidgets(
+    'системное назад позволяет сбросить отметки без создания связей',
+    (tester) async {
+      await open(tester, IntentionRelationGroup.neededFor);
+      await tester.tap(find.text('Плавать'));
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text('1 связь не будет добавлена.'), findsOneWidget);
+      await tester.tap(find.text('Сбросить'));
+      await tester.pumpAndSettle();
+      expect(find.byType(RelationBatchPickerPage), findsNothing);
+      expect(await tester.runAsync(relations), hasLength(4));
+    },
+  );
+
+  testWidgets('без отметок крестик закрывает поиск сразу', (tester) async {
+    await open(tester, IntentionRelationGroup.neededFor);
+    await tester.tap(find.byKey(const ValueKey('participant-picker-cancel')));
+    await tester.pumpAndSettle();
+    expect(find.byType(RelationBatchPickerPage), findsNothing);
+    expect(find.text('Сбросить выбранные намерения?'), findsNothing);
+  });
+
+  testWidgets('подтверждение сброса переводится на английский', (tester) async {
+    await open(
+      tester,
+      IntentionRelationGroup.neededFor,
+      locale: const Locale('en'),
+    );
+    await tester.tap(find.text('Плавать'));
+    await tester.tap(find.text('Бегать'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('participant-picker-cancel')));
+    await tester.pumpAndSettle();
+    expect(find.text('Discard selected intentions?'), findsOneWidget);
+    expect(find.text('2 relations will not be added.'), findsOneWidget);
+    expect(find.text('Discard'), findsOneWidget);
+    expect(find.text('Continue selecting'), findsOneWidget);
+  });
+
   testWidgets('кнопка называет число связей, а без отметок недоступна', (
     tester,
   ) async {

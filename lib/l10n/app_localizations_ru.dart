@@ -3382,4 +3382,26 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get batchAdding => 'Добавляем…';
+
+  @override
+  String get batchDiscardTitle => 'Сбросить выбранные намерения?';
+
+  @override
+  String batchDiscardMessage(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count связи не будут добавлены.',
+      many: '$count связей не будут добавлены.',
+      few: '$count связи не будут добавлены.',
+      one: '$count связь не будет добавлена.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get batchDiscardAction => 'Сбросить';
+
+  @override
+  String get batchContinueAction => 'Продолжить выбор';
 }
