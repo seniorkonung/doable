@@ -4,35 +4,49 @@ import 'dart:ui' show CheckedState;
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
-import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/data/local/app_database.dart' hide Tag;
 import 'package:doable/src/design_system/components/catalog_header.dart';
 import 'package:doable/src/design_system/components/docked_footer.dart';
+import 'package:doable/src/design_system/components/filter_button.dart';
 import 'package:doable/src/design_system/components/notice.dart';
 import 'package:doable/src/design_system/components/picker_row.dart';
+import 'package:doable/src/design_system/components/top_bar.dart';
 import 'package:doable/src/design_system/doable_metrics.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
+import 'package:doable/src/intention/application/intention_catalog.dart'
+    hide IntentionCatalogPage;
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
+import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/picker/intention_picker_view.dart';
 import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
+import 'package:doable/src/long_term_relation/application/relation_pair_probe.dart';
 import 'package:doable/src/long_term_relation/presentation/batch_picker/relation_batch_picker_page.dart';
+import 'package:doable/src/tag/application/tag_command.dart';
+import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
+import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:drift/drift.dart' show OrderingTerm, Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../intention/presentation/catalog/catalog_reconciliation_test_support.dart';
+import '../../../intention/presentation/catalog/catalog_test_support.dart'
+    show ControlledCatalogRepository, TestCatalogRevision, testSummary;
 import '../../../intention/presentation/picker/intention_picker_test_support.dart';
+import '../../../support/app_root_pages.dart';
 import '../../../support/graph_seed.dart';
 import '../../../support/in_memory_diagnostics_sink.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
+import '../../../support/tag_condition_cycles.dart';
 import '../../../support/tag_positions.dart';
 
 String _uuid(int value) =>
@@ -41,6 +55,8 @@ IntentionId _id(int value) =>
     (IntentionId.decode(_uuid(value)) as IntentionIdDecodingSuccess).id;
 
 void main() {
+  _defineControlledCatalogTests();
+
   late AppDatabase database;
   late AppRouter router;
 
@@ -933,6 +949,26 @@ void main() {
     semantics.dispose();
   });
 
+  testWidgets('экран с отметкой и открытый лист назначения доступны для '
+      'нажатия и контрастны', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await open(tester, IntentionRelationGroup.needs);
+    await tester.tap(find.text('Гулять'));
+    await tester.pumpAndSettle();
+
+    Future<void> expectAccessible() async {
+      await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(textContrastGuideline));
+    }
+
+    await expectAccessible();
+    await tester.tap(find.text('Добавить в "Нужно" · выбрано 1'));
+    await tester.pumpAndSettle();
+    await expectAccessible();
+    semantics.dispose();
+  });
+
   testWidgets(
     'условия тегов сохраняют активный охват и исключают намерение страницы',
     (tester) async {
@@ -994,3 +1030,311 @@ void main() {
     },
   );
 }
+
+/// Страница, из которой открыт поиск группы «Нужно» в проверках управляемой
+/// выдачи.
+final _pageIntentionId = testSummary(index: 9).id;
+
+final _needsProbe = RelationPairProbe.forGroup(
+  intentionId: _pageIntentionId,
+  group: IntentionRelationGroup.needs,
+);
+
+/// Проверки, которым нужна управляемая выдача: запрос 0 принадлежит каталогу,
+/// запрос 1 — первой порции поиска.
+void _defineControlledCatalogTests() {
+  for (final (language, title, cancelLabel, emptyMessage) in const [
+    (
+      'ru',
+      'Выбор намерений',
+      'Отменить выбор намерения',
+      'Других намерений для выбора нет.',
+    ),
+    (
+      'en',
+      'Choose intentions',
+      'Cancel intention selection',
+      'No other intentions are available to select.',
+    ),
+  ]) {
+    testWidgets('$language: шапка называет поиск и крестик, а пустой охват '
+        'называет своё сообщение', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final repository = ControlledCatalogRepository();
+      await _openPicker(tester, repository, locale: Locale(language));
+      repository.complete(1, _page(const []));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.descendant(of: find.byType(TopBar), matching: find.text(title)),
+        findsOneWidget,
+      );
+      expect(
+        tester.getSemantics(_cancel),
+        isSemantics(label: cancelLabel, isButton: true, hasTapAction: true),
+      );
+      expect(find.text(emptyMessage), findsOneWidget);
+      semantics.dispose();
+    });
+  }
+
+  testWidgets('кнопка фильтра открывает панель тегов, где условие добавляется, '
+      'переключается и снимается с прежними охватом и пробой пары, а закрытие '
+      'поиска не выполняет команд', (tester) async {
+    final repository = ControlledCatalogRepository();
+    final sport = _tag(2, 'Спорт');
+    repository.tagCatalogItems = [_tag(1, 'Здоровье'), sport];
+    final opened = await _openPicker(tester, repository);
+    repository.complete(1, _page(_summaries(const [], count: 3)));
+    await tester.pumpAndSettle();
+
+    await tester.tap(_filterButton);
+    await tester.pumpAndSettle();
+    expect(find.text('Filter by tags'), findsOneWidget);
+    // Первое нажатие требует тег, второе исключает его.
+    await tester.tap(_panelRow(sport));
+    await _pumpUntilQueries(tester, repository, 3);
+    _expectParticipantQuery(
+      repository.queryAt(2),
+      IntentionTagFilter(requiredTagIds: [sport.id]),
+    );
+    await tester.tap(_panelRow(sport));
+    await _pumpUntilQueries(tester, repository, 4);
+    _expectParticipantQuery(
+      repository.queryAt(3),
+      IntentionTagFilter(excludedTagIds: [sport.id]),
+    );
+    repository.complete(3, _page(_summaries(const [], count: 2)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Done'));
+    await tester.pumpAndSettle();
+
+    expect(opened.router.current.name, RelationBatchPickerRoute.name);
+    expect(tester.widget<FilterButton>(_filterButton).count, 1);
+    expect(intentionPickerRows, findsNWidgets(2));
+
+    // Третье нажатие снимает условие.
+    await tester.tap(_filterButton);
+    await tester.pumpAndSettle();
+    await tester.tap(_panelRow(sport));
+    await _pumpUntilQueries(tester, repository, 5);
+    _expectParticipantQuery(repository.queryAt(4), IntentionTagFilter.empty);
+    repository.complete(4, _page(_summaries(const [], count: 3)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Done'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<FilterButton>(_filterButton).count, 0);
+    expect(intentionPickerRows, findsNWidgets(3));
+
+    await tester.tap(_cancel);
+    await tester.pumpAndSettle();
+    expect(find.byType(RelationBatchPickerPage), findsNothing);
+    _expectNoCommands(repository);
+  });
+
+  testWidgets('отказ новой выдачи после удаления исключённого тега показан '
+      'отказом первой порции, а повтор показывает выдачу без его условия с '
+      'прежними охватом и пробой пары', (tester) async {
+    final repository = ControlledCatalogRepository();
+    final health = _tag(1, 'Здоровье');
+    final rest = _tag(2, 'Отдых');
+    final remaining = IntentionTagFilter(requiredTagIds: [health.id]);
+    final opened = await _openPicker(tester, repository);
+    await _applyConditions(tester, opened.container, repository, [
+      (health, IntentionTagRequirement.mustBePresent),
+      (rest, IntentionTagRequirement.mustBeAbsent),
+    ], _page(_summaries([health], count: 3)));
+    final restarted = repository.queries.length;
+
+    final accepted = acceptTagCommand(
+      opened.container,
+      repository,
+      DeleteTag(rest.id),
+      tagDeletionSuccess(
+        tagId: rest.id,
+        revision: const TestCatalogRevision(2),
+      ),
+    );
+    await accepted.future;
+    await _pumpUntilQueries(tester, repository, restarted + 1);
+    _expectParticipantQuery(repository.queryAt(restarted), remaining);
+    repository.complete(
+      restarted,
+      const ResultFailure(IntentionUnavailableFailure()),
+    );
+    await tester.pumpAndSettle();
+
+    const message = 'Intentions couldn’t be loaded. Try again.';
+    expect(find.text(message), findsOneWidget);
+    expect(intentionPickerRows, findsNothing);
+
+    await tester.tap(find.text('Try again'));
+    await _pumpUntilQueries(tester, repository, restarted + 2);
+    _expectParticipantQuery(repository.queryAt(restarted + 1), remaining);
+    repository.complete(
+      restarted + 1,
+      _page(_summaries([health], count: 4), revision: 2),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text(message), findsNothing);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is CatalogHeader &&
+            widget.title == 'All' &&
+            widget.count == 4,
+      ),
+      findsOneWidget,
+    );
+    expect(intentionPickerRows, findsNWidgets(4));
+    _expectNoCommands(repository, tagCommands: 1);
+  });
+}
+
+final _cancel = find.byKey(const ValueKey('participant-picker-cancel'));
+final _filterButton = find.byType(FilterButton);
+
+Finder _panelRow(Tag tag) =>
+    find.byKey(ValueKey('tags-panel-row-${tag.id.toCanonicalString()}'));
+
+/// Открывает поиск группы «Нужно» поверх каталога с управляемой выдачей.
+Future<({ProviderContainer container, AppRouter router})> _openPicker(
+  WidgetTester tester,
+  ControlledCatalogRepository repository, {
+  Locale locale = const Locale('en'),
+}) async {
+  final container = reconciliationCatalogContainer(repository);
+  final router = AppRouter();
+  addTearDown(container.dispose);
+  addTearDown(router.dispose);
+  await tester.pumpWidget(
+    UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp.router(
+        theme: doableTheme(Brightness.light),
+        locale: locale,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        routerConfig: router.config(),
+      ),
+    ),
+  );
+  await tester.pump();
+  await openIntentionGraph(tester);
+  repository.complete(0, _page(const []));
+  await tester.pumpAndSettle();
+  unawaited(
+    router.push(
+      RelationBatchPickerRoute(
+        pageIntentionId: _pageIntentionId,
+        pageTitle: 'Здоровье',
+        group: IntentionRelationGroup.needs,
+      ),
+    ),
+  );
+  // Ожидание первой порции показывает бесконечный индикатор, поэтому кадры
+  // перехода продвигаются явно.
+  await tester.pump();
+  await tester.pump();
+  await tester.pump(const Duration(seconds: 1));
+  return (container: container, router: router);
+}
+
+/// Передаёт модели условий выбор так же, как его возвращает панель тегов.
+/// Каждое условие сразу начинает новую выдачу; [result] отвечает на последнюю.
+Future<void> _applyConditions(
+  WidgetTester tester,
+  ProviderContainer container,
+  ControlledCatalogRepository repository,
+  List<(Tag, IntentionTagRequirement)> conditions,
+  Result<IntentionCatalogFirstPage> result,
+) async {
+  final model = container.read(
+    intentionTagConditionsViewModelProvider(
+      tester
+          .widget<IntentionPickerView>(find.byType(IntentionPickerView))
+          .purpose,
+    ).notifier,
+  );
+  var expectedQueries = repository.queries.length;
+  for (final (tag, requirement) in conditions) {
+    for (var i = 0; i < tagConditionCycles(requirement); i++) {
+      model.cycle(tag.id);
+      expectedQueries++;
+      await tester.pump();
+    }
+  }
+  await _pumpUntilQueries(tester, repository, expectedQueries);
+  repository.complete(expectedQueries - 1, result);
+  await tester.pumpAndSettle();
+}
+
+Future<void> _pumpUntilQueries(
+  WidgetTester tester,
+  ControlledCatalogRepository repository,
+  int count,
+) async {
+  for (var attempt = 0; attempt < 1000; attempt++) {
+    await tester.pump(const Duration(milliseconds: 1));
+    if (repository.queries.length >= count) {
+      return;
+    }
+  }
+  fail('Не дождались $count запросов каталога.');
+}
+
+/// Запрос поиска сохраняет активный охват и пробу пары при любых условиях;
+/// готовность поиск не ограничивает.
+void _expectParticipantQuery(
+  IntentionCatalogQuery query,
+  IntentionTagFilter tagFilter,
+) {
+  expect(query.scope, IntentionScope.active);
+  expect(query.readinessFilter, IntentionReadinessFilter.all);
+  expect(query.pairProbe, _needsProbe);
+  expect(query.tagFilter, tagFilter);
+  expect(query.cursor, isNull);
+}
+
+/// Изменение условий не выполняет команд графа, кроме команд тегов теста.
+void _expectNoCommands(
+  ControlledCatalogRepository repository, {
+  int tagCommands = 0,
+}) {
+  expect(repository.tagCommands, hasLength(tagCommands));
+  expect(repository.commands, isEmpty);
+  expect(repository.relationCommands, isEmpty);
+  expect(repository.dailyChoiceCommands, isEmpty);
+}
+
+Result<IntentionCatalogFirstPage> _page(
+  List<IntentionSummary> items, {
+  int revision = 0,
+}) => ResultSuccess(
+  IntentionCatalogFirstPage(
+    items: items,
+    totalCount: items.length,
+    nextCursor: null,
+    revision: TestCatalogRevision(revision),
+  ),
+);
+
+List<IntentionSummary> _summaries(List<Tag> tags, {required int count}) => [
+  for (var index = count; index >= 1; index--)
+    testSummary(index: index, title: 'Намерение $index', tags: tags),
+];
+
+Tag _tag(int index, String name) => Tag(
+  id: switch (TagId.decode(
+    '00000000-0000-4000-8000-${index.toString().padLeft(12, '0')}',
+  )) {
+    TagIdDecodingSuccess(:final id) => id,
+    InvalidTagIdDecoding() => throw StateError(
+      'Некорректный идентификатор тега в тесте.',
+    ),
+  },
+  name: TagName.fromInput(name),
+  color: null,
+  position: tagPositionAt(index),
+);
