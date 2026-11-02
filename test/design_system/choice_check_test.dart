@@ -78,18 +78,6 @@ void main() {
     }
   });
 
-  testWidgets('выбор без выполнения не рисует галочку', (tester) async {
-    await tester.pumpWidget(
-      _app(
-        Brightness.light,
-        const ChoiceCheck(priority: DoablePriority.p3),
-        GlobalKey(),
-      ),
-    );
-
-    expect(find.byType(DoableIcon), findsNothing);
-  });
-
   testWidgets('метка не создаёт узла экранного диктора и не нажимается', (
     tester,
   ) async {

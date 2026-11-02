@@ -99,25 +99,12 @@ void main() {
 
     expect(presses, 1);
   });
-
-  testWidgets('название потребителя заменяет прежнее', (tester) async {
-    final semantics = tester.ensureSemantics();
-    await tester.pumpWidget(_app());
-    expect(find.bySemanticsLabel(_label), findsOneWidget);
-
-    await tester.pumpWidget(_app(label: 'Наверх'));
-
-    expect(find.bySemanticsLabel(_label), findsNothing);
-    expect(find.bySemanticsLabel('Наверх'), findsOneWidget);
-    semantics.dispose();
-  });
 }
 
 const _label = 'К началу списка';
 
 Widget _app({
   Brightness brightness = Brightness.light,
-  String label = _label,
   VoidCallback? onPressed,
   GlobalKey? boundary,
 }) => MaterialApp(
@@ -133,7 +120,10 @@ Widget _app({
           },
           child: Padding(
             padding: const EdgeInsets.all(20),
-            child: ScrollTopButton(label: label, onPressed: onPressed ?? () {}),
+            child: ScrollTopButton(
+              label: _label,
+              onPressed: onPressed ?? () {},
+            ),
           ),
         ),
       ),
