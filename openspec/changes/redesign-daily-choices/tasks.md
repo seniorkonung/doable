@@ -309,10 +309,12 @@
     - Удалены `daily_choice_path_replacement_flow.dart`, `daily_choice_path_replace_page.dart`, `daily_choice_path_replace_state.dart`, `daily_choice_path_replace_view_model.dart` и их тесты.
     - Удалены `ChoicePathPage.forReplacement`, `ChoicePathPurpose.replace` и их ветви заголовка и кнопки. Пересчёт пути перед созданием работает как прежде.
     - Все строки `dailyChoiceReplace*` удалены из обоих файлов локализации.
+    - Значение ключа `relationDeleteReferencedByDailyPath` называет только удаление использующих связь дневных выборов. В `lib/l10n/app_ru.arb`: «Связь используется в сохранённом дневном пути. Сначала удалите использующие её дневные выборы.», в `lib/l10n/app_en.arb`: «This relation is used by a saved daily path. Delete the daily choices that use it first.». Имя ключа и условие показа не меняются. Отдельный тест на текст не добавляется: вернуть эту формулировку нечему.
     - Сценарий безымянного подтверждения замены удалён, а панель над безымянной страницей по-прежнему проверяет сценарий пересчёта пути. Вспомогательные функции без вызывающих удалены.
   - **Проверка:**
     - `mise exec --no-deps -- flutter test test/daily_choice/presentation test/app/navigation`.
     - `mise run codegen-check`.
+    - `grep -nE 'замените|or replace' lib/l10n/app_ru.arb lib/l10n/app_en.arb` ничего не находит.
   - **Зависимости:** нет.
   - **Предполагаемые файлы:**
     - удаляются четыре файла потока в `lib/src/daily_choice/presentation/editor/` и `test/daily_choice/presentation/daily_choice_path_replacement_flow_test.dart`, `editor/daily_choice_path_replace_page_test.dart`, `editor/daily_choice_path_replace_view_model_test.dart`;
