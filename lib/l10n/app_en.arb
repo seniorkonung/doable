@@ -2552,5 +2552,11 @@
   "batchRelatedSemantic": "Related intention: {name}",
   "@batchRelatedSemantic": {"placeholders": {"name": {"type": "String"}}},
   "batchRemove": "Remove selection: {name}",
-  "@batchRemove": {"placeholders": {"name": {"type": "String"}}}
+  "@batchRemove": {"placeholders": {"name": {"type": "String"}}},
+  "batchAddCount": "{count, plural, one{Add {count} relation} other{Add {count} relations}}",
+  "@batchAddCount": {"description": "Кнопка внизу поиска участника группы", "placeholders": {"count": {"type": "int"}}},
+  "batchAddNone": "Add relations",
+  "@batchAddNone": {"description": "Недоступная кнопка поиска участника группы без отметок"},
+  "batchAdding": "Adding…",
+  "@batchAdding": {"description": "Кнопка поиска участника группы во время добавления"}
 }

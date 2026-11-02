@@ -9,17 +9,32 @@ part of 'relation_batch_view_model.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 /// Отметки принадлежат экземпляру поиска и не зависят от его выдачи.
+///
+/// Принятая команда выполняется до результата и без поиска: его уход передаёт
+/// право предъявления оболочке.
 
 @ProviderFor(RelationBatchViewModel)
 final relationBatchViewModelProvider = RelationBatchViewModelFamily._();
 
 /// Отметки принадлежат экземпляру поиска и не зависят от его выдачи.
+///
+/// Принятая команда выполняется до результата и без поиска: его уход передаёт
+/// право предъявления оболочке.
 final class RelationBatchViewModelProvider
     extends $NotifierProvider<RelationBatchViewModel, RelationBatchState> {
   /// Отметки принадлежат экземпляру поиска и не зависят от его выдачи.
+  ///
+  /// Принятая команда выполняется до результата и без поиска: его уход передаёт
+  /// право предъявления оболочке.
   RelationBatchViewModelProvider._({
     required RelationBatchViewModelFamily super.from,
-    required (IntentionSearchSession, IntentionId, String) super.argument,
+    required (
+      IntentionSearchSession,
+      IntentionId,
+      IntentionRelationGroup,
+      String,
+    )
+    super.argument,
   }) : super(
          retry: null,
          name: r'relationBatchViewModelProvider',
@@ -63,9 +78,12 @@ final class RelationBatchViewModelProvider
 }
 
 String _$relationBatchViewModelHash() =>
-    r'9631ebd4d695d12186d2e3793da857296c1c4b43';
+    r'f41beaee40e41e56ca94c87fab0dacd1adeba54a';
 
 /// Отметки принадлежат экземпляру поиска и не зависят от его выдачи.
+///
+/// Принятая команда выполняется до результата и без поиска: его уход передаёт
+/// право предъявления оболочке.
 
 final class RelationBatchViewModelFamily extends $Family
     with
@@ -74,7 +92,7 @@ final class RelationBatchViewModelFamily extends $Family
           RelationBatchState,
           RelationBatchState,
           RelationBatchState,
-          (IntentionSearchSession, IntentionId, String)
+          (IntentionSearchSession, IntentionId, IntentionRelationGroup, String)
         > {
   RelationBatchViewModelFamily._()
     : super(
@@ -86,13 +104,17 @@ final class RelationBatchViewModelFamily extends $Family
       );
 
   /// Отметки принадлежат экземпляру поиска и не зависят от его выдачи.
+  ///
+  /// Принятая команда выполняется до результата и без поиска: его уход передаёт
+  /// право предъявления оболочке.
 
   RelationBatchViewModelProvider call(
     IntentionSearchSession session,
     IntentionId pageId,
+    IntentionRelationGroup group,
     String pageTitle,
   ) => RelationBatchViewModelProvider._(
-    argument: (session, pageId, pageTitle),
+    argument: (session, pageId, group, pageTitle),
     from: this,
   );
 
@@ -101,16 +123,28 @@ final class RelationBatchViewModelFamily extends $Family
 }
 
 /// Отметки принадлежат экземпляру поиска и не зависят от его выдачи.
+///
+/// Принятая команда выполняется до результата и без поиска: его уход передаёт
+/// право предъявления оболочке.
 
 abstract class _$RelationBatchViewModel extends $Notifier<RelationBatchState> {
-  late final _$args = ref.$arg as (IntentionSearchSession, IntentionId, String);
+  late final _$args =
+      ref.$arg
+          as (
+            IntentionSearchSession,
+            IntentionId,
+            IntentionRelationGroup,
+            String,
+          );
   IntentionSearchSession get session => _$args.$1;
   IntentionId get pageId => _$args.$2;
-  String get pageTitle => _$args.$3;
+  IntentionRelationGroup get group => _$args.$3;
+  String get pageTitle => _$args.$4;
 
   RelationBatchState build(
     IntentionSearchSession session,
     IntentionId pageId,
+    IntentionRelationGroup group,
     String pageTitle,
   );
   @$mustCallSuper
@@ -127,7 +161,7 @@ abstract class _$RelationBatchViewModel extends $Notifier<RelationBatchState> {
             >;
     return element.handleCreate(
       ref,
-      () => build(_$args.$1, _$args.$2, _$args.$3),
+      () => build(_$args.$1, _$args.$2, _$args.$3, _$args.$4),
     );
   }
 }

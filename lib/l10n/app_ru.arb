@@ -984,5 +984,8 @@
   "batchRelatedSemantic": "Связанное намерение: {name}",
   "@batchRelatedSemantic": {"placeholders": {"name": {"type": "String"}}},
   "batchRemove": "Снять отметку: {name}",
-  "@batchRemove": {"placeholders": {"name": {"type": "String"}}}
+  "@batchRemove": {"placeholders": {"name": {"type": "String"}}},
+  "batchAddCount": "{count, plural, one{Добавить {count} связь} few{Добавить {count} связи} many{Добавить {count} связей} other{Добавить {count} связи}}",
+  "batchAddNone": "Добавить связи",
+  "batchAdding": "Добавляем…"
 }

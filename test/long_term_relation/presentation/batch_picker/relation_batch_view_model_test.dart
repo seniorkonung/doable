@@ -9,6 +9,7 @@ import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/presentation/batch_picker/relation_batch_state.dart';
 import 'package:doable/src/long_term_relation/presentation/batch_picker/relation_batch_view_model.dart';
 import 'package:flutter/material.dart';
@@ -31,6 +32,7 @@ void main() {
     final provider = relationBatchViewModelProvider(
       IntentionSearchSession(),
       _id(9),
+      IntentionRelationGroup.needs,
       'Страница',
     );
     Widget screen(bool active) => UncontrolledProviderScope(
@@ -98,6 +100,7 @@ void main() {
     final other = relationBatchViewModelProvider(
       IntentionSearchSession(),
       _id(9),
+      IntentionRelationGroup.needs,
       'Страница',
     );
     final subscription = h.container.listen(other, (_, _) {});
@@ -141,6 +144,9 @@ final class _Harness {
   _Harness() {
     container = ProviderContainer(
       overrides: [
+        personalGraphRepositoryProvider.overrideWithValue(
+          ControlledCatalogRepository(),
+        ),
         relationBatchChangesProvider.overrideWithValue(changes.stream),
       ],
     );
@@ -152,6 +158,7 @@ final class _Harness {
   final provider = relationBatchViewModelProvider(
     IntentionSearchSession(),
     _id(9),
+    IntentionRelationGroup.needs,
     'Страница',
   );
   late final ProviderContainer container;

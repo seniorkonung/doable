@@ -6,12 +6,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
+import '../../../design_system/components/button.dart';
+import '../../../design_system/components/docked_footer.dart';
+import '../../../design_system/components/notice.dart';
+import '../../../graph/application/graph_command_coordinator.dart';
+import '../../../graph/presentation/operation_failure_presentation.dart';
 import '../../../intention/domain/intention_id.dart';
 import '../../../intention/presentation/catalog/intention_catalog_purpose.dart';
 import '../../../intention/presentation/picker/intention_picker_view.dart';
 import '../../application/intention_relation_group.dart';
 import '../../application/relation_pair_probe.dart';
+import '../relation_command_failure_message.dart';
 import 'relation_batch_picker_purpose.dart';
+import 'relation_batch_state.dart';
 import 'relation_batch_view_model.dart';
 
 /// Поиск участников одной группы с отметками на время жизни страницы.
@@ -51,28 +58,78 @@ final class _RelationBatchPickerPageState
     final provider = relationBatchViewModelProvider(
       _session,
       widget.pageIntentionId,
+      widget.group,
       widget.pageTitle,
     );
     final batch = ref.watch(provider);
-    return IntentionPickerView(
-      purpose: _purpose,
-      purposeDescription: relationBatchPickerPurpose(
-        l10n,
-        widget.group,
-        provider,
-        batch.selected.length,
-      ),
-      closeLabel: l10n.participantPickerCancel,
-      emptyScopeMessage: l10n.participantPickerEmpty,
-      onClose: () => unawaited(context.router.maybePop()),
-      rowBehavior: IntentionPickerCheckable(
-        group: widget.group,
-        selectedIds: {for (final selection in batch.selected) selection.id},
-        onToggle: (pick) =>
-            ref.read(provider.notifier).toggle(pick.value.id, pick.value.title),
-      ),
-      onOpenDetails: (id) => unawaited(
-        context.router.push(IntentionDetailsRoute(intentionId: id)),
+    ref.listen(provider, (previous, next) {
+      if (next.operation is RelationBatchAdded &&
+          previous?.operation is! RelationBatchAdded) {
+        // removeRoute снимает маршрут по его matchId, что бы ни стояло над ним:
+        // https://pub.dev/documentation/auto_route/11.1.0/auto_route/StackRouter/removeRoute.html
+        context.router.removeRoute(context.routeData);
+      }
+    });
+    return PopScope<void>(
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) ref.read(provider.notifier).leave();
+      },
+      child: IntentionPickerView(
+        purpose: _purpose,
+        purposeDescription: relationBatchPickerPurpose(
+          l10n,
+          widget.group,
+          provider,
+          batch.selected.length,
+        ),
+        closeLabel: l10n.participantPickerCancel,
+        emptyScopeMessage: l10n.participantPickerEmpty,
+        onClose: () => unawaited(context.router.maybePop()),
+        rowBehavior: IntentionPickerCheckable(
+          group: widget.group,
+          selectedIds: {for (final selection in batch.selected) selection.id},
+          onToggle: (pick) => ref
+              .read(provider.notifier)
+              .toggle(pick.value.id, pick.value.title),
+        ),
+        onOpenDetails: (id) {
+          if (!ref.read(provider).canEdit) return;
+          unawaited(
+            context.router.push(IntentionDetailsRoute(intentionId: id)),
+          );
+        },
+        notice: switch (batch.operation) {
+          RelationBatchFailed(:final failure, :final claim) => Notice.content(
+            message: OperationFailurePresentation(
+              claim: claim,
+              message: longTermRelationCommandFailureMessage(
+                l10n,
+                LongTermRelationCommandKind.add,
+                failure,
+              ),
+              inheritsColor: true,
+            ),
+          ),
+          RelationBatchIdle() ||
+          RelationBatchSubmitting() ||
+          RelationBatchAdded() => null,
+        },
+        footer: DockedFooter(
+          child: Button.primary(
+            label: switch (batch.operation) {
+              RelationBatchSubmitting() ||
+              RelationBatchAdded() => l10n.batchAdding,
+              RelationBatchIdle() ||
+              RelationBatchFailed() => switch (batch.selected.length) {
+                0 => l10n.batchAddNone,
+                final count => l10n.batchAddCount(count),
+              },
+            },
+            onPressed: batch.canSubmit
+                ? ref.read(provider.notifier).submit
+                : null,
+          ),
+        ),
       ),
     );
   }

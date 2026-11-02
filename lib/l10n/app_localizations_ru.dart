@@ -3363,4 +3363,23 @@ class AppLocalizationsRu extends AppLocalizations {
   String batchRemove(String name) {
     return 'Снять отметку: $name';
   }
+
+  @override
+  String batchAddCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Добавить $count связи',
+      many: 'Добавить $count связей',
+      few: 'Добавить $count связи',
+      one: 'Добавить $count связь',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get batchAddNone => 'Добавить связи';
+
+  @override
+  String get batchAdding => 'Добавляем…';
 }

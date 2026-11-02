@@ -5232,6 +5232,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Remove selection: {name}'**
   String batchRemove(String name);
+
+  /// Кнопка внизу поиска участника группы
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{Add {count} relation} other{Add {count} relations}}'**
+  String batchAddCount(int count);
+
+  /// Недоступная кнопка поиска участника группы без отметок
+  ///
+  /// In en, this message translates to:
+  /// **'Add relations'**
+  String get batchAddNone;
+
+  /// Кнопка поиска участника группы во время добавления
+  ///
+  /// In en, this message translates to:
+  /// **'Adding…'**
+  String get batchAdding;
 }
 
 class _AppLocalizationsDelegate

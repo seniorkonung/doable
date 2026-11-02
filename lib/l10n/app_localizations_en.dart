@@ -3337,4 +3337,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String batchRemove(String name) {
     return 'Remove selection: $name';
   }
+
+  @override
+  String batchAddCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Add $count relations',
+      one: 'Add $count relation',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get batchAddNone => 'Add relations';
+
+  @override
+  String get batchAdding => 'Adding…';
 }

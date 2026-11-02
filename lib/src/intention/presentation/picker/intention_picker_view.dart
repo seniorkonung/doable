@@ -44,6 +44,8 @@ final class IntentionPickerView extends ConsumerStatefulWidget {
     required this.rowBehavior,
     required this.onOpenDetails,
     this.purposeDescription,
+    this.notice,
+    this.footer,
     super.key,
   });
 
@@ -64,6 +66,12 @@ final class IntentionPickerView extends ConsumerStatefulWidget {
 
   final IntentionPickerRowBehavior rowBehavior;
   final void Function(IntentionId id) onOpenDetails;
+
+  /// Отказ экрана под выдачей.
+  final Widget? notice;
+
+  /// Закреплённая нижняя часть: сообщения приложения [Scaffold] ставит над ней.
+  final Widget? footer;
 
   @override
   ConsumerState<IntentionPickerView> createState() =>
@@ -245,9 +253,21 @@ final class _IntentionPickerViewState
                 bottomPadding: DoableMetrics.space10,
               ),
             ),
+            if (widget.notice case final notice?)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  DoableMetrics.space5,
+                  DoableMetrics.space2,
+                  DoableMetrics.space5,
+                  DoableMetrics.space2,
+                ),
+                child: notice,
+              ),
           ],
         ),
       ),
+      // https://api.flutter.dev/flutter/material/Scaffold/bottomNavigationBar.html
+      bottomNavigationBar: widget.footer,
     );
   }
 }
