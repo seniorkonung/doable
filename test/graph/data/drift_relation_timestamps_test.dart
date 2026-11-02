@@ -7,6 +7,7 @@ import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_id_generator.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
@@ -83,7 +84,7 @@ void main() {
           type: LongTermRelationFieldSet(LongTermRelationType.can),
         ),
         const LongTermRelationPatch(
-          priority: LongTermRelationFieldSet(RelationPriority.p4),
+          priority: LongTermRelationFieldSet(RelationPriority.p1),
         ),
         LongTermRelationPatch(
           description: LongTermRelationDescriptionReplaced(
@@ -139,7 +140,7 @@ void main() {
           relationId: relationId,
           patch: LongTermRelationPatch(
             type: const LongTermRelationFieldSet(LongTermRelationType.need),
-            priority: const LongTermRelationFieldSet(RelationPriority.p2),
+            priority: const LongTermRelationFieldSet(RelationPriority.p4),
             description: LongTermRelationDescriptionReplaced(
               LongTermRelationDescription.fromInput('Описание')!,
             ),
@@ -180,7 +181,7 @@ void main() {
         UpdateLongTermRelation(
           relationId: relationId,
           patch: const LongTermRelationPatch(
-            priority: LongTermRelationFieldSet(RelationPriority.p4),
+            priority: LongTermRelationFieldSet(RelationPriority.p1),
           ),
         ),
       ),
@@ -216,7 +217,7 @@ void main() {
           relationId: relationId,
           patch: const LongTermRelationPatch(
             type: LongTermRelationFieldSet(LongTermRelationType.need),
-            priority: LongTermRelationFieldSet(RelationPriority.p2),
+            priority: LongTermRelationFieldSet(RelationPriority.p4),
           ),
         ),
       ),
@@ -249,17 +250,15 @@ void main() {
         relationId: relationId,
         patch: const LongTermRelationPatch(
           type: LongTermRelationFieldSet(LongTermRelationType.can),
-          priority: LongTermRelationFieldSet(RelationPriority.p4),
+          priority: LongTermRelationFieldSet(RelationPriority.p1),
         ),
       ),
     );
     final occupiedPair = await repository.execute(
-      CreateLongTermRelation(
-        sourceIntentionId: sourceId,
-        relatedIntentionId: relatedId,
-        type: LongTermRelationType.can,
-        priority: RelationPriority.p1,
-        description: null,
+      AddLongTermRelations(
+        pageIntentionId: sourceId,
+        group: IntentionRelationGroup.canUse,
+        candidateIds: [relatedId],
       ),
     );
     await repository.execute(ArchiveIntention(sourceId));
@@ -381,24 +380,34 @@ Future<LongTermRelationCommandResult> _create(
   String? description,
 }) async {
   final result = await repository.execute(
-    CreateLongTermRelation(
-      sourceIntentionId: sourceId,
-      relatedIntentionId: relatedId,
-      type: LongTermRelationType.need,
-      priority: RelationPriority.p2,
-      description: description == null
-          ? null
-          : LongTermRelationDescription.fromInput(description),
+    AddLongTermRelations(
+      pageIntentionId: sourceId,
+      group: IntentionRelationGroup.needs,
+      candidateIds: [relatedId],
     ),
   );
   expect(result, isA<GraphCommandSucceeded>());
+  if (description != null) {
+    await _expectSucceeded(
+      repository.execute(
+        UpdateLongTermRelation(
+          relationId: _relationOf(result).id,
+          patch: LongTermRelationPatch(
+            description: LongTermRelationDescriptionPatch.fromInput(
+              description,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
   return result;
 }
 
 LongTermRelation _relationOf(LongTermRelationCommandResult result) =>
     switch (result) {
       GraphResultSuccess(:final value) =>
-        (value.value as LongTermRelationCreated).relation,
+        (value.value as LongTermRelationsAdded).relations.single,
       GraphResultFailure() => throw TestFailure('Команда связи отклонена'),
     };
 

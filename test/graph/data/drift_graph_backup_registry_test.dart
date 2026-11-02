@@ -21,6 +21,7 @@ import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention.dart';
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
@@ -172,15 +173,13 @@ void main() {
     await confirm<TagAssignmentChanged>(
       AssignTag(tagId: home.id, intentionId: running.id),
     );
-    final needRunning = (await confirm<LongTermRelationCreated>(
-      CreateLongTermRelation(
-        sourceIntentionId: health.id,
-        relatedIntentionId: running.id,
-        type: LongTermRelationType.need,
-        priority: RelationPriority.p2,
-        description: null,
+    final needRunning = (await confirm<LongTermRelationsAdded>(
+      AddLongTermRelations(
+        pageIntentionId: health.id,
+        group: IntentionRelationGroup.needs,
+        candidateIds: [running.id],
       ),
-    )).relation;
+    )).relations.single;
     await confirm<DailyChoiceCreated>(
       CreateDailyChoice(
         sourceIntentionId: health.id,

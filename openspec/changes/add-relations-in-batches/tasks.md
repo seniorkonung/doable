@@ -898,7 +898,7 @@
     - меняются `test/graph/application/graph_command_coordinator_relation_lifecycle_test.dart`, `test/graph/presentation/graph_operation_presenter_test.dart`.
   - **Размер:** S.
 
-- [ ] 3.20 Тесты хранилища создают связи командой пачки
+- [x] 3.20 Тесты хранилища создают связи командой пачки
   - **Критерии приёмки:**
     - Файлы `test/graph/data/` и `test/support/graph_operation_process_worker.dart` вызывают `AddLongTermRelations` вместо `CreateLongTermRelation` и читают `LongTermRelationsAdded`.
     - Где приоритет или описание важны для проверки, сразу после добавления идёт `UpdateLongTermRelation`, а ожидания ревизий и фактов следуют этому шагу. Защищаемый инвариант каждого теста не ослабляется.

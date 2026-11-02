@@ -11,6 +11,7 @@ import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_id_generator.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
@@ -407,26 +408,38 @@ void main() {
   });
 }
 
-Future<LongTermRelationCreated> _create(
+Future<void> _create(
   DriftPersonalGraphRepository repository,
   IntentionId sourceId,
   IntentionId relatedId, {
   String? description,
-}) async => _created(
-  await repository.execute(
-    CreateLongTermRelation(
-      sourceIntentionId: sourceId,
-      relatedIntentionId: relatedId,
-      type: LongTermRelationType.need,
-      priority: RelationPriority.p2,
-      description: description == null
-          ? null
-          : LongTermRelationDescription.fromInput(description),
+}) async {
+  final added = _added(
+    await repository.execute(
+      AddLongTermRelations(
+        pageIntentionId: sourceId,
+        group: IntentionRelationGroup.needs,
+        candidateIds: [relatedId],
+      ),
     ),
-  ),
-);
+  );
+  expect(
+    await repository.execute(
+      UpdateLongTermRelation(
+        relationId: added.relations.single.id,
+        patch: LongTermRelationPatch(
+          priority: const LongTermRelationFieldSet(RelationPriority.p2),
+          description: description == null
+              ? const LongTermRelationDescriptionUnchanged()
+              : LongTermRelationDescriptionPatch.fromInput(description),
+        ),
+      ),
+    ),
+    isA<GraphCommandSucceeded>(),
+  );
+}
 
-LongTermRelationCreated _created(LongTermRelationCommandResult result) {
+LongTermRelationsAdded _added(LongTermRelationCommandResult result) {
   expect(result, isA<GraphCommandSucceeded>());
   return (result
               as GraphCommandSucceeded<
@@ -435,7 +448,7 @@ LongTermRelationCreated _created(LongTermRelationCommandResult result) {
               >)
           .value
           .value
-      as LongTermRelationCreated;
+      as LongTermRelationsAdded;
 }
 
 LongTermRelationUpdated _updated(LongTermRelationCommandResult result) {

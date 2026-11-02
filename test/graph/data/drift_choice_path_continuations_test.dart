@@ -9,6 +9,7 @@ import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
@@ -636,12 +637,10 @@ void main() {
     final draft = ChoicePathDraftStart(_intention(1));
     final first = await fixture.page(draft, pageSize: 1);
     final mutation = await fixture.repository.execute(
-      CreateLongTermRelation(
-        sourceIntentionId: _intention(1),
-        relatedIntentionId: _intention(4),
-        type: LongTermRelationType.can,
-        priority: RelationPriority.p1,
-        description: null,
+      AddLongTermRelations(
+        pageIntentionId: _intention(1),
+        group: IntentionRelationGroup.canUse,
+        candidateIds: [_intention(4)],
       ),
     );
     expect(mutation, isA<GraphCommandSucceeded>());

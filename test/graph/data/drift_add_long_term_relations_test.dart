@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:doable/src/data/local/app_database.dart'
     hide Intention, LongTermRelation;
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
+import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
@@ -215,6 +218,163 @@ void main() {
         hasLength(2),
       );
     });
+
+    test('цикл через несколько намерений сохраняется целиком', () async {
+      final results = [
+        await repository.execute(_addCommand(pageId, firstId)),
+        await repository.execute(_addCommand(firstId, secondId)),
+        await repository.execute(_addCommand(secondId, pageId)),
+      ];
+
+      expect(results, everyElement(isA<GraphCommandSucceeded>()));
+      expect(
+        await database.select(database.longTermRelations).get(),
+        hasLength(3),
+      );
+      expect((await _details(repository, firstId)).relationCounts.active, 2);
+    });
+
+    test(
+      'одноимённые намерения остаются разными участниками и не меняются',
+      () async {
+        final namesakeId = _intentionId(_uuid(9));
+        await _insertIntention(database, namesakeId, title: 'Быть здоровым');
+        final intentionsBefore = await database
+            .select(database.intentions)
+            .get();
+
+        final result = await repository.execute(
+          _addCommand(pageId, namesakeId),
+        );
+
+        final added = _confirmed(result).value as LongTermRelationsAdded;
+        expect(added.relations.single.sourceIntentionId, pageId);
+        expect(added.relations.single.relatedIntentionId, namesakeId);
+        expect(
+          await database.select(database.intentions).get(),
+          intentionsBefore,
+        );
+      },
+    );
+  });
+
+  group('пересечение с чтениями и другими командами', () {
+    test(
+      'перечитывает наблюдения участников и не трогает постороннее намерение',
+      () async {
+        final pageEvents = <Result<GraphSnapshot<IntentionDetails?>>>[];
+        final candidateEvents = <Result<GraphSnapshot<IntentionDetails?>>>[];
+        final otherEvents = <Result<GraphSnapshot<IntentionDetails?>>>[];
+        final subscriptions = [
+          repository.watchIntention(pageId).listen(pageEvents.add),
+          repository.watchIntention(firstId).listen(candidateEvents.add),
+          repository.watchIntention(secondId).listen(otherEvents.add),
+        ];
+        await pumpEventQueue(times: 20);
+        expect(
+          [pageEvents.length, candidateEvents.length, otherEvents.length],
+          [1, 1, 1],
+        );
+
+        final added =
+            _confirmed(await repository.execute(_addCommand(pageId, firstId)))
+                    .value
+                as LongTermRelationsAdded;
+        await pumpEventQueue(times: 20);
+
+        expect(
+          [pageEvents.length, candidateEvents.length, otherEvents.length],
+          [2, 2, 1],
+        );
+        final pageSnapshot = _detailsSnapshot(pageEvents.last);
+        final candidateSnapshot = _detailsSnapshot(candidateEvents.last);
+        expect(pageSnapshot.value!.relationCounts.activeNeedOutgoing, 1);
+        expect(candidateSnapshot.value!.relationCounts.activeNeedIncoming, 1);
+        expect(
+          pageSnapshot.revision.compareTo(added.changes.first.revision),
+          GraphRevisionOrder.same,
+        );
+        expect(
+          candidateSnapshot.revision.compareTo(added.changes.first.revision),
+          GraphRevisionOrder.same,
+        );
+
+        await repository.execute(_addCommand(pageId, firstId));
+        await pumpEventQueue(times: 20);
+        expect(
+          [pageEvents.length, candidateEvents.length, otherEvents.length],
+          [2, 2, 1],
+        );
+        for (final subscription in subscriptions) {
+          unawaited(subscription.cancel());
+        }
+      },
+    );
+
+    test(
+      'конкурентное создание одной пары подтверждает ровно одну связь',
+      () async {
+        final results = await Future.wait([
+          repository.execute(_addCommand(pageId, firstId)),
+          repository.execute(
+            _addCommand(pageId, firstId, group: IntentionRelationGroup.canUse),
+          ),
+        ]);
+
+        expect(results.whereType<GraphCommandSucceeded>(), hasLength(1));
+        expect(
+          results.whereType<GraphCommandFailed>().single.failure,
+          isA<LongTermRelationPairOccupiedFailure>(),
+        );
+        expect(
+          await database.select(database.longTermRelations).get(),
+          hasLength(1),
+        );
+      },
+    );
+
+    test('создание перед архивированием попадает в атомарный каскад', () async {
+      final creation = repository.execute(_addCommand(pageId, firstId));
+      final archival = repository.execute(ArchiveIntention(pageId));
+
+      expect(await creation, isA<GraphCommandSucceeded>());
+      expect(await archival, isA<ResultSuccess>());
+      final stored = await database
+          .select(database.longTermRelations)
+          .getSingle();
+      expect(stored.isArchived, isTrue);
+    });
+
+    test(
+      'создание перед удалением сохраняет обе сущности и возвращает конфликт',
+      () async {
+        final intentionsBefore = await database
+            .select(database.intentions)
+            .get();
+
+        final creation = repository.execute(_addCommand(pageId, firstId));
+        final deletion = repository.execute(DeleteIntention(pageId));
+
+        expect(await creation, isA<GraphCommandSucceeded>());
+        expect(
+          await deletion,
+          isA<ResultFailure<ConfirmedGraphResult<IntentionCommandSuccess>>>()
+              .having(
+                (result) => result.failure,
+                'failure',
+                isA<IntentionHasBlockingRelationsFailure>(),
+              ),
+        );
+        expect(
+          await database.select(database.intentions).get(),
+          hasLength(intentionsBefore.length),
+        );
+        expect(
+          await database.select(database.longTermRelations).get(),
+          hasLength(1),
+        );
+      },
+    );
   });
 
   group('отказ не оставляет следов', () {
@@ -424,6 +584,16 @@ void main() {
   });
 }
 
+AddLongTermRelations _addCommand(
+  IntentionId pageId,
+  IntentionId candidateId, {
+  IntentionRelationGroup group = IntentionRelationGroup.needs,
+}) => AddLongTermRelations(
+  pageIntentionId: pageId,
+  group: group,
+  candidateIds: [candidateId],
+);
+
 /// Состояние графа, по которому отказ команды доказывает отсутствие следов.
 typedef _GraphSnapshot = ({
   List<String> relationIds,
@@ -467,6 +637,19 @@ Future<GraphRevision> _revision(
             as ResultSuccess<GraphSnapshot<IntentionDetails?>>)
         .value
         .revision;
+
+Future<IntentionDetails> _details(
+  DriftPersonalGraphRepository repository,
+  IntentionId id,
+) async =>
+    (await repository.watchIntention(id).first
+            as ResultSuccess<GraphSnapshot<IntentionDetails?>>)
+        .value
+        .value!;
+
+GraphSnapshot<IntentionDetails?> _detailsSnapshot(
+  Result<GraphSnapshot<IntentionDetails?>> result,
+) => (result as ResultSuccess<GraphSnapshot<IntentionDetails?>>).value;
 
 ConfirmedGraphResult<LongTermRelationCommandSuccess> _confirmed(
   LongTermRelationCommandResult result,

@@ -11,11 +11,11 @@ import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_id_generator.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation_description.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
@@ -136,8 +136,7 @@ void main() {
         repository,
         sourceId,
         relatedId,
-        type: LongTermRelationType.can,
-        priority: RelationPriority.p4,
+        group: IntentionRelationGroup.canUse,
       );
       await repository.execute(ArchiveIntention(sourceId));
       expect((await _storedRelation(database, relationId))['is_archived'], 1);
@@ -200,14 +199,14 @@ void main() {
       await repository.execute(DeleteLongTermRelation(relationId));
       final replacement = await _create(repository, sourceId, relatedId);
 
-      expect(replacement.relation.id, secondRelationId);
-      expect(replacement.relation.id, isNot(original.relation.id));
+      expect(replacement.id, secondRelationId);
+      expect(replacement.id, isNot(original.id));
       expect(
-        replacement.relation.creationSequence.value,
-        greaterThan(original.relation.creationSequence.value),
+        replacement.creationSequence.value,
+        greaterThan(original.creationSequence.value),
       );
-      expect(replacement.relation.sourceIntentionId, sourceId);
-      expect(replacement.relation.relatedIntentionId, relatedId);
+      expect(replacement.sourceIntentionId, sourceId);
+      expect(replacement.relatedIntentionId, relatedId);
     },
   );
 
@@ -243,25 +242,38 @@ void main() {
   );
 }
 
-Future<LongTermRelationCreated> _create(
+Future<LongTermRelation> _create(
   DriftPersonalGraphRepository repository,
   IntentionId sourceId,
   IntentionId relatedId, {
-  LongTermRelationType type = LongTermRelationType.need,
-  RelationPriority priority = RelationPriority.p2,
-}) async => _created(
-  await repository.execute(
-    CreateLongTermRelation(
-      sourceIntentionId: sourceId,
-      relatedIntentionId: relatedId,
-      type: type,
-      priority: priority,
-      description: LongTermRelationDescription.fromInput('  Описание\n'),
+  IntentionRelationGroup group = IntentionRelationGroup.needs,
+}) async {
+  final relation = _added(
+    await repository.execute(
+      AddLongTermRelations(
+        pageIntentionId: sourceId,
+        group: group,
+        candidateIds: [relatedId],
+      ),
     ),
-  ),
-);
+  ).relations.single;
+  expect(
+    await repository.execute(
+      UpdateLongTermRelation(
+        relationId: relation.id,
+        patch: LongTermRelationPatch(
+          description: LongTermRelationDescriptionPatch.fromInput(
+            '  Описание\n',
+          ),
+        ),
+      ),
+    ),
+    isA<GraphCommandSucceeded>(),
+  );
+  return relation;
+}
 
-LongTermRelationCreated _created(LongTermRelationCommandResult result) {
+LongTermRelationsAdded _added(LongTermRelationCommandResult result) {
   expect(result, isA<GraphCommandSucceeded>());
   return (result
               as GraphCommandSucceeded<
@@ -270,7 +282,7 @@ LongTermRelationCreated _created(LongTermRelationCommandResult result) {
               >)
           .value
           .value
-      as LongTermRelationCreated;
+      as LongTermRelationsAdded;
 }
 
 ConfirmedGraphResult<LongTermRelationDeleted> _confirmedDeleted(
