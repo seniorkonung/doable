@@ -5,7 +5,7 @@
 **Format version:** 1
 **Result:** Changes needed
 **Coverage status:** Complete
-**Summary:** Фаза 2 выполнена: существующая связь открывается и меняется только в панели, все критерии задач 2.1–2.16 подтверждены кодом или тестами, `mise run check` проходит. Осталось две находки низкой важности, ни одна не ломает сценарии спецификаций. Принятых рисков нет.
+**Summary:** Фаза 2 выполнена: существующая связь открывается и меняется только в панели, все критерии задач 2.1–2.16 подтверждены кодом или тестами, `mise run check` проходит. Осталась одна находка низкой важности, она не ломает сценарии спецификаций. Принятых рисков нет.
 
 ## Review target
 
@@ -48,15 +48,6 @@
 | Code quality | Complete | Пять линз `code-review-and-quality` применены ко всем рабочим путям U1 и U2 на `9229d2fc…`. Вне правок учтены `app_navigation.dart`, `operation_failure_presentation.dart`, `presentation_frame_evidence.dart`, `text_field.dart` и выполнение команд координатора. Новых зависимостей, границ доверия и неограниченных чтений в диапазоне нет. |
 
 ## Findings
-
-### F3 · Low — Параметр `chosen` у `PriorityPicker.itemLabel` не нужен ни одному потребителю
-
-- **Evidence:** `itemLabel` принимает `(priority, chosen)` (`priority_picker.dart:42`), хотя выбор уже объявляет `selected: chosen` (`priority_picker.dart:123`). Единственный рабочий потребитель параметр отбрасывает (`relation_details_sheet.dart:527`). Читает его только тестовый образец, который вписывает «выбран» в название (`test/design_system/priority_picker_test.dart:265-266`).
-- **Evidence revisions:** ["9229d2fcce5dc14a269ecb3a22de24e8adfbc5a1"]
-- **Impact:** Лишний параметр расширяет контракт компонента и подсказывает следующему потребителю вписать выбор в название, тогда диктор объявит его дважды.
-- **Required outcome:** Доступное название пилюли не зависит от состояния выбора, а выбор объявляется диктору один раз.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** ["lib/src/design_system/components/priority_picker.dart","lib/src/long_term_relation/presentation/details/relation_details_sheet.dart","test/design_system/priority_picker_test.dart"]
 
 ### F4 · Low — Политика предъявления связи выражена флагом рядом с существующим закрытым типом
 

@@ -570,3 +570,17 @@
   - **Зависимости:** нет.
   - **Предполагаемые файлы:** меняются `lib/src/long_term_relation/presentation/editor/relation_editor_state.dart`, `test/long_term_relation/presentation/editor/relation_editor_view_model_test.dart`.
   - **Размер:** XS.
+
+- [ ] 2.21 Доступное название пилюли `PriorityPicker` зависит только от приоритета
+  - **Критерии приёмки:**
+    - `PriorityPicker.itemLabel` имеет тип `String Function(DoablePriority priority)`: состояние выбора в него не передаётся, а выбор объявляется диктору один раз через `selected`.
+    - `priority_picker.dart` передаёт в `itemLabel` только приоритет, данные `_Pill` собираются без этого аргумента, а `chosen` остаётся у `_Pill` для вида пилюли и `selected`.
+    - `relation_details_sheet.dart` передаёт `itemLabel` без отбрасываемого параметра, а его доступные названия прежние.
+    - Образец `_itemLabel` в `test/design_system/priority_picker_test.dart` принимает только приоритет и не вписывает «, выбран». Проверка `isSelected` у пилюли остаётся.
+    - Поведение продукта не меняется: рабочий потребитель параметр уже игнорирует.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/priority_picker_test.dart test/long_term_relation/presentation/details/relation_details_sheet_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** меняются `lib/src/design_system/components/priority_picker.dart`, `lib/src/long_term_relation/presentation/details/relation_details_sheet.dart`, `test/design_system/priority_picker_test.dart`.
+  - **Размер:** XS.
