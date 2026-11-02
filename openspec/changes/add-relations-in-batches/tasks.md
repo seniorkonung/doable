@@ -461,7 +461,7 @@
     - меняются `test/long_term_relation/presentation/editor/relation_creation_navigation_test.dart`, `relation_editor_page_test.dart`, `test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart`, `test/app/creation_flows_test_support.dart`, `test/app/creation_flows_integration_test.dart`, `test/app/long_term_relation_app_flow_test.dart`.
   - **Размер:** M.
 
-- [ ] 2.13 Проверки оболочки навигации опираются на панель вместо страницы связи
+- [x] 2.13 Проверки оболочки навигации опираются на панель вместо страницы связи
   - **Критерии приёмки:**
     - Матрица страниц и сценарии сброса, возврата и раскладки открывают подробный просмотр нажатием на строку связи, а не маршрутом. Подробный просмотр связи больше не считается обычной страницей.
     - Сценарий «Выбранный пункт возвращает в корень» и сброс при принятой операции покрыты с панелью в истории, а удаление идёт через меню панели.

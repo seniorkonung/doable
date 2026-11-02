@@ -19,7 +19,6 @@ import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/design_system/components/top_bar.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -71,11 +70,6 @@ void main() {
           intentionId: (IntentionId.decode(
             tagFixtureId(1),
           ) as IntentionIdDecodingSuccess).id,
-        ),
-        RelationDetailsRoute(
-          relationId: (LongTermRelationId.decode(
-            tagFixtureId(101),
-          ) as LongTermRelationIdDecodingSuccess).id,
         ),
         DailyChoiceDetailsRoute(
           choiceId: (DailyChoiceId.decode(

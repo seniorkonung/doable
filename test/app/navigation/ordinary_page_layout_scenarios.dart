@@ -56,35 +56,16 @@ void _registerOrdinaryLayoutTests() {
       }
     });
 
-    testWidgets('подробные просмотры, $conditions: последние действия '
-        'доступны над панелью без двойного нижнего отступа', (tester) async {
+    testWidgets('подробный просмотр дневного выбора, $conditions: последние '
+        'действия доступны над панелью без двойного нижнего отступа', (
+      tester,
+    ) async {
       final app = await _start(
         tester,
         locale: locale,
         screen: screen,
         insets: insets,
       );
-      final relationId = (LongTermRelationId.decode(
-        tagFixtureId(_relation),
-      ) as LongTermRelationIdDecodingSuccess).id;
-      unawaited(app.router.push(RelationDetailsRoute(relationId: relationId)));
-      await _until(
-        tester,
-        find.byKey(const ValueKey('relation-details-phrase')),
-      );
-      await tester.pumpAndSettle();
-      await _scrollToEnd(tester, find.byType(RelationDetailsPage));
-      final participant = find.byKey(
-        const ValueKey('relation-details-related-participant'),
-      );
-      _expectFullyVisible(tester, participant, insets);
-      expect(participant.hitTestable(), findsOneWidget);
-      await tester.tap(participant);
-      await tester.pumpAndSettle();
-      expect(app.router.current.name, IntentionDetailsRoute.name);
-      app.router.pop();
-      await tester.pumpAndSettle();
-
       unawaited(
         app.router.push(
           DailyChoiceDetailsRoute(choiceId: _dailyChoiceId(_firstChoice)),
@@ -247,8 +228,11 @@ void _registerOrdinaryPaginationTests() {
       _expectFullyVisible(tester, last, insets);
       expect(last.hitTestable(), findsOneWidget);
       await tester.tap(last);
+      // Строка открывает панель связи над страницей, а не новую страницу.
+      await _until(tester, find.byType(RelationHead));
       await tester.pumpAndSettle();
-      expect(find.byType(RelationDetailsPage), findsOneWidget);
+      expect(find.byType(RelationHead), findsOneWidget);
+      expect(find.byType(IntentionDetailsPage), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   }
