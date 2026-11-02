@@ -4,11 +4,6 @@
 
 Файл ведёт оркестратор. Решения приняты пользователем в сессии решений и исполняются автономно, по одной finding за сессию. Сессия исполнения удаляет раздел своей finding в коммите её устранения.
 
-## F2 · Low — Задача 3.2 ломает исчерпывающие разборы в тестах, а метод для них появляется только в 3.3
-
-- **Решение:** Устранить
-- **Как устранить:** Исправить в tasks.md задачи 3.2 и 3.3, без новых задач и без смены порядка. В файлы и критерии 3.2 добавить test/intention/presentation/catalog/catalog_reconciliation_test_support.dart и test/app/home_statistics_app_flow_test.dart: в разборе команды (catalog_reconciliation_test_support.dart:147, home_statistics_app_flow_test.dart:808) и разборе успеха (home_statistics_app_flow_test.dart:820) задача ставит ветви, которые явно роняют тест через fail, потому что acceptRelationsAddition появляется только в 3.3. В файлы и критерии 3.3 добавить те же два файла: она заменяет эти ветви рабочими, команда идёт через acceptRelationsAddition, а успех разбирается как LongTermRelationsAdded, и заглушек не остаётся. В проверку 3.3 добавить test/intention/presentation/catalog и test/app/home_statistics_app_flow_test.dart. Вид диагностики выбран: AddLongTermRelations отображается в существующий LongTermRelationCommandDiagnosticsType.create через _longTermRelationCommandDiagnosticsType; значение add не вводится, перечисление и diagnostics_sink.dart не меняются, а читатель create в test/app/long_term_relation_app_flow_test.dart:350 остаётся. Закрепить это критерием 3.2, а 3.22 не удаляет значение create диагностики. Поведение продукта не меняется.
-
 ## F3 · Low — После удаления формы без читателей остаются `PathRail` и `showPreservingConfirmDialog`
 
 - **Решение:** Устранить

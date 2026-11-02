@@ -624,13 +624,15 @@
     - Запись идёт одной транзакцией единого пути: проверяются намерение страницы, каждый кандидат и каждая пара. Занятая пара, архивированный или отсутствующий участник на любом месте набора дают существующий типизированный отказ, и тогда нет ни связей, ни новой ревизии, ни фактов. Спецификационные сценарии «Участник архивирован до сохранения», «Участник удалён до сохранения» и «Архив сохраняет уникальность пары» подтверждены на настоящем хранилище.
     - Успех `LongTermRelationsAdded` несёт связи в порядке набора. На одной ревизии он публикует абсолютные счётчики намерения страницы и каждого кандидата и по одному `LongTermRelationCreatedChange` на связь, а лог фактов получает один пакет.
     - `CreateLongTermRelation` остаётся до 3.22: его читает форма. Исчерпывающий разбор успеха в presenter получает новую ветку как неожиданный исход, а сообщение появляется в 3.3.
+    - Разборы команды в `catalog_reconciliation_test_support.dart:147` и `home_statistics_app_flow_test.dart:808` и разбор успеха в `home_statistics_app_flow_test.dart:820` получают ветви, которые явно роняют тест через `fail`: `acceptRelationsAddition` появляется только в 3.3, и она заменяет эти ветви рабочими.
+    - `_longTermRelationCommandDiagnosticsType` отображает `AddLongTermRelations` в существующий `LongTermRelationCommandDiagnosticsType.create`. Значение `add` не вводится, перечисление и `diagnostics_sink.dart` не меняются, а читатель `create` в `test/app/long_term_relation_app_flow_test.dart:350` остаётся.
   - **Проверка:**
     - `mise exec --no-deps -- flutter test test/graph/data/drift_add_long_term_relations_test.dart test/long_term_relation/application/long_term_relation_command_test.dart test/graph/presentation/graph_operation_presenter_test.dart`.
     - `mise exec --no-deps -- flutter analyze`.
   - **Зависимости:** нет.
   - **Предполагаемые файлы:**
     - меняются `lib/src/long_term_relation/application/long_term_relation_command.dart`, `lib/src/graph/data/drift_personal_graph_repository_relation_commands.dart`, `lib/src/graph/presentation/graph_operation_presenter.dart`;
-    - новый `test/graph/data/drift_add_long_term_relations_test.dart`, меняется `test/long_term_relation/application/long_term_relation_command_test.dart`.
+    - новый `test/graph/data/drift_add_long_term_relations_test.dart`, меняются `test/long_term_relation/application/long_term_relation_command_test.dart`, `test/intention/presentation/catalog/catalog_reconciliation_test_support.dart`, `test/app/home_statistics_app_flow_test.dart`.
   - **Размер:** M.
 
 - [ ] 3.3 Координатор принимает добавление пачки, а сообщение называет число добавленных связей
@@ -639,14 +641,15 @@
     - Новый вид команды и цель добавления идут по общей политике: успех принадлежит оболочке, отказ — инициатору, а после ухода инициатора — оболочке. Поздний результат предъявляется ровно один раз.
     - Сообщение успеха собирается общим шаблоном, как у удаления связи, а его исход считает связи из результата команды: «Добавлена 1 связь.», «Добавлено 3 связи.», «Добавлено 5 связей.», на английском «1 relation added.» и «3 relations added.».
     - Отказы добавления говорят о пачке и о том, что связи не созданы: тексты занятой пары, отсутствующего и архивированного участника, недоступности, повреждения и неожиданной ошибки есть на русском и английском.
+    - Ветви с `fail` из 3.2 заменены рабочими: в `catalog_reconciliation_test_support.dart` и `home_statistics_app_flow_test.dart` команда идёт через `acceptRelationsAddition`, а в `home_statistics_app_flow_test.dart` успех разбирается как `LongTermRelationsAdded`. Заглушек не остаётся.
   - **Проверка:**
     - `mise run codegen`.
-    - `mise exec --no-deps -- flutter test test/graph/application/graph_command_coordinator_relation_creation_test.dart test/graph/presentation/graph_operation_presenter_test.dart`.
+    - `mise exec --no-deps -- flutter test test/graph/application/graph_command_coordinator_relation_creation_test.dart test/graph/presentation/graph_operation_presenter_test.dart test/intention/presentation/catalog test/app/home_statistics_app_flow_test.dart`.
     - `mise exec --no-deps -- flutter analyze`.
   - **Зависимости:** 3.2.
   - **Предполагаемые файлы:**
     - меняются `lib/src/graph/application/graph_command_coordinator.dart`, `lib/src/graph/presentation/graph_operation_presenter.dart`, `lib/src/long_term_relation/presentation/relation_command_failure_message.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
-    - меняются `test/graph/application/graph_command_coordinator_relation_creation_test.dart`, `test/graph/presentation/graph_operation_presenter_test.dart`.
+    - меняются `test/graph/application/graph_command_coordinator_relation_creation_test.dart`, `test/graph/presentation/graph_operation_presenter_test.dart`, `test/intention/presentation/catalog/catalog_reconciliation_test_support.dart`, `test/app/home_statistics_app_flow_test.dart`.
   - **Размер:** M.
 
 - [ ] 3.4 Занимающая связь несёт тип, а причина занятости выводится закрытым типом из группы поиска
@@ -906,23 +909,24 @@
   - **Проверка:**
     - `mise exec --no-deps -- flutter test test/graph_snapshots test/data_transfer test/app/bootstrap test/app/graph_export_app_flow_test.dart test/app/graph_import_app_flow_test.dart test/app/home_statistics_app_flow_test.dart`.
     - `mise exec --no-deps -- flutter analyze`.
-  - **Зависимости:** 3.2.
+  - **Зависимости:** 3.2, 3.3 — помощник `home_statistics_app_flow_test.dart` проводит команду пачки через рабочую ветвь из 3.3.
   - **Предполагаемые файлы:** механически меняются пять файлов `test/graph_snapshots/` и пять перечисленных файлов приложения и переноса данных.
   - **Размер:** M по логике: файлов больше нормы только из-за механической замены команды.
 
 - [ ] 3.22 Удалить `CreateLongTermRelation`: у него не осталось вызывающих
   - **Критерии приёмки:**
     - Оставшиеся тесты координатора, presenter, контрольной точки согласования и каталога используют `AddLongTermRelations`, `acceptRelationsAddition` и `LongTermRelationsAdded`.
-    - Удалены `CreateLongTermRelation` с отказами проверки, `LongTermRelationCreated`, `_createLongTermRelation`, `_CommittedLongTermRelationCreation`, `acceptRelationCreation`, `LongTermRelationCreationFormKey`, `LongTermRelationCommandKind.create`, `CreatingLongTermRelationOperationTarget` и ветки presenter и текстов отказа для них.
+    - Удалены `CreateLongTermRelation` с отказами проверки, `LongTermRelationCreated`, `_createLongTermRelation`, `_CommittedLongTermRelationCreation`, `acceptRelationCreation`, `LongTermRelationCreationFormKey`, `LongTermRelationCommandKind.create`, `CreatingLongTermRelationOperationTarget` и ветки presenter и текстов отказа для них, а также ветви `CreateLongTermRelation` и `LongTermRelationCreated` в разборах `catalog_reconciliation_test_support.dart` и `home_statistics_app_flow_test.dart`.
+    - Значение диагностики `LongTermRelationCommandDiagnosticsType.create` не удаляется: его пишет `AddLongTermRelations`, а читает `test/app/long_term_relation_app_flow_test.dart`.
     - Строки `relationEditorCreate*`, `relationEditorCreated` и `graphOperationNewRelation` удалены на обоих языках.
   - **Проверка:**
     - `mise run codegen`.
-    - `mise exec --no-deps -- flutter test test/graph/application test/graph/presentation test/intention/presentation/catalog test/intention/presentation/search test/long_term_relation/application`.
+    - `mise exec --no-deps -- flutter test test/graph/application test/graph/presentation test/intention/presentation/catalog test/intention/presentation/search test/long_term_relation/application test/app/home_statistics_app_flow_test.dart`.
     - `mise exec --no-deps -- flutter analyze`.
   - **Зависимости:** 3.17, 3.19, 3.20, 3.21.
   - **Предполагаемые файлы:**
     - меняются `lib/src/long_term_relation/application/long_term_relation_command.dart`, `lib/src/graph/application/graph_command_coordinator.dart`, `lib/src/graph/data/drift_personal_graph_repository_relation_commands.dart`, `lib/src/graph/presentation/graph_operation_presenter.dart`, `lib/src/long_term_relation/presentation/relation_command_failure_message.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
-    - меняются `test/graph/application/graph_command_coordinator_relation_creation_test.dart`, `graph_command_coordinator_relation_lifecycle_test.dart`, `test/graph/presentation/graph_operation_presenter_test.dart`, `graph_reconciliation_checkpoint_test.dart`, `test/intention/presentation/catalog/catalog_reconciliation_test_support.dart`, `intention_catalog_action_selection_test.dart`, `intention_catalog_mutation_reconciliation_test.dart`, `test/intention/presentation/search/intention_search_list_test.dart`, `test/long_term_relation/application/long_term_relation_command_test.dart`.
+    - меняются `test/graph/application/graph_command_coordinator_relation_creation_test.dart`, `graph_command_coordinator_relation_lifecycle_test.dart`, `test/graph/presentation/graph_operation_presenter_test.dart`, `graph_reconciliation_checkpoint_test.dart`, `test/intention/presentation/catalog/catalog_reconciliation_test_support.dart`, `intention_catalog_action_selection_test.dart`, `intention_catalog_mutation_reconciliation_test.dart`, `test/intention/presentation/search/intention_search_list_test.dart`, `test/long_term_relation/application/long_term_relation_command_test.dart`, `test/app/home_statistics_app_flow_test.dart`.
   - **Размер:** M по логике: файлов больше нормы только из-за механической замены команды.
 
 - [ ] 3.23 Проверить готовность фазы: связи добавляются пачкой только из группы
