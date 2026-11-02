@@ -12,15 +12,24 @@ import '../doable_priority.dart';
 /// название, в том числе приоритета, задаёт охватывающий элемент управления.
 ///
 /// P1–P3 рисуют кольцо цвета приоритета с его тоном 12% внутри, P4 — кольцо
-/// без тона. У выполненного выбора кольцо и заливка `grip`, галочка `fill`,
-/// и приоритет в нём уже не виден.
+/// без тона. У выполненного выбора кольцо и заливка `grip`, галочка цвета
+/// плоскости под кольцом, и приоритет в нём уже не виден.
 final class ChoiceCheck extends StatelessWidget {
-  const ChoiceCheck({required this.priority, this.done = false, super.key});
+  const ChoiceCheck({
+    required this.priority,
+    this.done = false,
+    this.markColor,
+    super.key,
+  });
 
   final DoablePriority priority;
 
   /// Выбор выполнен.
   final bool done;
+
+  /// Цвет галочки: цвет плоскости под кольцом. Без него `fill`, плоскость
+  /// строки списка; в шапке листа плоскость `raised`.
+  final Color? markColor;
 
   static const double _ringWidth = 2;
   static const double _tintAlpha = .12;
@@ -50,7 +59,7 @@ final class ChoiceCheck extends StatelessWidget {
                 child: DoableIcon(
                   DoableIconData.check,
                   size: _checkSize,
-                  color: colors.fill,
+                  color: markColor ?? colors.fill,
                 ),
               )
             : null,

@@ -64,6 +64,28 @@ void main() {
     });
   }
 
+  testWidgets('markColor задаёт цвет галочки выполненного выбора', (
+    tester,
+  ) async {
+    final colors = DoableColors.light;
+    await tester.pumpWidget(
+      _app(
+        Brightness.light,
+        ChoiceCheck(
+          priority: DoablePriority.p1,
+          done: true,
+          markColor: colors.raised,
+        ),
+        GlobalKey(),
+      ),
+    );
+
+    expect(
+      tester.widget<DoableIcon>(find.byType(DoableIcon)).color,
+      colors.raised,
+    );
+  });
+
   testWidgets('кольцо занимает 22 на 22 в обоих состояниях', (tester) async {
     for (final done in [false, true]) {
       await tester.pumpWidget(
