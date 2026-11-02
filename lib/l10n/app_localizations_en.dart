@@ -1836,9 +1836,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dailyChoiceUpdated => 'Daily choice updated.';
 
   @override
-  String get dailyChoicePathReplaced => 'Daily choice path replaced.';
-
-  @override
   String get dailyChoiceDeleted => 'Daily choice deleted.';
 
   @override

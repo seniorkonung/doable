@@ -833,10 +833,6 @@ void main() {
       kind: DailyChoiceCommandKind.update,
       message: 'Edit — “daily choice”: Daily choice updated.',
     ),
-    (
-      kind: DailyChoiceCommandKind.replace,
-      message: 'Edit — “daily choice”: Daily choice path replaced.',
-    ),
   ]) {
     testWidgets(
       'успех дневной команды ${scenario.kind.name} предъявляется один раз',
@@ -1978,7 +1974,6 @@ final class _PresenterHarness {
       switch (kind) {
         DailyChoiceCommandKind.create => _startDailyChoiceCreate(),
         DailyChoiceCommandKind.update => startDailyChoiceUpdate(),
-        DailyChoiceCommandKind.replace => _startDailyChoiceReplace(),
         DailyChoiceCommandKind.delete => startDailyChoiceDelete(),
       };
 
@@ -2002,21 +1997,6 @@ final class _PresenterHarness {
         date: CalendarDate.fromParts(2026, 9, 23),
         description: null,
         isCompleted: false,
-      ),
-    ) as DailyChoiceCommandAccepted;
-    _coordinator.releaseInitiatorPresentation(accepted.token);
-    _dailyChoiceIndexes[accepted] = commandIndex;
-    return accepted;
-  }
-
-  DailyChoiceCommandAccepted _startDailyChoiceReplace() {
-    final commandIndex = repository.dailyChoiceCommands.length;
-    final accepted = _coordinator.acceptDailyChoiceReplace(
-      ReplaceDailyChoicePath(
-        choiceId: _dailyChoiceId,
-        sourceIntentionId: testDetailsIntentionId(1),
-        selectedIntentionId: testDetailsIntentionId(2),
-        path: _confirmedChoicePath(),
       ),
     ) as DailyChoiceCommandAccepted;
     _coordinator.releaseInitiatorPresentation(accepted.token);
@@ -2109,12 +2089,6 @@ final class _PresenterHarness {
         changes: changes,
       ),
       DailyChoiceCommandKind.update => DailyChoiceFieldsUpdated(
-        before: choice,
-        choice: choice,
-        path: path,
-        changes: changes,
-      ),
-      DailyChoiceCommandKind.replace => DailyChoicePathReplaced(
         before: choice,
         choice: choice,
         path: path,

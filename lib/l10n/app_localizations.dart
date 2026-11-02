@@ -2839,12 +2839,6 @@ abstract class AppLocalizations {
   /// **'Daily choice updated.'**
   String get dailyChoiceUpdated;
 
-  /// Подтверждение замены пути дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Daily choice path replaced.'**
-  String get dailyChoicePathReplaced;
-
   /// Подтверждение удаления дневного выбора
   ///
   /// In en, this message translates to:

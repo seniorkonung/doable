@@ -529,9 +529,6 @@ final class _App {
         UpdateDailyChoiceFields() => coordinator.acceptDailyChoiceUpdate(
           command,
         ),
-        ReplaceDailyChoicePath() => coordinator.acceptDailyChoiceReplace(
-          command,
-        ),
         DeleteDailyChoice() => coordinator.acceptDailyChoiceDelete(command),
       };
       expect(start, isA<DailyChoiceCommandAccepted>());

@@ -8,9 +8,9 @@ import '../domain/daily_choice_schedule.dart';
 import 'confirmed_choice_path.dart';
 import 'daily_choice_result.dart';
 
-/// Исполняется через общий последовательный исполнитель графа. Создание и
-/// замена проверяют весь подтверждённый путь на актуальном снимке и сохраняют
-/// его одной транзакцией. Правка полей проверяет целостность существующего
+/// Исполняется через общий последовательный исполнитель графа. Создание
+/// проверяет весь подтверждённый путь на актуальном снимке и сохраняет его
+/// одной транзакцией. Правка полей проверяет целостность существующего
 /// выбора, но не требует повторной допустимости уже сохранённого пути.
 /// Удаление затрагивает только выбранную запись и принадлежащие ей шаги.
 sealed class DailyChoiceCommand
@@ -122,37 +122,6 @@ final class UpdateDailyChoiceFields extends DailyChoiceCommand {
 
   final DailyChoiceId choiceId;
   final DailyChoiceFieldsPatch patch;
-}
-
-final class ReplaceDailyChoicePath extends DailyChoiceCommand {
-  factory ReplaceDailyChoicePath({
-    required DailyChoiceId choiceId,
-    required IntentionId sourceIntentionId,
-    required IntentionId selectedIntentionId,
-    required ConfirmedChoicePath path,
-  }) {
-    if (sourceIntentionId == selectedIntentionId) {
-      throw ArgumentError.value(selectedIntentionId, 'selectedIntentionId');
-    }
-    return ReplaceDailyChoicePath._(
-      choiceId: choiceId,
-      sourceIntentionId: sourceIntentionId,
-      selectedIntentionId: selectedIntentionId,
-      path: path,
-    );
-  }
-
-  const ReplaceDailyChoicePath._({
-    required this.choiceId,
-    required this.sourceIntentionId,
-    required this.selectedIntentionId,
-    required this.path,
-  });
-
-  final DailyChoiceId choiceId;
-  final IntentionId sourceIntentionId;
-  final IntentionId selectedIntentionId;
-  final ConfirmedChoicePath path;
 }
 
 final class DeleteDailyChoice extends DailyChoiceCommand {

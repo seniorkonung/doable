@@ -295,7 +295,7 @@ final class LongTermRelationCommandCompletion
   };
 }
 
-enum DailyChoiceCommandKind { create, update, replace, delete }
+enum DailyChoiceCommandKind { create, update, delete }
 
 final class DailyChoiceCommandCompletion extends GraphPresentableCompletion {
   const DailyChoiceCommandCompletion._({
@@ -1015,14 +1015,6 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     ExistingDailyChoiceKey(command.choiceId),
     command,
     DailyChoiceCommandKind.update,
-  );
-
-  DailyChoiceCommandStart acceptDailyChoiceReplace(
-    ReplaceDailyChoicePath command,
-  ) => _acceptDailyChoice(
-    ExistingDailyChoiceKey(command.choiceId),
-    command,
-    DailyChoiceCommandKind.replace,
   );
 
   DailyChoiceCommandStart acceptDailyChoiceDelete(DeleteDailyChoice command) =>

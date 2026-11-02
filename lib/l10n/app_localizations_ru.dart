@@ -1860,9 +1860,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get dailyChoiceUpdated => 'Дневной выбор изменён.';
 
   @override
-  String get dailyChoicePathReplaced => 'Путь дневного выбора заменён.';
-
-  @override
   String get dailyChoiceDeleted => 'Дневной выбор удалён.';
 
   @override

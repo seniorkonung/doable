@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
 
-import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
@@ -14,8 +13,6 @@ import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -40,10 +37,6 @@ void main() {
       final claimFuture = registration.nextClaim();
 
       expect(coordinator.isDailyChoiceRunning(_choiceA), isTrue);
-      expect(
-        coordinator.acceptDailyChoiceReplace(_replace(_choiceA)),
-        isA<DailyChoiceCommandAlreadyRunning>(),
-      );
       expect(
         coordinator.acceptDailyChoiceDelete(DeleteDailyChoice(_choiceA)),
         isA<DailyChoiceCommandAlreadyRunning>(),
@@ -146,30 +139,11 @@ GraphCommandCoordinator _coordinator(PersonalGraphRepository repository) {
   return container.read(graphCommandCoordinatorProvider.notifier);
 }
 
-ReplaceDailyChoicePath _replace(DailyChoiceId id) => ReplaceDailyChoicePath(
-  choiceId: id,
-  sourceIntentionId: _source,
-  selectedIntentionId: _selected,
-  path: _path,
-);
-
-final _path = ConfirmedChoicePath([
-  ConfirmedChoicePathStep(
-    relationId: _relation,
-    sourceIntentionId: _source,
-    type: LongTermRelationType.need,
-    relatedIntentionId: _selected,
-  ),
-]);
-
 String _uuid(int number) =>
     '018f47c2-6b7d-7abc-8def-${number.toRadixString(16).padLeft(12, '0')}';
 final _source = (IntentionId.decode(_uuid(1)) as IntentionIdDecodingSuccess).id;
 final _selected =
     (IntentionId.decode(_uuid(2)) as IntentionIdDecodingSuccess).id;
-final _relation = (LongTermRelationId.decode(
-  _uuid(3),
-) as LongTermRelationIdDecodingSuccess).id;
 final _choiceA =
     (DailyChoiceId.decode(_uuid(4)) as DailyChoiceIdDecodingSuccess).id;
 final _choiceB =

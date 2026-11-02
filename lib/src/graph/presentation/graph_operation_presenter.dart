@@ -406,8 +406,7 @@ String _dailyChoiceMessage(
 ) => localizations.graphOperationMessage(
   switch (completion.kind) {
     DailyChoiceCommandKind.create => localizations.graphOperationCreate,
-    DailyChoiceCommandKind.update ||
-    DailyChoiceCommandKind.replace => localizations.graphOperationUpdate,
+    DailyChoiceCommandKind.update => localizations.graphOperationUpdate,
     DailyChoiceCommandKind.delete => localizations.graphOperationDelete,
   },
   localizations.graphOperationDailyChoice,
@@ -415,7 +414,6 @@ String _dailyChoiceMessage(
     GraphResultSuccess() => switch (completion.kind) {
       DailyChoiceCommandKind.create => localizations.dailyChoiceCreated,
       DailyChoiceCommandKind.update => localizations.dailyChoiceUpdated,
-      DailyChoiceCommandKind.replace => localizations.dailyChoicePathReplaced,
       DailyChoiceCommandKind.delete => localizations.dailyChoiceDeleted,
     },
     GraphResultFailure(:final failure) => dailyChoiceCommandFailureMessage(

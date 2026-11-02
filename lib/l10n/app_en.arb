@@ -1346,10 +1346,6 @@
   "@dailyChoiceUpdated": {
     "description": "Подтверждение изменения дневного выбора"
   },
-  "dailyChoicePathReplaced": "Daily choice path replaced.",
-  "@dailyChoicePathReplaced": {
-    "description": "Подтверждение замены пути дневного выбора"
-  },
   "dailyChoiceDeleted": "Daily choice deleted.",
   "@dailyChoiceDeleted": {
     "description": "Подтверждение удаления дневного выбора"
