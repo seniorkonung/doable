@@ -6,6 +6,7 @@ import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import 'package:doable/src/design_system/components/priority_picker.dart';
 import 'package:doable/src/design_system/components/relation_head.dart';
+import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/intention/domain/intention.dart';
@@ -1379,6 +1380,102 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.bySemanticsLabel('Параметры связи'), findsNothing);
+      semantics.dispose();
+    });
+  });
+
+  group('размер панели', () {
+    const screen = Size(390, 844);
+    const statusBar = 47.0;
+    const saved = 'Хотя бы раз в неделю';
+    const expand = 'Раскрыть панель связи';
+    const collapse = 'Свернуть панель связи';
+    const full = Rect.fromLTRB(0, statusBar, 390, 844);
+
+    Future<void> openLoaded(WidgetTester tester) async {
+      tester.view
+        ..devicePixelRatio = 1
+        ..physicalSize = screen
+        ..padding = const FakeViewPadding(top: statusBar);
+      addTearDown(tester.view.reset);
+      final repository = await _openSheet(tester);
+      repository
+          .watchAt(0)
+          .emitDetails(
+            testRelationDetails(
+              relationId: relationId,
+              sourceId: testIntentionId(1),
+              relatedId: testIntentionId(2),
+              description: saved,
+            ),
+            revision: revision,
+          );
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> openDescription(WidgetTester tester) async {
+      await tester.tap(find.text(saved));
+      await tester.pumpAndSettle();
+      expect(tester.getRect(find.byType(Sheet)), full);
+      expect(find.text('Сохранить'), findsOneWidget);
+    }
+
+    Future<void> leaveDescription(WidgetTester tester) async {
+      await tester.tap(find.bySemanticsLabel('Назад к связи'));
+      await tester.pumpAndSettle();
+      expect(find.text('Сохранить'), findsNothing);
+    }
+
+    testWidgets('ручка раскрывает панель на весь экран под строкой состояния, '
+        'даже когда связь помещается, а следующее нажатие возвращает '
+        'компактный размер', (tester) async {
+      final semantics = tester.ensureSemantics();
+      await openLoaded(tester);
+      final compact = tester.getRect(find.byType(Sheet));
+      expect(compact.top, greaterThan(statusBar));
+      expect(find.bySemanticsLabel(collapse), findsNothing);
+
+      await tester.tap(find.bySemanticsLabel(expand));
+      await tester.pumpAndSettle();
+
+      expect(tester.getRect(find.byType(Sheet)), full);
+      expect(find.bySemanticsLabel(expand), findsNothing);
+
+      await tester.tap(find.bySemanticsLabel(collapse));
+      await tester.pumpAndSettle();
+
+      expect(tester.getRect(find.byType(Sheet)), compact);
+      expect(find.bySemanticsLabel(expand), findsOneWidget);
+      semantics.dispose();
+    });
+
+    testWidgets('выход из изменения описания возвращает раскрытую панель с '
+        'ручкой вместо полосы', (tester) async {
+      final semantics = tester.ensureSemantics();
+      await openLoaded(tester);
+      await tester.tap(find.bySemanticsLabel(expand));
+      await tester.pumpAndSettle();
+
+      await openDescription(tester);
+      expect(find.bySemanticsLabel(collapse), findsNothing);
+      await leaveDescription(tester);
+
+      expect(tester.getRect(find.byType(Sheet)), full);
+      expect(find.bySemanticsLabel(collapse), findsOneWidget);
+      semantics.dispose();
+    });
+
+    testWidgets('изменение, открытое из компактного размера, возвращает '
+        'компактный размер', (tester) async {
+      final semantics = tester.ensureSemantics();
+      await openLoaded(tester);
+      final compact = tester.getRect(find.byType(Sheet));
+
+      await openDescription(tester);
+      await leaveDescription(tester);
+
+      expect(tester.getRect(find.byType(Sheet)), compact);
+      expect(find.bySemanticsLabel(expand), findsOneWidget);
       semantics.dispose();
     });
   });
