@@ -214,7 +214,7 @@
   - **Предполагаемые файлы:** `lib/src/design_system/components/day_heading.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`.
   - **Размер:** S.
 
-- [ ] 1.17 Проверка перезапуска подтверждает на экране строку выбора именно этого дня
+- [x] 1.17 Проверка перезапуска подтверждает на экране строку выбора именно этого дня
   - **Критерии приёмки:**
     - В `test/app/daily_choice_app_lifecycle_test.dart` проверки порядкового ключа `daily-choice-row-1` в сценарии перезапуска (строки 765–768 и 788–791) заменены проверкой ключа `daily-choice-completion-<id>` с каноническим идентификатором сохранённого выбора этого дня, например через `durabilityUuid`: для нового сегодня (`_nextTodayChoice`), прошлого (`_pastChoice`) и будущего дня (`_futureChoice`).
     - Тест падает, если после перезапуска экран показывает строку другого дня: ключ связан с выбором, а не с порядковым номером строки.

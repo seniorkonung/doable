@@ -763,7 +763,12 @@ void main() {
       );
       await showDailyChoiceCatalogSection(tester, true);
       expect(
-        find.byKey(const ValueKey('daily-choice-row-1'), skipOffstage: false),
+        find.byKey(
+          ValueKey(
+            'daily-choice-completion-${durabilityUuid(_nextTodayChoice)}',
+          ),
+          skipOffstage: false,
+        ),
         findsOneWidget,
       );
       expect(durabilityFileState(harness.databaseFile), stored);
@@ -786,7 +791,10 @@ void main() {
           result.items.single.isCompleted,
         );
         expect(
-          find.byKey(const ValueKey('daily-choice-row-1'), skipOffstage: false),
+          find.byKey(
+            ValueKey('daily-choice-completion-${durabilityUuid(choice)}'),
+            skipOffstage: false,
+          ),
           findsOneWidget,
         );
       }
