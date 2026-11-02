@@ -2000,9 +2000,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'The relation couldn’t be archived because of an unexpected error.';
 
   @override
-  String get relationRestored => 'Relation restored.';
-
-  @override
   String get relationRestoreNotFound => 'This relation no longer exists.';
 
   @override

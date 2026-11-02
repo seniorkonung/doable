@@ -3077,12 +3077,6 @@ abstract class AppLocalizations {
   /// **'The relation couldn’t be archived because of an unexpected error.'**
   String get relationArchiveUnexpected;
 
-  /// Подтверждение успешного восстановления долговременной связи
-  ///
-  /// In en, this message translates to:
-  /// **'Relation restored.'**
-  String get relationRestored;
-
   /// Отсутствие восстанавливаемой связи
   ///
   /// In en, this message translates to:

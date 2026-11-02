@@ -1484,10 +1484,6 @@
   "@relationArchiveUnexpected": {
     "description": "Терминальная непредвиденная ошибка архивирования связи"
   },
-  "relationRestored": "Relation restored.",
-  "@relationRestored": {
-    "description": "Подтверждение успешного восстановления долговременной связи"
-  },
   "relationRestoreNotFound": "This relation no longer exists.",
   "@relationRestoreNotFound": {
     "description": "Отсутствие восстанавливаемой связи"

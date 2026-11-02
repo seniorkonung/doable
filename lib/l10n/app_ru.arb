@@ -569,7 +569,6 @@
   "relationArchiveUnavailable": "Не удалось архивировать связь. Повторите попытку.",
   "relationArchiveCorruption": "Сохранённые данные повреждены. Связь не архивирована.",
   "relationArchiveUnexpected": "Не удалось архивировать связь из-за непредвиденной ошибки.",
-  "relationRestored": "Связь восстановлена.",
   "relationRestoreNotFound": "Эта связь больше не существует.",
   "relationRestoreConflict": "Связь не удалось восстановить из-за конфликта актуального состояния.",
   "relationRestoreSourceNotFound": "Исходное намерение больше не существует. Связь не восстановлена.",

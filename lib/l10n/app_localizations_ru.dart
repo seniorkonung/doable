@@ -2026,9 +2026,6 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось архивировать связь из-за непредвиденной ошибки.';
 
   @override
-  String get relationRestored => 'Связь восстановлена.';
-
-  @override
   String get relationRestoreNotFound => 'Эта связь больше не существует.';
 
   @override

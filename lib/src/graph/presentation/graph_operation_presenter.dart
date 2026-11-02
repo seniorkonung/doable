@@ -505,20 +505,14 @@ String _relationOutcomeFor(
       LongTermRelationsAdded(),
     ) => localizations.relationEditorCreateUnexpected,
     (
-      LongTermRelationCommandKind.update || LongTermRelationCommandKind.archive,
+      LongTermRelationCommandKind.update ||
+          LongTermRelationCommandKind.archive ||
+          LongTermRelationCommandKind.restore,
       _,
     ) =>
       throw StateError(
         'Успех этой операции связи не образует права предъявления.',
       ),
-    (LongTermRelationCommandKind.restore, LongTermRelationUpdated()) =>
-      localizations.relationRestored,
-    (LongTermRelationCommandKind.restore, LongTermRelationCreated()) ||
-    (LongTermRelationCommandKind.restore, LongTermRelationDeleted()) ||
-    (
-      LongTermRelationCommandKind.restore,
-      LongTermRelationsAdded(),
-    ) => localizations.relationRestoreUnexpected,
     (LongTermRelationCommandKind.delete, LongTermRelationDeleted()) =>
       localizations.relationDeleted,
     (LongTermRelationCommandKind.delete, LongTermRelationCreated()) ||
