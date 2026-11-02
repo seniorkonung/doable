@@ -26,7 +26,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 
 void main() {
-  test('успех публикует событие перехода к созданному выбору', () async {
+  test('успех публикует событие завершения потока', () async {
     final harness = _Harness();
     addTearDown(harness.dispose);
     expect(harness.state.schedule, const DailyChoiceAllDay());
@@ -37,7 +37,6 @@ void main() {
     harness.repository.succeed(0);
     await pumpEventQueue();
     expect(harness.state.event, isA<DailyChoiceCreationCreated>());
-    expect(harness.state.event!.choiceId, _dailyChoiceId(1));
   });
 
   test('пустое описание становится отсутствующим, а ввод остаётся видимым', () {

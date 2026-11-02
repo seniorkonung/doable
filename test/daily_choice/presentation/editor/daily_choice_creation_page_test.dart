@@ -219,7 +219,7 @@ void main() {
   }
 
   testWidgets(
-    'успех предъявляется после результата команды, затем открывается созданный выбор',
+    'успех предъявляется после результата команды, затем открыта исходная страница',
     (tester) async {
       final repository = _Repository();
       final navigatorKey = GlobalKey<NavigatorState>();
@@ -234,7 +234,7 @@ void main() {
       repository.succeed(0);
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('daily-choice-date')), findsNothing);
-      expect(find.text('Подробный просмотр выбора'), findsOneWidget);
+      expect(find.text('Домашний экран'), findsOneWidget);
       expect(find.textContaining('Дневной выбор создан'), findsOneWidget);
     },
   );
@@ -412,7 +412,7 @@ void main() {
     );
     repository.succeed(1);
     await tester.pumpAndSettle();
-    expect(find.text('Подробный просмотр выбора'), findsOneWidget);
+    expect(find.text('Домашний экран'), findsOneWidget);
     expect(find.textContaining('Дневной выбор создан'), findsOneWidget);
     semantics.dispose();
   });
@@ -848,11 +848,6 @@ Future<void> _pump(
         builder: (_, _) => const Scaffold(body: Text('Домашний экран')),
       ),
       AutoRoute(page: DailyChoiceCreationRoute.page),
-      NamedRouteDef(
-        name: DailyChoiceDetailsRoute.name,
-        builder: (_, _) =>
-            const Scaffold(body: Text('Подробный просмотр выбора')),
-      ),
     ],
   );
   addTearDown(router.dispose);

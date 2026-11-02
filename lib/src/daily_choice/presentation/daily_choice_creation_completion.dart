@@ -1,10 +1,7 @@
-import 'dart:async';
-
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../app/routing/app_router.gr.dart';
-import '../domain/daily_choice_id.dart';
 import 'daily_choice_creation_flow_session.dart';
 
 /// Прекращает создание до удаления его страниц; чужая история и новая сессия
@@ -14,11 +11,6 @@ void leaveDailyChoiceCreation({
   required DailyChoiceCreationFlowSession session,
   required LocalKey ownerMatchId,
 }) {
-  bool hasStack(List<LocalKey> suffix) => listEquals(
-    router.stackData.map((route) => route.matchId).toList(),
-    [...session.originalHistory, ...suffix],
-  );
-
   final top = router.stackData.lastOrNull;
   if (top == null || top.matchId != ownerMatchId) return;
   final suffix = <LocalKey>[session.rootMatchId];
@@ -30,14 +22,71 @@ void leaveDailyChoiceCreation({
       return;
     }
   }
-  if (!hasStack(suffix)) return;
-  final pageless = router.pagelessRoutesObserver;
-  if (pageless.hasPagelessTopRoute) return;
+  if (!_hasStack(router, session, suffix)) return;
+  if (router.pagelessRoutesObserver.hasPagelessTopRoute) return;
 
   session.leave();
+  _removeFlowRoutes(
+    router: router,
+    session: session,
+    suffix: suffix,
+    isCurrent: () => session.state is DailyChoiceCreationFlowLeft,
+  );
+}
+
+/// Закрывает поток сохранённого выбора одной попыткой, удерживая сессию
+/// независимо от виджетов. Удаляет только конкретное подтверждение и его корень,
+/// поэтому наверху остаётся страница, с которой начато создание.
+void completeDailyChoiceCreation({
+  required StackRouter router,
+  required DailyChoiceCreationFlowSession session,
+  required LocalKey confirmationMatchId,
+}) {
+  final suffix = <LocalKey>[session.rootMatchId, confirmationMatchId];
+  bool isSaved() => session.state is DailyChoiceCreationFlowSaved;
+  final ownsConfirmation = switch (router.stackData.lastOrNull?.args) {
+    DailyChoiceCreationRouteArgs(session: final owner) => identical(
+      owner,
+      session,
+    ),
+    _ => false,
+  };
+  if (!isSaved() ||
+      !_hasStack(router, session, suffix) ||
+      !ownsConfirmation ||
+      router.pagelessRoutesObserver.hasPagelessTopRoute ||
+      !session.claimCompletion()) {
+    return;
+  }
+  _removeFlowRoutes(
+    router: router,
+    session: session,
+    suffix: suffix,
+    isCurrent: isSaved,
+  );
+}
+
+bool _hasStack(
+  StackRouter router,
+  DailyChoiceCreationFlowSession session,
+  List<LocalKey> suffix,
+) => listEquals(router.stackData.map((route) => route.matchId).toList(), [
+  ...session.originalHistory,
+  ...suffix,
+]);
+
+/// Снимает страницы потока сверху вниз. Перед каждым снятием проверяет
+/// состояние сессии, полную исходную историю и верхний безымянный маршрут.
+void _removeFlowRoutes({
+  required StackRouter router,
+  required DailyChoiceCreationFlowSession session,
+  required List<LocalKey> suffix,
+  required bool Function() isCurrent,
+}) {
+  final pageless = router.pagelessRoutesObserver;
   while (suffix.isNotEmpty) {
-    if (session.state is! DailyChoiceCreationFlowLeft ||
-        !hasStack(suffix) ||
+    if (!isCurrent() ||
+        !_hasStack(router, session, suffix) ||
         pageless.hasPagelessTopRoute) {
       return;
     }
@@ -46,48 +95,4 @@ void leaveDailyChoiceCreation({
     router.removeRoute(router.stackData.last);
     suffix.removeLast();
   }
-}
-
-/// Открывает сохранённый выбор одной попыткой, удерживая сессию независимо
-/// от виджетов. Удаляет только конкретное подтверждение и заменяет его корень;
-/// перед каждой мутацией проверяет полную исходную историю и экземпляры.
-void completeDailyChoiceCreation({
-  required StackRouter router,
-  required DailyChoiceCreationFlowSession session,
-  required LocalKey confirmationMatchId,
-  required DailyChoiceId choiceId,
-}) {
-  final rootMatchId = session.rootMatchId;
-  bool hasStack(List<LocalKey> suffix) => listEquals(
-    router.stackData.map((route) => route.matchId).toList(),
-    [...session.originalHistory, ...suffix],
-  );
-
-  bool isActive() => session.state is DailyChoiceCreationFlowSaved;
-  final ownsConfirmation = switch (router.stackData.lastOrNull?.args) {
-    DailyChoiceCreationRouteArgs(session: final owner) => identical(
-      owner,
-      session,
-    ),
-    _ => false,
-  };
-  if (!isActive() ||
-      !hasStack([rootMatchId, confirmationMatchId]) ||
-      !ownsConfirmation ||
-      router.pagelessRoutesObserver.hasPagelessTopRoute ||
-      !session.claimOpening(choiceId)) {
-    return;
-  }
-  // removeRoute учитывает matchId и уведомляет без ожидания анимации:
-  // https://pub.dev/documentation/auto_route/11.1.0/auto_route/StackRouter/removeRoute.html
-  router.removeRoute(router.stackData.last);
-  if (!isActive() || !hasStack([rootMatchId])) return;
-  // replace удаляет корень до асинхронной установки нового маршрута. Его
-  // Future относится к возврату со страницы, а не к открытию:
-  // https://pub.dev/documentation/auto_route/11.1.0/auto_route/StackRouter/replace.html
-  unawaited(
-    router.replace<void>(
-      DailyChoiceDetailsRoute(choiceId: choiceId, key: UniqueKey()),
-    ),
-  );
 }

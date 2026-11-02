@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import '../../graph/application/graph_command_coordinator.dart';
 import '../../graph/application/graph_command_result.dart';
 import '../application/daily_choice_result.dart';
-import '../domain/daily_choice_id.dart';
 
 /// Идентичность одного входа в создание, независимая от участников и пути.
 final class DailyChoiceCreationFlowId {
@@ -34,9 +33,7 @@ final class DailyChoiceCreationFlowSubmitting
 
 final class DailyChoiceCreationFlowSaved
     extends DailyChoiceCreationFlowActiveState {
-  const DailyChoiceCreationFlowSaved(this.choiceId);
-
-  final DailyChoiceId choiceId;
+  const DailyChoiceCreationFlowSaved();
 }
 
 /// Поздний результат уточняет запись, но не возвращает право продолжения.
@@ -73,7 +70,7 @@ final class DailyChoiceCreationFlowSession {
     const DailyChoiceCreationFlowEditing(),
   );
   var _accepting = false;
-  var _openingAttempted = false;
+  var _completionAttempted = false;
 
   DailyChoiceCreationFlowState get state => _state.value;
   ValueListenable<DailyChoiceCreationFlowState> get changes => _state;
@@ -84,17 +81,14 @@ final class DailyChoiceCreationFlowSession {
   bool get canContinue =>
       !_accepting && state is DailyChoiceCreationFlowEditing;
 
-  /// Одна попытка открытия подтверждённого результата на весь поток.
+  /// Одна попытка завершения подтверждённого результата на весь поток.
   /// Удаление отдельных страниц не разрешает повтор.
-  bool claimOpening(DailyChoiceId choiceId) {
-    if (_openingAttempted) return false;
-    if (state case DailyChoiceCreationFlowSaved(choiceId: final savedId)
-        when savedId == choiceId) {
-      _openingAttempted = true;
-      return true;
-    } else {
+  bool claimCompletion() {
+    if (_completionAttempted || state is! DailyChoiceCreationFlowSaved) {
       return false;
     }
+    _completionAttempted = true;
+    return true;
   }
 
   /// Синхронно вызывает принятие команды координатором только у живого
@@ -140,8 +134,8 @@ final class DailyChoiceCreationFlowSession {
       return false;
     }
     final next = switch (completion.result) {
-      GraphResultSuccess(value: DailyChoiceCreated(:final choice)) =>
-        DailyChoiceCreationFlowSaved(choice.id),
+      GraphResultSuccess(value: DailyChoiceCreated()) =>
+        const DailyChoiceCreationFlowSaved(),
       GraphResultFailure() => const DailyChoiceCreationFlowEditing(),
       GraphResultSuccess() => null,
     };

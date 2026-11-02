@@ -140,20 +140,54 @@ void main() {
   });
 
   // Варианты потоков связи и дневного выбора принадлежат их собственным
-  // тестам. Здесь намерение проверяется над корневой и глубокой историей, а
-  // дневной выбор от действия — как одна связка общей кнопки с другим потоком.
-  for (final (flow, origin) in const [
-    (_Flow.intention, IntentionCreationOrigin.dailyChoices),
-    (_Flow.intention, IntentionCreationOrigin.deep),
-    (_Flow.bottomUp, IntentionCreationOrigin.deep),
+  // тестам. Здесь дневной выбор от действия — одна связка общей кнопки с другим
+  // потоком, а намерение проверяется над корневой и глубокой историей.
+  testWidgets('дневной выбор от действия: успех над глубокой историей '
+      'возвращает на исходную страницу и сохраняет параметры каталогов', (
+    tester,
+  ) async {
+    const flow = _Flow.bottomUp;
+    const origin = IntentionCreationOrigin.deep;
+    final app = await _start(tester, fileBacked: true);
+    final history = await origin.open(
+      tester,
+      app.router,
+      participantId: durabilityIntention(2),
+      waitFor: (tester, finder) =>
+          _until(tester, () => finder.evaluate().isNotEmpty),
+    );
+    final catalogs = app.catalogs;
+    await flow.open(tester, app, origin);
+    history.expectPrefix(app.router);
+    await flow.fill(tester);
+    app.observer.observe(flow.table);
+    await _tap(tester, _key(flow.submit));
+    await _until(
+      tester,
+      () => app.router.stackData.length == history.routes.length,
+    );
+    await tester.pumpAndSettle();
+    history.expectRestored(tester, app.router);
+    final rows = (await tester.runAsync(
+      () => durabilityRows(app.database, flow.table),
+    ))!;
+    expect(rows, hasLength(flow.initialRows + 1));
+    expect(app.observer.attempts, 1);
+    flow.expectStored(rows.last);
+    expect(find.textContaining('Дневной выбор создан'), findsOneWidget);
+    expect(app.catalogs, catalogs);
+    await history.expectUnderlyingDraft(tester, app.router);
+    expect(tester.takeException(), isNull);
+  });
+
+  const flow = _Flow.intention;
+  for (final origin in const [
+    IntentionCreationOrigin.dailyChoices,
+    IntentionCreationOrigin.deep,
   ]) {
     testWidgets('${flow.label}: успех над ${origin.description} сохраняет '
         'ID, историю, выбранный пункт и параметры каталогов', (tester) async {
-      final app = await _start(
-        tester,
-        fileBacked:
-            flow == _Flow.bottomUp && origin == IntentionCreationOrigin.deep,
-      );
+      final app = await _start(tester);
       final history = await origin.open(
         tester,
         app.router,
@@ -186,8 +220,6 @@ void main() {
           intentionId.toCanonicalString(),
         RelationDetailsRouteArgs(:final relationId) =>
           relationId.toCanonicalString(),
-        DailyChoiceDetailsRouteArgs(:final choiceId) =>
-          choiceId.toCanonicalString(),
         _ => throw StateError('Ожидался маршрут созданной сущности.'),
       };
       expect(resultId, created['id']);
@@ -200,7 +232,6 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
-  const flow = _Flow.intention;
   for (final origin in const [
     IntentionCreationOrigin.dailyChoices,
     IntentionCreationOrigin.deep,

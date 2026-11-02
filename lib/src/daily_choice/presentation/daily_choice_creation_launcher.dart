@@ -117,7 +117,7 @@ final class _Launch implements DailyChoicePickerLaunch {
     router.addListener(check);
     try {
       // Future push означает возврат со страницы. Открытие подтверждает
-      // конкретный маршрут: replace пути может вообще не завершить Future.
+      // конкретный маршрут.
       // https://pub.dev/documentation/auto_route/11.1.0/auto_route/StackRouter/push.html
       unawaited(router.push<void>(path).then<void>((_) => finish()));
       check();

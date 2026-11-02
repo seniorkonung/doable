@@ -9,7 +9,6 @@ import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
 import 'package:doable/src/daily_choice/presentation/daily_choice_creation_launcher.dart';
 import 'package:doable/src/daily_choice/presentation/daily_choice_picker_context.dart';
-import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/design_system/components/top_bar.dart';
@@ -379,9 +378,7 @@ void main() {
       await _tapKey(tester, 'choice-path-select-action');
       await _tapKey(tester, 'choice-path-open-confirmation');
       await _tapKey(tester, 'daily-choice-submit');
-      expect(find.byType(DailyChoiceDetailsPage), findsOneWidget);
-      await router.maybePop();
-      await tester.pumpAndSettle();
+      expect(router.stackData, hasLength(1));
       final next = launcher.launch(
         sourceContext: source,
         direction: ChoicePathDraftDirection.topDown,

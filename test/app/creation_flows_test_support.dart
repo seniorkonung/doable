@@ -21,7 +21,7 @@ enum _Flow {
     'daily_choices',
     0,
     'daily-choice-submit',
-    DailyChoiceDetailsRoute.name,
+    null,
   ),
   bottomUp(
     'дневной выбор от действия',
@@ -42,7 +42,9 @@ enum _Flow {
   final String table;
   final int initialRows;
   final String submit;
-  final String resultRoute;
+
+  /// Маршрут созданной сущности; дневной выбор возвращает на исходную страницу.
+  final String? resultRoute;
 
   Future<void> open(
     WidgetTester tester,

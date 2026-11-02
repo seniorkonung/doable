@@ -193,14 +193,13 @@ final class DailyChoiceCreationPageState
     final model = ref.read(provider.notifier);
     final canEdit = widget.session.canContinue;
     ref.listen(provider, (previous, next) {
-      if (next.event case DailyChoiceCreationCreated(:final choiceId)) {
+      if (next.event is DailyChoiceCreationCreated) {
         model.consumeEvent();
         if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
         completeDailyChoiceCreation(
           router: context.router.root,
           session: widget.session,
           confirmationMatchId: routeMatchId,
-          choiceId: choiceId,
         );
       } else if (next.operation is DailyChoiceCreationFailed &&
           previous?.operation != next.operation) {

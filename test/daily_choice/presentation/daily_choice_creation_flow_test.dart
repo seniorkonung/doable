@@ -94,7 +94,15 @@ Future<void> _openConfirmation(WidgetTester tester) async {
     tester,
     find.byKey(const ValueKey('choice-path-open-confirmation')),
   );
+  await _settleConfirmation(tester);
+}
+
+/// Видимое сообщение прежнего создания перелетает на новую страницу вместе со
+/// своим `Hero`. Отправка дожидается конца перехода, как и человек, иначе снятие
+/// потока прервёт этот перелёт и сработает проверка Flutter.
+Future<void> _settleConfirmation(WidgetTester tester) async {
   await _waitFor(tester, find.byKey(const ValueKey('daily-choice-date')));
+  await tester.pumpAndSettle();
 }
 
 Future<void> _save(WidgetTester tester, {bool doubleTap = false}) async {
@@ -108,13 +116,24 @@ Future<void> _save(WidgetTester tester, {bool doubleTap = false}) async {
   if (doubleTap) await tester.tap(submit);
   await tester.pump();
   await _waitFor(tester, find.textContaining('Дневной выбор создан'));
-  await _waitFor(tester, find.byType(DailyChoiceDetailsPage));
+  await _waitForCreationClosed(tester);
   await tester.pumpAndSettle();
-  await _waitFor(tester, find.byType(DailyChoiceDetailsPage));
+}
+
+/// Подтверждение снимается только после успеха, поэтому его исчезновение
+/// означает закрытие потока, даже пока видно прежнее сообщение.
+Future<void> _waitForCreationClosed(WidgetTester tester) async {
+  final confirmation = find.byType(DailyChoiceCreationPage);
+  for (var attempt = 0; attempt < 500; attempt += 1) {
+    if (confirmation.evaluate().isEmpty) return;
+    await tester.pump(const Duration(milliseconds: 10));
+  }
+  fail('Поток создания не закрылся');
 }
 
 Future<void> _restartPath(
   WidgetTester tester,
+  LocalDatabaseHarness harness,
   List<int> relations, {
   ChoicePathDraftDirection direction = ChoicePathDraftDirection.topDown,
 }) async {
@@ -124,19 +143,12 @@ Future<void> _restartPath(
           .container
           .read(appRouterProvider);
   final history = [for (final route in router.stackData) route.name];
-  expect(history.last, DailyChoiceDetailsRoute.name);
-  final created = tester
-      .widget<DailyChoiceDetailsPage>(find.byType(DailyChoiceDetailsPage))
-      .choiceId;
-  await tester.binding.handlePopRoute();
-  await tester.pumpAndSettle();
+  final created = _savedIds(harness).last;
   switch (direction) {
     case ChoicePathDraftDirection.topDown:
-      // Созданный выбор открыт прямо над намерением: пошагового выбора и
-      // подтверждения в истории нет, а «назад» возвращает на вкладку
+      // Пошагового выбора и подтверждения в истории нет: открыта вкладка
       // «Выборы» с прежней ролью и созданным выбором в списке.
-      expect(history[history.length - 2], IntentionDetailsRoute.name);
-      expect(router.current.name, IntentionDetailsRoute.name);
+      expect(history.last, IntentionDetailsRoute.name);
       expect(
         tester
             .widget<Tabs<IntentionDetailsTab>>(
@@ -161,6 +173,8 @@ Future<void> _restartPath(
       );
       await _tap(tester, intentionChoicesAdd);
     case ChoicePathDraftDirection.bottomUp:
+      // Поток начат с каталога, и над ним ничего не осталось.
+      expect(history, [AppShellRoute.name]);
       await openDailyChoiceQuickCreation(
         tester,
         ChoicePathDraftDirection.bottomUp,
@@ -445,6 +459,15 @@ void main() {
         _relation(102),
       ]);
 
+      await _waitForCreationClosed(tester);
+      await tester.pumpAndSettle();
+      // Созданный выбор открывается с исходной вкладки «Выборы».
+      await _tap(
+        tester,
+        find.byKey(
+          ValueKey('intention-choices-row-${ids.last.toCanonicalString()}'),
+        ),
+      );
       await _waitFor(tester, find.byType(DailyChoiceDetailsPage));
       await tester.pumpAndSettle();
       expect(find.text('Время: 18:00'), findsOneWidget);
@@ -673,8 +696,9 @@ void main() {
         _relation(102),
       ]);
 
+      await _waitForCreationClosed(tester);
       await tester.pumpAndSettle();
-      await _restartPath(tester, [
+      await _restartPath(tester, harness, [
         102,
         101,
       ], direction: ChoicePathDraftDirection.bottomUp);
@@ -686,14 +710,14 @@ void main() {
         tester,
         find.byKey(const ValueKey('choice-path-open-confirmation')),
       );
-      await _waitFor(tester, find.byKey(const ValueKey('daily-choice-date')));
+      await _settleConfirmation(tester);
       await tester.enterText(
         find.byKey(const ValueKey('daily-choice-date')),
         '2030-09-24',
       );
       await _tap(tester, find.byKey(const ValueKey('daily-choice-completed')));
       await _tap(tester, find.byKey(const ValueKey('daily-choice-submit')));
-      await _waitFor(tester, find.byType(DailyChoiceDetailsPage));
+      await _waitForCreationClosed(tester);
       final ids = _savedIds(harness);
       expect(ids, hasLength(2));
       expect(ids.toSet(), hasLength(2));
@@ -706,7 +730,7 @@ void main() {
       ]);
 
       await tester.pumpAndSettle();
-      await _restartPath(tester, [
+      await _restartPath(tester, harness, [
         102,
       ], direction: ChoicePathDraftDirection.bottomUp);
       await _tap(
@@ -717,7 +741,7 @@ void main() {
         tester,
         find.byKey(const ValueKey('choice-path-open-confirmation')),
       );
-      await _waitFor(tester, find.byKey(const ValueKey('daily-choice-date')));
+      await _settleConfirmation(tester);
       expect(
         find.descendant(
           of: find.byType(DailyChoiceCreationPage),
@@ -744,7 +768,7 @@ void main() {
       );
       await _tap(tester, find.byKey(const ValueKey('daily-choice-completed')));
       await _tap(tester, find.byKey(const ValueKey('daily-choice-submit')));
-      await _waitFor(tester, find.byType(DailyChoiceDetailsPage));
+      await _waitForCreationClosed(tester);
       await tester.pumpAndSettle();
       final oneStepId = _savedIds(harness).last;
       final oneStep = await _read(repository, oneStepId);
@@ -755,7 +779,7 @@ void main() {
       expect(oneStep.choice.isCompleted, isTrue);
       expect(oneStep.path.map((step) => step.relation.id), [_relation(102)]);
 
-      await _restartPath(tester, [
+      await _restartPath(tester, harness, [
         102,
       ], direction: ChoicePathDraftDirection.bottomUp);
       await _tap(
@@ -766,7 +790,7 @@ void main() {
         tester,
         find.byKey(const ValueKey('choice-path-open-confirmation')),
       );
-      await _waitFor(tester, find.byKey(const ValueKey('daily-choice-date')));
+      await _settleConfirmation(tester);
       await tester.enterText(
         find.byKey(const ValueKey('daily-choice-date')),
         '2030-09-24',
@@ -777,7 +801,7 @@ void main() {
       );
       await _tap(tester, find.byKey(const ValueKey('daily-choice-completed')));
       await _tap(tester, find.byKey(const ValueKey('daily-choice-submit')));
-      await _waitFor(tester, find.byType(DailyChoiceDetailsPage));
+      await _waitForCreationClosed(tester);
       final allIds = _savedIds(harness);
       expect(allIds, hasLength(4));
       expect(allIds.toSet(), hasLength(4));
@@ -796,8 +820,6 @@ void main() {
       expect(duplicate.path.map((step) => step.relation.id), [_relation(102)]);
       expect((await _read(repository, oneStepId)).path, hasLength(1));
 
-      await tester.pumpAndSettle();
-      await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       await showDailyChoiceCatalogSection(tester, true);
       await _waitFor(tester, find.byKey(const ValueKey('daily-choice-row-3')));
@@ -1093,7 +1115,7 @@ void main() {
         _relation(104),
       ]);
 
-      await _restartPath(tester, [101]);
+      await _restartPath(tester, harness, [101]);
       await _openConfirmation(tester);
       await _save(tester);
       final secondId = _savedIds(harness).last;
@@ -1101,7 +1123,7 @@ void main() {
       expect(second.choice.selectedIntentionId, _intention(2));
       expect(second.path.map((step) => step.relation.id), [_relation(101)]);
 
-      await _restartPath(tester, [101]);
+      await _restartPath(tester, harness, [101]);
       await _openConfirmation(tester);
       await _save(tester);
       final ids = _savedIds(harness);

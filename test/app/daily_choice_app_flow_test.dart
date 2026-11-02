@@ -3,6 +3,7 @@ import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
+import 'package:doable/src/daily_choice/presentation/editor/daily_choice_creation_page.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -85,7 +86,12 @@ Future<void> _createFromPath(WidgetTester tester) async {
   );
   await _tap(tester, find.byKey(const ValueKey('daily-choice-completed')));
   await _tap(tester, find.byKey(const ValueKey('daily-choice-submit')));
-  await _until(tester, find.byType(DailyChoiceDetailsPage));
+  final confirmation = find.byType(DailyChoiceCreationPage);
+  for (var attempt = 0; attempt < 500; attempt++) {
+    if (confirmation.evaluate().isEmpty) break;
+    await tester.pump(const Duration(milliseconds: 10));
+  }
+  expect(confirmation, findsNothing);
   await tester.pumpAndSettle(const Duration(milliseconds: 1));
 }
 
@@ -163,9 +169,7 @@ void main() {
       );
       await _createFromPath(tester);
       final firstId = _savedIds(harness).single;
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
-      // Вкладка «Выборы» остаётся выбранной после возвращения к намерению.
+      // Создание возвращает на вкладку «Выборы» страницы намерения.
       await _tap(tester, intentionChoicesAdd);
       await _tap(
         tester,
