@@ -16,6 +16,7 @@ import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
+import 'package:doable/src/daily_choice/presentation/daily_choice_picker_context.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_date_catalog_page.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_creation_page.dart';
@@ -45,12 +46,12 @@ import 'package:doable/src/long_term_relation/presentation/editor/relation_edito
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_state.dart';
 import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_choice.dart';
 import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart';
-import 'package:doable/src/design_system/components/page_head.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../intention/presentation/picker/intention_picker_test_support.dart';
 import '../../long_term_relation/presentation/participant_picker/participant_picker_test_support.dart'
     show testRelationRestore;
 import '../../support/app_root_pages.dart';
@@ -148,47 +149,26 @@ void main() {
     }
   });
 
-  // Выбор любого пункта сбрасывает историю одним путём: берём переход на
-  // другой пункт.
+  // Выбор любого пункта сбрасывает историю одним путём.
   const destination = AppDestination.dailyChoices;
   testWidgets(
-    'выбор пункта ${destination.index + 1} со страницы участника удаляет '
-    'незавершённую форму связи без сохранения',
+    'выбор пункта со страницы участника закрывает поиск действия без команды',
     (tester) async {
       final router = await _start(tester);
       await _select(tester, AppDestination.intentionGraph);
-      await _open(tester, intentionCatalogRow('Читать'), IntentionDetailsPage);
-      await _tap(tester, find.text('Relations').first);
-      await _tap(tester, _outgoingNeedGroup);
-      await _open(
-        tester,
-        find.byKey(const ValueKey('intention-relations-add')),
-        RelationEditorPage,
+      unawaited(
+        router.push(
+          DailyChoiceActionPickerRoute(
+            pickerContext: const PathReplacementDailyChoicePickerContext(),
+          ),
+        ),
       );
-      await _open(
-        tester,
-        find.byKey(const ValueKey('relation-editor-select-related')),
-        RelationParticipantPickerPage,
-      );
-      await _tap(tester, _summary(RelationParticipantPickerPage, 'Гулять'));
-      await _gone(tester, RelationParticipantPickerPage);
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('relation-editor-type-need')),
-      );
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('relation-editor-priority-p2')),
-      );
-      await tester.enterText(
-        find.byKey(const ValueKey('relation-editor-description')),
-        'Несохранённый черновик связи',
-      );
-      await _open(
-        tester,
-        find.byKey(const ValueKey('relation-editor-open-source-details')),
-        IntentionDetailsPage,
-      );
+      final filter = find.byKey(const ValueKey('daily-choice-action-filter'));
+      await _until(tester, filter);
+      await tester.enterText(filter, 'Гулять');
+      final row = _summary(DailyChoiceActionPickerPage, 'Гулять');
+      await _until(tester, row);
+      await _open(tester, intentionPickerArrow(row), IntentionDetailsPage);
       _expectAboveShell(
         tester,
         IntentionDetailsPage,
@@ -200,46 +180,16 @@ void main() {
       _expectRootPage(tester, router, destination);
       expect(find.byType(AlertDialog), findsNothing);
       expect(
-        find.byType(RelationEditorPage, skipOffstage: false),
+        find.byType(DailyChoiceActionPickerPage, skipOffstage: false),
         findsNothing,
       );
       expect(
         find.byType(IntentionDetailsPage, skipOffstage: false),
         findsNothing,
       );
-      await tester.binding.handlePopRoute();
+      await tester.pump(const Duration(seconds: 1));
       await tester.pumpAndSettle();
-      _expectRootPage(tester, router, AppDestination.home);
-      await _select(tester, AppDestination.intentionGraph);
-      await _open(tester, intentionCatalogRow('Читать'), IntentionDetailsPage);
-      expect(
-        tester
-            .widget<PageHead>(
-              find.byKey(const ValueKey('intention-details-title')),
-            )
-            .name,
-        'Читать',
-      );
-      await _tap(tester, find.text('Relations').first);
-      await _tap(tester, _outgoingNeedGroup);
-      await _open(
-        tester,
-        find.byKey(const ValueKey('intention-relations-add')),
-        RelationEditorPage,
-      );
-      expect(
-        tester
-            .widget<TextField>(
-              find.byKey(const ValueKey('relation-editor-description')),
-            )
-            .controller!
-            .text,
-        isEmpty,
-      );
-      expect(
-        find.byKey(const ValueKey('relation-editor-participant-title-related')),
-        findsNothing,
-      );
+      _expectRootPage(tester, router, destination);
       expect(tester.takeException(), isNull);
     },
   );
