@@ -91,9 +91,8 @@ Map<String, Object> _encode(DiagnosticsEvent event) => switch (event) {
       'pageSize': pageSize,
       'isContinuation': isContinuation,
     },
-  DailyChoicePathValidationDiagnosticsEvent(:final commandType) => {
+  DailyChoicePathValidationDiagnosticsEvent() => {
     'operation': 'dailyChoicePathValidation',
-    'commandType': commandType.name,
     'stage': 'validation',
     ..._encodeStatus(event.status),
   },

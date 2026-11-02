@@ -29,7 +29,6 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
         final pathStopwatch = Stopwatch()..start();
         _recordDiagnostics(
           const DailyChoicePathValidationDiagnosticsEvent(
-            commandType: DailyChoicePathCommandDiagnosticsType.create,
             status: DiagnosticsStarted(),
           ),
         );
@@ -41,7 +40,6 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
           );
           _recordDiagnostics(
             DailyChoicePathValidationDiagnosticsEvent(
-              commandType: DailyChoicePathCommandDiagnosticsType.create,
               status: DiagnosticsSucceeded(pathStopwatch.elapsed),
             ),
           );
@@ -49,7 +47,6 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
           final failure = _classifyDailyChoiceCommandFailure(error);
           _recordDiagnostics(
             DailyChoicePathValidationDiagnosticsEvent(
-              commandType: DailyChoicePathCommandDiagnosticsType.create,
               status: DiagnosticsFailed(
                 duration: pathStopwatch.elapsed,
                 code: _graphCommandDiagnosticsFailureCode(failure),
