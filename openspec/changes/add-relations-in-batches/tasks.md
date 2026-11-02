@@ -977,3 +977,17 @@
   - **Зависимости:** 3.24 — меняет ветку `_Occupied` того же файла.
   - **Предполагаемые файлы:** меняются `lib/src/design_system/components/picker_row.dart`, `lib/src/intention/presentation/picker/intention_picker_row.dart`, `test/intention/presentation/picker/intention_picker_test_support.dart`.
   - **Размер:** S.
+
+- [ ] 3.26 Отказ занятой пары говорит о связи с намерением страницы
+  - **Критерии приёмки:**
+    - `relationsAdditionPairOccupied` дословно равна «Некоторые выбранные намерения уже связаны с этим намерением. Связи не созданы.» в `lib/l10n/app_ru.arb` и «Some selected intentions are already linked to this intention. No relations were created.» в `lib/l10n/app_en.arb`. Конкретные намерения сообщение не называет.
+    - `app_localizations.dart`, `app_localizations_ru.dart` и `app_localizations_en.dart` пересозданы через `mise run codegen`, а не правкой вручную.
+    - Контракт отказа `LongTermRelationPairOccupiedFailure` и команда `AddLongTermRelations` не меняются. Спецификации не меняются: они не задают дословный текст этого отказа.
+    - Ожидания старого текста заменены новым в двух проверках `relation_batch_picker_page_test.dart` и в проверке обоих языков `graph_operation_presenter_test.dart`. Новых тестов нет: эти проверки уже предъявляют отказ.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/batch_picker/relation_batch_picker_page_test.dart test/graph/presentation/graph_operation_presenter_test.dart`.
+    - `mise run codegen-check`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** меняются `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации, `test/long_term_relation/presentation/batch_picker/relation_batch_picker_page_test.dart`, `test/graph/presentation/graph_operation_presenter_test.dart`.
+  - **Размер:** XS.

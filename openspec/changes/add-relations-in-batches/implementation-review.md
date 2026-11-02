@@ -5,7 +5,7 @@
 **Format version:** 1
 **Result:** Changes needed
 **Coverage status:** Complete
-**Summary:** Фаза 3 реализована: связи добавляются атомарной пачкой только из группы, старый поток удалён, а полные проверки проходят. Активны две находки Low без угрозы данным. Важнейшая — текст отказа занятой пары называет не те намерения. Принятых рисков нет. Ручные проверки на устройстве остаются за владельцем продукта.
+**Summary:** Фаза 3 реализована: связи добавляются атомарной пачкой только из группы, старый поток удалён, а полные проверки проходят. Активна одна находка Low без угрозы данным: строка `relationEditorDescriptionLabel` осталась без читателя. Принятых рисков нет. Ручные проверки на устройстве остаются за владельцем продукта.
 
 ## Review target
 
@@ -56,15 +56,6 @@
 | Code quality | Complete | Пять линз `code-review-and-quality` применены ко всем рабочим путям на `75766028…`. Вне правок учтены `_acceptOperation`, `_writeGraph`, согласование занятости и перезапуск выдачи в `intention_catalog_view_model.dart`. Новых зависимостей и границ доверия в диапазоне нет. |
 
 ## Findings
-
-### F3 · Low — Отказ занятой пары называет не те намерения
-
-- **Evidence:** `relationsAdditionPairOccupied` говорит «Между некоторыми выбранными намерениями уже есть связь» (`lib/l10n/app_ru.arb:548`) и «A relation already exists between some selected intentions» (`lib/l10n/app_en.arb:1403`). Команда проверяет пару намерения страницы и кандидата, а не пары кандидатов между собой, как видно по `_addLongTermRelations` в `lib/src/graph/data/drift_personal_graph_repository_relation_commands.dart`.
-- **Evidence revisions:** ["757660289963d17d8904fe3a823af057a647ea21"]
-- **Impact:** Человек ищет связь между отмеченными намерениями, хотя её там может не быть, и не понимает, что снять.
-- **Required outcome:** Текст на обоих языках описывает занятую пару с намерением страницы и по-прежнему говорит, что связи не созданы.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** ["lib/l10n/app_ru.arb","lib/l10n/app_en.arb"]
 
 ### F4 · Low — Строка `relationEditorDescriptionLabel` осталась без читателя
 
