@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../doable_colors.dart';
+import '../doable_icon.dart';
 import '../doable_metrics.dart';
 import '../doable_type.dart';
 
@@ -15,7 +16,8 @@ final class Button extends StatelessWidget {
     required this.onPressed,
     super.key,
   }) : _kind = _ButtonKind.primary,
-       semanticLabel = null;
+       semanticLabel = null,
+       icon = null;
 
   /// Основное действие экрана правки справа в верхней панели, например
   /// «Сохранить»: плашка `ink` с текстом `bg` размера sm шириной по подписи.
@@ -24,7 +26,8 @@ final class Button extends StatelessWidget {
     required this.onPressed,
     super.key,
   }) : _kind = _ButtonKind.primarySmall,
-       semanticLabel = null;
+       semanticLabel = null,
+       icon = null;
 
   /// Безопасный ответ диалога, который сохраняет данные, например
   /// «Продолжить правку» в диалоге отмены изменений или «Вернуть» в диалоге
@@ -35,13 +38,15 @@ final class Button extends StatelessWidget {
     required this.onPressed,
     super.key,
   }) : _kind = _ButtonKind.primaryCompact,
-       semanticLabel = null;
+       semanticLabel = null,
+       icon = null;
 
   /// Второстепенное действие диалога подтверждения, например «Отмена»:
   /// плашка `fill` с текстом `ink` шириной по подписи.
   const Button.quiet({required this.label, required this.onPressed, super.key})
     : _kind = _ButtonKind.quiet,
-      semanticLabel = null;
+      semanticLabel = null,
+      icon = null;
 
   /// Второстепенное действие на всю ширину контейнера, например
   /// «Восстановить из архива» в шапке страницы: плашка `fill` с текстом `ink`.
@@ -50,14 +55,16 @@ final class Button extends StatelessWidget {
     required this.onPressed,
     super.key,
   }) : _kind = _ButtonKind.quietBlock,
-       semanticLabel = null;
+       semanticLabel = null,
+       icon = null;
 
   /// Действие диалога подтверждения, которое необратимо удаляет или
   /// перезаписывает данные: плашка `accent` с текстом `on-accent` шириной по
   /// подписи.
   const Button.danger({required this.label, required this.onPressed, super.key})
     : _kind = _ButtonKind.danger,
-      semanticLabel = null;
+      semanticLabel = null,
+      icon = null;
 
   /// Небольшое действие у края шапки, например «Сбросить» листа: текст
   /// `accent` без плашки размера sm шириной по подписи.
@@ -66,7 +73,8 @@ final class Button extends StatelessWidget {
     required String this.semanticLabel,
     required this.onPressed,
     super.key,
-  }) : _kind = _ButtonKind.text;
+  }) : _kind = _ButtonKind.text,
+       icon = null;
 
   /// Выход рядом с основной кнопкой, например «Отменить» в диалоге отмены
   /// изменений: текст `accent` без плашки размера md шириной по подписи.
@@ -75,12 +83,29 @@ final class Button extends StatelessWidget {
     required this.onPressed,
     super.key,
   }) : _kind = _ButtonKind.textMedium,
-       semanticLabel = null;
+       semanticLabel = null,
+       icon = null;
+
+  /// Тихая плашка `fill` размера sm со значком перед подписью, например дата
+  /// или время дневного выбора в строке. Подпись — значение, а не действие,
+  /// поэтому доступное название, которое называет и значение, и действие,
+  /// обязательно. Цифры подписи табличные, а длинную подпись плашка переносит
+  /// внутри себя, поэтому ширина родителя должна быть ограничена.
+  const Button.quietSmallIcon({
+    required this.label,
+    required DoableIconData this.icon,
+    required String this.semanticLabel,
+    required this.onPressed,
+    super.key,
+  }) : _kind = _ButtonKind.quietSmallIcon;
 
   final String label;
 
   /// Доступное название; без него диктор объявляет [label].
   final String? semanticLabel;
+
+  /// Значок перед подписью; есть только у вариантов со значком.
+  final DoableIconData? icon;
 
   /// Без обработчика кнопка выключена: остаётся на своём месте плашкой
   /// `fill` с текстом `grip`, а текстовая — текстом `grip`, и объявляется
@@ -168,6 +193,20 @@ final class Button extends StatelessWidget {
         foreground: colors.onAccent,
         minimumSize: compact,
       ),
+      _ButtonKind.quietSmallIcon => _filled(
+        colors,
+        _iconLabel(colors),
+        background: colors.fill,
+        foreground: colors.ink,
+        // Строка подписи 20 и отступы по 8 дают высоту control-height-sm.
+        minimumSize: const Size(0, DoableMetrics.controlHeightSm),
+        padding: const EdgeInsetsDirectional.fromSTEB(
+          10,
+          _smallVerticalPadding,
+          DoableMetrics.space3,
+          _smallVerticalPadding,
+        ),
+      ),
       _ButtonKind.textMedium => _text(
         colors,
         label,
@@ -187,6 +226,28 @@ final class Button extends StatelessWidget {
       ),
     };
   }
+
+  /// Значок `muted` в 18, зазор 6 и подпись; у выключенной кнопки значок
+  /// `grip`, как и подпись.
+  Widget _iconLabel(DoableColors colors) => Row(
+    mainAxisSize: MainAxisSize.min,
+    spacing: 6,
+    children: [
+      DoableIcon(
+        icon!,
+        size: 18,
+        color: onPressed == null ? colors.grip : colors.muted,
+      ),
+      Flexible(
+        child: Text(
+          label,
+          semanticsLabel: semanticLabel,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontFeatures: [FontFeature.tabularFigures()]),
+        ),
+      ),
+    ],
+  );
 
   Widget _text(
     DoableColors colors,
@@ -244,6 +305,7 @@ enum _ButtonKind {
   primaryCompact,
   quiet,
   quietBlock,
+  quietSmallIcon,
   danger,
   textMedium,
   text,
