@@ -3,17 +3,17 @@
 ## Assessment
 
 **Format version:** 1
-**Result:** No unresolved findings
+**Result:** Changes needed
 **Coverage status:** Complete
-**Summary:** Задачи 1.15–1.18 выполнены по критериям приёмки, активных находок нет. Единое правило повтора отказа обновления передано в задачу 1.20 и ещё не реализовано. Принятых рисков нет.
+**Summary:** Задачи 1.19 и 1.20 выполнены по критериям приёмки. Активна одна находка низкой важности F1: граница 1,5, до которой слово обновления видно в заголовке дня, не закреплена тестом каталога, а запас при ней около 13 dp. Принятых рисков нет.
 
 ## Review target
 
-- **Baseline ref:** c499430a6f98e95fde6ee2285e0f7b2489bcd65f
-- **Base commit:** c499430a6f98e95fde6ee2285e0f7b2489bcd65f
-- **Reviewed head:** 702ff26f9996e647fa6e9a76bfbc530ae9e81618
-- **Target commits:** ["4ad528b9f62eda9294cd79b4ccf0e31520b2ec21", "a7d1534993aa5e13db53c2314e89b50333d9f3b3", "5564f454ec77ac1713ab0d42a6b8ef731b8a7968", "1e531a97df6270ad9796196d98c79aa7f09b493d", "702ff26f9996e647fa6e9a76bfbc530ae9e81618"]
-- **Reviewable paths:** ["lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart", "lib/src/design_system/components/day_heading.dart", "openspec/changes/redesign-daily-choices/task-profiles.md", "openspec/changes/redesign-daily-choices/tasks.md", "test/app/daily_choice_app_lifecycle_test.dart", "test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart", "test/design_system/choice_check_test.dart", "test/design_system/day_heading_test.dart", "test/design_system/scroll_top_button_test.dart"]
+- **Baseline ref:** 50289c5e96801e5f051bb3933d6c816b74acaba5
+- **Base commit:** 50289c5e96801e5f051bb3933d6c816b74acaba5
+- **Reviewed head:** 402b9271783e3b2701fc4958aa121bc8e3ab4c79
+- **Target commits:** ["ebdf7555859d8a442f66a69907420f51e6617007", "0e9e174b0ff971f5bac57c0deae490ace9eb7901", "402b9271783e3b2701fc4958aa121bc8e3ab4c79"]
+- **Reviewable paths:** ["lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart", "lib/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart", "lib/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart", "lib/src/design_system/components/list_state.dart", "openspec/changes/redesign-daily-choices/task-profiles.md", "openspec/changes/redesign-daily-choices/tasks.md", "test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart", "test/daily_choice/presentation/catalog/daily_choice_catalog_supported_layout_test.dart", "test/design_system/list_state_test.dart"]
 - **OpenSpec change:** redesign-daily-choices
 - **OpenSpec schema:** intent-driven
 - **Target scope:** User-requested bounded range
@@ -22,56 +22,51 @@
 
 ## Reviewed increment
 
-### U1 · Устаревшая выдача показывает отказ на месте продолжения
+### U1 · При крупном шрифте день недели не разрывается внутри слова
 
-- **Work items:** ["1.15"]
+- **Work items:** ["1.19"]
+- **Requirements and scenarios:** ["Задача 1.19: строка обновления сужается до кольца", "Задача 1.16: постоянное место строки обновления", "Каталог дневных выборов по дате и секциям"]
+- **Affected boundary:** Человек в экране дня корневого каталога и каталога на дату, в том числе с экранным диктором и крупным шрифтом, и потребители `ListState`
+- **Implementation target:** ["lib/src/design_system/components/list_state.dart", "test/design_system/list_state_test.dart", "test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart", "test/daily_choice/presentation/catalog/daily_choice_catalog_supported_layout_test.dart"]
+- **Applicable constraints and non-goals:** Компоненты модуля основ остаются представлениями без предметных типов по ADR-0030. Вид заголовка при масштабе 1, его высота и позиции строк не зависят от обновления. Окна уже 360 не входят в область поддержки. Спецификация и design не меняются.
+
+### U2 · Решение о повторе отказа обновления принимается в одном месте
+
+- **Work items:** ["1.20"]
 - **Requirements and scenarios:** ["Каталог дневных выборов по дате и секциям: Отказ обновления виден на месте продолжения", "Подтверждённые результаты и безопасные ошибки дневного выбора"]
-- **Affected boundary:** Человек в корневом каталоге и каталоге на дату, в том числе с экранным диктором
-- **Implementation target:** ["lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart", "test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart"]
-- **Applicable constraints and non-goals:** Модель, чтение и схема не меняются. `Notice` в начале выдачи остаётся. Повтор предлагается только при доказанно временном отказе.
-
-### U2 · Строка обновления не ложится на заголовок дня и ничего не двигает
-
-- **Work items:** ["1.16"]
-- **Requirements and scenarios:** ["Задача 1.9: обновление выдачи не сдвигает строки", "Каталог дневных выборов по дате и секциям"]
-- **Affected boundary:** Человек в каталоге дня, в том числе с экранным диктором и крупным шрифтом, и потребители `DayHeading`
-- **Implementation target:** ["lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart", "lib/src/design_system/components/day_heading.dart", "test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart", "test/design_system/day_heading_test.dart"]
-- **Applicable constraints and non-goals:** Компоненты модуля основ остаются представлениями без предметных типов по ADR-0030. При масштабе шрифта 1 вид заголовка не меняется. Спецификация и design не меняются.
-
-### U3 · Проверка перезапуска подтверждает строку выбора именно этого дня
-
-- **Work items:** ["1.17"]
-- **Requirements and scenarios:** ["Начальное состояние и сохранение календаря каталога: Перезапуск на следующий день", "Краткая карточка дневного выбора"]
-- **Affected boundary:** Защита от регрессий долговечности каталога при перезапуске
-- **Implementation target:** ["test/app/daily_choice_app_lifecycle_test.dart"]
-- **Applicable constraints and non-goals:** Дата в карточку не возвращается. Производственный код не меняется, остальные ожидания теста не ослаблены.
-
-### U4 · В тестах компонентов нет тестов без отдельной регрессии
-
-- **Work items:** ["1.18"]
-- **Requirements and scenarios:** ["Правило proven-necessity: тест ловит отдельную регрессию"]
-- **Affected boundary:** Защита от регрессий компонентов модуля основ
-- **Implementation target:** ["test/design_system/choice_check_test.dart", "test/design_system/scroll_top_button_test.dart"]
-- **Applicable constraints and non-goals:** Производственный код, спецификация и design не меняются.
+- **Affected boundary:** Человек с устаревшей выдачей в каталоге и слой представления каталога
+- **Implementation target:** ["lib/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart", "lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart", "lib/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart"]
+- **Applicable constraints and non-goals:** Рефакторинг без смены поведения: тексты отказов, модель выдачи, чтение и схема не меняются. Повтор предлагается только при доказанно временном отказе и запускается только при устаревшей выдаче.
 
 ## Pass coverage
 
 | Pass | Status | Evidence or limitation |
 |---|---|---|
-| Independent decision review | Complete | Свежие изолированные проверяющие получили нейтральные задания без артефактов планирования. U1 и U2 делят пути, поэтому у них один проверяющий и объединённое задание на четыре пути. U4 проверена отдельно на двух путях. Для U3 первый проверяющий прочитал изменённый вне границы путь и вернул неполное покрытие, поэтому его результат заменён: новый свежий проверяющий получил тест и `daily_choice_catalog_body.dart` как контекст ключа и вернул полное покрытие. Контекстные пути проверяющих вне цели не менялись в диапазоне |
-| OpenSpec conformance | Complete | `mise exec --no-deps -- openspec validate redesign-daily-choices --strict --json` проходит. Единственное сообщение уровня `INFO` о `Сброс истории пунктом панели` ожидаемо по D12. Целевые тесты изменённых модулей: 340 прошли. `mise run check` завершился с кодом 0 в этом worktree на `702ff26f9996e647fa6e9a76bfbc530ae9e81618`; менялся только этот отчёт, который проверки не читают. Задачи 1.15–1.18 и их сценарии сопоставлены с кодом и тестами |
+| Independent decision review | Complete | Свежие изолированные проверяющие получили нейтральные задания без артефактов планирования. Отдельный проверяющий U1 вернул неполное покрытие: ему нужен изменённый в диапазоне `daily_choice_catalog_body.dart` вне его цели. Поэтому U1 и U2 объединены, и новый свежий проверяющий с объединённым заданием на все семь путей поставки и тестов вернул полное покрытие на `50289c5e96801e5f051bb3933d6c816b74acaba5..402b9271783e3b2701fc4958aa121bc8e3ab4c79`. Контекстные пути `day_heading.dart` и `doable_type.dart` в диапазоне не менялись |
+| OpenSpec conformance | Complete | `mise exec --no-deps -- openspec validate redesign-daily-choices --strict --json` проходит. Единственное сообщение уровня `INFO` о `Сброс истории пунктом панели` ожидаемо по D12. `mise run check` завершился с кодом 0 в этом worktree на `402b9271783e3b2701fc4958aa121bc8e3ab4c79`: статический анализ без замечаний, 4029 обычных и 18 процессных тестов прошли; рабочее дерево отличалось только этим отчётом, который проверки не читают. Задачи 1.19 и 1.20 и их сценарии сопоставлены с кодом и тестами |
 | Code quality | Complete | Линзы `code-review-and-quality` применены ко всем путям поставки на проверенной ревизии: корректность, читаемость, архитектура, безопасность, производительность. Новых зависимостей, секретов и внешних границ в диапазоне нет |
 
 ## Findings
 
-No unresolved findings remain in the implementation review.
+### F1 · Low — Граница показа слова обновления не закреплена тестом каталога
+
+- **Evidence:** `lib/src/design_system/components/list_state.dart:86` и `:97-99` оставляют слово до масштаба 1,5 включительно. `test/daily_choice/presentation/catalog/daily_choice_catalog_supported_layout_test.dart:52-81` проверяет день недели только при масштабе 2, где слова уже нет, а `test/design_system/list_state_test.dart:138` и `:146` проверяют голый `ListState` вне `DayHeading`. Ширину слота ограничивает только половина заголовка: `lib/src/design_system/components/day_heading.dart:100`. Замер с настоящим Inter в окне 360 на этой ревизии: при 1,5 заголовок шириной 320 вмещает слот 150,0, промежуток 8 и «Понедельник» 149,1, поэтому запас 12,9 dp, примерно один символ слова «Обновляем…». При слове на масштабе 1,6 «Понедельник» и «Воскресенье» уже разрываются.
+- **Evidence revisions:** ["402b9271783e3b2701fc4958aa121bc8e3ab4c79"]
+- **Impact:** Сейчас день недели цел при всех замеренных масштабах от 1 до 2, но запас зависит от строки обновления, шрифта и геометрии заголовка. Строка длиннее на символ, другой шрифт или другие отступы вернут дефект задачи 1.19 при масштабе до 1,5, и все тесты останутся зелёными. Вред ограничен видом заголовка.
+- **Required outcome:** Изменение, которое разрывает день недели в окне 360 при наибольшем масштабе с видимым словом, ломает тест каталога на русском и английском.
+- **Earliest source of truth:** implementation/tests
+- **Affected artifacts:** ["test/daily_choice/presentation/catalog/daily_choice_catalog_supported_layout_test.dart"]
 
 ## Review coverage
 
-Прочитаны proposal, дельта `daily-choice-management`, design, adr, plan и tasks на проверенной ревизии. Покрыты все пять целевых коммитов: `4ad528b9f62eda9294cd79b4ccf0e31520b2ec21` относится только к планированию и добавляет профили задач, `a7d1534993aa5e13db53c2314e89b50333d9f3b3`, `5564f454ec77ac1713ab0d42a6b8ef731b8a7968`, `1e531a97df6270ad9796196d98c79aa7f09b493d` и `702ff26f9996e647fa6e9a76bfbc530ae9e81618` соответствуют задачам 1.15–1.18 один к одному. Изменения `tasks.md` в диапазоне — только отметки выполнения. Посторонних изменений нет.
+Прочитаны proposal, дельта `daily-choice-management`, design, adr, plan и tasks на проверенной ревизии. Покрыты все три целевых коммита: `ebdf7555859d8a442f66a69907420f51e6617007` относится только к планированию и добавляет профили задач 1.19 и 1.20, `0e9e174b0ff971f5bac57c0deae490ace9eb7901` соответствует задаче 1.19, `402b9271783e3b2701fc4958aa121bc8e3ab4c79` — задаче 1.20. Изменения `tasks.md` в диапазоне — только отметки выполнения. Посторонних изменений нет.
 
-Проверены сброс `refreshFailure` при запуске обновления и возврат кольца в подвал, сохранение `_requestPage`, скрытие строки обновления от нажатий и семантики, остановка кольца вне обновления, живая область во время обновления, совпадение `durabilityUuid` с ключом `daily-choice-completion-<id>` и достаточность оставшихся тестов после удалений. Вид заголовка при масштабе 1 в окнах 360 и 390 измерен со слотом: день недели с отметкой «Сегодня» стоит на одной строке. Окна уже 360 не входят в область поддержки `app-appearance`.
+По задаче 1.19 проверены все критерии приёмки. Замер в одноразовой копии подтвердил основание порога: до 1,5 день недели на одной строке, а со словом при 1,6 и 1,75 разрываются русские названия, при 2 ещё и «Wednesday». Мутации в той же копии: всегда видимое слово ломает тест `ListState` и все три теста дня недели при 200%, а убранное название живой области ломает тест `ListState` и тест строки обновления при 200%. Скрытие строки вне обновления при масштабе 200% проверяет `expectRefreshLineHidden`, поэтому название в режиме кольца не попадает в семантику вне обновления.
 
-Замечание проверяющего о том, что тест кольца не заметит галочку у невыполненного выбора, опровергнуто мутацией в одноразовой копии: при всегда рисуемой галочке падают тесты кольца в обеих темах. Удаление теста «выбор без выполнения не рисует галочку» обосновано.
+По задаче 1.20 найдены все три места чтения `canRetryRefresh`, других проверок типа отказа обновления для решения о повторе в `lib` нет: `daily_choice_catalog_body.dart:740` выбирает текст отказа. Проверка `freshness == stale` сохранена. Мутация, разрешающая повтор при любом отказе, ломает оба теста каталога о повторе только при доказанно временном отказе, поэтому существующие тесты действительно закрепляют неизменность поведения.
+
+Две мысли проверяющих не стали находками. Порог, подобранный под геометрию заголовка, не вредит сейчас: у `ListState.refreshing` один потребитель, выбор места в компоненте задан задачей 1.19, а параметр для другого потребителя был бы преждевременным. Отдельный тест нелинейного масштаба не добавлен в находку: код уже читает размер caption через `TextScaler`, а откат к другому чтению лишь немного сместил бы порог, и такой тест не окупается.
+
+Темы коммитов задач длиннее правила в 72 символа: 76 и 74. Переписывать историю этапу запрещено, на поведение это не влияет.
 
 Ручные проверки на устройстве остаются за владельцем продукта. Папка `context/` с README дизайна в этом worktree отсутствует, поэтому вид заголовка сверен с тестами, а не с README `DayHeading`.
