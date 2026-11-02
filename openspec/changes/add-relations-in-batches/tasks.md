@@ -963,3 +963,17 @@
   - **Зависимости:** нет.
   - **Предполагаемые файлы:** меняются `lib/src/design_system/components/picker_row.dart`, `test/design_system/picker_row_test.dart`.
   - **Размер:** XS.
+
+- [ ] 3.25 Набор действий строки экрана выбора определяется одним закрытым вариантом
+  - **Критерии приёмки:**
+    - `PickerRow` хранит единственное поле закрытого типа `_PickerBehavior`, которое задаёт его конструктор. Нулевых полей `_label`, `_onPick`, `_chosen`, `_reason` и открытых геттеров `label` и `onPick` нет, поэтому чтение действия, которого у варианта нет, не компилируется.
+    - `IntentionPickerRow` вместо нулевых полей `onPick`, `chosen`, `reason` и развёрток `onPick!` хранит один закрытый вариант, а `build` разбирает его исчерпывающе. Открытое поле `requiredTagIds` у занятой строки остаётся, только если оно нужно построению: сейчас его требует `IntentionRowContent.of`.
+    - Сигнатуры именованных конструкторов обоих виджетов и имена их параметров сохранены, поэтому `intention_picker_view.dart` и тесты строк не меняются. Конструкторы могут потерять `const`: вызовов с `const` нет.
+    - `intentionPickerPick` в `intention_picker_test_support.dart` возвращает обработчик области выбора, читая `onTap` у первого `InkWell` внутри строки. Её четыре вызова сохраняют смысл позднего вызова обработчика. Открытого варианта поведения ради тестов нет.
+    - Поведение продукта не меняется: существующие тесты строк и поисков проходят без правок проверок. Спецификации и дизайн не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/picker_row_test.dart test/intention/presentation/picker test/long_term_relation/presentation/batch_picker test/daily_choice/presentation/daily_choice_creation_launcher_test.dart test/daily_choice/presentation/source_picker test/daily_choice/presentation/action_picker test/app/navigation/app_shell_operation_reset_test.dart test/app/navigation/app_shell_back_test.dart test/app/navigation/app_shell_pages_above_test.dart test/app/long_term_relation_app_flow_test.dart test/app/intention_tag_search_app_flow_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 3.24 — меняет ветку `_Occupied` того же файла.
+  - **Предполагаемые файлы:** меняются `lib/src/design_system/components/picker_row.dart`, `lib/src/intention/presentation/picker/intention_picker_row.dart`, `test/intention/presentation/picker/intention_picker_test_support.dart`.
+  - **Размер:** S.

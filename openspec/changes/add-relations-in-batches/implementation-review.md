@@ -5,7 +5,7 @@
 **Format version:** 1
 **Result:** Changes needed
 **Coverage status:** Complete
-**Summary:** Фаза 3 реализована: связи добавляются атомарной пачкой только из группы, старый поток удалён, а полные проверки проходят. Активны три находки Low без угрозы данным. Важнейшая — открытые поля `PickerRow` компилируются у занятой строки, но падают при чтении. Принятых рисков нет. Ручные проверки на устройстве остаются за владельцем продукта.
+**Summary:** Фаза 3 реализована: связи добавляются атомарной пачкой только из группы, старый поток удалён, а полные проверки проходят. Активны две находки Low без угрозы данным. Важнейшая — текст отказа занятой пары называет не те намерения. Принятых рисков нет. Ручные проверки на устройстве остаются за владельцем продукта.
 
 ## Review target
 
@@ -56,15 +56,6 @@
 | Code quality | Complete | Пять линз `code-review-and-quality` применены ко всем рабочим путям на `75766028…`. Вне правок учтены `_acceptOperation`, `_writeGraph`, согласование занятости и перезапуск выдачи в `intention_catalog_view_model.dart`. Новых зависимостей и границ доверия в диапазоне нет. |
 
 ## Findings
-
-### F2 · Low — Открытые поля `PickerRow` падают у занятой строки
-
-- **Evidence:** `PickerRow.label` и `PickerRow.onPick` (`lib/src/design_system/components/picker_row.dart:92-93`) разворачивают `_label!` и `_onPick!`, а `PickerRow.occupied` задаёт оба как `null`. Вариант поведения хранится дважды: в нулевых полях и в закрытом `_PickerBehavior`, который `_behavior` (`:95`) пересобирает при каждом чтении. То же в `IntentionPickerRow`: три нулевых поля и `onPick!` (`lib/src/intention/presentation/picker/intention_picker_row.dart:53-55,88,101`). В `lib/` открытые поля не читаются, `onPick` читает только `test/intention/presentation/picker/intention_picker_test_support.dart:29`.
-- **Evidence revisions:** ["757660289963d17d8904fe3a823af057a647ea21"]
-- **Impact:** Обращение к `onPick` у занятой строки компилируется и падает во время выполнения. Правило `type-safe-design` просит недопустимые состояния исключать типом, а закрытый вариант здесь уже есть, поэтому цена проверки времени выполнения ничем не оправдана.
-- **Required outcome:** Набор действий строки определяется одним закрытым вариантом, а чтение действия, которого у варианта нет, не компилируется.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** ["lib/src/design_system/components/picker_row.dart","lib/src/intention/presentation/picker/intention_picker_row.dart","test/intention/presentation/picker/intention_picker_test_support.dart"]
 
 ### F3 · Low — Отказ занятой пары называет не те намерения
 
