@@ -3102,6 +3102,69 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
+  String get dailyChoiceSheetExpand => 'Раскрыть панель дневного выбора';
+
+  @override
+  String get dailyChoiceSheetCollapse => 'Свернуть панель дневного выбора';
+
+  @override
+  String dailyChoiceSheetCompletionLabel(String action, String priority) {
+    return 'Выполнение выбора. $action. $priority';
+  }
+
+  @override
+  String get dailyChoiceSheetOptionsLabel => 'Параметры дневного выбора';
+
+  @override
+  String get dailyChoiceSheetTabsLabel => 'Разделы дневного выбора';
+
+  @override
+  String get dailyChoiceSheetPathTab => 'Путь';
+
+  @override
+  String dailyChoiceSheetPathTabLabel(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Путь, $count шага',
+      many: 'Путь, $count шагов',
+      few: 'Путь, $count шага',
+      one: 'Путь, $count шаг',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String dailyChoiceSheetPathTabArchivedLabel(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Путь, $count шага, в пути есть архив',
+      many: 'Путь, $count шагов, в пути есть архив',
+      few: 'Путь, $count шага, в пути есть архив',
+      one: 'Путь, $count шаг, в пути есть архив',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get dailyChoiceFieldDate => 'Дата';
+
+  @override
+  String get dailyChoiceFieldTime => 'Время';
+
+  @override
+  String dailyChoiceFieldDateLabel(String date) {
+    return 'Дата: $date';
+  }
+
+  @override
+  String get dailyChoiceDateTomorrow => 'Завтра';
+
+  @override
+  String get dailyChoiceDateYesterday => 'Вчера';
+
+  @override
   String get dailyChoiceCreationPath => 'Подтверждаемый путь';
 
   @override

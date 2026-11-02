@@ -4814,6 +4814,84 @@ abstract class AppLocalizations {
   /// **'Transition {number}'**
   String dailyChoiceDetailsStep(int number);
 
+  /// Доступное название ручки компактной панели дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Expand daily choice sheet'**
+  String get dailyChoiceSheetExpand;
+
+  /// Доступное название ручки раскрытой панели дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Collapse daily choice sheet'**
+  String get dailyChoiceSheetCollapse;
+
+  /// Доступное название флажка в шапке панели; состояние сообщает сам флажок
+  ///
+  /// In en, this message translates to:
+  /// **'Completion of the choice. {action}. {priority}'**
+  String dailyChoiceSheetCompletionLabel(String action, String priority);
+
+  /// Доступное название кнопки параметров в шапке панели дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Daily choice options'**
+  String get dailyChoiceSheetOptionsLabel;
+
+  /// Доступное название полосы вкладок панели дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Daily choice sections'**
+  String get dailyChoiceSheetTabsLabel;
+
+  /// Вкладка сохранённого пути в панели дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Path'**
+  String get dailyChoiceSheetPathTab;
+
+  /// Доступное название вкладки пути с числом шагов
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{Path, {count} step} other{Path, {count} steps}}'**
+  String dailyChoiceSheetPathTabLabel(int count);
+
+  /// Доступное название вкладки пути, в котором что-то архивировано
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{Path, {count} step, something in it is archived} other{Path, {count} steps, something in it is archived}}'**
+  String dailyChoiceSheetPathTabArchivedLabel(int count);
+
+  /// Название поля даты дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Date'**
+  String get dailyChoiceFieldDate;
+
+  /// Название поля времени дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Time'**
+  String get dailyChoiceFieldTime;
+
+  /// Доступное название поля даты с полным значением
+  ///
+  /// In en, this message translates to:
+  /// **'Date: {date}'**
+  String dailyChoiceFieldDateLabel(String date);
+
+  /// Дата выбора, которая наступит завтра
+  ///
+  /// In en, this message translates to:
+  /// **'Tomorrow'**
+  String get dailyChoiceDateTomorrow;
+
+  /// Дата выбора, которая была вчера
+  ///
+  /// In en, this message translates to:
+  /// **'Yesterday'**
+  String get dailyChoiceDateYesterday;
+
   /// Заголовок подтверждаемого пути
   ///
   /// In en, this message translates to:

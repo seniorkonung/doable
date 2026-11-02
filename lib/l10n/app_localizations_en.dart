@@ -3078,6 +3078,65 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get dailyChoiceSheetExpand => 'Expand daily choice sheet';
+
+  @override
+  String get dailyChoiceSheetCollapse => 'Collapse daily choice sheet';
+
+  @override
+  String dailyChoiceSheetCompletionLabel(String action, String priority) {
+    return 'Completion of the choice. $action. $priority';
+  }
+
+  @override
+  String get dailyChoiceSheetOptionsLabel => 'Daily choice options';
+
+  @override
+  String get dailyChoiceSheetTabsLabel => 'Daily choice sections';
+
+  @override
+  String get dailyChoiceSheetPathTab => 'Path';
+
+  @override
+  String dailyChoiceSheetPathTabLabel(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Path, $count steps',
+      one: 'Path, $count step',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String dailyChoiceSheetPathTabArchivedLabel(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Path, $count steps, something in it is archived',
+      one: 'Path, $count step, something in it is archived',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get dailyChoiceFieldDate => 'Date';
+
+  @override
+  String get dailyChoiceFieldTime => 'Time';
+
+  @override
+  String dailyChoiceFieldDateLabel(String date) {
+    return 'Date: $date';
+  }
+
+  @override
+  String get dailyChoiceDateTomorrow => 'Tomorrow';
+
+  @override
+  String get dailyChoiceDateYesterday => 'Yesterday';
+
+  @override
   String get dailyChoiceCreationPath => 'Path to confirm';
 
   @override

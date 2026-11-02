@@ -1,0 +1,548 @@
+import 'dart:async';
+
+import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
+import 'package:doable/src/daily_choice/domain/calendar_date.dart';
+import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_description.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
+import 'package:doable/src/daily_choice/presentation/details/daily_choice_sheet.dart';
+import 'package:doable/src/design_system/components/badge.dart';
+import 'package:doable/src/design_system/components/priority_picker.dart';
+import 'package:doable/src/design_system/components/reason_chain.dart';
+import 'package:doable/src/design_system/components/sheet.dart';
+import 'package:doable/src/design_system/components/tabs.dart';
+import 'package:doable/src/design_system/doable_icon.dart';
+import 'package:doable/src/design_system/doable_priority.dart';
+import 'package:doable/src/graph/application/graph_revision.dart';
+import 'package:doable/src/graph/application/personal_graph_repository.dart';
+import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
+import 'package:doable/src/intention/domain/intention.dart';
+import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+import '../../../support/daily_choice_local_date.dart';
+import '../../../support/ordinary_page_test_app.dart';
+import '../../../support/tag_read_contract_test_fallback.dart';
+
+void main() {
+  setUp(() {
+    WidgetsBinding.instance.handleAppLifecycleStateChanged(
+      AppLifecycleState.resumed,
+    );
+  });
+
+  testWidgets('панель открывается на «Обзоре» с шапкой, описанием с переносами '
+      'и полями, которые только показывают значения', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final harness = await _openSheet(tester);
+
+    harness.repository.emit(
+      _details(
+        description: 'Первая строка\nВторая строка',
+        schedule: DailyChoiceTime(hour: 18, minute: 0),
+        priority: DailyChoicePriority.p2,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Основа'), findsOneWidget);
+    expect(find.text('Действие'), findsOneWidget);
+    final chain = tester.widget<ReasonChain>(find.byType(ReasonChain));
+    expect(chain.reasons, 2);
+    expect(chain.priority, DoablePriority.p2);
+    expect(chain.off, isFalse);
+    expect(find.text('Первая строка\nВторая строка'), findsOneWidget);
+    expect(find.text('Дата'), findsOneWidget);
+    expect(find.text('Время'), findsOneWidget);
+    expect(find.text('18:00'), findsOneWidget);
+    expect(find.text('Приоритет'), findsOneWidget);
+
+    expect(
+      tester.getSemantics(find.bySemanticsLabel('Обзор')),
+      isSemantics(hasSelectedState: true, isSelected: true),
+    );
+    expect(find.bySemanticsLabel('Путь, 2 шага'), findsOneWidget);
+    expect(_tabCount(tester), '2');
+
+    final picker = tester.widget<PriorityPicker>(find.byType(PriorityPicker));
+    expect(picker.value, DoablePriority.p2);
+    expect(picker.onChange, isNull);
+    expect(
+      tester.getSemantics(find.bySemanticsLabel('Время: 18:00')),
+      isSemantics(isButton: true, hasEnabledState: true, isEnabled: false),
+    );
+    semantics.dispose();
+  });
+
+  testWidgets('у выполненного выбора шапка зачёркнута, цепочка серая, а без '
+      'описания над полями ничего нет', (tester) async {
+    final harness = await _openSheet(tester);
+
+    harness.repository.emit(_details(isCompleted: true, description: ''));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.widget<Text>(find.text('Действие')).style!.decoration,
+      TextDecoration.lineThrough,
+    );
+    expect(tester.widget<ReasonChain>(find.byType(ReasonChain)).off, isTrue);
+    expect(
+      tester.getRect(find.text('Дата')).top,
+      greaterThan(tester.getRect(_tabs).bottom),
+    );
+    expect(find.text('Пояснение'), findsNothing);
+    expect(find.text('Добавить описание'), findsNothing);
+  });
+
+  testWidgets('архивированные исходное намерение и действие несут отметку, а '
+      'вкладка «Путь» — значок и название архива', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final harness = await _openSheet(tester);
+
+    harness.repository.emit(
+      _details(archived: {_Archived.source, _Archived.selected}),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(BadgeArchived), findsNWidgets(2));
+    expect(find.text('Архив'), findsNWidgets(2));
+    expect(_archiveIcon, findsOneWidget);
+    expect(
+      find.bySemanticsLabel('Путь, 2 шага, в пути есть архив'),
+      findsOneWidget,
+    );
+    semantics.dispose();
+  });
+
+  for (final (name, archived) in [
+    ('промежуточное намерение', {_Archived.middle}),
+    ('связь', {_Archived.relation}),
+  ]) {
+    testWidgets('архив в середине пути ($name) даёт значок на вкладке без '
+        'отметки в шапке', (tester) async {
+      final harness = await _openSheet(tester);
+
+      harness.repository.emit(_details(archived: archived));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(BadgeArchived), findsNothing);
+      expect(_archiveIcon, findsOneWidget);
+    });
+  }
+
+  testWidgets('путь без архива не несёт значка на вкладке', (tester) async {
+    final harness = await _openSheet(tester);
+
+    harness.repository.emit(_details());
+    await tester.pumpAndSettle();
+
+    expect(_archiveIcon, findsNothing);
+  });
+
+  testWidgets('дата читается относительно сегодня, иначе числом и коротким '
+      'месяцем, а год стоит только у другого года', (tester) async {
+    final harness = await _openSheet(tester);
+
+    for (final (date, label) in [
+      (CalendarDate.fromParts(2026, 10, 8), 'Сегодня'),
+      (CalendarDate.fromParts(2026, 10, 9), 'Завтра'),
+      (CalendarDate.fromParts(2026, 10, 7), 'Вчера'),
+      (CalendarDate.fromParts(2026, 10, 13), '13 окт.'),
+      (CalendarDate.fromParts(2027, 1, 5), '5 янв. 2027'),
+    ]) {
+      harness.repository.emit(_details(date: date));
+      await tester.pumpAndSettle();
+
+      expect(find.text(label), findsOneWidget);
+    }
+  });
+
+  testWidgets('открытая панель пересчитывает слово даты с наступлением нового '
+      'дня', (tester) async {
+    final harness = await _openSheet(tester);
+    harness.repository.emit(_details());
+    await tester.pumpAndSettle();
+    expect(find.text('Сегодня'), findsOneWidget);
+
+    harness.localDate.today = CalendarDate.fromParts(2026, 10, 9);
+    WidgetsBinding.instance
+      ..handleAppLifecycleStateChanged(AppLifecycleState.paused)
+      ..handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+
+    expect(find.text('Вчера'), findsOneWidget);
+  });
+
+  for (final (locale, value) in [
+    (const Locale('ru'), '18:30'),
+    (const Locale('en'), '6:30 PM'),
+  ]) {
+    testWidgets('сохранённые минуты показаны как есть в формате часов локали '
+        '$locale', (tester) async {
+      final harness = await _openSheet(tester, locale: locale);
+
+      harness.repository.emit(
+        _details(schedule: DailyChoiceTime(hour: 18, minute: 30)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text(value), findsOneWidget);
+    });
+  }
+
+  testWidgets('выбор на весь день показывает «Весь день»', (tester) async {
+    final harness = await _openSheet(tester);
+
+    harness.repository.emit(_details(schedule: const DailyChoiceAllDay()));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Весь день'), findsOneWidget);
+  });
+
+  testWidgets('при загрузке вместо шапки и вкладок стоит состояние, а название '
+      'панели и подписи ручки уже постоянны', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final harness = await _openSheet(tester);
+
+    expect(find.text('Загружаем дневной выбор…'), findsOneWidget);
+    expect(_tabs, findsNothing);
+    expect(find.bySemanticsLabel('Дневной выбор'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel('Раскрыть панель дневного выбора'),
+      findsOneWidget,
+    );
+
+    harness.repository.emit(_details());
+    await tester.pumpAndSettle();
+
+    expect(find.bySemanticsLabel('Дневной выбор'), findsOneWidget);
+    await tester.tap(find.bySemanticsLabel('Раскрыть панель дневного выбора'));
+    await tester.pumpAndSettle();
+    expect(
+      find.bySemanticsLabel('Свернуть панель дневного выбора'),
+      findsOneWidget,
+    );
+    semantics.dispose();
+  });
+
+  for (final (name, fail, message)
+      in <(String, void Function(_Repository), String)>[
+        (
+          'отсутствие записи',
+          (repository) => repository.emitMissing(),
+          'Дневной выбор больше не существует.',
+        ),
+        (
+          'повреждение',
+          (repository) =>
+              repository.fail(const DailyChoiceReadCorruptionFailure()),
+          'Сохранённый путь повреждён и не может быть показан.',
+        ),
+        (
+          'непредвиденный отказ',
+          (repository) =>
+              repository.fail(const DailyChoiceReadUnexpectedFailure()),
+          'Не удалось загрузить дневной выбор из-за непредвиденной ошибки.',
+        ),
+        (
+          'пустой путь',
+          (repository) => repository.emit(_details(emptyPath: true)),
+          'Сохранённый путь повреждён и не может быть показан.',
+        ),
+      ]) {
+    testWidgets('$name заменяет шапку и вкладки отказом без повтора, а лист '
+        'сам не закрывается', (tester) async {
+      final harness = await _openSheet(tester);
+      harness.repository.emit(_details());
+      await tester.pumpAndSettle();
+
+      fail(harness.repository);
+      await tester.pumpAndSettle();
+
+      expect(find.text(message), findsOneWidget);
+      expect(find.text('Действие'), findsNothing);
+      expect(find.text('Обзор'), findsNothing);
+      expect(find.text('Повторить'), findsNothing);
+      expect(find.byType(Sheet), findsOneWidget);
+    });
+  }
+
+  testWidgets('только недоступность хранилища предлагает повтор, и он снова '
+      'читает выбор', (tester) async {
+    final harness = await _openSheet(tester);
+
+    harness.repository.fail(const DailyChoiceReadUnavailableFailure());
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Не удалось загрузить дневной выбор. Повторите попытку.'),
+      findsOneWidget,
+    );
+    expect(harness.repository.watchCount, 1);
+
+    await tester.tap(find.text('Повторить'));
+    await tester.pump();
+    expect(find.text('Загружаем дневной выбор…'), findsOneWidget);
+    expect(harness.repository.watchCount, 2);
+
+    harness.repository.emit(_details());
+    await tester.pumpAndSettle();
+    expect(find.text('Действие'), findsOneWidget);
+  });
+
+  testWidgets('общее сообщение появляется над панелью, а её закрытие снимает '
+      'подписку', (tester) async {
+    final harness = await _openSheet(tester);
+    harness.repository.emit(_details());
+    await tester.pumpAndSettle();
+
+    ScaffoldMessenger.of(tester.element(find.byType(Sheet)))
+        .showSnackBar(const SnackBar(content: Text('Сообщение')));
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(of: find.byType(Sheet), matching: find.text('Сообщение')),
+      findsOneWidget,
+    );
+
+    expect(harness.repository.controller.hasListener, isTrue);
+    Navigator.of(tester.element(find.byType(Sheet))).pop();
+    await tester.pumpAndSettle();
+
+    expect(find.byType(Sheet), findsNothing);
+    expect(harness.repository.controller.hasListener, isFalse);
+  });
+}
+
+final _tabs = find.byWidgetPredicate((widget) => widget is Tabs);
+
+/// Значок архива на вкладке: у отметок шапки такой же.
+final _archiveIcon = find.descendant(
+  of: _tabs,
+  matching: find.byWidgetPredicate(
+    (widget) => widget is DoableIcon && widget.icon == DoableIconData.archive,
+  ),
+);
+
+/// Число на вкладке «Путь».
+String _tabCount(WidgetTester tester) => tester
+    .widget<Text>(
+      find.descendant(
+        of: _tabs,
+        matching: find.textContaining(RegExp(r'^\d+$')),
+      ),
+    )
+    .data!;
+
+enum _Archived { source, middle, selected, relation }
+
+final class _Harness {
+  const _Harness(this.repository, this.localDate);
+
+  final _Repository repository;
+  final ControlledDailyChoiceLocalDate localDate;
+}
+
+/// Открывает панель над страницей; выбор приходит из [_Repository.emit].
+Future<_Harness> _openSheet(
+  WidgetTester tester, {
+  Locale locale = const Locale('ru'),
+}) async {
+  final repository = _Repository();
+  addTearDown(repository.dispose);
+  final localDate = ControlledDailyChoiceLocalDate(
+    CalendarDate.fromParts(2026, 10, 8),
+  );
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        personalGraphRepositoryProvider.overrideWith((ref) => repository),
+        dailyChoiceLocalDateSourceProvider.overrideWithValue(localDate.read),
+      ],
+      child: OrdinaryPageTestApp(
+        locale: locale,
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => TextButton(
+              onPressed: () =>
+                  unawaited(showDailyChoiceSheet(context, _choice)),
+              child: const Text('Открыть'),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+  await tester.pump();
+  await tester.tap(find.text('Открыть'));
+  await tester.pump();
+  await tester.pump(const Duration(seconds: 1));
+  return _Harness(repository, localDate);
+}
+
+String _uuid(int n) =>
+    '018f0b5d-6b2e-7c80-8000-${n.toRadixString(16).padLeft(12, '0')}';
+final _choice =
+    (DailyChoiceId.decode(_uuid(1)) as DailyChoiceIdDecodingSuccess).id;
+IntentionId _intentionId(int n) =>
+    (IntentionId.decode(_uuid(n)) as IntentionIdDecodingSuccess).id;
+LongTermRelationId _relationId(int n) => (LongTermRelationId.decode(
+  _uuid(n),
+) as LongTermRelationIdDecodingSuccess).id;
+ChoicePathStepId _stepId(int n) =>
+    (ChoicePathStepId.decode(_uuid(n)) as ChoicePathStepIdDecodingSuccess).id;
+
+Intention _intention(int n, String title, {required bool archived}) =>
+    Intention(
+      id: _intentionId(n),
+      title: title,
+      description: null,
+      readiness: IntentionReadiness.ready,
+      archiveState: archived
+          ? IntentionArchiveState.archived
+          : IntentionArchiveState.active,
+      createdAt: IntentionTimestamp(DateTime.utc(2026)),
+      updatedAt: IntentionTimestamp(DateTime.utc(2026)),
+    );
+
+DailyChoiceDetails _details({
+  CalendarDate? date,
+  DailyChoiceSchedule schedule = const DailyChoiceAllDay(),
+  DailyChoicePriority priority = DailyChoicePriority.p4,
+  String description = 'Пояснение',
+  bool isCompleted = false,
+  bool emptyPath = false,
+  Set<_Archived> archived = const {},
+}) {
+  final source = _intention(
+    1,
+    'Основа',
+    archived: archived.contains(_Archived.source),
+  );
+  final middle = _intention(
+    2,
+    'Середина',
+    archived: archived.contains(_Archived.middle),
+  );
+  final selected = _intention(
+    3,
+    'Действие',
+    archived: archived.contains(_Archived.selected),
+  );
+  final choice = DailyChoice(
+    id: _choice,
+    sourceIntentionId: source.id,
+    selectedIntentionId: selected.id,
+    date: date ?? CalendarDate.fromParts(2026, 10, 8),
+    schedule: schedule,
+    priority: priority,
+    description: DailyChoiceDescription.fromInput(description),
+    isCompleted: isCompleted,
+  );
+  DailyChoicePathStepDetails step(
+    int n,
+    Intention from,
+    Intention to,
+    RelationScope scope,
+  ) => DailyChoicePathStepDetails(
+    step: ChoicePathStep(
+      id: _stepId(n),
+      dailyChoiceId: choice.id,
+      relationId: _relationId(n),
+      previousStepId: n == 1 ? null : _stepId(n - 1),
+    ),
+    relation: LongTermRelation(
+      id: _relationId(n),
+      sourceIntentionId: from.id,
+      relatedIntentionId: to.id,
+      type: LongTermRelationType.need,
+      priority: RelationPriority.p2,
+      scope: scope,
+      creationSequence: RelationCreationSequence(n),
+      createdAt: RelationTimestamp(DateTime.utc(2026)),
+      updatedAt: RelationTimestamp(DateTime.utc(2026)),
+    ),
+    description: null,
+    source: from,
+    related: to,
+  );
+  return DailyChoiceDetails(
+    choice: choice,
+    source: source,
+    selected: selected,
+    path: emptyPath
+        ? const []
+        : [
+            step(
+              1,
+              source,
+              middle,
+              archived.contains(_Archived.relation)
+                  ? RelationScope.archived
+                  : RelationScope.active,
+            ),
+            step(2, middle, selected, RelationScope.active),
+          ],
+  );
+}
+
+final class _Revision implements GraphRevision {
+  const _Revision(this.value);
+
+  final int value;
+
+  @override
+  GraphRevisionOrder compareTo(GraphRevision other) {
+    final n = value.compareTo((other as _Revision).value);
+    return n < 0
+        ? GraphRevisionOrder.older
+        : n > 0
+        ? GraphRevisionOrder.newer
+        : GraphRevisionOrder.same;
+  }
+}
+
+final class _Repository
+    with TagReadContractTestFallback
+    implements PersonalGraphRepository {
+  final controller = StreamController<DailyChoiceReadResult>.broadcast(
+    sync: true,
+  );
+  var watchCount = 0;
+  var _revision = 0;
+
+  @override
+  Stream<DailyChoiceReadResult> watchDailyChoice(DailyChoiceId id) {
+    watchCount++;
+    return controller.stream;
+  }
+
+  void emit(DailyChoiceDetails details) => controller.add(
+    DailyChoiceReadSuccess(
+      GraphSnapshot(value: details, revision: _Revision(++_revision)),
+    ),
+  );
+
+  void emitMissing() => controller.add(
+    DailyChoiceReadSuccess(
+      GraphSnapshot<DailyChoiceDetails?>(
+        value: null,
+        revision: _Revision(++_revision),
+      ),
+    ),
+  );
+
+  void fail(DailyChoiceReadFailure failure) =>
+      controller.add(DailyChoiceReadError(failure));
+
+  Future<void> dispose() => controller.close();
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
