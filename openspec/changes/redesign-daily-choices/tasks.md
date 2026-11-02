@@ -406,7 +406,7 @@
   - **Предполагаемые файлы:** `CONTEXT.md`.
   - **Размер:** XS.
 
-- [ ] 2.10 Проверить готовность фазы: создание возвращает на исходную страницу, а замены пути нет
+- [x] 2.10 Проверить готовность фазы: создание возвращает на исходную страницу, а замены пути нет
   - **Критерии приёмки:**
     - Создание со всех входов возвращает на исходную страницу, в том числе над глубокой историей и при уходе до результата.
     - В коде и спецификациях не осталось вызывающих удалённого потока: в `lib/` и `test/` нет `ReplaceDailyChoicePath`, `DailyChoicePathReplaced`, `acceptDailyChoiceReplace`, `DailyChoiceCommandKind.replace`, `forReplacement`, `DailyChoicePickerContext`, `DailyChoicePathCommandDiagnosticsType`, `replacePath`, `dailyChoiceReplace`, `daily-choice-replace` и `claimOpening`. В дельтах спецификаций замена пути остаётся только удалённым поведением.
