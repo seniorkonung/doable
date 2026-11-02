@@ -796,9 +796,7 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    const message =
-        'This relation is archived, so its type can’t be changed. Restore '
-        'the original type to save the other changes.';
+    const message = 'This relation is archived, so its type can’t be changed.';
     expect(find.text(message), findsOneWidget);
     expect(_isChipSelected(tester, 'relation-editor-type-can'), isTrue);
 

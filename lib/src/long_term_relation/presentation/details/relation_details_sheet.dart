@@ -8,6 +8,7 @@ import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
 import '../../../daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import '../../../design_system/components/list_state.dart';
+import '../../../design_system/components/notice.dart';
 import '../../../design_system/components/priority_picker.dart';
 import '../../../design_system/components/relation_head.dart';
 import '../../../design_system/components/sheet.dart';
@@ -15,11 +16,14 @@ import '../../../design_system/components/text_field.dart';
 import '../../../design_system/doable_colors.dart';
 import '../../../design_system/doable_metrics.dart';
 import '../../../design_system/doable_type.dart';
+import '../../../graph/application/graph_command_coordinator.dart';
+import '../../../graph/presentation/operation_failure_presentation.dart';
 import '../../../intention/domain/intention.dart';
 import '../../../shared/presentation/timestamp_dates_line.dart';
 import '../../application/long_term_relation_projection.dart';
 import '../../domain/long_term_relation.dart';
 import '../../domain/long_term_relation_id.dart';
+import '../relation_command_failure_message.dart';
 import 'relation_details_state.dart';
 import 'relation_details_view_model.dart';
 
@@ -74,6 +78,8 @@ final class _RelationDetailsSheet extends ConsumerWidget {
           final RelationDetailsLoaded loaded => _LoadedRelation(
             state: loaded,
             onRetry: viewModel.retry,
+            onChangeType: viewModel.changeType,
+            onChangePriority: viewModel.changePriority,
           ),
           RelationDetailsNotFound() || RelationDetailsDeleted() =>
             ListState.error(message: localizations.relationDetailsNotFound),
@@ -115,10 +121,17 @@ String _sheetLabel(
 }
 
 final class _LoadedRelation extends ConsumerWidget {
-  const _LoadedRelation({required this.state, required this.onRetry});
+  const _LoadedRelation({
+    required this.state,
+    required this.onRetry,
+    required this.onChangeType,
+    required this.onChangePriority,
+  });
 
   final RelationDetailsLoaded state;
   final VoidCallback onRetry;
+  final ValueChanged<LongTermRelationType> onChangeType;
+  final ValueChanged<RelationPriority> onChangePriority;
 
   /// Последняя пилюля приоритета выходит за край содержимого.
   static const double _pickerShift = 2;
@@ -130,6 +143,7 @@ final class _LoadedRelation extends ConsumerWidget {
     final details = state.details;
     final relation = details.relation;
     final description = details.description?.value;
+    final isOperationRunning = state.isOperationRunning;
     // Обычное обновление длится мгновения и не сдвигает панель строкой
     // статуса при каждой подтверждённой правке: виден только его отказ.
     final refreshFailure = switch (state.refreshStatus) {
@@ -163,7 +177,14 @@ final class _LoadedRelation extends ConsumerWidget {
           source: _participant(context, details.source),
           target: _participant(context, details.related),
           status: switch (relation.scope) {
-            RelationScope.active => const RelationHeadActive(),
+            RelationScope.active => RelationHeadActive(
+              kindSwitch: RelationHeadKindSwitch(
+                label: localizations.relationDetailsTypeLabel,
+                onChange: isOperationRunning
+                    ? null
+                    : (kind) => onChangeType(_relationType(kind)),
+              ),
+            ),
             RelationScope.archived => RelationHeadArchived(
               note: localizations.relationSheetArchivedNote,
             ),
@@ -202,7 +223,10 @@ final class _LoadedRelation extends ConsumerWidget {
               offset: const Offset(_pickerShift, 0),
               child: PriorityPicker(
                 value: _designPriority(relation.priority),
-                onChange: null,
+                onChange: isOperationRunning
+                    ? null
+                    : (priority) =>
+                          onChangePriority(_relationPriority(priority)),
                 label: localizations.relationDetailsPriorityLabel,
                 name: _priorityName,
                 itemLabel: (priority, _) =>
@@ -211,17 +235,47 @@ final class _LoadedRelation extends ConsumerWidget {
             ),
           ],
         ),
+        if (state.editFailure case final editFailure?) ...[
+          const SizedBox(height: DoableMetrics.space2),
+          Notice.content(
+            message: OperationFailurePresentation(
+              claim: editFailure.failurePresentation,
+              message: longTermRelationCommandFailureMessage(
+                localizations,
+                LongTermRelationCommandKind.update,
+                editFailure.failure,
+              ),
+              inheritsColor: true,
+            ),
+          ),
+        ],
         const SizedBox(height: DoableMetrics.space2),
-        timestampDatesLine(
-          localizations: localizations,
-          locale: Localizations.localeOf(context).toLanguageTag(),
-          createdAt: relation.createdAt.value,
-          updatedAt: relation.updatedAt.value,
-          // Строка называет год по дню показа панели.
-          currentYear: ref
-              .watch(dailyChoiceLocalDateSourceProvider)()
-              .date
-              .year,
+        // Правка длится мгновения: статус стоит рядом с датами, поэтому не
+        // дёргает панель по высоте при каждом нажатии.
+        Wrap(
+          spacing: DoableMetrics.space3,
+          children: [
+            timestampDatesLine(
+              localizations: localizations,
+              locale: Localizations.localeOf(context).toLanguageTag(),
+              createdAt: relation.createdAt.value,
+              updatedAt: relation.updatedAt.value,
+              // Строка называет год по дню показа панели.
+              currentYear: ref
+                  .watch(dailyChoiceLocalDateSourceProvider)()
+                  .date
+                  .year,
+            ),
+            if (isOperationRunning)
+              Semantics(
+                container: true,
+                liveRegion: true,
+                child: Text(
+                  localizations.detailsOperationRunning,
+                  style: DoableType.hint.copyWith(color: colors.muted),
+                ),
+              ),
+          ],
         ),
       ],
     );
@@ -247,6 +301,19 @@ final class _LoadedRelation extends ConsumerWidget {
     );
   }
 }
+
+LongTermRelationType _relationType(RelationHeadKind kind) => switch (kind) {
+  RelationHeadKind.need => LongTermRelationType.need,
+  RelationHeadKind.can => LongTermRelationType.can,
+};
+
+RelationPriority _relationPriority(DoablePriority priority) =>
+    switch (priority) {
+      DoablePriority.p1 => RelationPriority.p1,
+      DoablePriority.p2 => RelationPriority.p2,
+      DoablePriority.p3 => RelationPriority.p3,
+      DoablePriority.p4 => RelationPriority.p4,
+    };
 
 DoablePriority _designPriority(RelationPriority priority) => switch (priority) {
   RelationPriority.p1 => DoablePriority.p1,

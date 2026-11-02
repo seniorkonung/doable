@@ -2984,7 +2984,7 @@ abstract class AppLocalizations {
   /// Конфликт изменения типа архивированной связи
   ///
   /// In en, this message translates to:
-  /// **'This relation is archived, so its type can’t be changed. Restore the original type to save the other changes.'**
+  /// **'This relation is archived, so its type can’t be changed.'**
   String get relationEditorUpdateArchivedTypeChange;
 
   /// Устранимая недоступность изменения связи

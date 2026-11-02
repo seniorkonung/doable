@@ -45,7 +45,9 @@ final class RelationHeadKindSwitch {
   /// Доступное название переключателя.
   final String label;
 
-  final ValueChanged<RelationHeadKind> onChange;
+  /// Без обработчика пилюли недоступны: экранный диктор объявляет
+  /// недоступность их состоянием.
+  final ValueChanged<RelationHeadKind>? onChange;
 }
 
 /// Кнопка параметров связи.
@@ -535,8 +537,11 @@ final class _KindSwitch extends StatelessWidget {
                 option == kind ? tone : grip,
               ),
             },
-            onTap: () {
-              if (option != kind) kindSwitch.onChange(option);
+            onTap: switch (kindSwitch.onChange) {
+              null => null,
+              final onChange => () {
+                if (option != kind) onChange(option);
+              },
             },
           ),
       ],
@@ -556,7 +561,7 @@ final class _KindPill extends StatelessWidget {
   final String name;
   final bool chosen;
   final RelationStrokeKind mark;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -564,6 +569,7 @@ final class _KindPill extends StatelessWidget {
     return MergeSemantics(
       child: Semantics(
         button: true,
+        enabled: onTap != null,
         toggled: chosen,
         label: name,
         child: _Control(
@@ -619,7 +625,7 @@ final class _Control extends StatefulWidget {
     this.tapPadding = EdgeInsets.zero,
   });
 
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final double radius;
   final EdgeInsets tapPadding;
   final Widget child;

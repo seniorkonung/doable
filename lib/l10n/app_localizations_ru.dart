@@ -1951,7 +1951,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get relationEditorUpdateArchivedTypeChange =>
-      'Связь архивирована, поэтому её тип нельзя изменить. Верните прежний тип, чтобы сохранить остальные изменения.';
+      'Связь архивирована, поэтому её тип нельзя изменить.';
 
   @override
   String get relationEditorUpdateUnavailable =>

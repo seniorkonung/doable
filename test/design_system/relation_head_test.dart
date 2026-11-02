@@ -232,6 +232,35 @@ void main() {
     expect(changes, [RelationHeadKind.need]);
   });
 
+  testWidgets('без обработчика пилюли недоступны, и диктор слышит это их '
+      'состоянием', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await tester.pumpWidget(
+      _app(
+        Brightness.light,
+        _head(
+          status: const RelationHeadActive(
+            kindSwitch: RelationHeadKindSwitch(
+              label: 'Вид связи',
+              onChange: null,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(
+      tester.getSemantics(find.bySemanticsLabel('Можно')),
+      matchesSemantics(
+        label: 'Можно',
+        isButton: true,
+        hasToggledState: true,
+        hasEnabledState: true,
+      ),
+    );
+    semantics.dispose();
+  });
+
   testWidgets('диктор слышит название переключателя и пилюли с отметкой '
       'выбранной, а названия намерений — кнопками потребителя', (tester) async {
     final semantics = tester.ensureSemantics();
@@ -256,6 +285,8 @@ void main() {
       isButton: true,
       hasToggledState: true,
       isToggled: chosen,
+      hasEnabledState: true,
+      isEnabled: true,
       isFocusable: true,
       hasTapAction: true,
       hasFocusAction: true,

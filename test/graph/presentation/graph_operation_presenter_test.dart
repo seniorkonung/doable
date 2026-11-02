@@ -858,14 +858,12 @@ void main() {
       locale: const Locale('ru'),
       message:
           'Изменение — «связь»: Связь архивирована, поэтому её тип нельзя '
-          'изменить. Верните прежний тип, чтобы сохранить остальные '
-          'изменения.',
+          'изменить.',
     ),
     (
       locale: const Locale('en'),
       message: _relationUpdateOutcome(
-        'This relation is archived, so its type can’t be changed. Restore '
-        'the original type to save the other changes.',
+        'This relation is archived, so its type can’t be changed.',
       ),
     ),
   ]) {

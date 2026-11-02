@@ -549,7 +549,7 @@
   "relationEditorCreateCorruption": "Сохранённые данные повреждены. Связь не создана.",
   "relationEditorCreateUnexpected": "Не удалось создать связь из-за непредвиденной ошибки.",
   "relationEditorUpdateNotFound": "Эта связь больше не существует.",
-  "relationEditorUpdateArchivedTypeChange": "Связь архивирована, поэтому её тип нельзя изменить. Верните прежний тип, чтобы сохранить остальные изменения.",
+  "relationEditorUpdateArchivedTypeChange": "Связь архивирована, поэтому её тип нельзя изменить.",
   "relationEditorUpdateUnavailable": "Не удалось изменить связь. Повторите попытку.",
   "relationEditorUpdateCorruption": "Сохранённые данные повреждены. Связь не изменена.",
   "relationEditorUpdateUnexpected": "Не удалось изменить связь из-за непредвиденной ошибки.",

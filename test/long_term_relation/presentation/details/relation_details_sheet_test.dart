@@ -4,8 +4,11 @@ import 'package:auto_route/auto_route.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
+import 'package:doable/src/design_system/components/priority_picker.dart';
+import 'package:doable/src/design_system/components/relation_head.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/domain/intention.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/presentation/details/relation_details_sheet.dart';
@@ -284,6 +287,224 @@ void main() {
     expect(find.text('плавать').hitTestable(), findsOneWidget);
     // Та же панель не читает связь заново.
     expect(repository.relationWatches, hasLength(1));
+  });
+
+  group('тип и приоритет', () {
+    LongTermRelationDetails relation({
+      LongTermRelationType type = LongTermRelationType.need,
+      RelationPriority priority = RelationPriority.p2,
+      RelationScope scope = RelationScope.active,
+    }) => testRelationDetails(
+      relationId: relationId,
+      sourceId: testIntentionId(1),
+      relatedId: testIntentionId(2),
+      sourceTitle: 'быть здоровым',
+      relatedTitle: 'много ходить',
+      type: type,
+      priority: priority,
+      scope: scope,
+    );
+
+    RelationHead head(WidgetTester tester) =>
+        tester.widget<RelationHead>(find.byType(RelationHead));
+
+    PriorityPicker picker(WidgetTester tester) =>
+        tester.widget<PriorityPicker>(find.byType(PriorityPicker));
+
+    testWidgets('нажатие на другой тип меняет только тип, а после '
+        'подтверждения панель остаётся открытой с новой линией и '
+        'формулировкой', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final repository = await _openSheet(tester);
+      final before = relation();
+      repository.watchAt(0).emitDetails(before, revision: revision);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Можно'));
+      await tester.pump();
+
+      final command =
+          repository.relationCommands.single as UpdateLongTermRelation;
+      expect(
+        command.patch.type,
+        isA<LongTermRelationFieldSet<LongTermRelationType>>().having(
+          (patch) => patch.value,
+          'value',
+          LongTermRelationType.can,
+        ),
+      );
+      expect(
+        command.patch.priority,
+        isA<LongTermRelationFieldUnchanged<RelationPriority>>(),
+      );
+
+      final after = relation(type: LongTermRelationType.can);
+      repository.completeRelationUpdate(
+        0,
+        before: before.relation,
+        after: after.relation,
+        revision: const TestGraphRevision(2),
+      );
+      await tester.pump();
+      repository.relationWatches.last.emitDetails(
+        after,
+        revision: const TestGraphRevision(2),
+      );
+      await tester.pumpAndSettle();
+
+      expect(head(tester).kind, RelationHeadKind.can);
+      expect(
+        find.bySemanticsLabel('Чтобы быть здоровым, можно много ходить'),
+        findsOneWidget,
+      );
+      semantics.dispose();
+    });
+
+    testWidgets('выбор приоритета сразу сохраняется и красит шапку, а '
+        'выбранный приоритет ничего не меняет', (tester) async {
+      final repository = await _openSheet(tester);
+      final before = relation(priority: RelationPriority.p4);
+      repository.watchAt(0).emitDetails(before, revision: revision);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('P4'));
+      await tester.pump();
+      expect(repository.relationCommands, isEmpty);
+
+      await tester.tap(find.text('P1'));
+      await tester.pump();
+
+      final command =
+          repository.relationCommands.single as UpdateLongTermRelation;
+      expect(
+        command.patch.priority,
+        isA<LongTermRelationFieldSet<RelationPriority>>().having(
+          (patch) => patch.value,
+          'value',
+          RelationPriority.p1,
+        ),
+      );
+
+      final after = relation(priority: RelationPriority.p1);
+      repository.completeRelationUpdate(
+        0,
+        before: before.relation,
+        after: after.relation,
+        revision: const TestGraphRevision(2),
+      );
+      await tester.pump();
+      repository.relationWatches.last.emitDetails(
+        after,
+        revision: const TestGraphRevision(2),
+      );
+      await tester.pumpAndSettle();
+
+      expect(head(tester).priority, DoablePriority.p1);
+      expect(picker(tester).value, DoablePriority.p1);
+    });
+
+    testWidgets('архивированная связь показывает слово типа вместо '
+        'переключателя, а приоритет меняется', (tester) async {
+      final repository = await _openSheet(tester);
+      repository
+          .watchAt(0)
+          .emitDetails(
+            relation(scope: RelationScope.archived),
+            revision: revision,
+          );
+      await tester.pumpAndSettle();
+
+      expect(find.text('нужно'), findsOneWidget);
+      expect(find.text('Можно'), findsNothing);
+
+      await tester.tap(find.text('P1'));
+      await tester.pump();
+
+      expect(repository.relationCommands, hasLength(1));
+    });
+
+    testWidgets('операция, начатая до повторного открытия, оставляет '
+        'подтверждённое содержание со статусом и недоступным управлением до '
+        'своего конца', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final repository = await _openSheet(tester);
+      final before = relation();
+      repository.watchAt(0).emitDetails(before, revision: revision);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('P1'));
+      await tester.pump();
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Открыть'));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      repository.relationWatches.last.emitDetails(before, revision: revision);
+      await tester.pumpAndSettle();
+
+      expect(picker(tester).value, DoablePriority.p2);
+      expect(find.text('Сохранение изменений…'), findsOneWidget);
+      expect(
+        tester.getSemantics(find.bySemanticsLabel('Можно')),
+        isSemantics(isEnabled: false),
+      );
+      expect(
+        tester.getSemantics(find.bySemanticsLabel('Приоритет P3')),
+        isSemantics(isEnabled: false),
+      );
+
+      final after = relation(priority: RelationPriority.p1);
+      repository.completeRelationUpdate(
+        0,
+        before: before.relation,
+        after: after.relation,
+        revision: const TestGraphRevision(2),
+      );
+      await tester.pump();
+      repository.relationWatches.last.emitDetails(
+        after,
+        revision: const TestGraphRevision(2),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Сохранение изменений…'), findsNothing);
+      await tester.tap(find.text('P3'));
+      await tester.pump();
+      expect(repository.relationCommands, hasLength(2));
+      semantics.dispose();
+    });
+
+    testWidgets('отказ оставляет подтверждённый приоритет и объясняется '
+        'внутри панели, а следующая правка снимает сообщение', (tester) async {
+      final repository = await _openSheet(tester);
+      repository.watchAt(0).emitDetails(relation(), revision: revision);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('P1'));
+      await tester.pump();
+      repository.failRelationCommand(
+        0,
+        const LongTermRelationUnavailableFailure(),
+      );
+      await tester.pumpAndSettle();
+
+      expect(picker(tester).value, DoablePriority.p2);
+      expect(
+        find
+            .text('Не удалось изменить связь. Повторите попытку.')
+            .hitTestable(),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('P1'));
+      await tester.pump();
+
+      expect(repository.relationCommands, hasLength(2));
+      expect(
+        find.text('Не удалось изменить связь. Повторите попытку.'),
+        findsNothing,
+      );
+    });
   });
 
   testWidgets('сообщение появляется над панелью, а не за её затемнением', (

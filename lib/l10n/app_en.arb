@@ -1446,7 +1446,7 @@
   "@relationEditorUpdateNotFound": {
     "description": "Отсутствие изменяемой связи"
   },
-  "relationEditorUpdateArchivedTypeChange": "This relation is archived, so its type can’t be changed. Restore the original type to save the other changes.",
+  "relationEditorUpdateArchivedTypeChange": "This relation is archived, so its type can’t be changed.",
   "@relationEditorUpdateArchivedTypeChange": {
     "description": "Конфликт изменения типа архивированной связи"
   },

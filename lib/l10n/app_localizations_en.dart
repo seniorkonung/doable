@@ -1927,7 +1927,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get relationEditorUpdateArchivedTypeChange =>
-      'This relation is archived, so its type can’t be changed. Restore the original type to save the other changes.';
+      'This relation is archived, so its type can’t be changed.';
 
   @override
   String get relationEditorUpdateUnavailable =>
