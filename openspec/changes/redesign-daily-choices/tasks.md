@@ -436,3 +436,18 @@
   - **Зависимости:** 2.1.
   - **Предполагаемые файлы:** `lib/src/daily_choice/presentation/daily_choice_creation_flow_session.dart`, `lib/src/daily_choice/presentation/daily_choice_creation_completion.dart`, `test/daily_choice/presentation/daily_choice_creation_flow_session_test.dart`.
   - **Размер:** XS.
+
+- [ ] 2.12 Тест согласования не хранит данные удалённого шага замены
+  - **Критерии приёмки:**
+    - Из теста «повтор и удаление согласуют открытые представления одной ревизией» удалены вставка связи 105 вместе с лишним вызовом `seedGraph`, подписка и ожидание на этой связи и все проверки `relation(105).permissions.canDelete`.
+    - Вкладки выборов остаются только у намерений 1 и 3: намерения 4 и 5 убраны из `pages`, подписок, `selectRole`, ожидания `IntentionChoicesEmpty` и диагностики, а проверки их пустых вкладок удалены до и после повтора.
+    - Отдельной контрольной проверки незатронутого участника взамен нет: посторонние изменения уже проверяют нулевые счётчики намерения 2 и цикл сравнения намерений 1–5, а разрешение удалять неиспользуемую связь проверяет `test/graph/data/drift_relation_watch_test.dart`.
+    - Подписки и загрузка подробностей намерений 1–5, проверки связей 101 и 102, счётчики намерения 2, цикл сравнения намерений 1–5 и все ожидания к затронутым представлениям и ревизиям сохранены и не ослаблены.
+    - Производственный код, спецификация и design не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph/presentation/graph_reconciliation_checkpoint_test.dart`.
+    - `mise exec --no-deps -- openspec validate redesign-daily-choices --strict`.
+    - `grep -nE '\b105\b|choicesProvider\([45]\)|\[1, 3, 4, 5\]|\[3, 4\]|\[4, 5\]' test/graph/presentation/graph_reconciliation_checkpoint_test.dart` ничего не находит.
+  - **Зависимости:** 2.6.
+  - **Предполагаемые файлы:** `test/graph/presentation/graph_reconciliation_checkpoint_test.dart`.
+  - **Размер:** XS.
