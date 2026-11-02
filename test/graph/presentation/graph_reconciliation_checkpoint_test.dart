@@ -289,16 +289,6 @@ void main() {
       await database.open();
       addTearDown(database.close);
       await seedDurabilityGraph(database);
-      await seedGraph(
-        database,
-        () => database.customStatement(
-          '''INSERT INTO long_term_relations
-         (id, source_intention_id, related_intention_id,
-          type, priority, is_archived)
-         VALUES (?, ?, ?, 'need', 2, 0)''',
-          [durabilityUuid(105), durabilityUuid(5), durabilityUuid(4)],
-        ),
-      );
       final repository = DriftPersonalGraphRepository(
         database,
         UuidV7IntentionIdGenerator(),
@@ -327,7 +317,7 @@ void main() {
         DailyChoiceCatalogInstance(initialDate: durabilityChoiceDate),
       );
       final pages = {
-        for (final number in [1, 3, 4, 5])
+        for (final number in [1, 3])
           number: IntentionPageInstance(target: const ChoicesTarget()),
       };
       IntentionChoicesViewModelProvider choicesProvider(int number) =>
@@ -343,13 +333,13 @@ void main() {
             (_, _) {},
             fireImmediately: true,
           ),
-        for (final number in [1, 3, 4, 5])
+        for (final number in [1, 3])
           container.listen(
             choicesProvider(number),
             (_, _) {},
             fireImmediately: true,
           ),
-        for (final number in [101, 102, 105])
+        for (final number in [101, 102])
           container.listen(
             relationDetailsViewModelProvider(durabilityRelation(number)),
             (_, _) {},
@@ -367,11 +357,9 @@ void main() {
       final details = DailyChoiceDetailsViewModel(repository, firstId);
       addTearDown(details.dispose);
 
-      for (final number in [3, 4]) {
-        container
-            .read(choicesProvider(number).notifier)
-            .selectRole(DailyChoiceRelationRole.selected);
-      }
+      container
+          .read(choicesProvider(3).notifier)
+          .selectRole(DailyChoiceRelationRole.selected);
       DailyChoiceCatalogLoaded catalog() =>
           container.read(catalogProvider) as DailyChoiceCatalogLoaded;
       IntentionChoicesLoaded choices(int number) =>
@@ -391,17 +379,12 @@ void main() {
                   container.read(choicesProvider(number))
                       is IntentionChoicesLoaded,
             ) &&
-            [4, 5].every(
-              (number) =>
-                  container.read(choicesProvider(number))
-                      is IntentionChoicesEmpty,
-            ) &&
             [1, 2, 3, 4, 5].every(
               (number) => container.read(
                 intentionDetailsViewModelProvider(durabilityIntention(number)),
               ) is IntentionDetailsLoaded,
             ) &&
-            [101, 102, 105].every(
+            [101, 102].every(
               (number) => container.read(
                 relationDetailsViewModelProvider(durabilityRelation(number)),
               ) is RelationDetailsLoaded,
@@ -409,7 +392,7 @@ void main() {
         diagnostics: () => [
           container.read(catalogProvider).runtimeType,
           details.state.runtimeType,
-          for (final number in [1, 3, 4, 5])
+          for (final number in [1, 3])
             container.read(choicesProvider(number)).runtimeType,
           for (final number in [1, 2, 3, 4, 5])
             container
@@ -431,19 +414,6 @@ void main() {
       expect(choices(3).items.map((item) => item.id), [firstId]);
       expect(relation(101).permissions.canDelete, isFalse);
       expect(relation(102).permissions.canDelete, isFalse);
-      expect(relation(105).permissions.canDelete, isTrue);
-      expect(
-        (container.read(
-          choicesProvider(4),
-        ) as IntentionChoicesEmpty).counts.dailySelected,
-        0,
-      );
-      expect(
-        (container.read(
-          choicesProvider(5),
-        ) as IntentionChoicesEmpty).counts.dailySource,
-        0,
-      );
 
       final repeat = coordinator.acceptDailyChoiceCreation(
         DailyChoiceCreationFormKey(),
@@ -469,22 +439,9 @@ void main() {
       expect(choices(1).counts.dailySource, 2);
       expect(choices(3).counts.dailySelected, 2);
       expect(relation(101).permissions.canDelete, isFalse);
-      expect(relation(105).permissions.canDelete, isTrue);
       expect(intention(2).details.relationCounts.dailySource, 0);
       expect(intention(2).details.relationCounts.dailySelected, 0);
 
-      expect(
-        (container.read(
-          choicesProvider(4),
-        ) as IntentionChoicesEmpty).counts.dailySelected,
-        0,
-      );
-      expect(
-        (container.read(
-          choicesProvider(5),
-        ) as IntentionChoicesEmpty).counts.dailySource,
-        0,
-      );
       for (final number in [1, 2, 3, 4, 5]) {
         final before = initialIntentions[number]!;
         final after = intention(number).intention;
@@ -519,7 +476,6 @@ void main() {
       expect(choices(3).counts.dailySelected, 1);
       expect(relation(101).permissions.canDelete, isFalse);
       expect(relation(102).permissions.canDelete, isFalse);
-      expect(relation(105).permissions.canDelete, isTrue);
       expect(
         (details.state as DailyChoiceDetailsLoaded).details.path.map(
           (step) => step.relation.id,

@@ -437,7 +437,7 @@
   - **Предполагаемые файлы:** `lib/src/daily_choice/presentation/daily_choice_creation_flow_session.dart`, `lib/src/daily_choice/presentation/daily_choice_creation_completion.dart`, `test/daily_choice/presentation/daily_choice_creation_flow_session_test.dart`.
   - **Размер:** XS.
 
-- [ ] 2.12 Тест согласования не хранит данные удалённого шага замены
+- [x] 2.12 Тест согласования не хранит данные удалённого шага замены
   - **Критерии приёмки:**
     - Из теста «повтор и удаление согласуют открытые представления одной ревизией» удалены вставка связи 105 вместе с лишним вызовом `seedGraph`, подписка и ожидание на этой связи и все проверки `relation(105).permissions.canDelete`.
     - Вкладки выборов остаются только у намерений 1 и 3: намерения 4 и 5 убраны из `pages`, подписок, `selectRole`, ожидания `IntentionChoicesEmpty` и диагностики, а проверки их пустых вкладок удалены до и после повтора.
