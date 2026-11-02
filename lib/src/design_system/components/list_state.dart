@@ -3,11 +3,13 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../doable_colors.dart';
+import '../doable_metrics.dart';
 import '../doable_type.dart';
 import 'notice.dart';
 
-/// Состояние всего списка на месте его строк — загрузка или отказ загрузки —
-/// либо подгрузка следующей порции в конце списка.
+/// Состояние всего списка на месте его строк — загрузка или отказ загрузки —,
+/// обновление уже показанного списка либо подгрузка следующей порции в конце
+/// списка.
 ///
 /// Экранный диктор Android не различает роли статуса и оповещения, а Flutter
 /// запрещает совмещать их с живой областью, поэтому оба вида объявляются
@@ -19,6 +21,12 @@ sealed class ListState extends StatelessWidget {
   /// Кольцо и текст о том, что загружается; объявляется как статус.
   const factory ListState.loading({required String text, Key? key}) =
       _LoadingListState;
+
+  /// Кольцо 14 и текст caption для списка, который уже на экране; объявляется
+  /// как статус. Строка занимает только ширину содержимого, а место для неё
+  /// выбирает потребитель.
+  const factory ListState.refreshing({required String text, Key? key}) =
+      _RefreshingListState;
 
   /// Кольцо по центру строки высотой 40 в конце списка, пока в нём есть
   /// незагруженные строки. Видимого текста нет: [text] называет, что
@@ -65,6 +73,38 @@ final class _LoadingListState extends ListState {
   }
 }
 
+final class _RefreshingListState extends ListState {
+  const _RefreshingListState({required this.text, super.key}) : super._();
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<DoableColors>()!;
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        spacing: DoableMetrics.space2,
+        children: [
+          _Spinner(
+            color: colors.muted,
+            trackColor: colors.hairline,
+            dimension: 14,
+          ),
+          Flexible(
+            child: Text(
+              text,
+              style: DoableType.caption.copyWith(color: colors.muted),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 final class _MoreListState extends ListState {
   const _MoreListState({required this.text, super.key}) : super._();
 
@@ -105,10 +145,15 @@ final class _ErrorListState extends ListState {
 /// Кольцо загрузки: оборот за 0,8 с, а при уменьшенной анимации — втрое
 /// медленнее, без остановки.
 final class _Spinner extends StatefulWidget {
-  const _Spinner({required this.color, required this.trackColor});
+  const _Spinner({
+    required this.color,
+    required this.trackColor,
+    this.dimension = 18,
+  });
 
   final Color color;
   final Color trackColor;
+  final double dimension;
 
   @override
   State<_Spinner> createState() => _SpinnerState();
@@ -141,7 +186,7 @@ final class _SpinnerState extends State<_Spinner>
   Widget build(BuildContext context) => RotationTransition(
     turns: _turns,
     child: SizedBox.square(
-      dimension: 18,
+      dimension: widget.dimension,
       child: CustomPaint(
         painter: _SpinnerPainter(
           color: widget.color,

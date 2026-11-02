@@ -11,6 +11,7 @@ import '../../../design_system/components/choice_row.dart';
 import '../../../design_system/components/day_heading.dart';
 import '../../../design_system/components/empty_state.dart';
 import '../../../design_system/components/list_state.dart';
+import '../../../design_system/components/notice.dart';
 import '../../../design_system/components/section_header.dart';
 import '../../../design_system/doable_colors.dart';
 import '../../../design_system/doable_icon.dart';
@@ -171,15 +172,41 @@ final class _DailyChoiceCatalogBodyState
                           DoableMetrics.space5,
                           0,
                         ),
-                        child: DayHeading(
-                          weekday:
-                              weekday[0].toUpperCase() + weekday.substring(1),
-                          // Явный формат сохраняет порядок и не добавляет «г.»:
-                          // https://pub.dev/documentation/intl/latest/intl/DateFormat-class.html
-                          date: DateFormat('d MMMM y', locale).format(date),
-                          todayLabel: selectedDate == _localDay.today
-                              ? l10n.dailyChoiceCalendarToday
-                              : null,
+                        // Высоту задаёт только заголовок, поэтому строка
+                        // обновления не сдвигает выдачу:
+                        // https://api.flutter.dev/flutter/widgets/Stack-class.html
+                        child: Stack(
+                          fit: StackFit.passthrough,
+                          children: [
+                            DayHeading(
+                              weekday:
+                                  weekday[0].toUpperCase() +
+                                  weekday.substring(1),
+                              // Явный формат сохраняет порядок и не добавляет
+                              // «г.»:
+                              // https://pub.dev/documentation/intl/latest/intl/DateFormat-class.html
+                              date: DateFormat('d MMMM y', locale).format(date),
+                              todayLabel: selectedDate == _localDay.today
+                                  ? l10n.dailyChoiceCalendarToday
+                                  : null,
+                            ),
+                            if (state case DailyChoiceCatalogLoaded(
+                              freshness: DailyChoiceCatalogFreshness.refreshing,
+                            ))
+                              // Строка высотой 18 стоит по центру строки дня
+                              // высотой 24.
+                              PositionedDirectional(
+                                top: 3,
+                                start: 0,
+                                end: 0,
+                                child: Align(
+                                  alignment: AlignmentDirectional.topEnd,
+                                  child: ListState.refreshing(
+                                    text: l10n.dailyChoiceCatalogRefreshing,
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                     ),
@@ -288,10 +315,10 @@ final class _DailyChoiceCatalogBodyState
     AppLocalizations l10n,
   ) => switch (state) {
     DailyChoiceCatalogInitialLoad() => [
-      _listState(ListState.loading(text: l10n.dailyChoiceCatalogLoading)),
+      _status(ListState.loading(text: l10n.dailyChoiceCatalogLoading)),
     ],
     DailyChoiceCatalogInitialFailure(:final failure, :final canRetry) => [
-      _listState(
+      _status(
         ListState.error(
           message: _failureMessage(failure, l10n),
           retry: canRetry
@@ -307,14 +334,14 @@ final class _DailyChoiceCatalogBodyState
     ),
   };
 
-  SliverPadding _listState(ListState state) => SliverPadding(
+  SliverPadding _status(Widget status) => SliverPadding(
     padding: const EdgeInsets.fromLTRB(
       DoableMetrics.space5,
       DoableMetrics.space4,
       DoableMetrics.space5,
       0,
     ),
-    sliver: SliverToBoxAdapter(child: state),
+    sliver: SliverToBoxAdapter(child: status),
   );
 
   List<Widget> _loadedContent(
@@ -322,19 +349,16 @@ final class _DailyChoiceCatalogBodyState
     DailyChoiceCatalogViewModel model,
     AppLocalizations l10n,
   ) => [
-    if (state.freshness == DailyChoiceCatalogFreshness.refreshing)
-      SliverToBoxAdapter(
-        child: _Banner(
-          message: l10n.dailyChoiceCatalogRefreshing,
-          loading: true,
-        ),
-      ),
-    if (state.freshness == DailyChoiceCatalogFreshness.stale)
-      SliverToBoxAdapter(
-        child: _Banner(
-          message: _failureMessage(state.refreshFailure!, l10n),
-          onRetry: state.refreshFailure is DailyChoiceCatalogUnavailableFailure
-              ? model.retryRefresh
+    if (state.refreshFailure case final failure?)
+      _status(
+        Notice.content(
+          message: Semantics(
+            container: true,
+            liveRegion: true,
+            child: Text(_failureMessage(failure, l10n)),
+          ),
+          action: failure is DailyChoiceCatalogUnavailableFailure
+              ? (label: l10n.commonRetry, onPressed: model.retryRefresh)
               : null,
         ),
       ),
@@ -672,7 +696,7 @@ bool _hasSameScrollContent(
     (DailyChoiceCatalogLoaded before, DailyChoiceCatalogLoaded after) =>
       _hasSameSectionContent(before.incomplete, after.incomplete) &&
           _hasSameSectionContent(before.completed, after.completed) &&
-          before.freshness == after.freshness &&
+          // Строка обновления стоит над прокруткой, а отказ — внутри неё.
           before.refreshFailure == after.refreshFailure &&
           // Ход и отказ изменения выполнения выводятся внутри карточек.
           mapEquals(before.completionOperations, after.completionOperations),
@@ -720,11 +744,10 @@ final class _Status extends StatelessWidget {
 }
 
 final class _Banner extends StatelessWidget {
-  const _Banner({required this.message, this.loading = false, this.onRetry});
+  const _Banner({required this.message, this.loading = false});
 
   final String message;
   final bool loading;
-  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) => Semantics(
@@ -741,11 +764,6 @@ final class _Banner extends StatelessWidget {
             ),
           const SizedBox(width: 8),
           Expanded(child: Text(message)),
-          if (onRetry != null)
-            TextButton(
-              onPressed: onRetry,
-              child: Text(AppLocalizations.of(context).commonRetry),
-            ),
         ],
       ),
     ),

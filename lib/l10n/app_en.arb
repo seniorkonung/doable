@@ -2383,7 +2383,7 @@
   "@dailyChoiceCatalogEmptyTitle": {"description": "Заголовок пустого состояния дня без дневных выборов"},
   "dailyChoiceCatalogEmptyText": "Create a choice from an action and set this date. It will appear here.",
   "@dailyChoiceCatalogEmptyText": {"description": "Текст пустого состояния дня без дневных выборов"},
-  "dailyChoiceCatalogRefreshing": "Refreshing daily choices…",
+  "dailyChoiceCatalogRefreshing": "Refreshing…",
   "@dailyChoiceCatalogRefreshing": {"description": "Обновление подтверждённого снимка каталога"},
   "dailyChoiceCatalogLoadingMore": "Loading more daily choices…",
   "@dailyChoiceCatalogLoadingMore": {"description": "Загрузка следующей порции"},

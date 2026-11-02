@@ -4710,7 +4710,7 @@ abstract class AppLocalizations {
   /// Обновление подтверждённого снимка каталога
   ///
   /// In en, this message translates to:
-  /// **'Refreshing daily choices…'**
+  /// **'Refreshing…'**
   String get dailyChoiceCatalogRefreshing;
 
   /// Загрузка следующей порции

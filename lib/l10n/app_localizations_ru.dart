@@ -3023,7 +3023,7 @@ class AppLocalizationsRu extends AppLocalizations {
       'Создайте выбор из действия и назначьте эту дату. Он появится здесь.';
 
   @override
-  String get dailyChoiceCatalogRefreshing => 'Обновляем дневные выборы…';
+  String get dailyChoiceCatalogRefreshing => 'Обновляем…';
 
   @override
   String get dailyChoiceCatalogLoadingMore => 'Загружаем ещё дневные выборы…';

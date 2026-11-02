@@ -3002,7 +3002,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Create a choice from an action and set this date. It will appear here.';
 
   @override
-  String get dailyChoiceCatalogRefreshing => 'Refreshing daily choices…';
+  String get dailyChoiceCatalogRefreshing => 'Refreshing…';
 
   @override
   String get dailyChoiceCatalogLoadingMore => 'Loading more daily choices…';

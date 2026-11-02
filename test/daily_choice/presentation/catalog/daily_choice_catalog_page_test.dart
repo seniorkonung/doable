@@ -16,6 +16,9 @@ import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
+import 'package:doable/src/design_system/components/day_heading.dart';
+import 'package:doable/src/design_system/components/list_state.dart';
+import 'package:doable/src/design_system/components/notice.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/presentation/operation_failure_presentation.dart';
@@ -146,6 +149,135 @@ void main() {
       },
     );
   }
+
+  group('обновление выдачи', () {
+    final day = date(2026, 10, 4);
+    final open = catalogPageItem(1, date: day);
+    final done = catalogPageItem(2, date: day, isCompleted: true);
+    final refreshLine = find.byWidgetPredicate((widget) => widget is ListState);
+    const size = Size(390, 1000);
+
+    /// Положения всего, что не должно сдвигаться при обновлении.
+    List<Offset> positions(WidgetTester tester) => [
+      for (final finder in [
+        find.byType(DayHeading),
+        find.byKey(const ValueKey('daily-choice-section-false')),
+        find.byKey(const ValueKey('daily-choice-section-true')),
+        find.byKey(const ValueKey('daily-choice-row-1')),
+        find.byKey(const ValueKey('daily-choice-row-2')),
+      ])
+        tester.getTopLeft(finder),
+    ];
+
+    testWidgets('строка обновления стоит на линии заголовка дня, а её '
+        'появление и исчезновение не двигают заголовки и карточки', (
+      tester,
+    ) async {
+      final repository = CatalogPageRepository();
+      await pumpCatalogPage(
+        tester,
+        repository,
+        today: day,
+        locale: const Locale('ru'),
+        size: size,
+      );
+      repository.completeFirst(0, [open, done], total: 2);
+      await tester.pumpAndSettle();
+      final before = positions(tester);
+      expect(refreshLine, findsNothing);
+
+      await confirmOutsideChoiceChange(tester, repository, open, revision: 1);
+
+      expect(find.text('Обновляем…'), findsOneWidget);
+      expect(positions(tester), before);
+      final heading = tester.getRect(find.byType(DayHeading));
+      final line = tester.getRect(refreshLine);
+      expect(line.right, heading.right);
+      expect(line.left, greaterThan(heading.left));
+      expect(line.top, greaterThanOrEqualTo(heading.top));
+      expect(line.bottom, lessThanOrEqualTo(heading.top + 24));
+
+      repository.completeFirst(1, [open, done], total: 2, revision: 1);
+      await tester.pumpAndSettle();
+      expect(refreshLine, findsNothing);
+      expect(positions(tester), before);
+    });
+
+    testWidgets('обновление после записи выполнения не двигает заголовки и '
+        'карточки', (tester) async {
+      final repository = CatalogPageRepository();
+      await pumpCatalogPage(
+        tester,
+        repository,
+        today: day,
+        locale: const Locale('ru'),
+        size: size,
+      );
+      repository.completeFirst(0, [open, done], total: 2);
+      await tester.pumpAndSettle();
+      // Запись идёт от последней карточки: всё, что могло бы сдвинуться,
+      // стоит выше неё.
+      await tester.tap(
+        find.byKey(
+          ValueKey('daily-choice-completion-${done.id.toCanonicalString()}'),
+        ),
+      );
+      await tester.pump();
+      final before = positions(tester);
+      expect(refreshLine, findsNothing);
+
+      repository.confirmCompletion(0, done, isCompleted: false, revision: 1);
+      await tester.pump();
+      await tester.pump();
+
+      expect(refreshLine, findsOneWidget);
+      expect(positions(tester), before);
+    });
+
+    testWidgets('устаревшая выдача показывает Notice с повтором только при '
+        'доказанно временном отказе и сохраняет карточки', (tester) async {
+      final repository = CatalogPageRepository();
+      await pumpCatalogPage(
+        tester,
+        repository,
+        today: day,
+        locale: const Locale('ru'),
+        size: size,
+      );
+      repository.completeFirst(0, [open, done], total: 2);
+      await tester.pumpAndSettle();
+      final l10n = lookupAppLocalizations(const Locale('ru'));
+
+      await confirmOutsideChoiceChange(tester, repository, open, revision: 1);
+      repository.failUnavailable(1);
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: find.byType(Notice),
+          matching: find.text(l10n.dailyChoiceCatalogUnavailable),
+        ),
+        findsOneWidget,
+      );
+      expect(refreshLine, findsNothing);
+      expect(find.byKey(const ValueKey('daily-choice-row-2')), findsOneWidget);
+
+      await tester.tap(find.text(l10n.commonRetry));
+      await tester.pump();
+      expect(find.byType(Notice), findsNothing);
+      expect(refreshLine, findsOneWidget);
+
+      repository.fail(2, const DailyChoiceCatalogCorruptionFailure());
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: find.byType(Notice),
+          matching: find.text(l10n.dailyChoiceCatalogCorruption),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text(l10n.commonRetry), findsNothing);
+    });
+  });
 
   for (final locale in const [Locale('ru'), Locale('en')]) {
     testWidgets('отказ флажка локализован, временный допускает повтор, '

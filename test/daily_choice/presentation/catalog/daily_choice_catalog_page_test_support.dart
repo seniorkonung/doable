@@ -16,6 +16,7 @@ import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_description.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
@@ -367,9 +368,12 @@ final class CatalogPageRepository
 
   /// Завершает запрос номер [index] доказанно временной недоступностью
   /// хранилища: каталог предлагает повтор.
-  void failUnavailable(int index) => _requests[index].complete(
-    const DailyChoiceCatalogPageError(DailyChoiceCatalogUnavailableFailure()),
-  );
+  void failUnavailable(int index) =>
+      fail(index, const DailyChoiceCatalogUnavailableFailure());
+
+  /// Завершает запрос номер [index] отказом [failure].
+  void fail(int index, DailyChoiceCatalogReadFailure failure) =>
+      _requests[index].complete(DailyChoiceCatalogPageError(failure));
 
   @override
   Future<Result<IntentionCatalogPage>> getCatalogPage(
@@ -389,6 +393,37 @@ final class CatalogPageRepository
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+/// Подтверждает изменение видимого выбора [item], начатое не его карточкой,
+/// и начинает обновление выдачи. Поля выбора остаются прежними, поэтому
+/// обновление может вернуть те же строки.
+Future<void> confirmOutsideChoiceChange(
+  WidgetTester tester,
+  CatalogPageRepository repository,
+  DailyChoiceCatalogItem item, {
+  required int revision,
+}) async {
+  final coordinator = ProviderScope.containerOf(
+    tester.element(find.byType(DailyChoiceCatalogBody)),
+  ).read(graphCommandCoordinatorProvider.notifier);
+  coordinator.acceptDailyChoiceUpdate(
+    UpdateDailyChoiceFields(
+      choiceId: item.id,
+      patch: DailyChoiceFieldsPatch(
+        isCompleted: DailyChoiceFieldSet(item.isCompleted),
+      ),
+    ),
+  );
+  await tester.pump();
+  repository.confirmCompletion(
+    repository.completionCommands.length - 1,
+    item,
+    isCompleted: item.isCompleted,
+    revision: revision,
+  );
+  await tester.pump();
+  await tester.pump();
 }
 
 /// Продолжение выдачи каталога после завершённой первой порции.

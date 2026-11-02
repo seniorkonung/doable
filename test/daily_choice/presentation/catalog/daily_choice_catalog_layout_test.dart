@@ -359,6 +359,31 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('обновление выдачи во время удержания ручки сохраняет '
+      'восстановление неизменившейся выдачи', (tester) async {
+    final repository = await _openExpandedCatalogAtEnd(tester, false);
+    final position = tester.state<ScrollableState>(_pageScroll).position;
+    final offset = position.pixels;
+    final gesture = await _startShortCollapse(tester);
+    final items = [
+      for (var number = 1; number <= 20; number++)
+        catalogPageItem(number, date: _today),
+    ];
+    await confirmOutsideChoiceChange(
+      tester,
+      repository,
+      items.first,
+      revision: 1,
+    );
+    await gesture.cancel();
+    await _settle(tester);
+
+    expect(position.pixels, closeTo(offset, _epsilon));
+    repository.completeFirst(1, items, total: 20, revision: 1);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
   for (final (:locale, :full) in _configurations) {
     final language = locale.languageCode;
 
