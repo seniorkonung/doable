@@ -991,3 +991,17 @@
   - **Зависимости:** нет.
   - **Предполагаемые файлы:** меняются `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации, `test/long_term_relation/presentation/batch_picker/relation_batch_picker_page_test.dart`, `test/graph/presentation/graph_operation_presenter_test.dart`.
   - **Размер:** XS.
+
+- [ ] 3.27 Удалить строку `relationEditorDescriptionLabel`: у неё не осталось читателя
+  - **Критерии приёмки:**
+    - Ключ `relationEditorDescriptionLabel` удалён из `lib/l10n/app_ru.arb`, а ключ с блоком описания `@relationEditorDescriptionLabel` — из `lib/l10n/app_en.arb`.
+    - `app_localizations.dart`, `app_localizations_ru.dart` и `app_localizations_en.dart` пересозданы через `mise run codegen`, а не правкой вручную.
+    - `relationEditorDescriptionTooLong` и `relationEditorDescriptionInvalidUnicode` не меняются: их читает `relation_details_sheet.dart`.
+    - Другие строки без читателя, существовавшие до этого изменения, остаются: `navigationActiveIntentions`, `navigationArchive`, `commonLoading`, `commonEmpty`, `commonError`, `editorCreateAction`.
+    - Поведение продукта не меняется, спецификации не меняются. Тесты не меняются: строку не читает никто в `lib/src` и `test`.
+  - **Проверка:**
+    - `mise run codegen-check`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** меняются `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации.
+  - **Размер:** XS.
