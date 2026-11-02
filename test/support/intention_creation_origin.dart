@@ -4,20 +4,20 @@ import 'package:auto_route/auto_route.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/daily_choice/presentation/daily_choice_picker_context.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'app_root_pages.dart';
 
-/// Исходные страницы самостоятельного создания, включая чужой черновик.
+/// Исходные страницы самостоятельного создания, включая чужой поиск действия.
 enum IntentionCreationOrigin {
   home('Главной', AppDestination.home),
   dailyChoices('каталогом дневных выборов', AppDestination.dailyChoices),
   graph('каталогом намерений', AppDestination.intentionGraph),
   deep(
-    'страницей намерения над черновиком связи',
+    'страницей намерения над поиском действия',
     AppDestination.intentionGraph,
   );
 
@@ -48,20 +48,15 @@ enum IntentionCreationOrigin {
     if (this == deep) {
       unawaited(
         router.push<void>(
-          RelationEditorRoute(
-            editorContext: const RelationBlankCreationContext(),
+          DailyChoiceActionPickerRoute(
+            pickerContext: const PathReplacementDailyChoicePickerContext(),
           ),
         ),
       );
-      final description = find.byKey(
-        const ValueKey('relation-editor-description'),
-      );
-      await waitFor(tester, description);
+      final filter = find.byKey(const ValueKey('daily-choice-action-filter'));
+      await waitFor(tester, filter);
       await tester.pumpAndSettle();
-      await tester.enterText(
-        description,
-        IntentionCreationHistory.relationDraft,
-      );
+      await tester.enterText(filter, IntentionCreationHistory.taskFilter);
       unawaited(
         router.push<void>(IntentionDetailsRoute(intentionId: participantId)),
       );
@@ -75,12 +70,12 @@ enum IntentionCreationOrigin {
   }
 }
 
-/// Точные экземпляры исходных маршрутов и несохранённые данные под созданием.
+/// Точные экземпляры исходных маршрутов и состояние чужой задачи под созданием.
 final class IntentionCreationHistory {
   IntentionCreationHistory(this.origin, this.routes);
   final IntentionCreationOrigin origin;
   final List<RouteData> routes;
-  static const relationDraft = 'Несохранённое описание связи';
+  static const taskFilter = 'Намерение 3';
 
   void expectPrefix(StackRouter router) => expect(
     router.stackData.take(routes.length),
@@ -96,7 +91,7 @@ final class IntentionCreationHistory {
     );
   }
 
-  Future<void> expectUnderlyingDraft(
+  Future<void> expectUnderlyingTask(
     WidgetTester tester,
     StackRouter router,
   ) async {
@@ -109,12 +104,15 @@ final class IntentionCreationHistory {
     );
     expect(
       tester
-          .widget<TextField>(
-            find.byKey(const ValueKey('relation-editor-description')),
+          .widget<EditableText>(
+            find.descendant(
+              of: find.byKey(const ValueKey('daily-choice-action-filter')),
+              matching: find.byType(EditableText),
+            ),
           )
-          .controller!
+          .controller
           .text,
-      relationDraft,
+      taskFilter,
     );
   }
 }

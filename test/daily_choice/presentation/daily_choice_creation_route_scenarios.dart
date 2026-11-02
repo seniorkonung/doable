@@ -3,7 +3,7 @@ part of 'daily_choice_creation_flow_test.dart';
 void _registerCreationRouteScenarios() {
   for (final direction in ChoicePathDraftDirection.values) {
     testWidgets(
-      'типизированный корень ${direction == ChoicePathDraftDirection.topDown ? 'сверху вниз' : 'снизу вверх'} сохраняет глубокую историю и чужой черновик',
+      'типизированный корень ${direction == ChoicePathDraftDirection.topDown ? 'сверху вниз' : 'снизу вверх'} сохраняет глубокую историю и чужой поиск',
       (tester) async {
         tester.view.physicalSize = const Size(1200, 2400);
         tester.view.devicePixelRatio = 1;
@@ -36,18 +36,17 @@ void _registerCreationRouteScenarios() {
           content: find.text('Основание'),
         );
         await _tap(tester, find.text('Основание').first);
-        await _tap(tester, find.text('Связи'));
-        final createRelation = find.byKey(
-          const ValueKey('intention-relations-add'),
+        unawaited(
+          router.push(
+            DailyChoiceActionPickerRoute(
+              pickerContext: const PathReplacementDailyChoicePickerContext(),
+            ),
+          ),
         );
-        // Строка «Добавить» строится раньше, чем страница доезжает до места.
-        await _waitFor(tester, createRelation.hitTestable());
-        await _tap(tester, createRelation.first);
-        final description = find.byKey(
-          const ValueKey('relation-editor-description'),
-        );
-        await _waitFor(tester, description);
-        await tester.enterText(description, 'Черновик другой связи');
+        final filter = find.byKey(const ValueKey('daily-choice-action-filter'));
+        await _waitFor(tester, filter);
+        await tester.pumpAndSettle();
+        await tester.enterText(filter, 'Чужая подстрока');
         unawaited(
           router.push(IntentionDetailsRoute(intentionId: _intention(2))),
         );
@@ -164,8 +163,16 @@ void _registerCreationRouteScenarios() {
         await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
         expect(
-          tester.widget<TextField>(description).controller!.text,
-          'Черновик другой связи',
+          tester
+              .widget<EditableText>(
+                find.descendant(
+                  of: filter,
+                  matching: find.byType(EditableText),
+                ),
+              )
+              .controller
+              .text,
+          'Чужая подстрока',
         );
         expect(_savedIds(harness), isEmpty);
         expect(tester.takeException(), isNull);

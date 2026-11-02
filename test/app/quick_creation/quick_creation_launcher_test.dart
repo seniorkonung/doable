@@ -9,6 +9,7 @@ import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
+import 'package:doable/src/daily_choice/presentation/daily_choice_picker_context.dart';
 import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
@@ -121,11 +122,8 @@ void main() {
             await router.maybePop();
             await tester.pumpAndSettle();
             expect(
-              tester
-                  .widget<TextField>(_key('relation-editor-description'))
-                  .controller!
-                  .text,
-              'Чужой черновик',
+              _filterText(tester, ChoicePathDraftDirection.bottomUp),
+              _foreignFilter,
             );
           }
           expect(tester.takeException(), isNull);
@@ -211,6 +209,7 @@ void main() {
           final router = _DelayedPickerRouter();
           await _openApp(tester, router: router);
           final source = await _source(tester, router, origin);
+          router.holdNextPicker();
           final first = QuickCreationLauncher().launch(
             sourceContext: source,
             mode: mode,

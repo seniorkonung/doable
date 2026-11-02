@@ -86,7 +86,7 @@ void _registerQuickCreationFlowTests() {
         history.expectPrefix(app.router);
         await _closeCreation(tester, app, flow);
         history.expectRestored(tester, app.router);
-        await history.expectUnderlyingDraft(tester, app.router);
+        await history.expectUnderlyingTask(tester, app.router);
         expect(tester.takeException(), isNull);
       },
     );
@@ -166,7 +166,7 @@ void _registerQuickCreationFlowTests() {
         expect(message, findsNothing);
         expect(completions, hasLength(1));
         history.expectRestored(tester, app.router);
-        await history.expectUnderlyingDraft(tester, app.router);
+        await history.expectUnderlyingTask(tester, app.router);
         expect(tester.takeException(), isNull);
       });
     }

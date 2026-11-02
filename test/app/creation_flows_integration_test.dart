@@ -194,7 +194,7 @@ void main() {
       await tester.pumpAndSettle();
       history.expectRestored(tester, app.router);
       expect(app.catalogs, catalogs);
-      await history.expectUnderlyingDraft(tester, app.router);
+      await history.expectUnderlyingTask(tester, app.router);
       expect(tester.takeException(), isNull);
     });
   }
@@ -239,7 +239,7 @@ void main() {
           expect(rows, hasLength(flow.initialRows + (leave ? 1 : 0)));
           expect(app.observer.attempts, leave ? 1 : 0);
           if (leave) flow.expectStored(rows.last);
-          await history.expectUnderlyingDraft(tester, app.router);
+          await history.expectUnderlyingTask(tester, app.router);
           expect(tester.takeException(), isNull);
         },
       );
