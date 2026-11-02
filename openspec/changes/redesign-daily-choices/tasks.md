@@ -638,8 +638,10 @@
 
 - [ ] 3.14 Сценарии приложения работают с подробным просмотром через общие шаги
   - **Критерии приёмки:**
-    - `test/support/daily_choice_details_controls.dart` называет намерения человека: подробный просмотр открыт, открыть форму изменения, начать удаление, открыть шаг или связь пути. Сценарии вне этого файла не ищут `daily-choice-edit-open` и `daily-choice-delete-open`.
-    - Сценарии проходят без изменения ожиданий. Смена способа показа далее меняет только этот файл.
+    - `test/support/daily_choice_details_controls.dart` называет намерения человека: подробный просмотр открыт, какой выбор открыт, открыть форму изменения, начать удаление, открыть шаг или связь пути, закрыть подробный просмотр.
+    - Все сценарии, доходящие до просмотра нажатием на карточку или строку, идут через эти шаги и не ищут `daily-choice-edit-open` и `daily-choice-delete-open` сами.
+    - Сценарии проходят без изменения ожиданий.
+    - `ordinary_page_layout_scenarios.dart` и `tag_assignment_app_flow_test.dart` открывают страницу маршрутом и на общие шаги не переводятся: после 3.15 шаги работают с панелью, а эти обращения убирает задача 3.16.
     - `daily_choice_details_page_test.dart` не переводится: он проверяет саму страницу и удаляется в задаче 3.16.
     - Производственный код не меняется.
   - **Проверка:**
@@ -647,8 +649,8 @@
   - **Зависимости:** нет.
   - **Предполагаемые файлы:**
     - добавляется `test/support/daily_choice_details_controls.dart`;
-    - меняются `test/app/daily_choice_app_flow_test.dart`, `daily_choice_app_lifecycle_test.dart`, `intention_statistics_catalog_scenarios.dart`, `tag_assignment_app_flow_test.dart`;
-    - меняются `test/app/navigation/app_shell_page_matrix.dart`, `app_shell_state_test.dart`, `ordinary_page_layout_scenarios.dart`;
+    - меняются `test/app/daily_choice_app_flow_test.dart`, `daily_choice_app_lifecycle_test.dart`, `intention_statistics_catalog_scenarios.dart`, `long_term_relation_app_flow_test.dart`;
+    - меняются `test/app/navigation/app_shell_layout_test.dart`, `app_shell_page_matrix.dart`, `app_shell_state_test.dart`;
     - меняются `test/daily_choice/presentation/catalog/daily_choice_catalog_card_flow_test.dart`, `test/daily_choice/presentation/daily_choice_creation_flow_test.dart`.
   - **Размер:** M по логике: файлов больше нормы только из-за перевода тестов на общие шаги.
 
@@ -657,30 +659,35 @@
     - `daily_choice_catalog_body.dart` и `intention_details_page.dart` вызывают `showDailyChoiceSheet`, поэтому оба каталога и вкладка «Выборы» открывают одну панель.
     - Сценарии «Нажатие на карточку открывает панель» и «Страница намерения открывает ту же панель» подтверждены на настоящем приложении: панель навигации и страница под панелью недоступны, а закрытие возвращает страницу с прежним состоянием.
     - Сценарий на настоящем приложении: панель → «Путь» → страница исходного намерения → «Выборы» → та же панель → удаление → назад. Вторая панель закрыта, а первая открыта и показывает, что выбор не найден, без шапки, вкладок и меню, и закрывает её пользователь.
-    - Из сценариев приложения меняются только шаги `test/support/daily_choice_details_controls.dart` и проверки, которые называли страницу подробного просмотра или ждали её перехода. Ожидания не ослаблены.
+    - Всё, что доходит до просмотра нажатием на карточку или строку, работает с панелью: меняются шаги `test/support/daily_choice_details_controls.dart` и сценарии из перечня этой задачи. Прямые обращения к странице и маршруту остаются задаче 3.16.
+    - Матрица оболочки не считает подробный просмотр обычной страницей, а вход в форму изменения проходит из панели в два нажатия: кнопка параметров и пункт меню.
+    - Ожидания не ослаблены: проверка, читавшая текст страницы, подтверждает то же значение в том виде, в каком его показывает панель. Это относится к типу связи в `long_term_relation_app_flow_test.dart`, выбранному действию в `intention_statistics_catalog_scenarios.dart` и дате в `daily_choice_app_lifecycle_test.dart`.
   - **Проверка:**
     - `mise exec --no-deps -- flutter test test/app test/daily_choice/presentation test/intention/presentation/details`.
   - **Зависимости:** 3.10, 3.12, 3.14.
   - **Предполагаемые файлы:**
     - меняются `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`, `lib/src/intention/presentation/details/intention_details_page.dart`;
-    - меняются `test/support/daily_choice_details_controls.dart`, `test/app/daily_choice_app_flow_test.dart`, `test/intention/presentation/details/intention_details_choices_test.dart`;
-    - меняются `test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`, `daily_choice_date_catalog_page_test.dart`, `daily_choice_catalog_accessibility_test.dart`.
-  - **Размер:** M.
+    - меняются `test/support/daily_choice_details_controls.dart`, `test/intention/presentation/details/intention_details_choices_test.dart`;
+    - меняются `test/app/daily_choice_app_flow_test.dart`, `daily_choice_app_lifecycle_test.dart`, `intention_statistics_catalog_scenarios.dart`, `long_term_relation_app_flow_test.dart`;
+    - меняются `test/app/navigation/app_shell_layout_test.dart`, `app_shell_page_matrix.dart`, `app_shell_state_test.dart`;
+    - меняются `test/daily_choice/presentation/catalog/daily_choice_catalog_accessibility_test.dart`, `daily_choice_catalog_card_flow_test.dart`, `daily_choice_catalog_page_test.dart`, `daily_choice_date_catalog_page_test.dart`, `test/daily_choice/presentation/daily_choice_creation_flow_test.dart`.
+  - **Размер:** M по логике: 16 файлов, из них в `lib/` меняются только два вызова. Смена входа и перевод сценариев проходят проверку только вместе.
 
 - [ ] 3.16 Страница подробного просмотра удалена вместе с маршрутом
   - **Критерии приёмки:**
     - Удалены `daily_choice_details_page.dart`, `DailyChoiceDetailsRoute` и `daily_choice_details_page_test.dart`. Каждый сценарий удалённого теста уже подтверждён панелью либо описывал показ страницы, которого больше нет.
-    - Матрица оболочки и проверки раскладки не считают подробный просмотр обычной страницей. Форма изменения открывается в них из панели, а `DailyChoiceEditRoute` сохранён до фазы 4.
+    - Проверки раскладки и доступности не считают подробный просмотр обычной страницей. Сценарии, открывавшие страницу маршрутом, доходят до просмотра общими шагами, а ожидания, не связанные с показом самой страницы, не ослаблены. `DailyChoiceEditRoute` сохранён до фазы 4.
     - Строки, которые читала только страница, удалены из обоих файлов локализации, а созданные файлы получены `mise run codegen`.
   - **Проверка:**
     - `mise exec --no-deps -- flutter test test/app test/daily_choice/presentation test/intention/presentation/details`.
     - `mise run codegen-check`.
-    - `git grep -nE 'DailyChoiceDetailsPage|DailyChoiceDetailsRoute|daily-choice-edit-open|daily-choice-delete-open' -- lib test` ничего не находит.
+    - `git grep -nE 'DailyChoiceDetailsPage|DailyChoiceDetailsRoute|daily_choice_details_page|daily-choice-edit-open|daily-choice-delete-open' -- lib test` ничего не находит.
   - **Зависимости:** 3.15.
   - **Предполагаемые файлы:**
     - удаляются `lib/src/daily_choice/presentation/details/daily_choice_details_page.dart`, `test/daily_choice/presentation/details/daily_choice_details_page_test.dart`;
     - меняются `lib/src/app/routing/app_router.dart`, `app_router.gr.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
-    - меняются `test/app/navigation/app_navigation_accessibility_test.dart`, `app_shell_layout_test.dart`, `app_shell_page_matrix.dart`, `app_shell_pages_above_test.dart`, `app_shell_state_test.dart`, `ordinary_page_layout_scenarios.dart`, `test/app/creation_flows_test_support.dart`.
+    - меняются `test/app/navigation/app_navigation_accessibility_test.dart`, `app_shell_pages_above_test.dart`, `ordinary_page_layout_scenarios.dart`, `test/app/creation_flows_test_support.dart`, `test/app/tag_assignment_app_flow_test.dart`;
+    - убирается импорт страницы из `test/app/intention_statistics_app_flow_test.dart` и `test/app/navigation/app_shell_layout_test.dart`: он нужен их частям `intention_statistics_catalog_scenarios.dart` до 3.15 и `ordinary_page_layout_scenarios.dart` до этой задачи.
   - **Размер:** M по логике: удаление без нового поведения.
 
 - [ ] 3.17 Проверить готовность фазы: выбор открывается в панели, а страницы подробного просмотра нет

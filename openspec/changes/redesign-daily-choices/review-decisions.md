@@ -4,11 +4,6 @@
 
 Файл ведёт оркестратор. Решения приняты пользователем в сессии решений и исполняются автономно, по одной finding за сессию. Сессия исполнения удаляет раздел своей finding в коммите её устранения.
 
-## F1 · Medium — Проверка задачи 3.15 не проходит при распределении тестов между 3.14, 3.15 и 3.16
-
-- **Решение:** Устранить
-- **Как устранить:** Правится только `tasks.md`, задачи 3.14, 3.15 и 3.16 фазы 3; новых задач нет, порядок файла не меняется, ожидания сценариев не ослабляются. Цель: проверка каждой задачи проходит в порядке файла, включая файлы дерева слияния `HEAD` с `5b2253f4`. 3.14: `test/support/daily_choice_details_controls.dart` дополнительно называет шаги «закрыть подробный просмотр» и «какой выбор открыт», все сценарии, доходящие до просмотра нажатием, идут через общие шаги, в перечень добавлены `test/app/long_term_relation_app_flow_test.dart` и `test/app/navigation/app_shell_layout_test.dart`, а утверждение «Смена способа показа далее меняет только этот файл» удалено. 3.15: меняет общие шаги и всё, что доходит до просмотра нажатием на карточку или строку: `app_shell_page_matrix.dart` (строка подробного просмотра и вход в форму из панели в два нажатия), `app_shell_state_test.dart`, `app_shell_layout_test.dart`, `test/app/long_term_relation_app_flow_test.dart`, `test/app/intention_statistics_catalog_scenarios.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_card_flow_test.dart`, `test/daily_choice/presentation/daily_choice_creation_flow_test.dart`; критерий о том, что меняются только шаги общего файла, приведён в соответствие, размер задачи пересчитан. 3.16: оставляет прямые обращения к странице и маршруту: `ordinary_page_layout_scenarios.dart`, `app_navigation_accessibility_test.dart`, `app_shell_pages_above_test.dart`, `creation_flows_test_support.dart`, а также добавляются `test/app/tag_assignment_app_flow_test.dart` (прямой переход по маршруту, строка 207) и `test/app/intention_statistics_app_flow_test.dart` (импорт удаляемой страницы, строка 19). Поиск проверки 3.16 дополняется именем `daily_choice_details_page`, потому что нынешний шаблон не видит импорт.
-
 ## F2 · Medium — Задача 3.11 передаёт общей поверхности отказ при перекрытой панели, хотя design оставляет его панели
 
 - **Решение:** Устранить
