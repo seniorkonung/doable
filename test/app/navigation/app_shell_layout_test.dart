@@ -32,6 +32,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/daily_choice_details_controls.dart';
+
 import '../../support/app_root_pages.dart';
 import '../../support/daily_choice_catalog_controls.dart';
 import '../../support/daily_choice_local_date.dart';
@@ -300,16 +302,12 @@ void main() {
         expect(lastRow.hitTestable(), findsOneWidget);
 
         await tester.tap(lastRow);
-        await _until(tester, find.byType(DailyChoiceDetailsPage));
+        await _until(tester, dailyChoiceDetails);
         await tester.pumpAndSettle();
         // При равных времени и приоритете записи идут по созданию: последний
         // созданный дневной выбор стоит последним.
         expect(
-          tester
-              .widget<DailyChoiceDetailsPage>(
-                find.byType(DailyChoiceDetailsPage),
-              )
-              .choiceId,
+          shownDailyChoice(tester),
           _dailyChoiceId(_firstChoice + count - 1),
         );
         expect(tester.takeException(), isNull);

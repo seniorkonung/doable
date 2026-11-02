@@ -63,9 +63,7 @@ enum _MatrixEntry {
     _MatrixEntry.confirmPath => find.byKey(
       const ValueKey('choice-path-open-confirmation'),
     ),
-    _MatrixEntry.editChoice => find.byKey(
-      const ValueKey('daily-choice-edit-open'),
-    ),
+    _MatrixEntry.editChoice => dailyChoiceDetailsEdit,
     _MatrixEntry.createRelation => find.byKey(
       const ValueKey('intention-relations-add'),
     ),
@@ -455,6 +453,8 @@ void _registerPageMatrixTests() {
               openedPage: find.byType(DailyChoiceActionPickerPage),
               wait: _until,
             );
+          case _MatrixEntry.editChoice:
+            await openDailyChoiceEdit(tester, tap: _tap);
           default:
             if (entry == _MatrixEntry.createRelation ||
                 entry == _MatrixEntry.outgoingRelations ||

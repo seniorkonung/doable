@@ -8,7 +8,6 @@ import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
-import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/design_system/doable_priority.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -37,6 +36,8 @@ import 'package:drift/native.dart' show DatabaseSetup;
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
+
+import '../support/daily_choice_details_controls.dart';
 
 import '../support/app_root_pages.dart';
 import '../support/daily_choice_catalog_controls.dart';
@@ -748,11 +749,11 @@ void main() {
         tester,
         find.byKey(const ValueKey('daily-choice-row-1')),
       );
-      await _pumpUntilFound(tester, find.byType(DailyChoiceDetailsPage));
+      await _pumpUntilFound(tester, dailyChoiceDetails);
       await tester.pumpAndSettle(const Duration(milliseconds: 1));
       expect(
         find.descendant(
-          of: find.byKey(const ValueKey('daily-choice-relation-1')),
+          of: dailyChoiceDetailsRelation(1),
           matching: find.text(
             '${l10n.relationNeighborhoodTypeCan}: '
             '${l10n.relationNeighborhoodCanPhrase('Намерение 1', 'Намерение 2')}',

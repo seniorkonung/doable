@@ -4,7 +4,6 @@ import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
-import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_creation_page.dart';
 import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
@@ -21,6 +20,8 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
+
+import '../support/daily_choice_details_controls.dart';
 
 import '../support/app_root_pages.dart';
 import '../support/daily_choice_durability_fixture.dart';
@@ -110,7 +111,7 @@ Future<void> _edit(
   String? date,
   String? description,
 }) async {
-  await _tap(tester, find.byKey(const ValueKey('daily-choice-edit-open')));
+  await openDailyChoiceEdit(tester, tap: _tap);
   final submit = find.byKey(const ValueKey('daily-choice-edit-submit'));
   await _until(tester, submit);
   if (date != null) {
@@ -126,7 +127,7 @@ Future<void> _edit(
     );
   }
   await _tap(tester, submit);
-  await _until(tester, find.byKey(const ValueKey('daily-choice-edit-open')));
+  await _until(tester, dailyChoiceDetailsReady);
   await tester.pumpAndSettle(const Duration(milliseconds: 1));
 }
 
@@ -348,19 +349,10 @@ void main() {
       await openDailyChoices(tester, tap: _tap);
       await showDailyChoiceCatalogSection(tester, true);
       await _tap(tester, find.byKey(const ValueKey('daily-choice-row-2')));
-      await _until(
-        tester,
-        find.byKey(const ValueKey('daily-choice-edit-open')),
-      );
+      await _until(tester, dailyChoiceDetailsReady);
       expect(find.textContaining('Чтобы Намерение 1'), findsWidgets);
-      expect(
-        find.byKey(const ValueKey('daily-choice-relation-1')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const ValueKey('daily-choice-relation-2')),
-        findsOneWidget,
-      );
+      expect(dailyChoiceDetailsRelation(1), findsOneWidget);
+      expect(dailyChoiceDetailsRelation(2), findsOneWidget);
 
       await _edit(tester, date: '2027-01-02');
       expect(
@@ -390,18 +382,14 @@ void main() {
       await _until(tester, find.text('Архивировано'));
       expect(
         tester
-            .widget<Semantics>(
-              find.byKey(const ValueKey('daily-choice-intention-2')),
-            )
+            .widget<Semantics>(dailyChoiceDetailsIntention(2))
             .properties
             .label,
         contains('Архивировано'),
       );
       expect(
         tester
-            .widget<Semantics>(
-              find.byKey(const ValueKey('daily-choice-relation-2')),
-            )
+            .widget<Semantics>(dailyChoiceDetailsRelation(2))
             .properties
             .label,
         contains('Архивировано'),
@@ -416,15 +404,12 @@ void main() {
       await _until(tester, find.textContaining('Не готово к действию'));
       expect(
         tester
-            .widget<Semantics>(
-              find.byKey(const ValueKey('daily-choice-intention-3')),
-            )
+            .widget<Semantics>(dailyChoiceDetailsIntention(3))
             .properties
             .label,
         contains('Не готово к действию'),
       );
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
+      await closeDailyChoiceDetails(tester);
       await selectDailyChoiceCatalogDate(
         tester,
         CalendarDate.fromParts(2027, 1, 2),
@@ -440,7 +425,7 @@ void main() {
       await _until(tester, completion);
       expect(dailyChoiceCompletionState(tester, completion).completed, isFalse);
       await _tap(tester, find.byKey(const ValueKey('daily-choice-row-1')));
-      await _until(tester, find.byType(DailyChoiceDetailsPage));
+      await _until(tester, dailyChoiceDetails);
       final changed = await _read(repository, editedId);
       expect(changed.choice.id, editedId);
       expect(changed.choice.date, CalendarDate.fromParts(2027, 1, 2));
@@ -453,10 +438,7 @@ void main() {
       ]);
       expect(changed.selected.readiness, IntentionReadiness.notReady);
 
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('daily-choice-delete-open')),
-      );
+      await startDailyChoiceDeletion(tester, tap: _tap);
       await _tap(tester, find.text('Удалить'));
       await _until(tester, dailyChoiceCatalogDateControl);
       await selectDailyChoiceCatalogDate(tester, _formChoiceDate, tap: _tap);

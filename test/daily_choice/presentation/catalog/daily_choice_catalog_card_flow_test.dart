@@ -1,6 +1,5 @@
 import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
-import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_edit_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/design_system/components/choice_row.dart';
@@ -10,6 +9,7 @@ import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/daily_choice_details_controls.dart';
 import '../../../support/daily_choice_durability_fixture.dart';
 import '../../../support/daily_choice_catalog_controls.dart';
 import 'daily_choice_catalog_page_test_support.dart';
@@ -84,7 +84,7 @@ void main() {
               dailyChoiceCompletionState(tester, checkbox).completed,
         );
         expect(router.current.name, route);
-        expect(find.byType(DailyChoiceDetailsPage), findsNothing);
+        expect(dailyChoiceDetails, findsNothing);
         expect(shownDailyChoiceCatalogDate(tester), durabilityChoiceDate);
         expect(shownDailyChoiceCatalogViewport(tester), viewport);
         await tester.ensureVisible(
@@ -94,13 +94,10 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('daily-choice-row-1')));
         await _until(
           tester,
-          () => find
-              .byKey(const ValueKey('daily-choice-edit-open'))
-              .evaluate()
-              .isNotEmpty,
+          () => dailyChoiceDetailsReady.evaluate().isNotEmpty,
         );
         await tester.pumpAndSettle();
-        final details = find.byType(DailyChoiceDetailsPage);
+        final details = dailyChoiceDetails;
         expect(
           find.descendant(of: details, matching: find.text(description)),
           findsOneWidget,
@@ -110,21 +107,11 @@ void main() {
           find.descendant(of: details, matching: find.text('Выполнено')),
           findsOneWidget,
         );
-        await tester.scrollUntilVisible(
-          find.byKey(const ValueKey('daily-choice-relation-2')),
-          400,
-        );
-        expect(
-          find.byKey(const ValueKey('daily-choice-relation-1')),
-          findsOneWidget,
-        );
-        expect(
-          find.byKey(const ValueKey('daily-choice-relation-2')),
-          findsOneWidget,
-        );
-        final edit = find.byKey(const ValueKey('daily-choice-edit-open'));
-        await tester.scrollUntilVisible(edit, 300);
-        await tester.tap(edit);
+        await tester.scrollUntilVisible(dailyChoiceDetailsRelation(2), 400);
+        expect(dailyChoiceDetailsRelation(1), findsOneWidget);
+        expect(dailyChoiceDetailsRelation(2), findsOneWidget);
+        await tester.scrollUntilVisible(dailyChoiceDetailsEdit, 300);
+        await openDailyChoiceEdit(tester);
         await _until(
           tester,
           () => find.byType(DailyChoiceEditPage).evaluate().isNotEmpty,
@@ -142,8 +129,7 @@ void main() {
           () => find.byType(DailyChoiceEditPage).evaluate().isEmpty,
         );
         await tester.pumpAndSettle();
-        await tester.binding.handlePopRoute();
-        await tester.pumpAndSettle();
+        await closeDailyChoiceDetails(tester);
         await _until(
           tester,
           () => _rowWith(DoablePriority.p1).evaluate().isNotEmpty,

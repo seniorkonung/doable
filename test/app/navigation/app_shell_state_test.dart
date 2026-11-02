@@ -19,7 +19,6 @@ import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalo
     as daily_page;
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_date_catalog_page.dart';
-import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/design_system/components/calendar_handle.dart';
 import 'package:doable/src/design_system/components/day_mark.dart';
@@ -57,6 +56,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
+
+import '../../support/daily_choice_details_controls.dart';
 
 import '../../support/app_root_pages.dart';
 import '../../support/daily_choice_catalog_controls.dart';
@@ -184,9 +185,9 @@ void main() {
       await _select(tester, AppDestination.dailyChoices);
       expectPreserved();
       await tester.tap(_dailyChoiceRows.hitTestable().first);
-      await _until(tester, find.byType(DailyChoiceDetailsPage));
+      await _until(tester, dailyChoiceDetails);
       await tester.pumpAndSettle();
-      await _closeTop(tester, DailyChoiceDetailsPage);
+      await closeDailyChoiceDetails(tester);
       expectPreserved();
 
       await _tap(
@@ -346,12 +347,10 @@ void main() {
 
       await _select(tester, AppDestination.dailyChoices);
       await _selectDay(tester, app, _choiceDate, incomplete: _choiceCount ~/ 2);
-      await _open(tester, _dailyChoiceRows.first, DailyChoiceDetailsPage);
-      await _open(
-        tester,
-        find.byKey(const ValueKey('daily-choice-intention-2')),
-        IntentionDetailsPage,
-      );
+      await _tap(tester, _dailyChoiceRows.first);
+      await _until(tester, dailyChoiceDetails);
+      await openDailyChoicePathIntention(tester, 2, tap: _tap);
+      await _until(tester, find.byType(IntentionDetailsPage));
       await _open(tester, intentionHeadTitle, IntentionEditPage);
       await tester.enterText(intentionEditTitleField, newTitle);
       await _tap(tester, intentionEditSave);
@@ -409,12 +408,12 @@ void main() {
         IntentionDetailsPage,
       );
       await _tap(tester, find.text('Choices').first);
-      await _open(
+      await _tap(
         tester,
         find.byKey(ValueKey('intention-choices-row-${tagFixtureId(changed)}')),
-        DailyChoiceDetailsPage,
       );
-      await _tap(tester, find.byKey(const ValueKey('daily-choice-edit-open')));
+      await _until(tester, dailyChoiceDetails);
+      await openDailyChoiceEdit(tester, tap: _tap);
       await _until(
         tester,
         find.byKey(const ValueKey('daily-choice-edit-date')),
@@ -427,11 +426,8 @@ void main() {
         tester,
         find.byKey(const ValueKey('daily-choice-edit-submit')),
       );
-      await _until(
-        tester,
-        find.byKey(const ValueKey('daily-choice-edit-open')),
-      );
-      await _closeTop(tester, DailyChoiceDetailsPage);
+      await _until(tester, dailyChoiceDetailsReady);
+      await closeDailyChoiceDetails(tester);
       await _tap(tester, find.text(app.l10n.statisticsSectionTitle).first);
       // Флажок доступен в другом каталоге; корневой остаётся скрытым.
       final dayLabel = app.l10n.statisticsCalendarDaySemantics(
@@ -559,9 +555,9 @@ void main() {
 
       // Строка в видимой части открывается нажатием без прокрутки страницы.
       await tester.tap(_dailyChoiceRows.hitTestable().first);
-      await _until(tester, find.byType(DailyChoiceDetailsPage));
+      await _until(tester, dailyChoiceDetails);
       await tester.pumpAndSettle();
-      await _closeTop(tester, DailyChoiceDetailsPage);
+      await closeDailyChoiceDetails(tester);
 
       expect(_dailyChoiceCatalogView(tester, app), before);
       expect(tester.takeException(), isNull);
@@ -620,9 +616,9 @@ void main() {
 
       // Строка открывается нажатием без прокрутки страницы.
       await tester.tap(find.byKey(const ValueKey('daily-choice-row-1')));
-      await _until(tester, find.byType(DailyChoiceDetailsPage));
+      await _until(tester, dailyChoiceDetails);
       await tester.pumpAndSettle();
-      await _closeTop(tester, DailyChoiceDetailsPage);
+      await closeDailyChoiceDetails(tester);
       // Флажок нажимается там, где он есть: прокрутка к нему изменила бы
       // позицию, которую проверяет тест.
       await _until(tester, completion);

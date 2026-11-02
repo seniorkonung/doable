@@ -48,6 +48,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../support/daily_choice_details_controls.dart';
+
 import '../support/app_root_pages.dart';
 import '../support/daily_choice_catalog_controls.dart';
 import '../support/daily_choice_catalog_provider.dart';
@@ -391,7 +393,7 @@ void main() {
       final repository = ready.container.read(personalGraphRepositoryProvider);
 
       gate.arm(fail: true);
-      await _tap(tester, find.byKey(const ValueKey('daily-choice-edit-open')));
+      await openDailyChoiceEdit(tester, tap: _tap);
       await _until(
         tester,
         () => find
@@ -463,7 +465,7 @@ void main() {
       );
 
       gate.arm(fail: false);
-      await _tap(tester, find.byKey(const ValueKey('daily-choice-edit-open')));
+      await openDailyChoiceEdit(tester, tap: _tap);
       await _until(
         tester,
         () => find

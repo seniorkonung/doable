@@ -11,7 +11,6 @@ import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
-import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_creation_page.dart';
 import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
@@ -29,6 +28,8 @@ import 'package:drift/drift.dart' show Variable;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
+
+import '../../support/daily_choice_details_controls.dart';
 
 import '../../support/app_root_pages.dart';
 import '../../support/daily_choice_catalog_controls.dart';
@@ -468,11 +469,11 @@ void main() {
           ValueKey('intention-choices-row-${ids.last.toCanonicalString()}'),
         ),
       );
-      await _waitFor(tester, find.byType(DailyChoiceDetailsPage));
+      await _waitFor(tester, dailyChoiceDetails);
       await tester.pumpAndSettle();
       expect(find.text('Время: 18:00'), findsOneWidget);
       expect(find.text('Приоритет P2'), findsOneWidget);
-      await _tap(tester, find.byKey(const ValueKey('daily-choice-edit-open')));
+      await openDailyChoiceEdit(tester, tap: _tap);
       await _waitFor(
         tester,
         find.byKey(const ValueKey('daily-choice-edit-submit')),
@@ -485,10 +486,7 @@ void main() {
         tester,
         find.byKey(const ValueKey('daily-choice-edit-submit')),
       );
-      await _waitFor(
-        tester,
-        find.byKey(const ValueKey('daily-choice-edit-open')),
-      );
+      await _waitFor(tester, dailyChoiceDetailsReady);
       await tester.pumpAndSettle();
       expect(find.text('Весь день'), findsOneWidget);
       expect(find.text('Приоритет P2'), findsOneWidget);
@@ -520,28 +518,11 @@ void main() {
         }
         await showDailyChoiceCatalogSection(tester, day == catalogToday);
         await _tap(tester, find.byKey(const ValueKey('daily-choice-row-1')));
-        await _waitFor(
-          tester,
-          find.byKey(const ValueKey('daily-choice-edit-open')),
-        );
-        expect(
-          tester
-              .widget<DailyChoiceDetailsPage>(
-                find.byType(DailyChoiceDetailsPage),
-              )
-              .choiceId,
-          expectedId,
-        );
-        expect(
-          find.byKey(const ValueKey('daily-choice-relation-1')),
-          findsOneWidget,
-        );
-        expect(
-          find.byKey(const ValueKey('daily-choice-relation-2')),
-          findsOneWidget,
-        );
-        await tester.binding.handlePopRoute();
-        await tester.pumpAndSettle();
+        await _waitFor(tester, dailyChoiceDetailsReady);
+        expect(shownDailyChoice(tester), expectedId);
+        expect(dailyChoiceDetailsRelation(1), findsOneWidget);
+        expect(dailyChoiceDetailsRelation(2), findsOneWidget);
+        await closeDailyChoiceDetails(tester);
       }
     },
   );
@@ -798,25 +779,17 @@ void main() {
       await _waitFor(tester, find.byKey(const ValueKey('daily-choice-row-3')));
       expect(find.text(duplicateDescription), findsNWidgets(2));
       await _tap(tester, find.byKey(const ValueKey('daily-choice-row-3')));
-      await _waitFor(tester, find.byType(DailyChoiceDetailsPage));
-      expect(
-        tester
-            .widget<DailyChoiceDetailsPage>(find.byType(DailyChoiceDetailsPage))
-            .choiceId,
-        allIds.last,
-      );
+      await _waitFor(tester, dailyChoiceDetails);
+      expect(shownDailyChoice(tester), allIds.last);
       await tester.pumpAndSettle();
       expect(
         find.descendant(
-          of: find.byType(DailyChoiceDetailsPage),
+          of: dailyChoiceDetails,
           matching: find.text(duplicateDescription),
         ),
         findsOneWidget,
       );
-      expect(
-        find.byKey(const ValueKey('daily-choice-relation-1')),
-        findsOneWidget,
-      );
+      expect(dailyChoiceDetailsRelation(1), findsOneWidget);
       expect(_savedIds(harness), hasLength(4));
     },
   );
