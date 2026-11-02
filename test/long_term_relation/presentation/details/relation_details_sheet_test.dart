@@ -7,10 +7,12 @@ import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_local_
 import 'package:doable/src/design_system/components/priority_picker.dart';
 import 'package:doable/src/design_system/components/relation_head.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
+import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation_description.dart';
 import 'package:doable/src/long_term_relation/presentation/details/relation_details_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -23,6 +25,14 @@ import 'relation_details_test_support.dart';
 const _relatedPageText = 'Страница намерения';
 
 void main() {
+  // Общая поверхность сообщений предъявляет результат только в приложении с
+  // фокусом.
+  setUp(() {
+    WidgetsBinding.instance.handleAppLifecycleStateChanged(
+      AppLifecycleState.resumed,
+    );
+  });
+
   final relationId = testRelationId(1);
   const revision = TestGraphRevision(1);
 
@@ -452,6 +462,10 @@ void main() {
         tester.getSemantics(find.bySemanticsLabel('Приоритет P3')),
         isSemantics(isEnabled: false),
       );
+      expect(
+        tester.getSemantics(find.bySemanticsLabel('Добавить описание')),
+        isSemantics(isEnabled: false),
+      );
 
       final after = relation(priority: RelationPriority.p1);
       repository.completeRelationUpdate(
@@ -507,6 +521,326 @@ void main() {
     });
   });
 
+  group('описание', () {
+    const saved = 'Хотя бы раз в неделю';
+    const failureMessage = 'Не удалось изменить связь. Повторите попытку.';
+    Finder back() => find.bySemanticsLabel('Назад к связи');
+
+    LongTermRelationDetails relation({
+      String? description = saved,
+      RelationScope scope = RelationScope.active,
+    }) => testRelationDetails(
+      relationId: relationId,
+      sourceId: testIntentionId(1),
+      relatedId: testIntentionId(2),
+      description: description,
+      scope: scope,
+      createdAt: DateTime(2026, 3, 14, 12),
+      updatedAt: DateTime(2026, 3, 14, 12),
+    );
+
+    Future<ControlledRelationDetailsRepository> openEditing(
+      WidgetTester tester,
+      LongTermRelationDetails details,
+    ) async {
+      final repository = await _openSheet(tester);
+      repository.watchAt(0).emitDetails(details, revision: revision);
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.text(details.description?.value ?? 'Добавить описание'),
+      );
+      await tester.pumpAndSettle();
+      return repository;
+    }
+
+    Future<void> enterAndSave(WidgetTester tester, String text) async {
+      await tester.enterText(find.byType(TextField), text);
+      await tester.pump();
+      await tester.tap(find.text('Сохранить'));
+      await tester.pump();
+    }
+
+    testWidgets('нажатие на поле открывает изменение под полосой: шапка '
+        'показывает слово типа, а приоритета и дат нет', (tester) async {
+      final semantics = tester.ensureSemantics();
+      await openEditing(tester, relation());
+
+      expect(find.bySemanticsLabel('Описание связи'), findsOneWidget);
+      expect(find.text('Описание'), findsOneWidget);
+      expect(find.text(saved), findsOneWidget);
+      expect(find.text('нужно'), findsOneWidget);
+      expect(find.text('Можно'), findsNothing);
+      expect(find.byType(PriorityPicker), findsNothing);
+      expect(find.textContaining('Создано'), findsNothing);
+      semantics.dispose();
+    });
+
+    testWidgets('строка архива скрыта на время изменения', (tester) async {
+      await openEditing(tester, relation(scope: RelationScope.archived));
+
+      expect(find.text('Сохранить'), findsOneWidget);
+      expect(find.textContaining('Архивные связи'), findsNothing);
+    });
+
+    testWidgets('«Сохранить» доступна только при изменённом тексте', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      await openEditing(tester, relation());
+      final save = find.bySemanticsLabel('Сохранить');
+
+      expect(tester.getSemantics(save), isSemantics(isEnabled: false));
+
+      await tester.enterText(find.byType(TextField), '$saved!');
+      await tester.pump();
+      expect(tester.getSemantics(save), isSemantics(isEnabled: true));
+
+      await tester.enterText(find.byType(TextField), saved);
+      await tester.pump();
+      expect(tester.getSemantics(save), isSemantics(isEnabled: false));
+      semantics.dispose();
+    });
+
+    testWidgets('успех отправляет только описание и возвращает панель с новым '
+        'текстом без сообщения', (tester) async {
+      final repository = await openEditing(tester, relation());
+      final before = relation();
+
+      await enterAndSave(tester, 'Каждый день');
+
+      final command =
+          repository.relationCommands.single as UpdateLongTermRelation;
+      expect(
+        command.patch.description,
+        isA<LongTermRelationDescriptionReplaced>(),
+      );
+      expect(
+        command.patch.priority,
+        isA<LongTermRelationFieldUnchanged<RelationPriority>>(),
+      );
+
+      final after = relation(description: 'Каждый день');
+      repository.completeRelationUpdate(
+        0,
+        before: before.relation,
+        after: after.relation,
+        description: LongTermRelationDescription.fromInput('Каждый день'),
+        revision: const TestGraphRevision(2),
+      );
+      await tester.pump();
+      repository.relationWatches.last.emitDetails(
+        after,
+        revision: const TestGraphRevision(2),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Сохранить'), findsNothing);
+      expect(find.text('Каждый день').hitTestable(), findsOneWidget);
+      expect(find.byType(PriorityPicker), findsOneWidget);
+      expect(find.byType(SnackBar), findsNothing);
+    });
+
+    testWidgets('пробелы у связи без описания выходят из изменения без команды '
+        'и сообщения, а дата остаётся прежней', (tester) async {
+      final repository = await openEditing(tester, relation(description: null));
+
+      await enterAndSave(tester, '   ');
+      await tester.pumpAndSettle();
+
+      expect(repository.relationCommands, isEmpty);
+      expect(find.text('Сохранить'), findsNothing);
+      expect(find.text('Добавить описание'), findsOneWidget);
+      expect(find.text('Создано 14 мар.'), findsOneWidget);
+      expect(find.byType(SnackBar), findsNothing);
+    });
+
+    for (final (reason, text, message) in const [
+      ('слишком длинный текст', null, 'Используйте не более 4096 символов.'),
+      ('NUL', 'до\u0000после', 'Введите корректный Unicode-текст без NUL.'),
+    ]) {
+      testWidgets(
+        '$reason остаётся в поле и объясняется своей строкой, а новый '
+        'ввод снимает объяснение',
+        (tester) async {
+          final repository = await openEditing(tester, relation());
+          final entered = text ?? 'а' * 4097;
+
+          await enterAndSave(tester, entered);
+          await tester.pumpAndSettle();
+
+          expect(repository.relationCommands, isEmpty);
+          expect(find.text(entered), findsOneWidget);
+          expect(find.text(message), findsOneWidget);
+
+          await tester.enterText(find.byType(TextField), 'Исправлено');
+          await tester.pump();
+
+          expect(find.text(message), findsNothing);
+        },
+      );
+    }
+
+    testWidgets('пока сохранение выполняется, стрелка и поле недоступны, а '
+        'отказ оставляет введённый текст на открытой панели', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final repository = await openEditing(tester, relation());
+
+      await enterAndSave(tester, 'Каждый день');
+
+      expect(find.text('Сохранение изменений…'), findsOneWidget);
+      expect(tester.getSemantics(back()), isSemantics(isEnabled: false));
+      expect(tester.widget<TextField>(find.byType(TextField)).readOnly, isTrue);
+      await tester.tap(back());
+      await tester.pumpAndSettle();
+      expect(find.text('Сохранить'), findsOneWidget);
+      expect(find.text('Отменить изменения?'), findsNothing);
+
+      repository.failRelationCommand(
+        0,
+        const LongTermRelationUnavailableFailure(),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Каждый день'), findsOneWidget);
+      expect(find.text(failureMessage), findsOneWidget);
+      expect(find.byType(SnackBar), findsNothing);
+      expect(tester.getSemantics(back()), isSemantics(isEnabled: true));
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).readOnly,
+        isFalse,
+      );
+      semantics.dispose();
+    });
+
+    testWidgets('отказ записи виден над клавиатурой', (tester) async {
+      tester.view
+        ..physicalSize = const Size(390, 640)
+        ..devicePixelRatio = 1
+        ..viewInsets = const FakeViewPadding(bottom: 300);
+      addTearDown(tester.view.reset);
+      final repository = await openEditing(tester, relation());
+
+      await enterAndSave(tester, 'Каждый день');
+      repository.failRelationCommand(
+        0,
+        const LongTermRelationUnavailableFailure(),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text(failureMessage).hitTestable(), findsOneWidget);
+    });
+
+    testWidgets('изменённый текст спрашивает перед уходом стрелкой: отказ от '
+        'сброса возвращает текст, а сброс возвращает панель', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final repository = await openEditing(tester, relation());
+
+      await tester.enterText(find.byType(TextField), 'Черновик');
+      await tester.pump();
+      await tester.tap(back());
+      await tester.pumpAndSettle();
+      expect(find.text('Отменить изменения?'), findsOneWidget);
+
+      await tester.tap(find.text('Продолжить правку'));
+      await tester.pumpAndSettle();
+      expect(find.text('Черновик'), findsOneWidget);
+      expect(find.text('Сохранить'), findsOneWidget);
+
+      await tester.tap(back());
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Отменить'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Сохранить'), findsNothing);
+      expect(find.text(saved).hitTestable(), findsOneWidget);
+      expect(repository.relationCommands, isEmpty);
+      semantics.dispose();
+    });
+
+    testWidgets('изменённый текст спрашивает перед закрытием панели: отказ от '
+        'сброса оставляет изменение, а сброс закрывает панель', (tester) async {
+      await openEditing(tester, relation());
+
+      await tester.enterText(find.byType(TextField), 'Черновик');
+      await tester.pump();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text('Отменить изменения?'), findsOneWidget);
+
+      await tester.tap(find.text('Продолжить правку'));
+      await tester.pumpAndSettle();
+      expect(find.text('Черновик'), findsOneWidget);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Отменить'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Открыть').hitTestable(), findsOneWidget);
+      expect(find.text('Черновик'), findsNothing);
+    });
+
+    testWidgets('без изменений стрелка возвращает панель, а системное «назад» '
+        'закрывает её', (tester) async {
+      final semantics = tester.ensureSemantics();
+      await openEditing(tester, relation());
+
+      await tester.tap(back());
+      await tester.pumpAndSettle();
+      expect(find.text('Сохранить'), findsNothing);
+      expect(find.text(saved).hitTestable(), findsOneWidget);
+
+      await tester.tap(find.text(saved));
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Открыть').hitTestable(), findsOneWidget);
+      expect(find.text('Отменить изменения?'), findsNothing);
+      semantics.dispose();
+    });
+
+    testWidgets('закрытие панели во время сохранения не спрашивает, а отказ '
+        'предъявляет оболочка', (tester) async {
+      final repository = await openEditing(tester, relation());
+
+      await enterAndSave(tester, 'Каждый день');
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Отменить изменения?'), findsNothing);
+      expect(find.text('Открыть').hitTestable(), findsOneWidget);
+
+      repository.failRelationCommand(
+        0,
+        const LongTermRelationUnavailableFailure(),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(find.textContaining(failureMessage), findsOneWidget);
+    });
+
+    testWidgets('удалённая связь завершает изменение, и панель закрывается '
+        'без вопроса', (tester) async {
+      final repository = await openEditing(tester, relation());
+
+      await tester.enterText(find.byType(TextField), 'Черновик');
+      await tester.pump();
+      repository.watchAt(0).emitMissing(revision: const TestGraphRevision(2));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Эта связь больше не существует.'), findsOneWidget);
+      expect(find.text('Сохранить'), findsNothing);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Отменить изменения?'), findsNothing);
+      expect(find.text('Открыть').hitTestable(), findsOneWidget);
+    });
+  });
+
   testWidgets('сообщение появляется над панелью, а не за её затемнением', (
     tester,
   ) async {
@@ -556,6 +890,8 @@ Future<ControlledRelationDetailsRepository> _openSheet(
       container: container,
       child: OrdinaryPageTestApp(
         locale: const Locale('ru'),
+        builder: (_, child) =>
+            GraphOperationPresenter(child: child ?? const SizedBox.shrink()),
         routes: [
           NamedRouteDef(
             name: IntentionDetailsRoute.name,

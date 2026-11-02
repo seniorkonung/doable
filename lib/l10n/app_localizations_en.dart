@@ -2158,6 +2158,31 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get relationSheetDescriptionTitle => 'Description';
+
+  @override
+  String get relationSheetDescriptionLabel => 'Relation description';
+
+  @override
+  String get relationSheetDescriptionBack => 'Back to the relation';
+
+  @override
+  String get relationSheetDescriptionSave => 'Save';
+
+  @override
+  String get relationSheetDescriptionDiscardTitle => 'Discard changes?';
+
+  @override
+  String get relationSheetDescriptionDiscardMessage =>
+      'Your changes to the description won’t be saved.';
+
+  @override
+  String get relationSheetDescriptionDiscardAction => 'Discard';
+
+  @override
+  String get relationSheetDescriptionContinueAction => 'Keep editing';
+
+  @override
   String get actionPickerCancel => 'Cancel action selection';
 
   @override

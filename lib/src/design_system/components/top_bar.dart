@@ -141,6 +141,9 @@ final class TopBar extends StatelessWidget implements PreferredSizeWidget {
   /// Панель экрана правки со стрелкой назад, заголовком и основной кнопкой
   /// размера sm справа, например «Сохранить».
   ///
+  /// Без [onBack] стрелка выключена: уйти с экрана нельзя до результата
+  /// начатой на нём операции.
+  ///
   /// [context] — место, где панель передаётся в `Scaffold.appBar`. С крупным
   /// шрифтом кнопка растёт, и высота панели растёт вместе с ней;
   /// потребитель перестраивается при смене масштаба и пересчитывает высоту,
@@ -149,7 +152,7 @@ final class TopBar extends StatelessWidget implements PreferredSizeWidget {
     BuildContext context, {
     required String title,
     required String backLabel,
-    required VoidCallback onBack,
+    required VoidCallback? onBack,
     required String buttonLabel,
     required VoidCallback? onButtonPressed,
     super.key,
@@ -228,13 +231,13 @@ final class TopBar extends StatelessWidget implements PreferredSizeWidget {
   /// Доступное название кнопки слева.
   String get closeLabel => _leading.label;
 
-  /// Обработчик кнопки слева.
-  VoidCallback get onClose => _leading.onTap;
+  /// Обработчик кнопки слева; без него кнопка выключена.
+  VoidCallback? get onClose => _leading.onTap;
 
   /// Ключ крестика, по которому его находят сценарии экрана.
   Key? get closeKey => _leading.key;
 
-  final ({DoableIconData icon, String label, VoidCallback onTap, Key? key})
+  final ({DoableIconData icon, String label, VoidCallback? onTap, Key? key})
   _leading;
   final ({String title, TopBarPurpose purpose, TextScaler textScaler})?
   _purpose;
@@ -389,12 +392,13 @@ final class TopBar extends StatelessWidget implements PreferredSizeWidget {
     DoableColors colors, {
     required DoableIconData icon,
     required String label,
-    required VoidCallback onTap,
+    required VoidCallback? onTap,
     Key? key,
   }) => Center(
     child: MergeSemantics(
       child: Semantics(
         button: true,
+        enabled: onTap != null,
         label: label,
         child: InkResponse(
           key: key,
@@ -406,7 +410,7 @@ final class TopBar extends StatelessWidget implements PreferredSizeWidget {
               child: DoableIcon(
                 icon,
                 size: DoableMetrics.iconSize,
-                color: colors.ink,
+                color: onTap == null ? colors.grip : colors.ink,
               ),
             ),
           ),

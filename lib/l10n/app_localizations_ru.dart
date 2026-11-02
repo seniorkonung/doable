@@ -2182,6 +2182,31 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
+  String get relationSheetDescriptionTitle => 'Описание';
+
+  @override
+  String get relationSheetDescriptionLabel => 'Описание связи';
+
+  @override
+  String get relationSheetDescriptionBack => 'Назад к связи';
+
+  @override
+  String get relationSheetDescriptionSave => 'Сохранить';
+
+  @override
+  String get relationSheetDescriptionDiscardTitle => 'Отменить изменения?';
+
+  @override
+  String get relationSheetDescriptionDiscardMessage =>
+      'Изменения описания не сохранятся.';
+
+  @override
+  String get relationSheetDescriptionDiscardAction => 'Отменить';
+
+  @override
+  String get relationSheetDescriptionContinueAction => 'Продолжить правку';
+
+  @override
   String get actionPickerCancel => 'Отменить выбор действия';
 
   @override

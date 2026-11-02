@@ -1691,6 +1691,38 @@
     "description": "Доступное название пилюли низшего приоритета на панели связи",
     "placeholders": {"priority": {"type": "String"}}
   },
+  "relationSheetDescriptionTitle": "Description",
+  "@relationSheetDescriptionTitle": {
+    "description": "Заголовок полосы изменения описания на панели связи и название поля"
+  },
+  "relationSheetDescriptionLabel": "Relation description",
+  "@relationSheetDescriptionLabel": {
+    "description": "Доступное название панели связи во время изменения описания"
+  },
+  "relationSheetDescriptionBack": "Back to the relation",
+  "@relationSheetDescriptionBack": {
+    "description": "Доступное название стрелки назад при изменении описания связи"
+  },
+  "relationSheetDescriptionSave": "Save",
+  "@relationSheetDescriptionSave": {
+    "description": "Кнопка сохранения описания на панели связи"
+  },
+  "relationSheetDescriptionDiscardTitle": "Discard changes?",
+  "@relationSheetDescriptionDiscardTitle": {
+    "description": "Вопрос перед уходом с несохранённым описанием связи"
+  },
+  "relationSheetDescriptionDiscardMessage": "Your changes to the description won’t be saved.",
+  "@relationSheetDescriptionDiscardMessage": {
+    "description": "Пояснение вопроса перед уходом с несохранённым описанием связи"
+  },
+  "relationSheetDescriptionDiscardAction": "Discard",
+  "@relationSheetDescriptionDiscardAction": {
+    "description": "Действие, которое отменяет изменение описания связи"
+  },
+  "relationSheetDescriptionContinueAction": "Keep editing",
+  "@relationSheetDescriptionContinueAction": {
+    "description": "Действие, которое возвращает к изменению описания связи"
+  },
   "actionPickerCancel": "Cancel action selection",
   "@actionPickerCancel": {"description": "Отмена выбора действия"},
   "actionPickerLoading": "Loading actions…",

@@ -7,12 +7,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
 import '../../../daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
+import '../../../design_system/components/confirm_dialog.dart';
 import '../../../design_system/components/list_state.dart';
 import '../../../design_system/components/notice.dart';
 import '../../../design_system/components/priority_picker.dart';
 import '../../../design_system/components/relation_head.dart';
 import '../../../design_system/components/sheet.dart';
 import '../../../design_system/components/text_field.dart';
+import '../../../design_system/components/top_bar.dart';
 import '../../../design_system/doable_colors.dart';
 import '../../../design_system/doable_metrics.dart';
 import '../../../design_system/doable_type.dart';
@@ -22,6 +24,7 @@ import '../../../intention/domain/intention.dart';
 import '../../../shared/presentation/timestamp_dates_line.dart';
 import '../../application/long_term_relation_projection.dart';
 import '../../domain/long_term_relation.dart';
+import '../../domain/long_term_relation_description.dart';
 import '../../domain/long_term_relation_id.dart';
 import '../relation_command_failure_message.dart';
 import 'relation_details_state.dart';
@@ -32,6 +35,9 @@ import 'relation_details_view_model.dart';
 /// Шапка всегда сохраняет исходное направление связи, поэтому вход из входящей
 /// группы её не переворачивает. Название участника открывает его страницу
 /// поверх панели, а панель остаётся ниже в истории.
+///
+/// Описание меняется в полном размере панели, а изменённый текст уходит только
+/// после ответа на вопрос: панель не закрывается сама, пока он не сохраняется.
 Future<void> showRelationDetailsSheet(
   BuildContext context,
   LongTermRelationId relationId,
@@ -42,61 +48,232 @@ Future<void> showRelationDetailsSheet(
       _RelationDetailsSheet(presentation, relationId: relationId),
 );
 
-final class _RelationDetailsSheet extends ConsumerWidget {
+final class _RelationDetailsSheet extends ConsumerStatefulWidget {
   const _RelationDetailsSheet(this.presentation, {required this.relationId});
 
   final SheetPresentation presentation;
   final LongTermRelationId relationId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_RelationDetailsSheet> createState() =>
+      _RelationDetailsSheetState();
+}
+
+/// Открытое изменение описания: текст при открытии и отказ проверки введённого
+/// текста, который живёт до следующего ввода.
+typedef _DescriptionEdit = ({
+  String opened,
+  LongTermRelationTextValidationReason? invalid,
+});
+
+final class _RelationDetailsSheetState
+    extends ConsumerState<_RelationDetailsSheet> {
+  final _descriptionController = TextEditingController();
+  final _descriptionFocus = FocusNode();
+
+  /// Конец содержимого изменения: под полем и его отказами.
+  final _editEndKey = GlobalKey();
+
+  _DescriptionEdit? _edit;
+
+  RelationDetailsViewModelProvider get _provider =>
+      relationDetailsViewModelProvider(widget.relationId);
+
+  @override
+  void dispose() {
+    _descriptionController.dispose();
+    _descriptionFocus.dispose();
+    super.dispose();
+  }
+
+  void _openDescription(String text) {
+    _descriptionController.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+    setState(() => _edit = (opened: text, invalid: null));
+  }
+
+  void _closeDescription() => setState(() => _edit = null);
+
+  void _changeDescription(_DescriptionEdit edit) =>
+      setState(() => _edit = (opened: edit.opened, invalid: null));
+
+  Future<void> _saveDescription(_DescriptionEdit edit) async {
+    final outcome = await ref
+        .read(_provider.notifier)
+        .saveDescription(_descriptionController.text);
+    if (!mounted) return;
+    switch (outcome) {
+      case RelationDescriptionSaved() || RelationDescriptionUnchanged():
+        _closeDescription();
+      case RelationDescriptionInvalid(:final reason):
+        setState(() => _edit = (opened: edit.opened, invalid: reason));
+        _revealFailure();
+      case RelationDescriptionSaveFailed():
+        _revealFailure();
+    }
+  }
+
+  /// Прокручивает к отказу под полем после его кадра: над клавиатурой он
+  /// оказался бы вне видимой части, и кадр не подтвердил бы его предъявление.
+  ///
+  /// Фокус снимается, иначе вернувшаяся клавиатура прокрутит обратно к каретке.
+  void _revealFailure() {
+    _descriptionFocus.unfocus();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final end = _editEndKey.currentContext;
+      if (!mounted || end == null) return;
+      unawaited(
+        Scrollable.ensureVisible(
+          end,
+          alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+        ),
+      );
+    });
+  }
+
+  Future<bool> _confirmDiscard() {
     final localizations = AppLocalizations.of(context);
-    final provider = relationDetailsViewModelProvider(relationId);
-    final state = ref.watch(provider);
-    final viewModel = ref.read(provider.notifier);
+    return showDiscardDialog(
+      context: context,
+      title: localizations.relationSheetDescriptionDiscardTitle,
+      text: localizations.relationSheetDescriptionDiscardMessage,
+      discardLabel: localizations.relationSheetDescriptionDiscardAction,
+      keepLabel: localizations.relationSheetDescriptionContinueAction,
+    );
+  }
+
+  bool _isChanged(_DescriptionEdit edit) =>
+      _descriptionController.text != edit.opened;
+
+  /// Стрелка возвращает панель, а изменённый текст уходит только после ответа.
+  Future<void> _leaveDescription(_DescriptionEdit edit) async {
+    if (_isChanged(edit) && !await _confirmDiscard()) return;
+    if (mounted) _closeDescription();
+  }
+
+  Future<void> _closeSheetAfterDiscard() async {
+    if (await _confirmDiscard() && mounted) {
+      Navigator.of(context).pop();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context);
+    final state = ref.watch(_provider);
+    final viewModel = ref.read(_provider.notifier);
     final retry = (
       label: localizations.commonRetry,
       onPressed: viewModel.retry,
     );
-    return Sheet.untitled(
-      presentation,
-      label: switch (state) {
-        RelationDetailsLoaded(:final details) => _sheetLabel(
-          localizations,
-          details,
-        ),
-        _ => localizations.relationDetailsTitle,
+    // Связь, которой больше нет, изменять нечего, и панель закрывается сразу.
+    final edit = state is RelationDetailsLoaded ? _edit : null;
+    final isRunning = state.isOperationRunning;
+    final isChanged = edit != null && _isChanged(edit);
+    return PopScope<void>(
+      // Во время сохранения команда продолжится и без панели, а её отказ
+      // предъявит оболочка.
+      canPop: !isChanged || isRunning,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) unawaited(_closeSheetAfterDiscard());
       },
-      // Шапка стоит глубже поля листа: область нажатия кнопки параметров
-      // выходит за край содержимого.
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: DoableMetrics.space2),
-        child: switch (state) {
-          RelationDetailsLoading() => ListState.loading(
-            text: localizations.relationDetailsLoading,
+      child: Sheet.untitled(
+        widget.presentation,
+        label: switch (state) {
+          RelationDetailsLoaded() when edit != null =>
+            localizations.relationSheetDescriptionLabel,
+          RelationDetailsLoaded(:final details) => _sheetLabel(
+            localizations,
+            details,
           ),
-          final RelationDetailsLoaded loaded => _LoadedRelation(
-            state: loaded,
-            onRetry: viewModel.retry,
-            onChangeType: viewModel.changeType,
-            onChangePriority: viewModel.changePriority,
-          ),
-          RelationDetailsNotFound() || RelationDetailsDeleted() =>
-            ListState.error(message: localizations.relationDetailsNotFound),
-          RelationDetailsUnavailable() => ListState.error(
-            message: localizations.relationDetailsUnavailable,
-            retry: retry,
-          ),
-          RelationDetailsCorruption() => ListState.error(
-            message: localizations.relationDetailsCorruption,
-          ),
-          RelationDetailsUnexpected() => ListState.error(
-            message: localizations.relationDetailsUnexpected,
-          ),
+          _ => localizations.relationDetailsTitle,
         },
+        bar: edit == null
+            ? null
+            : TopBar.withButton(
+                context,
+                title: localizations.relationSheetDescriptionTitle,
+                backLabel: localizations.relationSheetDescriptionBack,
+                onBack: isRunning
+                    ? null
+                    : () => unawaited(_leaveDescription(edit)),
+                buttonLabel: localizations.relationSheetDescriptionSave,
+                onButtonPressed: isChanged && !isRunning
+                    ? () => unawaited(_saveDescription(edit))
+                    : null,
+              ),
+        // Шапка стоит глубже поля листа: область нажатия кнопки параметров
+        // выходит за край содержимого.
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: DoableMetrics.space2),
+          child: switch (state) {
+            RelationDetailsLoading() => ListState.loading(
+              text: localizations.relationDetailsLoading,
+            ),
+            final RelationDetailsLoaded loaded => _LoadedRelation(
+              state: loaded,
+              description: switch (edit) {
+                final edit? => _DescriptionEditing(
+                  controller: _descriptionController,
+                  focusNode: _descriptionFocus,
+                  invalid: edit.invalid,
+                  endKey: _editEndKey,
+                  onChanged: (_) => _changeDescription(edit),
+                ),
+                null => _DescriptionSaved(onOpen: _openDescription),
+              },
+              onRetry: viewModel.retry,
+              onChangeType: viewModel.changeType,
+              onChangePriority: viewModel.changePriority,
+            ),
+            RelationDetailsNotFound() || RelationDetailsDeleted() =>
+              ListState.error(message: localizations.relationDetailsNotFound),
+            RelationDetailsUnavailable() => ListState.error(
+              message: localizations.relationDetailsUnavailable,
+              retry: retry,
+            ),
+            RelationDetailsCorruption() => ListState.error(
+              message: localizations.relationDetailsCorruption,
+            ),
+            RelationDetailsUnexpected() => ListState.error(
+              message: localizations.relationDetailsUnexpected,
+            ),
+          },
+        ),
       ),
     );
   }
+}
+
+/// Что панель показывает на месте описания.
+sealed class _DescriptionMode {
+  const _DescriptionMode();
+}
+
+/// Сохранённое описание, нажатие на которое открывает его изменение.
+final class _DescriptionSaved extends _DescriptionMode {
+  const _DescriptionSaved({required this.onOpen});
+
+  final ValueChanged<String> onOpen;
+}
+
+/// Поле изменения описания в полном размере панели.
+final class _DescriptionEditing extends _DescriptionMode {
+  const _DescriptionEditing({
+    required this.controller,
+    required this.focusNode,
+    required this.invalid,
+    required this.endKey,
+    required this.onChanged,
+  });
+
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final LongTermRelationTextValidationReason? invalid;
+  final Key endKey;
+  final ValueChanged<String> onChanged;
 }
 
 /// Полная формулировка связи в исходном направлении.
@@ -123,18 +300,22 @@ String _sheetLabel(
 final class _LoadedRelation extends ConsumerWidget {
   const _LoadedRelation({
     required this.state,
+    required this.description,
     required this.onRetry,
     required this.onChangeType,
     required this.onChangePriority,
   });
 
   final RelationDetailsLoaded state;
+  final _DescriptionMode description;
   final VoidCallback onRetry;
   final ValueChanged<LongTermRelationType> onChangeType;
   final ValueChanged<RelationPriority> onChangePriority;
 
   /// Последняя пилюля приоритета выходит за край содержимого.
   static const double _pickerShift = 2;
+  static const _descriptionMinLines = 5;
+  static const _descriptionMaxLines = 13;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -142,7 +323,7 @@ final class _LoadedRelation extends ConsumerWidget {
     final colors = Theme.of(context).extension<DoableColors>()!;
     final details = state.details;
     final relation = details.relation;
-    final description = details.description?.value;
+    final savedDescription = details.description?.value;
     final isOperationRunning = state.isOperationRunning;
     // Обычное обновление длится мгновения и не сдвигает панель строкой
     // статуса при каждой подтверждённой правке: виден только его отказ.
@@ -155,6 +336,18 @@ final class _LoadedRelation extends ConsumerWidget {
       RelationDetailsRefreshUnexpected() =>
         localizations.relationDetailsRefreshUnexpected,
     };
+    final description = this.description;
+    final isEditing = description is _DescriptionEditing;
+    final operationStatus = isOperationRunning
+        ? Semantics(
+            container: true,
+            liveRegion: true,
+            child: Text(
+              localizations.detailsOperationRunning,
+              style: DoableType.hint.copyWith(color: colors.muted),
+            ),
+          )
+        : null;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -177,6 +370,9 @@ final class _LoadedRelation extends ConsumerWidget {
           source: _participant(context, details.source),
           target: _participant(context, details.related),
           status: switch (relation.scope) {
+            RelationScope.active when isEditing => const RelationHeadActive(),
+            RelationScope.archived when isEditing =>
+              const RelationHeadArchived(),
             RelationScope.active => RelationHeadActive(
               kindSwitch: RelationHeadKindSwitch(
                 label: localizations.relationDetailsTypeLabel,
@@ -196,45 +392,72 @@ final class _LoadedRelation extends ConsumerWidget {
           archivedWord: localizations.detailsArchivedBadge,
         ),
         const SizedBox(height: 10),
-        TextField.saved(
-          value: description ?? '',
-          placeholder: localizations.detailsAddDescription,
-          label: switch (description) {
-            final description? => localizations.detailsEditDescriptionLabel(
-              description,
+        ...switch (description) {
+          _DescriptionSaved(:final onOpen) => [
+            TextField.saved(
+              value: savedDescription ?? '',
+              placeholder: localizations.detailsAddDescription,
+              label: switch (savedDescription) {
+                final description? => localizations.detailsEditDescriptionLabel(
+                  description,
+                ),
+                null => localizations.detailsAddDescription,
+              },
+              onOpen: isOperationRunning
+                  ? null
+                  : () => onOpen(savedDescription ?? ''),
             ),
-            null => localizations.detailsAddDescription,
-          },
-          onOpen: null,
-        ),
-        const SizedBox(height: DoableMetrics.space2),
-        // Без места на одной строке приоритет переносится целиком, а слово
-        // не ломается.
-        Wrap(
-          alignment: WrapAlignment.spaceBetween,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          spacing: DoableMetrics.space3,
-          children: [
-            Text(
-              localizations.relationDetailsPriorityLabel,
-              style: DoableType.row.copyWith(color: colors.ink),
-            ),
-            Transform.translate(
-              offset: const Offset(_pickerShift, 0),
-              child: PriorityPicker(
-                value: _designPriority(relation.priority),
-                onChange: isOperationRunning
-                    ? null
-                    : (priority) =>
-                          onChangePriority(_relationPriority(priority)),
-                label: localizations.relationDetailsPriorityLabel,
-                name: _priorityName,
-                itemLabel: (priority, _) =>
-                    _priorityItemLabel(localizations, priority),
-              ),
+            const SizedBox(height: DoableMetrics.space2),
+            // Без места на одной строке приоритет переносится целиком, а слово
+            // не ломается.
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: DoableMetrics.space3,
+              children: [
+                Text(
+                  localizations.relationDetailsPriorityLabel,
+                  style: DoableType.row.copyWith(color: colors.ink),
+                ),
+                Transform.translate(
+                  offset: const Offset(_pickerShift, 0),
+                  child: PriorityPicker(
+                    value: _designPriority(relation.priority),
+                    onChange: isOperationRunning
+                        ? null
+                        : (priority) =>
+                              onChangePriority(_relationPriority(priority)),
+                    label: localizations.relationDetailsPriorityLabel,
+                    name: _priorityName,
+                    itemLabel: (priority, _) =>
+                        _priorityItemLabel(localizations, priority),
+                  ),
+                ),
+              ],
             ),
           ],
-        ),
+          final _DescriptionEditing editing => [
+            TextField.multiline(
+              controller: editing.controller,
+              focusNode: editing.focusNode,
+              placeholder: localizations.detailsAddDescription,
+              label: localizations.relationSheetDescriptionTitle,
+              minLines: _descriptionMinLines,
+              maxLines: _descriptionMaxLines,
+              autofocus: true,
+              readOnly: isOperationRunning,
+              onChanged: editing.onChanged,
+              error: switch (editing.invalid) {
+                LongTermRelationTextValidationReason.tooLong => Text(
+                  localizations.relationEditorDescriptionTooLong,
+                ),
+                LongTermRelationTextValidationReason.invalidUnicodeRepertoire =>
+                  Text(localizations.relationEditorDescriptionInvalidUnicode),
+                null => null,
+              },
+            ),
+          ],
+        },
         if (state.editFailure case final editFailure?) ...[
           const SizedBox(height: DoableMetrics.space2),
           Notice.content(
@@ -250,33 +473,31 @@ final class _LoadedRelation extends ConsumerWidget {
           ),
         ],
         const SizedBox(height: DoableMetrics.space2),
-        // Правка длится мгновения: статус стоит рядом с датами, поэтому не
-        // дёргает панель по высоте при каждом нажатии.
-        Wrap(
-          spacing: DoableMetrics.space3,
-          children: [
-            timestampDatesLine(
-              localizations: localizations,
-              locale: Localizations.localeOf(context).toLanguageTag(),
-              createdAt: relation.createdAt.value,
-              updatedAt: relation.updatedAt.value,
-              // Строка называет год по дню показа панели.
-              currentYear: ref
-                  .watch(dailyChoiceLocalDateSourceProvider)()
-                  .date
-                  .year,
-            ),
-            if (isOperationRunning)
-              Semantics(
-                container: true,
-                liveRegion: true,
-                child: Text(
-                  localizations.detailsOperationRunning,
-                  style: DoableType.hint.copyWith(color: colors.muted),
-                ),
+        switch (description) {
+          // Правка длится мгновения: статус стоит рядом с датами, поэтому не
+          // дёргает панель по высоте при каждом нажатии.
+          _DescriptionSaved() => Wrap(
+            spacing: DoableMetrics.space3,
+            children: [
+              timestampDatesLine(
+                localizations: localizations,
+                locale: Localizations.localeOf(context).toLanguageTag(),
+                createdAt: relation.createdAt.value,
+                updatedAt: relation.updatedAt.value,
+                // Строка называет год по дню показа панели.
+                currentYear: ref
+                    .watch(dailyChoiceLocalDateSourceProvider)()
+                    .date
+                    .year,
               ),
-          ],
-        ),
+              ?operationStatus,
+            ],
+          ),
+          _DescriptionEditing(:final endKey) => KeyedSubtree(
+            key: endKey,
+            child: operationStatus ?? const SizedBox.shrink(),
+          ),
+        },
       ],
     );
   }

@@ -3346,6 +3346,54 @@ abstract class AppLocalizations {
   /// **'Priority {priority}, the lowest'**
   String relationSheetPriorityLowest(String priority);
 
+  /// Заголовок полосы изменения описания на панели связи и название поля
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get relationSheetDescriptionTitle;
+
+  /// Доступное название панели связи во время изменения описания
+  ///
+  /// In en, this message translates to:
+  /// **'Relation description'**
+  String get relationSheetDescriptionLabel;
+
+  /// Доступное название стрелки назад при изменении описания связи
+  ///
+  /// In en, this message translates to:
+  /// **'Back to the relation'**
+  String get relationSheetDescriptionBack;
+
+  /// Кнопка сохранения описания на панели связи
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get relationSheetDescriptionSave;
+
+  /// Вопрос перед уходом с несохранённым описанием связи
+  ///
+  /// In en, this message translates to:
+  /// **'Discard changes?'**
+  String get relationSheetDescriptionDiscardTitle;
+
+  /// Пояснение вопроса перед уходом с несохранённым описанием связи
+  ///
+  /// In en, this message translates to:
+  /// **'Your changes to the description won’t be saved.'**
+  String get relationSheetDescriptionDiscardMessage;
+
+  /// Действие, которое отменяет изменение описания связи
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get relationSheetDescriptionDiscardAction;
+
+  /// Действие, которое возвращает к изменению описания связи
+  ///
+  /// In en, this message translates to:
+  /// **'Keep editing'**
+  String get relationSheetDescriptionContinueAction;
+
   /// Отмена выбора действия
   ///
   /// In en, this message translates to:
