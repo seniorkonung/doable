@@ -3281,6 +3281,18 @@ abstract class AppLocalizations {
   /// **'Keep editing'**
   String get relationSheetDescriptionContinueAction;
 
+  /// Доступное название ручки панели связи в компактном размере
+  ///
+  /// In en, this message translates to:
+  /// **'Expand relation panel'**
+  String get relationSheetExpand;
+
+  /// Доступное название ручки панели связи в полном размере
+  ///
+  /// In en, this message translates to:
+  /// **'Collapse relation panel'**
+  String get relationSheetCollapse;
+
   /// Доступное название кнопки параметров в шапке панели связи
   ///
   /// In en, this message translates to:

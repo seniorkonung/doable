@@ -1647,6 +1647,14 @@
   "@relationSheetDescriptionContinueAction": {
     "description": "Действие, которое возвращает к изменению описания связи"
   },
+  "relationSheetExpand": "Expand relation panel",
+  "@relationSheetExpand": {
+    "description": "Доступное название ручки панели связи в компактном размере"
+  },
+  "relationSheetCollapse": "Collapse relation panel",
+  "@relationSheetCollapse": {
+    "description": "Доступное название ручки панели связи в полном размере"
+  },
   "relationSheetOptionsLabel": "Relation options",
   "@relationSheetOptionsLabel": {
     "description": "Доступное название кнопки параметров в шапке панели связи"

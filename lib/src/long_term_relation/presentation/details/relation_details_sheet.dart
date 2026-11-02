@@ -264,6 +264,8 @@ final class _RelationDetailsSheetState
           ),
           _ => localizations.relationDetailsTitle,
         },
+        expandLabel: localizations.relationSheetExpand,
+        collapseLabel: localizations.relationSheetCollapse,
         bar: edit == null
             ? null
             : TopBar.withButton(
