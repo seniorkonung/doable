@@ -713,12 +713,12 @@
     - Доступное название свободной строки сообщает то же, что прежде, и не начинается с призыва выбрать, а у занятой называет причину. Занятая строка остаётся на месте и в числе заголовка списка.
   - **Проверка:**
     - `mise run codegen`.
-    - `mise exec --no-deps -- flutter test test/intention/presentation/picker test/daily_choice/presentation/action_picker test/daily_choice/presentation/source_picker test/long_term_relation/presentation/participant_picker test/long_term_relation/presentation/intention_relations`.
+    - `mise exec --no-deps -- flutter test test/intention/presentation/picker test/intention/presentation/search test/daily_choice/presentation/action_picker test/daily_choice/presentation/source_picker test/long_term_relation/presentation/participant_picker test/long_term_relation/presentation/intention_relations`.
     - `mise exec --no-deps -- flutter analyze`.
   - **Зависимости:** 3.4, 3.5.
   - **Предполагаемые файлы:**
     - меняются `lib/src/intention/presentation/picker/intention_picker_view.dart`, `intention_picker_row.dart`, `lib/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart`, `lib/src/daily_choice/presentation/source_picker/daily_choice_source_picker_page.dart`, `lib/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart`, `intention_relations/intention_relations_sliver.dart`;
-    - меняются `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации, `test/intention/presentation/picker/intention_picker_row_test.dart`, `intention_picker_view_test.dart`.
+    - меняются `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации, `test/intention/presentation/picker/intention_picker_row_test.dart`, `intention_picker_view_test.dart`, `intention_picker_purpose_sheet_test.dart`, `test/intention/presentation/search/show_and_sort_sheet_test.dart`.
   - **Размер:** M.
 
 - [ ] 3.9 Страница поиска участника группы открывается своим маршрутом и отмечает намерения
@@ -833,15 +833,15 @@
   - **Критерии приёмки:**
     - `QuickCreationMode.relation`, его ключ, запуск, подписи и пояснение удалены, поэтому меню показывает только «Новое намерение» и «Новый дневной выбор»: сценарий «Связи нет среди режимов». Сохранённое значение `relation` читается как неизвестное без особого случая, как велит D10.
     - Значки уходят только без читателей. `DoableIconData.relationMini` остаётся вопреки D10: с 2.5 его читает `RelationHead`. `DoableIconData.relation` остаётся: это отметка занятой строки.
-    - Тесты, где режим связи служил просто другим режимом, используют «Новый дневной выбор». Поток «пустая связь» в `creation_flows_integration_test.dart` удалён вместе с режимом. Проверки последовательного сохранения выборов сохраняют свои инварианты на двух режимах.
+    - Тесты, где режим связи служил просто другим режимом, используют «Новый дневной выбор», включая `test/app/bootstrap/app_runtime_quick_creation_mode_test.dart`. Поток «пустая связь» в `creation_flows_integration_test.dart` удалён вместе с режимом. Проверки последовательного сохранения выборов сохраняют свои инварианты на двух режимах: значения, которые проверка различает, остаются разными.
   - **Проверка:**
     - `mise run codegen`.
-    - `mise exec --no-deps -- flutter test test/app/quick_creation test/app/creation_flows_integration_test.dart test/app/navigation/app_navigation_bar_test.dart test/app/navigation/app_navigation_transition_test.dart test/design_system/doable_icon_test.dart`.
+    - `mise exec --no-deps -- flutter test test/app/quick_creation test/app/bootstrap/app_runtime_quick_creation_mode_test.dart test/app/creation_flows_integration_test.dart test/app/navigation/app_navigation_bar_test.dart test/app/navigation/app_navigation_transition_test.dart test/design_system/doable_icon_test.dart`.
     - `mise exec --no-deps -- flutter analyze`.
   - **Зависимости:** 3.15.
   - **Предполагаемые файлы:**
     - меняются `lib/src/app/quick_creation/quick_creation_mode.dart`, `quick_creation_launcher.dart`, `quick_creation_mode_presentation.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
-    - меняются тесты `test/app/quick_creation/`, `test/app/creation_flows_integration_test.dart`, `test/app/creation_flows_test_support.dart`, `test/app/navigation/app_navigation_bar_test.dart`, `app_navigation_transition_test.dart`.
+    - меняются тесты `test/app/quick_creation/`, `test/app/bootstrap/app_runtime_quick_creation_mode_test.dart`, `test/app/creation_flows_integration_test.dart`, `test/app/creation_flows_test_support.dart`, `test/app/navigation/app_navigation_bar_test.dart`, `app_navigation_transition_test.dart`.
   - **Размер:** M по логике: файлов больше нормы только из-за механической замены режима в тестах.
 
 - [ ] 3.17 Удалить форму связи и прежний поиск участника для роли

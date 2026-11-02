@@ -4,11 +4,6 @@
 
 Файл ведёт оркестратор. Решения приняты пользователем в сессии решений и исполняются автономно, по одной finding за сессию. Сессия исполнения удаляет раздел своей finding в коммите её устранения.
 
-## F5 · Low — Задачи 3.16 и 3.8 не называют затронутые тесты
-
-- **Решение:** Устранить
-- **Как устранить:** Исправить в tasks.md задачи 3.16 и 3.8, без новых задач и без смены порядка. В файлы и проверку 3.16 добавить test/app/bootstrap/app_runtime_quick_creation_mode_test.dart: он использует QuickCreationMode.relation и сейчас запускается только в 3.21; режим в нём заменяется на «Новый дневной выбор» с сохранением инвариантов. В файлы 3.8 добавить test/intention/presentation/search/show_and_sort_sheet_test.dart и test/intention/presentation/picker/intention_picker_purpose_sheet_test.dart: оба вызывают конструктор IntentionPickerView. Отчёт называл только первый из них. В проверку 3.8 добавить test/intention/presentation/search; каталог test/intention/presentation/picker в ней уже есть. Поведение продукта не меняется.
-
 ## F6 · Low — `design.md` велит удалить значок `relationMini`, а 3.16 сохраняет его вопреки решению
 
 - **Решение:** Устранить
