@@ -850,9 +850,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get detailsOperationRunning => 'Сохранение изменений…';
 
   @override
-  String get detailsActive => 'Активно';
-
-  @override
   String get detailsArchived => 'В архиве';
 
   @override
@@ -2663,133 +2660,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get participantPickerEmpty => 'Других намерений для выбора нет.';
 
   @override
-  String get participantPickerRestoreTitle => 'Восстановить связь?';
-
-  @override
-  String get participantPickerRestoreTextBefore => 'Вернётся связь «';
-
-  @override
-  String participantPickerRestoreTextAfter(String priority) {
-    return '» с приоритетом $priority.';
-  }
-
-  @override
-  String participantPickerRestoreWarning(String changes) {
-    return 'Заданное в форме не сохранится: $changes.';
-  }
-
-  @override
-  String get participantPickerRestoreWarningNeedType => 'вид «нужно»';
-
-  @override
-  String get participantPickerRestoreWarningCanType => 'вид «можно»';
-
-  @override
-  String get participantPickerRestoreWarningPriority => 'приоритет';
-
-  @override
-  String get participantPickerRestoreWarningDescription => 'описание';
-
-  @override
-  String get participantPickerRestoreCancel => 'Отмена';
-
-  @override
-  String get participantPickerRestoreConfirm => 'Восстановить';
-
-  @override
-  String get participantPickerOpenDetails =>
-      'Открыть подробные данные намерения';
-
-  @override
-  String get participantPickerPurposeCreationSource =>
-      'Новая связь: исходное намерение';
-
-  @override
-  String get participantPickerPurposeCreationRelated =>
-      'Новая связь: связанное намерение';
-
-  @override
-  String get participantPickerFlowCreation => 'Новая связь';
-
-  @override
-  String get participantPickerRoleSourceNote =>
-      'Исходное намерение — то, для чего нужно или можно связанное.';
-
-  @override
-  String get participantPickerRoleRelatedNeedNote =>
-      'Связанное намерение — то, что нужно для исходного.';
-
-  @override
-  String get participantPickerRoleRelatedCanNote =>
-      'Связанное намерение — то, что можно для исходного.';
-
-  @override
-  String get participantPickerRoleRelatedUndeterminedNote =>
-      'Связанное намерение — то, что нужно или можно для исходного.';
-
-  @override
-  String get participantPickerFieldChoosing => 'Сейчас выбирается';
-
-  @override
-  String get participantPickerFieldFromList => 'Из этого списка';
-
-  @override
-  String participantPickerFieldReplacing(String title) {
-    return 'Вместо: $title';
-  }
-
-  @override
-  String get participantPickerFieldNotChosen => 'Ещё не выбрано';
-
-  @override
-  String get participantPickerFieldArchived => 'В архиве';
-
-  @override
-  String get participantPickerKindUndetermined =>
-      'Нужно или можно: ещё не выбрано';
-
-  @override
-  String get relationEditorTitle => 'Новая связь';
-
-  @override
-  String get relationEditorPhraseLabel => 'Формулировка связи';
-
-  @override
-  String get relationEditorSourceLabel => 'Исходное намерение';
-
-  @override
-  String get relationEditorRelatedLabel => 'Связанное намерение';
-
-  @override
-  String get relationEditorParticipantSelected => 'Выбрано';
-
-  @override
-  String get relationEditorParticipantNotSelected => 'Не выбрано';
-
-  @override
-  String get relationEditorSelectSourceAction => 'Выбрать исходное намерение';
-
-  @override
-  String get relationEditorChangeSourceAction => 'Изменить исходное намерение';
-
-  @override
-  String get relationEditorSelectRelatedAction => 'Выбрать связанное намерение';
-
-  @override
-  String get relationEditorChangeRelatedAction =>
-      'Изменить связанное намерение';
-
-  @override
-  String get relationEditorTypeLabel => 'Тип связи';
-
-  @override
   String get relationEditorTypeNeed => 'Нужно';
 
   @override
   String get relationEditorTypeCan => 'Можно';
-
-  @override
-  String get relationEditorPriorityLabel => 'Приоритет';
 
   @override
   String get relationEditorDescriptionLabel => 'Описание (необязательно)';
@@ -2805,35 +2679,6 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get relationEditorCreateSameParticipants =>
       'Намерение нельзя связать с самим собой.';
-
-  @override
-  String get relationEditorMissingTitle => 'Чтобы создать связь, укажите:';
-
-  @override
-  String get relationEditorMissingSource => 'исходное намерение';
-
-  @override
-  String get relationEditorMissingRelated => 'связанное намерение';
-
-  @override
-  String get relationEditorMissingType => 'тип связи';
-
-  @override
-  String get relationEditorMissingPriority => 'приоритет от P1 до P4';
-
-  @override
-  String get relationEditorOpenExistingRelation => 'Открыть существующую связь';
-
-  @override
-  String get relationEditorSubmitAction => 'Создать связь';
-
-  @override
-  String get relationEditorCreating => 'Создаём…';
-
-  @override
-  String relationEditorPriorityOption(String priority) {
-    return 'Приоритет $priority';
-  }
 
   @override
   String get choicePathTitle => 'Выбор пути к действию';

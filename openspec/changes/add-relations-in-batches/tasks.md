@@ -846,7 +846,7 @@
     - меняются тесты `test/app/quick_creation/`, `test/app/bootstrap/app_runtime_quick_creation_mode_test.dart`, `test/app/creation_flows_integration_test.dart`, `test/app/creation_flows_test_support.dart`, `test/app/navigation/app_navigation_bar_test.dart`, `app_navigation_transition_test.dart`.
   - **Размер:** M по логике: файлов больше нормы только из-за механической замены режима в тестах.
 
-- [ ] 3.17 Удалить форму связи и прежний поиск участника для роли
+- [x] 3.17 Удалить форму связи и прежний поиск участника для роли
   - **Критерии приёмки:**
     - Удалены `RelationEditorPage`, его состояние и модель, `relation_creation_completion.dart`, `RelationParticipantPickerPage`, `RelationParticipantChoice`, `relationParticipantPickerPurpose`, `RelationForm` и маршруты `RelationEditorRoute` и `RelationParticipantPickerRoute`, а `app_router.gr.dart` создан заново.
     - Перед удалением тестов `test/long_term_relation/presentation/editor/`, `participant_picker/` и `test/design_system/relation_form_test.dart` их сценарии, которые описывают продукт сейчас, подтверждены тестами поиска участника группы: панель тегов, отказ новой выдачи и доступность экрана. Сценарии формы и восстановления удалены вместе с ней.

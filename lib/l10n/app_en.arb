@@ -625,10 +625,6 @@
   "@detailsOperationRunning": {
     "description": "Сохраняющаяся между экранами выполняющаяся операция намерения"
   },
-  "detailsActive": "Active",
-  "@detailsActive": {
-    "description": "Активное состояние намерения в подробных данных"
-  },
   "detailsArchived": "Archived",
   "@detailsArchived": {
     "description": "Архивное состояние намерения в подробных данных"
@@ -2075,125 +2071,6 @@
   "@participantPickerEmpty": {
     "description": "Отсутствие намерений, доступных для выбора участником"
   },
-  "participantPickerRestoreTitle": "Restore this relation?",
-  "@participantPickerRestoreTitle": {
-    "description": "Заголовок подтверждения восстановления занимающей связи из поиска участника"
-  },
-  "participantPickerRestoreTextBefore": "The relation “",
-  "@participantPickerRestoreTextBefore": {
-    "description": "Текст подтверждения восстановления до выделенной формулировки связи"
-  },
-  "participantPickerRestoreTextAfter": "” returns with priority {priority}.",
-  "@participantPickerRestoreTextAfter": {
-    "description": "Текст подтверждения восстановления после выделенной формулировки связи",
-    "placeholders": {"priority": {"type": "String"}}
-  },
-  "participantPickerRestoreWarning": "What you set in the form won’t be kept: {changes}.",
-  "@participantPickerRestoreWarning": {
-    "description": "Предупреждение в подтверждении восстановления: данные черновика формы, которые не сохранятся; changes — перечень отличающихся данных через запятую",
-    "placeholders": {"changes": {"type": "String"}}
-  },
-  "participantPickerRestoreWarningNeedType": "type “need”",
-  "@participantPickerRestoreWarningNeedType": {
-    "description": "Перечень предупреждения о восстановлении: выбранный в форме тип «нужно» не сохранится"
-  },
-  "participantPickerRestoreWarningCanType": "type “can”",
-  "@participantPickerRestoreWarningCanType": {
-    "description": "Перечень предупреждения о восстановлении: выбранный в форме тип «можно» не сохранится"
-  },
-  "participantPickerRestoreWarningPriority": "priority",
-  "@participantPickerRestoreWarningPriority": {
-    "description": "Перечень предупреждения о восстановлении: выбранный в форме приоритет не сохранится"
-  },
-  "participantPickerRestoreWarningDescription": "description",
-  "@participantPickerRestoreWarningDescription": {
-    "description": "Перечень предупреждения о восстановлении: введённое в форме описание не сохранится"
-  },
-  "participantPickerRestoreCancel": "Cancel",
-  "@participantPickerRestoreCancel": {
-    "description": "Отмена восстановления занимающей связи из поиска участника"
-  },
-  "participantPickerRestoreConfirm": "Restore",
-  "@participantPickerRestoreConfirm": {
-    "description": "Подтверждение восстановления занимающей связи из поиска участника"
-  },
-  "participantPickerOpenDetails": "Open intention details",
-  "@participantPickerOpenDetails": {
-    "description": "Назначение перехода к подробным данным намерения из выбора"
-  },
-  "participantPickerPurposeCreationSource": "New relation: source intention",
-  "@participantPickerPurposeCreationSource": {"description": "Подзаголовок поиска исходного намерения при создании связи"},
-  "participantPickerPurposeCreationRelated": "New relation: related intention",
-  "@participantPickerPurposeCreationRelated": {"description": "Подзаголовок поиска связанного намерения при создании связи"},
-  "participantPickerFlowCreation": "New relation",
-  "@participantPickerFlowCreation": {"description": "Строка листа назначения: создание связи"},
-  "participantPickerRoleSourceNote": "The source intention is what the related intention is needed for or can be used for.",
-  "@participantPickerRoleSourceNote": {"description": "Пояснение выбираемой роли исходного намерения в листе назначения"},
-  "participantPickerRoleRelatedNeedNote": "The related intention is what the source intention needs.",
-  "@participantPickerRoleRelatedNeedNote": {"description": "Пояснение выбираемой роли связанного намерения при виде «нужно»"},
-  "participantPickerRoleRelatedCanNote": "The related intention is what the source intention can use.",
-  "@participantPickerRoleRelatedCanNote": {"description": "Пояснение выбираемой роли связанного намерения при виде «можно»"},
-  "participantPickerRoleRelatedUndeterminedNote": "The related intention is what the source intention needs or can use.",
-  "@participantPickerRoleRelatedUndeterminedNote": {"description": "Пояснение выбираемой роли связанного намерения до выбора вида"},
-  "participantPickerFieldChoosing": "Choosing now",
-  "@participantPickerFieldChoosing": {"description": "Подпись поля связи, участника которого выбирают сейчас"},
-  "participantPickerFieldFromList": "From this list",
-  "@participantPickerFieldFromList": {"description": "Текст выбираемого поля связи без прежнего участника"},
-  "participantPickerFieldReplacing": "Instead of: {title}",
-  "@participantPickerFieldReplacing": {
-    "description": "Текст выбираемого поля связи с прежним участником этой роли",
-    "placeholders": {"title": {"type": "String"}}
-  },
-  "participantPickerFieldNotChosen": "Not chosen yet",
-  "@participantPickerFieldNotChosen": {"description": "Текст пустого поля связи"},
-  "participantPickerFieldArchived": "Archived",
-  "@participantPickerFieldArchived": {"description": "Признак архивного участника связи для экранного диктора"},
-  "participantPickerKindUndetermined": "Need or can: not chosen yet",
-  "@participantPickerKindUndetermined": {"description": "Вид связи в листе назначения, пока он не выбран"},
-  "relationEditorTitle": "New relation",
-  "@relationEditorTitle": {
-    "description": "Заголовок формы создания долговременной связи"
-  },
-  "relationEditorPhraseLabel": "Relation phrase",
-  "@relationEditorPhraseLabel": {
-    "description": "Доступная подпись текущей формулировки связи"
-  },
-  "relationEditorSourceLabel": "Source intention",
-  "@relationEditorSourceLabel": {
-    "description": "Подпись исходного участника в форме создания связи"
-  },
-  "relationEditorRelatedLabel": "Related intention",
-  "@relationEditorRelatedLabel": {
-    "description": "Подпись связанного участника в форме создания связи"
-  },
-  "relationEditorParticipantSelected": "Selected",
-  "@relationEditorParticipantSelected": {
-    "description": "Состояние выбранного участника связи"
-  },
-  "relationEditorParticipantNotSelected": "Not selected",
-  "@relationEditorParticipantNotSelected": {
-    "description": "Состояние невыбранного участника связи"
-  },
-  "relationEditorSelectSourceAction": "Select the source intention",
-  "@relationEditorSelectSourceAction": {
-    "description": "Переход к выбору исходного участника"
-  },
-  "relationEditorChangeSourceAction": "Change the source intention",
-  "@relationEditorChangeSourceAction": {
-    "description": "Замена выбранного исходного участника"
-  },
-  "relationEditorSelectRelatedAction": "Select the related intention",
-  "@relationEditorSelectRelatedAction": {
-    "description": "Переход к выбору связанного участника"
-  },
-  "relationEditorChangeRelatedAction": "Change the related intention",
-  "@relationEditorChangeRelatedAction": {
-    "description": "Замена выбранного связанного участника"
-  },
-  "relationEditorTypeLabel": "Relation type",
-  "@relationEditorTypeLabel": {
-    "description": "Подпись выбора типа связи в форме создания"
-  },
   "relationEditorTypeNeed": "Need",
   "@relationEditorTypeNeed": {
     "description": "Тип связи «нужно» в форме создания"
@@ -2201,10 +2078,6 @@
   "relationEditorTypeCan": "Can",
   "@relationEditorTypeCan": {
     "description": "Тип связи «можно» в форме создания"
-  },
-  "relationEditorPriorityLabel": "Priority",
-  "@relationEditorPriorityLabel": {
-    "description": "Подпись выбора приоритета связи"
   },
   "relationEditorDescriptionLabel": "Description (optional)",
   "@relationEditorDescriptionLabel": {
@@ -2221,47 +2094,6 @@
   "relationEditorCreateSameParticipants": "An intention can’t be related to itself.",
   "@relationEditorCreateSameParticipants": {
     "description": "Отказ создания связи намерения с самим собой"
-  },
-  "relationEditorMissingTitle": "To create the relation, provide:",
-  "@relationEditorMissingTitle": {
-    "description": "Объяснение недостающего обязательного выбора"
-  },
-  "relationEditorMissingSource": "the source intention",
-  "@relationEditorMissingSource": {
-    "description": "Недостающий исходный участник связи"
-  },
-  "relationEditorMissingRelated": "the related intention",
-  "@relationEditorMissingRelated": {
-    "description": "Недостающий связанный участник связи"
-  },
-  "relationEditorMissingType": "the relation type",
-  "@relationEditorMissingType": {
-    "description": "Недостающий тип связи"
-  },
-  "relationEditorMissingPriority": "a priority from P1 to P4",
-  "@relationEditorMissingPriority": {
-    "description": "Недостающий приоритет связи"
-  },
-  "relationEditorOpenExistingRelation": "Open the existing relation",
-  "@relationEditorOpenExistingRelation": {
-    "description": "Переход к связи, занявшей направленную пару"
-  },
-  "relationEditorSubmitAction": "Create relation",
-  "@relationEditorSubmitAction": {
-    "description": "Команда создания долговременной связи"
-  },
-  "relationEditorCreating": "Creating…",
-  "@relationEditorCreating": {
-    "description": "Выполняемое создание долговременной связи"
-  },
-  "relationEditorPriorityOption": "Priority {priority}",
-  "@relationEditorPriorityOption": {
-    "description": "Вариант приоритета P1–P4 в форме создания связи",
-    "placeholders": {
-      "priority": {
-        "type": "String"
-      }
-    }
   },
   "choicePathTitle": "Choose a path to an action",
   "@choicePathTitle": {"description": "Заголовок верхнего обхода"},

@@ -17,38 +17,10 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
-import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_choice.dart';
 
-import '../../../support/tag_read_contract_test_fallback.dart';
-import '../../../support/statistics_read_contract_test_fallback.dart';
-import '../../../support/intention_type_counts.dart';
-
-/// Дескриптор без формы: экран поиска здесь проверяется отдельно от неё.
-const RelationCreationRestore testRelationRestore = _NoRelationRestore();
-
-/// Дескриптор восстановления, продолжение потока которого задаёт тест.
-final class ControlledRelationRestore implements RelationCreationRestore {
-  @override
-  bool canContinue = true;
-
-  /// Связи, которые поиск передал на восстановление, в порядке передачи.
-  final accepted = <LongTermRelationId>[];
-
-  @override
-  void accept(LongTermRelationId relationId) => accepted.add(relationId);
-}
-
-final class _NoRelationRestore implements RelationCreationRestore {
-  const _NoRelationRestore();
-
-  @override
-  bool get canContinue => true;
-
-  @override
-  void accept(LongTermRelationId relationId) => throw UnsupportedError(
-    'Восстановление не выполняется в тесте выбора участника.',
-  );
-}
+import 'intention_type_counts.dart';
+import 'statistics_read_contract_test_fallback.dart';
+import 'tag_read_contract_test_fallback.dart';
 
 /// Репозиторий графа, управляемый тестом выбора участника.
 ///
@@ -88,18 +60,11 @@ final class ControlledParticipantPickerRepository
       <StreamController<Result<GraphSnapshot<IntentionDetails?>>>>[];
   final _relationStreams = <StreamController<LongTermRelationReadResult>>[];
 
-  /// Связи, подробный просмотр которых открывали, в порядке открытия.
-  final watchedRelations = <LongTermRelationId>[];
-
   IntentionCatalogQuery queryAt(int index) => queries[index];
 
   void complete(int index, Result<IntentionCatalogPage> result) {
     _requests[index].complete(answerCatalogQuery(queries[index], result));
   }
-
-  /// Отвечает на последнее чтение связи.
-  void answerRelationRead(LongTermRelationReadResult result) =>
-      _relationStreams.last.add(result);
 
   void dispose() {
     for (final controller in _intentionStreams) {
@@ -144,7 +109,6 @@ final class ControlledParticipantPickerRepository
 
   @override
   Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) {
-    watchedRelations.add(id);
     final controller = StreamController<LongTermRelationReadResult>.broadcast();
     _relationStreams.add(controller);
     return controller.stream;

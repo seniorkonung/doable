@@ -844,9 +844,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get detailsOperationRunning => 'Saving changes…';
 
   @override
-  String get detailsActive => 'Active';
-
-  @override
   String get detailsArchived => 'Archived';
 
   @override
@@ -2637,132 +2634,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'No other intentions are available to select.';
 
   @override
-  String get participantPickerRestoreTitle => 'Restore this relation?';
-
-  @override
-  String get participantPickerRestoreTextBefore => 'The relation “';
-
-  @override
-  String participantPickerRestoreTextAfter(String priority) {
-    return '” returns with priority $priority.';
-  }
-
-  @override
-  String participantPickerRestoreWarning(String changes) {
-    return 'What you set in the form won’t be kept: $changes.';
-  }
-
-  @override
-  String get participantPickerRestoreWarningNeedType => 'type “need”';
-
-  @override
-  String get participantPickerRestoreWarningCanType => 'type “can”';
-
-  @override
-  String get participantPickerRestoreWarningPriority => 'priority';
-
-  @override
-  String get participantPickerRestoreWarningDescription => 'description';
-
-  @override
-  String get participantPickerRestoreCancel => 'Cancel';
-
-  @override
-  String get participantPickerRestoreConfirm => 'Restore';
-
-  @override
-  String get participantPickerOpenDetails => 'Open intention details';
-
-  @override
-  String get participantPickerPurposeCreationSource =>
-      'New relation: source intention';
-
-  @override
-  String get participantPickerPurposeCreationRelated =>
-      'New relation: related intention';
-
-  @override
-  String get participantPickerFlowCreation => 'New relation';
-
-  @override
-  String get participantPickerRoleSourceNote =>
-      'The source intention is what the related intention is needed for or can be used for.';
-
-  @override
-  String get participantPickerRoleRelatedNeedNote =>
-      'The related intention is what the source intention needs.';
-
-  @override
-  String get participantPickerRoleRelatedCanNote =>
-      'The related intention is what the source intention can use.';
-
-  @override
-  String get participantPickerRoleRelatedUndeterminedNote =>
-      'The related intention is what the source intention needs or can use.';
-
-  @override
-  String get participantPickerFieldChoosing => 'Choosing now';
-
-  @override
-  String get participantPickerFieldFromList => 'From this list';
-
-  @override
-  String participantPickerFieldReplacing(String title) {
-    return 'Instead of: $title';
-  }
-
-  @override
-  String get participantPickerFieldNotChosen => 'Not chosen yet';
-
-  @override
-  String get participantPickerFieldArchived => 'Archived';
-
-  @override
-  String get participantPickerKindUndetermined => 'Need or can: not chosen yet';
-
-  @override
-  String get relationEditorTitle => 'New relation';
-
-  @override
-  String get relationEditorPhraseLabel => 'Relation phrase';
-
-  @override
-  String get relationEditorSourceLabel => 'Source intention';
-
-  @override
-  String get relationEditorRelatedLabel => 'Related intention';
-
-  @override
-  String get relationEditorParticipantSelected => 'Selected';
-
-  @override
-  String get relationEditorParticipantNotSelected => 'Not selected';
-
-  @override
-  String get relationEditorSelectSourceAction => 'Select the source intention';
-
-  @override
-  String get relationEditorChangeSourceAction => 'Change the source intention';
-
-  @override
-  String get relationEditorSelectRelatedAction =>
-      'Select the related intention';
-
-  @override
-  String get relationEditorChangeRelatedAction =>
-      'Change the related intention';
-
-  @override
-  String get relationEditorTypeLabel => 'Relation type';
-
-  @override
   String get relationEditorTypeNeed => 'Need';
 
   @override
   String get relationEditorTypeCan => 'Can';
-
-  @override
-  String get relationEditorPriorityLabel => 'Priority';
 
   @override
   String get relationEditorDescriptionLabel => 'Description (optional)';
@@ -2778,35 +2653,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get relationEditorCreateSameParticipants =>
       'An intention can’t be related to itself.';
-
-  @override
-  String get relationEditorMissingTitle => 'To create the relation, provide:';
-
-  @override
-  String get relationEditorMissingSource => 'the source intention';
-
-  @override
-  String get relationEditorMissingRelated => 'the related intention';
-
-  @override
-  String get relationEditorMissingType => 'the relation type';
-
-  @override
-  String get relationEditorMissingPriority => 'a priority from P1 to P4';
-
-  @override
-  String get relationEditorOpenExistingRelation => 'Open the existing relation';
-
-  @override
-  String get relationEditorSubmitAction => 'Create relation';
-
-  @override
-  String get relationEditorCreating => 'Creating…';
-
-  @override
-  String relationEditorPriorityOption(String priority) {
-    return 'Priority $priority';
-  }
 
   @override
   String get choicePathTitle => 'Choose a path to an action';

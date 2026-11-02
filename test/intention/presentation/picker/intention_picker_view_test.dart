@@ -31,8 +31,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../catalog/catalog_reconciliation_test_support.dart';
 import '../catalog/catalog_test_support.dart';
-import '../../../long_term_relation/presentation/editor/relation_form_test_support.dart'
-    show testFormRelationId;
+import '../../../long_term_relation/presentation/relation_graph_test_support.dart'
+    show testRelationId;
 import '../../../support/tag_positions.dart';
 
 const _screen = Size(390, 844);
@@ -864,7 +864,7 @@ void main() {
     final swim = _action(2);
     final sleep = _action(1);
     final walkOccupant = PairOccupant(
-      relationId: testFormRelationId(1),
+      relationId: testRelationId(1),
       type: LongTermRelationType.need,
       scope: RelationScope.active,
     );
@@ -875,7 +875,7 @@ void main() {
         pairOccupants: {
           walk.id: walkOccupant,
           swim.id: PairOccupant(
-            relationId: testFormRelationId(2),
+            relationId: testRelationId(2),
             type: LongTermRelationType.need,
             scope: RelationScope.archived,
           ),
@@ -948,7 +948,7 @@ void main() {
             pairOccupants: {
               for (var i = 0; i < 4; i++)
                 items[i].id: PairOccupant(
-                  relationId: testFormRelationId(i + 1),
+                  relationId: testRelationId(i + 1),
                   type: i < 2
                       ? LongTermRelationType.need
                       : LongTermRelationType.can,
