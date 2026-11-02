@@ -618,13 +618,16 @@
     - Удаление подтверждается `ConfirmDialog` дизайн-системы, который называет выбор, его дату и необратимость. Отмена ничего не меняет.
     - Подтверждённое удаление закрывает панель, а сообщение «Дневной выбор удалён» предъявляется один раз. Отказ остаётся в панели по задаче 3.11.
     - Прежние строки диалога удалены из обоих файлов локализации.
+    - Сценарии находят новый диалог по видимому содержимому: заголовку и подписи действия из локализации, а не по ключу и не по `AlertDialog`. Ключ в `showConfirmDialog` не добавляется, контракт `ConfirmDialog` не меняется.
+    - Сценарий удаления на странице проходит до задачи 3.16.
   - **Проверка:**
     - `mise exec --no-deps -- flutter test test/daily_choice/presentation/details`.
+    - `mise exec --no-deps -- flutter test test/app/daily_choice_app_flow_test.dart test/app/navigation/app_shell_layout_test.dart`: `ordinary_page_layout_scenarios.dart` входит во второй файл как `part` и отдельно не запускается.
     - `mise run codegen-check`.
   - **Зависимости:** 3.11.
   - **Предполагаемые файлы:**
     - меняются `lib/src/daily_choice/presentation/details/daily_choice_sheet.dart`, `daily_choice_delete_confirmation.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
-    - меняются `test/daily_choice/presentation/details/daily_choice_sheet_test.dart`, `daily_choice_details_page_test.dart`: страница использует тот же диалог до задачи 3.16.
+    - меняются `test/daily_choice/presentation/details/daily_choice_sheet_test.dart`, `daily_choice_details_page_test.dart`, `test/app/daily_choice_app_flow_test.dart`, `test/app/navigation/ordinary_page_layout_scenarios.dart`: страница использует тот же диалог до задачи 3.16.
   - **Размер:** M.
 
 - [ ] 3.13 Весь текст панели достижим при крайних размерах
