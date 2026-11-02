@@ -140,7 +140,7 @@ Person      Sheet         ViewModel          Coordinator      Repository
 | `ChoiceCheck`, `ReasonChain` | Новые, общие для карточки и шапки панели |
 | `ChoiceRow`, `ChoiceHead` | Новые, на `ChoiceCheck` и `ReasonChain` |
 | `SectionHeader`, `ScrollTopButton`, `DetailRow` | Новые |
-| `ChoicePath` | `PathRail`, `PathGlyph` с новой формой круга, `RelationStroke` |
+| `ChoicePath` | `PathGlyph` с новой формой круга, `RelationStroke` |
 | `DateGrid` | `CalendarHeader` без действия заголовка, `MonthGridWeekday`, `MonthGridDay` |
 | `TimeDial` | Новый, переключатель половины суток на `Tabs` |
 
