@@ -2068,7 +2068,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get relationDeleteReferencedByDailyPath =>
-      'Связь используется в сохранённом дневном пути. Сначала удалите или замените использующие её дневные выборы.';
+      'Связь используется в сохранённом дневном пути. Сначала удалите использующие её дневные выборы.';
 
   @override
   String get relationDeleteUnavailable =>
@@ -3204,62 +3204,6 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get dailyChoiceCreationRefreshPath =>
       'Вернуться к пути и актуализировать его';
-
-  @override
-  String get dailyChoiceReplaceTitle => 'Подтвердить замену пути';
-
-  @override
-  String get dailyChoiceReplacePreparing =>
-      'Готовим подтверждение нового пути…';
-
-  @override
-  String get dailyChoiceReplaceCurrent => 'Заменяемый дневной выбор';
-
-  @override
-  String get dailyChoiceReplaceNewPath => 'Новый путь от основания к действию';
-
-  @override
-  String get dailyChoiceReplaceNoDescription => 'Без описания';
-
-  @override
-  String get dailyChoiceReplaceFieldsPreserved =>
-      'Дата, описание и выполнение сохранятся без изменений при замене пути.';
-
-  @override
-  String get dailyChoiceReplaceCompletionPreserved =>
-      'Выполнение останется включённым, даже если выбрано другое действие.';
-
-  @override
-  String get dailyChoiceReplaceConfirm => 'Заменить только путь';
-
-  @override
-  String get dailyChoiceReplaceSubmitting => 'Заменяем путь…';
-
-  @override
-  String get dailyChoiceReplaceChooseAgain => 'Вернуться к выбору пути';
-
-  @override
-  String get dailyChoiceReplaceOpen => 'Заменить путь';
-
-  @override
-  String get dailyChoiceReplaceChooseDirection =>
-      'Выбрать направление нового пути';
-
-  @override
-  String get dailyChoiceReplaceChooseDirectionDescription =>
-      'Выберите новое основание или действие для замены сохранённого пути.';
-
-  @override
-  String get dailyChoiceReplaceFromSource => 'Начать с нового основания';
-
-  @override
-  String get dailyChoiceReplaceFromAction => 'Начать с нового действия';
-
-  @override
-  String get dailyChoiceReplaceSelectPath => 'Выбрать путь для замены';
-
-  @override
-  String get dailyChoiceReplaceOpenConfirmation => 'Подтвердить замену пути';
 
   @override
   String get choicePathOpenConfirmation => 'Перейти к подтверждению выбора';

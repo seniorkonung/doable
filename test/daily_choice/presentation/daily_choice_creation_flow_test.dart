@@ -493,43 +493,16 @@ void main() {
       expect(find.text('Весь день'), findsOneWidget);
       expect(find.text('Приоритет P2'), findsOneWidget);
 
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('daily-choice-replace-open')),
-      );
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('daily-choice-replace-top-down')),
-      );
-      await _tap(tester, find.text('Основание'));
-      await _continue(tester, 103);
-      await _continue(tester, 104);
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('choice-path-select-action')),
-      );
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('choice-path-open-confirmation')),
-      );
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('daily-choice-replace-confirm')),
-      );
-      await _waitFor(tester, find.text('Выбранное действие: Другое действие'));
-      await tester.pumpAndSettle();
-      expect(find.text('Весь день'), findsOneWidget);
-      expect(find.text('Приоритет P2'), findsOneWidget);
-      final replaced = await _read(repository, ids.last);
-      expect(replaced.choice.id, created.choice.id);
-      expect(replaced.choice.date, createdDate);
-      expect(replaced.choice.schedule, const DailyChoiceAllDay());
-      expect(replaced.choice.priority, DailyChoicePriority.p2);
-      expect(replaced.choice.description, created.choice.description);
-      expect(replaced.choice.isCompleted, created.choice.isCompleted);
-      expect(replaced.path.map((step) => step.relation.id), [
-        _relation(103),
-        _relation(104),
+      final edited = await _read(repository, ids.last);
+      expect(edited.choice.id, created.choice.id);
+      expect(edited.choice.date, createdDate);
+      expect(edited.choice.schedule, const DailyChoiceAllDay());
+      expect(edited.choice.priority, DailyChoicePriority.p2);
+      expect(edited.choice.description, created.choice.description);
+      expect(edited.choice.isCompleted, created.choice.isCompleted);
+      expect(edited.path.map((step) => step.relation.id), [
+        _relation(101),
+        _relation(102),
       ]);
       expect(_savedIds(harness), ids);
 

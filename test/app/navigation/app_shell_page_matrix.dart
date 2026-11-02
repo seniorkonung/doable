@@ -15,13 +15,12 @@ enum _MatrixEntry {
   dailyChoice,
   creation,
   condition,
+  source,
   action,
   actionCandidate,
   relation,
   assignTags,
   draftTags,
-  replaceChoice,
-  replaceTopDown,
   addChoice,
   continuePath,
   selectAction,
@@ -41,7 +40,9 @@ enum _MatrixEntry {
     _MatrixEntry.dailyChoice => find.byKey(
       const ValueKey('daily-choice-row-1'),
     ),
-    _MatrixEntry.creation || _MatrixEntry.action => quickCreationAction(),
+    _MatrixEntry.creation ||
+    _MatrixEntry.source ||
+    _MatrixEntry.action => quickCreationAction(),
     _MatrixEntry.condition => intentionCatalogTagFilterControl,
     _MatrixEntry.actionCandidate => _summary(
       DailyChoiceActionPickerPage,
@@ -53,12 +54,6 @@ enum _MatrixEntry {
     ),
     _MatrixEntry.draftTags => find.byKey(
       const ValueKey('intention-editor-choose-tags'),
-    ),
-    _MatrixEntry.replaceChoice => find.byKey(
-      const ValueKey('daily-choice-replace-open'),
-    ),
-    _MatrixEntry.replaceTopDown => find.byKey(
-      const ValueKey('daily-choice-replace-top-down'),
     ),
     _MatrixEntry.addChoice => intentionChoicesAdd,
     _MatrixEntry.continuePath => _continuePath,
@@ -300,7 +295,7 @@ void _registerPageMatrixTests() {
       name: 'поиск основания',
       page: DailyChoiceSourcePickerPage,
       panel: false,
-      entries: [daily, _MatrixEntry.replaceChoice, _MatrixEntry.replaceTopDown],
+      entries: [_MatrixEntry.source],
     ),
     (
       name: 'создание намерения',
@@ -409,6 +404,7 @@ void _registerPageMatrixTests() {
           _MatrixEntry.creation ||
           _MatrixEntry.condition => AppDestination.intentionGraph,
           _MatrixEntry.dailyChoice ||
+          _MatrixEntry.source ||
           _MatrixEntry.action => AppDestination.dailyChoices,
           _ => null,
         };
@@ -422,6 +418,13 @@ void _registerPageMatrixTests() {
               tester,
               QuickCreationMode.intention,
               openedPage: find.byType(IntentionEditorPage),
+              wait: _until,
+            );
+          case _MatrixEntry.source:
+            await openDailyChoiceQuickCreation(
+              tester,
+              ChoicePathDraftDirection.topDown,
+              openedPage: find.byType(DailyChoiceSourcePickerPage),
               wait: _until,
             );
           case _MatrixEntry.action:

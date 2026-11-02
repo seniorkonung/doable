@@ -52,7 +52,7 @@ final class DailyChoiceCreationFlowLeft extends DailyChoiceCreationFlowState {
 /// сессия освобождается сборщиком мусора. Глобального реестра нет.
 ///
 /// Сессия не выполняет команды, не предъявляет результаты и не меняет стек.
-/// Вспомогательные пересчёт и замена пути такую сессию не создают.
+/// Вспомогательный пересчёт пути такую сессию не создаёт.
 final class DailyChoiceCreationFlowSession {
   DailyChoiceCreationFlowSession({
     required this.rootMatchId,

@@ -2044,7 +2044,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get relationDeleteReferencedByDailyPath =>
-      'This relation is used by a saved daily path. Delete or replace the daily choices that use it first.';
+      'This relation is used by a saved daily path. Delete the daily choices that use it first.';
 
   @override
   String get relationDeleteUnavailable =>
@@ -3178,62 +3178,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get dailyChoiceCreationRefreshPath =>
       'Return to the path and refresh it';
-
-  @override
-  String get dailyChoiceReplaceTitle => 'Confirm path replacement';
-
-  @override
-  String get dailyChoiceReplacePreparing =>
-      'Preparing the new path confirmation…';
-
-  @override
-  String get dailyChoiceReplaceCurrent => 'Daily choice to replace';
-
-  @override
-  String get dailyChoiceReplaceNewPath => 'New path from source to action';
-
-  @override
-  String get dailyChoiceReplaceNoDescription => 'No description';
-
-  @override
-  String get dailyChoiceReplaceFieldsPreserved =>
-      'The date, description, and completion will stay unchanged when the path is replaced.';
-
-  @override
-  String get dailyChoiceReplaceCompletionPreserved =>
-      'Completion stays on even if a different action is selected.';
-
-  @override
-  String get dailyChoiceReplaceConfirm => 'Replace path only';
-
-  @override
-  String get dailyChoiceReplaceSubmitting => 'Replacing path…';
-
-  @override
-  String get dailyChoiceReplaceChooseAgain => 'Return to path selection';
-
-  @override
-  String get dailyChoiceReplaceOpen => 'Replace path';
-
-  @override
-  String get dailyChoiceReplaceChooseDirection =>
-      'Choose the new path direction';
-
-  @override
-  String get dailyChoiceReplaceChooseDirectionDescription =>
-      'Choose a new source or action to replace the saved path.';
-
-  @override
-  String get dailyChoiceReplaceFromSource => 'Start from a new source';
-
-  @override
-  String get dailyChoiceReplaceFromAction => 'Start from a new action';
-
-  @override
-  String get dailyChoiceReplaceSelectPath => 'Choose a replacement path';
-
-  @override
-  String get dailyChoiceReplaceOpenConfirmation => 'Confirm path replacement';
 
   @override
   String get choicePathOpenConfirmation => 'Continue to choice confirmation';

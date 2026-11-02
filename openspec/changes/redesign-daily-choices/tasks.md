@@ -303,7 +303,7 @@
   - **Предполагаемые файлы:** `test/app/daily_choice_app_flow_test.dart`.
   - **Размер:** S.
 
-- [ ] 2.3 Подробный просмотр теряет вход в замену пути, а её поток удалён
+- [x] 2.3 Подробный просмотр теряет вход в замену пути, а её поток удалён
   - **Критерии приёмки:**
     - Кнопки `daily-choice-replace-open` нет. Изменение и удаление на странице подробного просмотра работают как прежде.
     - Удалены `daily_choice_path_replacement_flow.dart`, `daily_choice_path_replace_page.dart`, `daily_choice_path_replace_state.dart`, `daily_choice_path_replace_view_model.dart` и их тесты.
