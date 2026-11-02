@@ -902,7 +902,13 @@ void main() {
                 IntentionCatalogCounting.byType,
               ),
               (
-                SelectRelationParticipant(session: IntentionSearchSession()),
+                SelectRelationParticipant(
+                  session: IntentionSearchSession(),
+                  pairProbe: RelationPairProbe(
+                    counterpartId: testSummary(index: 999).id,
+                    candidateRole: RelationParticipantRole.related,
+                  ),
+                ),
                 const IntentionScopeFixed(IntentionScope.active),
                 const IntentionTypeOpen(IntentionTypeChoice.all),
                 IntentionReadinessFilter.all,

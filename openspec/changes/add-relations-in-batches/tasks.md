@@ -865,7 +865,7 @@
     - удаляются соответствующие тесты, меняются `test/long_term_relation/presentation/batch_picker/relation_batch_picker_page_test.dart`, `test/daily_choice/presentation/action_picker/daily_choice_action_picker_page_test.dart`, `test/daily_choice/presentation/source_picker/daily_choice_source_picker_page_test.dart`, `test/intention/presentation/picker/intention_picker_view_test.dart`.
   - **Размер:** M по логике: удаление без нового поведения.
 
-- [ ] 3.18 Общие части поиска теряют то, что читал только прежний поток
+- [x] 3.18 Общие части поиска теряют то, что читал только прежний поток
   - **Критерии приёмки:**
     - Удалены `occupiedPairMark`, `OccupiedPairMark`, `OccupiedPairKind` и строки `intentionPickerPair*`, а также `Badge.word`, если у него не осталось читателей.
     - Удалены `TopBarPurposeMark`, `TopBarPurpose.mark`, `IntentionPickerPurposeDescription.subtitleMark` и `RelationStrokeKind.undetermined`: строка назначения новой шапки отметки не имеет, а вид связи в листе всегда определён.

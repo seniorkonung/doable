@@ -985,7 +985,7 @@ void main() {
         final repository = ControlledCatalogRepository();
         final container = reconciliationCatalogContainer(repository);
         final provider = intentionCatalogViewModelProvider(
-          SelectRelationParticipant(session: IntentionSearchSession()),
+          SelectDailyChoiceSource(session: IntentionSearchSession()),
         );
         final subscription = container.listen(
           provider,

@@ -12,6 +12,8 @@ import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
+import 'package:doable/src/long_term_relation/application/relation_pair_probe.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
 import 'package:doable/src/intention/presentation/picker/intention_picker_view.dart';
@@ -186,6 +188,10 @@ void main() {
       (tester) async {
         final purpose = SelectRelationParticipant(
           session: IntentionSearchSession(),
+          pairProbe: RelationPairProbe(
+            counterpartId: testSummary(index: 999).id,
+            candidateRole: RelationParticipantRole.related,
+          ),
         );
         final h = await _open(tester, purpose, locale);
         final items = [
@@ -235,6 +241,10 @@ void main() {
       (tester) async {
         final purpose = SelectRelationParticipant(
           session: IntentionSearchSession(),
+          pairProbe: RelationPairProbe(
+            counterpartId: testSummary(index: 999).id,
+            candidateRole: RelationParticipantRole.related,
+          ),
         );
         final h = await _open(tester, purpose, locale);
         h.container
@@ -624,6 +634,10 @@ void main() {
         final semantics = tester.ensureSemantics();
         final purpose = SelectRelationParticipant(
           session: IntentionSearchSession(),
+          pairProbe: RelationPairProbe(
+            counterpartId: testSummary(index: 999).id,
+            candidateRole: RelationParticipantRole.related,
+          ),
         );
         final h = await _open(tester, purpose, locale);
         final model = h.container.read(

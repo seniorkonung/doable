@@ -652,10 +652,6 @@
   "intentionPickerArchived": "в архиве",
   "intentionPickerKindAction": "действие",
   "intentionPickerKindIntention": "намерение",
-  "intentionPickerPairLinked": "Уже связано",
-  "intentionPickerPairArchived": "Связь в архиве",
-  "intentionPickerPairOpensRelation": "нажатие откроет существующую связь",
-  "intentionPickerPairOffersRestore": "нажатие предложит восстановить связь",
   "intentionPickerOpenActionPage": "Открыть страницу действия «{title}»",
   "@intentionPickerOpenActionPage": {
     "placeholders": {"title": {"type": "String"}}

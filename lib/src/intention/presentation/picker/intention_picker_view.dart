@@ -32,9 +32,7 @@ import 'intention_picker_row.dart';
 /// заголовка списка и выдачи.
 ///
 /// Экран не знает маршрутов, права запуска и типа результата: о закрытии,
-/// выборе и открытии подробностей страница узнаёт из обработчиков. Строка, пару
-/// которой занимает связь, не выбирается: вид её отметки и действие нажатия на
-/// текст задаёт вариант поведения строки.
+/// выборе и открытии подробностей страница узнаёт из обработчиков.
 final class IntentionPickerView extends ConsumerStatefulWidget {
   const IntentionPickerView({
     required this.purpose,
@@ -84,9 +82,8 @@ sealed class IntentionPickerRowBehavior {
 }
 
 final class IntentionPickerSingle extends IntentionPickerRowBehavior {
-  const IntentionPickerSingle({required this.onPick, this.occupiedPairMark});
+  const IntentionPickerSingle({required this.onPick});
   final void Function(GraphSnapshot<IntentionSummary>) onPick;
-  final OccupiedPairMark Function(PairOccupant)? occupiedPairMark;
 }
 
 final class IntentionPickerCheckable extends IntentionPickerRowBehavior {
@@ -146,7 +143,6 @@ final class _IntentionPickerViewState
               onClose: widget.onClose,
               purpose: TopBarPurpose(
                 subtitle: purposeDescription.subtitle,
-                mark: purposeDescription.subtitleMark,
                 label: l10n.intentionPickerPurposeLabel(
                   title,
                   purposeDescription.subtitle,
@@ -195,21 +191,14 @@ final class _IntentionPickerViewState
                   final occupant = results.pairOccupants[summary.id];
                   void openPage() => widget.onOpenDetails(summary.id);
                   return switch (widget.rowBehavior) {
-                    IntentionPickerSingle(
-                      :final onPick,
-                      :final occupiedPairMark,
-                    ) =>
-                      IntentionPickerRow(
-                        key: key,
-                        purpose: widget.purpose,
-                        summary: summary,
-                        requiredTagIds: results.query.tagFilter.requiredTagIds,
-                        onPick: () => onPick(snapshot),
-                        onOpenPage: openPage,
-                        occupiedPair: occupant == null
-                            ? null
-                            : occupiedPairMark?.call(occupant),
-                      ),
+                    IntentionPickerSingle(:final onPick) => IntentionPickerRow(
+                      key: key,
+                      purpose: widget.purpose,
+                      summary: summary,
+                      requiredTagIds: results.query.tagFilter.requiredTagIds,
+                      onPick: () => onPick(snapshot),
+                      onOpenPage: openPage,
+                    ),
                     IntentionPickerCheckable(
                       :final group,
                       :final selectedIds,

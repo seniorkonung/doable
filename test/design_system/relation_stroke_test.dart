@@ -97,29 +97,8 @@ void main() {
         expect([dashes.last.end], _points([const Offset(0.75, 35)]));
       });
 
-      testWidgets('вертикальная линия без вида — сплошная 2 цвета hairline '
-          'темы', (tester) async {
-        await tester.pumpWidget(
-          _rail(brightness, const RelationStrokeKind.undetermined()),
-        );
-
-        final stroke = find.byType(RelationStroke);
-        expect(tester.getSize(stroke), const Size(2, 40));
-        expect(
-          tester.renderObject(stroke),
-          paints..line(
-            p1: const Offset(1, 0),
-            p2: const Offset(1, 40),
-            color: colors.hairline,
-            strokeWidth: 2,
-          ),
-        );
-      });
-
       testWidgets('отметка вида 15 × 2: «нужно» сплошная stroke-need, '
-          '«можно» пунктир stroke-can 3 через 3, без вида hairline', (
-        tester,
-      ) async {
+          '«можно» пунктир stroke-can 3 через 3', (tester) async {
         await tester.pumpWidget(
           _mark(brightness, RelationStrokeKind.need(colors.grip)),
         );
@@ -154,19 +133,6 @@ void main() {
             const Offset(12, 1),
           ]),
         );
-
-        await tester.pumpWidget(
-          _mark(brightness, const RelationStrokeKind.undetermined()),
-        );
-        expect(
-          tester.renderObject(find.byType(RelationStroke)),
-          paints..line(
-            p1: const Offset(0, 1),
-            p2: const Offset(15, 1),
-            color: colors.hairline,
-            strokeWidth: 2,
-          ),
-        );
       });
     });
   }
@@ -178,7 +144,6 @@ void main() {
     for (final kind in [
       RelationStrokeKind.need(DoableColors.light.grip),
       RelationStrokeKind.can(DoableColors.light.grip),
-      const RelationStrokeKind.undetermined(),
     ]) {
       await tester.pumpWidget(
         MaterialApp(

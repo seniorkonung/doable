@@ -76,11 +76,13 @@ final class SelectDailyChoiceSource extends IntentionPickerPurpose {
 ///
 /// Участник другой роли из [pairProbe] исключается по идентификатору: прямая
 /// самосвязь запрещена, а одноимённые намерения остаются разными участниками.
-/// Без пробы ничего не исключается: второй участник ещё не выбран.
 final class SelectRelationParticipant extends IntentionPickerPurpose {
-  const SelectRelationParticipant({required this.session, this.pairProbe});
+  const SelectRelationParticipant({
+    required this.session,
+    required this.pairProbe,
+  });
 
-  final RelationPairProbe? pairProbe;
+  final RelationPairProbe pairProbe;
 
   final IntentionSearchSession session;
 

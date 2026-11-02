@@ -10,6 +10,8 @@ import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
+import 'package:doable/src/long_term_relation/application/relation_pair_probe.dart';
 import 'package:doable/src/intention/presentation/picker/intention_picker_row.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_color.dart';
@@ -18,6 +20,7 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter/material.dart' hide Badge;
 import 'package:flutter_test/flutter_test.dart';
 
+import '../catalog/catalog_test_support.dart';
 import '../../../support/intention_description_preview.dart';
 import '../../../support/tag_positions.dart';
 import '../../../support/intention_title_order_key.dart';
@@ -80,7 +83,16 @@ void main() {
       'исходного намерения',
       SelectDailyChoiceSource(session: IntentionSearchSession()),
     ),
-    ('участника', SelectRelationParticipant(session: IntentionSearchSession())),
+    (
+      'участника',
+      SelectRelationParticipant(
+        session: IntentionSearchSession(),
+        pairProbe: RelationPairProbe(
+          counterpartId: testSummary(index: 999).id,
+          candidateRole: RelationParticipantRole.related,
+        ),
+      ),
+    ),
   ]) {
     testWidgets('в поиске $search молния и доступное название отличают '
         'действие от намерения на двух языках', (tester) async {
@@ -210,87 +222,6 @@ void main() {
     }
     semantics.dispose();
   });
-
-  for (final (kind, ruWord, enWord, ruAction, enAction) in const [
-    (
-      OccupiedPairKind.linked,
-      'Уже связано',
-      'Already linked',
-      'нажатие откроет существующую связь',
-      'tapping opens the existing relation',
-    ),
-    (
-      OccupiedPairKind.restorable,
-      'Связь в архиве',
-      'Archived relation',
-      'нажатие предложит восстановить связь',
-      'tapping offers to restore the relation',
-    ),
-  ]) {
-    testWidgets('строка с отметкой ${kind.name} начинает метки словом, не '
-        'приглушает название, называет отметку и действие нажатия и выполняет '
-        'его вместо выбора на двух языках', (tester) async {
-      final semantics = tester.ensureSemantics();
-      var picks = 0;
-      var pageOpenings = 0;
-      var relationOpenings = 0;
-
-      for (final (locale, word, label, actionPage) in [
-        (
-          const Locale('ru'),
-          ruWord,
-          'Много ходить, действие, Без тегов, $ruWord, $ruAction',
-          'Открыть страницу действия «Много ходить»',
-        ),
-        (
-          const Locale('en'),
-          enWord,
-          'Много ходить, action, No tags, $enWord, $enAction',
-          'Open the page of action Много ходить',
-        ),
-      ]) {
-        await tester.pumpWidget(
-          _app(
-            locale: locale,
-            purpose: SelectRelationParticipant(
-              session: IntentionSearchSession(),
-            ),
-            summary: _summary('Много ходить'),
-            occupiedPair: OccupiedPairMark(
-              kind: kind,
-              onTap: () => relationOpenings++,
-            ),
-            onPick: () => picks++,
-            onOpenPage: () => pageOpenings++,
-          ),
-        );
-
-        final marks = tester.widget<PickerRow>(find.byType(PickerRow)).marks;
-        expect(marks, [
-          isA<BadgeWord>().having((mark) => mark.word, 'word', word),
-          isA<BadgeMark>().having(
-            (mark) => mark.icon,
-            'icon',
-            DoableIconData.bolt,
-          ),
-        ]);
-        expect(
-          tester.widget<PickerRow>(find.byType(PickerRow)).archived,
-          false,
-        );
-        expect(find.bySemanticsLabel(label), findsOneWidget);
-        // Метка не создаёт отдельного узла экранного диктора.
-        expect(find.bySemanticsLabel(word), findsNothing);
-
-        await tester.tap(find.bySemanticsLabel(label));
-        expect((picks, pageOpenings, relationOpenings), (0, 0, 1));
-        await tester.tap(find.bySemanticsLabel(actionPage));
-        expect((picks, pageOpenings, relationOpenings), (0, 1, 1));
-        picks = pageOpenings = relationOpenings = 0;
-      }
-      semantics.dispose();
-    });
-  }
 }
 
 List<(DoableIconData, BadgeTone)> _marks(WidgetTester tester) => [
@@ -332,7 +263,6 @@ Widget _app({
   required IntentionSummary summary,
   Locale locale = const Locale('ru'),
   Set<TagId> requiredTagIds = const {},
-  OccupiedPairMark? occupiedPair,
   VoidCallback? onPick,
   VoidCallback? onOpenPage,
 }) => MaterialApp(
@@ -350,7 +280,6 @@ Widget _app({
           requiredTagIds: requiredTagIds,
           onPick: onPick ?? () {},
           onOpenPage: onOpenPage ?? () {},
-          occupiedPair: occupiedPair,
         ),
       ),
     ),

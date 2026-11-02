@@ -15,7 +15,6 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_purp
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
-import 'package:doable/src/intention/presentation/picker/intention_picker_row.dart';
 import 'package:doable/src/intention/presentation/picker/intention_picker_view.dart';
 import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
@@ -72,7 +71,13 @@ void main() {
         'daily-choice-source',
       ),
       (
-        SelectRelationParticipant(session: IntentionSearchSession()),
+        SelectRelationParticipant(
+          session: IntentionSearchSession(),
+          pairProbe: RelationPairProbe(
+            counterpartId: testSummary(index: 999).id,
+            candidateRole: RelationParticipantRole.related,
+          ),
+        ),
         participants,
         'participant-picker',
       ),
@@ -845,65 +850,6 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('нажатие на текст отмеченной строки передаёт занимающую связь и '
-      'не выбирает намерение, а остальные строки и число не меняются', (
-    tester,
-  ) async {
-    final semantics = tester.ensureSemantics();
-    final h = await _open(
-      tester,
-      purpose: SelectRelationParticipant(
-        session: IntentionSearchSession(),
-        pairProbe: RelationPairProbe(
-          counterpartId: testSummary(index: 9).id,
-          candidateRole: RelationParticipantRole.related,
-        ),
-      ),
-    );
-    final walk = _action(3);
-    final swim = _action(2);
-    final sleep = _action(1);
-    final walkOccupant = PairOccupant(
-      relationId: testRelationId(1),
-      type: LongTermRelationType.need,
-      scope: RelationScope.active,
-    );
-    h.repository.complete(
-      0,
-      _firstPage(
-        [walk, swim, sleep],
-        pairOccupants: {
-          walk.id: walkOccupant,
-          swim.id: PairOccupant(
-            relationId: testRelationId(2),
-            type: LongTermRelationType.need,
-            scope: RelationScope.archived,
-          ),
-        },
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.bySemanticsLabel(RegExp('Уже связано')), findsOneWidget);
-    expect(find.bySemanticsLabel(RegExp('Связь в архиве')), findsOneWidget);
-    expect(find.text('Уже связано'), findsOneWidget);
-    expect(find.text('Связь в архиве'), findsOneWidget);
-    expect(_header('Все', 3), findsOneWidget);
-
-    await tester.tap(find.bySemanticsLabel(RegExp('Уже связано')));
-    expect(h.openedOccupants, [walkOccupant]);
-    expect(h.picks, isEmpty);
-
-    await tester.tap(find.bySemanticsLabel(RegExp('Связь в архиве')));
-    expect(h.openedOccupants.length, 2);
-    expect(h.picks, isEmpty);
-
-    await tester.tap(find.text('Действие 1'));
-    expect(h.picks.single.value.id, sleep.id);
-    expect(h.openedOccupants.length, 2);
-    semantics.dispose();
-  });
-
   for (final (locale, reasons) in [
     (
       const Locale('ru'),
@@ -1097,7 +1043,6 @@ final class _Harness {
   int closes = 0;
   final picks = <GraphSnapshot<IntentionSummary>>[];
   final openedDetails = <IntentionId>[];
-  final openedOccupants = <PairOccupant>[];
 
   IntentionTagConditionsViewModel conditions(IntentionPickerPurpose purpose) =>
       container.read(intentionTagConditionsViewModelProvider(purpose).notifier);
@@ -1140,16 +1085,7 @@ Future<_Harness> _open(
                   selectedIds: {_action(2).id},
                   onToggle: h.picks.add,
                 )
-              : IntentionPickerSingle(
-                  onPick: h.picks.add,
-                  occupiedPairMark: (occupant) => OccupiedPairMark(
-                    kind: switch (occupant.scope) {
-                      RelationScope.active => OccupiedPairKind.linked,
-                      RelationScope.archived => OccupiedPairKind.restorable,
-                    },
-                    onTap: () => h.openedOccupants.add(occupant),
-                  ),
-                ),
+              : IntentionPickerSingle(onPick: h.picks.add),
           onOpenDetails: h.openedDetails.add,
         ),
       ),

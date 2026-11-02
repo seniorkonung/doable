@@ -1,7 +1,5 @@
 import 'package:doable/l10n/app_localizations.dart';
-import 'package:doable/src/design_system/components/path_glyph.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
-import 'package:doable/src/design_system/components/top_bar.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
@@ -115,26 +113,6 @@ void main() {
       },
     );
   }
-
-  for (final (mark, shape) in [
-    (TopBarPurposeMark.sourceField, PathGlyphShape.diamond),
-    (TopBarPurposeMark.relatedField, PathGlyphShape.ring),
-  ]) {
-    testWidgets('отметка ${mark.name} из описания назначения стоит в шапке '
-        'перед подзаголовком: ${shape.name}', (tester) async {
-      await _open(tester, const Locale('ru'), subtitleMark: mark);
-
-      final glyph = find.descendant(
-        of: find.byType(TopBar),
-        matching: find.byType(PathGlyph),
-      );
-      expect(tester.widget<PathGlyph>(glyph).shape, shape);
-      expect(
-        tester.getRect(glyph).right,
-        lessThan(tester.getRect(find.text(_subtitle)).left),
-      );
-    });
-  }
 }
 
 const _subtitle = 'Новый поток: исходное';
@@ -155,11 +133,7 @@ ScrollPosition _position(WidgetTester tester, Finder list) => tester
     .position;
 
 Future<({ProviderContainer container, ControlledCatalogRepository repository})>
-_open(
-  WidgetTester tester,
-  Locale locale, {
-  TopBarPurposeMark? subtitleMark,
-}) async {
+_open(WidgetTester tester, Locale locale) async {
   tester.view
     ..physicalSize = const Size(390, 844)
     ..devicePixelRatio = 1;
@@ -181,7 +155,6 @@ _open(
             subtitle: _subtitle,
             sheetLine: _sheetLine,
             buildSheetBody: (_) => const Text(_body),
-            subtitleMark: subtitleMark,
           ),
           closeLabel: 'Закрыть поиск',
           emptyScopeMessage: 'Выбрать не из чего',
