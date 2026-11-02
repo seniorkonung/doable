@@ -25,6 +25,10 @@ sealed class ListState extends StatelessWidget {
   /// Кольцо 14 и текст caption для списка, который уже на экране; объявляется
   /// как статус. Строка занимает только ширину содержимого, а место для неё
   /// выбирает потребитель.
+  ///
+  /// При масштабе текста больше 1,5 остаётся одно кольцо: слово крупного
+  /// шрифта отнимало бы у соседнего текста место, и тот рвался бы внутри слов.
+  /// [text] при этом называет живую область, как у [ListState.more].
   const factory ListState.refreshing({required String text, Key? key}) =
       _RefreshingListState;
 
@@ -76,14 +80,28 @@ final class _LoadingListState extends ListState {
 final class _RefreshingListState extends ListState {
   const _RefreshingListState({required this.text, super.key}) : super._();
 
+  /// Наибольший масштаб caption, при котором слово обновления ещё видно. При
+  /// 1,5 день недели в окне 360 не разрывается внутри слова на русском и
+  /// английском, а при 1,75 уже разрывается.
+  static const double _wordMaxScale = 1.5;
+
   final String text;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).extension<DoableColors>()!;
+    // Масштаб читается по размеру caption, а не по коэффициенту: `TextScaler`
+    // может быть нелинейным, а слот занимает именно текст caption:
+    // https://api.flutter.dev/flutter/painting/TextScaler-class.html
+    final fontSize = DoableType.caption.fontSize!;
+    final showsWord =
+        MediaQuery.textScalerOf(context).scale(fontSize) / fontSize <=
+        _wordMaxScale;
     return Semantics(
       container: true,
       liveRegion: true,
+      // Без слова живую область называет сам текст.
+      label: showsWord ? null : text,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         spacing: DoableMetrics.space2,
@@ -93,12 +111,13 @@ final class _RefreshingListState extends ListState {
             trackColor: colors.hairline,
             dimension: 14,
           ),
-          Flexible(
-            child: Text(
-              text,
-              style: DoableType.caption.copyWith(color: colors.muted),
+          if (showsWord)
+            Flexible(
+              child: Text(
+                text,
+                style: DoableType.caption.copyWith(color: colors.muted),
+              ),
             ),
-          ),
         ],
       ),
     );

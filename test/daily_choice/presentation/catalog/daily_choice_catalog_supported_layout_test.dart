@@ -45,6 +45,42 @@ void main() {
       });
     }
   }
+
+  // Отметка «Сегодня» может стоять на второй строке, поэтому высота заголовка
+  // не годится: проверяется, что символы дня недели занимают одну строку
+  // абзаца. Место строки обновления при крупном шрифте сужено до кольца.
+  for (final (locale, selected, weekday) in [
+    (const Locale('ru'), date(2026, 10, 5), 'Понедельник'),
+    (const Locale('ru'), date(2026, 10, 4), 'Воскресенье'),
+    (const Locale('en'), date(2026, 10, 7), 'Wednesday'),
+  ]) {
+    testWidgets('при масштабе 200% в окне 360 день недели «$weekday» не '
+        'разрывается внутри слова', (tester) async {
+      await _loadInter();
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final repository = CatalogPageRepository();
+      await pumpCatalogPage(
+        tester,
+        repository,
+        today: selected,
+        locale: locale,
+        size: const Size(360, 2000),
+      );
+      repository.completeFirst(0, [
+        catalogPageItem(1, date: selected),
+      ], total: 1);
+      await tester.pumpAndSettle();
+
+      final paragraph = tester.renderObject<RenderParagraph>(
+        find.textContaining(weekday),
+      );
+      final boxes = paragraph.getBoxesForSelection(
+        TextSelection(baseOffset: 0, extentOffset: weekday.length),
+      );
+      expect({for (final box in boxes) box.top}, hasLength(1));
+    });
+  }
 }
 
 Future<void> _open(
@@ -92,11 +128,14 @@ Future<void> _setSupportBoundary(WidgetTester tester) async {
     ..viewPadding = const FakeViewPadding(top: 24, bottom: 48);
   addTearDown(tester.view.reset);
   // Реальный шрифт нужен для проверки переносов сообщения в обеих локалях.
-  await (FontLoader('Inter')..addFont(
-        rootBundle.load('lib/src/design_system/fonts/InterVariable.ttf'),
-      ))
-      .load();
+  await _loadInter();
 }
+
+Future<void> _loadInter() =>
+    (FontLoader('Inter')..addFont(
+          rootBundle.load('lib/src/design_system/fonts/InterVariable.ttf'),
+        ))
+        .load();
 
 /// Общий сценарий доступности закреплённого блока в обоих каталогах.
 /// Начальное чтение выдачи и отметок ещё не завершено; выбран октябрь 2026.

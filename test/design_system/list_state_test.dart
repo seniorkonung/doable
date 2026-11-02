@@ -129,6 +129,34 @@ void main() {
     semantics.dispose();
   });
 
+  testWidgets('при масштабе текста больше 1,5 обновление — одно кольцо без '
+      'видимого слова, а название остаётся в живой области; при 1,5 слово '
+      'видно', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await tester.pumpWidget(
+      _app(
+        textScale: 1.5,
+        state: const ListState.refreshing(text: 'Обновляем…'),
+      ),
+    );
+    expect(find.text('Обновляем…'), findsOneWidget);
+
+    await tester.pumpWidget(
+      _app(
+        textScale: 1.75,
+        state: const ListState.refreshing(text: 'Обновляем…'),
+      ),
+    );
+    expect(find.text('Обновляем…'), findsNothing);
+    expect(tester.getSize(_spinner), const Size.square(14));
+    expect(
+      tester.getSemantics(_listState),
+      isSemantics(label: 'Обновляем…', isLiveRegion: true),
+    );
+    expect(find.semantics.byFlag(SemanticsFlag.isLiveRegion), findsOneWidget);
+    semantics.dispose();
+  });
+
   for (final brightness in Brightness.values) {
     testWidgets('в ${brightness == Brightness.light ? 'светлой' : 'тёмной'} '
         'теме подгрузка — одно кольцо 18 по центру строки высотой 40 без '

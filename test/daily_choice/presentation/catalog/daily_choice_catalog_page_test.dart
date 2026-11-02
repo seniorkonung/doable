@@ -175,10 +175,12 @@ void main() {
       expect(find.semantics.byLabel('Обновляем…'), findsNothing);
     }
 
+    /// Объявление читается с самой строки, а не с её текста: при крупном шрифте
+    /// видимого слова нет.
     void expectRefreshLineShown(WidgetTester tester) {
       expect(refreshLine.hitTestable(), findsOneWidget);
       expect(
-        tester.getSemantics(find.text('Обновляем…')),
+        tester.getSemantics(refreshLine),
         isSemantics(label: 'Обновляем…', isLiveRegion: true),
       );
     }
