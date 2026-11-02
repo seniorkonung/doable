@@ -3304,4 +3304,63 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get creationSavingContinues =>
       'Сохранение продолжится после выхода из создания.';
+
+  @override
+  String batchSubtitle(String group) {
+    return 'Добавить в \"$group\"';
+  }
+
+  @override
+  String batchSubtitleSelected(String group, int count) {
+    return 'Добавить в \"$group\" · выбрано $count';
+  }
+
+  @override
+  String batchSheetLine(String group) {
+    return 'Новые связи в \"$group\"';
+  }
+
+  @override
+  String get batchNoteNeeds =>
+      'Каждое отмеченное намерение станет связью: оно нужно этому намерению';
+
+  @override
+  String get batchNoteCanUse =>
+      'Каждое отмеченное намерение станет связью: это намерение может его использовать';
+
+  @override
+  String get batchNoteNeededFor =>
+      'Каждое отмеченное намерение станет связью: ему нужно это намерение';
+
+  @override
+  String get batchNoteCanBeUsedFor =>
+      'Каждое отмеченное намерение станет связью: оно может использовать это намерение';
+
+  @override
+  String get batchDefaults =>
+      'Связи получат приоритет P4 и не будут иметь описания; и то и другое меняется на странице';
+
+  @override
+  String get batchAnchorNote => 'Намерение, со страницы которого вы пришли';
+
+  @override
+  String get batchEmpty => 'Пока ничего не выбрано';
+
+  @override
+  String get batchSelected => 'Отмеченные намерения';
+
+  @override
+  String batchSourceSemantic(String name) {
+    return 'Исходное намерение: $name';
+  }
+
+  @override
+  String batchRelatedSemantic(String name) {
+    return 'Связанное намерение: $name';
+  }
+
+  @override
+  String batchRemove(String name) {
+    return 'Снять отметку: $name';
+  }
 }

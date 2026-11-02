@@ -11,6 +11,7 @@ import '../../../intention/presentation/catalog/intention_catalog_purpose.dart';
 import '../../../intention/presentation/picker/intention_picker_view.dart';
 import '../../application/intention_relation_group.dart';
 import '../../application/relation_pair_probe.dart';
+import 'relation_batch_picker_purpose.dart';
 import 'relation_batch_view_model.dart';
 
 /// Поиск участников одной группы с отметками на время жизни страницы.
@@ -55,6 +56,12 @@ final class _RelationBatchPickerPageState
     final batch = ref.watch(provider);
     return IntentionPickerView(
       purpose: _purpose,
+      purposeDescription: relationBatchPickerPurpose(
+        l10n,
+        widget.group,
+        provider,
+        batch.selected.length,
+      ),
       closeLabel: l10n.participantPickerCancel,
       emptyScopeMessage: l10n.participantPickerEmpty,
       onClose: () => unawaited(context.router.maybePop()),

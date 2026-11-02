@@ -9,7 +9,9 @@ import 'package:doable/src/design_system/components/catalog_header.dart';
 import 'package:doable/src/design_system/components/picker_row.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
+import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
@@ -90,7 +92,11 @@ void main() {
     await database.close();
   });
 
-  Future<void> open(WidgetTester tester, IntentionRelationGroup group) async {
+  Future<void> open(
+    WidgetTester tester,
+    IntentionRelationGroup group, {
+    Locale locale = const Locale('ru'),
+  }) async {
     final repository = DriftPersonalGraphRepository(
       database,
       UuidV7IntentionIdGenerator(),
@@ -105,7 +111,7 @@ void main() {
         ],
         child: MaterialApp.router(
           theme: doableTheme(Brightness.light),
-          locale: const Locale('ru'),
+          locale: locale,
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           routerConfig: router.config(),
@@ -124,6 +130,148 @@ void main() {
     );
     await tester.pumpAndSettle();
   }
+
+  for (final (group, ruGroup, enGroup, ruNote, enNote) in [
+    (
+      IntentionRelationGroup.needs,
+      'Нужно',
+      'Needs',
+      'оно нужно этому намерению',
+      'this intention needs it',
+    ),
+    (
+      IntentionRelationGroup.canUse,
+      'Можно использовать',
+      'Can use',
+      'это намерение может его использовать',
+      'this intention can use it',
+    ),
+    (
+      IntentionRelationGroup.neededFor,
+      'Нужно для',
+      'Needed for',
+      'ему нужно это намерение',
+      'it needs this intention',
+    ),
+    (
+      IntentionRelationGroup.canBeUsedFor,
+      'Можно использовать для',
+      'Can be used for',
+      'оно может использовать это намерение',
+      'it can use this intention',
+    ),
+  ]) {
+    for (final locale in [const Locale('ru'), const Locale('en')]) {
+      testWidgets('назначение $group на языке ${locale.languageCode}', (
+        tester,
+      ) async {
+        await open(tester, group, locale: locale);
+        final ru = locale.languageCode == 'ru';
+        final name = ru ? ruGroup : enGroup;
+        final subtitle = ru ? 'Добавить в "$name"' : 'Add to "$name"';
+        await tester.tap(find.text(subtitle));
+        await tester.pumpAndSettle();
+        expect(
+          find.text(ru ? 'Новые связи в "$name"' : 'New relations in "$name"'),
+          findsOneWidget,
+        );
+        expect(find.textContaining(ru ? ruNote : enNote), findsOneWidget);
+        expect(
+          find.textContaining(
+            ru
+                ? 'Связи получат приоритет P4'
+                : 'Relations will have priority P4',
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.text(ru ? 'Пока ничего не выбрано' : 'Nothing selected yet'),
+          findsOneWidget,
+        );
+      });
+    }
+  }
+
+  testWidgets(
+    'лист показывает новое название намерения страницы и сохраняет поиск',
+    (tester) async {
+      await open(tester, IntentionRelationGroup.neededFor);
+      await tester.tap(find.text('Плавать'));
+      await tester.pumpAndSettle();
+      final field = find.byKey(const ValueKey('participant-picker-filter'));
+      await tester.enterText(field, 'Бегать');
+      await tester.pumpAndSettle();
+      await tester.tap(intentionPickerArrow(intentionPickerRows.first));
+      await tester.pumpAndSettle();
+      expect(find.byType(IntentionDetailsPage), findsOneWidget);
+      expect(find.textContaining('Добавить в "Нужно для"'), findsNothing);
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(IntentionDetailsPage)),
+      );
+      final accepted =
+          container
+                  .read(graphCommandCoordinatorProvider.notifier)
+                  .acceptExisting(
+                    UpdateIntention(
+                      id: _id(1),
+                      title: 'Бодрость',
+                      description: null,
+                    ),
+                    presentationTitle: 'Здоровье',
+                  )
+              as IntentionCommandAccepted;
+      await tester.runAsync(() => accepted.future);
+      await tester.pumpAndSettle();
+      await router.maybePop();
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Добавить в "Нужно для" · выбрано 1'));
+      await tester.pumpAndSettle();
+      expect(find.text('Бодрость'), findsOneWidget);
+      expect(
+        find.text('Намерение, со страницы которого вы пришли'),
+        findsOneWidget,
+      );
+      expect(find.byTooltip('Снять отметку: Плавать'), findsOneWidget);
+      await tester.tap(find.text('Вернуться к списку'));
+      await tester.pumpAndSettle();
+      expect(find.widgetWithText(TextField, 'Бегать'), findsOneWidget);
+    },
+  );
+
+  testWidgets('лист входящей группы показывает отметки и позволяет их снять', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    await open(tester, IntentionRelationGroup.neededFor);
+    expect(find.text('Добавить в "Нужно для"'), findsOneWidget);
+    await tester.tap(find.text('Плавать'));
+    await tester.tap(find.text('Бегать'));
+    await tester.tap(find.text('Высыпаться'));
+    await tester.pumpAndSettle();
+    expect(find.text('Добавить в "Нужно для" · выбрано 3'), findsOneWidget);
+    await tester.tap(find.text('Добавить в "Нужно для" · выбрано 3'));
+    await tester.pumpAndSettle();
+    expect(find.text('Новые связи в "Нужно для"'), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.text('Плавать').last).dy,
+      lessThan(tester.getTopLeft(find.text('Бегать').last).dy),
+    );
+    expect(
+      tester.getTopLeft(find.text('Бегать').last).dy,
+      lessThan(tester.getTopLeft(find.text('Здоровье')).dy),
+    );
+    await tester.tap(find.byTooltip('Снять отметку: Плавать'));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Снять отметку: Плавать'), findsNothing);
+    await tester.tap(find.text('Вернуться к списку'));
+    await tester.pumpAndSettle();
+    expect(find.text('Добавить в "Нужно для" · выбрано 2'), findsOneWidget);
+    expect(
+      tester.getSemantics(find.text('Плавать')).flagsCollection.isChecked,
+      CheckedState.isFalse,
+    );
+    semantics.dispose();
+  });
 
   testWidgets(
     'реальная занятость показывает причину, свободная строка отмечается и поиск остаётся открыт',

@@ -54,6 +54,10 @@ final class RelationBatchViewModel extends _$RelationBatchViewModel {
     state = _snapshot();
   }
 
+  void remove(IntentionId id) {
+    if (_selected.remove(id) != null) state = _snapshot();
+  }
+
   void _onPackage(ConfirmedGraphChangePackage package) {
     if (!ref.mounted) return;
     var changed = false;

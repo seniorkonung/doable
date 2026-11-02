@@ -5148,6 +5148,90 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Saving will continue after you leave creation.'**
   String get creationSavingContinues;
+
+  /// No description provided for @batchSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to \"{group}\"'**
+  String batchSubtitle(String group);
+
+  /// No description provided for @batchSubtitleSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to \"{group}\" · selected {count}'**
+  String batchSubtitleSelected(String group, int count);
+
+  /// No description provided for @batchSheetLine.
+  ///
+  /// In en, this message translates to:
+  /// **'New relations in \"{group}\"'**
+  String batchSheetLine(String group);
+
+  /// Текст поиска участников группы
+  ///
+  /// In en, this message translates to:
+  /// **'Each selected intention will become a relation: this intention needs it'**
+  String get batchNoteNeeds;
+
+  /// Текст поиска участников группы
+  ///
+  /// In en, this message translates to:
+  /// **'Each selected intention will become a relation: this intention can use it'**
+  String get batchNoteCanUse;
+
+  /// Текст поиска участников группы
+  ///
+  /// In en, this message translates to:
+  /// **'Each selected intention will become a relation: it needs this intention'**
+  String get batchNoteNeededFor;
+
+  /// Текст поиска участников группы
+  ///
+  /// In en, this message translates to:
+  /// **'Each selected intention will become a relation: it can use this intention'**
+  String get batchNoteCanBeUsedFor;
+
+  /// Текст поиска участников группы
+  ///
+  /// In en, this message translates to:
+  /// **'Relations will have priority P4 and no description; both can be changed on the page'**
+  String get batchDefaults;
+
+  /// Текст поиска участников группы
+  ///
+  /// In en, this message translates to:
+  /// **'The intention whose page you came from'**
+  String get batchAnchorNote;
+
+  /// Текст поиска участников группы
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing selected yet'**
+  String get batchEmpty;
+
+  /// Текст поиска участников группы
+  ///
+  /// In en, this message translates to:
+  /// **'Selected intentions'**
+  String get batchSelected;
+
+  /// No description provided for @batchSourceSemantic.
+  ///
+  /// In en, this message translates to:
+  /// **'Source intention: {name}'**
+  String batchSourceSemantic(String name);
+
+  /// No description provided for @batchRelatedSemantic.
+  ///
+  /// In en, this message translates to:
+  /// **'Related intention: {name}'**
+  String batchRelatedSemantic(String name);
+
+  /// No description provided for @batchRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove selection: {name}'**
+  String batchRemove(String name);
 }
 
 class _AppLocalizationsDelegate

@@ -3278,4 +3278,63 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get creationSavingContinues =>
       'Saving will continue after you leave creation.';
+
+  @override
+  String batchSubtitle(String group) {
+    return 'Add to \"$group\"';
+  }
+
+  @override
+  String batchSubtitleSelected(String group, int count) {
+    return 'Add to \"$group\" · selected $count';
+  }
+
+  @override
+  String batchSheetLine(String group) {
+    return 'New relations in \"$group\"';
+  }
+
+  @override
+  String get batchNoteNeeds =>
+      'Each selected intention will become a relation: this intention needs it';
+
+  @override
+  String get batchNoteCanUse =>
+      'Each selected intention will become a relation: this intention can use it';
+
+  @override
+  String get batchNoteNeededFor =>
+      'Each selected intention will become a relation: it needs this intention';
+
+  @override
+  String get batchNoteCanBeUsedFor =>
+      'Each selected intention will become a relation: it can use this intention';
+
+  @override
+  String get batchDefaults =>
+      'Relations will have priority P4 and no description; both can be changed on the page';
+
+  @override
+  String get batchAnchorNote => 'The intention whose page you came from';
+
+  @override
+  String get batchEmpty => 'Nothing selected yet';
+
+  @override
+  String get batchSelected => 'Selected intentions';
+
+  @override
+  String batchSourceSemantic(String name) {
+    return 'Source intention: $name';
+  }
+
+  @override
+  String batchRelatedSemantic(String name) {
+    return 'Related intention: $name';
+  }
+
+  @override
+  String batchRemove(String name) {
+    return 'Remove selection: $name';
+  }
 }
