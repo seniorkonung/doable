@@ -584,3 +584,23 @@
   - **Зависимости:** нет.
   - **Предполагаемые файлы:** меняются `lib/src/design_system/components/priority_picker.dart`, `lib/src/long_term_relation/presentation/details/relation_details_sheet.dart`, `test/design_system/priority_picker_test.dart`.
   - **Размер:** XS.
+
+- [ ] 2.22 Панель связи становится панелью по содержимому: `Sheet.untitled` теряет раскрытие и ручку-кнопку
+  - **Критерии приёмки:**
+    - `Sheet.untitled` не принимает `expandLabel` и `collapseLabel`, а его поведение возвращено к состоянию до `8ca3b18f`. Без `bar` высота следует содержимому до доступного места под строкой состояния, предел 534 не действует, а лист тянется вниз и закрывается по `bottom-sheets` и вверх не идёт. Ручка — только линия без кнопки и области нажатия, а тело начинается в 14 под ней.
+    - С `bar` лист ведёт себя как в 2.6, а снятие `bar` возвращает высоту по содержимому.
+    - Вынесенное из `_ExpandableSheet` ради этого раскрытия не остаётся: нет примеси `_SheetResizing` и параметров `origin` и `fullness` у `_ExpandableFrame`. Поведение `Sheet` и `Sheet.expandable` не меняется, а их тесты проходят без правок.
+    - `relation_details_sheet.dart` не передаёт названия ручки, а комментарий `showRelationDetailsSheet` описывает высоту по содержимому, прокрутку вместе с шапкой и выход из изменения описания. Автопрокрутка к новому отказу из 2.19 остаётся в обычном режиме и в изменении описания и размер не меняет.
+    - `relationSheetExpand` и `relationSheetCollapse` удалены из ARB на обоих языках и из созданных файлов, поэтому в `lib/` и `test/` их нет.
+    - Из `sheet_test.dart` удалены тесты раскрытия `Sheet.untitled`, добавленные в `8ca3b18f`: ручка, её область нажатия, жесты вверх, передача жеста телу, верхний край и снятие полосы в раскрытом листе, обрыв перетаскивания полосой. Тест «лист без заголовка, содержимое которого выросло выше предела…» переписан: тело выше экрана ставит верхний край под строкой состояния, скругление остаётся, а тело прокручивается.
+    - Из `relation_details_sheet_test.dart` удалена группа «размер панели». Тесты группы «новый отказ» сохранены без ручки: они подтверждают сценарии «Отказ действия из шапки виден без ручной прокрутки» и «Повторный отказ снова виден», которые заменили имена, названные в 2.19.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/design_system/sheet_test.dart test/long_term_relation/presentation/details test/app/navigation/app_shell_sheet_stack_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 2.17–2.19.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/design_system/components/sheet.dart`, `test/design_system/sheet_test.dart`;
+    - меняются `lib/src/long_term_relation/presentation/details/relation_details_sheet.dart`, `test/long_term_relation/presentation/details/relation_details_sheet_test.dart`;
+    - меняются `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации.
+  - **Размер:** M.
