@@ -937,7 +937,7 @@
     - меняются `test/graph/application/graph_command_coordinator_relation_creation_test.dart`, `graph_command_coordinator_relation_lifecycle_test.dart`, `test/graph/presentation/graph_operation_presenter_test.dart`, `graph_reconciliation_checkpoint_test.dart`, `test/intention/presentation/catalog/catalog_reconciliation_test_support.dart`, `intention_catalog_action_selection_test.dart`, `intention_catalog_mutation_reconciliation_test.dart`, `test/intention/presentation/search/intention_search_list_test.dart`, `test/long_term_relation/application/long_term_relation_command_test.dart`, `test/app/home_statistics_app_flow_test.dart`.
   - **Размер:** M по логике: файлов больше нормы только из-за механической замены команды.
 
-- [ ] 3.23 Проверить готовность фазы: связи добавляются пачкой только из группы
+- [x] 3.23 Проверить готовность фазы: связи добавляются пачкой только из группы
   - **Критерии приёмки:**
     - Пачка добавляется атомарно, в порядке отметок и с верными счётчиками всех участников.
     - В коде и спецификациях не осталось вызывающих удалённого потока: в `lib/` и `test/` нет `RelationEditor`, `RelationParticipantPicker`, `RelationForm`, `CreateLongTermRelation`, `QuickCreationMode.relation` и `acceptRelationRestoreFromCreation`, а спецификации изменения не опираются на форму связи, поиск по ролям, восстановление из поиска и режим «Новая связь».
