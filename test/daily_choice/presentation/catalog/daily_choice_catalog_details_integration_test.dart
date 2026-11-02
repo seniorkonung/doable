@@ -146,7 +146,11 @@ void main() {
       expect(catalog().items.last.id, _choice(251));
       await expectMarks({sourceDay: DailyChoiceDayStatus.hasIncomplete});
 
-      final details = DailyChoiceDetailsViewModel(repository, _choice(201));
+      final details = DailyChoiceDetailsViewModel(
+        repository,
+        container.read(graphCommandCoordinatorProvider.notifier),
+        _choice(201),
+      );
       addTearDown(details.dispose);
       await _until(() => details.state is DailyChoiceDetailsLoaded);
       DailyChoiceDetailsLoaded opened() =>
@@ -563,7 +567,11 @@ void main() {
     final coordinator = container.read(
       graphCommandCoordinatorProvider.notifier,
     );
-    final details = DailyChoiceDetailsViewModel(repository, _choice(201));
+    final details = DailyChoiceDetailsViewModel(
+      repository,
+      coordinator,
+      _choice(201),
+    );
     addTearDown(details.dispose);
     await _until(() => details.state is DailyChoiceDetailsLoaded);
     DailyChoiceDetailsLoaded opened() =>

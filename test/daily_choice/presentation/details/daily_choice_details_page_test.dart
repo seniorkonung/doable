@@ -679,6 +679,68 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets(
+    'отказ на перекрытой странице предъявляет оболочка, а возврат показывает его на месте',
+    (tester) async {
+      final repository = _Repository();
+      final router = AppRouter();
+      addTearDown(() async {
+        router.dispose();
+        await repository.dispose();
+      });
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            inMemoryQuickCreationModeOverride,
+            personalGraphRepositoryProvider.overrideWith((ref) => repository),
+          ],
+          child: MaterialApp.router(
+            theme: doableTheme(Brightness.light),
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            routerConfig: router.config(),
+            builder: (context, child) => GraphOperationPresenter(
+              child: child ?? const SizedBox.shrink(),
+            ),
+          ),
+        ),
+      );
+      unawaited(router.push(DailyChoiceDetailsRoute(choiceId: _choice(1))));
+      await tester.pump();
+      repository.emit(_details());
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('daily-choice-delete-open')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('daily-choice-delete-confirm')),
+      );
+      await tester.pump();
+      unawaited(
+        router.push(IntentionDetailsRoute(intentionId: _intentionId(1))),
+      );
+      await tester.pump(const Duration(seconds: 1));
+
+      repository.failDelete(const DailyChoiceUnavailableFailure());
+      await tester.pump(const Duration(seconds: 1));
+      expect(
+        find.text(
+          'Delete — “daily choice”: Could not complete the daily choice operation. Try again.',
+        ),
+        findsOneWidget,
+      );
+
+      await router.maybePop();
+      await tester.pump(const Duration(seconds: 1));
+      expect(router.current.name, DailyChoiceDetailsRoute.name);
+      expect(
+        find.byKey(const ValueKey('daily-choice-delete-failure')),
+        findsOneWidget,
+      );
+      expect(repository.deleteCommands, hasLength(1));
+    },
+  );
 }
 
 Future<void> _revealEditor(

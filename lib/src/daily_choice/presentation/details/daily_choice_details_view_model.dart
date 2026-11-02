@@ -2,32 +2,133 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_command_result.dart';
 import '../../../graph/application/graph_revision.dart';
 import '../../../graph/application/personal_graph_repository.dart';
+import '../../application/daily_choice_command.dart';
 import '../../application/daily_choice_details.dart';
+import '../../application/daily_choice_result.dart';
 import '../../domain/daily_choice_id.dart';
 import 'daily_choice_details_state.dart';
 
-/// Живой целый снимок одного выбора; экран владеет подпиской.
+/// Живой целый снимок одного выбора и запись его изменений; экран владеет
+/// подпиской.
 final class DailyChoiceDetailsViewModel extends ChangeNotifier {
-  DailyChoiceDetailsViewModel(this._repository, this._id) {
+  DailyChoiceDetailsViewModel(this._repository, this._coordinator, this._id) {
     _observe();
   }
 
   final PersonalGraphRepository _repository;
+  final GraphCommandCoordinator _coordinator;
   final DailyChoiceId _id;
   StreamSubscription<DailyChoiceReadResult>? _subscription;
   GraphRevision? _acceptedRevision;
   int _generation = 0;
   DailyChoiceDetailsState _state = const DailyChoiceDetailsLoading();
+  DailyChoiceOperationToken? _activeToken;
+  DailyChoiceDetailsOperation _operation =
+      const DailyChoiceDetailsOperationIdle();
 
   DailyChoiceDetailsState get state => _state;
+  DailyChoiceDetailsOperation get operation => _operation;
 
   void retry() {
     if (_state is! DailyChoiceDetailsUnavailable) return;
     _setState(const DailyChoiceDetailsLoading());
     _observe();
+  }
+
+  void change(DailyChoiceFieldsPatch patch) {
+    if (!_canStartOperation) return;
+    unawaited(
+      _run(
+        _coordinator.acceptDailyChoiceUpdate(
+          UpdateDailyChoiceFields(choiceId: _id, patch: patch),
+        ),
+      ),
+    );
+  }
+
+  /// Возвращает успех только собственной принятой команды удаления.
+  Future<bool> delete() async {
+    if (!_canStartOperation) return false;
+    final completion = await _run(
+      _coordinator.acceptDailyChoiceDelete(DeleteDailyChoice(_id)),
+    );
+    return switch (completion?.result) {
+      GraphResultSuccess(value: DailyChoiceDeleted(:final choice)) =>
+        choice.id == _id,
+      _ => false,
+    };
+  }
+
+  bool get _canStartOperation =>
+      _activeToken == null && _state is DailyChoiceDetailsLoaded;
+
+  Future<DailyChoiceCommandCompletion?> _run(
+    DailyChoiceCommandStart start,
+  ) async {
+    switch (start) {
+      case DailyChoiceCommandAccepted(:final token, :final future):
+        _activeToken = token;
+        _setOperation(const DailyChoiceDetailsOperationWriting());
+        final completion = await future;
+        if (identical(_activeToken, token)) {
+          _activeToken = null;
+          _setOperation(_operationAfter(completion));
+        }
+        return completion;
+      case DailyChoiceCommandAlreadyRunning():
+        _setOperation(
+          const DailyChoiceDetailsOperationFailed(
+            DailyChoiceConflictFailure(
+              DailyChoiceConflictReason.dependencyChanged,
+            ),
+          ),
+        );
+      case GraphCommandCoordinatorDraining():
+        _setOperation(
+          const DailyChoiceDetailsOperationFailed(
+            DailyChoiceUnexpectedFailure(),
+          ),
+        );
+    }
+    return null;
+  }
+
+  DailyChoiceDetailsOperation _operationAfter(
+    DailyChoiceCommandCompletion completion,
+  ) => switch (completion.result) {
+    GraphResultFailure(:final failure) => DailyChoiceDetailsOperationFailed(
+      failure,
+      failurePresentation: _coordinator.claimInitiatorFailure(completion.token),
+    ),
+    GraphResultSuccess(
+      value: DailyChoiceFieldsUpdated(:final choice) ||
+          DailyChoiceDeleted(:final choice),
+    )
+        when choice.id == _id =>
+      const DailyChoiceDetailsOperationIdle(),
+    GraphResultSuccess() => const DailyChoiceDetailsOperationFailed(
+      DailyChoiceUnexpectedFailure(),
+    ),
+  };
+
+  /// Передаёт общей поверхности право отказа, который перестал публиковаться.
+  /// Право, уже подтверждённое renderer, координатор не возвращает в ожидание.
+  void _setOperation(DailyChoiceDetailsOperation next) {
+    _releaseFailure();
+    _operation = next;
+    notifyListeners();
+  }
+
+  void _releaseFailure() {
+    if (_operation case DailyChoiceDetailsOperationFailed(
+      failurePresentation: final claim?,
+    )) {
+      _coordinator.releaseInitiatorClaim(claim);
+    }
   }
 
   void _observe() {
@@ -85,6 +186,10 @@ final class DailyChoiceDetailsViewModel extends ChangeNotifier {
   void dispose() {
     ++_generation;
     unawaited(_subscription?.cancel());
+    final active = _activeToken;
+    _activeToken = null;
+    if (active != null) _coordinator.releaseInitiatorPresentation(active);
+    _releaseFailure();
     super.dispose();
   }
 }

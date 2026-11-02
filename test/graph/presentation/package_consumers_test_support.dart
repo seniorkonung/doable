@@ -8,6 +8,7 @@ import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalo
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_state.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_view_model.dart';
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
@@ -325,7 +326,11 @@ final class PackageConsumerProbes {
 
   void dailyChoiceDetails(DailyChoiceId id) {
     final probe = _add('модель подробностей дневного выбора', observes: true);
-    final model = DailyChoiceDetailsViewModel(_repository, id);
+    final model = DailyChoiceDetailsViewModel(
+      _repository,
+      _container.read(graphCommandCoordinatorProvider.notifier),
+      id,
+    );
     _notifiers.add(model);
     model.addListener(() {
       final state = model.state;

@@ -354,7 +354,11 @@ void main() {
       // Каталог показывает день повторяемого выбора независимо от
       // первоначального охвата.
       container.read(catalogProvider.notifier).selectDate(durabilityChoiceDate);
-      final details = DailyChoiceDetailsViewModel(repository, firstId);
+      final details = DailyChoiceDetailsViewModel(
+        repository,
+        container.read(graphCommandCoordinatorProvider.notifier),
+        firstId,
+      );
       addTearDown(details.dispose);
 
       container

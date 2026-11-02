@@ -554,7 +554,7 @@
   - **Предполагаемые файлы:** добавляются `lib/src/design_system/components/choice_path.dart`, `test/design_system/choice_path_test.dart`; меняются `lib/src/design_system/components/path_glyph.dart`, `test/design_system/path_glyph_test.dart`, `openspec/changes/redesign-daily-choices/design.md`.
   - **Размер:** M.
 
-- [ ] 3.8 Модель панели записывает изменение полей и удаление одной операцией
+- [x] 3.8 Модель панели записывает изменение полей и удаление одной операцией
   - **Критерии приёмки:**
     - `DailyChoiceDetailsViewModel` получает координатор и операции `change(DailyChoiceFieldsPatch)` и `delete()`. Обе делят один токен, а вторая команда во время первой не отправляется.
     - Состояние операции — закрытый тип: простой, запись, отказ с правом предъявления. Новое значение приходит только из подписки, а при отказе остаётся последний подтверждённый снимок.
