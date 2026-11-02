@@ -19,6 +19,7 @@ import '../../application/long_term_relation_projection.dart';
 import '../../domain/long_term_relation.dart';
 import '../../domain/long_term_relation_description.dart';
 import '../../domain/long_term_relation_id.dart';
+import '../details/relation_details_sheet.dart';
 import '../details/relation_details_state.dart';
 import '../details/relation_details_view_model.dart';
 import '../participant_picker/relation_participant_choice.dart';
@@ -251,9 +252,7 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage>
                 child: OutlinedButton(
                   key: const ValueKey('relation-editor-open-existing'),
                   onPressed: controlsEnabled
-                      ? () => _openDetails(
-                          RelationDetailsRoute(relationId: relationId),
-                        )
+                      ? () => _openExistingRelation(relationId)
                       : null,
                   child: Text(localizations.relationEditorOpenExistingRelation),
                 ),
@@ -357,6 +356,12 @@ final class _RelationEditorPageState extends ConsumerState<RelationEditorPage>
     // Повторная проверка закрывает и быстрый вызов старого callback до кадра.
     if (!_canEdit) return;
     unawaited(context.router.push(route));
+  }
+
+  /// Панель перекрывает форму, а черновик остаётся под ней.
+  void _openExistingRelation(LongTermRelationId id) {
+    if (!_canEdit) return;
+    unawaited(showRelationDetailsSheet(context, id));
   }
 
   /// Открывает выбор участника и применяет только явно выбранное намерение.

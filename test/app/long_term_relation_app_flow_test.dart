@@ -557,29 +557,15 @@ void main() {
       );
       await tester.tap(find.text(l10n.participantPickerRestoreConfirm));
 
-      // Вместо формы открыта та же связь с собственными данными.
-      await _pumpUntilFound(
+      // Вместо формы открыта панель той же связи с собственными данными.
+      await _pumpUntilRelationSheet(
         tester,
-        find.byKey(const ValueKey('relation-details-phrase')),
-      );
-      await tester.pumpAndSettle(const Duration(milliseconds: 1));
-      expect(
-        _textByKey(tester, 'relation-details-phrase'),
         l10n.relationNeighborhoodNeedPhrase(_healthy, _swim),
       );
-      expect(
-        _textByKey(tester, 'relation-details-type'),
-        l10n.relationNeighborhoodTypeNeed,
-      );
-      expect(_textByKey(tester, 'relation-details-priority'), 'P2');
-      expect(
-        _textByKey(tester, 'relation-details-description'),
-        _swimDescription,
-      );
-      expect(
-        _textByKey(tester, 'relation-details-scope'),
-        l10n.relationNeighborhoodRelationActive,
-      );
+      expect(_relationHead(tester).kind, RelationHeadKind.need);
+      expect(_relationHead(tester).status, isA<RelationHeadActive>());
+      expect(_priorityPicker(tester).value, DoablePriority.p2);
+      expect(_inRelationSheet(find.text(_swimDescription)), findsOneWidget);
       expect(
         raw.select(
           'SELECT id, source_intention_id, related_intention_id, type, '
@@ -608,8 +594,8 @@ void main() {
           l10n.relationRestored,
         ),
       );
-      await _pumpUntilFound(tester, restored);
-      expect(restored, findsOneWidget);
+      await _pumpUntilFound(tester, restored.hitTestable());
+      expect(restored.hitTestable(), findsOneWidget);
       await _dismissOperationMessage(tester);
       expect(restored, findsNothing);
       expect(
@@ -620,9 +606,9 @@ void main() {
         [LongTermRelationCommandDiagnosticsType.restore],
       );
 
-      // «Назад» возвращает страницу начала создания, а поиска и формы нет в
-      // истории: следующее «назад» уходит в каталог.
-      await tester.binding.handlePopRoute();
+      // «Назад» закрывает панель над страницей начала создания, а поиска и формы
+      // нет в истории: следующее «назад» уходит в каталог.
+      await _closeRelationSheet(tester);
       await _pumpUntilDetailsTitle(tester, _healthy);
       expect(
         find.byType(RelationParticipantPickerPage, skipOffstage: false),
@@ -1030,13 +1016,9 @@ Future<void> _createNeedRelation(
     return;
   }
   await _pumpUntilAbsent(tester, submit);
-  await _pumpUntilFound(
-    tester,
-    find.byKey(const ValueKey('relation-details-edit-relation')),
-  );
-  expect(find.text(description), findsOneWidget);
-  // Созданная связь заменяет форму; возврат ведёт к исходному намерению.
-  await tester.tap(find.bySemanticsLabel('Back'));
+  await _pumpUntilFound(tester, _inRelationSheet(find.text(description)));
+  // Панель созданной связи стоит над исходным намерением, формы под ней нет.
+  await _closeRelationSheet(tester);
   await _pumpUntilFound(
     tester,
     find.byKey(const ValueKey('intention-relations-add')),
@@ -1322,9 +1304,6 @@ Future<void> _expandArchive(WidgetTester tester) async {
   await tester.tap(fold);
   await tester.pump();
 }
-
-String _textByKey(WidgetTester tester, String key) =>
-    tester.widget<Text>(find.byKey(ValueKey(key))).data!;
 
 extension<T> on T {
   T also(void Function(T value) action) {

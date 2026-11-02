@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 
 import '../../../app/routing/app_router.gr.dart';
 import '../../domain/long_term_relation_id.dart';
+import '../details/relation_details_sheet.dart';
 
 /// Закрывает только собственную форму после синхронной утраты прав создания.
 void leaveRelationCreation({
@@ -20,11 +22,11 @@ void leaveRelationCreation({
   router.removeRoute(router.stackData.last);
 }
 
-/// Заменяет только актуальную форму подробным просмотром созданной или
-/// восстановленной связи, удаляя поиск участника над ней. Этот поиск открывает
-/// только сама форма и только с вершины стека, поэтому поиск сразу над формой
-/// принадлежит её потоку. Переход не зависит от жизни виджета; поздний вызов не
-/// получает права менять новый маршрут.
+/// Убирает из истории только актуальную форму и показывает панель созданной или
+/// восстановленной связи над исходной страницей, удаляя и поиск участника над
+/// формой. Этот поиск открывает только сама форма и только с вершины стека,
+/// поэтому поиск сразу над формой принадлежит её потоку. Переход не зависит от
+/// жизни виджета; поздний вызов не получает права менять новый маршрут.
 void openCreatedRelation({
   required StackRouter router,
   required LocalKey formMatchId,
@@ -44,11 +46,13 @@ void openCreatedRelation({
     // https://pub.dev/documentation/auto_route/11.1.0/auto_route/StackRouter/removeRoute.html
     router.removeRoute(top!);
   }
-  // Future replace завершается при возврате со страницы, а не при открытии:
-  // https://pub.dev/documentation/auto_route/11.1.0/auto_route/StackRouter/replace.html
-  unawaited(
-    router.replace<void>(
-      RelationDetailsRoute(relationId: relationId, key: UniqueKey()),
-    ),
-  );
+  router.removeRoute(router.stackData.last);
+  // Безымянный маршрут уходит вместе со страницей под ним, поэтому панель ждёт
+  // кадра, в котором навигатор получил стек без формы:
+  // https://api.flutter.dev/flutter/widgets/Navigator-class.html#using-the-pages-api
+  SchedulerBinding.instance.addPostFrameCallback((_) {
+    if (router.navigatorKey.currentContext case final context?) {
+      unawaited(showRelationDetailsSheet(context, relationId));
+    }
+  });
 }

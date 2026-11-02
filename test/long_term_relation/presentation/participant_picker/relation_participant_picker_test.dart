@@ -199,17 +199,15 @@ void main() {
     await tester.tap(find.text('Много ходить'));
     await _settleRoute(tester);
 
-    expect(
-      router.current.argsAs<RelationDetailsRouteArgs>().relationId,
-      occupantId,
-    );
     expect(repository.watchedRelations, [occupantId]);
-    expect(router.stackData[router.stackData.length - 2].matchId, pickerId);
+    expect(router.current.matchId, pickerId);
+    expect(find.text('Много ходить').hitTestable(), findsNothing);
     expect(selectionCompleted, isFalse);
 
     await router.maybePop();
     await _settleRoute(tester);
     expect(router.current.matchId, pickerId);
+    expect(find.text('Много ходить').hitTestable(), findsOneWidget);
     expect(selectionCompleted, isFalse);
 
     await tester.tap(intentionPickerArrow(intentionPickerRows.first));
@@ -270,10 +268,7 @@ void main() {
     restore.canContinue = true;
     await tester.tap(find.text('Много ходить'));
     await _settleRoute(tester);
-    expect(
-      router.current.argsAs<RelationDetailsRouteArgs>().relationId,
-      testFormRelationId(5),
-    );
+    expect(repository.watchedRelations, [testFormRelationId(5)]);
     await router.maybePop();
     await _settleRoute(tester);
 
@@ -1209,14 +1204,12 @@ void _defineRestoreOfferTests() {
       await _settleRoute(tester);
 
       expect(find.text('Restore this relation?'), findsNothing);
-      expect(
-        offer.router.current.argsAs<RelationDetailsRouteArgs>().relationId,
+      expect(offer.router.current.matchId, offer.pickerId);
+      expect(offer.router.hasPagelessTopRoute, isTrue);
+      expect(offer.repository.watchedRelations, [
         _archivedOccupant,
-      );
-      expect(
-        offer.router.stackData[offer.router.stackData.length - 2].matchId,
-        offer.pickerId,
-      );
+        _archivedOccupant,
+      ]);
       expect(offer.restore.accepted, isEmpty);
     });
   }
@@ -1237,7 +1230,7 @@ void _defineRestoreOfferTests() {
     await tester.pumpAndSettle();
 
     expect(find.text('Restore this relation?'), findsNothing);
-    expect(offer.router.current.name, isNot(RelationDetailsRoute.name));
+    expect(offer.router.hasPagelessTopRoute, isFalse);
   });
 
   testWidgets('ответ чтения под страницей поверх поиска ничего не открывает, а '

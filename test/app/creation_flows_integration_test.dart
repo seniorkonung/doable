@@ -184,8 +184,6 @@ void main() {
       final resultId = switch (app.router.current.args) {
         IntentionDetailsRouteArgs(:final intentionId) =>
           intentionId.toCanonicalString(),
-        RelationDetailsRouteArgs(:final relationId) =>
-          relationId.toCanonicalString(),
         DailyChoiceDetailsRouteArgs(:final choiceId) =>
           choiceId.toCanonicalString(),
         _ => throw StateError('Ожидался маршрут созданной сущности.'),

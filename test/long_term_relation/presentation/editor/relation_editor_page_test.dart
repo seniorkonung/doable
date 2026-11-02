@@ -4,6 +4,7 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/localization/app_locale_resolution.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/design_system/components/relation_head.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -319,6 +320,7 @@ void main() {
       // Чтение открытой связи показывает индикатор: кадры перехода явные.
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
+      expect(repository.relationWatches.last.relationId, existingId);
       repository.relationWatches.last.emitDetails(
         testRelationDetails(
           relationId: existingId,
@@ -330,13 +332,16 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(router.current.name, RelationDetailsRoute.name);
-      expect(find.text('Archived relation'), findsOneWidget);
+      const archivedNote =
+          'Archived relations stay in saved paths and are not offered in new '
+          'ones.';
+      expect(find.text(archivedNote), findsOneWidget);
       expect(repository.relationCommands, hasLength(1));
 
-      await tester.pageBack();
+      await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
 
+      expect(find.text(archivedNote), findsNothing);
       expect(router.current.name, RelationEditorRoute.name);
       expect(
         tester
@@ -379,7 +384,7 @@ void main() {
       final created = repository.completeRelationCreated(1);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
-      expect(router.current.name, RelationDetailsRoute.name);
+      expect(repository.relationWatches.last.relationId, created.id);
       repository.relationWatches.last.emitDetails(
         testRelationDetails(
           relationId: created.id,
@@ -390,20 +395,18 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(router.current.name, RelationDetailsRoute.name);
-      expect(
-        router.current.argsAs<RelationDetailsRouteArgs>().relationId,
-        created.id,
-      );
+      expect(find.byType(RelationHead), findsOneWidget);
+      expectIntentionGraphRootPage(router);
       expect(
         find.byKey(const ValueKey('relation-editor-submit')),
         findsNothing,
       );
-      expect(find.text(busyMessage), findsOneWidget);
+      expect(find.text(busyMessage).hitTestable(), findsOneWidget);
       expect(find.text(successMessage), findsNothing);
 
-      await tester.pageBack();
+      await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
+      expect(find.byType(RelationHead), findsNothing);
       expectIntentionGraphRootPage(router);
 
       await _closeOperationMessage(tester);

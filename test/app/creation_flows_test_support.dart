@@ -14,7 +14,7 @@ enum _Flow {
     'long_term_relations',
     4,
     'relation-editor-submit',
-    RelationDetailsRoute.name,
+    null,
   ),
   topDown(
     'дневной выбор от намерения',
@@ -42,7 +42,9 @@ enum _Flow {
   final String table;
   final int initialRows;
   final String submit;
-  final String resultRoute;
+
+  /// Маршрут созданной сущности; панель связи открывается без маршрута.
+  final String? resultRoute;
 
   Future<void> open(
     WidgetTester tester,

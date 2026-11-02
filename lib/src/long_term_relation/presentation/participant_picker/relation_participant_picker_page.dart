@@ -17,6 +17,7 @@ import '../../application/long_term_relation_projection.dart';
 import '../../application/relation_pair_probe.dart';
 import '../../domain/long_term_relation.dart';
 import '../../domain/long_term_relation_id.dart';
+import '../details/relation_details_sheet.dart';
 import 'relation_participant_choice.dart';
 import 'relation_participant_picker_purpose.dart';
 
@@ -27,8 +28,8 @@ import 'relation_participant_picker_purpose.dart';
 /// намерение пары исключает запрос каталога по идентификатору, поэтому
 /// одноимённые намерения остаются отдельными строками. Строки, выбор которых
 /// дал бы занятую пару, отмечены и не выбираются. Нажатие на их текст открывает
-/// занимающую активную связь поверх поиска, а архивную предлагает восстановить
-/// с подтверждением. Пока форма создания не может продолжаться, например пока
+/// панель занимающей активной связи над поиском, а архивную предлагает
+/// восстановить с подтверждением. Пока форма создания не может продолжаться, например пока
 /// выполняется восстановление, нажатия на текст строк ничего не делают. Выбор
 /// возвращает снимок участника с ревизией выдачи, из которой выбрана строка.
 /// Закрытие не возвращает ничего и не создаёт намерений. Подзаголовок шапки
@@ -79,7 +80,7 @@ final class _RelationParticipantPickerPageState
       !context.router.hasPagelessTopRoute;
 
   void _openRelation(LongTermRelationId id) =>
-      unawaited(context.router.push(RelationDetailsRoute(relationId: id)));
+      unawaited(showRelationDetailsSheet(context, id));
 
   /// Что значит занятая пара: активная связь открывается, а архивную можно
   /// восстановить.

@@ -4,6 +4,8 @@ import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/design_system/components/relation_head.dart';
+import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
@@ -184,6 +186,7 @@ void main() {
     exit();
     await tester.pumpAndSettle();
     expect(app.router.stackData.last.matchId, newMatch);
+    expect(_relationSheet, findsNothing);
     expect(_description(tester), 'Новый черновик');
     expect(app.repository.relationCommands, hasLength(1));
     expect(find.textContaining('Relation created.'), findsOneWidget);
@@ -226,9 +229,8 @@ void main() {
       await _fill(tester, app);
       await _tap(tester, 'relation-editor-submit');
       final created = app.repository.completeRelationCreated(0);
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
-      expect(app.router.current.name, RelationDetailsRoute.name);
+      await _pumpSheetAfterForm(tester);
+      expect(app.repository.relationWatches.last.relationId, created.id);
       app.repository.relationWatches.last.emitDetails(
         testRelationDetails(
           relationId: created.id,
@@ -238,20 +240,16 @@ void main() {
         revision: const TestCatalogRevision(2),
       );
       await tester.pumpAndSettle();
-      expect(
-        tester
-            .widget<RelationDetailsPage>(find.byType(RelationDetailsPage))
-            .relationId,
-        created.id,
-      );
-      expect(
-        app.router.stackData.take(history.length).map((route) => route.matchId),
-        history,
-      );
-      expect(app.router.stackData, hasLength(history.length + 1));
+      expect(find.byType(RelationHead), findsOneWidget);
+      expect(app.router.stackData.map((route) => route.matchId), history);
       expect(app.repository.relationCommands, hasLength(1));
+      expect(
+        find.textContaining('Relation created.').hitTestable(),
+        findsOneWidget,
+      );
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
+      expect(_relationSheet, findsNothing);
       expect(app.router.stackData.map((route) => route.matchId), history);
       expect(find.byType(RelationDetailsPage), findsOneWidget);
       await tester.binding.handlePopRoute();
@@ -328,6 +326,7 @@ void main() {
       app.repository.completeRelationCreated(0);
       await tester.pumpAndSettle();
       expect(app.router.stackData.last.matchId, newMatch);
+      expect(_relationSheet, findsNothing);
       expect(_description(tester), 'Новый черновик');
       expect(app.repository.relationCommands, hasLength(1));
       expect(find.textContaining('Relation created.'), findsOneWidget);
@@ -352,7 +351,7 @@ void main() {
   });
 
   testWidgets(
-    'успех восстановления закрывает поиск и форму и открывает связь',
+    'успех восстановления убирает поиск и форму и открывает панель связи',
     (tester) async {
       final app = await _launch(tester);
       final history = app.router.stackData
@@ -371,8 +370,8 @@ void main() {
         testFormRelationId(5),
       );
       final restored = app.repository.completeRelationRestored(0);
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
+      await _pumpSheetAfterForm(tester);
+      expect(app.repository.relationWatches.last.relationId, restored.id);
       app.repository.relationWatches.last.emitDetails(
         testRelationDetails(
           relationId: restored.id,
@@ -382,16 +381,15 @@ void main() {
         revision: const TestCatalogRevision(2),
       );
       await tester.pumpAndSettle();
+      expect(find.byType(RelationHead), findsOneWidget);
+      expect(app.router.stackData.map((route) => route.matchId), history);
       expect(
-        tester
-            .widget<RelationDetailsPage>(find.byType(RelationDetailsPage))
-            .relationId,
-        restored.id,
+        find.textContaining('Relation restored.').hitTestable(),
+        findsOneWidget,
       );
-      expect(app.router.stackData, hasLength(history.length + 1));
-      expect(find.textContaining('Relation restored.'), findsOneWidget);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
+      expect(_relationSheet, findsNothing);
       expect(app.router.stackData.map((route) => route.matchId), history);
       expect(tester.takeException(), isNull);
     },
@@ -438,6 +436,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
       expect(app.router.stackData.map((route) => route.matchId), covered);
+      expect(_relationSheet, findsNothing);
       expect(choice.restore.canContinue, isFalse);
       expect(find.textContaining('Relation restored.'), findsOneWidget);
       while (app.router.current.name != RelationEditorRoute.name) {
@@ -454,7 +453,7 @@ void main() {
   }
 
   testWidgets(
-    'выход из потока до результата: поздний успех не открывает связь',
+    'выход из потока до результата: поздний успех не открывает панель',
     (tester) async {
       final app = await _launch(tester);
       await _openForm(tester, app, IntentionRelationGroup.needs);
@@ -476,6 +475,7 @@ void main() {
       app.repository.completeRelationRestored(0);
       await tester.pumpAndSettle();
       expect(app.router.stackData.map((route) => route.matchId), history);
+      expect(_relationSheet, findsNothing);
       expect(find.textContaining('Relation restored.'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
@@ -524,10 +524,19 @@ void main() {
 }
 
 Finder _key(String key) => find.byKey(ValueKey(key));
+final _relationSheet = find.byType(Sheet);
 String _description(WidgetTester tester) => tester
     .widget<TextField>(_key('relation-editor-description'))
     .controller!
     .text;
+
+/// Кадры удаления формы и панели, которая открывается только после него и
+/// начинает читать связь в следующем кадре.
+Future<void> _pumpSheetAfterForm(WidgetTester tester) async {
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 400));
+  await tester.pump();
+}
 
 Future<void> _tap(WidgetTester tester, String key) async {
   await tester.tap(_key(key));
