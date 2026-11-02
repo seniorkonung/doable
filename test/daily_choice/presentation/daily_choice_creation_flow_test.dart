@@ -18,6 +18,7 @@ import 'package:doable/src/design_system/components/tabs.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
+import 'package:doable/src/design_system/doable_priority.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_tabs.dart';
@@ -469,10 +470,10 @@ void main() {
           ValueKey('intention-choices-row-${ids.last.toCanonicalString()}'),
         ),
       );
-      await _waitFor(tester, dailyChoiceDetails);
+      await _waitFor(tester, dailyChoiceDetailsReady);
       await tester.pumpAndSettle();
-      expect(find.text('Время: 18:00'), findsOneWidget);
-      expect(find.text('Приоритет P2'), findsOneWidget);
+      expect(dailyChoiceDetailsField('18:00'), findsOneWidget);
+      expect(shownDailyChoiceHead(tester).priority, DoablePriority.p2);
       await openDailyChoiceEdit(tester, tap: _tap);
       await _waitFor(
         tester,
@@ -488,8 +489,8 @@ void main() {
       );
       await _waitFor(tester, dailyChoiceDetailsReady);
       await tester.pumpAndSettle();
-      expect(find.text('Весь день'), findsOneWidget);
-      expect(find.text('Приоритет P2'), findsOneWidget);
+      expect(dailyChoiceDetailsField('Весь день'), findsOneWidget);
+      expect(shownDailyChoiceHead(tester).priority, DoablePriority.p2);
 
       final edited = await _read(repository, ids.last);
       expect(edited.choice.id, created.choice.id);
@@ -520,6 +521,7 @@ void main() {
         await _tap(tester, find.byKey(const ValueKey('daily-choice-row-1')));
         await _waitFor(tester, dailyChoiceDetailsReady);
         expect(shownDailyChoice(tester), expectedId);
+        await showDailyChoicePath(tester, tap: _tap);
         expect(dailyChoiceDetailsRelation(1), findsOneWidget);
         expect(dailyChoiceDetailsRelation(2), findsOneWidget);
         await closeDailyChoiceDetails(tester);
@@ -789,6 +791,7 @@ void main() {
         ),
         findsOneWidget,
       );
+      await showDailyChoicePath(tester, tap: _tap);
       expect(dailyChoiceDetailsRelation(1), findsOneWidget);
       expect(_savedIds(harness), hasLength(4));
     },

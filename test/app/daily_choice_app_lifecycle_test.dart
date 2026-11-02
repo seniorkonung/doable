@@ -325,10 +325,7 @@ void main() {
       await selectDailyChoiceCatalogDate(tester, createdDate, tap: _tap);
       await _tap(tester, find.byKey(const ValueKey('daily-choice-row-1')));
       await tester.pumpAndSettle();
-      expect(
-        find.textContaining(createdDate.toCanonicalString()),
-        findsWidgets,
-      );
+      expect(dailyChoiceDetailsField('Завтра'), findsOneWidget);
       expect(_storedIds(harness, 'daily_choices'), hasLength(2));
       await tester.pump(const Duration(seconds: 1));
       expect(message, findsNothing);

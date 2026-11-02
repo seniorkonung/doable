@@ -63,7 +63,7 @@ enum _MatrixEntry {
     _MatrixEntry.confirmPath => find.byKey(
       const ValueKey('choice-path-open-confirmation'),
     ),
-    _MatrixEntry.editChoice => dailyChoiceDetailsEdit,
+    _MatrixEntry.editChoice => dailyChoiceDetailsOptions,
     _MatrixEntry.createRelation => find.byKey(
       const ValueKey('intention-relations-add'),
     ),
@@ -308,12 +308,6 @@ void _registerPageMatrixTests() {
       page: IntentionEditPage,
       panel: false,
       entries: [read, _MatrixEntry.editIntention],
-    ),
-    (
-      name: 'дневной выбор',
-      page: DailyChoiceDetailsPage,
-      panel: true,
-      entries: [daily],
     ),
     (
       name: 'поиск действия',

@@ -15,7 +15,6 @@ import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalo
 import 'package:doable/src/design_system/components/day_heading.dart';
 import 'package:doable/src/design_system/components/notice.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_date_catalog_page.dart';
-import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/design_system/components/calendar_handle.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
@@ -26,6 +25,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/app_root_pages.dart';
+import '../../../support/daily_choice_details_controls.dart';
 import '../../../support/daily_choice_local_date.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
 import 'daily_choice_calendar_test_support.dart';
@@ -447,7 +447,7 @@ void main() {
       await tester.tap(row);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
-      expect(find.byType(DailyChoiceDetailsPage), findsOneWidget);
+      expect(dailyChoiceDetails, findsOneWidget);
       await _back(tester);
       expect(find.text('2030'), findsOneWidget);
       expect(find.text('Январь'), findsOneWidget);
@@ -639,11 +639,7 @@ void main() {
     await tester.tap(row);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
-    expect(find.byType(DailyChoiceDetailsPage), findsOneWidget);
-    expect(
-      router.current.argsAs<DailyChoiceDetailsRouteArgs>().choiceId,
-      catalogPageItem(50, date: selected).id,
-    );
+    expect(shownDailyChoice(tester), catalogPageItem(50, date: selected).id);
     await _back(tester);
     expect(tester.getTopLeft(row).dy, closeTo(position, 1));
 

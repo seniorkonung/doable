@@ -167,10 +167,7 @@ void _catalogNavigationScenarios() {
       await tester.pumpAndSettle();
       expect(find.text('Намерение 4'), findsOneWidget);
       await _openChoiceRow(tester, 1);
-      expect(
-        find.text('${app.texts.dailyChoiceDetailsSelectedAction}: Намерение 4'),
-        findsOneWidget,
-      );
+      expect(shownDailyChoiceHead(tester).action, 'Намерение 4');
       await closeDailyChoiceDetails(tester);
       await _prepareCatalog(tester, app, second, total: 122);
       final reads = app.probe.sourceReads;

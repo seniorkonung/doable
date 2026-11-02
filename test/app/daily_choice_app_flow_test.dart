@@ -7,8 +7,11 @@ import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_creation_page.dart';
 import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/design_system/components/tabs.dart';
+import 'package:doable/src/design_system/doable_priority.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
@@ -191,6 +194,15 @@ Future<void> _openOrigin(
   }
 }
 
+/// Открывает вкладку «Выборы» страницы намерения 1.
+Future<void> _openIntentionChoices(WidgetTester tester) async {
+  await openIntentionGraph(tester, waitFor: _until);
+  final title = find.text('Намерение 1');
+  await _until(tester, title);
+  await _tap(tester, title.first);
+  await openIntentionChoicesTab(tester, waitFor: _until, tap: _tap);
+}
+
 /// Нажимает вход создания и доводит поток до пошагового выбора.
 Future<void> _beginCreation(WidgetTester tester, _CreationEntry entry) async {
   switch (entry) {
@@ -255,7 +267,143 @@ Future<void> _confirmNewChoice(
   await tester.pumpAndSettle(const Duration(milliseconds: 1));
 }
 
+/// Сохранённый выбор сценариев панели: сегодня, на 18:00, с приоритетом P2.
+final _panelChoice = durabilityChoice(201);
+const _panelDescription = 'Выйти до заката';
+final _panelChoiceRow = find.byKey(
+  ValueKey('intention-choices-row-${_panelChoice.toCanonicalString()}'),
+);
+
+/// Запускает приложение над графом с сохранённым [_panelChoice].
+Future<void> _startWithPanelChoice(WidgetTester tester) async {
+  tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+  tester.binding.platformDispatcher.localesTestValue = const [Locale('ru')];
+  addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
+  tester.view.physicalSize = const Size(1200, 2400);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+  final harness = (await tester.runAsync(LocalDatabaseHarness.fileBacked))!;
+  final seeded = await harness.openReadyDatabase();
+  await seedDurabilityGraph(seeded);
+  expect(
+    await durabilityRepository(seeded).execute(
+      durabilityCreate(
+        date: _todayDate,
+        description: _panelDescription,
+        completed: false,
+        schedule: DailyChoiceTime(hour: 18, minute: 0),
+        priority: DailyChoicePriority.p2,
+      ),
+    ),
+    isA<GraphCommandSucceeded>(),
+  );
+  await harness.closePersistenceObjectGraph();
+  final runtime = AppRuntime(
+    quickCreationModeStore: InMemoryQuickCreationModeStore(),
+    connectionFactory: () => openFileBackedLocalDatabase(harness.databaseFile),
+    diagnosticsSink: InMemoryDiagnosticsSink(),
+    dailyChoiceLocalDateSource: ControlledDailyChoiceLocalDate(_todayDate).read,
+  );
+  addTearDown(() async {
+    await tester.pumpWidget(const SizedBox.shrink());
+    await runtime.shutdown();
+    await harness.dispose();
+  });
+  await tester.pumpWidget(MainApp(runtime: runtime));
+}
+
+/// Пока панель открыта, панель навигации и [page] под ней не принимают нажатий.
+void _expectCoveredByPanel(Finder page) {
+  expect(dailyChoiceDetails, findsOneWidget);
+  expect(appNavigationDestinations().hitTestable(), findsNothing);
+  expect(page.hitTestable(), findsNothing);
+}
+
 void main() {
+  testWidgets('нажатие на карточку открывает панель на «Обзоре», а закрытие '
+      'возвращает каталог с прежним состоянием', (tester) async {
+    await _startWithPanelChoice(tester);
+    await openDailyChoices(tester, tap: _tap);
+    final row = find.byKey(const ValueKey('daily-choice-row-1'));
+    await _until(tester, row);
+    await tester.pumpAndSettle(const Duration(milliseconds: 1));
+    await expandDailyChoiceCatalogCalendar(tester);
+    final viewport = shownDailyChoiceCatalogViewport(tester);
+
+    await _tap(tester, row);
+    await _until(tester, dailyChoiceDetailsReady);
+    await tester.pumpAndSettle(const Duration(milliseconds: 1));
+
+    expect(shownDailyChoice(tester), _panelChoice);
+    final head = shownDailyChoiceHead(tester);
+    expect(head.goal, 'Намерение 1');
+    expect(head.action, 'Намерение 3');
+    expect(head.priority, DoablePriority.p2);
+    for (final value in [_panelDescription, 'Сегодня', '18:00']) {
+      expect(dailyChoiceDetailsField(value), findsOneWidget, reason: value);
+    }
+    expect(dailyChoiceDetailsRelation(1), findsNothing);
+    _expectCoveredByPanel(row);
+
+    await closeDailyChoiceDetails(tester);
+    expect(row.hitTestable(), findsOneWidget);
+    expect(appNavigationDestinations().hitTestable(), findsWidgets);
+    expect(shownDailyChoiceCatalogDate(tester), _todayDate);
+    expect(shownDailyChoiceCatalogViewport(tester), viewport);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('строка вкладки «Выборы» открывает ту же панель, а закрытие '
+      'возвращает вкладку', (tester) async {
+    await _startWithPanelChoice(tester);
+    await _openIntentionChoices(tester);
+
+    await _tap(tester, _panelChoiceRow);
+    await _until(tester, dailyChoiceDetailsReady);
+    await tester.pumpAndSettle(const Duration(milliseconds: 1));
+
+    expect(shownDailyChoice(tester), _panelChoice);
+    _expectCoveredByPanel(_panelChoiceRow);
+
+    await closeDailyChoiceDetails(tester);
+    expect(_panelChoiceRow.hitTestable(), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('выбор, удалённый из второй панели, оставляет первую открытой: '
+      'она показывает, что выбора нет, а закрывает её пользователь', (
+    tester,
+  ) async {
+    await _startWithPanelChoice(tester);
+    await openDailyChoices(tester, tap: _tap);
+    final row = find.byKey(const ValueKey('daily-choice-row-1'));
+    await _tap(tester, row);
+    await _until(tester, dailyChoiceDetailsReady);
+    await openDailyChoicePathIntention(tester, 1, tap: _tap);
+    await openIntentionChoicesTab(tester, waitFor: _until, tap: _tap);
+    await _tap(tester, _panelChoiceRow);
+    await _until(tester, dailyChoiceDetailsReady);
+
+    await startDailyChoiceDeletion(tester, tap: _tap);
+    await _tap(tester, find.text('Удалить'));
+    await _untilGone(tester, dailyChoiceDetails);
+    await tester.pumpAndSettle(const Duration(milliseconds: 1));
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle(const Duration(milliseconds: 1));
+
+    expect(
+      dailyChoiceDetailsField('Дневной выбор больше не существует.'),
+      findsOneWidget,
+    );
+    expect(dailyChoiceDetailsReady, findsNothing);
+    expect(dailyChoiceDetailsOptions, findsNothing);
+    expect(dailyChoiceDetailsField('Путь'), findsNothing);
+
+    await closeDailyChoiceDetails(tester);
+    await _untilGone(tester, row);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'полный путь через экраны переживает перезапуск, правки и удаление дубликата',
     (tester) async {
@@ -350,7 +498,14 @@ void main() {
       await showDailyChoiceCatalogSection(tester, true);
       await _tap(tester, find.byKey(const ValueKey('daily-choice-row-2')));
       await _until(tester, dailyChoiceDetailsReady);
-      expect(find.textContaining('Чтобы Намерение 1'), findsWidgets);
+      expect(
+        find.descendant(
+          of: dailyChoiceDetails,
+          matching: find.text('Намерение 1'),
+        ),
+        findsOneWidget,
+      );
+      await showDailyChoicePath(tester, tap: _tap);
       expect(dailyChoiceDetailsRelation(1), findsOneWidget);
       expect(dailyChoiceDetailsRelation(2), findsOneWidget);
 
@@ -379,19 +534,16 @@ void main() {
         await repository.execute(ArchiveIntention(durabilityIntention(2))),
         isA<ResultSuccess>(),
       );
-      await _until(tester, find.text('Архивировано'));
+      await _until(
+        tester,
+        find.text('В пути есть архивированные намерения или связи.'),
+      );
       expect(
-        tester
-            .widget<Semantics>(dailyChoiceDetailsIntention(2))
-            .properties
-            .label,
+        tester.getSemantics(dailyChoiceDetailsIntention(2)).label,
         contains('Архивировано'),
       );
       expect(
-        tester
-            .widget<Semantics>(dailyChoiceDetailsRelation(2))
-            .properties
-            .label,
+        tester.getSemantics(dailyChoiceDetailsRelation(2)).label,
         contains('Архивировано'),
       );
       await _edit(tester, description: 'После архивирования');
@@ -400,14 +552,6 @@ void main() {
           DisableIntentionReadiness(durabilityIntention(3)),
         ),
         isA<ResultSuccess>(),
-      );
-      await _until(tester, find.textContaining('Не готово к действию'));
-      expect(
-        tester
-            .widget<Semantics>(dailyChoiceDetailsIntention(3))
-            .properties
-            .label,
-        contains('Не готово к действию'),
       );
       await closeDailyChoiceDetails(tester);
       await selectDailyChoiceCatalogDate(
@@ -440,6 +584,7 @@ void main() {
 
       await startDailyChoiceDeletion(tester, tap: _tap);
       await _tap(tester, find.text('Удалить'));
+      await _untilGone(tester, dailyChoiceDetails);
       await _until(tester, dailyChoiceCatalogDateControl);
       await selectDailyChoiceCatalogDate(tester, _formChoiceDate, tap: _tap);
       await showDailyChoiceCatalogSection(tester, true);

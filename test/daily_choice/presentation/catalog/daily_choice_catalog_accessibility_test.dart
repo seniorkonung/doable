@@ -1,7 +1,6 @@
 import 'dart:ui' show Tristate, CheckedState;
 
 import 'package:doable/l10n/app_localizations.dart';
-import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
@@ -9,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/daily_choice_details_controls.dart';
 import 'daily_choice_calendar_test_support.dart';
 import 'daily_choice_catalog_page_test_support.dart';
 
@@ -93,11 +93,7 @@ void main() {
         expect(opening.evaluate().single.flagsCollection.isButton, isTrue);
         tester.semantics.tap(opening);
         await tester.pump();
-        expect(router.current.name, DailyChoiceDetailsRoute.name);
-        expect(
-          router.current.argsAs<DailyChoiceDetailsRouteArgs>().choiceId,
-          item.id,
-        );
+        expect(shownDailyChoice(tester), item.id);
         expect(repository.completionCommands, hasLength(1));
         semantics.dispose();
       });

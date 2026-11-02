@@ -102,15 +102,11 @@ void main() {
           find.descendant(of: details, matching: find.text(description)),
           findsOneWidget,
         );
-        expect(find.text('Время: 18:00'), findsOneWidget);
-        expect(
-          find.descendant(of: details, matching: find.text('Выполнено')),
-          findsOneWidget,
-        );
-        await tester.scrollUntilVisible(dailyChoiceDetailsRelation(2), 400);
+        expect(dailyChoiceDetailsField('18:00'), findsOneWidget);
+        expect(shownDailyChoiceHead(tester).done, isTrue);
+        await showDailyChoicePath(tester);
         expect(dailyChoiceDetailsRelation(1), findsOneWidget);
         expect(dailyChoiceDetailsRelation(2), findsOneWidget);
-        await tester.scrollUntilVisible(dailyChoiceDetailsEdit, 300);
         await openDailyChoiceEdit(tester);
         await _until(
           tester,

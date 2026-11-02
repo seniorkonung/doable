@@ -61,24 +61,25 @@ Future<void> showDailyChoiceSheet(
 ) => showDoableSheet<void>(
   context: context,
   hostsMessages: true,
-  builder: (_, sheet) => _DailyChoiceSheet(sheet, choiceId: choiceId),
+  builder: (_, sheet) => DailyChoiceSheet(sheet, choiceId: choiceId),
 );
 
 enum _ChoiceTab { overview, path }
 
 enum _ChoiceOption { edit, delete }
 
-final class _DailyChoiceSheet extends ConsumerStatefulWidget {
-  const _DailyChoiceSheet(this.sheet, {required this.choiceId});
+/// Содержимое панели выбора; показывает его [showDailyChoiceSheet].
+final class DailyChoiceSheet extends ConsumerStatefulWidget {
+  const DailyChoiceSheet(this.sheet, {required this.choiceId, super.key});
 
   final SheetPresentation sheet;
   final DailyChoiceId choiceId;
 
   @override
-  ConsumerState<_DailyChoiceSheet> createState() => _DailyChoiceSheetState();
+  ConsumerState<DailyChoiceSheet> createState() => _DailyChoiceSheetState();
 }
 
-final class _DailyChoiceSheetState extends ConsumerState<_DailyChoiceSheet> {
+final class _DailyChoiceSheetState extends ConsumerState<DailyChoiceSheet> {
   late final DailyChoiceDetailsViewModel _model;
 
   /// Сегодняшний день для подписи даты: панель может оставаться открытой

@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:auto_route/auto_route.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollCacheExtent, ScrollDirection;
@@ -8,7 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../l10n/app_localizations.dart';
-import '../../../app/routing/app_router.gr.dart';
 import '../../../design_system/components/choice_row.dart';
 import '../../../design_system/components/day_heading.dart';
 import '../../../design_system/components/empty_state.dart';
@@ -28,6 +26,7 @@ import '../../domain/daily_choice_id.dart';
 import '../../domain/daily_choice_priority.dart';
 import '../../domain/daily_choice_schedule.dart';
 import '../daily_choice_command_failure_message.dart';
+import '../details/daily_choice_sheet.dart';
 import 'daily_choice_calendar.dart';
 import 'daily_choice_calendar_day_marks_view_model.dart';
 import 'daily_choice_calendar_viewport.dart';
@@ -508,8 +507,7 @@ final class _DailyChoiceCatalogBodyState
           final completion = item.isCompleted
               ? l10n.dailyChoiceDetailsCompleted
               : l10n.dailyChoiceDetailsNotCompleted;
-          void open() =>
-              context.router.push(DailyChoiceDetailsRoute(choiceId: item.id));
+          void open() => unawaited(showDailyChoiceSheet(context, item.id));
           final schedule = switch (item.schedule) {
             DailyChoiceAllDay() => l10n.dailyChoiceAllDay,
             DailyChoiceTime(:final hour, :final minute) => TimeOfDay(

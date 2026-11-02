@@ -12,6 +12,7 @@ import '../../../daily_choice/application/choice_path_draft.dart';
 import '../../../daily_choice/domain/calendar_date.dart';
 import '../../../daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import '../../../daily_choice/presentation/catalog/daily_choice_local_day_observer.dart';
+import '../../../daily_choice/presentation/details/daily_choice_sheet.dart';
 import '../../../daily_choice/presentation/intention_choices/intention_choices_sliver.dart';
 import '../../../daily_choice/presentation/intention_choices/intention_choices_state.dart';
 import '../../../daily_choice/presentation/intention_choices/intention_choices_view_model.dart';
@@ -775,11 +776,8 @@ final class _LoadedDetails extends StatelessWidget {
               IntentionChoicesSliver(
                 intentionId: intention.id,
                 pageInstance: pageInstance,
-                onOpenDailyChoice: (choiceId) => unawaited(
-                  context.router.push(
-                    DailyChoiceDetailsRoute(choiceId: choiceId),
-                  ),
-                ),
+                onOpenDailyChoice: (choiceId) =>
+                    unawaited(showDailyChoiceSheet(context, choiceId)),
                 // Создание дневного выбора не изменяет намерение, поэтому
                 // изменяющая операция его не выключает: недопустимое начало
                 // отклоняет модель пути.

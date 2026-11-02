@@ -42,6 +42,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
 
 import '../../../support/app_root_pages.dart';
+import '../../../support/daily_choice_details_controls.dart';
 import '../../../support/daily_choice_local_date.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import 'daily_choice_calendar_test_support.dart';
@@ -152,11 +153,7 @@ void main() {
         expect(dailyChoiceCompletionState(tester, checkbox).completed, isTrue);
         await tester.tap(find.byKey(const ValueKey('daily-choice-row-2')));
         await tester.pump();
-        expect(router.current.name, DailyChoiceDetailsRoute.name);
-        expect(
-          router.current.argsAs<DailyChoiceDetailsRouteArgs>().choiceId,
-          second.id,
-        );
+        expect(shownDailyChoice(tester), second.id);
       },
     );
   }
@@ -576,7 +573,7 @@ void main() {
     tester,
   ) async {
     final repository = _Repository();
-    final router = await _open(tester, repository);
+    await _open(tester, repository);
     expect(find.text('Загружаем дневные выборы…'), findsOneWidget);
     repository.completeFirst([_item(1), _item(2)], total: 2);
     await tester.pumpAndSettle();
@@ -592,11 +589,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('daily-choice-row-2')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
-    expect(router.current.name, DailyChoiceDetailsRoute.name);
-    expect(
-      router.current.argsAs<DailyChoiceDetailsRouteArgs>().choiceId,
-      _id(2),
-    );
+    expect(shownDailyChoice(tester), _id(2));
     semantics.dispose();
   });
 

@@ -751,14 +751,11 @@ void main() {
       );
       await _pumpUntilFound(tester, dailyChoiceDetails);
       await tester.pumpAndSettle(const Duration(milliseconds: 1));
+      await showDailyChoicePath(tester, tap: _tapWhenFound);
       expect(
         find.descendant(
           of: dailyChoiceDetailsRelation(1),
-          matching: find.text(
-            '${l10n.relationNeighborhoodTypeCan}: '
-            '${l10n.relationNeighborhoodCanPhrase('Намерение 1', 'Намерение 2')}',
-            skipOffstage: false,
-          ),
+          matching: find.text(l10n.relationNeighborhoodTypeCan),
         ),
         findsOneWidget,
       );
