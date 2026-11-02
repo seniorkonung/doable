@@ -1928,56 +1928,9 @@ void main() {
     expect(_sheetHeight(tester), height);
   });
 
-  for (final hostsMessages in [false, true]) {
-    testWidgets('ручка раскрывает лист без заголовка'
-        '${hostsMessages ? ' с сообщениями поверх' : ''}, когда всё '
-        'помещается, на весь экран без скругления и тени, а следующее нажатие '
-        'возвращает компактный размер', (tester) async {
-      final semantics = tester.ensureSemantics();
-      await _openUntitledSheet(tester, hostsMessages: hostsMessages);
-      final compact = tester.getRect(find.byType(Sheet));
-      expect(
-        tester.getSemantics(find.bySemanticsLabel(_expandLabel)),
-        isSemantics(
-          label: _expandLabel,
-          isButton: true,
-          hasExpandedState: true,
-          isExpanded: false,
-          hasTapAction: true,
-        ),
-      );
-
-      await tester.tap(find.bySemanticsLabel(_expandLabel));
-      await tester.pumpAndSettle();
-
-      expect(
-        tester.getRect(find.byType(Sheet)),
-        Rect.fromLTRB(0, _statusBar, _screen.width, _screen.height),
-      );
-      expect(_topRadius(tester), 0);
-      expect(_hasShadow(tester), isFalse);
-      expect(
-        tester.getSemantics(find.bySemanticsLabel(_collapseLabel)),
-        isSemantics(
-          label: _collapseLabel,
-          isButton: true,
-          hasExpandedState: true,
-          isExpanded: true,
-          hasTapAction: true,
-        ),
-      );
-
-      await tester.tap(find.bySemanticsLabel(_collapseLabel));
-      await tester.pumpAndSettle();
-
-      expect(tester.getRect(find.byType(Sheet)), compact);
-      expect(_topRadius(tester), DoableMetrics.radiusXl);
-      semantics.dispose();
-    });
-  }
-
-  testWidgets('лист без заголовка, содержимое которого выросло выше предела, '
-      'остаётся компактным и прокручивает тело', (tester) async {
+  testWidgets('лист без заголовка, содержимое которого выросло выше экрана, '
+      'ставит верхний край под строку состояния, сохраняет скругление и '
+      'прокручивает тело', (tester) async {
     final isLong = ValueNotifier(false);
     addTearDown(isLong.dispose);
     await _openUntitledSheet(
@@ -1985,132 +1938,19 @@ void main() {
       hostsMessages: true,
       body: (_) => ValueListenableBuilder(
         valueListenable: isLong,
-        builder: (context, isLong, _) => SizedBox(height: isLong ? 700 : 120),
+        builder: (context, isLong, _) => SizedBox(height: isLong ? 1200 : 120),
       ),
     );
 
     isLong.value = true;
     await tester.pumpAndSettle();
 
-    expect(_sheetHeight(tester), _compact);
+    expect(
+      tester.getRect(find.byType(Sheet)),
+      Rect.fromLTRB(0, _statusBar, _screen.width, _screen.height),
+    );
     expect(_topRadius(tester), DoableMetrics.radiusXl);
     expect(_bodyPosition(tester).maxScrollExtent, greaterThan(0));
-    expect(find.bySemanticsLabel(_expandLabel), findsOne);
-  });
-
-  testWidgets('область нажатия ручки стоит над телом листа без заголовка, а '
-      'ниже неё нажатие принимает тело', (tester) async {
-    var bodyTaps = 0;
-    await _openUntitledSheet(
-      tester,
-      body: (_) => GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => bodyTaps++,
-        child: const SizedBox(height: 120, width: double.infinity),
-      ),
-    );
-    final compact = tester.getRect(find.byType(Sheet));
-
-    await tester.tapAt(Offset(compact.center.dx, compact.top + 26 + 10));
-    await tester.pumpAndSettle();
-    expect(_sheetHeight(tester), _full);
-    expect(bodyTaps, 0);
-
-    await tester.tapAt(Offset(compact.center.dx, _statusBar + 44 + 10));
-    await tester.pump();
-    expect(bodyTaps, 1);
-  });
-
-  testWidgets('за ручку лист без заголовка идёт вверх вслед за пальцем и '
-      'раскрывается, а вниз уходит целиком и закрывается', (tester) async {
-    final sheet = await _openUntitledSheet(tester);
-    final compact = tester.getRect(find.byType(Sheet));
-    final growth = _full - compact.height;
-
-    final up = await _SlowGesture.start(
-      tester,
-      find.bySemanticsLabel(_expandLabel),
-    );
-    for (final rise in [100.0, growth, growth + 60]) {
-      await up.moveTo(-rise);
-      expect(
-        tester.getRect(find.byType(Sheet)).top,
-        closeTo(compact.top - rise.clamp(0, growth), 1),
-        reason: 'подъём $rise',
-      );
-    }
-    await up.up();
-    await tester.pumpAndSettle();
-    expect(_sheetHeight(tester), _full);
-
-    await tester.tap(find.bySemanticsLabel(_collapseLabel));
-    await tester.pumpAndSettle();
-    final down = await _SlowGesture.start(
-      tester,
-      find.bySemanticsLabel(_expandLabel),
-    );
-    await down.moveTo(compact.height * 0.8);
-    expect(
-      tester.getRect(find.byType(Sheet)).top,
-      closeTo(compact.top + compact.height * 0.8, 1),
-    );
-    expect(_sheetHeight(tester), compact.height);
-    await down.up();
-    await tester.pumpAndSettle();
-    expect(sheet.isClosed, isTrue);
-  });
-
-  testWidgets('свайп вверх по телу листа без заголовка, которое помещается, '
-      'раскрывает лист вслед за пальцем', (tester) async {
-    await _openUntitledSheet(tester);
-    final compact = tester.getRect(find.byType(Sheet));
-    final gesture = await _SlowGesture.start(tester, find.text('Тело'));
-    // Первое движение тело тратит на принятие жеста.
-    await gesture.moveTo(-20);
-
-    await gesture.moveTo(-20 - 100);
-    expect(
-      tester.getRect(find.byType(Sheet)).top,
-      closeTo(compact.top - 100, 1),
-    );
-    await gesture.moveTo(-20 - (_full - compact.height));
-    await gesture.up();
-    await tester.pumpAndSettle();
-
-    expect(_sheetHeight(tester), _full);
-  });
-
-  testWidgets('длинное тело листа без заголовка прокручивается только в полном '
-      'размере, а вниз сначала прокручивается к началу и затем сворачивает '
-      'лист', (tester) async {
-    await _openUntitledSheet(tester, body: (_) => _longBody);
-    final compact = tester.getRect(find.byType(Sheet));
-    final body = _bodyPosition(tester);
-    final gesture = await _SlowGesture.start(tester, find.text('Строка 5'));
-    // Первое движение тело тратит на принятие жеста.
-    await gesture.moveTo(-20);
-
-    await gesture.moveTo(-20 - _growth);
-    expect(
-      tester.getRect(find.byType(Sheet)).top,
-      closeTo(compact.top - _growth, 1),
-    );
-    expect(body.pixels, 0);
-
-    await gesture.moveTo(-20 - _growth - 120);
-    expect(_sheetHeight(tester), _full);
-    expect(body.pixels, 120);
-
-    await gesture.moveTo(-20 - _growth - 20);
-    expect(body.pixels, 20);
-    expect(_sheetHeight(tester), _full);
-
-    await gesture.moveTo(-20 + 100);
-    expect(body.pixels, 0);
-    expect(_sheetHeight(tester), closeTo(_compact, 1));
-    await gesture.up();
-    await tester.pumpAndSettle();
-    expect(_sheetHeight(tester), _compact);
   });
 
   for (final hostsMessages in [false, true]) {
@@ -2182,61 +2022,6 @@ void main() {
     expect(_sheetHeight(tester), compact);
     expect(_topRadius(tester), DoableMetrics.radiusXl);
     expect(_hasShadow(tester), isTrue);
-  });
-
-  testWidgets('полоса в полном размере не двигает верхний край, а её снятие '
-      'возвращает раскрытый лист с ручкой', (tester) async {
-    final editing = ValueNotifier(false);
-    addTearDown(editing.dispose);
-    await _openUntitledSheet(
-      tester,
-      editing: editing,
-      body: (isEditing) =>
-          SizedBox(height: isEditing ? 400 : 120, child: const Text('Тело')),
-    );
-    final compact = tester.getRect(find.byType(Sheet));
-    await tester.tap(find.bySemanticsLabel(_expandLabel));
-    await tester.pumpAndSettle();
-
-    for (final isEditing in [true, false]) {
-      editing.value = isEditing;
-      do {
-        await tester.pump(const Duration(milliseconds: 16));
-        expect(
-          tester.getRect(find.byType(Sheet)).top,
-          _statusBar,
-          reason: 'полоса: $isEditing',
-        );
-        expect(_topRadius(tester), 0, reason: 'полоса: $isEditing');
-      } while (tester.binding.hasScheduledFrame);
-    }
-    expect(_sheetHeight(tester), _full);
-
-    await tester.tap(find.bySemanticsLabel(_collapseLabel));
-    await tester.pumpAndSettle();
-    expect(tester.getRect(find.byType(Sheet)), compact);
-  });
-
-  testWidgets('снятие полосы, которая оборвала перетаскивание, возвращает '
-      'размер начала жеста, а не промежуточное положение', (tester) async {
-    final editing = ValueNotifier(false);
-    addTearDown(editing.dispose);
-    await _openUntitledSheet(tester, editing: editing);
-    final compact = tester.getRect(find.byType(Sheet));
-    final gesture = await _SlowGesture.start(
-      tester,
-      find.bySemanticsLabel(_expandLabel),
-    );
-    await gesture.moveTo(-100);
-    expect(_sheetHeight(tester), greaterThan(compact.height));
-
-    editing.value = true;
-    await tester.pumpAndSettle();
-    await gesture.up();
-    editing.value = false;
-    await tester.pumpAndSettle();
-
-    expect(tester.getRect(find.byType(Sheet)), compact);
   });
 
   testWidgets('при уменьшении движения размер меняется сразу', (tester) async {
@@ -2638,8 +2423,6 @@ Future<_OpenedSheet> _openUntitledSheet(
       builder: (context, isEditing, _) => Sheet.untitled(
         sheet,
         label: _untitledLabel,
-        expandLabel: _expandLabel,
-        collapseLabel: _collapseLabel,
         bar: isEditing
             ? TopBar.withButton(
                 context,

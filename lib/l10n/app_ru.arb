@@ -599,8 +599,6 @@
   "relationSheetDescriptionDiscardMessage": "Изменения описания не сохранятся.",
   "relationSheetDescriptionDiscardAction": "Отменить",
   "relationSheetDescriptionContinueAction": "Продолжить правку",
-  "relationSheetExpand": "Раскрыть панель связи",
-  "relationSheetCollapse": "Свернуть панель связи",
   "relationSheetOptionsLabel": "Параметры связи",
   "relationSheetOptionArchive": "Архивировать",
   "relationSheetOptionRestore": "Восстановить из архива",

@@ -2141,12 +2141,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get relationSheetDescriptionContinueAction => 'Продолжить правку';
 
   @override
-  String get relationSheetExpand => 'Раскрыть панель связи';
-
-  @override
-  String get relationSheetCollapse => 'Свернуть панель связи';
-
-  @override
   String get relationSheetOptionsLabel => 'Параметры связи';
 
   @override

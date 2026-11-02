@@ -2117,12 +2117,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get relationSheetDescriptionContinueAction => 'Keep editing';
 
   @override
-  String get relationSheetExpand => 'Expand relation panel';
-
-  @override
-  String get relationSheetCollapse => 'Collapse relation panel';
-
-  @override
   String get relationSheetOptionsLabel => 'Relation options';
 
   @override

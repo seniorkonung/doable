@@ -1384,107 +1384,11 @@ void main() {
     });
   });
 
-  group('размер панели', () {
-    const screen = Size(390, 844);
-    const statusBar = 47.0;
-    const saved = 'Хотя бы раз в неделю';
-    const expand = 'Раскрыть панель связи';
-    const collapse = 'Свернуть панель связи';
-    const full = Rect.fromLTRB(0, statusBar, 390, 844);
-
-    Future<void> openLoaded(WidgetTester tester) async {
-      tester.view
-        ..devicePixelRatio = 1
-        ..physicalSize = screen
-        ..padding = const FakeViewPadding(top: statusBar);
-      addTearDown(tester.view.reset);
-      final repository = await _openSheet(tester);
-      repository
-          .watchAt(0)
-          .emitDetails(
-            testRelationDetails(
-              relationId: relationId,
-              sourceId: testIntentionId(1),
-              relatedId: testIntentionId(2),
-              description: saved,
-            ),
-            revision: revision,
-          );
-      await tester.pumpAndSettle();
-    }
-
-    Future<void> openDescription(WidgetTester tester) async {
-      await tester.tap(find.text(saved));
-      await tester.pumpAndSettle();
-      expect(tester.getRect(find.byType(Sheet)), full);
-      expect(find.text('Сохранить'), findsOneWidget);
-    }
-
-    Future<void> leaveDescription(WidgetTester tester) async {
-      await tester.tap(find.bySemanticsLabel('Назад к связи'));
-      await tester.pumpAndSettle();
-      expect(find.text('Сохранить'), findsNothing);
-    }
-
-    testWidgets('ручка раскрывает панель на весь экран под строкой состояния, '
-        'даже когда связь помещается, а следующее нажатие возвращает '
-        'компактный размер', (tester) async {
-      final semantics = tester.ensureSemantics();
-      await openLoaded(tester);
-      final compact = tester.getRect(find.byType(Sheet));
-      expect(compact.top, greaterThan(statusBar));
-      expect(find.bySemanticsLabel(collapse), findsNothing);
-
-      await tester.tap(find.bySemanticsLabel(expand));
-      await tester.pumpAndSettle();
-
-      expect(tester.getRect(find.byType(Sheet)), full);
-      expect(find.bySemanticsLabel(expand), findsNothing);
-
-      await tester.tap(find.bySemanticsLabel(collapse));
-      await tester.pumpAndSettle();
-
-      expect(tester.getRect(find.byType(Sheet)), compact);
-      expect(find.bySemanticsLabel(expand), findsOneWidget);
-      semantics.dispose();
-    });
-
-    testWidgets('выход из изменения описания возвращает раскрытую панель с '
-        'ручкой вместо полосы', (tester) async {
-      final semantics = tester.ensureSemantics();
-      await openLoaded(tester);
-      await tester.tap(find.bySemanticsLabel(expand));
-      await tester.pumpAndSettle();
-
-      await openDescription(tester);
-      expect(find.bySemanticsLabel(collapse), findsNothing);
-      await leaveDescription(tester);
-
-      expect(tester.getRect(find.byType(Sheet)), full);
-      expect(find.bySemanticsLabel(collapse), findsOneWidget);
-      semantics.dispose();
-    });
-
-    testWidgets('изменение, открытое из компактного размера, возвращает '
-        'компактный размер', (tester) async {
-      final semantics = tester.ensureSemantics();
-      await openLoaded(tester);
-      final compact = tester.getRect(find.byType(Sheet));
-
-      await openDescription(tester);
-      await leaveDescription(tester);
-
-      expect(tester.getRect(find.byType(Sheet)), compact);
-      expect(find.bySemanticsLabel(expand), findsOneWidget);
-      semantics.dispose();
-    });
-  });
-
   group('новый отказ', () {
     const updateFailure = 'Не удалось изменить связь. Повторите попытку.';
     const archiveFailure = 'Не удалось архивировать связь. Повторите попытку.';
 
-    /// Описание не помещается и в полный размер панели.
+    /// Описание не помещается и в высоту, доступную панели.
     final details = testRelationDetails(
       relationId: relationId,
       sourceId: testIntentionId(1),
@@ -1505,10 +1409,10 @@ void main() {
       return repository;
     }
 
-    testWidgets('отказ смены типа виден без раскрытия, а панель остаётся в '
-        'компактном размере', (tester) async {
+    testWidgets('отказ смены типа виден без ручной прокрутки, а высота '
+        'панели не меняется', (tester) async {
       final repository = await openLong(tester);
-      final compact = tester.getRect(find.byType(Sheet));
+      final before = tester.getRect(find.byType(Sheet));
 
       await tester.tap(find.text('Можно'));
       await tester.pump();
@@ -1519,16 +1423,14 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text(updateFailure).hitTestable(), findsOneWidget);
-      expect(tester.getRect(find.byType(Sheet)), compact);
+      expect(tester.getRect(find.byType(Sheet)), before);
     });
 
-    testWidgets('повторный отказ архивирования снова виден в полном '
-        'размере', (tester) async {
+    testWidgets('повторный отказ архивирования снова виден без ручной '
+        'прокрутки', (tester) async {
       final semantics = tester.ensureSemantics();
       final repository = await openLong(tester);
-      await tester.tap(find.bySemanticsLabel('Раскрыть панель связи'));
-      await tester.pumpAndSettle();
-      final full = tester.getRect(find.byType(Sheet));
+      final before = tester.getRect(find.byType(Sheet));
 
       await tester.tap(find.bySemanticsLabel('Параметры связи'));
       await tester.pumpAndSettle();
@@ -1550,7 +1452,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text(archiveFailure).hitTestable(), findsOneWidget);
-      expect(tester.getRect(find.byType(Sheet)), full);
+      expect(tester.getRect(find.byType(Sheet)), before);
       semantics.dispose();
     });
 
