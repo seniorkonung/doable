@@ -272,3 +272,141 @@
   - **Зависимости:** 1.9, 1.15, 1.19: полная проверка завершает фазу.
   - **Предполагаемые файлы:** `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart`.
   - **Размер:** XS.
+
+## Phase 2: Дневной выбор создаётся один раз и не меняет путь
+
+- [ ] 2.1 Успешное создание дневного выбора закрывает поток и возвращает на исходную страницу
+  - **Критерии приёмки:**
+    - `completeDailyChoiceCreation` снимает подтверждение и корень потока и не открывает подробный просмотр. Цикл снятия общий с `leaveDailyChoiceCreation` и отличается только проверкой состояния сессии. Перед каждым снятием по-прежнему проверяются полная история и отсутствие верхнего безымянного маршрута.
+    - `DailyChoiceCreationFlowSaved`, `DailyChoiceCreationSucceeded` и `DailyChoiceCreationCreated` не несут идентификатор выбора, а `claimOpening` заменён одной попыткой завершения без него. Повторный вызов завершения не меняет ни исходную историю, ни новую сессию.
+    - После успеха над глубокой историей открыта исходная страница, пути и подтверждения в истории нет, а страницы до начала создания не изменились, в том числе страница-задача с черновиком ниже. Сообщение «Дневной выбор создан» предъявлено один раз.
+    - Если человек покинул подтверждение до результата, поздний успех не меняет текущую страницу. Тесты выхода и возврата проходят без ослабления ожиданий.
+    - Тесты, которые ждали подробный просмотр после создания, ждут исходную страницу. Комментарий `DailyChoiceCreationLauncher` о замене маршрута пути снят.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation test/app/creation_flows_integration_test.dart test/app/daily_choice_app_flow_test.dart test/app/daily_choice_app_lifecycle_test.dart`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/daily_choice/presentation/daily_choice_creation_completion.dart`, `daily_choice_creation_flow_session.dart`, `daily_choice_creation_launcher.dart`, `editor/daily_choice_creation_page.dart`, `editor/daily_choice_creation_state.dart`, `editor/daily_choice_creation_view_model.dart`;
+    - меняются `test/daily_choice/presentation/daily_choice_creation_completion_test.dart`, `daily_choice_creation_flow_session_test.dart`, `daily_choice_creation_flow_test.dart`, `daily_choice_creation_launcher_test.dart`, `editor/daily_choice_creation_page_test.dart`, `editor/daily_choice_creation_view_model_test.dart`;
+    - меняются `test/app/creation_flows_test_support.dart`, `creation_flows_integration_test.dart`, `daily_choice_app_flow_test.dart`.
+  - **Размер:** M по логике: файлов больше нормы, потому что тесты ждут удаляемый переход.
+
+- [ ] 2.2 Результат создания виден на исходной странице со всех входов
+  - **Критерии приёмки:**
+    - Один параметризованный тест на настоящем хранилище проходит четыре входа: «От намерения» и «От действия» кнопки быстрого создания и «Добавить» на вкладке «Выборы» в обоих направлениях. После создания открыта исходная страница, а сообщение называет «Дневной выбор создан».
+    - Возврат на вкладку «Выборы» показывает эту вкладку с новым выбором.
+    - Каталог на 2026-10-07 после быстрого создания выбора на 2026-10-09 показывает прежнюю дату и её выдачу.
+    - Производственный код меняется, только если тест нашёл расхождение со спецификацией.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app/daily_choice_app_flow_test.dart`.
+  - **Зависимости:** 2.1.
+  - **Предполагаемые файлы:** `test/app/daily_choice_app_flow_test.dart`.
+  - **Размер:** S.
+
+- [ ] 2.3 Подробный просмотр теряет вход в замену пути, а её поток удалён
+  - **Критерии приёмки:**
+    - Кнопки `daily-choice-replace-open` нет. Изменение и удаление на странице подробного просмотра работают как прежде.
+    - Удалены `daily_choice_path_replacement_flow.dart`, `daily_choice_path_replace_page.dart`, `daily_choice_path_replace_state.dart`, `daily_choice_path_replace_view_model.dart` и их тесты.
+    - Удалены `ChoicePathPage.forReplacement`, `ChoicePathPurpose.replace` и их ветви заголовка и кнопки. Пересчёт пути перед созданием работает как прежде.
+    - Все строки `dailyChoiceReplace*` удалены из обоих файлов локализации.
+    - Сценарий безымянного подтверждения замены удалён, а панель над безымянной страницей по-прежнему проверяет сценарий пересчёта пути. Вспомогательные функции без вызывающих удалены.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation test/app/navigation`.
+    - `mise run codegen-check`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - удаляются четыре файла потока в `lib/src/daily_choice/presentation/editor/` и `test/daily_choice/presentation/daily_choice_path_replacement_flow_test.dart`, `editor/daily_choice_path_replace_page_test.dart`, `editor/daily_choice_path_replace_view_model_test.dart`;
+    - меняются `lib/src/daily_choice/presentation/details/daily_choice_details_page.dart`, `path/choice_path_page.dart`, `daily_choice_creation_flow_session.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb`;
+    - меняются `test/app/navigation/app_shell_unnamed_page_scenarios.dart`, `app_shell_pages_above_test.dart`.
+  - **Размер:** M по логике: удаление без нового поведения.
+
+- [ ] 2.4 Поиски дневного выбора знают только потоки создания
+  - **Критерии приёмки:**
+    - Закрытый `DailyChoicePickerContext` и оба его варианта удалены. Страницы и маршруты обоих поисков принимают `DailyChoicePickerLaunch launch`, а файл назван по этому типу: `daily_choice_picker_launch.dart`.
+    - `dailyChoicePickerPurpose` принимает только `DailyChoicePickerStart`. Подзаголовок, строка листа и шаги зависят только от начала, а третий шаг всегда «Дата, время, приоритет и описание».
+    - Закрытие обоих поисков подписано «Отменить создание». Строки `dailyChoicePicker*Replacement*`, `actionPickerCancel` и `sourcePickerCancel` удалены из обоих файлов локализации.
+    - Общий контракт поиска в тестах проверяет создание в обоих направлениях, а `app_router_test.dart` открывает поиск с активным запуском. Файл контракта назван по типу запуска.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation test/app/routing`.
+    - `mise run codegen-check`.
+  - **Зависимости:** 2.3.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/daily_choice/presentation/daily_choice_picker_context.dart`, `daily_choice_picker_purpose.dart`, `daily_choice_creation_launcher.dart`, `source_picker/daily_choice_source_picker_page.dart`, `action_picker/daily_choice_action_picker_page.dart`, `lib/src/app/routing/app_router.gr.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb`;
+    - меняются `test/daily_choice/presentation/daily_choice_picker_context_test_support.dart`, `source_picker/daily_choice_source_picker_page_test.dart`, `action_picker/daily_choice_action_picker_page_test.dart`, `daily_choice_creation_launcher_test.dart`, `test/app/routing/app_router_test.dart`.
+  - **Размер:** M по логике: файлов больше нормы из-за двух страниц поиска и их тестов.
+
+- [ ] 2.5 Тесты слоя данных не зависят от команды замены пути
+  - **Критерии приёмки:**
+    - Шаг замены убран там, где проверял саму замену: в `drift_daily_choice_read_cost_test.dart`, `drift_graph_fact_log_completeness_test.dart`, `drift_graph_fact_log_write_test.dart`, `drift_statistics_relation_snapshot_test.dart`, в конце теста «меняет зависимости наблюдаемого пути вместе со снимком» и вместе с тестом «замена обоих участников переключает наблюдение на новый путь». Данные, нужные только этому шагу, убраны.
+    - Состояние, которое замена только готовила, получено удалением и созданием в тестах «согласует счётчики прежнего и нового действия при замене пути», «замена и удаление дубликата снимают только последние ссылки» и «замена пути убирает прежние опорные намерения на новой ревизии». Названия говорят о новых шагах, а ожидания не ослаблены, кроме совпадения ревизий, которого у двух команд быть не может.
+    - Цикл в `file_backed_daily_choice_durability_test.dart` теряет шаг замены и проверяет, что изменение полей и повторное открытие сохраняют путь созданного выбора.
+    - Производственный код не меняется.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph/data`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** в `test/graph/data/` меняются `drift_daily_choice_read_cost_test.dart`, `drift_daily_choice_watch_test.dart`, `drift_daily_path_protection_test.dart`, `drift_graph_fact_log_completeness_test.dart`, `drift_graph_fact_log_write_test.dart`, `drift_statistics_relation_snapshot_test.dart`, `drift_statistics_seed_groups_test.dart`, `file_backed_daily_choice_durability_test.dart`.
+  - **Размер:** M по логике: в каждом файле правка в одном месте.
+
+- [ ] 2.6 Тесты согласования и приложения не зависят от команды замены пути
+  - **Критерии приёмки:**
+    - Тест «повтор и замена согласуют открытые представления одной ревизией» теряет шаг замены, а шаг удаления проверяется от состояния после повтора. Название говорит о повторе и удалении.
+    - В `home_statistics_app_flow_test.dart` выбор с путём к намерению 4 получен удалением прежнего выбора и созданием нового. Ожидания показа и числа чтений не меняются.
+    - В `daily_choice_catalog_details_integration_test.dart` шаг замены заменён вторым изменением полей, связь 103 убрана, а ожидания числа намерений пути отражают неизменный путь. Проверки пересборки обеих секций не ослаблены.
+    - Производственный код не меняется.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph/presentation/graph_reconciliation_checkpoint_test.dart test/app/home_statistics_app_flow_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_details_integration_test.dart`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `test/graph/presentation/graph_reconciliation_checkpoint_test.dart`, `test/app/home_statistics_app_flow_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_details_integration_test.dart`.
+  - **Размер:** S.
+
+- [ ] 2.7 Команда замены пути удалена из всех слоёв
+  - **Критерии приёмки:**
+    - Удалены `ReplaceDailyChoicePath`, `DailyChoicePathReplaced`, `acceptDailyChoiceReplace`, `DailyChoiceCommandKind.replace`, `_replaceDailyChoicePath`, ветви презентера и строка `dailyChoicePathReplaced`. Создание, изменение полей, удаление и их сообщения работают как прежде, а подтверждённый путь по-прежнему проверяется при создании.
+    - Ветвь пересечения `released` и `occupied` в `DailyChoiceChange` удалена: обе дельты были непусты только у замены.
+    - Удалены `drift_daily_choice_replace_test.dart`, тест замены в `daily_choice_change_test.dart`, сценарий и вспомогательные ветви замены в `graph_operation_presenter_test.dart`, проверка и `_replace` в `graph_command_coordinator_daily_choice_test.dart`, ветви `switch` в `home_statistics_app_flow_test.dart` и `intention_statistics_app_flow_test.dart`.
+    - Комментарии в `lib/src/daily_choice` и `lib/src/graph` не упоминают замену пути.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/application test/graph test/app/home_statistics_app_flow_test.dart test/app/intention_statistics_app_flow_test.dart`.
+    - `mise run codegen-check`.
+  - **Зависимости:** 2.3, 2.5, 2.6.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/daily_choice/application/daily_choice_command.dart`, `daily_choice_result.dart`, `lib/src/graph/application/graph_command_coordinator.dart`, `graph_change.dart`, `lib/src/graph/data/drift_personal_graph_repository_daily_choice_commands.dart`, `lib/src/graph/presentation/graph_operation_presenter.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb`;
+    - удаляется `test/graph/data/drift_daily_choice_replace_test.dart`;
+    - меняются `test/daily_choice/application/daily_choice_change_test.dart`, `test/graph/presentation/graph_operation_presenter_test.dart`, `test/graph/application/graph_command_coordinator_daily_choice_test.dart`, `test/app/home_statistics_app_flow_test.dart`, `intention_statistics_app_flow_test.dart`.
+  - **Размер:** M по логике: удаление без нового поведения.
+
+- [ ] 2.8 Диагностика дневного выбора знает только оставшиеся команды
+  - **Критерии приёмки:**
+    - `DailyChoiceCommandDiagnosticsType.replacePath` и `DailyChoicePathCommandDiagnosticsType` удалены. `DailyChoicePathValidationDiagnosticsEvent` относится только к созданию и не имеет `commandType`, а `developer_diagnostics_sink.dart` пишет его без этого поля.
+    - Тесты диагностики создания проходят без изменения ожиданий к кодам отказа.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph/data/drift_daily_choice_create_test.dart test/graph/data/drift_daily_choice_diagnostics_test.dart test/shared/diagnostics`.
+  - **Зависимости:** 2.7.
+  - **Предполагаемые файлы:** `lib/src/shared/diagnostics/diagnostics_sink.dart`, `developer_diagnostics_sink.dart`, `lib/src/graph/data/drift_personal_graph_repository_daily_choice_commands.dart`.
+  - **Размер:** S.
+
+- [ ] 2.9 Глоссарий говорит, что другой путь создаётся новым выбором
+  - **Критерии приёмки:**
+    - Определения «Готовность к действию», «Связь „я сегодня“» и «Путь выбора» в `CONTEXT.md` не упоминают замену участников и пути, а сохранённый путь не назван текущим.
+    - «Связь „я сегодня“» говорит, что участники и путь не меняются после создания, а другой путь означает новый выбор: человек удаляет выбор и создаёт новый. Это поведение приложения, а не инвариант хранилища.
+    - Остальные понятия, включая «Замену графа», не меняются.
+  - **Проверка:**
+    - `grep -nE "замене её участников|Замена исходного намерения|текущий сохранённый путь" CONTEXT.md` ничего не находит.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `CONTEXT.md`.
+  - **Размер:** XS.
+
+- [ ] 2.10 Проверить готовность фазы: создание возвращает на исходную страницу, а замены пути нет
+  - **Критерии приёмки:**
+    - Создание со всех входов возвращает на исходную страницу, в том числе над глубокой историей и при уходе до результата.
+    - В коде и спецификациях не осталось вызывающих удалённого потока: в `lib/` и `test/` нет `ReplaceDailyChoicePath`, `DailyChoicePathReplaced`, `acceptDailyChoiceReplace`, `DailyChoiceCommandKind.replace`, `forReplacement`, `DailyChoicePickerContext`, `DailyChoicePathCommandDiagnosticsType`, `replacePath`, `dailyChoiceReplace`, `daily-choice-replace` и `claimOpening`. В дельтах спецификаций замена пути остаётся только удалённым поведением.
+    - Данные, ранее изменённые заменой, читаются как прежде: хранилище, формат данных, журнал фактов и чтение дневных выборов не менялись от базовой точки фазы.
+  - **Проверка:**
+    - `git diff --quiet 5777debb24916bda3f92ed888089f9612a7e73d5 HEAD -- lib/src/data lib/src/graph_format lib/src/graph_snapshots lib/src/graph/data/drift_personal_graph_repository_daily_choice_reads.dart lib/src/graph/data/drift_personal_graph_repository_daily_choice_catalog.dart`.
+    - `mise run codegen-check`.
+    - `mise run check`.
+    - `mise exec --no-deps -- openspec validate redesign-daily-choices --strict`.
+    - `mise exec --no-deps -- flutter build apk --debug`: сборка для ручных проверок на устройстве, которые остаются за владельцем продукта.
+  - **Зависимости:** 2.1–2.9.
+  - **Предполагаемые файлы:** нет (только проверка).
+  - **Размер:** XS.
