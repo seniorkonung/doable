@@ -2163,9 +2163,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Open related intention';
 
   @override
-  String get actionPickerCancel => 'Cancel action selection';
-
-  @override
   String get actionPickerLoading => 'Loading actions…';
 
   @override
@@ -2184,9 +2181,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Actions couldn’t be loaded because of an unexpected error.';
 
   @override
-  String get sourcePickerCancel => 'Cancel intention selection';
-
-  @override
   String get sourcePickerEmpty => 'No active intentions are available.';
 
   @override
@@ -2198,28 +2192,12 @@ class AppLocalizationsEn extends AppLocalizations {
       'New daily choice: selected action';
 
   @override
-  String get dailyChoicePickerPurposeReplacementSource =>
-      'Path replacement: source intention';
-
-  @override
-  String get dailyChoicePickerPurposeReplacementAction =>
-      'Path replacement: selected action';
-
-  @override
   String get dailyChoicePickerFlowCreationFromSource =>
       'New daily choice, from an intention';
 
   @override
   String get dailyChoicePickerFlowCreationFromAction =>
       'New daily choice, from an action';
-
-  @override
-  String get dailyChoicePickerFlowReplacementFromSource =>
-      'Path replacement, from an intention';
-
-  @override
-  String get dailyChoicePickerFlowReplacementFromAction =>
-      'Path replacement, from an action';
 
   @override
   String get dailyChoicePickerStepCurrent => 'You are here';
@@ -2246,13 +2224,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get dailyChoicePickerStepDetails =>
       'Date, time, priority, and description';
-
-  @override
-  String get dailyChoicePickerStepReplacement => 'Replacement confirmation';
-
-  @override
-  String get dailyChoicePickerStepReplacementNote =>
-      'The date, scheduled time, priority, description, and completion stay the same';
 
   @override
   String get intentionPickerArchived => 'archived';

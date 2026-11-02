@@ -8,19 +8,19 @@ import '../../../app/routing/app_router.gr.dart';
 import '../../../intention/domain/intention_id.dart';
 import '../../../intention/presentation/catalog/intention_catalog_purpose.dart';
 import '../../../intention/presentation/picker/intention_picker_view.dart';
-import '../daily_choice_picker_context.dart';
+import '../daily_choice_picker_launch.dart';
 import '../daily_choice_picker_purpose.dart';
 
-/// Поиск исходного намерения для создания или замены пути дневного выбора.
+/// Поиск исходного намерения для создания дневного выбора.
 ///
 /// Список использует отдельную сессию ограниченного каталога. Только открытие
 /// подробностей читает полный текст выбранного намерения; результат выбора —
 /// его идентификатор, поэтому одноимённые намерения не смешиваются.
 @RoutePage()
 final class DailyChoiceSourcePickerPage extends StatefulWidget {
-  const DailyChoiceSourcePickerPage({required this.pickerContext, super.key});
+  const DailyChoiceSourcePickerPage({required this.launch, super.key});
 
-  final DailyChoicePickerContext pickerContext;
+  final DailyChoicePickerLaunch launch;
 
   @override
   State<DailyChoiceSourcePickerPage> createState() =>
@@ -35,7 +35,7 @@ final class _DailyChoiceSourcePickerPageState
 
   @override
   void dispose() {
-    if (!_returnedSelection) widget.pickerContext.cancelLaunch();
+    if (!_returnedSelection) widget.launch.cancel();
     super.dispose();
   }
 
@@ -48,19 +48,15 @@ final class _DailyChoiceSourcePickerPageState
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop) return;
         _returnedSelection = result != null;
-        if (!_returnedSelection) widget.pickerContext.cancelLaunch();
+        if (!_returnedSelection) widget.launch.cancel();
       },
       child: IntentionPickerView(
         purpose: _purpose,
         purposeDescription: dailyChoicePickerPurpose(
           l10n,
-          pickerContext: widget.pickerContext,
           start: DailyChoicePickerStart.source,
         ),
-        closeLabel: switch (widget.pickerContext) {
-          InitialDailyChoicePickerContext() => l10n.creationCancelAction,
-          PathReplacementDailyChoicePickerContext() => l10n.sourcePickerCancel,
-        },
+        closeLabel: l10n.creationCancelAction,
         emptyScopeMessage: l10n.sourcePickerEmpty,
         onClose: () => unawaited(_close()),
         onPick: (pick) => unawaited(_close(pick.value.id)),
@@ -80,14 +76,13 @@ final class _DailyChoiceSourcePickerPageState
           context.routeData.matchId &&
       !context.router.hasPagelessTopRoute;
 
-  bool get _canSelect =>
-      _ownsTopRoute && !_closing && widget.pickerContext.canContinue;
+  bool get _canSelect => _ownsTopRoute && !_closing && widget.launch.isActive;
 
   Future<void> _close([IntentionId? id]) async {
     if (!_ownsTopRoute || _closing) return;
-    if (id != null && !widget.pickerContext.canContinue) return;
+    if (id != null && !widget.launch.isActive) return;
     _closing = true;
-    if (id == null) widget.pickerContext.cancelLaunch();
+    if (id == null) widget.launch.cancel();
     try {
       await context.router.maybePop(id);
     } finally {

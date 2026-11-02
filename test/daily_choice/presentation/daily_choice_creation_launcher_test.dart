@@ -8,7 +8,7 @@ import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
 import 'package:doable/src/daily_choice/presentation/daily_choice_creation_launcher.dart';
-import 'package:doable/src/daily_choice/presentation/daily_choice_picker_context.dart';
+import 'package:doable/src/daily_choice/presentation/daily_choice_picker_launch.dart';
 import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/design_system/components/top_bar.dart';
@@ -46,8 +46,11 @@ void main() {
       expect(router.stackData, hasLength(history.length + 1));
       expect(router.current.name, DailyChoiceActionPickerRoute.name);
       expect(
-        router.current.argsAs<DailyChoiceActionPickerRouteArgs>().pickerContext,
-        isA<InitialDailyChoicePickerContext>(),
+        router.current
+            .argsAs<DailyChoiceActionPickerRouteArgs>()
+            .launch
+            .isActive,
+        isTrue,
       );
       await _cancelPicker(tester, ChoicePathDraftDirection.bottomUp);
       await tester.pumpAndSettle();
@@ -303,7 +306,7 @@ void main() {
           direction: direction,
         );
         await tester.pumpAndSettle();
-        final oldLaunch = _pickerContext(router).launch;
+        final oldLaunch = _pickerLaunch(router);
         await _choose(
           tester,
           direction,
@@ -495,12 +498,10 @@ String _directionName(ChoicePathDraftDirection direction) =>
       ChoicePathDraftDirection.bottomUp => 'Снизу вверх',
     };
 
-InitialDailyChoicePickerContext _pickerContext(RootStackRouter router) =>
+DailyChoicePickerLaunch _pickerLaunch(RootStackRouter router) =>
     switch (router.current.args) {
-      DailyChoiceSourcePickerRouteArgs(:final pickerContext) ||
-      DailyChoiceActionPickerRouteArgs(
-        :final pickerContext,
-      ) => pickerContext as InitialDailyChoicePickerContext,
+      DailyChoiceSourcePickerRouteArgs(:final launch) ||
+      DailyChoiceActionPickerRouteArgs(:final launch) => launch,
       _ => throw StateError('Ожидался начальный поиск.'),
     };
 

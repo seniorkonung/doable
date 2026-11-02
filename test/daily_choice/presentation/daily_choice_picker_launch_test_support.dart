@@ -4,7 +4,7 @@ import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
-import 'package:doable/src/daily_choice/presentation/daily_choice_picker_context.dart';
+import 'package:doable/src/daily_choice/presentation/daily_choice_picker_launch.dart';
 import 'package:doable/src/design_system/components/catalog_header.dart';
 import 'package:doable/src/design_system/components/filter_button.dart';
 import 'package:doable/src/design_system/components/flow_steps.dart';
@@ -32,147 +32,107 @@ import '../../support/app_root_pages.dart';
 import '../../support/tag_positions.dart';
 
 /// Тексты назначения поиска на одном языке, которые зависят от его вида:
-/// заголовок, подзаголовки и строки листа обоих потоков, первые два шага.
+/// заголовок, подзаголовок, строка листа и первые два шага.
 typedef DailyChoicePickerPurposeTexts = ({
   String title,
   String creationSubtitle,
   String creationLine,
-  String replacementSubtitle,
-  String replacementLine,
   String startStep,
   String pathStep,
   String pathNote,
 });
 
-/// Один контракт поиска для создания и замены пути в обоих направлениях.
-void defineDailyChoicePickerContextTests({
-  required PageRouteInfo Function(DailyChoicePickerContext) route,
+/// Один контракт поиска для создания дневного выбора в обоих направлениях.
+void defineDailyChoicePickerLaunchTests({
+  required PageRouteInfo Function(DailyChoicePickerLaunch) route,
   required String keyPrefix,
   required IntentionReadinessFilter readinessFilter,
-  required ({String title, String header, String pathReplacementCancel})
-  ruTexts,
+  required ({String title, String header}) ruTexts,
   required Map<String, DailyChoicePickerPurposeTexts> purposeTexts,
   required String emptyMessage,
   required String noMatchesMessage,
 }) {
   for (final MapEntry(key: language, value: texts) in purposeTexts.entries) {
     final ru = language == 'ru';
-    for (final replacement in [false, true]) {
-      final subtitle = replacement
-          ? texts.replacementSubtitle
-          : texts.creationSubtitle;
-      final sheetLine = replacement
-          ? texts.replacementLine
-          : texts.creationLine;
-      final lastStep = switch ((replacement, ru)) {
-        (false, true) => (
-          title: 'Дата, время, приоритет и описание',
-          note: null,
-        ),
-        (false, false) => (
-          title: 'Date, time, priority, and description',
-          note: null,
-        ),
-        (true, true) => (
-          title: 'Подтверждение замены',
-          note:
-              'Дата, запланированное время, приоритет, описание и '
-              'выполнение останутся прежними',
-        ),
-        (true, false) => (
-          title: 'Replacement confirmation',
-          note:
-              'The date, scheduled time, priority, description, and '
-              'completion stay the same',
-        ),
-      };
-      final mark = ru ? 'Вы здесь' : 'You are here';
-      final back = ru ? 'Вернуться к списку' : 'Back to the list';
+    final subtitle = texts.creationSubtitle;
+    final sheetLine = texts.creationLine;
+    final lastStep = (
+      title: ru
+          ? 'Дата, время, приоритет и описание'
+          : 'Date, time, priority, and description',
+      note: null,
+    );
+    final mark = ru ? 'Вы здесь' : 'You are here';
+    final back = ru ? 'Вернуться к списку' : 'Back to the list';
 
-      testWidgets('$language: «$subtitle» под заголовком открывает лист '
-          '«$sheetLine» с тремя обязательными шагами потока', (tester) async {
-        final semantics = tester.ensureSemantics();
-        final (repository, router) = await _openApp(tester, language: language);
-        unawaited(
-          router.push<IntentionId>(
-            route(
-              replacement
-                  ? const PathReplacementDailyChoicePickerContext()
-                  : InitialDailyChoicePickerContext(launch: _Launch()),
-            ),
-          ),
-        );
-        await _settleRoute(tester);
-        repository.complete(1, _page());
-        await tester.pumpAndSettle();
+    testWidgets('$language: «$subtitle» под заголовком открывает лист '
+        '«$sheetLine» с тремя обязательными шагами потока', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final (repository, router) = await _openApp(tester, language: language);
+      unawaited(router.push<IntentionId>(route(TestDailyChoicePickerLaunch())));
+      await _settleRoute(tester);
+      repository.complete(1, _page());
+      await tester.pumpAndSettle();
 
-        final subtitleText = find.descendant(
-          of: find.byType(TopBar),
-          matching: find.text(subtitle),
-        );
-        expect(subtitleText, findsOneWidget);
+      final subtitleText = find.descendant(
+        of: find.byType(TopBar),
+        matching: find.text(subtitle),
+      );
+      expect(subtitleText, findsOneWidget);
+      expect(
+        tester.getSemantics(subtitleText),
+        isSemantics(
+          label: ru
+              ? '${texts.title}. $subtitle. Показать, что выбирается'
+              : '${texts.title}. $subtitle. Show what you are choosing',
+          isButton: true,
+          hasTapAction: true,
+          hasExpandedState: true,
+          isExpanded: false,
+        ),
+      );
+
+      await tester.tap(subtitleText);
+      await tester.pumpAndSettle();
+      final sheet = find.byType(Sheet);
+      for (final text in [
+        ru ? 'Что вы выбираете' : 'What you are choosing',
+        sheetLine,
+        mark,
+        back,
+      ]) {
         expect(
-          tester.getSemantics(subtitleText),
-          isSemantics(
-            label: ru
-                ? '${texts.title}. $subtitle. Показать, что выбирается'
-                : '${texts.title}. $subtitle. Show what you are choosing',
-            isButton: true,
-            hasTapAction: true,
-            hasExpandedState: true,
-            isExpanded: false,
-          ),
+          find.descendant(of: sheet, matching: find.text(text)),
+          findsOneWidget,
         );
+      }
+      final steps = tester.widget<FlowSteps>(
+        find.descendant(of: sheet, matching: find.byType(FlowSteps)),
+      );
+      expect(steps.current, 0);
+      expect(steps.currentMark, mark);
+      expect(
+        [for (final step in steps.steps) (title: step.title, note: step.note)],
+        [
+          (title: texts.startStep, note: null),
+          (title: texts.pathStep, note: texts.pathNote),
+          lastStep,
+        ],
+      );
 
-        await tester.tap(subtitleText);
-        await tester.pumpAndSettle();
-        final sheet = find.byType(Sheet);
-        for (final text in [
-          ru ? 'Что вы выбираете' : 'What you are choosing',
-          sheetLine,
-          mark,
-          back,
-        ]) {
-          expect(
-            find.descendant(of: sheet, matching: find.text(text)),
-            findsOneWidget,
-          );
-        }
-        final steps = tester.widget<FlowSteps>(
-          find.descendant(of: sheet, matching: find.byType(FlowSteps)),
-        );
-        expect(steps.current, 0);
-        expect(steps.currentMark, mark);
-        expect(
-          [
-            for (final step in steps.steps)
-              (title: step.title, note: step.note),
-          ],
-          [
-            (title: texts.startStep, note: null),
-            (title: texts.pathStep, note: texts.pathNote),
-            lastStep,
-          ],
-        );
-
-        await tester.tap(find.text(back));
-        await tester.pumpAndSettle();
-        expect(sheet, findsNothing);
-        expect(subtitleText, findsOneWidget);
-        semantics.dispose();
-      });
-    }
+      await tester.tap(find.text(back));
+      await tester.pumpAndSettle();
+      expect(sheet, findsNothing);
+      expect(subtitleText, findsOneWidget);
+      semantics.dispose();
+    });
   }
 
   testWidgets('экран с подзаголовком и открытый лист назначения доступны '
       'для нажатия и контрастны', (tester) async {
     final semantics = tester.ensureSemantics();
     final (repository, router) = await _openApp(tester);
-    unawaited(
-      router.push<IntentionId>(
-        route(InitialDailyChoicePickerContext(launch: _Launch())),
-      ),
-    );
+    unawaited(router.push<IntentionId>(route(TestDailyChoicePickerLaunch())));
     await _settleRoute(tester);
     repository.complete(1, _page());
     await tester.pumpAndSettle();
@@ -204,59 +164,54 @@ void defineDailyChoicePickerContextTests({
           readiness: IntentionReadiness.ready,
         ),
     ];
-    for (final (index, (pickerContext, cancelLabel)) in [
-      (InitialDailyChoicePickerContext(launch: _Launch()), 'Отменить создание'),
-      (
-        const PathReplacementDailyChoicePickerContext(),
-        ruTexts.pathReplacementCancel,
+    const cancelLabel = 'Отменить создание';
+    final selection = router.push<IntentionId>(
+      route(TestDailyChoicePickerLaunch()),
+    );
+    await _settleRoute(tester);
+    repository.complete(
+      1,
+      ResultSuccess(
+        IntentionCatalogFirstPage(
+          items: items,
+          totalCount: items.length,
+          nextCursor: null,
+          revision: const TestCatalogRevision(1),
+        ),
       ),
-    ].indexed) {
-      final selection = router.push<IntentionId>(route(pickerContext));
-      await _settleRoute(tester);
-      repository.complete(
-        index + 1,
-        ResultSuccess(
-          IntentionCatalogFirstPage(
-            items: items,
-            totalCount: items.length,
-            nextCursor: null,
-            revision: const TestCatalogRevision(1),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
+    );
+    await tester.pumpAndSettle();
 
-      expect(
-        find.descendant(
-          of: find.byType(TopBar),
-          matching: find.text(ruTexts.title),
-        ),
-        findsOneWidget,
-      );
-      expect(
-        tester.getSemantics(find.byKey(ValueKey('$keyPrefix-cancel'))),
-        isSemantics(label: cancelLabel, isButton: true, hasTapAction: true),
-      );
-      expect(find.byKey(ValueKey('$keyPrefix-filter')), findsOneWidget);
-      expect(tester.widget<FilterButton>(find.byType(FilterButton)).count, 0);
-      expect(
-        find.byWidgetPredicate(
-          (widget) =>
-              widget is CatalogHeader &&
-              widget.title == ruTexts.header &&
-              widget.count == 13 &&
-              widget.summary == 'Создание, сначала новые',
-        ),
-        findsOneWidget,
-      );
-      // Крестик — единственное действие выхода: нижней кнопки нет.
-      expect(find.text(cancelLabel), findsNothing);
-      expect(find.byType(CreationExitAction), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byType(TopBar),
+        matching: find.text(ruTexts.title),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      tester.getSemantics(find.byKey(ValueKey('$keyPrefix-cancel'))),
+      isSemantics(label: cancelLabel, isButton: true, hasTapAction: true),
+    );
+    expect(find.byKey(ValueKey('$keyPrefix-filter')), findsOneWidget);
+    expect(tester.widget<FilterButton>(find.byType(FilterButton)).count, 0);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is CatalogHeader &&
+            widget.title == ruTexts.header &&
+            widget.count == 13 &&
+            widget.summary == 'Создание, сначала новые',
+      ),
+      findsOneWidget,
+    );
+    // Крестик — единственное действие выхода: нижней кнопки нет.
+    expect(find.text(cancelLabel), findsNothing);
+    expect(find.byType(CreationExitAction), findsNothing);
 
-      await tester.tap(find.byKey(ValueKey('$keyPrefix-cancel')));
-      await tester.pumpAndSettle();
-      expect(await selection, isNull);
-    }
+    await tester.tap(find.byKey(ValueKey('$keyPrefix-cancel')));
+    await tester.pumpAndSettle();
+    expect(await selection, isNull);
     semantics.dispose();
   });
 
@@ -267,7 +222,7 @@ void defineDailyChoicePickerContextTests({
     final (repository, router) = await _openApp(tester);
     var selected = false;
     final selection = router.push<IntentionId>(
-      route(const PathReplacementDailyChoicePickerContext()),
+      route(TestDailyChoicePickerLaunch()),
     );
     unawaited(selection.then((_) => selected = true));
     await _settleRoute(tester);
@@ -278,7 +233,7 @@ void defineDailyChoicePickerContextTests({
     await tester.pumpAndSettle();
     expect(intentionPickerRows, findsNWidgets(2));
 
-    final subtitle = find.text(purposeTexts['en']!.replacementSubtitle);
+    final subtitle = find.text(purposeTexts['en']!.creationSubtitle);
     expect(subtitle, findsOneWidget);
 
     await tester.tap(intentionPickerArrow(intentionPickerRows.last));
@@ -311,17 +266,14 @@ void defineDailyChoicePickerContextTests({
     addTearDown(tester.view.reset);
     final semantics = tester.ensureSemantics();
     final (repository, router) = await _openApp(tester, language: language);
-    final replacement = router.push<IntentionId>(
-      route(const PathReplacementDailyChoicePickerContext()),
-    );
+    final lowerLaunch = TestDailyChoicePickerLaunch();
+    final lowerSelection = router.push<IntentionId>(route(lowerLaunch));
     await _settleRoute(tester);
     repository.complete(1, _page());
     await tester.pumpAndSettle();
     final history = [for (final data in router.stackData) data.matchId];
-    final launch = _Launch();
-    final selection = router.push<IntentionId>(
-      route(InitialDailyChoicePickerContext(launch: launch)),
-    );
+    final launch = TestDailyChoicePickerLaunch();
+    final selection = router.push<IntentionId>(route(launch));
     await _settleRoute(tester);
     repository.complete(2, _page());
     await tester.pumpAndSettle();
@@ -339,13 +291,15 @@ void defineDailyChoicePickerContextTests({
     );
     await tester.tap(action);
     expect(launch.isActive, isFalse);
+    expect(lowerLaunch.isActive, isTrue);
     lateSelection();
     await tester.pumpAndSettle();
     expect(await selection, isNull);
     expect([for (final data in router.stackData) data.matchId], history);
+    expect(lowerLaunch.isActive, isTrue);
     await router.maybePop();
     await tester.pumpAndSettle();
-    expect(await replacement, isNull);
+    expect(await lowerSelection, isNull);
     semantics.dispose();
   });
 
@@ -364,10 +318,8 @@ void defineDailyChoicePickerContextTests({
       position: tagPositionAt(1000),
     );
     repository.tagCatalogItems = [tag];
-    final launch = _Launch();
-    final selection = router.push<IntentionId>(
-      route(InitialDailyChoicePickerContext(launch: launch)),
-    );
+    final launch = TestDailyChoicePickerLaunch();
+    final selection = router.push<IntentionId>(route(launch));
     await _settleRoute(tester);
     final pickerId = router.current.matchId;
     expect(repository.queryAt(1).scope, IntentionScope.active);
@@ -431,10 +383,8 @@ void defineDailyChoicePickerContextTests({
   testWidgets('утрата права запуска запрещает выбор кандидата и открытие '
       'подробностей, сохраняя доступную отмену поиска', (tester) async {
     final (repository, router) = await _openApp(tester);
-    final launch = _Launch();
-    final selection = router.push<IntentionId>(
-      route(InitialDailyChoicePickerContext(launch: launch)),
-    );
+    final launch = TestDailyChoicePickerLaunch();
+    final selection = router.push<IntentionId>(route(launch));
     await _settleRoute(tester);
     repository.complete(1, _page());
     await tester.pumpAndSettle();
@@ -453,10 +403,8 @@ void defineDailyChoicePickerContextTests({
   testWidgets('обычный возврат из начального поиска прекращает запуск '
       'до окончания анимации и возвращает отсутствие ID', (tester) async {
     final (repository, router) = await _openApp(tester);
-    final launch = _Launch();
-    final selection = router.push<IntentionId>(
-      route(InitialDailyChoicePickerContext(launch: launch)),
-    );
+    final launch = TestDailyChoicePickerLaunch();
+    final selection = router.push<IntentionId>(route(launch));
     await _settleRoute(tester);
     repository.complete(1, _page());
     await tester.pumpAndSettle();
@@ -467,46 +415,11 @@ void defineDailyChoicePickerContextTests({
     expectIntentionGraphRootPage(router);
   });
 
-  testWidgets('поиск замены пути над начальным поиском возвращает '
-      'результат и не отменяет нижележащий запуск', (tester) async {
-    final (repository, router) = await _openApp(tester);
-    final launch = _Launch();
-    final initial = router.push<IntentionId>(
-      route(InitialDailyChoicePickerContext(launch: launch)),
-    );
-    await _settleRoute(tester);
-    repository.complete(1, _page());
-    await tester.pumpAndSettle();
-    final initialId = router.current.matchId;
-    for (final choose in [false, true]) {
-      final replacement = router.push<IntentionId>(
-        route(const PathReplacementDailyChoicePickerContext()),
-      );
-      await _settleRoute(tester);
-      repository.complete(choose ? 3 : 2, _page());
-      await tester.pumpAndSettle();
-      if (choose) {
-        await tester.tap(find.text('Гулять').last);
-      } else {
-        await tester.tap(find.byKey(ValueKey('$keyPrefix-cancel')));
-      }
-      await tester.pumpAndSettle();
-      expect(await replacement, choose ? testSummary(index: 2).id : isNull);
-      expect(router.current.matchId, initialId);
-      expect(launch.isActive, isTrue);
-    }
-    await router.maybePop();
-    await tester.pumpAndSettle();
-    expect(await initial, isNull);
-  });
-
   testWidgets('пустой начальный поиск и отсутствие совпадений сохраняют '
       'объяснения и доступную отмену', (tester) async {
     final (repository, router) = await _openApp(tester);
-    final launch = _Launch();
-    final selection = router.push<IntentionId>(
-      route(InitialDailyChoicePickerContext(launch: launch)),
-    );
+    final launch = TestDailyChoicePickerLaunch();
+    final selection = router.push<IntentionId>(route(launch));
     await _settleRoute(tester);
     repository.complete(1, _page(empty: true));
     await tester.pumpAndSettle();
@@ -526,12 +439,8 @@ void defineDailyChoicePickerContextTests({
   testWidgets('поздний выбор и отмена прежней страницы не закрывают новый '
       'поиск во время обратной анимации', (tester) async {
     final (repository, router) = await _openApp(tester);
-    final launch = _Launch();
-    unawaited(
-      router.push<IntentionId>(
-        route(InitialDailyChoicePickerContext(launch: launch)),
-      ),
-    );
+    final launch = TestDailyChoicePickerLaunch();
+    unawaited(router.push<IntentionId>(route(launch)));
     await _settleRoute(tester);
     repository.complete(1, _page());
     await tester.pumpAndSettle();
@@ -539,12 +448,8 @@ void defineDailyChoicePickerContextTests({
     final lateCancel = tester.widget<TopBar>(find.byType(TopBar)).onClose;
     final oldElement = find.byType(TopBar).evaluate().single;
     await router.maybePop();
-    final nextLaunch = _Launch();
-    unawaited(
-      router.push<IntentionId>(
-        route(InitialDailyChoicePickerContext(launch: nextLaunch)),
-      ),
-    );
+    final nextLaunch = TestDailyChoicePickerLaunch();
+    unawaited(router.push<IntentionId>(route(nextLaunch)));
     await tester.pump();
     expect(oldElement.mounted, isTrue);
     final nextId = router.current.matchId;
@@ -579,7 +484,8 @@ void _setPickerInsets(
   tester.view.viewInsets = FakeViewPadding(bottom: keyboard);
 }
 
-final class _Launch implements DailyChoicePickerLaunch {
+/// Запуск поиска, которым управляет тест, а не исходная страница.
+final class TestDailyChoicePickerLaunch implements DailyChoicePickerLaunch {
   @override
   bool isActive = true;
 

@@ -31,7 +31,7 @@ import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_date_c
     as _i6;
 import 'package:doable/src/daily_choice/presentation/daily_choice_creation_flow_session.dart'
     as _i26;
-import 'package:doable/src/daily_choice/presentation/daily_choice_picker_context.dart'
+import 'package:doable/src/daily_choice/presentation/daily_choice_picker_launch.dart'
     as _i24;
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart'
     as _i7;
@@ -156,15 +156,12 @@ class ChoicePathRouteArgs {
 class DailyChoiceActionPickerRoute
     extends _i20.PageRouteInfo<DailyChoiceActionPickerRouteArgs> {
   DailyChoiceActionPickerRoute({
-    required _i24.DailyChoicePickerContext pickerContext,
+    required _i24.DailyChoicePickerLaunch launch,
     _i25.Key? key,
     List<_i20.PageRouteInfo>? children,
   }) : super(
          DailyChoiceActionPickerRoute.name,
-         args: DailyChoiceActionPickerRouteArgs(
-           pickerContext: pickerContext,
-           key: key,
-         ),
+         args: DailyChoiceActionPickerRouteArgs(launch: launch, key: key),
          initialChildren: children,
        );
 
@@ -175,7 +172,7 @@ class DailyChoiceActionPickerRoute
     builder: (data) {
       final args = data.argsAs<DailyChoiceActionPickerRouteArgs>();
       return _i3.DailyChoiceActionPickerPage(
-        pickerContext: args.pickerContext,
+        launch: args.launch,
         key: args.key,
       );
     },
@@ -183,29 +180,26 @@ class DailyChoiceActionPickerRoute
 }
 
 class DailyChoiceActionPickerRouteArgs {
-  const DailyChoiceActionPickerRouteArgs({
-    required this.pickerContext,
-    this.key,
-  });
+  const DailyChoiceActionPickerRouteArgs({required this.launch, this.key});
 
-  final _i24.DailyChoicePickerContext pickerContext;
+  final _i24.DailyChoicePickerLaunch launch;
 
   final _i25.Key? key;
 
   @override
   String toString() {
-    return 'DailyChoiceActionPickerRouteArgs{pickerContext: $pickerContext, key: $key}';
+    return 'DailyChoiceActionPickerRouteArgs{launch: $launch, key: $key}';
   }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     if (other is! DailyChoiceActionPickerRouteArgs) return false;
-    return pickerContext == other.pickerContext && key == other.key;
+    return launch == other.launch && key == other.key;
   }
 
   @override
-  int get hashCode => pickerContext.hashCode ^ key.hashCode;
+  int get hashCode => launch.hashCode ^ key.hashCode;
 }
 
 /// generated route for
@@ -469,15 +463,12 @@ class DailyChoiceEditRouteArgs {
 class DailyChoiceSourcePickerRoute
     extends _i20.PageRouteInfo<DailyChoiceSourcePickerRouteArgs> {
   DailyChoiceSourcePickerRoute({
-    required _i24.DailyChoicePickerContext pickerContext,
+    required _i24.DailyChoicePickerLaunch launch,
     _i25.Key? key,
     List<_i20.PageRouteInfo>? children,
   }) : super(
          DailyChoiceSourcePickerRoute.name,
-         args: DailyChoiceSourcePickerRouteArgs(
-           pickerContext: pickerContext,
-           key: key,
-         ),
+         args: DailyChoiceSourcePickerRouteArgs(launch: launch, key: key),
          initialChildren: children,
        );
 
@@ -488,7 +479,7 @@ class DailyChoiceSourcePickerRoute
     builder: (data) {
       final args = data.argsAs<DailyChoiceSourcePickerRouteArgs>();
       return _i9.DailyChoiceSourcePickerPage(
-        pickerContext: args.pickerContext,
+        launch: args.launch,
         key: args.key,
       );
     },
@@ -496,29 +487,26 @@ class DailyChoiceSourcePickerRoute
 }
 
 class DailyChoiceSourcePickerRouteArgs {
-  const DailyChoiceSourcePickerRouteArgs({
-    required this.pickerContext,
-    this.key,
-  });
+  const DailyChoiceSourcePickerRouteArgs({required this.launch, this.key});
 
-  final _i24.DailyChoicePickerContext pickerContext;
+  final _i24.DailyChoicePickerLaunch launch;
 
   final _i25.Key? key;
 
   @override
   String toString() {
-    return 'DailyChoiceSourcePickerRouteArgs{pickerContext: $pickerContext, key: $key}';
+    return 'DailyChoiceSourcePickerRouteArgs{launch: $launch, key: $key}';
   }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     if (other is! DailyChoiceSourcePickerRouteArgs) return false;
-    return pickerContext == other.pickerContext && key == other.key;
+    return launch == other.launch && key == other.key;
   }
 
   @override
-  int get hashCode => pickerContext.hashCode ^ key.hashCode;
+  int get hashCode => launch.hashCode ^ key.hashCode;
 }
 
 /// generated route for

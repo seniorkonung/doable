@@ -2187,9 +2187,6 @@ class AppLocalizationsRu extends AppLocalizations {
       'Открыть связанное намерение';
 
   @override
-  String get actionPickerCancel => 'Отменить выбор действия';
-
-  @override
   String get actionPickerLoading => 'Загружаем действия…';
 
   @override
@@ -2208,9 +2205,6 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось загрузить действия из-за непредвиденной ошибки.';
 
   @override
-  String get sourcePickerCancel => 'Отменить выбор намерения';
-
-  @override
   String get sourcePickerEmpty => 'Доступных активных намерений нет.';
 
   @override
@@ -2222,28 +2216,12 @@ class AppLocalizationsRu extends AppLocalizations {
       'Новый дневной выбор: конечное действие';
 
   @override
-  String get dailyChoicePickerPurposeReplacementSource =>
-      'Замена пути: исходное намерение';
-
-  @override
-  String get dailyChoicePickerPurposeReplacementAction =>
-      'Замена пути: конечное действие';
-
-  @override
   String get dailyChoicePickerFlowCreationFromSource =>
       'Новый дневной выбор, от намерения';
 
   @override
   String get dailyChoicePickerFlowCreationFromAction =>
       'Новый дневной выбор, от действия';
-
-  @override
-  String get dailyChoicePickerFlowReplacementFromSource =>
-      'Замена пути, от намерения';
-
-  @override
-  String get dailyChoicePickerFlowReplacementFromAction =>
-      'Замена пути, от действия';
 
   @override
   String get dailyChoicePickerStepCurrent => 'Вы здесь';
@@ -2270,13 +2248,6 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get dailyChoicePickerStepDetails =>
       'Дата, время, приоритет и описание';
-
-  @override
-  String get dailyChoicePickerStepReplacement => 'Подтверждение замены';
-
-  @override
-  String get dailyChoicePickerStepReplacementNote =>
-      'Дата, запланированное время, приоритет, описание и выполнение останутся прежними';
 
   @override
   String get intentionPickerArchived => 'в архиве';

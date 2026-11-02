@@ -3364,12 +3364,6 @@ abstract class AppLocalizations {
   /// **'Open related intention'**
   String get relationDetailsOpenRelatedParticipantAction;
 
-  /// Отмена выбора действия
-  ///
-  /// In en, this message translates to:
-  /// **'Cancel action selection'**
-  String get actionPickerCancel;
-
   /// Чтение первой порции действий
   ///
   /// In en, this message translates to:
@@ -3400,12 +3394,6 @@ abstract class AppLocalizations {
   /// **'Actions couldn’t be loaded because of an unexpected error.'**
   String get actionPickerUnexpected;
 
-  /// Отмена выбора исходного намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Cancel intention selection'**
-  String get sourcePickerCancel;
-
   /// Пустой выбор активных намерений
   ///
   /// In en, this message translates to:
@@ -3424,18 +3412,6 @@ abstract class AppLocalizations {
   /// **'New daily choice: selected action'**
   String get dailyChoicePickerPurposeCreationAction;
 
-  /// Подзаголовок поиска исходного намерения при замене пути
-  ///
-  /// In en, this message translates to:
-  /// **'Path replacement: source intention'**
-  String get dailyChoicePickerPurposeReplacementSource;
-
-  /// Подзаголовок поиска действия при замене пути
-  ///
-  /// In en, this message translates to:
-  /// **'Path replacement: selected action'**
-  String get dailyChoicePickerPurposeReplacementAction;
-
   /// Строка листа назначения: создание дневного выбора от намерения
   ///
   /// In en, this message translates to:
@@ -3447,18 +3423,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'New daily choice, from an action'**
   String get dailyChoicePickerFlowCreationFromAction;
-
-  /// Строка листа назначения: замена пути от намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Path replacement, from an intention'**
-  String get dailyChoicePickerFlowReplacementFromSource;
-
-  /// Строка листа назначения: замена пути от действия
-  ///
-  /// In en, this message translates to:
-  /// **'Path replacement, from an action'**
-  String get dailyChoicePickerFlowReplacementFromAction;
 
   /// Отметка текущего шага дневного выбора
   ///
@@ -3507,18 +3471,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Date, time, priority, and description'**
   String get dailyChoicePickerStepDetails;
-
-  /// Последний шаг замены пути
-  ///
-  /// In en, this message translates to:
-  /// **'Replacement confirmation'**
-  String get dailyChoicePickerStepReplacement;
-
-  /// Пояснение подтверждения замены пути
-  ///
-  /// In en, this message translates to:
-  /// **'The date, scheduled time, priority, description, and completion stay the same'**
-  String get dailyChoicePickerStepReplacementNote;
 
   /// Архивное состояние намерения в доступном названии строки экрана выбора
   ///
