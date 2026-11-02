@@ -1923,9 +1923,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'The relation couldn’t be created because of an unexpected error.';
 
   @override
-  String get relationEditorUpdated => 'Relation updated.';
-
-  @override
   String get relationEditorUpdateNotFound => 'This relation no longer exists.';
 
   @override
@@ -1943,9 +1940,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get relationEditorUpdateUnexpected =>
       'The relation couldn’t be updated because of an unexpected error.';
-
-  @override
-  String get relationArchived => 'Relation archived.';
 
   @override
   String get relationArchiveNotFound => 'This relation no longer exists.';

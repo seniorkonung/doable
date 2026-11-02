@@ -1947,9 +1947,6 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось создать связь из-за непредвиденной ошибки.';
 
   @override
-  String get relationEditorUpdated => 'Связь изменена.';
-
-  @override
   String get relationEditorUpdateNotFound => 'Эта связь больше не существует.';
 
   @override
@@ -1967,9 +1964,6 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get relationEditorUpdateUnexpected =>
       'Не удалось изменить связь из-за непредвиденной ошибки.';
-
-  @override
-  String get relationArchived => 'Связь архивирована.';
 
   @override
   String get relationArchiveNotFound => 'Эта связь больше не существует.';

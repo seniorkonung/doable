@@ -2975,12 +2975,6 @@ abstract class AppLocalizations {
   /// **'The relation couldn’t be created because of an unexpected error.'**
   String get relationEditorCreateUnexpected;
 
-  /// Подтверждение успешного изменения долговременной связи
-  ///
-  /// In en, this message translates to:
-  /// **'Relation updated.'**
-  String get relationEditorUpdated;
-
   /// Отсутствие изменяемой связи
   ///
   /// In en, this message translates to:
@@ -3010,12 +3004,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The relation couldn’t be updated because of an unexpected error.'**
   String get relationEditorUpdateUnexpected;
-
-  /// Подтверждение успешного архивирования долговременной связи
-  ///
-  /// In en, this message translates to:
-  /// **'Relation archived.'**
-  String get relationArchived;
 
   /// Отсутствие архивируемой связи
   ///

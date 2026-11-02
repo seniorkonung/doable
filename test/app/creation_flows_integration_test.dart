@@ -78,15 +78,15 @@ void main() {
     final completions = <GraphCommandCompletion>[];
     final subscription = coordinator.completions.listen(completions.add);
     addTearDown(subscription.cancel);
-    coordinator.acceptRelationArchive(
-      ArchiveLongTermRelation(durabilityRelation(104)),
+    coordinator.acceptRelationDelete(
+      DeleteLongTermRelation(durabilityRelation(104)),
     );
     await _until(tester, () => completions.length == 1);
     await tester.pumpAndSettle();
     final first = app.l10n.graphOperationMessage(
-      app.l10n.graphOperationArchive,
+      app.l10n.graphOperationDelete,
       app.l10n.graphOperationRelation,
-      app.l10n.relationArchived,
+      app.l10n.relationDeleted,
     );
     final createdMessage = app.l10n.graphOperationMessage(
       app.l10n.graphOperationCreate,

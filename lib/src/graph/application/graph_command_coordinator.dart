@@ -261,8 +261,7 @@ final class IntentionUnannouncedSuccessCompletion
 
 enum LongTermRelationCommandKind { create, update, archive, restore, delete }
 
-final class LongTermRelationCommandCompletion
-    extends GraphPresentableCompletion {
+sealed class LongTermRelationCommandCompletion extends GraphCommandCompletion {
   const LongTermRelationCommandCompletion._({
     required this.token,
     required this.kind,
@@ -293,6 +292,36 @@ final class LongTermRelationCommandCompletion
     GraphResultSuccess() => false,
     GraphResultFailure() => true,
   };
+}
+
+final class LongTermRelationPresentableCompletion
+    extends LongTermRelationCommandCompletion
+    implements GraphPresentableCompletion {
+  const LongTermRelationPresentableCompletion._({
+    required super.token,
+    required super.kind,
+    required super.target,
+    required super.confirmedResult,
+  }) : super._();
+}
+
+/// Успех изменения, архивирования и восстановления связи публикуется только
+/// для согласования данных.
+///
+/// Эти операции следуют политике «успех без сообщения» по ADR-0046: результат
+/// виден в открытой панели связи, а отказ сохраняет протокол ADR-0012.
+final class LongTermRelationUnannouncedSuccessCompletion
+    extends LongTermRelationCommandCompletion {
+  const LongTermRelationUnannouncedSuccessCompletion._({
+    required super.token,
+    required super.kind,
+    required super.target,
+    required GraphCommandSucceeded<
+      LongTermRelationCommandSuccess,
+      LongTermRelationCommandFailure
+    >
+    result,
+  }) : super._(confirmedResult: result);
 }
 
 enum DailyChoiceCommandKind { create, update, replace, delete }
@@ -949,6 +978,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     target: const CreatingLongTermRelationOperationTarget(),
   );
 
+  /// Принимает изменение связи с политикой «успех без сообщения» по ADR-0046.
   LongTermRelationCommandStart acceptRelationUpdate(
     UpdateLongTermRelation command,
   ) => _acceptRelation(
@@ -956,8 +986,11 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     command: command,
     kind: LongTermRelationCommandKind.update,
     target: ExistingLongTermRelationOperationTarget(command.relationId),
+    announcesSuccess: false,
   );
 
+  /// Принимает архивирование связи с политикой «успех без сообщения» по
+  /// ADR-0046.
   LongTermRelationCommandStart acceptRelationArchive(
     ArchiveLongTermRelation command,
   ) => _acceptRelation(
@@ -965,8 +998,11 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     command: command,
     kind: LongTermRelationCommandKind.archive,
     target: ExistingLongTermRelationOperationTarget(command.relationId),
+    announcesSuccess: false,
   );
 
+  /// Принимает восстановление связи с политикой «успех без сообщения» по
+  /// ADR-0046.
   LongTermRelationCommandStart acceptRelationRestore(
     RestoreLongTermRelation command,
   ) => _acceptRelation(
@@ -974,6 +1010,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     command: command,
     kind: LongTermRelationCommandKind.restore,
     target: ExistingLongTermRelationOperationTarget(command.relationId),
+    announcesSuccess: false,
   );
 
   /// Принимает восстановление связи из поиска участника как отправку формы
@@ -1134,6 +1171,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     required LongTermRelationCommand command,
     required LongTermRelationCommandKind kind,
     required LongTermRelationOperationTarget target,
+    bool announcesSuccess = true,
     bool initiatorReleased = false,
   }) {
     final token = LongTermRelationOperationToken._();
@@ -1142,7 +1180,20 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
       entry: _PresentationEntry(token)..initiatorReleased = initiatorReleased,
       execute: () async {
         final result = await _executeLongTermRelation(command);
-        return LongTermRelationCommandCompletion._(
+        if (!announcesSuccess &&
+            result
+                is GraphCommandSucceeded<
+                  LongTermRelationCommandSuccess,
+                  LongTermRelationCommandFailure
+                >) {
+          return LongTermRelationUnannouncedSuccessCompletion._(
+            token: token,
+            kind: kind,
+            target: target,
+            result: result,
+          );
+        }
+        return LongTermRelationPresentableCompletion._(
           token: token,
           kind: kind,
           target: target,

@@ -1075,46 +1075,26 @@ void main() {
   );
 
   testWidgets(
-    'успех изменения связи ждёт сообщение намерения в той же очереди',
+    'успех изменения, архивирования и восстановления связи не объявляется '
+    'сообщением и не занимает очередь',
     (tester) async {
       final harness = await _pumpPresenterApp(tester);
       final intention = harness.startDelete(index: 1, title: 'Намерение');
-      final relation = harness.startRelationUpdate();
+      final update = harness.startRelationUpdate();
       harness.completeDeleted(intention);
-      harness.completeRelationUpdated(relation);
-      await tester.pumpAndSettle();
+      harness.completeRelationUpdated(update);
+      await update.future;
 
-      expect(find.text(_deleted('Намерение')), findsOneWidget);
-      expect(find.text(_relationUpdated), findsNothing);
-
-      await _closeMessage(tester);
-      expect(find.text(_relationUpdated), findsOneWidget);
-      await _closeMessage(tester);
-      expect(find.byType(SnackBar), findsNothing);
-    },
-  );
-
-  testWidgets(
-    'архивирование и восстановление связи используют общую очередь результатов',
-    (tester) async {
-      final harness = await _pumpPresenterApp(tester);
-      final intention = harness.startDelete(index: 1, title: 'Намерение');
       final archive = harness.startRelationArchive();
-      harness.completeDeleted(intention);
       harness.completeRelationArchived(archive);
       await archive.future;
 
       final restore = harness.startRelationRestore();
       harness.completeRelationRestored(restore);
+      await restore.future;
       await tester.pumpAndSettle();
 
       expect(find.text(_deleted('Намерение')), findsOneWidget);
-      expect(find.text(_relationArchived), findsNothing);
-      expect(find.text(_relationRestored), findsNothing);
-
-      await _closeMessage(tester);
-      expect(find.text(_relationArchived), findsNothing);
-      expect(find.text('$_relationRestored · 1 more'), findsOneWidget);
 
       await _closeMessage(tester);
       expect(find.byType(SnackBar), findsNothing);
@@ -1636,17 +1616,8 @@ final _relationCreated = _relationOutcome('Relation created.');
 
 String _relationUpdateOutcome(String outcome) => 'Edit — “relation”: $outcome';
 
-final _relationUpdated = _relationUpdateOutcome('Relation updated.');
-
-String _relationArchiveOutcome(String outcome) =>
-    'Archive — “relation”: $outcome';
-
-final _relationArchived = _relationArchiveOutcome('Relation archived.');
-
 String _relationRestoreOutcome(String outcome) =>
     'Restore — “relation”: $outcome';
-
-final _relationRestored = _relationRestoreOutcome('Relation restored.');
 
 String _relationDeleteOutcome(String outcome) =>
     'Delete — “relation”: $outcome';

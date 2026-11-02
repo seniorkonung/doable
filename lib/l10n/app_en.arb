@@ -1442,10 +1442,6 @@
   "@relationEditorCreateUnexpected": {
     "description": "Терминальная непредвиденная ошибка создания связи"
   },
-  "relationEditorUpdated": "Relation updated.",
-  "@relationEditorUpdated": {
-    "description": "Подтверждение успешного изменения долговременной связи"
-  },
   "relationEditorUpdateNotFound": "This relation no longer exists.",
   "@relationEditorUpdateNotFound": {
     "description": "Отсутствие изменяемой связи"
@@ -1465,10 +1461,6 @@
   "relationEditorUpdateUnexpected": "The relation couldn’t be updated because of an unexpected error.",
   "@relationEditorUpdateUnexpected": {
     "description": "Терминальная непредвиденная ошибка изменения связи"
-  },
-  "relationArchived": "Relation archived.",
-  "@relationArchived": {
-    "description": "Подтверждение успешного архивирования долговременной связи"
   },
   "relationArchiveNotFound": "This relation no longer exists.",
   "@relationArchiveNotFound": {
