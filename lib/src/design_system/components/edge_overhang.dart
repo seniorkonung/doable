@@ -3,44 +3,58 @@ import 'dart:math' as math;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 
-/// Отдаёт ребёнку ширину на [extent] больше своей: лишняя полоса лежит
-/// за концом строки, рисуется там и принимает касания, пока родитель
-/// шире строки на эту полосу, например поле содержимого с отступами.
-final class EndOverhang extends SingleChildRenderObjectWidget {
-  const EndOverhang({
-    required this.extent,
+/// Отдаёт ребёнку ширину на [start] и [end] больше своей: лишние полосы лежат
+/// за началом и за концом строки, рисуются там и принимают касания, пока
+/// родитель шире строки на эти полосы, например поле содержимого с отступами.
+final class EdgeOverhang extends SingleChildRenderObjectWidget {
+  const EdgeOverhang({
     required Widget super.child,
+    this.start = 0,
+    this.end = 0,
     super.key,
   });
 
-  final double extent;
+  final double start;
+  final double end;
 
   @override
-  RenderEndOverhang createRenderObject(BuildContext context) =>
-      RenderEndOverhang(
-        extent: extent,
+  RenderEdgeOverhang createRenderObject(BuildContext context) =>
+      RenderEdgeOverhang(
+        start: start,
+        end: end,
         textDirection: Directionality.of(context),
       );
 
   @override
   void updateRenderObject(
     BuildContext context,
-    RenderEndOverhang renderObject,
+    RenderEdgeOverhang renderObject,
   ) {
     renderObject
-      ..extent = extent
+      ..start = start
+      ..end = end
       ..textDirection = Directionality.of(context);
   }
 }
 
-final class RenderEndOverhang extends RenderShiftedBox {
-  RenderEndOverhang({required this._extent, required this._textDirection})
-    : super(null);
+final class RenderEdgeOverhang extends RenderShiftedBox {
+  RenderEdgeOverhang({
+    required this._start,
+    required this._end,
+    required this._textDirection,
+  }) : super(null);
 
-  double _extent;
-  set extent(double value) {
-    if (value == _extent) return;
-    _extent = value;
+  double _start;
+  set start(double value) {
+    if (value == _start) return;
+    _start = value;
+    markNeedsLayout();
+  }
+
+  double _end;
+  set end(double value) {
+    if (value == _end) return;
+    _end = value;
     markNeedsLayout();
   }
 
@@ -50,6 +64,8 @@ final class RenderEndOverhang extends RenderShiftedBox {
     _textDirection = value;
     markNeedsLayout();
   }
+
+  double get _extent => _start + _end;
 
   BoxConstraints _childConstraints(BoxConstraints constraints) =>
       constraints.copyWith(
@@ -89,9 +105,10 @@ final class RenderEndOverhang extends RenderShiftedBox {
     final child = this.child!;
     child.layout(_childConstraints(constraints), parentUsesSize: true);
     size = _sizeFor(constraints, child.size);
+    // Ребёнок сдвинут к стороне, на которую выходит его лишняя полоса.
     (child.parentData! as BoxParentData).offset = switch (_textDirection) {
-      TextDirection.ltr => Offset.zero,
-      TextDirection.rtl => Offset(-_extent, 0),
+      TextDirection.ltr => Offset(-_start, 0),
+      TextDirection.rtl => Offset(-_end, 0),
     };
   }
 

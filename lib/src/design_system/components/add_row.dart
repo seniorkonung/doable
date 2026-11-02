@@ -4,7 +4,7 @@ import '../doable_colors.dart';
 import '../doable_icon.dart';
 import '../doable_metrics.dart';
 import '../doable_type.dart';
-import 'end_overhang.dart';
+import 'edge_overhang.dart';
 
 /// Строка о том, что лежит под ней: заголовок или подсказка и «Добавить»
 /// у правого края.
@@ -126,7 +126,7 @@ final class AddRow extends StatelessWidget {
       ),
     );
 
-    return add == null ? row : EndOverhang(extent: _addOverhang, child: row);
+    return add == null ? row : EdgeOverhang(end: _addOverhang, child: row);
   }
 }
 

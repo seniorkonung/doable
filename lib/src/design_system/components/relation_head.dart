@@ -8,7 +8,7 @@ import '../doable_metrics.dart';
 import '../doable_priority.dart';
 import '../doable_type.dart';
 import 'badge.dart';
-import 'end_overhang.dart';
+import 'edge_overhang.dart';
 import 'path_glyph.dart';
 import 'relation_stroke.dart';
 
@@ -200,9 +200,7 @@ final class RelationHead extends StatelessWidget {
           ),
       ],
     );
-    return menu == null
-        ? head
-        : EndOverhang(extent: _menuOverhang, child: head);
+    return menu == null ? head : EdgeOverhang(end: _menuOverhang, child: head);
   }
 }
 
