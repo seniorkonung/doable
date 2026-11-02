@@ -394,6 +394,8 @@ Future<void> _insertRelation(
           priority: priority.index + 1,
           description: Value(description),
           isArchived: Value(isArchived),
+          createdAt: 0,
+          updatedAt: 0,
         ),
       ),
 );

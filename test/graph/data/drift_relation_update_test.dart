@@ -130,7 +130,7 @@ void main() {
     );
   });
 
-  test('одна транзакция заменяет поля и публикует абсолютные количества участников', () async {
+  test('одна транзакция заменяет поля и публикует абсолютные количества двух участников', () async {
     await _create(repository, sourceId, relatedId, description: 'Прежнее');
     final intentionsBefore = await _storedIntentions(database);
     final revisionBefore = await _revision(repository, sourceId);
@@ -142,7 +142,6 @@ void main() {
           patch: LongTermRelationPatch(
             type: const LongTermRelationFieldSet(LongTermRelationType.can),
             priority: const LongTermRelationFieldSet(RelationPriority.p1),
-            relatedIntentionId: LongTermRelationFieldSet(thirdId),
             description: LongTermRelationDescriptionPatch.fromInput(
               '  Новое описание\n',
             ),
@@ -155,16 +154,16 @@ void main() {
       revisionBefore.compareTo(result.changes.first.revision),
       GraphRevisionOrder.older,
     );
-    expect(result.before.relatedIntentionId, relatedId);
-    expect(result.relation.relatedIntentionId, thirdId);
+    expect(result.relation.sourceIntentionId, sourceId);
+    expect(result.relation.relatedIntentionId, relatedId);
     expect(result.relation.type, LongTermRelationType.can);
     expect(result.relation.priority, RelationPriority.p1);
     expect(result.description?.value, '  Новое описание\n');
     final relationChange = result.changes
         .whereType<LongTermRelationUpdatedChange>()
         .single;
-    expect(relationChange.before.relatedIntentionId, relatedId);
-    expect(relationChange.after.relatedIntentionId, thirdId);
+    expect(relationChange.before.type, LongTermRelationType.need);
+    expect(relationChange.after.type, LongTermRelationType.can);
 
     final countChanges = result.changes
         .whereType<IntentionRelationCountsChanged>()
@@ -172,29 +171,17 @@ void main() {
     expect(countChanges.map((change) => change.intentionId), {
       sourceId,
       relatedId,
-      thirdId,
     });
-    expect(
-      countChanges
-          .singleWhere((change) => change.intentionId == sourceId)
-          .counts
-          .activeCanOutgoing,
-      1,
-    );
-    expect(
-      countChanges
-          .singleWhere((change) => change.intentionId == relatedId)
-          .counts
-          .total,
-      0,
-    );
-    expect(
-      countChanges
-          .singleWhere((change) => change.intentionId == thirdId)
-          .counts
-          .activeCanIncoming,
-      1,
-    );
+    final sourceCounts = countChanges
+        .singleWhere((change) => change.intentionId == sourceId)
+        .counts;
+    expect(sourceCounts.activeCanOutgoing, 1);
+    expect(sourceCounts.activeNeedOutgoing, 0);
+    final relatedCounts = countChanges
+        .singleWhere((change) => change.intentionId == relatedId)
+        .counts;
+    expect(relatedCounts.activeCanIncoming, 1);
+    expect(relatedCounts.activeNeedIncoming, 0);
     expect(await _storedIntentions(database), intentionsBefore);
   });
 
@@ -242,15 +229,19 @@ void main() {
   );
 
   test(
-    'изменение отсутствующей связи возвращает типизированное отсутствие',
+    'изменение удалённой связи возвращает типизированное отсутствие',
     () async {
-      final missingId = _relationId(_uuid(999));
+      await _create(repository, sourceId, relatedId);
+      expect(
+        await repository.execute(DeleteLongTermRelation(relationId)),
+        isA<GraphCommandSucceeded>(),
+      );
       final revisionBefore = await _revision(repository, sourceId);
 
       final failure = _failure(
         await repository.execute(
           UpdateLongTermRelation(
-            relationId: missingId,
+            relationId: relationId,
             patch: const LongTermRelationPatch(
               priority: LongTermRelationFieldSet(RelationPriority.p1),
             ),
@@ -263,7 +254,7 @@ void main() {
         isA<LongTermRelationNotFoundFailure>().having(
           (value) => value.relationId,
           'relationId',
-          missingId,
+          relationId,
         ),
       );
       expect(
@@ -273,134 +264,7 @@ void main() {
     },
   );
 
-  test('совпавшие итоговые участники отклоняют весь набор правок', () async {
-    await _create(repository, sourceId, relatedId, description: 'Прежнее');
-    final storedBefore = await _storedRelation(database, relationId);
-
-    final failure = _failure(
-      await repository.execute(
-        UpdateLongTermRelation(
-          relationId: relationId,
-          patch: LongTermRelationPatch(
-            relatedIntentionId: LongTermRelationFieldSet(sourceId),
-            description: LongTermRelationDescriptionPatch.fromInput('Новое'),
-          ),
-        ),
-      ),
-    );
-
-    expect(
-      failure,
-      isA<LongTermRelationCommandValidationFailure>().having(
-        (value) => value.reason,
-        'reason',
-        CreateLongTermRelationValidationFailure.sameIntention,
-      ),
-    );
-    expect(await _storedRelation(database, relationId), storedBefore);
-  });
-
-  test(
-    'занятая новая пара возвращает прежнюю связь и откатывает все поля',
-    () async {
-      await _create(repository, sourceId, relatedId, description: 'Прежнее');
-      await _create(repository, sourceId, thirdId);
-      final storedBefore = await _storedRelation(database, relationId);
-
-      final failure = _failure(
-        await repository.execute(
-          UpdateLongTermRelation(
-            relationId: relationId,
-            patch: LongTermRelationPatch(
-              relatedIntentionId: LongTermRelationFieldSet(thirdId),
-              type: const LongTermRelationFieldSet(LongTermRelationType.can),
-              description: LongTermRelationDescriptionPatch.fromInput('Новое'),
-            ),
-          ),
-        ),
-      );
-
-      expect(
-        failure,
-        isA<LongTermRelationPairOccupiedFailure>().having(
-          (value) => value.existingRelationId,
-          'existingRelationId',
-          secondRelationId,
-        ),
-      );
-      expect(await _storedRelation(database, relationId), storedBefore);
-    },
-  );
-
-  test('собственная пара исключается из проверки уникальности', () async {
-    await _create(repository, sourceId, relatedId);
-
-    final updated = _updated(
-      await repository.execute(
-        UpdateLongTermRelation(
-          relationId: relationId,
-          patch: const LongTermRelationPatch(
-            type: LongTermRelationFieldSet(LongTermRelationType.can),
-          ),
-        ),
-      ),
-    );
-
-    expect(updated.relation.type, LongTermRelationType.can);
-  });
-
-  test(
-    'активная связь проверяет существование и архив участников по роли',
-    () async {
-      await _create(repository, sourceId, relatedId);
-      final missingId = _intentionId(_uuid(999));
-      await repository.execute(ArchiveIntention(thirdId));
-
-      final missing = _failure(
-        await repository.execute(
-          UpdateLongTermRelation(
-            relationId: relationId,
-            patch: LongTermRelationPatch(
-              sourceIntentionId: LongTermRelationFieldSet(missingId),
-            ),
-          ),
-        ),
-      );
-      final archived = _failure(
-        await repository.execute(
-          UpdateLongTermRelation(
-            relationId: relationId,
-            patch: LongTermRelationPatch(
-              relatedIntentionId: LongTermRelationFieldSet(thirdId),
-            ),
-          ),
-        ),
-      );
-
-      expect(
-        missing,
-        isA<LongTermRelationParticipantNotFoundFailure>()
-            .having(
-              (value) => value.role,
-              'role',
-              RelationParticipantRole.source,
-            )
-            .having((value) => value.intentionId, 'intentionId', missingId),
-      );
-      expect(
-        archived,
-        isA<LongTermRelationParticipantArchivedFailure>()
-            .having(
-              (value) => value.role,
-              'role',
-              RelationParticipantRole.related,
-            )
-            .having((value) => value.intentionId, 'intentionId', thirdId),
-      );
-    },
-  );
-
-  test('архивная связь допускает архивированного участника', () async {
+  test('изменение архивной связи сохраняет архивное состояние и последовательность создания', () async {
     await _create(repository, sourceId, relatedId);
     await seedGraph(
       database,
@@ -409,48 +273,137 @@ void main() {
                 ..where((row) => row.id.equals(relationId.toCanonicalString())))
               .write(const LongTermRelationsCompanion(isArchived: Value(true))),
     );
-    await repository.execute(ArchiveIntention(thirdId));
+    await repository.execute(ArchiveIntention(relatedId));
 
     final updated = _updated(
       await repository.execute(
         UpdateLongTermRelation(
           relationId: relationId,
-          patch: LongTermRelationPatch(
-            sourceIntentionId: LongTermRelationFieldSet(thirdId),
+          patch: const LongTermRelationPatch(
+            priority: LongTermRelationFieldSet(RelationPriority.p1),
           ),
         ),
       ),
     );
 
-    expect(updated.relation.sourceIntentionId, thirdId);
+    expect(updated.relation.priority, RelationPriority.p1);
     expect(updated.relation.scope, RelationScope.archived);
-    expect((await _storedIntention(database, thirdId))['is_archived'], 1);
+    expect(updated.relation.creationSequence.value, 1);
+    expect((await _storedIntention(database, relatedId))['is_archived'], 1);
   });
 
-  test('встречная связь и цикл остаются допустимыми после изменения', () async {
-    await _create(repository, sourceId, relatedId);
-    await _create(repository, relatedId, sourceId);
-    final cycleRelationId = _relationId(_uuid(103));
-    await _create(repository, relatedId, thirdId);
+  group('изменение типа архивированной связи', () {
+    Future<void> archiveRelation() async {
+      await _create(repository, sourceId, relatedId, description: 'Описание');
+      expect(
+        await repository.execute(ArchiveLongTermRelation(relationId)),
+        isA<GraphCommandSucceeded>(),
+      );
+    }
 
-    final updated = _updated(
-      await repository.execute(
-        UpdateLongTermRelation(
-          relationId: cycleRelationId,
-          patch: LongTermRelationPatch(
-            sourceIntentionId: LongTermRelationFieldSet(thirdId),
-            relatedIntentionId: LongTermRelationFieldSet(sourceId),
+    test(
+      'отклоняется конфликтом целиком вместе с приоритетом и описанием',
+      () async {
+        await archiveRelation();
+        final storedBefore = await _storedRelation(database, relationId);
+        final revisionBefore = await _revision(repository, sourceId);
+
+        final failure = _failure(
+          await repository.execute(
+            UpdateLongTermRelation(
+              relationId: relationId,
+              patch: LongTermRelationPatch(
+                type: const LongTermRelationFieldSet(LongTermRelationType.can),
+                priority: const LongTermRelationFieldSet(RelationPriority.p1),
+                description: LongTermRelationDescriptionReplaced(
+                  LongTermRelationDescription.fromInput('Новое описание')!,
+                ),
+              ),
+            ),
+          ),
+        );
+
+        expect(
+          failure,
+          isA<LongTermRelationArchivedTypeChangeFailure>().having(
+            (value) => value.relationId,
+            'relationId',
+            relationId,
+          ),
+        );
+        expect(failure.category, GraphFailureCategory.conflict);
+        expect(await _storedRelation(database, relationId), storedBefore);
+        expect(
+          revisionBefore.compareTo(await _revision(repository, sourceId)),
+          GraphRevisionOrder.same,
+        );
+      },
+    );
+
+    test('приоритет и описание меняются как прежде', () async {
+      await archiveRelation();
+
+      final updated = _updated(
+        await repository.execute(
+          UpdateLongTermRelation(
+            relationId: relationId,
+            patch: LongTermRelationPatch(
+              priority: const LongTermRelationFieldSet(RelationPriority.p1),
+              description: LongTermRelationDescriptionReplaced(
+                LongTermRelationDescription.fromInput('Новое описание')!,
+              ),
+            ),
           ),
         ),
-      ),
-    );
+      );
 
-    expect(updated.relation.sourceIntentionId, thirdId);
-    expect(updated.relation.relatedIntentionId, sourceId);
-    expect(
-      await database.select(database.longTermRelations).get(),
-      hasLength(3),
-    );
+      expect(updated.relation.scope, RelationScope.archived);
+      expect(updated.relation.type, LongTermRelationType.need);
+      expect(updated.relation.priority, RelationPriority.p1);
+      expect(updated.description?.value, 'Новое описание');
+    });
+
+    test('указание прежнего типа не считается изменением типа', () async {
+      await archiveRelation();
+
+      final updated = _updated(
+        await repository.execute(
+          UpdateLongTermRelation(
+            relationId: relationId,
+            patch: const LongTermRelationPatch(
+              type: LongTermRelationFieldSet(LongTermRelationType.need),
+              priority: LongTermRelationFieldSet(RelationPriority.p1),
+            ),
+          ),
+        ),
+      );
+
+      expect(updated.relation.scope, RelationScope.archived);
+      expect(updated.relation.type, LongTermRelationType.need);
+      expect(updated.relation.priority, RelationPriority.p1);
+    });
+
+    test('после восстановления тип меняется', () async {
+      await archiveRelation();
+      expect(
+        await repository.execute(RestoreLongTermRelation(relationId)),
+        isA<GraphCommandSucceeded>(),
+      );
+
+      final updated = _updated(
+        await repository.execute(
+          UpdateLongTermRelation(
+            relationId: relationId,
+            patch: const LongTermRelationPatch(
+              type: LongTermRelationFieldSet(LongTermRelationType.can),
+            ),
+          ),
+        ),
+      );
+
+      expect(updated.relation.scope, RelationScope.active);
+      expect(updated.relation.type, LongTermRelationType.can);
+    });
   });
 }
 

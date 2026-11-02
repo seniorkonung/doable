@@ -277,6 +277,8 @@ LongTermRelationSummary _summary(
       priority: priority,
       scope: RelationScope.active,
       creationSequence: RelationCreationSequence(sequence),
+      createdAt: RelationTimestamp(DateTime.utc(2026)),
+      updatedAt: RelationTimestamp(DateTime.utc(2026)),
     ),
     source: source,
     related: related,

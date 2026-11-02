@@ -108,17 +108,11 @@ final class LongTermRelationPatch {
   const LongTermRelationPatch({
     this.type = const LongTermRelationFieldUnchanged<LongTermRelationType>(),
     this.priority = const LongTermRelationFieldUnchanged<RelationPriority>(),
-    this.sourceIntentionId =
-        const LongTermRelationFieldUnchanged<IntentionId>(),
-    this.relatedIntentionId =
-        const LongTermRelationFieldUnchanged<IntentionId>(),
     this.description = const LongTermRelationDescriptionUnchanged(),
   });
 
   final LongTermRelationFieldPatch<LongTermRelationType> type;
   final LongTermRelationFieldPatch<RelationPriority> priority;
-  final LongTermRelationFieldPatch<IntentionId> sourceIntentionId;
-  final LongTermRelationFieldPatch<IntentionId> relatedIntentionId;
   final LongTermRelationDescriptionPatch description;
 }
 
@@ -153,16 +147,6 @@ sealed class LongTermRelationCommandFailure implements GraphCommandFailure {
   const LongTermRelationCommandFailure();
 }
 
-final class LongTermRelationCommandValidationFailure
-    extends LongTermRelationCommandFailure {
-  const LongTermRelationCommandValidationFailure(this.reason);
-
-  final CreateLongTermRelationValidationFailure reason;
-
-  @override
-  GraphFailureCategory get category => GraphFailureCategory.validation;
-}
-
 final class LongTermRelationPairOccupiedFailure
     extends LongTermRelationCommandFailure {
   const LongTermRelationPairOccupiedFailure(this.existingRelationId);
@@ -176,6 +160,20 @@ final class LongTermRelationPairOccupiedFailure
 final class LongTermRelationReferencedByDailyPathFailure
     extends LongTermRelationCommandFailure {
   const LongTermRelationReferencedByDailyPathFailure(this.relationId);
+
+  final LongTermRelationId relationId;
+
+  @override
+  GraphFailureCategory get category => GraphFailureCategory.conflict;
+}
+
+/// Набор правок архивированной связи меняет её тип.
+///
+/// Архивированная связь сохраняет тип до восстановления, поэтому отклоняется
+/// весь набор, а не только изменение типа.
+final class LongTermRelationArchivedTypeChangeFailure
+    extends LongTermRelationCommandFailure {
+  const LongTermRelationArchivedTypeChangeFailure(this.relationId);
 
   final LongTermRelationId relationId;
 

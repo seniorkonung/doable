@@ -18,7 +18,6 @@ enum _MatrixEntry {
   source,
   action,
   actionCandidate,
-  relation,
   assignTags,
   draftTags,
   addChoice,
@@ -30,7 +29,6 @@ enum _MatrixEntry {
   createRelation,
   outgoingRelations,
   incomingRelations,
-  editRelation,
   changeSource,
   selectRelated;
 
@@ -48,7 +46,6 @@ enum _MatrixEntry {
       DailyChoiceActionPickerPage,
       'Бегать',
     ),
-    _MatrixEntry.relation => _relationRow,
     _MatrixEntry.assignTags => find.byKey(
       const ValueKey('tag-assignments-choose'),
     ),
@@ -75,9 +72,6 @@ enum _MatrixEntry {
     _MatrixEntry.outgoingRelations => _outgoingNeedGroup,
     _MatrixEntry.incomingRelations => find.byKey(
       const ValueKey('intention-relations-group-neededFor'),
-    ),
-    _MatrixEntry.editRelation => find.byKey(
-      const ValueKey('relation-details-edit-relation'),
     ),
     _MatrixEntry.changeSource => find.byKey(
       const ValueKey('relation-editor-change-source'),
@@ -258,6 +252,50 @@ void _registerPageMatrixTests() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('матрица: панель связи перекрывает страницу намерения и панель '
+      'навигации, а «назад» закрывает только её', (tester) async {
+    final router = await _start(tester);
+    await _select(tester, AppDestination.intentionGraph);
+    await _open(tester, intentionCatalogRow('Читать'), IntentionDetailsPage);
+    await _tap(tester, find.text('Relations').first);
+    await _tap(tester, _outgoingNeedGroup);
+    await _tap(tester, _relationRow);
+    await _until(tester, find.byType(RelationHead));
+    await tester.pumpAndSettle();
+
+    // Панель — не маршрут-страница: в стеке по-прежнему страница намерения.
+    final panel = find.byType(Sheet);
+    expect(panel, findsOneWidget);
+    expect(tester.getRect(panel).bottom, _screen(tester).height);
+    expect(router.stack.map((page) => page.name), [
+      AppShellRoute.name,
+      IntentionDetailsRoute.name,
+    ]);
+    expect(router.hasPagelessTopRoute, isTrue);
+    expect(find.byType(IntentionDetailsPage), findsOneWidget);
+    expect(_relationRow.hitTestable(), findsNothing);
+    final bar = find.byType(AppNavigationBar);
+    expect(bar, findsOneWidget);
+    expect(
+      tester.widget<AppNavigationBar>(bar).selected,
+      AppDestination.intentionGraph,
+    );
+    expect(_destinations.hitTestable(), findsNothing);
+    expect(_announcedDestinations, findsNothing);
+
+    await tester.binding.handlePopRoute();
+    await _gone(tester, Sheet);
+    _expectAboveShell(
+      tester,
+      IntentionDetailsPage,
+      AppDestination.intentionGraph,
+    );
+    expect(router.hasPagelessTopRoute, isFalse);
+    await _close(tester, IntentionDetailsPage);
+    _expectRootPage(tester, router, AppDestination.intentionGraph);
+    expect(tester.takeException(), isNull);
+  });
+
   const read = _MatrixEntry.intention;
   const daily = _MatrixEntry.dailyChoice;
   const cases = <_PageCase>[
@@ -272,12 +310,6 @@ void _registerPageMatrixTests() {
       page: IntentionEditPage,
       panel: false,
       entries: [read, _MatrixEntry.editIntention],
-    ),
-    (
-      name: 'долговременная связь',
-      page: RelationDetailsPage,
-      panel: true,
-      entries: [read, _MatrixEntry.outgoingRelations, _MatrixEntry.relation],
     ),
     (
       name: 'дневной выбор',
@@ -360,17 +392,6 @@ void _registerPageMatrixTests() {
       ],
     ),
     (
-      name: 'изменение связи',
-      page: RelationEditorPage,
-      panel: false,
-      entries: [
-        read,
-        _MatrixEntry.outgoingRelations,
-        _MatrixEntry.relation,
-        _MatrixEntry.editRelation,
-      ],
-    ),
-    (
       name: 'поиск исходного участника',
       page: RelationParticipantPickerPage,
       panel: false,
@@ -435,8 +456,7 @@ void _registerPageMatrixTests() {
               wait: _until,
             );
           default:
-            if (entry == _MatrixEntry.relation ||
-                entry == _MatrixEntry.createRelation ||
+            if (entry == _MatrixEntry.createRelation ||
                 entry == _MatrixEntry.outgoingRelations ||
                 entry == _MatrixEntry.incomingRelations) {
               await _tap(tester, find.text('Relations').first);
@@ -457,7 +477,6 @@ void _registerPageMatrixTests() {
             RelationDirection.outgoing => 'создание исходящей связи',
             RelationDirection.incoming => 'создание входящей связи',
           },
-          RelationEditingContext() => 'изменение связи',
         },
         _ => null,
       };
@@ -489,53 +508,46 @@ void _registerPageMatrixTests() {
     });
   }
 
-  for (final scope in RelationScope.values) {
-    final name = switch (scope) {
-      RelationScope.active => 'активной связи',
-      RelationScope.archived => 'архивной связи',
-    };
-    testWidgets('поиск участника $name без панели', (tester) async {
-      final router = await _start(tester);
-      final choice = RelationParticipantChoice(
-        role: RelationParticipantRole.related,
-        flow: RelationChangeChoiceFlow(
-          relationId: testFormRelationId(1),
-          relationScope: scope,
-        ),
-        type: LongTermRelationType.need,
-        source: RelationParticipantSummary(
-          id: _intentionId(_read),
-          title: 'Читать',
-          archiveState: IntentionArchiveState.active,
-        ),
-        related: RelationParticipantSummary(
-          id: _intentionId(_run),
-          title: 'Бегать',
-          archiveState: IntentionArchiveState.active,
-        ),
-      );
-      unawaited(router.push(RelationParticipantPickerRoute(choice: choice)));
-      await _until(tester, _summary(RelationParticipantPickerPage, 'Бегать'));
-      await tester.pumpAndSettle();
-      _expectAboveShell(
-        tester,
-        RelationParticipantPickerPage,
-        AppDestination.home,
-        expectedPanel: false,
-      );
-      expect(
-        tester
-            .widget<RelationParticipantPickerPage>(
-              find.byType(RelationParticipantPickerPage),
-            )
-            .choice,
-        same(choice),
-      );
-      await _close(tester, RelationParticipantPickerPage);
-      _expectRootPage(tester, router, AppDestination.home);
-      expect(tester.takeException(), isNull);
-    });
-  }
+  testWidgets('поиск участника без панели', (tester) async {
+    final router = await _start(tester);
+    final choice = RelationParticipantChoice(
+      role: RelationParticipantRole.related,
+      restore: testRelationRestore,
+      type: LongTermRelationType.need,
+      priority: null,
+      description: '',
+      source: RelationParticipantSummary(
+        id: _intentionId(_read),
+        title: 'Читать',
+        archiveState: IntentionArchiveState.active,
+      ),
+      related: RelationParticipantSummary(
+        id: _intentionId(_run),
+        title: 'Бегать',
+        archiveState: IntentionArchiveState.active,
+      ),
+    );
+    unawaited(router.push(RelationParticipantPickerRoute(choice: choice)));
+    await _until(tester, _summary(RelationParticipantPickerPage, 'Бегать'));
+    await tester.pumpAndSettle();
+    _expectAboveShell(
+      tester,
+      RelationParticipantPickerPage,
+      AppDestination.home,
+      expectedPanel: false,
+    );
+    expect(
+      tester
+          .widget<RelationParticipantPickerPage>(
+            find.byType(RelationParticipantPickerPage),
+          )
+          .choice,
+      same(choice),
+    );
+    await _close(tester, RelationParticipantPickerPage);
+    _expectRootPage(tester, router, AppDestination.home);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('матрица: создание связи без участников — задача без панели', (
     tester,

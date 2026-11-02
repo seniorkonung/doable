@@ -76,7 +76,7 @@ final class _Fixture {
       raw.execute(
         '''INSERT INTO long_term_relations
          (id, source_intention_id, related_intention_id, type, priority,
-          is_archived) VALUES (?, ?, ?, ?, ?, ?)''',
+          is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 0, 0)''',
         [
           _uuid(id),
           _uuid(source),
@@ -256,7 +256,6 @@ void main() {
       fixture.intention(1);
       fixture.intention(2);
       fixture.intention(3, ready: true);
-      fixture.intention(4);
       fixture.relation(101, 1, 2);
       fixture.relation(102, 2, 3);
       final draft = fixture.bottomProgress(3, [(102, 2, 3), (101, 1, 2)]);
@@ -271,11 +270,6 @@ void main() {
           'UPDATE long_term_relations SET is_archived = ? WHERE id = ?',
           <Object>[1, _uuid(101)],
           <Object>[0, _uuid(101)],
-        ),
-        (
-          'UPDATE long_term_relations SET source_intention_id = ? WHERE id = ?',
-          <Object>[_uuid(4), _uuid(101)],
-          <Object>[_uuid(1), _uuid(101)],
         ),
         (
           'UPDATE intentions SET is_action_ready = ? WHERE id = ?',
@@ -857,11 +851,11 @@ void main() {
           )
           INSERT INTO long_term_relations
             (id, source_intention_id, related_intention_id, type, priority,
-             is_archived)
+             is_archived, created_at, updated_at)
           SELECT printf('018f0b5d-6b2e-7c80-8000-%012x', $idBase + n),
                  printf('018f0b5d-6b2e-7c80-8000-%012x', n),
                  printf('018f0b5d-6b2e-7c80-8000-%012x', n + $offset),
-                 'need', 2, 0 FROM ids
+                 'need', 2, 0, 0, 0 FROM ids
         ''');
           }
         });

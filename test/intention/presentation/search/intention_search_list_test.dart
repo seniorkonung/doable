@@ -806,7 +806,6 @@ final _counterpart = testSummary(index: 100);
 Future<_Harness> _openRelationParticipants(WidgetTester tester) => _open(
   tester,
   purpose: SelectRelationParticipant(
-    selectionContext: RelationParticipantSelectionContext.activeRelation,
     session: IntentionSearchSession(),
     pairProbe: RelationPairProbe(
       counterpartId: _counterpart.id,

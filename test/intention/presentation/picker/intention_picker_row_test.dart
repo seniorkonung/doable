@@ -80,13 +80,7 @@ void main() {
       'исходного намерения',
       SelectDailyChoiceSource(session: IntentionSearchSession()),
     ),
-    (
-      'участника',
-      SelectRelationParticipant(
-        selectionContext: RelationParticipantSelectionContext.activeRelation,
-        session: IntentionSearchSession(),
-      ),
-    ),
+    ('участника', SelectRelationParticipant(session: IntentionSearchSession())),
   ]) {
     testWidgets('в поиске $search молния и доступное название отличают '
         'действие от намерения на двух языках', (tester) async {
@@ -165,55 +159,6 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('архивированное действие в поиске участника архивированной '
-      'связи несёт метку архива, приглушено и называет архив на двух языках', (
-    tester,
-  ) async {
-    final semantics = tester.ensureSemantics();
-    final health = _tag(2, 'Здоровье', color: TagColor.blue);
-    final summary = _summary(
-      'Бегать по утрам',
-      archiveState: IntentionArchiveState.archived,
-      tags: [_tag(1, 'Утро'), health],
-    );
-
-    for (final (locale, label) in const [
-      (
-        Locale('ru'),
-        'Бегать по утрам, в архиве, действие, Теги: Здоровье, Утро',
-      ),
-      (Locale('en'), 'Бегать по утрам, archived, action, Tags: Здоровье, Утро'),
-    ]) {
-      await tester.pumpWidget(
-        _app(
-          locale: locale,
-          purpose: SelectRelationParticipant(
-            selectionContext:
-                RelationParticipantSelectionContext.archivedRelation,
-            session: IntentionSearchSession(),
-          ),
-          summary: summary,
-          requiredTagIds: {health.id},
-        ),
-      );
-
-      expect(_marks(tester), [
-        (DoableIconData.archive, BadgeTone.muted),
-        (DoableIconData.bolt, BadgeTone.muted),
-      ]);
-      expect(tester.widget<PickerRow>(find.byType(PickerRow)).archived, true);
-      expect(
-        [
-          for (final chip in tester.widgetList<TagChip>(find.byType(TagChip)))
-            (chip.name, chip.strong),
-        ],
-        [('Здоровье', false), ('Утро', false)],
-      );
-      expect(find.bySemanticsLabel(label), findsOneWidget);
-    }
-    semantics.dispose();
-  });
-
   testWidgets('строка без тегов называет их отсутствие, а стрелка открывает '
       'страницу без выбора на двух языках', (tester) async {
     final semantics = tester.ensureSemantics();
@@ -275,13 +220,6 @@ void main() {
       'tapping opens the existing relation',
     ),
     (
-      OccupiedPairKind.archived,
-      'Связь в архиве',
-      'Archived relation',
-      'нажатие откроет существующую связь',
-      'tapping opens the existing relation',
-    ),
-    (
       OccupiedPairKind.restorable,
       'Связь в архиве',
       'Archived relation',
@@ -315,8 +253,6 @@ void main() {
           _app(
             locale: locale,
             purpose: SelectRelationParticipant(
-              selectionContext:
-                  RelationParticipantSelectionContext.activeRelation,
               session: IntentionSearchSession(),
             ),
             summary: _summary('Много ходить'),
@@ -355,48 +291,6 @@ void main() {
       semantics.dispose();
     });
   }
-
-  testWidgets('отметка занятой пары не приглушает название активного '
-      'намерения, а у архивированного приглушено только оно', (tester) async {
-    for (final (archiveState, archived) in const [
-      (IntentionArchiveState.active, false),
-      (IntentionArchiveState.archived, true),
-    ]) {
-      await tester.pumpWidget(
-        _app(
-          purpose: SelectRelationParticipant(
-            selectionContext:
-                RelationParticipantSelectionContext.archivedRelation,
-            session: IntentionSearchSession(),
-          ),
-          summary: _summary('Плавать', archiveState: archiveState),
-          occupiedPair: OccupiedPairMark(
-            kind: OccupiedPairKind.archived,
-            onTap: () {},
-          ),
-        ),
-      );
-
-      expect(
-        tester.widget<PickerRow>(find.byType(PickerRow)).archived,
-        archived,
-      );
-      expect(tester.widget<PickerRow>(find.byType(PickerRow)).marks, [
-        isA<BadgeWord>().having((mark) => mark.word, 'word', 'Связь в архиве'),
-        if (archived)
-          isA<BadgeMark>().having(
-            (mark) => mark.icon,
-            'icon',
-            DoableIconData.archive,
-          ),
-        isA<BadgeMark>().having(
-          (mark) => mark.icon,
-          'icon',
-          DoableIconData.bolt,
-        ),
-      ]);
-    }
-  });
 }
 
 List<(DoableIconData, BadgeTone)> _marks(WidgetTester tester) => [

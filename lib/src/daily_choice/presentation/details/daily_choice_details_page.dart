@@ -13,6 +13,7 @@ import '../../../graph/application/personal_graph_repository_provider.dart';
 import '../../../graph/presentation/operation_failure_presentation.dart';
 import '../../../intention/domain/intention.dart';
 import '../../../long_term_relation/domain/long_term_relation.dart';
+import '../../../long_term_relation/presentation/details/relation_details_sheet.dart';
 import '../../application/daily_choice_command.dart';
 import '../../application/daily_choice_details.dart';
 import '../../application/daily_choice_result.dart';
@@ -460,9 +461,7 @@ final class _Relation extends StatelessWidget {
     final subtitle = step.description == null
         ? summary
         : '$summary\n${step.description!.value}';
-    void onOpen() => unawaited(
-      context.router.push(RelationDetailsRoute(relationId: relation.id)),
-    );
+    void onOpen() => unawaited(showRelationDetailsSheet(context, relation.id));
     return Semantics(
       key: ValueKey('daily-choice-relation-$position'),
       button: true,

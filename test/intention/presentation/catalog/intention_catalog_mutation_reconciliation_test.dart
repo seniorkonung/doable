@@ -985,11 +985,7 @@ void main() {
         final repository = ControlledCatalogRepository();
         final container = reconciliationCatalogContainer(repository);
         final provider = intentionCatalogViewModelProvider(
-          SelectRelationParticipant(
-            selectionContext:
-                RelationParticipantSelectionContext.activeRelation,
-            session: IntentionSearchSession(),
-          ),
+          SelectRelationParticipant(session: IntentionSearchSession()),
         );
         final subscription = container.listen(
           provider,
@@ -1501,7 +1497,6 @@ void main() {
       );
       final provider = intentionCatalogViewModelProvider(
         SelectRelationParticipant(
-          selectionContext: RelationParticipantSelectionContext.activeRelation,
           session: IntentionSearchSession(),
           pairProbe: RelationPairProbe(
             counterpartId: counterpart.id,

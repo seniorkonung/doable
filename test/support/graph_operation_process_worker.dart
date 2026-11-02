@@ -24,8 +24,6 @@ const _readyMarker = 'DOABLE_GRAPH_WORKER_READY';
 
 const _sourceIdValue = '018f0b5d-6b2e-7c80-8000-000000000901';
 const _firstNeighborIdValue = '018f0b5d-6b2e-7c80-8000-000000000902';
-const _secondNeighborIdValue = '018f0b5d-6b2e-7c80-8000-000000000903';
-const _unrelatedIdValue = '018f0b5d-6b2e-7c80-8000-000000000904';
 const _workerRelationIdValue = '018f0b5d-6b2e-7c80-8000-000000000954';
 
 void main() {
@@ -82,12 +80,6 @@ void main() {
             UpdateLongTermRelation(
               relationId: _relationId(_workerRelationIdValue),
               patch: LongTermRelationPatch(
-                sourceIntentionId: LongTermRelationFieldSet(
-                  _intentionId(_secondNeighborIdValue),
-                ),
-                relatedIntentionId: LongTermRelationFieldSet(
-                  _intentionId(_unrelatedIdValue),
-                ),
                 type: const LongTermRelationFieldSet(LongTermRelationType.can),
                 priority: const LongTermRelationFieldSet(RelationPriority.p4),
                 description: LongTermRelationDescriptionReplaced(

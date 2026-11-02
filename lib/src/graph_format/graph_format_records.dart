@@ -123,6 +123,8 @@ final class LongTermRelationRecord extends GraphEntityRecord {
     required this.priority,
     required this.description,
     required this.scope,
+    required this.createdAt,
+    required this.updatedAt,
   });
 
   final LongTermRelationId id;
@@ -132,6 +134,8 @@ final class LongTermRelationRecord extends GraphEntityRecord {
   final RelationPriority priority;
   final LongTermRelationDescription? description;
   final RelationScope scope;
+  final RelationTimestamp createdAt;
+  final RelationTimestamp updatedAt;
 }
 
 final class DailyChoiceRecord extends GraphEntityRecord {

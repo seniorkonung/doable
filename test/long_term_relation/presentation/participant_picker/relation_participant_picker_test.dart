@@ -161,76 +161,69 @@ void main() {
     expect((await selection)?.value.id, _id(1));
   });
 
-  // Нажатие на текст отмеченной строки открывает занимающую связь, кроме
-  // архивной связи при создании: её восстановление проверяет
+  // Предложение восстановить архивную связь проверяет
   // _defineRestoreOfferTests.
-  for (final (flow, choice, scope) in [
-    ('создания', _activeRelation.choice, RelationScope.active),
-    ('изменения', _archivedRelation.choice, RelationScope.active),
-    ('изменения', _archivedRelation.choice, RelationScope.archived),
-  ]) {
-    testWidgets('в потоке $flow нажатие на текст строки со связью '
-        '${scope.name} открывает её поверх поиска без выбора, а «назад» '
-        'возвращает в поиск', (tester) async {
-      final semantics = tester.ensureSemantics();
-      final repository = ControlledParticipantPickerRepository();
-      addTearDown(repository.dispose);
-      final router = await _pumpAppWithCatalog(tester, repository);
-      addTearDown(router.dispose);
+  testWidgets('нажатие на текст строки с активной связью открывает её '
+      'поверх поиска без выбора, а «назад» возвращает в поиск', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final repository = ControlledParticipantPickerRepository();
+    addTearDown(repository.dispose);
+    final router = await _pumpAppWithCatalog(tester, repository);
+    addTearDown(router.dispose);
 
-      var selectionCompleted = false;
-      final selection = _pushPicker(router, choice)
-        ..whenComplete(() => selectionCompleted = true);
-      await _settleRoute(tester);
-      final pickerId = router.current.matchId;
-      final occupied = testSummary(index: 2, title: 'Много ходить');
-      final free = testSummary(index: 1, title: 'Высыпаться');
-      final occupantId = testFormRelationId(5);
-      _completePage(
-        repository,
-        1,
-        [occupied, free],
-        pairOccupants: {
-          occupied.id: PairOccupant(relationId: occupantId, scope: scope),
-        },
-      );
-      await tester.pumpAndSettle();
+    var selectionCompleted = false;
+    final selection = _pushPicker(router, _activeRelation.choice)
+      ..whenComplete(() => selectionCompleted = true);
+    await _settleRoute(tester);
+    final pickerId = router.current.matchId;
+    final occupied = testSummary(index: 2, title: 'Много ходить');
+    final free = testSummary(index: 1, title: 'Высыпаться');
+    final occupantId = testFormRelationId(5);
+    _completePage(
+      repository,
+      1,
+      [occupied, free],
+      pairOccupants: {
+        occupied.id: PairOccupant(
+          relationId: occupantId,
+          scope: RelationScope.active,
+        ),
+      },
+    );
+    await tester.pumpAndSettle();
 
-      expect(
-        find.bySemanticsLabel(RegExp('tapping opens the existing relation')),
-        findsOneWidget,
-      );
-      await tester.tap(find.text('Много ходить'));
-      await _settleRoute(tester);
+    expect(
+      find.bySemanticsLabel(RegExp('tapping opens the existing relation')),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Много ходить'));
+    await _settleRoute(tester);
 
-      expect(
-        router.current.argsAs<RelationDetailsRouteArgs>().relationId,
-        occupantId,
-      );
-      expect(repository.watchedRelations, [occupantId]);
-      expect(router.stackData[router.stackData.length - 2].matchId, pickerId);
-      expect(selectionCompleted, isFalse);
+    expect(repository.watchedRelations, [occupantId]);
+    expect(router.current.matchId, pickerId);
+    expect(find.text('Много ходить').hitTestable(), findsNothing);
+    expect(selectionCompleted, isFalse);
 
-      await router.maybePop();
-      await _settleRoute(tester);
-      expect(router.current.matchId, pickerId);
-      expect(selectionCompleted, isFalse);
+    await router.maybePop();
+    await _settleRoute(tester);
+    expect(router.current.matchId, pickerId);
+    expect(find.text('Много ходить').hitTestable(), findsOneWidget);
+    expect(selectionCompleted, isFalse);
 
-      await tester.tap(intentionPickerArrow(intentionPickerRows.first));
-      await _settleRoute(tester);
-      expect(
-        router.current.argsAs<IntentionDetailsRouteArgs>().intentionId,
-        occupied.id,
-      );
-      await router.maybePop();
-      await _settleRoute(tester);
+    await tester.tap(intentionPickerArrow(intentionPickerRows.first));
+    await _settleRoute(tester);
+    expect(
+      router.current.argsAs<IntentionDetailsRouteArgs>().intentionId,
+      occupied.id,
+    );
+    await router.maybePop();
+    await _settleRoute(tester);
 
-      await tester.tap(find.text('Высыпаться'));
-      await tester.pumpAndSettle();
-      expect((await selection)?.value.id, free.id);
-      semantics.dispose();
-    });
-  }
+    await tester.tap(find.text('Высыпаться'));
+    await tester.pumpAndSettle();
+    expect((await selection)?.value.id, free.id);
+    semantics.dispose();
+  });
 
   // Пока форма создания не может продолжаться, например пока выполняется
   // восстановление, поиск не принимает выбор и нажатия на отмеченные строки.
@@ -275,10 +268,7 @@ void main() {
     restore.canContinue = true;
     await tester.tap(find.text('Много ходить'));
     await _settleRoute(tester);
-    expect(
-      router.current.argsAs<RelationDetailsRouteArgs>().relationId,
-      testFormRelationId(5),
-    );
+    expect(repository.watchedRelations, [testFormRelationId(5)]);
     await router.maybePop();
     await _settleRoute(tester);
 
@@ -332,29 +322,29 @@ void main() {
       'новой связи без участника другой роли',
       RelationParticipantChoice(
         role: RelationParticipantRole.source,
-        flow: testRelationCreationFlow,
+        restore: testRelationRestore,
         type: null,
+        priority: null,
+        description: '',
         source: _participant(3),
         related: null,
       ),
       null,
     ),
     (
-      'активной изменяемой связи',
+      'новой связи с участником другой роли',
       RelationParticipantChoice(
         role: RelationParticipantRole.related,
-        flow: RelationChangeChoiceFlow(
-          relationId: _editedRelation,
-          relationScope: RelationScope.active,
-        ),
+        restore: testRelationRestore,
         type: LongTermRelationType.need,
+        priority: null,
+        description: '',
         source: _participant(3),
         related: _participant(4),
       ),
       RelationPairProbe(
         counterpartId: _id(3),
         candidateRole: RelationParticipantRole.related,
-        ignoredRelationId: _editedRelation,
       ),
     ),
   ]) {
@@ -384,12 +374,10 @@ RelationParticipantChoice _creationChoice(
   String description = '',
 }) => RelationParticipantChoice(
   role: RelationParticipantRole.related,
-  flow: RelationCreationChoiceFlow(
-    restore: restore,
-    priority: priority,
-    description: description,
-  ),
+  restore: restore,
   type: type,
+  priority: priority,
+  description: description,
   source: _participant(_excludedIndex),
   related: null,
 );
@@ -470,16 +458,16 @@ Future<AppRouter> _pumpAppWithCatalog(
 /// Проверки охвата, исключения и результата поиска участника по названию и
 /// тегам.
 void _defineTagSearchTests() {
-  testWidgets('поиск для архивированной связи допускает оба состояния, а '
-      'выбор возвращает снимок строки с ревизией её выдачи', (tester) async {
-    final semantics = tester.ensureSemantics();
+  testWidgets('выбор возвращает снимок строки с ревизией её выдачи', (
+    tester,
+  ) async {
     final repository = ControlledCatalogRepository();
     final health = _tag(1, 'Здоровье');
     final sport = _tag(2, 'Спорт');
     final opened = await _openTagSearchPicker(
       tester,
       repository,
-      _archivedRelation,
+      _replacedSource,
     );
     await _filterByTitle(tester, repository, 'Гулять');
     await _applyConditions(
@@ -491,18 +479,12 @@ void _defineTagSearchTests() {
         (sport, IntentionTagRequirement.mustBeAbsent),
       ],
       _tagSearchPage([
-        testSummary(index: 2, title: 'Гулять', tags: [health]),
-        testSummary(
-          index: 1,
-          title: 'Гулять',
-          archiveState: IntentionArchiveState.archived,
-          tags: [health],
-        ),
+        testSummary(index: 1, title: 'Гулять', tags: [health]),
       ], revision: 3),
     );
     _expectParticipantQuery(
       repository.queries.last,
-      _archivedRelation,
+      _replacedSource,
       IntentionTagFilter(
         requiredTagIds: [health.id],
         excludedTagIds: [sport.id],
@@ -510,15 +492,9 @@ void _defineTagSearchTests() {
       title: 'Гулять',
     );
 
-    expect(intentionPickerRows, findsNWidgets(2));
-    expect(
-      find.bySemanticsLabel('Гулять, intention, Tags: Здоровье'),
-      findsOneWidget,
+    await tester.tap(
+      find.descendant(of: intentionPickerRows, matching: find.text('Гулять')),
     );
-    const archivedLabel = 'Гулять, archived, intention, Tags: Здоровье';
-    expect(find.bySemanticsLabel(archivedLabel), findsOneWidget);
-
-    await tester.tap(find.bySemanticsLabel(archivedLabel));
     await tester.pumpAndSettle();
     expect(
       await opened.selection,
@@ -534,11 +510,10 @@ void _defineTagSearchTests() {
           .having(
             (snapshot) => snapshot.value.archiveState,
             'архивное состояние',
-            IntentionArchiveState.archived,
+            IntentionArchiveState.active,
           ),
     );
     _expectNoCommands(repository);
-    semantics.dispose();
   });
 
   testWidgets('совпадение тегов не разрешает самосвязь: второго участника '
@@ -649,7 +624,7 @@ void _defineTagSearchTests() {
     final opened = await _openTagSearchPicker(
       tester,
       repository,
-      _archivedRelation,
+      _replacedSource,
     );
     await _applyConditions(tester, opened.container, repository, [
       (health, IntentionTagRequirement.mustBePresent),
@@ -670,7 +645,7 @@ void _defineTagSearchTests() {
     await _pumpUntilQueries(tester, repository, restarted + 1);
     _expectParticipantQuery(
       repository.queryAt(restarted),
-      _archivedRelation,
+      _replacedSource,
       remaining,
     );
     repository.complete(
@@ -687,7 +662,7 @@ void _defineTagSearchTests() {
     await _pumpUntilQueries(tester, repository, restarted + 2);
     _expectParticipantQuery(
       repository.queryAt(restarted + 1),
-      _archivedRelation,
+      _replacedSource,
       remaining,
     );
     repository.complete(
@@ -714,12 +689,9 @@ void _defineTagSearchTests() {
 /// Индекс намерения, уже занятого вторым участником связи.
 const _excludedIndex = 9;
 
-final _editedRelation = testFormRelationId(1);
-
 /// Описание выбора и ограничения запроса каталога, которые из него следуют.
 typedef _ParticipantChoiceCase = ({
   RelationParticipantChoice choice,
-  IntentionScope scope,
   RelationPairProbe? pairProbe,
 });
 
@@ -728,36 +700,34 @@ typedef _ParticipantChoiceCase = ({
 final _ParticipantChoiceCase _activeRelation = (
   choice: RelationParticipantChoice(
     role: RelationParticipantRole.related,
-    flow: testRelationCreationFlow,
+    restore: testRelationRestore,
     type: null,
+    priority: null,
+    description: '',
     source: _participant(_excludedIndex),
     related: null,
   ),
-  scope: IntentionScope.active,
   pairProbe: RelationPairProbe(
     counterpartId: _id(_excludedIndex),
     candidateRole: RelationParticipantRole.related,
   ),
 );
 
-/// Изменение архивной связи: заменяемый исходный участник остаётся в выдаче,
-/// а связанный исключается.
-final _ParticipantChoiceCase _archivedRelation = (
+/// Замена исходного участника черновика: заменяемый остаётся в выдаче, а
+/// связанный исключается.
+final _ParticipantChoiceCase _replacedSource = (
   choice: RelationParticipantChoice(
     role: RelationParticipantRole.source,
-    flow: RelationChangeChoiceFlow(
-      relationId: _editedRelation,
-      relationScope: RelationScope.archived,
-    ),
+    restore: testRelationRestore,
     type: LongTermRelationType.can,
+    priority: null,
+    description: '',
     source: _participant(5),
     related: _participant(_excludedIndex),
   ),
-  scope: IntentionScope.all,
   pairProbe: RelationPairProbe(
     counterpartId: _id(_excludedIndex),
     candidateRole: RelationParticipantRole.source,
-    ignoredRelationId: _editedRelation,
   ),
 );
 
@@ -859,7 +829,7 @@ Future<void> _applyConditions(
   await tester.pumpAndSettle();
 }
 
-/// Запрос выбора участника сохраняет охват связи и исключение второго
+/// Запрос выбора участника сохраняет активный охват и исключение второго
 /// участника при любых условиях; готовность поиск не ограничивает.
 void _expectParticipantQuery(
   IntentionCatalogQuery query,
@@ -867,7 +837,7 @@ void _expectParticipantQuery(
   IntentionTagFilter tagFilter, {
   String? title,
 }) {
-  expect(query.scope, expected.scope);
+  expect(query.scope, IntentionScope.active);
   expect(query.readinessFilter, IntentionReadinessFilter.all);
   expect(query.pairProbe, expected.pairProbe);
   expect(query.titleFilter?.map((value) => value), title);
@@ -1015,6 +985,8 @@ LongTermRelationReadResult _archivedRelationRead(
         priority: RelationPriority.p2,
         scope: RelationScope.archived,
         creationSequence: RelationCreationSequence(1),
+        createdAt: RelationTimestamp(DateTime.utc(2026)),
+        updatedAt: RelationTimestamp(DateTime.utc(2026)),
       ),
       source: _named(_excludedIndex, 'быть здоровым'),
       related: _named(2, 'плавать'),
@@ -1232,14 +1204,12 @@ void _defineRestoreOfferTests() {
       await _settleRoute(tester);
 
       expect(find.text('Restore this relation?'), findsNothing);
-      expect(
-        offer.router.current.argsAs<RelationDetailsRouteArgs>().relationId,
+      expect(offer.router.current.matchId, offer.pickerId);
+      expect(offer.router.hasPagelessTopRoute, isTrue);
+      expect(offer.repository.watchedRelations, [
         _archivedOccupant,
-      );
-      expect(
-        offer.router.stackData[offer.router.stackData.length - 2].matchId,
-        offer.pickerId,
-      );
+        _archivedOccupant,
+      ]);
       expect(offer.restore.accepted, isEmpty);
     });
   }
@@ -1260,7 +1230,7 @@ void _defineRestoreOfferTests() {
     await tester.pumpAndSettle();
 
     expect(find.text('Restore this relation?'), findsNothing);
-    expect(offer.router.current.name, isNot(RelationDetailsRoute.name));
+    expect(offer.router.hasPagelessTopRoute, isFalse);
   });
 
   testWidgets('ответ чтения под страницей поверх поиска ничего не открывает, а '
@@ -1376,8 +1346,10 @@ final List<_PurposeCase> _purposeCases = [
     name: 'лист показывает исходное намерение целиком',
     choice: RelationParticipantChoice(
       role: RelationParticipantRole.related,
-      flow: testRelationCreationFlow,
+      restore: testRelationRestore,
       type: LongTermRelationType.need,
+      priority: null,
+      description: '',
       source: _named(3, _longSource),
       related: null,
     ),
@@ -1402,45 +1374,13 @@ final List<_PurposeCase> _purposeCases = [
     },
   ),
   (
-    name: 'изменение связи показывает заменяемого участника',
-    choice: RelationParticipantChoice(
-      role: RelationParticipantRole.related,
-      flow: RelationChangeChoiceFlow(
-        relationId: _editedRelation,
-        relationScope: RelationScope.active,
-      ),
-      type: LongTermRelationType.need,
-      source: _named(3, 'Быть здоровым'),
-      related: _named(4, 'много ходить'),
-    ),
-    mark: PathGlyphShape.ring,
-    texts: {
-      'ru': (
-        subtitle: 'Изменение связи: связанное намерение',
-        sheetLine: 'Изменение связи',
-        roleNote: 'Связанное намерение — то, что нужно для исходного.',
-        sourceField: 'Исходное намерение\nБыть здоровым',
-        relatedField:
-            'Связанное намерение\nСейчас выбирается\nВместо: много ходить',
-        kind: 'Нужно',
-      ),
-      'en': (
-        subtitle: 'Relation change: related intention',
-        sheetLine: 'Relation change',
-        roleNote: 'The related intention is what the source intention needs.',
-        sourceField: 'Source intention\nБыть здоровым',
-        relatedField:
-            'Related intention\nChoosing now\nInstead of: много ходить',
-        kind: 'Need',
-      ),
-    },
-  ),
-  (
     name: 'выбор исходного при пустом связанном и невыбранном виде',
     choice: const RelationParticipantChoice(
       role: RelationParticipantRole.source,
-      flow: testRelationCreationFlow,
+      restore: testRelationRestore,
       type: null,
+      priority: null,
+      description: '',
       source: null,
       related: null,
     ),
@@ -1468,14 +1408,13 @@ final List<_PurposeCase> _purposeCases = [
     },
   ),
   (
-    name: 'архивная изменяемая связь с архивным участником',
+    name: 'замена исходного при архивном связанном участнике',
     choice: RelationParticipantChoice(
       role: RelationParticipantRole.source,
-      flow: RelationChangeChoiceFlow(
-        relationId: _editedRelation,
-        relationScope: RelationScope.archived,
-      ),
+      restore: testRelationRestore,
       type: LongTermRelationType.can,
+      priority: null,
+      description: '',
       source: _named(3, 'Гулять'),
       related: _named(
         _excludedIndex,
@@ -1486,8 +1425,8 @@ final List<_PurposeCase> _purposeCases = [
     mark: PathGlyphShape.diamond,
     texts: {
       'ru': (
-        subtitle: 'Изменение связи: исходное намерение',
-        sheetLine: 'Изменение связи',
+        subtitle: 'Новая связь: исходное намерение',
+        sheetLine: 'Новая связь',
         roleNote:
             'Исходное намерение — то, для чего нужно или можно связанное.',
         sourceField: 'Исходное намерение\nСейчас выбирается\nВместо: Гулять',
@@ -1495,8 +1434,8 @@ final List<_PurposeCase> _purposeCases = [
         kind: 'Можно',
       ),
       'en': (
-        subtitle: 'Relation change: source intention',
-        sheetLine: 'Relation change',
+        subtitle: 'New relation: source intention',
+        sheetLine: 'New relation',
         roleNote:
             'The source intention is what the related intention is needed '
             'for or can be used for.',
@@ -1608,7 +1547,7 @@ void _definePurposeTests() {
   });
 
   testWidgets('архивный участник приглушён, а запрос каталога сохраняет '
-      'полный охват и исключение', (tester) async {
+      'активный охват и исключение', (tester) async {
     final repository = ControlledParticipantPickerRepository();
     addTearDown(repository.dispose);
     final router = await _pumpAppWithCatalog(tester, repository);
@@ -1617,11 +1556,11 @@ void _definePurposeTests() {
     unawaited(_pushPicker(router, _purposeCases.last.choice));
     await _settleRoute(tester);
     final query = repository.queryAt(1);
-    expect(query.scope, IntentionScope.all);
+    expect(query.scope, IntentionScope.active);
     expect(query.pairProbe?.counterpartId, _id(_excludedIndex));
     _completePage(repository, 1, const []);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Relation change: source intention'));
+    await tester.tap(find.text('New relation: source intention'));
     await tester.pumpAndSettle();
 
     final archived = find.descendant(
@@ -1674,7 +1613,7 @@ void _definePurposeTests() {
 
     for (final open in [false, true]) {
       if (open) {
-        await tester.tap(find.text('Relation change: source intention'));
+        await tester.tap(find.text('New relation: source intention'));
         await tester.pumpAndSettle();
         expect(find.byType(Sheet), findsOneWidget);
       }

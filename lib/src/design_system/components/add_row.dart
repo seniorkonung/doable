@@ -1,12 +1,10 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 
 import '../doable_colors.dart';
 import '../doable_icon.dart';
 import '../doable_metrics.dart';
 import '../doable_type.dart';
+import 'end_overhang.dart';
 
 /// Строка о том, что лежит под ней: заголовок или подсказка и «Добавить»
 /// у правого края.
@@ -128,7 +126,7 @@ final class AddRow extends StatelessWidget {
       ),
     );
 
-    return add == null ? row : _EndOverhang(extent: _addOverhang, child: row);
+    return add == null ? row : EndOverhang(extent: _addOverhang, child: row);
   }
 }
 
@@ -158,104 +156,4 @@ final class _Add {
   final String label;
   final VoidCallback? onAdd;
   final Key? key;
-}
-
-/// Отдаёт ребёнку ширину на [extent] больше своей: лишняя полоса лежит
-/// за концом строки, рисуется там и принимает касания.
-final class _EndOverhang extends SingleChildRenderObjectWidget {
-  const _EndOverhang({required this.extent, required Widget super.child});
-
-  final double extent;
-
-  @override
-  _RenderEndOverhang createRenderObject(BuildContext context) =>
-      _RenderEndOverhang(
-        extent: extent,
-        textDirection: Directionality.of(context),
-      );
-
-  @override
-  void updateRenderObject(
-    BuildContext context,
-    _RenderEndOverhang renderObject,
-  ) {
-    renderObject
-      ..extent = extent
-      ..textDirection = Directionality.of(context);
-  }
-}
-
-final class _RenderEndOverhang extends RenderShiftedBox {
-  _RenderEndOverhang({required this._extent, required this._textDirection})
-    : super(null);
-
-  double _extent;
-  set extent(double value) {
-    if (value == _extent) return;
-    _extent = value;
-    markNeedsLayout();
-  }
-
-  TextDirection _textDirection;
-  set textDirection(TextDirection value) {
-    if (value == _textDirection) return;
-    _textDirection = value;
-    markNeedsLayout();
-  }
-
-  BoxConstraints _childConstraints(BoxConstraints constraints) =>
-      constraints.copyWith(
-        minWidth: constraints.minWidth + _extent,
-        maxWidth: constraints.maxWidth + _extent,
-      );
-
-  Size _sizeFor(BoxConstraints constraints, Size childSize) =>
-      constraints.constrain(
-        Size(math.max(0, childSize.width - _extent), childSize.height),
-      );
-
-  @override
-  double computeMinIntrinsicWidth(double height) =>
-      math.max(0, child!.getMinIntrinsicWidth(height) - _extent);
-
-  @override
-  double computeMaxIntrinsicWidth(double height) =>
-      math.max(0, child!.getMaxIntrinsicWidth(height) - _extent);
-
-  @override
-  double computeMinIntrinsicHeight(double width) =>
-      child!.getMinIntrinsicHeight(width + _extent);
-
-  @override
-  double computeMaxIntrinsicHeight(double width) =>
-      child!.getMaxIntrinsicHeight(width + _extent);
-
-  @override
-  Size computeDryLayout(BoxConstraints constraints) => _sizeFor(
-    constraints,
-    child!.getDryLayout(_childConstraints(constraints)),
-  );
-
-  @override
-  void performLayout() {
-    final child = this.child!;
-    child.layout(_childConstraints(constraints), parentUsesSize: true);
-    size = _sizeFor(constraints, child.size);
-    (child.parentData! as BoxParentData).offset = switch (_textDirection) {
-      TextDirection.ltr => Offset.zero,
-      TextDirection.rtl => Offset(-_extent, 0),
-    };
-  }
-
-  @override
-  bool hitTest(BoxHitTestResult result, {required Offset position}) {
-    final child = this.child!;
-    final childOffset = (child.parentData! as BoxParentData).offset;
-    if (!(childOffset & child.size).contains(position) ||
-        !hitTestChildren(result, position: position)) {
-      return false;
-    }
-    result.add(BoxHitTestEntry(this, position));
-    return true;
-  }
 }

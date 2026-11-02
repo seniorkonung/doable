@@ -133,7 +133,8 @@ final class GraphFactCapture {
                 relation.id IS NOT NULL AS present, relation.creation_sequence,
                 relation.id, relation.source_intention_id,
                 relation.related_intention_id, relation.type, relation.priority,
-                relation.description, relation.is_archived
+                relation.description, relation.is_archived,
+                relation.created_at, relation.updated_at
          FROM graph_log_long_term_relation_marks AS mark
          LEFT JOIN long_term_relations AS relation
            ON relation.id = mark.long_term_relation_id

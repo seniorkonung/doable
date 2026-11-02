@@ -18,7 +18,6 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
-import 'package:doable/src/long_term_relation/application/long_term_relation_permissions.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_description.dart';
@@ -66,9 +65,6 @@ final class ControlledRelationEditorRepository
   CreateLongTermRelation createCommandAt(int index) =>
       relationCommands[index] as CreateLongTermRelation;
 
-  UpdateLongTermRelation updateCommandAt(int index) =>
-      relationCommands[index] as UpdateLongTermRelation;
-
   void completeRelationCommand(
     int index,
     LongTermRelationCommandResult result,
@@ -96,6 +92,8 @@ final class ControlledRelationEditorRepository
       priority: command.priority,
       scope: RelationScope.active,
       creationSequence: RelationCreationSequence(1),
+      createdAt: RelationTimestamp(DateTime.utc(2026)),
+      updatedAt: RelationTimestamp(DateTime.utc(2026)),
     );
     completeRelationCommand(
       index,
@@ -132,6 +130,8 @@ final class ControlledRelationEditorRepository
       priority: RelationPriority.p2,
       scope: scope,
       creationSequence: RelationCreationSequence(1),
+      createdAt: RelationTimestamp(DateTime.utc(2026)),
+      updatedAt: RelationTimestamp(DateTime.utc(2026)),
     );
     final before = relationIn(RelationScope.archived);
     final after = relationIn(RelationScope.active);
@@ -273,34 +273,6 @@ GraphSnapshot<RelationParticipantSummary> testEditorSelection(
   value: testEditorParticipant(index, title: title, archiveState: archiveState),
   revision: TestRelationEditorRevision(revision),
 );
-
-LongTermRelationDetails testEditorRelationDetails({
-  LongTermRelationType type = LongTermRelationType.need,
-  RelationPriority priority = RelationPriority.p2,
-  RelationScope scope = RelationScope.active,
-  String? description = 'Исходное описание',
-  LongTermRelationPermissions permissions =
-      const LongTermRelationPermissions.unrestricted(),
-}) {
-  final relation = LongTermRelation(
-    id: testRelationId(1),
-    sourceIntentionId: testEditorIntentionId(1),
-    relatedIntentionId: testEditorIntentionId(2),
-    type: type,
-    priority: priority,
-    scope: scope,
-    creationSequence: RelationCreationSequence(1),
-  );
-  return LongTermRelationDetails(
-    relation: relation,
-    source: testEditorParticipant(1),
-    related: testEditorParticipant(2),
-    description: description == null
-        ? null
-        : LongTermRelationDescription.fromInput(description),
-    permissions: permissions,
-  );
-}
 
 LongTermRelationId testRelationId(int index) {
   final encoded =

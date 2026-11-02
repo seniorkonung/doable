@@ -283,20 +283,135 @@ void main() {
         registration.release();
         await coordinator.shutdown();
       });
+    });
 
-      test('отказ существующего восстановления из просмотра по-прежнему '
-          'принадлежит сначала инициатору', () async {
+    group('политика предъявления', () {
+      final silentOperations =
+          <
+            ({
+              String name,
+              LongTermRelationCommandStart Function(GraphCommandCoordinator)
+              start,
+            })
+          >[
+            (
+              name: 'изменение',
+              start: (coordinator) => coordinator.acceptRelationUpdate(
+                _updateRelation(_relationId),
+              ),
+            ),
+            (
+              name: 'архивирование',
+              start: (coordinator) => coordinator.acceptRelationArchive(
+                ArchiveLongTermRelation(_relationId),
+              ),
+            ),
+            (
+              name: 'восстановление',
+              start: (coordinator) => coordinator.acceptRelationRestore(
+                RestoreLongTermRelation(_relationId),
+              ),
+            ),
+          ];
+
+      for (final operation in silentOperations) {
+        test(
+          'успех операции «${operation.name}» публикуется для согласования без '
+          'права предъявления и не задерживает следующий отказ',
+          () async {
+            final repository = _ControlledPersonalGraphRepository();
+            final coordinator = _coordinator(repository);
+            final completions = <GraphCommandCompletion>[];
+            final subscription = coordinator.completions.listen(
+              completions.add,
+            );
+            final registration = coordinator.registerAppPresentation();
+            final claims = <GraphAppPresentationClaim?>[];
+            unawaited(registration.nextClaim().then(claims.add));
+
+            final accepted =
+                operation.start(coordinator) as LongTermRelationCommandAccepted;
+            repository.completeRelationUpdated(0, _relationId);
+            final completion = await accepted.future;
+            await pumpEventQueue();
+
+            expect(completion.isFailure, isFalse);
+            expect(completion, isNot(isA<GraphPresentableCompletion>()));
+            expect(completion.revision, const _TestRevision(1));
+            expect(completions, [same(completion)]);
+            expect(claims, isEmpty);
+            expect(coordinator.claimInitiatorFailure(accepted.token), isNull);
+
+            final failed = coordinator.acceptRelationDelete(
+              DeleteLongTermRelation(_otherRelationId),
+            ) as LongTermRelationCommandAccepted;
+            coordinator.releaseInitiatorPresentation(failed.token);
+            repository.completeRelationFailure(1);
+            final failure = await failed.future;
+            await pumpEventQueue();
+
+            expect(claims.single?.completions, [same(failure)]);
+            coordinator.confirmAppPresentation(claims.single!, [failure.token]);
+            registration.release();
+            await subscription.cancel();
+            await coordinator.shutdown();
+          },
+        );
+
+        test(
+          'отказ операции «${operation.name}» принадлежит сначала инициатору',
+          () async {
+            final repository = _ControlledPersonalGraphRepository();
+            final coordinator = _coordinator(repository);
+            final registration = coordinator.registerAppPresentation();
+            final claims = <GraphAppPresentationClaim?>[];
+            unawaited(registration.nextClaim().then(claims.add));
+
+            final accepted =
+                operation.start(coordinator) as LongTermRelationCommandAccepted;
+            repository.completeRelationFailure(0);
+            final completion = await accepted.future;
+            await pumpEventQueue();
+
+            expect(completion, isA<GraphPresentableCompletion>());
+            expect(claims, isEmpty);
+            final claim = coordinator.claimInitiatorFailure(accepted.token);
+            expect(claim, isNotNull);
+            coordinator.releaseInitiatorClaim(claim!);
+            registration.release();
+            await coordinator.shutdown();
+          },
+        );
+      }
+
+      test('успех создания и удаления принадлежит оболочке', () async {
         final repository = _ControlledPersonalGraphRepository();
         final coordinator = _coordinator(repository);
+        final registration = coordinator.registerAppPresentation();
+        final claims = <GraphAppPresentationClaim?>[];
+        unawaited(registration.nextClaim().then(claims.add));
 
-        final restore = coordinator.acceptRelationRestore(
-          RestoreLongTermRelation(_relationId),
+        final creation = coordinator.acceptRelationCreation(
+          LongTermRelationCreationFormKey(),
+          _createRelation(),
         ) as LongTermRelationCommandAccepted;
-        repository.completeRelationFailure(0);
-        await restore.future;
+        repository.completeRelationUpdated(0, _relationId);
+        final created = await creation.future;
+        await pumpEventQueue();
 
-        expect(coordinator.claimInitiatorFailure(restore.token), isNotNull);
-        coordinator.releaseInitiatorPresentation(restore.token);
+        expect(created, isA<GraphPresentableCompletion>());
+        expect(claims.single?.completions, [same(created)]);
+        coordinator.confirmAppPresentation(claims.single!, [created.token]);
+
+        final deletion = coordinator.acceptRelationDelete(
+          DeleteLongTermRelation(_otherRelationId),
+        ) as LongTermRelationCommandAccepted;
+        repository.completeRelationDeleted(1, _otherRelationId, revision: 2);
+        final deleted = await deletion.future;
+        await pumpEventQueue();
+
+        expect(deleted, isA<GraphPresentableCompletion>());
+        registration.release();
         await coordinator.shutdown();
       });
     });
@@ -339,6 +454,8 @@ LongTermRelation _relation(
   priority: priority,
   scope: scope,
   creationSequence: RelationCreationSequence(1),
+  createdAt: RelationTimestamp(DateTime.utc(2026)),
+  updatedAt: RelationTimestamp(DateTime.utc(2026)),
 );
 
 final class _ControlledPersonalGraphRepository

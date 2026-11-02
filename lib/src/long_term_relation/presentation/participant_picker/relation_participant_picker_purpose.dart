@@ -13,22 +13,16 @@ import '../../application/long_term_relation_projection.dart';
 import '../../domain/long_term_relation.dart';
 import 'relation_participant_choice.dart';
 
-/// Назначение поиска участника: поток и роль из [choice] определяют
-/// подзаголовок с отметкой роли и строку листа, а тело листа показывает связь
-/// формой только для чтения такой, какой она была при открытии поиска.
+/// Назначение поиска участника: роль из [choice] определяет подзаголовок с
+/// отметкой роли, а тело листа показывает связь формой только для чтения такой,
+/// какой она была при открытии поиска.
 IntentionPickerPurposeDescription relationParticipantPickerPurpose(
   AppLocalizations l10n,
   RelationParticipantChoice choice,
 ) {
-  final creation = switch (choice.flow) {
-    RelationCreationChoiceFlow() => true,
-    RelationChangeChoiceFlow() => false,
-  };
   final (subtitle, mark, role, roleNote, chosen, other) = switch (choice.role) {
     RelationParticipantRole.source => (
-      creation
-          ? l10n.participantPickerPurposeCreationSource
-          : l10n.participantPickerPurposeChangeSource,
+      l10n.participantPickerPurposeCreationSource,
       TopBarPurposeMark.sourceField,
       RelationFormRole.source,
       l10n.participantPickerRoleSourceNote,
@@ -36,9 +30,7 @@ IntentionPickerPurposeDescription relationParticipantPickerPurpose(
       choice.related,
     ),
     RelationParticipantRole.related => (
-      creation
-          ? l10n.participantPickerPurposeCreationRelated
-          : l10n.participantPickerPurposeChangeRelated,
+      l10n.participantPickerPurposeCreationRelated,
       TopBarPurposeMark.relatedField,
       RelationFormRole.related,
       switch (choice.type) {
@@ -83,9 +75,7 @@ IntentionPickerPurposeDescription relationParticipantPickerPurpose(
   return IntentionPickerPurposeDescription(
     subtitle: subtitle,
     subtitleMark: mark,
-    sheetLine: creation
-        ? l10n.participantPickerFlowCreation
-        : l10n.participantPickerFlowChange,
+    sheetLine: l10n.participantPickerFlowCreation,
     buildSheetBody: (context) => Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,

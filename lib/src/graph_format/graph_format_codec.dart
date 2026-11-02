@@ -335,6 +335,8 @@ Map<String, Object?> _writeRecord(GraphEntityRecord record) => switch (record) {
       RelationScope.active => false,
       RelationScope.archived => true,
     },
+    'createdAt': _writeTimestamp(relation.createdAt.value),
+    'updatedAt': _writeTimestamp(relation.updatedAt.value),
   },
   DailyChoiceRecord(:final choice, :final path) => {
     'kind': _dailyChoiceKind,
@@ -493,6 +495,8 @@ LongTermRelationRecord _readRelation(_JsonFields fields) {
     scope: fields.boolean('archived')
         ? RelationScope.archived
         : RelationScope.active,
+    createdAt: RelationTimestamp(_readTimestamp(fields.string('createdAt'))),
+    updatedAt: RelationTimestamp(_readTimestamp(fields.string('updatedAt'))),
   );
 }
 

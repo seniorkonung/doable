@@ -32,8 +32,8 @@ final class IntentionStatisticsFixture {
       (id, title, is_action_ready, created_at, updated_at)
       VALUES (?, ?, 1, 0, 0)''');
     final relation = database.prepare('''INSERT INTO long_term_relations
-      (id, source_intention_id, related_intention_id, type, priority)
-      VALUES (?, ?, ?, 'need', 2)''');
+      (id, source_intention_id, related_intention_id, type, priority, created_at, updated_at)
+      VALUES (?, ?, ?, 'need', 2, 0, 0)''');
     final choice = database.prepare('''INSERT INTO daily_choices
       (id, source_intention_id, selected_intention_id, choice_date, is_completed)
       VALUES (?, ?, ?, ?, ?)''');

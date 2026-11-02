@@ -44,24 +44,6 @@ void main() {
       ),
     ),
     (
-      'смена исходного намерения',
-      UpdateLongTermRelation(
-        relationId: durabilityRelation(101),
-        patch: LongTermRelationPatch(
-          sourceIntentionId: LongTermRelationFieldSet(durabilityIntention(5)),
-        ),
-      ),
-    ),
-    (
-      'смена связанного намерения',
-      UpdateLongTermRelation(
-        relationId: durabilityRelation(101),
-        patch: LongTermRelationPatch(
-          relatedIntentionId: LongTermRelationFieldSet(durabilityIntention(3)),
-        ),
-      ),
-    ),
-    (
       'смена типа',
       UpdateLongTermRelation(
         relationId: durabilityRelation(101),
@@ -310,8 +292,8 @@ void main() {
     await seedGraph(database, () async {
       await database.customStatement(
         '''INSERT INTO long_term_relations
-         (id, source_intention_id, related_intention_id, type, priority)
-         VALUES (?, ?, ?, 'need', 4)''',
+         (id, source_intention_id, related_intention_id, type, priority, created_at, updated_at)
+         VALUES (?, ?, ?, 'need', 4, 0, 0)''',
         [durabilityUuid(105), durabilityUuid(4), durabilityUuid(2)],
       );
       await database.customStatement(
@@ -381,7 +363,6 @@ void main() {
       expect(change.after.scope, RelationScope.archived);
       expect(change.permissions.isConfirmed, isTrue);
       expect(change.permissions.canDelete, !referenced);
-      expect(change.permissions.canChangeMeaning, !referenced);
       expect(change.permissions.canEditDescriptionAndPriority, isTrue);
       expect(change.permissions.canChangeArchiveState, isTrue);
     }
@@ -440,8 +421,8 @@ Future<void> _addRelations(AppDatabase database, int count) async {
       );
       await database.customStatement(
         '''INSERT INTO long_term_relations
-           (id, source_intention_id, related_intention_id, type, priority)
-           VALUES (?, ?, ?, 'need', 2)''',
+           (id, source_intention_id, related_intention_id, type, priority, created_at, updated_at)
+           VALUES (?, ?, ?, 'need', 2, 0, 0)''',
         [durabilityUuid(2000 + i), durabilityUuid(1), durabilityUuid(1000 + i)],
       );
     }

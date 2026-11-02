@@ -192,22 +192,6 @@ void main() {
     );
   });
 
-  test('изменяемая связь пару не занимает', () {
-    final edited = relation(source: counterpart, related: row);
-
-    expect(
-      reconcile(
-        [LongTermRelationCreatedChange(revision: revision, relation: edited)],
-        probe: RelationPairProbe(
-          counterpartId: counterpart,
-          candidateRole: RelationParticipantRole.related,
-          ignoredRelationId: edited.id,
-        ),
-      ),
-      isEmpty,
-    );
-  });
-
   test('прежнее состояние связи не снимает отметку другой связи', () {
     final moved = relation(source: counterpart, related: row, index: 1);
     final occupying = relation(source: counterpart, related: row, index: 2);

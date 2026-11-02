@@ -844,8 +844,10 @@ Future<void> _insertRelation(
       related_intention_id,
       type,
       priority,
-      is_archived
-    ) VALUES (?, ?, ?, 'need', 1, 0)
+      is_archived,
+      created_at,
+      updated_at
+    ) VALUES (?, ?, ?, 'need', 1, 0, 0, 0)
   ''',
     [id, sourceId.toCanonicalString(), relatedId.toCanonicalString()],
   ),

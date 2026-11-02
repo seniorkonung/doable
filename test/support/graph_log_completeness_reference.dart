@@ -100,9 +100,11 @@ Intention _intention(local.Intention row) => Intention(
   updatedAt: _timestamp(row.updatedAt),
 );
 
-IntentionTimestamp _timestamp(int microseconds) => IntentionTimestamp(
-  DateTime.fromMicrosecondsSinceEpoch(microseconds, isUtc: true),
-);
+IntentionTimestamp _timestamp(int microseconds) =>
+    IntentionTimestamp(_instant(microseconds));
+
+DateTime _instant(int microseconds) =>
+    DateTime.fromMicrosecondsSinceEpoch(microseconds, isUtc: true);
 
 LongTermRelationRecord _relation(local.LongTermRelation row) =>
     LongTermRelationRecord(
@@ -118,6 +120,8 @@ LongTermRelationRecord _relation(local.LongTermRelation row) =>
         null => null,
       },
       scope: row.isArchived ? RelationScope.archived : RelationScope.active,
+      createdAt: RelationTimestamp(_instant(row.createdAt)),
+      updatedAt: RelationTimestamp(_instant(row.updatedAt)),
     );
 
 DailyChoice _dailyChoice(local.DailyChoice row) => DailyChoice(

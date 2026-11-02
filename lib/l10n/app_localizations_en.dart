@@ -521,21 +521,12 @@ class AppLocalizationsEn extends AppLocalizations {
       'All relations in this group are loaded.';
 
   @override
-  String get relationNeighborhoodRelationActive => 'Active relation';
-
-  @override
   String get relationNeighborhoodRelationArchived => 'Archived relation';
 
   @override
   String relationNeighborhoodPriority(String priority) {
     return 'Priority $priority';
   }
-
-  @override
-  String get relationNeighborhoodSourceParticipant => 'Source intention';
-
-  @override
-  String get relationNeighborhoodRelatedParticipant => 'Related intention';
 
   @override
   String relationNeighborhoodNeedPhrase(String source, String related) {
@@ -1896,10 +1887,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get relationEditorCreated => 'Relation created.';
 
   @override
-  String get relationEditorCreateInvalidInput =>
-      'Check the selected intentions and relation details.';
-
-  @override
   String get relationEditorCreatePairOccupied =>
       'A relation with this direction already exists between the selected intentions.';
 
@@ -1924,38 +1911,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'The relation couldn’t be created because of an unexpected error.';
 
   @override
-  String get relationEditorUpdated => 'Relation updated.';
-
-  @override
-  String get relationEditorUpdateInvalidInput =>
-      'Check the selected intentions and relation changes.';
-
-  @override
-  String get relationEditorUpdatePairOccupied =>
-      'A relation with this direction already exists between the selected intentions.';
-
-  @override
   String get relationEditorUpdateNotFound => 'This relation no longer exists.';
 
   @override
-  String get relationEditorUpdateParticipantNotFound =>
-      'One of the selected intentions no longer exists.';
-
-  @override
-  String get relationEditorUpdateParticipantArchived =>
-      'An active relation can only link active intentions.';
-
-  @override
-  String get relationEditorUpdateReferencedByDailyPath =>
-      'This relation is used by a saved daily path. Its type and participants can’t be changed.';
-
-  @override
-  String get relationEditorPathProtection =>
-      'This relation is used in a saved daily path. Its type and participants cannot be changed. Its description and priority remain editable.';
-
-  @override
-  String get relationEditorPathProtectionWithDraft =>
-      'This relation is used in a saved daily path. Restore the original type and participants to save description and priority changes.';
+  String get relationEditorUpdateArchivedTypeChange =>
+      'This relation is archived, so its type can’t be changed.';
 
   @override
   String get relationEditorUpdateUnavailable =>
@@ -1968,9 +1928,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get relationEditorUpdateUnexpected =>
       'The relation couldn’t be updated because of an unexpected error.';
-
-  @override
-  String get relationArchived => 'Relation archived.';
 
   @override
   String get relationArchiveNotFound => 'This relation no longer exists.';
@@ -2081,9 +2038,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'The relation couldn’t be loaded because of an unexpected error.';
 
   @override
-  String get relationDetailsRefreshing => 'Refreshing relation details…';
-
-  @override
   String get relationDetailsRefreshUnavailable =>
       'The relation details couldn’t be refreshed. Previously confirmed data is still shown.';
 
@@ -2102,62 +2056,95 @@ class AppLocalizationsEn extends AppLocalizations {
   String get relationDetailsPriorityLabel => 'Priority';
 
   @override
-  String get relationDetailsScopeLabel => 'Relation state';
-
-  @override
-  String get relationDetailsDescriptionLabel => 'Description';
-
-  @override
-  String get relationDetailsNoDescription => 'No description';
-
-  @override
-  String get relationDetailsOpenParticipant =>
-      'Opens the intention and its own relations';
-
-  @override
-  String get relationDetailsEditAction => 'Edit relation';
-
-  @override
-  String get relationDetailsArchiveAction => 'Archive relation';
-
-  @override
-  String get relationDetailsRestoreAction => 'Restore relation';
-
-  @override
-  String get relationDetailsDeleteAction => 'Delete relation permanently';
-
-  @override
   String get relationDetailsPathProtection =>
-      'This relation is used in a saved daily path. It cannot be deleted, and its type and participants cannot be changed. Its description, priority, and archive state remain editable.';
+      'This relation is used in a saved daily path, so it cannot be deleted.';
 
   @override
-  String get relationDetailsDeletionChecking =>
-      'Deletion is unavailable until this relation’s dependencies are confirmed.';
-
-  @override
-  String get relationDetailsDeleteConfirmationTitle =>
-      'Delete relation permanently?';
-
-  @override
-  String relationDetailsDeleteConfirmationMessage(
-    String phrase,
-    String sourceTitle,
-    String relatedTitle,
-    String scope,
-  ) {
-    return 'Relation: $phrase\nSource intention: $sourceTitle\nRelated intention: $relatedTitle\nRelation state: $scope\n\nThis can’t be undone. The relation and its description will be permanently deleted. The tags, all their assignments to intentions, both intentions and all other relations will remain.';
+  String relationSheetArchivedLabel(String phrase) {
+    return '$phrase. Archived';
   }
 
   @override
-  String get relationDetailsConfirmDeleteAction => 'Delete permanently';
+  String get relationSheetArchivedNote =>
+      'Archived relations stay in saved paths and are not offered in new ones.';
 
   @override
-  String get relationDetailsOpenSourceParticipantAction =>
-      'Open source intention';
+  String relationSheetOpenParticipant(String title) {
+    return 'Open the page of the intention: $title';
+  }
 
   @override
-  String get relationDetailsOpenRelatedParticipantAction =>
-      'Open related intention';
+  String relationSheetOpenArchivedParticipant(String title) {
+    return 'Open the page of the intention: $title. Archived';
+  }
+
+  @override
+  String relationSheetPriorityHighest(String priority) {
+    return 'Priority $priority, the highest';
+  }
+
+  @override
+  String relationSheetPriorityLowest(String priority) {
+    return 'Priority $priority, the lowest';
+  }
+
+  @override
+  String get relationSheetDescriptionTitle => 'Description';
+
+  @override
+  String get relationSheetDescriptionLabel => 'Relation description';
+
+  @override
+  String get relationSheetDescriptionBack => 'Back to the relation';
+
+  @override
+  String get relationSheetDescriptionSave => 'Save';
+
+  @override
+  String get relationSheetDescriptionDiscardTitle => 'Discard changes?';
+
+  @override
+  String get relationSheetDescriptionDiscardMessage =>
+      'Your changes to the description won’t be saved.';
+
+  @override
+  String get relationSheetDescriptionDiscardAction => 'Discard';
+
+  @override
+  String get relationSheetDescriptionContinueAction => 'Keep editing';
+
+  @override
+  String get relationSheetOptionsLabel => 'Relation options';
+
+  @override
+  String get relationSheetOptionArchive => 'Archive';
+
+  @override
+  String get relationSheetOptionRestore => 'Restore from archive';
+
+  @override
+  String get relationSheetOptionDelete => 'Delete';
+
+  @override
+  String get relationSheetOptionRestoreBothArchived =>
+      'Restore the source and related intentions before restoring this relation.';
+
+  @override
+  String get relationSheetDeleteDialogTitle => 'Delete relation?';
+
+  @override
+  String get relationSheetDeleteDialogTextBefore =>
+      'This removes the relation “';
+
+  @override
+  String get relationSheetDeleteDialogTextAfter =>
+      '” with its description and cannot be undone. Both intentions stay.';
+
+  @override
+  String get relationSheetDeleteDialogCancel => 'Cancel';
+
+  @override
+  String get relationSheetDeleteDialogConfirm => 'Delete';
 
   @override
   String get actionPickerLoading => 'Loading actions…';
@@ -2609,18 +2596,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'New relation: related intention';
 
   @override
-  String get participantPickerPurposeChangeSource =>
-      'Relation change: source intention';
-
-  @override
-  String get participantPickerPurposeChangeRelated =>
-      'Relation change: related intention';
-
-  @override
   String get participantPickerFlowCreation => 'New relation';
-
-  @override
-  String get participantPickerFlowChange => 'Relation change';
 
   @override
   String get participantPickerRoleSourceNote =>
@@ -2660,9 +2636,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get relationEditorTitle => 'New relation';
-
-  @override
-  String get relationEditorEditTitle => 'Edit relation';
 
   @override
   String get relationEditorPhraseLabel => 'Relation phrase';
@@ -2743,12 +2716,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get relationEditorCreating => 'Creating…';
-
-  @override
-  String get relationEditorSaveAction => 'Save changes';
-
-  @override
-  String get relationEditorSaving => 'Saving…';
 
   @override
   String relationEditorPriorityOption(String priority) {

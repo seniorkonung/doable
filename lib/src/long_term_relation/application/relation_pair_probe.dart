@@ -11,7 +11,6 @@ final class RelationPairProbe {
   const RelationPairProbe({
     required this.counterpartId,
     required this.candidateRole,
-    this.ignoredRelationId,
   });
 
   /// Участник другой роли; в выдачу не входит.
@@ -20,19 +19,14 @@ final class RelationPairProbe {
   /// Роль, участника которой выбирает поиск.
   final RelationParticipantRole candidateRole;
 
-  /// Изменяемая связь: собственную пару она не занимает.
-  final LongTermRelationId? ignoredRelationId;
-
   @override
   bool operator ==(Object other) =>
       other is RelationPairProbe &&
       other.counterpartId == counterpartId &&
-      other.candidateRole == candidateRole &&
-      other.ignoredRelationId == ignoredRelationId;
+      other.candidateRole == candidateRole;
 
   @override
-  int get hashCode =>
-      Object.hash(counterpartId, candidateRole, ignoredRelationId);
+  int get hashCode => Object.hash(counterpartId, candidateRole);
 }
 
 /// Связь, которая занимает направленную пару строки поиска участника.

@@ -77,7 +77,7 @@ void main() {
         );
       }
       raw.execute(
-        'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
+        'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 0, 0)',
         [_uuid(201), _uuid(1), _uuid(3), 'need', 2, 1],
       );
       raw.execute(

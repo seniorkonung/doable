@@ -8,23 +8,21 @@ import 'package:doable/src/long_term_relation/presentation/participant_picker/re
 
 import '../../../intention/presentation/catalog/catalog_test_support.dart';
 import '../../../intention/presentation/catalog/intention_picker_session_test_support.dart';
-import '../editor/relation_form_test_support.dart' show testFormRelationId;
+import 'participant_picker_test_support.dart';
 
 void main() {
-  // Сессия поиска не зависит от описания выбора; выбран случай, где оба
-  // ограничения начального запроса отличаются от умолчаний.
+  // Сессия поиска не зависит от описания выбора; выбран случай, где начальный
+  // запрос исключает участника другой роли.
   final replaced = testSummary(index: 998);
   final excluded = testSummary(index: 999);
-  final edited = testFormRelationId(1);
   defineIntentionPickerSessionTests(
     route: RelationParticipantPickerRoute(
       choice: RelationParticipantChoice(
         role: RelationParticipantRole.source,
-        flow: RelationChangeChoiceFlow(
-          relationId: edited,
-          relationScope: RelationScope.archived,
-        ),
+        restore: testRelationRestore,
         type: LongTermRelationType.need,
+        priority: null,
+        description: '',
         source: RelationParticipantSummary(
           id: replaced.id,
           title: replaced.title,
@@ -39,11 +37,9 @@ void main() {
     ),
     filterKey: 'participant-picker-filter',
     listKey: 'participant-picker-list',
-    scope: IntentionScope.all,
     pairProbe: RelationPairProbe(
       counterpartId: excluded.id,
       candidateRole: RelationParticipantRole.source,
-      ignoredRelationId: edited,
     ),
     readinessFilter: IntentionReadinessFilter.all,
   );

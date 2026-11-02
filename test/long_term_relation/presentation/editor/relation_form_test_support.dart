@@ -77,11 +77,6 @@ final class ControlledRelationFormRepository
 
   CreateLongTermRelation commandAt(int index) => relationCommands[index];
 
-  UpdateLongTermRelation updateCommandAt(int index) =>
-      relationUpdateCommands[index];
-
-  ControlledRelationWatch watchAt(int index) => relationWatches[index];
-
   void emitIntention(
     Intention intention, {
     required RelationCounts counts,
@@ -139,6 +134,8 @@ final class ControlledRelationFormRepository
       priority: command.priority,
       scope: RelationScope.active,
       creationSequence: RelationCreationSequence(index + 1),
+      createdAt: RelationTimestamp(DateTime.utc(2026)),
+      updatedAt: RelationTimestamp(DateTime.utc(2026)),
     );
     _relationRequests[index].complete(
       GraphCommandSucceeded(
@@ -200,6 +197,8 @@ final class ControlledRelationFormRepository
       priority: RelationPriority.p2,
       scope: scope,
       creationSequence: RelationCreationSequence(1),
+      createdAt: RelationTimestamp(DateTime.utc(2026)),
+      updatedAt: RelationTimestamp(DateTime.utc(2026)),
     );
     final after = relationIn(RelationScope.active);
     completeRelationUpdated(

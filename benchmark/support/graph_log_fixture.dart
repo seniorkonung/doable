@@ -89,8 +89,8 @@ final class GraphLogFixture {
         VALUES (?, ?)'''),
       database.prepare('''INSERT INTO long_term_relations
         (id, source_intention_id, related_intention_id, type, priority,
-         description, is_archived)
-        VALUES (?, ?, ?, ?, ?, ?, ?)'''),
+         description, is_archived, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0)'''),
       database.prepare('''INSERT INTO daily_choices
         (id, source_intention_id, selected_intention_id, choice_date,
          description, is_completed, scheduled_minute, priority)

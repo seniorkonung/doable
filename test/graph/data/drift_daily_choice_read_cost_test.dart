@@ -144,7 +144,7 @@ final class _Fixture {
   void _addRelation(int id, int source, int related) => raw.execute(
     '''INSERT INTO long_term_relations
        (id, source_intention_id, related_intention_id, type, priority,
-        is_archived) VALUES (?, ?, ?, 'need', 2, 0)''',
+        is_archived, created_at, updated_at) VALUES (?, ?, ?, 'need', 2, 0, 0, 0)''',
     [_uuid(id), _uuid(source), _uuid(related)],
   );
 

@@ -27,6 +27,8 @@ CREATE TABLE long_term_relations (
     typeof(is_archived) = 'integer' AND
     is_archived IN (0, 1)
   ),
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
   UNIQUE (source_intention_id, related_intention_id),
   CHECK (source_intention_id <> related_intention_id)
 );
@@ -50,10 +52,17 @@ CREATE INDEX long_term_relations_related_group_order
   );
 
 CREATE TRIGGER long_term_relations_immutable_identity
-AFTER UPDATE OF creation_sequence, id ON long_term_relations
+AFTER UPDATE OF
+  creation_sequence,
+  id,
+  source_intention_id,
+  related_intention_id
+ON long_term_relations
 WHEN
   new.creation_sequence <> old.creation_sequence OR
-  new.id <> old.id
+  new.id <> old.id OR
+  new.source_intention_id <> old.source_intention_id OR
+  new.related_intention_id <> old.related_intention_id
 BEGIN
   SELECT RAISE(ABORT, 'long-term relation identity is immutable');
 END;
@@ -79,8 +88,7 @@ BEGIN
 END;
 
 CREATE TRIGGER long_term_relations_active_participants_after_update
-AFTER UPDATE OF source_intention_id, related_intention_id, is_archived
-ON long_term_relations
+AFTER UPDATE OF is_archived ON long_term_relations
 WHEN
   new.is_archived = 0 AND
   (

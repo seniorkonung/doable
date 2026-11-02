@@ -524,21 +524,12 @@ class AppLocalizationsRu extends AppLocalizations {
       'Все связи этой группы загружены.';
 
   @override
-  String get relationNeighborhoodRelationActive => 'Активная связь';
-
-  @override
   String get relationNeighborhoodRelationArchived => 'Связь в архиве';
 
   @override
   String relationNeighborhoodPriority(String priority) {
     return 'Приоритет $priority';
   }
-
-  @override
-  String get relationNeighborhoodSourceParticipant => 'Исходное намерение';
-
-  @override
-  String get relationNeighborhoodRelatedParticipant => 'Связанное намерение';
 
   @override
   String relationNeighborhoodNeedPhrase(String source, String related) {
@@ -1920,10 +1911,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get relationEditorCreated => 'Связь создана.';
 
   @override
-  String get relationEditorCreateInvalidInput =>
-      'Проверьте выбранные намерения и данные связи.';
-
-  @override
   String get relationEditorCreatePairOccupied =>
       'Связь этого направления между выбранными намерениями уже есть.';
 
@@ -1948,38 +1935,11 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось создать связь из-за непредвиденной ошибки.';
 
   @override
-  String get relationEditorUpdated => 'Связь изменена.';
-
-  @override
-  String get relationEditorUpdateInvalidInput =>
-      'Проверьте выбранные намерения и изменения связи.';
-
-  @override
-  String get relationEditorUpdatePairOccupied =>
-      'Связь этого направления между выбранными намерениями уже есть.';
-
-  @override
   String get relationEditorUpdateNotFound => 'Эта связь больше не существует.';
 
   @override
-  String get relationEditorUpdateParticipantNotFound =>
-      'Одно из выбранных намерений больше не существует.';
-
-  @override
-  String get relationEditorUpdateParticipantArchived =>
-      'Активная связь может соединять только активные намерения.';
-
-  @override
-  String get relationEditorUpdateReferencedByDailyPath =>
-      'Связь используется в сохранённом дневном пути. Её тип и участников нельзя изменить.';
-
-  @override
-  String get relationEditorPathProtection =>
-      'Связь используется в сохранённом дневном пути. Её тип и участников нельзя изменить. Описание и приоритет остаются доступными.';
-
-  @override
-  String get relationEditorPathProtectionWithDraft =>
-      'Связь используется в сохранённом дневном пути. Верните прежние тип и участников, чтобы сохранить изменения описания и приоритета.';
+  String get relationEditorUpdateArchivedTypeChange =>
+      'Связь архивирована, поэтому её тип нельзя изменить.';
 
   @override
   String get relationEditorUpdateUnavailable =>
@@ -1992,9 +1952,6 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get relationEditorUpdateUnexpected =>
       'Не удалось изменить связь из-за непредвиденной ошибки.';
-
-  @override
-  String get relationArchived => 'Связь архивирована.';
 
   @override
   String get relationArchiveNotFound => 'Эта связь больше не существует.';
@@ -2105,9 +2062,6 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось загрузить связь из-за непредвиденной ошибки.';
 
   @override
-  String get relationDetailsRefreshing => 'Обновляем подробные данные связи…';
-
-  @override
   String get relationDetailsRefreshUnavailable =>
       'Не удалось обновить подробные данные связи. Ранее подтверждённые данные по-прежнему показаны.';
 
@@ -2126,62 +2080,94 @@ class AppLocalizationsRu extends AppLocalizations {
   String get relationDetailsPriorityLabel => 'Приоритет';
 
   @override
-  String get relationDetailsScopeLabel => 'Состояние связи';
-
-  @override
-  String get relationDetailsDescriptionLabel => 'Описание';
-
-  @override
-  String get relationDetailsNoDescription => 'Описания нет';
-
-  @override
-  String get relationDetailsOpenParticipant =>
-      'Открывает намерение и его собственные связи';
-
-  @override
-  String get relationDetailsEditAction => 'Редактировать связь';
-
-  @override
-  String get relationDetailsArchiveAction => 'Архивировать связь';
-
-  @override
-  String get relationDetailsRestoreAction => 'Восстановить связь';
-
-  @override
-  String get relationDetailsDeleteAction => 'Удалить связь навсегда';
-
-  @override
   String get relationDetailsPathProtection =>
-      'Связь используется в сохранённом дневном пути. Удалить её или изменить тип и участников нельзя. Описание, приоритет и архивное состояние остаются доступными.';
+      'Связь используется в сохранённом дневном пути, поэтому удалить её нельзя.';
 
   @override
-  String get relationDetailsDeletionChecking =>
-      'Удаление недоступно, пока не подтверждены зависимости связи.';
-
-  @override
-  String get relationDetailsDeleteConfirmationTitle =>
-      'Удалить связь навсегда?';
-
-  @override
-  String relationDetailsDeleteConfirmationMessage(
-    String phrase,
-    String sourceTitle,
-    String relatedTitle,
-    String scope,
-  ) {
-    return 'Связь: $phrase\nИсходное намерение: $sourceTitle\nСвязанное намерение: $relatedTitle\nСостояние связи: $scope\n\nЭто действие нельзя отменить. Связь и её описание будут удалены навсегда. Сами теги, все их назначения намерениям, оба намерения и все остальные связи сохранятся.';
+  String relationSheetArchivedLabel(String phrase) {
+    return '$phrase. Архив';
   }
 
   @override
-  String get relationDetailsConfirmDeleteAction => 'Удалить навсегда';
+  String get relationSheetArchivedNote =>
+      'Архивные связи остаются в сохранённых путях и не предлагаются в новых.';
 
   @override
-  String get relationDetailsOpenSourceParticipantAction =>
-      'Открыть исходное намерение';
+  String relationSheetOpenParticipant(String title) {
+    return 'Открыть страницу намерения: $title';
+  }
 
   @override
-  String get relationDetailsOpenRelatedParticipantAction =>
-      'Открыть связанное намерение';
+  String relationSheetOpenArchivedParticipant(String title) {
+    return 'Открыть страницу намерения: $title. Архив';
+  }
+
+  @override
+  String relationSheetPriorityHighest(String priority) {
+    return 'Приоритет $priority, высший';
+  }
+
+  @override
+  String relationSheetPriorityLowest(String priority) {
+    return 'Приоритет $priority, низший';
+  }
+
+  @override
+  String get relationSheetDescriptionTitle => 'Описание';
+
+  @override
+  String get relationSheetDescriptionLabel => 'Описание связи';
+
+  @override
+  String get relationSheetDescriptionBack => 'Назад к связи';
+
+  @override
+  String get relationSheetDescriptionSave => 'Сохранить';
+
+  @override
+  String get relationSheetDescriptionDiscardTitle => 'Отменить изменения?';
+
+  @override
+  String get relationSheetDescriptionDiscardMessage =>
+      'Изменения описания не сохранятся.';
+
+  @override
+  String get relationSheetDescriptionDiscardAction => 'Отменить';
+
+  @override
+  String get relationSheetDescriptionContinueAction => 'Продолжить правку';
+
+  @override
+  String get relationSheetOptionsLabel => 'Параметры связи';
+
+  @override
+  String get relationSheetOptionArchive => 'Архивировать';
+
+  @override
+  String get relationSheetOptionRestore => 'Восстановить из архива';
+
+  @override
+  String get relationSheetOptionDelete => 'Удалить';
+
+  @override
+  String get relationSheetOptionRestoreBothArchived =>
+      'Сначала восстановите исходное и связанное намерения, затем восстановите эту связь.';
+
+  @override
+  String get relationSheetDeleteDialogTitle => 'Удалить связь?';
+
+  @override
+  String get relationSheetDeleteDialogTextBefore => 'Связь «';
+
+  @override
+  String get relationSheetDeleteDialogTextAfter =>
+      '» будет безвозвратно удалена вместе с описанием. Оба намерения сохранятся.';
+
+  @override
+  String get relationSheetDeleteDialogCancel => 'Отмена';
+
+  @override
+  String get relationSheetDeleteDialogConfirm => 'Удалить';
 
   @override
   String get actionPickerLoading => 'Загружаем действия…';
@@ -2635,18 +2621,7 @@ class AppLocalizationsRu extends AppLocalizations {
       'Новая связь: связанное намерение';
 
   @override
-  String get participantPickerPurposeChangeSource =>
-      'Изменение связи: исходное намерение';
-
-  @override
-  String get participantPickerPurposeChangeRelated =>
-      'Изменение связи: связанное намерение';
-
-  @override
   String get participantPickerFlowCreation => 'Новая связь';
-
-  @override
-  String get participantPickerFlowChange => 'Изменение связи';
 
   @override
   String get participantPickerRoleSourceNote =>
@@ -2687,9 +2662,6 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get relationEditorTitle => 'Новая связь';
-
-  @override
-  String get relationEditorEditTitle => 'Редактирование связи';
 
   @override
   String get relationEditorPhraseLabel => 'Формулировка связи';
@@ -2769,12 +2741,6 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get relationEditorCreating => 'Создаём…';
-
-  @override
-  String get relationEditorSaveAction => 'Сохранить изменения';
-
-  @override
-  String get relationEditorSaving => 'Сохраняем…';
 
   @override
   String relationEditorPriorityOption(String priority) {

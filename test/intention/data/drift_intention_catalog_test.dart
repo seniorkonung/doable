@@ -760,7 +760,7 @@ void main() {
             }
           }
           raw.execute(
-            'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority) VALUES (?, ?, ?, ?, ?)',
+            'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 0, 0)',
             [_uuid(500), _uuid(1), _uuid(5), 'need', 2],
           );
         });
@@ -887,7 +887,7 @@ void main() {
           (502, 8, 7, 1),
         ]) {
           raw.execute(
-            'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
+            'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 0, 0)',
             [
               _uuid(relation),
               _uuid(source),
@@ -1114,7 +1114,7 @@ void main() {
           raw.execute(
             '''INSERT INTO long_term_relations
                (id, source_intention_id, related_intention_id, type, priority,
-                is_archived) VALUES (?, ?, ?, 'need', 2, ?)''',
+                is_archived, created_at, updated_at) VALUES (?, ?, ?, 'need', 2, ?, 0, 0)''',
             [_uuid(number), _uuid(source), _uuid(related), archived],
           );
         }
@@ -1124,17 +1124,11 @@ void main() {
     PairOccupant occupant(int relation, RelationScope scope) =>
         PairOccupant(relationId: _relationId(relation), scope: scope);
 
-    RelationPairProbe probe(
-      int counterpart,
-      RelationParticipantRole role, {
-      int? ignoredRelation,
-    }) => RelationPairProbe(
-      counterpartId: _id(_uuid(counterpart)),
-      candidateRole: role,
-      ignoredRelationId: ignoredRelation == null
-          ? null
-          : _relationId(ignoredRelation),
-    );
+    RelationPairProbe probe(int counterpart, RelationParticipantRole role) =>
+        RelationPairProbe(
+          counterpartId: _id(_uuid(counterpart)),
+          candidateRole: role,
+        );
 
     Future<IntentionCatalogFirstPage> firstPage(
       RelationPairProbe? pairProbe, {
@@ -1196,39 +1190,6 @@ void main() {
         _id(_uuid(sleeping)): occupant(sleepingToHealthy, RelationScope.active),
       });
     });
-
-    test(
-      'изменяемая связь свою пару не занимает, а остальные занимают',
-      () async {
-        final asRelated = await firstPage(
-          probe(
-            healthy,
-            RelationParticipantRole.related,
-            ignoredRelation: healthyToWalking,
-          ),
-        );
-        final asSource = await firstPage(
-          probe(
-            walking,
-            RelationParticipantRole.source,
-            ignoredRelation: healthyToWalking,
-          ),
-        );
-
-        expect(asRelated.pairOccupants, {
-          _id(_uuid(swimming)): occupant(
-            healthyToSwimming,
-            RelationScope.archived,
-          ),
-        });
-        expect(asSource.pairOccupants, {
-          _id(_uuid(resting)): occupant(
-            restingToWalking,
-            RelationScope.archived,
-          ),
-        });
-      },
-    );
 
     test('запрос без пробы приходит без карты занятости', () async {
       final page = await firstPage(null);
@@ -1347,7 +1308,7 @@ void main() {
           );
         }
         raw.execute(
-          'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority) VALUES (?, ?, ?, ?, ?)',
+          'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 0, 0)',
           [_uuid(500), _uuid(1), _uuid(3), 'need', 2],
         );
         raw.execute(

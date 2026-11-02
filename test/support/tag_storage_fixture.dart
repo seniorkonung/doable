@@ -57,7 +57,7 @@ void _writeTagRecipientGraph(sqlite.Database database) {
   }
   for (final (number, related, archived) in [(101, 3, 0), (102, 2, 1)]) {
     database.execute(
-      'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
+      'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 0, 0)',
       [
         tagFixtureId(number),
         tagFixtureId(1),
@@ -183,7 +183,7 @@ void seedWidelyAssignedTagFixture(
         [intentionId, 'Получатель $index', 0, archived, index + 2, index + 2],
       );
       database.execute(
-        'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
+        'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 0, 0)',
         [relationId, tagFixtureId(1), intentionId, 'need', 2, archived],
       );
       for (final tagNumber in [9000, 9001]) {

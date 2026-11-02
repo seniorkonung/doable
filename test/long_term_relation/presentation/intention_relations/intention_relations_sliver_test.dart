@@ -170,6 +170,8 @@ void main() {
           priority: RelationPriority.p1,
           scope: RelationScope.active,
           creationSequence: RelationCreationSequence(1),
+          createdAt: RelationTimestamp(DateTime.utc(2026)),
+          updatedAt: RelationTimestamp(DateTime.utc(2026)),
         ),
         neighbor: RelationNeighbor(
           id: neighborId,

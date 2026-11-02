@@ -15,6 +15,7 @@ import '../../application/long_term_relation_command.dart';
 import '../../application/long_term_relation_projection.dart';
 import '../../application/long_term_relation_permissions.dart';
 import '../../domain/long_term_relation.dart';
+import '../../domain/long_term_relation_description.dart';
 import '../../domain/long_term_relation_id.dart';
 import 'relation_details_state.dart';
 
@@ -60,7 +61,15 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
   ProviderSubscription<AsyncValue<LongTermRelationReadResult>>?
   _observationSubscription;
   GraphRevision? _acceptedRevision;
-  LongTermRelationOperationToken? _activeLifecycleToken;
+  LongTermRelationOperationToken? _activeToken;
+
+  /// Значения, с которыми сравнивается правка. После подтверждения они новее
+  /// показанного снимка, пока наблюдение не прочитает его заново.
+  ({LongTermRelation relation, LongTermRelationDescription? description})?
+  _confirmed;
+
+  /// Право отказа правки, которое публикует текущее состояние.
+  GraphInitiatorPresentationClaim? _publishedEditFailureClaim;
   var _isTerminated = false;
 
   @override
@@ -68,16 +77,25 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
     _relationId = relationId;
     _generation = _RelationObservationGeneration.initial;
     _acceptedRevision = null;
+    _confirmed = null;
     _isTerminated = false;
     _coordinator = ref.watch(graphCommandCoordinatorProvider.notifier);
     _completionSubscription = _coordinator.completions.listen(
       _handleCompletion,
     );
+    listenSelf(
+      (_, next) => _publishEditFailureClaim(switch (next) {
+        RelationDetailsLoaded(:final editFailure) =>
+          editFailure?.failurePresentation,
+        _ => null,
+      }),
+    );
     ref.onDispose(() {
-      final activeLifecycleToken = _activeLifecycleToken;
-      if (activeLifecycleToken != null) {
-        _coordinator.releaseInitiatorPresentation(activeLifecycleToken);
+      final activeToken = _activeToken;
+      if (activeToken != null) {
+        _coordinator.releaseInitiatorPresentation(activeToken);
       }
+      _publishEditFailureClaim(null);
       _observationSubscription?.close();
       unawaited(_completionSubscription.cancel());
     });
@@ -100,6 +118,63 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
       return;
     }
     state = _stateFromObservation(_startObservation());
+  }
+
+  /// Меняет тип активной связи: архивированная сохраняет его до восстановления.
+  void changeType(LongTermRelationType type) {
+    final relation = _confirmed?.relation;
+    if (relation == null ||
+        relation.type == type ||
+        relation.scope == RelationScope.archived) {
+      return;
+    }
+    _startEdit(LongTermRelationPatch(type: LongTermRelationFieldSet(type)));
+  }
+
+  /// Меняет приоритет активной или архивированной связи.
+  void changePriority(RelationPriority priority) {
+    final relation = _confirmed?.relation;
+    if (relation == null || relation.priority == priority) {
+      return;
+    }
+    _startEdit(
+      LongTermRelationPatch(priority: LongTermRelationFieldSet(priority)),
+    );
+  }
+
+  /// Проверяет [text] и сохраняет его описанием связи.
+  ///
+  /// Успех относится только к собственной принятой команде, как у [delete].
+  Future<RelationDescriptionSaveOutcome> saveDescription(String text) async {
+    final confirmed = _confirmed;
+    if (confirmed == null) {
+      return const RelationDescriptionSaveFailed();
+    }
+
+    final LongTermRelationDescription? description;
+    try {
+      description = LongTermRelationDescription.fromInput(text);
+    } on LongTermRelationTextValidationException catch (exception) {
+      return RelationDescriptionInvalid(exception.failure.reason);
+    }
+    if (description == confirmed.description) {
+      return const RelationDescriptionUnchanged();
+    }
+
+    final relationId = _relationId;
+    final completion = await _startEdit(
+      LongTermRelationPatch(
+        description: description == null
+            ? const LongTermRelationDescriptionCleared()
+            : LongTermRelationDescriptionReplaced(description),
+      ),
+    );
+    return switch (completion?.result) {
+      GraphResultSuccess(value: LongTermRelationUpdated(:final relation))
+          when relation.id == relationId =>
+        const RelationDescriptionSaved(),
+      _ => const RelationDescriptionSaveFailed(),
+    };
   }
 
   /// Архивирует активную связь независимо от состояния её участников.
@@ -133,6 +208,83 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
     }
   }
 
+  /// Отправляет правку, если координатор её принял: пока операция этой связи
+  /// выполняется, новая не встаёт в очередь. Поля меняет только новый снимок.
+  Future<LongTermRelationCommandCompletion>? _startEdit(
+    LongTermRelationPatch patch,
+  ) {
+    final current = state;
+    if (current is! RelationDetailsLoaded) {
+      return null;
+    }
+
+    switch (_coordinator.acceptRelationUpdate(
+      UpdateLongTermRelation(relationId: _relationId, patch: patch),
+    )) {
+      case LongTermRelationCommandAccepted(:final token, :final future):
+        _activeToken = token;
+        state = current.copyWith(
+          isOperationRunning: true,
+          clearEditFailure: true,
+        );
+        unawaited(_finishEdit(future));
+        return future;
+      case LongTermRelationCommandAlreadyRunning():
+        state = current.copyWith(isOperationRunning: true);
+      case GraphCommandCoordinatorDraining():
+        state = current.copyWith(
+          editFailure: const RelationDetailsEditFailure(
+            LongTermRelationUnexpectedFailure(),
+          ),
+        );
+    }
+    return null;
+  }
+
+  Future<void> _finishEdit(
+    Future<LongTermRelationCommandCompletion> future,
+  ) async {
+    final completion = await future;
+    if (!ref.mounted || !identical(_activeToken, completion.token)) {
+      return;
+    }
+
+    _activeToken = null;
+    final failure = switch (completion.result) {
+      GraphResultFailure(:final failure) => failure,
+      GraphResultSuccess(value: LongTermRelationUpdated()) => null,
+      GraphResultSuccess() => const LongTermRelationUnexpectedFailure(),
+    };
+    if (failure == null) {
+      return;
+    }
+    final current = state;
+    if (current is! RelationDetailsLoaded) {
+      _coordinator.releaseInitiatorPresentation(completion.token);
+      return;
+    }
+    state = current.copyWith(
+      isOperationRunning: _isOperationRunning,
+      editFailure: RelationDetailsEditFailure(
+        failure,
+        failurePresentation: _coordinator.claimInitiatorFailure(
+          completion.token,
+        ),
+      ),
+    );
+  }
+
+  /// Учитывает право отказа, которое публикует состояние, и передаёт общей
+  /// поверхности прежнее право, переставшее публиковаться. Право, уже
+  /// подтверждённое renderer, координатор повторно не выдаёт.
+  void _publishEditFailureClaim(GraphInitiatorPresentationClaim? claim) {
+    final previous = _publishedEditFailureClaim;
+    _publishedEditFailureClaim = claim;
+    if (previous != null && !identical(previous, claim)) {
+      _coordinator.releaseInitiatorClaim(previous);
+    }
+  }
+
   Future<LongTermRelationCommandCompletion>? _startLifecycleChange(
     RelationDetailsLifecycleKind kind,
   ) {
@@ -158,10 +310,11 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
     };
     switch (start) {
       case LongTermRelationCommandAccepted(:final token, :final future):
-        _activeLifecycleToken = token;
+        _activeToken = token;
         state = current.copyWith(
           isOperationRunning: true,
           lifecycleChange: RelationDetailsLifecycleRunning(kind),
+          clearEditFailure: true,
         );
         unawaited(_finishLifecycleChange(kind, future));
         return future;
@@ -199,11 +352,11 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
   ) async {
     try {
       final completion = await future;
-      if (!ref.mounted || !identical(_activeLifecycleToken, completion.token)) {
+      if (!ref.mounted || !identical(_activeToken, completion.token)) {
         return;
       }
 
-      _activeLifecycleToken = null;
+      _activeToken = null;
       final current = state;
       if (current is! RelationDetailsLoaded) {
         if (completion.isFailure) {
@@ -241,8 +394,8 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
       if (!ref.mounted) {
         return;
       }
-      final token = _activeLifecycleToken;
-      _activeLifecycleToken = null;
+      final token = _activeToken;
+      _activeToken = null;
       if (token != null) {
         _coordinator.releaseInitiatorPresentation(token);
       }
@@ -356,19 +509,54 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
       state = _terminateAsDeleted();
       return;
     }
+    _acceptConfirmedFields(completion, changes);
     _generation = _generation.next();
     state = switch (current) {
       RelationDetailsLoaded() => current.copyWith(
         permissions: confirmedPermissions,
-        permissionRevision: confirmedPermissions == null
-            ? null
-            : confirmedChange.revision,
         isOperationRunning: _isOperationRunning,
         refreshStatus: const RelationDetailsRefreshing(),
       ),
       _ => RelationDetailsLoading(isOperationRunning: _isOperationRunning),
     };
     _startObservation();
+  }
+
+  /// Запоминает подтверждённые поля пакета, который прошёл барьер ревизий.
+  ///
+  /// Показанный снимок остаётся прежним до цельного чтения. Описание несёт
+  /// только результат команды этой связи: другие пакеты его не меняют.
+  void _acceptConfirmedFields(
+    GraphCommandCompletion completion,
+    List<GraphChange> changes,
+  ) {
+    final confirmed = _confirmed;
+    if (confirmed == null) {
+      return;
+    }
+    var relation = confirmed.relation;
+    for (final change in changes) {
+      if (change case LongTermRelationChange(:final id, after: final after?)
+          when id == _relationId) {
+        relation = after;
+      }
+    }
+    _confirmed = (
+      relation: relation,
+      description: switch (completion) {
+        LongTermRelationCommandCompletion(
+          result: GraphResultSuccess(
+            value: LongTermRelationUpdated(
+              relation: LongTermRelation(:final id),
+              :final description,
+            ),
+          ),
+        )
+            when id == _relationId =>
+          description,
+        _ => confirmed.description,
+      },
+    );
   }
 
   bool _advanceRevisionBarrier(GraphRevision revision) {
@@ -442,11 +630,7 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
     GraphResultSuccess(
       value: GraphSnapshot(value: final details?, :final revision),
     ) =>
-      RelationDetailsLoaded(
-        details: details,
-        revision: revision,
-        isOperationRunning: _isOperationRunning,
-      ),
+      _loadedFromSnapshot(details, revision, previousLoaded),
     GraphResultSuccess() => _terminateAsNotFound(),
     GraphResultFailure(failure: LongTermRelationReadUnavailableFailure()) =>
       previousLoaded?.copyWith(
@@ -468,8 +652,25 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
           RelationDetailsUnexpected(isOperationRunning: _isOperationRunning),
   };
 
+  /// Цельный снимок не снимает отказ правки: это делает только принятая
+  /// операция.
+  RelationDetailsLoaded _loadedFromSnapshot(
+    LongTermRelationDetails details,
+    GraphRevision revision,
+    RelationDetailsLoaded? previousLoaded,
+  ) {
+    _confirmed = (relation: details.relation, description: details.description);
+    return RelationDetailsLoaded(
+      details: details,
+      revision: revision,
+      isOperationRunning: _isOperationRunning,
+      editFailure: previousLoaded?.editFailure,
+    );
+  }
+
   RelationDetailsNotFound _terminateAsNotFound() {
     _isTerminated = true;
+    _confirmed = null;
     _observationSubscription?.close();
     _observationSubscription = null;
     unawaited(_completionSubscription.cancel());
@@ -478,6 +679,7 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
 
   RelationDetailsDeleted _terminateAsDeleted() {
     _isTerminated = true;
+    _confirmed = null;
     _observationSubscription?.close();
     _observationSubscription = null;
     unawaited(_completionSubscription.cancel());

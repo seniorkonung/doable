@@ -310,7 +310,7 @@ GraphOperationMessage _messageFor(
   IntentionPresentableCompletion() => GraphOperationMessage(
     _intentionMessage(localizations, completion),
   ),
-  LongTermRelationCommandCompletion() => GraphOperationMessage(
+  LongTermRelationPresentableCompletion() => GraphOperationMessage(
     _relationMessage(localizations, completion),
   ),
   DailyChoiceCommandCompletion() => GraphOperationMessage(
@@ -457,7 +457,7 @@ String _intentionMessage(
 /// опирается только на локализованное обозначение вида операции и её предмета.
 String _relationMessage(
   AppLocalizations localizations,
-  LongTermRelationCommandCompletion completion,
+  LongTermRelationPresentableCompletion completion,
 ) {
   final operation = switch (completion.kind) {
     LongTermRelationCommandKind.create => localizations.graphOperationCreate,
@@ -481,7 +481,7 @@ String _relationMessage(
 
 String _relationOutcomeFor(
   AppLocalizations localizations,
-  LongTermRelationCommandCompletion completion,
+  LongTermRelationPresentableCompletion completion,
 ) => switch (completion.result) {
   GraphResultSuccess(:final value) => switch ((completion.kind, value)) {
     (LongTermRelationCommandKind.create, LongTermRelationCreated()) =>
@@ -490,18 +490,13 @@ String _relationOutcomeFor(
       localizations.relationEditorCreateUnexpected,
     (LongTermRelationCommandKind.create, LongTermRelationDeleted()) =>
       localizations.relationEditorCreateUnexpected,
-    (LongTermRelationCommandKind.update, LongTermRelationUpdated()) =>
-      localizations.relationEditorUpdated,
-    (LongTermRelationCommandKind.update, LongTermRelationCreated()) =>
-      localizations.relationEditorUpdateUnexpected,
-    (LongTermRelationCommandKind.update, LongTermRelationDeleted()) =>
-      localizations.relationEditorUpdateUnexpected,
-    (LongTermRelationCommandKind.archive, LongTermRelationUpdated()) =>
-      localizations.relationArchived,
-    (LongTermRelationCommandKind.archive, LongTermRelationCreated()) =>
-      localizations.relationArchiveUnexpected,
-    (LongTermRelationCommandKind.archive, LongTermRelationDeleted()) =>
-      localizations.relationArchiveUnexpected,
+    (
+      LongTermRelationCommandKind.update || LongTermRelationCommandKind.archive,
+      _,
+    ) =>
+      throw StateError(
+        'Успех этой операции связи не образует права предъявления.',
+      ),
     (LongTermRelationCommandKind.restore, LongTermRelationUpdated()) =>
       localizations.relationRestored,
     (LongTermRelationCommandKind.restore, LongTermRelationCreated()) =>

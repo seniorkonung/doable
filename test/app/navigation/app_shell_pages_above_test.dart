@@ -25,6 +25,7 @@ import 'package:doable/src/daily_choice/presentation/source_picker/daily_choice_
 import 'package:doable/src/data/local/app_database.dart'
     show openInMemoryLocalDatabase;
 import 'package:doable/src/design_system/components/picker_row.dart';
+import 'package:doable/src/design_system/components/relation_head.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
@@ -38,7 +39,6 @@ import 'package:doable/src/intention/presentation/editor/intention_editor_page.d
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
-import 'package:doable/src/long_term_relation/presentation/details/relation_details_page.dart';
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_page.dart';
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_state.dart';
 import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_choice.dart';
@@ -49,8 +49,8 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
-import '../../long_term_relation/presentation/editor/relation_form_test_support.dart'
-    show testFormRelationId;
+import '../../long_term_relation/presentation/participant_picker/participant_picker_test_support.dart'
+    show testRelationRestore;
 import '../../support/app_root_pages.dart';
 import '../../support/daily_choice_local_date.dart';
 import '../../support/graph_seed.dart';
@@ -328,9 +328,7 @@ void _expectAboveShell(
 
   final ordinary =
       expectedPanel ??
-      (page == IntentionDetailsPage ||
-          page == RelationDetailsPage ||
-          page == DailyChoiceDetailsPage);
+      (page == IntentionDetailsPage || page == DailyChoiceDetailsPage);
   expect(
     find.byType(AppNavigationBar),
     ordinary ? findsOneWidget : findsNothing,
@@ -444,8 +442,8 @@ void _seed(sqlite.Database database) {
     }
     database.execute(
       'INSERT INTO long_term_relations (id, source_intention_id, '
-      'related_intention_id, type, priority, is_archived) '
-      'VALUES (?, ?, ?, ?, ?, ?)',
+      'related_intention_id, type, priority, is_archived, created_at, updated_at) '
+      'VALUES (?, ?, ?, ?, ?, ?, 0, 0)',
       [
         tagFixtureId(_relation),
         tagFixtureId(_read),

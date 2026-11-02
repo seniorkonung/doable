@@ -611,6 +611,8 @@ LongTermRelationSummary _edge(
     priority: RelationPriority.p1,
     scope: RelationScope.active,
     creationSequence: RelationCreationSequence(number),
+    createdAt: RelationTimestamp(DateTime.utc(2026)),
+    updatedAt: RelationTimestamp(DateTime.utc(2026)),
   ),
   source: RelationParticipantSummary(
     id: _intention(source),

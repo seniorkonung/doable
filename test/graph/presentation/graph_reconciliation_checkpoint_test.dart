@@ -466,7 +466,7 @@ void main() {
             catalog().totalCount == 1 &&
             choices(1).items.length == 1 &&
             choices(3).items.length == 1 &&
-            relation(101).permissionRevision.compareTo(deletionRevision) ==
+            relation(101).revision.compareTo(deletionRevision) ==
                 GraphRevisionOrder.same,
       );
       expect(catalog().items.single.id, firstId);
@@ -593,7 +593,6 @@ void main() {
             counterpartId: ids[3],
             candidateRole: RelationParticipantRole.related,
           ),
-          selectionContext: RelationParticipantSelectionContext.activeRelation,
         ),
       );
       final subscriptions = [
@@ -957,8 +956,8 @@ void main() {
     },
   );
 
-  test('перемещение связи продвигает ревизию каталога без замены строк и '
-      'согласует подробные данные всех участников', () async {
+  test('смена типа связи продвигает ревизию каталога без замены строк и '
+      'согласует подробные данные обоих участников', () async {
     final repository = _CheckpointGraphRepository();
     final container = ProviderContainer(
       overrides: [
@@ -973,11 +972,14 @@ void main() {
       ],
       retry: (retryCount, error) => null,
     );
-    final participantIds = [
-      testIntentionId(1),
-      testIntentionId(2),
-      testIntentionId(3),
-      testIntentionId(4),
+    final participantIds = [testIntentionId(1), testIntentionId(2)];
+    final countsBefore = [
+      testRelationCounts(activeNeedOutgoing: 1),
+      testRelationCounts(activeNeedIncoming: 1),
+    ];
+    final countsAfter = [
+      testRelationCounts(activeCanOutgoing: 1),
+      testRelationCounts(activeCanIncoming: 1),
     ];
     final catalogSubscription = container.listen(
       intentionCatalogViewModelProvider(const BrowseIntentionCatalog()),
@@ -1002,8 +1004,6 @@ void main() {
     });
 
     final summaries = [
-      catalog_support.testSummary(index: 4, title: 'Участник Г'),
-      catalog_support.testSummary(index: 3, title: 'Участник В'),
       catalog_support.testSummary(index: 2, title: 'Участник Б'),
       catalog_support.testSummary(index: 1, title: 'Участник А'),
     ];
@@ -1028,11 +1028,7 @@ void main() {
           id: participantIds[index],
           title: 'Участник ${String.fromCharCode(1040 + index)}',
         ),
-        counts: switch (index) {
-          0 => testRelationCounts(activeNeedOutgoing: 1),
-          1 => testRelationCounts(activeNeedIncoming: 1),
-          _ => testRelationCounts(),
-        },
+        counts: countsBefore[index],
         revision: const TestGraphRevision(4),
       );
     }
@@ -1045,12 +1041,14 @@ void main() {
     );
     final relationAfter = LongTermRelation(
       id: relationBefore.id,
-      sourceIntentionId: participantIds[2],
-      relatedIntentionId: participantIds[3],
-      type: relationBefore.type,
+      sourceIntentionId: relationBefore.sourceIntentionId,
+      relatedIntentionId: relationBefore.relatedIntentionId,
+      type: LongTermRelationType.can,
       priority: relationBefore.priority,
       scope: relationBefore.scope,
       creationSequence: relationBefore.creationSequence,
+      createdAt: RelationTimestamp(DateTime.utc(2026)),
+      updatedAt: RelationTimestamp(DateTime.utc(2026)),
     );
     final coordinator = container.read(
       graphCommandCoordinatorProvider.notifier,
@@ -1058,9 +1056,8 @@ void main() {
     final accepted = coordinator.acceptRelationUpdate(
       UpdateLongTermRelation(
         relationId: relationBefore.id,
-        patch: LongTermRelationPatch(
-          sourceIntentionId: LongTermRelationFieldSet(participantIds[2]),
-          relatedIntentionId: LongTermRelationFieldSet(participantIds[3]),
+        patch: const LongTermRelationPatch(
+          type: LongTermRelationFieldSet(LongTermRelationType.can),
         ),
       ),
     );
@@ -1075,26 +1072,12 @@ void main() {
             relation: relationAfter,
             description: null,
             changes: [
-              IntentionRelationCountsChanged(
-                revision: const TestGraphRevision(9),
-                intentionId: participantIds[0],
-                counts: testRelationCounts(),
-              ),
-              IntentionRelationCountsChanged(
-                revision: const TestGraphRevision(9),
-                intentionId: participantIds[1],
-                counts: testRelationCounts(),
-              ),
-              IntentionRelationCountsChanged(
-                revision: const TestGraphRevision(9),
-                intentionId: participantIds[2],
-                counts: testRelationCounts(activeNeedOutgoing: 1),
-              ),
-              IntentionRelationCountsChanged(
-                revision: const TestGraphRevision(9),
-                intentionId: participantIds[3],
-                counts: testRelationCounts(activeNeedIncoming: 1),
-              ),
+              for (var index = 0; index < participantIds.length; index++)
+                IntentionRelationCountsChanged(
+                  revision: const TestGraphRevision(9),
+                  intentionId: participantIds[index],
+                  counts: countsAfter[index],
+                ),
               LongTermRelationUpdatedChange(
                 revision: const TestGraphRevision(9),
                 before: relationBefore,
@@ -1117,15 +1100,15 @@ void main() {
                 )
                 .requireValue
             as IntentionCatalogLoaded;
-    int activeCount(IntentionId id) => (container.read(
+    RelationCounts counts(IntentionId id) => (container.read(
       intentionDetailsViewModelProvider(id),
-    ) as IntentionDetailsLoaded).details.relationCounts.active;
+    ) as IntentionDetailsLoaded).details.relationCounts;
     String title(IntentionId id) => (container.read(
       intentionDetailsViewModelProvider(id),
     ) as IntentionDetailsLoaded).details.intention.title;
 
     expect(catalog().items, summaries);
-    expect(catalog().totalCount, 4);
+    expect(catalog().totalCount, 2);
     expect(
       catalog().revision.compareTo(const TestGraphRevision(9)),
       GraphRevisionOrder.same,
@@ -1138,17 +1121,15 @@ void main() {
           id: participantIds[index],
           title: 'Устаревший участник',
         ),
-        counts: index < 2
-            ? testRelationCounts()
-            : testRelationCounts(activeNeedOutgoing: 1),
+        counts: testRelationCounts(),
         revision: const TestGraphRevision(7),
       );
     }
     await pumpEventQueue();
-    expect([for (final id in participantIds) activeCount(id)], [1, 1, 0, 0]);
+    expect([for (final id in participantIds) counts(id)], countsBefore);
     expect(
       [for (final id in participantIds) title(id)],
-      ['Участник А', 'Участник Б', 'Участник В', 'Участник Г'],
+      ['Участник А', 'Участник Б'],
     );
 
     for (var index = 0; index < participantIds.length; index++) {
@@ -1158,21 +1139,16 @@ void main() {
           id: participantIds[index],
           title: 'Участник ${String.fromCharCode(1040 + index)}',
         ),
-        counts: switch (index) {
-          0 || 1 => testRelationCounts(),
-          2 => testRelationCounts(activeNeedOutgoing: 1),
-          3 => testRelationCounts(activeNeedIncoming: 1),
-          _ => throw StateError('Неизвестный участник.'),
-        },
+        counts: countsAfter[index],
         revision: const TestGraphRevision(9),
       );
     }
     await pumpEventQueue();
 
-    expect([for (final id in participantIds) activeCount(id)], [0, 0, 1, 1]);
+    expect([for (final id in participantIds) counts(id)], countsAfter);
     expect(
       [for (final id in participantIds) title(id)],
-      ['Участник А', 'Участник Б', 'Участник В', 'Участник Г'],
+      ['Участник А', 'Участник Б'],
     );
   });
 

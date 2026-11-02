@@ -499,6 +499,8 @@ Future<void> _insertRelation(
           },
           description: Value(description),
           isArchived: Value(scope == RelationScope.archived),
+          createdAt: 0,
+          updatedAt: 0,
         ),
       ),
 );

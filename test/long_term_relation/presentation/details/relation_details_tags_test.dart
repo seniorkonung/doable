@@ -1,14 +1,18 @@
 import 'dart:async';
 
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/design_system/components/relation_head.dart';
+import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/long_term_relation/presentation/details/relation_details_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -25,8 +29,8 @@ LongTermRelationId _relationId(int number) => (LongTermRelationId.decode(
 ) as LongTermRelationIdDecodingSuccess).id;
 
 void main() {
-  // Активность связи и защита дневным путём управляют независимыми кнопками,
-  // а тип меняет только подпись: двух комбинаций хватает на все значения.
+  // Активность связи и защита дневным путём управляют независимыми частями
+  // панели, а тип меняет только шапку: двух комбинаций хватает на все значения.
   for (final (number, usedByDailyPath, type) in [
     (101, false, 'need'),
     (102, true, 'can'),
@@ -34,6 +38,7 @@ void main() {
     testWidgets(
       'связь «${type == 'need' ? 'нужно' : 'можно'}» ${number == 101 ? 'активна' : 'в архиве'}, ${usedByDailyPath ? 'в дневном пути' : 'без пути'}: собственных тегов нет',
       (tester) async {
+        final semantics = tester.ensureSemantics();
         tester.view.physicalSize = const Size(1200, 6000);
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.reset);
@@ -103,13 +108,15 @@ void main() {
         await tester.pumpAndSettle();
         await openIntentionGraph(tester);
         unawaited(
-          router.push(RelationDetailsRoute(relationId: _relationId(number))),
+          showRelationDetailsSheet(
+            tester.element(find.byType(AppNavigationBar)),
+            _relationId(number),
+          ),
         );
         await tester.pumpAndSettle();
 
-        final l10n = AppLocalizations.of(
-          tester.element(find.byKey(const ValueKey('relation-details-phrase'))),
-        );
+        final head = find.byType(RelationHead);
+        final l10n = AppLocalizations.of(tester.element(head));
         expect(
           find.byKey(const ValueKey('tag-assignments-choose')),
           findsNothing,
@@ -124,66 +131,44 @@ void main() {
             );
           }
         }
-        expect(find.text('Дом'), findsNothing);
-        expect(find.text('Работа'), findsNothing);
+        // Каталог под панелью показывает теги намерений: проверяется сама панель.
+        for (final tag in ['Дом', 'Работа']) {
+          expect(
+            find.descendant(of: find.byType(Sheet), matching: find.text(tag)),
+            findsNothing,
+          );
+        }
         expect(
-          _textOf(tester, 'relation-details-type'),
-          type == 'need'
-              ? l10n.relationNeighborhoodTypeNeed
-              : l10n.relationNeighborhoodTypeCan,
+          tester.widget<RelationHead>(head).kind,
+          type == 'need' ? RelationHeadKind.need : RelationHeadKind.can,
         );
-        expect(_textOf(tester, 'relation-details-priority'), 'P2');
+        expect(find.text('Описание связи $number'), findsOneWidget);
         expect(
-          _textOf(tester, 'relation-details-scope'),
-          number == 101
-              ? l10n.relationNeighborhoodRelationActive
-              : l10n.relationNeighborhoodRelationArchived,
-        );
-        expect(
-          _textOf(tester, 'relation-details-description'),
-          'Описание связи $number',
-        );
-        expect(
-          tester
-              .widget<FilledButton>(
-                find.byKey(const ValueKey('relation-details-edit-relation')),
-              )
-              .onPressed,
-          isNotNull,
-        );
-        expect(
-          tester
-              .widget<FilledButton>(
-                find.byKey(
-                  ValueKey(
-                    number == 101
-                        ? 'relation-details-archive-relation'
-                        : 'relation-details-restore-relation',
-                  ),
-                ),
-              )
-              .onPressed,
-          number == 101 ? isNotNull : isNull,
-        );
-        expect(
-          tester
-              .widget<OutlinedButton>(
-                find.byKey(const ValueKey('relation-details-delete-relation')),
-              )
-              .onPressed,
-          usedByDailyPath ? isNull : isNotNull,
+          find.text(l10n.relationSheetArchivedNote),
+          number == 101 ? findsNothing : findsOneWidget,
         );
 
-        for (final (role, participantNumber, tagNumber) in [
-          ('source', 1, firstTagNumber),
+        await tester.tap(find.bySemanticsLabel(l10n.relationSheetOptionsLabel));
+        await tester.pumpAndSettle();
+        expect(
+          find.text(l10n.relationDetailsPathProtection),
+          usedByDailyPath ? findsOneWidget : findsNothing,
+        );
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+
+        for (final (participantNumber, tagNumber) in [
+          (1, firstTagNumber),
           (
-            'related',
             number == 101 ? 3 : 2,
             number == 101 ? lastTagNumber : firstTagNumber,
           ),
         ]) {
           await tester.tap(
-            find.byKey(ValueKey('relation-details-$role-participant')),
+            find.descendant(
+              of: head,
+              matching: find.text('Намерение $participantNumber'),
+            ),
           );
           await tester.pumpAndSettle();
           expect(router.current.name, IntentionDetailsRoute.name);
@@ -204,19 +189,22 @@ void main() {
             ),
             findsOneWidget,
           );
-          router.pop();
+          await tester.binding.handlePopRoute();
           await tester.pumpAndSettle();
         }
-        expect(router.current.name, RelationDetailsRoute.name);
+        expect(
+          find
+              .descendant(of: head, matching: find.text('Намерение 1'))
+              .hitTestable(),
+          findsOneWidget,
+        );
         expect(_storedGraph(raw), graphBefore);
         expect(tester.takeException(), isNull);
+        semantics.dispose();
       },
     );
   }
 }
-
-String _textOf(WidgetTester tester, String key) =>
-    tester.widget<Text>(find.byKey(ValueKey(key))).data!;
 
 Map<String, List<List<Object?>>> _storedGraph(sqlite.Database raw) => {
   ...retainedTagFixtureGraph(raw),

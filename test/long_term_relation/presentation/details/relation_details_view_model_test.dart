@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
@@ -72,7 +74,6 @@ void main() {
 
       final loaded = harness.state as RelationDetailsLoaded;
       expect(loaded.permissions.canDelete, number == 5);
-      expect(loaded.permissions.canChangeMeaning, number == 5);
       expect(loaded.permissions.canEditDescriptionAndPriority, isTrue);
       expect(loaded.permissions.canChangeArchiveState, isTrue);
       if (number == 2) {
@@ -525,6 +526,445 @@ void main() {
 
     expect(harness.state, isA<RelationDetailsNotFound>());
   });
+
+  group('правка связи', () {
+    test('смена типа отправляет только тип', () async {
+      final harness = _RelationDetailsHarness();
+      addTearDown(harness.dispose);
+      await harness.open();
+
+      harness.viewModel.changeType(LongTermRelationType.can);
+
+      final patch = harness.singleUpdatePatch;
+      expect(
+        patch.type,
+        isA<LongTermRelationFieldSet<LongTermRelationType>>().having(
+          (field) => field.value,
+          'тип',
+          LongTermRelationType.can,
+        ),
+      );
+      expect(
+        patch.priority,
+        isA<LongTermRelationFieldUnchanged<RelationPriority>>(),
+      );
+      expect(patch.description, isA<LongTermRelationDescriptionUnchanged>());
+    });
+
+    test('смена приоритета отправляет только приоритет', () async {
+      final harness = _RelationDetailsHarness();
+      addTearDown(harness.dispose);
+      await harness.open();
+
+      harness.viewModel.changePriority(RelationPriority.p1);
+
+      final patch = harness.singleUpdatePatch;
+      expect(
+        patch.priority,
+        isA<LongTermRelationFieldSet<RelationPriority>>().having(
+          (field) => field.value,
+          'приоритет',
+          RelationPriority.p1,
+        ),
+      );
+      expect(
+        patch.type,
+        isA<LongTermRelationFieldUnchanged<LongTermRelationType>>(),
+      );
+      expect(patch.description, isA<LongTermRelationDescriptionUnchanged>());
+    });
+
+    test('значение, равное подтверждённому, команды не порождает', () async {
+      final harness = _RelationDetailsHarness();
+      addTearDown(harness.dispose);
+      await harness.open(priority: RelationPriority.p2);
+
+      harness.viewModel.changePriority(RelationPriority.p2);
+      harness.viewModel.changeType(LongTermRelationType.need);
+
+      expect(harness.repository.relationCommands, isEmpty);
+    });
+
+    test(
+      'до нового снимка правка сравнивается с подтверждённым приоритетом',
+      () async {
+        final harness = _RelationDetailsHarness();
+        addTearDown(harness.dispose);
+        final details = await harness.open(priority: RelationPriority.p2);
+
+        harness.viewModel.changePriority(RelationPriority.p1);
+        harness.repository.completeRelationUpdate(
+          0,
+          before: details.relation,
+          after: details.relation.copyWithForTest(
+            priority: RelationPriority.p1,
+          ),
+          revision: const TestGraphRevision(2),
+        );
+        await pumpEventQueue();
+
+        expect(harness.loaded.details.relation.priority, RelationPriority.p2);
+        harness.viewModel.changePriority(RelationPriority.p1);
+        expect(harness.repository.relationCommands, hasLength(1));
+
+        harness.viewModel.changePriority(RelationPriority.p2);
+        expect(harness.repository.relationCommands, hasLength(2));
+      },
+    );
+
+    test(
+      'до нового снимка каскадное архивирование запрещает смену типа',
+      () async {
+        final harness = _RelationDetailsHarness();
+        addTearDown(harness.dispose);
+        final details = await harness.open();
+        final unrelated = testRelationDetails(
+          relationId: testRelationId(9),
+          sourceId: testIntentionId(3),
+          relatedId: testIntentionId(4),
+        ).relation;
+
+        final start = harness.coordinator.acceptRelationUpdate(
+          UpdateLongTermRelation(
+            relationId: unrelated.id,
+            patch: const LongTermRelationPatch(
+              priority: LongTermRelationFieldSet(RelationPriority.p1),
+            ),
+          ),
+        );
+        const revision = TestGraphRevision(2);
+        harness.repository.completeRelationUpdate(
+          0,
+          before: unrelated,
+          after: unrelated,
+          revision: revision,
+          additionalChanges: [
+            LongTermRelationUpdatedChange(
+              revision: revision,
+              before: details.relation,
+              after: details.relation.copyWithForTest(
+                scope: RelationScope.archived,
+              ),
+            ),
+          ],
+        );
+        await (start as LongTermRelationCommandAccepted).future;
+        await pumpEventQueue();
+
+        harness.viewModel.changeType(LongTermRelationType.can);
+
+        expect(harness.repository.relationCommands, hasLength(1));
+      },
+    );
+
+    test('пока операция связи выполняется, правка не принимается и не ждёт очереди', () async {
+      final harness = _RelationDetailsHarness();
+      addTearDown(harness.dispose);
+      final details = await harness.open(priority: RelationPriority.p2);
+
+      harness.viewModel.changePriority(RelationPriority.p1);
+      expect(harness.state.isOperationRunning, isTrue);
+
+      harness.viewModel.changeType(LongTermRelationType.can);
+      harness.viewModel.changePriority(RelationPriority.p3);
+      final save = await harness.viewModel.saveDescription('Новое описание');
+
+      expect(save, isA<RelationDescriptionSaveFailed>());
+      expect(harness.loaded.editFailure, isNull);
+      harness.repository.completeRelationUpdate(
+        0,
+        before: details.relation,
+        after: details.relation.copyWithForTest(priority: RelationPriority.p1),
+        revision: const TestGraphRevision(2),
+      );
+      await pumpEventQueue();
+
+      expect(harness.repository.relationCommands, hasLength(1));
+      expect(harness.state.isOperationRunning, isFalse);
+    });
+
+    test('архивированная связь принимает правки, кроме типа', () async {
+      final harness = _RelationDetailsHarness();
+      addTearDown(harness.dispose);
+      await harness.open(scope: RelationScope.archived);
+
+      harness.viewModel.changeType(LongTermRelationType.can);
+      expect(harness.repository.relationCommands, isEmpty);
+
+      harness.viewModel.changePriority(RelationPriority.p1);
+      expect(
+        harness.singleUpdatePatch.priority,
+        isA<LongTermRelationFieldSet>(),
+      );
+    });
+
+    test(
+      'отказ каскадно архивированной связи переживает запоздавший снимок',
+      () async {
+        final harness = _RelationDetailsHarness();
+        addTearDown(harness.dispose);
+        await harness.open();
+
+        harness.viewModel.changeType(LongTermRelationType.can);
+        harness.repository.failRelationCommand(
+          0,
+          LongTermRelationArchivedTypeChangeFailure(harness.relationId),
+        );
+        await pumpEventQueue();
+
+        expect(
+          harness.loaded.editFailure?.failure,
+          isA<LongTermRelationArchivedTypeChangeFailure>(),
+        );
+        expect(harness.loaded.editFailure?.failurePresentation, isNotNull);
+        expect(harness.state.isOperationRunning, isFalse);
+
+        harness.repository
+            .watchAt(0)
+            .emitDetails(
+              testRelationDetails(
+                relationId: harness.relationId,
+                sourceId: testIntentionId(1),
+                relatedId: testIntentionId(2),
+                scope: RelationScope.archived,
+              ),
+              revision: const TestGraphRevision(2),
+            );
+        await pumpEventQueue();
+
+        expect(harness.loaded.details.relation.scope, RelationScope.archived);
+        expect(
+          harness.loaded.editFailure?.failure,
+          isA<LongTermRelationArchivedTypeChangeFailure>(),
+        );
+      },
+    );
+
+    test(
+      'отказ оставляет подтверждённые поля до следующей принятой правки',
+      () async {
+        final harness = _RelationDetailsHarness();
+        addTearDown(harness.dispose);
+        await harness.open(priority: RelationPriority.p2);
+
+        harness.viewModel.changePriority(RelationPriority.p1);
+        harness.repository.failRelationCommand(
+          0,
+          const LongTermRelationUnavailableFailure(),
+        );
+        await pumpEventQueue();
+
+        expect(harness.loaded.details.relation.priority, RelationPriority.p2);
+        final failure = harness.loaded.editFailure;
+        expect(failure?.failure, isA<LongTermRelationUnavailableFailure>());
+
+        harness.viewModel.changePriority(RelationPriority.p2);
+        expect(harness.loaded.editFailure, same(failure));
+
+        harness.viewModel.changePriority(RelationPriority.p3);
+        expect(harness.loaded.editFailure, isNull);
+      },
+    );
+
+    test('снятое право отказа переходит общей поверхности', () async {
+      final harness = _RelationDetailsHarness();
+      addTearDown(harness.dispose);
+      await harness.open();
+
+      harness.viewModel.changePriority(RelationPriority.p1);
+      harness.repository.failRelationCommand(
+        0,
+        const LongTermRelationUnavailableFailure(),
+      );
+      await pumpEventQueue();
+      final claim = harness.loaded.editFailure!.failurePresentation!;
+      expect(
+        harness.coordinator.claimInitiatorFailure(claim.token),
+        same(claim),
+      );
+
+      harness.viewModel.changePriority(RelationPriority.p3);
+      await pumpEventQueue();
+
+      expect(harness.coordinator.claimInitiatorFailure(claim.token), isNull);
+    });
+
+    test('принятое архивирование снимает отказ правки', () async {
+      final harness = _RelationDetailsHarness();
+      addTearDown(harness.dispose);
+      await harness.open();
+
+      harness.viewModel.changePriority(RelationPriority.p1);
+      harness.repository.failRelationCommand(
+        0,
+        const LongTermRelationUnavailableFailure(),
+      );
+      await pumpEventQueue();
+
+      harness.viewModel.archive();
+
+      expect(harness.loaded.editFailure, isNull);
+    });
+  });
+
+  group('сохранение описания', () {
+    test('успех собственной команды заменяет только описание', () async {
+      final harness = _RelationDetailsHarness();
+      addTearDown(harness.dispose);
+      final details = await harness.open(description: 'Прежнее описание');
+
+      final save = harness.viewModel.saveDescription('Новое описание');
+
+      final patch = harness.singleUpdatePatch;
+      expect(
+        patch.description,
+        isA<LongTermRelationDescriptionReplaced>().having(
+          (description) => description.value.value,
+          'текст',
+          'Новое описание',
+        ),
+      );
+      expect(
+        patch.priority,
+        isA<LongTermRelationFieldUnchanged<RelationPriority>>(),
+      );
+      expect(
+        patch.type,
+        isA<LongTermRelationFieldUnchanged<LongTermRelationType>>(),
+      );
+      harness.repository.completeRelationUpdate(
+        0,
+        before: details.relation,
+        after: details.relation,
+        revision: const TestGraphRevision(2),
+        description: LongTermRelationDescription.fromInput('Новое описание'),
+      );
+
+      expect(await save, isA<RelationDescriptionSaved>());
+    });
+
+    test('текст, равный сохранённому, команды не порождает', () async {
+      final harness = _RelationDetailsHarness();
+      addTearDown(harness.dispose);
+      await harness.open(description: 'Прежнее описание');
+
+      final save = await harness.viewModel.saveDescription('Прежнее описание');
+
+      expect(save, isA<RelationDescriptionUnchanged>());
+      expect(harness.repository.relationCommands, isEmpty);
+    });
+
+    test('пробелы у связи без описания команды не порождают', () async {
+      final harness = _RelationDetailsHarness();
+      addTearDown(harness.dispose);
+      await harness.open();
+
+      final save = await harness.viewModel.saveDescription('  \n ');
+
+      expect(save, isA<RelationDescriptionUnchanged>());
+      expect(harness.repository.relationCommands, isEmpty);
+    });
+
+    test('пробельный текст очищает описание', () async {
+      final harness = _RelationDetailsHarness();
+      addTearDown(harness.dispose);
+      await harness.open(description: 'Прежнее описание');
+
+      unawaited(harness.viewModel.saveDescription('   '));
+
+      expect(
+        harness.singleUpdatePatch.description,
+        isA<LongTermRelationDescriptionCleared>(),
+      );
+    });
+
+    test(
+      'до нового снимка текст сравнивается с подтверждённым описанием',
+      () async {
+        final harness = _RelationDetailsHarness();
+        addTearDown(harness.dispose);
+        final details = await harness.open(description: 'Прежнее описание');
+
+        final save = harness.viewModel.saveDescription('Новое описание');
+        harness.repository.completeRelationUpdate(
+          0,
+          before: details.relation,
+          after: details.relation,
+          revision: const TestGraphRevision(2),
+          description: LongTermRelationDescription.fromInput('Новое описание'),
+        );
+        await save;
+
+        expect(harness.loaded.details.description?.value, 'Прежнее описание');
+        expect(
+          await harness.viewModel.saveDescription('Новое описание'),
+          isA<RelationDescriptionUnchanged>(),
+        );
+        unawaited(harness.viewModel.saveDescription('Прежнее описание'));
+        expect(harness.repository.relationCommands, hasLength(2));
+      },
+    );
+
+    test('слишком длинный текст называет свою причину', () async {
+      final harness = _RelationDetailsHarness();
+      addTearDown(harness.dispose);
+      await harness.open();
+
+      final save = await harness.viewModel.saveDescription(
+        'а' * (LongTermRelationDescription.maxGraphemeClusters + 1),
+      );
+
+      expect(
+        save,
+        isA<RelationDescriptionInvalid>().having(
+          (outcome) => outcome.reason,
+          'причина',
+          LongTermRelationTextValidationReason.tooLong,
+        ),
+      );
+      expect(harness.repository.relationCommands, isEmpty);
+    });
+
+    test('NUL называет причину недопустимого Unicode', () async {
+      final harness = _RelationDetailsHarness();
+      addTearDown(harness.dispose);
+      await harness.open();
+
+      final save = await harness.viewModel.saveDescription('текст\u0000');
+
+      expect(
+        save,
+        isA<RelationDescriptionInvalid>().having(
+          (outcome) => outcome.reason,
+          'причина',
+          LongTermRelationTextValidationReason.invalidUnicodeRepertoire,
+        ),
+      );
+      expect(harness.repository.relationCommands, isEmpty);
+    });
+
+    test(
+      'отказ команды возвращается вызывающему и хранится в состоянии',
+      () async {
+        final harness = _RelationDetailsHarness();
+        addTearDown(harness.dispose);
+        await harness.open(description: 'Прежнее описание');
+
+        final save = harness.viewModel.saveDescription('Новое описание');
+        harness.repository.failRelationCommand(
+          0,
+          const LongTermRelationCorruptionFailure(),
+        );
+
+        expect(await save, isA<RelationDescriptionSaveFailed>());
+        expect(
+          harness.loaded.editFailure?.failure,
+          isA<LongTermRelationCorruptionFailure>(),
+        );
+        expect(harness.loaded.details.description?.value, 'Прежнее описание');
+      },
+    );
+  });
 }
 
 final class _RelationDetailsHarness {
@@ -554,8 +994,33 @@ final class _RelationDetailsHarness {
 
   RelationDetailsState get state => _subscription.read();
 
+  RelationDetailsLoaded get loaded => state as RelationDetailsLoaded;
+
+  LongTermRelationPatch get singleUpdatePatch =>
+      (repository.relationCommands.single as UpdateLongTermRelation).patch;
+
   RelationDetailsViewModel get viewModel =>
       _container.read(relationDetailsViewModelProvider(relationId).notifier);
+
+  Future<LongTermRelationDetails> open({
+    RelationPriority priority = RelationPriority.p2,
+    RelationScope scope = RelationScope.active,
+    String? description,
+  }) async {
+    final details = testRelationDetails(
+      relationId: relationId,
+      sourceId: testIntentionId(1),
+      relatedId: testIntentionId(2),
+      priority: priority,
+      scope: scope,
+      description: description,
+    );
+    repository
+        .watchAt(0)
+        .emitDetails(details, revision: const TestGraphRevision(1));
+    await pumpEventQueue();
+    return details;
+  }
 
   LongTermRelationCommandStart startUpdate() =>
       coordinator.acceptRelationUpdate(
@@ -589,5 +1054,7 @@ extension on LongTermRelation {
     priority: priority ?? this.priority,
     scope: scope ?? this.scope,
     creationSequence: creationSequence,
+    createdAt: RelationTimestamp(DateTime.utc(2026)),
+    updatedAt: RelationTimestamp(DateTime.utc(2026)),
   );
 }

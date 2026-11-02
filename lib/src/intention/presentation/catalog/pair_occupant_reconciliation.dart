@@ -39,17 +39,13 @@ Map<IntentionId, PairOccupant> reconcilePairOccupants({
 
 /// Намерение, выбор которого в роли пробы дал бы пару [relation]; `null` —
 /// связь пару не занимает.
-IntentionId? _candidate(RelationPairProbe probe, LongTermRelation relation) {
-  if (relation.id == probe.ignoredRelationId) {
-    return null;
-  }
-  return switch (probe.candidateRole) {
-    RelationParticipantRole.related
-        when relation.sourceIntentionId == probe.counterpartId =>
-      relation.relatedIntentionId,
-    RelationParticipantRole.source
-        when relation.relatedIntentionId == probe.counterpartId =>
-      relation.sourceIntentionId,
-    _ => null,
-  };
-}
+IntentionId? _candidate(RelationPairProbe probe, LongTermRelation relation) =>
+    switch (probe.candidateRole) {
+      RelationParticipantRole.related
+          when relation.sourceIntentionId == probe.counterpartId =>
+        relation.relatedIntentionId,
+      RelationParticipantRole.source
+          when relation.relatedIntentionId == probe.counterpartId =>
+        relation.sourceIntentionId,
+      _ => null,
+    };

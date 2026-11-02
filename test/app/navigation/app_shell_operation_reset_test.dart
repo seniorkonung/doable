@@ -8,7 +8,9 @@ import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
+import 'package:doable/src/design_system/components/relation_head.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
+import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openInMemoryLocalDatabase;
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
@@ -26,7 +28,6 @@ import 'package:doable/src/long_term_relation/application/intention_relation_gro
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
-import 'package:doable/src/long_term_relation/presentation/details/relation_details_page.dart';
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_page.dart';
 import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_state.dart';
 import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart';
@@ -110,20 +111,16 @@ void main() {
   });
 
   testWidgets('позднее удаление связи после сброса к другому пункту '
-      'сохраняет повторно открытый просмотр той же связи', (tester) async {
+      'сохраняет повторно открытую панель той же связи', (tester) async {
     final app = await _ControlledApp.start(tester);
+    await app.openRelationSourceDetails(tester);
     await app.openRelationDetails(tester);
     await app.deleteRelation(tester);
+    await app.openParticipantAbovePanel(tester);
 
     await _select(tester, destination, settle: false);
     await app.openRelationSourceDetails(tester);
-    unawaited(
-      app.router.push(
-        RelationDetailsRoute(relationId: app.relationDetails.relation.id),
-      ),
-    );
-    await tester.pump();
-    await tester.pump();
+    await app.openRelationDetails(tester);
 
     app.completeRelationDelete();
     await _until(
@@ -132,28 +129,34 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byType(RelationDetailsPage), findsOneWidget);
+    // Панель — не страница: в истории только страница намерения под ней.
+    expect(find.byType(Sheet), findsOneWidget);
     expect(app.router.stack.map((page) => page.name), [
       AppShellRoute.name,
       IntentionDetailsRoute.name,
-      RelationDetailsRoute.name,
     ]);
-    final l10n = AppLocalizations.of(
-      tester.element(find.byType(RelationDetailsPage)),
-    );
+    expect(app.router.hasPagelessTopRoute, isTrue);
+    final l10n = AppLocalizations.of(tester.element(find.byType(Sheet)));
     expect(find.text(l10n.relationDetailsNotFound), findsOneWidget);
-    expect(find.byKey(const ValueKey('relation-details-phrase')), findsNothing);
+    expect(find.byType(RelationHead), findsNothing);
     _expectSelected(tester, destination);
-    expect(find.text(_relationDeleteSuccess), findsOneWidget);
+    // Сообщение показано над нижней частью открытой панели.
+    expect(
+      find.descendant(
+        of: find.byType(Sheet),
+        matching: find.text(_relationDeleteSuccess),
+      ),
+      findsOneWidget,
+    );
     await _expireMessages(tester);
-    expect(find.byType(RelationDetailsPage), findsOneWidget);
+    expect(find.byType(Sheet), findsOneWidget);
     expect(
       app.repository.relationCommands.single,
       isA<DeleteLongTermRelation>(),
     );
     expect(app.repository.commands, isEmpty);
-    unawaited(app.router.maybePop());
-    await tester.pumpAndSettle();
+    await _systemBack(tester);
+    expect(find.byType(Sheet, skipOffstage: false), findsNothing);
     await app.answerSourceReread(tester);
     await _expectSourceActiveRelationCount(tester, 0);
     unawaited(app.router.maybePop());
@@ -166,8 +169,10 @@ void main() {
     tester,
   ) async {
     final app = await _ControlledApp.start(tester);
+    await app.openRelationSourceDetails(tester);
     await app.openRelationDetails(tester);
     await app.deleteRelation(tester);
+    await app.openParticipantAbovePanel(tester);
 
     await _select(tester, destination, settle: false);
     await app.openRelationSourceDetails(tester);
@@ -215,13 +220,14 @@ void main() {
 
     unawaited(app.router.maybePop());
     await tester.pumpAndSettle();
-    expect(find.byType(RelationDetailsPage, skipOffstage: false), findsNothing);
+    expect(find.byType(Sheet, skipOffstage: false), findsNothing);
     await app.answerSourceReread(tester);
     await _expectSourceActiveRelationCount(tester, 0);
     unawaited(app.router.maybePop());
     await tester.pumpAndSettle();
     _expectRoot(tester, app.router, destination);
   });
+
   testWidgets(
     'позднее удаление намерения после сброса к другому пункту '
     'сохраняет новую форму связи и её ввод до освобождения прежней страницы',
@@ -279,9 +285,9 @@ void main() {
   );
 
   testWidgets('удаление связи с актуальной верхней страницы закрывает только '
-      'её просмотр и один раз предъявляет результат', (tester) async {
+      'её панель и один раз предъявляет результат', (tester) async {
     final app = await _ControlledApp.start(tester);
-    await app.openDetails(tester);
+    await app.openRelationSourceDetails(tester);
     await app.openRelationDetails(tester);
     await app.deleteRelation(tester);
 
@@ -296,8 +302,9 @@ void main() {
       AppShellRoute.name,
       IntentionDetailsRoute.name,
     ]);
+    expect(app.router.hasPagelessTopRoute, isFalse);
     expect(find.byType(IntentionDetailsPage), findsOneWidget);
-    expect(find.byType(RelationDetailsPage, skipOffstage: false), findsNothing);
+    expect(find.byType(Sheet, skipOffstage: false), findsNothing);
     expect(find.text(_relationDeleteSuccess), findsOneWidget);
     await _expireMessages(tester);
     expect(
@@ -506,6 +513,19 @@ void main() {
   });
 }
 
+/// Кнопка параметров в шапке панели связи.
+final _relationOptionsButton = find.descendant(
+  of: find.byType(RelationHead),
+  matching: find.byWidgetPredicate(
+    (widget) => widget is DoableIcon && widget.icon == DoableIconData.more,
+  ),
+);
+
+Future<void> _systemBack(WidgetTester tester) async {
+  await tester.binding.handlePopRoute();
+  await tester.pumpAndSettle();
+}
+
 Future<void> _select(
   WidgetTester tester,
   AppDestination destination, {
@@ -581,11 +601,13 @@ final class _ControlledApp {
   final ControlledDetailsRepository repository;
   final intention = testDetailsIntention(description: null);
   final relationDetails = testRelationDetails(
-    relationId: testRelationId(101),
+    relationId: testRelationId(1),
     sourceId: testDetailsIntentionId(1),
     relatedId: testDetailsIntentionId(2),
     sourceTitle: 'Намерение',
+    relatedTitle: 'Другое намерение',
   );
+  final _relationWatches = <ControlledRelationWatch>[];
   var completedCommands = 0;
   var completedRelationCommands = 0;
   var _relationDeleted = false;
@@ -663,7 +685,12 @@ final class _ControlledApp {
         RelationGroupFirstPage(
           items: [
             if (counts.forSelection(query.group) > 0)
-              testDetailsRelationRow(ownerId: intention.id, index: 1),
+              testDetailsRelationRow(
+                ownerId: intention.id,
+                index: 1,
+                neighborId: relationDetails.related.id,
+                neighborTitle: relationDetails.related.title,
+              ),
           ],
           counts: counts,
           nextCursor: null,
@@ -684,11 +711,20 @@ final class _ControlledApp {
     unawaited(router.push(IntentionDetailsRoute(intentionId: shown.id)));
     await tester.pump();
     await tester.pump();
-    // Страница и её соседство наблюдают намерение; общий поток получает
-    // только первая открытая страница, поэтому отвечаем каждому новому.
-    final opened = repository.detailRequests.skip(requests).toList();
-    expect(opened, isNotEmpty);
-    for (final request in opened) {
+    await _answerDetails(tester, shown, from: requests, activeNeedOutgoing);
+  }
+
+  /// Страница и её соседство наблюдают намерение; общий поток получает
+  /// только первая открытая страница, поэтому отвечаем каждому новому запросу
+  /// начиная с [from]. Страница, открытая заново до освобождения прежней, тех
+  /// же данных не запрашивает.
+  Future<void> _answerDetails(
+    WidgetTester tester,
+    Intention shown,
+    int activeNeedOutgoing, {
+    required int from,
+  }) async {
+    for (final request in repository.detailRequests.skip(from)) {
       request.add(
         ResultSuccess(shown),
         relationCounts: testRelationCounts(
@@ -715,34 +751,60 @@ final class _ControlledApp {
     await tester.pumpAndSettle();
   }
 
+  /// Нажимает на строку связи на странице исходного намерения: панель
+  /// открывается над страницей, а чтение связи отвечает [relationDetails].
   Future<void> openRelationDetails(WidgetTester tester) async {
-    final watch = ControlledRelationWatch(relationDetails.relation.id);
-    addTearDown(watch.close);
     repository.onWatchRelation = (id) {
       expect(id, relationDetails.relation.id);
+      final watch = ControlledRelationWatch(id);
+      addTearDown(watch.close);
+      _relationWatches.add(watch);
       return watch.stream;
     };
-    unawaited(
-      router.push(
-        RelationDetailsRoute(relationId: relationDetails.relation.id),
+    final row = find.byKey(
+      ValueKey(
+        'intention-relations-row-${relationDetails.relation.id.toCanonicalString()}',
+      ),
+    );
+    await tester.ensureVisible(row);
+    await tester.tap(row);
+    await tester.pump();
+    await tester.pump();
+    _relationWatches.last.emitDetails(
+      relationDetails,
+      revision: const TestDetailsRevision(0),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(RelationHead), findsOneWidget);
+  }
+
+  /// Нажимает на название связанного участника панели: страница его
+  /// намерения встаёт над панелью, и её панель навигации доступна.
+  Future<void> openParticipantAbovePanel(WidgetTester tester) async {
+    final requests = repository.detailRequests.length;
+    await tester.tap(
+      find.descendant(
+        of: find.byType(RelationHead),
+        matching: find.text(relationDetails.related.title),
       ),
     );
     await tester.pump();
     await tester.pump();
-    watch.emitDetails(relationDetails, revision: const TestDetailsRevision(0));
-    await tester.pumpAndSettle();
+    await _answerDetails(
+      tester,
+      testDetailsIntention(index: 2, title: relationDetails.related.title),
+      0,
+      from: requests,
+    );
   }
 
+  /// Удаляет связь параметрами панели и подтверждает вопрос.
   Future<void> deleteRelation(WidgetTester tester) async {
-    final delete = find.byKey(
-      const ValueKey('relation-details-delete-relation'),
-    );
-    await tester.ensureVisible(delete);
-    await tester.tap(delete);
+    await tester.tap(_relationOptionsButton);
     await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const ValueKey('relation-details-confirm-delete')),
-    );
+    await tester.tap(find.text('Удалить'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Удалить'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     expect(repository.relationCommands.single, isA<DeleteLongTermRelation>());

@@ -4,7 +4,6 @@ import '../../../intention/domain/intention_id.dart';
 import '../../application/intention_relation_group.dart';
 import '../../application/long_term_relation_command.dart';
 import '../../application/long_term_relation_projection.dart';
-import '../../application/long_term_relation_permissions.dart';
 import '../../domain/long_term_relation.dart';
 import '../../domain/long_term_relation_description.dart';
 import '../../domain/long_term_relation_id.dart';
@@ -12,11 +11,6 @@ import '../../domain/long_term_relation_id.dart';
 /// Типизированный источник черновика формы связи.
 sealed class RelationEditorContext {
   const RelationEditorContext();
-
-  bool get isCreating => switch (this) {
-    RelationBlankCreationContext() || RelationCreationContext() => true,
-    RelationEditingContext() => false,
-  };
 }
 
 /// Самостоятельное создание связи без заранее выбранных участников.
@@ -70,58 +64,6 @@ final class RelationCreationContext extends RelationEditorContext {
     participant.archiveState,
     group,
   );
-}
-
-/// Подтверждённая основа черновика изменения существующей связи.
-///
-/// Основа остаётся неизменной в течение экранной сессии и позволяет отличить
-/// явные правки от полей, которые форма не должна перезаписывать.
-final class RelationEditingContext extends RelationEditorContext {
-  const RelationEditingContext(
-    this.details, {
-    required this.revision,
-    this.permissionRevision,
-  }) : super();
-
-  final LongTermRelationDetails details;
-  final GraphRevision revision;
-  final GraphRevision? permissionRevision;
-
-  /// Строит частичную правку только из значений, отличающихся от основы.
-  LongTermRelationPatch patchFor(
-    RelationDraftComplete draft,
-    LongTermRelationDescription? validatedDescription,
-  ) {
-    final relation = details.relation;
-    return LongTermRelationPatch(
-      type: draft.type == relation.type
-          ? const LongTermRelationFieldUnchanged<LongTermRelationType>()
-          : LongTermRelationFieldSet(draft.type),
-      priority: draft.priority == relation.priority
-          ? const LongTermRelationFieldUnchanged<RelationPriority>()
-          : LongTermRelationFieldSet(draft.priority),
-      sourceIntentionId: draft.sourceIntentionId == relation.sourceIntentionId
-          ? const LongTermRelationFieldUnchanged<IntentionId>()
-          : LongTermRelationFieldSet(draft.sourceIntentionId),
-      relatedIntentionId:
-          draft.relatedIntentionId == relation.relatedIntentionId
-          ? const LongTermRelationFieldUnchanged<IntentionId>()
-          : LongTermRelationFieldSet(draft.relatedIntentionId),
-      description: _descriptionPatchFor(validatedDescription),
-    );
-  }
-
-  LongTermRelationDescriptionPatch _descriptionPatchFor(
-    LongTermRelationDescription? validatedDescription,
-  ) {
-    if (validatedDescription == details.description) {
-      return const LongTermRelationDescriptionUnchanged();
-    }
-    if (validatedDescription == null) {
-      return const LongTermRelationDescriptionCleared();
-    }
-    return LongTermRelationDescriptionReplaced(validatedDescription);
-  }
 }
 
 /// Выбор, без которого команда создания связи не может быть составлена.
@@ -208,16 +150,6 @@ final class RelationEditorSameParticipants extends RelationEditorFailure {
   const RelationEditorSameParticipants();
 }
 
-/// Редактируемая связь больше не существует.
-final class RelationEditorRelationNotFound extends RelationEditorFailure {
-  const RelationEditorRelationNotFound();
-}
-
-/// Сохранённый дневной путь использует смысл редактируемой связи.
-final class RelationEditorReferencedByDailyPath extends RelationEditorFailure {
-  const RelationEditorReferencedByDailyPath();
-}
-
 /// Доказанно устранимая недоступность хранилища.
 final class RelationEditorUnavailable extends RelationEditorFailure {
   const RelationEditorUnavailable();
@@ -280,14 +212,7 @@ final class RelationEditorCreated extends RelationEditorEvent {
   final LongTermRelationId relationId;
 }
 
-/// Изменение подтверждено: форма может вернуться к той же связи.
-final class RelationEditorUpdated extends RelationEditorEvent {
-  const RelationEditorUpdated(this.relationId);
-
-  final LongTermRelationId relationId;
-}
-
-/// Черновик одной открытой формы создания или изменения связи.
+/// Черновик одной открытой формы создания связи.
 ///
 /// Черновик хранит только выбор пользователя и исход последней отправки.
 /// Подтверждённой связью он не становится: успех отмечается отдельным
@@ -299,9 +224,6 @@ final class RelationEditorState {
     required this.relatedParticipant,
     required this.sourceRevision,
     required this.relatedRevision,
-    required this.permissions,
-    required this.permissionRevision,
-    this.permissionRequiresNewRevision = false,
     required this.type,
     required this.priority,
     required this.description,
@@ -319,8 +241,6 @@ final class RelationEditorState {
           relatedParticipant: null,
           sourceRevision: null,
           relatedRevision: null,
-          permissions: const LongTermRelationPermissions.unknown(),
-          permissionRevision: null,
           type: null,
           priority: null,
           description: '',
@@ -333,25 +253,9 @@ final class RelationEditorState {
           relatedParticipant: creation.initialRelatedParticipant,
           sourceRevision: null,
           relatedRevision: null,
-          permissions: const LongTermRelationPermissions.unknown(),
-          permissionRevision: null,
           type: creation.initialType,
           priority: null,
           description: '',
-          operation: const RelationEditorIdle(),
-          event: null,
-        ),
-        final RelationEditingContext editing => RelationEditorState(
-          context: context,
-          sourceParticipant: editing.details.source,
-          relatedParticipant: editing.details.related,
-          sourceRevision: editing.revision,
-          relatedRevision: editing.revision,
-          permissions: editing.details.permissions,
-          permissionRevision: editing.permissionRevision ?? editing.revision,
-          type: editing.details.relation.type,
-          priority: editing.details.relation.priority,
-          description: editing.details.description?.value ?? '',
           operation: const RelationEditorIdle(),
           event: null,
         ),
@@ -364,19 +268,10 @@ final class RelationEditorState {
       sessionState == RelationEditorSessionState.active &&
       (operation is RelationEditorIdle || operation is RelationEditorFailed);
 
-  LongTermRelationDetails? get editingBasis => switch (context) {
-    RelationBlankCreationContext() || RelationCreationContext() => null,
-    RelationEditingContext(:final details) => details,
-  };
-
   final RelationParticipantSummary? sourceParticipant;
   final RelationParticipantSummary? relatedParticipant;
   final GraphRevision? sourceRevision;
   final GraphRevision? relatedRevision;
-  final LongTermRelationPermissions permissions;
-  final GraphRevision? permissionRevision;
-  final bool permissionRequiresNewRevision;
-
   GraphRevision? revisionFor(RelationParticipantRole role) => switch (role) {
     RelationParticipantRole.source => sourceRevision,
     RelationParticipantRole.related => relatedRevision,
@@ -442,51 +337,10 @@ final class RelationEditorState {
     RelationEditorSucceeded() => false,
   };
 
-  /// Есть ли явная правка относительно исходного снимка формы.
-  ///
-  /// Недопустимый текст считается правкой, чтобы отправка могла показать
-  /// точную ошибку валидации и сохранить введённое значение.
-  bool get hasChanges => switch (context) {
-    RelationBlankCreationContext() =>
-      sourceParticipant != null ||
-          relatedParticipant != null ||
-          type != null ||
-          priority != null ||
-          description.isNotEmpty,
-    final RelationCreationContext creation =>
-      sourceParticipant != creation.initialSourceParticipant ||
-          relatedParticipant != creation.initialRelatedParticipant ||
-          type != creation.initialType ||
-          priority != null ||
-          description.isNotEmpty,
-    RelationEditingContext(:final details) =>
-      sourceIntentionId != details.relation.sourceIntentionId ||
-          relatedIntentionId != details.relation.relatedIntentionId ||
-          type != details.relation.type ||
-          priority != details.relation.priority ||
-          _descriptionDiffersFrom(details.description),
-  };
-
   bool get canSubmit =>
       sessionState == RelationEditorSessionState.active &&
       completeness is RelationDraftComplete &&
-      (switch (context) {
-        RelationBlankCreationContext() || RelationCreationContext() => true,
-        RelationEditingContext() => hasChanges,
-      }) &&
-      (editingBasis == null ||
-          !_meaningChanged ||
-          permissions.canChangeMeaning) &&
       (operation is RelationEditorIdle || canRetry);
-
-  bool get _meaningChanged {
-    final basis = editingBasis;
-    if (basis == null) return false;
-    final relation = basis.relation;
-    return type != relation.type ||
-        sourceIntentionId != relation.sourceIntentionId ||
-        relatedIntentionId != relation.relatedIntentionId;
-  }
 
   RelationEditorState withParticipant(
     RelationParticipantRole role,
@@ -523,13 +377,8 @@ final class RelationEditorState {
     );
   }
 
-  RelationEditorState withType(LongTermRelationType value) => _copyWith(
-    type: value,
-    operation: _operationAfter(
-      (failure) =>
-          failure is RelationEditorReferencedByDailyPath && value != type,
-    ),
-  );
+  RelationEditorState withType(LongTermRelationType value) =>
+      _copyWith(type: value, operation: operation);
 
   RelationEditorState withPriority(RelationPriority value) =>
       _copyWith(priority: value, operation: operation);
@@ -538,113 +387,6 @@ final class RelationEditorState {
     description: value,
     operation: _operationAfter(_isCorrectedByDescription),
   );
-
-  /// Освежает разрешение и отображаемые снимки участников с прежними id.
-  ///
-  /// Исходная основа, введённые поля, выбранные идентификаторы и ошибка
-  /// остаются прежними. Поэтому фоновое чтение не превращается в неявную
-  /// правку и не снимает ошибку занятой пары.
-  RelationEditorState withConfirmedDetails(
-    LongTermRelationDetails details,
-    GraphRevision revision,
-  ) {
-    final basis = editingBasis;
-    if (basis == null || details.relation.id != basis.relation.id) {
-      return this;
-    }
-    return withPermissions(details.permissions, revision)
-        .withConfirmedParticipant(
-          RelationParticipantRole.source,
-          details.source,
-          revision,
-        )
-        .withConfirmedParticipant(
-          RelationParticipantRole.related,
-          details.related,
-          revision,
-        );
-  }
-
-  RelationEditorState withPermissions(
-    LongTermRelationPermissions value,
-    GraphRevision revision,
-  ) {
-    final previous = permissionRevision;
-    if (previous != null) {
-      final order = revision.compareTo(previous);
-      if (order == GraphRevisionOrder.older ||
-          order == GraphRevisionOrder.differentEpoch ||
-          (permissionRequiresNewRevision && order == GraphRevisionOrder.same)) {
-        return this;
-      }
-    }
-    final nextOperation =
-        value.canChangeMeaning &&
-            operation is RelationEditorFailed &&
-            (operation as RelationEditorFailed).failure
-                is RelationEditorReferencedByDailyPath
-        ? const RelationEditorIdle()
-        : operation;
-    return RelationEditorState(
-      context: context,
-      sessionState: sessionState,
-      sourceParticipant: sourceParticipant,
-      relatedParticipant: relatedParticipant,
-      sourceRevision: sourceRevision,
-      relatedRevision: relatedRevision,
-      permissions: value,
-      permissionRevision: revision,
-      permissionRequiresNewRevision: false,
-      type: type,
-      priority: priority,
-      description: description,
-      operation: nextOperation,
-      event: event,
-      failurePresentation: nextOperation is RelationEditorIdle
-          ? null
-          : failurePresentation,
-    );
-  }
-
-  /// Освежает выбранного участника только пока его идентичность не изменилась.
-  RelationEditorState withConfirmedParticipant(
-    RelationParticipantRole role,
-    RelationParticipantSummary participant,
-    GraphRevision revision,
-  ) {
-    final current = switch (role) {
-      RelationParticipantRole.source => sourceParticipant,
-      RelationParticipantRole.related => relatedParticipant,
-    };
-    if (current?.id != participant.id || !_isNewer(role, revision)) {
-      return this;
-    }
-    return RelationEditorState(
-      context: context,
-      sessionState: sessionState,
-      sourceParticipant: role == RelationParticipantRole.source
-          ? participant
-          : sourceParticipant,
-      relatedParticipant: role == RelationParticipantRole.related
-          ? participant
-          : relatedParticipant,
-      sourceRevision: role == RelationParticipantRole.source
-          ? revision
-          : sourceRevision,
-      relatedRevision: role == RelationParticipantRole.related
-          ? revision
-          : relatedRevision,
-      permissions: permissions,
-      permissionRevision: permissionRevision,
-      permissionRequiresNewRevision: permissionRequiresNewRevision,
-      type: type,
-      priority: priority,
-      description: description,
-      operation: operation,
-      event: event,
-      failurePresentation: failurePresentation,
-    );
-  }
 
   /// Новое чтение, запущенное после обнаружения другой эпохи, задаёт основу.
   RelationEditorState withNewBasis(
@@ -682,9 +424,6 @@ final class RelationEditorState {
       relatedRevision: role == RelationParticipantRole.related
           ? snapshot.revision
           : relatedRevision,
-      permissions: permissions,
-      permissionRevision: permissionRevision,
-      permissionRequiresNewRevision: permissionRequiresNewRevision,
       type: type,
       priority: priority,
       description: description,
@@ -712,16 +451,6 @@ final class RelationEditorState {
     relatedParticipant: relatedParticipant,
     sourceRevision: sourceRevision,
     relatedRevision: relatedRevision,
-    permissions:
-        value is RelationEditorFailed &&
-            value.failure is RelationEditorReferencedByDailyPath
-        ? const LongTermRelationPermissions.referencedByDailyPath()
-        : permissions,
-    permissionRevision: permissionRevision,
-    permissionRequiresNewRevision:
-        permissionRequiresNewRevision ||
-        (value is RelationEditorFailed &&
-            value.failure is RelationEditorReferencedByDailyPath),
     type: type,
     priority: priority,
     description: description,
@@ -737,9 +466,6 @@ final class RelationEditorState {
     relatedParticipant: relatedParticipant,
     sourceRevision: sourceRevision,
     relatedRevision: relatedRevision,
-    permissions: permissions,
-    permissionRevision: permissionRevision,
-    permissionRequiresNewRevision: permissionRequiresNewRevision,
     type: type,
     priority: priority,
     description: description,
@@ -764,9 +490,6 @@ final class RelationEditorState {
     relatedParticipant: relatedParticipant ?? this.relatedParticipant,
     sourceRevision: sourceRevision ?? this.sourceRevision,
     relatedRevision: relatedRevision ?? this.relatedRevision,
-    permissions: permissions,
-    permissionRevision: permissionRevision,
-    permissionRequiresNewRevision: permissionRequiresNewRevision,
     type: type ?? this.type,
     priority: priority ?? this.priority,
     description: description ?? this.description,
@@ -797,8 +520,6 @@ final class RelationEditorState {
         RelationEditorParticipantRejected() ||
         RelationEditorPairOccupied() ||
         RelationEditorSameParticipants() ||
-        RelationEditorRelationNotFound() ||
-        RelationEditorReferencedByDailyPath() ||
         RelationEditorUnavailable() ||
         RelationEditorCorruption() ||
         RelationEditorUnexpected() => false,
@@ -813,18 +534,9 @@ final class RelationEditorState {
     // Занятость пары и самосвязь зависят только от участников.
     RelationEditorPairOccupied() ||
     RelationEditorSameParticipants() => identityChanged,
-    RelationEditorReferencedByDailyPath() => identityChanged,
     RelationEditorDescriptionInvalid() ||
-    RelationEditorRelationNotFound() ||
     RelationEditorUnavailable() ||
     RelationEditorCorruption() ||
     RelationEditorUnexpected() => false,
   };
-
-  bool _descriptionDiffersFrom(LongTermRelationDescription? original) {
-    if (description == original?.value) {
-      return false;
-    }
-    return original != null || description.trim().isNotEmpty;
-  }
 }

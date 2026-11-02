@@ -9,13 +9,12 @@ String longTermRelationCommandFailureMessage(
   LongTermRelationCommandFailure failure,
 ) => switch (kind) {
   LongTermRelationCommandKind.create => switch (failure) {
-    LongTermRelationCommandValidationFailure() =>
-      localizations.relationEditorCreateInvalidInput,
     LongTermRelationPairOccupiedFailure() =>
       localizations.relationEditorCreatePairOccupied,
     LongTermRelationNotFoundFailure() =>
       localizations.relationEditorCreateUnexpected,
-    LongTermRelationReferencedByDailyPathFailure() =>
+    LongTermRelationReferencedByDailyPathFailure() ||
+    LongTermRelationArchivedTypeChangeFailure() =>
       localizations.relationEditorCreateUnexpected,
     LongTermRelationParticipantNotFoundFailure() =>
       localizations.relationEditorCreateParticipantNotFound,
@@ -29,22 +28,20 @@ String longTermRelationCommandFailureMessage(
       localizations.relationEditorCreateUnexpected,
   },
   LongTermRelationCommandKind.update => switch (failure) {
-    LongTermRelationCommandValidationFailure() =>
-      localizations.relationEditorUpdateInvalidInput,
-    LongTermRelationPairOccupiedFailure() =>
-      localizations.relationEditorUpdatePairOccupied,
     LongTermRelationNotFoundFailure() =>
       localizations.relationEditorUpdateNotFound,
-    LongTermRelationReferencedByDailyPathFailure() =>
-      localizations.relationEditorUpdateReferencedByDailyPath,
-    LongTermRelationParticipantNotFoundFailure() =>
-      localizations.relationEditorUpdateParticipantNotFound,
-    LongTermRelationParticipantArchivedFailure() =>
-      localizations.relationEditorUpdateParticipantArchived,
+    LongTermRelationArchivedTypeChangeFailure() =>
+      localizations.relationEditorUpdateArchivedTypeChange,
     LongTermRelationUnavailableFailure() =>
       localizations.relationEditorUpdateUnavailable,
     LongTermRelationCorruptionFailure() =>
       localizations.relationEditorUpdateCorruption,
+    // Изменение связи не называет пару и участников и не проверяет шаги пути,
+    // поэтому такие отказы для него неожиданны.
+    LongTermRelationReferencedByDailyPathFailure() ||
+    LongTermRelationPairOccupiedFailure() ||
+    LongTermRelationParticipantNotFoundFailure() ||
+    LongTermRelationParticipantArchivedFailure() ||
     LongTermRelationUnexpectedFailure() =>
       localizations.relationEditorUpdateUnexpected,
   },
@@ -54,9 +51,9 @@ String longTermRelationCommandFailureMessage(
       localizations.relationArchiveUnavailable,
     LongTermRelationCorruptionFailure() =>
       localizations.relationArchiveCorruption,
-    LongTermRelationCommandValidationFailure() ||
     LongTermRelationPairOccupiedFailure() ||
     LongTermRelationReferencedByDailyPathFailure() ||
+    LongTermRelationArchivedTypeChangeFailure() ||
     LongTermRelationParticipantNotFoundFailure() ||
     LongTermRelationParticipantArchivedFailure() =>
       localizations.relationArchiveConflict,
@@ -81,10 +78,10 @@ String longTermRelationCommandFailureMessage(
       localizations.relationRestoreUnavailable,
     LongTermRelationCorruptionFailure() =>
       localizations.relationRestoreCorruption,
-    LongTermRelationCommandValidationFailure() ||
     LongTermRelationPairOccupiedFailure() =>
       localizations.relationRestoreConflict,
-    LongTermRelationReferencedByDailyPathFailure() =>
+    LongTermRelationReferencedByDailyPathFailure() ||
+    LongTermRelationArchivedTypeChangeFailure() =>
       localizations.relationRestoreConflict,
     LongTermRelationUnexpectedFailure() =>
       localizations.relationRestoreUnexpected,
@@ -97,8 +94,8 @@ String longTermRelationCommandFailureMessage(
       localizations.relationDeleteUnavailable,
     LongTermRelationCorruptionFailure() =>
       localizations.relationDeleteCorruption,
-    LongTermRelationCommandValidationFailure() ||
     LongTermRelationPairOccupiedFailure() ||
+    LongTermRelationArchivedTypeChangeFailure() ||
     LongTermRelationParticipantNotFoundFailure() ||
     LongTermRelationParticipantArchivedFailure() =>
       localizations.relationDeleteConflict,

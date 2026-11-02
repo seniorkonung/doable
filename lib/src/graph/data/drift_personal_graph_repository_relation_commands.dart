@@ -1,11 +1,17 @@
 part of 'drift_personal_graph_repository.dart';
 
-/// Состояние связи до каскада и её неизменившиеся разрешения из той же
-/// транзакции. Изменение получает ревизию только после подтверждения каскада.
+/// Состояние связи до каскада, показание времени, записанное каскадом, и
+/// неизменившиеся разрешения из той же транзакции. Изменение получает ревизию
+/// только после подтверждения каскада.
 final class _CascadedRelationArchive {
-  const _CascadedRelationArchive(this.before, this.permissions);
+  const _CascadedRelationArchive(
+    this.before,
+    this.archivedAt,
+    this.permissions,
+  );
 
   final relation_domain.LongTermRelation before;
+  final relation_domain.RelationTimestamp archivedAt;
   final LongTermRelationPermissions permissions;
 
   LongTermRelationUpdatedChange toChange(GraphRevision revision) =>
@@ -20,6 +26,8 @@ final class _CascadedRelationArchive {
           priority: before.priority,
           scope: relation_domain.RelationScope.archived,
           creationSequence: before.creationSequence,
+          createdAt: before.createdAt,
+          updatedAt: archivedAt,
         ),
         permissions: permissions,
       );
@@ -34,16 +42,18 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
 
     try {
       final success = await _writeGraph<LongTermRelationCommandSuccess>(
-        (_) => switch (command) {
-          CreateLongTermRelation() => _createLongTermRelation(command),
-          UpdateLongTermRelation() => _updateLongTermRelation(command),
+        (clock) => switch (command) {
+          CreateLongTermRelation() => _createLongTermRelation(command, clock),
+          UpdateLongTermRelation() => _updateLongTermRelation(command, clock),
           ArchiveLongTermRelation() => _setLongTermRelationScope(
             relationId: command.relationId,
             scope: relation_domain.RelationScope.archived,
+            clock: clock,
           ),
           RestoreLongTermRelation() => _setLongTermRelationScope(
             relationId: command.relationId,
             scope: relation_domain.RelationScope.active,
+            clock: clock,
           ),
           DeleteLongTermRelation() => _deleteLongTermRelation(
             command.relationId,
@@ -74,6 +84,7 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
 
   Future<_CommittedLongTermRelationCreation> _createLongTermRelation(
     CreateLongTermRelation command,
+    _GraphWriteClock clock,
   ) async {
     await _requireRelationParticipant(
       command.sourceIntentionId,
@@ -95,6 +106,8 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
     }
 
     final id = _relationIdGenerator.generate();
+    final createdAt = relation_domain.RelationTimestamp(clock.read());
+    final storedCreatedAt = createdAt.value.microsecondsSinceEpoch;
     final creationSequence = await _database
         .into(_database.longTermRelations)
         .insert(
@@ -114,6 +127,8 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
             },
             description: Value(command.description?.value),
             isArchived: const Value(false),
+            createdAt: storedCreatedAt,
+            updatedAt: storedCreatedAt,
           ),
         );
     final created = relation_domain.LongTermRelation(
@@ -126,6 +141,8 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
       creationSequence: relation_domain.RelationCreationSequence(
         creationSequence,
       ),
+      createdAt: createdAt,
+      updatedAt: createdAt,
     );
     final affectedCounts = await _readVerifiedRelationCountsFor([
       command.sourceIntentionId,
@@ -141,69 +158,37 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
 
   Future<_CommittedLongTermRelationUpdate> _updateLongTermRelation(
     UpdateLongTermRelation command,
+    _GraphWriteClock clock,
   ) async {
     final storedBefore = await _readStoredRelation(command.relationId);
     if (storedBefore == null) {
       throw _LongTermRelationNotFound(command.relationId);
     }
     final before = storedBefore.toDomain();
-    final sourceId = _applyRelationFieldPatch(
-      before.sourceIntentionId,
-      command.patch.sourceIntentionId,
-    );
-    final relatedId = _applyRelationFieldPatch(
-      before.relatedIntentionId,
-      command.patch.relatedIntentionId,
-    );
-    if (sourceId == relatedId) {
-      throw const _LongTermRelationSameParticipants();
-    }
-
-    final mustBeActive = before.scope == relation_domain.RelationScope.active;
-    await _requireRelationParticipant(
-      sourceId,
-      RelationParticipantRole.source,
-      mustBeActive: mustBeActive,
-    );
-    await _requireRelationParticipant(
-      relatedId,
-      RelationParticipantRole.related,
-      mustBeActive: mustBeActive,
-    );
-    final occupiedRelationId = await _findRelationForPair(
-      sourceId,
-      relatedId,
-      excludingId: command.relationId,
-    );
-    if (occupiedRelationId != null) {
-      throw _LongTermRelationPairOccupied(occupiedRelationId);
-    }
 
     final type = _applyRelationFieldPatch(before.type, command.patch.type);
-    if (sourceId != before.sourceIntentionId ||
-        relatedId != before.relatedIntentionId ||
-        type != before.type) {
-      final permissions = await _readRelationPermissions(before.id);
-      if (!permissions.canChangeMeaning) {
-        throw _LongTermRelationReferencedByDailyPath(before.id);
-      }
-    }
     final priority = _applyRelationFieldPatch(
       before.priority,
       command.patch.priority,
     );
+    if (before.scope == relation_domain.RelationScope.archived &&
+        type != before.type) {
+      throw _LongTermRelationArchivedTypeChange(before.id);
+    }
     final description = _applyRelationDescriptionPatch(
       storedBefore.description,
       command.patch.description,
     );
     final after = relation_domain.LongTermRelation(
       id: before.id,
-      sourceIntentionId: sourceId,
-      relatedIntentionId: relatedId,
+      sourceIntentionId: before.sourceIntentionId,
+      relatedIntentionId: before.relatedIntentionId,
       type: type,
       priority: priority,
       scope: before.scope,
       creationSequence: before.creationSequence,
+      createdAt: before.createdAt,
+      updatedAt: before.updatedAt,
     );
     final didMutate = !_sameStoredRelation(
       before: before,
@@ -228,18 +213,6 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
             ))
             .write(
               local.LongTermRelationsCompanion(
-                sourceIntentionId: switch (command.patch.sourceIntentionId) {
-                  LongTermRelationFieldUnchanged() => const Value.absent(),
-                  LongTermRelationFieldSet(:final value) => Value(
-                    value.toCanonicalString(),
-                  ),
-                },
-                relatedIntentionId: switch (command.patch.relatedIntentionId) {
-                  LongTermRelationFieldUnchanged() => const Value.absent(),
-                  LongTermRelationFieldSet(:final value) => Value(
-                    value.toCanonicalString(),
-                  ),
-                },
                 type: switch (command.patch.type) {
                   LongTermRelationFieldUnchanged() => const Value.absent(),
                   LongTermRelationFieldSet(:final value) => Value(
@@ -260,6 +233,7 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
                     value.value,
                   ),
                 },
+                updatedAt: Value(clock.read().microsecondsSinceEpoch),
               ),
             );
     if (updatedRows != 1) {
@@ -279,8 +253,6 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
     final affectedCounts = await _readVerifiedRelationCountsFor({
       before.sourceIntentionId,
       before.relatedIntentionId,
-      verifiedAfter.sourceIntentionId,
-      verifiedAfter.relatedIntentionId,
     });
     return _CommittedLongTermRelationUpdate(
       before: before,
@@ -295,6 +267,7 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
   Future<_CommittedLongTermRelationUpdate> _setLongTermRelationScope({
     required LongTermRelationId relationId,
     required relation_domain.RelationScope scope,
+    required _GraphWriteClock clock,
   }) async {
     final storedBefore = await _readStoredRelation(relationId);
     if (storedBefore == null) {
@@ -323,6 +296,8 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
       priority: before.priority,
       scope: scope,
       creationSequence: before.creationSequence,
+      createdAt: before.createdAt,
+      updatedAt: before.updatedAt,
     );
     if (before.scope == scope) {
       return _CommittedLongTermRelationUpdate(
@@ -341,6 +316,7 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
         )..where((row) => row.id.equals(relationId.toCanonicalString()))).write(
           local.LongTermRelationsCompanion(
             isArchived: Value(scope == relation_domain.RelationScope.archived),
+            updatedAt: Value(clock.read().microsecondsSinceEpoch),
           ),
         );
     if (updatedRows != 1) {
@@ -415,7 +391,9 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
               type,
               priority,
               description,
-              is_archived
+              is_archived,
+              created_at,
+              updated_at
             FROM long_term_relations
             WHERE id = ?
           ''',
@@ -450,23 +428,18 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
 
   Future<LongTermRelationId?> _findRelationForPair(
     IntentionId sourceId,
-    IntentionId relatedId, {
-    LongTermRelationId? excludingId,
-  }) async {
-    final exclusion = excludingId == null ? '' : 'AND id <> ?';
+    IntentionId relatedId,
+  ) async {
     final row = await _database
         .customSelect(
           '''
             SELECT id
             FROM long_term_relations
             WHERE source_intention_id = ? AND related_intention_id = ?
-              $exclusion
           ''',
           variables: [
             Variable<String>(sourceId.toCanonicalString()),
             Variable<String>(relatedId.toCanonicalString()),
-            if (excludingId != null)
-              Variable<String>(excludingId.toCanonicalString()),
           ],
           readsFrom: {_database.longTermRelations},
         )
@@ -607,16 +580,14 @@ LongTermRelationCommandFailure _classifyLongTermRelationCommandFailure(
   if (error case _LongTermRelationPairOccupied(:final relationId)) {
     return LongTermRelationPairOccupiedFailure(relationId);
   }
+  if (error case _LongTermRelationArchivedTypeChange(:final relationId)) {
+    return LongTermRelationArchivedTypeChangeFailure(relationId);
+  }
   if (error case _LongTermRelationNotFound(:final relationId)) {
     return LongTermRelationNotFoundFailure(relationId);
   }
   if (error case _LongTermRelationReferencedByDailyPath(:final relationId)) {
     return LongTermRelationReferencedByDailyPathFailure(relationId);
-  }
-  if (error is _LongTermRelationSameParticipants) {
-    return const LongTermRelationCommandValidationFailure(
-      CreateLongTermRelationValidationFailure.sameIntention,
-    );
   }
   if (error case _LongTermRelationParticipantNotFound(:final role, :final id)) {
     return LongTermRelationParticipantNotFoundFailure(
@@ -670,6 +641,12 @@ final class _LongTermRelationPairOccupied implements Exception {
   final LongTermRelationId relationId;
 }
 
+final class _LongTermRelationArchivedTypeChange implements Exception {
+  const _LongTermRelationArchivedTypeChange(this.relationId);
+
+  final LongTermRelationId relationId;
+}
+
 final class _LongTermRelationNotFound implements Exception {
   const _LongTermRelationNotFound(this.relationId);
 
@@ -680,10 +657,6 @@ final class _LongTermRelationReferencedByDailyPath implements Exception {
   const _LongTermRelationReferencedByDailyPath(this.relationId);
 
   final LongTermRelationId relationId;
-}
-
-final class _LongTermRelationSameParticipants implements Exception {
-  const _LongTermRelationSameParticipants();
 }
 
 final class _LongTermRelationParticipantNotFound implements Exception {

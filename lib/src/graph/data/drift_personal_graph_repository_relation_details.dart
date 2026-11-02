@@ -77,7 +77,9 @@ extension _LongTermRelationDetailsReading on DriftPersonalGraphRepository {
                 type,
                 priority,
                 description,
-                is_archived
+                is_archived,
+                created_at,
+                updated_at
               FROM long_term_relations
               WHERE id = ?
             ''',

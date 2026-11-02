@@ -1,5 +1,6 @@
 import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/data/local/app_database.dart';
@@ -65,22 +66,22 @@ void main() {
       raw.execute(
         '''INSERT INTO long_term_relations
          (id, source_intention_id, related_intention_id, type, priority,
-          description, is_archived)
-         VALUES (?, ?, ?, 'need', 2, 'Прежнее', 0)''',
+          description, is_archived, created_at, updated_at)
+         VALUES (?, ?, ?, 'need', 2, 'Прежнее', 0, 0, 0)''',
         [_uuid(101), _uuid(1), _uuid(2)],
       );
       raw.execute(
         '''INSERT INTO long_term_relations
          (id, source_intention_id, related_intention_id, type, priority,
-          description, is_archived)
-         VALUES (?, ?, ?, 'can', 2, NULL, 0)''',
+          description, is_archived, created_at, updated_at)
+         VALUES (?, ?, ?, 'can', 2, NULL, 0, 0, 0)''',
         [_uuid(102), _uuid(2), _uuid(3)],
       );
       raw.execute(
         '''INSERT INTO long_term_relations
          (id, source_intention_id, related_intention_id, type, priority,
-          description, is_archived)
-         VALUES (?, ?, ?, 'need', 2, NULL, 0)''',
+          description, is_archived, created_at, updated_at)
+         VALUES (?, ?, ?, 'need', 2, NULL, 0, 0, 0)''',
         [_uuid(103), _uuid(1), _uuid(4)],
       );
       raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
@@ -165,61 +166,41 @@ void main() {
     },
   );
 
-  test('составная смена типа или участника отклоняет все поля', () async {
-    addChoice(201);
-    final before = storedRelation(101);
-    final patches = [
-      LongTermRelationPatch(
-        type: const LongTermRelationFieldSet(LongTermRelationType.can),
-        priority: const LongTermRelationFieldSet(RelationPriority.p4),
-        description: LongTermRelationDescriptionPatch.fromInput('Новое'),
-      ),
-      LongTermRelationPatch(
-        relatedIntentionId: LongTermRelationFieldSet(_intention(5)),
-        priority: const LongTermRelationFieldSet(RelationPriority.p4),
-      ),
-      LongTermRelationPatch(
-        sourceIntentionId: LongTermRelationFieldSet(_intention(5)),
-        priority: const LongTermRelationFieldSet(RelationPriority.p4),
-      ),
-    ];
+  test(
+    'смена типа связи с шагами пути подтверждается и путь показывает новый тип',
+    () async {
+      addChoice(201, completed: true);
+      final choicesBefore = storedRows('daily_choices');
+      final stepsBefore = storedRows('daily_choice_path_steps');
 
-    for (final patch in patches) {
       final result = await repository.execute(
-        UpdateLongTermRelation(relationId: _relation(101), patch: patch),
-      );
-      expect(result, isA<GraphCommandFailed>());
-      expect(
-        (result as GraphCommandFailed).failure,
-        isA<LongTermRelationReferencedByDailyPathFailure>(),
-      );
-      expect(storedRelation(101), before);
-      expectAssignments();
-    }
-  });
-
-  test('прежние значения смысла допускают описание и приоритет', () async {
-    addChoice(201);
-
-    final result = await repository.execute(
-      UpdateLongTermRelation(
-        relationId: _relation(101),
-        patch: LongTermRelationPatch(
-          type: const LongTermRelationFieldSet(LongTermRelationType.need),
-          sourceIntentionId: LongTermRelationFieldSet(_intention(1)),
-          relatedIntentionId: LongTermRelationFieldSet(_intention(2)),
-          priority: const LongTermRelationFieldSet(RelationPriority.p4),
-          description: LongTermRelationDescriptionPatch.fromInput('Новое'),
+        UpdateLongTermRelation(
+          relationId: _relation(101),
+          patch: LongTermRelationPatch(
+            type: const LongTermRelationFieldSet(LongTermRelationType.can),
+            priority: const LongTermRelationFieldSet(RelationPriority.p4),
+            description: LongTermRelationDescriptionPatch.fromInput('Новое'),
+          ),
         ),
-      ),
-    );
+      );
 
-    expect(result, isA<GraphCommandSucceeded>());
-    expect(storedRelation(101)['priority'], 4);
-    expect(storedRelation(101)['description'], 'Новое');
-    expect(count('daily_choice_path_steps'), 2);
-    expectAssignments();
-  });
+      expect(result, isA<GraphCommandSucceeded>());
+      expect(storedRelation(101)['type'], 'can');
+      expect(storedRelation(101)['priority'], 4);
+      expect(storedRelation(101)['description'], 'Новое');
+      expect(storedRows('daily_choices'), choicesBefore);
+      expect(storedRows('daily_choice_path_steps'), stepsBefore);
+      final details = (await repository.getDailyChoice(
+        _choice(201),
+      ) as DailyChoiceReadSuccess).value.value!;
+      expect(details.choice.isCompleted, isTrue);
+      expect(details.path.map((step) => step.relation.type), [
+        LongTermRelationType.can,
+        LongTermRelationType.can,
+      ]);
+      expectAssignments();
+    },
+  );
 
   test(
     'архивирование промежуточного намерения и готовность сохраняют путь',
@@ -324,7 +305,7 @@ void main() {
       raw.execute(
         '''INSERT INTO long_term_relations
          (id, source_intention_id, related_intention_id, type, priority,
-          is_archived) VALUES (?, ?, ?, 'can', 2, 0)''',
+          is_archived, created_at, updated_at) VALUES (?, ?, ?, 'can', 2, 0, 0, 0)''',
         [_uuid(104), _uuid(5), _uuid(4)],
       );
     });

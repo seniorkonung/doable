@@ -849,31 +849,35 @@ void main() {
     );
   }
 
-  const pathDependency = (
-    locale: Locale('ru'),
-    message:
-        'Изменение — «связь»: Связь используется в сохранённом дневном '
-        'пути. Её тип и участников нельзя изменить.',
-  );
-  testWidgets(
-    'конфликт зависимости пути объяснён для ${pathDependency.locale.languageCode}',
-    (tester) async {
-      final harness = await _pumpPresenterApp(
-        tester,
-        locale: pathDependency.locale,
-      );
+  for (final scenario in <({Locale locale, String message})>[
+    (
+      locale: const Locale('ru'),
+      message:
+          'Изменение — «связь»: Связь архивирована, поэтому её тип нельзя '
+          'изменить.',
+    ),
+    (
+      locale: const Locale('en'),
+      message: _relationUpdateOutcome(
+        'This relation is archived, so its type can’t be changed.',
+      ),
+    ),
+  ]) {
+    testWidgets('отказ смены типа архивированной связи назван для '
+        '${scenario.locale.languageCode}', (tester) async {
+      final harness = await _pumpPresenterApp(tester, locale: scenario.locale);
       final update = harness.startRelationUpdate();
       harness.completeRelationFailure(
         update,
-        LongTermRelationReferencedByDailyPathFailure(_relationId),
+        LongTermRelationArchivedTypeChangeFailure(_relationId),
       );
       await tester.pumpAndSettle();
 
-      expect(find.text(pathDependency.message), findsOneWidget);
+      expect(find.text(scenario.message), findsOneWidget);
       await _closeMessage(tester);
       expect(find.byType(SnackBar), findsNothing);
-    },
-  );
+    });
+  }
 
   // Все состояния, кроме resumed, удерживают результат одной ветвью; берём
   // полный уход в фон и возврат через промежуточные состояния.
@@ -1065,46 +1069,26 @@ void main() {
   );
 
   testWidgets(
-    'успех изменения связи ждёт сообщение намерения в той же очереди',
+    'успех изменения, архивирования и восстановления связи не объявляется '
+    'сообщением и не занимает очередь',
     (tester) async {
       final harness = await _pumpPresenterApp(tester);
       final intention = harness.startDelete(index: 1, title: 'Намерение');
-      final relation = harness.startRelationUpdate();
+      final update = harness.startRelationUpdate();
       harness.completeDeleted(intention);
-      harness.completeRelationUpdated(relation);
-      await tester.pumpAndSettle();
+      harness.completeRelationUpdated(update);
+      await update.future;
 
-      expect(find.text(_deleted('Намерение')), findsOneWidget);
-      expect(find.text(_relationUpdated), findsNothing);
-
-      await _closeMessage(tester);
-      expect(find.text(_relationUpdated), findsOneWidget);
-      await _closeMessage(tester);
-      expect(find.byType(SnackBar), findsNothing);
-    },
-  );
-
-  testWidgets(
-    'архивирование и восстановление связи используют общую очередь результатов',
-    (tester) async {
-      final harness = await _pumpPresenterApp(tester);
-      final intention = harness.startDelete(index: 1, title: 'Намерение');
       final archive = harness.startRelationArchive();
-      harness.completeDeleted(intention);
       harness.completeRelationArchived(archive);
       await archive.future;
 
       final restore = harness.startRelationRestore();
       harness.completeRelationRestored(restore);
+      await restore.future;
       await tester.pumpAndSettle();
 
       expect(find.text(_deleted('Намерение')), findsOneWidget);
-      expect(find.text(_relationArchived), findsNothing);
-      expect(find.text(_relationRestored), findsNothing);
-
-      await _closeMessage(tester);
-      expect(find.text(_relationArchived), findsNothing);
-      expect(find.text('$_relationRestored · 1 more'), findsOneWidget);
 
       await _closeMessage(tester);
       expect(find.byType(SnackBar), findsNothing);
@@ -1626,30 +1610,14 @@ final _relationCreated = _relationOutcome('Relation created.');
 
 String _relationUpdateOutcome(String outcome) => 'Edit — “relation”: $outcome';
 
-final _relationUpdated = _relationUpdateOutcome('Relation updated.');
-
-String _relationArchiveOutcome(String outcome) =>
-    'Archive — “relation”: $outcome';
-
-final _relationArchived = _relationArchiveOutcome('Relation archived.');
-
 String _relationRestoreOutcome(String outcome) =>
     'Restore — “relation”: $outcome';
-
-final _relationRestored = _relationRestoreOutcome('Relation restored.');
 
 String _relationDeleteOutcome(String outcome) =>
     'Delete — “relation”: $outcome';
 
 final _relationFailures =
     <({String name, LongTermRelationCommandFailure failure, String outcome})>[
-      (
-        name: 'validation',
-        failure: const LongTermRelationCommandValidationFailure(
-          CreateLongTermRelationValidationFailure.sameIntention,
-        ),
-        outcome: 'Check the selected intentions and relation details.',
-      ),
       (
         name: 'conflict',
         failure: LongTermRelationPairOccupiedFailure(_relationId),
@@ -1692,21 +1660,15 @@ final _relationFailures =
       ),
     ];
 
+const _relationUpdateUnexpected =
+    'The relation couldn’t be updated because of an unexpected error.';
+
 final _relationUpdateFailures =
     <({String name, LongTermRelationCommandFailure failure, String outcome})>[
       (
-        name: 'validation',
-        failure: const LongTermRelationCommandValidationFailure(
-          CreateLongTermRelationValidationFailure.sameIntention,
-        ),
-        outcome: 'Check the selected intentions and relation changes.',
-      ),
-      (
         name: 'pair conflict',
         failure: LongTermRelationPairOccupiedFailure(_otherRelationId),
-        outcome:
-            'A relation with this direction already exists between the '
-            'selected intentions.',
+        outcome: _relationUpdateUnexpected,
       ),
       (
         name: 'relation not found',
@@ -1719,7 +1681,7 @@ final _relationUpdateFailures =
           role: RelationParticipantRole.related,
           intentionId: testDetailsIntentionId(2),
         ),
-        outcome: 'One of the selected intentions no longer exists.',
+        outcome: _relationUpdateUnexpected,
       ),
       (
         name: 'participant archived',
@@ -1727,7 +1689,7 @@ final _relationUpdateFailures =
           role: RelationParticipantRole.source,
           intentionId: testDetailsIntentionId(1),
         ),
-        outcome: 'An active relation can only link active intentions.',
+        outcome: _relationUpdateUnexpected,
       ),
       (
         name: 'unavailable',
@@ -1742,19 +1704,15 @@ final _relationUpdateFailures =
       (
         name: 'unexpected',
         failure: const LongTermRelationUnexpectedFailure(),
-        outcome:
-            'The relation couldn’t be updated because of an unexpected '
-            'error.',
+        outcome: _relationUpdateUnexpected,
       ),
     ];
 
 final _relationDeleteFailures =
     <({String name, LongTermRelationCommandFailure failure, String outcome})>[
       (
-        name: 'validation',
-        failure: const LongTermRelationCommandValidationFailure(
-          CreateLongTermRelationValidationFailure.sameIntention,
-        ),
+        name: 'pair conflict',
+        failure: LongTermRelationPairOccupiedFailure(_otherRelationId),
         outcome:
             'The relation couldn’t be deleted because its current state '
             'conflicts with the operation.',
@@ -2313,6 +2271,8 @@ final class _PresenterHarness {
       priority: RelationPriority.p2,
       scope: RelationScope.active,
       creationSequence: RelationCreationSequence(1),
+      createdAt: RelationTimestamp(DateTime.utc(2026)),
+      updatedAt: RelationTimestamp(DateTime.utc(2026)),
     );
     repository.completeRelationCommand(
       _relationIndexes[accepted]!,
@@ -2344,6 +2304,8 @@ final class _PresenterHarness {
       priority: RelationPriority.p2,
       scope: RelationScope.active,
       creationSequence: RelationCreationSequence(1),
+      createdAt: RelationTimestamp(DateTime.utc(2026)),
+      updatedAt: RelationTimestamp(DateTime.utc(2026)),
     );
     final after = LongTermRelation(
       id: _relationId,
@@ -2353,6 +2315,8 @@ final class _PresenterHarness {
       priority: RelationPriority.p1,
       scope: RelationScope.active,
       creationSequence: RelationCreationSequence(1),
+      createdAt: RelationTimestamp(DateTime.utc(2026)),
+      updatedAt: RelationTimestamp(DateTime.utc(2026)),
     );
     repository.completeRelationCommand(
       _relationIndexes[accepted]!,
@@ -2402,6 +2366,8 @@ final class _PresenterHarness {
       priority: RelationPriority.p2,
       scope: RelationScope.active,
       creationSequence: RelationCreationSequence(1),
+      createdAt: RelationTimestamp(DateTime.utc(2026)),
+      updatedAt: RelationTimestamp(DateTime.utc(2026)),
     );
     repository.completeRelationCommand(
       _relationIndexes[accepted]!,
@@ -2437,6 +2403,8 @@ final class _PresenterHarness {
       priority: RelationPriority.p2,
       scope: beforeScope,
       creationSequence: RelationCreationSequence(1),
+      createdAt: RelationTimestamp(DateTime.utc(2026)),
+      updatedAt: RelationTimestamp(DateTime.utc(2026)),
     );
     final after = LongTermRelation(
       id: _relationId,
@@ -2446,6 +2414,8 @@ final class _PresenterHarness {
       priority: RelationPriority.p2,
       scope: afterScope,
       creationSequence: RelationCreationSequence(1),
+      createdAt: RelationTimestamp(DateTime.utc(2026)),
+      updatedAt: RelationTimestamp(DateTime.utc(2026)),
     );
     repository.completeRelationCommand(
       _relationIndexes[accepted]!,

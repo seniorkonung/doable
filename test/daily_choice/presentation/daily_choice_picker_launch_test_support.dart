@@ -445,7 +445,7 @@ void defineDailyChoicePickerLaunchTests({
     repository.complete(1, _page());
     await tester.pumpAndSettle();
     final lateSelection = intentionPickerPick(tester, intentionPickerRows.last);
-    final lateCancel = tester.widget<TopBar>(find.byType(TopBar)).onClose;
+    final lateCancel = tester.widget<TopBar>(find.byType(TopBar)).onClose!;
     final oldElement = find.byType(TopBar).evaluate().single;
     await router.maybePop();
     final nextLaunch = TestDailyChoicePickerLaunch();

@@ -308,14 +308,11 @@
   "relationNeighborhoodRefreshing": "Refreshing relations…",
   "relationNeighborhoodRefreshFailed": "The relations couldn’t be refreshed. Previously loaded data is still shown.",
   "relationNeighborhoodConfirmedEnd": "All relations in this group are loaded.",
-  "relationNeighborhoodRelationActive": "Active relation",
   "relationNeighborhoodRelationArchived": "Archived relation",
   "relationNeighborhoodPriority": "Priority {priority}",
   "@relationNeighborhoodPriority": {
     "placeholders": {"priority": {"type": "String"}}
   },
-  "relationNeighborhoodSourceParticipant": "Source intention",
-  "relationNeighborhoodRelatedParticipant": "Related intention",
   "relationNeighborhoodNeedPhrase": "To {source}, you need {related}",
   "@relationNeighborhoodNeedPhrase": {
     "placeholders": {
@@ -381,17 +378,8 @@
   "@relationNeighborhoodConfirmedEnd": {
     "description": "Подтверждённый конец выбранной группы"
   },
-  "@relationNeighborhoodRelationActive": {
-    "description": "Активное состояние строки связи"
-  },
   "@relationNeighborhoodRelationArchived": {
     "description": "Архивное состояние строки связи"
-  },
-  "@relationNeighborhoodSourceParticipant": {
-    "description": "Подпись исходного участника связи"
-  },
-  "@relationNeighborhoodRelatedParticipant": {
-    "description": "Подпись связанного участника связи"
   },
   "detailsTabsLabel": "Intention sections",
   "@detailsTabsLabel": {"description": "Доступное название полосы вкладок страницы намерения"},
@@ -598,12 +586,12 @@
   },
   "detailsEditDescriptionLabel": "Edit the description: {description}",
   "@detailsEditDescriptionLabel": {
-    "description": "Доступное название описания на вкладке «Обзор», которое открывает экран изменения с курсором в описании; описание намерения не переводится",
+    "description": "Доступное название сохранённого описания намерения на вкладке «Обзор» и описания на панели связи; нажатие открывает его изменение, а само описание не переводится",
     "placeholders": {"description": {"type": "String"}}
   },
   "detailsAddDescription": "Add a description",
   "@detailsAddDescription": {
-    "description": "Приглашение добавить описание на вкладке «Обзор» намерения без описания; открывает экран изменения с курсором в описании"
+    "description": "Приглашение добавить описание на вкладке «Обзор» намерения и на панели связи без описания; нажатие открывает его изменение"
   },
   "detailsCreatedLabel": "Created",
   "@detailsCreatedLabel": {
@@ -1414,10 +1402,6 @@
   "@relationEditorCreated": {
     "description": "Подтверждение успешного создания долговременной связи"
   },
-  "relationEditorCreateInvalidInput": "Check the selected intentions and relation details.",
-  "@relationEditorCreateInvalidInput": {
-    "description": "Ошибка проверки данных создания связи"
-  },
   "relationEditorCreatePairOccupied": "A relation with this direction already exists between the selected intentions.",
   "@relationEditorCreatePairOccupied": {
     "description": "Конфликт занятой направленной пары при создании связи"
@@ -1442,37 +1426,13 @@
   "@relationEditorCreateUnexpected": {
     "description": "Терминальная непредвиденная ошибка создания связи"
   },
-  "relationEditorUpdated": "Relation updated.",
-  "@relationEditorUpdated": {
-    "description": "Подтверждение успешного изменения долговременной связи"
-  },
-  "relationEditorUpdateInvalidInput": "Check the selected intentions and relation changes.",
-  "@relationEditorUpdateInvalidInput": {
-    "description": "Ошибка проверки данных изменения связи"
-  },
-  "relationEditorUpdatePairOccupied": "A relation with this direction already exists between the selected intentions.",
-  "@relationEditorUpdatePairOccupied": {
-    "description": "Конфликт занятой направленной пары при изменении связи"
-  },
   "relationEditorUpdateNotFound": "This relation no longer exists.",
   "@relationEditorUpdateNotFound": {
     "description": "Отсутствие изменяемой связи"
   },
-  "relationEditorUpdateParticipantNotFound": "One of the selected intentions no longer exists.",
-  "@relationEditorUpdateParticipantNotFound": {
-    "description": "Отсутствие участника при изменении связи"
-  },
-  "relationEditorUpdateParticipantArchived": "An active relation can only link active intentions.",
-  "@relationEditorUpdateParticipantArchived": {
-    "description": "Конфликт архивного состояния участника при изменении активной связи"
-  },
-  "relationEditorUpdateReferencedByDailyPath": "This relation is used by a saved daily path. Its type and participants can’t be changed.",
-  "relationEditorPathProtection": "This relation is used in a saved daily path. Its type and participants cannot be changed. Its description and priority remain editable.",
-  "@relationEditorPathProtection": {"description": "Ограничение смысла связи сохранённым дневным путём"},
-  "relationEditorPathProtectionWithDraft": "This relation is used in a saved daily path. Restore the original type and participants to save description and priority changes.",
-  "@relationEditorPathProtectionWithDraft": {"description": "Исправление черновика при новом ограничении пути"},
-  "@relationEditorUpdateReferencedByDailyPath": {
-    "description": "Конфликт изменения смысла используемой дневным путём связи"
+  "relationEditorUpdateArchivedTypeChange": "This relation is archived, so its type can’t be changed.",
+  "@relationEditorUpdateArchivedTypeChange": {
+    "description": "Конфликт изменения типа архивированной связи"
   },
   "relationEditorUpdateUnavailable": "The relation couldn’t be updated. Try again.",
   "@relationEditorUpdateUnavailable": {
@@ -1485,10 +1445,6 @@
   "relationEditorUpdateUnexpected": "The relation couldn’t be updated because of an unexpected error.",
   "@relationEditorUpdateUnexpected": {
     "description": "Терминальная непредвиденная ошибка изменения связи"
-  },
-  "relationArchived": "Relation archived.",
-  "@relationArchived": {
-    "description": "Подтверждение успешного архивирования долговременной связи"
   },
   "relationArchiveNotFound": "This relation no longer exists.",
   "@relationArchiveNotFound": {
@@ -1604,10 +1560,6 @@
   "@relationDetailsUnexpected": {
     "description": "Безопасный непредвиденный отказ чтения подробных данных связи"
   },
-  "relationDetailsRefreshing": "Refreshing relation details…",
-  "@relationDetailsRefreshing": {
-    "description": "Согласование сохранённого подробного просмотра связи с новой ревизией"
-  },
   "relationDetailsRefreshUnavailable": "The relation details couldn’t be refreshed. Previously confirmed data is still shown.",
   "@relationDetailsRefreshUnavailable": {
     "description": "Устранимая ошибка обновления при сохранённых подробных данных связи"
@@ -1628,67 +1580,108 @@
   "@relationDetailsPriorityLabel": {
     "description": "Подпись приоритета связи в подробном просмотре"
   },
-  "relationDetailsScopeLabel": "Relation state",
-  "@relationDetailsScopeLabel": {
-    "description": "Подпись собственного архивного состояния связи"
-  },
-  "relationDetailsDescriptionLabel": "Description",
-  "@relationDetailsDescriptionLabel": {
-    "description": "Подпись полного описания связи"
-  },
-  "relationDetailsNoDescription": "No description",
-  "@relationDetailsNoDescription": {
-    "description": "Отсутствие описания у связи"
-  },
-  "relationDetailsOpenParticipant": "Opens the intention and its own relations",
-  "@relationDetailsOpenParticipant": {
-    "description": "Назначение перехода к участнику связи"
-  },
-  "relationDetailsEditAction": "Edit relation",
-  "@relationDetailsEditAction": {
-    "description": "Переход из подробного просмотра к изменению связи"
-  },
-  "relationDetailsArchiveAction": "Archive relation",
-  "@relationDetailsArchiveAction": {
-    "description": "Действие самостоятельного архивирования связи"
-  },
-  "relationDetailsRestoreAction": "Restore relation",
-  "@relationDetailsRestoreAction": {
-    "description": "Действие самостоятельного восстановления связи"
-  },
-  "relationDetailsDeleteAction": "Delete relation permanently",
-  "relationDetailsPathProtection": "This relation is used in a saved daily path. It cannot be deleted, and its type and participants cannot be changed. Its description, priority, and archive state remain editable.",
+  "relationDetailsPathProtection": "This relation is used in a saved daily path, so it cannot be deleted.",
   "@relationDetailsPathProtection": {"description": "Причина недоступности удаления связи в подробностях"},
-  "relationDetailsDeletionChecking": "Deletion is unavailable until this relation’s dependencies are confirmed.",
-  "@relationDetailsDeletionChecking": {"description": "Неизвестные разрешения на удаление связи"},
-  "@relationDetailsDeleteAction": {
-    "description": "Действие начала физического удаления конкретной долговременной связи"
+  "relationSheetArchivedLabel": "{phrase}. Archived",
+  "@relationSheetArchivedLabel": {
+    "description": "Доступное название панели архивированной связи; phrase — полная формулировка связи",
+    "placeholders": {"phrase": {"type": "String"}}
   },
-  "relationDetailsDeleteConfirmationTitle": "Delete relation permanently?",
-  "@relationDetailsDeleteConfirmationTitle": {
-    "description": "Заголовок подтверждения необратимого удаления конкретной связи"
+  "relationSheetArchivedNote": "Archived relations stay in saved paths and are not offered in new ones.",
+  "@relationSheetArchivedNote": {
+    "description": "Строка о смысле архива под шапкой панели архивированной связи"
   },
-  "relationDetailsDeleteConfirmationMessage": "Relation: {phrase}\nSource intention: {sourceTitle}\nRelated intention: {relatedTitle}\nRelation state: {scope}\n\nThis can’t be undone. The relation and its description will be permanently deleted. The tags, all their assignments to intentions, both intentions and all other relations will remain.",
-  "@relationDetailsDeleteConfirmationMessage": {
-    "description": "Контекст и объяснение необратимости удаления конкретной связи",
-    "placeholders": {
-      "phrase": {"type": "String"},
-      "sourceTitle": {"type": "String"},
-      "relatedTitle": {"type": "String"},
-      "scope": {"type": "String"}
-    }
+  "relationSheetOpenParticipant": "Open the page of the intention: {title}",
+  "@relationSheetOpenParticipant": {
+    "description": "Доступное название кнопки-названия участника в шапке панели связи; название намерения не переводится",
+    "placeholders": {"title": {"type": "String"}}
   },
-  "relationDetailsConfirmDeleteAction": "Delete permanently",
-  "@relationDetailsConfirmDeleteAction": {
-    "description": "Явное подтверждение физического удаления конкретной связи"
+  "relationSheetOpenArchivedParticipant": "Open the page of the intention: {title}. Archived",
+  "@relationSheetOpenArchivedParticipant": {
+    "description": "Доступное название кнопки-названия архивированного участника в шапке панели связи; название намерения не переводится",
+    "placeholders": {"title": {"type": "String"}}
   },
-  "relationDetailsOpenSourceParticipantAction": "Open source intention",
-  "@relationDetailsOpenSourceParticipantAction": {
-    "description": "Переход к архивному исходному участнику, блокирующему восстановление связи"
+  "relationSheetPriorityHighest": "Priority {priority}, the highest",
+  "@relationSheetPriorityHighest": {
+    "description": "Доступное название пилюли высшего приоритета на панели связи",
+    "placeholders": {"priority": {"type": "String"}}
   },
-  "relationDetailsOpenRelatedParticipantAction": "Open related intention",
-  "@relationDetailsOpenRelatedParticipantAction": {
-    "description": "Переход к архивному связанному участнику, блокирующему восстановление связи"
+  "relationSheetPriorityLowest": "Priority {priority}, the lowest",
+  "@relationSheetPriorityLowest": {
+    "description": "Доступное название пилюли низшего приоритета на панели связи",
+    "placeholders": {"priority": {"type": "String"}}
+  },
+  "relationSheetDescriptionTitle": "Description",
+  "@relationSheetDescriptionTitle": {
+    "description": "Заголовок полосы изменения описания на панели связи и название поля"
+  },
+  "relationSheetDescriptionLabel": "Relation description",
+  "@relationSheetDescriptionLabel": {
+    "description": "Доступное название панели связи во время изменения описания"
+  },
+  "relationSheetDescriptionBack": "Back to the relation",
+  "@relationSheetDescriptionBack": {
+    "description": "Доступное название стрелки назад при изменении описания связи"
+  },
+  "relationSheetDescriptionSave": "Save",
+  "@relationSheetDescriptionSave": {
+    "description": "Кнопка сохранения описания на панели связи"
+  },
+  "relationSheetDescriptionDiscardTitle": "Discard changes?",
+  "@relationSheetDescriptionDiscardTitle": {
+    "description": "Вопрос перед уходом с несохранённым описанием связи"
+  },
+  "relationSheetDescriptionDiscardMessage": "Your changes to the description won’t be saved.",
+  "@relationSheetDescriptionDiscardMessage": {
+    "description": "Пояснение вопроса перед уходом с несохранённым описанием связи"
+  },
+  "relationSheetDescriptionDiscardAction": "Discard",
+  "@relationSheetDescriptionDiscardAction": {
+    "description": "Действие, которое отменяет изменение описания связи"
+  },
+  "relationSheetDescriptionContinueAction": "Keep editing",
+  "@relationSheetDescriptionContinueAction": {
+    "description": "Действие, которое возвращает к изменению описания связи"
+  },
+  "relationSheetOptionsLabel": "Relation options",
+  "@relationSheetOptionsLabel": {
+    "description": "Доступное название кнопки параметров в шапке панели связи"
+  },
+  "relationSheetOptionArchive": "Archive",
+  "@relationSheetOptionArchive": {
+    "description": "Пункт параметров панели активной связи: архивировать"
+  },
+  "relationSheetOptionRestore": "Restore from archive",
+  "@relationSheetOptionRestore": {
+    "description": "Пункт параметров панели архивированной связи: восстановить"
+  },
+  "relationSheetOptionDelete": "Delete",
+  "@relationSheetOptionDelete": {
+    "description": "Пункт параметров панели связи: удалить"
+  },
+  "relationSheetOptionRestoreBothArchived": "Restore the source and related intentions before restoring this relation.",
+  "@relationSheetOptionRestoreBothArchived": {
+    "description": "Причина недоступности восстановления связи, когда архивированы оба участника"
+  },
+  "relationSheetDeleteDialogTitle": "Delete relation?",
+  "@relationSheetDeleteDialogTitle": {
+    "description": "Вопрос подтверждения удаления связи из параметров панели"
+  },
+  "relationSheetDeleteDialogTextBefore": "This removes the relation “",
+  "@relationSheetDeleteDialogTextBefore": {
+    "description": "Текст подтверждения удаления связи до выделенной формулировки связи"
+  },
+  "relationSheetDeleteDialogTextAfter": "” with its description and cannot be undone. Both intentions stay.",
+  "@relationSheetDeleteDialogTextAfter": {
+    "description": "Текст подтверждения удаления связи после выделенной формулировки связи"
+  },
+  "relationSheetDeleteDialogCancel": "Cancel",
+  "@relationSheetDeleteDialogCancel": {
+    "description": "Отмена удаления связи"
+  },
+  "relationSheetDeleteDialogConfirm": "Delete",
+  "@relationSheetDeleteDialogConfirm": {
+    "description": "Подтверждение удаления связи"
   },
   "actionPickerLoading": "Loading actions…",
   "@actionPickerLoading": {"description": "Чтение первой порции действий"},
@@ -2090,14 +2083,8 @@
   "@participantPickerPurposeCreationSource": {"description": "Подзаголовок поиска исходного намерения при создании связи"},
   "participantPickerPurposeCreationRelated": "New relation: related intention",
   "@participantPickerPurposeCreationRelated": {"description": "Подзаголовок поиска связанного намерения при создании связи"},
-  "participantPickerPurposeChangeSource": "Relation change: source intention",
-  "@participantPickerPurposeChangeSource": {"description": "Подзаголовок поиска исходного намерения при изменении связи"},
-  "participantPickerPurposeChangeRelated": "Relation change: related intention",
-  "@participantPickerPurposeChangeRelated": {"description": "Подзаголовок поиска связанного намерения при изменении связи"},
   "participantPickerFlowCreation": "New relation",
   "@participantPickerFlowCreation": {"description": "Строка листа назначения: создание связи"},
-  "participantPickerFlowChange": "Relation change",
-  "@participantPickerFlowChange": {"description": "Строка листа назначения: изменение связи"},
   "participantPickerRoleSourceNote": "The source intention is what the related intention is needed for or can be used for.",
   "@participantPickerRoleSourceNote": {"description": "Пояснение выбираемой роли исходного намерения в листе назначения"},
   "participantPickerRoleRelatedNeedNote": "The related intention is what the source intention needs.",
@@ -2124,10 +2111,6 @@
   "relationEditorTitle": "New relation",
   "@relationEditorTitle": {
     "description": "Заголовок формы создания долговременной связи"
-  },
-  "relationEditorEditTitle": "Edit relation",
-  "@relationEditorEditTitle": {
-    "description": "Заголовок формы изменения долговременной связи"
   },
   "relationEditorPhraseLabel": "Relation phrase",
   "@relationEditorPhraseLabel": {
@@ -2228,14 +2211,6 @@
   "relationEditorCreating": "Creating…",
   "@relationEditorCreating": {
     "description": "Выполняемое создание долговременной связи"
-  },
-  "relationEditorSaveAction": "Save changes",
-  "@relationEditorSaveAction": {
-    "description": "Команда сохранения изменений долговременной связи"
-  },
-  "relationEditorSaving": "Saving…",
-  "@relationEditorSaving": {
-    "description": "Выполняемое изменение долговременной связи"
   },
   "relationEditorPriorityOption": "Priority {priority}",
   "@relationEditorPriorityOption": {

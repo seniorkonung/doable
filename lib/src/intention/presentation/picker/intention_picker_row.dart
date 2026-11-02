@@ -10,13 +10,10 @@ import '../search/intention_row_content.dart';
 import '../search/intention_search_kind.dart';
 
 /// Вид отметки занятой пары: слово метки и то, что обещает нажатие на текст
-/// строки. Предложить восстановление можно только для архивной связи.
+/// строки.
 enum OccupiedPairKind {
   /// Пару занимает активная связь, нажатие её откроет.
   linked,
-
-  /// Пару занимает архивная связь, нажатие её откроет.
-  archived,
 
   /// Пару занимает архивная связь, нажатие предложит её восстановить.
   restorable,
@@ -78,10 +75,6 @@ final class IntentionPickerRow extends StatelessWidget {
       null => null,
       OccupiedPairKind.linked => (
         word: l10n.intentionPickerPairLinked,
-        action: l10n.intentionPickerPairOpensRelation,
-      ),
-      OccupiedPairKind.archived => (
-        word: l10n.intentionPickerPairArchived,
         action: l10n.intentionPickerPairOpensRelation,
       ),
       OccupiedPairKind.restorable => (

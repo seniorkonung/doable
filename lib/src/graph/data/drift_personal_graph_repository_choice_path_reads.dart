@@ -102,7 +102,7 @@ extension _ChoicePathContinuationReading on DriftPersonalGraphRepository {
           .customSelect(
             '''SELECT creation_sequence, id, source_intention_id,
                       related_intention_id, type, priority, description,
-                      is_archived
+                      is_archived, created_at, updated_at
                FROM long_term_relations
                WHERE id IN (SELECT value FROM json_each(?))''',
             variables: [
@@ -148,7 +148,7 @@ extension _ChoicePathContinuationReading on DriftPersonalGraphRepository {
         ? '''WITH visited(id) AS (SELECT value FROM json_each(?))
              SELECT r.creation_sequence, r.id, r.source_intention_id,
                     r.related_intention_id, r.type, r.priority,
-                    r.description, r.is_archived
+                    r.description, r.is_archived, r.created_at, r.updated_at
              FROM long_term_relations r
              JOIN intentions source ON source.id = r.source_intention_id
              WHERE r.related_intention_id = ? AND r.is_archived = 0
@@ -170,7 +170,7 @@ extension _ChoicePathContinuationReading on DriftPersonalGraphRepository {
                )
              SELECT r.creation_sequence, r.id, r.source_intention_id,
                     r.related_intention_id, r.type, r.priority,
-                    r.description, r.is_archived
+                    r.description, r.is_archived, r.created_at, r.updated_at
              FROM long_term_relations r
              JOIN reachable ON reachable.id = r.related_intention_id
              WHERE r.source_intention_id = ? AND r.is_archived = 0''';
