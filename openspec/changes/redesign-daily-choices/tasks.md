@@ -311,15 +311,18 @@
     - Все строки `dailyChoiceReplace*` удалены из обоих файлов локализации.
     - Значение ключа `relationDeleteReferencedByDailyPath` называет только удаление использующих связь дневных выборов. В `lib/l10n/app_ru.arb`: «Связь используется в сохранённом дневном пути. Сначала удалите использующие её дневные выборы.», в `lib/l10n/app_en.arb`: «This relation is used by a saved daily path. Delete the daily choices that use it first.». Имя ключа и условие показа не меняются. Отдельный тест на текст не добавляется: вернуть эту формулировку нечему.
     - Сценарий безымянного подтверждения замены удалён, а панель над безымянной страницей по-прежнему проверяет сценарий пересчёта пути. Вспомогательные функции без вызывающих удалены.
+    - Строка матрицы «поиск основания» в `app_shell_page_matrix.dart` сохраняется, по-прежнему проверяет `DailyChoiceSourcePickerPage` без панели и открывает страницу входом создания «От намерения»: `openDailyChoiceQuickCreation` с `ChoicePathDraftDirection.topDown` по образцу записи `_MatrixEntry.action`. Записи `replaceChoice` и `replaceTopDown` и их поисковые ветви удалены. Удалить строку вместо перевода на вход создания нельзя.
+    - Из хвоста теста в `daily_choice_creation_flow_test.dart` удалены шаги замены, начиная с нажатия `daily-choice-replace-open` и кончая ожиданиями замены. Файл к этому моменту уже изменён задачей 2.1, поэтому границы определяются по шагам, а не по номерам строк. Проверки сохранённого выбора из этого хвоста остаются для самого выбора: дата, расписание, приоритет, описание и выполнение, а путь ожидается из связей 101 и 102 вместо 103 и 104. Переменная `replaced` переименована по смыслу.
   - **Проверка:**
     - `mise exec --no-deps -- flutter test test/daily_choice/presentation test/app/navigation`.
     - `mise run codegen-check`.
     - `grep -nE 'замените|or replace' lib/l10n/app_ru.arb lib/l10n/app_en.arb` ничего не находит.
-  - **Зависимости:** нет.
+  - **Зависимости:** 2.1: она меняет тот же тест создания.
   - **Предполагаемые файлы:**
     - удаляются четыре файла потока в `lib/src/daily_choice/presentation/editor/` и `test/daily_choice/presentation/daily_choice_path_replacement_flow_test.dart`, `editor/daily_choice_path_replace_page_test.dart`, `editor/daily_choice_path_replace_view_model_test.dart`;
     - меняются `lib/src/daily_choice/presentation/details/daily_choice_details_page.dart`, `path/choice_path_page.dart`, `daily_choice_creation_flow_session.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb`;
-    - меняются `test/app/navigation/app_shell_unnamed_page_scenarios.dart`, `app_shell_pages_above_test.dart`.
+    - меняются `test/app/navigation/app_shell_unnamed_page_scenarios.dart`, `app_shell_page_matrix.dart`, `app_shell_pages_above_test.dart`;
+    - меняется `test/daily_choice/presentation/daily_choice_creation_flow_test.dart`.
   - **Размер:** M по логике: удаление без нового поведения.
 
 - [ ] 2.4 Поиски дневного выбора знают только потоки создания
