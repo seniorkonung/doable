@@ -755,6 +755,7 @@
   "intentionCatalogEmptyArchiveText": "Архивированное намерение уходит из активного списка и остаётся здесь.",
   "intentionPickerActionTitle": "Выбор действия",
   "intentionPickerIntentionTitle": "Выбор намерения",
+  "participantPickerTitle": "Выбор намерений",
   "intentionPickerSearchPlaceholder": "Поиск по названию",
   "intentionPickerClearSearch": "Очистить название",
   "intentionPickerFilterLabel": "{count, plural, =0{Фильтр по тегам} one{Фильтр по тегам, {count} условие} few{Фильтр по тегам, {count} условия} many{Фильтр по тегам, {count} условий} other{Фильтр по тегам, {count} условия}}",

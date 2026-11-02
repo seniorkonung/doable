@@ -2015,6 +2015,10 @@
     "description": "Заголовок шапки экрана выбора действия"
   },
   "intentionPickerIntentionTitle": "Choose an intention",
+  "participantPickerTitle": "Choose intentions",
+  "@participantPickerTitle": {
+    "description": "Заголовок поиска участников связи"
+  },
   "@intentionPickerIntentionTitle": {
     "description": "Заголовок шапки экрана выбора намерения"
   },

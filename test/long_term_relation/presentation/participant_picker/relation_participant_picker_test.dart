@@ -56,13 +56,13 @@ void main() {
   for (final (language, title, cancelLabel, emptyMessage) in const [
     (
       'ru',
-      'Выбор намерения',
+      'Выбор намерений',
       'Отменить выбор намерения',
       'Других намерений для выбора нет.',
     ),
     (
       'en',
-      'Choose an intention',
+      'Choose intentions',
       'Cancel intention selection',
       'No other intentions are available to select.',
     ),
@@ -1482,9 +1482,9 @@ void _definePurposeTests() {
           tester.getSemantics(subtitle),
           isSemantics(
             label: ru
-                ? 'Выбор намерения. ${texts.subtitle}. Показать, что '
+                ? 'Выбор намерений. ${texts.subtitle}. Показать, что '
                       'выбирается'
-                : 'Choose an intention. ${texts.subtitle}. Show what you are '
+                : 'Choose intentions. ${texts.subtitle}. Show what you are '
                       'choosing',
             isButton: true,
             hasTapAction: true,

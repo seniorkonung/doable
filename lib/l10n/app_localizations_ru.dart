@@ -2606,6 +2606,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get intentionPickerIntentionTitle => 'Выбор намерения';
 
   @override
+  String get participantPickerTitle => 'Выбор намерений';
+
+  @override
   String get intentionPickerSearchPlaceholder => 'Поиск по названию';
 
   @override

@@ -3976,6 +3976,12 @@ abstract class AppLocalizations {
   /// **'Choose an intention'**
   String get intentionPickerIntentionTitle;
 
+  /// Заголовок поиска участников связи
+  ///
+  /// In en, this message translates to:
+  /// **'Choose intentions'**
+  String get participantPickerTitle;
+
   /// Заполнитель и доступное название поля поиска по названию на экране выбора
   ///
   /// In en, this message translates to:

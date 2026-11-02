@@ -46,9 +46,19 @@ final _list = find.byKey(
 );
 
 void main() {
-  for (final (locale, action, intention) in [
-    (const Locale('ru'), 'Выбор действия', 'Выбор намерения'),
-    (const Locale('en'), 'Choose an action', 'Choose an intention'),
+  for (final (locale, action, intention, participants) in [
+    (
+      const Locale('ru'),
+      'Выбор действия',
+      'Выбор намерения',
+      'Выбор намерений',
+    ),
+    (
+      const Locale('en'),
+      'Choose an action',
+      'Choose an intention',
+      'Choose intentions',
+    ),
   ]) {
     for (final (purpose, title, keyPrefix) in [
       (
@@ -63,7 +73,7 @@ void main() {
       ),
       (
         SelectRelationParticipant(session: IntentionSearchSession()),
-        intention,
+        participants,
         'participant-picker',
       ),
     ]) {

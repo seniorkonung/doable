@@ -2581,6 +2581,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get intentionPickerIntentionTitle => 'Choose an intention';
 
   @override
+  String get participantPickerTitle => 'Choose intentions';
+
+  @override
   String get intentionPickerSearchPlaceholder => 'Search by name';
 
   @override
