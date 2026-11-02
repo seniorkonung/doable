@@ -142,6 +142,7 @@ Widget _sampleRow(DoableIconData icon, DoableColors colors) {
     DoableIconData.selector => (16.0, colors.muted, colors.raised),
     DoableIconData.sortAsc ||
     DoableIconData.sortDesc => (20.0, colors.ink, colors.fill),
+    DoableIconData.toTop => (20.0, colors.ink, colors.raised),
   };
 
   return SizedBox(

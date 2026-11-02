@@ -146,7 +146,7 @@
   - **Предполагаемые файлы:** `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb`, `test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`, `daily_choice_date_catalog_page_test.dart`.
   - **Размер:** M.
 
-- [ ] 1.12 Компонент `ScrollTopButton` возвращает список к началу
+- [x] 1.12 Компонент `ScrollTopButton` возвращает список к началу
   - **Критерии приёмки:**
     - Компонент оформлен по своему README, а доступное имя и обработчик задаёт потребитель.
     - Значок стрелки к линии взят из `Main.dc.html` и добавлен по правилам `lib/src/design_system/icons/README.md` вместе с обновлённым эталоном таблицы иконок.
