@@ -1,10 +1,13 @@
 import 'dart:async';
 
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice.dart';
@@ -15,6 +18,7 @@ import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_sheet.dart';
 import 'package:doable/src/design_system/components/badge.dart';
+import 'package:doable/src/design_system/components/choice_head.dart';
 import 'package:doable/src/design_system/components/choice_path.dart' as ui;
 import 'package:doable/src/design_system/components/priority_picker.dart';
 import 'package:doable/src/design_system/components/reason_chain.dart';
@@ -23,9 +27,11 @@ import 'package:doable/src/design_system/components/tabs.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/design_system/doable_priority.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
+import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/application/intention_details.dart'
     as application;
@@ -38,6 +44,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/app_root_pages.dart';
 import '../../../support/daily_choice_local_date.dart';
 import '../../../support/ordinary_page_test_app.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
@@ -126,36 +133,7 @@ void main() {
       tester.view.physicalSize = const Size(1200, 2400);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
-      final repository = _Repository();
-      final router = AppRouter();
-      addTearDown(() async {
-        router.dispose();
-        await repository.dispose();
-      });
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            inMemoryQuickCreationModeOverride,
-            personalGraphRepositoryProvider.overrideWithValue(repository),
-          ],
-          retry: (count, error) => null,
-          child: MaterialApp.router(
-            theme: doableTheme(Brightness.light),
-            locale: const Locale('ru'),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
-            supportedLocales: AppLocalizations.supportedLocales,
-            routerConfig: router.config(),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      unawaited(
-        showDailyChoiceSheet(
-          tester.element(find.byType(AppNavigationBar)),
-          _choice,
-        ),
-      );
-      await tester.pump();
+      final (repository, router) = await _openOnRouter(tester);
       repository.emit(_details());
       await tester.pumpAndSettle();
       await tester.tap(find.text('Путь'));
@@ -489,7 +467,254 @@ void main() {
     expect(find.byType(Sheet), findsNothing);
     expect(harness.repository.controller.hasListener, isFalse);
   });
+
+  testWidgets('флажок отправляет обратное выполнение и выключен на время '
+      'записи, а новое состояние приходит из подписки', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final harness = await _openSheet(tester);
+    final repository = harness.repository;
+    repository.emit(_details());
+    await tester.pumpAndSettle();
+    final options = tester.getRect(_options);
+
+    await tester.tap(_check);
+    await tester.pump();
+
+    expect(repository.sentCompletion, [true]);
+    expect(
+      tester.getSemantics(_check),
+      isSemantics(hasEnabledState: true, isEnabled: false),
+    );
+    expect(
+      tester.getSemantics(_options),
+      isSemantics(hasEnabledState: true, isEnabled: false),
+    );
+    expect(tester.getRect(_options), options);
+
+    repository.succeedUpdate();
+    await tester.pumpAndSettle();
+    expect(_actionDecoration(tester), isNull);
+
+    repository.emit(_details(isCompleted: true));
+    await tester.pumpAndSettle();
+    expect(_actionDecoration(tester), TextDecoration.lineThrough);
+    expect(
+      find.descendant(
+        of: find.byType(Sheet),
+        matching: find.textContaining('Дневной выбор изменён.'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      tester.getSemantics(_check),
+      isSemantics(hasEnabledState: true, isEnabled: true),
+    );
+
+    await tester.tap(_check);
+    await tester.pump();
+    expect(repository.sentCompletion, [true, false]);
+    repository.succeedUpdate();
+    await tester.pumpAndSettle();
+    semantics.dispose();
+  });
+
+  testWidgets('отказ стоит над содержимым обеих вкладок, выбор остаётся '
+      'подтверждённым, а флажок снова отправляет запись', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final harness = await _openSheet(tester);
+    final repository = harness.repository;
+    repository.emit(_details());
+    await tester.pumpAndSettle();
+
+    await tester.tap(_check);
+    await tester.pump();
+    repository.failCommand(const DailyChoiceUnavailableFailure());
+    await tester.pumpAndSettle();
+
+    final notice = find.text(_commandFailure);
+    expect(notice, findsOneWidget);
+    expect(find.byType(SnackBar), findsNothing);
+    expect(_actionDecoration(tester), isNull);
+    expect(
+      tester.getRect(notice).top,
+      greaterThan(tester.getRect(_tabs).bottom),
+    );
+    expect(
+      tester.getRect(notice).bottom,
+      lessThan(tester.getRect(find.text('Пояснение')).top),
+    );
+
+    await tester.tap(find.text('Путь'));
+    await tester.pumpAndSettle();
+    expect(
+      tester.getRect(notice).bottom,
+      lessThan(tester.getRect(find.byType(ui.ChoicePath)).top),
+    );
+
+    await tester.tap(_check);
+    await tester.pump();
+    expect(repository.sentCompletion, [true, true]);
+    expect(notice, findsNothing);
+    repository.succeedUpdate();
+    await tester.pumpAndSettle();
+    semantics.dispose();
+  });
+
+  testWidgets('новый отказ виден без ручной прокрутки, когда тело прокручено '
+      'мимо него', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final harness = await _openSheet(tester);
+    harness.repository.emit(_details(description: _longText));
+    await tester.pumpAndSettle();
+    await _scrollBodyToEnd(tester);
+    expect(find.text('Дата').hitTestable(), findsOneWidget);
+
+    await tester.tap(_check);
+    await tester.pump();
+    harness.repository.failCommand(const DailyChoiceUnavailableFailure());
+    await tester.pumpAndSettle();
+
+    expect(find.text(_commandFailure).hitTestable(), findsOneWidget);
+    semantics.dispose();
+  });
+
+  testWidgets('новый отказ виден без ручной прокрутки, когда высокая шапка '
+      'вытеснила его из видимой части', (tester) async {
+    _useLowScreen(tester);
+    final semantics = tester.ensureSemantics();
+    final harness = await _openSheet(tester);
+    harness.repository.emit(_details(actionTitle: _longTitle));
+    await tester.pumpAndSettle();
+    expect(
+      tester.getRect(_tabs).top,
+      greaterThan(tester.getRect(find.byType(Sheet)).bottom),
+    );
+
+    tester.widget<ChoiceHead>(find.byType(ChoiceHead)).onToggle!();
+    await tester.pump();
+    harness.repository.failCommand(const DailyChoiceUnavailableFailure());
+    await tester.pumpAndSettle();
+
+    expect(find.text(_commandFailure).hitTestable(), findsOneWidget);
+    semantics.dispose();
+  });
+
+  testWidgets('перекрытая панель хранит отказ и показывает его при возврате, а '
+      'её закрытие отказ не повторяет', (tester) async {
+    _useLowScreen(tester);
+    final semantics = tester.ensureSemantics();
+    final (repository, router) = await _openOnRouter(tester);
+    repository.emit(_details(middleTitle: _longTitle));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Путь'));
+    await tester.pumpAndSettle();
+    await _scrollBodyToEnd(tester);
+
+    await tester.tap(_check);
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('daily-choice-intention-3')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(router.current.name, IntentionDetailsRoute.name);
+
+    repository.failCommand(const DailyChoiceUnavailableFailure());
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.byType(SnackBar), findsNothing);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text(_commandFailure).hitTestable(), findsOneWidget);
+    expect(find.byType(SnackBar), findsNothing);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byType(Sheet), findsNothing);
+    expect(find.byType(SnackBar), findsNothing);
+    semantics.dispose();
+  });
+
+  testWidgets('сброс истории над панелью отдаёт отказ общей поверхности один '
+      'раз', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final (repository, _) = await _openOnRouter(tester);
+    repository.emit(_details());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Путь'));
+    await tester.pumpAndSettle();
+    await tester.tap(_check);
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('daily-choice-intention-1')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    repository.failCommand(const DailyChoiceUnavailableFailure());
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.byType(SnackBar), findsNothing);
+
+    await tester.tap(appNavigationDestination(AppDestination.home));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(Sheet), findsNothing);
+    expect(find.textContaining(_commandFailure), findsOneWidget);
+    semantics.dispose();
+  });
+
+  testWidgets('закрытие панели до результата отдаёт отказ общей поверхности '
+      'один раз', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final harness = await _openSheet(tester);
+    harness.repository.emit(_details());
+    await tester.pumpAndSettle();
+    await tester.tap(_check);
+    await tester.pump();
+
+    Navigator.of(tester.element(find.byType(Sheet))).pop();
+    await tester.pumpAndSettle();
+    harness.repository.failCommand(const DailyChoiceUnavailableFailure());
+    await tester.pumpAndSettle();
+
+    expect(find.byType(Sheet), findsNothing);
+    expect(find.textContaining(_commandFailure), findsOneWidget);
+    semantics.dispose();
+  });
 }
+
+const _commandFailure =
+    'Не удалось выполнить действие с дневным выбором. Повторите попытку.';
+
+/// Не помещается в тело панели и в полном размере.
+final _longText = List.filled(300, 'слово').join(' ');
+
+/// Название наибольшей допустимой длины.
+final _longTitle = 'слово ' * 42;
+
+/// Первый жест раскрывает панель, второй прокручивает тело к концу.
+Future<void> _scrollBodyToEnd(WidgetTester tester) async {
+  for (var i = 0; i < 2; i++) {
+    await tester.drag(
+      find.descendant(
+        of: find.byType(Sheet),
+        matching: find.byType(CustomScrollView),
+      ),
+      const Offset(0, -3000),
+    );
+    await tester.pumpAndSettle();
+  }
+}
+
+void _useLowScreen(WidgetTester tester) {
+  tester.view
+    ..physicalSize = const Size(440, 420)
+    ..devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+}
+
+final _check = find.bySemanticsLabel(RegExp('^Выполнение выбора'));
+final _options = find.bySemanticsLabel('Параметры дневного выбора');
+
+TextDecoration? _actionDecoration(WidgetTester tester) =>
+    tester.widget<Text>(find.text('Действие')).style!.decoration;
 
 final _tabs = find.byWidgetPredicate((widget) => widget is Tabs);
 
@@ -538,6 +763,8 @@ Future<_Harness> _openSheet(
       ],
       child: OrdinaryPageTestApp(
         locale: locale,
+        builder: (_, child) =>
+            GraphOperationPresenter(child: child ?? const SizedBox.shrink()),
         home: Scaffold(
           body: Builder(
             builder: (context) => TextButton(
@@ -555,6 +782,43 @@ Future<_Harness> _openSheet(
   await tester.pump();
   await tester.pump(const Duration(seconds: 1));
   return _Harness(repository, localDate);
+}
+
+/// Открывает панель над корневой страницей настоящего [AppRouter].
+Future<(_Repository, AppRouter)> _openOnRouter(WidgetTester tester) async {
+  final repository = _Repository();
+  final router = AppRouter();
+  addTearDown(() async {
+    router.dispose();
+    await repository.dispose();
+  });
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        inMemoryQuickCreationModeOverride,
+        personalGraphRepositoryProvider.overrideWithValue(repository),
+      ],
+      retry: (count, error) => null,
+      child: MaterialApp.router(
+        theme: doableTheme(Brightness.light),
+        locale: const Locale('ru'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        builder: (_, child) =>
+            GraphOperationPresenter(child: child ?? const SizedBox.shrink()),
+        routerConfig: router.config(),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+  unawaited(
+    showDailyChoiceSheet(
+      tester.element(find.byType(AppNavigationBar)),
+      _choice,
+    ),
+  );
+  await tester.pump();
+  return (repository, router);
 }
 
 String _uuid(int n) =>
@@ -592,6 +856,7 @@ DailyChoiceDetails _details({
   bool oneStep = false,
   Set<_Archived> archived = const {},
   String middleTitle = 'Середина',
+  String actionTitle = 'Действие',
 }) {
   final source = _intention(
     1,
@@ -605,7 +870,7 @@ DailyChoiceDetails _details({
   );
   final selected = _intention(
     3,
-    'Действие',
+    actionTitle,
     archived: archived.contains(_Archived.selected),
   );
   final choice = DailyChoice(
@@ -683,6 +948,13 @@ final class _Revision implements GraphRevision {
   }
 }
 
+final class _Change implements GraphChange {
+  const _Change(this.revision);
+
+  @override
+  final GraphRevision revision;
+}
+
 final class _Repository
     with TagReadContractTestFallback
     implements PersonalGraphRepository {
@@ -692,6 +964,51 @@ final class _Repository
   var watchCount = 0;
   var _revision = 0;
   final watchedRelations = <LongTermRelationId>[];
+  final _commands = <UpdateDailyChoiceFields>[];
+  final _requests = <Completer<DailyChoiceCommandResult>>[];
+
+  /// Значения выполнения из отправленных команд.
+  List<bool> get sentCompletion => [
+    for (final command in _commands)
+      switch (command.patch.isCompleted) {
+        DailyChoiceFieldSet(:final value) => value,
+        DailyChoiceFieldUnchanged() => throw StateError(
+          'Выполнение не менялось.',
+        ),
+      },
+  ];
+
+  @override
+  Future<GraphCommandResult<TSuccess, TFailure>> execute<
+    TSuccess extends GraphCommandOutcome,
+    TFailure extends GraphCommandFailure
+  >(GraphCommand<TSuccess, TFailure> command) async {
+    _commands.add(command as UpdateDailyChoiceFields);
+    final request = Completer<DailyChoiceCommandResult>();
+    _requests.add(request);
+    return await request.future as GraphCommandResult<TSuccess, TFailure>;
+  }
+
+  void failCommand(DailyChoiceCommandFailure failure) =>
+      _requests.last.complete(GraphCommandFailed(failure));
+
+  /// Подтверждает запись; новое значение приходит отдельно через [emit].
+  void succeedUpdate() {
+    final details = _details();
+    _requests.last.complete(
+      GraphCommandSucceeded(
+        ConfirmedGraphResult(
+          revision: _Revision(++_revision),
+          value: DailyChoiceFieldsUpdated(
+            before: details.choice,
+            choice: details.choice,
+            path: StoredChoicePath(details.path.map((step) => step.step)),
+            changes: [_Change(_Revision(_revision))],
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) {

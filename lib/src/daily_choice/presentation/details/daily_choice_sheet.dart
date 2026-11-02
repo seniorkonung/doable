@@ -12,6 +12,7 @@ import '../../../design_system/components/choice_path.dart';
 import '../../../design_system/components/detail_row.dart';
 import '../../../design_system/components/half_pinned_sliver.dart';
 import '../../../design_system/components/list_state.dart';
+import '../../../design_system/components/notice.dart';
 import '../../../design_system/components/priority_picker.dart';
 import '../../../design_system/components/reason_chain.dart';
 import '../../../design_system/components/sheet.dart';
@@ -23,14 +24,17 @@ import '../../../design_system/doable_metrics.dart';
 import '../../../design_system/doable_priority.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/personal_graph_repository_provider.dart';
+import '../../../graph/presentation/operation_failure_presentation.dart';
 import '../../../intention/domain/intention.dart';
 import '../../../long_term_relation/domain/long_term_relation.dart';
 import '../../../long_term_relation/presentation/details/relation_details_sheet.dart';
+import '../../application/daily_choice_command.dart';
 import '../../application/daily_choice_details.dart';
 import '../../domain/calendar_date.dart';
 import '../../domain/daily_choice_id.dart';
 import '../catalog/daily_choice_local_date_provider.dart';
 import '../catalog/daily_choice_local_day_observer.dart';
+import '../daily_choice_command_failure_message.dart';
 import 'daily_choice_details_state.dart';
 import 'daily_choice_details_view_model.dart';
 import 'daily_choice_field_labels.dart';
@@ -44,6 +48,10 @@ import 'daily_choice_field_labels.dart';
 /// Без загруженного выбора вместо шапки и вкладок стоит одно состояние.
 /// Параметров в нём нет, а закрывает лист пользователь, в том числе когда
 /// выбора больше нет.
+///
+/// Флажок шапки выключен на время записи, а новое значение приходит из
+/// подписки. Отказ стоит над содержимым обеих вкладок и остаётся за панелью,
+/// пока она открыта, даже перекрытая страницей.
 Future<void> showDailyChoiceSheet(
   BuildContext context,
   DailyChoiceId choiceId,
@@ -145,8 +153,20 @@ final class _DailyChoiceSheetState extends ConsumerState<_DailyChoiceSheet> {
                 details: details,
                 tab: _tab,
                 onTabChange: (tab) => setState(() => _tab = tab),
+                onToggle: _model.operation is DailyChoiceDetailsOperationWriting
+                    ? null
+                    : () => _model.change(
+                        DailyChoiceFieldsPatch(
+                          isCompleted: DailyChoiceFieldSet(
+                            !details.choice.isCompleted,
+                          ),
+                        ),
+                      ),
               ),
             ),
+            if (_model.operation
+                case final DailyChoiceDetailsOperationFailed operation)
+              _OperationFailureNotice(operation),
             ...switch (_tab) {
               _ChoiceTab.overview => [
                 _Overview(details: details, today: _localDay.today),
@@ -182,6 +202,58 @@ final class _StateSliver extends StatelessWidget {
   );
 }
 
+/// Отказ операции под вкладками. Новый отказ панель показывает сама: тело могло
+/// уйти дальше него, а высокая шапка могла вытеснить его вниз. Видимый отказ
+/// остаётся на месте.
+final class _OperationFailureNotice extends StatefulWidget {
+  const _OperationFailureNotice(this.operation);
+
+  final DailyChoiceDetailsOperationFailed operation;
+
+  @override
+  State<_OperationFailureNotice> createState() =>
+      _OperationFailureNoticeState();
+}
+
+final class _OperationFailureNoticeState
+    extends State<_OperationFailureNotice> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      for (final policy in const [
+        ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+        ScrollPositionAlignmentPolicy.keepVisibleAtStart,
+      ]) {
+        unawaited(Scrollable.ensureVisible(context, alignmentPolicy: policy));
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => SliverPadding(
+    padding: const EdgeInsets.fromLTRB(
+      DoableMetrics.space5,
+      2,
+      DoableMetrics.space5,
+      DoableMetrics.space1,
+    ),
+    sliver: SliverToBoxAdapter(
+      child: Notice.content(
+        message: OperationFailurePresentation(
+          claim: widget.operation.failurePresentation,
+          message: dailyChoiceCommandFailureMessage(
+            AppLocalizations.of(context),
+            widget.operation.failure,
+          ),
+          inheritsColor: true,
+        ),
+      ),
+    ),
+  );
+}
+
 /// Шапка выбора и вкладки. Тело проходит под закреплённым срезом, поэтому фон
 /// непрозрачный.
 final class _ChoiceHeader extends StatelessWidget {
@@ -189,11 +261,15 @@ final class _ChoiceHeader extends StatelessWidget {
     required this.details,
     required this.tab,
     required this.onTabChange,
+    required this.onToggle,
   });
 
   final DailyChoiceDetails details;
   final _ChoiceTab tab;
   final ValueChanged<_ChoiceTab> onTabChange;
+
+  /// Переключает выполнение; без него флажок выключен.
+  final VoidCallback? onToggle;
 
   @override
   Widget build(BuildContext context) {
@@ -229,6 +305,7 @@ final class _ChoiceHeader extends StatelessWidget {
                   dailyChoicePriorityName(priority),
                 ),
               ),
+              onToggle: onToggle,
               goalBadge: _archiveBadge(localizations, details.source),
               actionBadge: _archiveBadge(localizations, details.selected),
               options: ChoiceHeadOptions.unavailable(
