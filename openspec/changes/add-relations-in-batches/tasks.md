@@ -1306,3 +1306,15 @@
   - **Зависимости:** 4.3, 4.4.
   - **Предполагаемые файлы:** меняются `lib/l10n/app_en.arb` с созданными файлами локализации `lib/l10n/app_localizations.dart` и `lib/l10n/app_localizations_en.dart`, `test/graph/presentation/graph_operation_presenter_test.dart`, `test/intention/presentation/editor/intention_editor_page_test.dart`.
   - **Размер:** XS.
+
+- [ ] 4.21 Сессию создания дневного выбора нельзя собрать без экземпляра пути её корня
+  - **Критерии приёмки:**
+    - В `daily_choice_creation_flow_session.dart` конструктор `DailyChoiceCreationFlowSession` принимает `required ChoicePathPageInstance pathInstance`; необязательный параметр и подстановка нового `ChoicePathPageInstance()` удалены, других веток только для тестов в рабочем коде нет.
+    - Рабочий вызов в `choice_path_page.dart` по-прежнему передаёт `_pageInstance` своего корня; поведение продукта, в том числе показ уточнённого пути после «назад» из подтверждения, не меняется.
+    - Тесты, собиравшие сессию без экземпляра пути (`daily_choice_creation_flow_session_test.dart`, `editor/daily_choice_creation_page_test.dart`, `editor/daily_choice_creation_view_model_test.dart` и другие вызовы, найденные поиском по `DailyChoiceCreationFlowSession(`), передают экземпляр явно. Новые тесты не добавляются: обязательность параметра проверяет компилятор.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 4.12.
+  - **Предполагаемые файлы:** меняются `lib/src/daily_choice/presentation/daily_choice_creation_flow_session.dart`, `test/daily_choice/presentation/daily_choice_creation_flow_session_test.dart`, `test/daily_choice/presentation/editor/daily_choice_creation_page_test.dart`, `test/daily_choice/presentation/editor/daily_choice_creation_view_model_test.dart`.
+  - **Размер:** XS.
