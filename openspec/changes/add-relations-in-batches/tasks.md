@@ -1358,7 +1358,7 @@
   - **Предполагаемые файлы:** меняются `lib/src/intention/presentation/editor/intention_editor_view_model.dart`, `lib/src/intention/presentation/editor/intention_editor_page.dart` и, если его изменит генерация, `lib/src/intention/presentation/editor/intention_editor_view_model.g.dart`.
   - **Размер:** XS.
 
-- [ ] 4.25 Поиск участника решает, можно ли открыть панель создания, по фактическому стеку навигации в момент нажатия
+- [x] 4.25 Поиск участника решает, можно ли открыть панель создания, по фактическому стеку навигации в момент нажатия
   - **Критерии приёмки:**
     - В `relation_batch_picker_page.dart` плюс в шапке и строка «Создать» открывают панель создания намерения, только если в `context.router.stackData` над маршрутом этого поиска, найденным по `context.routeData.matchId`, нет маршрута `IntentionEditorRoute`. Проверка выполняется в момент нажатия, как в `_canCloseRoute` и `_completeCreation` из `intention_editor_page.dart`.
     - Поле `_stopFollowingCreation`, слушатель роутера, поиск `matchId` панели, снятие по `whenComplete` и связанная с ними логика `dispose` удалены; панель открывается обычным `router.push`.
