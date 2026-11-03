@@ -57,12 +57,10 @@ import 'package:doable/src/intention/presentation/editor/intention_creation_laun
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart'
     as _i15;
 import 'package:doable/src/long_term_relation/application/intention_relation_group.dart'
-    as _i33;
-import 'package:doable/src/long_term_relation/presentation/batch_picker/relation_batch_page_footer.dart'
-    as _i31;
+    as _i32;
 import 'package:doable/src/long_term_relation/presentation/batch_picker/relation_batch_picker_page.dart'
     as _i17;
-import 'package:flutter/foundation.dart' as _i32;
+import 'package:flutter/foundation.dart' as _i31;
 import 'package:flutter/material.dart' as _i22;
 import 'package:flutter/widgets.dart' as _i24;
 
@@ -556,15 +554,13 @@ class IntentionDetailsRoute
   IntentionDetailsRoute({
     required _i20.IntentionId intentionId,
     _i13.IntentionPageTarget target = const _i13.OverviewTarget(),
-    _i31.RelationBatchRowContext? batchRow,
-    _i32.Key? key,
+    _i31.Key? key,
     List<_i19.PageRouteInfo>? children,
   }) : super(
          IntentionDetailsRoute.name,
          args: IntentionDetailsRouteArgs(
            intentionId: intentionId,
            target: target,
-           batchRow: batchRow,
            key: key,
          ),
          initialChildren: children,
@@ -579,7 +575,6 @@ class IntentionDetailsRoute
       return _i12.IntentionDetailsPage(
         intentionId: args.intentionId,
         target: args.target,
-        batchRow: args.batchRow,
         key: args.key,
       );
     },
@@ -590,7 +585,6 @@ class IntentionDetailsRouteArgs {
   const IntentionDetailsRouteArgs({
     required this.intentionId,
     this.target = const _i13.OverviewTarget(),
-    this.batchRow,
     this.key,
   });
 
@@ -598,13 +592,11 @@ class IntentionDetailsRouteArgs {
 
   final _i13.IntentionPageTarget target;
 
-  final _i31.RelationBatchRowContext? batchRow;
-
-  final _i32.Key? key;
+  final _i31.Key? key;
 
   @override
   String toString() {
-    return 'IntentionDetailsRouteArgs{intentionId: $intentionId, target: $target, batchRow: $batchRow, key: $key}';
+    return 'IntentionDetailsRouteArgs{intentionId: $intentionId, target: $target, key: $key}';
   }
 
   @override
@@ -613,13 +605,11 @@ class IntentionDetailsRouteArgs {
     if (other is! IntentionDetailsRouteArgs) return false;
     return intentionId == other.intentionId &&
         target == other.target &&
-        batchRow == other.batchRow &&
         key == other.key;
   }
 
   @override
-  int get hashCode =>
-      intentionId.hashCode ^ target.hashCode ^ batchRow.hashCode ^ key.hashCode;
+  int get hashCode => intentionId.hashCode ^ target.hashCode ^ key.hashCode;
 }
 
 /// generated route for
@@ -747,7 +737,7 @@ class RelationBatchPickerRoute
   RelationBatchPickerRoute({
     required _i20.IntentionId pageIntentionId,
     required String pageTitle,
-    required _i33.IntentionRelationGroup group,
+    required _i32.IntentionRelationGroup group,
     _i24.Key? key,
     List<_i19.PageRouteInfo>? children,
   }) : super(
@@ -789,7 +779,7 @@ class RelationBatchPickerRouteArgs {
 
   final String pageTitle;
 
-  final _i33.IntentionRelationGroup group;
+  final _i32.IntentionRelationGroup group;
 
   final _i24.Key? key;
 

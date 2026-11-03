@@ -12,7 +12,6 @@ import 'package:doable/src/design_system/components/filter_button.dart';
 import 'package:doable/src/design_system/components/notice.dart';
 import 'package:doable/src/design_system/components/picker_row.dart';
 import 'package:doable/src/design_system/components/top_bar.dart';
-import 'package:doable/src/design_system/doable_colors.dart';
 import 'package:doable/src/design_system/doable_metrics.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
@@ -31,11 +30,7 @@ import 'package:doable/src/intention/presentation/details/intention_details_page
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/intention/presentation/picker/intention_picker_view.dart';
 import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
-import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/relation_pair_probe.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation.dart'
-    show LongTermRelationType;
-import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/long_term_relation/presentation/batch_picker/relation_batch_picker_page.dart';
 import 'package:doable/src/long_term_relation/presentation/batch_picker/relation_batch_view_model.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
@@ -1201,112 +1196,69 @@ void main() {
     expect(find.byType(IntentionDetailsPage), findsOneWidget);
   }
 
-  GraphCommandCoordinator pageCoordinator(WidgetTester tester) =>
-      ProviderScope.containerOf(
-        tester.element(find.byType(IntentionDetailsPage)),
-      ).read(graphCommandCoordinatorProvider.notifier);
-
-  Future<void> finishIntentionCommand(
-    WidgetTester tester,
-    IntentionCommandStart start,
-  ) async {
-    await tester.runAsync(() => (start as IntentionCommandAccepted).future);
-    await tester.pumpAndSettle();
-  }
-
-  Future<void> finishRelationCommand(
-    WidgetTester tester,
-    LongTermRelationCommandStart start,
-  ) async {
-    await tester.runAsync(
-      () => (start as LongTermRelationCommandAccepted).future,
-    );
-    await tester.pumpAndSettle();
-  }
-
-  Color? pageButtonFill(WidgetTester tester) => tester
-      .widget<FilledButton>(addButton)
-      .style
-      ?.backgroundColor
-      ?.resolve(const {});
-
-  final colors = doableTheme(Brightness.light).extension<DoableColors>()!;
-
-  void expectDisabledPageButton(WidgetTester tester, String label) {
-    expect(
-      find.descendant(of: addButton, matching: find.text(label)),
-      findsOneWidget,
-    );
-    expect(tester.widget<FilledButton>(addButton).onPressed, isNull);
-    expect(find.byType(AppNavigationBar), findsNothing);
-  }
-
-  testWidgets(
-    'кнопка страницы отмечает намерение и возвращает поиск с прежними '
-    'параметрами и позицией',
-    (tester) async {
-      final semantics = tester.ensureSemantics();
-      await seedGraph(database, () async {
-        for (var id = 10; id < 24; id++) {
-          await database
-              .into(database.intentions)
-              .insert(
-                IntentionsCompanion.insert(
-                  id: _uuid(id),
-                  title: 'Намерение $id',
-                  createdAt: id,
-                  updatedAt: id,
-                ),
-              );
-        }
-      });
-      await open(tester, IntentionRelationGroup.needs);
-      await tester.enterText(
-        find.byKey(const ValueKey('participant-picker-filter')),
-        'Намерение',
-      );
-      await tester.pumpAndSettle();
-      final list = find.byKey(
-        const PageStorageKey<String>('participant-picker-list'),
-      );
-      await tester.drag(list, const Offset(0, -300));
-      await tester.pumpAndSettle();
-      final scrollable = find
-          .descendant(of: list, matching: find.byType(Scrollable))
-          .first;
-      final offset = tester.state<ScrollableState>(scrollable).position.pixels;
-      expect(offset, greaterThan(0));
-      final name = tester.widget<PickerRow>(intentionPickerRows.first).name;
-
-      await openRowPage(tester, name);
-      expect(find.text('Добавить к выбранным'), findsOneWidget);
-      expect(pageButtonFill(tester), colors.ink);
-      expect(find.byType(AppNavigationBar), findsNothing);
-      await tester.tap(addButton);
-      await tester.pumpAndSettle();
-
-      expect(find.byType(IntentionDetailsPage), findsNothing);
-      expect(find.byType(RelationBatchPickerPage), findsOneWidget);
-      expect(find.widgetWithText(TextField, 'Намерение'), findsOneWidget);
-      expect(tester.state<ScrollableState>(scrollable).position.pixels, offset);
-      expect(find.text('Добавить 1 связь'), findsOneWidget);
-      expect(
-        tester
-            .getSemantics(
-              find.descendant(
-                of: intentionPickerRows.first,
-                matching: find.text(name),
+  testWidgets('страница свободного намерения не меняет поиск с прежними '
+      'параметрами и позицией', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await seedGraph(database, () async {
+      for (var id = 10; id < 24; id++) {
+        await database
+            .into(database.intentions)
+            .insert(
+              IntentionsCompanion.insert(
+                id: _uuid(id),
+                title: 'Намерение $id',
+                createdAt: id,
+                updatedAt: id,
               ),
-            )
-            .flagsCollection
-            .isChecked,
-        CheckedState.isTrue,
-      );
-      semantics.dispose();
-    },
-  );
+            );
+      }
+    });
+    await open(tester, IntentionRelationGroup.needs);
+    await tester.enterText(
+      find.byKey(const ValueKey('participant-picker-filter')),
+      'Намерение',
+    );
+    await tester.pumpAndSettle();
+    final list = find.byKey(
+      const PageStorageKey<String>('participant-picker-list'),
+    );
+    await tester.drag(list, const Offset(0, -300));
+    await tester.pumpAndSettle();
+    final scrollable = find
+        .descendant(of: list, matching: find.byType(Scrollable))
+        .first;
+    final offset = tester.state<ScrollableState>(scrollable).position.pixels;
+    expect(offset, greaterThan(0));
+    final name = tester.widget<PickerRow>(intentionPickerRows.first).name;
 
-  testWidgets('отмеченное намерение снимается тихой кнопкой страницы', (
+    await openRowPage(tester, name);
+    expect(find.text('Добавить к выбранным'), findsNothing);
+    expect(find.text('Убрать из выбранных'), findsNothing);
+    expect(find.byType(AppNavigationBar), findsNothing);
+    await router.maybePop();
+    await tester.pumpAndSettle();
+
+    expect(find.byType(IntentionDetailsPage), findsNothing);
+    expect(find.byType(RelationBatchPickerPage), findsOneWidget);
+    expect(find.widgetWithText(TextField, 'Намерение'), findsOneWidget);
+    expect(tester.state<ScrollableState>(scrollable).position.pixels, offset);
+    expect(find.text('Добавить связи'), findsOneWidget);
+    expect(
+      tester
+          .getSemantics(
+            find.descendant(
+              of: intentionPickerRows.first,
+              matching: find.text(name),
+            ),
+          )
+          .flagsCollection
+          .isChecked,
+      CheckedState.isFalse,
+    );
+    semantics.dispose();
+  });
+
+  testWidgets('страница отмеченного намерения сохраняет отметку при возврате', (
     tester,
   ) async {
     await open(tester, IntentionRelationGroup.needs);
@@ -1314,163 +1266,48 @@ void main() {
     await tester.pumpAndSettle();
     await openRowPage(tester, 'Гулять');
 
-    expect(find.text('Убрать из выбранных'), findsOneWidget);
-    expect(pageButtonFill(tester), colors.fill);
-    await tester.tap(addButton);
-    await tester.pumpAndSettle();
-
-    expect(find.byType(RelationBatchPickerPage), findsOneWidget);
-    expect(find.text('Добавить связи'), findsOneWidget);
-  });
-
-  testWidgets('занятая строка называет причину на недоступной кнопке', (
-    tester,
-  ) async {
-    await open(tester, IntentionRelationGroup.needs);
-    await openRowPage(tester, 'Высыпаться');
-    expectDisabledPageButton(tester, 'Уже в группе "Можно использовать"');
-    await tester.tap(addButton, warnIfMissed: false);
-    await tester.pumpAndSettle();
-    expect(find.byType(IntentionDetailsPage), findsOneWidget);
+    expect(find.byType(DockedFooter), findsNothing);
+    expect(find.text('Убрать из выбранных'), findsNothing);
     await router.maybePop();
-    await tester.pumpAndSettle();
-    expect(find.text('Добавить связи'), findsOneWidget);
-  });
-
-  testWidgets('причина на кнопке следует фактам связей, а не выдаче поиска', (
-    tester,
-  ) async {
-    await open(tester, IntentionRelationGroup.needs);
-    await tester.enterText(
-      find.byKey(const ValueKey('participant-picker-filter')),
-      'Плавать',
-    );
-    await tester.pumpAndSettle();
-    await openRowPage(tester, 'Плавать');
-    final coordinator = pageCoordinator(tester);
-    final relationId = (LongTermRelationId.decode(
-      _uuid(101),
-    ) as LongTermRelationIdDecodingSuccess).id;
-
-    // Новое название уводит строку из выдачи, а связь остаётся.
-    await finishIntentionCommand(
-      tester,
-      coordinator.acceptExisting(
-        UpdateIntention(id: _id(2), title: 'Нырять', description: null),
-        presentationTitle: 'Плавать',
-      ),
-    );
-    expectDisabledPageButton(tester, 'Уже добавлено');
-
-    await finishRelationCommand(
-      tester,
-      coordinator.acceptRelationUpdate(
-        UpdateLongTermRelation(
-          relationId: relationId,
-          patch: const LongTermRelationPatch(
-            type: LongTermRelationFieldSet(LongTermRelationType.can),
-          ),
-        ),
-      ),
-    );
-    expectDisabledPageButton(tester, 'Уже в группе "Можно использовать"');
-
-    await finishRelationCommand(
-      tester,
-      coordinator.acceptRelationArchive(ArchiveLongTermRelation(relationId)),
-    );
-    expectDisabledPageButton(
-      tester,
-      'Уже в группе "Можно использовать", в архиве',
-    );
-
-    await finishRelationCommand(
-      tester,
-      coordinator.acceptRelationDelete(DeleteLongTermRelation(relationId)),
-    );
-    expect(find.text('Добавить к выбранным'), findsOneWidget);
-    await tester.tap(addButton);
     await tester.pumpAndSettle();
     expect(find.text('Добавить 1 связь'), findsOneWidget);
   });
 
-  testWidgets('занятое архивированное намерение называет архив, а после '
-      'восстановления снова причину занятости', (tester) async {
-    await open(tester, IntentionRelationGroup.needs);
-    await openRowPage(tester, 'Плавать');
-    final coordinator = pageCoordinator(tester);
-
-    await finishIntentionCommand(
-      tester,
-      coordinator.acceptExisting(
-        ArchiveIntention(_id(2)),
-        presentationTitle: 'Плавать',
-      ),
-    );
-    expectDisabledPageButton(tester, 'Намерение в архиве');
-
-    await finishIntentionCommand(
-      tester,
-      coordinator.acceptExisting(
-        RestoreIntention(_id(2)),
-        presentationTitle: 'Плавать',
-      ),
-    );
-    // Каскад архивировал занимающую связь, и причина это называет.
-    expectDisabledPageButton(tester, 'Уже добавлено, в архиве');
-  });
-
-  testWidgets('страница удалённого намерения кнопку не показывает', (
+  testWidgets('причина занятой пары остаётся в поиске, а не на странице', (
     tester,
   ) async {
-    await seedGraph(
-      database,
-      () => database
-          .into(database.intentions)
-          .insert(
-            IntentionsCompanion.insert(
-              id: _uuid(6),
-              title: 'Отдыхать',
-              createdAt: 6,
-              updatedAt: 6,
-            ),
-          ),
-    );
     await open(tester, IntentionRelationGroup.needs);
-    await openRowPage(tester, 'Отдыхать');
-    expect(find.byType(DockedFooter), findsOneWidget);
+    expect(find.text('Уже в группе "Можно использовать"'), findsOneWidget);
+    await openRowPage(tester, 'Высыпаться');
 
-    await finishIntentionCommand(
-      tester,
-      pageCoordinator(
-        tester,
-      ).acceptExisting(DeleteIntention(_id(6)), presentationTitle: 'Отдыхать'),
-    );
-
-    expect(find.byType(IntentionDetailsPage), findsOneWidget);
     expect(find.byType(DockedFooter), findsNothing);
+    expect(find.text('Уже в группе "Можно использовать"'), findsNothing);
+    await router.maybePop();
+    await tester.pumpAndSettle();
+    expect(find.text('Уже в группе "Можно использовать"'), findsOneWidget);
+    expect(find.text('Добавить связи'), findsOneWidget);
   });
 
-  testWidgets('кнопка страницы говорит по-английски', (tester) async {
-    await open(
-      tester,
-      IntentionRelationGroup.needs,
-      locale: const Locale('en'),
-    );
+  testWidgets('архивированное намерение не показывает управление отметками', (
+    tester,
+  ) async {
+    await open(tester, IntentionRelationGroup.needs);
     await openRowPage(tester, 'Гулять');
-    expect(find.text('Add to selected'), findsOneWidget);
-    await tester.tap(addButton);
+    final coordinator = ProviderScope.containerOf(
+      tester.element(find.byType(IntentionDetailsPage)),
+    ).read(graphCommandCoordinatorProvider.notifier);
+    final result = coordinator.acceptExisting(
+      ArchiveIntention(_id(5)),
+      presentationTitle: 'Гулять',
+    );
+    await tester.runAsync(() => (result as IntentionCommandAccepted).future);
     await tester.pumpAndSettle();
 
-    await openRowPage(tester, 'Гулять');
-    expect(find.text('Remove from selected'), findsOneWidget);
-    await finishIntentionCommand(
-      tester,
-      pageCoordinator(
-        tester,
-      ).acceptExisting(ArchiveIntention(_id(5)), presentationTitle: 'Гулять'),
-    );
-    expectDisabledPageButton(tester, 'Intention is archived');
+    expect(find.byType(DockedFooter), findsNothing);
+    expect(find.text('Намерение в архиве'), findsNothing);
+    await router.maybePop();
+    await tester.pumpAndSettle();
+    expect(find.text('Добавить связи'), findsOneWidget);
   });
 
   testWidgets('экран с отметкой и открытый лист назначения доступны для '
