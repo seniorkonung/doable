@@ -664,6 +664,51 @@ void main() {
       );
     });
 
+    testWidgets('после появления строки «Создать» следующее изменение '
+        'сохраняет положение видимого намерения', (tester) async {
+      final h = await _openRelationParticipants(tester, onCreate: (_) {});
+      await _showTitleResults(
+        tester,
+        h,
+        'Действие',
+        _firstPage(_actions(15), exactTitleCount: 1),
+      );
+
+      await _renameCounterpart(tester, h, from: _exactMatch, to: _counterpart);
+      expect(find.byType(TagCreateRow), findsOneWidget);
+      expect(h.position.pixels, 0);
+
+      h.position.jumpTo(180);
+      await _settle(tester);
+      final visibleTop = _rowTop(tester, 'Действие 12');
+
+      final created = _action(16);
+      final accepted =
+          h.container
+                  .read(graphCommandCoordinatorProvider.notifier)
+                  .acceptCreation(
+                    IntentionCreationFormKey(),
+                    CreateIntention.withInitialState(
+                      title: created.title,
+                      description: null,
+                      readiness: created.readiness,
+                      tagIds: [],
+                    ),
+                  )
+              as IntentionCommandAccepted;
+      h.repository.completeCommand(
+        h.repository.commands.length - 1,
+        ResultSuccess(
+          fullCreationSuccess(created, revision: const TestCatalogRevision(3)),
+        ),
+      );
+      await accepted.future;
+      await _settle(tester);
+
+      expect(_loadedOf(h).items.first.title, 'Действие 16');
+      expect(_rowTop(tester, 'Действие 12'), visibleTop);
+    });
+
     testWidgets('строка, вернувшаяся в начале выдачи, видна над первой '
         'строкой и после ещё одного изменения выдачи до перестройки списка', (
       tester,
