@@ -1318,3 +1318,16 @@
   - **Зависимости:** 4.12.
   - **Предполагаемые файлы:** меняются `lib/src/daily_choice/presentation/daily_choice_creation_flow_session.dart`, `test/daily_choice/presentation/daily_choice_creation_flow_session_test.dart`, `test/daily_choice/presentation/editor/daily_choice_creation_page_test.dart`, `test/daily_choice/presentation/editor/daily_choice_creation_view_model_test.dart`.
   - **Размер:** XS.
+
+- [ ] 4.22 Созданные файлы соответствуют исходникам на голове, и проверка кодогенерации в CI проходит
+  - **Критерии приёмки:**
+    - `mise run codegen` выполнен, обновлённый `lib/src/intention/presentation/editor/intention_editor_view_model.g.dart` закоммичен: `_$intentionEditorViewModelHash()` соответствует исходнику после 4.18 вместо устаревшего `fdfe23ea…`. Закоммичены и любые другие изменения созданных файлов, которые даёт генерация.
+    - Созданные файлы не правятся вручную; исходники, тесты и поведение продукта не меняются.
+    - После коммита на чистом дереве `mise run codegen-check` завершается с кодом 0.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise run codegen-check` на чистом дереве после коммита (код 0).
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 4.18.
+  - **Предполагаемые файлы:** меняется `lib/src/intention/presentation/editor/intention_editor_view_model.g.dart` и, если их изменит генерация, другие созданные файлы.
+  - **Размер:** XS.
