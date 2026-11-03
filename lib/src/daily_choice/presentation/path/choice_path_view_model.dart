@@ -98,7 +98,7 @@ final class ChoicePathViewModel extends _$ChoicePathViewModel {
       ChoicePathDraftDirection.topDown => [...current.visibleSteps, selected],
       ChoicePathDraftDirection.bottomUp => [selected, ...current.visibleSteps],
     };
-    _restart(draft, visibleSteps);
+    unawaited(_restart(draft, visibleSteps));
     return true;
   }
 
@@ -128,7 +128,7 @@ final class ChoicePathViewModel extends _$ChoicePathViewModel {
         current.steps.length - stepCount,
       ),
     };
-    _restart(draft, visibleSteps);
+    unawaited(_restart(draft, visibleSteps));
     return true;
   }
 
@@ -143,11 +143,7 @@ final class ChoicePathViewModel extends _$ChoicePathViewModel {
             !(current.progress as ChoicePathPageFailure).canRetry)) {
       return Future.value();
     }
-    final draft = current.draft;
-    final visibleSteps = current.visibleSteps;
-    final generation = ++_generation;
-    state = ChoicePathLoading(draft, visibleSteps);
-    return _loadFirst(generation, draft, visibleSteps);
+    return _restart(current.draft, current.visibleSteps);
   }
 
   Future<void> retry() {
@@ -182,16 +178,15 @@ final class ChoicePathViewModel extends _$ChoicePathViewModel {
       ),
     );
     if (!_isCurrent(generation)) return;
-    if (_precedesKnownRevision(current.revision)) {
-      _conflict();
-      return;
-    }
     switch (result) {
       case GraphResultSuccess(:final value):
-        if (!_sameDraft(value.draft, current.draft) ||
-            value.revision.compareTo(current.revision) !=
-                GraphRevisionOrder.same) {
+        if (!_sameDraft(value.draft, current.draft)) {
           _conflict();
+          return;
+        }
+        if (value.revision.compareTo(current.revision) !=
+            GraphRevisionOrder.same) {
+          await _restart(current.draft, current.visibleSteps);
           return;
         }
         if (!_validPage(value)) {
@@ -220,8 +215,9 @@ final class ChoicePathViewModel extends _$ChoicePathViewModel {
           items: [...current.items, ...value.items],
           nextCursor: value.nextCursor,
         );
+      // Завершение могло прийти позже записи: путь проверяет первая порция.
       case GraphResultFailure(failure: ChoicePathContinuationSnapshotExpired()):
-        _conflict();
+        await _restart(current.draft, current.visibleSteps);
       case GraphResultFailure(
         failure: ChoicePathContinuationIntentionNotFoundFailure(),
       ):
@@ -231,13 +227,13 @@ final class ChoicePathViewModel extends _$ChoicePathViewModel {
     }
   }
 
-  void _restart(
+  Future<void> _restart(
     ChoicePathDraft draft,
     Iterable<LongTermRelationSummary> visibleSteps,
   ) {
     final generation = ++_generation;
     state = ChoicePathLoading(draft, visibleSteps);
-    unawaited(_loadFirst(generation, draft, state.visibleSteps));
+    return _loadFirst(generation, draft, state.visibleSteps);
   }
 
   Future<void> _loadFirst(
@@ -250,7 +246,10 @@ final class ChoicePathViewModel extends _$ChoicePathViewModel {
     if (!_isCurrent(generation)) return;
     switch (result) {
       case GraphResultSuccess(:final value):
-        if (_precedesKnownRevision(value.revision)) {
+        if (_isOlderObservation(value.revision)) {
+          return _loadFirst(generation, draft, visibleSteps);
+        }
+        if (_isOtherEpoch(value.revision)) {
           _conflict();
           return;
         }
@@ -263,16 +262,17 @@ final class ChoicePathViewModel extends _$ChoicePathViewModel {
           return;
         }
         _knownRevision = value.revision;
+        final currentSteps = draft.pathOrder(value.steps);
         state = value.items.isEmpty
             ? ChoicePathEmpty(
                 draft: draft,
-                visibleSteps: visibleSteps,
+                visibleSteps: currentSteps,
                 current: value.current,
                 revision: value.revision,
               )
             : ChoicePathData(
                 draft: draft,
-                visibleSteps: visibleSteps,
+                visibleSteps: currentSteps,
                 current: value.current,
                 revision: value.revision,
                 items: value.items,
@@ -341,16 +341,19 @@ final class ChoicePathViewModel extends _$ChoicePathViewModel {
     switch (result) {
       case GraphResultSuccess(:final value):
         if (_isOlderObservation(value.revision)) return;
-        _observeRevision(value.revision);
         final details = value.value;
         if (details == null) {
+          _knownRevision = value.revision;
           ++_generation;
           state = ChoicePathNotFound(state.draft, state.visibleSteps);
         } else if (details.intention.archiveState !=
                 IntentionArchiveState.active ||
             (state.draft.direction == ChoicePathDraftDirection.bottomUp &&
                 details.intention.readiness != IntentionReadiness.ready)) {
+          _knownRevision = value.revision;
           _conflict();
+        } else {
+          _observeRevision(value.revision);
         }
       case GraphResultFailure(:final failure):
         _observationFailed(switch (failure) {
@@ -369,17 +372,22 @@ final class ChoicePathViewModel extends _$ChoicePathViewModel {
     state = ChoicePathFailure(state.draft, state.visibleSteps, failure);
   }
 
+  /// Новая ревизия сама по себе не конфликт: путь проверяет новое чтение.
+  /// Идущее чтение отвечает старой ревизией и начинается заново в `_loadFirst`.
   void _observeRevision(GraphRevision revision) {
     if (!ref.mounted || _isOlderObservation(revision)) return;
     final known = _knownRevision;
     if (known != null && revision.compareTo(known) == GraphRevisionOrder.same) {
       return;
     }
+    final isOtherEpoch = _isOtherEpoch(revision);
     _knownRevision = revision;
     final current = state;
-    if (current is ChoicePathConfirmedState &&
-        revision.compareTo(current.revision) != GraphRevisionOrder.same) {
+    if (current is! ChoicePathConfirmedState) return;
+    if (isOtherEpoch) {
       _conflict();
+    } else {
+      unawaited(_restart(current.draft, current.visibleSteps));
     }
   }
 
@@ -389,13 +397,10 @@ final class ChoicePathViewModel extends _$ChoicePathViewModel {
         revision.compareTo(known) == GraphRevisionOrder.older;
   }
 
-  bool _precedesKnownRevision(GraphRevision revision) {
+  bool _isOtherEpoch(GraphRevision revision) {
     final known = _knownRevision;
-    if (known == null) return false;
-    return switch (revision.compareTo(known)) {
-      GraphRevisionOrder.older || GraphRevisionOrder.differentEpoch => true,
-      GraphRevisionOrder.same || GraphRevisionOrder.newer => false,
-    };
+    return known != null &&
+        revision.compareTo(known) == GraphRevisionOrder.differentEpoch;
   }
 
   void _conflict() {

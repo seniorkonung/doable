@@ -97,6 +97,7 @@ extension _ChoicePathContinuationReading on DriftPersonalGraphRepository {
       throw const _ChoicePathSnapshotHasExpired();
     }
 
+    final steps = <LongTermRelationSummary>[];
     if (draft.steps.isNotEmpty) {
       final relationRows = await _database
           .customSelect(
@@ -133,6 +134,16 @@ extension _ChoicePathContinuationReading on DriftPersonalGraphRepository {
             actual.scope != relation_domain.RelationScope.active) {
           throw const _ChoicePathSnapshotHasExpired();
         }
+        steps.add(
+          LongTermRelationSummary(
+            relation: actual.toDomain(),
+            source: _choicePathParticipant(intentions[step.sourceIntentionId]!),
+            related: _choicePathParticipant(
+              intentions[step.relatedIntentionId]!,
+            ),
+            hasDescription: actual.hasDescription,
+          ),
+        );
       }
     }
 
@@ -240,6 +251,7 @@ extension _ChoicePathContinuationReading on DriftPersonalGraphRepository {
     return ChoicePathContinuationsPage(
       draft: draft,
       current: intentions[draft.currentIntentionId]!,
+      steps: steps,
       items: items,
       nextCursor: stored.length > query.pageSize
           ? _DriftChoicePathCursor.fromBoundary(
@@ -251,6 +263,13 @@ extension _ChoicePathContinuationReading on DriftPersonalGraphRepository {
     );
   }
 }
+
+RelationParticipantSummary _choicePathParticipant(domain.Intention intention) =>
+    RelationParticipantSummary(
+      id: intention.id,
+      title: intention.title,
+      archiveState: intention.archiveState,
+    );
 
 final class _DriftChoicePathCursor implements ChoicePathContinuationCursor {
   _DriftChoicePathCursor.fromBoundary({

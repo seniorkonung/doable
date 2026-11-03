@@ -5,6 +5,7 @@ import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
+import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice.dart';
@@ -325,16 +326,19 @@ void main() {
     );
 
     repository.emitRevision(2);
+    await tester.pump();
+    expect(find.byKey(const ValueKey('choice-path-conflict')), findsNothing);
+    repository.fail(1, const ChoicePathContinuationSnapshotExpired());
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('choice-path-conflict')), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('choice-path-refresh')));
     await tester.pump();
-    repository.fail(1, const ChoicePathContinuationUnavailableFailure());
+    repository.fail(2, const ChoicePathContinuationUnavailableFailure());
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('choice-path-failure')), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('choice-path-retry')));
     await tester.pump();
-    repository.complete(2, [_edge(1, 2, 1)], revision: 2);
+    repository.complete(3, [_edge(1, 2, 1)], revision: 2);
     await tester.pumpAndSettle();
     expect(
       find.byKey(
@@ -343,6 +347,49 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets(
+    'новая ревизия снимает выбор действия и показывает новое название шага',
+    (tester) async {
+      final repository = _PathRepository();
+      addTearDown(repository.dispose);
+      await _pumpPage(tester, repository);
+      repository.complete(0, [_edge(1, 2, 1)]);
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(
+          ValueKey('choice-path-continue-${_relation(1).toCanonicalString()}'),
+        ),
+      );
+      await tester.pump();
+      repository.complete(1, [], ready: true);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('choice-path-select-action')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('choice-path-open-confirmation')),
+        findsOneWidget,
+      );
+
+      repository.emitRevision(2);
+      await tester.pump();
+      repository.complete(
+        2,
+        [],
+        ready: true,
+        revision: 2,
+        steps: [_edge(1, 2, 1, relatedTitle: 'Новое название')],
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('choice-path-conflict')), findsNothing);
+      expect(
+        find.byKey(const ValueKey('choice-path-open-confirmation')),
+        findsNothing,
+      );
+      expect(find.textContaining('Новое название'), findsOneWidget);
+    },
+  );
 
   testWidgets('порции и семантика доступны на английском', (tester) async {
     final repository = _PathRepository();
@@ -702,6 +749,7 @@ final class _PathRepository
     int revision = 1,
     bool ready = false,
     ChoicePathContinuationCursor? cursor,
+    List<LongTermRelationSummary>? steps,
   }) {
     final draft = queries[index].draft;
     _requests[index].complete(
@@ -709,6 +757,7 @@ final class _PathRepository
         ChoicePathContinuationsPage(
           draft: draft,
           current: _current(draft.currentIntentionId, ready: ready),
+          steps: steps ?? draft.steps.map(_stepSummary),
           items: items,
           nextCursor: cursor,
           revision: _Revision(revision),
@@ -803,26 +852,48 @@ LongTermRelationSummary _edge(
   int related,
   int number, {
   LongTermRelationType type = LongTermRelationType.need,
+  String? relatedTitle,
+}) => _summary(
+  id: _relation(number),
+  sourceId: _intention(source),
+  relatedId: _intention(related),
+  type: type,
+  relatedTitle: relatedTitle,
+);
+
+LongTermRelationSummary _stepSummary(ConfirmedChoicePathStep step) => _summary(
+  id: step.relationId,
+  sourceId: step.sourceIntentionId,
+  relatedId: step.relatedIntentionId,
+  type: step.type,
+);
+
+LongTermRelationSummary _summary({
+  required LongTermRelationId id,
+  required IntentionId sourceId,
+  required IntentionId relatedId,
+  required LongTermRelationType type,
+  String? relatedTitle,
 }) => LongTermRelationSummary(
   relation: LongTermRelation(
-    id: _relation(number),
-    sourceIntentionId: _intention(source),
-    relatedIntentionId: _intention(related),
+    id: id,
+    sourceIntentionId: sourceId,
+    relatedIntentionId: relatedId,
     type: type,
     priority: RelationPriority.p1,
     scope: RelationScope.active,
-    creationSequence: RelationCreationSequence(number),
+    creationSequence: RelationCreationSequence(1),
     createdAt: RelationTimestamp(DateTime.utc(2026)),
     updatedAt: RelationTimestamp(DateTime.utc(2026)),
   ),
   source: RelationParticipantSummary(
-    id: _intention(source),
-    title: 'Намерение $source',
+    id: sourceId,
+    title: _current(sourceId).title,
     archiveState: IntentionArchiveState.active,
   ),
   related: RelationParticipantSummary(
-    id: _intention(related),
-    title: 'Намерение $related',
+    id: relatedId,
+    title: relatedTitle ?? _current(relatedId).title,
     archiveState: IntentionArchiveState.active,
   ),
   hasDescription: false,
