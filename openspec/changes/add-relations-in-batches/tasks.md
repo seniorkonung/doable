@@ -1266,7 +1266,7 @@
   - **Предполагаемые файлы:** меняются `lib/src/long_term_relation/presentation/batch_picker/relation_batch_picker_page.dart`, `test/long_term_relation/presentation/batch_picker/relation_batch_picker_page_test.dart`.
   - **Размер:** XS.
 
-- [ ] 4.18 Уход во время принятого сохранения всегда спрашивает подтверждение, даже с непоправленным переданным названием
+- [x] 4.18 Уход во время принятого сохранения всегда спрашивает подтверждение, даже с непоправленным переданным названием
   - **Критерии приёмки:**
     - `requestClose` в `intention_editor_view_model.dart` при `draftAvailability == submitting` всегда возвращает `IntentionCreationCloseNeedsConfirmation` с `savingOnClose == IntentionCreationSavingOnClose.continues`, независимо от `draft.isChanged`. Сразу закрывается только неизменённый черновик в `editable`, в том числе с непоправленным названием из строки «Создать». Семантика `IntentionCreationDraft.isChanged` не меняется.
     - `IntentionCreationClosedImmediately` больше не несёт `savingOnClose`: сразу закрывается только черновик до принятия отправки, поэтому поле всегда было бы `notStarted`. Комментарий к `requestClose` описывает новое правило.

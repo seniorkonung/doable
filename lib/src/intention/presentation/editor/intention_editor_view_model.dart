@@ -202,10 +202,10 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
 
   /// Решает запрос закрытия сессии от любого способа ухода.
   ///
-  /// Неизменённый черновик завершает сессию сразу. Изменённый требует одного
-  /// подтверждения; повторный запрос до ответа второго не создаёт. Решение
-  /// сообщает, продолжится ли принятая отправка после закрытия. Запрос к
-  /// завершённой сессии ничего не закрывает.
+  /// Неизменённый черновик до отправки завершает сессию сразу. Изменённый
+  /// черновик или принятая отправка требуют одного подтверждения; повторный
+  /// запрос до ответа второго не создаёт. Решение сообщает, продолжится ли
+  /// отправка после закрытия. Запрос к завершённой сессии ничего не закрывает.
   IntentionCreationCloseDecision requestClose() {
     if (!ref.mounted) {
       return const IntentionCreationCloseSessionEnded();
@@ -225,11 +225,11 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
       case IntentionDraftAvailability.submitting:
         savingOnClose = IntentionCreationSavingOnClose.continues;
       case IntentionDraftAvailability.editable:
+        if (!state.draft.isChanged) {
+          _endOnRequest();
+          return const IntentionCreationClosedImmediately();
+        }
         savingOnClose = IntentionCreationSavingOnClose.notStarted;
-    }
-    if (!state.draft.isChanged) {
-      _endOnRequest();
-      return IntentionCreationClosedImmediately(savingOnClose);
     }
     final confirmation = IntentionCreationCloseConfirmation(
       formKey: _formKey,

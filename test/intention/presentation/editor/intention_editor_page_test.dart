@@ -146,6 +146,50 @@ void main() {
   );
 
   testWidgets(
+    'уход во время сохранения непоправленного названия требует подтверждения',
+    (tester) async {
+      final repository = ControlledCatalogRepository();
+      final created = <String>[];
+      final router = await _openEditor(
+        tester,
+        repository,
+        locale: const Locale('ru'),
+        launch: IntentionCreationForSearch(
+          initialTitle: 'Без правки',
+          onCreated: (_, title) => created.add(title),
+        ),
+      );
+      await tester.tap(find.byKey(_submit));
+      await tester.pump();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(_closeConfirmation), findsOneWidget);
+      expect(find.byKey(_sheet), findsOneWidget);
+      expect(
+        find.text(
+          'Сохранение уже выполняется и продолжится после закрытия формы. '
+          'Если сохранить не удастся, введённые данные не восстановятся.',
+        ),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(_closeDiscard));
+      await tester.pumpAndSettle();
+      expectIntentionGraphRootPage(router);
+      repository.completeCommand(0, _savedResult(title: 'Без правки'));
+      await tester.pump();
+      _completeCatalogRefresh(repository);
+      await tester.pumpAndSettle();
+      expect(created, isEmpty);
+      expect(
+        find.text('Создание — «Без правки»: Намерение создано.'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
     'поздний успех после ухода из панели поиска не вызывает обработчик',
     (tester) async {
       final repository = ControlledCatalogRepository();
