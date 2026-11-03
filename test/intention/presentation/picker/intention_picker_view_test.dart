@@ -15,6 +15,7 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_purp
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
+import 'package:doable/src/intention/presentation/picker/intention_picker_purpose_sheet.dart';
 import 'package:doable/src/intention/presentation/picker/intention_picker_view.dart';
 import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
@@ -37,6 +38,11 @@ import '../../../support/tag_positions.dart';
 const _screen = Size(390, 844);
 const _closeLabel = 'Закрыть поиск';
 const _emptyScopeMessage = 'Доступных активных действий нет.';
+final _purposeDescription = IntentionPickerPurposeDescription(
+  subtitle: 'Добавить в «Нужно»',
+  sheetLine: 'Новые связи в «Нужно»',
+  buildSheetBody: (_) => const SizedBox.shrink(),
+);
 
 final _actionField = find.byKey(const ValueKey('daily-choice-action-filter'));
 final _filterButton = find.byType(FilterButton);
@@ -956,6 +962,90 @@ void main() {
     );
   }
 
+  group('создание намерения в поиске с отметками', () {
+    final participants = SelectRelationParticipant(
+      session: IntentionSearchSession(),
+      pairProbe: RelationPairProbe(
+        counterpartId: testSummary(index: 9).id,
+        candidateRole: RelationParticipantRole.related,
+      ),
+    );
+
+    for (final (locale, plusLabel, rowText) in [
+      (const Locale('ru'), 'Создать намерение', 'Создать «Плавать»'),
+      (const Locale('en'), 'Create intention', 'Create “Плавать”'),
+    ]) {
+      testWidgets(
+        '${locale.languageCode}: плюс просит создание с пустым названием, '
+        'а строка «Создать» — с подстрокой',
+        (tester) async {
+          final h = await _open(
+            tester,
+            locale: locale,
+            checkable: true,
+            purpose: participants,
+            purposeDescription: _purposeDescription,
+          );
+          h.repository.complete(0, _firstPage(const []));
+          await tester.pumpAndSettle();
+          await _showTitleResults(tester, h, ' Плавать ');
+
+          await tester.tap(find.bySemanticsLabel(plusLabel));
+          await tester.tap(find.text(rowText));
+
+          expect(h.creations.map((creation) => creation.title), [
+            '',
+            'Плавать',
+          ]);
+        },
+      );
+    }
+
+    testWidgets('просьба страницы очищает поле и фильтр названия и сохраняет '
+        'условия по тегам', (tester) async {
+      final sport = _tag(1, 'Спорт');
+      final h = await _open(
+        tester,
+        checkable: true,
+        purpose: participants,
+        purposeDescription: _purposeDescription,
+        tags: [sport],
+      );
+      h.repository.complete(0, _firstPage(const []));
+      await tester.pumpAndSettle();
+      h.conditions(participants).cycle(sport.id);
+      await tester.pump();
+      h.repository.complete(1, _firstPage(const []));
+      await tester.pumpAndSettle();
+      await _showTitleResults(tester, h, 'Плавать');
+
+      await tester.tap(find.text('Создать «Плавать»'));
+      h.creations.single.clearTitle();
+      await tester.pump();
+
+      expect(find.text('Плавать'), findsNothing);
+      final query = h.repository.queries.last;
+      expect(query.titleFilter, isNull);
+      expect(query.tagFilter.requiredTagIds, [sport.id]);
+    });
+
+    testWidgets('поиск с выбором одного намерения плюса и строки не имеет', (
+      tester,
+    ) async {
+      final h = await _open(
+        tester,
+        purpose: participants,
+        purposeDescription: _purposeDescription,
+      );
+      h.repository.complete(0, _firstPage(const []));
+      await tester.pumpAndSettle();
+      await _showTitleResults(tester, h, 'Плавать');
+
+      expect(find.bySemanticsLabel('Создать намерение'), findsNothing);
+      expect(find.text('Создать «Плавать»'), findsNothing);
+    });
+  });
+
   for (final brightness in Brightness.values) {
     for (final locale in [const Locale('ru'), const Locale('en')]) {
       testWidgets(
@@ -1011,6 +1101,7 @@ Result<IntentionCatalogPage> _firstPage(
   int? totalCount,
   IntentionTypeCounts? typeCounts,
   Map<IntentionId, PairOccupant>? pairOccupants,
+  int? exactTitleCount,
 }) => ResultSuccess(
   IntentionCatalogFirstPage(
     items: items,
@@ -1023,8 +1114,25 @@ Result<IntentionCatalogPage> _firstPage(
         : null,
     revision: const TestCatalogRevision(1),
     pairOccupants: pairOccupants,
+    exactTitleCount: exactTitleCount,
   ),
 );
+
+/// Вводит подстроку [title], которой не называется ни одно активное намерение.
+Future<void> _showTitleResults(
+  WidgetTester tester,
+  _Harness h,
+  String title,
+) async {
+  await tester.enterText(find.byType(EditableText), title);
+  await tester.pump(const Duration(milliseconds: 300));
+  await tester.pump();
+  h.repository.complete(
+    h.repository.queries.length - 1,
+    _firstPage(const [], exactTitleCount: 0),
+  );
+  await tester.pumpAndSettle();
+}
 
 Tag _tag(int number, String name) => Tag(
   id: (TagId.decode(
@@ -1043,6 +1151,7 @@ final class _Harness {
   int closes = 0;
   final picks = <GraphSnapshot<IntentionSummary>>[];
   final openedDetails = <IntentionId>[];
+  final creations = <({String title, VoidCallback clearTitle})>[];
 
   IntentionTagConditionsViewModel conditions(IntentionPickerPurpose purpose) =>
       container.read(intentionTagConditionsViewModelProvider(purpose).notifier);
@@ -1055,6 +1164,7 @@ Future<_Harness> _open(
   IntentionPickerPurpose? purpose,
   List<Tag>? tags,
   bool checkable = false,
+  IntentionPickerPurposeDescription? purposeDescription,
 }) async {
   tester.view
     ..physicalSize = _screen
@@ -1084,9 +1194,12 @@ Future<_Harness> _open(
                   group: IntentionRelationGroup.needs,
                   selectedIds: {_action(2).id},
                   onToggle: h.picks.add,
+                  onCreate: (title, clearTitle) =>
+                      h.creations.add((title: title, clearTitle: clearTitle)),
                 )
               : IntentionPickerSingle(onPick: h.picks.add),
           onOpenDetails: h.openedDetails.add,
+          purposeDescription: purposeDescription,
         ),
       ),
     ),

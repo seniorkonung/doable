@@ -117,6 +117,7 @@ final class _RelationBatchPickerPageState
           onToggle: (pick) => ref
               .read(provider.notifier)
               .toggle(pick.value.id, pick.value.title),
+          onCreate: (_, _) {},
         ),
         onOpenDetails: (id) {
           if (!ref.read(provider).canEdit) return;

@@ -3910,6 +3910,18 @@ abstract class AppLocalizations {
   /// **'Clear the name'**
   String get intentionPickerClearSearch;
 
+  /// Доступное название плюса в шапке поиска участника
+  ///
+  /// In en, this message translates to:
+  /// **'Create intention'**
+  String get intentionPickerCreateIntention;
+
+  /// Строка над выдачей поиска участника, которая создаёт намерение с названием из подстроки
+  ///
+  /// In en, this message translates to:
+  /// **'Create “{title}”'**
+  String intentionPickerCreateNamed(String title);
+
   /// Доступное название кнопки фильтра по тегам на экране выбора с числом условий
   ///
   /// In en, this message translates to:

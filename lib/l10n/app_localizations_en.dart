@@ -2540,6 +2540,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get intentionPickerClearSearch => 'Clear the name';
 
   @override
+  String get intentionPickerCreateIntention => 'Create intention';
+
+  @override
+  String intentionPickerCreateNamed(String title) {
+    return 'Create “$title”';
+  }
+
+  @override
   String intentionPickerFilterLabel(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,

@@ -1077,7 +1077,7 @@
   - **Предполагаемые файлы:** меняются `lib/src/long_term_relation/presentation/batch_picker/relation_batch_view_model.dart`, `relation_batch_state.dart`, `relation_batch_picker_page.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации, тесты `test/long_term_relation/presentation/batch_picker/`.
   - **Размер:** S.
 
-- [ ] 4.6 Экран выбора с отметками показывает плюс в шапке и строку «Создать» над выдачей
+- [x] 4.6 Экран выбора с отметками показывает плюс в шапке и строку «Создать» над выдачей
   - **Критерии приёмки:**
     - `TopBar.withPurpose` принимает `action`, а `TopBarAction` — мини-значок: плюс с `intentionMini` как в `NavBar` по README `TopBar`, область нажатия 44. Заголовок и строка назначения не меняются.
     - `IntentionPickerCheckable` несёт обработчик создания, поэтому плюс и строка есть только в варианте отметок. У поисков дневного выбора их нет, а их тесты не меняются.

@@ -1974,6 +1974,15 @@
   "@intentionPickerClearSearch": {
     "description": "Доступное название крестика очистки поля поиска на экране выбора"
   },
+  "intentionPickerCreateIntention": "Create intention",
+  "@intentionPickerCreateIntention": {
+    "description": "Доступное название плюса в шапке поиска участника"
+  },
+  "intentionPickerCreateNamed": "Create “{title}”",
+  "@intentionPickerCreateNamed": {
+    "description": "Строка над выдачей поиска участника, которая создаёт намерение с названием из подстроки",
+    "placeholders": {"title": {"type": "String"}}
+  },
   "intentionPickerFilterLabel": "{count, plural, =0{Filter by tags} =1{Filter by tags, 1 condition} other{Filter by tags, {count} conditions}}",
   "@intentionPickerFilterLabel": {
     "description": "Доступное название кнопки фильтра по тегам на экране выбора с числом условий",

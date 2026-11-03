@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../design_system/components/empty_state.dart';
 import '../../../design_system/components/top_bar.dart';
+import '../../../design_system/doable_icon.dart';
 import '../../../design_system/doable_metrics.dart';
 import '../../../graph/application/graph_revision.dart';
 import '../../../long_term_relation/application/intention_relation_group.dart';
@@ -32,7 +33,7 @@ import 'intention_picker_row.dart';
 /// заголовка списка и выдачи.
 ///
 /// Экран не знает маршрутов, права запуска и типа результата: о закрытии,
-/// выборе и открытии подробностей страница узнаёт из обработчиков.
+/// выборе, создании и открытии подробностей страница узнаёт из обработчиков.
 final class IntentionPickerView extends ConsumerStatefulWidget {
   const IntentionPickerView({
     required this.purpose,
@@ -91,16 +92,30 @@ final class IntentionPickerCheckable extends IntentionPickerRowBehavior {
     required this.group,
     required this.selectedIds,
     required this.onToggle,
+    required this.onCreate,
   });
   final IntentionRelationGroup group;
   final Set<IntentionId> selectedIds;
   final void Function(GraphSnapshot<IntentionSummary>) onToggle;
+
+  /// Просит создать намерение: плюс шапки передаёт пустое [title], а строка
+  /// «Создать» — подстроку. [clearTitle] разом очищает поле и фильтр названия
+  /// и сохраняет условия по тегам.
+  final void Function(String title, VoidCallback clearTitle) onCreate;
 }
 
 final class _IntentionPickerViewState
     extends ConsumerState<IntentionPickerView> {
   final _titleController = TextEditingController();
   bool _purposeExpanded = false;
+
+  /// Полем владеет экран, а применённым фильтром — модель выдачи.
+  void _clearTitle() {
+    _titleController.clear();
+    ref
+        .read(intentionCatalogViewModelProvider(widget.purpose).notifier)
+        .clearTitleFilter();
+  }
 
   Future<void> _openPurpose(
     IntentionPickerPurposeDescription description,
@@ -121,12 +136,15 @@ final class _IntentionPickerViewState
     final l10n = AppLocalizations.of(context);
     final kind = IntentionSearchKind.of(widget.purpose);
     final keyPrefix = kind.keyPrefix;
-    final catalogProvider = intentionCatalogViewModelProvider(widget.purpose);
     final conditionsProvider = intentionTagConditionsViewModelProvider(
       widget.purpose,
     );
     final title = kind.title(l10n);
     final purposeDescription = widget.purposeDescription;
+    final onCreate = switch (widget.rowBehavior) {
+      IntentionPickerSingle() => null,
+      IntentionPickerCheckable(:final onCreate) => onCreate,
+    };
     return Scaffold(
       appBar: purposeDescription == null
           ? TopBar(
@@ -150,6 +168,14 @@ final class _IntentionPickerViewState
                 expanded: _purposeExpanded,
                 onOpen: () => unawaited(_openPurpose(purposeDescription)),
               ),
+              action: onCreate == null
+                  ? null
+                  : TopBarAction(
+                      icon: DoableIconData.plus,
+                      miniIcon: DoableIconData.intentionMini,
+                      label: l10n.intentionPickerCreateIntention,
+                      onPressed: () => onCreate('', _clearTitle),
+                    ),
             ),
       body: SafeArea(
         top: false,
@@ -235,11 +261,13 @@ final class _IntentionPickerViewState
                   text: widget.emptyScopeMessage,
                 ),
                 onResetFilters: () {
-                  _titleController.clear();
-                  ref.read(catalogProvider.notifier).clearTitleFilter();
+                  _clearTitle();
                   ref.read(conditionsProvider.notifier).clear();
                 },
                 bottomPadding: DoableMetrics.space10,
+                onCreate: onCreate == null
+                    ? null
+                    : (title) => onCreate(title, _clearTitle),
               ),
             ),
             if (widget.notice case final notice?)

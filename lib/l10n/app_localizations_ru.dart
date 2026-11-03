@@ -2565,6 +2565,14 @@ class AppLocalizationsRu extends AppLocalizations {
   String get intentionPickerClearSearch => 'Очистить название';
 
   @override
+  String get intentionPickerCreateIntention => 'Создать намерение';
+
+  @override
+  String intentionPickerCreateNamed(String title) {
+    return 'Создать «$title»';
+  }
+
+  @override
   String intentionPickerFilterLabel(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,

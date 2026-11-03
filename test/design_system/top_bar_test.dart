@@ -620,6 +620,57 @@ void main() {
     });
   }
 
+  testWidgets('плюс с мини-значком стоит на панели со строкой назначения в '
+      'области 44, а заголовок и строка назначения не сдвигаются', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    var opens = 0;
+    await _pump(tester, _app(bar: _purposeBar()));
+    final titleRect = tester.getRect(find.text('Выбор'));
+    final subtitleRect = tester.getRect(find.text('Для чего'));
+
+    await _pump(
+      tester,
+      _app(
+        bar: _purposeBar(
+          action: TopBarAction(
+            icon: DoableIconData.plus,
+            miniIcon: DoableIconData.intentionMini,
+            label: 'Создать намерение',
+            onPressed: () => opens++,
+          ),
+        ),
+      ),
+    );
+
+    final plus = _icon(DoableIconData.plus);
+    final mini = _icon(DoableIconData.intentionMini);
+    final area = find.ancestor(of: plus, matching: find.byType(InkResponse));
+    expect(tester.widget<DoableIcon>(plus).size, 24);
+    expect(tester.widget<DoableIcon>(mini).size, 14);
+    expect(tester.getRect(area), const Rect.fromLTWH(390 - 8 - 44, 54, 44, 44));
+    expect(tester.getCenter(plus), const Offset(390 - 30, 76));
+    // Мини-значок выходит за плюс настолько же, как у кнопки NavBar.
+    expect(tester.getRect(mini).right, tester.getRect(plus).right + 8);
+    expect(tester.getRect(mini).bottom, tester.getRect(plus).bottom + 4);
+    expect(tester.getRect(find.text('Выбор')), titleRect);
+    expect(tester.getRect(find.text('Для чего')), subtitleRect);
+    expect(
+      tester.getSemantics(find.bySemanticsLabel('Создать намерение')),
+      isSemantics(
+        label: 'Создать намерение',
+        isButton: true,
+        hasTapAction: true,
+        children: const [],
+      ),
+    );
+
+    await tester.tap(area);
+    expect(opens, 1);
+    semantics.dispose();
+  });
+
   testWidgets('при тексте масштаба 2 заголовок по-прежнему вмещается в '
       'панель по центру', (tester) async {
     await _pump(tester, _app(textScale: 2, bar: _bar()));
@@ -707,12 +758,14 @@ TopBar Function(BuildContext) _purposeBar({
   String label = 'Выбор. Для чего. Показать, что выбирается',
   bool expanded = false,
   VoidCallback? onOpen,
+  TopBarAction? action,
 }) =>
     (context) => TopBar.withPurpose(
       context,
       title: title,
       closeLabel: 'Закрыть выбор',
       onClose: () {},
+      action: action,
       purpose: TopBarPurpose(
         subtitle: subtitle,
         label: label,

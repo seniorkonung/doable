@@ -155,11 +155,14 @@ final class ResultsScrollKeeper {
   /// Строки, добавленные за прежней выдачей, и отметки занятых пар этих новых
   /// строк видимую строку не сдвигают. Отметка прежней строки сдвигает: она
   /// добавляет строке или убирает у неё линию меток, и строки под ней
-  /// смещаются.
+  /// смещаются. Сдвигает и строка «Создать»: она стоит над всей выдачей.
   bool _mayShiftVisibleRow(
     IntentionCatalogLoaded previous,
     IntentionCatalogLoaded next,
   ) {
+    if (previous.createTitle != next.createTitle) {
+      return true;
+    }
     final previousItems = previous.items;
     final nextItems = next.items;
     if (nextItems.length < previousItems.length) {
