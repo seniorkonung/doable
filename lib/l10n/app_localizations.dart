@@ -4897,6 +4897,12 @@ abstract class AppLocalizations {
   /// **'{count, plural, one{{count} relation will not be added.} other{{count} relations will not be added.}}'**
   String batchDiscardMessage(int count);
 
+  /// При сбросе отметок созданные намерения сохраняются
+  ///
+  /// In en, this message translates to:
+  /// **'Created intentions will remain in the catalog.'**
+  String get batchCreatedRemain;
+
   /// Сбросить отметки поиска
   ///
   /// In en, this message translates to:

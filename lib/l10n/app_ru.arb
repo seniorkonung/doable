@@ -927,6 +927,7 @@
   "batchAdding": "Добавляем…",
   "batchDiscardTitle": "Сбросить выбранные намерения?",
   "batchDiscardMessage": "{count, plural, one{{count} связь не будет добавлена.} few{{count} связи не будут добавлены.} many{{count} связей не будут добавлены.} other{{count} связи не будут добавлены.}}",
+  "batchCreatedRemain": "Созданные намерения останутся в каталоге.",
   "batchDiscardAction": "Сбросить",
   "batchContinueAction": "Продолжить выбор"
 }

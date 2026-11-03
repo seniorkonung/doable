@@ -23,12 +23,14 @@ import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/picker/intention_picker_view.dart';
 import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/relation_pair_probe.dart';
 import 'package:doable/src/long_term_relation/presentation/batch_picker/relation_batch_picker_page.dart';
+import 'package:doable/src/long_term_relation/presentation/batch_picker/relation_batch_view_model.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
@@ -214,6 +216,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Сбросить выбранные намерения?'), findsOneWidget);
       expect(find.text('3 связи не будут добавлены.'), findsOneWidget);
+      expect(find.textContaining('Созданные намерения'), findsNothing);
       final l10n = AppLocalizations.of(
         tester.element(find.byType(RelationBatchPickerPage)),
       );
@@ -230,6 +233,66 @@ void main() {
       semantics.dispose();
     },
   );
+
+  for (final (locale, message, keep) in const [
+    (
+      Locale('ru'),
+      'Созданные намерения останутся в каталоге.',
+      'Продолжить выбор',
+    ),
+    (
+      Locale('en'),
+      'Created intentions will remain in the catalog.',
+      'Continue selecting',
+    ),
+  ]) {
+    testWidgets(
+      '${locale.languageCode}: подтверждение сохраняет созданные намерения и отметки',
+      (tester) async {
+        await open(tester, IntentionRelationGroup.neededFor, locale: locale);
+        await tester.tap(find.text('Плавать'));
+        await tester.tap(find.text('Бегать'));
+        final picker = tester.widget<IntentionPickerView>(
+          find.byType(IntentionPickerView),
+        );
+        final purpose = picker.purpose as SelectRelationParticipant;
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(RelationBatchPickerPage)),
+        );
+        final model = container.read(
+          relationBatchViewModelProvider(
+            purpose.session,
+            _id(1),
+            IntentionRelationGroup.neededFor,
+            'Здоровье',
+          ).notifier,
+        );
+        model.acceptCreated(_id(6), 'Созданное');
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const ValueKey('participant-picker-cancel')),
+        );
+        await tester.pumpAndSettle();
+        expect(find.textContaining(message), findsOneWidget);
+        await tester.tap(find.text(keep));
+        await tester.pumpAndSettle();
+        expect(
+          container
+              .read(
+                relationBatchViewModelProvider(
+                  purpose.session,
+                  _id(1),
+                  IntentionRelationGroup.neededFor,
+                  'Здоровье',
+                ),
+              )
+              .selected
+              .map((item) => item.title),
+          ['Плавать', 'Бегать', 'Созданное'],
+        );
+      },
+    );
+  }
 
   testWidgets(
     'системное назад позволяет сбросить отметки без создания связей',
@@ -466,6 +529,37 @@ void main() {
 
     expect(find.byType(Notice), findsNothing);
     expect(find.text('Добавить 1 связь'), findsOneWidget);
+  });
+
+  testWidgets('созданное намерение снимает отказ добавления', (tester) async {
+    await open(tester, IntentionRelationGroup.neededFor);
+    await tester.tap(find.text('Плавать'));
+    await tester.pumpAndSettle();
+    await tester.runAsync(() => occupyPair(2, 1));
+    await tester.tap(addButton);
+    await settleCommand(tester);
+    expect(find.byType(Notice), findsOneWidget);
+
+    final picker = tester.widget<IntentionPickerView>(
+      find.byType(IntentionPickerView),
+    );
+    final purpose = picker.purpose as SelectRelationParticipant;
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(RelationBatchPickerPage)),
+    );
+    container
+        .read(
+          relationBatchViewModelProvider(
+            purpose.session,
+            _id(1),
+            IntentionRelationGroup.neededFor,
+            'Здоровье',
+          ).notifier,
+        )
+        .acceptCreated(_id(6), 'Созданное');
+    await tester.pumpAndSettle();
+    expect(find.byType(Notice), findsNothing);
+    expect(find.text('Добавить 2 связи'), findsOneWidget);
   });
 
   testWidgets('отказ сохраняет отметку на том же одноимённом намерении', (

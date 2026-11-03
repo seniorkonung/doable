@@ -3191,6 +3191,9 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
+  String get batchCreatedRemain => 'Созданные намерения останутся в каталоге.';
+
+  @override
   String get batchDiscardAction => 'Сбросить';
 
   @override

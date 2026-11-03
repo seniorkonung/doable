@@ -43,11 +43,13 @@ final class RelationBatchState {
     required this.pageTitle,
     required Iterable<RelationBatchSelection> selected,
     required this.operation,
+    required this.hasCreatedIntentions,
   }) : selected = List.unmodifiable(selected);
 
   final String pageTitle;
   final List<RelationBatchSelection> selected;
   final RelationBatchOperation operation;
+  final bool hasCreatedIntentions;
 
   /// Отметки и переходы со строк принимаются, пока добавление не начато.
   bool get canEdit => switch (operation) {

@@ -108,6 +108,28 @@ void main() {
     expect(h.container.read(other).selected, isEmpty);
   });
 
+  test(
+    'созданное намерение отмечается последним и факт создания сохраняется',
+    () {
+      final h = _Harness();
+      addTearDown(h.dispose);
+      h.model.toggle(_id(1), 'Первое');
+      h.model.toggle(_id(2), 'Второе');
+
+      h.model.acceptCreated(_id(3), 'Созданное');
+      expect(h.selected, [
+        (_id(1), 'Первое'),
+        (_id(2), 'Второе'),
+        (_id(3), 'Созданное'),
+      ]);
+      expect(h.state.hasCreatedIntentions, isTrue);
+
+      h.model.remove(_id(3));
+      expect(h.state.hasCreatedIntentions, isTrue);
+      expect(h.selected, [(_id(1), 'Первое'), (_id(2), 'Второе')]);
+    },
+  );
+
   test('подтверждённые переименования обновляют названия, а архив и удаление снимают отметки', () {
     final h = _Harness();
     addTearDown(h.dispose);

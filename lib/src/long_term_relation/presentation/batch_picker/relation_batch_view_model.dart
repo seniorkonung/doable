@@ -37,6 +37,7 @@ final class RelationBatchViewModel extends _$RelationBatchViewModel {
   late IntentionRelationGroup _group;
   final _searchKey = RelationsAdditionSearchKey();
   final _selected = <IntentionId, String>{};
+  bool _hasCreatedIntentions = false;
   late String _pageTitle;
   RelationBatchOperation _operation = const RelationBatchIdle();
   LongTermRelationOperationToken? _activeToken;
@@ -69,6 +70,15 @@ final class RelationBatchViewModel extends _$RelationBatchViewModel {
     } else {
       _selected[id] = title;
     }
+    _publish(const RelationBatchIdle());
+  }
+
+  /// Принимает результат живой панели создания для этого поиска.
+  void acceptCreated(IntentionId id, String title) {
+    if (!ref.mounted || !state.canEdit) return;
+    _selected.remove(id);
+    _selected[id] = title;
+    _hasCreatedIntentions = true;
     _publish(const RelationBatchIdle());
   }
 
@@ -181,6 +191,7 @@ final class RelationBatchViewModel extends _$RelationBatchViewModel {
   RelationBatchState _snapshot() => RelationBatchState(
     operation: _operation,
     pageTitle: _pageTitle,
+    hasCreatedIntentions: _hasCreatedIntentions,
     selected: [
       for (final entry in _selected.entries)
         RelationBatchSelection(id: entry.key, title: entry.value),

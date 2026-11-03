@@ -3162,6 +3162,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get batchCreatedRemain =>
+      'Created intentions will remain in the catalog.';
+
+  @override
   String get batchDiscardAction => 'Discard';
 
   @override

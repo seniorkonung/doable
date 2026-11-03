@@ -85,7 +85,10 @@ final class _RelationBatchPickerPageState
             final discard = await showDiscardDialog(
               context: context,
               title: l10n.batchDiscardTitle,
-              text: l10n.batchDiscardMessage(batch.selected.length),
+              text: [
+                l10n.batchDiscardMessage(batch.selected.length),
+                if (batch.hasCreatedIntentions) l10n.batchCreatedRemain,
+              ].join(' '),
               discardLabel: l10n.batchDiscardAction,
               keepLabel: l10n.batchContinueAction,
             );
