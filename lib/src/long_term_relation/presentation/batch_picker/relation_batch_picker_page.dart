@@ -49,7 +49,11 @@ final class _RelationBatchPickerPageState
     extends ConsumerState<RelationBatchPickerPage> {
   final _session = IntentionSearchSession();
   bool _confirmingClose = false;
-  bool _openingCreation = false;
+
+  /// Прекращает слежение за панелью создания, открытой этим поиском.
+  ///
+  /// Пока слежение идёт, вторая панель не открывается.
+  VoidCallback? _stopFollowingCreation;
 
   late final _purpose = SelectRelationParticipant(
     session: _session,
@@ -58,6 +62,50 @@ final class _RelationBatchPickerPageState
       group: widget.group,
     ),
   );
+
+  @override
+  void dispose() {
+    _stopFollowingCreation?.call();
+    super.dispose();
+  }
+
+  /// Открывает панель создания и следит за ней, пока её маршрут не снят.
+  ///
+  /// Future перехода не завершается, если панель снята вместе с открытым над
+  /// ней диалогом, поэтому снятие отслеживается и по стеку маршрутов.
+  void _openCreation(IntentionEditorRoute route) {
+    final router = context.router;
+    final pickerMatchId = context.routeData.matchId;
+    LocalKey? panelMatchId;
+    late final VoidCallback follow;
+    void stop() {
+      router.removeListener(follow);
+      _stopFollowingCreation = null;
+    }
+
+    follow = () {
+      final stack = router.stackData;
+      if (panelMatchId case final panel?) {
+        if (!stack.any((entry) => entry.matchId == panel)) stop();
+        return;
+      }
+      // Переход добавляет панель в стек не сразу, а над этим поиском.
+      panelMatchId = stack
+          .skipWhile((entry) => entry.matchId != pickerMatchId)
+          .skip(1)
+          .where((entry) => entry.name == IntentionEditorRoute.name)
+          .firstOrNull
+          ?.matchId;
+    };
+    _stopFollowingCreation = stop;
+    router.addListener(follow);
+    unawaited(
+      router.push(route).whenComplete(() {
+        // Позднее завершение перехода не касается следующей панели.
+        if (identical(_stopFollowingCreation, stop)) stop();
+      }),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -123,28 +171,21 @@ final class _RelationBatchPickerPageState
               .read(provider.notifier)
               .toggle(pick.value.id, pick.value.title),
           onCreate: (title, clearTitle) {
-            if (_openingCreation || !ref.read(provider).canEdit) return;
-            _openingCreation = true;
-            unawaited(() async {
-              try {
-                await context.router.push(
-                  IntentionEditorRoute(
-                    launch: IntentionCreationForSearch(
-                      initialTitle: title,
-                      onCreated: (id, createdTitle) {
-                        if (!mounted || !ref.read(provider).canEdit) return;
-                        ref
-                            .read(provider.notifier)
-                            .acceptCreated(id, createdTitle);
-                        clearTitle();
-                      },
-                    ),
-                  ),
-                );
-              } finally {
-                _openingCreation = false;
-              }
-            }());
+            if (_stopFollowingCreation != null || !ref.read(provider).canEdit) {
+              return;
+            }
+            _openCreation(
+              IntentionEditorRoute(
+                launch: IntentionCreationForSearch(
+                  initialTitle: title,
+                  onCreated: (id, createdTitle) {
+                    if (!mounted || !ref.read(provider).canEdit) return;
+                    ref.read(provider.notifier).acceptCreated(id, createdTitle);
+                    clearTitle();
+                  },
+                ),
+              ),
+            );
           },
         ),
         onOpenDetails: (id) {

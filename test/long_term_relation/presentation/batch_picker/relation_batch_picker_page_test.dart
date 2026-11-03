@@ -308,6 +308,44 @@ void main() {
   );
 
   testWidgets(
+    'успех при открытом подтверждении ухода снимает панель, и плюс снова её открывает',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      await open(tester, IntentionRelationGroup.neededFor);
+      await tester.tap(find.bySemanticsLabel('Создать намерение'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('intention-editor-title')),
+        'Ходить на работу',
+      );
+      await tester.pump();
+      final gate = holdStorage();
+      await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
+      await tester.pump();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text('Закрыть форму?'), findsOneWidget);
+
+      gate.complete();
+      await settleCommand(tester);
+      expect(find.byType(IntentionEditorPage), findsNothing);
+      expect(find.text('Закрыть форму?'), findsNothing);
+      expect(
+        tester
+            .getSemantics(find.text('Ходить на работу'))
+            .flagsCollection
+            .isChecked,
+        CheckedState.isTrue,
+      );
+
+      await tester.tap(find.bySemanticsLabel('Создать намерение'));
+      await tester.pumpAndSettle();
+      expect(find.byType(IntentionEditorPage), findsOneWidget);
+      semantics.dispose();
+    },
+  );
+
+  testWidgets(
     'крестик спрашивает о сбросе и сохраняет отметки при продолжении',
     (tester) async {
       final semantics = tester.ensureSemantics();
