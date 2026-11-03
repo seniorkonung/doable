@@ -1337,6 +1337,119 @@ void main() {
     expect(find.text('Добавить 1 связь'), findsOneWidget);
   });
 
+  for (final complete in [true, false]) {
+    testWidgets(
+      complete
+          ? 'успех вложенного поиска сохраняет первоначальный поиск того же назначения'
+          : 'сброс вложенного поиска сохраняет первоначальный поиск того же назначения',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        await seedGraph(database, () async {
+          await database
+              .into(database.intentions)
+              .insert(
+                IntentionsCompanion.insert(
+                  id: _uuid(6),
+                  title: 'Дышать',
+                  createdAt: 6,
+                  updatedAt: 6,
+                ),
+              );
+        });
+        await open(tester, IntentionRelationGroup.needs);
+        await tester.tap(find.text('Гулять'));
+        await tester.pumpAndSettle();
+        final filter = find.byKey(const ValueKey('participant-picker-filter'));
+        await tester.enterText(filter, 'Гулять');
+        await tester.pumpAndSettle();
+        await openRowPage(tester, 'Гулять');
+        await tester.tap(find.text('Связи').first);
+        await tester.pumpAndSettle();
+        final neighbor = find.bySemanticsLabel(
+          'Открыть страницу намерения: Здоровье',
+        );
+        await tester.ensureVisible(neighbor);
+        await tester.tap(neighbor);
+        await tester.pumpAndSettle();
+        final group = find.byKey(
+          const ValueKey('intention-relations-group-needs'),
+        );
+        await tester.ensureVisible(group);
+        await tester.tap(group);
+        await tester.pumpAndSettle();
+        final add = find.byKey(const ValueKey('intention-relations-add'));
+        await tester.ensureVisible(add);
+        await tester.tap(add);
+        await tester.pumpAndSettle();
+
+        expect(find.widgetWithText(TextField, 'Гулять'), findsNothing);
+        expect(find.text('Добавить связи'), findsOneWidget);
+        await tester.enterText(filter, 'Дышать');
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.descendant(
+            of: intentionPickerRows,
+            matching: find.text('Дышать'),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Добавить 1 связь'), findsOneWidget);
+        if (complete) {
+          await tester.tap(addButton);
+          await settleCommand(tester);
+        } else {
+          await tester.tap(
+            find.byKey(const ValueKey('participant-picker-cancel')),
+          );
+          await tester.pumpAndSettle();
+          expect(find.text('1 связь не будет добавлена.'), findsOneWidget);
+          await tester.tap(find.text('Сбросить'));
+          await tester.pumpAndSettle();
+        }
+
+        expect(find.byType(IntentionDetailsPage), findsOneWidget);
+        expect(
+          tester
+              .widget<IntentionDetailsPage>(find.byType(IntentionDetailsPage))
+              .intentionId,
+          _id(1),
+        );
+        final saved = (await tester.runAsync(relations))!;
+        expect(saved, hasLength(complete ? 5 : 4));
+        if (complete) {
+          expect(saved.last.sourceIntentionId, _uuid(1));
+          expect(saved.last.relatedIntentionId, _uuid(6));
+        }
+        await router.maybePop();
+        await tester.pumpAndSettle();
+        expect(
+          tester
+              .widget<IntentionDetailsPage>(find.byType(IntentionDetailsPage))
+              .intentionId,
+          _id(5),
+        );
+        await router.maybePop();
+        await tester.pumpAndSettle();
+        expect(find.byType(RelationBatchPickerPage), findsOneWidget);
+        expect(find.widgetWithText(TextField, 'Гулять'), findsOneWidget);
+        expect(find.text('Добавить 1 связь'), findsOneWidget);
+        expect(
+          tester
+              .getSemantics(
+                find.descendant(
+                  of: intentionPickerRows,
+                  matching: find.text('Гулять'),
+                ),
+              )
+              .flagsCollection
+              .isChecked,
+          CheckedState.isTrue,
+        );
+        semantics.dispose();
+      },
+    );
+  }
+
   testWidgets('со страницы действия над поиском доступны оба направления '
       'создания дневного выбора', (tester) async {
     await seedGraph(database, () async {
