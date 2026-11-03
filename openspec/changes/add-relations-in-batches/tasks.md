@@ -1294,7 +1294,7 @@
   - **Предполагаемые файлы:** меняются `lib/src/intention/presentation/search/results_scroll_keeper.dart`, `test/intention/presentation/search/intention_search_list_test.dart`.
   - **Размер:** XS.
 
-- [ ] 4.20 Английские строки называют отметку для новых связей словом «selected», как остальная лексика пакета
+- [x] 4.20 Английские строки называют отметку для новых связей словом «selected», как остальная лексика пакета
   - **Критерии приёмки:**
     - В `lib/l10n/app_en.arb` `editorCreatedAndChosen` — «Intention created and selected.», `editorSearchSubtitle` — «Selected right away for new relations». Остальная лексика пакета («Add to selected», «Remove from selected», «Selected intentions») не меняется.
     - Ключи `editorCreatedAndChosen` и `editorSearchSubtitle` не переименовываются, русские строки в `app_ru.arb` не меняются. Созданные файлы локализации обновлены кодогенерацией, а не вручную.

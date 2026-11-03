@@ -753,7 +753,7 @@
   "@editorTitle": {
     "description": "Заголовок формы создания намерения"
   },
-  "editorSearchSubtitle": "Immediately chosen for new relations",
+  "editorSearchSubtitle": "Selected right away for new relations",
   "@editorSearchSubtitle": {
     "description": "Пояснение панели создания намерения из поиска участника"
   },
@@ -818,7 +818,7 @@
     "description": "Терминальная непредвиденная ошибка создания намерения"
   },
   "editorCreated": "Intention created.",
-  "editorCreatedAndChosen": "Intention created and chosen.",
+  "editorCreatedAndChosen": "Intention created and selected.",
   "@editorCreatedAndChosen": {
     "description": "Успех создания намерения для поиска участника"
   },

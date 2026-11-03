@@ -958,7 +958,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get editorTitle => 'Create intention';
 
   @override
-  String get editorSearchSubtitle => 'Immediately chosen for new relations';
+  String get editorSearchSubtitle => 'Selected right away for new relations';
 
   @override
   String get editorCreateAction => 'Create intention';
@@ -1015,7 +1015,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get editorCreated => 'Intention created.';
 
   @override
-  String get editorCreatedAndChosen => 'Intention created and chosen.';
+  String get editorCreatedAndChosen => 'Intention created and selected.';
 
   @override
   String get editorCloseDiscardTitle => 'Discard the draft?';

@@ -95,7 +95,10 @@ void main() {
           onCreated: (id, title) => created.add((id, title)),
         ),
       );
-      expect(find.text('Immediately chosen for new relations'), findsOneWidget);
+      expect(
+        find.text('Selected right away for new relations'),
+        findsOneWidget,
+      );
       await tester.enterText(find.byKey(_title), 'Плавать');
       await tester.tap(find.byKey(_submit));
       await tester.pump();
@@ -109,7 +112,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(created, [(testIntention(title: 'Плавать').id, 'Плавать')]);
       expect(
-        find.text('Create — “Плавать”: Intention created and chosen.'),
+        find.text('Create — “Плавать”: Intention created and selected.'),
         findsOneWidget,
       );
       expect(find.byKey(_closeConfirmation), findsNothing);

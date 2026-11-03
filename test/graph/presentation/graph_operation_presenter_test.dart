@@ -394,7 +394,7 @@ void main() {
     ),
     (
       const Locale('en'),
-      'Create — “Полное намерение”: Intention created and chosen.',
+      'Create — “Полное намерение”: Intention created and selected.',
       'Create — “Полное намерение”: Intention created.',
     ),
   ]) {

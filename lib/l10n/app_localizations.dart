@@ -1529,7 +1529,7 @@ abstract class AppLocalizations {
   /// Пояснение панели создания намерения из поиска участника
   ///
   /// In en, this message translates to:
-  /// **'Immediately chosen for new relations'**
+  /// **'Selected right away for new relations'**
   String get editorSearchSubtitle;
 
   /// Действие создания намерения
@@ -1631,7 +1631,7 @@ abstract class AppLocalizations {
   /// Успех создания намерения для поиска участника
   ///
   /// In en, this message translates to:
-  /// **'Intention created and chosen.'**
+  /// **'Intention created and selected.'**
   String get editorCreatedAndChosen;
 
   /// Заголовок подтверждения закрытия изменённого черновика создания до отправки
