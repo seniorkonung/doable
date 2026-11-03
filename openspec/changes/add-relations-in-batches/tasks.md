@@ -1265,3 +1265,18 @@
   - **Зависимости:** 4.7.
   - **Предполагаемые файлы:** меняются `lib/src/long_term_relation/presentation/batch_picker/relation_batch_picker_page.dart`, `test/long_term_relation/presentation/batch_picker/relation_batch_picker_page_test.dart`.
   - **Размер:** XS.
+
+- [ ] 4.18 Уход во время принятого сохранения всегда спрашивает подтверждение, даже с непоправленным переданным названием
+  - **Критерии приёмки:**
+    - `requestClose` в `intention_editor_view_model.dart` при `draftAvailability == submitting` всегда возвращает `IntentionCreationCloseNeedsConfirmation` с `savingOnClose == IntentionCreationSavingOnClose.continues`, независимо от `draft.isChanged`. Сразу закрывается только неизменённый черновик в `editable`, в том числе с непоправленным названием из строки «Создать». Семантика `IntentionCreationDraft.isChanged` не меняется.
+    - `IntentionCreationClosedImmediately` больше не несёт `savingOnClose`: сразу закрывается только черновик до принятия отправки, поэтому поле всегда было бы `notStarted`. Комментарий к `requestClose` описывает новое правило.
+    - Подтверждённый уход до результата даёт прежний поздний успех по действующим правилам: панель уже закрыта, отметка в поиске участника не ставится, показывается обычное сообщение о создании намерения.
+    - Тест «неизменённая сессия во время принятой отправки закрывается сразу с продолжением сохранения» в `intention_editor_view_model_test.dart` заменён тестом, что неизменённая сессия во время принятой отправки требует подтверждения с продолжением сохранения. Ожидания `savingOnClose` у `IntentionCreationClosedImmediately` в этом файле и в `test/graph/presentation/operation_failure_presentation_test.dart` обновлены под новый тип.
+    - Сценарий «Уход во время сохранения непоправленного названия требует подтверждения» (`specs/intention-management/spec.md`) подтверждён тестом страницы в `intention_editor_page_test.dart`: панель с `IntentionCreationForSearch` и названием «Без правки», «Сохранить» при удержанном хранилище, «назад». Показано подтверждение с объяснением, что сохранение продолжится, а панель остаётся открытой. Названия тестов на русском.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/editor/intention_editor_view_model_test.dart test/intention/presentation/editor/intention_editor_page_test.dart test/graph/presentation/operation_failure_presentation_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+    - `mise exec --no-deps -- openspec validate add-relations-in-batches --strict`.
+  - **Зависимости:** 4.7.
+  - **Предполагаемые файлы:** меняются `lib/src/intention/presentation/editor/intention_editor_view_model.dart`, `lib/src/intention/presentation/editor/intention_creation_close.dart`, при необходимости `lib/src/intention/presentation/editor/intention_editor_page.dart`; меняются `test/intention/presentation/editor/intention_editor_view_model_test.dart`, `test/intention/presentation/editor/intention_editor_page_test.dart`, `test/graph/presentation/operation_failure_presentation_test.dart`.
+  - **Размер:** XS.
