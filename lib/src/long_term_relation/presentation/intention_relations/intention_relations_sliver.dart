@@ -56,8 +56,9 @@ final class IntentionRelationsSliver extends ConsumerStatefulWidget {
   onWalk;
 
   /// Начинает создание связи выбранной группы; на архивированном намерении
-  /// «Добавить» нет, и обработчик не вызывается.
-  final ValueChanged<IntentionRelationGroup> onAdd;
+  /// «Добавить» нет, и обработчик не вызывается. Без обработчика показывается
+  /// только подсказка о группе.
+  final ValueChanged<IntentionRelationGroup>? onAdd;
 
   Intention get owner => details.intention;
 
@@ -174,8 +175,8 @@ final class _IntentionRelationsSliverState
       IntentionRelationGroup.canBeUsedFor =>
         l10n.detailsRelationsCanBeUsedForHint,
     };
-    return switch (widget.owner.archiveState) {
-      IntentionArchiveState.active => AddRow.hint(
+    return switch ((widget.owner.archiveState, widget.onAdd)) {
+      (IntentionArchiveState.active, final onAdd?) => AddRow.hint(
         hint: hint,
         addText: l10n.detailsRelationsAdd,
         addLabel: switch (group) {
@@ -186,10 +187,11 @@ final class _IntentionRelationsSliverState
           IntentionRelationGroup.canBeUsedFor =>
             l10n.detailsRelationsAddCanBeUsedForLabel,
         },
-        onAdd: () => widget.onAdd(group),
+        onAdd: () => onAdd(group),
         addKey: const ValueKey('intention-relations-add'),
       ),
-      IntentionArchiveState.archived => AddRow.hintOnly(hint: hint),
+      (IntentionArchiveState.archived, _) ||
+      (IntentionArchiveState.active, null) => AddRow.hintOnly(hint: hint),
     };
   }
 

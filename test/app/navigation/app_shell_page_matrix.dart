@@ -80,6 +80,128 @@ enum _MatrixEntry {
 }
 
 void _registerPageMatrixTests() {
+  testWidgets('страницы над поиском сохраняют отметку и скрывают действия', (
+    tester,
+  ) async {
+    await _start(tester);
+    await _select(tester, AppDestination.intentionGraph);
+    await _open(tester, intentionCatalogRow('Читать'), IntentionDetailsPage);
+    await _tap(tester, find.text('Relations').first);
+    await _tap(tester, _outgoingNeedGroup);
+    await _tap(tester, find.byKey(const ValueKey('intention-relations-add')));
+    await _until(tester, _summary(RelationBatchPickerPage, 'Гулять'));
+    await _tap(
+      tester,
+      find.descendant(
+        of: _summary(RelationBatchPickerPage, 'Гулять'),
+        matching: find.text('Гулять'),
+      ),
+    );
+    await _until(tester, find.text('Add 1 relation'));
+
+    final underlying = find.byType(IntentionDetailsPage, skipOffstage: false);
+    tester.element(underlying).markNeedsBuild();
+    await tester.pump();
+    await _tap(
+      tester,
+      find.descendant(
+        of: _summary(RelationBatchPickerPage, 'Бегать'),
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is DoableIcon &&
+              widget.icon == DoableIconData.arrowUpRight,
+        ),
+      ),
+    );
+    await _until(tester, find.byType(IntentionDetailsPage));
+    await tester.pumpAndSettle();
+    expect(find.byType(AppNavigationBar), findsNothing);
+    await openIntentionChoicesTab(tester, waitFor: _until, tap: _tap);
+    expect(intentionChoicesAdd, findsNothing);
+    await _tap(
+      tester,
+      find.byKey(const ValueKey('intention-choices-role-selected')),
+    );
+    expect(intentionChoicesAdd, findsNothing);
+    await _tap(tester, find.text('Relations').first);
+    await _tap(
+      tester,
+      find.byKey(const ValueKey('intention-relations-group-neededFor')),
+    );
+    await _until(tester, _relationRow);
+    expect(find.byKey(const ValueKey('intention-relations-add')), findsNothing);
+    await _tap(
+      tester,
+      find.descendant(
+        of: _relationRow,
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is DoableIcon &&
+              widget.icon == DoableIconData.arrowUpRight,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(AppNavigationBar), findsNothing);
+    expect(find.byKey(const ValueKey('intention-relations-add')), findsNothing);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byType(AppNavigationBar), findsNothing);
+    await tester.binding.handlePopRoute();
+    await _until(tester, find.byType(RelationBatchPickerPage));
+    expect(find.text('Add 1 relation'), findsOneWidget);
+    await _tap(tester, find.text('Add 1 relation'));
+    await _until(tester, find.byType(IntentionDetailsPage));
+    await tester.pumpAndSettle();
+    expect(find.byType(AppNavigationBar), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('intention-relations-add')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('дневной выбор и каталог на дату над поиском скрывают панель', (
+    tester,
+  ) async {
+    final router = await _start(tester);
+    await _select(tester, AppDestination.intentionGraph);
+    await _open(tester, intentionCatalogRow('Читать'), IntentionDetailsPage);
+    await _tap(tester, find.text('Relations').first);
+    await _tap(tester, _outgoingNeedGroup);
+    await _tap(tester, find.byKey(const ValueKey('intention-relations-add')));
+    await _until(tester, find.byType(RelationBatchPickerPage));
+    tester
+        .element(find.byType(IntentionDetailsPage, skipOffstage: false))
+        .markNeedsBuild();
+    await tester.pump();
+    final choiceId = (DailyChoiceId.decode(
+      tagFixtureId(_choice),
+    ) as DailyChoiceIdDecodingSuccess).id;
+    unawaited(router.push(DailyChoiceDetailsRoute(choiceId: choiceId)));
+    await _until(tester, find.byType(DailyChoiceDetailsPage));
+    await tester.pumpAndSettle();
+    expect(find.byType(AppNavigationBar), findsNothing);
+    unawaited(router.push(DailyChoiceDateCatalogRoute(date: _choiceDate)));
+    await _until(tester, find.byType(DailyChoiceDateCatalogPage));
+    await tester.pumpAndSettle();
+    expect(find.byType(AppNavigationBar), findsNothing);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byType(AppNavigationBar), findsNothing);
+    await tester.binding.handlePopRoute();
+    await _until(tester, find.byType(RelationBatchPickerPage));
+    await _tap(tester, find.byKey(const ValueKey('participant-picker-cancel')));
+    await _until(tester, find.byType(IntentionDetailsPage));
+    await tester.pumpAndSettle();
+    expect(find.byType(AppNavigationBar), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('intention-relations-add')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('матрица: каталог на дату — обычная страница поверх намерения', (
     tester,
   ) async {

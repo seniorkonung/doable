@@ -1103,7 +1103,7 @@
   - **Предполагаемые файлы:** меняются `lib/src/long_term_relation/presentation/batch_picker/relation_batch_picker_page.dart`, `test/long_term_relation/presentation/batch_picker/relation_batch_picker_page_test.dart`, `test/app/long_term_relation_app_flow_test.dart`.
   - **Размер:** S.
 
-- [ ] 4.8 Над поиском участника нет панели навигации, «Добавить» и запуска дневного выбора
+- [x] 4.8 Над поиском участника нет панели навигации, «Добавить» и запуска дневного выбора
   - **Критерии приёмки:**
     - Одна функция в `lib/src/app/navigation/` определяет при построении, лежит ли `RelationBatchPickerRoute` в корневом стеке ниже маршрута самой страницы, сравнивая `matchId`. Подписки на стек и передачи контекста через переходы нет.
     - `OrdinaryPageScaffold` над поиском панель не показывает: это подтверждено для страницы намерения, подробного просмотра дневного выбора и каталога на дату.

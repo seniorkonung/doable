@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../../../app/navigation/ordinary_page_scaffold.dart';
+import '../../../app/navigation/relation_picker_position.dart';
 import '../../../app/routing/app_router.gr.dart';
 import '../../../daily_choice/application/choice_path_draft.dart';
 import '../../../daily_choice/domain/calendar_date.dart';
@@ -658,6 +659,7 @@ final class _LoadedDetails extends StatelessWidget {
     final localizations = AppLocalizations.of(context);
     final intention = state.intention;
     final isActive = intention.archiveState == IntentionArchiveState.active;
+    final canStartNewFlow = !isAboveRelationPicker(context);
     return CustomScrollView(
       controller: scrollController,
       slivers: [
@@ -776,14 +778,16 @@ final class _LoadedDetails extends StatelessWidget {
                 // Создание дневного выбора не изменяет намерение, поэтому
                 // изменяющая операция его не выключает: недопустимое начало
                 // отклоняет модель пути.
-                onAddAsSource: isActive
+                onAddAsSource: isActive && canStartNewFlow
                     ? () => _startChoicePath(
                         context,
                         ChoicePathDraftDirection.topDown,
                       )
                     : null,
                 onAddAsSelected:
-                    isActive && intention.readiness == IntentionReadiness.ready
+                    isActive &&
+                        canStartNewFlow &&
+                        intention.readiness == IntentionReadiness.ready
                     ? () => _startChoicePath(
                         context,
                         ChoicePathDraftDirection.bottomUp,
@@ -806,15 +810,17 @@ final class _LoadedDetails extends StatelessWidget {
                     ),
                   ),
                 ),
-                onAdd: (group) => unawaited(
-                  context.router.push(
-                    RelationBatchPickerRoute(
-                      pageIntentionId: intention.id,
-                      pageTitle: intention.title,
-                      group: group,
-                    ),
-                  ),
-                ),
+                onAdd: !canStartNewFlow
+                    ? null
+                    : (group) => unawaited(
+                        context.router.push(
+                          RelationBatchPickerRoute(
+                            pageIntentionId: intention.id,
+                            pageTitle: intention.title,
+                            group: group,
+                          ),
+                        ),
+                      ),
               ),
           ],
         ),

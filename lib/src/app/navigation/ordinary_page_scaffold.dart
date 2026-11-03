@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
 import 'app_navigation.dart';
+import 'relation_picker_position.dart';
 
 /// Каркас обычной страницы над оболочкой основной навигации.
 ///
-/// Панель всегда занимает [Scaffold.bottomNavigationBar]; тело и сообщения
+/// Панель занимает [Scaffold.bottomNavigationBar], кроме страниц над поиском
+/// участника; тело и сообщения
 /// размещает Scaffold с учётом панели, безопасных отступов и клавиатуры.
 /// Требует смонтированную оболочку приложения; состояние навигации и сброс
 /// истории предоставляет [AppNavigation]. У страницы-задачи свой Scaffold.
@@ -19,6 +21,8 @@ final class OrdinaryPageScaffold extends StatelessWidget {
     appBar: appBar,
     body: body,
     // https://api.flutter.dev/flutter/material/Scaffold/bottomNavigationBar.html
-    bottomNavigationBar: const AppNavigation(),
+    bottomNavigationBar: isAboveRelationPicker(context)
+        ? null
+        : const AppNavigation(),
   );
 }
