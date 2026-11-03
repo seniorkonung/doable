@@ -3,9 +3,9 @@
 ## Assessment
 
 **Format version:** 1
-**Result:** Changes needed
+**Result:** No unresolved findings
 **Coverage status:** Complete
-**Summary:** Задачи 4.22–4.25 выполнены по своим критериям, `mise run check` и `mise run codegen-check` проходят. Активна одна находка F13 (Low): ни один тест не ловит, если удержание начала выдачи в `ResultsScrollKeeper` перестанет сниматься после перестройки списка. Принятых рисков нет.
+**Summary:** Неурегулированных находок и принятых рисков нет. Проверка снятия удержания начала выдачи передана в новую невыполненную задачу 4.26 (`tasks.md`): один регрессионный виджет-тест с проверкой мутацией. Реализация и выполнение этой проверки остаются отдельной работой. Покрытие и свидетельства проверок ниже относятся к записанному диапазону обзора; повторный аудит не проводился.
 
 ## Review target
 
@@ -58,20 +58,13 @@
 
 | Pass | Status | Evidence or limitation |
 |---|---|---|
-| Independent decision review | Complete | Свежие изолированные ревьюеры `implementation-decision-review` проверяли `5494b67b…..f8aebaf5…` и получали только нейтральный бриф и пути своей группы. U1 и U2 делят `intention_editor_view_model.g.dart`, поэтому шли одной группой с объединёнными путями (Sonnet, medium): находок нет, `mise run codegen-check` прошёл на чистом дереве. U3 — отдельно (Sonnet, high): одна находка, она записана как F13. U4 — отдельно (Opus, high): находок нет. Этот ревьюер разобрал auto_route 11.1.0: страница попадает в `_pages` в микрозадаче после нажатия, но до следующего пакета событий указателя. Его допущение, что панель снимает себя через маршрутизатор, подтверждено в координаторе: `intention_editor_page.dart` на голове использует `router.removeRoute` (строки 434 и 471). |
+| Independent decision review | Complete | Свежие изолированные ревьюеры `implementation-decision-review` проверяли `5494b67b…..f8aebaf5…` и получали только нейтральный бриф и пути своей группы. U1 и U2 делят `intention_editor_view_model.g.dart`, поэтому шли одной группой с объединёнными путями (Sonnet, medium): находок нет, `mise run codegen-check` прошёл на чистом дереве. U3 — отдельно (Sonnet, high). U4 — отдельно (Opus, high): находок нет. Этот ревьюер разобрал auto_route 11.1.0: страница попадает в `_pages` в микрозадаче после нажатия, но до следующего пакета событий указателя. Его допущение, что панель снимает себя через маршрутизатор, подтверждено в координаторе: `intention_editor_page.dart` на голове использует `router.removeRoute` (строки 434 и 471). |
 | OpenSpec conformance | Complete | Проверки шли в рабочем дереве с `HEAD` = `f8aebaf5634b60df6c5073c4b4c53bebf8351a4f` без правок. `mise run check` — код 0: анализ без замечаний, 4018 и 18 тестов прошли. `mise run codegen-check` — код 0, дерево после него чистое. `mise exec --no-deps -- openspec validate add-relations-in-batches --strict --json` — успех; это только структурное свидетельство. Критерии приёмки 4.22–4.25 сверены с диффом. Для 4.25 тест на повторное нажатие уже был: `relation_batch_picker_page_test.dart:279-307` нажимает плюс и сразу вызывает `onCreate` без кадра. Регрессионный тест 4.17 (`:310-345`) не изменён. Тест 4.23 воспроизводит два изменения подряд без кадра, тесты 4.19 и «появление и уход строки…» сохранены. Коммит `15edb893` добавляет только профили задач 4.22–4.25. Устройство и эмулятор не использовались. |
-| Code quality | Complete | Пять линз `code-review-and-quality` применены ко всем рабочим путям на `f8aebaf5…`. Вне правок как контекст учтены `intention_search_list.dart`, `app_router.dart`, `requestClose` и `_CloseConfirmationDialog`, а также `push`, `_canNavigate`, `_addNewPage` и `_removeRoute` из auto_route 11.1.0. Новых зависимостей и границ доверия нет. Для F13 выполнена мутация: без строки `_holdsStart = false` (`results_scroll_keeper.dart:252`) прошли все 316 тестов `test/intention/presentation/search/`, `test/intention/presentation/catalog/` и `test/long_term_relation/presentation/batch_picker/`. Затем файл возвращён к закоммиченному. |
+| Code quality | Complete | Пять линз `code-review-and-quality` применены ко всем рабочим путям на `f8aebaf5…`. Вне правок как контекст учтены `intention_search_list.dart`, `app_router.dart`, `requestClose` и `_CloseConfirmationDialog`, а также `push`, `_canNavigate`, `_addNewPage` и `_removeRoute` из auto_route 11.1.0. Новых зависимостей и границ доверия нет. Для проверки регрессионного покрытия выполнена мутация: без строки `_holdsStart = false` (`results_scroll_keeper.dart:252`) прошли все 316 тестов `test/intention/presentation/search/`, `test/intention/presentation/catalog/` и `test/long_term_relation/presentation/batch_picker/`. Затем файл возвращён к закоммиченному. |
 
 ## Findings
 
-### F13 · Low — Снятие удержания начала выдачи не защищено тестом
-
-- **Evidence:** `results_scroll_keeper.dart:92` ставит `_holdsStart`, когда над выдачей появляется строка «Создать», а список стоит в начале. Снимает флаг только послекадровое обслуживание (`:252`). Пока флаг стоит, `:95` не даёт захватить якорь видимой строки. Новый тест (`intention_search_list_test.dart:667-702`) и тест 4.19 (`:640-665`) заканчиваются сразу после перестройки. Ни один тест не проверяет, что после показа «Создать» в начале и перестройки следующее подтверждённое изменение снова сохраняет положение видимой строки. Мутация подтвердила пробел: без строки `:252` все 316 тестов поиска, каталога и поиска участника проходят.
-- **Evidence revisions:** ["f8aebaf5634b60df6c5073c4b4c53bebf8351a4f"]
-- **Impact:** Сброс флага живёт в общем колбэке, который также ведёт приближение к якорю и чистку ключей. Если при правке колбэка сброс потеряется, проверки останутся зелёными. Тогда после первого появления «Создать» в начале выдачи поиск участника перестанет сохранять положение видимой строки при всех следующих подтверждённых изменениях. Это нарушает требование «Сохранение состояния загруженного каталога» из `intention-management`.
-- **Required outcome:** Регрессионный тест доказывает, что удержание начала заканчивается с перестройкой списка. После того как «Создать» показана в начале и список перестроен, следующее подтверждённое изменение выдачи сохраняет экранное положение видимой строки. Тест падает, если сброс удержания убран.
-- **Earliest source of truth:** task/verification
-- **Affected artifacts:** ["tasks.md: 4.23","test/intention/presentation/search/intention_search_list_test.dart"]
+No unresolved findings remain in the implementation review.
 
 ## Review coverage
 
