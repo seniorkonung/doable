@@ -116,6 +116,7 @@ void _registerPageMatrixTests() {
     await _until(tester, find.byType(IntentionDetailsPage));
     await tester.pumpAndSettle();
     expect(find.byType(AppNavigationBar), findsNothing);
+    expect(find.byType(DockedFooter), findsOneWidget);
     await openIntentionChoicesTab(tester, waitFor: _until, tap: _tap);
     expect(intentionChoicesAdd, findsNothing);
     await _tap(
@@ -143,6 +144,7 @@ void _registerPageMatrixTests() {
     );
     await tester.pumpAndSettle();
     expect(find.byType(AppNavigationBar), findsNothing);
+    expect(find.byType(DockedFooter), findsNothing);
     expect(find.byKey(const ValueKey('intention-relations-add')), findsNothing);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();

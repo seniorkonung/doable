@@ -2349,5 +2349,11 @@
   "batchDiscardAction": "Discard",
   "@batchDiscardAction": {"description": "Сбросить отметки поиска"},
   "batchContinueAction": "Continue selecting",
-  "@batchContinueAction": {"description": "Продолжить отмечать намерения"}
+  "@batchContinueAction": {"description": "Продолжить отмечать намерения"},
+  "batchPageAdd": "Add to selected",
+  "@batchPageAdd": {"description": "Кнопка страницы намерения, открытой стрелкой поиска участника: ставит отметку"},
+  "batchPageRemove": "Remove from selected",
+  "@batchPageRemove": {"description": "Кнопка страницы намерения, открытой стрелкой поиска участника: снимает отметку"},
+  "batchPageArchived": "Intention is archived",
+  "@batchPageArchived": {"description": "Недоступная кнопка страницы архивированного намерения, открытой стрелкой поиска участника"}
 }

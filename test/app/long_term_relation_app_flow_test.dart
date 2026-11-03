@@ -648,6 +648,69 @@ void main() {
   });
 
   testWidgets(
+    'страница из поиска архивирует и восстанавливает намерение, а снятая '
+    'отметка не возвращается сама',
+    (tester) async {
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      tester.binding.platformDispatcher.localesTestValue = const [Locale('ru')];
+      addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
+      final l10n = lookupAppLocalizations(const Locale('ru'));
+      final storage = (await tester.runAsync(LocalDatabaseHarness.fileBacked))!;
+      await tester.runAsync(() async {
+        final db = await storage.openReadyDatabase();
+        await _seedOccupiedPairs(db);
+        await storage.closePersistenceObjectGraph();
+      });
+      final runtime = _fileRuntime(
+        storage,
+        diagnostics: InMemoryDiagnosticsSink(),
+      );
+      addTearDown(() async {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await runtime.shutdown();
+        await storage.dispose();
+      });
+      await tester.pumpWidget(MainApp(runtime: runtime));
+      await openIntentionGraph(tester, waitFor: _pumpUntilFound);
+      await enterIntentionCatalogTitle(tester, _healthy);
+      await _pumpUntilFound(tester, find.text(_healthy));
+      await _tapWhenFound(tester, intentionCatalogRow(_healthy));
+      await _pumpUntilDetailsTitle(tester, _healthy);
+      await _chooseDetailsTab(tester, l10n.detailsRelationsTab);
+      await _tapWhenFound(
+        tester,
+        find.byKey(const ValueKey('intention-relations-add')),
+      );
+      await _pumpUntilFound(tester, _pickerRow(_sleep));
+      await tester.pumpAndSettle();
+      await _tapWhenFound(
+        tester,
+        find.descendant(of: _pickerRow(_sleep), matching: find.text(_sleep)),
+      );
+      await _pumpUntilFound(tester, find.text(l10n.batchAddCount(1)));
+      await _tapPickerArrow(tester, _sleep);
+      await _pumpUntilDetailsTitle(tester, _sleep);
+      await _pumpUntilFound(tester, find.text(l10n.batchPageRemove));
+
+      await _chooseIntentionOption(tester, IntentionOption.archive);
+      await _pumpUntilFound(tester, find.text(l10n.batchPageArchived));
+      final disabled = find.ancestor(
+        of: find.text(l10n.batchPageArchived),
+        matching: find.byType(FilledButton),
+      );
+      expect(tester.widget<FilledButton>(disabled).onPressed, isNull);
+
+      await _dismissOperationMessage(tester);
+      await _tapWhenFound(tester, intentionHeadRestore);
+      await _pumpUntilFound(tester, find.text(l10n.batchPageAdd));
+      await _dismissOperationMessage(tester);
+      await _tapWhenFound(tester, find.text(l10n.batchPageAdd));
+      await _pumpUntilAbsent(tester, find.byType(IntentionDetailsPage));
+      await _pumpUntilFound(tester, find.text(l10n.batchAddCount(1)));
+    },
+  );
+
+  testWidgets(
     'архивирование снимает отметку, восстановление обновляет выдачу и причину',
     (tester) async {
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);

@@ -28,6 +28,7 @@ import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart'
 import 'package:doable/src/daily_choice/presentation/source_picker/daily_choice_source_picker_page.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openInMemoryLocalDatabase;
+import 'package:doable/src/design_system/components/docked_footer.dart';
 import 'package:doable/src/design_system/components/picker_row.dart';
 import 'package:doable/src/design_system/components/relation_head.dart';
 import 'package:doable/src/design_system/components/sheet.dart';

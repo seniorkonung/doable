@@ -932,5 +932,11 @@
   "batchDiscardMessage": "{count, plural, one{{count} связь не будет добавлена.} few{{count} связи не будут добавлены.} many{{count} связей не будут добавлены.} other{{count} связи не будут добавлены.}}",
   "batchCreatedRemain": "Созданные намерения останутся в каталоге.",
   "batchDiscardAction": "Сбросить",
-  "batchContinueAction": "Продолжить выбор"
+  "batchContinueAction": "Продолжить выбор",
+  "batchPageAdd": "Добавить к выбранным",
+  "@batchPageAdd": {"description": "Кнопка страницы намерения, открытой стрелкой поиска участника: ставит отметку"},
+  "batchPageRemove": "Убрать из выбранных",
+  "@batchPageRemove": {"description": "Кнопка страницы намерения, открытой стрелкой поиска участника: снимает отметку"},
+  "batchPageArchived": "Намерение в архиве",
+  "@batchPageArchived": {"description": "Недоступная кнопка страницы архивированного намерения, открытой стрелкой поиска участника"}
 }

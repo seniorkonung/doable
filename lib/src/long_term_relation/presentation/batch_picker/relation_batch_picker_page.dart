@@ -14,11 +14,14 @@ import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/presentation/operation_failure_presentation.dart';
 import '../../../intention/domain/intention_id.dart';
 import '../../../intention/presentation/catalog/intention_catalog_purpose.dart';
+import '../../../intention/presentation/catalog/intention_catalog_state.dart';
+import '../../../intention/presentation/catalog/intention_catalog_view_model.dart';
 import '../../../intention/presentation/editor/intention_creation_launch.dart';
 import '../../../intention/presentation/picker/intention_picker_view.dart';
 import '../../application/intention_relation_group.dart';
 import '../../application/relation_pair_probe.dart';
 import '../relation_command_failure_message.dart';
+import 'relation_batch_page_footer.dart';
 import 'relation_batch_picker_purpose.dart';
 import 'relation_batch_state.dart';
 import 'relation_batch_view_model.dart';
@@ -146,8 +149,24 @@ final class _RelationBatchPickerPageState
         ),
         onOpenDetails: (id) {
           if (!ref.read(provider).canEdit) return;
+          final catalog = ref
+              .read(intentionCatalogViewModelProvider(_purpose))
+              .value;
           unawaited(
-            context.router.push(IntentionDetailsRoute(intentionId: id)),
+            context.router.push(
+              IntentionDetailsRoute(
+                intentionId: id,
+                batchRow: RelationBatchRowContext(
+                  batch: provider,
+                  group: widget.group,
+                  probe: _purpose.pairProbe,
+                  // Строки со стрелкой строит только загруженная выдача.
+                  occupant: catalog is IntentionCatalogLoaded
+                      ? catalog.pairOccupants[id]
+                      : null,
+                ),
+              ),
+            ),
           );
         },
         notice: switch (batch.operation) {

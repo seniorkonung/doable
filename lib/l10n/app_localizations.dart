@@ -4926,6 +4926,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Continue selecting'**
   String get batchContinueAction;
+
+  /// Кнопка страницы намерения, открытой стрелкой поиска участника: ставит отметку
+  ///
+  /// In en, this message translates to:
+  /// **'Add to selected'**
+  String get batchPageAdd;
+
+  /// Кнопка страницы намерения, открытой стрелкой поиска участника: снимает отметку
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from selected'**
+  String get batchPageRemove;
+
+  /// Недоступная кнопка страницы архивированного намерения, открытой стрелкой поиска участника
+  ///
+  /// In en, this message translates to:
+  /// **'Intention is archived'**
+  String get batchPageArchived;
 }
 
 class _AppLocalizationsDelegate

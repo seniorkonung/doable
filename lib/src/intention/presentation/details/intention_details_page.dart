@@ -32,6 +32,7 @@ import '../../domain/intention.dart';
 import '../../domain/intention_id.dart';
 import '../edit/intention_edit_page.dart';
 import '../../../long_term_relation/application/relation_counts.dart';
+import '../../../long_term_relation/presentation/batch_picker/relation_batch_page_footer.dart';
 import '../../../long_term_relation/presentation/details/relation_details_sheet.dart';
 import '../../../long_term_relation/presentation/intention_relations/intention_relations_sliver.dart';
 import '../../../long_term_relation/presentation/intention_relations/intention_relations_state.dart';
@@ -53,11 +54,15 @@ final class IntentionDetailsPage extends ConsumerStatefulWidget {
   const IntentionDetailsPage({
     required this.intentionId,
     this.target = const OverviewTarget(),
+    this.batchRow,
     super.key,
   });
 
   final IntentionId intentionId;
   final IntentionPageTarget target;
+
+  /// Есть только у страницы, открытой стрелкой поиска участника.
+  final RelationBatchRowContext? batchRow;
 
   @override
   ConsumerState<IntentionDetailsPage> createState() =>
@@ -481,6 +486,16 @@ final class _IntentionDetailsPageState
           ],
         ),
       ),
+      pickerFooter: switch (widget.batchRow) {
+        null => null,
+        final row => RelationBatchPageFooter(
+          row: row,
+          intentionId: intentionId,
+          intention: details is IntentionDetailsLoaded
+              ? details.intention
+              : null,
+        ),
+      },
     );
   }
 }
