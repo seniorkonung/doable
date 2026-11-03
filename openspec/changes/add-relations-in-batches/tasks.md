@@ -1091,7 +1091,7 @@
   - **Предполагаемые файлы:** меняются `lib/src/design_system/components/top_bar.dart`, `lib/src/intention/presentation/search/intention_search_list.dart`, `lib/src/intention/presentation/picker/intention_picker_view.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации, `test/design_system/top_bar_test.dart`, `test/intention/presentation/search/intention_search_list_test.dart`, `test/intention/presentation/picker/intention_picker_view_test.dart`.
   - **Размер:** M.
 
-- [ ] 4.7 Намерение создаётся прямо в поиске участника и сразу отмечено
+- [x] 4.7 Намерение создаётся прямо в поиске участника и сразу отмечено
   - **Критерии приёмки:**
     - Плюс открывает панель с пустым названием, а строка «Создать» — с названием из подстроки. Повторное нажатие до закрытия панели второй панели не открывает. Пока добавление выполняется, панель не открывается.
     - Обработчик созданного намерения ставит отметку через 4.5 и очищает подстроку через 4.6. Поздний успех покинутой панели отметку не ставит и подстроку не меняет.

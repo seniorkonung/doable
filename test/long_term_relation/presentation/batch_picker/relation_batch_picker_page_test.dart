@@ -26,6 +26,7 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
+import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/intention/presentation/picker/intention_picker_view.dart';
 import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/relation_pair_probe.dart';
@@ -201,6 +202,103 @@ void main() {
   final addButton = find.descendant(
     of: find.byType(DockedFooter),
     matching: find.byType(FilledButton),
+  );
+
+  testWidgets(
+    'создание из поиска отмечает намерение и сохраняет его после сброса',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      await open(tester, IntentionRelationGroup.neededFor);
+      await tester.tap(find.text('Плавать'));
+      await tester.pumpAndSettle();
+      final filter = find.byKey(const ValueKey('participant-picker-filter'));
+      await tester.enterText(filter, '  Ходить на работу  ');
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Создать «Ходить на работу»'));
+      await tester.pumpAndSettle();
+      final title = find.byKey(const ValueKey('intention-editor-title'));
+      expect(
+        tester.widget<TextField>(title).controller!.text,
+        'Ходить на работу',
+      );
+      expect(find.text('Сразу отмечается для новых связей'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
+      await settleCommand(tester);
+      expect(find.byType(IntentionEditorPage), findsNothing);
+      expect(find.byType(IntentionDetailsPage), findsNothing);
+      expect(
+        tester
+            .widget<TextField>(
+              find.descendant(of: filter, matching: find.byType(TextField)),
+            )
+            .controller!
+            .text,
+        isEmpty,
+      );
+      expect(
+        tester
+            .getSemantics(find.text('Ходить на работу'))
+            .flagsCollection
+            .isChecked,
+        CheckedState.isTrue,
+      );
+      expect(find.text('Добавить 2 связи'), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.text('Ходить на работу')).dy,
+        lessThan(tester.getTopLeft(find.text('Гулять')).dy),
+      );
+      expect(
+        find.textContaining('Намерение создано и отмечено'),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const ValueKey('participant-picker-cancel')));
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('Созданные намерения останутся в каталоге.'),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Сбросить'));
+      await tester.pumpAndSettle();
+      final saved = await tester.runAsync(
+        () => (database.select(
+          database.intentions,
+        )..where((row) => row.title.equals('Ходить на работу'))).get(),
+      );
+      expect(saved, hasLength(1));
+      expect(await tester.runAsync(relations), hasLength(4));
+      semantics.dispose();
+    },
+  );
+
+  testWidgets(
+    'точное совпадение скрывает создание, плюс открывает пустую панель только один раз',
+    (tester) async {
+      await open(tester, IntentionRelationGroup.neededFor);
+      await tester.enterText(
+        find.byKey(const ValueKey('participant-picker-filter')),
+        'ПЛАВАТЬ',
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Создать «ПЛАВАТЬ»'), findsNothing);
+      expect(find.text('Плавать'), findsOneWidget);
+      final picker = tester.widget<IntentionPickerView>(
+        find.byType(IntentionPickerView),
+      );
+      final behavior = picker.rowBehavior as IntentionPickerCheckable;
+      await tester.tap(find.bySemanticsLabel('Создать намерение'));
+      behavior.onCreate('', () {});
+      await tester.pumpAndSettle();
+      expect(find.byType(IntentionEditorPage), findsOneWidget);
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const ValueKey('intention-editor-title')),
+            )
+            .controller!
+            .text,
+        isEmpty,
+      );
+    },
   );
 
   testWidgets(
@@ -435,6 +533,9 @@ void main() {
 
       expect(find.text('Добавляем…'), findsOneWidget);
       expect(tester.widget<FilledButton>(addButton).onPressed, isNull);
+      await tester.tap(find.bySemanticsLabel('Создать намерение'));
+      await tester.pump();
+      expect(find.byType(IntentionEditorPage), findsNothing);
       await tester.tap(find.text('Высыпаться'));
       await tester.pump();
       expect(find.text('Добавить в "Нужно для" · выбрано 2'), findsOneWidget);

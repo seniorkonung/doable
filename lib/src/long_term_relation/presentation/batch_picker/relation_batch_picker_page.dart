@@ -14,6 +14,7 @@ import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/presentation/operation_failure_presentation.dart';
 import '../../../intention/domain/intention_id.dart';
 import '../../../intention/presentation/catalog/intention_catalog_purpose.dart';
+import '../../../intention/presentation/editor/intention_creation_launch.dart';
 import '../../../intention/presentation/picker/intention_picker_view.dart';
 import '../../application/intention_relation_group.dart';
 import '../../application/relation_pair_probe.dart';
@@ -45,6 +46,7 @@ final class _RelationBatchPickerPageState
     extends ConsumerState<RelationBatchPickerPage> {
   final _session = IntentionSearchSession();
   bool _confirmingClose = false;
+  bool _openingCreation = false;
 
   late final _purpose = SelectRelationParticipant(
     session: _session,
@@ -117,7 +119,30 @@ final class _RelationBatchPickerPageState
           onToggle: (pick) => ref
               .read(provider.notifier)
               .toggle(pick.value.id, pick.value.title),
-          onCreate: (_, _) {},
+          onCreate: (title, clearTitle) {
+            if (_openingCreation || !ref.read(provider).canEdit) return;
+            _openingCreation = true;
+            unawaited(() async {
+              try {
+                await context.router.push(
+                  IntentionEditorRoute(
+                    launch: IntentionCreationForSearch(
+                      initialTitle: title,
+                      onCreated: (id, createdTitle) {
+                        if (!mounted || !ref.read(provider).canEdit) return;
+                        ref
+                            .read(provider.notifier)
+                            .acceptCreated(id, createdTitle);
+                        clearTitle();
+                      },
+                    ),
+                  ),
+                );
+              } finally {
+                _openingCreation = false;
+              }
+            }());
+          },
         ),
         onOpenDetails: (id) {
           if (!ref.read(provider).canEdit) return;
