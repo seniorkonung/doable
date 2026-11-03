@@ -15,7 +15,8 @@ import '../catalog/intention_catalog_state.dart';
 /// параметров поиска хранитель сохраняет экранное положение видимого
 /// намерения, а если оно исчезло из выдачи — ближайшего соседа. Исключение —
 /// строка «Создать», появившаяся над выдачей, пока список стоит в начале:
-/// список остаётся в начале, и строка видна над выдачей. Пока видимая
+/// до перестройки списка хранитель держит начало при любых следующих
+/// изменениях выдачи, и строка видна над выдачей. Пока видимая
 /// строка не сместилась, хранитель не трогает прокрутку: `jumpTo` оборвал бы
 /// инерцию и перетаскивание.
 ///
@@ -47,6 +48,11 @@ final class ResultsScrollKeeper {
   /// новый запрос.
   IntentionCatalogQuery? _query;
   _VisualAnchor? _pendingVisualAnchor;
+
+  /// Держит ли хранитель начало списка до его перестройки: над выдачей
+  /// появилась строка «Создать», а построенная раскладка её ещё не содержит, и
+  /// якорь по ней спрятал бы строку.
+  bool _holdsStart = false;
   bool _maintenanceScheduled = false;
   bool _disposed = false;
 
@@ -83,12 +89,11 @@ final class ResultsScrollKeeper {
     }
     if (previousState is IntentionCatalogLoaded &&
         _revealsCreateRowAtStart(previousState, nextState)) {
-      // В начале выдачи хранитель держит начало списка: якорь по первой
-      // строке спрятал бы появившуюся над ней строку «Создать».
+      _holdsStart = true;
       _pendingVisualAnchor = null;
-      return;
     }
-    if (_pendingVisualAnchor == null &&
+    if (!_holdsStart &&
+        _pendingVisualAnchor == null &&
         previousState is IntentionCatalogLoaded &&
         identical(previousState.query, nextState.query) &&
         _isShownResultsOf(nextState) &&
@@ -244,6 +249,7 @@ final class ResultsScrollKeeper {
       if (_disposed) {
         return;
       }
+      _holdsStart = false;
       _restoreVisualAnchor();
       _pruneItemKeys();
     });

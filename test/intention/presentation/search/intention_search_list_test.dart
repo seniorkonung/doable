@@ -663,6 +663,43 @@ void main() {
         lessThanOrEqualTo(_rowTop(tester, 'Действие 30')),
       );
     });
+
+    testWidgets('строка, вернувшаяся в начале выдачи, видна над первой '
+        'строкой и после ещё одного изменения выдачи до перестройки списка', (
+      tester,
+    ) async {
+      final h = await _openRelationParticipants(tester, onCreate: (_) {});
+      await _showTitleResults(
+        tester,
+        h,
+        'Действие',
+        _firstPage(_actions(30), exactTitleCount: 1),
+      );
+      final listTop = tester.getTopLeft(_list).dy;
+
+      await _acceptCounterpartRename(h, from: _exactMatch, to: _counterpart);
+      final (command, result) = intentionTagAssignment(
+        state: TagAssignmentState.assigned,
+        tagId: _sport.id,
+        before: _action(29),
+        after: _action(29, tags: [_sport]),
+        revision: const TestCatalogRevision(3),
+      );
+      await acceptTagCommand(h.container, h.repository, command, result).future;
+      expect(_loadedOf(h).items[1].tags, [_sport]);
+      await _settle(tester);
+
+      expect(_loadedOf(h).createTitle, 'Действие');
+      expect(h.position.pixels, 0);
+      expect(
+        tester.getTopLeft(find.byType(TagCreateRow)).dy,
+        greaterThanOrEqualTo(listTop),
+      );
+      expect(
+        tester.getBottomLeft(find.byType(TagCreateRow)).dy,
+        lessThanOrEqualTo(_rowTop(tester, 'Действие 30')),
+      );
+    });
   });
 
   group('согласование отметок занятых пар', () {
@@ -969,6 +1006,16 @@ Future<void> _renameCounterpart(
   required IntentionSummary from,
   required IntentionSummary to,
 }) async {
+  await _acceptCounterpartRename(h, from: from, to: to);
+  await _settle(tester);
+}
+
+/// Подтверждает переименование намерения страницы без следующего кадра.
+Future<void> _acceptCounterpartRename(
+  _Harness h, {
+  required IntentionSummary from,
+  required IntentionSummary to,
+}) async {
   final commandIndex = h.repository.commands.length;
   final accepted =
       h.container
@@ -992,7 +1039,6 @@ Future<void> _renameCounterpart(
     ),
   );
   await accepted.future;
-  await _settle(tester);
 }
 
 IntentionCatalogLoaded _loadedOf(_Harness h) =>
