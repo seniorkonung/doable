@@ -1344,3 +1344,16 @@
   - **Зависимости:** 4.19.
   - **Предполагаемые файлы:** меняются `lib/src/intention/presentation/search/results_scroll_keeper.dart`, `test/intention/presentation/search/intention_search_list_test.dart`.
   - **Размер:** XS.
+
+- [ ] 4.24 Описания правила закрытия сессии создания намерения согласованы с поведением после 4.18
+  - **Критерии приёмки:**
+    - Комментарий класса `IntentionEditorViewModel` в `intention_editor_view_model.dart`, описание `IntentionEditorPage` и описание `_CloseConfirmationDialog` в `intention_editor_page.dart` излагают одно правило с `requestClose`: сразу закрывается только неизменённый черновик до принятия отправки; изменённый черновик или принятая отправка требуют одного подтверждения. Формулировки «неизменённый черновик закрывается сразу, изменённый — после одного подтверждения», «сразу для неизменённого черновика» и «Подтверждение закрытия изменённого черновика» в прежнем виде не остаются.
+    - Меняются только комментарии, на русском; код, тесты и поведение продукта не меняются, новых тестов нет.
+    - `mise run codegen` выполнен; `intention_editor_view_model.g.dart` закоммичен, если генерация его изменила. Созданные файлы не правятся вручную. После коммита на чистом дереве `mise run codegen-check` завершается с кодом 0.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter analyze`.
+    - `mise run codegen-check` на чистом дереве после коммита (код 0).
+  - **Зависимости:** 4.18, 4.22.
+  - **Предполагаемые файлы:** меняются `lib/src/intention/presentation/editor/intention_editor_view_model.dart`, `lib/src/intention/presentation/editor/intention_editor_page.dart` и, если его изменит генерация, `lib/src/intention/presentation/editor/intention_editor_view_model.g.dart`.
+  - **Размер:** XS.
