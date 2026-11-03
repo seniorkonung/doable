@@ -1357,3 +1357,18 @@
   - **Зависимости:** 4.18, 4.22.
   - **Предполагаемые файлы:** меняются `lib/src/intention/presentation/editor/intention_editor_view_model.dart`, `lib/src/intention/presentation/editor/intention_editor_page.dart` и, если его изменит генерация, `lib/src/intention/presentation/editor/intention_editor_view_model.g.dart`.
   - **Размер:** XS.
+
+- [ ] 4.25 Поиск участника решает, можно ли открыть панель создания, по фактическому стеку навигации в момент нажатия
+  - **Критерии приёмки:**
+    - В `relation_batch_picker_page.dart` плюс в шапке и строка «Создать» открывают панель создания намерения, только если в `context.router.stackData` над маршрутом этого поиска, найденным по `context.routeData.matchId`, нет маршрута `IntentionEditorRoute`. Проверка выполняется в момент нажатия, как в `_canCloseRoute` и `_completeCreation` из `intention_editor_page.dart`.
+    - Поле `_stopFollowingCreation`, слушатель роутера, поиск `matchId` панели, снятие по `whenComplete` и связанная с ними логика `dispose` удалены; панель открывается обычным `router.push`.
+    - Поведение сохраняется: пока панель открыта, повторное нажатие плюса или строки «Создать» второй панели не открывает; пока выполняется добавление (`canEdit == false`), панель не открывается; после любого снятия панели, в том числе через `removeRoute` вместе с диалогом ухода, создание снова доступно.
+    - Регрессионный тест 4.17 в `relation_batch_picker_page_test.dart` сохраняется без ослабления. Если в этом файле нет теста, что повторное нажатие при открытой панели не открывает вторую панель, он добавлен с названием на русском.
+    - Если окажется, что auto_route добавляет панель в стек не до следующего пользовательского события и проверка по стеку не защищает от второго нажатия, копия состояния стека не возвращается: работа останавливается, и об этом сообщается.
+    - `intention_editor_page.dart` и поведение продукта не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/batch_picker/relation_batch_picker_page_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 4.17.
+  - **Предполагаемые файлы:** меняются `lib/src/long_term_relation/presentation/batch_picker/relation_batch_picker_page.dart` и, если не хватает теста на повторное нажатие, `test/long_term_relation/presentation/batch_picker/relation_batch_picker_page_test.dart`.
+  - **Размер:** XS.
