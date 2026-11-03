@@ -36,7 +36,7 @@
   - **Вероятные файлы:** `lib/src/app/navigation/ordinary_page_scaffold.dart`, `lib/src/app/navigation/relation_picker_position.dart` (удаление), `lib/src/intention/presentation/details/intention_details_page.dart`, `test/long_term_relation/presentation/batch_picker/relation_batch_picker_page_test.dart`, `test/app/navigation/app_shell_pages_above_test.dart`.
   - **Размер:** M.
 
-- [ ] 1.4 Удалить локализацию кнопок отметки, лишившихся потребителя
+- [x] 1.4 Удалить локализацию кнопок отметки, лишившихся потребителя
   - **Критерии приёмки:**
     - Из русской и английской локализации удалены только `batchPageAdd`, `batchPageRemove`, `batchPageArchived` и их метаданные; строки поиска и причин занятости сохранены.
     - Сгенерированная локализация соответствует ARB-файлам, а код и проверки больше не обращаются к удалённым ключам.

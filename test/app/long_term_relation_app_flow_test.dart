@@ -690,22 +690,20 @@ void main() {
       await _pumpUntilFound(tester, find.text(l10n.batchAddCount(1)));
       await _tapPickerArrow(tester, _sleep);
       await _pumpUntilDetailsTitle(tester, _sleep);
-      await _pumpUntilFound(tester, find.text(l10n.batchPageRemove));
 
       await _chooseIntentionOption(tester, IntentionOption.archive);
-      await _pumpUntilFound(tester, find.text(l10n.batchPageArchived));
-      final disabled = find.ancestor(
-        of: find.text(l10n.batchPageArchived),
-        matching: find.byType(FilledButton),
-      );
-      expect(tester.widget<FilledButton>(disabled).onPressed, isNull);
-
+      await _pumpUntilFound(tester, intentionHeadRestore);
       await _dismissOperationMessage(tester);
       await _tapWhenFound(tester, intentionHeadRestore);
-      await _pumpUntilFound(tester, find.text(l10n.batchPageAdd));
+      await _pumpUntilAbsent(tester, intentionHeadRestore);
       await _dismissOperationMessage(tester);
-      await _tapWhenFound(tester, find.text(l10n.batchPageAdd));
+      await tester.binding.handlePopRoute();
       await _pumpUntilAbsent(tester, find.byType(IntentionDetailsPage));
+      await _pumpUntilFound(tester, find.text(l10n.batchAddNone));
+      await _tapWhenFound(
+        tester,
+        find.descendant(of: _pickerRow(_sleep), matching: find.text(_sleep)),
+      );
       await _pumpUntilFound(tester, find.text(l10n.batchAddCount(1)));
     },
   );
