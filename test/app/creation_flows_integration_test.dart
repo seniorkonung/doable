@@ -1,10 +1,11 @@
 import 'dart:async';
-import 'dart:ui' show Tristate;
+import 'dart:ui' show CheckedState, Tristate;
 
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_daily_choice_start_sheet.dart';
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
@@ -26,7 +27,10 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_purp
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
 import 'package:doable/src/intention/presentation/picker/intention_picker_view.dart';
+import 'package:doable/src/intention/presentation/picker/intention_picker_row.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
+import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -46,6 +50,7 @@ import '../support/tag_positions.dart';
 
 part 'creation_flows_test_support.dart';
 part 'creation_flows_accessibility_scenarios.dart';
+part 'creation_flows_relation_picker_scenarios.dart';
 part 'quick_creation/quick_creation_flow_scenarios.dart';
 
 void main() {
@@ -57,6 +62,7 @@ void main() {
   _registerAccessibilityTests();
   _registerQuickCreationFlowTests();
   _registerNestedQuickCreationTests();
+  _registerRelationPickerDailyChoiceTests();
   testWidgets('охват «Все» остаётся в каталоге при переходе к связям', (
     tester,
   ) async {
