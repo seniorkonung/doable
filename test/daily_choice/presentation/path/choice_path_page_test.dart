@@ -33,6 +33,59 @@ import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
 
 void main() {
+  for (final locale in [const Locale('ru'), const Locale('en')]) {
+    for (final direction in ChoicePathDraftDirection.values) {
+      for (final hasSteps in [false, true]) {
+        testWidgets(
+          'объяснение тупика ${direction == ChoicePathDraftDirection.topDown ? 'сверху вниз' : 'снизу вверх'}, ${hasSteps ? 'со шагом' : 'без шагов'}, ${locale.languageCode == 'ru' ? 'по-русски' : 'по-английски'}',
+          (tester) async {
+            final repository = _PathRepository();
+            addTearDown(repository.dispose);
+            final topDown = direction == ChoicePathDraftDirection.topDown;
+            await _pumpPage(
+              tester,
+              repository,
+              locale: locale,
+              direction: direction,
+              startingId: topDown ? 1 : 2,
+            );
+            if (hasSteps) {
+              repository.complete(0, [_edge(1, 2, 1)]);
+              await tester.pumpAndSettle();
+              await tester.tap(
+                find.byKey(
+                  ValueKey(
+                    'choice-path-continue-${_relation(1).toCanonicalString()}',
+                  ),
+                ),
+              );
+              await tester.pump();
+            }
+            repository.complete(hasSteps ? 1 : 0, []);
+            await tester.pumpAndSettle();
+            await tester.scrollUntilVisible(
+              find.byKey(const ValueKey('choice-path-empty')),
+              150,
+              scrollable: find.byType(Scrollable).first,
+            );
+            await tester.pumpAndSettle();
+            final message = switch ((locale.languageCode, topDown, hasSteps)) {
+              ('ru', true, false) => 'Из этого намерения сейчас нет допустимого пути к другому действию. Продолжениями становятся только связи, ведущие к готовому действию. Отметьте намерение готовым или свяжите его с действием.',
+              ('ru', true, true) => 'Дальнейших допустимых продолжений нет. Продолжениями становятся только связи, ведущие к готовому действию. Отметьте намерение готовым или свяжите его с действием.',
+              ('en', true, false) => 'There is no valid path from this intention to another action right now. Only relations leading to a ready action become continuations. Mark an intention as ready or link it to an action.',
+              ('en', true, true) => 'There are no further valid continuations. Only relations leading to a ready action become continuations. Mark an intention as ready or link it to an action.',
+              ('ru', false, false) => 'Для этого действия сейчас нет допустимых входящих связей. Выберите другое действие.',
+              ('ru', false, true) => 'Дальнейших допустимых продолжений нет.',
+              ('en', false, false) => 'There are no valid incoming relations for this action right now. Choose another action.',
+              _ => 'There are no further valid continuations.',
+            };
+            expect(find.text(message), findsOneWidget);
+          },
+        );
+      }
+    }
+  }
+
   // Поздний результат не зависит от сочетания направления и исхода: два
   // случая покрывают оба значения каждой оси.
   for (final (direction, succeeds) in [

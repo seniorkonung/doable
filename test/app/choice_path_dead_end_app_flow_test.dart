@@ -294,6 +294,56 @@ void main() {
     },
   );
 
+  testWidgets('связь с неготовым намерением не становится продолжением', (
+    tester,
+  ) async {
+    await _start(tester, ChoicePathDraftDirection.topDown);
+    await _tap(tester, _continuation(101));
+    await _tap(tester, _continuation(102));
+    await _tap(
+      tester,
+      find.byKey(const ValueKey('choice-path-open-relations')),
+    );
+    await _tap(tester, find.byKey(const ValueKey('intention-relations-add')));
+    await _until(
+      tester,
+      find.byKey(const ValueKey('participant-picker-filter')),
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('participant-picker-filter')),
+      'Гулять по вечерам',
+    );
+    await _tap(tester, find.text('Создать «Гулять по вечерам»'));
+    await _tap(tester, find.byKey(const ValueKey('intention-editor-submit')));
+    await _tap(
+      tester,
+      find.text(lookupAppLocalizations(const Locale('ru')).batchAddCount(1)),
+    );
+    await _until(
+      tester,
+      _relationRow('Чтобы Намерение 3, нужно Гулять по вечерам'),
+    );
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await _until(tester, find.byKey(const ValueKey('choice-path-empty')));
+    expect(find.textContaining('Намерение 1'), findsWidgets);
+    expect(find.textContaining('Намерение 2'), findsWidgets);
+    expect(find.textContaining('Намерение 3'), findsWidgets);
+    expect(find.byKey(const ValueKey('choice-path-conflict')), findsNothing);
+    expect(
+      find.textContaining(
+        'Продолжениями становятся только связи, ведущие к готовому действию.',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'Отметьте намерение готовым или свяжите его с действием.',
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('тупик снизу вверх открывает группу «Нужно для»', (tester) async {
     await _start(tester, ChoicePathDraftDirection.bottomUp);
     await _tap(tester, _continuation(103));

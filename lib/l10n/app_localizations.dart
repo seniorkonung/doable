@@ -4147,7 +4147,7 @@ abstract class AppLocalizations {
   /// Из исходного намерения нет допустимого пути
   ///
   /// In en, this message translates to:
-  /// **'There is no valid path from this intention to another action right now.'**
+  /// **'There is no valid path from this intention to another action right now. Only relations leading to a ready action become continuations. Mark an intention as ready or link it to an action.'**
   String get choicePathNoPath;
 
   /// У достигнутого шага нет продолжений
@@ -4155,6 +4155,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'There are no further valid continuations.'**
   String get choicePathNoFurtherPath;
+
+  /// У достигнутого шага сверху вниз нет продолжений
+  ///
+  /// In en, this message translates to:
+  /// **'There are no further valid continuations. Only relations leading to a ready action become continuations. Mark an intention as ready or link it to an action.'**
+  String get choicePathTopNoFurtherPath;
 
   /// Переход к связям из тупика выбора
   ///

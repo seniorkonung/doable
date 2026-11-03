@@ -318,7 +318,9 @@ final class ChoicePathPageState extends ConsumerState<ChoicePathPage> {
                       ? widget.direction == ChoicePathDraftDirection.bottomUp
                             ? l10n.choicePathBottomNoPath
                             : l10n.choicePathNoPath
-                      : l10n.choicePathNoFurtherPath,
+                      : widget.direction == ChoicePathDraftDirection.bottomUp
+                      ? l10n.choicePathNoFurtherPath
+                      : l10n.choicePathTopNoFurtherPath,
                   actionLabel: l10n.choicePathOpenRelations,
                   actionKey: const ValueKey('choice-path-open-relations'),
                   onAction: () => unawaited(

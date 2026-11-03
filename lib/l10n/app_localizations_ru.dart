@@ -2718,11 +2718,15 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get choicePathNoPath =>
-      'Из этого намерения сейчас нет допустимого пути к другому действию.';
+      'Из этого намерения сейчас нет допустимого пути к другому действию. Продолжениями становятся только связи, ведущие к готовому действию. Отметьте намерение готовым или свяжите его с действием.';
 
   @override
   String get choicePathNoFurtherPath =>
       'Дальнейших допустимых продолжений нет.';
+
+  @override
+  String get choicePathTopNoFurtherPath =>
+      'Дальнейших допустимых продолжений нет. Продолжениями становятся только связи, ведущие к готовому действию. Отметьте намерение готовым или свяжите его с действием.';
 
   @override
   String get choicePathOpenRelations => 'Открыть связи';

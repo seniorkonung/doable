@@ -2695,11 +2695,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get choicePathNoPath =>
-      'There is no valid path from this intention to another action right now.';
+      'There is no valid path from this intention to another action right now. Only relations leading to a ready action become continuations. Mark an intention as ready or link it to an action.';
 
   @override
   String get choicePathNoFurtherPath =>
       'There are no further valid continuations.';
+
+  @override
+  String get choicePathTopNoFurtherPath =>
+      'There are no further valid continuations. Only relations leading to a ready action become continuations. Mark an intention as ready or link it to an action.';
 
   @override
   String get choicePathOpenRelations => 'Open relations';
