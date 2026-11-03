@@ -23,6 +23,7 @@ import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
     show IntentionCatalogOrder, IntentionTagFilter, IntentionScope;
+import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
@@ -63,6 +64,7 @@ void main() {
   _registerQuickCreationFlowTests();
   _registerNestedQuickCreationTests();
   _registerRelationPickerDailyChoiceTests();
+  _registerRelationPickerIntentionTest();
   testWidgets('охват «Все» остаётся в каталоге при переходе к связям', (
     tester,
   ) async {
