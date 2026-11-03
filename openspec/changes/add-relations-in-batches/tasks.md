@@ -1307,7 +1307,7 @@
   - **Предполагаемые файлы:** меняются `lib/l10n/app_en.arb` с созданными файлами локализации `lib/l10n/app_localizations.dart` и `lib/l10n/app_localizations_en.dart`, `test/graph/presentation/graph_operation_presenter_test.dart`, `test/intention/presentation/editor/intention_editor_page_test.dart`.
   - **Размер:** XS.
 
-- [ ] 4.21 Сессию создания дневного выбора нельзя собрать без экземпляра пути её корня
+- [x] 4.21 Сессию создания дневного выбора нельзя собрать без экземпляра пути её корня
   - **Критерии приёмки:**
     - В `daily_choice_creation_flow_session.dart` конструктор `DailyChoiceCreationFlowSession` принимает `required ChoicePathPageInstance pathInstance`; необязательный параметр и подстановка нового `ChoicePathPageInstance()` удалены, других веток только для тестов в рабочем коде нет.
     - Рабочий вызов в `choice_path_page.dart` по-прежнему передаёт `_pageInstance` своего корня; поведение продукта, в том числе показ уточнённого пути после «назад» из подтверждения, не меняется.

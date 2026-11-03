@@ -61,9 +61,8 @@ final class DailyChoiceCreationFlowSession {
   DailyChoiceCreationFlowSession({
     required this.rootMatchId,
     required Iterable<LocalKey> originalHistory,
-    ChoicePathPageInstance? pathInstance,
-  }) : originalHistory = List.unmodifiable(originalHistory),
-       pathInstance = pathInstance ?? ChoicePathPageInstance();
+    required this.pathInstance,
+  }) : originalHistory = List.unmodifiable(originalHistory);
 
   final DailyChoiceCreationFlowId flowId = DailyChoiceCreationFlowId._();
   final LocalKey rootMatchId;
