@@ -173,7 +173,7 @@ final class IntentionEditorViewModelProvider
 }
 
 String _$intentionEditorViewModelHash() =>
-    r'fdfe23eabd5fde9028ac8df2f450d386cc18782b';
+    r'a8b99df4100d5e499c38fa964d26744034c4786d';
 
 /// Экранная сессия создания намерения по собственному ключу формы.
 ///
