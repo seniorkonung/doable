@@ -637,6 +637,32 @@ void main() {
       expect(_loadedOf(h).createTitle, 'Действие');
       expect(_rowTop(tester, 'Действие 25'), visibleTop);
     });
+
+    testWidgets('строка, вернувшаяся в начале выдачи, видна над первой '
+        'строкой', (tester) async {
+      final h = await _openRelationParticipants(tester, onCreate: (_) {});
+      await _showTitleResults(
+        tester,
+        h,
+        'Действие',
+        _firstPage(_actions(30), exactTitleCount: 1),
+      );
+      expect(find.byType(TagCreateRow), findsNothing);
+      final listTop = tester.getTopLeft(_list).dy;
+
+      await _renameCounterpart(tester, h, from: _exactMatch, to: _counterpart);
+
+      expect(_loadedOf(h).createTitle, 'Действие');
+      expect(h.position.pixels, 0);
+      expect(
+        tester.getTopLeft(find.byType(TagCreateRow)).dy,
+        greaterThanOrEqualTo(listTop),
+      );
+      expect(
+        tester.getBottomLeft(find.byType(TagCreateRow)).dy,
+        lessThanOrEqualTo(_rowTop(tester, 'Действие 30')),
+      );
+    });
   });
 
   group('согласование отметок занятых пар', () {

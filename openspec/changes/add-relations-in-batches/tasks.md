@@ -1281,7 +1281,7 @@
   - **Предполагаемые файлы:** меняются `lib/src/intention/presentation/editor/intention_editor_view_model.dart`, `lib/src/intention/presentation/editor/intention_creation_close.dart`, при необходимости `lib/src/intention/presentation/editor/intention_editor_page.dart`; меняются `test/intention/presentation/editor/intention_editor_view_model_test.dart`, `test/intention/presentation/editor/intention_editor_page_test.dart`, `test/graph/presentation/operation_failure_presentation_test.dart`.
   - **Размер:** XS.
 
-- [ ] 4.19 Вернувшаяся строка «Создать» видна человеку в начале выдачи поиска участника
+- [x] 4.19 Вернувшаяся строка «Создать» видна человеку в начале выдачи поиска участника
   - **Критерии приёмки:**
     - В `results_scroll_keeper.dart` появление строки «Создать» над выдачей (`createTitle` становится непустым) при позиции прокрутки 0 не сдвигает прокрутку на высоту этой строки: позиция остаётся 0, а строка «Создать» видна над первой строкой выдачи.
     - В остальных случаях, в том числе при появлении строки «Создать» на ненулевой позиции и при её уходе, якорь по первой видимой строке работает как прежде: `_mayShiftVisibleRow` и компенсация якоря меняются только для начала выдачи.

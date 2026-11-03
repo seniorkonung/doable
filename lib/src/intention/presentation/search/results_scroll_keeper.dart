@@ -13,7 +13,9 @@ import '../catalog/intention_catalog_state.dart';
 /// верхней позиции, а пауза ввода, загрузка и отказы первой порции
 /// показываются вместо строк сразу сверху. При обновлении выдачи без смены
 /// параметров поиска хранитель сохраняет экранное положение видимого
-/// намерения, а если оно исчезло из выдачи — ближайшего соседа. Пока видимая
+/// намерения, а если оно исчезло из выдачи — ближайшего соседа. Исключение —
+/// строка «Создать», появившаяся над выдачей, пока список стоит в начале:
+/// список остаётся в начале, и строка видна над выдачей. Пока видимая
 /// строка не сместилась, хранитель не трогает прокрутку: `jumpTo` оборвал бы
 /// инерцию и перетаскивание.
 ///
@@ -77,6 +79,13 @@ final class ResultsScrollKeeper {
 
     final previousState = previous?.value;
     if (nextState is! IntentionCatalogLoaded) {
+      return;
+    }
+    if (previousState is IntentionCatalogLoaded &&
+        _revealsCreateRowAtStart(previousState, nextState)) {
+      // В начале выдачи хранитель держит начало списка: якорь по первой
+      // строке спрятал бы появившуюся над ней строку «Создать».
+      _pendingVisualAnchor = null;
       return;
     }
     if (_pendingVisualAnchor == null &&
@@ -149,6 +158,16 @@ final class ResultsScrollKeeper {
     return shown is IntentionCatalogLoaded &&
         identical(shown.query, state.query);
   }
+
+  /// Появляется ли строка «Создать» над выдачей, пока список стоит в начале.
+  bool _revealsCreateRowAtStart(
+    IntentionCatalogLoaded previous,
+    IntentionCatalogLoaded next,
+  ) =>
+      previous.createTitle == null &&
+      next.createTitle != null &&
+      controller.hasClients &&
+      controller.position.pixels <= controller.position.minScrollExtent;
 
   /// Может ли переход от [previous] к [next] сдвинуть видимую строку.
   ///
