@@ -231,6 +231,40 @@ void _registerPageMatrixTests() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('матрица: сценарий «Правка на странице намерения не скрывает '
+      'панель»', (tester) async {
+    await _start(tester);
+    await _select(tester, AppDestination.intentionGraph);
+    await _open(tester, intentionCatalogRow('Читать'), IntentionDetailsPage);
+    final types = find.byType(OptionTiles<IntentionReadiness>);
+    final removeTag = find.byKey(
+      ValueKey('tag-assignment-remove-${tagFixtureId(_tag)}'),
+    );
+
+    await _tap(
+      tester,
+      find.descendant(of: types, matching: find.text('Intention')),
+    );
+    await _waitFor(
+      tester,
+      () =>
+          tester.widget<OptionTiles<IntentionReadiness>>(types).value ==
+          IntentionReadiness.notReady,
+    );
+    // Индикатор выполняющейся команды не даёт кадрам успокоиться.
+    await _waitFor(tester, () => !tester.binding.hasScheduledFrame);
+    await _tap(tester, removeTag);
+    await _waitFor(tester, () => removeTag.evaluate().isEmpty);
+    await _waitFor(tester, () => !tester.binding.hasScheduledFrame);
+
+    _expectAboveShell(
+      tester,
+      IntentionDetailsPage,
+      AppDestination.intentionGraph,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('матрица: настройки — обычная страница поверх Главной', (
     tester,
   ) async {

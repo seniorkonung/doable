@@ -220,6 +220,41 @@ void main() {
   });
 
   group('сброс истории со страницы намерения', () {
+    testWidgets('пункт «Дневные выборы» над каталогом на дату открывает '
+        'корневой каталог с прежним состоянием', (tester) async {
+      final app = await _start(tester);
+      await _prepareDailyChoiceCatalog(tester, app);
+      final before = _dailyChoiceCatalogView(tester, app);
+      await _select(tester, AppDestination.intentionGraph);
+      final router = app.container.read(appRouterProvider);
+      await tester.tap(intentionCatalogRows.hitTestable().first);
+      await _until(tester, find.byType(IntentionDetailsPage));
+      await tester.pumpAndSettle();
+      unawaited(router.push(DailyChoiceDateCatalogRoute(date: _viewedDate)));
+      await _until(tester, find.byType(DailyChoiceDateCatalogPage));
+      await tester.pumpAndSettle();
+      expect(_selected(tester), AppDestination.intentionGraph);
+
+      await _select(tester, AppDestination.dailyChoices);
+
+      expect(router.stack.map((page) => page.name), [AppShellRoute.name]);
+      expect(
+        find.byType(DailyChoiceDateCatalogPage, skipOffstage: false),
+        findsNothing,
+      );
+      expect(
+        find.byType(IntentionDetailsPage, skipOffstage: false),
+        findsNothing,
+      );
+      expect(_selected(tester), AppDestination.dailyChoices);
+      // Каталог на дату читал свою выдачу тем же счётчиком.
+      expect(
+        {..._dailyChoiceCatalogView(tester, app)}..remove('чтения выдачи'),
+        {...before}..remove('чтения выдачи'),
+      );
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('позднее архивирование один раз согласует сохранённые корни '
         'на настоящем хранилище после сброса истории', (tester) async {
       final app = await _start(tester);

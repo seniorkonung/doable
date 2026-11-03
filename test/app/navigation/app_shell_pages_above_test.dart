@@ -30,10 +30,13 @@ import 'package:doable/src/daily_choice/presentation/source_picker/daily_choice_
 import 'package:doable/src/data/local/app_database.dart'
     show openInMemoryLocalDatabase;
 import 'package:doable/src/design_system/components/docked_footer.dart';
+import 'package:doable/src/design_system/components/option_tiles.dart';
 import 'package:doable/src/design_system/components/picker_row.dart';
 import 'package:doable/src/design_system/components/relation_head.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
+import 'package:doable/src/intention/domain/intention.dart'
+    show IntentionReadiness;
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';

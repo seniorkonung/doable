@@ -256,6 +256,27 @@ void main() {
         );
       },
     );
+
+    test('готовность участников не ограничивает связь и не меняется', () async {
+      await seedGraph(
+        database,
+        () =>
+            (database.update(database.intentions)
+                  ..where((row) => row.id.equals(pageId.toCanonicalString())))
+                .write(const IntentionsCompanion(isActionReady: Value(true))),
+      );
+      final intentionsBefore = await database.select(database.intentions).get();
+
+      final result = await repository.execute(_addCommand(pageId, firstId));
+
+      final added = _confirmed(result).value as LongTermRelationsAdded;
+      expect(added.relations.single.sourceIntentionId, pageId);
+      expect(added.relations.single.relatedIntentionId, firstId);
+      expect(
+        await database.select(database.intentions).get(),
+        intentionsBefore,
+      );
+    });
   });
 
   group('пересечение с чтениями и другими командами', () {

@@ -915,6 +915,7 @@ void main() {
     await tester.tap(find.text('Вернуться к списку'));
     await tester.pumpAndSettle();
     expect(find.text('Добавить в "Нужно для" · выбрано 2'), findsOneWidget);
+    expect(find.text('Добавить 2 связи'), findsOneWidget);
     expect(
       tester.getSemantics(find.text('Плавать')).flagsCollection.isChecked,
       CheckedState.isFalse,
@@ -1030,6 +1031,7 @@ void main() {
       await tester.enterText(field, 'Плавать');
       await tester.pumpAndSettle();
       expect(find.text('Гулять'), findsNothing);
+      expect(find.text('Добавить в "Нужно" · выбрано 1'), findsOneWidget);
       await tester.enterText(field, 'Гулять');
       await tester.pumpAndSettle();
       final selectedText = find.descendant(

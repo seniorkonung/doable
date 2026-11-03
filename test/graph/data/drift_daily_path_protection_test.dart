@@ -202,6 +202,47 @@ void main() {
   );
 
   test(
+    'приоритет и описание архивированной связи выполненного выбора меняются, '
+    'а путь показывает их и сохраняет состав',
+    () async {
+      addChoice(201, completed: true);
+      expect(
+        await repository.execute(ArchiveLongTermRelation(_relation(101))),
+        isA<GraphCommandSucceeded>(),
+      );
+      final choicesBefore = storedRows('daily_choices');
+      final stepsBefore = storedRows('daily_choice_path_steps');
+
+      final result = await repository.execute(
+        UpdateLongTermRelation(
+          relationId: _relation(101),
+          patch: LongTermRelationPatch(
+            priority: const LongTermRelationFieldSet(RelationPriority.p1),
+            description: LongTermRelationDescriptionPatch.fromInput('Новое'),
+          ),
+        ),
+      );
+
+      expect(result, isA<GraphCommandSucceeded>());
+      expect(storedRows('daily_choices'), choicesBefore);
+      expect(storedRows('daily_choice_path_steps'), stepsBefore);
+      final details = (await repository.getDailyChoice(
+        _choice(201),
+      ) as DailyChoiceReadSuccess).value.value!;
+      expect(details.choice.isCompleted, isTrue);
+      expect(details.path.map((step) => step.relation.id), [
+        _relation(101),
+        _relation(102),
+      ]);
+      final step = details.path.first;
+      expect(step.relation.scope, RelationScope.archived);
+      expect(step.relation.priority, RelationPriority.p1);
+      expect(step.description!.value, 'Новое');
+      expectAssignments();
+    },
+  );
+
+  test(
     'архивирование промежуточного намерения и готовность сохраняют путь',
     () async {
       addChoice(201);

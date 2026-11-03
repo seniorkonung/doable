@@ -293,6 +293,44 @@ void main() {
     expect((await _storedIntention(database, relatedId))['is_archived'], 1);
   });
 
+  test(
+    'ошибка записи составного изменения сохраняет весь прежний набор полей',
+    () async {
+      await _create(repository, sourceId, relatedId, description: 'Описание');
+      final storedBefore = await _storedRelation(database, relationId);
+      final revisionBefore = await _revision(repository, sourceId);
+      await database.customStatement('''
+      CREATE TEMP TRIGGER canary_relation_update_failure
+      BEFORE UPDATE ON long_term_relations
+      BEGIN
+        SELECT RAISE(ABORT, 'canary relation update failure');
+      END
+    ''');
+
+      final failure = _failure(
+        await repository.execute(
+          UpdateLongTermRelation(
+            relationId: relationId,
+            patch: LongTermRelationPatch(
+              type: const LongTermRelationFieldSet(LongTermRelationType.can),
+              priority: const LongTermRelationFieldSet(RelationPriority.p1),
+              description: LongTermRelationDescriptionReplaced(
+                LongTermRelationDescription.fromInput('Новое описание')!,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(failure, isA<LongTermRelationUnexpectedFailure>());
+      expect(await _storedRelation(database, relationId), storedBefore);
+      expect(
+        revisionBefore.compareTo(await _revision(repository, sourceId)),
+        GraphRevisionOrder.same,
+      );
+    },
+  );
+
   group('изменение типа архивированной связи', () {
     Future<void> archiveRelation() async {
       await _create(repository, sourceId, relatedId, description: 'Описание');

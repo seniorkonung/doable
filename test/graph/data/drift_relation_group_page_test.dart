@@ -63,6 +63,18 @@ void main() {
         }
       }
 
+      // Связь между соседями не входит ни в одну группу владельца.
+      await _insertRelation(
+        database,
+        id: _relationId(_uuid(100 + fixture)),
+        ownerId: _intentionId(_uuid(10)),
+        participantId: _intentionId(_uuid(11)),
+        type: LongTermRelationType.need,
+        direction: RelationDirection.outgoing,
+        scope: RelationScope.active,
+        priority: RelationPriority.p2,
+      );
+
       // Остальные семь групп отличаются от каждой запрошенной хотя бы одним
       // признаком, поэтому одна связь в выдаче подтверждает все три отбора.
       for (final (scope, type, direction) in [

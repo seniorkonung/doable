@@ -834,7 +834,11 @@ void main() {
   });
 
   group('полный заполненный сценарий на тесном экране', () {
-    for (final device in [_narrowPortrait, _narrowLandscape]) {
+    for (final device in [
+      _narrowPortrait,
+      _narrowLandscape,
+      _tabletLandscape,
+    ]) {
       testWidgets(
         'на ${device.name} с безопасными отступами, клавиатурой все четыре поля, закрытие, объяснения, сохранение и исправление отказов доступны без переполнений',
         (tester) async {
@@ -1423,6 +1427,16 @@ const _Device _narrowLandscape = (
   padding: EdgeInsets.only(top: 24, right: 48),
   keyboard: 160,
   visibleContextWithKeyboard: _minVisibleContextExtent,
+);
+
+/// Планшет в альбомной ориентации: панель уже наибольшей ширины, а над
+/// клавиатурой остаётся обычный видимый участок страницы.
+const _Device _tabletLandscape = (
+  name: 'планшете в альбомной ориентации',
+  size: Size(1280, 800),
+  padding: EdgeInsets.only(top: 24),
+  keyboard: 320,
+  visibleContextWithKeyboard: _visibleContextExtent,
 );
 
 /// Ставит экран [device]; открытая клавиатура закрывает нижний безопасный

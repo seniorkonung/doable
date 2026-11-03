@@ -1194,7 +1194,7 @@
     - меняются `test/daily_choice/presentation/path/choice_path_view_model_test.dart`, `choice_path_page_test.dart`, `test/daily_choice/presentation/daily_choice_creation_flow_test.dart`, `test/daily_choice/presentation/editor/daily_choice_creation_page_test.dart`, `daily_choice_path_replace_page_test.dart`, `test/app/navigation/app_shell_unnamed_page_scenarios.dart`, `test/app/choice_path_dead_end_app_flow_test.dart`.
   - **Размер:** M.
 
-- [ ] 4.13 Проверить готовность фазы: все сценарии изменения подтверждены без устройства
+- [x] 4.13 Проверить готовность фазы: все сценарии изменения подтверждены без устройства
   - **Критерии приёмки:**
     - Каждый сценарий дельт спецификаций изменения подтверждён автоматической проверкой.
     - «Добавленная связь становится продолжением» подтверждён по исходу, а несколько изменений на странице из тупика не дают конфликта. Изменение пути, пока выбор стоит в тупике или показывает строки, даёт конфликт с кнопкой обновления.

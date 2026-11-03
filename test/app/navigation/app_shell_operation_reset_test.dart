@@ -5,6 +5,8 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
+import 'package:doable/src/app/navigation/app_navigation_bar.dart';
+import 'package:doable/src/app/quick_creation/quick_creation_button.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
@@ -26,6 +28,7 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_options.dart';
+import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:flutter/material.dart';
@@ -333,6 +336,53 @@ void main() {
     _expectRoot(tester, app.router, AppDestination.intentionGraph);
     _expectSelected(tester, AppDestination.intentionGraph);
     expect(find.text(app.intention.title), findsNothing);
+  });
+
+  testWidgets('позднее удаление намерения сохраняет панель создания с '
+      'несохранённым описанием, открытую после сброса истории', (tester) async {
+    const draft = 'Несохранённое описание';
+    final app = await _ControlledApp.start(tester);
+    await app.openDetails(tester);
+    await app.delete(tester);
+
+    await _select(tester, AppDestination.intentionGraph, settle: false);
+    // Панель навигации принимает нажатие только после перелёта общего Hero,
+    // поэтому кнопку нажимаем в первый же доступный момент.
+    final quickCreation = find.byType(QuickCreationButton).hitTestable();
+    await _until(tester, () => quickCreation.evaluate().isNotEmpty);
+    await tester.tap(quickCreation.first);
+    await tester.pump();
+    await tester.pump();
+    await tester.enterText(
+      find.byKey(const ValueKey('intention-editor-description')),
+      draft,
+    );
+    await tester.pump();
+
+    app.complete(
+      testDetailsDeletedResult(
+        app.intention,
+        revision: const TestDetailsRevision(1),
+      ),
+    );
+    await _until(tester, () => !app.coordinator.isRunning(app.intention.id));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(IntentionEditorPage), findsOneWidget);
+    expect(find.text(draft), findsOneWidget);
+    expect(
+      find.byType(IntentionDetailsPage, skipOffstage: false),
+      findsNothing,
+    );
+    expect(
+      tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected,
+      AppDestination.intentionGraph,
+    );
+    // Одно сообщение рисуется в каждом корневом `Scaffold`.
+    expect(find.text(_deleteSuccess), findsWidgets);
+    await _expireMessages(tester);
+    expect(find.text(draft), findsOneWidget);
+    expect(app.repository.commands.single, isA<DeleteIntention>());
   });
 
   testWidgets('успешный повтор удаления после отказа закрывает только '
