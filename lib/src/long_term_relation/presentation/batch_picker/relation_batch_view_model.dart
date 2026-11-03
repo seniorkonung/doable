@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../graph/application/graph_change.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_command_result.dart';
 import '../../../graph/application/graph_revision.dart';
@@ -10,8 +11,10 @@ import '../../../intention/application/intention_catalog.dart';
 import '../../../intention/domain/intention.dart';
 import '../../../intention/domain/intention_id.dart';
 import '../../../intention/presentation/catalog/intention_catalog_purpose.dart';
+import '../../../intention/presentation/catalog/pair_occupant_reconciliation.dart';
 import '../../application/intention_relation_group.dart';
 import '../../application/long_term_relation_command.dart';
+import '../../application/relation_pair_probe.dart';
 import 'relation_batch_state.dart';
 
 part 'relation_batch_view_model.g.dart';
@@ -180,6 +183,16 @@ final class RelationBatchViewModel extends _$RelationBatchViewModel {
         case GraphChange():
           break;
       }
+    }
+    final occupied = reconcilePairOccupants(
+      probe: RelationPairProbe.forGroup(intentionId: _pageId, group: _group),
+      occupants: const {},
+      rowIds: _selected.keys.toSet(),
+      changes: package.changes.whereType<LongTermRelationChange>(),
+    );
+    for (final id in occupied.keys) {
+      _selected.remove(id);
+      changed = true;
     }
     if (_selected.length != count && _operation is RelationBatchFailed) {
       _publish(const RelationBatchIdle());

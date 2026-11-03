@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:doable/src/graph/application/graph_revision.dart';
+import 'package:doable/src/graph/application/graph_change.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
@@ -10,6 +12,8 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/presentation/batch_picker/relation_batch_state.dart';
 import 'package:doable/src/long_term_relation/presentation/batch_picker/relation_batch_view_model.dart';
 import 'package:flutter/material.dart';
@@ -160,15 +164,118 @@ void main() {
     expect(h.selected, isEmpty);
     expect(h.state.pageTitle, 'Страница');
   });
+
+  test('пакет согласует отметки отдельных исходящих и входящих поисков одним снимком', () {
+    final h = _Harness();
+    addTearDown(h.dispose);
+    final incoming = relationBatchViewModelProvider(
+      IntentionSearchSession(),
+      _id(9),
+      IntentionRelationGroup.neededFor,
+      'Страница',
+    );
+    final other = relationBatchViewModelProvider(
+      IntentionSearchSession(),
+      _id(8),
+      IntentionRelationGroup.needs,
+      'Другая',
+    );
+    final incomingSubscription = h.container.listen(incoming, (_, _) {});
+    final otherSubscription = h.container.listen(other, (_, _) {});
+    addTearDown(incomingSubscription.close);
+    addTearDown(otherSubscription.close);
+    for (final id in [1, 2, 3]) {
+      h.model.toggle(_id(id), 'Намерение $id');
+      h.container.read(incoming.notifier).toggle(_id(id), 'Намерение $id');
+      h.container.read(other.notifier).toggle(_id(id), 'Намерение $id');
+    }
+    final snapshots = <List<IntentionId>>[];
+    final observer = h.container.listen(h.provider, (_, next) {
+      snapshots.add(next.selected.map((item) => item.id).toList());
+    });
+    addTearDown(observer.close);
+
+    h.changes.add(
+      _Package([
+        LongTermRelationCreatedChange(
+          revision: const TestCatalogRevision(1),
+          relation: testRelation(
+            sourceIntentionId: _id(9),
+            relatedIntentionId: _id(2),
+            type: LongTermRelationType.can,
+          ),
+        ),
+        LongTermRelationCreatedChange(
+          revision: const TestCatalogRevision(1),
+          relation: testRelation(
+            sourceIntentionId: _id(3),
+            relatedIntentionId: _id(9),
+            index: 2,
+          ),
+        ),
+      ]),
+    );
+
+    expect(h.selected, [(_id(1), 'Намерение 1'), (_id(3), 'Намерение 3')]);
+    expect(h.container.read(incoming).selected.map((item) => item.id), [
+      _id(1),
+      _id(2),
+    ]);
+    expect(h.container.read(other).selected.map((item) => item.id), [
+      _id(1),
+      _id(2),
+      _id(3),
+    ]);
+    expect(snapshots, [
+      [_id(1), _id(3)],
+    ]);
+  });
+
+  testWidgets(
+    'занятая пара снимает отметку и освобождает право предъявления отказа',
+    (tester) async {
+      final h = _Harness();
+      addTearDown(h.dispose);
+      h.model.toggle(_id(1), 'Первое');
+      h.model.submit();
+      h.repository.completeRelationCommand(
+        0,
+        const GraphResultFailure(LongTermRelationUnexpectedFailure()),
+      );
+      await tester.pump();
+      final failure = h.state.operation as RelationBatchFailed;
+      final claim = failure.claim!;
+
+      h.changes.add(
+        _Package([
+          LongTermRelationCreatedChange(
+            revision: const TestCatalogRevision(1),
+            relation: testRelation(
+              sourceIntentionId: _id(9),
+              relatedIntentionId: _id(1),
+            ),
+          ),
+        ]),
+      );
+
+      expect(h.state.operation, isA<RelationBatchIdle>());
+      expect(h.state.canEdit, isTrue);
+      expect(h.selected, isEmpty);
+      expect(
+        h.container
+            .read(graphCommandCoordinatorProvider.notifier)
+            .claimInitiatorFailure(claim.token),
+        isNull,
+      );
+    },
+  );
 }
 
 final class _Harness {
   _Harness() {
     container = ProviderContainer(
       overrides: [
-        personalGraphRepositoryProvider.overrideWithValue(
-          ControlledCatalogRepository(),
-        ),
+        personalGraphRepositoryProvider.overrideWithValue(repository),
         relationBatchChangesProvider.overrideWithValue(changes.stream),
       ],
     );
@@ -177,6 +284,7 @@ final class _Harness {
   final changes = StreamController<ConfirmedGraphChangePackage>.broadcast(
     sync: true,
   );
+  final repository = ControlledCatalogRepository();
   final provider = relationBatchViewModelProvider(
     IntentionSearchSession(),
     _id(9),
