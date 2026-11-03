@@ -1234,3 +1234,21 @@
   - **Зависимости:** нет.
   - **Предполагаемые файлы:** меняются `test/graph/data/drift_relation_update_test.dart`, `test/app/creation_flows_integration_test.dart`, `test/app/creation_flows_test_support.dart`; тест охвата «все» — в существующем тестовом файле приложения или виджета намерений либо в новом файле рядом с ними.
   - **Размер:** S.
+
+- [ ] 4.16 Тупик сверху вниз объясняет, что продолжением становится только связь к готовому действию
+  - **Критерии приёмки:**
+    - Тексты `ChoicePathEmpty` при выборе сверху вниз — без шагов (`choicePathNoPath`) и после хотя бы одного шага — на русском и английском говорят, что продолжениями становятся только связи, ведущие к готовому действию, и предлагают отметить намерение готовым или связать его с действием.
+    - Тексты тупика снизу вверх не меняются: без шагов остаётся `choicePathBottomNoPath`, после хотя бы одного шага — прежний текст «Дальнейших допустимых продолжений нет.». Сейчас `choice_path_page.dart` показывает `choicePathNoFurtherPath` в обоих направлениях, поэтому строки шага с путём разделяются по направлению.
+    - Кнопка «Открыть связи», чтение продолжений в `drift_personal_graph_repository_choice_path_reads.dart` и модель пути не меняются: нового состояния тупика и новых чтений нет, неготовые цели продолжениями не показываются.
+    - Сценарий «Связь с неготовым намерением не становится продолжением» подтверждён по исходу сквозным тестом на настоящем хранилище в `choice_path_dead_end_app_flow_test.dart`: из тупика сверху вниз «Открыть связи», создание неготового намерения в поиске группы «Нужно», добавление связи и возврат показывают тот же путь, тупик без продолжений и новое объяснение условия.
+    - Тест страницы в `choice_path_page_test.dart` проверяет объяснения тупика по направлению и наличию шагов: сверху вниз — новые тексты, снизу вверх — прежние. Названия тестов на русском.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/path/choice_path_page_test.dart test/app/choice_path_dead_end_app_flow_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+    - `mise exec --no-deps -- openspec validate add-relations-in-batches --strict`.
+  - **Зависимости:** 4.11.
+  - **Предполагаемые файлы:**
+    - меняются `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации, `lib/src/daily_choice/presentation/path/choice_path_page.dart`;
+    - меняются `test/daily_choice/presentation/path/choice_path_page_test.dart`, `test/app/choice_path_dead_end_app_flow_test.dart`.
+  - **Размер:** S.
