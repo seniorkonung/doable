@@ -91,8 +91,8 @@ void main() {
       ]) {
         await database.customInsert(
           '''INSERT INTO long_term_relations
-           (id, source_intention_id, related_intention_id, type, priority, is_archived)
-           VALUES (?, ?, ?, ?, 1, 0)''',
+           (id, source_intention_id, related_intention_id, type, priority, is_archived, created_at, updated_at)
+           VALUES (?, ?, ?, ?, 1, 0, 0, 0)''',
           variables: [
             Variable.withString(_uuid(n)),
             Variable.withString(_uuid(source)),

@@ -54,6 +54,77 @@ void main() {
 
   tearDown(() => database.close());
 
+  test('первая порция поиска считает все активные точные названия', () async {
+    seedRawGraph(raw, () {
+      raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
+        _uuid(100),
+        'Тег',
+        tagPositionKey(100),
+      ]);
+      for (final (number, title, ready, archived) in [
+        (1, 'Читать', 1, 0),
+        (2, 'ЧИТАТЬ', 1, 0),
+        (3, 'читать', 0, 0),
+        (4, 'Читать', 1, 0),
+        (5, 'Читать', 1, 1),
+        (6, 'Читать книгу', 1, 0),
+        (7, 'Читать', 1, 0),
+      ]) {
+        raw.execute(
+          'INSERT INTO intentions '
+          '(id, title, is_action_ready, is_archived, created_at, updated_at) '
+          'VALUES (?, ?, ?, ?, ?, ?)',
+          [_uuid(number), title, ready, archived, number, number],
+        );
+      }
+      for (final number in [2, 3, 4, 5, 6]) {
+        raw.execute(
+          'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
+          [_uuid(100), _uuid(number)],
+        );
+      }
+    });
+
+    final query = _tagQuery(
+      scope: IntentionScope.active,
+      readinessFilter: IntentionReadinessFilter.readyOnly,
+      titleFilter: '  чИтАтЬ  ',
+      tagFilter: IntentionTagFilter(requiredTagIds: [_tagId(100)]),
+      pairProbe: _excluding(_id(_uuid(1))),
+    );
+    final page = _firstPage(await repository.getCatalogPage(query));
+    expect(page.items.single.id, _id(_uuid(2)));
+    expect(page.nextCursor, isNotNull);
+    expect(page.exactTitleCount, 5);
+
+    final partialTitle = _firstPage(
+      await repository.getCatalogPage(
+        _tagQuery(
+          tagFilter: IntentionTagFilter.empty,
+          titleFilter: 'чита',
+          pairProbe: _excluding(_id(_uuid(1))),
+        ),
+      ),
+    );
+    expect(partialTitle.exactTitleCount, 0);
+
+    final withoutProbe = _firstPage(
+      await repository.getCatalogPage(
+        _tagQuery(tagFilter: IntentionTagFilter.empty, titleFilter: 'читать'),
+      ),
+    );
+    expect(withoutProbe.exactTitleCount, isNull);
+    final withoutTitle = _firstPage(
+      await repository.getCatalogPage(
+        _tagQuery(
+          tagFilter: IntentionTagFilter.empty,
+          pairProbe: _excluding(_id(_uuid(1))),
+        ),
+      ),
+    );
+    expect(withoutTitle.exactTitleCount, isNull);
+  });
+
   group('Совместный запрос каталога', () {
     final originalFilter = IntentionTagFilter(
       requiredTagIds: [_tagId(firstTagNumber)],
@@ -760,7 +831,7 @@ void main() {
             }
           }
           raw.execute(
-            'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority) VALUES (?, ?, ?, ?, ?)',
+            'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 0, 0)',
             [_uuid(500), _uuid(1), _uuid(5), 'need', 2],
           );
         });
@@ -887,7 +958,7 @@ void main() {
           (502, 8, 7, 1),
         ]) {
           raw.execute(
-            'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
+            'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 0, 0)',
             [
               _uuid(relation),
               _uuid(source),
@@ -1114,27 +1185,24 @@ void main() {
           raw.execute(
             '''INSERT INTO long_term_relations
                (id, source_intention_id, related_intention_id, type, priority,
-                is_archived) VALUES (?, ?, ?, 'need', 2, ?)''',
+                is_archived, created_at, updated_at) VALUES (?, ?, ?, 'need', 2, ?, 0, 0)''',
             [_uuid(number), _uuid(source), _uuid(related), archived],
           );
         }
       });
     });
 
-    PairOccupant occupant(int relation, RelationScope scope) =>
-        PairOccupant(relationId: _relationId(relation), scope: scope);
-
-    RelationPairProbe probe(
-      int counterpart,
-      RelationParticipantRole role, {
-      int? ignoredRelation,
-    }) => RelationPairProbe(
-      counterpartId: _id(_uuid(counterpart)),
-      candidateRole: role,
-      ignoredRelationId: ignoredRelation == null
-          ? null
-          : _relationId(ignoredRelation),
+    PairOccupant occupant(int relation, RelationScope scope) => PairOccupant(
+      relationId: _relationId(relation),
+      type: LongTermRelationType.need,
+      scope: scope,
     );
+
+    RelationPairProbe probe(int counterpart, RelationParticipantRole role) =>
+        RelationPairProbe(
+          counterpartId: _id(_uuid(counterpart)),
+          candidateRole: role,
+        );
 
     Future<IntentionCatalogFirstPage> firstPage(
       RelationPairProbe? pairProbe, {
@@ -1183,6 +1251,27 @@ void main() {
       });
     });
 
+    test('порция читает текущий тип занимающей связи', () async {
+      seedRawGraph(raw, () {
+        raw.execute(
+          "UPDATE long_term_relations SET type = 'can' WHERE id = ?",
+          [_uuid(healthyToWalking)],
+        );
+      });
+      final page = await firstPage(
+        probe(healthy, RelationParticipantRole.related),
+      );
+
+      expect(
+        page.pairOccupants![_id(_uuid(walking))]!.type,
+        LongTermRelationType.can,
+      );
+      expect(
+        page.pairOccupants![_id(_uuid(swimming))]!.type,
+        LongTermRelationType.need,
+      );
+    });
+
     test('связь обратного направления пару не занимает', () async {
       final asRelated = await firstPage(
         probe(healthy, RelationParticipantRole.related),
@@ -1196,39 +1285,6 @@ void main() {
         _id(_uuid(sleeping)): occupant(sleepingToHealthy, RelationScope.active),
       });
     });
-
-    test(
-      'изменяемая связь свою пару не занимает, а остальные занимают',
-      () async {
-        final asRelated = await firstPage(
-          probe(
-            healthy,
-            RelationParticipantRole.related,
-            ignoredRelation: healthyToWalking,
-          ),
-        );
-        final asSource = await firstPage(
-          probe(
-            walking,
-            RelationParticipantRole.source,
-            ignoredRelation: healthyToWalking,
-          ),
-        );
-
-        expect(asRelated.pairOccupants, {
-          _id(_uuid(swimming)): occupant(
-            healthyToSwimming,
-            RelationScope.archived,
-          ),
-        });
-        expect(asSource.pairOccupants, {
-          _id(_uuid(resting)): occupant(
-            restingToWalking,
-            RelationScope.archived,
-          ),
-        });
-      },
-    );
 
     test('запрос без пробы приходит без карты занятости', () async {
       final page = await firstPage(null);
@@ -1347,7 +1403,7 @@ void main() {
           );
         }
         raw.execute(
-          'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority) VALUES (?, ?, ?, ?, ?)',
+          'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 0, 0)',
           [_uuid(500), _uuid(1), _uuid(3), 'need', 2],
         );
         raw.execute(

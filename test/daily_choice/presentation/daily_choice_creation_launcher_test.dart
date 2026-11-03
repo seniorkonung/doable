@@ -16,7 +16,6 @@ import 'package:doable/src/design_system/components/top_bar.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
-import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -26,6 +25,8 @@ import '../../support/daily_choice_durability_fixture.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 import '../../support/quick_creation.dart';
+
+const _foreignFilter = 'Намерение 3';
 
 void main() {
   _defineLatePickerTests();
@@ -107,13 +108,11 @@ void main() {
         await router.maybePop();
         await tester.pumpAndSettle();
         expect(
-          tester
-              .widget<TextField>(
-                find.byKey(const ValueKey('relation-editor-description')),
-              )
-              .controller!
-              .text,
-          'Чужой черновик',
+          _fieldText(
+            tester,
+            find.byKey(const ValueKey('daily-choice-action-filter')),
+          ),
+          _foreignFilter,
         );
         expect(tester.takeException(), isNull);
       },
@@ -149,10 +148,11 @@ void main() {
           direction,
           direction == ChoicePathDraftDirection.topDown ? 1 : 3,
         );
-        expect(
-          router.stackData.map((route) => route.name),
-          isNot(contains(_pickerName(direction))),
-        );
+        expect(router.current.name, ChoicePathRoute.name);
+        expect(router.stackData.map((route) => route.matchId), [
+          ...history,
+          router.current.matchId,
+        ]);
         for (final relation
             in direction == ChoicePathDraftDirection.topDown
                 ? [101, 102]
@@ -192,13 +192,11 @@ void main() {
           await router.maybePop();
           await tester.pumpAndSettle();
           expect(
-            tester
-                .widget<TextField>(
-                  find.byKey(const ValueKey('relation-editor-description')),
-                )
-                .controller!
-                .text,
-            'Чужой черновик',
+            _fieldText(
+              tester,
+              find.byKey(const ValueKey('daily-choice-action-filter')),
+            ),
+            _foreignFilter,
           );
         }
         expect(tester.takeException(), isNull);
@@ -298,6 +296,7 @@ void main() {
         final router = _DelayedPickerRouter();
         await _openApp(tester, router: router);
         final source = await _sourceContext(tester, router);
+        router.holdNextPicker();
         final launcher = DailyChoiceCreationLauncher();
         final first = launcher.launch(
           sourceContext: source,
@@ -410,6 +409,7 @@ void _defineLatePickerTests() {
         final router = _DelayedPickerRouter();
         await _openApp(tester, router: router);
         final source = await _sourceContext(tester, router, deep: deep);
+        router.holdNextPicker();
         final launcher = DailyChoiceCreationLauncher();
         final old = launcher.launch(
           sourceContext: source,
@@ -461,13 +461,15 @@ void _defineLatePickerTests() {
   }
 }
 
-/// Задерживает доставку результата первого настоящего поиска его владельцу.
+/// Задерживает доставку результата поиска, открытого после [holdNextPicker].
 final class _DelayedPickerRouter extends RootStackRouter {
   final _gate = Completer<void>();
-  bool _holdNextPicker = true;
+  bool _holdNextPicker = false;
 
   @override
   List<AutoRoute> get routes => AppRouter().routes;
+
+  void holdNextPicker() => _holdNextPicker = true;
 
   void release() => _gate.complete();
 
@@ -515,13 +517,15 @@ Future<BuildContext> _sourceContext(
   if (!deep) return tester.element(find.byType(DailyChoiceCatalogPage));
   unawaited(
     router.push(
-      RelationEditorRoute(editorContext: const RelationBlankCreationContext()),
+      DailyChoiceActionPickerRoute(
+        pickerContext: const PathReplacementDailyChoicePickerContext(),
+      ),
     ),
   );
   await tester.pumpAndSettle();
   await tester.enterText(
-    find.byKey(const ValueKey('relation-editor-description')),
-    'Чужой черновик',
+    find.byKey(const ValueKey('daily-choice-action-filter')),
+    _foreignFilter,
   );
   unawaited(
     router.push(IntentionDetailsRoute(intentionId: durabilityIntention(2))),

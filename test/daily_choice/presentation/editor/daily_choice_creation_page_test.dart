@@ -16,6 +16,7 @@ import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/daily_choice/presentation/daily_choice_creation_flow_session.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_creation_page.dart';
 import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
+import 'package:doable/src/daily_choice/presentation/path/choice_path_view_model.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -897,6 +898,7 @@ Future<void> _pump(
   final session = DailyChoiceCreationFlowSession(
     rootMatchId: router.stackData.last.matchId,
     originalHistory: history,
+    pathInstance: ChoicePathPageInstance(),
   );
   unawaited(
     router.push(
@@ -1060,6 +1062,8 @@ LongTermRelationSummary _step() => LongTermRelationSummary(
     priority: RelationPriority.p1,
     scope: RelationScope.active,
     creationSequence: RelationCreationSequence(1),
+    createdAt: RelationTimestamp(DateTime.utc(2026)),
+    updatedAt: RelationTimestamp(DateTime.utc(2026)),
   ),
   source: RelationParticipantSummary(
     id: _intention(1),
@@ -1094,6 +1098,8 @@ ChoicePathSelection _selection(int relation, int action, String title) =>
             priority: RelationPriority.p1,
             scope: RelationScope.active,
             creationSequence: RelationCreationSequence(relation),
+            createdAt: RelationTimestamp(DateTime.utc(2026)),
+            updatedAt: RelationTimestamp(DateTime.utc(2026)),
           ),
           sourceTitle: 'Основание',
           relatedTitle: title,
@@ -1121,6 +1127,8 @@ ChoicePathSelection _bottomSelection(int relation, int source, String title) =>
             priority: RelationPriority.p1,
             scope: RelationScope.active,
             creationSequence: RelationCreationSequence(relation),
+            createdAt: RelationTimestamp(DateTime.utc(2026)),
+            updatedAt: RelationTimestamp(DateTime.utc(2026)),
           ),
           sourceTitle: title,
           relatedTitle: 'Действие',

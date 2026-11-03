@@ -21,6 +21,7 @@ import 'package:doable/src/intention/application/intention_catalog.dart'
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/statistics/application/statistics_period.dart';
@@ -413,16 +414,28 @@ Future<LongTermRelation> _createNeed(
   PersonalGraphRepository graph,
   Intention source,
   Intention related,
-) async => (await _confirm<LongTermRelationCreated>(
-  graph,
-  CreateLongTermRelation(
-    sourceIntentionId: source.id,
-    relatedIntentionId: related.id,
-    type: LongTermRelationType.need,
-    priority: RelationPriority.p2,
-    description: null,
-  ),
-)).relation;
+) async {
+  final relation = (await _confirm<LongTermRelationsAdded>(
+    graph,
+    AddLongTermRelations(
+      pageIntentionId: source.id,
+      candidateIds: [related.id],
+      group: IntentionRelationGroup.needs,
+    ),
+  )).relations.single;
+  return (await _confirm<LongTermRelationUpdated>(
+    graph,
+    UpdateLongTermRelation(
+      relationId: relation.id,
+      patch: LongTermRelationPatch(
+        priority: const LongTermRelationFieldSet(RelationPriority.p2),
+        description: LongTermRelationDescriptionPatch.fromInput(
+          'Описание связи',
+        ),
+      ),
+    ),
+  )).relation;
+}
 
 /// Моменты и сводки копий в открытой панели по порядку, без заголовка,
 /// пояснения и кнопки ручной копии.

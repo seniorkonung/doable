@@ -51,13 +51,13 @@ void main() {
       expect(_filterText(tester), isEmpty);
       await tester.tap(_key('daily-choice-action-cancel'));
       await tester.pumpAndSettle();
-      await _selectMode(tester, QuickCreationMode.relation);
+      await _selectMode(tester, QuickCreationMode.intention);
       await router.maybePop();
       await tester.pumpAndSettle();
       expect(_filterText(tester), 'Намерение 3');
       await tester.tap(_key('daily-choice-action-cancel'));
       await tester.pumpAndSettle();
-      expectQuickCreationMode(tester, QuickCreationMode.relation);
+      expectQuickCreationMode(tester, QuickCreationMode.intention);
       expect(tester.takeException(), isNull);
     },
   );

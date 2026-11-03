@@ -29,8 +29,9 @@ part 'intention_editor_view_model.g.dart';
 /// закрытия по запросу или освобождения и отвергает правки черновика.
 ///
 /// Все способы ухода обращаются к единому решению [requestClose]: неизменённый
-/// черновик закрывается сразу, изменённый — после одного подтверждения,
-/// связанного с ключом сессии и состоянием отправки. Панель тегов и лист тега
+/// черновик до принятия отправки закрывается сразу; изменённый черновик или
+/// принятая отправка требуют одного подтверждения, связанного с ключом сессии
+/// и состоянием отправки. Панель тегов и лист тега
 /// поверх формы сессию не завершают. Закрытие не отменяет принятую отправку:
 /// её будущий результат переходит общей поверхности.
 ///
@@ -73,11 +74,16 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
   var _tagObservationGeneration = 0;
 
   @override
-  IntentionEditorState build(IntentionCreationFormKey formKey) {
+  IntentionEditorState build(
+    IntentionCreationFormKey formKey, {
+    String initialTitle = '',
+    IntentionCreationOperationTarget target =
+        const CreatingIntentionOperationTarget(),
+  }) {
     _formKey = formKey;
     _coordinator = ref.watch(graphCommandCoordinatorProvider.notifier);
     _tagReads = ref.watch(personalGraphRepositoryProvider);
-    const initial = IntentionEditorState.initial();
+    final initial = IntentionEditorState.initial(initialTitle: initialTitle);
     final draftTagSet = _draftTagSet = _SessionDraftTagSet(
       this,
       initial.draft.tagIds,
@@ -179,6 +185,7 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
         readiness: draft.readiness,
         tagIds: draft.tagIds,
       ),
+      target: target,
     );
     switch (start) {
       case IntentionCommandAccepted(:final token, :final future):
@@ -196,10 +203,10 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
 
   /// Решает запрос закрытия сессии от любого способа ухода.
   ///
-  /// Неизменённый черновик завершает сессию сразу. Изменённый требует одного
-  /// подтверждения; повторный запрос до ответа второго не создаёт. Решение
-  /// сообщает, продолжится ли принятая отправка после закрытия. Запрос к
-  /// завершённой сессии ничего не закрывает.
+  /// Неизменённый черновик до отправки завершает сессию сразу. Изменённый
+  /// черновик или принятая отправка требуют одного подтверждения; повторный
+  /// запрос до ответа второго не создаёт. Решение сообщает, продолжится ли
+  /// отправка после закрытия. Запрос к завершённой сессии ничего не закрывает.
   IntentionCreationCloseDecision requestClose() {
     if (!ref.mounted) {
       return const IntentionCreationCloseSessionEnded();
@@ -219,11 +226,11 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
       case IntentionDraftAvailability.submitting:
         savingOnClose = IntentionCreationSavingOnClose.continues;
       case IntentionDraftAvailability.editable:
+        if (!state.draft.isChanged) {
+          _endOnRequest();
+          return const IntentionCreationClosedImmediately();
+        }
         savingOnClose = IntentionCreationSavingOnClose.notStarted;
-    }
-    if (!state.draft.isChanged) {
-      _endOnRequest();
-      return IntentionCreationClosedImmediately(savingOnClose);
     }
     final confirmation = IntentionCreationCloseConfirmation(
       formKey: _formKey,
@@ -282,7 +289,7 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
         ResultSuccess(value: IntentionSaved(:final intention)) =>
           state.withOperation(
             OperationSucceeded<Intention>(intention),
-            event: IntentionEditorCreated(intention.id),
+            event: IntentionEditorCreated(intention),
           ),
         ResultSuccess(value: IntentionDeleted()) => state.withOperation(
           const OperationFailed<Intention>(IntentionUnexpectedFailure()),

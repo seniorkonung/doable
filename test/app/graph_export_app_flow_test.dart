@@ -23,6 +23,7 @@ import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention.dart';
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:flutter/material.dart';
@@ -289,15 +290,25 @@ Future<DailyChoiceId> _seedGraph(AppDatabase database) async {
 
   final health = await createIntention('Здоровье', IntentionReadiness.notReady);
   final running = await createIntention('Бегать', IntentionReadiness.ready);
-  final relation = (await confirm<LongTermRelationCreated>(
-    CreateLongTermRelation(
-      sourceIntentionId: health.id,
-      relatedIntentionId: running.id,
-      type: LongTermRelationType.need,
-      priority: RelationPriority.p2,
-      description: null,
+  final relation = (await confirm<LongTermRelationsAdded>(
+    AddLongTermRelations(
+      pageIntentionId: health.id,
+      candidateIds: [running.id],
+      group: IntentionRelationGroup.needs,
     ),
-  )).relation;
+  )).relations.single;
+
+  await confirm<LongTermRelationUpdated>(
+    UpdateLongTermRelation(
+      relationId: relation.id,
+      patch: LongTermRelationPatch(
+        priority: const LongTermRelationFieldSet(RelationPriority.p2),
+        description: LongTermRelationDescriptionPatch.fromInput(
+          'Описание связи',
+        ),
+      ),
+    ),
+  );
   final created = await confirm<DailyChoiceCreated>(
     CreateDailyChoice(
       sourceIntentionId: health.id,

@@ -17,6 +17,7 @@ import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_edit_page.dart';
+import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -38,6 +39,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/app_root_pages.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/ordinary_page_test_app.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
@@ -309,7 +311,8 @@ void main() {
   });
 
   testWidgets(
-    'каждый участник и связь открываются по сохранённому идентификатору',
+    'каждый участник открывается страницей, а связь — панелью по сохранённому '
+    'идентификатору',
     (tester) async {
       final repository = _Repository();
       final router = AppRouter();
@@ -342,14 +345,21 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(const ValueKey('daily-choice-relation-2')));
+      // Открытая связь читается: индикатор чтения не даёт дождаться покоя.
       await tester.pump();
-      expect(router.current.name, RelationDetailsRoute.name);
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(repository.watchedRelations, [_relationId(2)]);
+      expect(find.byType(Sheet), findsOneWidget);
+      expect(router.current.name, DailyChoiceDetailsRoute.name);
+      // Панель закрывает навигацию и страницу под собой от нажатий.
+      expect(appNavigationDestinations().hitTestable(), findsNothing);
       expect(
-        router.current.argsAs<RelationDetailsRouteArgs>().relationId,
-        _relationId(2),
+        find.byKey(const ValueKey('daily-choice-relation-2')).hitTestable(),
+        findsNothing,
       );
-      unawaited(router.maybePop());
+      await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
+      expect(find.byType(Sheet), findsNothing);
 
       await tester.tap(find.byKey(const ValueKey('daily-choice-intention-2')));
       await tester.pump();
@@ -782,6 +792,8 @@ DailyChoiceDetails _details({
       priority: relationPriority,
       scope: scope,
       creationSequence: RelationCreationSequence(n),
+      createdAt: RelationTimestamp(DateTime.utc(2026)),
+      updatedAt: RelationTimestamp(DateTime.utc(2026)),
     ),
     description: relationDescription == null
         ? null
@@ -920,9 +932,14 @@ final class _Repository
     IntentionCatalogQuery query,
   ) => Future.error(StateError('Нет данных каталога в этом тесте'));
 
+  /// Связи, чтение которых начала панель, в порядке начала.
+  final watchedRelations = <LongTermRelationId>[];
+
   @override
-  Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) =>
-      const Stream.empty();
+  Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) {
+    watchedRelations.add(id);
+    return const Stream.empty();
+  }
 
   @override
   Stream<Result<GraphSnapshot<application.IntentionDetails?>>> watchIntention(

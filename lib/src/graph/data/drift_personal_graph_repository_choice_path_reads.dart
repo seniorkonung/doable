@@ -97,12 +97,13 @@ extension _ChoicePathContinuationReading on DriftPersonalGraphRepository {
       throw const _ChoicePathSnapshotHasExpired();
     }
 
+    final steps = <LongTermRelationSummary>[];
     if (draft.steps.isNotEmpty) {
       final relationRows = await _database
           .customSelect(
             '''SELECT creation_sequence, id, source_intention_id,
                       related_intention_id, type, priority, description,
-                      is_archived
+                      is_archived, created_at, updated_at
                FROM long_term_relations
                WHERE id IN (SELECT value FROM json_each(?))''',
             variables: [
@@ -133,6 +134,16 @@ extension _ChoicePathContinuationReading on DriftPersonalGraphRepository {
             actual.scope != relation_domain.RelationScope.active) {
           throw const _ChoicePathSnapshotHasExpired();
         }
+        steps.add(
+          LongTermRelationSummary(
+            relation: actual.toDomain(),
+            source: _choicePathParticipant(intentions[step.sourceIntentionId]!),
+            related: _choicePathParticipant(
+              intentions[step.relatedIntentionId]!,
+            ),
+            hasDescription: actual.hasDescription,
+          ),
+        );
       }
     }
 
@@ -148,7 +159,7 @@ extension _ChoicePathContinuationReading on DriftPersonalGraphRepository {
         ? '''WITH visited(id) AS (SELECT value FROM json_each(?))
              SELECT r.creation_sequence, r.id, r.source_intention_id,
                     r.related_intention_id, r.type, r.priority,
-                    r.description, r.is_archived
+                    r.description, r.is_archived, r.created_at, r.updated_at
              FROM long_term_relations r
              JOIN intentions source ON source.id = r.source_intention_id
              WHERE r.related_intention_id = ? AND r.is_archived = 0
@@ -170,7 +181,7 @@ extension _ChoicePathContinuationReading on DriftPersonalGraphRepository {
                )
              SELECT r.creation_sequence, r.id, r.source_intention_id,
                     r.related_intention_id, r.type, r.priority,
-                    r.description, r.is_archived
+                    r.description, r.is_archived, r.created_at, r.updated_at
              FROM long_term_relations r
              JOIN reachable ON reachable.id = r.related_intention_id
              WHERE r.source_intention_id = ? AND r.is_archived = 0''';
@@ -240,6 +251,7 @@ extension _ChoicePathContinuationReading on DriftPersonalGraphRepository {
     return ChoicePathContinuationsPage(
       draft: draft,
       current: intentions[draft.currentIntentionId]!,
+      steps: steps,
       items: items,
       nextCursor: stored.length > query.pageSize
           ? _DriftChoicePathCursor.fromBoundary(
@@ -251,6 +263,13 @@ extension _ChoicePathContinuationReading on DriftPersonalGraphRepository {
     );
   }
 }
+
+RelationParticipantSummary _choicePathParticipant(domain.Intention intention) =>
+    RelationParticipantSummary(
+      id: intention.id,
+      title: intention.title,
+      archiveState: intention.archiveState,
+    );
 
 final class _DriftChoicePathCursor implements ChoicePathContinuationCursor {
   _DriftChoicePathCursor.fromBoundary({

@@ -930,7 +930,7 @@ final class DriftPersonalGraphRepository
         ? await _readActiveRelationNeighborIds(id)
         : const <IntentionId>[];
     final archivedRelations = cascadedNeighborIds.isNotEmpty
-        ? await _archiveActiveRelations(id)
+        ? await _archiveActiveRelations(id, clock)
         : const <_CascadedRelationArchive>[];
 
     final updated = domain.Intention(
@@ -1000,6 +1000,7 @@ final class DriftPersonalGraphRepository
 
   Future<List<_CascadedRelationArchive>> _archiveActiveRelations(
     IntentionId id,
+    _GraphWriteClock clock,
   ) async {
     final serializedId = id.toCanonicalString();
     final rows = await _database
@@ -1007,6 +1008,7 @@ final class DriftPersonalGraphRepository
           '''SELECT relation.creation_sequence, relation.id,
                 relation.source_intention_id, relation.related_intention_id,
                 relation.type, relation.priority, relation.is_archived,
+                relation.created_at, relation.updated_at,
                 EXISTS(SELECT 1 FROM daily_choice_path_steps AS step
                        WHERE step.long_term_relation_id = relation.id) AS is_referenced
          FROM long_term_relations AS relation
@@ -1022,10 +1024,12 @@ final class DriftPersonalGraphRepository
           },
         )
         .get();
+    final archivedAt = relation_domain.RelationTimestamp(clock.read());
     final archived = [
       for (final row in rows)
         _CascadedRelationArchive(
           StoredLongTermRelation.decode(row.data).toDomain(),
+          archivedAt,
           switch (requiredStoredInteger(row.data, 'is_referenced')) {
             0 => const LongTermRelationPermissions.unrestricted(),
             1 => const LongTermRelationPermissions.referencedByDailyPath(),
@@ -1036,12 +1040,13 @@ final class DriftPersonalGraphRepository
     await _database.customUpdate(
       '''
         UPDATE long_term_relations
-        SET is_archived = 1
+        SET is_archived = 1, updated_at = ?
         WHERE
           is_archived = 0 AND
           (source_intention_id = ? OR related_intention_id = ?)
       ''',
       variables: [
+        Variable<int>(archivedAt.value.microsecondsSinceEpoch),
         Variable<String>(serializedId),
         Variable<String>(serializedId),
       ],
@@ -1126,6 +1131,18 @@ final class DriftPersonalGraphRepository
     final intentions = _database.intentions;
     final condition = _catalogCondition(query);
     final (totalCount, counts) = await _countCatalog(query);
+    final titleFilter = query.titleFilter;
+    int? exactTitleCount;
+    if (query.pairProbe != null && titleFilter != null) {
+      final count = countAll();
+      final countQuery = _database.selectOnly(intentions)
+        ..addColumns([count])
+        ..where(
+          intentions.isArchived.equals(false) &
+              intentions.titleSearchKey.equals(titleFilter.map(titleSearchKey)),
+        );
+      exactTitleCount = (await countQuery.getSingle()).read(count)!;
+    }
     final rowsQuery = _database.selectOnly(intentions)
       ..addColumns([
         intentions.id,
@@ -1153,6 +1170,7 @@ final class DriftPersonalGraphRepository
       items: items,
       totalCount: totalCount,
       counts: counts,
+      exactTitleCount: exactTitleCount,
       nextCursor: nextCursor,
       revision: _currentRevision,
       pairOccupants: pairOccupants,
@@ -1413,7 +1431,6 @@ final class DriftPersonalGraphRepository
     final intentions = _database.intentions;
     final relations = _database.longTermRelations;
     final counterpartId = probe.counterpartId.toCanonicalString();
-    final ignoredRelationId = probe.ignoredRelationId;
     final occupiesPair = switch (probe.candidateRole) {
       RelationParticipantRole.related =>
         relations.sourceIntentionId.equals(counterpartId) &
@@ -1423,18 +1440,8 @@ final class DriftPersonalGraphRepository
             relations.sourceIntentionId.equalsExp(intentions.id),
     };
     rowsQuery
-      ..join([
-        leftOuterJoin(
-          relations,
-          ignoredRelationId == null
-              ? occupiesPair
-              : occupiesPair &
-                    relations.id
-                        .equals(ignoredRelationId.toCanonicalString())
-                        .not(),
-        ),
-      ])
-      ..addColumns([relations.id, relations.isArchived]);
+      ..join([leftOuterJoin(relations, occupiesPair)])
+      ..addColumns([relations.id, relations.type, relations.isArchived]);
   }
 
   /// Занимающая связь строки порции; `null` — пара строки свободна.
@@ -1444,6 +1451,11 @@ final class DriftPersonalGraphRepository
     if (relationId == null) return null;
     return PairOccupant(
       relationId: decodeStoredRelationId(relationId),
+      type: switch (row.read(relations.type)) {
+        'need' => relation_domain.LongTermRelationType.need,
+        'can' => relation_domain.LongTermRelationType.can,
+        _ => throw const StoredGraphCorruption(),
+      },
       scope: row.read(relations.isArchived)!
           ? relation_domain.RelationScope.archived
           : relation_domain.RelationScope.active,

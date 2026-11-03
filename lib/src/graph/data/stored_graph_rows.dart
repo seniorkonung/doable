@@ -188,12 +188,18 @@ IntentionArchiveState decodeStoredIntentionArchiveState(
 IntentionTimestamp _decodeStoredIntentionTimestamp(
   Map<String, Object?> data,
   String column,
-) {
+) => IntentionTimestamp(_decodeStoredInstant(data, column));
+
+RelationTimestamp _decodeStoredRelationTimestamp(
+  Map<String, Object?> data,
+  String column,
+) => RelationTimestamp(_decodeStoredInstant(data, column));
+
+/// Момент из столбца [column], который хранит микросекунды эпохи.
+DateTime _decodeStoredInstant(Map<String, Object?> data, String column) {
   final microseconds = requiredStoredInteger(data, column);
   try {
-    return IntentionTimestamp(
-      DateTime.fromMicrosecondsSinceEpoch(microseconds, isUtc: true),
-    );
+    return DateTime.fromMicrosecondsSinceEpoch(microseconds, isUtc: true);
   } on ArgumentError {
     throw const StoredGraphCorruption();
   }
@@ -228,7 +234,8 @@ TagAssignment decodeStoredTagAssignment(Map<String, Object?> data) =>
     );
 
 /// Долговременная связь из столбцов таблицы `long_term_relations`: значения
-/// связи модели и описание, которого модель связи не несёт.
+/// связи модели, показания времени и описание, которого модель связи не
+/// несёт.
 final class StoredLongTermRelation {
   factory StoredLongTermRelation.decode(Map<String, Object?> data) {
     final creationSequence = requiredStoredInteger(data, 'creation_sequence');
@@ -249,6 +256,8 @@ final class StoredLongTermRelation {
     };
     final scope = decodeStoredRelationScope(data);
     final description = _nullableStoredString(data, 'description');
+    final createdAt = _decodeStoredRelationTimestamp(data, 'created_at');
+    final updatedAt = _decodeStoredRelationTimestamp(data, 'updated_at');
     LongTermRelationDescription? verifiedDescription;
     if (description != null) {
       try {
@@ -269,6 +278,8 @@ final class StoredLongTermRelation {
       priority: priority,
       scope: scope,
       description: verifiedDescription,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
     );
   }
 
@@ -281,6 +292,8 @@ final class StoredLongTermRelation {
     required this.priority,
     required this.scope,
     required this.description,
+    required this.createdAt,
+    required this.updatedAt,
   });
 
   final int creationSequence;
@@ -291,6 +304,8 @@ final class StoredLongTermRelation {
   final RelationPriority priority;
   final RelationScope scope;
   final LongTermRelationDescription? description;
+  final RelationTimestamp createdAt;
+  final RelationTimestamp updatedAt;
 
   bool get hasDescription => description != null;
 
@@ -304,6 +319,8 @@ final class StoredLongTermRelation {
         priority: priority,
         scope: scope,
         creationSequence: RelationCreationSequence(creationSequence),
+        createdAt: createdAt,
+        updatedAt: updatedAt,
       );
     } on LongTermRelationValidationException {
       throw const StoredGraphCorruption();

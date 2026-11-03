@@ -348,12 +348,6 @@ class AppLocalizationsRu extends AppLocalizations {
       'То, что вы хотите сделать или изменить';
 
   @override
-  String get quickCreationModeRelation => 'Новая связь';
-
-  @override
-  String get quickCreationModeRelationHint => 'Чтобы …, нужно или можно …';
-
-  @override
   String get quickCreationModeDailyChoice => 'Новый дневной выбор';
 
   @override
@@ -524,21 +518,12 @@ class AppLocalizationsRu extends AppLocalizations {
       'Все связи этой группы загружены.';
 
   @override
-  String get relationNeighborhoodRelationActive => 'Активная связь';
-
-  @override
   String get relationNeighborhoodRelationArchived => 'Связь в архиве';
 
   @override
   String relationNeighborhoodPriority(String priority) {
     return 'Приоритет $priority';
   }
-
-  @override
-  String get relationNeighborhoodSourceParticipant => 'Исходное намерение';
-
-  @override
-  String get relationNeighborhoodRelatedParticipant => 'Связанное намерение';
 
   @override
   String relationNeighborhoodNeedPhrase(String source, String related) {
@@ -562,6 +547,22 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String detailsRelationsTabSemantic(int active, int archived) {
     return 'Связи: активных — $active, архивированных — $archived';
+  }
+
+  @override
+  String get relationPairAlreadyAdded => 'Уже добавлено';
+
+  @override
+  String get relationPairAlreadyAddedArchived => 'Уже добавлено, в архиве';
+
+  @override
+  String relationPairOtherGroup(String group) {
+    return 'Уже в группе \"$group\"';
+  }
+
+  @override
+  String relationPairOtherGroupArchived(String group) {
+    return 'Уже в группе \"$group\", в архиве';
   }
 
   @override
@@ -849,9 +850,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get detailsOperationRunning => 'Сохранение изменений…';
 
   @override
-  String get detailsActive => 'Активно';
-
-  @override
   String get detailsArchived => 'В архиве';
 
   @override
@@ -966,6 +964,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get editorTitle => 'Создать намерение';
 
   @override
+  String get editorSearchSubtitle => 'Сразу отмечается для новых связей';
+
+  @override
   String get editorCreateAction => 'Создать намерение';
 
   @override
@@ -1018,6 +1019,9 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get editorCreated => 'Намерение создано.';
+
+  @override
+  String get editorCreatedAndChosen => 'Намерение создано и отмечено.';
 
   @override
   String get editorCloseDiscardTitle => 'Сбросить черновик?';
@@ -1153,9 +1157,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String graphOperationMessageWithOthers(String message, int count) {
     return '$message · ещё $count';
   }
-
-  @override
-  String get graphOperationNewRelation => 'новая связь';
 
   @override
   String get graphOperationRelation => 'связь';
@@ -1920,69 +1921,54 @@ class AppLocalizationsRu extends AppLocalizations {
       'Действие с дневным выбором не выполнено из-за непредвиденной ошибки.';
 
   @override
-  String get relationEditorCreated => 'Связь создана.';
+  String get graphOperationAddRelations => 'Добавление';
 
   @override
-  String get relationEditorCreateInvalidInput =>
-      'Проверьте выбранные намерения и данные связи.';
+  String get graphOperationRelations => 'связи';
 
   @override
-  String get relationEditorCreatePairOccupied =>
-      'Связь этого направления между выбранными намерениями уже есть.';
+  String relationsAdded(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Добавлено $count связи.',
+      many: 'Добавлено $count связей.',
+      few: 'Добавлено $count связи.',
+      one: 'Добавлена $count связь.',
+    );
+    return '$_temp0';
+  }
 
   @override
-  String get relationEditorCreateParticipantNotFound =>
-      'Одно из выбранных намерений больше не существует.';
+  String get relationsAdditionPairOccupied =>
+      'Некоторые выбранные намерения уже связаны с этим намерением. Связи не созданы.';
 
   @override
-  String get relationEditorCreateParticipantArchived =>
-      'Связать можно только активные намерения.';
+  String get relationsAdditionParticipantNotFound =>
+      'Одно из выбранных намерений больше не существует. Связи не созданы.';
 
   @override
-  String get relationEditorCreateUnavailable =>
-      'Не удалось создать связь. Повторите попытку.';
+  String get relationsAdditionParticipantArchived =>
+      'Связать можно только активные намерения. Связи не созданы.';
 
   @override
-  String get relationEditorCreateCorruption =>
-      'Сохранённые данные повреждены. Связь не создана.';
+  String get relationsAdditionUnavailable =>
+      'Связи не созданы. Повторите попытку.';
 
   @override
-  String get relationEditorCreateUnexpected =>
-      'Не удалось создать связь из-за непредвиденной ошибки.';
+  String get relationsAdditionCorruption =>
+      'Сохранённые данные повреждены. Связи не созданы.';
 
   @override
-  String get relationEditorUpdated => 'Связь изменена.';
-
-  @override
-  String get relationEditorUpdateInvalidInput =>
-      'Проверьте выбранные намерения и изменения связи.';
-
-  @override
-  String get relationEditorUpdatePairOccupied =>
-      'Связь этого направления между выбранными намерениями уже есть.';
+  String get relationsAdditionUnexpected =>
+      'Связи не созданы из-за непредвиденной ошибки.';
 
   @override
   String get relationEditorUpdateNotFound => 'Эта связь больше не существует.';
 
   @override
-  String get relationEditorUpdateParticipantNotFound =>
-      'Одно из выбранных намерений больше не существует.';
-
-  @override
-  String get relationEditorUpdateParticipantArchived =>
-      'Активная связь может соединять только активные намерения.';
-
-  @override
-  String get relationEditorUpdateReferencedByDailyPath =>
-      'Связь используется в сохранённом дневном пути. Её тип и участников нельзя изменить.';
-
-  @override
-  String get relationEditorPathProtection =>
-      'Связь используется в сохранённом дневном пути. Её тип и участников нельзя изменить. Описание и приоритет остаются доступными.';
-
-  @override
-  String get relationEditorPathProtectionWithDraft =>
-      'Связь используется в сохранённом дневном пути. Верните прежние тип и участников, чтобы сохранить изменения описания и приоритета.';
+  String get relationEditorUpdateArchivedTypeChange =>
+      'Связь архивирована, поэтому её тип нельзя изменить.';
 
   @override
   String get relationEditorUpdateUnavailable =>
@@ -1995,9 +1981,6 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get relationEditorUpdateUnexpected =>
       'Не удалось изменить связь из-за непредвиденной ошибки.';
-
-  @override
-  String get relationArchived => 'Связь архивирована.';
 
   @override
   String get relationArchiveNotFound => 'Эта связь больше не существует.';
@@ -2017,9 +2000,6 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get relationArchiveUnexpected =>
       'Не удалось архивировать связь из-за непредвиденной ошибки.';
-
-  @override
-  String get relationRestored => 'Связь восстановлена.';
 
   @override
   String get relationRestoreNotFound => 'Эта связь больше не существует.';
@@ -2108,9 +2088,6 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось загрузить связь из-за непредвиденной ошибки.';
 
   @override
-  String get relationDetailsRefreshing => 'Обновляем подробные данные связи…';
-
-  @override
   String get relationDetailsRefreshUnavailable =>
       'Не удалось обновить подробные данные связи. Ранее подтверждённые данные по-прежнему показаны.';
 
@@ -2129,62 +2106,94 @@ class AppLocalizationsRu extends AppLocalizations {
   String get relationDetailsPriorityLabel => 'Приоритет';
 
   @override
-  String get relationDetailsScopeLabel => 'Состояние связи';
-
-  @override
-  String get relationDetailsDescriptionLabel => 'Описание';
-
-  @override
-  String get relationDetailsNoDescription => 'Описания нет';
-
-  @override
-  String get relationDetailsOpenParticipant =>
-      'Открывает намерение и его собственные связи';
-
-  @override
-  String get relationDetailsEditAction => 'Редактировать связь';
-
-  @override
-  String get relationDetailsArchiveAction => 'Архивировать связь';
-
-  @override
-  String get relationDetailsRestoreAction => 'Восстановить связь';
-
-  @override
-  String get relationDetailsDeleteAction => 'Удалить связь навсегда';
-
-  @override
   String get relationDetailsPathProtection =>
-      'Связь используется в сохранённом дневном пути. Удалить её или изменить тип и участников нельзя. Описание, приоритет и архивное состояние остаются доступными.';
+      'Связь используется в сохранённом дневном пути, поэтому удалить её нельзя.';
 
   @override
-  String get relationDetailsDeletionChecking =>
-      'Удаление недоступно, пока не подтверждены зависимости связи.';
-
-  @override
-  String get relationDetailsDeleteConfirmationTitle =>
-      'Удалить связь навсегда?';
-
-  @override
-  String relationDetailsDeleteConfirmationMessage(
-    String phrase,
-    String sourceTitle,
-    String relatedTitle,
-    String scope,
-  ) {
-    return 'Связь: $phrase\nИсходное намерение: $sourceTitle\nСвязанное намерение: $relatedTitle\nСостояние связи: $scope\n\nЭто действие нельзя отменить. Связь и её описание будут удалены навсегда. Сами теги, все их назначения намерениям, оба намерения и все остальные связи сохранятся.';
+  String relationSheetArchivedLabel(String phrase) {
+    return '$phrase. Архив';
   }
 
   @override
-  String get relationDetailsConfirmDeleteAction => 'Удалить навсегда';
+  String get relationSheetArchivedNote =>
+      'Архивные связи остаются в сохранённых путях и не предлагаются в новых.';
 
   @override
-  String get relationDetailsOpenSourceParticipantAction =>
-      'Открыть исходное намерение';
+  String relationSheetOpenParticipant(String title) {
+    return 'Открыть страницу намерения: $title';
+  }
 
   @override
-  String get relationDetailsOpenRelatedParticipantAction =>
-      'Открыть связанное намерение';
+  String relationSheetOpenArchivedParticipant(String title) {
+    return 'Открыть страницу намерения: $title. Архив';
+  }
+
+  @override
+  String relationSheetPriorityHighest(String priority) {
+    return 'Приоритет $priority, высший';
+  }
+
+  @override
+  String relationSheetPriorityLowest(String priority) {
+    return 'Приоритет $priority, низший';
+  }
+
+  @override
+  String get relationSheetDescriptionTitle => 'Описание';
+
+  @override
+  String get relationSheetDescriptionLabel => 'Описание связи';
+
+  @override
+  String get relationSheetDescriptionBack => 'Назад к связи';
+
+  @override
+  String get relationSheetDescriptionSave => 'Сохранить';
+
+  @override
+  String get relationSheetDescriptionDiscardTitle => 'Отменить изменения?';
+
+  @override
+  String get relationSheetDescriptionDiscardMessage =>
+      'Изменения описания не сохранятся.';
+
+  @override
+  String get relationSheetDescriptionDiscardAction => 'Отменить';
+
+  @override
+  String get relationSheetDescriptionContinueAction => 'Продолжить правку';
+
+  @override
+  String get relationSheetOptionsLabel => 'Параметры связи';
+
+  @override
+  String get relationSheetOptionArchive => 'Архивировать';
+
+  @override
+  String get relationSheetOptionRestore => 'Восстановить из архива';
+
+  @override
+  String get relationSheetOptionDelete => 'Удалить';
+
+  @override
+  String get relationSheetOptionRestoreBothArchived =>
+      'Сначала восстановите исходное и связанное намерения, затем восстановите эту связь.';
+
+  @override
+  String get relationSheetDeleteDialogTitle => 'Удалить связь?';
+
+  @override
+  String get relationSheetDeleteDialogTextBefore => 'Связь «';
+
+  @override
+  String get relationSheetDeleteDialogTextAfter =>
+      '» будет безвозвратно удалена вместе с описанием. Оба намерения сохранятся.';
+
+  @override
+  String get relationSheetDeleteDialogCancel => 'Отмена';
+
+  @override
+  String get relationSheetDeleteDialogConfirm => 'Удалить';
 
   @override
   String get actionPickerCancel => 'Отменить выбор действия';
@@ -2286,20 +2295,6 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get intentionPickerKindIntention => 'намерение';
-
-  @override
-  String get intentionPickerPairLinked => 'Уже связано';
-
-  @override
-  String get intentionPickerPairArchived => 'Связь в архиве';
-
-  @override
-  String get intentionPickerPairOpensRelation =>
-      'нажатие откроет существующую связь';
-
-  @override
-  String get intentionPickerPairOffersRestore =>
-      'нажатие предложит восстановить связь';
 
   @override
   String intentionPickerOpenActionPage(String title) {
@@ -2561,10 +2556,21 @@ class AppLocalizationsRu extends AppLocalizations {
   String get intentionPickerIntentionTitle => 'Выбор намерения';
 
   @override
+  String get participantPickerTitle => 'Выбор намерений';
+
+  @override
   String get intentionPickerSearchPlaceholder => 'Поиск по названию';
 
   @override
   String get intentionPickerClearSearch => 'Очистить название';
+
+  @override
+  String get intentionPickerCreateIntention => 'Создать намерение';
+
+  @override
+  String intentionPickerCreateNamed(String title) {
+    return 'Создать «$title»';
+  }
 
   @override
   String intentionPickerFilterLabel(int count) {
@@ -2621,150 +2627,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get participantPickerEmpty => 'Других намерений для выбора нет.';
 
   @override
-  String get participantPickerRestoreTitle => 'Восстановить связь?';
-
-  @override
-  String get participantPickerRestoreTextBefore => 'Вернётся связь «';
-
-  @override
-  String participantPickerRestoreTextAfter(String priority) {
-    return '» с приоритетом $priority.';
-  }
-
-  @override
-  String participantPickerRestoreWarning(String changes) {
-    return 'Заданное в форме не сохранится: $changes.';
-  }
-
-  @override
-  String get participantPickerRestoreWarningNeedType => 'вид «нужно»';
-
-  @override
-  String get participantPickerRestoreWarningCanType => 'вид «можно»';
-
-  @override
-  String get participantPickerRestoreWarningPriority => 'приоритет';
-
-  @override
-  String get participantPickerRestoreWarningDescription => 'описание';
-
-  @override
-  String get participantPickerRestoreCancel => 'Отмена';
-
-  @override
-  String get participantPickerRestoreConfirm => 'Восстановить';
-
-  @override
-  String get participantPickerOpenDetails =>
-      'Открыть подробные данные намерения';
-
-  @override
-  String get participantPickerPurposeCreationSource =>
-      'Новая связь: исходное намерение';
-
-  @override
-  String get participantPickerPurposeCreationRelated =>
-      'Новая связь: связанное намерение';
-
-  @override
-  String get participantPickerPurposeChangeSource =>
-      'Изменение связи: исходное намерение';
-
-  @override
-  String get participantPickerPurposeChangeRelated =>
-      'Изменение связи: связанное намерение';
-
-  @override
-  String get participantPickerFlowCreation => 'Новая связь';
-
-  @override
-  String get participantPickerFlowChange => 'Изменение связи';
-
-  @override
-  String get participantPickerRoleSourceNote =>
-      'Исходное намерение — то, для чего нужно или можно связанное.';
-
-  @override
-  String get participantPickerRoleRelatedNeedNote =>
-      'Связанное намерение — то, что нужно для исходного.';
-
-  @override
-  String get participantPickerRoleRelatedCanNote =>
-      'Связанное намерение — то, что можно для исходного.';
-
-  @override
-  String get participantPickerRoleRelatedUndeterminedNote =>
-      'Связанное намерение — то, что нужно или можно для исходного.';
-
-  @override
-  String get participantPickerFieldChoosing => 'Сейчас выбирается';
-
-  @override
-  String get participantPickerFieldFromList => 'Из этого списка';
-
-  @override
-  String participantPickerFieldReplacing(String title) {
-    return 'Вместо: $title';
-  }
-
-  @override
-  String get participantPickerFieldNotChosen => 'Ещё не выбрано';
-
-  @override
-  String get participantPickerFieldArchived => 'В архиве';
-
-  @override
-  String get participantPickerKindUndetermined =>
-      'Нужно или можно: ещё не выбрано';
-
-  @override
-  String get relationEditorTitle => 'Новая связь';
-
-  @override
-  String get relationEditorEditTitle => 'Редактирование связи';
-
-  @override
-  String get relationEditorPhraseLabel => 'Формулировка связи';
-
-  @override
-  String get relationEditorSourceLabel => 'Исходное намерение';
-
-  @override
-  String get relationEditorRelatedLabel => 'Связанное намерение';
-
-  @override
-  String get relationEditorParticipantSelected => 'Выбрано';
-
-  @override
-  String get relationEditorParticipantNotSelected => 'Не выбрано';
-
-  @override
-  String get relationEditorSelectSourceAction => 'Выбрать исходное намерение';
-
-  @override
-  String get relationEditorChangeSourceAction => 'Изменить исходное намерение';
-
-  @override
-  String get relationEditorSelectRelatedAction => 'Выбрать связанное намерение';
-
-  @override
-  String get relationEditorChangeRelatedAction =>
-      'Изменить связанное намерение';
-
-  @override
-  String get relationEditorTypeLabel => 'Тип связи';
-
-  @override
   String get relationEditorTypeNeed => 'Нужно';
 
   @override
   String get relationEditorTypeCan => 'Можно';
-
-  @override
-  String get relationEditorPriorityLabel => 'Приоритет';
-
-  @override
-  String get relationEditorDescriptionLabel => 'Описание (необязательно)';
 
   @override
   String get relationEditorDescriptionTooLong =>
@@ -2773,45 +2639,6 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get relationEditorDescriptionInvalidUnicode =>
       'Введите корректный Unicode-текст без NUL.';
-
-  @override
-  String get relationEditorCreateSameParticipants =>
-      'Намерение нельзя связать с самим собой.';
-
-  @override
-  String get relationEditorMissingTitle => 'Чтобы создать связь, укажите:';
-
-  @override
-  String get relationEditorMissingSource => 'исходное намерение';
-
-  @override
-  String get relationEditorMissingRelated => 'связанное намерение';
-
-  @override
-  String get relationEditorMissingType => 'тип связи';
-
-  @override
-  String get relationEditorMissingPriority => 'приоритет от P1 до P4';
-
-  @override
-  String get relationEditorOpenExistingRelation => 'Открыть существующую связь';
-
-  @override
-  String get relationEditorSubmitAction => 'Создать связь';
-
-  @override
-  String get relationEditorCreating => 'Создаём…';
-
-  @override
-  String get relationEditorSaveAction => 'Сохранить изменения';
-
-  @override
-  String get relationEditorSaving => 'Сохраняем…';
-
-  @override
-  String relationEditorPriorityOption(String priority) {
-    return 'Приоритет $priority';
-  }
 
   @override
   String get choicePathTitle => 'Выбор пути к действию';
@@ -2891,11 +2718,18 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get choicePathNoPath =>
-      'Из этого намерения сейчас нет допустимого пути к другому действию.';
+      'Из этого намерения сейчас нет допустимого пути к другому действию. Продолжениями становятся только связи, ведущие к готовому действию. Отметьте намерение готовым или свяжите его с действием.';
 
   @override
   String get choicePathNoFurtherPath =>
       'Дальнейших допустимых продолжений нет.';
+
+  @override
+  String get choicePathTopNoFurtherPath =>
+      'Дальнейших допустимых продолжений нет. Продолжениями становятся только связи, ведущие к готовому действию. Отметьте намерение готовым или свяжите его с действием.';
+
+  @override
+  String get choicePathOpenRelations => 'Открыть связи';
 
   @override
   String get choicePathConflict =>
@@ -3276,4 +3110,116 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get creationSavingContinues =>
       'Сохранение продолжится после выхода из создания.';
+
+  @override
+  String batchSubtitle(String group) {
+    return 'Добавить в \"$group\"';
+  }
+
+  @override
+  String batchSubtitleSelected(String group, int count) {
+    return 'Добавить в \"$group\" · выбрано $count';
+  }
+
+  @override
+  String batchSheetLine(String group) {
+    return 'Новые связи в \"$group\"';
+  }
+
+  @override
+  String get batchNoteNeeds =>
+      'Каждое отмеченное намерение станет связью: оно нужно этому намерению';
+
+  @override
+  String get batchNoteCanUse =>
+      'Каждое отмеченное намерение станет связью: это намерение может его использовать';
+
+  @override
+  String get batchNoteNeededFor =>
+      'Каждое отмеченное намерение станет связью: ему нужно это намерение';
+
+  @override
+  String get batchNoteCanBeUsedFor =>
+      'Каждое отмеченное намерение станет связью: оно может использовать это намерение';
+
+  @override
+  String get batchDefaults =>
+      'Связи получат приоритет P4 и не будут иметь описания; и то и другое меняется на странице';
+
+  @override
+  String get batchAnchorNote => 'Намерение, со страницы которого вы пришли';
+
+  @override
+  String get batchEmpty => 'Пока ничего не выбрано';
+
+  @override
+  String get batchSelected => 'Отмеченные намерения';
+
+  @override
+  String batchSourceSemantic(String name) {
+    return 'Исходное намерение: $name';
+  }
+
+  @override
+  String batchRelatedSemantic(String name) {
+    return 'Связанное намерение: $name';
+  }
+
+  @override
+  String batchRemove(String name) {
+    return 'Снять отметку: $name';
+  }
+
+  @override
+  String batchAddCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Добавить $count связи',
+      many: 'Добавить $count связей',
+      few: 'Добавить $count связи',
+      one: 'Добавить $count связь',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get batchAddNone => 'Добавить связи';
+
+  @override
+  String get batchAdding => 'Добавляем…';
+
+  @override
+  String get batchDiscardTitle => 'Сбросить выбранные намерения?';
+
+  @override
+  String batchDiscardMessage(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count связи не будут добавлены.',
+      many: '$count связей не будут добавлены.',
+      few: '$count связи не будут добавлены.',
+      one: '$count связь не будет добавлена.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get batchCreatedRemain => 'Созданные намерения останутся в каталоге.';
+
+  @override
+  String get batchDiscardAction => 'Сбросить';
+
+  @override
+  String get batchContinueAction => 'Продолжить выбор';
+
+  @override
+  String get batchPageAdd => 'Добавить к выбранным';
+
+  @override
+  String get batchPageRemove => 'Убрать из выбранных';
+
+  @override
+  String get batchPageArchived => 'Намерение в архиве';
 }

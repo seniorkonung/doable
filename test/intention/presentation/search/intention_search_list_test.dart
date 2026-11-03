@@ -1,16 +1,21 @@
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
+
 import 'dart:async';
 
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/design_system/components/catalog_header.dart';
 import 'package:doable/src/design_system/components/empty_state.dart';
 import 'package:doable/src/design_system/components/list_state.dart';
+import 'package:doable/src/design_system/components/tag_create_row.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/design_system/doable_metrics.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
+import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
@@ -544,6 +549,204 @@ void main() {
     });
   });
 
+  group('строка «Создать»', () {
+    testWidgets('стоит над строками выдачи, предлагающей создание, и передаёт '
+        'название без окружающих пробелов', (tester) async {
+      final titles = <String>[];
+      final h = await _openRelationParticipants(tester, onCreate: titles.add);
+      await _showTitleResults(
+        tester,
+        h,
+        '  Действие  ',
+        _firstPage(_actions(3), exactTitleCount: 0),
+      );
+
+      expect(
+        _rowTop(tester, 'Создать «Действие»'),
+        lessThan(_rowTop(tester, 'Действие 3')),
+      );
+      await tester.tap(find.text('Создать «Действие»'));
+      expect(titles, ['Действие']);
+    });
+
+    testWidgets('стоит над пустым состоянием', (tester) async {
+      final h = await _openRelationParticipants(tester, onCreate: (_) {});
+      await _showTitleResults(
+        tester,
+        h,
+        'Плавать',
+        _firstPage(const [], exactTitleCount: 0),
+      );
+
+      expect(
+        tester.getBottomLeft(find.byType(TagCreateRow)).dy,
+        lessThanOrEqualTo(tester.getTopLeft(find.byType(EmptyState)).dy),
+      );
+    });
+
+    testWidgets('в паузе ввода, при загрузке и отказе строки нет', (
+      tester,
+    ) async {
+      final h = await _openRelationParticipants(tester, onCreate: (_) {});
+      await _showTitleResults(
+        tester,
+        h,
+        'Плавать',
+        _firstPage(_actions(3), exactTitleCount: 0),
+      );
+      expect(find.byType(TagCreateRow), findsOneWidget);
+
+      h.notifier.changeTitleFilter('Бегать');
+      await tester.pump();
+      expect(find.byType(TagCreateRow), findsNothing);
+
+      await _waitForDebouncedQuery(tester, h, 3);
+      expect(find.byType(TagCreateRow), findsNothing);
+
+      h.repository.complete(
+        2,
+        const ResultFailure(IntentionUnavailableFailure()),
+      );
+      await _settle(tester);
+      expect(_listState, findsOneWidget);
+      expect(find.byType(TagCreateRow), findsNothing);
+    });
+
+    testWidgets('появление и уход строки оставляют видимую строку на месте', (
+      tester,
+    ) async {
+      final h = await _openRelationParticipants(tester, onCreate: (_) {});
+      await _showTitleResults(
+        tester,
+        h,
+        'Действие',
+        _firstPage(_actions(30), exactTitleCount: 0),
+      );
+      h.position.jumpTo(300);
+      await _settle(tester);
+      final visibleTop = _rowTop(tester, 'Действие 25');
+
+      await _renameCounterpart(tester, h, from: _counterpart, to: _exactMatch);
+
+      expect(find.byType(TagCreateRow), findsNothing);
+      expect(_loadedOf(h).createTitle, isNull);
+      expect(_rowTop(tester, 'Действие 25'), visibleTop);
+
+      await _renameCounterpart(tester, h, from: _exactMatch, to: _counterpart);
+
+      expect(_loadedOf(h).createTitle, 'Действие');
+      expect(_rowTop(tester, 'Действие 25'), visibleTop);
+    });
+
+    testWidgets('строка, вернувшаяся в начале выдачи, видна над первой '
+        'строкой', (tester) async {
+      final h = await _openRelationParticipants(tester, onCreate: (_) {});
+      await _showTitleResults(
+        tester,
+        h,
+        'Действие',
+        _firstPage(_actions(30), exactTitleCount: 1),
+      );
+      expect(find.byType(TagCreateRow), findsNothing);
+      final listTop = tester.getTopLeft(_list).dy;
+
+      await _renameCounterpart(tester, h, from: _exactMatch, to: _counterpart);
+
+      expect(_loadedOf(h).createTitle, 'Действие');
+      expect(h.position.pixels, 0);
+      expect(
+        tester.getTopLeft(find.byType(TagCreateRow)).dy,
+        greaterThanOrEqualTo(listTop),
+      );
+      expect(
+        tester.getBottomLeft(find.byType(TagCreateRow)).dy,
+        lessThanOrEqualTo(_rowTop(tester, 'Действие 30')),
+      );
+    });
+
+    testWidgets('после появления строки «Создать» следующее изменение '
+        'сохраняет положение видимого намерения', (tester) async {
+      final h = await _openRelationParticipants(tester, onCreate: (_) {});
+      await _showTitleResults(
+        tester,
+        h,
+        'Действие',
+        _firstPage(_actions(15), exactTitleCount: 1),
+      );
+
+      await _renameCounterpart(tester, h, from: _exactMatch, to: _counterpart);
+      expect(find.byType(TagCreateRow), findsOneWidget);
+      expect(h.position.pixels, 0);
+
+      h.position.jumpTo(180);
+      await _settle(tester);
+      final visibleTop = _rowTop(tester, 'Действие 12');
+
+      final created = _action(16);
+      final accepted =
+          h.container
+                  .read(graphCommandCoordinatorProvider.notifier)
+                  .acceptCreation(
+                    IntentionCreationFormKey(),
+                    CreateIntention.withInitialState(
+                      title: created.title,
+                      description: null,
+                      readiness: created.readiness,
+                      tagIds: [],
+                    ),
+                  )
+              as IntentionCommandAccepted;
+      h.repository.completeCommand(
+        h.repository.commands.length - 1,
+        ResultSuccess(
+          fullCreationSuccess(created, revision: const TestCatalogRevision(3)),
+        ),
+      );
+      await accepted.future;
+      await _settle(tester);
+
+      expect(_loadedOf(h).items.first.title, 'Действие 16');
+      expect(_rowTop(tester, 'Действие 12'), visibleTop);
+    });
+
+    testWidgets('строка, вернувшаяся в начале выдачи, видна над первой '
+        'строкой и после ещё одного изменения выдачи до перестройки списка', (
+      tester,
+    ) async {
+      final h = await _openRelationParticipants(tester, onCreate: (_) {});
+      await _showTitleResults(
+        tester,
+        h,
+        'Действие',
+        _firstPage(_actions(30), exactTitleCount: 1),
+      );
+      final listTop = tester.getTopLeft(_list).dy;
+
+      await _acceptCounterpartRename(h, from: _exactMatch, to: _counterpart);
+      final (command, result) = intentionTagAssignment(
+        state: TagAssignmentState.assigned,
+        tagId: _sport.id,
+        before: _action(29),
+        after: _action(29, tags: [_sport]),
+        revision: const TestCatalogRevision(3),
+      );
+      await acceptTagCommand(h.container, h.repository, command, result).future;
+      expect(_loadedOf(h).items[1].tags, [_sport]);
+      await _settle(tester);
+
+      expect(_loadedOf(h).createTitle, 'Действие');
+      expect(h.position.pixels, 0);
+      expect(
+        tester.getTopLeft(find.byType(TagCreateRow)).dy,
+        greaterThanOrEqualTo(listTop),
+      );
+      expect(
+        tester.getBottomLeft(find.byType(TagCreateRow)).dy,
+        lessThanOrEqualTo(_rowTop(tester, 'Действие 30')),
+      );
+    });
+  });
+
   group('согласование отметок занятых пар', () {
     testWidgets('отметка появилась у строки над первой видимой, пока список '
         'закрыт страницей: видимая строка остаётся на месте', (tester) async {
@@ -573,6 +776,7 @@ void main() {
           pairOccupants: {
             _action(28).id: PairOccupant(
               relationId: relation.id,
+              type: relation.type,
               scope: relation.scope,
             ),
           },
@@ -644,6 +848,7 @@ Result<IntentionCatalogPage> _firstPage(
   List<IntentionSummary> items, {
   int? totalCount,
   Map<IntentionId, PairOccupant>? pairOccupants,
+  int? exactTitleCount,
 }) {
   final total = totalCount ?? items.length;
   return ResultSuccess(
@@ -653,6 +858,7 @@ Result<IntentionCatalogPage> _firstPage(
       nextCursor: total > items.length ? const TestCatalogCursor() : null,
       revision: const TestCatalogRevision(1),
       pairOccupants: pairOccupants,
+      exactTitleCount: exactTitleCount,
     ),
   );
 }
@@ -713,6 +919,7 @@ Future<_Harness> _open(
   Locale locale = const Locale('ru'),
   int pageSize = 100,
   List<IntentionSummary>? loadedBeforeMount,
+  void Function(String title)? onCreate,
 }) async {
   final repository = ControlledCatalogRepository();
   // Подгрузка начинается, когда построена последняя загруженная строка.
@@ -769,6 +976,7 @@ Future<_Harness> _open(
             ),
             onResetFilters: () {},
             bottomPadding: DoableMetrics.space10,
+            onCreate: onCreate,
           ),
         ),
       ),
@@ -801,19 +1009,82 @@ Future<_Harness> _openSportActions(WidgetTester tester) async {
 /// Участник другой роли в поиске участника связи: выбирается связанное.
 final _counterpart = testSummary(index: 100);
 
+/// Он же под названием, которое точно совпадает с подстрокой «Действие»: в
+/// выдаче его нет, а число совпадений оно меняет.
+final _exactMatch = testSummary(index: 100, title: 'ДЕЙСТВИЕ');
+
 /// Открывает выдачу поиска участника с пробой пары: отметки занятых пар
 /// следуют за подтверждёнными изменениями связей.
-Future<_Harness> _openRelationParticipants(WidgetTester tester) => _open(
+Future<_Harness> _openRelationParticipants(
+  WidgetTester tester, {
+  void Function(String title)? onCreate,
+}) => _open(
   tester,
   purpose: SelectRelationParticipant(
-    selectionContext: RelationParticipantSelectionContext.activeRelation,
     session: IntentionSearchSession(),
     pairProbe: RelationPairProbe(
       counterpartId: _counterpart.id,
       candidateRole: RelationParticipantRole.related,
     ),
   ),
+  onCreate: onCreate,
 );
+
+/// Вводит подстроку [title] и показывает её выдачу [results].
+Future<void> _showTitleResults(
+  WidgetTester tester,
+  _Harness h,
+  String title,
+  Result<IntentionCatalogPage> results,
+) async {
+  h.notifier.changeTitleFilter(title);
+  await _waitForDebouncedQuery(tester, h, h.repository.queries.length + 1);
+  h.repository.complete(h.repository.queries.length - 1, results);
+  await _settle(tester);
+}
+
+/// Подтверждённое переименование намерения страницы меняет только число
+/// точных совпадений: строк выдачи оно не касается.
+Future<void> _renameCounterpart(
+  WidgetTester tester,
+  _Harness h, {
+  required IntentionSummary from,
+  required IntentionSummary to,
+}) async {
+  await _acceptCounterpartRename(h, from: from, to: to);
+  await _settle(tester);
+}
+
+/// Подтверждает переименование намерения страницы без следующего кадра.
+Future<void> _acceptCounterpartRename(
+  _Harness h, {
+  required IntentionSummary from,
+  required IntentionSummary to,
+}) async {
+  final commandIndex = h.repository.commands.length;
+  final accepted =
+      h.container
+              .read(graphCommandCoordinatorProvider.notifier)
+              .acceptExisting(
+                UpdateIntention(id: to.id, title: to.title, description: null),
+                presentationTitle: to.title,
+              )
+          as IntentionCommandAccepted;
+  h.repository.completeCommand(
+    commandIndex,
+    ResultSuccess(
+      IntentionSaved(
+        testIntention(index: 100, title: to.title),
+        catalogMutation: IntentionCatalogUpdated(
+          revision: TestCatalogRevision(commandIndex + 2),
+          before: TestCatalogEntrySnapshot(from),
+          after: TestCatalogEntrySnapshot(to),
+        ),
+      ),
+    ),
+  );
+  await accepted.future;
+}
 
 IntentionCatalogLoaded _loadedOf(_Harness h) =>
     h.container.read(intentionCatalogViewModelProvider(h.purpose)).requireValue
@@ -823,6 +1094,7 @@ IntentionCatalogLoaded _loadedOf(_Harness h) =>
 LongTermRelation _occupyingRelation(IntentionSummary candidate) => testRelation(
   sourceIntentionId: _counterpart.id,
   relatedIntentionId: candidate.id,
+  priority: RelationPriority.p4,
 );
 
 /// Подтверждение команды связи на ревизии 2: первая порция читалась на первой.
@@ -849,17 +1121,16 @@ Future<void> _createOccupyingRelation(
   await acceptRelationCommand(
     h.container,
     h.repository,
-    CreateLongTermRelation(
-      sourceIntentionId: relation.sourceIntentionId,
-      relatedIntentionId: relation.relatedIntentionId,
-      type: relation.type,
-      priority: relation.priority,
-      description: null,
+    AddLongTermRelations(
+      pageIntentionId: relation.sourceIntentionId,
+      candidateIds: [relation.relatedIntentionId],
+      group: (relation.type == LongTermRelationType.need
+          ? IntentionRelationGroup.needs
+          : IntentionRelationGroup.canUse),
     ),
     _confirmedRelation(
-      LongTermRelationCreated(
-        relation: relation,
-        description: null,
+      LongTermRelationsAdded(
+        relations: [relation],
         changes: [
           LongTermRelationCreatedChange(
             revision: const TestCatalogRevision(2),
@@ -979,6 +1250,16 @@ Future<void> _waitForQueries(WidgetTester tester, _Harness h, int count) async {
     }
     await tester.pump(const Duration(milliseconds: 1));
   }
+}
+
+/// Ждёт чтения подстроки, которое начинается после паузы ввода.
+Future<void> _waitForDebouncedQuery(
+  WidgetTester tester,
+  _Harness h,
+  int count,
+) async {
+  await tester.pump(const Duration(milliseconds: 300));
+  await _waitForQueries(tester, h, count);
 }
 
 /// Завершённое чтение публикует состояние в микрозадаче, перестроение

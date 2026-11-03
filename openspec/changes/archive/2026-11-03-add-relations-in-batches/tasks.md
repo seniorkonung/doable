@@ -1,0 +1,1387 @@
+## Phase 1: Связь определяется неизменной парой намерений
+
+- [x] 1.1 Закрепить в глоссарии неизменность участников, изменяемый тип и показания времени долговременной связи
+  - **Критерии приёмки:**
+    - `CONTEXT.md` говорит, что исходное и связанное намерения долговременной связи неизменны, а другая направленная пара является другой связью. Замена участников связи «я сегодня» не меняется.
+    - Тип активной связи меняется и при шагах пути выбора, сохранённый путь показывает текущий тип, а архивированная связь сохраняет тип до восстановления. Определение архивирования этому не противоречит.
+    - Долговременная связь имеет показания времени создания и последнего изменения, которые служат только для показа. Назначение P4 при добавлении сюда не входит: оно появляется с командой пачки в фазе 3.
+  - **Проверка:**
+    - Сверка изменённых определений с [ADR-0051](../../../docs/adr/0051-identify-long-term-relation-by-immutable-pair.md) и требованием «Изменение типа, приоритета и описания связи».
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `CONTEXT.md`.
+  - **Размер:** XS.
+
+- [x] 1.2 Форма изменения связи показывает участников без возможности заменить их
+  - **Критерии приёмки:**
+    - При изменении связи слоты участников показывают название и переход на страницу намерения, но не открывают поиск участника.
+    - Черновик изменения не принимает другого участника. Форма создания работает как прежде.
+    - Тесты замены участника через форму удалены, а один тест подтверждает отсутствие замены.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/editor`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/long_term_relation/presentation/editor/relation_editor_page.dart`, `relation_editor_view_model.dart`;
+    - меняются `test/long_term_relation/presentation/editor/relation_editor_page_test.dart`, `relation_editor_view_model_test.dart`, `relation_participant_selection_scenarios.dart`.
+  - **Размер:** S.
+
+- [x] 1.3 Убрать из поиска участника поток изменения связи
+  - **Критерии приёмки:**
+    - `RelationChangeChoiceFlow` удалён, а в поиске участника и форме нет ветвей по потоку изменения. Подзаголовок, занятость и предложение восстановления для создания не меняются.
+    - Поиск участника всегда ограничен активными намерениями: `RelationParticipantSelectionContext` удалён вместе с архивным охватом.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/participant_picker test/long_term_relation/presentation/editor test/intention/presentation/catalog/intention_catalog_mutation_reconciliation_test.dart test/intention/presentation/catalog/intention_catalog_revision_protocol_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.2 — у потока изменения не должно остаться вызывающего.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/long_term_relation/presentation/participant_picker/relation_participant_choice.dart`, `relation_participant_picker_page.dart`, `relation_participant_picker_purpose.dart`;
+    - меняются `lib/src/long_term_relation/presentation/editor/relation_editor_page.dart`, `lib/src/intention/presentation/catalog/intention_catalog_purpose.dart`;
+    - меняются тесты поиска участника и двух файлов каталога из проверки.
+  - **Размер:** M.
+
+- [x] 1.4 Проба пары перестаёт знать об изменяемой связи
+  - **Критерии приёмки:**
+    - `RelationPairProbe` не имеет `ignoredRelationId`, а чтение занятости и `pair_occupant_reconciliation.dart` не исключают ни одной связи.
+    - Занятость строк при создании связи не меняется. Тип занимающей связи сюда не входит: он появляется в фазе 3.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog/pair_occupant_reconciliation_test.dart test/intention/data/drift_intention_catalog_test.dart test/long_term_relation/presentation/participant_picker`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.3 — поиск перестаёт передавать это поле.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/long_term_relation/application/relation_pair_probe.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `lib/src/intention/presentation/catalog/pair_occupant_reconciliation.dart`;
+    - меняются тесты из проверки.
+  - **Размер:** S.
+
+- [x] 1.5 Проверки согласования, статистики и лога фактов перестают опираться на замену участников
+  - **Критерии приёмки:**
+    - Ни один из семи тестовых файлов ниже не заменяет участников связи.
+    - Сценарий, который проверял согласование через замену, выражен изменением типа, архивированием или удалением с новой связью. Сценарий, проверявший только саму замену, удалён.
+    - `lib/` не меняется.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph/data/drift_relation_watch_test.dart test/graph/data/drift_statistics_relation_snapshot_test.dart test/graph/data/tag_assignment_graph_lifecycle_test.dart test/graph/data/drift_graph_fact_log_completeness_test.dart test/graph/presentation/graph_reconciliation_checkpoint_test.dart test/app/home_statistics_app_flow_test.dart`.
+    - `mise exec --no-deps -- flutter test --concurrency=1 test/graph/data/file_backed_graph_durability_test.dart`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** файлы первой проверки и `test/support/graph_operation_process_worker.dart`.
+  - **Размер:** M.
+
+- [x] 1.6 Операция изменения связи перестаёт принимать участников
+  - **Критерии приёмки:**
+    - `LongTermRelationPatch` не имеет полей участников, поэтому замену нельзя собрать.
+    - `_updateLongTermRelation` не проверяет участников и пару, а `_findRelationForPair` теряет `excludingId`. Абсолютные счётчики читаются для двух неизменных участников.
+    - Незапрошенные поля, архивное состояние и последовательность создания сохраняются, а изменение удалённой связи сообщает об её отсутствии.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph/data/drift_relation_update_test.dart test/graph/data/drift_daily_path_protection_test.dart test/long_term_relation/presentation/editor`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.2, 1.5.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/long_term_relation/application/long_term_relation_command.dart`, `lib/src/graph/data/drift_personal_graph_repository_relation_commands.dart`, `lib/src/long_term_relation/presentation/editor/relation_editor_state.dart`;
+    - меняются `test/graph/data/drift_relation_update_test.dart`, `drift_daily_path_protection_test.dart`.
+  - **Размер:** M.
+
+- [x] 1.7 Убрать отказы, которых у изменения связи больше нет
+  - **Критерии приёмки:**
+    - `LongTermRelationCommandValidationFailure` и `_LongTermRelationSameParticipants` удалены: без замены участников их некому создать.
+    - Изменение связи не называет занятую пару, отсутствующего или архивированного участника. Такие ветви исчерпывающих разборов отказов ведут к тексту неожиданной ошибки, а строки `relationEditorUpdatePairOccupied`, `relationEditorUpdateParticipantNotFound`, `relationEditorUpdateParticipantArchived`, `relationEditorUpdateInvalidInput` и `relationEditorCreateInvalidInput` удалены на обоих языках.
+    - Создание связи сохраняет свои отказы и тексты.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation test/graph/presentation/graph_operation_presenter_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.6.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/long_term_relation/application/long_term_relation_command.dart`, `lib/src/graph/data/drift_personal_graph_repository_relation_commands.dart`, `lib/src/long_term_relation/presentation/relation_command_failure_message.dart`;
+    - меняются `lib/src/long_term_relation/presentation/editor/relation_editor_view_model.dart`, `relation_editor_page.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
+    - меняется `test/graph/presentation/graph_operation_presenter_test.dart`.
+  - **Размер:** M.
+
+- [x] 1.8 Базовая схема 7 делает участников частью неизменяемой идентичности связи
+  - **Критерии приёмки:**
+    - Триггер `long_term_relations_immutable_identity` отклоняет изменение обоих участников. Триггер активных участников при обновлении реагирует только на `is_archived`.
+    - `AppDatabase.currentSchemaVersion` равен 7, снимок `drift_schemas/drift_schema_v7.json` заменяет снимок версии 6, а пути обновления нет, как у прежних базовых версий. База с меньшей версией определяется как повреждённая.
+    - Тесты, менявшие участников сырым SQL, проверяют отказ или лишаются этого случая.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/data/local test/graph/data/drift_choice_path_continuations_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.6 — запись связи больше не передаёт участников.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/data/local/schema/long_term_relation_schema.drift`, `lib/src/data/local/app_database.dart`, `app_database.g.dart`, `lib/src/data/local/migrations/migration_strategy.dart`;
+    - `drift_schemas/drift_schema_v7.json` заменяет `drift_schema_v6.json`;
+    - меняются `test/data/local/app_database_schema_test.dart`, `daily_choice_schema_test.dart`, `test/graph/data/drift_choice_path_continuations_test.dart`.
+  - **Размер:** M.
+
+- [x] 1.9 Тип связи перестаёт зависеть от шагов пути выбора в команде и схеме
+  - **Критерии приёмки:**
+    - Триггер `long_term_relations_protect_daily_choice_path` удалён, а изменение связи не проверяет разрешения. Тип активной связи с шагами пути меняется, а состав пути, дата и выполнение дневного выбора сохраняются.
+    - Удаление связи с шагами пути блокируется как прежде.
+    - Сверка типа в снимке незавершённого выбора (`actual.type` в чтении продолжений и команде дневного выбора) остаётся: она относится к черновику, а не к сохранённому пути.
+    - Пересечение создания дневного выбора со сменой типа даёт оба исхода сценария «Создание пересекается с изменением типа связи». Порядок «выбор первым» покрывает проверка смены типа связи с шагами пути: смена подтверждается, а путь показывает новый тип. Порядок «тип первым» покрывает тест «изменённый смысл маршрута возвращает конфликт без записи»: создание отклоняется конфликтом.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/data/local/daily_choice_schema_test.dart test/graph/data/drift_daily_path_protection_test.dart test/graph/data/drift_relation_update_test.dart test/graph/data/drift_daily_choice_create_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.8 — участников защищает триггер идентичности.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/data/local/schema/daily_choice_schema.drift`, `lib/src/data/local/app_database.g.dart`, `drift_schemas/drift_schema_v7.json`;
+    - меняется `lib/src/graph/data/drift_personal_graph_repository_relation_commands.dart`;
+    - меняются тесты из проверки, кроме `test/graph/data/drift_daily_choice_create_test.dart`: он уже покрывает порядок «тип первым».
+  - **Размер:** S.
+
+- [x] 1.10 Изменение типа архивированной связи отклоняется отдельным типизированным отказом
+  - **Критерии приёмки:**
+    - `LongTermRelationArchivedTypeChangeFailure` с категорией конфликта отклоняет весь набор правок архивированной связи, если он меняет тип. Все поля сохраняются.
+    - Приоритет и описание архивированной связи меняются как прежде, а указание прежнего типа изменением не считается.
+    - Отказ доходит до формы, если каскад архивировал связь за открытой формой, и назван русской и английской строкой.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/graph/data/drift_relation_update_test.dart test/long_term_relation/presentation/editor test/graph/presentation/graph_operation_presenter_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.9.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/long_term_relation/application/long_term_relation_command.dart`, `lib/src/graph/data/drift_personal_graph_repository_relation_commands.dart`, `lib/src/long_term_relation/presentation/relation_command_failure_message.dart`;
+    - меняются `lib/src/long_term_relation/presentation/editor/relation_editor_view_model.dart`, `relation_editor_state.dart`, `relation_editor_page.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
+    - меняются тесты из проверки.
+  - **Размер:** M.
+
+- [x] 1.11 Форма переводит связь из пути в другую группу, а архивированной связи тип не предлагает
+  - **Критерии приёмки:**
+    - Выбор типа доступен у активной связи и в сохранённом пути, а у архивированной связи недоступен. Предупреждения о защите пути в форме нет.
+    - Форма больше не хранит разрешения: удалены `permissions`, `permissionRevision`, `RelationEditorReferencedByDailyPath`, подписка на завершения ради них и строки `relationEditorPathProtection`, `relationEditorPathProtectionWithDraft`, `relationEditorUpdateReferencedByDailyPath`. `relationDetailsPathProtection` называет запретом только удаление.
+    - Сквозной тест на настоящем хранилище: связь из пути сохранённого дневного выбора переведена формой в другую группу, подробный просмотр дневного выбора показывает её новый тип, а состав пути, дата и выполнение прежние.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation test/app/long_term_relation_app_flow_test.dart test/daily_choice/presentation/details`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.10.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/long_term_relation/presentation/editor/relation_editor_page.dart`, `relation_editor_state.dart`, `relation_editor_view_model.dart`;
+    - меняются `lib/src/long_term_relation/presentation/details/relation_details_page.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
+    - меняются `test/long_term_relation/presentation/editor/relation_editor_page_test.dart`, `relation_editor_view_model_test.dart`, `test/app/long_term_relation_app_flow_test.dart`.
+  - **Размер:** M.
+
+- [x] 1.12 Удалить разрешение на изменение смысла связи
+  - **Критерии приёмки:**
+    - `LongTermRelationPermissions.canChangeMeaning` удалён. Проверки, которые его читали, используют `canDelete` или удалены, если проверяли только его.
+    - Разрешения на удаление, изменение описания, приоритета и архивного состояния не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/long_term_relation/application/long_term_relation_projection_test.dart test/long_term_relation/presentation/details/relation_details_view_model_test.dart test/graph/data/drift_relation_watch_test.dart test/graph/data/drift_statistics_relation_snapshot_test.dart test/graph/data/drift_relation_count_aggregates_test.dart test/daily_choice/application/daily_choice_change_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.11 — у разрешения не остаётся чтений в `lib/`.
+  - **Предполагаемые файлы:** `lib/src/long_term_relation/application/long_term_relation_permissions.dart` и тесты из проверки.
+  - **Размер:** S.
+
+- [x] 1.13 Команды связи записывают показания времени создания и последнего изменения
+  - **Критерии приёмки:**
+    - Таблица `long_term_relations` получает `created_at` и `updated_at` (`INTEGER NOT NULL`) с временным `DEFAULT 0`, которое снимает 1.17. Индексов по ним нет.
+    - Создание записывает в оба столбца одно показание источника времени команды, как у намерения. Фактическое изменение типа, приоритета или описания, архивирование и восстановление обновляют только `updated_at`.
+    - Каскад обновляет `updated_at` только у связей, которые он архивирует, тем же показанием, что и у намерения. Повтор прежнего значения и отклонённая операция показания не меняют, а порядок связей от них не зависит.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/graph/data/drift_relation_timestamps_test.dart test/graph/data/drift_relation_update_test.dart test/graph/data/drift_relation_archive_restore_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.9, 1.10 — изменение связи уже имеет итоговый вид.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/data/local/schema/long_term_relation_schema.drift`, `lib/src/data/local/app_database.g.dart`, `drift_schemas/drift_schema_v7.json`;
+    - меняются `lib/src/graph/data/drift_personal_graph_repository_relation_commands.dart`, `drift_personal_graph_repository.dart`;
+    - новый `test/graph/data/drift_relation_timestamps_test.dart`.
+  - **Размер:** M.
+
+- [x] 1.14 Чтения связи из хранилища получают показания времени
+  - **Критерии приёмки:**
+    - `StoredLongTermRelation` несёт `createdAt` и `updatedAt` типа показания времени связи, устроенного как `IntentionTimestamp`. Отсутствующее или нечисловое значение становится `StoredGraphCorruption`.
+    - Все девять чтений, декодирующих `StoredLongTermRelation`, выбирают оба столбца.
+    - Поведение чтений не меняется.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph/data test/daily_choice/application test/long_term_relation/application`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.13.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/long_term_relation/domain/long_term_relation.dart`, `lib/src/graph/data/stored_graph_rows.dart`;
+    - по одному запросу меняется в `graph_fact_capture.dart`, `drift_personal_graph_repository.dart` и в частях репозитория `_relation_commands`, `_relation_details`, `_relation_groups`, `_fact_log`, `_daily_choice_reads`, `_choice_path_reads` из `lib/src/graph/data/`.
+  - **Размер:** M: по одной строке в большинстве файлов.
+
+- [x] 1.15 Файл экспорта сохраняет показания времени долговременной связи
+  - **Критерии приёмки:**
+    - Запись связи содержит обязательные `createdAt` и `updatedAt` в том же виде, что у намерения. Версия формата не меняется, а запись без них считается повреждённой. Взаимный порядок показаний не проверяется.
+    - Замена графа записывает показания из записи, а лог фактов и снимки несут их.
+    - Граф, экспортированный из одной установки и импортированный в другую, содержит связи с теми же показаниями. Образцы `test/graph_format/golden/` обновлены.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph_format test/graph_snapshots test/graph_backups test/data_transfer test/graph/data/graph_fact_capture_test.dart test/graph/data/drift_graph_fact_log_write_test.dart test/data/local/graph_log_schema_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.14.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/graph_format/graph_format_records.dart`, `graph_format_codec.dart`;
+    - меняются `lib/src/graph/data/graph_record_rows.dart`, `drift_personal_graph_repository_replacement.dart`;
+    - меняются образцы, `test/support/graph_log_completeness_reference.dart` и тесты, создающие `LongTermRelationRecord`.
+  - **Размер:** M.
+
+- [x] 1.16 Модель связи несёт подтверждённые показания времени
+  - **Критерии приёмки:**
+    - `LongTermRelation` требует `createdAt` и `updatedAt`. Результаты команд и изменения графа, включая каскад, несут подтверждённые значения.
+    - Наличие изменения определяется по типу, приоритету, описанию и архивному состоянию, поэтому повтор значений остаётся без изменения.
+    - Вызовы конструктора в тестах получают показания без изменения проверок: это 51 вызов в 32 файлах. Обязательные поля ломают компиляцию всех файлов сразу, поэтому правка не делится на части.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter analyze`.
+    - `mise exec --no-deps -- flutter test test/long_term_relation test/graph test/daily_choice test/intention test/app/routing`.
+  - **Зависимости:** 1.14.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/long_term_relation/domain/long_term_relation.dart`, `lib/src/graph/data/stored_graph_rows.dart`, `drift_personal_graph_repository_relation_commands.dart`;
+    - механически меняются тесты с вызовом конструктора, например `test/graph/presentation/graph_operation_presenter_test.dart`.
+  - **Размер:** M по логике: файлов больше нормы только из-за механической правки вызовов.
+
+- [x] 1.17 Снять временное умолчание показаний времени
+  - **Критерии приёмки:**
+    - У `created_at` и `updated_at` нет `DEFAULT`, поэтому вставка без показаний не компилируется и не выполняется.
+    - 55 файлов с вставкой связи (52 теста и 3 фикстуры бенчмарков) задают показания. В сыром SQL значения дописываются литералами, аргументы запросов не меняются.
+    - Проверки тестов не меняются. Правка не делится на части: снятие умолчания ломает все вставки сразу.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter analyze`.
+    - `mise exec --no-deps -- flutter test test/graph test/data test/intention test/daily_choice test/app`.
+    - `mise run benchmark`.
+  - **Зависимости:** 1.15 — замена графа пишет показания сама.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/data/local/schema/long_term_relation_schema.drift`, `lib/src/data/local/app_database.g.dart`, `drift_schemas/drift_schema_v7.json`;
+    - механически меняются файлы с `INSERT INTO long_term_relations` и `LongTermRelationsCompanion` в `test/` и `benchmark/support/`.
+  - **Размер:** M по логике: файлов больше нормы только из-за механической правки вставок.
+
+- [x] 1.18 Проверить готовность фазы: неизменная пара, свободный тип и сохранённые показания времени
+  - **Критерии приёмки:**
+    - Связь в пути переводится в другую группу, и её новый тип виден в подробном просмотре дневного выбора.
+    - Новая установка открывает базовую схему, а показания времени переживают экспорт и импорт.
+    - В `lib/` и `test/` нет `canChangeMeaning`, `long_term_relations_protect_daily_choice_path`, `ignoredRelationId`, `RelationChangeChoiceFlow` и замены участников в `LongTermRelationPatch`.
+  - **Проверка:**
+    - `mise run codegen-check`.
+    - `mise run check`.
+    - `mise exec --no-deps -- openspec validate add-relations-in-batches --strict`.
+  - **Зависимости:** 1.1–1.17.
+  - **Предполагаемые файлы:** нет (только проверка).
+  - **Размер:** XS.
+
+- [x] 1.19 Убрать из подробного просмотра связи данные разрешений без читателя
+  - **Критерии приёмки:**
+    - Состояние подробного просмотра долговременной связи содержит только то, что читает рабочий код. Поведение для человека не меняется.
+    - `RelationDetailsLoaded` не имеет `permissionRevision`: удалены поле, параметр конструктора, параметр и присваивание в `copyWith`, а `_handleCompletion` его не записывает.
+    - Геттер `editingDetails` удалён, а `relation_details_page.dart` передаёт в `RelationEditingContext` `loaded.details`. `LongTermRelationDetails.withPermissions` удалён.
+    - Поле `permissions` в `RelationDetailsLoaded` и его обновление из подтверждённого изменения сохранены: их читают кнопка удаления, объяснение запрета и `_isLifecycleChangeApplicable`.
+    - В `graph_reconciliation_checkpoint_test.dart` ожидание после удаления дневного выбора проверяет наблюдаемый результат вместо ревизии разрешений: `relation(101).permissions.canDelete` и `relation(102).permissions.canDelete` истинны, `relation(105).permissions.canDelete` ложно. Проверки после ожидания не меняются.
+    - В `relation_details_widget_test.dart` второй снимок собирается через `testRelationDetails(..., permissions: ...)` с теми же идентификаторами.
+    - В `lib/` и `test/` нет `permissionRevision` в подробном просмотре, `editingDetails` и `withPermissions`.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation test/long_term_relation/application/long_term_relation_projection_test.dart test/graph/presentation/graph_reconciliation_checkpoint_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 1.11 — форма больше не читает разрешения.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/long_term_relation/presentation/details/relation_details_state.dart`, `relation_details_view_model.dart`, `relation_details_page.dart`;
+    - меняется `lib/src/long_term_relation/application/long_term_relation_projection.dart`;
+    - меняются `test/graph/presentation/graph_reconciliation_checkpoint_test.dart`, `test/long_term_relation/presentation/details/relation_details_widget_test.dart`.
+  - **Размер:** S.
+
+## Phase 2: Связь просматривается и меняется в нижней панели
+
+- [x] 2.1 Закрепить тестом, что страница намерения над листом не теряет лист в стеке навигации
+  - **Критерии приёмки:**
+    - Тест идёт на настоящем `AppRouter`: лист `showDoableSheet` над страницей намерения открывает через `context.router.push` страницу другого намерения, и она встаёт над листом.
+    - «Назад» на этой странице и системное «назад» возвращают тот же лист с его состоянием, а следующее «назад» закрывает лист и показывает исходную страницу.
+    - Выбор пункта панели навигации на странице над листом убирает страницы и лист из истории. Быстрое создание на этой странице запускается, а возврат с созданного намерения ведёт на неё и затем на лист.
+    - `lib/` не меняется. Если лист не удерживается, работа над фазой останавливается: по разделу рисков `design.md` D8 возвращается к решению с закрытием листа и обновлённым сценарием.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app/navigation/app_shell_sheet_stack_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** новый `test/app/navigation/app_shell_sheet_stack_test.dart`.
+  - **Размер:** S.
+
+- [x] 2.2 Успех изменения, архивирования и восстановления связи больше не объявляется сообщением
+  - **Критерии приёмки:**
+    - `acceptRelationUpdate`, `acceptRelationArchive` и `acceptRelationRestore` следуют политике «успех без сообщения» из [ADR-0046](../../../docs/adr/0046-keep-edit-failures-on-screen-without-success-message.md): успех публикуется для согласования и не образует права предъявления, а отказ принадлежит инициатору и переходит оболочке, когда инициатор ушёл.
+    - Создание и удаление остаются на общей политике. `acceptRelationRestoreFromCreation` тоже: до фазы 3 он завершает поток формы, и его успех предъявляет оболочка.
+    - Строки `relationEditorUpdated` и `relationArchived` удалены на обоих языках: показывать их больше нечему. `relationRestored` остаётся ради восстановления из поиска.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/graph/application/graph_command_coordinator_relation_lifecycle_test.dart test/graph/presentation/graph_operation_presenter_test.dart test/long_term_relation/presentation test/app/long_term_relation_app_flow_test.dart test/app/creation_flows_integration_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/graph/application/graph_command_coordinator.dart`, `lib/src/graph/presentation/graph_operation_presenter.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
+    - меняются тесты координатора и presenter и сценарии из проверки, ждавшие этих сообщений.
+  - **Размер:** M.
+
+- [x] 2.3 Модель подробного просмотра принимает изменение типа, приоритета и описания связи
+  - **Критерии приёмки:**
+    - `RelationDetailsViewModel` отправляет через `acceptRelationUpdate` правку только названного поля. Значение, равное подтверждённому, команды не порождает, поэтому показание времени изменения остаётся прежним. Пока операция этой связи выполняется, новая не принимается и не встаёт в очередь.
+    - Смену типа архивированной связи модель не отправляет. Если каскад архивировал связь за открытой панелью, `LongTermRelationArchivedTypeChangeFailure` становится отказом панели.
+    - Текст описания проверяется `LongTermRelationDescription.fromInput`. Сохранение описания возвращает вызывающему один из четырёх типизированных исходов: успех собственной команды, как при `delete`, значение без изменений, отказ проверки или отказ команды. Отказ проверки различает причину: слишком длинный текст или недопустимый Unicode, в том числе NUL.
+    - Пробельный текст очищает описание. Текст, который после проверки равен сохранённому, например пробелы у связи без описания, команды не порождает и даёт исход «значение без изменений».
+    - Отказ правки хранится в состоянии с правом предъявления, поля остаются последним подтверждённым снимком, а следующая принятая правка снимает отказ.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `relation_details_view_model_test.dart` покрывает все четыре исхода сохранения описания и обе причины отказа проверки, а исход без изменений не отправляет команду.
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/details/relation_details_view_model_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/long_term_relation/presentation/details/relation_details_view_model.dart`, `relation_details_view_model.g.dart`, `relation_details_state.dart`;
+    - меняется `test/long_term_relation/presentation/details/relation_details_view_model_test.dart`.
+  - **Размер:** M.
+
+- [x] 2.4 В модуле основ появляется `PriorityPicker`
+  - **Критерии приёмки:**
+    - Четыре пилюли P1–P4 с кольцом цвета приоритета по README компонента: выбранная лежит на `fill`, а цвет приоритета не заливает пилюлю и не красит подпись. Выбрана всегда одна, а нажатие на выбранную ничего не делает. Без `onChange` пилюли недоступны.
+    - Компонент не знает предметной модели: значение принадлежит модулю основ, а подписи и доступные названия задаёт потребитель. Диктор слышит порядок приоритетов и выбранную пилюлю, а фокус с клавиатуры обводит пилюлю.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/priority_picker_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** новые `lib/src/design_system/components/priority_picker.dart`, `test/design_system/priority_picker_test.dart`.
+  - **Размер:** S.
+
+- [x] 2.5 В модуле основ появляется `RelationHead`
+  - **Критерии приёмки:**
+    - Три строки не ниже `tapMin` по README компонента: исходное намерение с ромбом, тип, связанное намерение с кольцом. Линия сплошная у «нужно» и пунктирная у «можно», цвета следуют приоритету, а у архивированной связи — `grip`. Компонент строится на `RelationStroke`, `PathGlyph` и `Badge.archived`.
+    - С `onKind` средняя строка — переключатель двух типов с отметкой типа, без него — плитка со значком и слово типа. Без `onMenu` кнопки параметров нет.
+    - Длинное название переносится и не обрезается. Название участника — кнопка с доступным названием от потребителя, а архивированный участник приглушён и несёт метку. Под архивированной связью стоит строка, которую задаёт потребитель.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/relation_head_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** новые `lib/src/design_system/components/relation_head.dart`, `test/design_system/relation_head_test.dart`.
+  - **Размер:** M по логике: файла два, но вариантов состояния много.
+
+- [x] 2.6 `Sheet` получает вариант без заголовка и полный размер с полосой редактирования
+  - **Критерии приёмки:**
+    - Лист без заголовка начинает тело в 14 под ручкой и называет себя диктору доступным названием от потребителя.
+    - С полосой `bar` лист занимает весь экран под строкой состояния без скругления и тени, полоса стоит на месте ручки, а тело — под ней и над открытой клавиатурой. Смена размера идёт 180 мс с `easeOut`, а при уменьшении движения происходит сразу. Снятие полосы возвращает размер по содержимому.
+    - В полном размере лист не перетаскивается, а `hostsMessages` не укорачивает его. Существующие варианты листа не меняются: их тесты в `sheet_test.dart` проходят без правок.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/sheet_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** меняются `lib/src/design_system/components/sheet.dart`, `test/design_system/sheet_test.dart`.
+  - **Размер:** M.
+
+- [x] 2.7 Панель показывает связь, её участников и даты, а название участника ведёт на его страницу
+  - **Критерии приёмки:**
+    - `showRelationDetailsSheet` показывает через `showDoableSheet` с `hostsMessages` лист без заголовка высотой по содержимому: шапка сохраняет исходное направление связи, затем идут описание или подсказка «Добавить описание», приоритет и строка дат.
+    - Строка дат следует требованию «Время создания и изменения связи». Правило `intentionDatesLine` становится общим для намерения и связи, а не копируется.
+    - Доступное название панели в обычном режиме — полная формулировка связи в исходном направлении, у архивированной связи с пометкой архива, а в режиме изменения описания — «Описание связи». `relation_details_sheet_test.dart` проверяет оба названия обычного режима. Режим изменения появляется в 2.9, и его название проверяется там.
+    - Архивированная связь показывает отметку архива и строку «Архивные связи остаются в сохранённых путях и не предлагаются в новых», а архивированный участник — свою метку.
+    - Загрузка, отсутствие связи, отказ чтения с повтором и отказ обновления с прежним снимком различимы внутри панели, как на прежней странице.
+    - Нажатие на название открывает поверх панели страницу намерения, а возврат показывает ту же панель. Поиска участника и иного способа заменить его нет.
+    - Входа из приложения ещё нет: он появляется в 2.11, а старая страница работает до 2.14. Строки появляются на русском и английском.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/details/relation_details_sheet_test.dart test/intention/presentation/details`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 2.4, 2.5, 2.6.
+  - **Предполагаемые файлы:**
+    - новый `lib/src/long_term_relation/presentation/details/relation_details_sheet.dart`;
+    - `lib/src/intention/presentation/details/intention_dates.dart` с тестом переносится в `lib/src/shared/presentation/`, меняется `intention_details_page.dart`;
+    - меняются `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
+    - новый `test/long_term_relation/presentation/details/relation_details_sheet_test.dart`, меняется `relation_details_test_support.dart`.
+  - **Размер:** M.
+
+- [x] 2.8 Тип и приоритет связи меняются в панели сразу, а отказ остаётся внутри неё
+  - **Критерии приёмки:**
+    - У активной связи нажатие на другой тип и выбор P1–P4 сразу принимают изменение: после подтверждения линия и цвет шапки следуют новым значениям, сообщения нет, а панель остаётся открытой. Нажатие на уже выбранный приоритет ничего не меняет.
+    - У архивированной связи вместо переключателя стоит слово типа, а приоритет меняется.
+    - Пока операция выполняется, в том числе начатая до повторного открытия панели, панель показывает её состояние и последнее подтверждённое содержание, а управление недоступно.
+    - При отказе панель показывает прежние значения и сообщение внутри себя: сценарий «Отказ оставляет подтверждённый приоритет».
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/details/relation_details_sheet_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 2.3, 2.7.
+  - **Предполагаемые файлы:** меняются `lib/src/long_term_relation/presentation/details/relation_details_sheet.dart`, `test/long_term_relation/presentation/details/relation_details_sheet_test.dart`.
+  - **Размер:** S.
+
+- [x] 2.9 Описание связи меняется в полном размере панели с подтверждением ухода
+  - **Критерии приёмки:**
+    - Нажатие на поле описания открывает полный размер под полосой со стрелкой назад, словом «Описание» и кнопкой «Сохранить». Шапка связи остаётся над полем со словом типа вместо переключателя и без кнопки параметров, а строки архива и дат скрыты.
+    - В этом режиме `relation_details_sheet_test.dart` подтверждает доступное название панели «Описание связи» из 2.7.
+    - «Сохранить» недоступна, пока текст не изменён. Успех возвращает панель в размер по содержимому с новым описанием и без сообщения.
+    - Текст, который после проверки равен сохранённому, например пробелы у связи без описания, не порождает команду: панель выходит из изменения как при успехе, без сообщения и без смены даты изменения.
+    - Слишком длинный текст, недопустимый Unicode, в том числе NUL, и отказ записи оставляют введённый текст и объясняются внутри панели. Отказы проверки используют существующие строки своей причины: `relationEditorDescriptionTooLong` и `relationEditorDescriptionInvalidUnicode`.
+    - При изменённом тексте стрелка назад и закрытие панели спрашивают подтверждение через `showDiscardDialog`, а отказ от сброса возвращает то же изменение с текстом. Без изменений стрелка возвращает панель, а системное «назад» закрывает её по `bottom-sheets`.
+    - Пока сохранение выполняется, стрелка назад и поле недоступны, поэтому изменение остаётся открытым до результата, а отказ сохраняет введённый текст на открытой панели. Закрытие панели в это время, в том числе системным «назад», не спрашивает подтверждения: принятая команда продолжается, а оболочка предъявляет отказ только при закрытой панели. Сброс истории пунктом панели со страницы над панелью идёт без подтверждения.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `relation_details_sheet_test.dart` покрывает выход из изменения без команды и сообщения, объяснение обеих причин отказа проверки с сохранением текста, недоступность стрелки и поля во время сохранения, отказ на открытой панели с сохранением текста и предъявление отказа оболочкой после закрытия панели.
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/details/relation_details_sheet_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 2.3, 2.6, 2.7.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/long_term_relation/presentation/details/relation_details_sheet.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
+    - меняется `test/long_term_relation/presentation/details/relation_details_sheet_test.dart`.
+  - **Размер:** M.
+
+- [x] 2.10 Меню панели архивирует, восстанавливает и удаляет связь
+  - **Критерии приёмки:**
+    - Три точки открывают `OptionsMenu` с двумя пунктами: архивирование или восстановление и удаление. Пункта изменения описания из макета нет: спецификация называет только эти действия.
+    - Действие начинается после закрытия меню, а поздний выбор отбрасывается, если панель уже перекрыта или уходит.
+    - Недоступный пункт остаётся в меню с причиной: удаление — пока связь входит в путь дневного выбора, восстановление — пока архивирован участник.
+    - Архивирование и восстановление сразу отражаются в панели без сообщения, а отказ и устранимый повтор остаются внутри неё.
+    - Удаление подтверждается через `showConfirmDialog`, который называет эту связь и необратимость. Успех закрывает только панель, принявшую команду, и сообщение называет «Связь удалена». Сценарии отказа и повтора удаления из `relation_details_widget_test.dart` выражены на панели.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/details/relation_details_sheet_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 2.2, 2.7.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/long_term_relation/presentation/details/relation_details_sheet.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
+    - меняется `test/long_term_relation/presentation/details/relation_details_sheet_test.dart`.
+  - **Размер:** M.
+
+- [x] 2.11 Группа страницы намерения и путь дневного выбора открывают панель
+  - **Критерии приёмки:**
+    - Нажатие на строку связи и на шаг пути в подробном просмотре дневного выбора открывает панель над страницей, а панель навигации и страница под ней недоступны для взаимодействия.
+    - Сквозные сценарии на настоящем хранилище: смена типа переводит связь в другую группу того же направления, а связь из пути сохранённого дневного выбора переведена панелью, и подробный просмотр показывает новый тип при прежних составе пути, дате и выполнении.
+    - Сквозной сценарий переименования в `test/app/long_term_relation_app_flow_test.dart` проверяет новое название через шапку и доступное название панели вместо чтения `relation-details-phrase`.
+    - `app_shell_sheet_stack_test.dart` из 2.1 работает с настоящей панелью: название участника, страница над панелью, возврат и сброс пунктом панели.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/details test/daily_choice/presentation/details test/long_term_relation/presentation/intention_relations test/app/long_term_relation_app_flow_test.dart test/app/navigation/app_shell_sheet_stack_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 2.1, 2.8, 2.9, 2.10.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/intention/presentation/details/intention_details_page.dart`, `lib/src/daily_choice/presentation/details/daily_choice_details_page.dart`;
+    - меняются `test/intention/presentation/details/intention_details_relations_test.dart`, `test/daily_choice/presentation/details/daily_choice_details_page_test.dart`, `test/app/long_term_relation_app_flow_test.dart`, `test/app/navigation/app_shell_sheet_stack_test.dart`.
+  - **Размер:** M.
+
+- [x] 2.12 Форма создания и прежний поиск участника открывают связь той же панелью
+  - **Критерии приёмки:**
+    - После создания связи или её восстановления из поиска форма и поиск уходят из истории, а панель открывается над исходной страницей. Она показывается только после того, как навигатор удалил форму, потому что безымянный маршрут уходит вместе со страницей под ним. Сообщение об успехе предъявляется один раз.
+    - Поздний успех покинутой формы панель не открывает и текущую страницу не меняет.
+    - «Открыть существующую связь» в форме и занятая активная связь в поиске открывают панель над ними, а возврат сохраняет черновик формы и выдачу поиска.
+    - В `lib/src` у `RelationDetailsRoute` остаётся только объявление маршрута.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/editor test/long_term_relation/presentation/participant_picker test/app/creation_flows_integration_test.dart test/app/long_term_relation_app_flow_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 2.11.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/long_term_relation/presentation/editor/relation_creation_completion.dart`, `relation_editor_page.dart`, `lib/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart`;
+    - меняются `test/long_term_relation/presentation/editor/relation_creation_navigation_test.dart`, `relation_editor_page_test.dart`, `test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart`, `test/app/creation_flows_test_support.dart`, `test/app/creation_flows_integration_test.dart`, `test/app/long_term_relation_app_flow_test.dart`.
+  - **Размер:** M.
+
+- [x] 2.13 Проверки оболочки навигации опираются на панель вместо страницы связи
+  - **Критерии приёмки:**
+    - Матрица страниц и сценарии сброса, возврата и раскладки открывают подробный просмотр нажатием на строку связи, а не маршрутом. Подробный просмотр связи больше не считается обычной страницей.
+    - Сценарий «Выбранный пункт возвращает в корень» и сброс при принятой операции покрыты с панелью в истории, а удаление идёт через меню панели.
+    - `lib/` не меняется.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app/navigation test/app/routing/app_router_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 2.11, 2.12.
+  - **Предполагаемые файлы:** меняются `test/app/navigation/app_shell_page_matrix.dart`, `app_shell_pages_above_test.dart`, `app_shell_operation_reset_test.dart`, `ordinary_page_layout_scenarios.dart`, `app_navigation_accessibility_test.dart`, `test/app/routing/app_router_test.dart`.
+  - **Размер:** M по логике: меняются только способ открытия и ожидания.
+
+- [x] 2.14 Удалить страницу подробного просмотра связи и её маршрут
+  - **Критерии приёмки:**
+    - `RelationDetailsPage` и `RelationDetailsRoute` удалены, а `app_router.gr.dart` создан заново. Кнопка «Редактировать связь» уходит вместе со страницей, поэтому у существующей связи нет пути в форму.
+    - Сценарии `relation_details_widget_test.dart` и `relation_details_tags_test.dart`, которые описывают продукт, выражены на панели, остальные удалены. `relation_details_navigation_test.dart` удалён: панели навигации над листом нет.
+    - В `test/long_term_relation/presentation/editor/relation_editor_page_test.dart` сценарии изменения через форму удалены вместе с `_openDetailsForEditing` и всеми обращениями к `RelationDetailsRoute` и `relation-details-edit-relation`, а сценарий запасной локали проверяет форму создания.
+    - Строки, которые читала только прежняя страница, удалены на обоих языках.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/long_term_relation test/app/routing/app_router_test.dart test/graph/presentation/graph_reconciliation_checkpoint_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 2.12, 2.13.
+  - **Предполагаемые файлы:**
+    - удаляется `lib/src/long_term_relation/presentation/details/relation_details_page.dart`;
+    - меняются `lib/src/app/routing/app_router.dart`, `app_router.gr.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
+    - меняются или удаляются `test/long_term_relation/presentation/details/relation_details_widget_test.dart`, `relation_details_tags_test.dart`, `relation_details_navigation_test.dart`;
+    - меняется `test/long_term_relation/presentation/editor/relation_editor_page_test.dart`.
+  - **Размер:** M.
+
+- [x] 2.15 Форма связи остаётся только формой создания
+  - **Критерии приёмки:**
+    - `RelationEditingContext` удалён вместе с `editingBasis`, `withConfirmedDetails`, `refreshConfirmedDetails` и `RelationEditorUpdated`. Форма не читает подробный просмотр связи.
+    - Отказы, которых у создания нет, и строки `relationEditorEditTitle`, `relationEditorSaveAction`, `relationEditorSaving` удалены на обоих языках. `relationEditorUpdate*` остаются: их читает панель.
+    - Создание из группы и из быстрого создания работает как прежде, а тесты режима изменения в модели формы удалены вместе с проверкой, что форма не заменяет участников: это закрепляет сценарий «Панель не предлагает заменить участника».
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation test/app/navigation/app_shell_pages_above_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 2.14 — у режима изменения не остаётся вызывающего.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/long_term_relation/presentation/editor/relation_editor_state.dart`, `relation_editor_view_model.dart`, `relation_editor_view_model.g.dart`, `relation_editor_page.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
+    - меняются `test/long_term_relation/presentation/editor/relation_editor_view_model_test.dart`, `test/app/navigation/app_shell_page_matrix.dart`.
+  - **Размер:** M.
+
+- [x] 2.16 Проверить готовность фазы: существующая связь открывается и меняется только в панели
+  - **Критерии приёмки:**
+    - Переход с панели на страницу намерения и возврат работают в настоящем стеке навигации либо приняты альтернативой из [design](design.md).
+    - У существующей связи нет пути в форму: в `lib/` и `test/` нет `RelationDetailsPage`, `RelationDetailsRoute` и `RelationEditingContext`.
+    - Из группы страницы намерения и из пути дневного выбора открывается панель с обоими участниками и строкой дат. Тип, приоритет и описание меняются на месте, архивирование, восстановление и удаление доступны из меню, правки не объявляются сообщением, а отказы показываются внутри панели.
+  - **Проверка:**
+    - `mise run codegen-check`.
+    - `mise run check`.
+    - `mise exec --no-deps -- openspec validate add-relations-in-batches --strict`.
+  - **Зависимости:** 2.1–2.15.
+  - **Предполагаемые файлы:** нет (только проверка).
+  - **Размер:** XS.
+
+- [x] 2.17 `Sheet.untitled` раскрывается на весь экран и сохраняет размер под полосой редактирования
+  - **Критерии приёмки:**
+    - `Sheet.untitled` требует `expandLabel` и `collapseLabel`, а заголовка и нижней кнопки у него по-прежнему нет. Компактная высота следует содержимому как `SheetCompactHeight.content`, рост содержимого лист не раскрывает, а тело остаётся в 14 под ручкой.
+    - Перетаскивание, передача жеста телу, ручка `_SizeButton` с областью нажатия над телом и её объявление диктору следуют `bottom-sheets` так же, как у `Sheet.expandable`, в том числе когда всё помещается в компактный размер. `hostsMessages` не укорачивает лист.
+    - С `bar` лист ведёт себя как в 2.6, а снятие `bar` возвращает размер, в котором она появилась: компактный или полный. Верхний край не скачет при появлении и снятии полосы.
+    - Единственный вызов в `relation_details_sheet.dart` передаёт строки «Раскрыть панель связи» и «Свернуть панель связи» на русском и английском: без них проект не собирается. Тесты `Sheet` и `Sheet.expandable` в `sheet_test.dart` проходят без правок.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/design_system/sheet_test.dart test/long_term_relation/presentation/details test/app/navigation/app_shell_sheet_stack_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/design_system/components/sheet.dart`, `test/design_system/sheet_test.dart`;
+    - меняются `lib/src/long_term_relation/presentation/details/relation_details_sheet.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации.
+  - **Размер:** M.
+
+- [x] 2.18 Панель связи раскрывается ручкой и возвращается из изменения описания в прежний размер
+  - **Критерии приёмки:**
+    - `relation_details_sheet_test.dart` подтверждает сценарий «Панель раскрывается, даже когда связь помещается» через ручку с доступными названиями на русском языке. Жесты панели здесь не проверяются повторно: их закрепляет `sheet_test.dart`.
+    - Подтверждён сценарий «Выход из изменения описания возвращает полный размер». Изменение, открытое из компактного размера, возвращает компактный размер.
+    - Комментарий `showRelationDetailsSheet` описывает компактный размер, раскрытие и отдельный размер изменения описания.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/details/relation_details_sheet_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 2.17.
+  - **Предполагаемые файлы:** меняются `lib/src/long_term_relation/presentation/details/relation_details_sheet.dart`, `test/long_term_relation/presentation/details/relation_details_sheet_test.dart`.
+  - **Размер:** S.
+
+- [x] 2.19 Новый отказ любой операции панели становится видимым без ручной прокрутки
+  - **Критерии приёмки:**
+    - Появление другого объекта `editFailure` или `RelationDetailsLifecycleFailed` после кадра прокручивает тело через `Scrollable.ensureVisible` к концу содержимого в обычном режиме и в изменении описания. Размер панели не меняется, а показанный ранее отказ при обновлении панели прокрутку не повторяет.
+    - Прокрутка при сохранении описания работает как прежде, включая снятие фокуса и отказ проверки текста: тест «отказ записи виден над клавиатурой» проходит без правок.
+    - `relation_details_sheet_test.dart` подтверждает сценарии «Отказ действия из шапки виден без раскрытия» и «Повторный отказ снова виден в полном размере». Первый идёт через `editFailure`, второй через `RelationDetailsLifecycleFailed`, а остальные операции используют эти же два пути.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/details/relation_details_sheet_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 2.18.
+  - **Предполагаемые файлы:** меняются `lib/src/long_term_relation/presentation/details/relation_details_sheet.dart`, `test/long_term_relation/presentation/details/relation_details_sheet_test.dart`.
+  - **Размер:** S.
+
+- [x] 2.20 Убрать из состояния формы создания признак `hasChanges` без читателя
+  - **Критерии приёмки:**
+    - Геттер `RelationEditorState.hasChanges` удалён вместе с комментарием, поэтому в `lib/` и `test/` нет `hasChanges`.
+    - Тест «только что открытая форма не изменена, смена типа её изменяет» удалён вместе с опустевшей группой «Создание связи из группы». Отдельный тест начального типа не добавляется: тип из группы проверяет `relation_editor_page_test.dart`.
+    - `initialSourceParticipant`, `initialRelatedParticipant` и `initialType` остаются: их читает начальное состояние формы. Поведение продукта не меняется.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/editor`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** меняются `lib/src/long_term_relation/presentation/editor/relation_editor_state.dart`, `test/long_term_relation/presentation/editor/relation_editor_view_model_test.dart`.
+  - **Размер:** XS.
+
+- [x] 2.21 Доступное название пилюли `PriorityPicker` зависит только от приоритета
+  - **Критерии приёмки:**
+    - `PriorityPicker.itemLabel` имеет тип `String Function(DoablePriority priority)`: состояние выбора в него не передаётся, а выбор объявляется диктору один раз через `selected`.
+    - `priority_picker.dart` передаёт в `itemLabel` только приоритет, данные `_Pill` собираются без этого аргумента, а `chosen` остаётся у `_Pill` для вида пилюли и `selected`.
+    - `relation_details_sheet.dart` передаёт `itemLabel` без отбрасываемого параметра, а его доступные названия прежние.
+    - Образец `_itemLabel` в `test/design_system/priority_picker_test.dart` принимает только приоритет и не вписывает «, выбран». Проверка `isSelected` у пилюли остаётся.
+    - Поведение продукта не меняется: рабочий потребитель параметр уже игнорирует.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/priority_picker_test.dart test/long_term_relation/presentation/details/relation_details_sheet_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** меняются `lib/src/design_system/components/priority_picker.dart`, `lib/src/long_term_relation/presentation/details/relation_details_sheet.dart`, `test/design_system/priority_picker_test.dart`.
+  - **Размер:** XS.
+
+- [x] 2.22 Панель связи становится панелью по содержимому: `Sheet.untitled` теряет раскрытие и ручку-кнопку
+  - **Критерии приёмки:**
+    - `Sheet.untitled` не принимает `expandLabel` и `collapseLabel`, а его поведение возвращено к состоянию до `8ca3b18f`. Без `bar` высота следует содержимому до доступного места под строкой состояния, предел 534 не действует, а лист тянется вниз и закрывается по `bottom-sheets` и вверх не идёт. Ручка — только линия без кнопки и области нажатия, а тело начинается в 14 под ней.
+    - С `bar` лист ведёт себя как в 2.6, а снятие `bar` возвращает высоту по содержимому.
+    - Вынесенное из `_ExpandableSheet` ради этого раскрытия не остаётся: нет примеси `_SheetResizing` и параметров `origin` и `fullness` у `_ExpandableFrame`. Поведение `Sheet` и `Sheet.expandable` не меняется, а их тесты проходят без правок.
+    - `relation_details_sheet.dart` не передаёт названия ручки, а комментарий `showRelationDetailsSheet` описывает высоту по содержимому, прокрутку вместе с шапкой и выход из изменения описания. Автопрокрутка к новому отказу из 2.19 остаётся в обычном режиме и в изменении описания и размер не меняет.
+    - `relationSheetExpand` и `relationSheetCollapse` удалены из ARB на обоих языках и из созданных файлов, поэтому в `lib/` и `test/` их нет.
+    - Из `sheet_test.dart` удалены тесты раскрытия `Sheet.untitled`, добавленные в `8ca3b18f`: ручка, её область нажатия, жесты вверх, передача жеста телу, верхний край и снятие полосы в раскрытом листе, обрыв перетаскивания полосой. Тест «лист без заголовка, содержимое которого выросло выше предела…» переписан: тело выше экрана ставит верхний край под строкой состояния, скругление остаётся, а тело прокручивается.
+    - Из `relation_details_sheet_test.dart` удалена группа «размер панели». Тесты группы «новый отказ» сохранены без ручки: они подтверждают сценарии «Отказ действия из шапки виден без ручной прокрутки» и «Повторный отказ снова виден», которые заменили имена, названные в 2.19.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/design_system/sheet_test.dart test/long_term_relation/presentation/details test/app/navigation/app_shell_sheet_stack_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 2.17–2.19.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/design_system/components/sheet.dart`, `test/design_system/sheet_test.dart`;
+    - меняются `lib/src/long_term_relation/presentation/details/relation_details_sheet.dart`, `test/long_term_relation/presentation/details/relation_details_sheet_test.dart`;
+    - меняются `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации.
+  - **Размер:** M.
+
+## Phase 3: Связи добавляются пачкой только из группы
+
+- [x] 3.1 Закрепить в глоссарии, что новая долговременная связь получает приоритет P4 и не имеет описания
+  - **Критерии приёмки:**
+    - Определение приоритета в `CONTEXT.md` говорит, что новая долговременная связь получает P4 и не имеет описания, пока человек не изменит их в подробном просмотре связи.
+    - Приоритет дневного выбора и остальные определения не меняются.
+  - **Проверка:**
+    - Сверка определения с [ADR-0052](../../../docs/adr/0052-add-relations-as-one-batch-from-group-picker.md) и требованием «Приоритет и последовательность создания связей».
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `CONTEXT.md`.
+  - **Размер:** XS.
+
+- [x] 3.2 Команда `AddLongTermRelations` создаёт все связи пачки в одной транзакции или ни одной
+  - **Критерии приёмки:**
+    - Команда принимает намерение страницы, `IntentionRelationGroup` и упорядоченный набор идентификаторов. Конструктор типизированным отказом отклоняет пустой набор, повторы и намерение страницы среди кандидатов. Приоритета и описания команда не принимает.
+    - Группа задаёт участников: в исходящей намерение страницы исходное, во входящей связанное. Каждая связь активна, имеет P4 и не имеет описания. Связи пачки получают одно показание времени, а последовательность создания идёт в порядке набора.
+    - Запись идёт одной транзакцией единого пути: проверяются намерение страницы, каждый кандидат и каждая пара. Занятая пара, архивированный или отсутствующий участник на любом месте набора дают существующий типизированный отказ, и тогда нет ни связей, ни новой ревизии, ни фактов. Спецификационные сценарии «Участник архивирован до сохранения», «Участник удалён до сохранения» и «Архив сохраняет уникальность пары» подтверждены на настоящем хранилище.
+    - Успех `LongTermRelationsAdded` несёт связи в порядке набора. На одной ревизии он публикует абсолютные счётчики намерения страницы и каждого кандидата и по одному `LongTermRelationCreatedChange` на связь, а лог фактов получает один пакет.
+    - `CreateLongTermRelation` остаётся до 3.22: его читает форма. Исчерпывающий разбор успеха в presenter получает новую ветку как неожиданный исход, а сообщение появляется в 3.3.
+    - Разборы команды в `catalog_reconciliation_test_support.dart:147` и `home_statistics_app_flow_test.dart:808` и разбор успеха в `home_statistics_app_flow_test.dart:820` получают ветви, которые явно роняют тест через `fail`: `acceptRelationsAddition` появляется только в 3.3, и она заменяет эти ветви рабочими.
+    - `_longTermRelationCommandDiagnosticsType` отображает `AddLongTermRelations` в существующий `LongTermRelationCommandDiagnosticsType.create`. Значение `add` не вводится, перечисление и `diagnostics_sink.dart` не меняются, а читатель `create` в `test/app/long_term_relation_app_flow_test.dart:350` остаётся.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph/data/drift_add_long_term_relations_test.dart test/long_term_relation/application/long_term_relation_command_test.dart test/graph/presentation/graph_operation_presenter_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/long_term_relation/application/long_term_relation_command.dart`, `lib/src/graph/data/drift_personal_graph_repository_relation_commands.dart`, `lib/src/graph/presentation/graph_operation_presenter.dart`;
+    - новый `test/graph/data/drift_add_long_term_relations_test.dart`, меняются `test/long_term_relation/application/long_term_relation_command_test.dart`, `test/intention/presentation/catalog/catalog_reconciliation_test_support.dart`, `test/app/home_statistics_app_flow_test.dart`.
+  - **Размер:** M.
+
+- [x] 3.3 Координатор принимает добавление пачки, а сообщение называет число добавленных связей
+  - **Критерии приёмки:**
+    - `acceptRelationsAddition` принимает команду с ключом экземпляра поиска: пока она выполняется, второе добавление с тем же ключом не принимается и не встаёт в очередь, а другой экземпляр поиска работает независимо.
+    - Новый вид команды и цель добавления идут по общей политике: успех принадлежит оболочке, отказ — инициатору, а после ухода инициатора — оболочке. Поздний результат предъявляется ровно один раз.
+    - Сообщение успеха собирается общим шаблоном, как у удаления связи, а его исход считает связи из результата команды: «Добавлена 1 связь.», «Добавлено 3 связи.», «Добавлено 5 связей.», на английском «1 relation added.» и «3 relations added.».
+    - Отказы добавления говорят о пачке и о том, что связи не созданы: тексты занятой пары, отсутствующего и архивированного участника, недоступности, повреждения и неожиданной ошибки есть на русском и английском.
+    - Ветви с `fail` из 3.2 заменены рабочими: в `catalog_reconciliation_test_support.dart` и `home_statistics_app_flow_test.dart` команда идёт через `acceptRelationsAddition`, а в `home_statistics_app_flow_test.dart` успех разбирается как `LongTermRelationsAdded`. Заглушек не остаётся.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/graph/application/graph_command_coordinator_relation_creation_test.dart test/graph/presentation/graph_operation_presenter_test.dart test/intention/presentation/catalog test/app/home_statistics_app_flow_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 3.2.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/graph/application/graph_command_coordinator.dart`, `lib/src/graph/presentation/graph_operation_presenter.dart`, `lib/src/long_term_relation/presentation/relation_command_failure_message.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
+    - меняются `test/graph/application/graph_command_coordinator_relation_creation_test.dart`, `test/graph/presentation/graph_operation_presenter_test.dart`, `test/intention/presentation/catalog/catalog_reconciliation_test_support.dart`, `test/app/home_statistics_app_flow_test.dart`.
+  - **Размер:** M.
+
+- [x] 3.4 Занимающая связь несёт тип, а причина занятости выводится закрытым типом из группы поиска
+  - **Критерии приёмки:**
+    - `PairOccupant` несёт тип занимающей связи. Порция каталога читает его в том же снимке, а `reconcilePairOccupants` обновляет занятость и при смене типа, поэтому открытый поиск не показывает прежнюю причину.
+    - Закрытый тип причины выводится из `IntentionRelationGroup` и `PairOccupant`: своя группа или другая группа того же направления, активная либо архивная связь. Слова из строк не собираются.
+    - `RelationPairProbe` строится из намерения страницы и группы, поэтому исключение из выдачи и проверка пары не могут расходиться.
+    - Прежний поиск участника ведёт себя как раньше. Остальные вызовы конструктора `PairOccupant` в тестах получают тип без изменения проверок.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/long_term_relation/application/relation_pair_reason_test.dart test/intention/presentation/catalog test/intention/data/drift_intention_catalog_test.dart test/intention/application/intention_contract_test.dart test/intention/presentation/picker test/intention/presentation/search test/long_term_relation/presentation/participant_picker`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/long_term_relation/application/relation_pair_probe.dart`, `lib/src/intention/presentation/catalog/pair_occupant_reconciliation.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`;
+    - новый `test/long_term_relation/application/relation_pair_reason_test.dart`, меняются `test/intention/presentation/catalog/pair_occupant_reconciliation_test.dart`, `test/intention/data/drift_intention_catalog_test.dart`;
+    - механически меняются остальные тесты с конструктором `PairOccupant`.
+  - **Размер:** M по логике: файлов больше нормы только из-за механической правки вызовов.
+
+- [x] 3.5 `PickerRow` получает вариант с круглым чекбоксом и вариант занятой строки
+  - **Критерии приёмки:**
+    - Вариант с чекбоксом следует README `PickerRow`: у каждой строки есть колонка чекбокса, поэтому отметка ничего не сдвигает и не меняет плоскость. Нажатие на текст переключает отметку, а область сообщает диктору состояние через `checked`.
+    - Вариант занятой строки принимает только название, причину и стрелку, поэтому описание, метки и теги ему передать нельзя. Строка стоит без подложки, с обводкой `hairline`, отметкой связи 18 цвета `grip`, приглушённым названием и причиной под ним. Текст не нажимается и не объявляется кнопкой, а стрелка работает.
+    - Обычный `PickerRow` не меняется: его тесты проходят без правок. Компонент не знает групп и связей.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/picker_row_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** меняются `lib/src/design_system/components/picker_row.dart`, `test/design_system/picker_row_test.dart`, при необходимости `lib/src/design_system/doable_metrics.dart`.
+  - **Размер:** S.
+
+- [x] 3.6 В модуле основ появляется `RelationBatch`: дерево будущих связей
+  - **Критерии приёмки:**
+    - Компонент следует README `RelationBatch`: намерение страницы, вид, направление, отмеченные элементы, снятие отметки и все подписи задаёт потребитель. В исходящей группе сверху стоит намерение страницы с ромбом, затем вид и карточки, а во входящей — карточки, вид и намерение страницы с кольцом.
+    - Каждая карточка висит на общей линии собственной ветвью. Линии и отметки цвета `grip`, «нужно» сплошная, «можно» пунктирная: компонент строится на `RelationStroke` и `PathGlyph`.
+    - Названия переносятся и не обрезаются. Крестик карточки в квадрате 48 снимает отметку, а без отметок стоит пунктирная карточка с текстом потребителя.
+    - Диктор слышит роль каждой карточки и вид связи словами из подписей потребителя.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/relation_batch_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** новые `lib/src/design_system/components/relation_batch.dart`, `test/design_system/relation_batch_test.dart`.
+  - **Размер:** M по логике: файла два, но геометрия дерева и варианты направления требуют отдельной проверки.
+
+- [x] 3.7 Модель поиска хранит упорядоченные отметки и согласует их с завершениями команд
+  - **Критерии приёмки:**
+    - `RelationBatchViewModel` принадлежит сессии поиска и живёт столько же, сколько экземпляр страницы, по [ADR-0028](../../../docs/adr/0028-scope-opening-parameter-state-to-page-instances.md): другая сессия начинает с пустого набора.
+    - Отметка хранит типизированный идентификатор и текущее название. Порядок набора — порядок установки: снятая и снова поставленная отметка становится последней. Одноимённые намерения остаются разными отметками.
+    - Модель хранит актуальное название намерения страницы: начальное значение она получает при создании, а передаёт его маршрут из 3.9.
+    - Своя подписка на завершения координатора работает и под страницей над поиском: архивирование и удаление отмеченного намерения снимают отметку, переименование обновляет название отметки или намерения страницы, а другие изменения набор и это название не трогают. Архивирование и удаление намерения страницы модель не обрабатывает: это делает команда.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/batch_picker/relation_batch_view_model_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** новые `lib/src/long_term_relation/presentation/batch_picker/relation_batch_view_model.dart` с созданным файлом, `relation_batch_state.dart`, `test/long_term_relation/presentation/batch_picker/relation_batch_view_model_test.dart`.
+  - **Размер:** S.
+
+- [x] 3.8 Экран выбора получает закрытый вариант поведения строки: выбор одного намерения или отметку с причиной занятости
+  - **Критерии приёмки:**
+    - `IntentionPickerView` принимает закрытый тип поведения строки. Поиски дневного выбора и прежний поиск участника остаются в варианте выбора одного намерения, а их тесты меняются только в вызове конструктора.
+    - В варианте отметки свободная строка строится через чекбокс, а строка с `PairOccupant` — как занятая, с причиной из 3.4: «Уже добавлено», «Уже добавлено, в архиве», «Уже в группе "Можно использовать"» и та же фраза с «, в архиве» на обоих языках. Название группы даёт одна функция от строк `detailsRelationsGroup*`, общая с плитками групп.
+    - Доступное название свободной строки сообщает то же, что прежде, и не начинается с призыва выбрать, а у занятой называет причину. Занятая строка остаётся на месте и в числе заголовка списка.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/intention/presentation/picker test/intention/presentation/search test/daily_choice/presentation/action_picker test/daily_choice/presentation/source_picker test/long_term_relation/presentation/participant_picker test/long_term_relation/presentation/intention_relations`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 3.4, 3.5.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/intention/presentation/picker/intention_picker_view.dart`, `intention_picker_row.dart`, `lib/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart`, `lib/src/daily_choice/presentation/source_picker/daily_choice_source_picker_page.dart`, `lib/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart`, `intention_relations/intention_relations_sliver.dart`;
+    - меняются `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации, `test/intention/presentation/picker/intention_picker_row_test.dart`, `intention_picker_view_test.dart`, `intention_picker_purpose_sheet_test.dart`, `test/intention/presentation/search/show_and_sort_sheet_test.dart`.
+  - **Размер:** M.
+
+- [x] 3.9 Страница поиска участника группы открывается своим маршрутом и отмечает намерения
+  - **Критерии приёмки:**
+    - `RelationBatchPickerRoute` принимает намерение страницы и группу, а страница показывает экран выбора в варианте отметки на общем модуле поиска. Заголовок поиска участника — «Выбор намерений». Плюса в шапке и строки «Создать» нет: они появляются в фазе 4.
+    - Подтверждены сценарии «Поиск для активной связи сохраняет допустимый охват», «Совпадение тегов не разрешает самосвязь», «Прямая самосвязь запрещена», «Выбор среди одноимённых намерений», «Отметка не закрывает поиск» и «Отметка переживает смену выдачи».
+    - Подтверждены сценарии причин на настоящей занятости: «Причины группы и архива», «Другой тип называет свою группу», «Другой тип не позволяет повторить пару», «Входящая группа проверяет связи к намерению страницы» и «Нажатие на занятую строку ничего не делает».
+    - Стрелка свободной и занятой строки открывает поверх поиска обычную страницу намерения, а возврат сохраняет параметры, позицию и отметки. Панель навигации и «Добавить» на этой странице снимает фаза 4.
+    - Вход из группы появляется в 3.15, а форма работает до 3.17. Заголовок прежнего поиска меняется вместе с общим видом поиска, и его тест ожидает новое слово.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/batch_picker test/long_term_relation/presentation/participant_picker test/intention/presentation/search`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 3.7, 3.8.
+  - **Предполагаемые файлы:**
+    - новый `lib/src/long_term_relation/presentation/batch_picker/relation_batch_picker_page.dart`;
+    - меняются `lib/src/app/routing/app_router.dart`, `app_router.gr.dart`, `lib/src/intention/presentation/search/intention_search_kind.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
+    - новый `test/long_term_relation/presentation/batch_picker/relation_batch_picker_page_test.dart`, меняется `test/long_term_relation/presentation/participant_picker/relation_participant_picker_test.dart`.
+  - **Размер:** M.
+
+- [x] 3.10 Шапка и лист «Что вы выбираете» показывают группу, число отметок и будущие связи деревом
+  - **Критерии приёмки:**
+    - Подзаголовок называет группу и после первой отметки добавляет « · выбрано N». Строка листа — «Новые связи в "Нужно"» и так же для остальных групп. Над деревом стоят две фразы требования «Назначение поиска участника группы» для каждой из четырёх групп на обоих языках.
+    - Тело листа — `RelationBatch` на текущем наборе отметок: снятие отметки сразу убирает карточку, а числа шапки и строка в поиске следуют ему. Карточка намерения страницы читает название из `RelationBatchViewModel`, показывает его целиком и несёт подпись «Намерение, со страницы которого вы пришли».
+    - Подтверждены сценарии «Подзаголовок считает отмеченные намерения», «Входящая группа показывает отмеченные над намерением страницы», «Крестик в листе снимает отметку» и «Лист напоминает назначение и не меняет поиск».
+    - Сценарий «Лист показывает новое название намерения страницы» подтверждён в `test/long_term_relation/presentation/batch_picker`.
+    - Экран с подзаголовком и открытый лист соответствуют правилам доступности, а страница намерения подзаголовка поиска не показывает.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/batch_picker test/intention/presentation/picker/intention_picker_purpose_sheet_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 3.6, 3.9.
+  - **Предполагаемые файлы:**
+    - новый `lib/src/long_term_relation/presentation/batch_picker/relation_batch_picker_purpose.dart`;
+    - меняются `relation_batch_picker_page.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации, `test/long_term_relation/presentation/batch_picker/relation_batch_picker_page_test.dart`.
+  - **Размер:** M.
+
+- [x] 3.11 Кнопка внизу поиска добавляет все отмеченные намерения, а отказ остаётся на экране поиска
+  - **Критерии приёмки:**
+    - Закреплённая нижняя часть следует README `PickerRow`: плоскость `raised`, линия `hairline`, высота `nav-height` с системным отступом и основная кнопка на всю ширину. Подписи: «Добавить 1 связь», «Добавить 3 связи», а без отметок — недоступная «Добавить связи». Сообщения приложения стоят над ней, а у поисков дневного выбора её нет.
+    - Нажатие отправляет одну команду со всеми отметками в порядке установки, включая не попавшие в выдачу. Подтверждён сценарий «Повторное нажатие во время добавления». Пока команда выполняется, кнопка показывает выполнение, а отметки, стрелки и лист действий не принимают.
+    - Подтверждённый успех закрывает только свой маршрут. Подробный просмотр новой связи не открывается.
+    - При отказе поиск остаётся открытым с теми же отметками, а `Notice` над нижней частью показывает отказ через право инициатора: сценарии «Отказ оставляет отметки» и «Ошибка сохраняет проверяемую идентичность выбранных участников». Изменение набора отметок и новая отправка снимают отказ.
+    - Уход с поиска во время команды передаёт право предъявления оболочке: подтверждён сценарий «Успешная операция после ухода с экрана».
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/design_system/docked_footer_test.dart test/long_term_relation/presentation/batch_picker test/intention/presentation/picker`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 3.3, 3.9.
+  - **Предполагаемые файлы:**
+    - новые `lib/src/design_system/components/docked_footer.dart`, `test/design_system/docked_footer_test.dart`;
+    - меняются `relation_batch_view_model.dart` с созданным файлом, `relation_batch_state.dart`, `relation_batch_picker_page.dart`, `lib/src/intention/presentation/picker/intention_picker_view.dart`;
+    - меняются `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации, тесты `test/long_term_relation/presentation/batch_picker/`.
+  - **Размер:** M.
+
+- [x] 3.12 Закрытие поиска с отметками спрашивает подтверждение
+  - **Критерии приёмки:**
+    - Крестик и системное «назад» при отметках до принятия команды открывают `showDiscardDialog` с текстами «Сбросить выбранные намерения?», «3 связи не будут добавлены.», «Сбросить» и «Продолжить выбор» на обоих языках и с верным склонением числа.
+    - «Продолжить выбор» возвращает поиск с теми же отметками, а «Сбросить» закрывает его без команды. Без отметок и после принятия команды поиск закрывается сразу: сценарий «Без отметок поиск закрывается сразу».
+    - Третья строка о созданных намерениях появляется в фазе 4: создания в поиске ещё нет.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/batch_picker`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 3.11.
+  - **Предполагаемые файлы:** меняются `relation_batch_picker_page.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации, `test/long_term_relation/presentation/batch_picker/relation_batch_picker_page_test.dart`.
+  - **Размер:** S.
+
+- [x] 3.13 Проверки дневного выбора и начала создания перестают опираться на форму связи
+  - **Критерии приёмки:**
+    - Сценарии, где форма связи с черновиком лежала ниже в истории как чужая страница-задача, держат там поиск действия с введённой подстрокой, как требует сценарий «Создание поверх задачи сохраняет её состояние».
+    - Защищаемые инварианты те же: чужая задача и её состояние сохраняются, а возврат ведёт к ней. Запуска создания со страницы связи в этих сценариях нет.
+    - `lib/` не меняется.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation test/app/intention_creation_sheet_integration_test.dart test/app/intention_creation_sheet_failure_integration_test.dart test/app/creation_flows_integration_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** меняются `test/daily_choice/presentation/daily_choice_creation_exit_test.dart`, `daily_choice_creation_completion_test.dart`, `daily_choice_creation_route_scenarios.dart`, `daily_choice_creation_launcher_test.dart`, `test/support/intention_creation_origin.dart`.
+  - **Размер:** M.
+
+- [x] 3.14 Проверки оболочки навигации держат поиски вместо формы связи
+  - **Критерии приёмки:**
+    - Сценарии возврата и страниц над задачей идут через `RelationBatchPickerRoute`: страница над поиском возвращает его с прежними параметрами и отметками. Панель на странице над поиском эти сценарии не утверждают.
+    - Проверки сброса истории пунктом панели, которые шли через форму связи и поиск участника, опираются на поиск действия, как 3.13 и сценарий «Сброс закрывает поиск ниже в истории»: «выбор пункта … со страницы участника» в `app_shell_pages_above_test.dart` и «сброс над поиском участника» в `app_shell_operation_reset_test.dart`. Поиск с подстрокой и страница над ним закрываются без подтверждения и без команды, а поздние обработчики не меняют выбранную корневую страницу.
+    - Тесты «позднее удаление связи после сброса» и «позднее удаление намерения после сброса» в `app_shell_operation_reset_test.dart` держат вместо новой формы новый поиск действия с введённой подстрокой.
+    - Поздний результат поиска при новом запуске уже подтверждают тесты «поздний … после сброса» в `daily_choice_creation_launcher_test.dart`, которые переводит 3.13: 3.14 их не повторяет.
+    - Сброс с потерей отметок над поиском участника группы тестом не закрепляется: фаза 4 снимает там панель, а релиза до неё нет.
+    - `lib/` не меняется.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app/navigation`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 3.12, 3.13.
+  - **Предполагаемые файлы:** меняются `test/app/navigation/app_shell_back_test.dart`, `app_shell_pages_above_test.dart`, `app_shell_operation_reset_test.dart`.
+  - **Размер:** M.
+
+- [x] 3.15 «Добавить» группы открывает поиск участника, а новые связи появляются в той же группе
+  - **Критерии приёмки:**
+    - Действие «Добавить» открывает `RelationBatchPickerRoute` с намерением страницы и выбранной группой, а поиск занимает весь экран без панели. Форма доступна только из быстрого создания до 3.16.
+    - Сквозные сценарии на настоящем хранилище подтверждают «Вход из исходящей группы», «Вход из входящей группы», «Отмеченные намерения становятся связями группы», «Добавленные связи стоят в порядке отметок», «Добавление обновляет всех участников» и «Другая пара создаётся новой связью». Связи сохраняются после повторного открытия файла базы.
+    - Сквозные сценарии подтверждают «Удаление связи на странице из поиска снимает причину», «Восстановленное намерение начинает выдачу поиска заново» и «Архивирование намерения снимает отметку».
+    - Матрица страниц вместо строк формы и поисков по ролям проверяет поиск участника группы. Сценарий восстановления из поиска в `long_term_relation_app_flow_test.dart` удалён: в продукт к нему больше нет пути.
+    - Импорт `show testRelationRestore` в `app_shell_pages_above_test.dart` снят вместе с поиском по роли в матрице: `app_shell_page_matrix.dart` — часть этого теста и читает импорт в тесте «поиск участника без панели».
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app/long_term_relation_app_flow_test.dart test/app/routing/app_router_test.dart test/app/navigation test/intention/presentation/details test/long_term_relation/presentation/intention_relations`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 3.10, 3.12, 3.13, 3.14.
+  - **Предполагаемые файлы:**
+    - меняется `lib/src/intention/presentation/details/intention_details_page.dart`;
+    - меняются `test/app/long_term_relation_app_flow_test.dart`, `test/app/routing/app_router_test.dart`, `test/app/navigation/app_shell_page_matrix.dart`, `app_shell_pages_above_test.dart`, `test/intention/presentation/details/intention_details_relations_test.dart`.
+  - **Размер:** M.
+
+- [x] 3.16 Быстрое создание получает два режима
+  - **Критерии приёмки:**
+    - `QuickCreationMode.relation`, его ключ, запуск, подписи и пояснение удалены, поэтому меню показывает только «Новое намерение» и «Новый дневной выбор»: сценарий «Связи нет среди режимов». Сохранённое значение `relation` читается как неизвестное без особого случая, как велит D10.
+    - Значки уходят только без читателей. `DoableIconData.relationMini` остаётся: с 2.5 его читает `RelationHead`. `DoableIconData.relation` остаётся: это отметка занятой строки.
+    - Тесты, где режим связи служил просто другим режимом, используют «Новый дневной выбор», включая `test/app/bootstrap/app_runtime_quick_creation_mode_test.dart`. Поток «пустая связь» в `creation_flows_integration_test.dart` удалён вместе с режимом. Проверки последовательного сохранения выборов сохраняют свои инварианты на двух режимах: значения, которые проверка различает, остаются разными.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/app/quick_creation test/app/bootstrap/app_runtime_quick_creation_mode_test.dart test/app/creation_flows_integration_test.dart test/app/navigation/app_navigation_bar_test.dart test/app/navigation/app_navigation_transition_test.dart test/design_system/doable_icon_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 3.15.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/app/quick_creation/quick_creation_mode.dart`, `quick_creation_launcher.dart`, `quick_creation_mode_presentation.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
+    - меняются тесты `test/app/quick_creation/`, `test/app/bootstrap/app_runtime_quick_creation_mode_test.dart`, `test/app/creation_flows_integration_test.dart`, `test/app/creation_flows_test_support.dart`, `test/app/navigation/app_navigation_bar_test.dart`, `app_navigation_transition_test.dart`.
+  - **Размер:** M по логике: файлов больше нормы только из-за механической замены режима в тестах.
+
+- [x] 3.17 Удалить форму связи и прежний поиск участника для роли
+  - **Критерии приёмки:**
+    - Удалены `RelationEditorPage`, его состояние и модель, `relation_creation_completion.dart`, `RelationParticipantPickerPage`, `RelationParticipantChoice`, `relationParticipantPickerPurpose`, `RelationForm` и маршруты `RelationEditorRoute` и `RelationParticipantPickerRoute`, а `app_router.gr.dart` создан заново.
+    - Перед удалением тестов `test/long_term_relation/presentation/editor/`, `participant_picker/` и `test/design_system/relation_form_test.dart` их сценарии, которые описывают продукт сейчас, подтверждены тестами поиска участника группы: панель тегов, отказ новой выдачи и доступность экрана. Сценарии формы и восстановления удалены вместе с ней.
+    - До удаления этих каталогов `ControlledParticipantPickerRepository`, `TestPickerCursor` и `TestPickerRevision` перенесены из `participant_picker_test_support.dart` в `test/support/controlled_participant_picker_repository.dart`, и эту опору импортируют `daily_choice_action_picker_page_test.dart` и `daily_choice_source_picker_page_test.dart`. `testRelationRestore`, `ControlledRelationRestore` и импорт `relation_participant_choice.dart` не переносятся: в опоре нет типов старого потока.
+    - `testFormRelationId` не переносится: `intention_picker_view_test.dart` переходит на существующий `testRelationId` из `test/long_term_relation/presentation/relation_graph_test_support.dart`.
+    - Строки без читателей удалены на обоих языках. Остаются `relationEditorUpdate*`, `relationEditorDescription*`, `relationEditorCreate*` до 3.22 и `participantPicker*`, которые читает новый поиск.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/long_term_relation test/app/routing/app_router_test.dart test/app/navigation test/design_system test/daily_choice/presentation/action_picker test/daily_choice/presentation/source_picker test/intention/presentation/picker`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 3.16 — у формы не остаётся входов.
+  - **Предполагаемые файлы:**
+    - удаляются `lib/src/long_term_relation/presentation/editor/`, `lib/src/long_term_relation/presentation/participant_picker/`, `lib/src/design_system/components/relation_form.dart`;
+    - меняются `lib/src/app/routing/app_router.dart`, `app_router.gr.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
+    - создаётся `test/support/controlled_participant_picker_repository.dart`;
+    - удаляются соответствующие тесты, меняются `test/long_term_relation/presentation/batch_picker/relation_batch_picker_page_test.dart`, `test/daily_choice/presentation/action_picker/daily_choice_action_picker_page_test.dart`, `test/daily_choice/presentation/source_picker/daily_choice_source_picker_page_test.dart`, `test/intention/presentation/picker/intention_picker_view_test.dart`.
+  - **Размер:** M по логике: удаление без нового поведения.
+
+- [x] 3.18 Общие части поиска теряют то, что читал только прежний поток
+  - **Критерии приёмки:**
+    - Удалены `occupiedPairMark`, `OccupiedPairMark`, `OccupiedPairKind` и строки `intentionPickerPair*`, а также `Badge.word`, если у него не осталось читателей.
+    - Удалены `TopBarPurposeMark`, `TopBarPurpose.mark`, `IntentionPickerPurposeDescription.subtitleMark` и `RelationStrokeKind.undetermined`: строка назначения новой шапки отметки не имеет, а вид связи в листе всегда определён.
+    - Удалены `lib/src/design_system/components/path_rail.dart` с `PathRail`, `PathRailMark` и его вариантами `PathRailGlyph` и `PathRailStroke` и `test/design_system/path_rail_test.dart`: единственного читателя удалила 3.17, а `RelationBatch` рисует линию сам.
+    - Удалены `showPreservingConfirmDialog`, вариант `_Preserving` и абзац предупреждения, который показывал только он, а из `test/design_system/confirm_dialog_test.dart` — тесты этого диалога с помощником `_showPreserving` и его опорами `_preservingTitle`, `_warning` и `_preservingParagraph`. Диалоги `showConfirmDialog` и `showDiscardDialog` и их тесты не меняются.
+    - `SelectRelationParticipant.pairProbe` обязателен, поэтому поиска участника без пробы собрать нельзя. Поиски дневного выбора ведут себя как прежде.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/design_system test/intention/presentation test/daily_choice/presentation/action_picker test/daily_choice/presentation/source_picker test/graph/presentation/graph_reconciliation_checkpoint_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 3.17.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/intention/presentation/picker/intention_picker_view.dart`, `intention_picker_row.dart`, `intention_picker_purpose_sheet.dart`, `lib/src/intention/presentation/catalog/intention_catalog_purpose.dart`, `lib/src/design_system/components/top_bar.dart`, `badge.dart`, `relation_stroke.dart`, `confirm_dialog.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
+    - удаляются `lib/src/design_system/components/path_rail.dart` и `test/design_system/path_rail_test.dart`;
+    - меняются тесты этих компонентов, включая `test/design_system/confirm_dialog_test.dart`, и вызовы `SelectRelationParticipant` без пробы в `test/intention/presentation/`.
+  - **Размер:** M.
+
+- [x] 3.19 Восстановление из поиска удаляется, а политику предъявления команд связи задаёт один закрытый тип
+  - **Критерии приёмки:**
+    - `acceptRelationRestoreFromCreation` и его тесты удалены. Успех восстановления, как изменения и архивирования, не образует права предъявления, поэтому `relationRestored` и его ветка в presenter удалены.
+    - `_acceptRelation` принимает один `_PresentationPolicy` вместо `announcesSuccess` и `initiatorReleased`: создание, удаление и добавление пачки идут по `standard`, изменение, архивирование и восстановление по `silentSuccess`, а ветка успеха без сообщения описана в одном месте. Четвёртый вариант не вводится.
+    - Поведение продукта не меняется: тесты координатора для оставшихся команд связи проходят без правок.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/graph/application test/graph/presentation/graph_operation_presenter_test.dart test/long_term_relation/presentation/details`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 3.17.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/graph/application/graph_command_coordinator.dart`, `lib/src/graph/presentation/graph_operation_presenter.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
+    - меняются `test/graph/application/graph_command_coordinator_relation_lifecycle_test.dart`, `test/graph/presentation/graph_operation_presenter_test.dart`.
+  - **Размер:** S.
+
+- [x] 3.20 Тесты хранилища создают связи командой пачки
+  - **Критерии приёмки:**
+    - Файлы `test/graph/data/` и `test/support/graph_operation_process_worker.dart` вызывают `AddLongTermRelations` вместо `CreateLongTermRelation` и читают `LongTermRelationsAdded`.
+    - Где приоритет или описание важны для проверки, сразу после добавления идёт `UpdateLongTermRelation`, а ожидания ревизий и фактов следуют этому шагу. Защищаемый инвариант каждого теста не ослабляется.
+    - Сценарии `drift_personal_graph_repository_create_relation_test.dart`, которых нет в `drift_add_long_term_relations_test.dart`, в том числе «Конкурирующее создание одной пары», «Создание одновременно с архивированием участника» и «Удаление намерения одновременно с созданием связи», перенесены туда, а старый файл удалён.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph/data`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 3.2.
+  - **Предполагаемые файлы:** механически меняются 13 файлов `test/graph/data/` с вызовом команды и `test/support/graph_operation_process_worker.dart`, удаляется `test/graph/data/drift_personal_graph_repository_create_relation_test.dart`.
+  - **Размер:** M по логике: файлов больше нормы только из-за механической замены команды.
+
+- [x] 3.21 Тесты снимков, переноса данных и приложения создают связи командой пачки
+  - **Критерии приёмки:**
+    - Файлы `test/graph_snapshots/`, `test/data_transfer/graph_export_test.dart`, `test/app/bootstrap/app_runtime_graph_export_test.dart`, `test/app/graph_export_app_flow_test.dart`, `test/app/graph_import_app_flow_test.dart` и `test/app/home_statistics_app_flow_test.dart` вызывают `AddLongTermRelations` и читают `LongTermRelationsAdded`.
+    - Проверки экспорта и снимков по-прежнему видят приоритет и описание, отличные от значений по умолчанию: их задаёт `UpdateLongTermRelation` после добавления.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph_snapshots test/data_transfer test/app/bootstrap test/app/graph_export_app_flow_test.dart test/app/graph_import_app_flow_test.dart test/app/home_statistics_app_flow_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 3.2, 3.3 — помощник `home_statistics_app_flow_test.dart` проводит команду пачки через рабочую ветвь из 3.3.
+  - **Предполагаемые файлы:** механически меняются пять файлов `test/graph_snapshots/` и пять перечисленных файлов приложения и переноса данных.
+  - **Размер:** M по логике: файлов больше нормы только из-за механической замены команды.
+
+- [x] 3.22 Удалить `CreateLongTermRelation`: у него не осталось вызывающих
+  - **Критерии приёмки:**
+    - Оставшиеся тесты координатора, presenter, контрольной точки согласования и каталога используют `AddLongTermRelations`, `acceptRelationsAddition` и `LongTermRelationsAdded`.
+    - Удалены `CreateLongTermRelation` с отказами проверки, `LongTermRelationCreated`, `_createLongTermRelation`, `_CommittedLongTermRelationCreation`, `acceptRelationCreation`, `LongTermRelationCreationFormKey`, `LongTermRelationCommandKind.create`, `CreatingLongTermRelationOperationTarget` и ветки presenter и текстов отказа для них, а также ветви `CreateLongTermRelation` и `LongTermRelationCreated` в разборах `catalog_reconciliation_test_support.dart` и `home_statistics_app_flow_test.dart`.
+    - Значение диагностики `LongTermRelationCommandDiagnosticsType.create` не удаляется: его пишет `AddLongTermRelations`, а читает `test/app/long_term_relation_app_flow_test.dart`.
+    - Строки `relationEditorCreate*`, `relationEditorCreated` и `graphOperationNewRelation` удалены на обоих языках.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/graph/application test/graph/presentation test/intention/presentation/catalog test/intention/presentation/search test/long_term_relation/application test/app/home_statistics_app_flow_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 3.17, 3.19, 3.20, 3.21.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/long_term_relation/application/long_term_relation_command.dart`, `lib/src/graph/application/graph_command_coordinator.dart`, `lib/src/graph/data/drift_personal_graph_repository_relation_commands.dart`, `lib/src/graph/presentation/graph_operation_presenter.dart`, `lib/src/long_term_relation/presentation/relation_command_failure_message.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
+    - меняются `test/graph/application/graph_command_coordinator_relation_creation_test.dart`, `graph_command_coordinator_relation_lifecycle_test.dart`, `test/graph/presentation/graph_operation_presenter_test.dart`, `graph_reconciliation_checkpoint_test.dart`, `test/intention/presentation/catalog/catalog_reconciliation_test_support.dart`, `intention_catalog_action_selection_test.dart`, `intention_catalog_mutation_reconciliation_test.dart`, `test/intention/presentation/search/intention_search_list_test.dart`, `test/long_term_relation/application/long_term_relation_command_test.dart`, `test/app/home_statistics_app_flow_test.dart`.
+  - **Размер:** M по логике: файлов больше нормы только из-за механической замены команды.
+
+- [x] 3.23 Проверить готовность фазы: связи добавляются пачкой только из группы
+  - **Критерии приёмки:**
+    - Пачка добавляется атомарно, в порядке отметок и с верными счётчиками всех участников.
+    - В коде и спецификациях не осталось вызывающих удалённого потока: в `lib/` и `test/` нет `RelationEditor`, `RelationParticipantPicker`, `RelationForm`, `CreateLongTermRelation`, `QuickCreationMode.relation` и `acceptRelationRestoreFromCreation`, а спецификации изменения не опираются на форму связи, поиск по ролям, восстановление из поиска и режим «Новая связь».
+    - Политика предъявления команд связи задана одним закрытым типом, поведение продукта от этого не изменилось: те же тесты координатора для оставшихся команд связи проходят.
+    - `CONTEXT.md` называет назначение P4 при добавлении связей. Стрелка строки открывает обычную страницу намерения, а создания намерения в поиске нет: это остаётся фазе 4.
+  - **Проверка:**
+    - `mise run codegen-check`.
+    - `mise run check`.
+    - `mise exec --no-deps -- openspec validate add-relations-in-batches --strict`.
+  - **Зависимости:** 3.1–3.22.
+  - **Предполагаемые файлы:** нет (только проверка).
+  - **Размер:** XS.
+
+- [x] 3.24 Занятая строка сообщает диктору название и причину одним элементом
+  - **Критерии приёмки:**
+    - В ветке `_Occupied` компонента `PickerRow` название и причина объединены в один узел семантики, например через `MergeSemantics`. Его доступное название содержит только название намерения и причину, то есть то, что видно на экране: тип, начало описания и теги в него не входят, новых строк локализации нет.
+    - Текст занятой строки не становится кнопкой и не получает действия нажатия. Стрелка остаётся отдельным элементом со своим доступным названием и открывает страницу.
+    - В `test/design_system/picker_row_test.dart` проверка, которая ждёт название ровно «Бег», заменена проверкой, что один узел семантики содержит название и причину, а стрелка сохраняет своё название. Этот тест подтверждает сценарий «Карточка занятой пары называет отметку».
+    - Ручная проверка диктора на устройстве остаётся за пользователем.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/picker_row_test.dart test/intention/presentation/picker test/long_term_relation/presentation/batch_picker`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** меняются `lib/src/design_system/components/picker_row.dart`, `test/design_system/picker_row_test.dart`.
+  - **Размер:** XS.
+
+- [x] 3.25 Набор действий строки экрана выбора определяется одним закрытым вариантом
+  - **Критерии приёмки:**
+    - `PickerRow` хранит единственное поле закрытого типа `_PickerBehavior`, которое задаёт его конструктор. Нулевых полей `_label`, `_onPick`, `_chosen`, `_reason` и открытых геттеров `label` и `onPick` нет, поэтому чтение действия, которого у варианта нет, не компилируется.
+    - `IntentionPickerRow` вместо нулевых полей `onPick`, `chosen`, `reason` и развёрток `onPick!` хранит один закрытый вариант, а `build` разбирает его исчерпывающе. Открытое поле `requiredTagIds` у занятой строки остаётся, только если оно нужно построению: сейчас его требует `IntentionRowContent.of`.
+    - Сигнатуры именованных конструкторов обоих виджетов и имена их параметров сохранены, поэтому `intention_picker_view.dart` и тесты строк не меняются. Конструкторы могут потерять `const`: вызовов с `const` нет.
+    - `intentionPickerPick` в `intention_picker_test_support.dart` возвращает обработчик области выбора, читая `onTap` у первого `InkWell` внутри строки. Её четыре вызова сохраняют смысл позднего вызова обработчика. Открытого варианта поведения ради тестов нет.
+    - Поведение продукта не меняется: существующие тесты строк и поисков проходят без правок проверок. Спецификации и дизайн не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/picker_row_test.dart test/intention/presentation/picker test/long_term_relation/presentation/batch_picker test/daily_choice/presentation/daily_choice_creation_launcher_test.dart test/daily_choice/presentation/source_picker test/daily_choice/presentation/action_picker test/app/navigation/app_shell_operation_reset_test.dart test/app/navigation/app_shell_back_test.dart test/app/navigation/app_shell_pages_above_test.dart test/app/long_term_relation_app_flow_test.dart test/app/intention_tag_search_app_flow_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 3.24 — меняет ветку `_Occupied` того же файла.
+  - **Предполагаемые файлы:** меняются `lib/src/design_system/components/picker_row.dart`, `lib/src/intention/presentation/picker/intention_picker_row.dart`, `test/intention/presentation/picker/intention_picker_test_support.dart`.
+  - **Размер:** S.
+
+- [x] 3.26 Отказ занятой пары говорит о связи с намерением страницы
+  - **Критерии приёмки:**
+    - `relationsAdditionPairOccupied` дословно равна «Некоторые выбранные намерения уже связаны с этим намерением. Связи не созданы.» в `lib/l10n/app_ru.arb` и «Some selected intentions are already linked to this intention. No relations were created.» в `lib/l10n/app_en.arb`. Конкретные намерения сообщение не называет.
+    - `app_localizations.dart`, `app_localizations_ru.dart` и `app_localizations_en.dart` пересозданы через `mise run codegen`, а не правкой вручную.
+    - Контракт отказа `LongTermRelationPairOccupiedFailure` и команда `AddLongTermRelations` не меняются. Спецификации не меняются: они не задают дословный текст этого отказа.
+    - Ожидания старого текста заменены новым в двух проверках `relation_batch_picker_page_test.dart` и в проверке обоих языков `graph_operation_presenter_test.dart`. Новых тестов нет: эти проверки уже предъявляют отказ.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/batch_picker/relation_batch_picker_page_test.dart test/graph/presentation/graph_operation_presenter_test.dart`.
+    - `mise run codegen-check`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** меняются `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации, `test/long_term_relation/presentation/batch_picker/relation_batch_picker_page_test.dart`, `test/graph/presentation/graph_operation_presenter_test.dart`.
+  - **Размер:** XS.
+
+- [x] 3.27 Удалить строку `relationEditorDescriptionLabel`: у неё не осталось читателя
+  - **Критерии приёмки:**
+    - Ключ `relationEditorDescriptionLabel` удалён из `lib/l10n/app_ru.arb`, а ключ с блоком описания `@relationEditorDescriptionLabel` — из `lib/l10n/app_en.arb`.
+    - `app_localizations.dart`, `app_localizations_ru.dart` и `app_localizations_en.dart` пересозданы через `mise run codegen`, а не правкой вручную.
+    - `relationEditorDescriptionTooLong` и `relationEditorDescriptionInvalidUnicode` не меняются: их читает `relation_details_sheet.dart`.
+    - Другие строки без читателя, существовавшие до этого изменения, остаются: `navigationActiveIntentions`, `navigationArchive`, `commonLoading`, `commonEmpty`, `commonError`, `editorCreateAction`.
+    - Поведение продукта не меняется, спецификации не меняются. Тесты не меняются: строку не читает никто в `lib/src` и `test`.
+  - **Проверка:**
+    - `mise run codegen-check`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** меняются `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации.
+  - **Размер:** XS.
+
+## Phase 4: Человек достраивает связи, не теряя контекста
+
+- [x] 4.1 Первая порция поиска участника считает активные намерения с точно таким названием
+  - **Критерии приёмки:**
+    - `IntentionCatalogFirstPage` несёт `exactTitleCount` в ответ на запрос с пробой пары и фильтром названия. Другие запросы подсчёта не делают, а их порция числа не несёт.
+    - Подсчёт идёт в снимке этой порции по `title_search_key` среди активных намерений и не зависит от условий по тегам, типа, исключения намерения страницы и границы порции. Архивированное намерение не считается.
+    - Число нужно вместо признака: уход одного из одноимённых намерений иначе нельзя согласовать без нового чтения.
+  - **Проверка:**
+    - `drift_intention_catalog_test.dart` на настоящем хранилище покрывает совпадение без учёта регистра, за границей порции, скрытое условиями и у намерения страницы, а также архивированное намерение.
+    - `mise exec --no-deps -- flutter test test/intention/data/drift_intention_catalog_test.dart test/intention/application/intention_contract_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** меняются `lib/src/intention/application/intention_catalog.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `test/intention/data/drift_intention_catalog_test.dart`.
+  - **Размер:** S.
+
+- [x] 4.2 Выдача поиска участника знает, предлагать ли создание, и следует подтверждённым изменениям
+  - **Критерии приёмки:**
+    - `IntentionCatalogConfirmedState` хранит число из порции и отдаёт название для строки «Создать» без окружающих пробелов, только пока фильтр названия непуст, а число равно нулю. Все состояния, которые модель собирает заново, включая `IntentionCatalogEmpty`, число сохраняют.
+    - `IntentionTitleFilter` сравнивает название целиком тем же `titleSearchKey`. Модель поправляет число на каждую мутацию по снимкам «до» и «после»: активное намерение с точно этим названием считается независимо от соответствия выдаче, поэтому переименование намерения страницы тоже учитывается.
+    - Поправка не начинает новую выдачу и сохраняет позицию: единственным исключением остаётся требование «Причина занятой пары в поиске участника».
+    - Подтверждено: переименование в подстроку убирает предложение, архивирование, удаление или переименование единственного совпадения возвращает его, уход одного из двух одноимённых не возвращает, а пакет ревизии, уже отражённой порцией, не считается второй раз.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog test/intention/presentation/search test/intention/presentation/picker`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 4.1.
+  - **Предполагаемые файлы:** меняются `lib/src/intention/application/intention_catalog.dart`, `lib/src/intention/presentation/catalog/intention_catalog_state.dart`, `intention_catalog_view_model.dart`, `intention_catalog_view_model.g.dart`, `test/intention/presentation/catalog/intention_catalog_mutation_reconciliation_test.dart`.
+  - **Размер:** S.
+
+- [x] 4.3 Панель создания намерения запускается закрытым контекстом и завершается по его варианту
+  - **Критерии приёмки:**
+    - `IntentionEditorRoute` принимает закрытый тип запуска. Самостоятельный вариант стоит по умолчанию и ведёт себя как прежде: существующие проверки панели не меняются. Вариант для поиска несёт начальное название и обработчик созданного намерения, а флагов нет.
+    - Начальное название стоит в поле и черновике и считается начальным значением: без правок панель закрывается сразу, а сохранение доступно. Под заголовком варианта для поиска стоит «Сразу отмечается для новых связей» на обоих языках. Остальной вид панели не меняется.
+    - Успех живой сессии варианта для поиска удаляет только маршрут панели вместе с её подтверждением ухода и один раз передаёт обработчику идентификатор и название. Страница намерения не открывается, а история под панелью сохраняется.
+    - После подтверждённого ухода поздний успех обработчик не вызывает и текущую страницу не меняет.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/intention/presentation/editor test/app/quick_creation test/app/intention_creation_sheet_integration_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - новый `lib/src/intention/presentation/editor/intention_creation_launch.dart`;
+    - меняются `intention_editor_page.dart`, `intention_editor_state.dart`, `intention_editor_view_model.dart` с созданным файлом, `lib/src/app/routing/app_router.gr.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
+    - меняются `test/intention/presentation/editor/intention_editor_page_test.dart`, `intention_editor_view_model_test.dart`.
+  - **Размер:** M.
+
+- [x] 4.4 Живая сессия панели из поиска объявляет «Намерение создано и отмечено»
+  - **Критерии приёмки:**
+    - Сессия варианта для поиска сообщает координатору о своём запуске при `acceptCreation`. Завершение определяет сообщение в момент успеха: пока право инициатора не освобождено, цель операции — создание для поиска, а после `releaseInitiatorPresentation` — обычное создание. Различие задаёт закрытый вариант цели, а не флаг.
+    - Общий шаблон сообщения называет исход «Намерение создано и отмечено.» и «Intention created and selected.». Самостоятельное создание и поздний успех покинутой панели называют прежний `editorCreated`. Сообщение предъявляется один раз.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `graph_operation_presenter_test.dart` на настоящем координаторе покрывает успех живой сессии и успех после освобождения права на обоих языках.
+    - `mise exec --no-deps -- flutter test test/graph/presentation/graph_operation_presenter_test.dart test/graph/application test/intention/presentation/editor/intention_editor_view_model_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 4.3.
+  - **Предполагаемые файлы:** меняются `lib/src/graph/application/graph_command_coordinator.dart`, `lib/src/graph/presentation/graph_operation_presenter.dart`, `lib/src/intention/presentation/editor/intention_editor_view_model.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации, `test/graph/presentation/graph_operation_presenter_test.dart`.
+  - **Размер:** S.
+
+- [x] 4.5 Модель отметок принимает созданное намерение, а подтверждение закрытия называет созданные намерения
+  - **Критерии приёмки:**
+    - `RelationBatchViewModel` ставит созданное намерение отмеченным последним и снимает показанный отказ добавления. С этого момента состояние помнит до конца поиска, что в нём создавались намерения, даже если отметку потом сняли. Поздний успех покинутой панели модель не меняет.
+    - Подтверждение закрытия после числа связей называет «Созданные намерения останутся в каталоге.» и английский текст только в этом случае: сценарий «Подтверждение называет связи и созданные намерения», включая «Продолжить выбор» с теми же отметками.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/batch_picker`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** меняются `lib/src/long_term_relation/presentation/batch_picker/relation_batch_view_model.dart`, `relation_batch_state.dart`, `relation_batch_picker_page.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации, тесты `test/long_term_relation/presentation/batch_picker/`.
+  - **Размер:** S.
+
+- [x] 4.6 Экран выбора с отметками показывает плюс в шапке и строку «Создать» над выдачей
+  - **Критерии приёмки:**
+    - `TopBar.withPurpose` принимает `action`, а `TopBarAction` — мини-значок: плюс с `intentionMini` как в `NavBar` по README `TopBar`, область нажатия 44. Заголовок и строка назначения не меняются.
+    - `IntentionPickerCheckable` несёт обработчик создания, поэтому плюс и строка есть только в варианте отметок. У поисков дневного выбора их нет, а их тесты не меняются.
+    - `IntentionSearchList` показывает первым элементом `TagCreateRow` «Создать «название»» выше строк и пустого состояния, пока подтверждённая выдача из 4.2 предлагает создание. В паузе ввода, при загрузке и отказе строки нет. Длинное название переносится, тексты есть на обоих языках.
+    - Экран по просьбе страницы очищает поле и фильтр названия одним действием и сохраняет условия по тегам.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/design_system/top_bar_test.dart test/intention/presentation/picker test/intention/presentation/search test/daily_choice/presentation/action_picker test/daily_choice/presentation/source_picker`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 4.2.
+  - **Предполагаемые файлы:** меняются `lib/src/design_system/components/top_bar.dart`, `lib/src/intention/presentation/search/intention_search_list.dart`, `lib/src/intention/presentation/picker/intention_picker_view.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации, `test/design_system/top_bar_test.dart`, `test/intention/presentation/search/intention_search_list_test.dart`, `test/intention/presentation/picker/intention_picker_view_test.dart`.
+  - **Размер:** M.
+
+- [x] 4.7 Намерение создаётся прямо в поиске участника и сразу отмечено
+  - **Критерии приёмки:**
+    - Плюс открывает панель с пустым названием, а строка «Создать» — с названием из подстроки. Повторное нажатие до закрытия панели второй панели не открывает. Пока добавление выполняется, панель не открывается.
+    - Обработчик созданного намерения ставит отметку через 4.5 и очищает подстроку через 4.6. Поздний успех покинутой панели отметку не ставит и подстроку не меняет.
+    - Сквозные сценарии на настоящем хранилище подтверждают «Намерение из подстроки сразу отмечено» и «Точное совпадение убирает строку создания». Намерение, созданное в поиске, остаётся в каталоге после сброса отметок.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/batch_picker test/app/long_term_relation_app_flow_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 4.3, 4.4, 4.5, 4.6.
+  - **Предполагаемые файлы:** меняются `lib/src/long_term_relation/presentation/batch_picker/relation_batch_picker_page.dart`, `test/long_term_relation/presentation/batch_picker/relation_batch_picker_page_test.dart`, `test/app/long_term_relation_app_flow_test.dart`.
+  - **Размер:** S.
+
+- [x] 4.8 Над поиском участника нет панели навигации, «Добавить» и запуска дневного выбора
+  - **Критерии приёмки:**
+    - Одна функция в `lib/src/app/navigation/` определяет при построении, лежит ли `RelationBatchPickerRoute` в корневом стеке ниже маршрута самой страницы, сравнивая `matchId`. Подписки на стек и передачи контекста через переходы нет.
+    - `OrdinaryPageScaffold` над поиском панель не показывает: это подтверждено для страницы намерения, подробного просмотра дневного выбора и каталога на дату.
+    - Страница намерения над поиском не показывает «Добавить» групп и оба запуска дневного выбора. Группа показывает подсказку без действия, как у архивированного намерения.
+    - Страница под поиском, которая перестроилась при открытом поиске, показывает панель и «Добавить» и после успешного добавления, и после закрытия поиска крестиком.
+    - Подтверждено отсутствие панели и действий в сценариях «Страницы над поиском участника скрывают панель» и «Страница глубже первой не даёт потерять отметки», а «назад» возвращает через обе страницы в поиск с прежними отметками.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app/navigation test/intention/presentation/details test/daily_choice/presentation/details test/daily_choice/presentation/catalog test/long_term_relation/presentation/intention_relations test/long_term_relation/presentation/batch_picker`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - новый `lib/src/app/navigation/relation_picker_position.dart`;
+    - меняются `lib/src/app/navigation/ordinary_page_scaffold.dart`, `lib/src/intention/presentation/details/intention_details_page.dart`, `lib/src/long_term_relation/presentation/intention_relations/intention_relations_sliver.dart`;
+    - меняются `test/app/navigation/app_shell_page_matrix.dart`, `app_shell_pages_above_test.dart`.
+  - **Размер:** M.
+
+- [x] 4.9 Страница, открытая стрелкой поиска, ставит и снимает отметку
+  - **Критерии приёмки:**
+    - `IntentionDetailsRoute` принимает необязательный контекст строки: модель отметок, группу, пробу и занимающую связь. Его передаёт только стрелка поиска участника. На месте панели такая страница показывает `DockedFooter`, а без данных намерения кнопки нет.
+    - Свободное неотмеченное намерение получает основную «Добавить к выбранным», отмеченное — тихую «Убрать из выбранных». Нажатие меняет отметку и возвращает поиск с прежними параметрами и позицией: сценарий «Отметка со страницы намерения».
+    - Занятое намерение получает недоступную кнопку с причиной: сценарий «Занятая строка показывает причину на кнопке». Причина следует подтверждённым фактам своей подпиской через `reconcilePairOccupants`, а не загруженной выдаче: переименование, уводящее строку из выдачи, причину не снимает, а удаление связи снимает.
+    - Пока намерение архивировано, кнопка недоступна и называет «Намерение в архиве», в том числе у занятого: сценарий «Архивированное намерение нельзя отметить со страницы». После восстановления на этой же странице она снова предлагает «Добавить к выбранным» или причину занятости, а снятая отметка не возвращается.
+    - Страница глубже первой кнопки не имеет. Тексты есть на обоих языках.
+  - **Проверка:**
+    - `mise run codegen`.
+    - Сквозной тест на настоящем хранилище подтверждает архивирование и восстановление на странице из поиска.
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/batch_picker test/intention/presentation/details test/app/navigation test/app/long_term_relation_app_flow_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 4.8 — кнопка стоит на месте снятой панели.
+  - **Предполагаемые файлы:**
+    - новый `lib/src/long_term_relation/presentation/batch_picker/relation_batch_page_footer.dart`;
+    - меняются `relation_batch_picker_page.dart`, `lib/src/intention/presentation/details/intention_details_page.dart`, `lib/src/app/navigation/ordinary_page_scaffold.dart`, `lib/src/app/routing/app_router.gr.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
+    - меняются `test/long_term_relation/presentation/batch_picker/relation_batch_picker_page_test.dart`, `test/app/long_term_relation_app_flow_test.dart`.
+  - **Размер:** M.
+
+- [x] 4.10 Модель пути перечитывает продолжения при новой ревизии, а конфликт даёт только изменённый путь
+  - **Критерии приёмки:**
+    - При более новой ревизии `ChoicePathEmpty` и `ChoicePathData` без действия человека переходят в `ChoicePathLoading` с прежними черновиком и видимым путём и читают первую порцию, поэтому до ответа прежний снимок подтвердить нельзя. Работает своя подписка модели, в том числе когда выбор закрыт страницей сверху.
+    - Успешный ответ показывает продолжения или тупик с прежним составом пути, а `ChoicePathContinuationSnapshotExpired` первой порции даёт `ChoicePathConflict` с кнопкой обновления.
+    - `ChoicePathContinuationsPage` несёт сводки всех шагов черновика в порядке `draft.steps`. Хранилище строит их из строк намерений и связей, которые проверка пути уже прочитала в той же транзакции, поэтому отдельного чтения нет. Другое число шагов или сводку другой связи страница отвергает, как несогласованный `current`.
+    - При каждом успешном чтении первой порции, включая `refresh()`, модель заменяет сводками содержание видимых шагов с учётом порядка по направлению: шаги и подтверждение получают текущие названия и приоритет, состав пути не меняется, а новое название или приоритет конфликта не дают.
+    - Ответ первой порции старше известной ревизии начинает чтение заново. Порция продолжения с другой ревизией или с истёкшим курсором тоже начинает чтение первой порции, и конфликт решает только её ответ: завершение могло прийти позже записи.
+    - Смена эпохи графа и утрата активности или готовности начального намерения по-прежнему дают конфликт.
+    - Тесты, ждавшие конфликта от самой ревизии, в `choice_path_view_model_test.dart` и `choice_path_page_test.dart` выражены новым правилом. Покрыты две ревизии подряд во время чтения, обе причины перечитывания из `loadMore` и замена содержания шагов в обоих направлениях, в том числе через `refresh()`.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `drift_choice_path_continuations_test.dart` на настоящем хранилище покрывает новые название и приоритет в сводках шагов обоих направлений.
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation test/daily_choice/application/choice_path_continuations_test.dart test/graph/data/drift_choice_path_continuations_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/daily_choice/application/choice_path_continuations.dart`, `lib/src/graph/data/drift_personal_graph_repository_choice_path_reads.dart`, `lib/src/daily_choice/presentation/path/choice_path_view_model.dart`, `choice_path_view_model.g.dart`;
+    - меняются `test/daily_choice/application/choice_path_continuations_test.dart`, `test/graph/data/drift_choice_path_continuations_test.dart`, `test/daily_choice/presentation/path/choice_path_view_model_test.dart`, `choice_path_page_test.dart`.
+  - **Размер:** M.
+
+- [x] 4.11 Тупик пошагового выбора ведёт на нужную группу связей, а добавленные связи становятся продолжениями
+  - **Критерии приёмки:**
+    - `ChoicePathEmpty` при всех назначениях страницы показывает под объяснением кнопку «Открыть связи» и английский текст. Она открывает обычную страницу намерения `current` на вкладке «Связи»: при выборе сверху вниз с группой «Нужно», снизу вверх — «Нужно для». «Назад» возвращает выбор с прежним путём.
+    - Сквозные тесты на настоящем хранилище подтверждают «Добавленная связь становится продолжением» по исходу: после возврата без действий человека продолжение предложено с прежним путём, а не только получена ревизия. Подтверждён сценарий «Тупик выбора снизу вверх открывает группу «Нужно для»».
+    - После нескольких изменений на странице из тупика (связь добавлена и ей задан приоритет, добавлена вторая связь или добавленная удалена) возврат без действий человека показывает актуальные продолжения либо тупик с прежним путём и без конфликта.
+    - Сквозные тесты на настоящем хранилище подтверждают по исходу переименование `current` и изменение приоритета связи пути на странице из тупика: после возврата без действий человека и без конфликта шаг показывает новые название и приоритет, а подтверждение этого пути — новое название и новый приоритет в описании шага для диктора. Состав пути прежний.
+    - Изменение пути, пока выбор стоит в тупике или показывает строки, даёт конфликт с кнопкой обновления.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/path test/app/choice_path_dead_end_app_flow_test.dart test/app/daily_choice_app_flow_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 4.10.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/daily_choice/presentation/path/choice_path_page.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
+    - новый `test/app/choice_path_dead_end_app_flow_test.dart`, меняется `test/daily_choice/presentation/path/choice_path_page_test.dart`.
+  - **Размер:** M.
+
+- [x] 4.12 Второй пошаговый выбор от того же намерения не меняет путь первого
+  - **Критерии приёмки:**
+    - `ChoicePathViewModel` выбирается также по ключу экземпляра с равенством по идентичности, как модели страницы намерения по `IntentionPageInstance`. `ChoicePathPage` создаёт ключ и удерживает его до закрытия, поэтому модель живёт и освобождается вместе со своей страницей.
+    - Второй выбор от того же намерения и направления начинает с пустого пути и не меняет черновик первого. Это верно для обоих запусков со страницы из тупика: вкладки «Выборы» и быстрой кнопки панели через `DailyChoiceCreationLauncher`. Оба запуска и панель на этой странице остаются.
+    - Пересчёт перед созданием остаётся частью своего потока: его страница работает с ключом корня этого потока, а `ref.invalidate` в `daily_choice_creation_page.dart` остаётся и обращается к этому ключу. Пересчёт по-прежнему начинается с начала пути, а «назад» из подтверждения показывает пошаговый выбор с уже уточнённым путём: сценарий «Назад из подтверждения возвращает на шаг».
+    - Страница замены пути работает со своим ключом, поэтому `ref.invalidate` из `daily_choice_path_replace_page.dart` удалён. Новое построение по-прежнему начинается с начала пути, а закрытие построения возвращает к замене с прежней связью и прежним путём.
+  - **Проверка:**
+    - `mise run codegen`.
+    - Сквозные тесты на настоящем хранилище в `choice_path_dead_end_app_flow_test.dart`: второй выбор, начатый из настоящего тупика вкладкой «Выборы» и быстрой кнопкой панели, делает шаг, а после возврата первый выбор показывает прежний путь.
+    - `daily_choice_creation_flow_test.dart` подтверждает, что после пересчёта «назад» из подтверждения показывает уточнённый путь.
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation test/app/navigation test/app/choice_path_dead_end_app_flow_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 4.10, 4.11.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/daily_choice/presentation/path/choice_path_view_model.dart` с созданным файлом, `choice_path_page.dart`, `lib/src/daily_choice/presentation/daily_choice_creation_flow_session.dart`, `lib/src/daily_choice/presentation/editor/daily_choice_creation_page.dart`, `daily_choice_path_replace_page.dart`;
+    - меняются `test/daily_choice/presentation/path/choice_path_view_model_test.dart`, `choice_path_page_test.dart`, `test/daily_choice/presentation/daily_choice_creation_flow_test.dart`, `test/daily_choice/presentation/editor/daily_choice_creation_page_test.dart`, `daily_choice_path_replace_page_test.dart`, `test/app/navigation/app_shell_unnamed_page_scenarios.dart`, `test/app/choice_path_dead_end_app_flow_test.dart`.
+  - **Размер:** M.
+
+- [x] 4.13 Проверить готовность фазы: все сценарии изменения подтверждены без устройства
+  - **Критерии приёмки:**
+    - Каждый сценарий дельт спецификаций изменения подтверждён автоматической проверкой.
+    - «Добавленная связь становится продолжением» подтверждён по исходу, а несколько изменений на странице из тупика не дают конфликта. Изменение пути, пока выбор стоит в тупике или показывает строки, даёт конфликт с кнопкой обновления.
+    - Страница под поиском, которая перестроилась при открытом поиске, показывает панель и «Добавить» и после успешного добавления, и после закрытия поиска крестиком.
+    - Намерение, архивированное на странице из поиска, показывает недоступную кнопку «Намерение в архиве» и не отмечается, а после восстановления кнопка снова предлагает «Добавить к выбранным» без возврата снятой отметки.
+    - Ручные проверки на устройстве остаются за владельцем продукта.
+  - **Проверка:**
+    - `mise run codegen-check`.
+    - `mise run check`.
+    - `mise exec --no-deps -- openspec validate add-relations-in-batches --strict`.
+  - **Зависимости:** 4.1–4.12.
+  - **Предполагаемые файлы:** нет (только проверка).
+  - **Размер:** XS.
+
+- [x] 4.14 Проверка объёма чтения большой фикстуры учитывает подсчёт точных названий и по-прежнему ловит лишние чтения
+  - **Критерии приёмки:**
+    - В `drift_intention_repository_large_fixture_test.dart` `_readVolumeLimit` и `_expectBoundedReadVolume` допускают ровно одну дополнительную строку числа точных названий из задачи 4.1, и только для первой порции запроса, у которого есть и `pairProbe`, и фильтр названия. Это задаётся явным параметром от вызывающего, например из `_expectJointPage` по запросу `_jointQuery`.
+    - Для остальных запросов, в том числе совместного запроса без фильтра названия и следующих порций, предел прежний; послабления сверх одной строки нет.
+    - Код хранилища, включая `_readFirstCatalogPage` в `drift_personal_graph_repository.dart`, и поведение продукта не меняются. Комментарии в тесте на русском.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/data/drift_intention_repository_large_fixture_test.dart`.
+    - `mise run check`.
+  - **Зависимости:** 4.1.
+  - **Предполагаемые файлы:** меняется `test/intention/data/drift_intention_repository_large_fixture_test.dart`.
+  - **Размер:** XS.
+
+- [x] 4.15 Четыре сценария дельт без подтверждающего теста подтверждены по исходу
+  - **Критерии приёмки:**
+    - «Изменение типа сохраняет связь» (`specs/long-term-relation-management/spec.md`): тест на настоящем хранилище в `drift_relation_update_test.dart` меняет у связи «нужно» с описанием и P2 только тип на «можно». После изменения у связи прежние идентификатор, участники, описание, приоритет и последовательность создания, и она читается в группе «можно».
+    - «Редактирование архивированной связи»: архивированы связь и её исходное намерение, тест сохраняет новые приоритет и описание. Изменена та же связь с новыми приоритетом и описанием; связь и её исходное намерение остаются архивированными, а ни связь, ни участники не восстановлены.
+    - «Охват «все» остаётся только в общем каталоге намерений»: тест приложения или виджета идёт из общего каталога намерений с охватом «все» к странице неготового намерения на вкладку «Связи». Вкладка открыта на группе «Нужно» и не предлагает охват «все», а после возврата общий каталог по-прежнему показывает охват «все».
+    - «Закрытие возвращает исходную страницу» (`specs/app-navigation/spec.md`): в `creation_flows_integration_test.dart` с поддержкой из `creation_flows_test_support.dart` панель создания открывается над каталогом дневных выборов с изменёнными датой и фильтром и прокрученным от начала, затем закрывается без правок черновика. После закрытия каталог показывает прежние дату, фильтр и позицию прокрутки, а выбран пункт «Дневные выборы».
+    - Сценарии в спецификациях и код продукта не меняются. Названия тестов на русском, тесты без устройства и замеров времени, фикстуры минимальны для своей проверки.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test` для каждого изменённого тестового файла.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** меняются `test/graph/data/drift_relation_update_test.dart`, `test/app/creation_flows_integration_test.dart`, `test/app/creation_flows_test_support.dart`; тест охвата «все» — в существующем тестовом файле приложения или виджета намерений либо в новом файле рядом с ними.
+  - **Размер:** S.
+
+- [x] 4.16 Тупик сверху вниз объясняет, что продолжением становится только связь к готовому действию
+  - **Критерии приёмки:**
+    - Тексты `ChoicePathEmpty` при выборе сверху вниз — без шагов (`choicePathNoPath`) и после хотя бы одного шага — на русском и английском говорят, что продолжениями становятся только связи, ведущие к готовому действию, и предлагают отметить намерение готовым или связать его с действием.
+    - Тексты тупика снизу вверх не меняются: без шагов остаётся `choicePathBottomNoPath`, после хотя бы одного шага — прежний текст «Дальнейших допустимых продолжений нет.». Сейчас `choice_path_page.dart` показывает `choicePathNoFurtherPath` в обоих направлениях, поэтому строки шага с путём разделяются по направлению.
+    - Кнопка «Открыть связи», чтение продолжений в `drift_personal_graph_repository_choice_path_reads.dart` и модель пути не меняются: нового состояния тупика и новых чтений нет, неготовые цели продолжениями не показываются.
+    - Сценарий «Связь с неготовым намерением не становится продолжением» подтверждён по исходу сквозным тестом на настоящем хранилище в `choice_path_dead_end_app_flow_test.dart`: из тупика сверху вниз «Открыть связи», создание неготового намерения в поиске группы «Нужно», добавление связи и возврат показывают тот же путь, тупик без продолжений и новое объяснение условия.
+    - Тест страницы в `choice_path_page_test.dart` проверяет объяснения тупика по направлению и наличию шагов: сверху вниз — новые тексты, снизу вверх — прежние. Названия тестов на русском.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/path/choice_path_page_test.dart test/app/choice_path_dead_end_app_flow_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+    - `mise exec --no-deps -- openspec validate add-relations-in-batches --strict`.
+  - **Зависимости:** 4.11.
+  - **Предполагаемые файлы:**
+    - меняются `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации, `lib/src/daily_choice/presentation/path/choice_path_page.dart`;
+    - меняются `test/daily_choice/presentation/path/choice_path_page_test.dart`, `test/app/choice_path_dead_end_app_flow_test.dart`.
+  - **Размер:** S.
+
+- [x] 4.17 Создание в поиске участника снова доступно после любого закрытия панели, в том числе вместе с подтверждением ухода
+  - **Критерии приёмки:**
+    - В `relation_batch_picker_page.dart` защита `_openingCreation` от повторного открытия снимается при любом снятии маршрута панели создания: при обычном закрытии и при успехе, который снимает панель через `router.removeRoute` вместе с открытым над ней диалогом ухода, когда future `context.router.push(...)` не завершается. Снятие не зависит только от этого future.
+    - Пока панель открыта, повторное нажатие плюса или строки «Создать» второй панели не открывает; пока добавление выполняется, панель не открывается, как в 4.7.
+    - `intention_editor_page.dart` и поведение продукта не меняются.
+    - Регрессионный тест в `relation_batch_picker_page_test.dart`: изменить название в панели, нажать «Сохранить» при удержанном хранилище, нажать «назад», чтобы открылся диалог ухода, и завершить запись. Созданное намерение отмечено, а следующий плюс в шапке снова открывает панель. Название теста на русском.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/batch_picker/relation_batch_picker_page_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 4.7.
+  - **Предполагаемые файлы:** меняются `lib/src/long_term_relation/presentation/batch_picker/relation_batch_picker_page.dart`, `test/long_term_relation/presentation/batch_picker/relation_batch_picker_page_test.dart`.
+  - **Размер:** XS.
+
+- [x] 4.18 Уход во время принятого сохранения всегда спрашивает подтверждение, даже с непоправленным переданным названием
+  - **Критерии приёмки:**
+    - `requestClose` в `intention_editor_view_model.dart` при `draftAvailability == submitting` всегда возвращает `IntentionCreationCloseNeedsConfirmation` с `savingOnClose == IntentionCreationSavingOnClose.continues`, независимо от `draft.isChanged`. Сразу закрывается только неизменённый черновик в `editable`, в том числе с непоправленным названием из строки «Создать». Семантика `IntentionCreationDraft.isChanged` не меняется.
+    - `IntentionCreationClosedImmediately` больше не несёт `savingOnClose`: сразу закрывается только черновик до принятия отправки, поэтому поле всегда было бы `notStarted`. Комментарий к `requestClose` описывает новое правило.
+    - Подтверждённый уход до результата даёт прежний поздний успех по действующим правилам: панель уже закрыта, отметка в поиске участника не ставится, показывается обычное сообщение о создании намерения.
+    - Тест «неизменённая сессия во время принятой отправки закрывается сразу с продолжением сохранения» в `intention_editor_view_model_test.dart` заменён тестом, что неизменённая сессия во время принятой отправки требует подтверждения с продолжением сохранения. Ожидания `savingOnClose` у `IntentionCreationClosedImmediately` в этом файле и в `test/graph/presentation/operation_failure_presentation_test.dart` обновлены под новый тип.
+    - Сценарий «Уход во время сохранения непоправленного названия требует подтверждения» (`specs/intention-management/spec.md`) подтверждён тестом страницы в `intention_editor_page_test.dart`: панель с `IntentionCreationForSearch` и названием «Без правки», «Сохранить» при удержанном хранилище, «назад». Показано подтверждение с объяснением, что сохранение продолжится, а панель остаётся открытой. Названия тестов на русском.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/editor/intention_editor_view_model_test.dart test/intention/presentation/editor/intention_editor_page_test.dart test/graph/presentation/operation_failure_presentation_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+    - `mise exec --no-deps -- openspec validate add-relations-in-batches --strict`.
+  - **Зависимости:** 4.7.
+  - **Предполагаемые файлы:** меняются `lib/src/intention/presentation/editor/intention_editor_view_model.dart`, `lib/src/intention/presentation/editor/intention_creation_close.dart`, при необходимости `lib/src/intention/presentation/editor/intention_editor_page.dart`; меняются `test/intention/presentation/editor/intention_editor_view_model_test.dart`, `test/intention/presentation/editor/intention_editor_page_test.dart`, `test/graph/presentation/operation_failure_presentation_test.dart`.
+  - **Размер:** XS.
+
+- [x] 4.19 Вернувшаяся строка «Создать» видна человеку в начале выдачи поиска участника
+  - **Критерии приёмки:**
+    - В `results_scroll_keeper.dart` появление строки «Создать» над выдачей (`createTitle` становится непустым) при позиции прокрутки 0 не сдвигает прокрутку на высоту этой строки: позиция остаётся 0, а строка «Создать» видна над первой строкой выдачи.
+    - В остальных случаях, в том числе при появлении строки «Создать» на ненулевой позиции и при её уходе, якорь по первой видимой строке работает как прежде: `_mayShiftVisibleRow` и компенсация якоря меняются только для начала выдачи.
+    - Исключение требования «Причина занятой пары в поиске участника» (`long-term-relation-management`): возврат строки в загруженную часть выдачи по-прежнему начинает выдачу заново и сбрасывает позицию.
+    - Регрессионный тест в `intention_search_list_test.dart`: при позиции 0 после ухода единственного точного совпадения строка «Создать» видна, а позиция прокрутки равна 0. Существующий тест «появление и уход строки оставляют видимую строку на месте» для позиции 300 остаётся без изменений. Название теста на русском.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/search/intention_search_list_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 4.6.
+  - **Предполагаемые файлы:** меняются `lib/src/intention/presentation/search/results_scroll_keeper.dart`, `test/intention/presentation/search/intention_search_list_test.dart`.
+  - **Размер:** XS.
+
+- [x] 4.20 Английские строки называют отметку для новых связей словом «selected», как остальная лексика пакета
+  - **Критерии приёмки:**
+    - В `lib/l10n/app_en.arb` `editorCreatedAndChosen` — «Intention created and selected.», `editorSearchSubtitle` — «Selected right away for new relations». Остальная лексика пакета («Add to selected», «Remove from selected», «Selected intentions») не меняется.
+    - Ключи `editorCreatedAndChosen` и `editorSearchSubtitle` не переименовываются, русские строки в `app_ru.arb` не меняются. Созданные файлы локализации обновлены кодогенерацией, а не вручную.
+    - Ожидания английского текста в `graph_operation_presenter_test.dart` и `intention_editor_page_test.dart` называют новые строки; в `lib` и `test` не остаётся «Intention created and chosen.» и «Immediately chosen for new relations».
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/graph/presentation/graph_operation_presenter_test.dart test/intention/presentation/editor/intention_editor_page_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 4.3, 4.4.
+  - **Предполагаемые файлы:** меняются `lib/l10n/app_en.arb` с созданными файлами локализации `lib/l10n/app_localizations.dart` и `lib/l10n/app_localizations_en.dart`, `test/graph/presentation/graph_operation_presenter_test.dart`, `test/intention/presentation/editor/intention_editor_page_test.dart`.
+  - **Размер:** XS.
+
+- [x] 4.21 Сессию создания дневного выбора нельзя собрать без экземпляра пути её корня
+  - **Критерии приёмки:**
+    - В `daily_choice_creation_flow_session.dart` конструктор `DailyChoiceCreationFlowSession` принимает `required ChoicePathPageInstance pathInstance`; необязательный параметр и подстановка нового `ChoicePathPageInstance()` удалены, других веток только для тестов в рабочем коде нет.
+    - Рабочий вызов в `choice_path_page.dart` по-прежнему передаёт `_pageInstance` своего корня; поведение продукта, в том числе показ уточнённого пути после «назад» из подтверждения, не меняется.
+    - Тесты, собиравшие сессию без экземпляра пути (`daily_choice_creation_flow_session_test.dart`, `editor/daily_choice_creation_page_test.dart`, `editor/daily_choice_creation_view_model_test.dart` и другие вызовы, найденные поиском по `DailyChoiceCreationFlowSession(`), передают экземпляр явно. Новые тесты не добавляются: обязательность параметра проверяет компилятор.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 4.12.
+  - **Предполагаемые файлы:** меняются `lib/src/daily_choice/presentation/daily_choice_creation_flow_session.dart`, `test/daily_choice/presentation/daily_choice_creation_flow_session_test.dart`, `test/daily_choice/presentation/editor/daily_choice_creation_page_test.dart`, `test/daily_choice/presentation/editor/daily_choice_creation_view_model_test.dart`.
+  - **Размер:** XS.
+
+- [x] 4.22 Созданные файлы соответствуют исходникам на голове, и проверка кодогенерации в CI проходит
+  - **Критерии приёмки:**
+    - `mise run codegen` выполнен, обновлённый `lib/src/intention/presentation/editor/intention_editor_view_model.g.dart` закоммичен: `_$intentionEditorViewModelHash()` соответствует исходнику после 4.18 вместо устаревшего `fdfe23ea…`. Закоммичены и любые другие изменения созданных файлов, которые даёт генерация.
+    - Созданные файлы не правятся вручную; исходники, тесты и поведение продукта не меняются.
+    - После коммита на чистом дереве `mise run codegen-check` завершается с кодом 0.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise run codegen-check` на чистом дереве после коммита (код 0).
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 4.18.
+  - **Предполагаемые файлы:** меняется `lib/src/intention/presentation/editor/intention_editor_view_model.g.dart` и, если их изменит генерация, другие созданные файлы.
+  - **Размер:** XS.
+
+- [x] 4.23 Строка «Создать» остаётся видна в начале выдачи поиска участника, сколько бы изменений ни пришло до перестройки списка
+  - **Критерии приёмки:**
+    - В `results_scroll_keeper.dart` решение «держать начало» сохраняется до перестройки списка (`onListBuilt` и обслуживание после кадра), а не только для одного перехода: если строка «Создать» появилась над выдачей, пока позиция прокрутки стояла на `minScrollExtent`, следующие состояния модели до перестройки не снимают якорь по ещё не перестроенной раскладке. После перестройки позиция остаётся в начале, и строка «Создать» видна, в том числе когда скрытая под страницей поиск не перестраивается между изменениями.
+    - В остальных случаях якорь по видимой строке работает как прежде: появление строки «Создать» на ненулевой позиции, её уход, смена запроса с `_jumpToTop` и исключение требования «Причина занятой пары в поиске участника» (`long-term-relation-management`) со сбросом позиции. Лишних `jumpTo` нет.
+    - Описание класса `ResultsScrollKeeper` согласовано с уточнённым правилом, если оно в нём меняется.
+    - Регрессионный тест в `intention_search_list_test.dart`: при позиции 0 уход единственного точного совпадения и затем ещё одно подтверждённое изменение другой строки выдачи без кадра между ними — после перестройки позиция 0 и строка «Создать» видна. Существующие тест задачи 4.19 и тест «появление и уход строки оставляют видимую строку на месте» сохраняются без изменений. Название теста на русском, без замеров времени, фикстура минимальна.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/search/intention_search_list_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 4.19.
+  - **Предполагаемые файлы:** меняются `lib/src/intention/presentation/search/results_scroll_keeper.dart`, `test/intention/presentation/search/intention_search_list_test.dart`.
+  - **Размер:** XS.
+
+- [x] 4.24 Описания правила закрытия сессии создания намерения согласованы с поведением после 4.18
+  - **Критерии приёмки:**
+    - Комментарий класса `IntentionEditorViewModel` в `intention_editor_view_model.dart`, описание `IntentionEditorPage` и описание `_CloseConfirmationDialog` в `intention_editor_page.dart` излагают одно правило с `requestClose`: сразу закрывается только неизменённый черновик до принятия отправки; изменённый черновик или принятая отправка требуют одного подтверждения. Формулировки «неизменённый черновик закрывается сразу, изменённый — после одного подтверждения», «сразу для неизменённого черновика» и «Подтверждение закрытия изменённого черновика» в прежнем виде не остаются.
+    - Меняются только комментарии, на русском; код, тесты и поведение продукта не меняются, новых тестов нет.
+    - `mise run codegen` выполнен; `intention_editor_view_model.g.dart` закоммичен, если генерация его изменила. Созданные файлы не правятся вручную. После коммита на чистом дереве `mise run codegen-check` завершается с кодом 0.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter analyze`.
+    - `mise run codegen-check` на чистом дереве после коммита (код 0).
+  - **Зависимости:** 4.18, 4.22.
+  - **Предполагаемые файлы:** меняются `lib/src/intention/presentation/editor/intention_editor_view_model.dart`, `lib/src/intention/presentation/editor/intention_editor_page.dart` и, если его изменит генерация, `lib/src/intention/presentation/editor/intention_editor_view_model.g.dart`.
+  - **Размер:** XS.
+
+- [x] 4.25 Поиск участника решает, можно ли открыть панель создания, по фактическому стеку навигации в момент нажатия
+  - **Критерии приёмки:**
+    - В `relation_batch_picker_page.dart` плюс в шапке и строка «Создать» открывают панель создания намерения, только если в `context.router.stackData` над маршрутом этого поиска, найденным по `context.routeData.matchId`, нет маршрута `IntentionEditorRoute`. Проверка выполняется в момент нажатия, как в `_canCloseRoute` и `_completeCreation` из `intention_editor_page.dart`.
+    - Поле `_stopFollowingCreation`, слушатель роутера, поиск `matchId` панели, снятие по `whenComplete` и связанная с ними логика `dispose` удалены; панель открывается обычным `router.push`.
+    - Поведение сохраняется: пока панель открыта, повторное нажатие плюса или строки «Создать» второй панели не открывает; пока выполняется добавление (`canEdit == false`), панель не открывается; после любого снятия панели, в том числе через `removeRoute` вместе с диалогом ухода, создание снова доступно.
+    - Регрессионный тест 4.17 в `relation_batch_picker_page_test.dart` сохраняется без ослабления. Если в этом файле нет теста, что повторное нажатие при открытой панели не открывает вторую панель, он добавлен с названием на русском.
+    - Если окажется, что auto_route добавляет панель в стек не до следующего пользовательского события и проверка по стеку не защищает от второго нажатия, копия состояния стека не возвращается: работа останавливается, и об этом сообщается.
+    - `intention_editor_page.dart` и поведение продукта не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/batch_picker/relation_batch_picker_page_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 4.17.
+  - **Предполагаемые файлы:** меняются `lib/src/long_term_relation/presentation/batch_picker/relation_batch_picker_page.dart` и, если не хватает теста на повторное нажатие, `test/long_term_relation/presentation/batch_picker/relation_batch_picker_page_test.dart`.
+  - **Размер:** XS.
+
+- [x] 4.26 После появления строки «Создать» в начале и перестройки списка следующее изменение выдачи сохраняет экранное положение видимого намерения
+  - **Критерии приёмки:**
+    - Один новый регрессионный виджет-тест в `intention_search_list_test.dart` показывает строку «Создать» в поиске участника при позиции в начале, дожидается перестройки списка и послекадрового обслуживания, затем прокручивает список и запоминает экранную позицию видимого намерения. Подтверждённое изменение той же выдачи без смены запроса сдвигает строки перед этим намерением; после перестройки намерение сохраняет экранную позицию по требованию «Сохранение состояния загруженного каталога» (`specs/intention-management/spec.md`). Изменение не вызывает исключение со сбросом выдачи из требования «Причина занятой пары в поиске участника» (`specs/long-term-relation-management/spec.md`).
+    - Тест проходит с текущим кодом и падает при временном удалении сброса `_holdsStart = false` из послекадрового обслуживания `ResultsScrollKeeper`; после восстановления исходника тест снова проходит.
+    - Название теста на русском, фикстура минимальна, без замеров времени и расширенных тайм-аутов. Рабочий код, продуктовый контракт, спецификации и дизайн не меняются; существующие тесты, включая проверки 4.19 и 4.23, сохраняются без ослабления.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/search/intention_search_list_test.dart`.
+    - Временно удалить только `_holdsStart = false` из `_scheduleMaintenance` в `lib/src/intention/presentation/search/results_scroll_keeper.dart`, повторить команду и убедиться, что новый тест падает именно на сохранении экранной позиции. Полностью восстановить исходник после мутации и повторить команду: весь файл тестов проходит.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 4.23.
+  - **Предполагаемые файлы:** меняются `test/intention/presentation/search/intention_search_list_test.dart` и отметка выполнения этой задачи в `tasks.md`; `results_scroll_keeper.dart` временно меняется только для проверки мутацией и полностью восстанавливается.
+  - **Размер:** XS.

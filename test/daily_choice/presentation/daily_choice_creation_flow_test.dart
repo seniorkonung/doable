@@ -11,6 +11,7 @@ import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
+import 'package:doable/src/daily_choice/presentation/daily_choice_picker_context.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_creation_page.dart';
 import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
@@ -208,7 +209,7 @@ Future<void> _seed(LocalDatabaseHarness harness) async {
       await database.customInsert(
         '''INSERT INTO long_term_relations
            (id, source_intention_id, related_intention_id, type, priority,
-            is_archived) VALUES (?, ?, ?, ?, 2, 0)''',
+            is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, 2, 0, 0, 0)''',
         variables: [
           Variable.withString(_uuid(number)),
           Variable.withString(_uuid(source)),
@@ -1321,6 +1322,8 @@ void main() {
       await tester.pumpAndSettle();
       await _waitFor(tester, find.text('Choose a path to an action'));
       expect(_savedIds(harness), isEmpty);
+      expect(find.textContaining('Другая ветвь'), findsWidgets);
+      expect(find.textContaining('Другое действие'), findsWidgets);
       expect(
         find.byKey(const ValueKey('choice-path-select-action')),
         findsOneWidget,

@@ -45,13 +45,13 @@ void main() {
         await tester.longPress(quickCreationAction());
         await tester.pumpAndSettle();
         final nextTitle = title == 'Первая страница'
-            ? 'Новая связь'
-            : 'Новый дневной выбор';
+            ? 'Новый дневной выбор'
+            : 'Новое намерение';
         await tester.tap(find.widgetWithText(OptionRow, nextTitle));
         await tester.pumpAndSettle();
         mode = title == 'Первая страница'
-            ? QuickCreationMode.relation
-            : QuickCreationMode.dailyChoice;
+            ? QuickCreationMode.dailyChoice
+            : QuickCreationMode.intention;
         expect(tester.getRect(_bar), rect);
       }
       if (platform == TargetPlatform.iOS) {

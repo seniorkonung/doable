@@ -4,6 +4,7 @@ import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice.dart';
 import 'package:doable/src/daily_choice/presentation/daily_choice_creation_flow_session.dart';
+import 'package:doable/src/daily_choice/presentation/path/choice_path_view_model.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -22,6 +23,7 @@ void main() {
     final session = DailyChoiceCreationFlowSession(
       rootMatchId: root,
       originalHistory: history,
+      pathInstance: ChoicePathPageInstance(),
     );
     final snapshot = List<LocalKey>.of(history);
     history.clear();
@@ -75,6 +77,7 @@ void main() {
       final second = DailyChoiceCreationFlowSession(
         rootMatchId: first.rootMatchId,
         originalHistory: first.originalHistory,
+        pathInstance: ChoicePathPageInstance(),
       );
       final a = harness.submit(first)!;
       final b = harness.submit(second)!;
@@ -188,6 +191,7 @@ void main() {
 DailyChoiceCreationFlowSession _session() => DailyChoiceCreationFlowSession(
   rootMatchId: UniqueKey(),
   originalHistory: [const ValueKey('оболочка'), UniqueKey()],
+  pathInstance: ChoicePathPageInstance(),
 );
 
 final class _Harness {

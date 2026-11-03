@@ -511,6 +511,8 @@ List<GraphEntityRecord> _expectedGoldenRecords() {
       priority: RelationPriority.p2,
       description: null,
       scope: RelationScope.active,
+      createdAt: RelationTimestamp(DateTime.utc(2026, 10, 1, 6, 32)),
+      updatedAt: RelationTimestamp(DateTime.utc(2026, 10, 1, 6, 32)),
     ),
     LongTermRelationRecord(
       id: needJogging,
@@ -520,6 +522,8 @@ List<GraphEntityRecord> _expectedGoldenRecords() {
       priority: RelationPriority.p2,
       description: LongTermRelationDescription.fromInput('\n Темп\nлёгкий \n'),
       scope: RelationScope.active,
+      createdAt: RelationTimestamp(DateTime.utc(2026, 10, 1, 6, 33, 0, 0, 1)),
+      updatedAt: RelationTimestamp(DateTime.utc(2026, 10, 2, 9, 0, 0, 250)),
     ),
     LongTermRelationRecord(
       id: canSwim,
@@ -529,6 +533,8 @@ List<GraphEntityRecord> _expectedGoldenRecords() {
       priority: RelationPriority.p4,
       description: null,
       scope: RelationScope.archived,
+      createdAt: RelationTimestamp(DateTime.utc(2026, 10, 1, 6, 34)),
+      updatedAt: RelationTimestamp(DateTime.utc(2026, 10, 2, 10, 45, 10)),
     ),
     DailyChoiceRecord(
       choice: DailyChoice(

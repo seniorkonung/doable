@@ -18,6 +18,7 @@ import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention.dart';
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
@@ -87,16 +88,14 @@ void main() {
   Future<LongTermRelation> relate(
     Intention source,
     Intention related, {
-    LongTermRelationType type = LongTermRelationType.need,
-  }) async => (await confirm<LongTermRelationCreated>(
-    CreateLongTermRelation(
-      sourceIntentionId: source.id,
-      relatedIntentionId: related.id,
-      type: type,
-      priority: RelationPriority.p2,
-      description: null,
+    IntentionRelationGroup group = IntentionRelationGroup.needs,
+  }) async => (await confirm<LongTermRelationsAdded>(
+    AddLongTermRelations(
+      pageIntentionId: source.id,
+      group: group,
+      candidateIds: [related.id],
     ),
-  )).relation;
+  )).relations.single;
 
   Future<DailyChoice> choose(LongTermRelation relation) async =>
       (await confirm<DailyChoiceCreated>(
@@ -148,7 +147,7 @@ void main() {
     );
     final swimming = await createIntention('Плавать');
     final needRunning = await relate(health, running);
-    await relate(swimming, health, type: LongTermRelationType.can);
+    await relate(swimming, health, group: IntentionRelationGroup.canUse);
     await choose(needRunning);
     await confirm(ArchiveIntention(swimming.id));
     await confirm(ArchiveLongTermRelation(needRunning.id));

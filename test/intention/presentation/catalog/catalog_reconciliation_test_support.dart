@@ -145,8 +145,8 @@ LongTermRelationCommandAccepted acceptRelationCommand(
   final coordinator = container.read(graphCommandCoordinatorProvider.notifier);
   final commandIndex = repository.relationCommands.length;
   final start = switch (command) {
-    CreateLongTermRelation() => coordinator.acceptRelationCreation(
-      LongTermRelationCreationFormKey(),
+    AddLongTermRelations() => coordinator.acceptRelationsAddition(
+      RelationsAdditionSearchKey(),
       command,
     ),
     UpdateLongTermRelation() => coordinator.acceptRelationUpdate(command),
@@ -184,7 +184,7 @@ Future<LongTermRelationCommandCompletion> completeRelationCommand(
 /// Собирает успешный результат создания связи с абсолютными количествами.
 LongTermRelationCommandResult relationCreationSuccess({
   required GraphRevision revision,
-  required LongTermRelationCreated success,
+  required LongTermRelationsAdded success,
 }) =>
     GraphCommandSucceeded<
       LongTermRelationCommandSuccess,

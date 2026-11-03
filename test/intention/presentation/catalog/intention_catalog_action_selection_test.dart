@@ -1,3 +1,4 @@
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
@@ -192,22 +193,20 @@ void main() {
       final relation = testRelation(
         sourceIntentionId: action.id,
         relatedIntentionId: neighbour.id,
+        priority: RelationPriority.p4,
       );
       await completeRelationCommand(
         container,
         repository,
-        CreateLongTermRelation(
-          sourceIntentionId: action.id,
-          relatedIntentionId: neighbour.id,
-          type: LongTermRelationType.need,
-          priority: RelationPriority.p2,
-          description: null,
+        AddLongTermRelations(
+          pageIntentionId: action.id,
+          candidateIds: [neighbour.id],
+          group: IntentionRelationGroup.needs,
         ),
         relationCreationSuccess(
           revision: revision,
-          success: LongTermRelationCreated(
-            relation: relation,
-            description: null,
+          success: LongTermRelationsAdded(
+            relations: [relation],
             changes: [
               IntentionRelationCountsChanged(
                 revision: revision,

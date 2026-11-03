@@ -96,7 +96,7 @@ void main() {
     () async {
       seedRawGraph(raw, () {
         raw.execute(
-          'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority) VALUES (?, ?, ?, ?, ?)',
+          'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 0, 0)',
           [tagFixtureId(103), tagFixtureId(3), tagFixtureId(1), 'can', 3],
         );
       });
@@ -127,6 +127,9 @@ void main() {
         row('long_term_relations', 101),
         row('long_term_relations', 103),
       ];
+      // Каскад архива меняет показание изменения прямых связей один раз;
+      // восстановление намерения связи не восстанавливает.
+      var directRelationUpdatedAt = activeDirectRelations[0]['updated_at'];
 
       Future<void> expectStep(
         IntentionCommand command, {
@@ -146,13 +149,16 @@ void main() {
         expect(intention['is_archived'], archived);
         expect(intention['created_at'], createdAt);
         expect(intention['updated_at'], now.microsecondsSinceEpoch);
+        if (archived == 1) directRelationUpdatedAt = now.microsecondsSinceEpoch;
         expect(row('long_term_relations', 101), {
           ...activeDirectRelations[0],
           'is_archived': directRelationArchive,
+          'updated_at': directRelationUpdatedAt,
         });
         expect(row('long_term_relations', 103), {
           ...activeDirectRelations[1],
           'is_archived': directRelationArchive,
+          'updated_at': directRelationUpdatedAt,
         });
         expect(row('long_term_relations', 102), alreadyArchivedRelation);
         expect([row('intentions', 2), row('intentions', 3)], otherIntentions);
@@ -261,7 +267,7 @@ void main() {
   );
 
   test(
-    'правки участников, типа и архива связи сохраняют назначения намерениям',
+    'правки типа, описания и архива связи сохраняют назначения намерениям',
     () async {
       seedRawGraph(raw, () {
         for (final number in [4, 5]) {
@@ -271,7 +277,7 @@ void main() {
           );
         }
         raw.execute(
-          'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, description) VALUES (?, ?, ?, ?, ?, ?)',
+          'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 0, 0)',
           [
             tagFixtureId(103),
             tagFixtureId(3),
@@ -316,7 +322,11 @@ void main() {
       ) async {
         final before = row('long_term_relations', 103);
         expect(await repository.execute(command), isA<GraphCommandSucceeded>());
-        expect(row('long_term_relations', 103), {...before, ...expectedChange});
+        expect(row('long_term_relations', 103), {
+          ...before,
+          ...expectedChange,
+          'updated_at': now.microsecondsSinceEpoch,
+        });
         expect(assignments(), originalAssignments);
         expect(rows('intentions'), intentions);
         expect([
@@ -337,24 +347,6 @@ void main() {
           ),
         ),
         {'type': 'can'},
-      );
-      await expectRelationStep(
-        UpdateLongTermRelation(
-          relationId: _relation(103),
-          patch: LongTermRelationPatch(
-            sourceIntentionId: LongTermRelationFieldSet(_intention(1)),
-          ),
-        ),
-        {'source_intention_id': tagFixtureId(1)},
-      );
-      await expectRelationStep(
-        UpdateLongTermRelation(
-          relationId: _relation(103),
-          patch: LongTermRelationPatch(
-            relatedIntentionId: LongTermRelationFieldSet(_intention(5)),
-          ),
-        ),
-        {'related_intention_id': tagFixtureId(5)},
       );
       await expectRelationStep(
         UpdateLongTermRelation(
@@ -386,14 +378,8 @@ void main() {
   );
 
   test(
-    'теги участников дневного пути меняются без обхода защиты смысла связи',
+    'теги участников дневного пути меняются независимо от связи и пути',
     () async {
-      seedRawGraph(raw, () {
-        raw.execute(
-          'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, 0, 0, 100, 200)',
-          [tagFixtureId(4), 'Новое намерение'],
-        );
-      });
       final relationBefore = row('long_term_relations', 101);
       final intentionsBefore = rows('intentions');
       final choicesBefore = rows('daily_choices');
@@ -420,30 +406,7 @@ void main() {
       expect(rows('daily_choice_path_steps'), pathBefore);
       expect(assignedTags(1), [tagFixtureId(lastTagNumber)]);
 
-      final beforeRejectedEdits = graph();
-      for (final patch in [
-        const LongTermRelationPatch(
-          type: LongTermRelationFieldSet(LongTermRelationType.can),
-          priority: LongTermRelationFieldSet(RelationPriority.p4),
-        ),
-        LongTermRelationPatch(
-          sourceIntentionId: LongTermRelationFieldSet(_intention(4)),
-        ),
-        LongTermRelationPatch(
-          relatedIntentionId: LongTermRelationFieldSet(_intention(4)),
-        ),
-      ]) {
-        final result = await repository.execute(
-          UpdateLongTermRelation(relationId: _relation(101), patch: patch),
-        );
-        expect(result, isA<GraphCommandFailed>());
-        expect(
-          (result as GraphCommandFailed).failure,
-          isA<LongTermRelationReferencedByDailyPathFailure>(),
-        );
-        expect(graph(), beforeRejectedEdits);
-      }
-
+      final assignmentsBeforeEdit = assignments();
       expect(
         await repository.execute(
           UpdateLongTermRelation(
@@ -462,8 +425,9 @@ void main() {
         ...relationBefore,
         'priority': 4,
         'description': 'Обновлено',
+        'updated_at': now.microsecondsSinceEpoch,
       });
-      expect(assignments(), beforeRejectedEdits['tag_assignments']);
+      expect(assignments(), assignmentsBeforeEdit);
       expect(rows('daily_choices'), choicesBefore);
       expect(rows('daily_choice_path_steps'), pathBefore);
     },

@@ -502,6 +502,8 @@ LongTermRelation _relation(
   priority: RelationPriority.p1,
   scope: RelationScope.active,
   creationSequence: RelationCreationSequence(id),
+  createdAt: RelationTimestamp(DateTime.utc(2026)),
+  updatedAt: RelationTimestamp(DateTime.utc(2026)),
 );
 
 Intention _intention(int id, String title) => Intention(

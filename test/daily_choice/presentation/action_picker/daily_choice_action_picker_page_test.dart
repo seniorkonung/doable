@@ -18,8 +18,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../../intention/presentation/catalog/catalog_test_support.dart'
     show testSummary;
-import '../../../long_term_relation/presentation/participant_picker/participant_picker_test_support.dart';
 import '../../../support/app_root_pages.dart';
+import '../../../support/controlled_participant_picker_repository.dart';
 import '../daily_choice_picker_tag_search_test_support.dart';
 import '../daily_choice_picker_context_test_support.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';

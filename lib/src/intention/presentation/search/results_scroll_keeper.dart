@@ -13,7 +13,10 @@ import '../catalog/intention_catalog_state.dart';
 /// верхней позиции, а пауза ввода, загрузка и отказы первой порции
 /// показываются вместо строк сразу сверху. При обновлении выдачи без смены
 /// параметров поиска хранитель сохраняет экранное положение видимого
-/// намерения, а если оно исчезло из выдачи — ближайшего соседа. Пока видимая
+/// намерения, а если оно исчезло из выдачи — ближайшего соседа. Исключение —
+/// строка «Создать», появившаяся над выдачей, пока список стоит в начале:
+/// до перестройки списка хранитель держит начало при любых следующих
+/// изменениях выдачи, и строка видна над выдачей. Пока видимая
 /// строка не сместилась, хранитель не трогает прокрутку: `jumpTo` оборвал бы
 /// инерцию и перетаскивание.
 ///
@@ -45,6 +48,11 @@ final class ResultsScrollKeeper {
   /// новый запрос.
   IntentionCatalogQuery? _query;
   _VisualAnchor? _pendingVisualAnchor;
+
+  /// Держит ли хранитель начало списка до его перестройки: над выдачей
+  /// появилась строка «Создать», а построенная раскладка её ещё не содержит, и
+  /// якорь по ней спрятал бы строку.
+  bool _holdsStart = false;
   bool _maintenanceScheduled = false;
   bool _disposed = false;
 
@@ -79,7 +87,13 @@ final class ResultsScrollKeeper {
     if (nextState is! IntentionCatalogLoaded) {
       return;
     }
-    if (_pendingVisualAnchor == null &&
+    if (previousState is IntentionCatalogLoaded &&
+        _revealsCreateRowAtStart(previousState, nextState)) {
+      _holdsStart = true;
+      _pendingVisualAnchor = null;
+    }
+    if (!_holdsStart &&
+        _pendingVisualAnchor == null &&
         previousState is IntentionCatalogLoaded &&
         identical(previousState.query, nextState.query) &&
         _isShownResultsOf(nextState) &&
@@ -150,16 +164,29 @@ final class ResultsScrollKeeper {
         identical(shown.query, state.query);
   }
 
+  /// Появляется ли строка «Создать» над выдачей, пока список стоит в начале.
+  bool _revealsCreateRowAtStart(
+    IntentionCatalogLoaded previous,
+    IntentionCatalogLoaded next,
+  ) =>
+      previous.createTitle == null &&
+      next.createTitle != null &&
+      controller.hasClients &&
+      controller.position.pixels <= controller.position.minScrollExtent;
+
   /// Может ли переход от [previous] к [next] сдвинуть видимую строку.
   ///
   /// Строки, добавленные за прежней выдачей, и отметки занятых пар этих новых
   /// строк видимую строку не сдвигают. Отметка прежней строки сдвигает: она
   /// добавляет строке или убирает у неё линию меток, и строки под ней
-  /// смещаются.
+  /// смещаются. Сдвигает и строка «Создать»: она стоит над всей выдачей.
   bool _mayShiftVisibleRow(
     IntentionCatalogLoaded previous,
     IntentionCatalogLoaded next,
   ) {
+    if (previous.createTitle != next.createTitle) {
+      return true;
+    }
     final previousItems = previous.items;
     final nextItems = next.items;
     if (nextItems.length < previousItems.length) {
@@ -222,6 +249,7 @@ final class ResultsScrollKeeper {
       if (_disposed) {
         return;
       }
+      _holdsStart = false;
       _restoreVisualAnchor();
       _pruneItemKeys();
     });

@@ -6,6 +6,7 @@ import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/design_system/components/archived_fold.dart';
 import 'package:doable/src/design_system/components/option_tiles.dart';
+import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/design_system/components/top_bar.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -21,13 +22,14 @@ import 'package:doable/src/long_term_relation/application/long_term_relation_pro
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
-import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_page.dart';
-import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_state.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/long_term_relation/presentation/batch_picker/relation_batch_picker_page.dart';
 import 'package:doable/src/long_term_relation/presentation/relation_group_paging_policy.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/app_root_pages.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
 import 'details_test_support.dart';
 
@@ -238,19 +240,12 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('intention-relations-add')));
     await tester.pumpAndSettle();
-    expect(
-      tester
-          .widget<RelationEditorPage>(find.byType(RelationEditorPage))
-          .editorContext,
-      RelationCreationContext(
-        participant: RelationParticipantSummary(
-          id: owner.id,
-          title: owner.title,
-          archiveState: owner.archiveState,
-        ),
-        group: IntentionRelationGroup.canUse,
-      ),
+    final picker = tester.widget<RelationBatchPickerPage>(
+      find.byType(RelationBatchPickerPage),
     );
+    expect(picker.pageIntentionId, owner.id);
+    expect(picker.pageTitle, owner.title);
+    expect(picker.group, IntentionRelationGroup.canUse);
 
     // Созданная связь подтверждается после возвращения на страницу.
     await router.maybePop();
@@ -313,9 +308,8 @@ void main() {
     expect(query.direction, RelationDirection.outgoing);
   });
 
-  _testWidgets('подробности связи над вкладкой «Связи» сохраняют её строки', (
-    tester,
-  ) async {
+  _testWidgets('нажатие на строку открывает панель связи над страницей, и '
+      'вкладка «Связи» сохраняет свои строки', (tester) async {
     final graph = _Graph();
     final owner = graph.addIntention(1, 'Быть здоровым');
     final rows = [
@@ -324,7 +318,11 @@ void main() {
     ];
     final relationWatches = StreamController<LongTermRelationReadResult>();
     addTearDown(relationWatches.close);
-    graph.repository.onWatchRelation = (_) => relationWatches.stream;
+    final watched = <LongTermRelationId>[];
+    graph.repository.onWatchRelation = (id) {
+      watched.add(id);
+      return relationWatches.stream;
+    };
     await _openPage(tester, graph, owner);
     await _chooseTab(tester, 'Relations');
     final reads = graph.repository.relationGroupQueries.length;
@@ -333,9 +331,15 @@ void main() {
     // Открытая связь читается: индикатор чтения не даёт дождаться покоя.
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
-    await _back(tester, settle: false);
+    expect(watched, [rows.first.relation.id]);
+    expect(find.byType(Sheet), findsOneWidget);
+    // Панель закрывает навигацию и страницу под собой от нажатий.
+    expect(appNavigationDestinations().hitTestable(), findsNothing);
+    expect(_row(rows.last).hitTestable(), findsNothing);
+    await tester.binding.handlePopRoute();
     await tester.pump(const Duration(milliseconds: 500));
     await tester.pumpAndSettle();
+    expect(find.byType(Sheet), findsNothing);
 
     expect(graph.repository.relationGroupQueries, hasLength(reads));
     for (final row in rows) {

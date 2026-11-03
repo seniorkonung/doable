@@ -124,6 +124,7 @@ sealed class IntentionCatalogConfirmedState extends IntentionCatalogState {
     required this.counts,
     required this.nextCursor,
     required this.revision,
+    this.exactTitleCount,
   });
 
   final IntentionCatalogQuery query;
@@ -133,6 +134,11 @@ sealed class IntentionCatalogConfirmedState extends IntentionCatalogState {
   final IntentionCatalogCounts counts;
   final IntentionCatalogCursor? nextCursor;
   final GraphRevision revision;
+  final int? exactTitleCount;
+
+  /// Название для создания, если активного намерения с ним ещё нет.
+  String? get createTitle =>
+      exactTitleCount == 0 ? query.titleFilter?.map((value) => value) : null;
 
   /// Числа обоих типов в текущем охвате при условиях выдачи без условия
   /// готовности. Есть тогда и только тогда, когда тип в [selection] открыт.
@@ -163,6 +169,7 @@ final class IntentionCatalogLoaded extends IntentionCatalogConfirmedState {
     required super.counts,
     required super.nextCursor,
     required super.revision,
+    super.exactTitleCount,
     Map<IntentionId, PairOccupant> pairOccupants = const {},
     this.continuation = const IntentionCatalogContinuationIdle(),
   }) : items = List.unmodifiable(items),
@@ -213,6 +220,7 @@ final class IntentionCatalogEmpty extends IntentionCatalogConfirmedState {
     required super.query,
     required super.counts,
     required super.revision,
+    super.exactTitleCount,
   }) : super(totalCount: 0, nextCursor: null);
 
   IntentionScope get scope => query.scope;

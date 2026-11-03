@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:ui' show CheckedState;
+
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/home/home_page.dart';
@@ -14,12 +17,15 @@ import 'package:doable/src/data/local/app_database.dart'
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
-import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_page.dart';
+import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
+import 'package:doable/src/long_term_relation/presentation/batch_picker/relation_batch_picker_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../intention/presentation/picker/intention_picker_test_support.dart';
 import '../../support/app_root_pages.dart';
 import '../../support/daily_choice_local_date.dart';
 import '../../support/graph_seed.dart';
@@ -152,65 +158,70 @@ void main() {
     expect(tester.takeException(), isNull);
   }, variant: _android);
 
-  testWidgets('«назад» со страницы участника сохраняет черновик формы связи '
-      'и пункт начала истории', (tester) async {
-    final app = await _start(tester);
-    await _select(tester, AppDestination.intentionGraph);
-    await enterIntentionCatalogTitle(tester, 'Намерение 01');
-    await _open(
-      tester,
-      intentionCatalogRow('Намерение 01'),
-      IntentionDetailsPage,
-    );
-    await _tap(tester, find.text('Relations').first);
-    // Вкладка «Связи» действия открывается на группе «Нужно для».
-    await _tap(
-      tester,
-      find.byKey(const ValueKey('intention-relations-group-needs')),
-    );
-    await _open(
-      tester,
-      find.byKey(
-        const ValueKey('intention-relations-add'),
-        skipOffstage: false,
-      ),
-      RelationEditorPage,
-    );
-    const draft = 'Сохранить пояснение после просмотра участника';
-    final description = find.byKey(
-      const ValueKey('relation-editor-description'),
-    );
-    await tester.enterText(description, draft);
-    await _open(
-      tester,
-      find.byKey(const ValueKey('relation-editor-open-source-details')),
-      IntentionDetailsPage,
-    );
-    expect(
-      tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected,
-      AppDestination.intentionGraph,
-    );
+  testWidgets(
+    '«назад» со страницы участника сохраняет параметры и отметку поиска',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      final app = await _start(tester);
+      await _select(tester, AppDestination.intentionGraph);
+      final id = (IntentionId.decode(
+        tagFixtureId(1),
+      ) as IntentionIdDecodingSuccess).id;
+      unawaited(
+        app.router.push(
+          RelationBatchPickerRoute(
+            pageIntentionId: id,
+            pageTitle: 'Намерение 01',
+            group: IntentionRelationGroup.needs,
+          ),
+        ),
+      );
+      final filter = find.byKey(const ValueKey('participant-picker-filter'));
+      await _until(tester, filter);
+      await tester.enterText(filter, 'Намерение 03');
+      final row = find.byKey(ValueKey('participant-picker-${tagFixtureId(3)}'));
+      await _until(tester, row);
+      await _tap(
+        tester,
+        find.descendant(of: row, matching: find.text('Намерение 03')),
+      );
+      final pickerRoute = app.router.current.matchId;
+      await _open(tester, intentionPickerArrow(row), IntentionDetailsPage);
 
-    await _back(tester);
+      await _back(tester);
 
-    expect(find.byType(RelationEditorPage), findsOneWidget);
-    expect(find.byType(AppNavigationBar), findsNothing);
-    expect(tester.widget<TextField>(description).controller!.text, draft);
-    expect(
-      find.byKey(const ValueKey('relation-editor-participant-title-source')),
-      findsOneWidget,
-    );
-    expect(app.platform.exits, 0);
-    await _back(tester);
-    expect(find.byType(IntentionDetailsPage), findsOneWidget);
-    expect(
-      tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected,
-      AppDestination.intentionGraph,
-    );
-    await _back(tester);
-    _expectRootPage(tester, app.router, AppDestination.intentionGraph);
-    expect(tester.takeException(), isNull);
-  }, variant: _android);
+      expect(find.byType(RelationBatchPickerPage), findsOneWidget);
+      expect(app.router.current.matchId, pickerRoute);
+      expect(
+        tester
+            .widget<EditableText>(
+              find.descendant(of: filter, matching: find.byType(EditableText)),
+            )
+            .controller
+            .text,
+        'Намерение 03',
+      );
+      expect(
+        tester
+            .getSemantics(
+              find.descendant(of: row, matching: find.text('Намерение 03')),
+            )
+            .flagsCollection
+            .isChecked,
+        CheckedState.isTrue,
+      );
+      expect(app.platform.exits, 0);
+      await _tap(
+        tester,
+        find.descendant(of: row, matching: find.text('Намерение 03')),
+      );
+      await _back(tester);
+      _expectRootPage(tester, app.router, AppDestination.intentionGraph);
+      expect(tester.takeException(), isNull);
+      semantics.dispose();
+    },
+    variant: _android,
+  );
 
   testWidgets('«назад» на странице намерения поверх каталога намерений '
       'закрывает только её и не меняет выбранный пункт', (tester) async {
@@ -375,8 +386,8 @@ void _seed(sqlite.Database database) {
     }
     database.execute(
       'INSERT INTO long_term_relations (id, source_intention_id, '
-      'related_intention_id, type, priority, is_archived) '
-      'VALUES (?, ?, ?, ?, ?, ?)',
+      'related_intention_id, type, priority, is_archived, created_at, updated_at) '
+      'VALUES (?, ?, ?, ?, ?, ?, 0, 0)',
       [tagFixtureId(_relation), tagFixtureId(1), tagFixtureId(2), 'need', 2, 0],
     );
     for (final (choice, date) in [

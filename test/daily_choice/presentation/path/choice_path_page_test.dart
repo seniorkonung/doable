@@ -5,6 +5,7 @@ import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
+import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice.dart';
@@ -32,6 +33,59 @@ import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
 
 void main() {
+  for (final locale in [const Locale('ru'), const Locale('en')]) {
+    for (final direction in ChoicePathDraftDirection.values) {
+      for (final hasSteps in [false, true]) {
+        testWidgets(
+          'объяснение тупика ${direction == ChoicePathDraftDirection.topDown ? 'сверху вниз' : 'снизу вверх'}, ${hasSteps ? 'со шагом' : 'без шагов'}, ${locale.languageCode == 'ru' ? 'по-русски' : 'по-английски'}',
+          (tester) async {
+            final repository = _PathRepository();
+            addTearDown(repository.dispose);
+            final topDown = direction == ChoicePathDraftDirection.topDown;
+            await _pumpPage(
+              tester,
+              repository,
+              locale: locale,
+              direction: direction,
+              startingId: topDown ? 1 : 2,
+            );
+            if (hasSteps) {
+              repository.complete(0, [_edge(1, 2, 1)]);
+              await tester.pumpAndSettle();
+              await tester.tap(
+                find.byKey(
+                  ValueKey(
+                    'choice-path-continue-${_relation(1).toCanonicalString()}',
+                  ),
+                ),
+              );
+              await tester.pump();
+            }
+            repository.complete(hasSteps ? 1 : 0, []);
+            await tester.pumpAndSettle();
+            await tester.scrollUntilVisible(
+              find.byKey(const ValueKey('choice-path-empty')),
+              150,
+              scrollable: find.byType(Scrollable).first,
+            );
+            await tester.pumpAndSettle();
+            final message = switch ((locale.languageCode, topDown, hasSteps)) {
+              ('ru', true, false) => 'Из этого намерения сейчас нет допустимого пути к другому действию. Продолжениями становятся только связи, ведущие к готовому действию. Отметьте намерение готовым или свяжите его с действием.',
+              ('ru', true, true) => 'Дальнейших допустимых продолжений нет. Продолжениями становятся только связи, ведущие к готовому действию. Отметьте намерение готовым или свяжите его с действием.',
+              ('en', true, false) => 'There is no valid path from this intention to another action right now. Only relations leading to a ready action become continuations. Mark an intention as ready or link it to an action.',
+              ('en', true, true) => 'There are no further valid continuations. Only relations leading to a ready action become continuations. Mark an intention as ready or link it to an action.',
+              ('ru', false, false) => 'Для этого действия сейчас нет допустимых входящих связей. Выберите другое действие.',
+              ('ru', false, true) => 'Дальнейших допустимых продолжений нет.',
+              ('en', false, false) => 'There are no valid incoming relations for this action right now. Choose another action.',
+              _ => 'There are no further valid continuations.',
+            };
+            expect(find.text(message), findsOneWidget);
+          },
+        );
+      }
+    }
+  }
+
   // Поздний результат не зависит от сочетания направления и исхода: два
   // случая покрывают оба значения каждой оси.
   for (final (direction, succeeds) in [
@@ -319,22 +373,26 @@ void main() {
     repository.complete(0, []);
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('choice-path-empty')), findsOneWidget);
+    expect(find.text('Открыть связи'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('choice-path-select-action')),
       findsNothing,
     );
 
     repository.emitRevision(2);
+    await tester.pump();
+    expect(find.byKey(const ValueKey('choice-path-conflict')), findsNothing);
+    repository.fail(1, const ChoicePathContinuationSnapshotExpired());
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('choice-path-conflict')), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('choice-path-refresh')));
     await tester.pump();
-    repository.fail(1, const ChoicePathContinuationUnavailableFailure());
+    repository.fail(2, const ChoicePathContinuationUnavailableFailure());
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('choice-path-failure')), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('choice-path-retry')));
     await tester.pump();
-    repository.complete(2, [_edge(1, 2, 1)], revision: 2);
+    repository.complete(3, [_edge(1, 2, 1)], revision: 2);
     await tester.pumpAndSettle();
     expect(
       find.byKey(
@@ -343,6 +401,49 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets(
+    'новая ревизия снимает выбор действия и показывает новое название шага',
+    (tester) async {
+      final repository = _PathRepository();
+      addTearDown(repository.dispose);
+      await _pumpPage(tester, repository);
+      repository.complete(0, [_edge(1, 2, 1)]);
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(
+          ValueKey('choice-path-continue-${_relation(1).toCanonicalString()}'),
+        ),
+      );
+      await tester.pump();
+      repository.complete(1, [], ready: true);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('choice-path-select-action')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('choice-path-open-confirmation')),
+        findsOneWidget,
+      );
+
+      repository.emitRevision(2);
+      await tester.pump();
+      repository.complete(
+        2,
+        [],
+        ready: true,
+        revision: 2,
+        steps: [_edge(1, 2, 1, relatedTitle: 'Новое название')],
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('choice-path-conflict')), findsNothing);
+      expect(
+        find.byKey(const ValueKey('choice-path-open-confirmation')),
+        findsNothing,
+      );
+      expect(find.textContaining('Новое название'), findsOneWidget);
+    },
+  );
 
   testWidgets('порции и семантика доступны на английском', (tester) async {
     final repository = _PathRepository();
@@ -702,6 +803,7 @@ final class _PathRepository
     int revision = 1,
     bool ready = false,
     ChoicePathContinuationCursor? cursor,
+    List<LongTermRelationSummary>? steps,
   }) {
     final draft = queries[index].draft;
     _requests[index].complete(
@@ -709,6 +811,7 @@ final class _PathRepository
         ChoicePathContinuationsPage(
           draft: draft,
           current: _current(draft.currentIntentionId, ready: ready),
+          steps: steps ?? draft.steps.map(_stepSummary),
           items: items,
           nextCursor: cursor,
           revision: _Revision(revision),
@@ -803,24 +906,48 @@ LongTermRelationSummary _edge(
   int related,
   int number, {
   LongTermRelationType type = LongTermRelationType.need,
+  String? relatedTitle,
+}) => _summary(
+  id: _relation(number),
+  sourceId: _intention(source),
+  relatedId: _intention(related),
+  type: type,
+  relatedTitle: relatedTitle,
+);
+
+LongTermRelationSummary _stepSummary(ConfirmedChoicePathStep step) => _summary(
+  id: step.relationId,
+  sourceId: step.sourceIntentionId,
+  relatedId: step.relatedIntentionId,
+  type: step.type,
+);
+
+LongTermRelationSummary _summary({
+  required LongTermRelationId id,
+  required IntentionId sourceId,
+  required IntentionId relatedId,
+  required LongTermRelationType type,
+  String? relatedTitle,
 }) => LongTermRelationSummary(
   relation: LongTermRelation(
-    id: _relation(number),
-    sourceIntentionId: _intention(source),
-    relatedIntentionId: _intention(related),
+    id: id,
+    sourceIntentionId: sourceId,
+    relatedIntentionId: relatedId,
     type: type,
     priority: RelationPriority.p1,
     scope: RelationScope.active,
-    creationSequence: RelationCreationSequence(number),
+    creationSequence: RelationCreationSequence(1),
+    createdAt: RelationTimestamp(DateTime.utc(2026)),
+    updatedAt: RelationTimestamp(DateTime.utc(2026)),
   ),
   source: RelationParticipantSummary(
-    id: _intention(source),
-    title: 'Намерение $source',
+    id: sourceId,
+    title: _current(sourceId).title,
     archiveState: IntentionArchiveState.active,
   ),
   related: RelationParticipantSummary(
-    id: _intention(related),
-    title: 'Намерение $related',
+    id: relatedId,
+    title: relatedTitle ?? _current(relatedId).title,
     archiveState: IntentionArchiveState.active,
   ),
   hasDescription: false,

@@ -370,60 +370,29 @@ void main() {
     },
   );
 
-  test('блокирует смену смысла используемой связи, сохраняя остальные правки', () {
+  test('допускает смену типа используемой связи и сохраняет путь', () {
     _addChoice(raw, _choice);
     _addStep(raw, _firstStep, _choice, _relation);
-    for (final (column, value) in [
-      ('type', 'can'),
-      ('source_intention_id', _other),
-      ('related_intention_id', _other),
-    ]) {
-      expect(
-        () => seedRawGraph(
-          raw,
-          () => raw.execute(
-            'UPDATE long_term_relations SET $column = ?, description = ? WHERE id = ?',
-            [value, 'Изменение', _relation],
-          ),
-        ),
-        throwsA(isA<sqlite.SqliteException>()),
-      );
-    }
-    expect(
-      raw.select('SELECT description FROM long_term_relations WHERE id = ?', [
-        _relation,
-      ]).single['description'],
-      isNull,
-    );
+
     seedRawGraph(
       raw,
       () => raw.execute(
-        '''UPDATE long_term_relations
-         SET type = 'need', source_intention_id = ?, related_intention_id = ?,
-             priority = 2, description = 'Допустимо', is_archived = 1
-         WHERE id = ?''',
-        [_source, _selected, _relation],
+        "UPDATE long_term_relations SET type = 'can' WHERE id = ?",
+        [_relation],
       ),
     );
-    final row = raw.select('SELECT * FROM long_term_relations WHERE id = ?', [
-      _relation,
-    ]).single;
-    expect(row['priority'], 2);
-    expect(row['description'], 'Допустимо');
-    expect(row['is_archived'], 1);
-    seedRawGraph(raw, () {
-      raw
-        ..execute('DELETE FROM daily_choices WHERE id = ?', [_choice])
-        ..execute('UPDATE long_term_relations SET type = ? WHERE id = ?', [
-          'can',
-          _relation,
-        ]);
-    });
+
     expect(
       raw.select('SELECT type FROM long_term_relations WHERE id = ?', [
         _relation,
       ]).single['type'],
       'can',
+    );
+    expect(
+      raw.select('SELECT long_term_relation_id FROM daily_choice_path_steps'),
+      [
+        {'long_term_relation_id': _relation},
+      ],
     );
   });
 }
@@ -438,8 +407,8 @@ void _addRelation(
     db,
     () => db.execute(
       '''INSERT INTO long_term_relations
-       (id, source_intention_id, related_intention_id, type, priority)
-       VALUES (?, ?, ?, 'need', 1)''',
+       (id, source_intention_id, related_intention_id, type, priority, created_at, updated_at)
+       VALUES (?, ?, ?, 'need', 1, 0, 0)''',
       [id, source, related],
     ),
   );

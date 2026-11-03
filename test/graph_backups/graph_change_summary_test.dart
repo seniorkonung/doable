@@ -428,6 +428,8 @@ LongTermRelationRecord _relation(
   priority: RelationPriority.p2,
   description: null,
   scope: scope,
+  createdAt: RelationTimestamp(DateTime.utc(2026, 10, 17, 9)),
+  updatedAt: RelationTimestamp(DateTime.utc(2026, 10, 17, 9)),
 );
 
 DailyChoiceRecord _dailyChoice(

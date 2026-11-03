@@ -16,11 +16,11 @@ import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_id_generator.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation_description.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter_test/flutter_test.dart';
@@ -67,9 +67,17 @@ void main() {
 
     expect(
       await firstRepository.execute(
-        _createCommand(
+        _addCommand(
           relatedId: _firstNeighborId,
-          type: LongTermRelationType.need,
+          group: IntentionRelationGroup.needs,
+        ),
+      ),
+      isA<GraphCommandSucceeded>(),
+    );
+    expect(
+      await firstRepository.execute(
+        _updateCommand(
+          _firstRelationId,
           priority: RelationPriority.p2,
           description: '  Читать каждый день\n',
         ),
@@ -84,9 +92,17 @@ void main() {
     ], now: () => DateTime.utc(2026, 9, 19, 12));
     expect(
       await secondRepository.execute(
-        _createCommand(
+        _addCommand(
           relatedId: _secondNeighborId,
-          type: LongTermRelationType.can,
+          group: IntentionRelationGroup.canUse,
+        ),
+      ),
+      isA<GraphCommandSucceeded>(),
+    );
+    expect(
+      await secondRepository.execute(
+        _updateCommand(
+          _secondRelationId,
           priority: RelationPriority.p2,
           description: null,
         ),
@@ -133,7 +149,12 @@ void main() {
             isUtc: true,
           ),
       ],
-      [DateTime.utc(2026, 9, 20, 12), DateTime.utc(2026, 9, 19, 12)],
+      [
+        DateTime.utc(2026, 9, 20, 12),
+        DateTime.utc(2026, 9, 20, 12),
+        DateTime.utc(2026, 9, 19, 12),
+        DateTime.utc(2026, 9, 19, 12),
+      ],
     );
     final reopenedRepository = _repository(database, const []);
     final sourceCounts = await _counts(reopenedRepository, _sourceId);
@@ -171,9 +192,17 @@ void main() {
     ]);
     expect(
       await repository.execute(
-        _createCommand(
+        _addCommand(
           relatedId: _firstNeighborId,
-          type: LongTermRelationType.need,
+          group: IntentionRelationGroup.needs,
+        ),
+      ),
+      isA<GraphCommandSucceeded>(),
+    );
+    expect(
+      await repository.execute(
+        _updateCommand(
+          _firstRelationId,
           priority: RelationPriority.p1,
           description: 'Нужная связь',
         ),
@@ -182,9 +211,17 @@ void main() {
     );
     expect(
       await repository.execute(
-        _createCommand(
+        _addCommand(
           relatedId: _secondNeighborId,
-          type: LongTermRelationType.can,
+          group: IntentionRelationGroup.canUse,
+        ),
+      ),
+      isA<GraphCommandSucceeded>(),
+    );
+    expect(
+      await repository.execute(
+        _updateCommand(
+          _secondRelationId,
           priority: RelationPriority.p4,
           description: 'Возможная связь',
         ),
@@ -298,34 +335,28 @@ void main() {
   }
 }
 
-CreateLongTermRelation _createCommand({
+AddLongTermRelations _addCommand({
   required IntentionId relatedId,
-  required LongTermRelationType type,
-  required RelationPriority priority,
-  required String? description,
-}) => _createRelationCommand(
-  sourceId: _sourceId,
-  relatedId: relatedId,
-  type: type,
-  priority: priority,
-  description: description,
+  required IntentionRelationGroup group,
+}) => AddLongTermRelations(
+  pageIntentionId: _sourceId,
+  group: group,
+  candidateIds: [relatedId],
 );
 
-CreateLongTermRelation _createRelationCommand({
-  required IntentionId sourceId,
-  required IntentionId relatedId,
-  required LongTermRelationType type,
+UpdateLongTermRelation _updateCommand(
+  LongTermRelationId relationId, {
   required RelationPriority priority,
   required String? description,
-}) => CreateLongTermRelation(
-  sourceIntentionId: sourceId,
-  relatedIntentionId: relatedId,
-  type: type,
-  priority: priority,
-  description: switch (description) {
-    null => null,
-    final value => LongTermRelationDescription.fromInput(value),
-  },
+}) => UpdateLongTermRelation(
+  relationId: relationId,
+  patch: LongTermRelationPatch(
+    priority: LongTermRelationFieldSet(priority),
+    description: switch (description) {
+      null => const LongTermRelationDescriptionUnchanged(),
+      final value => LongTermRelationDescriptionPatch.fromInput(value),
+    },
+  ),
 );
 
 PersonalGraphRepository _repository(
@@ -394,6 +425,8 @@ Future<void> _insertRelation(
           priority: priority.index + 1,
           description: Value(description),
           isArchived: Value(isArchived),
+          createdAt: 0,
+          updatedAt: 0,
         ),
       ),
 );

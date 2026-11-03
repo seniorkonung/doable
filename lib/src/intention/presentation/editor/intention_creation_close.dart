@@ -11,7 +11,7 @@ enum IntentionCreationSavingOnClose {
   continues,
 }
 
-/// Единственное подтверждение закрытия изменённого черновика одной сессии.
+/// Единственное подтверждение закрытия одной сессии.
 ///
 /// Действует, только пока остаётся ожидающим подтверждением выдавшего его
 /// построения сессии с ключом [formKey]. Ответ на него, смена состояния
@@ -37,16 +37,13 @@ sealed class IntentionCreationCloseDecision {
   const IntentionCreationCloseDecision();
 }
 
-/// Черновик не изменён: сессия уже завершена без подтверждения, и её панель
-/// закрывается сразу.
+/// Черновик не изменён и отправка не принята: панель закрывается сразу.
 final class IntentionCreationClosedImmediately
     extends IntentionCreationCloseDecision {
-  const IntentionCreationClosedImmediately(this.savingOnClose);
-
-  final IntentionCreationSavingOnClose savingOnClose;
+  const IntentionCreationClosedImmediately();
 }
 
-/// Черновик изменён: закрытие требует одного явного подтверждения.
+/// Черновик изменён или отправка принята: требуется подтверждение закрытия.
 final class IntentionCreationCloseNeedsConfirmation
     extends IntentionCreationCloseDecision {
   const IntentionCreationCloseNeedsConfirmation(this.confirmation);

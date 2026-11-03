@@ -59,7 +59,7 @@ void main() {
   void addRelation(int number, int source, int related) {
     seedRawGraph(raw, () {
       raw.execute(
-        'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority) VALUES (?, ?, ?, ?, ?)',
+        'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 0, 0)',
         [
           tagFixtureId(number),
           tagFixtureId(source),

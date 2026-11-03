@@ -14,9 +14,9 @@ import '../../../tag/presentation/panel/tags_panel.dart';
 import '../../../tag/presentation/panel/tags_panel_context.dart';
 import '../../application/intention_result.dart';
 import '../../domain/intention.dart';
-import '../../domain/intention_id.dart';
 import '../../domain/intention_text.dart';
 import '../operation/operation_state.dart';
+import 'intention_creation_launch.dart';
 import 'intention_creation_sheet.dart';
 import 'intention_creation_tags.dart';
 import 'intention_editor_state.dart';
@@ -49,12 +49,18 @@ import 'intention_editor_view_model.dart';
 /// Любой уход с формы — кнопка закрытия, нажатие вне панели, системное
 /// «назад» и программный `maybePop` — сначала обращается к единому решению
 /// сессии о закрытии и не удаляет маршрут сам. Маршрут формы закрывается
-/// только по завершению сессии: сразу для неизменённого черновика или после
-/// подтверждённого сброса. Успешное создание заменяет форму страницей
-/// созданного намерения в том же стеке, сохраняя исходную историю для возврата.
+/// только по завершению сессии: сразу для неизменённого черновика до принятия
+/// отправки или после одного подтверждения для изменённого черновика либо
+/// принятой отправки. Успешное создание завершает панель согласно контексту
+/// запуска, сохраняя исходную историю.
 @RoutePage()
 final class IntentionEditorPage extends ConsumerStatefulWidget {
-  const IntentionEditorPage({super.key});
+  const IntentionEditorPage({
+    super.key,
+    this.launch = const IntentionCreationStandalone(),
+  });
+
+  final IntentionCreationLaunch launch;
 
   @override
   ConsumerState<IntentionEditorPage> createState() =>
@@ -64,7 +70,7 @@ final class IntentionEditorPage extends ConsumerStatefulWidget {
 final class _IntentionEditorPageState
     extends ConsumerState<IntentionEditorPage> {
   final _formKey = IntentionCreationFormKey();
-  final _titleController = TextEditingController();
+  late final _titleController = TextEditingController(text: _initialTitle);
   final _descriptionController = TextEditingController();
   final _descriptionFocus = FocusNode();
 
@@ -78,7 +84,7 @@ final class _IntentionEditorPageState
   /// черновик остаются прежними.
   IntentionCreationSheetReveal? _failureReveal;
 
-  /// Открытие созданного намерения одноразово: после него форма недоступна.
+  /// Завершение создания одноразово: после него форма недоступна.
   var _routeState = _EditorRouteState.active;
 
   /// Объяснение критериев действия уже открыто.
@@ -88,8 +94,22 @@ final class _IntentionEditorPageState
   /// своего закрытия.
   var _isChoosingTags = false;
 
+  String get _initialTitle => switch (widget.launch) {
+    IntentionCreationStandalone() => '',
+    IntentionCreationForSearch(:final initialTitle) => initialTitle,
+  };
+
   IntentionEditorViewModelProvider get _provider =>
-      intentionEditorViewModelProvider(_formKey);
+      intentionEditorViewModelProvider(
+        _formKey,
+        initialTitle: _initialTitle,
+        target: switch (widget.launch) {
+          IntentionCreationStandalone() =>
+            const CreatingIntentionOperationTarget(),
+          IntentionCreationForSearch() =>
+            const CreatingIntentionForSearchOperationTarget(),
+        },
+      );
 
   @override
   void dispose() {
@@ -108,8 +128,8 @@ final class _IntentionEditorPageState
     ref.listen(provider, (previous, next) {
       // Страница следит за сессией и перестраивается с новым запросом.
       _failureReveal = _failureRevealAfter(previous, next);
-      if (next.event case IntentionEditorCreated(:final intentionId)) {
-        _openCreatedIntention(intentionId);
+      if (next.event case IntentionEditorCreated(:final intention)) {
+        _completeCreation(intention);
       }
     });
 
@@ -152,10 +172,17 @@ final class _IntentionEditorPageState
             container: true,
             header: true,
             namesRoute: true,
-            child: Text(
-              localizations.editorTitle,
-              key: const ValueKey('intention-editor-heading'),
-              style: Theme.of(context).textTheme.titleLarge,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  localizations.editorTitle,
+                  key: const ValueKey('intention-editor-heading'),
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                if (widget.launch is IntentionCreationForSearch)
+                  Text(localizations.editorSearchSubtitle),
+              ],
             ),
           ),
         ),
@@ -428,7 +455,7 @@ final class _IntentionEditorPageState
 
   /// Потребляет успех только живого исходного маршрута и завершает переход
   /// до любого запоздалого запроса закрытия или ответа его диалога.
-  void _openCreatedIntention(IntentionId intentionId) {
+  void _completeCreation(Intention intention) {
     if (!mounted || _routeState != _EditorRouteState.active) {
       return;
     }
@@ -439,12 +466,20 @@ final class _IntentionEditorPageState
     }
     _routeState = _EditorRouteState.openingCreatedIntention;
     ref.read(_provider.notifier).consumeEvent();
+    switch (widget.launch) {
+      case IntentionCreationForSearch(:final onCreated):
+        router.removeRoute(route);
+        onCreated(intention.id, intention.title);
+        return;
+      case IntentionCreationStandalone():
+        break;
+    }
 
     // replace удаляет форму вместе с её диалогами, сохраняя исходную историю:
     // https://pub.dev/packages/auto_route/versions/11.1.0#navigating-between-screens
     // Future завершается при возврате со страницы; сессия его не ждёт.
     unawaited(
-      router.replace<void>(IntentionDetailsRoute(intentionId: intentionId)),
+      router.replace<void>(IntentionDetailsRoute(intentionId: intention.id)),
     );
   }
 
@@ -526,7 +561,7 @@ String _failureMessage(
   IntentionUnexpectedFailure() => localizations.editorCreateUnexpected,
 };
 
-/// Подтверждение закрытия изменённого черновика одной сессии.
+/// Подтверждение закрытия сессии с изменённым черновиком или принятой отправкой.
 ///
 /// Ответ действует, пока [confirmation] остаётся ожидающим подтверждением
 /// сессии. Смена состояния отправки или завершение сессии отключают ответы и

@@ -559,8 +559,8 @@ void _addRelation(
 ) {
   db.execute(
     '''INSERT INTO long_term_relations
-       (id, source_intention_id, related_intention_id, type, priority)
-       VALUES (?, ?, ?, 'need', 1)''',
+       (id, source_intention_id, related_intention_id, type, priority, created_at, updated_at)
+       VALUES (?, ?, ?, 'need', 1, 0, 0)''',
     [id, source, related],
   );
 }

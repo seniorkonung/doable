@@ -8,6 +8,7 @@ import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_id_generator.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
@@ -24,8 +25,6 @@ const _readyMarker = 'DOABLE_GRAPH_WORKER_READY';
 
 const _sourceIdValue = '018f0b5d-6b2e-7c80-8000-000000000901';
 const _firstNeighborIdValue = '018f0b5d-6b2e-7c80-8000-000000000902';
-const _secondNeighborIdValue = '018f0b5d-6b2e-7c80-8000-000000000903';
-const _unrelatedIdValue = '018f0b5d-6b2e-7c80-8000-000000000904';
 const _workerRelationIdValue = '018f0b5d-6b2e-7c80-8000-000000000954';
 
 void main() {
@@ -65,14 +64,10 @@ void main() {
         );
         final result = switch (operation) {
           _GraphOperation.create => await repository.execute(
-            CreateLongTermRelation(
-              sourceIntentionId: _intentionId(_sourceIdValue),
-              relatedIntentionId: _intentionId(_firstNeighborIdValue),
-              type: LongTermRelationType.need,
-              priority: RelationPriority.p2,
-              description: LongTermRelationDescription.fromInput(
-                'Создано дочерним процессом',
-              ),
+            AddLongTermRelations(
+              pageIntentionId: _intentionId(_sourceIdValue),
+              group: IntentionRelationGroup.needs,
+              candidateIds: [_intentionId(_firstNeighborIdValue)],
             ),
           ),
           _GraphOperation.cascade => await repository.execute(
@@ -82,12 +77,6 @@ void main() {
             UpdateLongTermRelation(
               relationId: _relationId(_workerRelationIdValue),
               patch: LongTermRelationPatch(
-                sourceIntentionId: LongTermRelationFieldSet(
-                  _intentionId(_secondNeighborIdValue),
-                ),
-                relatedIntentionId: LongTermRelationFieldSet(
-                  _intentionId(_unrelatedIdValue),
-                ),
                 type: const LongTermRelationFieldSet(LongTermRelationType.can),
                 priority: const LongTermRelationFieldSet(RelationPriority.p4),
                 description: LongTermRelationDescriptionReplaced(

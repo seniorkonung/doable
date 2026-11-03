@@ -903,11 +903,13 @@ void main() {
               ),
               (
                 SelectRelationParticipant(
-                  selectionContext:
-                      RelationParticipantSelectionContext.archivedRelation,
                   session: IntentionSearchSession(),
+                  pairProbe: RelationPairProbe(
+                    counterpartId: testSummary(index: 999).id,
+                    candidateRole: RelationParticipantRole.related,
+                  ),
                 ),
-                const IntentionScopeFixed(IntentionScope.all),
+                const IntentionScopeFixed(IntentionScope.active),
                 const IntentionTypeOpen(IntentionTypeChoice.all),
                 IntentionReadinessFilter.all,
                 IntentionCatalogCounting.byType,
@@ -1472,7 +1474,6 @@ void main() {
 
   group('занимающие связи строк поиска участника', () {
     final purpose = SelectRelationParticipant(
-      selectionContext: RelationParticipantSelectionContext.activeRelation,
       session: IntentionSearchSession(),
       pairProbe: RelationPairProbe(
         counterpartId: testSummary(index: 9).id,
@@ -1487,6 +1488,7 @@ void main() {
         relatedIntentionId: testSummary(index: rowIndex).id,
         index: rowIndex,
       ).id,
+      type: LongTermRelationType.need,
       scope: scope,
     );
 

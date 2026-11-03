@@ -319,6 +319,14 @@ final class IntentionTitleFilter {
     return titleSearchKey(title).contains(titleSearchKey(_normalizedValue));
   }
 
+  bool matchesExactTitle(String title) {
+    IntentionText.ensureValidUnicodeRepertoire(
+      title,
+      field: IntentionTextField.title,
+    );
+    return titleSearchKey(title) == titleSearchKey(_normalizedValue);
+  }
+
   T map<T>(T Function(String normalizedValue) transform) =>
       transform(_normalizedValue);
 }
@@ -593,13 +601,26 @@ final class IntentionCatalogFirstPage extends IntentionCatalogPage {
     required super.nextCursor,
     required super.revision,
     super.pairOccupants,
-  }) : totalCount = _requireTotalCount(totalCount, items.length, counts);
+    int? exactTitleCount,
+  }) : totalCount = _requireTotalCount(totalCount, items.length, counts),
+       exactTitleCount = _requireExactTitleCount(exactTitleCount);
 
   /// Количество совпадений со всеми условиями запроса, включая готовность.
   final int totalCount;
 
   /// Числа вида, который попросил запрос.
   final IntentionCatalogCounts counts;
+
+  /// Число активных намерений с точным названием при поиске участника.
+  /// Отсутствует без пробы пары или фильтра названия.
+  final int? exactTitleCount;
+
+  static int? _requireExactTitleCount(int? count) {
+    if (count != null && count < 0) {
+      throw const IntentionCatalogPageValidationException();
+    }
+    return count;
+  }
 
   static int _requireTotalCount(
     int totalCount,

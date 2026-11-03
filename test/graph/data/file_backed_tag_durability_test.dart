@@ -321,7 +321,7 @@ void _seedAssignmentRecipients(sqlite.Database raw) {
       [tagFixtureId(4), 'Удаляемое намерение'],
     );
     raw.execute(
-      'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority) VALUES (?, ?, ?, ?, 2)',
+      'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, created_at, updated_at) VALUES (?, ?, ?, ?, 2, 0, 0)',
       [tagFixtureId(103), tagFixtureId(3), tagFixtureId(4), 'can'],
     );
   });

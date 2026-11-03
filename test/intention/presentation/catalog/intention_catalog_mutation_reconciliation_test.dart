@@ -1,3 +1,4 @@
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -985,11 +986,7 @@ void main() {
         final repository = ControlledCatalogRepository();
         final container = reconciliationCatalogContainer(repository);
         final provider = intentionCatalogViewModelProvider(
-          SelectRelationParticipant(
-            selectionContext:
-                RelationParticipantSelectionContext.activeRelation,
-            session: IntentionSearchSession(),
-          ),
+          SelectDailyChoiceSource(session: IntentionSearchSession()),
         );
         final subscription = container.listen(
           provider,
@@ -1459,6 +1456,361 @@ void main() {
     }
   });
 
+  group('точное название в поиске участника', () {
+    test(
+      'учитывает изменения исключённого участника и не перечитывает выдачу',
+      () async {
+        final repository = ControlledCatalogRepository();
+        final container = reconciliationCatalogContainer(
+          repository,
+          filterDebounce: Duration.zero,
+        );
+        final counterpart = testSummary(index: 9, title: 'Другое');
+        final provider = intentionCatalogViewModelProvider(
+          SelectRelationParticipant(
+            session: IntentionSearchSession(),
+            pairProbe: RelationPairProbe(
+              counterpartId: counterpart.id,
+              candidateRole: RelationParticipantRole.related,
+            ),
+          ),
+        );
+        final subscription = container.listen(
+          provider,
+          (_, _) {},
+          fireImmediately: true,
+        );
+        addTearDown(subscription.close);
+        addTearDown(container.dispose);
+        container.read(provider.notifier).changeTitleFilter('  Читать  ');
+        await waitForCatalogQueries(repository, 2);
+        repository.completeVerbatim(
+          1,
+          ResultSuccess(
+            IntentionCatalogFirstPage(
+              items: const [],
+              totalCount: 0,
+              counts: IntentionCountsByType(
+                IntentionTypeCounts(all: 0, actions: 0),
+              ),
+              nextCursor: null,
+              revision: const TestCatalogRevision(1),
+              pairOccupants: const {},
+              exactTitleCount: 0,
+            ),
+          ),
+        );
+        await container.read(provider.future);
+        IntentionCatalogConfirmedState current() =>
+            container.read(provider).requireValue
+                as IntentionCatalogConfirmedState;
+        expect(current().createTitle, 'Читать');
+        final exact = testSummary(index: 9, title: 'ЧИТАТЬ');
+        await completeCatalogCommand(
+          container,
+          repository,
+          UpdateIntention(
+            id: counterpart.id,
+            title: exact.title,
+            description: null,
+          ),
+          IntentionSaved(
+            testIntention(index: 9, title: exact.title),
+            catalogMutation: IntentionCatalogUpdated(
+              revision: const TestCatalogRevision(2),
+              before: TestCatalogEntrySnapshot(counterpart),
+              after: TestCatalogEntrySnapshot(exact),
+            ),
+          ),
+        );
+        expect(current().exactTitleCount, 1);
+        expect(current().createTitle, isNull);
+        await completeCatalogCommand(
+          container,
+          repository,
+          UpdateIntention(
+            id: counterpart.id,
+            title: counterpart.title,
+            description: null,
+          ),
+          IntentionSaved(
+            testIntention(index: 9),
+            catalogMutation: IntentionCatalogUpdated(
+              revision: const TestCatalogRevision(3),
+              before: TestCatalogEntrySnapshot(exact),
+              after: TestCatalogEntrySnapshot(counterpart),
+            ),
+          ),
+        );
+        expect(current().exactTitleCount, 0);
+        expect(current().createTitle, 'Читать');
+        expect(current(), isA<IntentionCatalogEmpty>());
+        expect(repository.queries, hasLength(2));
+      },
+    );
+    test(
+      'совпадения считаются при переименовании, архивировании и удалении',
+      () async {
+        final repository = ControlledCatalogRepository();
+        final container = reconciliationCatalogContainer(
+          repository,
+          filterDebounce: Duration.zero,
+        );
+        final counterpart = testSummary(index: 9);
+        final provider = intentionCatalogViewModelProvider(
+          SelectRelationParticipant(
+            session: IntentionSearchSession(),
+            pairProbe: RelationPairProbe(
+              counterpartId: counterpart.id,
+              candidateRole: RelationParticipantRole.related,
+            ),
+          ),
+        );
+        final subscription = container.listen(
+          provider,
+          (_, _) {},
+          fireImmediately: true,
+        );
+        addTearDown(subscription.close);
+        addTearDown(container.dispose);
+        container.read(provider.notifier).changeTitleFilter('Читать');
+        await waitForCatalogQueries(repository, 2);
+        final longer = testSummary(index: 1, title: 'Читать книгу');
+        final exact = testSummary(index: 1, title: 'Читать');
+        repository.completeVerbatim(
+          1,
+          ResultSuccess(
+            IntentionCatalogFirstPage(
+              items: [longer],
+              totalCount: 1,
+              counts: IntentionCountsByType(
+                IntentionTypeCounts(all: 1, actions: 0),
+              ),
+              nextCursor: null,
+              revision: const TestCatalogRevision(1),
+              pairOccupants: const {},
+              exactTitleCount: 0,
+            ),
+          ),
+        );
+        await container.read(provider.future);
+        IntentionCatalogConfirmedState current() =>
+            container.read(provider).requireValue
+                as IntentionCatalogConfirmedState;
+        expect(current().createTitle, 'Читать');
+        await completeCatalogCommand(
+          container,
+          repository,
+          UpdateIntention(id: exact.id, title: exact.title, description: null),
+          IntentionSaved(
+            testIntention(index: 1, title: exact.title),
+            catalogMutation: IntentionCatalogUpdated(
+              revision: const TestCatalogRevision(2),
+              before: TestCatalogEntrySnapshot(longer),
+              after: TestCatalogEntrySnapshot(exact),
+            ),
+          ),
+        );
+        expect(current().createTitle, isNull);
+        final second = testSummary(index: 2, title: 'читать');
+        await completeFullCreation(
+          container,
+          repository,
+          second,
+          revision: const TestCatalogRevision(3),
+        );
+        expect(current().exactTitleCount, 2);
+        final archived = testSummary(
+          index: 1,
+          title: 'Читать',
+          archiveState: IntentionArchiveState.archived,
+        );
+        await completeCatalogCommand(
+          container,
+          repository,
+          ArchiveIntention(exact.id),
+          IntentionSaved(
+            testIntention(index: 1),
+            catalogMutation: IntentionCatalogUpdated(
+              revision: const TestCatalogRevision(4),
+              before: TestCatalogEntrySnapshot(exact),
+              after: TestCatalogEntrySnapshot(archived),
+            ),
+          ),
+        );
+        expect(current().exactTitleCount, 1);
+        expect(current().createTitle, isNull);
+        await completeCatalogCommand(
+          container,
+          repository,
+          DeleteIntention(second.id),
+          IntentionDeleted(
+            second.id,
+            catalogMutation: IntentionCatalogDeleted(
+              revision: const TestCatalogRevision(5),
+              entry: TestCatalogEntrySnapshot(second),
+            ),
+          ),
+        );
+        expect(current(), isA<IntentionCatalogEmpty>());
+        expect(current().exactTitleCount, 0);
+        expect(current().createTitle, 'Читать');
+        expect(repository.queries, hasLength(2));
+      },
+    );
+
+    test('пакет ревизии порции не меняет её число повторно', () async {
+      final repository = ControlledCatalogRepository();
+      final container = reconciliationCatalogContainer(
+        repository,
+        filterDebounce: Duration.zero,
+      );
+      final counterpart = testSummary(index: 9);
+      final provider = intentionCatalogViewModelProvider(
+        SelectRelationParticipant(
+          session: IntentionSearchSession(),
+          pairProbe: RelationPairProbe(
+            counterpartId: counterpart.id,
+            candidateRole: RelationParticipantRole.related,
+          ),
+        ),
+      );
+      final subscription = container.listen(
+        provider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      addTearDown(container.dispose);
+      container.read(provider.notifier).changeTitleFilter('Читать');
+      await waitForCatalogQueries(repository, 2);
+      final created = testSummary(index: 1, title: 'Читать');
+      await completeFullCreation(
+        container,
+        repository,
+        created,
+        revision: const TestCatalogRevision(2),
+      );
+      repository.completeVerbatim(
+        1,
+        ResultSuccess(
+          IntentionCatalogFirstPage(
+            items: [created],
+            totalCount: 1,
+            counts: IntentionCountsByType(
+              IntentionTypeCounts(all: 1, actions: 0),
+            ),
+            nextCursor: null,
+            revision: const TestCatalogRevision(2),
+            pairOccupants: const {},
+            exactTitleCount: 1,
+          ),
+        ),
+      );
+      final current = await container.read(
+        provider.future,
+      ) as IntentionCatalogConfirmedState;
+      expect(current.exactTitleCount, 1);
+      expect(current.createTitle, isNull);
+      expect(repository.queries, hasLength(2));
+    });
+    test(
+      'поправка сохраняет курсор и число при загрузке продолжения',
+      () async {
+        final repository = ControlledCatalogRepository();
+        final container = reconciliationCatalogContainer(
+          repository,
+          filterDebounce: Duration.zero,
+          pageSize: 1,
+          prefetchRemaining: 0,
+        );
+        final counterpart = testSummary(index: 9, title: 'Другое');
+        final provider = intentionCatalogViewModelProvider(
+          SelectRelationParticipant(
+            session: IntentionSearchSession(),
+            pairProbe: RelationPairProbe(
+              counterpartId: counterpart.id,
+              candidateRole: RelationParticipantRole.related,
+            ),
+          ),
+        );
+        final subscription = container.listen(
+          provider,
+          (_, _) {},
+          fireImmediately: true,
+        );
+        addTearDown(subscription.close);
+        addTearDown(container.dispose);
+        container.read(provider.notifier).changeTitleFilter('Читать');
+        await waitForCatalogQueries(repository, 2);
+        const cursor = TestCatalogCursor();
+        final first = testSummary(index: 2, title: 'Читать первое');
+        final second = testSummary(index: 1, title: 'Читать второе');
+        repository.completeVerbatim(
+          1,
+          ResultSuccess(
+            IntentionCatalogFirstPage(
+              items: [first],
+              totalCount: 2,
+              counts: IntentionCountsByType(
+                IntentionTypeCounts(all: 2, actions: 0),
+              ),
+              nextCursor: cursor,
+              revision: const TestCatalogRevision(1),
+              pairOccupants: const {},
+              exactTitleCount: 0,
+            ),
+          ),
+        );
+        await container.read(provider.future);
+        final renamed = testSummary(index: 9, title: 'Читать');
+        await completeCatalogCommand(
+          container,
+          repository,
+          UpdateIntention(
+            id: counterpart.id,
+            title: renamed.title,
+            description: null,
+          ),
+          IntentionSaved(
+            testIntention(index: 9, title: renamed.title),
+            catalogMutation: IntentionCatalogUpdated(
+              revision: const TestCatalogRevision(2),
+              before: TestCatalogEntrySnapshot(counterpart),
+              after: TestCatalogEntrySnapshot(renamed),
+            ),
+          ),
+        );
+        var current =
+            container.read(provider).requireValue as IntentionCatalogLoaded;
+        expect(current.nextCursor, same(cursor));
+        expect(current.items.single.id, first.id);
+        expect(current.exactTitleCount, 1);
+        expect(repository.queries, hasLength(2));
+        final continuation = container
+            .read(provider.notifier)
+            .loadNextPageIfNeeded(visibleIndex: 0);
+        repository.completeVerbatim(
+          2,
+          ResultSuccess(
+            IntentionCatalogContinuationPage(
+              items: [second],
+              nextCursor: null,
+              revision: const TestCatalogRevision(2),
+              pairOccupants: const {},
+            ),
+          ),
+        );
+        await continuation;
+        current =
+            container.read(provider).requireValue as IntentionCatalogLoaded;
+        expect(current.items.map((item) => item.id), [first.id, second.id]);
+        expect(current.exactTitleCount, 1);
+        expect(current.createTitle, isNull);
+      },
+    );
+  });
+
   group('занимающие связи поиска с пробой пары', () {
     const cursor = TestCatalogCursor();
     final counterpart = testSummary(index: 9);
@@ -1474,10 +1826,14 @@ void main() {
       sourceIntentionId: counterpart.id,
       relatedIntentionId: fourth.id,
       index: 4,
+      priority: RelationPriority.p4,
     );
 
-    PairOccupant occupantOf(LongTermRelation relation) =>
-        PairOccupant(relationId: relation.id, scope: relation.scope);
+    PairOccupant occupantOf(LongTermRelation relation) => PairOccupant(
+      relationId: relation.id,
+      type: relation.type,
+      scope: relation.scope,
+    );
 
     /// Открывает поиск с пробой на первой порции [items]: при [nextCursor]
     /// за её границей остаются ещё две строки.
@@ -1501,7 +1857,6 @@ void main() {
       );
       final provider = intentionCatalogViewModelProvider(
         SelectRelationParticipant(
-          selectionContext: RelationParticipantSelectionContext.activeRelation,
           session: IntentionSearchSession(),
           pairProbe: RelationPairProbe(
             counterpartId: counterpart.id,
@@ -1570,18 +1925,17 @@ void main() {
         await completeRelationCommand(
           search.container,
           search.repository,
-          CreateLongTermRelation(
-            sourceIntentionId: counterpart.id,
-            relatedIntentionId: fourth.id,
-            type: occupyingFourth.type,
-            priority: occupyingFourth.priority,
-            description: null,
+          AddLongTermRelations(
+            pageIntentionId: counterpart.id,
+            candidateIds: [fourth.id],
+            group: (occupyingFourth.type == LongTermRelationType.need
+                ? IntentionRelationGroup.needs
+                : IntentionRelationGroup.canUse),
           ),
           _relationSuccess(
             const TestCatalogRevision(3),
-            LongTermRelationCreated(
-              relation: occupyingFourth,
-              description: null,
+            LongTermRelationsAdded(
+              relations: [occupyingFourth],
               changes: [
                 LongTermRelationCreatedChange(
                   revision: const TestCatalogRevision(3),
@@ -1617,6 +1971,7 @@ void main() {
           relatedIntentionId: relation.relatedIntentionId,
           index: relation.creationSequence.value,
           scope: RelationScope.archived,
+          priority: relation.priority,
         );
         await completeCatalogCommand(
           search.container,
@@ -1758,6 +2113,7 @@ void main() {
         expect(search.repository.queryAt(1).cursor, isNull);
         final archivedOccupant = PairOccupant(
           relationId: occupyingFourth.id,
+          type: occupyingFourth.type,
           scope: RelationScope.archived,
         );
         search.repository.complete(

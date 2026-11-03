@@ -4061,6 +4061,28 @@ class LongTermRelations extends Table
     $customConstraints: 'NOT NULL DEFAULT FALSE CHECK (typeof(is_archived) = \'integer\' AND is_archived IN (0, 1))',
     defaultValue: const CustomExpression('FALSE'),
   );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  late final GeneratedColumn<int> updatedAt = GeneratedColumn<int>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
   @override
   List<GeneratedColumn> get $columns => [
     creationSequence,
@@ -4071,6 +4093,8 @@ class LongTermRelations extends Table
     priority,
     description,
     isArchived,
+    createdAt,
+    updatedAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -4151,6 +4175,22 @@ class LongTermRelations extends Table
         isArchived.isAcceptableOrUnknown(data['is_archived']!, _isArchivedMeta),
       );
     }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
     return context;
   }
 
@@ -4196,6 +4236,14 @@ class LongTermRelations extends Table
         DriftSqlType.bool,
         data['${effectivePrefix}is_archived'],
       )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updated_at'],
+      )!,
     );
   }
 
@@ -4223,6 +4271,8 @@ class LongTermRelation extends DataClass
   final int priority;
   final String? description;
   final bool isArchived;
+  final int createdAt;
+  final int updatedAt;
   const LongTermRelation({
     required this.creationSequence,
     required this.id,
@@ -4232,6 +4282,8 @@ class LongTermRelation extends DataClass
     required this.priority,
     this.description,
     required this.isArchived,
+    required this.createdAt,
+    required this.updatedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -4246,6 +4298,8 @@ class LongTermRelation extends DataClass
       map['description'] = Variable<String>(description);
     }
     map['is_archived'] = Variable<bool>(isArchived);
+    map['created_at'] = Variable<int>(createdAt);
+    map['updated_at'] = Variable<int>(updatedAt);
     return map;
   }
 
@@ -4261,6 +4315,8 @@ class LongTermRelation extends DataClass
           ? const Value.absent()
           : Value(description),
       isArchived: Value(isArchived),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
     );
   }
 
@@ -4282,6 +4338,8 @@ class LongTermRelation extends DataClass
       priority: serializer.fromJson<int>(json['priority']),
       description: serializer.fromJson<String?>(json['description']),
       isArchived: serializer.fromJson<bool>(json['is_archived']),
+      createdAt: serializer.fromJson<int>(json['created_at']),
+      updatedAt: serializer.fromJson<int>(json['updated_at']),
     );
   }
   @override
@@ -4296,6 +4354,8 @@ class LongTermRelation extends DataClass
       'priority': serializer.toJson<int>(priority),
       'description': serializer.toJson<String?>(description),
       'is_archived': serializer.toJson<bool>(isArchived),
+      'created_at': serializer.toJson<int>(createdAt),
+      'updated_at': serializer.toJson<int>(updatedAt),
     };
   }
 
@@ -4308,6 +4368,8 @@ class LongTermRelation extends DataClass
     int? priority,
     Value<String?> description = const Value.absent(),
     bool? isArchived,
+    int? createdAt,
+    int? updatedAt,
   }) => LongTermRelation(
     creationSequence: creationSequence ?? this.creationSequence,
     id: id ?? this.id,
@@ -4317,6 +4379,8 @@ class LongTermRelation extends DataClass
     priority: priority ?? this.priority,
     description: description.present ? description.value : this.description,
     isArchived: isArchived ?? this.isArchived,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
   );
   LongTermRelation copyWithCompanion(LongTermRelationsCompanion data) {
     return LongTermRelation(
@@ -4338,6 +4402,8 @@ class LongTermRelation extends DataClass
       isArchived: data.isArchived.present
           ? data.isArchived.value
           : this.isArchived,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
 
@@ -4351,7 +4417,9 @@ class LongTermRelation extends DataClass
           ..write('type: $type, ')
           ..write('priority: $priority, ')
           ..write('description: $description, ')
-          ..write('isArchived: $isArchived')
+          ..write('isArchived: $isArchived, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
@@ -4366,6 +4434,8 @@ class LongTermRelation extends DataClass
     priority,
     description,
     isArchived,
+    createdAt,
+    updatedAt,
   );
   @override
   bool operator ==(Object other) =>
@@ -4378,7 +4448,9 @@ class LongTermRelation extends DataClass
           other.type == this.type &&
           other.priority == this.priority &&
           other.description == this.description &&
-          other.isArchived == this.isArchived);
+          other.isArchived == this.isArchived &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
 }
 
 class LongTermRelationsCompanion extends UpdateCompanion<LongTermRelation> {
@@ -4390,6 +4462,8 @@ class LongTermRelationsCompanion extends UpdateCompanion<LongTermRelation> {
   final Value<int> priority;
   final Value<String?> description;
   final Value<bool> isArchived;
+  final Value<int> createdAt;
+  final Value<int> updatedAt;
   const LongTermRelationsCompanion({
     this.creationSequence = const Value.absent(),
     this.id = const Value.absent(),
@@ -4399,6 +4473,8 @@ class LongTermRelationsCompanion extends UpdateCompanion<LongTermRelation> {
     this.priority = const Value.absent(),
     this.description = const Value.absent(),
     this.isArchived = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
   });
   LongTermRelationsCompanion.insert({
     this.creationSequence = const Value.absent(),
@@ -4409,11 +4485,15 @@ class LongTermRelationsCompanion extends UpdateCompanion<LongTermRelation> {
     required int priority,
     this.description = const Value.absent(),
     this.isArchived = const Value.absent(),
+    required int createdAt,
+    required int updatedAt,
   }) : id = Value(id),
        sourceIntentionId = Value(sourceIntentionId),
        relatedIntentionId = Value(relatedIntentionId),
        type = Value(type),
-       priority = Value(priority);
+       priority = Value(priority),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
   static Insertable<LongTermRelation> custom({
     Expression<int>? creationSequence,
     Expression<String>? id,
@@ -4423,6 +4503,8 @@ class LongTermRelationsCompanion extends UpdateCompanion<LongTermRelation> {
     Expression<int>? priority,
     Expression<String>? description,
     Expression<bool>? isArchived,
+    Expression<int>? createdAt,
+    Expression<int>? updatedAt,
   }) {
     return RawValuesInsertable({
       if (creationSequence != null) 'creation_sequence': creationSequence,
@@ -4434,6 +4516,8 @@ class LongTermRelationsCompanion extends UpdateCompanion<LongTermRelation> {
       if (priority != null) 'priority': priority,
       if (description != null) 'description': description,
       if (isArchived != null) 'is_archived': isArchived,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
     });
   }
 
@@ -4446,6 +4530,8 @@ class LongTermRelationsCompanion extends UpdateCompanion<LongTermRelation> {
     Value<int>? priority,
     Value<String?>? description,
     Value<bool>? isArchived,
+    Value<int>? createdAt,
+    Value<int>? updatedAt,
   }) {
     return LongTermRelationsCompanion(
       creationSequence: creationSequence ?? this.creationSequence,
@@ -4456,6 +4542,8 @@ class LongTermRelationsCompanion extends UpdateCompanion<LongTermRelation> {
       priority: priority ?? this.priority,
       description: description ?? this.description,
       isArchived: isArchived ?? this.isArchived,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 
@@ -4486,6 +4574,12 @@ class LongTermRelationsCompanion extends UpdateCompanion<LongTermRelation> {
     if (isArchived.present) {
       map['is_archived'] = Variable<bool>(isArchived.value);
     }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(updatedAt.value);
+    }
     return map;
   }
 
@@ -4499,7 +4593,9 @@ class LongTermRelationsCompanion extends UpdateCompanion<LongTermRelation> {
           ..write('type: $type, ')
           ..write('priority: $priority, ')
           ..write('description: $description, ')
-          ..write('isArchived: $isArchived')
+          ..write('isArchived: $isArchived, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
@@ -5777,10 +5873,6 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'daily_choice_path_steps_relation',
     'CREATE INDEX daily_choice_path_steps_relation ON daily_choice_path_steps (long_term_relation_id)',
   );
-  late final Trigger longTermRelationsProtectDailyChoicePath = Trigger(
-    'CREATE TRIGGER long_term_relations_protect_daily_choice_path BEFORE UPDATE OF type, source_intention_id, related_intention_id ON long_term_relations WHEN(new.type <> old.type OR new.source_intention_id <> old.source_intention_id OR new.related_intention_id <> old.related_intention_id)AND EXISTS (SELECT 1 FROM daily_choice_path_steps WHERE long_term_relation_id = old.id) BEGIN SELECT RAISE (ABORT, \'long-term relation is used by a daily choice path\');END',
-    'long_term_relations_protect_daily_choice_path',
-  );
   late final Index longTermRelationsSourceGroupOrder = Index(
     'long_term_relations_source_group_order',
     'CREATE INDEX long_term_relations_source_group_order ON long_term_relations (source_intention_id, type, is_archived, priority, creation_sequence)',
@@ -5790,7 +5882,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'CREATE INDEX long_term_relations_related_group_order ON long_term_relations (related_intention_id, type, is_archived, priority, creation_sequence)',
   );
   late final Trigger longTermRelationsImmutableIdentity = Trigger(
-    'CREATE TRIGGER long_term_relations_immutable_identity AFTER UPDATE OF creation_sequence, id ON long_term_relations WHEN new.creation_sequence <> old.creation_sequence OR new.id <> old.id BEGIN SELECT RAISE (ABORT, \'long-term relation identity is immutable\');END',
+    'CREATE TRIGGER long_term_relations_immutable_identity AFTER UPDATE OF creation_sequence, id, source_intention_id, related_intention_id ON long_term_relations WHEN new.creation_sequence <> old.creation_sequence OR new.id <> old.id OR new.source_intention_id <> old.source_intention_id OR new.related_intention_id <> old.related_intention_id BEGIN SELECT RAISE (ABORT, \'long-term relation identity is immutable\');END',
     'long_term_relations_immutable_identity',
   );
   late final Trigger longTermRelationsActiveParticipantsAfterInsert = Trigger(
@@ -5798,7 +5890,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'long_term_relations_active_participants_after_insert',
   );
   late final Trigger longTermRelationsActiveParticipantsAfterUpdate = Trigger(
-    'CREATE TRIGGER long_term_relations_active_participants_after_update AFTER UPDATE OF source_intention_id, related_intention_id, is_archived ON long_term_relations WHEN new.is_archived = 0 AND(NOT EXISTS (SELECT 1 FROM intentions WHERE id = new.source_intention_id AND is_archived = 0) OR NOT EXISTS (SELECT 1 FROM intentions WHERE id = new.related_intention_id AND is_archived = 0))BEGIN SELECT RAISE (ABORT, \'active relation requires active intentions\');END',
+    'CREATE TRIGGER long_term_relations_active_participants_after_update AFTER UPDATE OF is_archived ON long_term_relations WHEN new.is_archived = 0 AND(NOT EXISTS (SELECT 1 FROM intentions WHERE id = new.source_intention_id AND is_archived = 0) OR NOT EXISTS (SELECT 1 FROM intentions WHERE id = new.related_intention_id AND is_archived = 0))BEGIN SELECT RAISE (ABORT, \'active relation requires active intentions\');END',
     'long_term_relations_active_participants_after_update',
   );
   late final Trigger intentionsArchiveRequiresNoActiveRelations = Trigger(
@@ -5942,7 +6034,6 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     dailyChoicePathStepsOneRoot,
     dailyChoicePathStepsOneSuccessor,
     dailyChoicePathStepsRelation,
-    longTermRelationsProtectDailyChoicePath,
     longTermRelationsSourceGroupOrder,
     longTermRelationsRelatedGroupOrder,
     longTermRelationsImmutableIdentity,
@@ -6177,13 +6268,6 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     WritePropagation(
       on: TableUpdateQuery.onTableName(
         'daily_choices',
-        limitUpdateKind: UpdateKind.update,
-      ),
-      result: [],
-    ),
-    WritePropagation(
-      on: TableUpdateQuery.onTableName(
-        'long_term_relations',
         limitUpdateKind: UpdateKind.update,
       ),
       result: [],
@@ -9110,6 +9194,8 @@ typedef $LongTermRelationsCreateCompanionBuilder =
       required int priority,
       Value<String?> description,
       Value<bool> isArchived,
+      required int createdAt,
+      required int updatedAt,
     });
 typedef $LongTermRelationsUpdateCompanionBuilder =
     LongTermRelationsCompanion Function({
@@ -9121,6 +9207,8 @@ typedef $LongTermRelationsUpdateCompanionBuilder =
       Value<int> priority,
       Value<String?> description,
       Value<bool> isArchived,
+      Value<int> createdAt,
+      Value<int> updatedAt,
     });
 
 final class $LongTermRelationsReferences
@@ -9222,6 +9310,16 @@ class $LongTermRelationsFilterComposer
 
   ColumnFilters<bool> get isArchived => $composableBuilder(
     column: $table.isArchived,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -9336,6 +9434,16 @@ class $LongTermRelationsOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $IntentionsOrderingComposer get sourceIntentionId {
     final $IntentionsOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -9415,6 +9523,12 @@ class $LongTermRelationsAnnotationComposer
     column: $table.isArchived,
     builder: (column) => column,
   );
+
+  GeneratedColumn<int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 
   $IntentionsAnnotationComposer get sourceIntentionId {
     final $IntentionsAnnotationComposer composer = $composerBuilder(
@@ -9528,6 +9642,8 @@ class $LongTermRelationsTableManager
                 Value<int> priority = const Value.absent(),
                 Value<String?> description = const Value.absent(),
                 Value<bool> isArchived = const Value.absent(),
+                Value<int> createdAt = const Value.absent(),
+                Value<int> updatedAt = const Value.absent(),
               }) => LongTermRelationsCompanion(
                 creationSequence: creationSequence,
                 id: id,
@@ -9537,6 +9653,8 @@ class $LongTermRelationsTableManager
                 priority: priority,
                 description: description,
                 isArchived: isArchived,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
               ),
           createCompanionCallback:
               ({
@@ -9548,6 +9666,8 @@ class $LongTermRelationsTableManager
                 required int priority,
                 Value<String?> description = const Value.absent(),
                 Value<bool> isArchived = const Value.absent(),
+                required int createdAt,
+                required int updatedAt,
               }) => LongTermRelationsCompanion.insert(
                 creationSequence: creationSequence,
                 id: id,
@@ -9557,6 +9677,8 @@ class $LongTermRelationsTableManager
                 priority: priority,
                 description: description,
                 isArchived: isArchived,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
               ),
           withReferenceMapper: (p0) => p0
               .map(

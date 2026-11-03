@@ -60,6 +60,24 @@ void main() {
     },
   );
 
+  test('повторная прокрутка во время подгрузки не отправляет продолжение '
+      'второй раз', () async {
+    final harness = _ListHarness();
+    addTearDown(harness.dispose);
+    harness.reads.first(0, [1, 2], total: 5, revision: 1, next: 2);
+    await pumpEventQueue();
+
+    harness.scrollTo(1);
+    harness.scrollTo(1);
+    await pumpEventQueue();
+    expect(harness.reads.count, 2);
+
+    harness.reads.continuation(1, [3, 4], revision: 1, next: 4);
+    await pumpEventQueue();
+    expect(harness.active.data.items, [1, 2, 3, 4]);
+    expect(harness.reads.count, 2);
+  });
+
   test('прерванная подгрузка ведёт к новой основе в пределах загруженной части '
       'и запрошенной порции', () async {
     final harness = _ListHarness();

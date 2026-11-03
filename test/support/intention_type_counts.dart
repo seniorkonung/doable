@@ -41,6 +41,7 @@ IntentionCatalogPage _answer(
       nextCursor: page.nextCursor,
       revision: page.revision,
       pairOccupants: pairOccupants,
+      exactTitleCount: page.exactTitleCount,
     ),
     IntentionCatalogContinuationPage() => IntentionCatalogContinuationPage(
       items: page.items,

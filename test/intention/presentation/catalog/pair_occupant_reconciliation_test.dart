@@ -30,15 +30,20 @@ void main() {
     required IntentionId related,
     int index = 1,
     RelationScope scope = RelationScope.active,
+    LongTermRelationType type = LongTermRelationType.need,
   }) => testRelation(
     sourceIntentionId: source,
     relatedIntentionId: related,
     index: index,
     scope: scope,
+    type: type,
   );
 
-  PairOccupant occupantOf(LongTermRelation relation) =>
-      PairOccupant(relationId: relation.id, scope: relation.scope);
+  PairOccupant occupantOf(LongTermRelation relation) => PairOccupant(
+    relationId: relation.id,
+    type: relation.type,
+    scope: relation.scope,
+  );
 
   Map<IntentionId, PairOccupant> reconcile(
     Iterable<LongTermRelationChange> changes, {
@@ -157,6 +162,29 @@ void main() {
     );
   });
 
+  test('изменение типа обновляет занимающую связь', () {
+    final before = relation(source: counterpart, related: row);
+    final after = relation(
+      source: counterpart,
+      related: row,
+      type: LongTermRelationType.can,
+    );
+
+    expect(
+      reconcile(
+        [
+          LongTermRelationUpdatedChange(
+            revision: revision,
+            before: before,
+            after: after,
+          ),
+        ],
+        occupants: {row: occupantOf(before)},
+      ),
+      {row: occupantOf(after)},
+    );
+  });
+
   test('восстановление делает отметку активной', () {
     final before = relation(
       source: counterpart,
@@ -187,22 +215,6 @@ void main() {
       reconcile(
         [LongTermRelationDeletedChange(revision: revision, relation: deleted)],
         occupants: {row: occupantOf(deleted)},
-      ),
-      isEmpty,
-    );
-  });
-
-  test('изменяемая связь пару не занимает', () {
-    final edited = relation(source: counterpart, related: row);
-
-    expect(
-      reconcile(
-        [LongTermRelationCreatedChange(revision: revision, relation: edited)],
-        probe: RelationPairProbe(
-          counterpartId: counterpart,
-          candidateRole: RelationParticipantRole.related,
-          ignoredRelationId: edited.id,
-        ),
       ),
       isEmpty,
     );

@@ -1,3 +1,4 @@
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 
@@ -135,180 +136,143 @@ void main() {
       },
     );
 
-    group('восстановление как отправка формы создания', () {
-      test(
-        'занимает ключи формы и связи, а операцию другой связи принимает',
-        () async {
-          final repository = _ControlledPersonalGraphRepository();
-          final coordinator = _coordinator(repository);
-          final formKey = LongTermRelationCreationFormKey();
-
-          final restore = coordinator.acceptRelationRestoreFromCreation(
-            formKey,
-            RestoreLongTermRelation(_relationId),
-          );
-
-          expect(restore, isA<LongTermRelationCommandAccepted>());
-          expect(coordinator.isKeyRunning(formKey), isTrue);
-          expect(coordinator.isRelationRunning(_relationId), isTrue);
-          expect(
-            coordinator.acceptRelationCreation(formKey, _createRelation()),
-            isA<LongTermRelationCommandAlreadyRunning>(),
-          );
-          expect(
-            coordinator.acceptRelationRestoreFromCreation(
-              formKey,
-              RestoreLongTermRelation(_otherRelationId),
+    group('политика предъявления', () {
+      final silentOperations =
+          <
+            ({
+              String name,
+              LongTermRelationCommandStart Function(GraphCommandCoordinator)
+              start,
+            })
+          >[
+            (
+              name: 'изменение',
+              start: (coordinator) => coordinator.acceptRelationUpdate(
+                _updateRelation(_relationId),
+              ),
             ),
-            isA<LongTermRelationCommandAlreadyRunning>(),
-          );
-          expect(
-            coordinator.acceptRelationRestore(
-              RestoreLongTermRelation(_relationId),
+            (
+              name: 'архивирование',
+              start: (coordinator) => coordinator.acceptRelationArchive(
+                ArchiveLongTermRelation(_relationId),
+              ),
             ),
-            isA<LongTermRelationCommandAlreadyRunning>(),
-          );
-          expect(
-            coordinator.acceptRelationUpdate(_updateRelation(_relationId)),
-            isA<LongTermRelationCommandAlreadyRunning>(),
-          );
-          expect(
-            coordinator.acceptRelationDelete(
-              DeleteLongTermRelation(_relationId),
+            (
+              name: 'восстановление',
+              start: (coordinator) => coordinator.acceptRelationRestore(
+                RestoreLongTermRelation(_relationId),
+              ),
             ),
-            isA<LongTermRelationCommandAlreadyRunning>(),
-          );
-          expect(repository.commands, hasLength(1));
+          ];
 
-          final otherRelation = coordinator.acceptRelationArchive(
-            ArchiveLongTermRelation(_otherRelationId),
-          );
-          expect(otherRelation, isA<LongTermRelationCommandAccepted>());
-          expect(repository.commands, hasLength(2));
+      for (final operation in silentOperations) {
+        test(
+          'успех операции «${operation.name}» публикуется для согласования без '
+          'права предъявления и не задерживает следующий отказ',
+          () async {
+            final repository = _ControlledPersonalGraphRepository();
+            final coordinator = _coordinator(repository);
+            final completions = <GraphCommandCompletion>[];
+            final subscription = coordinator.completions.listen(
+              completions.add,
+            );
+            final registration = coordinator.registerAppPresentation();
+            final claims = <GraphAppPresentationClaim?>[];
+            unawaited(registration.nextClaim().then(claims.add));
 
-          repository
-            ..completeRelationUpdated(0, _relationId)
-            ..completeRelationFailure(1);
-          await (restore as LongTermRelationCommandAccepted).future;
-          await (otherRelation as LongTermRelationCommandAccepted).future;
+            final accepted =
+                operation.start(coordinator) as LongTermRelationCommandAccepted;
+            repository.completeRelationUpdated(0, _relationId);
+            final completion = await accepted.future;
+            await pumpEventQueue();
 
-          expect(coordinator.isKeyRunning(formKey), isFalse);
-          expect(coordinator.isRelationRunning(_relationId), isFalse);
-          await coordinator.shutdown();
-        },
-      );
+            expect(completion.isFailure, isFalse);
+            expect(completion, isNot(isA<GraphPresentableCompletion>()));
+            expect(completion.revision, const _TestRevision(1));
+            expect(completions, [same(completion)]);
+            expect(claims, isEmpty);
+            expect(coordinator.claimInitiatorFailure(accepted.token), isNull);
 
-      test('освобождает оба ключа после завершения', () async {
+            final failed = coordinator.acceptRelationDelete(
+              DeleteLongTermRelation(_otherRelationId),
+            ) as LongTermRelationCommandAccepted;
+            coordinator.releaseInitiatorPresentation(failed.token);
+            repository.completeRelationFailure(1);
+            final failure = await failed.future;
+            await pumpEventQueue();
+
+            expect(claims.single?.completions, [same(failure)]);
+            coordinator.confirmAppPresentation(claims.single!, [failure.token]);
+            registration.release();
+            await subscription.cancel();
+            await coordinator.shutdown();
+          },
+        );
+
+        test(
+          'отказ операции «${operation.name}» принадлежит сначала инициатору',
+          () async {
+            final repository = _ControlledPersonalGraphRepository();
+            final coordinator = _coordinator(repository);
+            final registration = coordinator.registerAppPresentation();
+            final claims = <GraphAppPresentationClaim?>[];
+            unawaited(registration.nextClaim().then(claims.add));
+
+            final accepted =
+                operation.start(coordinator) as LongTermRelationCommandAccepted;
+            repository.completeRelationFailure(0);
+            final completion = await accepted.future;
+            await pumpEventQueue();
+
+            expect(completion, isA<GraphPresentableCompletion>());
+            expect(claims, isEmpty);
+            final claim = coordinator.claimInitiatorFailure(accepted.token);
+            expect(claim, isNotNull);
+            coordinator.releaseInitiatorClaim(claim!);
+            registration.release();
+            await coordinator.shutdown();
+          },
+        );
+      }
+
+      test('успех создания и удаления принадлежит оболочке', () async {
         final repository = _ControlledPersonalGraphRepository();
         final coordinator = _coordinator(repository);
-        final formKey = LongTermRelationCreationFormKey();
+        final registration = coordinator.registerAppPresentation();
+        final claims = <GraphAppPresentationClaim?>[];
+        unawaited(registration.nextClaim().then(claims.add));
 
-        final restore = coordinator.acceptRelationRestoreFromCreation(
-          formKey,
-          RestoreLongTermRelation(_relationId),
-        ) as LongTermRelationCommandAccepted;
-        repository.completeRelationFailure(0);
-        await restore.future;
-
-        final repeated = coordinator.acceptRelationCreation(
-          formKey,
+        final creation = coordinator.acceptRelationsAddition(
+          RelationsAdditionSearchKey(),
           _createRelation(),
-        );
-        final sameRelation = coordinator.acceptRelationRestore(
-          RestoreLongTermRelation(_relationId),
-        );
-        expect(repeated, isA<LongTermRelationCommandAccepted>());
-        expect(sameRelation, isA<LongTermRelationCommandAccepted>());
-
-        repository
-          ..completeRelationFailure(1)
-          ..completeRelationFailure(2);
-        await (repeated as LongTermRelationCommandAccepted).future;
-        await (sameRelation as LongTermRelationCommandAccepted).future;
-        await coordinator.shutdown();
-      });
-
-      test('завершение имеет вид восстановления и цель существующей связи, а '
-          'успех принадлежит оболочке без права инициатора', () async {
-        final repository = _ControlledPersonalGraphRepository();
-        final coordinator = _coordinator(repository);
-        final registration = coordinator.registerAppPresentation();
-        final claimFuture = registration.nextClaim();
-
-        final restore = coordinator.acceptRelationRestoreFromCreation(
-          LongTermRelationCreationFormKey(),
-          RestoreLongTermRelation(_relationId),
         ) as LongTermRelationCommandAccepted;
-        repository.completeRelationUpdated(0, _relationId);
-        final completion = await restore.future;
-        final claim = await claimFuture;
+        repository.completeRelationsAdded(0, _relationId);
+        final created = await creation.future;
+        await pumpEventQueue();
 
-        expect(completion.kind, LongTermRelationCommandKind.restore);
-        expect(
-          completion.target,
-          isA<ExistingLongTermRelationOperationTarget>().having(
-            (target) => target.relationId,
-            'идентификатор связи',
-            _relationId,
-          ),
-        );
-        expect(completion.isFailure, isFalse);
-        expect(claim?.completions, [same(completion)]);
-        expect(coordinator.claimInitiatorFailure(restore.token), isNull);
+        expect(created, isA<GraphPresentableCompletion>());
+        expect(claims.single?.completions, [same(created)]);
+        coordinator.confirmAppPresentation(claims.single!, [created.token]);
 
-        coordinator.confirmAppPresentation(claim!, [completion.token]);
+        final deletion = coordinator.acceptRelationDelete(
+          DeleteLongTermRelation(_otherRelationId),
+        ) as LongTermRelationCommandAccepted;
+        repository.completeRelationDeleted(1, _otherRelationId, revision: 2);
+        final deleted = await deletion.future;
+        await pumpEventQueue();
+
+        expect(deleted, isA<GraphPresentableCompletion>());
         registration.release();
-        await coordinator.shutdown();
-      });
-
-      test('отказ сразу принадлежит оболочке без права инициатора', () async {
-        final repository = _ControlledPersonalGraphRepository();
-        final coordinator = _coordinator(repository);
-        final registration = coordinator.registerAppPresentation();
-        final claimFuture = registration.nextClaim();
-
-        final restore = coordinator.acceptRelationRestoreFromCreation(
-          LongTermRelationCreationFormKey(),
-          RestoreLongTermRelation(_relationId),
-        ) as LongTermRelationCommandAccepted;
-        repository.completeRelationFailure(0);
-        final completion = await restore.future;
-        final claim = await claimFuture;
-
-        expect(completion.isFailure, isTrue);
-        expect(coordinator.claimInitiatorFailure(restore.token), isNull);
-        expect(claim?.completions, [same(completion)]);
-
-        coordinator.confirmAppPresentation(claim!, [completion.token]);
-        registration.release();
-        await coordinator.shutdown();
-      });
-
-      test('отказ существующего восстановления из просмотра по-прежнему '
-          'принадлежит сначала инициатору', () async {
-        final repository = _ControlledPersonalGraphRepository();
-        final coordinator = _coordinator(repository);
-
-        final restore = coordinator.acceptRelationRestore(
-          RestoreLongTermRelation(_relationId),
-        ) as LongTermRelationCommandAccepted;
-        repository.completeRelationFailure(0);
-        await restore.future;
-
-        expect(coordinator.claimInitiatorFailure(restore.token), isNotNull);
-        coordinator.releaseInitiatorPresentation(restore.token);
         await coordinator.shutdown();
       });
     });
   });
 }
 
-CreateLongTermRelation _createRelation() => CreateLongTermRelation(
-  sourceIntentionId: _intentionId(_sourceUuid),
-  relatedIntentionId: _intentionId(_relatedUuid),
-  type: LongTermRelationType.need,
-  priority: RelationPriority.p2,
-  description: null,
+AddLongTermRelations _createRelation() => AddLongTermRelations(
+  pageIntentionId: _intentionId(_sourceUuid),
+  candidateIds: [_intentionId(_relatedUuid)],
+  group: IntentionRelationGroup.needs,
 );
 
 GraphCommandCoordinator _coordinator(PersonalGraphRepository repository) {
@@ -339,6 +303,8 @@ LongTermRelation _relation(
   priority: priority,
   scope: scope,
   creationSequence: RelationCreationSequence(1),
+  createdAt: RelationTimestamp(DateTime.utc(2026)),
+  updatedAt: RelationTimestamp(DateTime.utc(2026)),
 );
 
 final class _ControlledPersonalGraphRepository
@@ -394,6 +360,30 @@ final class _ControlledPersonalGraphRepository
       IntentionUnavailableFailure(),
     ),
   );
+
+  void completeRelationsAdded(int index, LongTermRelationId id) {
+    const revision = _TestRevision(1);
+    final relation = _relation(id, RelationPriority.p4);
+    _results[index].complete(
+      GraphCommandSucceeded<
+        LongTermRelationCommandSuccess,
+        LongTermRelationCommandFailure
+      >(
+        ConfirmedGraphResult(
+          revision: revision,
+          value: LongTermRelationsAdded(
+            relations: [relation],
+            changes: [
+              LongTermRelationCreatedChange(
+                revision: revision,
+                relation: relation,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   void completeRelationUpdated(int index, LongTermRelationId id) {
     const revision = _TestRevision(1);

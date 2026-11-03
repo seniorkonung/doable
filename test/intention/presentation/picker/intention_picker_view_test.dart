@@ -15,8 +15,9 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_purp
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
-import 'package:doable/src/intention/presentation/picker/intention_picker_row.dart';
+import 'package:doable/src/intention/presentation/picker/intention_picker_purpose_sheet.dart';
 import 'package:doable/src/intention/presentation/picker/intention_picker_view.dart';
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/relation_pair_probe.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
@@ -30,13 +31,18 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../catalog/catalog_reconciliation_test_support.dart';
 import '../catalog/catalog_test_support.dart';
-import '../../../long_term_relation/presentation/editor/relation_form_test_support.dart'
-    show testFormRelationId;
+import '../../../long_term_relation/presentation/relation_graph_test_support.dart'
+    show testRelationId;
 import '../../../support/tag_positions.dart';
 
 const _screen = Size(390, 844);
 const _closeLabel = 'Закрыть поиск';
 const _emptyScopeMessage = 'Доступных активных действий нет.';
+final _purposeDescription = IntentionPickerPurposeDescription(
+  subtitle: 'Добавить в «Нужно»',
+  sheetLine: 'Новые связи в «Нужно»',
+  buildSheetBody: (_) => const SizedBox.shrink(),
+);
 
 final _actionField = find.byKey(const ValueKey('daily-choice-action-filter'));
 final _filterButton = find.byType(FilterButton);
@@ -45,9 +51,19 @@ final _list = find.byKey(
 );
 
 void main() {
-  for (final (locale, action, intention) in [
-    (const Locale('ru'), 'Выбор действия', 'Выбор намерения'),
-    (const Locale('en'), 'Choose an action', 'Choose an intention'),
+  for (final (locale, action, intention, participants) in [
+    (
+      const Locale('ru'),
+      'Выбор действия',
+      'Выбор намерения',
+      'Выбор намерений',
+    ),
+    (
+      const Locale('en'),
+      'Choose an action',
+      'Choose an intention',
+      'Choose intentions',
+    ),
   ]) {
     for (final (purpose, title, keyPrefix) in [
       (
@@ -62,10 +78,13 @@ void main() {
       ),
       (
         SelectRelationParticipant(
-          selectionContext: RelationParticipantSelectionContext.activeRelation,
           session: IntentionSearchSession(),
+          pairProbe: RelationPairProbe(
+            counterpartId: testSummary(index: 999).id,
+            candidateRole: RelationParticipantRole.related,
+          ),
         ),
-        intention,
+        participants,
         'participant-picker',
       ),
     ]) {
@@ -528,8 +547,6 @@ void main() {
       ),
       (
         SelectRelationParticipant(
-          selectionContext:
-              RelationParticipantSelectionContext.archivedRelation,
           pairProbe: RelationPairProbe(
             counterpartId: _action(9).id,
             candidateRole: RelationParticipantRole.related,
@@ -620,8 +637,6 @@ void main() {
         (tester) async {
           final ru = locale.languageCode == 'ru';
           final purpose = SelectRelationParticipant(
-            selectionContext:
-                RelationParticipantSelectionContext.activeRelation,
             pairProbe: RelationPairProbe(
               counterpartId: _action(9).id,
               candidateRole: RelationParticipantRole.related,
@@ -841,62 +856,194 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('нажатие на текст отмеченной строки передаёт занимающую связь и '
-      'не выбирает намерение, а остальные строки и число не меняются', (
-    tester,
-  ) async {
-    final semantics = tester.ensureSemantics();
-    final h = await _open(
-      tester,
-      purpose: SelectRelationParticipant(
-        selectionContext: RelationParticipantSelectionContext.activeRelation,
-        session: IntentionSearchSession(),
-        pairProbe: RelationPairProbe(
-          counterpartId: testSummary(index: 9).id,
-          candidateRole: RelationParticipantRole.related,
-        ),
-      ),
-    );
-    final walk = _action(3);
-    final swim = _action(2);
-    final sleep = _action(1);
-    final walkOccupant = PairOccupant(
-      relationId: testFormRelationId(1),
-      scope: RelationScope.active,
-    );
-    h.repository.complete(
-      0,
-      _firstPage(
-        [walk, swim, sleep],
-        pairOccupants: {
-          walk.id: walkOccupant,
-          swim.id: PairOccupant(
-            relationId: testFormRelationId(2),
-            scope: RelationScope.archived,
+  for (final (locale, reasons) in [
+    (
+      const Locale('ru'),
+      [
+        'Уже добавлено',
+        'Уже добавлено, в архиве',
+        'Уже в группе "Можно использовать"',
+        'Уже в группе "Можно использовать", в архиве',
+      ],
+    ),
+    (
+      const Locale('en'),
+      [
+        'Already added',
+        'Already added, archived',
+        'Already in group "Can use"',
+        'Already in group "Can use", archived',
+      ],
+    ),
+  ]) {
+    testWidgets(
+      '${locale.languageCode}: отметка свободной строки и причины занятых строк сохраняют выдачу',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        final h = await _open(
+          tester,
+          locale: locale,
+          checkable: true,
+          purpose: SelectRelationParticipant(
+            session: IntentionSearchSession(),
+            pairProbe: RelationPairProbe(
+              counterpartId: testSummary(index: 9).id,
+              candidateRole: RelationParticipantRole.related,
+            ),
           ),
-        },
+        );
+        final items = _actions(6);
+        h.repository.complete(
+          0,
+          _firstPage(
+            items,
+            pairOccupants: {
+              for (var i = 0; i < 4; i++)
+                items[i].id: PairOccupant(
+                  relationId: testRelationId(i + 1),
+                  type: i < 2
+                      ? LongTermRelationType.need
+                      : LongTermRelationType.can,
+                  scope: i.isEven
+                      ? RelationScope.active
+                      : RelationScope.archived,
+                ),
+            },
+          ),
+        );
+        await tester.pumpAndSettle();
+        for (final reason in reasons) {
+          expect(find.text(reason), findsOneWidget);
+          expect(
+            find.bySemanticsLabel(RegExp("${RegExp.escape(reason)}\$")),
+            findsOneWidget,
+          );
+        }
+        expect(
+          _header(locale.languageCode == 'ru' ? 'Все' : 'All', 6),
+          findsOneWidget,
+        );
+        await tester.tap(find.text(items.first.title));
+        expect(h.picks, isEmpty);
+        await tester.tap(find.text(items.last.title));
+        expect(h.picks.single.value.id, items.last.id);
+        expect(
+          tester.getSemantics(
+            find.bySemanticsLabel(
+              RegExp("^${RegExp.escape(items.last.title)},"),
+            ),
+          ),
+          isSemantics(
+            hasCheckedState: true,
+            isChecked: false,
+            hasTapAction: true,
+          ),
+        );
+        expect(
+          tester.getSemantics(
+            find.bySemanticsLabel(RegExp("^${RegExp.escape(items[4].title)},")),
+          ),
+          isSemantics(
+            hasCheckedState: true,
+            isChecked: true,
+            hasTapAction: true,
+          ),
+        );
+        await tester.tap(
+          find.bySemanticsLabel(
+            locale.languageCode == 'ru'
+                ? 'Открыть страницу действия «${items.first.title}»'
+                : 'Open the page of action ${items.first.title}',
+          ),
+        );
+        expect(h.openedDetails, [items.first.id]);
+        semantics.dispose();
+      },
+    );
+  }
+
+  group('создание намерения в поиске с отметками', () {
+    final participants = SelectRelationParticipant(
+      session: IntentionSearchSession(),
+      pairProbe: RelationPairProbe(
+        counterpartId: testSummary(index: 9).id,
+        candidateRole: RelationParticipantRole.related,
       ),
     );
-    await tester.pumpAndSettle();
 
-    expect(find.bySemanticsLabel(RegExp('Уже связано')), findsOneWidget);
-    expect(find.bySemanticsLabel(RegExp('Связь в архиве')), findsOneWidget);
-    expect(find.text('Уже связано'), findsOneWidget);
-    expect(find.text('Связь в архиве'), findsOneWidget);
-    expect(_header('Все', 3), findsOneWidget);
+    for (final (locale, plusLabel, rowText) in [
+      (const Locale('ru'), 'Создать намерение', 'Создать «Плавать»'),
+      (const Locale('en'), 'Create intention', 'Create “Плавать”'),
+    ]) {
+      testWidgets(
+        '${locale.languageCode}: плюс просит создание с пустым названием, '
+        'а строка «Создать» — с подстрокой',
+        (tester) async {
+          final h = await _open(
+            tester,
+            locale: locale,
+            checkable: true,
+            purpose: participants,
+            purposeDescription: _purposeDescription,
+          );
+          h.repository.complete(0, _firstPage(const []));
+          await tester.pumpAndSettle();
+          await _showTitleResults(tester, h, ' Плавать ');
 
-    await tester.tap(find.bySemanticsLabel(RegExp('Уже связано')));
-    expect(h.openedOccupants, [walkOccupant]);
-    expect(h.picks, isEmpty);
+          await tester.tap(find.bySemanticsLabel(plusLabel));
+          await tester.tap(find.text(rowText));
 
-    await tester.tap(find.bySemanticsLabel(RegExp('Связь в архиве')));
-    expect(h.openedOccupants.length, 2);
-    expect(h.picks, isEmpty);
+          expect(h.creations.map((creation) => creation.title), [
+            '',
+            'Плавать',
+          ]);
+        },
+      );
+    }
 
-    await tester.tap(find.text('Действие 1'));
-    expect(h.picks.single.value.id, sleep.id);
-    expect(h.openedOccupants.length, 2);
-    semantics.dispose();
+    testWidgets('просьба страницы очищает поле и фильтр названия и сохраняет '
+        'условия по тегам', (tester) async {
+      final sport = _tag(1, 'Спорт');
+      final h = await _open(
+        tester,
+        checkable: true,
+        purpose: participants,
+        purposeDescription: _purposeDescription,
+        tags: [sport],
+      );
+      h.repository.complete(0, _firstPage(const []));
+      await tester.pumpAndSettle();
+      h.conditions(participants).cycle(sport.id);
+      await tester.pump();
+      h.repository.complete(1, _firstPage(const []));
+      await tester.pumpAndSettle();
+      await _showTitleResults(tester, h, 'Плавать');
+
+      await tester.tap(find.text('Создать «Плавать»'));
+      h.creations.single.clearTitle();
+      await tester.pump();
+
+      expect(find.text('Плавать'), findsNothing);
+      final query = h.repository.queries.last;
+      expect(query.titleFilter, isNull);
+      expect(query.tagFilter.requiredTagIds, [sport.id]);
+    });
+
+    testWidgets('поиск с выбором одного намерения плюса и строки не имеет', (
+      tester,
+    ) async {
+      final h = await _open(
+        tester,
+        purpose: participants,
+        purposeDescription: _purposeDescription,
+      );
+      h.repository.complete(0, _firstPage(const []));
+      await tester.pumpAndSettle();
+      await _showTitleResults(tester, h, 'Плавать');
+
+      expect(find.bySemanticsLabel('Создать намерение'), findsNothing);
+      expect(find.text('Создать «Плавать»'), findsNothing);
+    });
   });
 
   for (final brightness in Brightness.values) {
@@ -954,6 +1101,7 @@ Result<IntentionCatalogPage> _firstPage(
   int? totalCount,
   IntentionTypeCounts? typeCounts,
   Map<IntentionId, PairOccupant>? pairOccupants,
+  int? exactTitleCount,
 }) => ResultSuccess(
   IntentionCatalogFirstPage(
     items: items,
@@ -966,8 +1114,25 @@ Result<IntentionCatalogPage> _firstPage(
         : null,
     revision: const TestCatalogRevision(1),
     pairOccupants: pairOccupants,
+    exactTitleCount: exactTitleCount,
   ),
 );
+
+/// Вводит подстроку [title], которой не называется ни одно активное намерение.
+Future<void> _showTitleResults(
+  WidgetTester tester,
+  _Harness h,
+  String title,
+) async {
+  await tester.enterText(find.byType(EditableText), title);
+  await tester.pump(const Duration(milliseconds: 300));
+  await tester.pump();
+  h.repository.complete(
+    h.repository.queries.length - 1,
+    _firstPage(const [], exactTitleCount: 0),
+  );
+  await tester.pumpAndSettle();
+}
 
 Tag _tag(int number, String name) => Tag(
   id: (TagId.decode(
@@ -986,7 +1151,7 @@ final class _Harness {
   int closes = 0;
   final picks = <GraphSnapshot<IntentionSummary>>[];
   final openedDetails = <IntentionId>[];
-  final openedOccupants = <PairOccupant>[];
+  final creations = <({String title, VoidCallback clearTitle})>[];
 
   IntentionTagConditionsViewModel conditions(IntentionPickerPurpose purpose) =>
       container.read(intentionTagConditionsViewModelProvider(purpose).notifier);
@@ -998,6 +1163,8 @@ Future<_Harness> _open(
   Brightness brightness = Brightness.light,
   IntentionPickerPurpose? purpose,
   List<Tag>? tags,
+  bool checkable = false,
+  IntentionPickerPurposeDescription? purposeDescription,
 }) async {
   tester.view
     ..physicalSize = _screen
@@ -1022,15 +1189,17 @@ Future<_Harness> _open(
           closeLabel: _closeLabel,
           emptyScopeMessage: _emptyScopeMessage,
           onClose: () => h.closes++,
-          onPick: h.picks.add,
+          rowBehavior: checkable
+              ? IntentionPickerCheckable(
+                  group: IntentionRelationGroup.needs,
+                  selectedIds: {_action(2).id},
+                  onToggle: h.picks.add,
+                  onCreate: (title, clearTitle) =>
+                      h.creations.add((title: title, clearTitle: clearTitle)),
+                )
+              : IntentionPickerSingle(onPick: h.picks.add),
           onOpenDetails: h.openedDetails.add,
-          occupiedPairMark: (occupant) => OccupiedPairMark(
-            kind: switch (occupant.scope) {
-              RelationScope.active => OccupiedPairKind.linked,
-              RelationScope.archived => OccupiedPairKind.archived,
-            },
-            onTap: () => h.openedOccupants.add(occupant),
-          ),
+          purposeDescription: purposeDescription,
         ),
       ),
     ),

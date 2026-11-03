@@ -19,8 +19,9 @@ part of 'intention_editor_view_model.dart';
 /// закрытия по запросу или освобождения и отвергает правки черновика.
 ///
 /// Все способы ухода обращаются к единому решению [requestClose]: неизменённый
-/// черновик закрывается сразу, изменённый — после одного подтверждения,
-/// связанного с ключом сессии и состоянием отправки. Панель тегов и лист тега
+/// черновик до принятия отправки закрывается сразу; изменённый черновик или
+/// принятая отправка требуют одного подтверждения, связанного с ключом сессии
+/// и состоянием отправки. Панель тегов и лист тега
 /// поверх формы сессию не завершают. Закрытие не отменяет принятую отправку:
 /// её будущий результат переходит общей поверхности.
 ///
@@ -59,8 +60,9 @@ final intentionEditorViewModelProvider = IntentionEditorViewModelFamily._();
 /// закрытия по запросу или освобождения и отвергает правки черновика.
 ///
 /// Все способы ухода обращаются к единому решению [requestClose]: неизменённый
-/// черновик закрывается сразу, изменённый — после одного подтверждения,
-/// связанного с ключом сессии и состоянием отправки. Панель тегов и лист тега
+/// черновик до принятия отправки закрывается сразу; изменённый черновик или
+/// принятая отправка требуют одного подтверждения, связанного с ключом сессии
+/// и состоянием отправки. Панель тегов и лист тега
 /// поверх формы сессию не завершают. Закрытие не отменяет принятую отправку:
 /// её будущий результат переходит общей поверхности.
 ///
@@ -97,8 +99,9 @@ final class IntentionEditorViewModelProvider
   /// закрытия по запросу или освобождения и отвергает правки черновика.
   ///
   /// Все способы ухода обращаются к единому решению [requestClose]: неизменённый
-  /// черновик закрывается сразу, изменённый — после одного подтверждения,
-  /// связанного с ключом сессии и состоянием отправки. Панель тегов и лист тега
+  /// черновик до принятия отправки закрывается сразу; изменённый черновик или
+  /// принятая отправка требуют одного подтверждения, связанного с ключом сессии
+  /// и состоянием отправки. Панель тегов и лист тега
   /// поверх формы сессию не завершают. Закрытие не отменяет принятую отправку:
   /// её будущий результат переходит общей поверхности.
   ///
@@ -124,7 +127,12 @@ final class IntentionEditorViewModelProvider
   /// черновик зафиксирован.
   IntentionEditorViewModelProvider._({
     required IntentionEditorViewModelFamily super.from,
-    required IntentionCreationFormKey super.argument,
+    required (
+      IntentionCreationFormKey, {
+      String initialTitle,
+      IntentionCreationOperationTarget target,
+    })
+    super.argument,
   }) : super(
          retry: null,
          name: r'intentionEditorViewModelProvider',
@@ -140,7 +148,7 @@ final class IntentionEditorViewModelProvider
   String toString() {
     return r'intentionEditorViewModelProvider'
         ''
-        '($argument)';
+        '$argument';
   }
 
   @$internal
@@ -168,7 +176,7 @@ final class IntentionEditorViewModelProvider
 }
 
 String _$intentionEditorViewModelHash() =>
-    r'9553a791ca18cd351f379c0f5cfba2e2026d2c1e';
+    r'a8b99df4100d5e499c38fa964d26744034c4786d';
 
 /// Экранная сессия создания намерения по собственному ключу формы.
 ///
@@ -181,8 +189,9 @@ String _$intentionEditorViewModelHash() =>
 /// закрытия по запросу или освобождения и отвергает правки черновика.
 ///
 /// Все способы ухода обращаются к единому решению [requestClose]: неизменённый
-/// черновик закрывается сразу, изменённый — после одного подтверждения,
-/// связанного с ключом сессии и состоянием отправки. Панель тегов и лист тега
+/// черновик до принятия отправки закрывается сразу; изменённый черновик или
+/// принятая отправка требуют одного подтверждения, связанного с ключом сессии
+/// и состоянием отправки. Панель тегов и лист тега
 /// поверх формы сессию не завершают. Закрытие не отменяет принятую отправку:
 /// её будущий результат переходит общей поверхности.
 ///
@@ -214,7 +223,11 @@ final class IntentionEditorViewModelFamily extends $Family
           IntentionEditorState,
           IntentionEditorState,
           IntentionEditorState,
-          IntentionCreationFormKey
+          (
+            IntentionCreationFormKey, {
+            String initialTitle,
+            IntentionCreationOperationTarget target,
+          })
         > {
   IntentionEditorViewModelFamily._()
     : super(
@@ -236,8 +249,9 @@ final class IntentionEditorViewModelFamily extends $Family
   /// закрытия по запросу или освобождения и отвергает правки черновика.
   ///
   /// Все способы ухода обращаются к единому решению [requestClose]: неизменённый
-  /// черновик закрывается сразу, изменённый — после одного подтверждения,
-  /// связанного с ключом сессии и состоянием отправки. Панель тегов и лист тега
+  /// черновик до принятия отправки закрывается сразу; изменённый черновик или
+  /// принятая отправка требуют одного подтверждения, связанного с ключом сессии
+  /// и состоянием отправки. Панель тегов и лист тега
   /// поверх формы сессию не завершают. Закрытие не отменяет принятую отправку:
   /// её будущий результат переходит общей поверхности.
   ///
@@ -262,8 +276,15 @@ final class IntentionEditorViewModelFamily extends $Family
   /// наблюдения; во время отправки — после её результата, потому что до него
   /// черновик зафиксирован.
 
-  IntentionEditorViewModelProvider call(IntentionCreationFormKey formKey) =>
-      IntentionEditorViewModelProvider._(argument: formKey, from: this);
+  IntentionEditorViewModelProvider call(
+    IntentionCreationFormKey formKey, {
+    String initialTitle = '',
+    IntentionCreationOperationTarget target =
+        const CreatingIntentionOperationTarget(),
+  }) => IntentionEditorViewModelProvider._(
+    argument: (formKey, initialTitle: initialTitle, target: target),
+    from: this,
+  );
 
   @override
   String toString() => r'intentionEditorViewModelProvider';
@@ -280,8 +301,9 @@ final class IntentionEditorViewModelFamily extends $Family
 /// закрытия по запросу или освобождения и отвергает правки черновика.
 ///
 /// Все способы ухода обращаются к единому решению [requestClose]: неизменённый
-/// черновик закрывается сразу, изменённый — после одного подтверждения,
-/// связанного с ключом сессии и состоянием отправки. Панель тегов и лист тега
+/// черновик до принятия отправки закрывается сразу; изменённый черновик или
+/// принятая отправка требуют одного подтверждения, связанного с ключом сессии
+/// и состоянием отправки. Панель тегов и лист тега
 /// поверх формы сессию не завершают. Закрытие не отменяет принятую отправку:
 /// её будущий результат переходит общей поверхности.
 ///
@@ -308,10 +330,23 @@ final class IntentionEditorViewModelFamily extends $Family
 
 abstract class _$IntentionEditorViewModel
     extends $Notifier<IntentionEditorState> {
-  late final _$args = ref.$arg as IntentionCreationFormKey;
-  IntentionCreationFormKey get formKey => _$args;
+  late final _$args =
+      ref.$arg
+          as (
+            IntentionCreationFormKey, {
+            String initialTitle,
+            IntentionCreationOperationTarget target,
+          });
+  IntentionCreationFormKey get formKey => _$args.$1;
+  String get initialTitle => _$args.initialTitle;
+  IntentionCreationOperationTarget get target => _$args.target;
 
-  IntentionEditorState build(IntentionCreationFormKey formKey);
+  IntentionEditorState build(
+    IntentionCreationFormKey formKey, {
+    String initialTitle = '',
+    IntentionCreationOperationTarget target =
+        const CreatingIntentionOperationTarget(),
+  });
   @$mustCallSuper
   @override
   WhenComplete runBuild() {
@@ -324,6 +359,13 @@ abstract class _$IntentionEditorViewModel
               Object?,
               Object?
             >;
-    return element.handleCreate(ref, () => build(_$args));
+    return element.handleCreate(
+      ref,
+      () => build(
+        _$args.$1,
+        initialTitle: _$args.initialTitle,
+        target: _$args.target,
+      ),
+    );
   }
 }

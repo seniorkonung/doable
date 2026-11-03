@@ -58,8 +58,8 @@ void main() {
         raw.execute(
           '''INSERT INTO long_term_relations
            (id, source_intention_id, related_intention_id, type, priority,
-            description, is_archived)
-           VALUES (?, ?, ?, 'need', 2, ?, ?)''',
+            description, is_archived, created_at, updated_at)
+           VALUES (?, ?, ?, 'need', 2, ?, ?, 0, 0)''',
           [
             _uuid(number),
             _uuid(source),
@@ -144,8 +144,8 @@ void main() {
         );
         raw.execute(
           '''INSERT INTO long_term_relations
-      (id, source_intention_id, related_intention_id, type, priority, is_archived)
-      VALUES (?, ?, ?, 'can', 1, 0)''',
+      (id, source_intention_id, related_intention_id, type, priority, is_archived, created_at, updated_at)
+      VALUES (?, ?, ?, 'can', 1, 0, 0, 0)''',
           [_uuid(103), _uuid(3), _uuid(4)],
         );
         raw.execute(
@@ -583,7 +583,7 @@ void main() {
         raw.execute(
           '''INSERT INTO long_term_relations
            (id, source_intention_id, related_intention_id, type, priority,
-            is_archived) VALUES (?, ?, ?, 'need', 2, 0)''',
+            is_archived, created_at, updated_at) VALUES (?, ?, ?, 'need', 2, 0, 0, 0)''',
           [_uuid(100 + number), _uuid(number), _uuid(number + 1)],
         );
       }

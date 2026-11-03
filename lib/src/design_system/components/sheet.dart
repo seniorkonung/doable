@@ -11,8 +11,9 @@ import '../doable_metrics.dart';
 import '../doable_shadows.dart';
 import '../doable_type.dart';
 import 'button.dart';
+import 'top_bar.dart';
 
-/// Возможность построить [Sheet] или [Sheet.expandable].
+/// Возможность построить любой вариант [Sheet].
 ///
 /// Её даёт построителю только [showDoableSheet]: она несёт маршрут этой
 /// функции, анимацию которого лист ведёт пальцем.
@@ -34,8 +35,8 @@ final class SheetPresentation {
 /// Показывает лист над корневым навигатором, перекрывая всю страницу и
 /// панель.
 ///
-/// [builder] строит [Sheet], [Sheet.expandable] или композицию на их основе с
-/// переданной возможностью. Потребитель закрывает лист через Navigator.pop с
+/// [builder] строит [Sheet], [Sheet.expandable], [Sheet.untitled] или композицию
+/// на их основе с переданной возможностью. Потребитель закрывает лист через Navigator.pop с
 /// результатом типа [T], и показ отдаёт его в момент закрытия, или через
 /// [SheetPresentation.closeWithChoice], и показ отдаёт его после анимации
 /// закрытия; закрытие без выбора даёт null. Лист перетаскивает сам [Sheet], а
@@ -233,6 +234,7 @@ final class _SheetMotion extends StatefulWidget {
   const _SheetMotion({
     required this.route,
     required this.expansion,
+    required this.isFixed,
     required this.builder,
   });
 
@@ -240,6 +242,9 @@ final class _SheetMotion extends StatefulWidget {
 
   /// Раскрытие листа; без него лист — по содержимому.
   final _SheetExpansion? expansion;
+
+  /// Палец не ведёт лист, а тело только прокручивается.
+  final bool isFixed;
 
   /// Строит лист с контроллером прокрутки его тела.
   final Widget Function(ScrollController body) builder;
@@ -387,10 +392,11 @@ final class _SheetMotionState extends State<_SheetMotion> {
       // Как у модальной нижней панели Material, перетаскивание не
       // объявляется диктору прокруткой.
       excludeFromSemantics: true,
-      onVerticalDragStart: (_) => _startDrag(),
-      onVerticalDragUpdate: _updateDrag,
-      onVerticalDragEnd: (details) =>
-          _endDrag(details.velocity.pixelsPerSecond.dy),
+      onVerticalDragStart: widget.isFixed ? null : (_) => _startDrag(),
+      onVerticalDragUpdate: widget.isFixed ? null : _updateDrag,
+      onVerticalDragEnd: widget.isFixed
+          ? null
+          : (details) => _endDrag(details.velocity.pixelsPerSecond.dy),
       child: widget.builder(_body),
     ),
   );
@@ -456,7 +462,7 @@ final class _SheetBodyPosition extends ScrollPositionWithSingleContext {
     // Действия прокрутки диктора Flutter выполняет обработчиками
     // перетаскивания списка, но без устройства ввода:
     // https://api.flutter.dev/flutter/gestures/DragStartDetails/kind.html
-    _isFingerDrag = details.kind != null;
+    _isFingerDrag = details.kind != null && !_motion.widget.isFixed;
     _hasSheetMoved = false;
     if (_isFingerDrag) _motion._startDrag();
     return super.drag(details, dragCancelCallback);
@@ -523,7 +529,7 @@ typedef SheetAction = ({
 
 /// Лист с ручкой, заголовком, пояснением, телом и нижней частью.
 ///
-/// Оба варианта листа строятся только с возможностью, которую даёт
+/// Все варианты листа строятся только с возможностью, которую даёт
 /// построителю [showDoableSheet].
 final class Sheet extends StatelessWidget {
   /// Лист высотой по содержимому.
@@ -541,13 +547,14 @@ final class Sheet extends StatelessWidget {
   /// например «Сбросить»; заголовок при ней остаётся по центру.
   Sheet(
     this._presentation, {
-    required this.title,
+    required String title,
     required Widget child,
     String? text,
     Widget? footer,
     SheetAction? action,
     super.key,
   }) : _parts = _ContentParts(
+         title: title,
          text: text,
          body: child,
          footer: footer,
@@ -576,7 +583,7 @@ final class Sheet extends StatelessWidget {
   /// например «Сбросить»; заголовок при ней остаётся по центру.
   Sheet.expandable(
     this._presentation, {
-    required this.title,
+    required String title,
     required String text,
     required SheetCompactHeight compactHeight,
     required List<Widget> slivers,
@@ -587,6 +594,7 @@ final class Sheet extends StatelessWidget {
     SheetAction? action,
     super.key,
   }) : _parts = _ExpandableParts(
+         title: title,
          text: text,
          compactHeight: compactHeight,
          pinned: pinned,
@@ -597,7 +605,22 @@ final class Sheet extends StatelessWidget {
          action: action,
        );
 
-  final String title;
+  /// Лист без заголовка, содержимое которого говорит само за себя.
+  ///
+  /// [label] называет лист диктору. Без [bar] это лист высотой по содержимому,
+  /// который движется как [Sheet], а [child] начинается в 14 под ручкой.
+  ///
+  /// [bar] — полоса редактирования на месте ручки: с ней лист занимает всё
+  /// место под строкой состояния и над клавиатурой без скругления и тени и не
+  /// перетаскивается, а [child] только прокручивается. Снятие полосы возвращает
+  /// высоту по содержимому; размер меняется анимацией листа.
+  Sheet.untitled(
+    this._presentation, {
+    required String label,
+    required Widget child,
+    TopBar? bar,
+    super.key,
+  }) : _parts = _UntitledParts(label: label, body: child, bar: bar);
 
   final SheetPresentation _presentation;
 
@@ -609,7 +632,10 @@ final class Sheet extends StatelessWidget {
     final _ContentParts parts => _buildContent(context, parts),
     final _ExpandableParts parts => _ExpandableSheet(
       route: _presentation._route,
-      title: title,
+      parts: parts,
+    ),
+    final _UntitledParts parts => _UntitledSheet(
+      route: _presentation._route,
       parts: parts,
     ),
   };
@@ -624,6 +650,7 @@ final class Sheet extends StatelessWidget {
     return _SheetMotion(
       route: _presentation._route,
       expansion: null,
+      isFixed: false,
       builder: (body) => DecoratedBox(
         decoration: BoxDecoration(
           borderRadius: borderRadius,
@@ -647,7 +674,7 @@ final class Sheet extends StatelessWidget {
                 Center(child: _Grip(color: colors.grip)),
                 const SizedBox(height: 14),
                 _TitleBlock(
-                  title: title,
+                  title: parts.title,
                   text: parts.text,
                   action: parts.action,
                 ),
@@ -905,7 +932,7 @@ const _compactLimit = 534.0;
 /// началом заголовка.
 const _titleTop = 26.0;
 
-/// Части листа одного из двух вариантов.
+/// Части листа одного из его вариантов.
 sealed class _SheetParts {
   const _SheetParts();
 }
@@ -913,12 +940,14 @@ sealed class _SheetParts {
 /// Части листа по содержимому.
 final class _ContentParts extends _SheetParts {
   const _ContentParts({
+    required this.title,
     required this.text,
     required this.body,
     required this.footer,
     required this.action,
   });
 
+  final String title;
   final String? text;
   final Widget body;
   final Widget? footer;
@@ -928,6 +957,7 @@ final class _ContentParts extends _SheetParts {
 /// Части раскрываемого листа.
 final class _ExpandableParts extends _SheetParts {
   const _ExpandableParts({
+    required this.title,
     required this.text,
     required this.compactHeight,
     required this.pinned,
@@ -938,6 +968,7 @@ final class _ExpandableParts extends _SheetParts {
     required this.action,
   });
 
+  final String title;
   final String text;
   final SheetCompactHeight compactHeight;
   final Widget? pinned;
@@ -950,15 +981,23 @@ final class _ExpandableParts extends _SheetParts {
   final SheetAction? action;
 }
 
-final class _ExpandableSheet extends StatefulWidget {
-  const _ExpandableSheet({
-    required this.route,
-    required this.title,
-    required this.parts,
+/// Части листа без заголовка.
+final class _UntitledParts extends _SheetParts {
+  const _UntitledParts({
+    required this.label,
+    required this.body,
+    required this.bar,
   });
 
+  final String label;
+  final Widget body;
+  final TopBar? bar;
+}
+
+final class _ExpandableSheet extends StatefulWidget {
+  const _ExpandableSheet({required this.route, required this.parts});
+
   final _DoableSheetRoute<Object?> route;
-  final String title;
   final _ExpandableParts parts;
 
   @override
@@ -995,9 +1034,6 @@ final class _ExpandableSheetState extends State<_ExpandableSheet>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = _colorsOf(theme);
-    final shadows = _shadowsOf(theme);
     final parts = widget.parts;
 
     final handle = _SizeButton(
@@ -1006,7 +1042,7 @@ final class _ExpandableSheetState extends State<_ExpandableSheet>
       onTap: () => _resize(full: !_isFull),
     );
     final titleBlock = _TitleBlock(
-      title: widget.title,
+      title: parts.title,
       text: parts.text,
       action: parts.action,
     );
@@ -1065,6 +1101,7 @@ final class _ExpandableSheetState extends State<_ExpandableSheet>
 
     return _SheetMotion(
       route: widget.route,
+      isFixed: false,
       expansion: _SheetExpansion(
         controller: _expansion,
         extents: _extents,
@@ -1074,38 +1111,244 @@ final class _ExpandableSheetState extends State<_ExpandableSheet>
       ),
       builder: (body) => AnimatedBuilder(
         animation: _expansion,
-        builder: (context, child) {
-          final progress = _expansion.value;
-          final borderRadius = BorderRadius.vertical(
-            top: Radius.circular(
-              lerpDouble(DoableMetrics.radiusXl, 0, progress)!,
-            ),
-          );
-          return _ExpandableFrame(
-            compactHeight: parts.compactHeight,
-            progress: progress,
-            extents: _extents,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                borderRadius: borderRadius,
-                boxShadow: BoxShadow.lerpList(
-                  shadows.shadowFloat,
-                  null,
-                  progress,
-                ),
-              ),
-              child: Material(
-                color: colors.raised,
-                borderRadius: borderRadius,
-                clipBehavior: Clip.antiAlias,
-                child: child,
-              ),
-            ),
-          );
-        },
+        builder: (context, child) => _ExpandableFrame(
+          compactHeight: parts.compactHeight,
+          progress: _expansion.value,
+          extents: _extents,
+          child: _ResizingSurface(progress: _expansion.value, child: child!),
+        ),
         child: content(body),
       ),
     );
+  }
+}
+
+/// Поверхность листа, у которой скругление верхних углов и тень уходят по мере
+/// [progress]: 0 — размер листа без раскрытия, 1 — полный.
+final class _ResizingSurface extends StatelessWidget {
+  const _ResizingSurface({required this.progress, required this.child});
+
+  final double progress;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final borderRadius = BorderRadius.vertical(
+      top: Radius.circular(lerpDouble(DoableMetrics.radiusXl, 0, progress)!),
+    );
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: borderRadius,
+        boxShadow: BoxShadow.lerpList(
+          _shadowsOf(theme).shadowFloat,
+          null,
+          progress,
+        ),
+      ),
+      child: Material(
+        color: _colorsOf(theme).raised,
+        borderRadius: borderRadius,
+        clipBehavior: Clip.antiAlias,
+        child: child,
+      ),
+    );
+  }
+}
+
+final class _UntitledSheet extends StatefulWidget {
+  const _UntitledSheet({required this.route, required this.parts});
+
+  final _DoableSheetRoute<Object?> route;
+  final _UntitledParts parts;
+
+  @override
+  State<_UntitledSheet> createState() => _UntitledSheetState();
+}
+
+final class _UntitledSheetState extends State<_UntitledSheet>
+    with SingleTickerProviderStateMixin {
+  /// 0 — высота по содержимому, 1 — весь экран.
+  late final _fullness = AnimationController(
+    vsync: this,
+    duration: _sheetDuration,
+    value: widget.parts.bar == null ? 0 : 1,
+  );
+
+  /// Высота листа при последней раскладке.
+  var _height = 0.0;
+
+  /// Высота, от которой лист растёт к полному размеру; содержимое с полосой
+  /// другое, поэтому своя высота дала бы скачок верхнего края. Без неё лист
+  /// идёт от высоты содержимого.
+  double? _origin;
+
+  @override
+  void didUpdateWidget(_UntitledSheet oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final isFull = widget.parts.bar != null;
+    if (isFull == (oldWidget.parts.bar != null)) return;
+    _origin = isFull ? _height : null;
+    if (isFull) _fullness.value = 0;
+    // Без явного нуля контроллер лишь укорачивает анимацию в 20 раз:
+    // https://api.flutter.dev/flutter/animation/AnimationBehavior.html
+    _fullness.animateTo(
+      isFull ? 1 : 0,
+      duration: MediaQuery.disableAnimationsOf(context) ? Duration.zero : null,
+      curve: _sheetCurve,
+    );
+  }
+
+  @override
+  void dispose() {
+    _fullness.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = _colorsOf(Theme.of(context));
+    final parts = widget.parts;
+    final bar = parts.bar;
+
+    return _SheetMotion(
+      route: widget.route,
+      expansion: null,
+      isFixed: bar != null,
+      // Вложенный узел называет лист вместо общего названия модальной панели,
+      // как у диалога Material:
+      // https://api.flutter.dev/flutter/material/AlertDialog/semanticLabel.html
+      builder: (body) => Semantics(
+        container: true,
+        scopesRoute: true,
+        namesRoute: true,
+        explicitChildNodes: true,
+        label: parts.label,
+        child: AnimatedBuilder(
+          animation: _fullness,
+          builder: (context, child) => _ExtentProbe(
+            onLayout: (height) => _height = height,
+            child: _UntitledFrame(
+              origin: _origin,
+              progress: _fullness.value,
+              child: _ResizingSurface(progress: _fullness.value, child: child!),
+            ),
+          ),
+          child: _SheetLayout(
+            minimum: EdgeInsets.only(
+              top: bar == null ? DoableMetrics.space2 : 0,
+            ),
+            head: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                bar ?? Center(child: _Grip(color: colors.grip)),
+                SizedBox(height: bar == null ? 14 : DoableMetrics.space1),
+                Flexible(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: DoableMetrics.space3,
+                    ),
+                    child: SingleChildScrollView(
+                      controller: body,
+                      // Тело, которое помещается целиком, тоже передаёт жест
+                      // листу.
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: parts.body,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            footer: null,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Ставит лист без заголовка в высоту между начальной и полной по [progress].
+///
+/// Полный лист занимает всё место над клавиатурой: его отнимает _SheetFrame.
+/// Начальная высота — [origin] или, без него, высота содержимого.
+final class _UntitledFrame extends SingleChildRenderObjectWidget {
+  const _UntitledFrame({
+    required this.origin,
+    required this.progress,
+    required super.child,
+  });
+
+  final double? origin;
+
+  /// 0 — начальная высота, 1 — полная.
+  final double progress;
+
+  @override
+  _RenderUntitledFrame createRenderObject(BuildContext context) =>
+      _RenderUntitledFrame(origin, progress);
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    _RenderUntitledFrame renderObject,
+  ) => renderObject
+    ..origin = origin
+    ..progress = progress;
+}
+
+final class _RenderUntitledFrame extends RenderProxyBox {
+  _RenderUntitledFrame(this._origin, this._progress);
+
+  double? _origin;
+
+  set origin(double? value) {
+    if (value == _origin) return;
+    _origin = value;
+    markNeedsLayout();
+  }
+
+  double _progress;
+
+  set progress(double value) {
+    if (value == _progress) return;
+    _progress = value;
+    markNeedsLayout();
+  }
+
+  @override
+  Size computeDryLayout(BoxConstraints constraints) {
+    assert(
+      debugCannotComputeDryLayout(
+        reason: 'Высота листа зависит от раскладки его содержимого.',
+      ),
+    );
+    return Size.zero;
+  }
+
+  @override
+  void performLayout() {
+    final sheet = child!;
+    final full = constraints.maxHeight;
+    // Ширина нестрогая, поэтому лист не становится границей раскладки, и
+    // изменение содержимого снова доходит до его высоты.
+    final loose = BoxConstraints(
+      maxWidth: constraints.maxWidth,
+      maxHeight: full,
+    );
+    final origin = _origin;
+    if (origin == null) sheet.layout(loose, parentUsesSize: true);
+    // Клавиатура, открытая вместе с полосой, оставляет места меньше начальной
+    // высоты.
+    final start = math.min(origin ?? sheet.size.height, full);
+    final height = lerpDouble(start, full, _progress)!;
+    if (origin != null || sheet.size.height != height) {
+      sheet.layout(
+        loose.copyWith(minHeight: height, maxHeight: height),
+        parentUsesSize: true,
+      );
+    }
+    size = constraints.constrain(sheet.size);
   }
 }
 

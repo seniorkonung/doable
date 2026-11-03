@@ -5,7 +5,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import '../../daily_choice/presentation/daily_choice_creation_launcher.dart';
-import '../../long_term_relation/presentation/editor/relation_editor_state.dart';
 import '../../shared/presentation/exclusive_operation.dart';
 import '../routing/app_router.gr.dart';
 import 'quick_creation_daily_choice_start_sheet.dart';
@@ -40,14 +39,7 @@ final class QuickCreationLauncher {
     }
     switch (mode) {
       case QuickCreationMode.intention:
-        await _openFirst(router, const IntentionEditorRoute());
-      case QuickCreationMode.relation:
-        await _openFirst(
-          router,
-          RelationEditorRoute(
-            editorContext: const RelationBlankCreationContext(),
-          ),
-        );
+        await _openFirst(router, IntentionEditorRoute());
       case QuickCreationMode.dailyChoice:
         final direction = await showQuickCreationDailyChoiceStartSheet(context);
         if (direction == null || !context.mounted) return;

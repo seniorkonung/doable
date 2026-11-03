@@ -11,12 +11,12 @@ import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_id_generator.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation_description.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
@@ -313,7 +313,7 @@ void main() {
     await repository.execute(ArchiveLongTermRelation(relationId));
 
     final failure = _failure(
-      await repository.execute(_createCommand(sourceId, relatedId)),
+      await repository.execute(_addCommand(sourceId, relatedId)),
     );
 
     expect(
@@ -362,25 +362,38 @@ void main() {
   });
 }
 
-Future<LongTermRelationCreated> _create(
+Future<void> _create(
   DriftPersonalGraphRepository repository,
   IntentionId sourceId,
   IntentionId relatedId,
-) async =>
-    _created(await repository.execute(_createCommand(sourceId, relatedId)));
+) async {
+  final added = _added(
+    await repository.execute(_addCommand(sourceId, relatedId)),
+  );
+  expect(
+    await repository.execute(
+      UpdateLongTermRelation(
+        relationId: added.relations.single.id,
+        patch: LongTermRelationPatch(
+          priority: const LongTermRelationFieldSet(RelationPriority.p2),
+          description: LongTermRelationDescriptionPatch.fromInput(
+            '  Описание\n',
+          ),
+        ),
+      ),
+    ),
+    isA<GraphCommandSucceeded>(),
+  );
+}
 
-CreateLongTermRelation _createCommand(
-  IntentionId sourceId,
-  IntentionId relatedId,
-) => CreateLongTermRelation(
-  sourceIntentionId: sourceId,
-  relatedIntentionId: relatedId,
-  type: LongTermRelationType.need,
-  priority: RelationPriority.p2,
-  description: LongTermRelationDescription.fromInput('  Описание\n'),
-);
+AddLongTermRelations _addCommand(IntentionId sourceId, IntentionId relatedId) =>
+    AddLongTermRelations(
+      pageIntentionId: sourceId,
+      group: IntentionRelationGroup.needs,
+      candidateIds: [relatedId],
+    );
 
-LongTermRelationCreated _created(LongTermRelationCommandResult result) {
+LongTermRelationsAdded _added(LongTermRelationCommandResult result) {
   expect(result, isA<GraphCommandSucceeded>());
   return (result
               as GraphCommandSucceeded<
@@ -389,7 +402,7 @@ LongTermRelationCreated _created(LongTermRelationCommandResult result) {
               >)
           .value
           .value
-      as LongTermRelationCreated;
+      as LongTermRelationsAdded;
 }
 
 ConfirmedGraphResult<LongTermRelationUpdated> _confirmedUpdated(

@@ -148,13 +148,18 @@ final class DailyChoiceCreationPageState
         widget.path.steps.last.relatedIntentionId,
     };
     ref.invalidate(
-      choicePathViewModelProvider(startingId, direction: widget.direction),
+      choicePathViewModelProvider(
+        startingId,
+        widget.session.pathInstance,
+        direction: widget.direction,
+      ),
     );
     final selection = await Navigator.of(context).push<ChoicePathSelection>(
       MaterialPageRoute(
         builder: (_) => ChoicePathPage.forCreationRefresh(
           startingIntentionId: startingId,
           direction: widget.direction,
+          pathInstance: widget.session.pathInstance,
         ),
       ),
     );

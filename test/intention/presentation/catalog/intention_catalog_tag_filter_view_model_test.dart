@@ -318,13 +318,6 @@ void main() {
         SelectRelationParticipant(
           session: IntentionSearchSession(),
           pairProbe: probe,
-          selectionContext: RelationParticipantSelectionContext.activeRelation,
-        ),
-        SelectRelationParticipant(
-          session: IntentionSearchSession(),
-          pairProbe: probe,
-          selectionContext:
-              RelationParticipantSelectionContext.archivedRelation,
         ),
       ];
       final filters = <IntentionTagFilter>[];
@@ -355,10 +348,7 @@ void main() {
         final query = repository.queryAt(purposes.length + index);
         expect(query.tagFilter, filters[index]);
         expect(query.titleFilter?.map((value) => value), 'свой $index');
-        expect(
-          query.scope,
-          index == 4 ? IntentionScope.all : IntentionScope.active,
-        );
+        expect(query.scope, IntentionScope.active);
         expect(
           query.readinessFilter,
           index == 1
@@ -373,8 +363,8 @@ void main() {
         intentionCatalogViewModelProvider(purposes.first).notifier,
       );
       browse.changeTagFilter(IntentionTagFilter.empty);
-      await waitForCatalogQueries(repository, 11);
-      _completeEmptyPage(repository, 10);
+      await waitForCatalogQueries(repository, 9);
+      _completeEmptyPage(repository, 8);
       await container.read(
         intentionCatalogViewModelProvider(purposes.first).future,
       );
@@ -387,17 +377,15 @@ void main() {
         notifier.changeScope(IntentionScope.archived);
         expect(
           notifier.selection.scope,
-          IntentionScopeFixed(
-            index == 4 ? IntentionScope.all : IntentionScope.active,
-          ),
+          const IntentionScopeFixed(IntentionScope.active),
         );
       }
-      expect(repository.queries, hasLength(11));
+      expect(repository.queries, hasLength(9));
     },
   );
 
-  // Ограничения назначений, отличные от умолчаний: готовность у действия,
-  // охват всех и исключённый участник у участника архивной связи.
+  // Ограничения назначений, отличные от умолчаний: готовность у действия и
+  // исключённый участник у участника связи.
   for (final purpose in <IntentionCatalogPurpose>[
     _actionSearchPurpose,
     SelectRelationParticipant(
@@ -406,21 +394,13 @@ void main() {
         counterpartId: testSummary(index: 9).id,
         candidateRole: RelationParticipantRole.related,
       ),
-      selectionContext: RelationParticipantSelectionContext.archivedRelation,
     ),
   ]) {
     final context = switch (purpose) {
       BrowseIntentionCatalog() => 'каталог',
       SelectDailyChoiceAction() => 'действие',
       SelectDailyChoiceSource() => 'исходное намерение',
-      SelectRelationParticipant(
-        selectionContext: RelationParticipantSelectionContext.activeRelation,
-      ) =>
-        'участник активной связи',
-      SelectRelationParticipant(
-        selectionContext: RelationParticipantSelectionContext.archivedRelation,
-      ) =>
-        'участник архивной связи',
+      SelectRelationParticipant() => 'участник связи',
     };
     test(
       'продолжение и его повтор сохраняют совместный запрос: $context',

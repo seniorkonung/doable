@@ -15,7 +15,6 @@ import '../../application/daily_choice_result.dart';
 import '../../domain/daily_choice_id.dart';
 import '../daily_choice_command_failure_message.dart';
 import '../path/choice_path_page.dart';
-import '../path/choice_path_view_model.dart';
 import 'daily_choice_creation_page.dart';
 import 'daily_choice_path_replace_state.dart';
 import 'daily_choice_path_replace_view_model.dart';
@@ -146,9 +145,6 @@ final class _DailyChoicePathReplacePageState
       ChoicePathDraftDirection.topDown => current.proposal.sourceIntentionId,
       ChoicePathDraftDirection.bottomUp => current.proposal.selectedIntentionId,
     };
-    ref.invalidate(
-      choicePathViewModelProvider(startingId, direction: direction),
-    );
     final selection = await Navigator.of(context).push<ChoicePathSelection>(
       MaterialPageRoute(
         builder: (_) => ChoicePathPage.forReplacement(

@@ -163,15 +163,6 @@ final class LongTermRelationDetails {
   final LongTermRelationPermissions permissions;
 
   bool get hasDescription => description != null;
-
-  LongTermRelationDetails withPermissions(LongTermRelationPermissions value) =>
-      LongTermRelationDetails(
-        relation: relation,
-        source: source,
-        related: related,
-        description: description,
-        permissions: value,
-      );
 }
 
 sealed class LongTermRelationReadFailure implements GraphCommandFailure {

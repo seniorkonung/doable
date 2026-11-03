@@ -226,9 +226,7 @@ Future<_App> _launch(
 
 Future<void> _open(WidgetTester tester, _App app) async {
   unawaited(
-    app.container
-        .read(appRouterProvider)
-        .push<void>(const IntentionEditorRoute()),
+    app.container.read(appRouterProvider).push<void>(IntentionEditorRoute()),
   );
   await _until(tester, _sheet);
   await tester.pumpAndSettle();

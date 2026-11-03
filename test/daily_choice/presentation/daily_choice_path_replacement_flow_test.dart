@@ -72,7 +72,7 @@ Future<void> _seed(LocalDatabaseHarness harness) async {
       await database.customInsert(
         '''INSERT INTO long_term_relations
            (id, source_intention_id, related_intention_id, type, priority,
-            is_archived) VALUES (?, ?, ?, ?, 2, ?)''',
+            is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, 2, ?, 0, 0)''',
         variables: [
           Variable.withString(_uuid(id)),
           Variable.withString(_uuid(source)),
@@ -295,6 +295,8 @@ void main() {
         find.byKey(const ValueKey('daily-choice-replace-refresh-path')),
         findsOneWidget,
       );
+      expect(find.textContaining('Новое основание'), findsWidgets);
+      expect(find.textContaining('Новое действие'), findsWidgets);
       expect(
         (await _read(repository)).path.map((step) => step.relation.id),
         oldPath,

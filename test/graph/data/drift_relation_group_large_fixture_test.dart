@@ -143,8 +143,10 @@ void main() {
             type,
             priority,
             description,
-            is_archived
-          ) VALUES (?, ?, ?, 'can', 1, CAST(x'80' AS TEXT), 1)
+            is_archived,
+            created_at,
+            updated_at
+          ) VALUES (?, ?, ?, 'can', 1, CAST(x'80' AS TEXT), 1, 0, 0)
         ''',
         [_relationId(1), _participantId(1), _ownerIdValue],
       ),
@@ -206,6 +208,8 @@ Future<void> _populateLargeFixture(AppDatabase database) => seedGraph(
             priority: index % 4 + 1,
             description: Value(index % 17 == 0 ? 'Описание $index' : null),
             isArchived: Value(index >= _activeGroupSize),
+            createdAt: 0,
+            updatedAt: 0,
           ),
         );
     }

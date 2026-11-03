@@ -189,7 +189,8 @@ extension _DailyChoiceReading on DriftPersonalGraphRepository {
       final rows = await _database
           .customSelect(
             '''SELECT creation_sequence, id, source_intention_id,
-                  related_intention_id, type, priority, description, is_archived
+                  related_intention_id, type, priority, description, is_archived,
+                  created_at, updated_at
            FROM long_term_relations
            WHERE id IN (${List.filled(batch.length, '?').join(',')})''',
             variables: [

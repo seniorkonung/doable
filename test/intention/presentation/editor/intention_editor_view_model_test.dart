@@ -1677,7 +1677,7 @@ void main() {
   });
 
   group('решение о закрытии сессии', () {
-    test('неизменённая сессия во время принятой отправки закрывается сразу с продолжением сохранения', () async {
+    test('неизменённая сессия во время принятой отправки требует подтверждения с продолжением сохранения', () async {
       final repository = ControlledCatalogRepository();
       final container = _container(repository);
       final coordinator = container.read(
@@ -1696,11 +1696,18 @@ void main() {
 
       expect(
         decision,
-        isA<IntentionCreationClosedImmediately>().having(
-          (decision) => decision.savingOnClose,
+        isA<IntentionCreationCloseNeedsConfirmation>().having(
+          (decision) => decision.confirmation.savingOnClose,
           'отправка',
           IntentionCreationSavingOnClose.continues,
         ),
+      );
+      expect(
+        editor.resolveClose(
+          _confirmationOf(decision),
+          IntentionCreationCloseChoice.discardDraft,
+        ),
+        IntentionCreationCloseResolution.closed,
       );
       expect(coordinator.isKeyRunning(formKey), isTrue);
       repository.completeCommand(
@@ -1872,14 +1879,7 @@ void main() {
       expect(container.read(provider).failurePresentation, isNotNull);
       expect(container.read(provider).draft.isChanged, isFalse);
 
-      expect(
-        editor.requestClose(),
-        isA<IntentionCreationClosedImmediately>().having(
-          (decision) => decision.savingOnClose,
-          'отправка',
-          IntentionCreationSavingOnClose.notStarted,
-        ),
-      );
+      expect(editor.requestClose(), isA<IntentionCreationClosedImmediately>());
       await _settle(container);
 
       expect(container.read(provider).failurePresentation, isNull);

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../design_system/components/empty_state.dart';
 import '../../../design_system/components/list_state.dart';
+import '../../../design_system/components/tag_create_row.dart';
 import '../../../design_system/doable_icon.dart';
 import '../../../design_system/doable_metrics.dart';
 import '../../application/intention_catalog.dart';
@@ -27,7 +28,8 @@ typedef IntentionSearchRowBuilder = Widget Function(
 ///
 /// Пустая выдача из-за фильтров предлагает их сбросить, а пустой выбранный
 /// тип — показать оба типа. Пустой допустимый охват описывает страница через
-/// [emptyScope].
+/// [emptyScope]. С [onCreate] подтверждённая выдача, которая предлагает
+/// создание, начинается строкой «Создать».
 ///
 /// Место в списке держит [ResultsScrollKeeper]: новая выдача начинается с
 /// верхней позиции, а согласование выдачи с подтверждёнными операциями
@@ -40,6 +42,7 @@ final class IntentionSearchList extends ConsumerStatefulWidget {
     required this.emptyScope,
     required this.onResetFilters,
     required this.bottomPadding,
+    this.onCreate,
     super.key,
   });
 
@@ -57,6 +60,9 @@ final class IntentionSearchList extends ConsumerStatefulWidget {
 
   /// Отступ под последней строкой списка.
   final double bottomPadding;
+
+  /// Просит создать намерение с названием из строки «Создать».
+  final void Function(String title)? onCreate;
 
   @override
   ConsumerState<IntentionSearchList> createState() =>
@@ -102,8 +108,12 @@ final class _IntentionSearchListState
           ListState.loading(text: kind.loading(l10n)),
         ),
         IntentionCatalogInvalidFilter() => const <Widget>[],
-        final IntentionCatalogLoaded loaded => _loaded(l10n, kind, loaded),
+        final IntentionCatalogLoaded loaded => [
+          ..._createRow(l10n, loaded),
+          ..._loaded(l10n, kind, loaded),
+        ],
         final IntentionCatalogEmpty empty => [
+          ..._createRow(l10n, empty),
           SliverFillRemaining(hasScrollBody: false, child: _empty(l10n, empty)),
         ],
         IntentionCatalogUnavailable() => _status(
@@ -145,6 +155,31 @@ final class _IntentionSearchListState
   /// Состояние вместо выдачи прокручивается, когда крупный текст не
   /// помещается в оставшуюся высоту.
   List<Widget> _status(ListState state) => [SliverToBoxAdapter(child: state)];
+
+  /// Выше строк и пустого состояния, пока [confirmed] предлагает создание.
+  List<Widget> _createRow(
+    AppLocalizations l10n,
+    IntentionCatalogConfirmedState confirmed,
+  ) {
+    final onCreate = widget.onCreate;
+    final title = confirmed.createTitle;
+    if (onCreate == null || title == null) {
+      return const [];
+    }
+    final text = l10n.intentionPickerCreateNamed(title);
+    return [
+      SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: DoableMetrics.space2),
+          child: TagCreateRow(
+            text: text,
+            label: text,
+            onPressed: () => onCreate(title),
+          ),
+        ),
+      ),
+    ];
+  }
 
   List<Widget> _loaded(
     AppLocalizations l10n,

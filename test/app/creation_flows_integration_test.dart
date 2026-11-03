@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:ui' show Tristate;
 
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_daily_choice_start_sheet.dart';
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
+import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
@@ -19,7 +21,7 @@ import 'package:doable/src/graph/application/personal_graph_repository_provider.
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
-    show IntentionCatalogOrder, IntentionTagFilter;
+    show IntentionCatalogOrder, IntentionTagFilter, IntentionScope;
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
@@ -31,6 +33,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/daily_choice_catalog_provider.dart';
+import '../support/daily_choice_catalog_controls.dart';
 import '../support/daily_choice_durability_fixture.dart';
 import '../support/daily_choice_local_date.dart';
 import '../support/graph_seed.dart';
@@ -54,6 +57,103 @@ void main() {
   _registerAccessibilityTests();
   _registerQuickCreationFlowTests();
   _registerNestedQuickCreationTests();
+  testWidgets('охват «Все» остаётся в каталоге при переходе к связям', (
+    tester,
+  ) async {
+    final app = await _start(tester);
+    await IntentionCreationOrigin.graph.open(
+      tester,
+      app.router,
+      participantId: durabilityIntention(1),
+      waitFor: (tester, finder) =>
+          _until(tester, () => finder.evaluate().isNotEmpty),
+    );
+    await selectIntentionCatalogScope(tester, IntentionScope.all);
+    await _until(
+      tester,
+      () => intentionCatalogRow('Намерение 1').evaluate().isNotEmpty,
+    );
+    expect(shownIntentionCatalogParameters(tester).scope, IntentionScope.all);
+    await _tap(tester, intentionCatalogRow('Намерение 1'));
+    await _until(
+      tester,
+      () => _key('intention-details-title').evaluate().isNotEmpty,
+    );
+    await _tap(tester, find.text(app.l10n.detailsRelationsTab).first);
+    expect(find.text(app.l10n.detailsRelationsNeedsHint), findsOneWidget);
+    expect(find.text(app.l10n.intentionPickerScopeAll), findsNothing);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(shownIntentionCatalogParameters(tester).scope, IntentionScope.all);
+  });
+
+  testWidgets(
+    'закрытие чистой панели возвращает дату, фильтр и прокрутку каталога дневных выборов',
+    (tester) async {
+      final app = await _start(tester, seed: _seedDailyChoicesForReturn);
+      final date = CalendarDate.fromParts(2026, 10, 7);
+      await selectDailyChoiceCatalogDate(tester, date);
+      await _until(
+        tester,
+        () => _key('daily-choice-section-false').evaluate().isNotEmpty,
+      );
+      await showDailyChoiceCatalogSection(tester, false);
+      await showDailyChoiceCatalogSection(tester, true);
+      final position = _dailyChoiceScrollPosition(tester);
+      position.jumpTo(position.maxScrollExtent / 2);
+      await tester.pumpAndSettle();
+      expect(position.pixels, greaterThan(0));
+      final offset = position.pixels;
+      expect(shownDailyChoiceCatalogDate(tester), date);
+      final semantics = tester.ensureSemantics();
+      expect(
+        tester
+            .getSemantics(_key('daily-choice-section-false'))
+            .flagsCollection
+            .isExpanded,
+        Tristate.isFalse,
+      );
+      expect(
+        tester
+            .getSemantics(_key('daily-choice-section-true'))
+            .flagsCollection
+            .isExpanded,
+        Tristate.isTrue,
+      );
+      await _Flow.intention.open(
+        tester,
+        app,
+        IntentionCreationOrigin.dailyChoices,
+      );
+      await tester.tap(_key('intention-editor-close'));
+      await _until(
+        tester,
+        () => _key('intention-editor-title').evaluate().isEmpty,
+      );
+      await tester.pumpAndSettle();
+      expect(shownDailyChoiceCatalogDate(tester), date);
+      expect(
+        tester
+            .getSemantics(_key('daily-choice-section-false'))
+            .flagsCollection
+            .isExpanded,
+        Tristate.isFalse,
+      );
+      expect(
+        tester
+            .getSemantics(_key('daily-choice-section-true'))
+            .flagsCollection
+            .isExpanded,
+        Tristate.isTrue,
+      );
+      expect(_dailyChoiceScrollPosition(tester).pixels, offset);
+      expect(
+        tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected,
+        AppDestination.dailyChoices,
+      );
+      semantics.dispose();
+    },
+  );
   testWidgets('создание при занятой поверхности закрывает форму и обновляет '
       'каталог до сообщения, а возвращение не повторяет результат', (
     tester,
@@ -78,15 +178,15 @@ void main() {
     final completions = <GraphCommandCompletion>[];
     final subscription = coordinator.completions.listen(completions.add);
     addTearDown(subscription.cancel);
-    coordinator.acceptRelationArchive(
-      ArchiveLongTermRelation(durabilityRelation(104)),
+    coordinator.acceptRelationDelete(
+      DeleteLongTermRelation(durabilityRelation(104)),
     );
     await _until(tester, () => completions.length == 1);
     await tester.pumpAndSettle();
     final first = app.l10n.graphOperationMessage(
-      app.l10n.graphOperationArchive,
+      app.l10n.graphOperationDelete,
       app.l10n.graphOperationRelation,
-      app.l10n.relationArchived,
+      app.l10n.relationDeleted,
     );
     final createdMessage = app.l10n.graphOperationMessage(
       app.l10n.graphOperationCreate,
@@ -184,8 +284,6 @@ void main() {
       final resultId = switch (app.router.current.args) {
         IntentionDetailsRouteArgs(:final intentionId) =>
           intentionId.toCanonicalString(),
-        RelationDetailsRouteArgs(:final relationId) =>
-          relationId.toCanonicalString(),
         DailyChoiceDetailsRouteArgs(:final choiceId) =>
           choiceId.toCanonicalString(),
         _ => throw StateError('Ожидался маршрут созданной сущности.'),
@@ -196,7 +294,7 @@ void main() {
       await tester.pumpAndSettle();
       history.expectRestored(tester, app.router);
       expect(app.catalogs, catalogs);
-      await history.expectUnderlyingDraft(tester, app.router);
+      await history.expectUnderlyingTask(tester, app.router);
       expect(tester.takeException(), isNull);
     });
   }
@@ -241,7 +339,7 @@ void main() {
           expect(rows, hasLength(flow.initialRows + (leave ? 1 : 0)));
           expect(app.observer.attempts, leave ? 1 : 0);
           if (leave) flow.expectStored(rows.last);
-          await history.expectUnderlyingDraft(tester, app.router);
+          await history.expectUnderlyingTask(tester, app.router);
           expect(tester.takeException(), isNull);
         },
       );
