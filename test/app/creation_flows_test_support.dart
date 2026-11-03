@@ -1,5 +1,45 @@
 part of 'creation_flows_integration_test.dart';
 
+Future<void> _seedDailyChoicesForReturn(AppDatabase database) async {
+  await seedDurabilityGraph(database);
+  await seedGraph(database, () async {
+    for (var index = 0; index < 12; index++) {
+      await database.customStatement(
+        'INSERT INTO daily_choices (id, source_intention_id, '
+        'selected_intention_id, choice_date, is_completed) VALUES (?, ?, ?, ?, ?)',
+        [
+          durabilityUuid(200 + index),
+          durabilityUuid(1),
+          durabilityUuid(2),
+          '2026-10-07',
+          1,
+        ],
+      );
+      await database.customStatement(
+        'INSERT INTO daily_choice_path_steps (id, daily_choice_id, long_term_relation_id) VALUES (?, ?, ?)',
+        [
+          durabilityUuid(300 + index),
+          durabilityUuid(200 + index),
+          durabilityUuid(101),
+        ],
+      );
+    }
+  });
+}
+
+ScrollPosition _dailyChoiceScrollPosition(WidgetTester tester) => tester
+    .state<ScrollableState>(
+      find
+          .descendant(
+            of: find.byKey(
+              const PageStorageKey<String>('daily-choice-catalog'),
+            ),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    )
+    .position;
+
 /// Три потока общей кнопки с настоящим локальным графом.
 enum _Flow {
   intention(

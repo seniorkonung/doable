@@ -14,6 +14,7 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_id_generator.dart';
+import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_description.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
@@ -62,6 +63,54 @@ void main() {
   });
 
   tearDown(() => database.close());
+
+  test('смена типа сохраняет связь и переносит её в группу «Можно»', () async {
+    await _create(repository, sourceId, relatedId, description: 'Описание');
+    final before = await _storedRelation(database, relationId);
+    final updated = _updated(
+      await repository.execute(
+        UpdateLongTermRelation(
+          relationId: relationId,
+          patch: const LongTermRelationPatch(
+            type: LongTermRelationFieldSet(LongTermRelationType.can),
+          ),
+        ),
+      ),
+    );
+
+    expect(updated.relation.id, relationId);
+    expect(updated.relation.sourceIntentionId, sourceId);
+    expect(updated.relation.relatedIntentionId, relatedId);
+    expect(updated.relation.priority, RelationPriority.p2);
+    expect(updated.description?.value, 'Описание');
+    expect(
+      updated.relation.creationSequence.value,
+      before['creation_sequence'],
+    );
+    final result = await repository.getRelationGroupPage(
+      RelationGroupQuery(
+        intentionId: sourceId,
+        type: LongTermRelationType.can,
+        direction: RelationDirection.outgoing,
+        scope: RelationScope.active,
+        pageSize: 1,
+      ),
+    );
+    expect(result, isA<RelationGroupPageSuccess>());
+    final page =
+        (result as RelationGroupPageSuccess).value as RelationGroupFirstPage;
+    final stored = page.items.single.relation;
+    expect(stored.id, relationId);
+    expect(stored.type, LongTermRelationType.can);
+    expect(stored.sourceIntentionId, sourceId);
+    expect(stored.relatedIntentionId, relatedId);
+    expect(stored.priority, RelationPriority.p2);
+    expect(stored.creationSequence.value, before['creation_sequence']);
+    expect(
+      (await _storedRelation(database, relationId))['description'],
+      'Описание',
+    );
+  });
 
   test(
     'частичное изменение сохраняет идентичность, порядок и незапрошенные поля',
@@ -265,32 +314,43 @@ void main() {
     },
   );
 
-  test('изменение архивной связи сохраняет архивное состояние и последовательность создания', () async {
+  test('изменение архивной связи не восстанавливает её и участников', () async {
     await _create(repository, sourceId, relatedId);
-    await seedGraph(
-      database,
-      () =>
-          (database.update(database.longTermRelations)
-                ..where((row) => row.id.equals(relationId.toCanonicalString())))
-              .write(const LongTermRelationsCompanion(isArchived: Value(true))),
+    expect(
+      await repository.execute(ArchiveLongTermRelation(relationId)),
+      isA<GraphCommandSucceeded>(),
     );
-    await repository.execute(ArchiveIntention(relatedId));
+    expect(
+      await repository.execute(ArchiveIntention(sourceId)),
+      isA<GraphCommandSucceeded>(),
+    );
 
     final updated = _updated(
       await repository.execute(
         UpdateLongTermRelation(
           relationId: relationId,
-          patch: const LongTermRelationPatch(
-            priority: LongTermRelationFieldSet(RelationPriority.p1),
+          patch: LongTermRelationPatch(
+            priority: const LongTermRelationFieldSet(RelationPriority.p1),
+            description: LongTermRelationDescriptionPatch.fromInput(
+              'Новое описание',
+            ),
           ),
         ),
       ),
     );
 
     expect(updated.relation.priority, RelationPriority.p1);
+    expect(updated.relation.id, relationId);
+    expect(updated.description?.value, 'Новое описание');
     expect(updated.relation.scope, RelationScope.archived);
     expect(updated.relation.creationSequence.value, 1);
-    expect((await _storedIntention(database, relatedId))['is_archived'], 1);
+    expect((await _storedRelation(database, relationId))['is_archived'], 1);
+    expect(
+      (await _storedRelation(database, relationId))['description'],
+      'Новое описание',
+    );
+    expect((await _storedIntention(database, sourceId))['is_archived'], 1);
+    expect((await _storedIntention(database, relatedId))['is_archived'], 0);
   });
 
   test(
