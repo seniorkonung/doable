@@ -24,7 +24,7 @@
   - **Вероятные файлы:** `lib/src/intention/presentation/details/intention_details_page.dart`, `lib/src/long_term_relation/presentation/batch_picker/relation_batch_picker_page.dart`, `lib/src/long_term_relation/presentation/batch_picker/relation_batch_page_footer.dart` (удаление), `lib/src/app/routing/app_router.gr.dart`, `test/long_term_relation/presentation/batch_picker/relation_batch_picker_page_test.dart`.
   - **Размер:** M.
 
-- [ ] 1.3 Показывать обычную навигацию и разрешать создание со страницы намерения над любым поиском
+- [x] 1.3 Показывать обычную навигацию и разрешать создание со страницы намерения над любым поиском
   - **Критерии приёмки:**
     - `OrdinaryPageScaffold` всегда размещает `AppNavigation` в нижней панели по требованию «Панель на обычных страницах независимо от истории» из [спецификации навигации](specs/app-navigation/spec.md). `pickerFooter` и `isAboveRelationPicker` удалены; обычная страница над поиском и её соседние страницы показывают панель, поиск остаётся полноэкранной страницей-задачей.
     - Доступность добавления из всех четырёх групп и создания дневного выбора определяется теми же предметными правилами, что при открытии намерения из каталога, включая глубокие переходы от поиска. Проверки сохраняют ограничения архивированного намерения и действующие правила готовности к действию.

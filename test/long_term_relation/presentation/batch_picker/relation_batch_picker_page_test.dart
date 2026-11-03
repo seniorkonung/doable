@@ -2,9 +2,12 @@ import 'dart:async';
 import 'dart:ui' show CheckedState;
 
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
+import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
 import 'package:doable/src/data/local/app_database.dart' hide Tag;
 import 'package:doable/src/design_system/components/catalog_header.dart';
 import 'package:doable/src/design_system/components/docked_footer.dart';
@@ -1234,7 +1237,7 @@ void main() {
     await openRowPage(tester, name);
     expect(find.text('Добавить к выбранным'), findsNothing);
     expect(find.text('Убрать из выбранных'), findsNothing);
-    expect(find.byType(AppNavigationBar), findsNothing);
+    expect(find.byType(AppNavigationBar), findsOneWidget);
     await router.maybePop();
     await tester.pumpAndSettle();
 
@@ -1271,6 +1274,119 @@ void main() {
     await router.maybePop();
     await tester.pumpAndSettle();
     expect(find.text('Добавить 1 связь'), findsOneWidget);
+  });
+
+  testWidgets('глубокая страница над поиском открывает все группы и сохраняет '
+      'выбранный пункт при возврате', (tester) async {
+    await open(tester, IntentionRelationGroup.needs);
+    await tester.tap(find.text('Гулять'));
+    await tester.pumpAndSettle();
+    await openRowPage(tester, 'Гулять');
+    expect(
+      tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected,
+      AppDestination.home,
+    );
+    await tester.tap(find.text('Связи').first);
+    await tester.pumpAndSettle();
+    final walk = find.bySemanticsLabel('Открыть страницу намерения: Здоровье');
+    await tester.ensureVisible(walk);
+    await tester.tap(walk);
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<IntentionDetailsPage>(find.byType(IntentionDetailsPage))
+          .intentionId,
+      _id(1),
+    );
+    expect(
+      tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected,
+      AppDestination.home,
+    );
+
+    for (final group in IntentionRelationGroup.values) {
+      final tile = find.byKey(
+        ValueKey('intention-relations-group-${group.name}'),
+      );
+      await tester.ensureVisible(tile);
+      await tester.tap(tile);
+      await tester.pumpAndSettle();
+      final add = find.byKey(const ValueKey('intention-relations-add'));
+      await tester.ensureVisible(add);
+      await tester.tap(add);
+      await tester.pumpAndSettle();
+      expect(find.byType(AppNavigationBar), findsNothing);
+      expect(
+        tester
+            .widget<RelationBatchPickerPage>(
+              find.byType(RelationBatchPickerPage),
+            )
+            .group,
+        group,
+      );
+      await router.maybePop();
+      await tester.pumpAndSettle();
+    }
+    await router.maybePop();
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected,
+      AppDestination.home,
+    );
+    await router.maybePop();
+    await tester.pumpAndSettle();
+    expect(find.text('Добавить 1 связь'), findsOneWidget);
+  });
+
+  testWidgets('со страницы действия над поиском доступны оба направления '
+      'создания дневного выбора', (tester) async {
+    await seedGraph(database, () async {
+      await (database.update(database.intentions)
+            ..where((row) => row.id.equals(_uuid(5))))
+          .write(const IntentionsCompanion(isActionReady: Value(true)));
+    });
+    await open(tester, IntentionRelationGroup.needs);
+    await openRowPage(tester, 'Гулять');
+    await tester.tap(find.text('Выборы').first);
+    await tester.pumpAndSettle();
+    for (final (role, direction) in [
+      ('source', ChoicePathDraftDirection.topDown),
+      ('selected', ChoicePathDraftDirection.bottomUp),
+    ]) {
+      await tester.tap(find.byKey(ValueKey('intention-choices-role-$role')));
+      await tester.pumpAndSettle();
+      final add = find.byKey(const ValueKey('intention-choices-add'));
+      await tester.ensureVisible(add);
+      await tester.tap(add);
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<ChoicePathPage>(find.byType(ChoicePathPage)).direction,
+        direction,
+      );
+      await router.maybePop();
+      await tester.pumpAndSettle();
+    }
+  });
+
+  testWidgets('пункт панели закрывает поиск с отметкой без отправки пачки', (
+    tester,
+  ) async {
+    await open(tester, IntentionRelationGroup.needs);
+    await tester.tap(find.text('Гулять'));
+    await tester.pumpAndSettle();
+    await openRowPage(tester, 'Гулять');
+    await tester.tap(appNavigationDestination(AppDestination.intentionGraph));
+    await tester.pumpAndSettle();
+
+    expectIntentionGraphRootPage(router);
+    expect(
+      find.byType(RelationBatchPickerPage, skipOffstage: false),
+      findsNothing,
+    );
+    expect(
+      find.byType(IntentionDetailsPage, skipOffstage: false),
+      findsNothing,
+    );
+    expect(await tester.runAsync(relations), hasLength(4));
   });
 
   testWidgets('причина занятой пары остаётся в поиске, а не на странице', (
