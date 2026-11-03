@@ -705,6 +705,7 @@ final class _Harness {
     subscription = container.listen(
       choicePathViewModelProvider(
         _intention(direction == ChoicePathDraftDirection.bottomUp ? 3 : 1),
+        pageInstance,
         direction: direction,
       ),
       (_, _) {},
@@ -713,6 +714,7 @@ final class _Harness {
   }
 
   final repository = _Repository();
+  final pageInstance = ChoicePathPageInstance();
   final ChoicePathDraftDirection direction;
   late final ProviderContainer container;
   late final ProviderSubscription<ChoicePathState> subscription;
@@ -720,12 +722,14 @@ final class _Harness {
   ChoicePathViewModel get model => container.read(
     choicePathViewModelProvider(
       _intention(direction == ChoicePathDraftDirection.bottomUp ? 3 : 1),
+      pageInstance,
       direction: direction,
     ).notifier,
   );
   ChoicePathState get state => container.read(
     choicePathViewModelProvider(
       _intention(direction == ChoicePathDraftDirection.bottomUp ? 3 : 1),
+      pageInstance,
       direction: direction,
     ),
   );

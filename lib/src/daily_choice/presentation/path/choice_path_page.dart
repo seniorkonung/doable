@@ -29,11 +29,13 @@ final class ChoicePathPage extends ConsumerStatefulWidget {
     required this.sourceIntentionId,
     required this.direction,
     super.key,
-  }) : purpose = ChoicePathPurpose.create;
+  }) : pathInstance = null,
+       purpose = ChoicePathPurpose.create;
 
   const ChoicePathPage.forCreationRefresh({
     required IntentionId startingIntentionId,
     required this.direction,
+    required ChoicePathPageInstance this.pathInstance,
     super.key,
   }) : sourceIntentionId = startingIntentionId,
        purpose = ChoicePathPurpose.refreshCreation;
@@ -42,12 +44,14 @@ final class ChoicePathPage extends ConsumerStatefulWidget {
     required IntentionId startingIntentionId,
     required this.direction,
     super.key,
-  }) : sourceIntentionId = startingIntentionId,
+  }) : pathInstance = null,
+       sourceIntentionId = startingIntentionId,
        purpose = ChoicePathPurpose.replace;
 
   final IntentionId sourceIntentionId;
   final ChoicePathDraftDirection direction;
   final ChoicePathPurpose purpose;
+  final ChoicePathPageInstance? pathInstance;
 
   @override
   ConsumerState<ChoicePathPage> createState() => ChoicePathPageState();
@@ -66,6 +70,8 @@ final class ChoicePathSelection {
 }
 
 final class ChoicePathPageState extends ConsumerState<ChoicePathPage> {
+  late final ChoicePathPageInstance _pageInstance =
+      widget.pathInstance ?? ChoicePathPageInstance();
   DailyChoiceCreationFlowSession? _creationSession;
 
   /// Сессия конкретного корня; вспомогательный выбор ею не владеет.
@@ -93,6 +99,7 @@ final class ChoicePathPageState extends ConsumerState<ChoicePathPage> {
     final rootMatchId = context.routeData.matchId;
     _creationSession = DailyChoiceCreationFlowSession(
       rootMatchId: rootMatchId,
+      pathInstance: _pageInstance,
       originalHistory: context.router.root.stackData
           .takeWhile((route) => route.matchId != rootMatchId)
           .map((route) => route.matchId),
@@ -140,6 +147,7 @@ final class ChoicePathPageState extends ConsumerState<ChoicePathPage> {
           .read(
             choicePathViewModelProvider(
               widget.sourceIntentionId,
+              _pageInstance,
               direction: widget.direction,
             ).notifier,
           )
@@ -152,6 +160,7 @@ final class ChoicePathPageState extends ConsumerState<ChoicePathPage> {
     final l10n = AppLocalizations.of(context);
     final provider = choicePathViewModelProvider(
       widget.sourceIntentionId,
+      _pageInstance,
       direction: widget.direction,
     );
     final state = ref.watch(provider);

@@ -295,6 +295,8 @@ void main() {
         find.byKey(const ValueKey('daily-choice-replace-refresh-path')),
         findsOneWidget,
       );
+      expect(find.textContaining('Новое основание'), findsWidgets);
+      expect(find.textContaining('Новое действие'), findsWidgets);
       expect(
         (await _read(repository)).path.map((step) => step.relation.id),
         oldPath,

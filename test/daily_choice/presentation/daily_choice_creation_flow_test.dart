@@ -1322,6 +1322,8 @@ void main() {
       await tester.pumpAndSettle();
       await _waitFor(tester, find.text('Choose a path to an action'));
       expect(_savedIds(harness), isEmpty);
+      expect(find.textContaining('Другая ветвь'), findsWidgets);
+      expect(find.textContaining('Другое действие'), findsWidgets);
       expect(
         find.byKey(const ValueKey('choice-path-select-action')),
         findsOneWidget,

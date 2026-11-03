@@ -22,6 +22,8 @@ import 'choice_path_state.dart';
 
 part 'choice_path_view_model.g.dart';
 
+final class ChoicePathPageInstance {}
+
 /// Управляет одним обходом. Ответы принимаются только поколением текущего
 /// черновика, экранной сессией и ревизией подтверждённого снимка.
 @riverpod
@@ -37,7 +39,8 @@ final class ChoicePathViewModel extends _$ChoicePathViewModel {
 
   @override
   ChoicePathState build(
-    IntentionId startingIntentionId, {
+    IntentionId startingIntentionId,
+    ChoicePathPageInstance pageInstance, {
     ChoicePathDraftDirection direction = ChoicePathDraftDirection.topDown,
   }) {
     _repository = ref.watch(personalGraphRepositoryProvider);

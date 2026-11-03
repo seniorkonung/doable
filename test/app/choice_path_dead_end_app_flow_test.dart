@@ -7,6 +7,8 @@ import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
+import 'package:doable/src/daily_choice/presentation/path/choice_path_view_model.dart';
+import 'package:doable/src/daily_choice/presentation/source_picker/daily_choice_source_picker_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/design_system/components/priority_picker.dart';
 import 'package:doable/src/design_system/components/option_row.dart';
@@ -27,6 +29,8 @@ import '../support/in_memory_diagnostics_sink.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
 import '../support/local_database_harness.dart';
 import '../support/intention_edit_screen.dart';
+import '../support/intention_choices_tab.dart';
+import '../support/quick_creation.dart';
 import '../support/graph_seed.dart';
 
 Future<void> _until(WidgetTester tester, Finder finder) async {
@@ -52,6 +56,7 @@ Future<AppRuntime> _start(
   ChoicePathDraftDirection direction, {
   ChoicePathPurpose purpose = ChoicePathPurpose.create,
   Locale locale = const Locale('ru'),
+  int? startingNumber,
 }) async {
   tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
   tester.binding.platformDispatcher.localesTestValue = [locale];
@@ -87,7 +92,7 @@ Future<AppRuntime> _start(
   await _until(tester, find.byType(IntentionDetailsPage));
   final context = tester.element(find.byType(IntentionDetailsPage));
   final startingId = durabilityIntention(
-    direction == ChoicePathDraftDirection.bottomUp ? 4 : 1,
+    startingNumber ?? (direction == ChoicePathDraftDirection.bottomUp ? 4 : 1),
   );
   if (purpose == ChoicePathPurpose.create) {
     unawaited(
@@ -100,6 +105,7 @@ Future<AppRuntime> _start(
         ? ChoicePathPage.forCreationRefresh(
             startingIntentionId: startingId,
             direction: direction,
+            pathInstance: ChoicePathPageInstance(),
           )
         : ChoicePathPage.forReplacement(
             startingIntentionId: startingId,
@@ -163,6 +169,56 @@ Future<void> _priority(WidgetTester tester, String phrase) async {
 }
 
 void main() {
+  for (final fromQuickButton in [false, true]) {
+    testWidgets(
+      'второй выбор через ${fromQuickButton ? 'быструю кнопку' : 'вкладку'} не меняет первый путь',
+      (tester) async {
+        await _start(
+          tester,
+          ChoicePathDraftDirection.topDown,
+          startingNumber: 3,
+        );
+        await _tap(
+          tester,
+          find.byKey(const ValueKey('choice-path-open-relations')),
+        );
+        await _add(tester, 'Намерение 4');
+
+        if (fromQuickButton) {
+          await openDailyChoiceQuickCreation(
+            tester,
+            ChoicePathDraftDirection.topDown,
+            openedPage: find.byType(DailyChoiceSourcePickerPage),
+            wait: _until,
+          );
+          await _tap(tester, _pickerTitle('Намерение 3'));
+        } else {
+          await startDailyChoiceFromIntentionChoices(
+            tester,
+            waitFor: _until,
+            tap: _tap,
+          );
+        }
+        await _until(tester, find.textContaining('Намерение 4'));
+        final semantics = tester.ensureSemantics();
+        await tester.pump();
+        expect(find.bySemanticsLabel(RegExp('Шаг 1:')), findsNothing);
+        await _tap(tester, find.textContaining('Намерение 4').last);
+        await _until(tester, find.byKey(const ValueKey('choice-path-empty')));
+        expect(find.bySemanticsLabel(RegExp('Шаг 1:')), findsOneWidget);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        await _until(tester, find.textContaining('Намерение 4'));
+        expect(find.byKey(const ValueKey('choice-path-empty')), findsNothing);
+        expect(find.textContaining('Намерение 3'), findsWidgets);
+        expect(find.bySemanticsLabel(RegExp('Шаг 1:')), findsNothing);
+        semantics.dispose();
+      },
+    );
+  }
+
   testWidgets(
     'добавленная из тупика связь становится продолжением прежнего пути',
     (tester) async {

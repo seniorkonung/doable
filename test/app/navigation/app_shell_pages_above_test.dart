@@ -25,6 +25,7 @@ import 'package:doable/src/daily_choice/presentation/editor/daily_choice_edit_pa
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_path_replace_page.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_path_replacement_flow.dart';
 import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
+import 'package:doable/src/daily_choice/presentation/path/choice_path_view_model.dart';
 import 'package:doable/src/daily_choice/presentation/source_picker/daily_choice_source_picker_page.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openInMemoryLocalDatabase;

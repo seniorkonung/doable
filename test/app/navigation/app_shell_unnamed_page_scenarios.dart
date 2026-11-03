@@ -22,6 +22,7 @@ void _registerUnnamedPageTests() {
             ChoicePathPage.forCreationRefresh(
               startingIntentionId: startingId,
               direction: direction,
+              pathInstance: ChoicePathPageInstance(),
             ),
           ChoicePathPurpose.replace => ChoicePathPage.forReplacement(
             startingIntentionId: startingId,
