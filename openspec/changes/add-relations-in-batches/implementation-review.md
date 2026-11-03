@@ -5,15 +5,15 @@
 **Format version:** 1
 **Result:** No unresolved findings
 **Coverage status:** Complete
-**Summary:** Неурегулированных находок и принятых рисков нет. Проверка снятия удержания начала выдачи передана в новую невыполненную задачу 4.26 (`tasks.md`): один регрессионный виджет-тест с проверкой мутацией. Реализация и выполнение этой проверки остаются отдельной работой. Покрытие и свидетельства проверок ниже относятся к записанному диапазону обзора; повторный аудит не проводился.
+**Summary:** Задача 4.26 подтверждена: новый тест проверяет сохранение экранного положения намерения после появления строки «Создать», завершённой перестройки, прокрутки и следующей вставки перед видимой строкой. Независимый проход, соответствие OpenSpec и проверка качества завершены. Неурегулированных находок и принятых рисков нет.
 
 ## Review target
 
-- **Baseline ref:** 5494b67b8e57106e49094bb4f78b78808e9b9709
-- **Base commit:** 5494b67b8e57106e49094bb4f78b78808e9b9709
-- **Reviewed head:** f8aebaf5634b60df6c5073c4b4c53bebf8351a4f
-- **Target commits:** ["15edb8938b1c8827b908e77b6b28915d80a14884","94ca900050bc9144765ebe2c426c0294fa9d1a7f","d5215821562018db4102670ac85f7f20c043590a","22addecd8445dbbba79a39310f97744b905c3ba3","f8aebaf5634b60df6c5073c4b4c53bebf8351a4f"]
-- **Reviewable paths:** ["lib/src/intention/presentation/editor/intention_editor_page.dart","lib/src/intention/presentation/editor/intention_editor_view_model.dart","lib/src/intention/presentation/editor/intention_editor_view_model.g.dart","lib/src/intention/presentation/search/results_scroll_keeper.dart","lib/src/long_term_relation/presentation/batch_picker/relation_batch_picker_page.dart","openspec/changes/add-relations-in-batches/task-profiles.md","openspec/changes/add-relations-in-batches/tasks.md","test/intention/presentation/search/intention_search_list_test.dart"]
+- **Baseline ref:** b8a925592a14fcd7840254dc5ea0e6b19a053877
+- **Base commit:** b8a925592a14fcd7840254dc5ea0e6b19a053877
+- **Reviewed head:** 9dab8f5d451eab4e6dbb07e7ea952a93065bca1e
+- **Target commits:** ["01d205242ecdf6c23c83b0809c4d79f7621727ad","9dab8f5d451eab4e6dbb07e7ea952a93065bca1e"]
+- **Reviewable paths:** ["openspec/changes/add-relations-in-batches/task-profiles.md","openspec/changes/add-relations-in-batches/tasks.md","test/intention/presentation/search/intention_search_list_test.dart"]
 - **OpenSpec change:** add-relations-in-batches
 - **OpenSpec schema:** intent-driven
 - **Target scope:** User-requested bounded range
@@ -22,45 +22,21 @@
 
 ## Reviewed increment
 
-### U1 · Созданный файл провайдера редактора соответствует исходнику
+### U1 · Сохранение позиции после появления строки «Создать» проверяется регрессионным тестом
 
-- **Work items:** ["4.22"]
-- **Requirements and scenarios:** ["plan: Phase 4 «Ready to advance» — полные проверки проекта проходят"]
-- **Affected boundary:** Разработчики и проверка кодогенерации в CI.
-- **Implementation target:** ["lib/src/intention/presentation/editor/intention_editor_view_model.g.dart"]
-- **Applicable constraints and non-goals:** Созданные файлы приходят только из `mise run codegen` и не правятся вручную. Исходники, тесты и поведение продукта не меняются.
-
-### U2 · Описания правила закрытия сессии создания согласованы с поведением
-
-- **Work items:** ["4.24"]
-- **Requirements and scenarios:** ["intention-management: Уход во время сохранения непоправленного названия требует подтверждения"]
-- **Affected boundary:** Разработчики, читающие код панели создания намерения.
-- **Implementation target:** ["lib/src/intention/presentation/editor/intention_editor_view_model.dart","lib/src/intention/presentation/editor/intention_editor_page.dart","lib/src/intention/presentation/editor/intention_editor_view_model.g.dart"]
-- **Applicable constraints and non-goals:** Меняются только комментарии на русском. Код, тесты и поведение не меняются, новых тестов нет.
-
-### U3 · Строка «Создать» остаётся видна в начале выдачи после нескольких изменений до перестройки
-
-- **Work items:** ["4.23"]
-- **Requirements and scenarios:** ["long-term-relation-management: Создание намерения из поиска участника","long-term-relation-management: Точное совпадение убирает строку создания","intention-management: Сохранение состояния загруженного каталога","long-term-relation-management: Причина занятой пары в поиске участника (исключение со сбросом позиции)"]
-- **Affected boundary:** Человек, прокручивающий выдачу поиска участника.
-- **Implementation target:** ["lib/src/intention/presentation/search/results_scroll_keeper.dart","test/intention/presentation/search/intention_search_list_test.dart"]
-- **Applicable constraints and non-goals:** В остальных случаях якорь по видимой строке работает как прежде, лишних `jumpTo` нет. Тесты без замеров времени, фикстура минимальна, названия на русском.
-
-### U4 · Поиск участника открывает панель создания по фактическому стеку навигации
-
-- **Work items:** ["4.25"]
-- **Requirements and scenarios:** ["long-term-relation-management: Создание намерения из поиска участника","long-term-relation-management: Намерение из подстроки сразу отмечено"]
-- **Affected boundary:** Человек в поиске участника и корневой стек навигации auto_route.
-- **Implementation target:** ["lib/src/long_term_relation/presentation/batch_picker/relation_batch_picker_page.dart"]
-- **Applicable constraints and non-goals:** Пока панель открыта, второй панели нет. Пока идёт добавление, панель не открывается. После любого снятия панели создание снова доступно. Страница панели создания не меняется.
+- **Work items:** ["4.26"]
+- **Requirements and scenarios:** ["intention-management: Сохранение состояния загруженного каталога / Сохранение позиции после локального согласования","long-term-relation-management: Создание намерения из поиска участника","long-term-relation-management: Причина занятой пары в поиске участника — исключение со сбросом выдачи"]
+- **Affected boundary:** Человек в поиске участника и согласование отображаемой выдачи с подтверждёнными изменениями графа.
+- **Implementation target:** ["test/intention/presentation/search/intention_search_list_test.dart"]
+- **Applicable constraints and non-goals:** Один тест на русском, небольшая фикстура, без замеров времени и расширенного тайм-аута; проверка без устройства. Рабочий код, продуктовый контракт и существующие тесты сохраняются.
 
 ## Pass coverage
 
 | Pass | Status | Evidence or limitation |
 |---|---|---|
-| Independent decision review | Complete | Свежие изолированные ревьюеры `implementation-decision-review` проверяли `5494b67b…..f8aebaf5…` и получали только нейтральный бриф и пути своей группы. U1 и U2 делят `intention_editor_view_model.g.dart`, поэтому шли одной группой с объединёнными путями (Sonnet, medium): находок нет, `mise run codegen-check` прошёл на чистом дереве. U3 — отдельно (Sonnet, high). U4 — отдельно (Opus, high): находок нет. Этот ревьюер разобрал auto_route 11.1.0: страница попадает в `_pages` в микрозадаче после нажатия, но до следующего пакета событий указателя. Его допущение, что панель снимает себя через маршрутизатор, подтверждено в координаторе: `intention_editor_page.dart` на голове использует `router.removeRoute` (строки 434 и 471). |
-| OpenSpec conformance | Complete | Проверки шли в рабочем дереве с `HEAD` = `f8aebaf5634b60df6c5073c4b4c53bebf8351a4f` без правок. `mise run check` — код 0: анализ без замечаний, 4018 и 18 тестов прошли. `mise run codegen-check` — код 0, дерево после него чистое. `mise exec --no-deps -- openspec validate add-relations-in-batches --strict --json` — успех; это только структурное свидетельство. Критерии приёмки 4.22–4.25 сверены с диффом. Для 4.25 тест на повторное нажатие уже был: `relation_batch_picker_page_test.dart:279-307` нажимает плюс и сразу вызывает `onCreate` без кадра. Регрессионный тест 4.17 (`:310-345`) не изменён. Тест 4.23 воспроизводит два изменения подряд без кадра, тесты 4.19 и «появление и уход строки…» сохранены. Коммит `15edb893` добавляет только профили задач 4.22–4.25. Устройство и эмулятор не использовались. |
-| Code quality | Complete | Пять линз `code-review-and-quality` применены ко всем рабочим путям на `f8aebaf5…`. Вне правок как контекст учтены `intention_search_list.dart`, `app_router.dart`, `requestClose` и `_CloseConfirmationDialog`, а также `push`, `_canNavigate`, `_addNewPage` и `_removeRoute` из auto_route 11.1.0. Новых зависимостей и границ доверия нет. Для проверки регрессионного покрытия выполнена мутация: без строки `_holdsStart = false` (`results_scroll_keeper.dart:252`) прошли все 316 тестов `test/intention/presentation/search/`, `test/intention/presentation/catalog/` и `test/long_term_relation/presentation/batch_picker/`. Затем файл возвращён к закоммиченному. |
+| Independent decision review | Complete | Свежий изолированный агент `decision_review` (GPT-6.1 Sol, medium), навык `implementation-decision-review`, нейтральный бриф и единственный путь U1. Изучен полный файл на точном диапазоне; неизменённый контекст читался после проверки границ. Существенных находок нет. |
+| OpenSpec conformance | Complete | Критерии задачи 4.26 (`tasks.md:1376–1387`) сверены с обоими коммитами. На чистом рабочем дереве с `HEAD=9dab8f5d451eab4e6dbb07e7ea952a93065bca1e` команда `mise exec --no-deps -- flutter test test/intention/presentation/search/intention_search_list_test.dart` завершилась кодом 0: 42 теста. Проверка мутацией и повтор после восстановления описаны ниже. `mise run check` — код 0: форматирование без изменений, проверки инструментария, анализ без замечаний, 4019 обычных и 18 процессных тестов прошли. `mise exec --no-deps -- openspec validate add-relations-in-batches --strict --json` — `valid: true`, замечаний нет; это структурное свидетельство. |
+| Code quality | Complete | Пять направлений `code-review-and-quality` применены ко всему пути U1: корректность, читаемость, архитектура, безопасность и производительность. Проверены последовательность кадров, принадлежность изменений одному запросу, наблюдаемая экранная координата, отличия от соседних тестов и ограниченный размер фикстуры. Новых зависимостей и границ доверия нет. |
 
 ## Findings
 
@@ -68,4 +44,16 @@ No unresolved findings remain in the implementation review.
 
 ## Review coverage
 
-Изучены все пути диапазона на `f8aebaf5…`. Хранитель прокрутки: установка и снятие `_holdsStart`, смена запроса и `_jumpToTop`, состояния-статусы, ожидающий якорь, `dispose`, ранний возврат `onListBuilt`. Поиск участника: проверка `canEdit` и стека над `matchId` поиска, поздний `onCreated` после ухода, порядок добавления страницы в стек auto_route относительно событий указателя, снятие панели через `removeRoute` и `onPopPage`. Комментарии правила закрытия сверены с `requestClose` и диалогом подтверждения. Созданный файл провайдера сверен через `codegen-check`. Требования «Создание намерения из поиска участника», «Сохранение состояния загруженного каталога» и «Компактная панель создания намерения» прочитаны на голове.
+Единица U1 покрывает задачу `taskId=94`, номер `4.26`, с сохранением её описания и завершённого состояния. Все три пути диапазона учтены: два документа служат плановыми свидетельствами, файл тестов — единственный путь проверки поведения. Несопоставленных путей нет.
+
+Коммит `01d205242ecdf6c23c83b0809c4d79f7621727ad` добавляет профиль задачи 4.26 (`task-profiles.md:472–475`), соответствующий ограниченному тестовому изменению; он сопоставлен U1 и задаче 94 / 4.26.
+
+Коммит `9dab8f5d451eab4e6dbb07e7ea952a93065bca1e` добавляет тест `intention_search_list_test.dart:667–710` и отмечает задачу выполненной в `tasks.md:1376`; он сопоставлен U1 и задаче 94 / 4.26. Других изменений рабочего кода или существующих проверок нет.
+
+Тест загружает 15 намерений, переименованием намерения страницы снимает единственное точное совпадение и ждёт три кадра через существующий помощник `_settle`. Затем прокручивает список, запоминает координату «Действие 12» и подтверждает создание «Действие 16» на следующей ревизии. Проверки `:708–709` устанавливают появление новой первой строки и сохранение координаты видимого намерения.
+
+В неизменённом контексте головы изучены `IntentionSearchList`, `ResultsScrollKeeper` и согласование в `IntentionCatalogViewModel`. Создание проходит ветку `IntentionCatalogCreated` (`intention_catalog_view_model.dart:999–1028`), сохраняющую запрос и локально вставляющую намерение; исключение со сбросом поиска не применяется. Тесты появления строки в начале, её появления и ухода на ненулевой позиции и нескольких изменений до перестройки сохранены. Новый тест проверяет следующий переход уже после обслуживания кадра.
+
+Мутация проверена отдельно на временной копии входных файлов головы в `/tmp/review-mutation-inputs-4xu2xqt4`: `flutter test --no-pub test/intention/presentation/search/intention_search_list_test.dart`, Flutter взят из `mise exec --no-deps`. Единственное изменение копии — удаление `_holdsStart = false` из `results_scroll_keeper.dart:252`. Результат: код 1, 41 тест прошёл, только новый тест упал на `:709`: ожидалась координата 44, получена 100. После восстановления исходных байтов та же команда завершилась кодом 0, все 42 теста прошли. Копия удалена; исходники рабочего дерева при проверке не менялись.
+
+Плановые свидетельства прочитаны из записанной головы; незакоммиченных входных изменений при начале ревью и проверок не было. Исправления кода и плановых артефактов, новые задачи и передача работ на устранение находок не потребовались. Полная проверка фазы выполнена в корне репозитория на записанной голове; проверки на устройстве остаются за владельцем продукта.
