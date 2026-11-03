@@ -1055,7 +1055,7 @@
 - [x] 4.4 Живая сессия панели из поиска объявляет «Намерение создано и отмечено»
   - **Критерии приёмки:**
     - Сессия варианта для поиска сообщает координатору о своём запуске при `acceptCreation`. Завершение определяет сообщение в момент успеха: пока право инициатора не освобождено, цель операции — создание для поиска, а после `releaseInitiatorPresentation` — обычное создание. Различие задаёт закрытый вариант цели, а не флаг.
-    - Общий шаблон сообщения называет исход «Намерение создано и отмечено.» и «Intention created and chosen.». Самостоятельное создание и поздний успех покинутой панели называют прежний `editorCreated`. Сообщение предъявляется один раз.
+    - Общий шаблон сообщения называет исход «Намерение создано и отмечено.» и «Intention created and selected.». Самостоятельное создание и поздний успех покинутой панели называют прежний `editorCreated`. Сообщение предъявляется один раз.
   - **Проверка:**
     - `mise run codegen`.
     - `graph_operation_presenter_test.dart` на настоящем координаторе покрывает успех живой сессии и успех после освобождения права на обоих языках.
@@ -1292,4 +1292,17 @@
     - `mise exec --no-deps -- flutter analyze`.
   - **Зависимости:** 4.6.
   - **Предполагаемые файлы:** меняются `lib/src/intention/presentation/search/results_scroll_keeper.dart`, `test/intention/presentation/search/intention_search_list_test.dart`.
+  - **Размер:** XS.
+
+- [ ] 4.20 Английские строки называют отметку для новых связей словом «selected», как остальная лексика пакета
+  - **Критерии приёмки:**
+    - В `lib/l10n/app_en.arb` `editorCreatedAndChosen` — «Intention created and selected.», `editorSearchSubtitle` — «Selected right away for new relations». Остальная лексика пакета («Add to selected», «Remove from selected», «Selected intentions») не меняется.
+    - Ключи `editorCreatedAndChosen` и `editorSearchSubtitle` не переименовываются, русские строки в `app_ru.arb` не меняются. Созданные файлы локализации обновлены кодогенерацией, а не вручную.
+    - Ожидания английского текста в `graph_operation_presenter_test.dart` и `intention_editor_page_test.dart` называют новые строки; в `lib` и `test` не остаётся «Intention created and chosen.» и «Immediately chosen for new relations».
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/graph/presentation/graph_operation_presenter_test.dart test/intention/presentation/editor/intention_editor_page_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 4.3, 4.4.
+  - **Предполагаемые файлы:** меняются `lib/l10n/app_en.arb` с созданными файлами локализации `lib/l10n/app_localizations.dart` и `lib/l10n/app_localizations_en.dart`, `test/graph/presentation/graph_operation_presenter_test.dart`, `test/intention/presentation/editor/intention_editor_page_test.dart`.
   - **Размер:** XS.
