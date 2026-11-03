@@ -124,7 +124,12 @@ final class IntentionEditorViewModelProvider
   /// черновик зафиксирован.
   IntentionEditorViewModelProvider._({
     required IntentionEditorViewModelFamily super.from,
-    required (IntentionCreationFormKey, {String initialTitle}) super.argument,
+    required (
+      IntentionCreationFormKey, {
+      String initialTitle,
+      IntentionCreationOperationTarget target,
+    })
+    super.argument,
   }) : super(
          retry: null,
          name: r'intentionEditorViewModelProvider',
@@ -168,7 +173,7 @@ final class IntentionEditorViewModelProvider
 }
 
 String _$intentionEditorViewModelHash() =>
-    r'aa44dc92c36437344d38c590588e69dcc28d8d50';
+    r'fdfe23eabd5fde9028ac8df2f450d386cc18782b';
 
 /// Экранная сессия создания намерения по собственному ключу формы.
 ///
@@ -214,7 +219,11 @@ final class IntentionEditorViewModelFamily extends $Family
           IntentionEditorState,
           IntentionEditorState,
           IntentionEditorState,
-          (IntentionCreationFormKey, {String initialTitle})
+          (
+            IntentionCreationFormKey, {
+            String initialTitle,
+            IntentionCreationOperationTarget target,
+          })
         > {
   IntentionEditorViewModelFamily._()
     : super(
@@ -265,8 +274,10 @@ final class IntentionEditorViewModelFamily extends $Family
   IntentionEditorViewModelProvider call(
     IntentionCreationFormKey formKey, {
     String initialTitle = '',
+    IntentionCreationOperationTarget target =
+        const CreatingIntentionOperationTarget(),
   }) => IntentionEditorViewModelProvider._(
-    argument: (formKey, initialTitle: initialTitle),
+    argument: (formKey, initialTitle: initialTitle, target: target),
     from: this,
   );
 
@@ -314,13 +325,21 @@ final class IntentionEditorViewModelFamily extends $Family
 abstract class _$IntentionEditorViewModel
     extends $Notifier<IntentionEditorState> {
   late final _$args =
-      ref.$arg as (IntentionCreationFormKey, {String initialTitle});
+      ref.$arg
+          as (
+            IntentionCreationFormKey, {
+            String initialTitle,
+            IntentionCreationOperationTarget target,
+          });
   IntentionCreationFormKey get formKey => _$args.$1;
   String get initialTitle => _$args.initialTitle;
+  IntentionCreationOperationTarget get target => _$args.target;
 
   IntentionEditorState build(
     IntentionCreationFormKey formKey, {
     String initialTitle = '',
+    IntentionCreationOperationTarget target =
+        const CreatingIntentionOperationTarget(),
   });
   @$mustCallSuper
   @override
@@ -336,7 +355,11 @@ abstract class _$IntentionEditorViewModel
             >;
     return element.handleCreate(
       ref,
-      () => build(_$args.$1, initialTitle: _$args.initialTitle),
+      () => build(
+        _$args.$1,
+        initialTitle: _$args.initialTitle,
+        target: _$args.target,
+      ),
     );
   }
 }

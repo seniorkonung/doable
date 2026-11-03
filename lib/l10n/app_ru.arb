@@ -320,6 +320,8 @@
   "editorCreateCorruption": "Сохранённые данные повреждены. Намерение не создано.",
   "editorCreateUnexpected": "Не удалось создать намерение из-за непредвиденной ошибки.",
   "editorCreated": "Намерение создано.",
+  "editorCreatedAndChosen": "Намерение создано и отмечено.",
+  "@editorCreatedAndChosen": {"description": "Успех создания намерения для поиска участника"},
   "editorCloseDiscardTitle": "Сбросить черновик?",
   "editorCloseDiscardMessage": "Введённые данные нового намерения не сохранены и будут потеряны.",
   "editorCloseContinueAction": "Продолжить ввод",

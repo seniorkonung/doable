@@ -1628,6 +1628,12 @@ abstract class AppLocalizations {
   /// **'Intention created.'**
   String get editorCreated;
 
+  /// Успех создания намерения для поиска участника
+  ///
+  /// In en, this message translates to:
+  /// **'Intention created and chosen.'**
+  String get editorCreatedAndChosen;
+
   /// Заголовок подтверждения закрытия изменённого черновика создания до отправки
   ///
   /// In en, this message translates to:

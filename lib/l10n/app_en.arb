@@ -818,6 +818,10 @@
     "description": "Терминальная непредвиденная ошибка создания намерения"
   },
   "editorCreated": "Intention created.",
+  "editorCreatedAndChosen": "Intention created and chosen.",
+  "@editorCreatedAndChosen": {
+    "description": "Успех создания намерения для поиска участника"
+  },
   "@editorCreated": {
     "description": "Подтверждение успешного создания намерения"
   },

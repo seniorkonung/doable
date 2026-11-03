@@ -1021,6 +1021,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get editorCreated => 'Намерение создано.';
 
   @override
+  String get editorCreatedAndChosen => 'Намерение создано и отмечено.';
+
+  @override
   String get editorCloseDiscardTitle => 'Сбросить черновик?';
 
   @override

@@ -99,7 +99,16 @@ final class _IntentionEditorPageState
   };
 
   IntentionEditorViewModelProvider get _provider =>
-      intentionEditorViewModelProvider(_formKey, initialTitle: _initialTitle);
+      intentionEditorViewModelProvider(
+        _formKey,
+        initialTitle: _initialTitle,
+        target: switch (widget.launch) {
+          IntentionCreationStandalone() =>
+            const CreatingIntentionOperationTarget(),
+          IntentionCreationForSearch() =>
+            const CreatingIntentionForSearchOperationTarget(),
+        },
+      );
 
   @override
   void dispose() {

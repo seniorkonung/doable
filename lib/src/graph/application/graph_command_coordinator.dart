@@ -228,7 +228,7 @@ sealed class IntentionCommandCompletion extends GraphCommandCompletion {
     ResultSuccess(value: IntentionDeleted()) ||
     ResultFailure() => switch (target) {
       ExistingIntentionOperationTarget(:final title) => title,
-      CreatingIntentionOperationTarget() => null,
+      IntentionCreationOperationTarget() => null,
     },
   };
 }
@@ -657,8 +657,18 @@ sealed class IntentionOperationTarget {
   const IntentionOperationTarget();
 }
 
-final class CreatingIntentionOperationTarget extends IntentionOperationTarget {
+sealed class IntentionCreationOperationTarget extends IntentionOperationTarget {
+  const IntentionCreationOperationTarget();
+}
+
+final class CreatingIntentionOperationTarget
+    extends IntentionCreationOperationTarget {
   const CreatingIntentionOperationTarget();
+}
+
+final class CreatingIntentionForSearchOperationTarget
+    extends IntentionCreationOperationTarget {
+  const CreatingIntentionForSearchOperationTarget();
 }
 
 final class ExistingIntentionOperationTarget extends IntentionOperationTarget {
@@ -949,8 +959,10 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
   /// отказ — сначала живой форме по ADR-0012.
   IntentionCommandStart acceptCreation(
     IntentionCreationFormKey formKey,
-    CreateIntention command,
-  ) => _accept(formKey, command, const CreatingIntentionOperationTarget());
+    CreateIntention command, {
+    IntentionCreationOperationTarget target =
+        const CreatingIntentionOperationTarget(),
+  }) => _accept(formKey, command, target);
 
   /// Принимает команду существующего намерения.
   ///
@@ -1206,14 +1218,20 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     final token = IntentionOperationToken._();
     final kind = _kindOf(command);
     final policy = _intentionPresentationPolicyOf(kind);
+    final entry = _PresentationEntry(token)
+      ..initiatorReleased = policy == _PresentationPolicy.failureOnly;
     final acceptance = _acceptOperation(
       keys: {key},
       // Права инициатора у операций «только отказ» нет: отказ сразу
       // принадлежит оболочке.
-      entry: _PresentationEntry(token)
-        ..initiatorReleased = policy == _PresentationPolicy.failureOnly,
+      entry: entry,
       execute: () async {
         final result = await _executeIntention(command);
+        final completionTarget =
+            target is CreatingIntentionForSearchOperationTarget &&
+                entry.initiatorReleased
+            ? const CreatingIntentionOperationTarget()
+            : target;
         if (policy != _PresentationPolicy.standard &&
             result
                 is ResultSuccess<
@@ -1222,14 +1240,14 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
           return IntentionUnannouncedSuccessCompletion._(
             token: token,
             kind: kind,
-            target: target,
+            target: completionTarget,
             result: result,
           );
         }
         return IntentionPresentableCompletion._(
           token: token,
           kind: kind,
-          target: target,
+          target: completionTarget,
           confirmedResult: result,
         );
       },

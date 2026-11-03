@@ -108,6 +108,10 @@ void main() {
       _completeCatalogRefresh(repository);
       await tester.pumpAndSettle();
       expect(created, [(testIntention(title: 'Плавать').id, 'Плавать')]);
+      expect(
+        find.text('Create — “Плавать”: Intention created and chosen.'),
+        findsOneWidget,
+      );
       expect(find.byKey(_closeConfirmation), findsNothing);
       expectIntentionGraphRootPage(router);
       expect(router.stackData.map((route) => route.name), [AppShellRoute.name]);
@@ -166,6 +170,10 @@ void main() {
       _completeCatalogRefresh(repository);
       await tester.pumpAndSettle();
       expect(created, isEmpty);
+      expect(
+        find.text('Create — “Плавать”: Intention created.'),
+        findsOneWidget,
+      );
       expectIntentionGraphRootPage(router);
     },
   );

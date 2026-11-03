@@ -386,6 +386,36 @@ void main() {
     },
   );
 
+  for (final (locale, live, late) in [
+    (
+      const Locale('ru'),
+      'Создание — «Полное намерение»: Намерение создано и отмечено.',
+      'Создание — «Полное намерение»: Намерение создано.',
+    ),
+    (
+      const Locale('en'),
+      'Create — “Полное намерение”: Intention created and chosen.',
+      'Create — “Полное намерение”: Intention created.',
+    ),
+  ]) {
+    for (final released in [false, true]) {
+      testWidgets('создание для поиска сообщает исход с учётом ухода, '
+          '${locale.languageCode}, освобождено: $released', (tester) async {
+        final harness = await _pumpPresenterApp(tester, locale: locale);
+        final creation = harness.startFullCreation(
+          releaseInitiator: released,
+          target: const CreatingIntentionForSearchOperationTarget(),
+        );
+        harness.completeFullCreated(creation);
+        await tester.pumpAndSettle();
+
+        expect(find.text(released ? late : live), findsOneWidget);
+        await _closeMessage(tester);
+        expect(find.byType(SnackBar), findsNothing);
+      });
+    }
+  }
+
   // Язык не меняет путь предъявления, поэтому достаточно русского.
   const fullCreation = (
     locale: Locale('ru'),
@@ -2151,7 +2181,11 @@ final class _PresenterHarness {
   }
 
   /// Создание с готовностью и двумя тегами из отдельной формы.
-  IntentionCommandAccepted startFullCreation({required bool releaseInitiator}) {
+  IntentionCommandAccepted startFullCreation({
+    required bool releaseInitiator,
+    IntentionCreationOperationTarget target =
+        const CreatingIntentionOperationTarget(),
+  }) {
     final commandIndex = repository.commands.length;
     final accepted = _coordinator.acceptCreation(
       IntentionCreationFormKey(),
@@ -2161,6 +2195,7 @@ final class _PresenterHarness {
         readiness: IntentionReadiness.ready,
         tagIds: [_tagId, _otherTagId],
       ),
+      target: target,
     ) as IntentionCommandAccepted;
     if (releaseInitiator) {
       _coordinator.releaseInitiatorPresentation(accepted.token);

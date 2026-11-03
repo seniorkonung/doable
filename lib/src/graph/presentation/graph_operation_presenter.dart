@@ -443,7 +443,7 @@ String _intentionMessage(
   final target =
       completion.presentationTitle ??
       switch (completion.target) {
-        CreatingIntentionOperationTarget() =>
+        IntentionCreationOperationTarget() =>
           localizations.graphOperationNewIntention,
         ExistingIntentionOperationTarget() =>
           localizations.graphOperationIntention,
@@ -525,6 +525,7 @@ String _intentionOutcomeFor(
     localizations,
     completion.kind,
     value,
+    completion.target,
   ),
   ResultFailure(:final failure) => _failureFor(
     localizations,
@@ -537,9 +538,14 @@ String _successFor(
   AppLocalizations localizations,
   IntentionCommandKind kind,
   IntentionCommandSuccess success,
+  IntentionOperationTarget target,
 ) => switch ((kind, success)) {
-  (IntentionCommandKind.create, IntentionSaved()) =>
-    localizations.editorCreated,
+  (IntentionCommandKind.create, IntentionSaved()) => switch (target) {
+    CreatingIntentionForSearchOperationTarget() =>
+      localizations.editorCreatedAndChosen,
+    CreatingIntentionOperationTarget() ||
+    ExistingIntentionOperationTarget() => localizations.editorCreated,
+  },
   (
     IntentionCommandKind.update ||
         IntentionCommandKind.enableReadiness ||

@@ -76,6 +76,8 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
   IntentionEditorState build(
     IntentionCreationFormKey formKey, {
     String initialTitle = '',
+    IntentionCreationOperationTarget target =
+        const CreatingIntentionOperationTarget(),
   }) {
     _formKey = formKey;
     _coordinator = ref.watch(graphCommandCoordinatorProvider.notifier);
@@ -182,6 +184,7 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
         readiness: draft.readiness,
         tagIds: draft.tagIds,
       ),
+      target: target,
     );
     switch (start) {
       case IntentionCommandAccepted(:final token, :final future):

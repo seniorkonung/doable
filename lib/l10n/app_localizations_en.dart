@@ -1015,6 +1015,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get editorCreated => 'Intention created.';
 
   @override
+  String get editorCreatedAndChosen => 'Intention created and chosen.';
+
+  @override
   String get editorCloseDiscardTitle => 'Discard the draft?';
 
   @override
