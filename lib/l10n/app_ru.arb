@@ -788,6 +788,7 @@
   "choicePathLoading": "Проверяем доступные продолжения…",
   "choicePathNoPath": "Из этого намерения сейчас нет допустимого пути к другому действию.",
   "choicePathNoFurtherPath": "Дальнейших допустимых продолжений нет.",
+  "choicePathOpenRelations": "Открыть связи",
   "choicePathConflict": "Граф изменился. Актуализируйте путь перед дальнейшим выбором.",
   "choicePathRefresh": "Актуализировать путь",
   "choicePathNotFound": "Намерение пути больше не существует.",

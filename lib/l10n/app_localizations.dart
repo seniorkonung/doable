@@ -4156,6 +4156,12 @@ abstract class AppLocalizations {
   /// **'There are no further valid continuations.'**
   String get choicePathNoFurtherPath;
 
+  /// Переход к связям из тупика выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Open relations'**
+  String get choicePathOpenRelations;
+
   /// Устаревший префикс пути
   ///
   /// In en, this message translates to:

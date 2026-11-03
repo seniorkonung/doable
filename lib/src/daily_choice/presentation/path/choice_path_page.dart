@@ -8,6 +8,8 @@ import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
 import '../../../graph/application/graph_revision.dart';
 import '../../../intention/domain/intention_id.dart';
+import '../../../intention/presentation/details/intention_page_target.dart';
+import '../../../long_term_relation/application/intention_relation_group.dart';
 import '../../../long_term_relation/application/long_term_relation_projection.dart';
 import '../../../long_term_relation/domain/long_term_relation.dart';
 import '../../../long_term_relation/domain/long_term_relation_id.dart';
@@ -308,6 +310,20 @@ final class ChoicePathPageState extends ConsumerState<ChoicePathPage> {
                             ? l10n.choicePathBottomNoPath
                             : l10n.choicePathNoPath
                       : l10n.choicePathNoFurtherPath,
+                  actionLabel: l10n.choicePathOpenRelations,
+                  actionKey: const ValueKey('choice-path-open-relations'),
+                  onAction: () => unawaited(
+                    context.router.root.push<void>(
+                      IntentionDetailsRoute(
+                        intentionId: state.current.id,
+                        target: RelationsTarget(
+                          widget.direction == ChoicePathDraftDirection.topDown
+                              ? IntentionRelationGroup.needs
+                              : IntentionRelationGroup.neededFor,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
                 ChoicePathData() => _ContinuationList(
                   state: state,

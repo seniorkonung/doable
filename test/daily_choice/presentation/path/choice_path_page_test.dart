@@ -320,6 +320,7 @@ void main() {
     repository.complete(0, []);
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('choice-path-empty')), findsOneWidget);
+    expect(find.text('Открыть связи'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('choice-path-select-action')),
       findsNothing,

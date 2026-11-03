@@ -2725,6 +2725,9 @@ class AppLocalizationsRu extends AppLocalizations {
       'Дальнейших допустимых продолжений нет.';
 
   @override
+  String get choicePathOpenRelations => 'Открыть связи';
+
+  @override
   String get choicePathConflict =>
       'Граф изменился. Актуализируйте путь перед дальнейшим выбором.';
 

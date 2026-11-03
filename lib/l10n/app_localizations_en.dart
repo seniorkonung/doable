@@ -2702,6 +2702,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'There are no further valid continuations.';
 
   @override
+  String get choicePathOpenRelations => 'Open relations';
+
+  @override
   String get choicePathConflict =>
       'The graph has changed. Refresh the path before continuing.';
 
