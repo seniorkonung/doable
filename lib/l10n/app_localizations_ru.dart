@@ -964,6 +964,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get editorTitle => 'Создать намерение';
 
   @override
+  String get editorSearchSubtitle => 'Сразу отмечается для новых связей';
+
+  @override
   String get editorCreateAction => 'Создать намерение';
 
   @override

@@ -39,7 +39,7 @@ final class QuickCreationLauncher {
     }
     switch (mode) {
       case QuickCreationMode.intention:
-        await _openFirst(router, const IntentionEditorRoute());
+        await _openFirst(router, IntentionEditorRoute());
       case QuickCreationMode.dailyChoice:
         final direction = await showQuickCreationDailyChoiceStartSheet(context);
         if (direction == null || !context.mounted) return;

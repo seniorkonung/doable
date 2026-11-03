@@ -73,11 +73,14 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
   var _tagObservationGeneration = 0;
 
   @override
-  IntentionEditorState build(IntentionCreationFormKey formKey) {
+  IntentionEditorState build(
+    IntentionCreationFormKey formKey, {
+    String initialTitle = '',
+  }) {
     _formKey = formKey;
     _coordinator = ref.watch(graphCommandCoordinatorProvider.notifier);
     _tagReads = ref.watch(personalGraphRepositoryProvider);
-    const initial = IntentionEditorState.initial();
+    final initial = IntentionEditorState.initial(initialTitle: initialTitle);
     final draftTagSet = _draftTagSet = _SessionDraftTagSet(
       this,
       initial.draft.tagIds,
@@ -282,7 +285,7 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
         ResultSuccess(value: IntentionSaved(:final intention)) =>
           state.withOperation(
             OperationSucceeded<Intention>(intention),
-            event: IntentionEditorCreated(intention.id),
+            event: IntentionEditorCreated(intention),
           ),
         ResultSuccess(value: IntentionDeleted()) => state.withOperation(
           const OperationFailed<Intention>(IntentionUnexpectedFailure()),

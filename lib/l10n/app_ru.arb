@@ -303,6 +303,7 @@
   "intentionEditDiscardAction": "Отменить",
   "intentionEditContinueAction": "Продолжить правку",
   "editorTitle": "Создать намерение",
+  "editorSearchSubtitle": "Сразу отмечается для новых связей",
   "editorCreateAction": "Создать намерение",
   "editorSaveAction": "Сохранить",
   "editorSaving": "Сохраняем…",

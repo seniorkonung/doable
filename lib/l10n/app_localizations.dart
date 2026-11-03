@@ -1526,6 +1526,12 @@ abstract class AppLocalizations {
   /// **'Create intention'**
   String get editorTitle;
 
+  /// Пояснение панели создания намерения из поиска участника
+  ///
+  /// In en, this message translates to:
+  /// **'Immediately chosen for new relations'**
+  String get editorSearchSubtitle;
+
   /// Действие создания намерения
   ///
   /// In en, this message translates to:

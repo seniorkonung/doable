@@ -32,9 +32,10 @@ sealed class IntentionEditorEvent {
 }
 
 final class IntentionEditorCreated extends IntentionEditorEvent {
-  const IntentionEditorCreated(this.intentionId);
+  const IntentionEditorCreated(this.intention);
 
-  final IntentionId intentionId;
+  final Intention intention;
+  IntentionId get intentionId => intention.id;
 }
 
 /// Черновик создания намерения: данные будущего намерения, которое ещё не
@@ -45,8 +46,9 @@ final class IntentionEditorCreated extends IntentionEditorEvent {
 /// порядке добавления. Поиск, кандидат выбора, фокус и размер панели не
 /// входят в черновик.
 final class IntentionCreationDraft {
-  const IntentionCreationDraft.initial()
-    : title = '',
+  const IntentionCreationDraft.initial({String initialTitle = ''})
+    : title = initialTitle,
+      _initialTitle = initialTitle,
       description = '',
       tagIds = const {},
       readiness = IntentionReadiness.notReady;
@@ -55,12 +57,14 @@ final class IntentionCreationDraft {
   /// набора, чтобы неизменённый набор сохранял свою идентичность.
   const IntentionCreationDraft._({
     required this.title,
+    required this._initialTitle,
     required this.description,
     required this.tagIds,
     required this.readiness,
   });
 
   final String title;
+  final String _initialTitle;
   final String description;
   final Set<TagId> tagIds;
 
@@ -68,9 +72,9 @@ final class IntentionCreationDraft {
   final IntentionReadiness readiness;
 
   /// Отличается ли хотя бы одно из четырёх полей от начального значения.
-  /// Полностью пробельный текст тоже считается изменением.
+  /// Текст сравнивается буквально, включая пробелы.
   bool get isChanged =>
-      title.isNotEmpty ||
+      title != _initialTitle ||
       description.isNotEmpty ||
       tagIds.isNotEmpty ||
       readiness != IntentionReadiness.notReady;
@@ -98,6 +102,7 @@ final class IntentionCreationDraft {
     IntentionReadiness? readiness,
   }) => IntentionCreationDraft._(
     title: title ?? this.title,
+    initialTitle: _initialTitle,
     description: description ?? this.description,
     tagIds: tagIds ?? this.tagIds,
     readiness: readiness ?? this.readiness,
@@ -178,8 +183,8 @@ final class IntentionEditorState {
     required this.closing,
   });
 
-  const IntentionEditorState.initial()
-    : draft = const IntentionCreationDraft.initial(),
+  IntentionEditorState.initial({String initialTitle = ''})
+    : draft = IntentionCreationDraft.initial(initialTitle: initialTitle),
       selectedTags = const {},
       operation = const OperationIdle<Intention>(),
       event = null,

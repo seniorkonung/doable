@@ -124,7 +124,7 @@ final class IntentionEditorViewModelProvider
   /// черновик зафиксирован.
   IntentionEditorViewModelProvider._({
     required IntentionEditorViewModelFamily super.from,
-    required IntentionCreationFormKey super.argument,
+    required (IntentionCreationFormKey, {String initialTitle}) super.argument,
   }) : super(
          retry: null,
          name: r'intentionEditorViewModelProvider',
@@ -140,7 +140,7 @@ final class IntentionEditorViewModelProvider
   String toString() {
     return r'intentionEditorViewModelProvider'
         ''
-        '($argument)';
+        '$argument';
   }
 
   @$internal
@@ -168,7 +168,7 @@ final class IntentionEditorViewModelProvider
 }
 
 String _$intentionEditorViewModelHash() =>
-    r'9553a791ca18cd351f379c0f5cfba2e2026d2c1e';
+    r'aa44dc92c36437344d38c590588e69dcc28d8d50';
 
 /// Экранная сессия создания намерения по собственному ключу формы.
 ///
@@ -214,7 +214,7 @@ final class IntentionEditorViewModelFamily extends $Family
           IntentionEditorState,
           IntentionEditorState,
           IntentionEditorState,
-          IntentionCreationFormKey
+          (IntentionCreationFormKey, {String initialTitle})
         > {
   IntentionEditorViewModelFamily._()
     : super(
@@ -262,8 +262,13 @@ final class IntentionEditorViewModelFamily extends $Family
   /// наблюдения; во время отправки — после её результата, потому что до него
   /// черновик зафиксирован.
 
-  IntentionEditorViewModelProvider call(IntentionCreationFormKey formKey) =>
-      IntentionEditorViewModelProvider._(argument: formKey, from: this);
+  IntentionEditorViewModelProvider call(
+    IntentionCreationFormKey formKey, {
+    String initialTitle = '',
+  }) => IntentionEditorViewModelProvider._(
+    argument: (formKey, initialTitle: initialTitle),
+    from: this,
+  );
 
   @override
   String toString() => r'intentionEditorViewModelProvider';
@@ -308,10 +313,15 @@ final class IntentionEditorViewModelFamily extends $Family
 
 abstract class _$IntentionEditorViewModel
     extends $Notifier<IntentionEditorState> {
-  late final _$args = ref.$arg as IntentionCreationFormKey;
-  IntentionCreationFormKey get formKey => _$args;
+  late final _$args =
+      ref.$arg as (IntentionCreationFormKey, {String initialTitle});
+  IntentionCreationFormKey get formKey => _$args.$1;
+  String get initialTitle => _$args.initialTitle;
 
-  IntentionEditorState build(IntentionCreationFormKey formKey);
+  IntentionEditorState build(
+    IntentionCreationFormKey formKey, {
+    String initialTitle = '',
+  });
   @$mustCallSuper
   @override
   WhenComplete runBuild() {
@@ -324,6 +334,9 @@ abstract class _$IntentionEditorViewModel
               Object?,
               Object?
             >;
-    return element.handleCreate(ref, () => build(_$args));
+    return element.handleCreate(
+      ref,
+      () => build(_$args.$1, initialTitle: _$args.initialTitle),
+    );
   }
 }

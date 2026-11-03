@@ -958,6 +958,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get editorTitle => 'Create intention';
 
   @override
+  String get editorSearchSubtitle => 'Immediately chosen for new relations';
+
+  @override
   String get editorCreateAction => 'Create intention';
 
   @override

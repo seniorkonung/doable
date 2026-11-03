@@ -22,9 +22,11 @@ import 'package:doable/src/intention/application/intention_catalog.dart'
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_text.dart';
+import 'package:doable/src/intention/presentation/editor/intention_creation_launch.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_state.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_view_model.dart';
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
@@ -50,6 +52,123 @@ void main() {
       AppLifecycleState.resumed,
     );
   });
+
+  testWidgets(
+    'название поиска является исходным значением и панель закрывается без подтверждения',
+    (tester) async {
+      final sessions = _EditorSessions();
+      final router = await _openEditor(
+        tester,
+        ControlledCatalogRepository(),
+        observers: [sessions],
+        locale: const Locale('ru'),
+        launch: IntentionCreationForSearch(
+          initialTitle: 'Бегать',
+          onCreated: (_, _) {},
+        ),
+      );
+      expect(_fieldText(tester, 'intention-editor-title'), 'Бегать');
+      expect(sessions.state(tester).draft.title, 'Бегать');
+      expect(sessions.state(tester).draft.isChanged, isFalse);
+      expect(find.text('Сразу отмечается для новых связей'), findsOneWidget);
+      expect(
+        tester.widget<FilledButton>(find.byKey(_submit)).onPressed,
+        isNotNull,
+      );
+      await _tapClose(tester);
+      await tester.pumpAndSettle();
+      expect(find.byKey(_closeConfirmation), findsNothing);
+      expectIntentionGraphRootPage(router);
+    },
+  );
+
+  testWidgets(
+    'успех из поиска закрывает панель с подтверждением и передаёт созданное намерение один раз',
+    (tester) async {
+      final repository = ControlledCatalogRepository();
+      final created = <(Object, String)>[];
+      final router = await _openEditor(
+        tester,
+        repository,
+        launch: IntentionCreationForSearch(
+          initialTitle: 'Бегать',
+          onCreated: (id, title) => created.add((id, title)),
+        ),
+      );
+      expect(find.text('Immediately chosen for new relations'), findsOneWidget);
+      await tester.enterText(find.byKey(_title), 'Плавать');
+      await tester.tap(find.byKey(_submit));
+      await tester.pump();
+      await _tapClose(tester);
+      await tester.pumpAndSettle();
+      expect(find.byKey(_closeConfirmation), findsOneWidget);
+      repository.completeCommand(0, _savedResult(title: 'Плавать'));
+      await tester.pump();
+      await tester.pump();
+      _completeCatalogRefresh(repository);
+      await tester.pumpAndSettle();
+      expect(created, [(testIntention(title: 'Плавать').id, 'Плавать')]);
+      expect(find.byKey(_closeConfirmation), findsNothing);
+      expectIntentionGraphRootPage(router);
+      expect(router.stackData.map((route) => route.name), [AppShellRoute.name]);
+    },
+  );
+
+  testWidgets(
+    'сохранение исходного названия возвращает созданное намерение поверх сохранённой истории',
+    (tester) async {
+      final repository = ControlledCatalogRepository();
+      final created = <(Object, String)>[];
+      final router = await _openEditor(
+        tester,
+        repository,
+        withPicker: true,
+        launch: IntentionCreationForSearch(
+          initialTitle: 'Бегать',
+          onCreated: (id, title) => created.add((id, title)),
+        ),
+      );
+      await tester.tap(find.byKey(_submit));
+      await tester.pump();
+      expect((repository.commands.single as CreateIntention).title, 'Бегать');
+      repository.completeCommand(0, _savedResult(title: 'Бегать'));
+      await tester.pumpAndSettle();
+      expect(created, [(testIntention(title: 'Бегать').id, 'Бегать')]);
+      expect(router.stackData.map((route) => route.name), [
+        AppShellRoute.name,
+        RelationBatchPickerRoute.name,
+      ]);
+    },
+  );
+
+  testWidgets(
+    'поздний успех после ухода из панели поиска не вызывает обработчик',
+    (tester) async {
+      final repository = ControlledCatalogRepository();
+      final created = <String>[];
+      final router = await _openEditor(
+        tester,
+        repository,
+        launch: IntentionCreationForSearch(
+          initialTitle: 'Бегать',
+          onCreated: (_, title) => created.add(title),
+        ),
+      );
+      await tester.enterText(find.byKey(_title), 'Плавать');
+      await tester.tap(find.byKey(_submit));
+      await tester.pump();
+      await _tapClose(tester);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(_closeDiscard));
+      await tester.pump();
+      repository.completeCommand(0, _savedResult(title: 'Плавать'));
+      await tester.pump();
+      _completeCatalogRefresh(repository);
+      await tester.pumpAndSettle();
+      expect(created, isEmpty);
+      expectIntentionGraphRootPage(router);
+    },
+  );
 
   testWidgets(
     'блокирует повторную отправку, сохраняя доступный уход с подтверждением',
@@ -2414,6 +2533,8 @@ Future<RootStackRouter> _openEditor(
   ControlledCatalogRepository repository, {
   Locale locale = const Locale('en'),
   List<ProviderObserver> observers = const [],
+  IntentionCreationLaunch? launch,
+  bool withPicker = false,
 }) async {
   final router = AppRouter();
   addTearDown(router.dispose);
@@ -2450,11 +2571,42 @@ Future<RootStackRouter> _openEditor(
     ),
   );
   await tester.pumpAndSettle();
-  await openQuickCreation(
-    tester,
-    QuickCreationMode.intention,
-    openedPage: find.byType(IntentionEditorPage),
-  );
+  if (withPicker) {
+    unawaited(
+      router.push(
+        RelationBatchPickerRoute(
+          pageIntentionId: testIntention(title: 'Страница').id,
+          pageTitle: 'Страница',
+          group: IntentionRelationGroup.needs,
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    repository.complete(
+      1,
+      ResultSuccess(
+        IntentionCatalogFirstPage(
+          items: const [],
+          totalCount: 0,
+          nextCursor: null,
+          revision: const TestCatalogRevision(0),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
+  if (launch == null) {
+    await openQuickCreation(
+      tester,
+      QuickCreationMode.intention,
+      openedPage: find.byType(IntentionEditorPage),
+    );
+  } else {
+    unawaited(router.push(IntentionEditorRoute(launch: launch)));
+    await tester.pumpAndSettle();
+  }
   return router;
 }
 

@@ -753,6 +753,10 @@
   "@editorTitle": {
     "description": "Заголовок формы создания намерения"
   },
+  "editorSearchSubtitle": "Immediately chosen for new relations",
+  "@editorSearchSubtitle": {
+    "description": "Пояснение панели создания намерения из поиска участника"
+  },
   "editorCreateAction": "Create intention",
   "@editorCreateAction": {
     "description": "Действие создания намерения"
