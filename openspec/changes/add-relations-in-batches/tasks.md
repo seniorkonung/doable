@@ -1252,3 +1252,16 @@
     - меняются `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации, `lib/src/daily_choice/presentation/path/choice_path_page.dart`;
     - меняются `test/daily_choice/presentation/path/choice_path_page_test.dart`, `test/app/choice_path_dead_end_app_flow_test.dart`.
   - **Размер:** S.
+
+- [ ] 4.17 Создание в поиске участника снова доступно после любого закрытия панели, в том числе вместе с подтверждением ухода
+  - **Критерии приёмки:**
+    - В `relation_batch_picker_page.dart` защита `_openingCreation` от повторного открытия снимается при любом снятии маршрута панели создания: при обычном закрытии и при успехе, который снимает панель через `router.removeRoute` вместе с открытым над ней диалогом ухода, когда future `context.router.push(...)` не завершается. Снятие не зависит только от этого future.
+    - Пока панель открыта, повторное нажатие плюса или строки «Создать» второй панели не открывает; пока добавление выполняется, панель не открывается, как в 4.7.
+    - `intention_editor_page.dart` и поведение продукта не меняются.
+    - Регрессионный тест в `relation_batch_picker_page_test.dart`: изменить название в панели, нажать «Сохранить» при удержанном хранилище, нажать «назад», чтобы открылся диалог ухода, и завершить запись. Созданное намерение отмечено, а следующий плюс в шапке снова открывает панель. Название теста на русском.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/batch_picker/relation_batch_picker_page_test.dart`.
+    - `mise exec --no-deps -- flutter analyze`.
+  - **Зависимости:** 4.7.
+  - **Предполагаемые файлы:** меняются `lib/src/long_term_relation/presentation/batch_picker/relation_batch_picker_page.dart`, `test/long_term_relation/presentation/batch_picker/relation_batch_picker_page_test.dart`.
+  - **Размер:** XS.
