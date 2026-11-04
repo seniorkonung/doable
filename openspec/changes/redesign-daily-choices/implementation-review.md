@@ -5,15 +5,15 @@
 **Format version:** 1
 **Result:** No unresolved findings
 **Coverage status:** Complete
-**Summary:** Задачи 3.18–3.22 выполнены и подтверждены тестами, а `mise run check` и `mise run codegen-check` на проверенной голове проходят. Неустранённых находок нет: исправление второй панели той же связи после собственного удаления связи отслеживается незавершённой задачей 3.23. Остаточный риск AR1 перенесён без изменений.
+**Summary:** Задача 3.23 выполнена: прежнее содержимое после подтверждённого удаления связи показывает только панель-инициатор, а другие панели той же связи показывают «Эта связь больше не существует.». Новый тест проверяет оба порядка событий. `mise run check` и `mise run codegen-check` на проверенной голове проходят. Неустранённых находок нет. Остаточный риск AR1 перенесён без изменений.
 
 ## Review target
 
-- **Baseline ref:** 37835b580716c7b4005b21bf827cf12e041d2bf3
-- **Base commit:** 37835b580716c7b4005b21bf827cf12e041d2bf3
-- **Reviewed head:** 2139ac35881f5bf035902c30eeaba6a16ab4a13f
-- **Target commits:** ["224d045158982819e60a1e5cb5f09ff2ed706814","036a28db12db90086f2731a095e4d6caeebb4a94","f886085ca12284e75bd9ef7055d5bd2d54f0fe80","df2da66446cf04279189e92ab2130f1c60441e1c","fbd7137974c7266c32472b18fc4839b506bae778","2139ac35881f5bf035902c30eeaba6a16ab4a13f"]
-- **Reviewable paths:** ["lib/l10n/app_en.arb","lib/l10n/app_localizations.dart","lib/l10n/app_localizations_en.dart","lib/l10n/app_localizations_ru.dart","lib/l10n/app_ru.arb","lib/src/daily_choice/presentation/details/daily_choice_details_state.dart","lib/src/daily_choice/presentation/details/daily_choice_details_view_model.dart","lib/src/daily_choice/presentation/details/daily_choice_sheet.dart","lib/src/design_system/components/relation_head.dart","lib/src/long_term_relation/presentation/details/relation_details_sheet.dart","lib/src/long_term_relation/presentation/details/relation_details_state.dart","lib/src/long_term_relation/presentation/details/relation_details_view_model.dart","lib/src/long_term_relation/presentation/details/relation_details_view_model.g.dart","openspec/changes/redesign-daily-choices/task-profiles.md","openspec/changes/redesign-daily-choices/tasks.md","test/daily_choice/presentation/details/daily_choice_sheet_test.dart","test/design_system/relation_head_test.dart","test/graph/presentation/package_consumers_test_support.dart","test/long_term_relation/presentation/details/relation_details_sheet_test.dart"]
+- **Baseline ref:** d7a9bdc212195027f60fcc6ec34a9da87d3cbc31
+- **Base commit:** d7a9bdc212195027f60fcc6ec34a9da87d3cbc31
+- **Reviewed head:** bedbcd6047cd0f88c51a6fa934cffa78a4cfb162
+- **Target commits:** ["294e5cda50c29bbec7280433b8aa8c5ff7242a9a","8eb76dce78fd4d8936381370bc07477bb755e351","bedbcd6047cd0f88c51a6fa934cffa78a4cfb162"]
+- **Reviewable paths:** ["lib/src/long_term_relation/presentation/details/relation_details_sheet.dart","lib/src/long_term_relation/presentation/details/relation_details_state.dart","lib/src/long_term_relation/presentation/details/relation_details_view_model.dart","lib/src/long_term_relation/presentation/details/relation_details_view_model.g.dart","openspec/changes/redesign-daily-choices/task-profiles.md","openspec/changes/redesign-daily-choices/tasks.md","test/long_term_relation/presentation/details/relation_details_sheet_test.dart","test/long_term_relation/presentation/details/relation_details_view_model_test.dart"]
 - **OpenSpec change:** redesign-daily-choices
 - **OpenSpec schema:** intent-driven
 - **Target scope:** User-requested bounded range
@@ -22,45 +22,21 @@
 
 ## Reviewed increment
 
-### U1 · Собственное удаление закрывает панель выбора с прежним содержимым, а меню не проверяет недостижимую запись
+### U1 · Прежнее содержимое после собственного удаления связи показывает только панель-инициатор
 
-- **Work items:** ["3.18","3.22"]
-- **Requirements and scenarios:** ["daily-choice-management: Параметры дневного выбора","Scenario: Удаление закрывает панель","design.md D4: закрытие после собственного удаления и перекрытая панель"]
-- **Affected boundary:** Пользователь панели дневного выбора и потребители её состояния.
-- **Implementation target:** ["lib/src/daily_choice/presentation/details/daily_choice_details_state.dart","lib/src/daily_choice/presentation/details/daily_choice_details_view_model.dart","lib/src/daily_choice/presentation/details/daily_choice_sheet.dart","test/daily_choice/presentation/details/daily_choice_sheet_test.dart","test/graph/presentation/package_consumers_test_support.dart"]
-- **Applicable constraints and non-goals:** Закрывающаяся панель не показывает и не объявляет «не найден» при любом порядке снимка и исхода команды; чужое удаление, перекрытая панель и отказ показывают «не найден» без самостоятельного закрытия; сообщение об успехе один раз; состояния выражены закрытыми типами; спецификации не меняются.
-
-### U2 · Панель связи не показывает ложное «не найден» при собственном удалении
-
-- **Work items:** ["3.19"]
-- **Requirements and scenarios:** ["design.md D4: закрытие после собственного удаления (по задаче 3.19 то же поведение для панели связи)"]
-- **Affected boundary:** Пользователь панели связи и все потребители общего состояния просмотра связи.
-- **Implementation target:** ["lib/src/long_term_relation/presentation/details/relation_details_sheet.dart","lib/src/long_term_relation/presentation/details/relation_details_state.dart","lib/src/long_term_relation/presentation/details/relation_details_view_model.dart","lib/src/long_term_relation/presentation/details/relation_details_view_model.g.dart","test/long_term_relation/presentation/details/relation_details_sheet_test.dart","test/graph/presentation/package_consumers_test_support.dart"]
-- **Applicable constraints and non-goals:** Поведение повторяет U1; удаление, начатое не этой панелью, показывает «не найден»; спецификации не меняются.
-
-### U3 · Переключатель вида связи виден и нажимается при крупном шрифте
-
-- **Work items:** ["3.20"]
-- **Requirements and scenarios:** ["tasks.md 3.20: масштаб до 2 на ширине 360 с полями 20 и меню"]
-- **Affected boundary:** Пользователь панели связи; потребители компонента `RelationHead`.
-- **Implementation target:** ["lib/src/design_system/components/relation_head.dart","test/design_system/relation_head_test.dart"]
-- **Applicable constraints and non-goals:** Компонент остаётся представлением без предметных типов по ADR-0030; слова и шрифт не сокращаются; семантика и выбор не меняются.
-
-### U4 · Неиспользуемая строка удаления дневного выбора удалена
-
-- **Work items:** ["3.21"]
-- **Requirements and scenarios:** ["proposal.md: строки удалённых потоков уходят"]
-- **Affected boundary:** Ресурсы локализации и созданный API локализации.
-- **Implementation target:** ["lib/l10n/app_en.arb","lib/l10n/app_localizations.dart","lib/l10n/app_localizations_en.dart","lib/l10n/app_localizations_ru.dart","lib/l10n/app_ru.arb"]
-- **Applicable constraints and non-goals:** Созданные файлы получены кодогенерацией; видимый текст не меняется; поиск других неиспользуемых строк не входит.
+- **Work items:** ["3.23"]
+- **Requirements and scenarios:** ["design.md D4: закрытие после собственного удаления и перекрытая панель (для панели связи по задачам 3.19 и 3.23)","tasks.md 3.23: другая открытая панель той же связи показывает «Эта связь больше не существует.»"]
+- **Affected boundary:** Пользователь панели связи и все панели одной связи, у которых общая модель `RelationDetailsViewModel`.
+- **Implementation target:** ["lib/src/long_term_relation/presentation/details/relation_details_sheet.dart","lib/src/long_term_relation/presentation/details/relation_details_state.dart","lib/src/long_term_relation/presentation/details/relation_details_view_model.dart","lib/src/long_term_relation/presentation/details/relation_details_view_model.g.dart","test/long_term_relation/presentation/details/relation_details_sheet_test.dart","test/long_term_relation/presentation/details/relation_details_view_model_test.dart"]
+- **Applicable constraints and non-goals:** Модель остаётся общей для всех панелей связи, с ключом `relationId`. Гарантии задачи 3.19 для инициатора сохраняются: закрытие без кадра «не найден», перекрытая панель сама не закрывается, при отказе панель остаётся открытой, сообщение об успехе показывается один раз. Состояния выражены закрытыми типами без флага рядом с ними. Спецификации и `design.md` не меняются.
 
 ## Pass coverage
 
 | Pass | Status | Evidence or limitation |
 |---|---|---|
-| Independent decision review | Complete | Свежие изолированные проверяющие с брифом без планирования: U1+U2 вместе с U3 одной группой по объединённой границе из 12 путей (первый проверяющий U1+U2 без `relation_head.dart` отметил неполное покрытие, поэтому группа проверена заново по полной границе), U3 отдельно, U4 отдельно. Первый проверяющий U4 случайно увидел файлы планирования при поиске по всему репозиторию, его результат не использован, и U4 проверен заново с поиском только по `lib` и `test`. Ревизия `37835b580716c7b4005b21bf827cf12e041d2bf3..2139ac35881f5bf035902c30eeaba6a16ab4a13f`. |
-| OpenSpec conformance | Complete | Прочитаны design D4, требование «Параметры дневного выбора», задачи 3.18–3.22 и профили на проверенной голове. `mise exec --no-deps -- openspec validate redesign-daily-choices --json` — valid. `mise run codegen-check` — exit 0, `git grep dailyChoiceDeleteAction 2139ac35… -- lib test` пуст, `_showOptions` вызывается только из `daily_choice_sheet.dart:240`. `mise run check` — exit 0: формат и `flutter analyze` без замечаний, 4161 обычный тест и 18 процессных тестов проходят. Рабочая копия = проверенная голова, дерево чистое; запуск в `/home/seniorkonung/.paseo/worktrees/1id27gtb/purple-scorpion`. |
-| Code quality | Complete | Пять осей `code-review-and-quality` по всем 17 путям доставки и тестов, с контекстом `graph_command_coordinator.dart`, `intention_details_page.dart`, `sheet.dart` и `ModalRoute` из Flutter. |
+| Independent decision review | Complete | Один свежий изолированный проверяющий получил бриф без планирования и границу из всех 6 путей U1. Ревизия `d7a9bdc212195027f60fcc6ec34a9da87d3cbc31..bedbcd6047cd0f88c51a6fa934cffa78a4cfb162`. Существенных замечаний нет, покрытие полное. Проверяющий не читал `openspec/`, историю коммитов и прежний отчёт. |
+| OpenSpec conformance | Complete | На проверенной голове прочитаны design D4, plan.md Phase 3, задача 3.23 и её профиль. `mise exec --no-deps -- openspec validate redesign-daily-choices --json` — valid; одно сообщение уровня INFO касается дельты `app-navigation` вне диапазона. `mise run check` — exit 0: формат 879 файлов без изменений, `flutter analyze` — «No issues found!», 4163 обычных и 18 процессных тестов проходят. `mise run codegen-check` — exit 0, дерево после него чистое. Запуск в `/home/seniorkonung/.paseo/worktrees/1id27gtb/purple-scorpion`: `HEAD` совпадает с проверенной головой, дерево чистое. |
+| Code quality | Complete | Пять осей `code-review-and-quality` по всем 6 путям доставки и тестов. Контекст: вызовы `retryLifecycleChange`, `releaseDeletedContent`, `RelationDeletionInitiator` и `RelationDetailsOwnDeletionConfirmed` в `lib` и `test`, а также `package_consumers_test_support.dart:272`. |
 
 ## Findings
 
@@ -83,12 +59,22 @@ No unresolved findings remain in the implementation review.
 
 ## Review coverage
 
-**Цель.** `discover-review-target.mjs` вернул `ready` для изменения `redesign-daily-choices`; рабочее дерево чистое, исключённых путей нет. Все 6 целевых коммитов и 19 путей распределены: `224d0451` — профили задач 3.18–3.22 (`task-profiles.md`), отметки в `tasks.md` — свидетельства планирования; 3.18 — `036a28db` (U1), 3.19 — `f886085c` (U2), 3.20 — `df2da664` (U3), 3.21 — `fbd71379` (U4), 3.22 — `2139ac35` (U1). `package_consumers_test_support.dart` меняют 3.18 и 3.19, поэтому U1 и U2 проверялись одной группой. Неотнесённых путей нет.
+**Цель.** `discover-review-target.mjs` вернул `ready` для изменения `redesign-daily-choices`. Рабочее дерево чистое, исключённых путей нет. Все 3 целевых коммита и 8 путей распределены. `294e5cda` добавляет профиль задачи 3.23 в `task-profiles.md`; это свидетельство планирования. `8eb76dce` содержит реализацию, тесты и отметку задачи 3.23 в `tasks.md` и относится к U1. `bedbcd60` пересоздаёт хеш провайдера в `relation_details_view_model.g.dart` и тоже относится к U1. Неотнесённых путей нет.
 
-**Сценарии и критерии.** 3.18: оба порядка снимка и подтверждения с покадровым закрытием без `pumpAndSettle` и однократным сообщением — `test/daily_choice/presentation/details/daily_choice_sheet_test.dart:113`; перекрытая панель — там же, `:141`; отказ при исчезнувшем выборе — `:174`; выключенные флажок и параметры во время записи и закрытия — `_expectHeadLocked`. Чужое удаление по-прежнему ведёт в `DailyChoiceDetailsNotFound`, потому что у каждой панели своя модель. 3.19: дефект подтверждён кодом прежней головы (общий `RelationDetailsDeleted` показывал «не найден»), тесты обоих порядков, перекрытой панели и отказа — `test/long_term_relation/presentation/details/relation_details_sheet_test.dart:1192`, `:1239`, `:1279`. Порядков два, а не шесть, обоснованно: поток завершений синхронный (`graph_command_coordinator.dart:889`) и выдаёт пакет до завершения команды (`:1292-1293`), а обратный порядок отсекает `_isTerminated`. Показ «не найден» во второй открытой панели той же связи после удаления из другой панели отслеживает задача 3.23. 3.20: `Wrap` и тесты с настоящим Inter при масштабе 2 на ширине 360 — `test/design_system/relation_head_test.dart`. 3.21 и 3.22 подтверждены поиском и `codegen-check`. Тесты не содержат замеров времени.
+**Критерии 3.23.** Модель осталась общей. Панель передаёт в `delete` свой `RelationDeletionInitiator`, и он хранится в `RelationDetailsOwnDeletionConfirmed` (`relation_details_state.dart:166-183`). Через `_Deletion` и `_DeletionRelationMissing` он проходит при любом порядке снимка и исхода (`relation_details_view_model.dart:391-401`, `:494-497`).
 
-**Разбор замечаний, не ставших находками.** «Панель выбора при отказе чтения во время собственного удаления закрывается с отказом „недоступно“ и живым повтором»: при отказе чтения панель уже показывала этот отказ, и закрытие сохраняет показанное, а не подменяет его «не найден»; повтор во время закрытия недоступен, потому что `ModalRoute` игнорирует указатель на обратной анимации, а в перекрытой панели повтор приводит к верному «не найден». Цена отдельного хранения содержимого превышает вред. «Кнопка параметров панели связи не выключена во время записи»: поведение до диапазона, задачей 3.19 не затронуто; при закрытии нажатие невозможно по той же причине.
+Прежнее содержимое показывается только при `identical(initiator, _deletionInitiator)` (`relation_details_sheet.dart:310-312`, `:340-342`). Остальные панели попадают в ветку «не найден» без шапки и меню (`:343-347`).
 
-**Перенесённое состояние.** Предыдущий отчёт не содержал активных находок. AR1 сохранён: `list_state.dart`, `day_heading.dart`, типографика и отступы заголовка дня в диапазоне не менялись, условий повторного открытия нет.
+Флажок `_deletedWhileCovered` заменён вызовом `releaseDeletedContent`. Он переводит общее состояние в `RelationDetailsDeleted` только для своего инициатора (`relation_details_view_model.dart:209-214`).
 
-**Устройство.** Устройство и эмулятор не использовались. Ручные проверки остаются за владельцем продукта: закрытие панелей выбора и связи после удаления, возврат к перекрытой панели и переключатель вида связи при крупном системном шрифте.
+Ветка `delete` в `retryLifecycleChange` — пустой вариант исчерпывающего `switch`. Единственный вызывающий, `_retryLifecycleChange` панели, направляет повтор удаления через `_delete` (`relation_details_sheet.dart:246-258`), поэтому повтор не теряется.
+
+Новый тест `relation_details_sheet_test.dart:1281` открывает вторую панель той же связи поверх страницы участника и проверяет оба порядка событий. Верхняя панель закрывается с прежним содержимым. Нижняя после возврата показывает «не найден» без `RelationHead` и без кнопки «Параметры связи». Сообщение «Связь удалена.» показано один раз. На базе нижняя панель показала бы прежнее содержимое, потому что флажок ставила только инициатор. Это установлено разбором кода, тест на базе не запускался.
+
+Тесты задачи 3.19 остаются в наборе и проходят в составе `mise run check`. Два порядка вместо шести обоснованы так же, как для 3.19: поток завершений синхронный, а после завершения поздние события отсекает `_isTerminated`. `package_consumers_test_support.dart` не менялся: набор вариантов состояния прежний, изменилось только поле варианта. Тесты не содержат замеров времени.
+
+**Фаза 3.** Все задачи Phase 3 в `tasks.md` отмечены выполненными. Полная проверка фазы `mise run check` пройдена на проверенной голове. Эта стадия не добавляла новых задач и исправлений.
+
+**Перенесённое состояние.** Предыдущий отчёт не содержал активных находок. AR1 сохранён: `list_state.dart`, `day_heading.dart`, типографика и отступы заголовка дня в диапазоне не менялись, и условий повторного открытия нет.
+
+**Устройство.** Устройство и эмулятор не использовались. Ручная проверка остаётся за владельцем продукта: удаление связи из второй панели той же связи и возврат к первой.
