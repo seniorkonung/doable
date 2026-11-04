@@ -5,15 +5,15 @@
 **Format version:** 1
 **Result:** No unresolved findings
 **Coverage status:** Complete
-**Summary:** Задачи 4.17–4.21 выполнены по критериям, `mise run check` на проверенной голове проходит. Активных находок нет: F7 и F8 по решениям пользователя переданы в незавершённые задачи 4.22 и 4.23 Phase 4 `tasks.md`, код по ним ещё не менялся. Остаточный риск AR1 перенесён без изменений.
+**Summary:** Задачи 4.22 и 4.23 выполнены по критериям. Активных находок нет, `mise run check` на проверенной голове проходит. Phase 4 завершена: все задачи отмечены. Остаточный риск AR1 перенесён без изменений.
 
 ## Review target
 
-- **Baseline ref:** 70190820a75cdef0d1cca72d3111ca0056b15e1d
-- **Base commit:** 70190820a75cdef0d1cca72d3111ca0056b15e1d
-- **Reviewed head:** febecc20e9578c10b666cdf0294495039d784d83
-- **Target commits:** ["8319463dbebce2d58cc1c21443d2f692d0ea00cd","f6a796eeb307279b631e917940dece8045b43610","70c110e929f170bb3d4a06ed2e861f363c1ad334","09980166c122107946258b10aefe0b97713abfeb","5f97bc68bb05090fdf76079e8a4be49938c3e11d","febecc20e9578c10b666cdf0294495039d784d83"]
-- **Reviewable paths:** ["lib/src/daily_choice/presentation/details/daily_choice_details_state.dart","lib/src/daily_choice/presentation/details/daily_choice_details_view_model.dart","lib/src/daily_choice/presentation/details/daily_choice_field_labels.dart","lib/src/daily_choice/presentation/details/daily_choice_sheet.dart","lib/src/daily_choice/presentation/details/daily_choice_time_sheet.dart","lib/src/design_system/components/tabs.dart","lib/src/design_system/components/time_dial.dart","openspec/changes/redesign-daily-choices/task-profiles.md","openspec/changes/redesign-daily-choices/tasks.md","test/daily_choice/presentation/details/daily_choice_details_view_model_test.dart","test/daily_choice/presentation/details/daily_choice_sheet_test.dart","test/daily_choice/presentation/details/daily_choice_time_sheet_test.dart","test/daily_choice/presentation/editor/daily_choice_creation_page_test.dart","test/design_system/tabs_test.dart","test/design_system/time_dial_test.dart"]
+- **Baseline ref:** 1baab10dfd599d6fef74ffb5138409ae17fc69ad
+- **Base commit:** 1baab10dfd599d6fef74ffb5138409ae17fc69ad
+- **Reviewed head:** e39c70d576895f3f6fb1a3e5c6e696f00a0d327f
+- **Target commits:** ["feea6b0e284239096900c1e01a445cea3657a244","be0adb1c32ce897cdb5aec95e0e677d751e32dd0","e39c70d576895f3f6fb1a3e5c6e696f00a0d327f"]
+- **Reviewable paths:** ["lib/src/daily_choice/presentation/details/daily_choice_details_view_model.dart","lib/src/daily_choice/presentation/details/daily_choice_field_labels.dart","openspec/changes/redesign-daily-choices/task-profiles.md","openspec/changes/redesign-daily-choices/tasks.md","test/daily_choice/presentation/details/daily_choice_details_view_model_test.dart","test/daily_choice/presentation/details/daily_choice_sheet_test.dart"]
 - **OpenSpec change:** redesign-daily-choices
 - **OpenSpec schema:** intent-driven
 - **Target scope:** User-requested bounded range
@@ -22,45 +22,29 @@
 
 ## Reviewed increment
 
-### U1 · После собственной подтверждённой записи панель ждёт снимок с записанным значением
+### U1 · Запись, которая ничего не изменила, не оставляет панель ждать снимок
 
-- **Work items:** ["4.17"]
-- **Requirements and scenarios:** ["daily-choice-management: Изменение дневного выбора в нижней панели","daily-choice-management: Изменение описания в нижней панели / Описание добавляется под полосой","tasks.md 4.17: ожидание снимка, конец ожидания при любом исходе подписки"]
-- **Affected boundary:** Человек в панели дневного выбора; `DailyChoiceDetailsViewModel`, его состояние операции и лист панели.
-- **Implementation target:** ["lib/src/daily_choice/presentation/details/daily_choice_details_state.dart","lib/src/daily_choice/presentation/details/daily_choice_details_view_model.dart","lib/src/daily_choice/presentation/details/daily_choice_sheet.dart","test/daily_choice/presentation/details/daily_choice_details_view_model_test.dart","test/daily_choice/presentation/details/daily_choice_sheet_test.dart"]
-- **Applicable constraints and non-goals:** Ревизия графа — единственный сигнал порядка между записью и снимком, а снимки разных эпох несравнимы. Успех изменения не объявляется. Отказ записи, удаление и закрытие панели до результата ведут себя как раньше.
+- **Work items:** ["4.22"]
+- **Requirements and scenarios:** ["daily-choice-management: Изменение дневного выбора в нижней панели","tasks.md 4.22: запись без изменения значений завершается сразу; при отличии любого значения ожидание из 4.17 сохраняется"]
+- **Affected boundary:** Человек в панели дневного выбора; `DailyChoiceDetailsViewModel` и его состояние операции.
+- **Implementation target:** ["lib/src/daily_choice/presentation/details/daily_choice_details_view_model.dart","test/daily_choice/presentation/details/daily_choice_details_view_model_test.dart","test/daily_choice/presentation/details/daily_choice_sheet_test.dart"]
+- **Applicable constraints and non-goals:** Ревизия графа — единственный сигнал порядка между записью и снимком, снимки разных эпох несравнимы. Контракт прикладного слоя, типы результата, репозиторий и подписка не меняются. Лист панели не меняется, «Сохранить» для пробельного ввода в пустое описание остаётся доступной. Сообщения об успехе нет.
 
-### U2 · Циферблат следует итоговому формату часов устройства и локали
+### U2 · Формат часов циферблата и подписей времени решается в одном месте
 
-- **Work items:** ["4.18"]
-- **Requirements and scenarios:** ["daily-choice-management: Поля даты, времени и приоритета дневного выбора (время в системном формате)","tasks.md 4.18: ru и en при выключенном 24-часовом времени"]
-- **Affected boundary:** Человек, который выбирает время в листе времени панели и подтверждения создания.
-- **Implementation target:** ["lib/src/daily_choice/presentation/details/daily_choice_field_labels.dart","lib/src/daily_choice/presentation/details/daily_choice_time_sheet.dart","test/daily_choice/presentation/details/daily_choice_sheet_test.dart","test/daily_choice/presentation/details/daily_choice_time_sheet_test.dart"]
-- **Applicable constraints and non-goals:** Начальная половина суток и подписи половин суток не меняются. Подписи резервных копий не меняются.
-
-### U3 · Контракты `Tabs` и `TimeDial` без лишних параметров
-
-- **Work items:** ["4.19","4.20"]
-- **Requirements and scenarios:** ["design.md D4: компоненты дизайн-системы без предметных типов","tasks.md 4.19: Tabs.toggle без параметров полосы","tasks.md 4.20: TimeDial без allDayHint и showsFocus"]
-- **Affected boundary:** Потребители модуля `lib/src/design_system/` и люди с экранным диктором.
-- **Implementation target:** ["lib/src/design_system/components/tabs.dart","lib/src/design_system/components/time_dial.dart","lib/src/daily_choice/presentation/details/daily_choice_time_sheet.dart","test/design_system/tabs_test.dart","test/design_system/time_dial_test.dart"]
-- **Applicable constraints and non-goals:** Вид, раскладка, семантика и поведение полос вкладок и переключателя «AM»/«PM» не меняются. Новых режимов циферблата нет.
-
-### U4 · Тесты подтверждения создания не проверяют недостижимый отказ по дате
-
-- **Work items:** ["4.21"]
-- **Requirements and scenarios:** ["tasks.md 4.21: удалён тест отказа по полю даты"]
-- **Affected boundary:** Набор тестов страницы подтверждения создания.
-- **Implementation target:** ["test/daily_choice/presentation/editor/daily_choice_creation_page_test.dart"]
-- **Applicable constraints and non-goals:** Производственный код, `DailyChoiceValidationField.date`, строка `dailyChoiceDateInvalid` и тесты модели создания не меняются.
+- **Work items:** ["4.23"]
+- **Requirements and scenarios:** ["daily-choice-management: Поля даты, времени и приоритета дневного выбора (время в системном формате)","tasks.md 4.23: видимый вывод ru и en не меняется"]
+- **Affected boundary:** Человек, который читает и выбирает время дневного выбора; форматирование времени в представлении дневных выборов.
+- **Implementation target:** ["lib/src/daily_choice/presentation/details/daily_choice_field_labels.dart"]
+- **Applicable constraints and non-goals:** Формат следует настройке 24-часового времени устройства и шаблону локали. «Весь день», подписи половин суток, `backup_descriptions.dart`, `TimeDial` и лист времени не меняются.
 
 ## Pass coverage
 
 | Pass | Status | Evidence or limitation |
 |---|---|---|
-| Independent decision review | Complete | Два свежих изолированных проверяющих получили нейтральные брифы без планирования, истории коммитов и прежнего отчёта. Группа U1–U3 связана общими путями `daily_choice_sheet_test.dart` и `daily_choice_time_sheet.dart`, поэтому её проверял один проверяющий по объединению из 12 путей. Он нашёл два замечания уровня Medium. После проверки они записаны как F7 и F8. F7 передан в задачу 4.22, F8 — в задачу 4.23. U4 проверял отдельный проверяющий по одному пути: существенных замечаний нет. Оба отчитались о полном покрытии на `70190820..febecc20`. |
-| OpenSpec conformance | Complete | На проверенной голове прочитаны критерии 4.17–4.21, plan.md Phase 4 и требования `daily-choice-management` об изменении в панели, описании и полях. Отметки 4.17–4.21 и профили задач подтверждены диффом. `mise exec --no-deps -- openspec validate redesign-daily-choices --json`: 1/1 passed. `mise run check` в рабочем дереве на `febecc20`, дерево чистое: формат, `flutter analyze` (No issues found), основной набор (+4217) и процессные тесты (+18) прошли, exit 0. |
-| Code quality | Complete | Пять осей `code-review-and-quality` по всем путям U1–U4. Контекст на голове: `graph_command_coordinator.dart` (`DailyChoiceCommandCompletion.confirmedResult`), `drift_personal_graph_repository.dart` (ревизия подтверждения), `drift_personal_graph_repository_daily_choice_commands.dart` (`didMutate`), `drift_personal_graph_repository_daily_choice_reads.dart` (подписка выбора и её сигналы), `daily_choice_command.dart` и `daily_choice_description.dart` (пробельный ввод). |
+| Independent decision review | Complete | U1 и U2 не делят путей, поэтому их проверяли два свежих изолированных проверяющих. Они получили нейтральные брифы без планирования, истории коммитов и прежнего отчёта. Проверяющий U1 работал по трём путям, U2 — по одному. Оба вернули «No substantive findings» с полным покрытием на `1baab10d..e39c70d5`. Проверяющий U2 читал потребителей из рабочего дерева и не открывал исходники Flutter. Рабочее дерево совпадало с головой и было чистым. Эквивалентность форматов проверена отдельно по исходникам Flutter SDK, см. «Review coverage». |
+| OpenSpec conformance | Complete | На голове прочитаны критерии 4.22 и 4.23 `tasks.md` и требования `daily-choice-management` об изменении в панели и поле времени. Отметки 4.22 и 4.23 и профили задач в `task-profiles.md` подтверждены диффом. `mise exec --no-deps -- openspec validate redesign-daily-choices --json`: 1/1 passed. `openspec instructions apply`: 78/78 задач выполнено. `mise run check` в рабочем дереве на `e39c70d5`, дерево чистое, exit 0: формат (881 файл, 0 изменено), `flutter analyze` (No issues found), основной набор (+4219) и процессные тесты (+18). |
+| Code quality | Complete | Пять осей `code-review-and-quality` по всем путям U1 и U2. Контекст на голове: доменные типы `CalendarDate`, `DailyChoiceDescription`, `DailyChoiceSchedule`, `DailyChoicePriority` (равенство по значению); `_updateDailyChoiceFields` и `_writeGraph` (ревизия записи без изменений); `_watchDailyChoice`; потребители `dailyChoiceTimeValue` в `daily_choice_time_sheet.dart`, `daily_choice_detail_fields.dart`, `daily_choice_catalog_body.dart`. |
 
 ## Findings
 
@@ -84,20 +68,18 @@ No unresolved findings remain in the implementation review.
 
 ## Review coverage
 
-**Цель.** `discover-review-target.mjs` вернул `ready` для изменения `redesign-daily-choices`: 6 коммитов и 15 путей, список коммитов совпадает с данными процесса. Рабочее дерево чистое, исключённых путей нет. `8319463d` меняет только `task-profiles.md` (профили 4.17–4.21). Задачи 4.17–4.21 соответствуют коммитам `f6a796ee`, `70c110e9`, `09980166`, `5f97bc68` и `febecc20`, и каждый из них отмечает свою задачу в `tasks.md`.
+**Цель.** `discover-review-target.mjs` вернул `ready` для изменения `redesign-daily-choices`: 3 коммита и 6 путей, список коммитов совпадает с данными процесса. Рабочее дерево чистое, исключённых путей нет. `feea6b0e` меняет только `task-profiles.md` (профили 4.22 и 4.23). Задача 4.22 соответствует коммиту `be0adb1c`, задача 4.23 — коммиту `e39c70d5`. Каждый из них отмечает свою задачу в `tasks.md`.
 
-**Задача 4.17.** `DailyChoiceDetailsOperationAwaitingSnapshot` хранит ревизию из `completion.confirmedResult`. Пока снимок не пришёл, новые операции запрещены (`_canStartOperation`), а панель считает это состояние записью (`daily_choice_sheet.dart:287-292`). Ожидание заканчивают снимок не старше записи, снимок другой эпохи, отсутствие выбора, отказ чтения и `dispose`. Тесты модели проверяют успех только после снимка и исходы «не найден» и «отказ чтения». Тест панели фиксирует кадр между подтверждением и снимком для приоритета и описания. Пробел этого механизма — запись без изменений (бывшая F7). По решению пользователя его устраняет задача 4.22 в `tasks.md`: если показанный снимок уже содержит записанные значения, ожидания нет.
+**Задача 4.22.** В `_operationAfter` ожидание снимка наступает, только если `_awaitsSnapshot(revision)` и показанный загруженный снимок не содержит записанных значений (`_showsWritten`). `_showsWritten` сравнивает по значению дату, описание, выполнение, время и приоритет. У этих типов есть равенство по значению. Остальные поля `DailyChoice` (идентификаторы) патч не меняет. Запись без изменений не продвигает ревизию графа. Но показанный снимок может быть старше ревизии подтверждения из-за записей в другие части графа, и тогда нового снимка не будет. Значит, без этой ветки ожидание действительно не заканчивалось. Сравнение с показанным снимком, а не `before` подтверждения, продолжает ждать в случае, когда хранилище уже изменилось, а снимок ещё не доставлен. Тесты модели проверяют два случая. Запись тех же значений при снимке R1 и подтверждении R2 даёт успех, `Idle` и разрешает следующую операцию. Отличие любого из пяти значений оставляет `AwaitingSnapshot`, пока не придёт снимок.
 
-**Задача 4.18.** `dailyChoiceUsesTwelveHourClock` берёт `timeOfDayFormat(alwaysUse24HourFormat:)` и `hourFormat`. Лист времени выбирает по ней `TimeDialClock12` или `TimeDialClock24`. Тесты листа и панели подтверждают ru «18:00» на 24-часовом циферблате, en «6:00 PM» на 12-часовом и en с включённым 24-часовым временем. Расхождение между утверждением о едином месте и кодом (бывшая F8): `dailyChoiceTimeValue` выбирает формат сам, через `TimeOfDay.format`. По решению пользователя его устраняет задача 4.23 в `tasks.md`: подписи времени получают формат из `dailyChoiceUsesTwelveHourClock`, видимый вывод не меняется.
+Подделка репозитория в `daily_choice_sheet_test.dart` теперь применяет патч к показанному выбору. Без этого прежние сценарии ожидания снимка (4.17) завершались бы сразу после подтверждения и перестали бы проверять кадр ожидания. Контракты прикладного слоя, репозиторий, подписка и `daily_choice_sheet.dart` не менялись.
 
-**Задачи 4.19 и 4.20.** У `Tabs.toggle` нет `stuck` и `plane`, `assert` удалён, перечисление смысла закрыто (`_TabsSemantics`). `minWidth` задаёт только переключатель, полоса держит `DoableMetrics.tapMin`. Тест циферблата проверяет переключатель по семантике (кнопка, включена, не вкладка), а не по удалённому полю. У `TimeDial` нет `allDayHint`, доступное название кнопки «Весь день» совпадает с её текстом, `_DialButton` принимает готовый `child`, кольцо фокуса рисует `foregroundPainter`.
+**Задача 4.23.** `dailyChoiceTimeValue` вызывает `MaterialLocalizations.formatTimeOfDay` с `alwaysUse24HourFormat: !dailyChoiceUsesTwelveHourClock(context)`. Поэтому формат подписей и циферблата решает одна функция, и комментарии обеих функций это описывают. Видимый вывод не изменился, это проверено по исходникам Flutter SDK. `TimeOfDay.format` передаёт `MediaQuery.alwaysUse24HourFormatOf`, а `_get24HourVersionOf` в `flutter_localizations` оставляет 24-часовые шаблоны локали без изменений. Поэтому для любой локали, где решение даёт 24 часа при выключенной настройке, вывод совпадает с прежним. Тесты совпадения формата циферблата и подписей в листе времени и панели не менялись и проходят. Прямых вызовов `TimeOfDay.format` и `formatTimeOfDay` в `lib/src/daily_choice` вне этого файла нет.
 
-**Задача 4.21.** Удалён один тест. Изолированный проверяющий подтвердил, что в `lib/` нет производителя `DailyChoiceValidationField.date`, а уведомление отказа страницы по-прежнему проверяют тесты отказа описания и временного отказа.
+**Отклонённые наблюдения.** В тестах модели `_withPriority` — однострочная обёртка над `_withFields`, и вызывает её одно место. Отдельной находкой она не стала: вреда для сопровождения нет.
 
-**Отклонённые наблюдения.** Отдельного теста для ветки «показанный снимок уже не старше подтверждения, ожидания нет» нет. Регрессия этой ветки оставила бы панель ждать снимок, который уже показан. У неё тот же корень, что у бывшей F7: ожидание рассчитывает на будущий снимок. Тест задачи 4.22 (показанный снимок уже содержит записанные значения, ожидания нет) покрывает и её, поэтому отдельная находка не заводится.
+**Перенесённое состояние.** В прежнем отчёте активных находок не было. AR1 сохранён: `list_state.dart`, `day_heading.dart`, порог `_wordMaxScale`, шрифт, типографика и отступы заголовка дня в диапазоне не менялись.
 
-**Перенесённое состояние.** В прежнем отчёте активных находок не было. Новые номера начинаются с F7, потому что F1–F6 уже использованы. AR1 сохранён: `list_state.dart`, `day_heading.dart`, порог `_wordMaxScale`, шрифт, типографика и отступы заголовка дня в диапазоне не менялись.
+**Исправления этой стадии.** Код, тесты и артефакты планирования не менялись. Новых задач нет.
 
-**Исправления этой стадии.** Код, тесты и артефакты планирования не менялись. Навык проверки реализации запрещает этой стадии править код. Решения по находкам принимают отдельные стадии их разрешения. F7 по решению пользователя передана в новую незавершённую задачу 4.22 в конце Phase 4 `tasks.md`; код по ней ещё не менялся. F8 по решению пользователя передана в новую незавершённую задачу 4.23 в конце Phase 4 `tasks.md`; код по ней ещё не менялся.
-
-**Устройство.** Устройство и эмулятор не использовались. Ручная проверка на устройстве остаётся за владельцем продукта: переход панели через ожидание снимка при изменении описания и формат циферблата в ru и en при выключенном 24-часовом времени.
+**Устройство.** Устройство и эмулятор не использовались. Ручная проверка на устройстве остаётся за владельцем продукта. Нужно убедиться, что повторное сохранение того же значения в панели не оставляет её в состоянии записи. Ещё нужно сверить подписи времени и циферблат в ru и en при выключенном и включённом 24-часовом времени.
