@@ -6,8 +6,10 @@ import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_description.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
+import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_state.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_view_model.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
@@ -104,6 +106,62 @@ void main() {
       },
     );
   }
+
+  test('запись без изменения значений не оставляет ожидание снимка', () async {
+    final harness = await _Harness.loaded();
+    addTearDown(harness.dispose);
+    final model = harness.model;
+    final shown = _details(id).choice;
+
+    final saved = model.change(_patch);
+    harness.repository.succeedUpdate(id, written: shown);
+
+    expect(await saved, isTrue);
+    expect(model.operation, isA<DailyChoiceDetailsOperationIdle>());
+    expect(model.state, isA<DailyChoiceDetailsLoaded>());
+
+    final next = model.change(_patch);
+    expect(harness.repository.commands, hasLength(2));
+    expect(model.operation, isA<DailyChoiceDetailsOperationWriting>());
+    harness.repository.succeedUpdate(id, written: shown);
+    expect(await next, isTrue);
+  });
+
+  test('запись, отличающаяся от показанного снимка любым значением, ждёт '
+      'снимок', () async {
+    final shown = _details(id).choice;
+    final differing = <String, DailyChoice>{
+      'датой': _withFields(shown, date: CalendarDate.fromParts(2026, 9, 25)),
+      'описанием': _withFields(
+        shown,
+        description: DailyChoiceDescription.fromInput('Описание'),
+      ),
+      'выполнением': _withFields(shown, isCompleted: true),
+      'временем': _withFields(
+        shown,
+        schedule: DailyChoiceTime(hour: 9, minute: 0),
+      ),
+      'приоритетом': _withFields(shown, priority: DailyChoicePriority.p1),
+    };
+    for (final MapEntry(key: field, value: written) in differing.entries) {
+      final harness = await _Harness.loaded();
+      addTearDown(harness.dispose);
+      final model = harness.model;
+
+      final saved = model.change(_patch);
+      harness.repository.succeedUpdate(id, written: written);
+      await pumpEventQueue();
+
+      expect(
+        model.operation,
+        isA<DailyChoiceDetailsOperationAwaitingSnapshot>(),
+        reason: 'запись, отличающаяся $field',
+      );
+
+      harness.repository.emit(_details(id), revision: 2);
+      expect(await saved, isTrue);
+    }
+  });
 
   test('изменение и удаление делят одну операцию', () async {
     final harness = await _Harness.loaded();
@@ -277,8 +335,31 @@ void main() {
   });
 }
 
+const _patchedPriority = DailyChoicePriority.p1;
 const _patch = DailyChoiceFieldsPatch(
-  priority: DailyChoiceFieldSet(DailyChoicePriority.p1),
+  priority: DailyChoiceFieldSet(_patchedPriority),
+);
+
+DailyChoice _withPriority(DailyChoice choice, DailyChoicePriority priority) =>
+    _withFields(choice, priority: priority);
+
+/// Копия выбора с заменой указанных значений; пустое описание не задаётся.
+DailyChoice _withFields(
+  DailyChoice choice, {
+  CalendarDate? date,
+  DailyChoiceDescription? description,
+  bool? isCompleted,
+  DailyChoiceSchedule? schedule,
+  DailyChoicePriority? priority,
+}) => DailyChoice(
+  id: choice.id,
+  sourceIntentionId: choice.sourceIntentionId,
+  selectedIntentionId: choice.selectedIntentionId,
+  date: date ?? choice.date,
+  description: description ?? choice.description,
+  isCompleted: isCompleted ?? choice.isCompleted,
+  schedule: schedule ?? choice.schedule,
+  priority: priority ?? choice.priority,
 );
 
 DailyChoiceId _choiceId(int number) => (DailyChoiceId.decode(
@@ -417,7 +498,8 @@ final class _Repository
   void fail(DailyChoiceCommandFailure failure) =>
       _requests.last.complete(GraphCommandFailed(failure));
 
-  void succeedUpdate(DailyChoiceId id) {
+  /// Подтверждает запись; без [written] она меняет приоритет, как [_patch].
+  void succeedUpdate(DailyChoiceId id, {DailyChoice? written}) {
     final details = _details(id);
     _requests.last.complete(
       GraphCommandSucceeded(
@@ -425,7 +507,7 @@ final class _Repository
           revision: const _Revision(2),
           value: DailyChoiceFieldsUpdated(
             before: details.choice,
-            choice: details.choice,
+            choice: written ?? _withPriority(details.choice, _patchedPriority),
             path: StoredChoicePath(details.path.map((step) => step.step)),
             changes: const [_Change()],
           ),

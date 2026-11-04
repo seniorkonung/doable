@@ -1667,6 +1667,7 @@ final class _Repository
   final watchedRelations = <LongTermRelationId>[];
   final _commands = <UpdateDailyChoiceFields>[];
   final _requests = <Completer<DailyChoiceCommandResult>>[];
+  DailyChoice _shown = _details().choice;
 
   /// Изменения полей из отправленных команд.
   List<DailyChoiceFieldsPatch> get sentPatches => [
@@ -1715,16 +1716,44 @@ final class _Repository
     );
   }
 
-  /// Подтверждает запись; новое значение приходит отдельно через [emit].
+  /// Подтверждает запись последнего патча поверх показанного выбора; новое
+  /// значение приходит отдельно через [emit].
   void succeedUpdate() {
     final details = _details();
+    final before = _shown;
+    final patch = _commands.last.patch;
     _requests.last.complete(
       GraphCommandSucceeded(
         ConfirmedGraphResult(
           revision: _Revision(++_revision),
           value: DailyChoiceFieldsUpdated(
-            before: details.choice,
-            choice: details.choice,
+            before: before,
+            choice: DailyChoice(
+              id: before.id,
+              sourceIntentionId: before.sourceIntentionId,
+              selectedIntentionId: before.selectedIntentionId,
+              date: switch (patch.date) {
+                DailyChoiceFieldSet(:final value) => value,
+                DailyChoiceFieldUnchanged() => before.date,
+              },
+              description: switch (patch.description) {
+                DailyChoiceDescriptionSet(:final value) => value,
+                DailyChoiceDescriptionCleared() => null,
+                DailyChoiceDescriptionUnchanged() => before.description,
+              },
+              isCompleted: switch (patch.isCompleted) {
+                DailyChoiceFieldSet(:final value) => value,
+                DailyChoiceFieldUnchanged() => before.isCompleted,
+              },
+              schedule: switch (patch.schedule) {
+                DailyChoiceFieldSet(:final value) => value,
+                DailyChoiceFieldUnchanged() => before.schedule,
+              },
+              priority: switch (patch.priority) {
+                DailyChoiceFieldSet(:final value) => value,
+                DailyChoiceFieldUnchanged() => before.priority,
+              },
+            ),
             path: StoredChoicePath(details.path.map((step) => step.step)),
             changes: [_Change(_Revision(_revision))],
           ),
@@ -1761,11 +1790,14 @@ final class _Repository
     return controller.stream;
   }
 
-  void emit(DailyChoiceDetails details) => controller.add(
-    DailyChoiceReadSuccess(
-      GraphSnapshot(value: details, revision: _Revision(++_revision)),
-    ),
-  );
+  void emit(DailyChoiceDetails details) {
+    _shown = details.choice;
+    controller.add(
+      DailyChoiceReadSuccess(
+        GraphSnapshot(value: details, revision: _Revision(++_revision)),
+      ),
+    );
+  }
 
   void emitMissing() => controller.add(
     DailyChoiceReadSuccess(

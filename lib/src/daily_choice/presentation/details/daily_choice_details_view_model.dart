@@ -9,6 +9,7 @@ import '../../../graph/application/personal_graph_repository.dart';
 import '../../application/daily_choice_command.dart';
 import '../../application/daily_choice_details.dart';
 import '../../application/daily_choice_result.dart';
+import '../../domain/daily_choice.dart';
 import '../../domain/daily_choice_id.dart';
 import 'daily_choice_details_state.dart';
 
@@ -44,7 +45,8 @@ final class DailyChoiceDetailsViewModel extends ChangeNotifier {
 
   /// Возвращает успех только собственной подтверждённой записи; новое значение
   /// приходит из подписки. Успех возвращается, когда подписка показала снимок
-  /// не старше записи или закончилась иным исходом.
+  /// не старше записи или закончилась иным исходом, а запись, которая ничего не
+  /// изменила, завершается сразу.
   Future<bool> change(DailyChoiceFieldsPatch patch) async {
     if (!_canStartOperation) return false;
     final completion = await _run(
@@ -152,7 +154,7 @@ final class DailyChoiceDetailsViewModel extends ChangeNotifier {
     ),
     GraphResultSuccess(:final value) => switch (value.value) {
       DailyChoiceFieldsUpdated(:final choice) when choice.id == _id =>
-        _awaitsSnapshot(value.revision)
+        _awaitsSnapshot(value.revision) && !_showsWritten(choice)
             ? DailyChoiceDetailsOperationAwaitingSnapshot(value.revision)
             : const DailyChoiceDetailsOperationIdle(),
       DailyChoiceDeleted(:final choice) when choice.id == _id =>
@@ -169,6 +171,18 @@ final class DailyChoiceDetailsViewModel extends ChangeNotifier {
   bool _awaitsSnapshot(GraphRevision required) => switch (_state) {
     DailyChoiceDetailsLoaded(:final revision) =>
       revision.compareTo(required) == GraphRevisionOrder.older,
+    _ => false,
+  };
+
+  /// Запись, не изменившая значений, не меняет хранилище, и подписка не
+  /// выпустит нового снимка: ждать его незачем.
+  bool _showsWritten(DailyChoice written) => switch (_state) {
+    DailyChoiceDetailsLoaded(:final details) =>
+      details.choice.date == written.date &&
+          details.choice.description == written.description &&
+          details.choice.isCompleted == written.isCompleted &&
+          details.choice.schedule == written.schedule &&
+          details.choice.priority == written.priority,
     _ => false,
   };
 
