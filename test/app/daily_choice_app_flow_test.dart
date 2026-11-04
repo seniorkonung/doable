@@ -24,6 +24,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../support/daily_choice_creation_controls.dart';
 import '../support/daily_choice_details_controls.dart';
 
 import '../support/app_root_pages.dart';
@@ -96,9 +97,8 @@ Future<void> _createFromPath(WidgetTester tester) async {
     tester,
     find.byKey(const ValueKey('choice-path-open-confirmation')),
   );
-  final date = find.byKey(const ValueKey('daily-choice-date'));
-  await _until(tester, date);
-  await tester.enterText(date, _formChoiceDate.toCanonicalString());
+  await awaitDailyChoiceConfirmation(tester, waitFor: _until);
+  await setDailyChoiceCreationDate(tester, _formChoiceDate);
   await tester.enterText(
     find.byKey(const ValueKey('daily-choice-description')),
     'Выбранный путь',
@@ -258,10 +258,9 @@ Future<void> _confirmNewChoice(
     tester,
     find.byKey(const ValueKey('choice-path-open-confirmation')),
   );
-  final date = find.byKey(const ValueKey('daily-choice-date'));
-  await _until(tester, date);
+  await awaitDailyChoiceConfirmation(tester, waitFor: _until);
   await tester.pumpAndSettle(const Duration(milliseconds: 1));
-  await tester.enterText(date, _newChoiceDate.toCanonicalString());
+  await setDailyChoiceCreationDate(tester, _newChoiceDate);
   await _tap(tester, find.byKey(const ValueKey('daily-choice-submit')));
   await _untilGone(tester, find.byType(DailyChoiceCreationPage));
   await tester.pumpAndSettle(const Duration(milliseconds: 1));

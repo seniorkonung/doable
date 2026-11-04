@@ -231,7 +231,10 @@ void _registerRelationPickerDailyChoiceTests() {
             );
             await _tap(tester, _key('choice-path-select-action'));
             await _tap(tester, _key('choice-path-open-confirmation'));
-            await tester.enterText(_key('daily-choice-date'), '2026-10-09');
+            await setDailyChoiceCreationDate(
+              tester,
+              CalendarDate.fromParts(2026, 10, 9),
+            );
             await tester.enterText(
               _key('daily-choice-description'),
               'Сохранённое описание',

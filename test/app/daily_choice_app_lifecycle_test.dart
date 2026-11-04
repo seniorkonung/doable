@@ -48,6 +48,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../support/daily_choice_creation_controls.dart';
 import '../support/daily_choice_details_controls.dart';
 
 import '../support/app_root_pages.dart';
@@ -246,17 +247,12 @@ void main() {
         tester,
         find.byKey(const ValueKey('choice-path-open-confirmation')),
       );
-      await _until(
+      await awaitDailyChoiceConfirmation(
         tester,
-        () => find
-            .byKey(const ValueKey('daily-choice-submit'))
-            .evaluate()
-            .isNotEmpty,
+        waitFor: (tester, finder) =>
+            _until(tester, () => finder.evaluate().isNotEmpty),
       );
-      await tester.enterText(
-        find.byKey(const ValueKey('daily-choice-date')),
-        createdDate.toCanonicalString(),
-      );
+      await setDailyChoiceCreationDate(tester, createdDate);
       gate.arm(
         fail: false,
         operation: LocalDatabaseSqlOperation.insert,
