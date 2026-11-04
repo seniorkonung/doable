@@ -511,8 +511,9 @@ final class _KindSwitch extends StatelessWidget {
     container: true,
     explicitChildNodes: true,
     label: kindSwitch.label,
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
+    // Пилюли не сужаются: при нехватке ширины, например при крупном системном
+    // шрифте, вторая переносится на новую строку.
+    child: Wrap(
       spacing: DoableMetrics.space1,
       children: [
         for (final option in RelationHeadKind.values)
