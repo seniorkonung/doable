@@ -808,7 +808,7 @@
 
 ## Phase 4: Выбор меняется на месте одними полями
 
-- [ ] 4.1 В ветке этого изменения есть `main` с архивированными `add-relations-in-batches` и `open-full-intention-pages-from-pickers`
+- [x] 4.1 В ветке этого изменения есть `main` с архивированными `add-relations-in-batches` и `open-full-intention-pages-from-pickers`
   - **Критерии приёмки:**
     - Коммит `52f6cf70` из `main` — слияние PR #83 `change/open-full-intention-pages-from-pickers` вместе с его архивацией — входит в историю ветки. Он содержит и слияние `change/add-relations-in-batches` `19a1625d` с архивацией `3fab3364`. Вливается именно `52f6cf70`, а не более поздняя вершина `main`: перечень конфликтов ниже посчитан для него. Если коммит уже в истории, задача только выполняет проверки.
     - Конфликты решены в пользу этого изменения там, где оно удалило поведение: `daily_choice_path_replace_page.dart` и `daily_choice_path_replacement_flow_test.dart` остаются удалёнными, а `ReplaceDailyChoicePath`, `DailyChoicePathReplaced` и `DailyChoiceCommandKind.replace` не возвращаются. Поведение фаз 3 и 4 `add-relations-in-batches` и `open-full-intention-pages-from-pickers` работает как в `main`: в том числе панель навигации видна на страницах над поиском участника связи.
