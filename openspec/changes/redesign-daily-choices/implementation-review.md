@@ -5,7 +5,7 @@
 **Format version:** 1
 **Result:** Changes needed
 **Coverage status:** Complete
-**Summary:** Фаза 4 выполнена и проверена. Слияние `main` на `52f6cf70` сохранило удаления этого изменения, дельты сверены с каноном, а дата, время, приоритет и описание меняются в панели. Общий блок полей стоит и на подтверждении создания, форма изменения удалена. `mise run check` и `mise run codegen-check` на проверенной голове проходят. Открыты пять находок низкой важности. Главная из них — F2: после собственной записи панель снимает блокировку и закрывает изменение описания раньше, чем показывает записанное значение. Остаточный риск AR1 перенесён без изменений.
+**Summary:** Фаза 4 выполнена и проверена. Слияние `main` на `52f6cf70` сохранило удаления этого изменения, дельты сверены с каноном, а дата, время, приоритет и описание меняются в панели. Общий блок полей стоит и на подтверждении создания, форма изменения удалена. `mise run check` и `mise run codegen-check` на проверенной голове проходят. Открыты четыре находки низкой важности. Главная из них — F3: циферблат и поле времени по-разному определяют 12- и 24-часовой формат. Остаточный риск AR1 перенесён без изменений.
 
 ## Review target
 
@@ -72,24 +72,11 @@
 
 | Pass | Status | Evidence or limitation |
 |---|---|---|
-| Independent decision review | Complete | Три свежих изолированных проверяющих получили нейтральные брифы без планирования, истории коммитов и прежнего отчёта. U1 проверен на коммите слияния (`4da9c18bf6c7701a87c7c22ae9fdc6f9485a0389..ff39e59dd44b32c9e4547b22ca3d789b292ac292`, вторая сторона `52f6cf7064f86510db24ebbd7e25a47d83a97300`, плюс `--remerge-diff`) по всем 24 путям: существенных замечаний нет. U3 проверен на `d20553b3c1af1235e10c3ca0aed87897ecfcbb2f..f7d098e2c91f9314ea44462296e24621635d0191` по 10 путям. Группа U2, U4 и U5 на том же диапазоне получила все 57 путей, а после первого раунда — ещё 10 путей U3, от которых зависят её исходы; покрытие полное. Найденное отражено в F2, F4 и F5. |
+| Independent decision review | Complete | Три свежих изолированных проверяющих получили нейтральные брифы без планирования, истории коммитов и прежнего отчёта. U1 проверен на коммите слияния (`4da9c18bf6c7701a87c7c22ae9fdc6f9485a0389..ff39e59dd44b32c9e4547b22ca3d789b292ac292`, вторая сторона `52f6cf7064f86510db24ebbd7e25a47d83a97300`, плюс `--remerge-diff`) по всем 24 путям: существенных замечаний нет. U3 проверен на `d20553b3c1af1235e10c3ca0aed87897ecfcbb2f..f7d098e2c91f9314ea44462296e24621635d0191` по 10 путям. Группа U2, U4 и U5 на том же диапазоне получила все 57 путей, а после первого раунда — ещё 10 путей U3, от которых зависят её исходы; покрытие полное. Найденное отражено в F4 и F5. |
 | OpenSpec conformance | Complete | На проверенной голове прочитаны proposal, design D2–D5 и D12, plan.md Phase 4, задачи 4.1–4.16 и дельты `daily-choice-management`, `bottom-sheets` и `app-navigation`. Проверки 4.1: `git merge-base --is-ancestor 52f6cf70` проходит, оба `git grep` пусты, `daily_choice_path_replace_page.dart` и `daily_choice_path_replacement_flow_test.dart` отсутствуют. Проверки 4.11 и 4.15 (`git grep`) тоже пусты. Шесть `MODIFIED` из D12 сверены по словам с `openspec/specs`: отличия только в замене пути, открытии созданного выбора и странице подробного просмотра. `mise exec --no-deps -- openspec validate redesign-daily-choices --strict --json` — valid, без сообщений. `mise run check` — exit 0: формат 881 файла без изменений, `flutter analyze` — «No issues found!», 4213 обычных и 18 процессных тестов проходят. `mise run codegen-check` — exit 0, дерево после него чистое. Запуск в `/home/seniorkonung/.paseo/worktrees/1id27gtb/purple-scorpion`, где `HEAD` равен проверенной голове и дерево чистое. |
 | Code quality | Complete | Пять осей `code-review-and-quality` по всем путям U2–U5 и по разрешению конфликтов U1. Контекст: `graph_command_coordinator.dart` (политика `silentSuccess`, `_acceptOperation`), `daily_choice_catalog_view_model.dart` (`DailyChoiceCompletionAwaitingSnapshot`), `drift_personal_graph_repository_daily_choice_reads.dart`, `priority_picker.dart`, `daily_choice_creation_view_model.dart`, `daily_choice_result.dart`, `month_grid_day.dart`, `doable_metrics.dart`, `openspec/specs/app-appearance/spec.md`, `flutter_localizations` (`timeOfDayFormat`). |
 
 ## Findings
-
-### F2 · Low — Панель снимает блокировку и закрывает изменение описания раньше, чем показывает записанное значение
-
-- **Evidence:** `lib/src/daily_choice/presentation/details/daily_choice_details_view_model.dart:79-93`: при завершении команды `_run` сразу сбрасывает `_command`. Для собственного успеха `_operationAfter` (`:136-150`) ставит `DailyChoiceDetailsOperationIdle`, а `change` (`:44-56`) возвращает `true`.
-  Новое значение приходит только из `watchDailyChoice` (`:170-197`). Репозиторий перечитывает выбор асинхронно после инвалидации (`lib/src/graph/data/drift_personal_graph_repository_daily_choice_reads.dart:16-26`, `:39-53`). Завершение команды публикуется отдельно, через `_publicationTail` (`lib/src/graph/application/graph_command_coordinator.dart:1324-1338`), и не ждёт этого чтения.
-  В файле `lib/src/daily_choice/presentation/details/daily_choice_sheet.dart:166-169` после `saved` сразу вызывается `_closeDescription()`, и «Обзор» строится из прежнего `state.details` (`:348-354`). При `writable: !isRunning` (`:353`) поля, флажок и меню снова доступны, хотя показывают прежние значения. Проверка «выбрано уже показанное значение» в `daily_choice_detail_fields.dart:78`, `:84` сравнивает с ними же.
-  Каталог для той же записи держит флажок недоступным до снимка с подтверждённой ревизией: `DailyChoiceCompletionAwaitingSnapshot(confirmed.revision)` (`lib/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart:213-219`). Диаграмма D2 тоже включает управление только после нового снимка (шаги 7 и 8).
-  Тесты не видят этот промежуток: `test/daily_choice/presentation/details/daily_choice_sheet_test.dart:1103-1105` вызывает `succeedUpdate()` и `emit()` до первого `pump`.
-- **Evidence revisions:** ["f7d098e2c91f9314ea44462296e24621635d0191"]
-- **Impact:** После «Сохранить» «Обзор» может на кадр показать прежнее описание или «Добавить описание», и сохранение выглядит несработавшим. После смены даты, времени или приоритета изменения снова доступны, пока показано перезаписанное значение. Действие в этом окне опирается на неверный показ, а флажок панели и карточки ведут себя по-разному. Окно ограничено временем одного чтения из Drift.
-- **Required outcome:** После собственной подтверждённой записи панель выходит из изменения описания и снова допускает изменения только тогда, когда показанный снимок не старше ревизии этой записи. Отказ и закрытие панели до результата работают как сейчас. Тест фиксирует кадр между подтверждением и снимком.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** ["lib/src/daily_choice/presentation/details/daily_choice_details_view_model.dart","lib/src/daily_choice/presentation/details/daily_choice_sheet.dart","test/daily_choice/presentation/details/daily_choice_sheet_test.dart","tasks.md 4.9","tasks.md 4.12"]
 
 ### F3 · Low — Циферблат и поле времени по-разному определяют 12- и 24-часовой формат
 
@@ -169,6 +156,6 @@
 
 **Перенесённое состояние.** В прежнем отчёте активных находок не было. Номера новых находок начинаются с F2, потому что F1 — исходная находка AR1. AR1 сохранён: `list_state.dart`, `day_heading.dart`, порог `_wordMaxScale`, шрифт, типографика и отступы заголовка дня в диапазоне не менялись. В `daily_choice_catalog_body.dart` изменилась только подпись времени группы, поэтому условий повторного открытия нет.
 
-**Исправления этой стадии.** Код, тесты и артефакты планирования не менялись. Проверка фиксирует находки и не добавляет по ним задач. Находки F2–F6 переходят в последующие стадии решения находок.
+**Исправления этой стадии.** Код, тесты и артефакты планирования не менялись. Проверка фиксирует находки и не добавляет по ним задач. Находки F3–F6 переходят в последующие стадии решения находок.
 
 **Устройство.** Устройство и эмулятор не использовались. Ручная проверка на устройстве остаётся за владельцем продукта по сборке `build/app/outputs/flutter-apk/app-debug.apk`: изменение полей и описания в панели, циферблат в 12-часовом формате, поле описания над клавиатурой.
