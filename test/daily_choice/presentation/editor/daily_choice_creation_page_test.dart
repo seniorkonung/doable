@@ -416,29 +416,6 @@ void main() {
     expect(repository.commands.single.path.steps.length, 1);
   });
 
-  testWidgets('отказ по полю даты показан уведомлением отказа страницы', (
-    tester,
-  ) async {
-    final repository = _Repository();
-    await _pump(tester, repository);
-    await _tapVisible(
-      tester,
-      find.byKey(const ValueKey('daily-choice-submit')),
-    );
-    repository.fail(
-      0,
-      const DailyChoiceValidationFailure(DailyChoiceValidationField.date),
-    );
-    await tester.pumpAndSettle();
-    expect(
-      find.descendant(
-        of: find.byKey(const ValueKey('daily-choice-failure')),
-        matching: find.text('Проверьте дату дневного выбора.'),
-      ),
-      findsOneWidget,
-    );
-  });
-
   testWidgets('неверное описание можно исправить без потери ввода', (
     tester,
   ) async {

@@ -1096,7 +1096,7 @@
   - **Предполагаемые файлы:** меняются `lib/src/design_system/components/time_dial.dart`, `lib/src/daily_choice/presentation/details/daily_choice_time_sheet.dart`, `test/design_system/time_dial_test.dart`.
   - **Размер:** XS.
 
-- [ ] 4.21 Тесты подтверждения создания не проверяют отказ по полю даты, которого система не порождает
+- [x] 4.21 Тесты подтверждения создания не проверяют отказ по полю даты, которого система не порождает
   - **Критерии приёмки:**
     - Из `test/daily_choice/presentation/editor/daily_choice_creation_page_test.dart` удалён тест «отказ по полю даты показан уведомлением отказа страницы», который подставляет `DailyChoiceValidationFailure(DailyChoiceValidationField.date)`. Ни команда, ни репозиторий такой отказ не порождают, а общий путь уведомления отказа страницы проверяют её остальные тесты отказов.
     - Остальные тесты страницы не меняются.
