@@ -25,6 +25,8 @@ import 'package:doable/src/design_system/components/choice_head.dart';
 import 'package:doable/src/design_system/components/choice_path.dart' as ui;
 import 'package:doable/src/design_system/components/date_grid.dart';
 import 'package:doable/src/design_system/components/detail_row.dart';
+import 'package:doable/src/design_system/components/option_row.dart';
+import 'package:doable/src/design_system/components/options_menu.dart';
 import 'package:doable/src/design_system/components/priority_picker.dart';
 import 'package:doable/src/design_system/components/reason_chain.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
@@ -86,33 +88,72 @@ void main() {
     expect(find.text('Действие'), findsOneWidget);
   });
 
-  testWidgets(
-    'меню открывает форму, а после возврата панель показывает изменения',
-    (tester) async {
-      final (repository, router) = await _openOnRouter(tester);
-      repository.emit(_details());
+  for (final (name, description, item) in [
+    ('с описанием', 'Пояснение', 'Изменить описание'),
+    ('без описания', '', 'Добавить описание'),
+  ]) {
+    testWidgets('меню выбора $name предлагает только «$item» и удаление, '
+        'а не замену пути', (tester) async {
+      final harness = await _openSheet(tester);
+      harness.repository.emit(_details(description: description));
       await tester.pumpAndSettle();
+
       await tester.tap(_options);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Редактировать дневной выбор'));
-      await tester.pumpAndSettle();
-      expect(router.current.name, DailyChoiceEditRoute.name);
-      await tester.enterText(
-        find.byKey(const ValueKey('daily-choice-edit-description')),
-        'Новое описание',
+
+      expect(
+        tester
+            .widgetList<OptionRow>(
+              find.descendant(of: _menu, matching: find.byType(OptionRow)),
+            )
+            .map((row) => row.name),
+        [item, 'Удалить дневной выбор'],
       );
-      await tester.pump();
-      await tester.ensureVisible(
-        find.byKey(const ValueKey('daily-choice-edit-submit')),
-      );
-      await tester.tap(find.byKey(const ValueKey('daily-choice-edit-submit')));
-      await tester.pump();
-      repository.emit(_details(description: 'Новое описание'));
-      repository.succeedUpdate();
-      await tester.pumpAndSettle();
-      expect(find.text('Новое описание'), findsOneWidget);
-    },
-  );
+    });
+  }
+
+  testWidgets('пункт меню с вкладки «Путь» открывает то же изменение описания, '
+      'а сохранение возвращает «Обзор»', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final harness = await _openSheet(tester);
+    final repository = harness.repository;
+    repository.emit(_details());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Путь'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(_options);
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(of: _menu, matching: find.text('Изменить описание')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(TopBar, 'Описание'), findsOneWidget);
+    expect(_head(tester).options, isA<ChoiceHeadOptionsNone>());
+    expect(_editedText(tester), 'Пояснение');
+    expect(tester.getSemantics(_save), isSemantics(isEnabled: false));
+
+    await tester.enterText(find.byType(EditableText), 'Новое');
+    await tester.pump();
+    await tester.tap(_save);
+    await tester.pump();
+    final description = _onlyField(repository.sentPatches.single);
+    expect(description.$1, 'description');
+    expect((description.$2 as DailyChoiceDescriptionSet).value.value, 'Новое');
+
+    repository.succeedUpdate();
+    repository.emit(_details(description: 'Новое'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TopBar), findsNothing);
+    expect(find.text('Новое'), findsOneWidget);
+    expect(
+      tester.getSemantics(find.bySemanticsLabel('Обзор')),
+      isSemantics(hasSelectedState: true, isSelected: true),
+    );
+    semantics.dispose();
+  });
 
   for (final (order, missingFirst) in [
     ('снимок без выбора приходит до подтверждения', true),
@@ -1310,6 +1351,8 @@ Rect _fullScreen(WidgetTester tester) =>
 String _editedText(WidgetTester tester) =>
     tester.widget<EditableText>(find.byType(EditableText)).controller.text;
 final _options = find.bySemanticsLabel('Параметры дневного выбора');
+
+final _menu = find.byWidgetPredicate((widget) => widget is OptionsMenu);
 
 TextDecoration? _actionDecoration(WidgetTester tester) =>
     tester.widget<Text>(find.text('Действие')).style!.decoration;

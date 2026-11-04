@@ -75,7 +75,7 @@ Future<void> showDailyChoiceSheet(
 
 enum _ChoiceTab { overview, path }
 
-enum _ChoiceOption { edit, delete }
+enum _ChoiceOption { description, delete }
 
 /// Открытое изменение описания: текст при открытии и отказ проверки введённого
 /// текста, который живёт до следующего ввода.
@@ -210,8 +210,11 @@ final class _DailyChoiceSheetState extends ConsumerState<DailyChoiceSheet> {
     }
   }
 
-  Future<void> _showOptions() async {
+  /// Пункт описания открывает то же изменение, что и нажатие на описание в
+  /// «Обзоре», с какой бы вкладки ни открыто меню.
+  Future<void> _showOptions(DailyChoiceDetails details) async {
     final l10n = AppLocalizations.of(context);
+    final description = details.choice.description?.value;
     final option = await showDoableSheet<_ChoiceOption>(
       context: context,
       builder: (_, sheet) => OptionsMenu<_ChoiceOption>(
@@ -219,9 +222,11 @@ final class _DailyChoiceSheetState extends ConsumerState<DailyChoiceSheet> {
         title: l10n.dailyChoiceDetailsTitle,
         items: [
           OptionsMenuItem(
-            value: _ChoiceOption.edit,
+            value: _ChoiceOption.description,
             icon: DoableIconData.edit,
-            name: l10n.dailyChoiceEditTitle,
+            name: description == null
+                ? l10n.detailsAddDescription
+                : l10n.dailyChoiceSheetOptionEditDescription,
           ),
           OptionsMenuItem(
             value: _ChoiceOption.delete,
@@ -238,8 +243,8 @@ final class _DailyChoiceSheetState extends ConsumerState<DailyChoiceSheet> {
       return;
     }
     switch (option) {
-      case _ChoiceOption.edit:
-        await context.router.push(DailyChoiceEditRoute(details: state.details));
+      case _ChoiceOption.description:
+        _openDescription(state.details.choice.description?.value ?? '');
       case _ChoiceOption.delete:
         final confirmed = await confirmDailyChoiceDeletion(
           context,
@@ -367,7 +372,7 @@ final class _DailyChoiceSheetState extends ConsumerState<DailyChoiceSheet> {
           browsing: (
             tab: _tab,
             onTabChange: (tab) => setState(() => _tab = tab),
-            onOptions: writable ? () => unawaited(_showOptions()) : null,
+            onOptions: writable ? () => unawaited(_showOptions(details)) : null,
           ),
           onToggle: writable
               ? () => _model.change(

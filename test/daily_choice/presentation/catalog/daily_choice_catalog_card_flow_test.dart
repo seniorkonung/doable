@@ -1,6 +1,5 @@
 import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
-import 'package:doable/src/daily_choice/presentation/editor/daily_choice_edit_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/design_system/components/choice_row.dart';
 import 'package:doable/src/design_system/components/day_mark.dart';
@@ -9,6 +8,7 @@ import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/daily_choice_detail_fields_controls.dart';
 import '../../../support/daily_choice_details_controls.dart';
 import '../../../support/daily_choice_durability_fixture.dart';
 import '../../../support/daily_choice_catalog_controls.dart';
@@ -104,27 +104,14 @@ void main() {
         );
         expect(dailyChoiceDetailsField('18:00'), findsOneWidget);
         expect(shownDailyChoiceHead(tester).done, isTrue);
+        await setDailyChoicePriority(tester, DailyChoicePriority.p1, tap: _tap);
+        await _until(
+          tester,
+          () => shownDailyChoiceHead(tester).priority == DoablePriority.p1,
+        );
         await showDailyChoicePath(tester);
         expect(dailyChoiceDetailsRelation(1), findsOneWidget);
         expect(dailyChoiceDetailsRelation(2), findsOneWidget);
-        await openDailyChoiceEdit(tester);
-        await _until(
-          tester,
-          () => find.byType(DailyChoiceEditPage).evaluate().isNotEmpty,
-        );
-        await tester.pumpAndSettle();
-        final priority = find.widgetWithText(ChoiceChip, 'Приоритет P1');
-        await tester.ensureVisible(priority);
-        await tester.tap(priority);
-        await tester.pumpAndSettle();
-        final submit = find.byKey(const ValueKey('daily-choice-edit-submit'));
-        await tester.ensureVisible(submit);
-        await tester.tap(submit);
-        await _until(
-          tester,
-          () => find.byType(DailyChoiceEditPage).evaluate().isEmpty,
-        );
-        await tester.pumpAndSettle();
         await closeDailyChoiceDetails(tester);
         await _until(
           tester,
@@ -162,6 +149,14 @@ void main() {
 Finder _rowWith(DoablePriority priority) => find.byWidgetPredicate(
   (widget) => widget is ChoiceRow && widget.priority == priority,
 );
+
+/// Прокрутка к элементу сдвигает его только к следующему кадру.
+Future<void> _tap(WidgetTester tester, Finder finder) async {
+  await tester.ensureVisible(finder);
+  await tester.pumpAndSettle();
+  await tester.tap(finder);
+  await tester.pump();
+}
 
 Future<void> _until(WidgetTester tester, bool Function() condition) async {
   for (var attempt = 0; attempt < 200 && !condition(); attempt++) {

@@ -12,7 +12,6 @@ typedef _PageCase = ({
 enum _MatrixEntry {
   intention,
   editIntention,
-  dailyChoice,
   creation,
   condition,
   source,
@@ -25,7 +24,6 @@ enum _MatrixEntry {
   selectAction,
   selectSource,
   confirmPath,
-  editChoice,
   createRelation,
   outgoingRelations,
   incomingRelations;
@@ -33,9 +31,6 @@ enum _MatrixEntry {
   Finder get finder => switch (this) {
     _MatrixEntry.intention => intentionCatalogRow('Читать'),
     _MatrixEntry.editIntention => intentionHeadTitle,
-    _MatrixEntry.dailyChoice => find.byKey(
-      const ValueKey('daily-choice-row-1'),
-    ),
     _MatrixEntry.creation ||
     _MatrixEntry.source ||
     _MatrixEntry.action => quickCreationAction(),
@@ -61,7 +56,6 @@ enum _MatrixEntry {
     _MatrixEntry.confirmPath => find.byKey(
       const ValueKey('choice-path-open-confirmation'),
     ),
-    _MatrixEntry.editChoice => dailyChoiceDetailsOptions,
     _MatrixEntry.createRelation => find.byKey(
       const ValueKey('intention-relations-add'),
     ),
@@ -439,7 +433,6 @@ void _registerPageMatrixTests() {
   });
 
   const read = _MatrixEntry.intention;
-  const daily = _MatrixEntry.dailyChoice;
   const cases = <_PageCase>[
     (
       name: 'намерение',
@@ -502,12 +495,6 @@ void _registerPageMatrixTests() {
       ],
     ),
     (
-      name: 'изменение дневного выбора',
-      page: DailyChoiceEditPage,
-      panel: false,
-      entries: [daily, _MatrixEntry.editChoice],
-    ),
-    (
       name: 'поиск участника исходящей группы',
       page: RelationBatchPickerPage,
       panel: false,
@@ -538,7 +525,6 @@ void _registerPageMatrixTests() {
           _MatrixEntry.intention ||
           _MatrixEntry.creation ||
           _MatrixEntry.condition => AppDestination.intentionGraph,
-          _MatrixEntry.dailyChoice ||
           _MatrixEntry.source ||
           _MatrixEntry.action => AppDestination.dailyChoices,
           _ => null,
@@ -569,8 +555,6 @@ void _registerPageMatrixTests() {
               openedPage: find.byType(DailyChoiceActionPickerPage),
               wait: _until,
             );
-          case _MatrixEntry.editChoice:
-            await openDailyChoiceEdit(tester, tap: _tap);
           default:
             if (entry == _MatrixEntry.createRelation ||
                 entry == _MatrixEntry.outgoingRelations ||

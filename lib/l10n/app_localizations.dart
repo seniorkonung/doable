@@ -2833,6 +2833,12 @@ abstract class AppLocalizations {
   /// **'Daily choice deleted.'**
   String get dailyChoiceDeleted;
 
+  /// Пункт меню дневного выбора, открывающий изменение имеющегося описания
+  ///
+  /// In en, this message translates to:
+  /// **'Edit the description'**
+  String get dailyChoiceSheetOptionEditDescription;
+
   /// Пункт удаления дневного выбора
   ///
   /// In en, this message translates to:

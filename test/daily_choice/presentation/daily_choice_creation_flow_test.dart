@@ -445,20 +445,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(dailyChoiceDetailsField('18:00'), findsOneWidget);
       expect(shownDailyChoiceHead(tester).priority, DoablePriority.p2);
-      await openDailyChoiceEdit(tester, tap: _tap);
-      await _waitFor(
-        tester,
-        find.byKey(const ValueKey('daily-choice-edit-submit')),
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('Время: 18:00'), findsOneWidget);
-      expect(find.text('Приоритет P2'), findsOneWidget);
-      await _tap(tester, find.text('Весь день'));
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('daily-choice-edit-submit')),
-      );
-      await _waitFor(tester, dailyChoiceDetailsReady);
+      await setDailyChoiceAllDay(tester, tap: _tap);
+      await _waitFor(tester, dailyChoiceDetailsField('Весь день'));
       await tester.pumpAndSettle();
       expect(dailyChoiceDetailsField('Весь день'), findsOneWidget);
       expect(shownDailyChoiceHead(tester).priority, DoablePriority.p2);

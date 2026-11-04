@@ -49,6 +49,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../support/daily_choice_creation_controls.dart';
+import '../support/daily_choice_detail_fields_controls.dart';
 import '../support/daily_choice_details_controls.dart';
 
 import '../support/app_root_pages.dart';
@@ -386,27 +387,7 @@ void main() {
       final repository = ready.container.read(personalGraphRepositoryProvider);
 
       gate.arm(fail: true);
-      await openDailyChoiceEdit(tester, tap: _tap);
-      await _until(
-        tester,
-        () => find
-            .byKey(const ValueKey('daily-choice-edit-date'))
-            .evaluate()
-            .isNotEmpty,
-      );
-      await tester.pumpAndSettle(const Duration(milliseconds: 1));
-      await tester.enterText(
-        find.byKey(const ValueKey('daily-choice-edit-date')),
-        '2027-01-02',
-      );
-      await tester.enterText(
-        find.byKey(const ValueKey('daily-choice-edit-description')),
-        'Запись до commit',
-      );
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('daily-choice-edit-submit')),
-      );
+      await changeDailyChoiceDescription(tester, 'Запись до commit', tap: _tap);
       await _until(tester, () => gate.hasEntered);
       expect(_storedDate(harness, 202), '2026-09-23');
       final failedRead = repository.getDailyChoice(durabilityChoice(202));
@@ -445,6 +426,7 @@ void main() {
         findsWidgets,
       );
       await tester.pumpAndSettle();
+      expect(dailyChoiceDetails, findsNothing);
       ScaffoldMessenger.of(
         tester.element(
           find.byKey(const ValueKey('graph-operation-message')).first,
@@ -456,23 +438,14 @@ void main() {
         findsNothing,
       );
 
+      // Закрытая до результата панель открывается заново.
+      await _tap(tester, find.byKey(const ValueKey('daily-choice-row-2')));
+      await _until(tester, () => dailyChoiceDetailsReady.evaluate().isNotEmpty);
       gate.arm(fail: false);
-      await openDailyChoiceEdit(tester, tap: _tap);
-      await _until(
+      await setDailyChoiceDate(
         tester,
-        () => find
-            .byKey(const ValueKey('daily-choice-edit-date'))
-            .evaluate()
-            .isNotEmpty,
-      );
-      await tester.pumpAndSettle(const Duration(milliseconds: 1));
-      await tester.enterText(
-        find.byKey(const ValueKey('daily-choice-edit-date')),
-        '2027-01-02',
-      );
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('daily-choice-edit-submit')),
+        CalendarDate.fromParts(2027, 1, 2),
+        tap: _tap,
       );
       await _until(tester, () => gate.hasEntered);
       var readCompleted = false;
@@ -508,6 +481,7 @@ void main() {
       );
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await tester.pumpAndSettle();
+      expect(dailyChoiceDetails, findsNothing);
       expect(
         find.byKey(const ValueKey('graph-operation-message')),
         findsNothing,

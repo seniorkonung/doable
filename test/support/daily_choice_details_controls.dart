@@ -5,6 +5,8 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_sheet.dart';
 import 'package:doable/src/design_system/components/choice_head.dart';
+import 'package:doable/src/design_system/components/options_menu.dart';
+import 'package:doable/src/design_system/components/top_bar.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -54,17 +56,56 @@ Future<void> closeDailyChoiceDetails(WidgetTester tester) async {
   expect(dailyChoiceDetails, findsNothing);
 }
 
-/// Открывает форму изменения выбора.
-Future<void> openDailyChoiceEdit(
-  WidgetTester tester, {
+/// Полоса изменения описания: пока она видна, описание не сохранено.
+Finder get dailyChoiceDescriptionEdit =>
+    find.descendant(of: dailyChoiceDetails, matching: find.byType(TopBar));
+
+/// Меняет описание под полосой: открывает его пунктом меню параметров, вводит
+/// [text] и нажимает «Сохранить». Полоса скрывается после подтверждённой
+/// записи, и её дожидается сам сценарий.
+Future<void> changeDailyChoiceDescription(
+  WidgetTester tester,
+  String text, {
   RootPageTap tap = tapWhenFound,
-}) => _chooseOption(tester, tap, (l10n) => l10n.dailyChoiceEditTitle);
+}) async {
+  final l10n = _l10n(tester);
+  // Название пункта зависит от того, есть ли описание.
+  await _chooseOption(
+    tester,
+    tap,
+    RegExp(
+      '^(${RegExp.escape(l10n.dailyChoiceSheetOptionEditDescription)}|'
+      '${RegExp.escape(l10n.detailsAddDescription)})\$',
+    ),
+  );
+  await pumpUntilFound(tester, dailyChoiceDescriptionEdit);
+  await tester.pumpAndSettle();
+  await tester.enterText(
+    find.descendant(
+      of: dailyChoiceDetails,
+      matching: find.byType(EditableText),
+    ),
+    text,
+  );
+  await tester.pump();
+  await tap(
+    tester,
+    find.descendant(
+      of: dailyChoiceDescriptionEdit,
+      matching: find.text(l10n.dailyChoiceSheetDescriptionSave),
+    ),
+  );
+}
 
 /// Начинает удаление выбора.
 Future<void> startDailyChoiceDeletion(
   WidgetTester tester, {
   RootPageTap tap = tapWhenFound,
-}) => _chooseOption(tester, tap, (l10n) => l10n.dailyChoiceSheetOptionDelete);
+}) => _chooseOption(
+  tester,
+  tap,
+  RegExp('^${RegExp.escape(_l10n(tester).dailyChoiceSheetOptionDelete)}\$'),
+);
 
 /// Показывает вкладку сохранённого пути.
 Future<void> showDailyChoicePath(
@@ -104,16 +145,26 @@ Future<void> openDailyChoicePathRelation(
   await tap(tester, dailyChoiceDetailsRelation(number));
 }
 
-/// Выбирает пункт меню параметров. Действие пункта начинается после закрытия
-/// меню, поэтому результат дожидается сам сценарий.
+/// Выбирает пункт меню параметров с названием [name]. Действие пункта
+/// начинается после закрытия меню, поэтому результат дожидается сам сценарий.
 Future<void> _chooseOption(
   WidgetTester tester,
   RootPageTap tap,
-  String Function(AppLocalizations) name,
+  Pattern name,
 ) async {
   await tap(tester, dailyChoiceDetailsOptions);
   await tester.pumpAndSettle();
-  await tap(tester, find.text(name(_l10n(tester))));
+  // Подсказка «Добавить описание» в «Обзоре» под меню называется так же.
+  await tap(
+    tester,
+    find.descendant(
+      of: find.byWidgetPredicate(
+        (widget) => widget is OptionsMenu,
+        description: 'меню параметров',
+      ),
+      matching: find.textContaining(name),
+    ),
+  );
 }
 
 AppLocalizations _l10n(WidgetTester tester) =>

@@ -530,6 +530,7 @@
   "tagUnexpected": "Действие с тегом не выполнено из-за непредвиденной ошибки.",
   "dailyChoiceCreated": "Дневной выбор создан.",
   "dailyChoiceDeleted": "Дневной выбор удалён.",
+  "dailyChoiceSheetOptionEditDescription": "Изменить описание",
   "dailyChoiceSheetOptionDelete": "Удалить дневной выбор",
   "dailyChoiceDeleteDialogTitle": "Удалить дневной выбор?",
   "dailyChoiceDeleteDialogBefore": "Выбор ",

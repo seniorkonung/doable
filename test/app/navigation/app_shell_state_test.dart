@@ -57,6 +57,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/daily_choice_detail_fields_controls.dart';
 import '../../support/daily_choice_details_controls.dart';
 
 import '../../support/app_root_pages.dart';
@@ -447,21 +448,9 @@ void main() {
         tester,
         find.byKey(ValueKey('intention-choices-row-${tagFixtureId(changed)}')),
       );
-      await _until(tester, dailyChoiceDetails);
-      await openDailyChoiceEdit(tester, tap: _tap);
-      await _until(
-        tester,
-        find.byKey(const ValueKey('daily-choice-edit-date')),
-      );
-      await tester.enterText(
-        find.byKey(const ValueKey('daily-choice-edit-date')),
-        _viewedDate.toCanonicalString(),
-      );
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('daily-choice-edit-submit')),
-      );
       await _until(tester, dailyChoiceDetailsReady);
+      await setDailyChoiceDate(tester, _viewedDate, tap: _tap);
+      await _waitFor(tester, () => shownDailyChoiceDate(tester) == _viewedDate);
       await closeDailyChoiceDetails(tester);
       await _tap(tester, find.text(app.l10n.statisticsSectionTitle).first);
       // Флажок доступен в другом каталоге; корневой остаётся скрытым.

@@ -25,6 +25,10 @@ import 'app_root_pages.dart';
 /// Блок полей, показанный на экране.
 Finder get dailyChoiceDetailFields => find.byType(DailyChoiceDetailFields);
 
+/// Дата, показанная в поле «Дата». В панели это подтверждённая дата выбора.
+CalendarDate shownDailyChoiceDate(WidgetTester tester) =>
+    tester.widget<DailyChoiceDetailFields>(dailyChoiceDetailFields).date;
+
 /// Задаёт выбору [date] в листе даты: шаг переходит к её месяцу и нажимает
 /// день. [tap] нажимает поле «Дата»; остальное происходит внутри листа.
 Future<void> setDailyChoiceDate(
@@ -34,9 +38,7 @@ Future<void> setDailyChoiceDate(
 }) async {
   final semantics = tester.ensureSemantics();
   try {
-    final shown = tester
-        .widget<DailyChoiceDetailFields>(dailyChoiceDetailFields)
-        .date;
+    final shown = shownDailyChoiceDate(tester);
     await _openField(tester, tap, (l10n) => l10n.dailyChoiceFieldDate);
     final l10n = _l10n(tester);
     // Каталог под панелью тоже показывает месяц с такими же подписями.

@@ -4,6 +4,7 @@ import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
+import 'package:doable/src/daily_choice/presentation/details/daily_choice_detail_fields.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_creation_page.dart';
 import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
@@ -25,6 +26,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../support/daily_choice_creation_controls.dart';
+import '../support/daily_choice_detail_fields_controls.dart';
 import '../support/daily_choice_details_controls.dart';
 
 import '../support/app_root_pages.dart';
@@ -109,28 +111,22 @@ Future<void> _createFromPath(WidgetTester tester) async {
   await tester.pumpAndSettle(const Duration(milliseconds: 1));
 }
 
-Future<void> _edit(
-  WidgetTester tester, {
-  String? date,
-  String? description,
-}) async {
-  await openDailyChoiceEdit(tester, tap: _tap);
-  final submit = find.byKey(const ValueKey('daily-choice-edit-submit'));
-  await _until(tester, submit);
-  if (date != null) {
-    await tester.enterText(
-      find.byKey(const ValueKey('daily-choice-edit-date')),
-      date,
-    );
-  }
-  if (description != null) {
-    await tester.enterText(
-      find.byKey(const ValueKey('daily-choice-edit-description')),
-      description,
-    );
-  }
-  await _tap(tester, submit);
-  await _until(tester, dailyChoiceDetailsReady);
+/// Переносит выбор на [date] в панели и ждёт подтверждённой записи.
+Future<void> _changeDate(WidgetTester tester, CalendarDate date) async {
+  await setDailyChoiceDate(tester, date, tap: _tap);
+  await _until(
+    tester,
+    find.byWidgetPredicate(
+      (widget) => widget is DailyChoiceDetailFields && widget.date == date,
+    ),
+  );
+  await tester.pumpAndSettle(const Duration(milliseconds: 1));
+}
+
+/// Меняет описание под полосой и ждёт подтверждённой записи.
+Future<void> _changeDescription(WidgetTester tester, String text) async {
+  await changeDailyChoiceDescription(tester, text, tap: _tap);
+  await _untilGone(tester, dailyChoiceDescriptionEdit);
   await tester.pumpAndSettle(const Duration(milliseconds: 1));
 }
 
@@ -504,11 +500,10 @@ void main() {
         ),
         findsOneWidget,
       );
+      await _changeDate(tester, CalendarDate.fromParts(2027, 1, 2));
       await showDailyChoicePath(tester, tap: _tap);
       expect(dailyChoiceDetailsRelation(1), findsOneWidget);
       expect(dailyChoiceDetailsRelation(2), findsOneWidget);
-
-      await _edit(tester, date: '2027-01-02');
       expect(
         (await _read(repository, editedId)).choice.date,
         CalendarDate.fromParts(2027, 1, 2),
@@ -545,7 +540,7 @@ void main() {
         tester.getSemantics(dailyChoiceDetailsRelation(2)).label,
         contains('Архивировано'),
       );
-      await _edit(tester, description: 'После архивирования');
+      await _changeDescription(tester, 'После архивирования');
       expect(
         await repository.execute(
           DisableIntentionReadiness(durabilityIntention(3)),

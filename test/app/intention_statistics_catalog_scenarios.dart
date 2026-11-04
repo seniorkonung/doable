@@ -604,24 +604,8 @@ Future<void> _editChoice(
   WidgetTester tester, {
   required CalendarDate date,
 }) async {
-  await openDailyChoiceEdit(tester);
-  await _wait(
-    tester,
-    () => find.byType(DailyChoiceEditPage).evaluate().isNotEmpty,
-  );
-  await tester.pumpAndSettle();
-  await tester.enterText(
-    find.byKey(const ValueKey('daily-choice-edit-date')),
-    date.toCanonicalString(),
-  );
-  final submit = find.byKey(const ValueKey('daily-choice-edit-submit'));
-  await tester.pump();
-  await tester.ensureVisible(submit);
-  await tester.tap(submit);
-  await _wait(
-    tester,
-    () => find.byType(DailyChoiceEditPage).evaluate().isEmpty,
-  );
+  await setDailyChoiceDate(tester, date);
+  await _wait(tester, () => shownDailyChoiceDate(tester) == date);
   await tester.pumpAndSettle();
   expect(dailyChoiceDetails, findsOneWidget);
 }

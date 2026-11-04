@@ -1334,6 +1334,8 @@
   "@dailyChoiceDeleted": {
     "description": "Подтверждение удаления дневного выбора"
   },
+  "dailyChoiceSheetOptionEditDescription": "Edit the description",
+  "@dailyChoiceSheetOptionEditDescription": {"description": "Пункт меню дневного выбора, открывающий изменение имеющегося описания"},
   "dailyChoiceSheetOptionDelete": "Delete daily choice",
   "@dailyChoiceSheetOptionDelete": {"description": "Пункт удаления дневного выбора"},
   "dailyChoiceDeleteDialogTitle": "Delete daily choice?",
