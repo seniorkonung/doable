@@ -1106,3 +1106,16 @@
   - **Зависимости:** 4.11.
   - **Предполагаемые файлы:** меняется `test/daily_choice/presentation/editor/daily_choice_creation_page_test.dart`.
   - **Размер:** XS.
+
+- [ ] 4.22 Запись, которая ничего не изменила, не оставляет панель ждать снимок
+  - **Критерии приёмки:**
+    - После собственной подтверждённой записи `change` модель `DailyChoiceDetailsViewModel` в `lib/src/daily_choice/presentation/details/daily_choice_details_view_model.dart` не входит в `DailyChoiceDetailsOperationAwaitingSnapshot`, если показанный загруженный снимок уже содержит записанные значения из подтверждённого `DailyChoiceFieldsUpdated.choice`: дату, описание, выполнение, время и приоритет, сравнённые по значению. Тогда операция сразу становится `DailyChoiceDetailsOperationIdle`, а `change` завершается успехом, даже если ревизия подтверждения новее ревизии показанного снимка и нового снимка подписка не выпустит.
+    - Если хотя бы одно из этих значений в показанном снимке отличается от записанного, ожидание снимка остаётся таким, как задано в 4.17.
+    - Контракт прикладного слоя, `DailyChoiceFieldsUpdated`, `ConfirmedGraphResult`, репозиторий и подписка `watchDailyChoice` не меняются. `daily_choice_sheet.dart` не меняется, и «Сохранить» для пробельного ввода в пустое описание остаётся доступной.
+    - Отказ записи, удаление, закрытие панели и прежние выходы из ожидания снимка ведут себя как сейчас. Сообщения об успехе нет.
+    - Тест модели: показан снимок с ревизией R(n), запись без изменения значений подтверждена более новой ревизией, нового снимка нет. `change` завершается успехом, операция — `DailyChoiceDetailsOperationIdle`, новые операции разрешены.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/details`.
+  - **Зависимости:** 4.17.
+  - **Предполагаемые файлы:** меняются `lib/src/daily_choice/presentation/details/daily_choice_details_view_model.dart`, `test/daily_choice/presentation/details/daily_choice_details_view_model_test.dart`.
+  - **Размер:** XS.
