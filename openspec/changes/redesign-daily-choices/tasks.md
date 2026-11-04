@@ -1119,3 +1119,17 @@
   - **Зависимости:** 4.17.
   - **Предполагаемые файлы:** меняются `lib/src/daily_choice/presentation/details/daily_choice_details_view_model.dart`, `test/daily_choice/presentation/details/daily_choice_details_view_model_test.dart`.
   - **Размер:** XS.
+
+- [ ] 4.23 Формат часов циферблата и подписей времени дневных выборов решается в одном месте
+  - **Критерии приёмки:**
+    - Формат часов (12 или 24) для циферблата и всех подписей времени дневных выборов решает только `dailyChoiceUsesTwelveHourClock` в `lib/src/daily_choice/presentation/details/daily_choice_field_labels.dart`, и её комментарий о единственном месте выбора формата верен.
+    - `dailyChoiceTimeValue` форматирует время с форматом из `dailyChoiceUsesTwelveHourClock`, например `MaterialLocalizations.of(context).formatTimeOfDay(time, alwaysUse24HourFormat: !dailyChoiceUsesTwelveHourClock(context))`, а не выбирает формат сам через `TimeOfDay.format(context)`. Комментарии обеих функций описывают это устройство.
+    - Задача заменяет критерий 4.18 о том, что `dailyChoiceTimeValue` строит время через `TimeOfDay.format`. Остальные критерии 4.18 действуют.
+    - Видимый вывод не меняется: русская локаль при выключенном 24-часовом времени показывает «18:00» и 24-часовой циферблат, английская — «6:00 PM» и 12-часовой циферблат, английская при включённом 24-часовом времени — 24-часовой циферблат.
+    - «Весь день», подписи половин суток, `backup_descriptions.dart`, `TimeDial` и лист времени не меняются.
+    - Существующие тесты совпадения формата циферблата и подписей в `test/daily_choice/presentation/details/daily_choice_time_sheet_test.dart` и `test/daily_choice/presentation/details/daily_choice_sheet_test.dart` проходят без ослабления. Новый тест добавляется, только если они не ловят расхождение формата циферблата и подписей времени.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/details test/daily_choice/presentation/catalog`.
+  - **Зависимости:** 4.18.
+  - **Предполагаемые файлы:** меняется `lib/src/daily_choice/presentation/details/daily_choice_field_labels.dart`.
+  - **Размер:** XS.
