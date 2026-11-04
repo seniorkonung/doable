@@ -764,7 +764,7 @@
   - **Предполагаемые файлы:** `lib/src/design_system/components/relation_head.dart`, `test/design_system/relation_head_test.dart`.
   - **Размер:** S.
 
-- [ ] 3.21 Неиспользуемая строка `dailyChoiceDeleteAction` удалена из локализации
+- [x] 3.21 Неиспользуемая строка `dailyChoiceDeleteAction` удалена из локализации
   - **Критерии приёмки:**
     - Ключ `dailyChoiceDeleteAction` удалён из `lib/l10n/app_ru.arb` и `lib/l10n/app_en.arb`, в английском файле вместе с описанием `@dailyChoiceDeleteAction`. Его единственным потребителем была страница подробного просмотра, удалённая в задаче 3.16.
     - `app_localizations.dart`, `app_localizations_ru.dart` и `app_localizations_en.dart` получены только `mise run codegen`, без ручных правок.

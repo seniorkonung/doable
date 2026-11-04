@@ -1854,9 +1854,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get dailyChoiceDeleted => 'Дневной выбор удалён.';
 
   @override
-  String get dailyChoiceDeleteAction => 'Удалить дневной выбор навсегда';
-
-  @override
   String get dailyChoiceSheetOptionDelete => 'Удалить дневной выбор';
 
   @override

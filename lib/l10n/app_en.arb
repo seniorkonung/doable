@@ -1338,10 +1338,6 @@
   "@dailyChoiceDeleted": {
     "description": "Подтверждение удаления дневного выбора"
   },
-  "dailyChoiceDeleteAction": "Delete daily choice permanently",
-  "@dailyChoiceDeleteAction": {
-    "description": "Открытие отдельного подтверждения удаления дневного выбора"
-  },
   "dailyChoiceSheetOptionDelete": "Delete daily choice",
   "@dailyChoiceSheetOptionDelete": {"description": "Пункт удаления дневного выбора"},
   "dailyChoiceDeleteDialogTitle": "Delete daily choice?",

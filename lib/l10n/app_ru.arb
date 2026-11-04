@@ -524,7 +524,6 @@
   "dailyChoiceCreated": "Дневной выбор создан.",
   "dailyChoiceUpdated": "Дневной выбор изменён.",
   "dailyChoiceDeleted": "Дневной выбор удалён.",
-  "dailyChoiceDeleteAction": "Удалить дневной выбор навсегда",
   "dailyChoiceSheetOptionDelete": "Удалить дневной выбор",
   "dailyChoiceDeleteDialogTitle": "Удалить дневной выбор?",
   "dailyChoiceDeleteDialogBefore": "Выбор ",

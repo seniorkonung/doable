@@ -2827,12 +2827,6 @@ abstract class AppLocalizations {
   /// **'Daily choice deleted.'**
   String get dailyChoiceDeleted;
 
-  /// Открытие отдельного подтверждения удаления дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Delete daily choice permanently'**
-  String get dailyChoiceDeleteAction;
-
   /// Пункт удаления дневного выбора
   ///
   /// In en, this message translates to:
