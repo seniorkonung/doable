@@ -33,23 +33,28 @@ String dailyChoiceDateValue(
 String dailyChoiceFullDate(BuildContext context, CalendarDate date) =>
     DateFormat.yMMMMEEEEd(_locale(context)).format(_dateTime(date));
 
-/// Время поля в формате часов устройства; минуты показываются как сохранены.
+/// Время поля в формате часов из [dailyChoiceUsesTwelveHourClock]; минуты
+/// показываются как сохранены.
+///
+/// Формат не выбирается здесь: время строится под тот же формат, что и
+/// циферблат, поэтому подписи не расходятся с ним.
 String dailyChoiceTimeValue(
   BuildContext context,
   DailyChoiceSchedule schedule,
 ) => switch (schedule) {
   DailyChoiceAllDay() => AppLocalizations.of(context).dailyChoiceAllDay,
-  DailyChoiceTime(:final hour, :final minute) => TimeOfDay(
-    hour: hour,
-    minute: minute,
-  ).format(context),
+  DailyChoiceTime(:final hour, :final minute) =>
+    MaterialLocalizations.of(context).formatTimeOfDay(
+      TimeOfDay(hour: hour, minute: minute),
+      alwaysUse24HourFormat: !dailyChoiceUsesTwelveHourClock(context),
+    ),
 };
 
 /// Показывает ли формат часов дневных выборов половину суток.
 ///
-/// Единственное место выбора формата: итоговый формат складывается из
-/// настройки 24-часового времени устройства и шаблона локали, как у
-/// [TimeOfDay.format], на котором стоят поле «Время» и все подписи часов.
+/// Единственное место выбора формата для циферблата и всех подписей времени:
+/// итоговый формат складывается из настройки 24-часового времени устройства и
+/// шаблона локали. Остальные места берут формат отсюда и не решают его сами.
 bool dailyChoiceUsesTwelveHourClock(BuildContext context) =>
     hourFormat(
       of: MaterialLocalizations.of(context).timeOfDayFormat(

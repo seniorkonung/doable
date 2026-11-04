@@ -1120,7 +1120,7 @@
   - **Предполагаемые файлы:** меняются `lib/src/daily_choice/presentation/details/daily_choice_details_view_model.dart`, `test/daily_choice/presentation/details/daily_choice_details_view_model_test.dart`.
   - **Размер:** XS.
 
-- [ ] 4.23 Формат часов циферблата и подписей времени дневных выборов решается в одном месте
+- [x] 4.23 Формат часов циферблата и подписей времени дневных выборов решается в одном месте
   - **Критерии приёмки:**
     - Формат часов (12 или 24) для циферблата и всех подписей времени дневных выборов решает только `dailyChoiceUsesTwelveHourClock` в `lib/src/daily_choice/presentation/details/daily_choice_field_labels.dart`, и её комментарий о единственном месте выбора формата верен.
     - `dailyChoiceTimeValue` форматирует время с форматом из `dailyChoiceUsesTwelveHourClock`, например `MaterialLocalizations.of(context).formatTimeOfDay(time, alwaysUse24HourFormat: !dailyChoiceUsesTwelveHourClock(context))`, а не выбирает формат сам через `TimeOfDay.format(context)`. Комментарии обеих функций описывают это устройство.
