@@ -19,7 +19,7 @@ accepted ADRs are immutable.
 - [ADR-0009](../../../docs/adr/0009-unify-personal-graph-module-and-revision.md) — accepted. Запись панели идёт через один координатор и пакеты изменений. Ограничение.
 - [ADR-0012](../../../docs/adr/0012-centralize-graph-operation-result-presentation.md) — accepted. Отказ принадлежит открытой панели и переходит общей поверхности после её закрытия. Ограничение для D2.
 - [ADR-0020](../../../docs/adr/0020-host-persistent-navigation-in-ordinary-page-scaffolds.md) — proposed, изменение `add-quick-creation-and-persistent-navigation` в архиве. Страницы и каркасы сохраняются, лист к ним не относится.
-- [ADR-0022](../../../docs/adr/0022-complete-creation-flows-within-owned-route-boundaries.md) — proposed, изменение `add-quick-creation-and-persistent-navigation` в архиве. Граница потока сохраняется, правило о замене корня для дневного выбора пересматривает ADR-0053.
+- [ADR-0022](../../../docs/adr/0022-complete-creation-flows-within-owned-route-boundaries.md) — proposed, изменение `add-quick-creation-and-persistent-navigation` в архиве. Граница потока сохраняется, правило о замене корня для дневного выбора пересматривает ADR-0054.
 - [ADR-0030](../../../docs/adr/0030-keep-design-system-components-presentational.md) — proposed, изменение `redesign-daily-choice-calendar` в архиве. Новые компоненты остаются представлениями и появляются вместе с потребителем.
 - [ADR-0032](../../../docs/adr/0032-present-design-system-sheets-over-root-navigator.md) — proposed, изменение `redesign-navigation-bar` в архиве. Панель показывается общей функцией листа.
 - [ADR-0033](../../../docs/adr/0033-coordinate-daily-choice-sections-on-one-revision.md) — proposed, изменение `enrich-daily-choice-catalog` в архиве. Обе секции уже читаются на одной ревизии, поэтому счётчики и признак времени дня доступны без нового чтения.
@@ -40,4 +40,4 @@ accepted ADRs are immutable.
 
 ## ADRs Owned by This Change
 
-- [ADR-0053](../../../docs/adr/0053-show-and-change-daily-choice-in-one-routeless-sheet.md) — proposed. Лист без маршрута как единственное место просмотра и изменения, кроме флажка выполнения в карточке, создание без открытия сущности и страницы поверх листа.
+- [ADR-0054](../../../docs/adr/0054-show-and-change-daily-choice-in-one-routeless-sheet.md) — proposed. Лист без маршрута как единственное место просмотра и изменения, кроме флажка выполнения в карточке, создание без открытия сущности и страницы поверх листа.

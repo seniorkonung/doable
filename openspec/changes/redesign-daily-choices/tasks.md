@@ -808,31 +808,33 @@
 
 ## Phase 4: Выбор меняется на месте одними полями
 
-- [ ] 4.1 В ветке этого изменения есть `main` с завершённым и архивированным `add-relations-in-batches`
+- [ ] 4.1 В ветке этого изменения есть `main` с архивированными `add-relations-in-batches` и `open-full-intention-pages-from-pickers`
   - **Критерии приёмки:**
-    - Коммит `19a1625d` из `main` — слияние `change/add-relations-in-batches` вместе с его архивацией `3fab3364` — входит в историю ветки. Вливается именно он, а не более поздняя вершина `main`: перечень конфликтов ниже посчитан для него. Если коммит уже в истории, задача только выполняет проверки.
-    - Конфликты решены в пользу этого изменения там, где оно удалило поведение: `daily_choice_path_replace_page.dart` и `daily_choice_path_replacement_flow_test.dart` остаются удалёнными, а `ReplaceDailyChoicePath`, `DailyChoicePathReplaced` и `DailyChoiceCommandKind.replace` не возвращаются. Поведение фаз 3 и 4 `add-relations-in-batches` работает как в `main`.
-    - Изменения обеих сторон одного файла сохраняются, если не противоречат друг другу: например, `OrdinaryPageScaffold` получает и `floatingActionButton` этой ветки, и `pickerFooter` из `main`, а `Badge.archivedInline` этой ветки остаётся вместе с удалением `Badge.word` в `main`.
-    - Каталога `openspec/changes/add-relations-in-batches/` нет: изменение лежит в архиве, а канонические спецификации содержат его итоговый текст. Строки обеих сторон сохранены в ARB, а созданные файлы получены `mise run codegen`, а не правкой вручную.
+    - Коммит `52f6cf70` из `main` — слияние PR #83 `change/open-full-intention-pages-from-pickers` вместе с его архивацией — входит в историю ветки. Он содержит и слияние `change/add-relations-in-batches` `19a1625d` с архивацией `3fab3364`. Вливается именно `52f6cf70`, а не более поздняя вершина `main`: перечень конфликтов ниже посчитан для него. Если коммит уже в истории, задача только выполняет проверки.
+    - Конфликты решены в пользу этого изменения там, где оно удалило поведение: `daily_choice_path_replace_page.dart` и `daily_choice_path_replacement_flow_test.dart` остаются удалёнными, а `ReplaceDailyChoicePath`, `DailyChoicePathReplaced` и `DailyChoiceCommandKind.replace` не возвращаются. Поведение фаз 3 и 4 `add-relations-in-batches` и `open-full-intention-pages-from-pickers` работает как в `main`: в том числе панель навигации видна на страницах над поиском участника связи.
+    - Изменения обеих сторон одного файла сохраняются, если не противоречат друг другу: например, `Badge.archivedInline` этой ветки остаётся вместе с удалением `Badge.word` в `main`. `OrdinaryPageScaffold` сливается без конфликта и сохраняет `floatingActionButton` этой ветки без `pickerFooter`, который убрал `main`.
+    - В `docs/adr/README.md` по порядку номеров стоят строка и пояснение ADR-0053 из `main` и строка и пояснение ADR-0054 этого изменения. Файл `docs/adr/0053-open-ordinary-pages-independently-of-picker-history.md` не меняется, а ADR этого изменения лежит в `docs/adr/0054-show-and-change-daily-choice-in-one-routeless-sheet.md`.
+    - Каталогов `openspec/changes/add-relations-in-batches/` и `openspec/changes/open-full-intention-pages-from-pickers/` нет: оба изменения лежат в архиве, а канонические спецификации содержат их итоговый текст. Строки обеих сторон сохранены в ARB, а созданные файлы получены `mise run codegen`, а не правкой вручную.
   - **Проверка:**
-    - `git merge-base --is-ancestor 19a1625d HEAD`.
+    - `git merge-base --is-ancestor 52f6cf70 HEAD`.
     - `mise run codegen-check`.
     - `mise exec --no-deps -- flutter analyze`.
     - `mise exec --no-deps -- flutter test test/app test/daily_choice test/data_transfer test/design_system test/graph test/graph_snapshots test/intention test/long_term_relation`: слияние меняет все эти модули.
     - `git grep -nE 'ReplaceDailyChoicePath|DailyChoicePathReplaced|daily_choice_path_replace' -- lib test` ничего не находит.
+    - `git grep -n '0053-show-and-change' -- docs` ничего не находит.
   - **Зависимости:** нет.
   - **Предполагаемые файлы:**
-    - конфликтуют `lib/src/app/navigation/ordinary_page_scaffold.dart`, `lib/src/app/routing/app_router.gr.dart`, `lib/src/daily_choice/presentation/daily_choice_creation_flow_session.dart`, `lib/src/daily_choice/presentation/path/choice_path_page.dart`, `lib/src/design_system/components/badge.dart`, `lib/src/graph/application/graph_command_coordinator.g.dart`;
+    - конфликтуют `lib/src/app/routing/app_router.gr.dart`, `lib/src/daily_choice/presentation/daily_choice_creation_flow_session.dart`, `lib/src/daily_choice/presentation/path/choice_path_page.dart`, `lib/src/design_system/components/badge.dart`, `lib/src/graph/application/graph_command_coordinator.g.dart`, `docs/adr/README.md`;
     - конфликтуют `test/app/creation_flows_test_support.dart`, `test/app/navigation/app_shell_pages_above_test.dart`, `app_shell_unnamed_page_scenarios.dart`, `test/daily_choice/presentation/daily_choice_creation_completion_test.dart`, `daily_choice_creation_flow_test.dart`, `test/graph/data/drift_graph_fact_log_completeness_test.dart`, `drift_graph_fact_log_write_test.dart`;
     - остаются удалёнными `lib/src/daily_choice/presentation/editor/daily_choice_path_replace_page.dart`, `test/daily_choice/presentation/daily_choice_path_replacement_flow_test.dart`.
   - **Размер:** M по логике: файлов больше нормы, но нового поведения нет.
 
-- [ ] 4.2 Дельты изменения сверены с итоговым текстом требований `add-relations-in-batches`
+- [ ] 4.2 Дельты изменения сверены с итоговым текстом требований `add-relations-in-batches` и `open-full-intention-pages-from-pickers`
   - **Критерии приёмки:**
-    - Список пересечений из `design.md`, D12, пересчитан по каноническим спецификациям после задачи 4.1: сравнено каждое требование, которое это изменение помечает `MODIFIED` или `REMOVED` и которое меняло `add-relations-in-batches`.
-    - Каждое такое `MODIFIED` сохраняет всё, что внёс `add-relations-in-batches`, кроме частей, которые это изменение убирает намеренно: замены пути, открытия созданного дневного выбора и страницы подробного просмотра. `REMOVED` убирают только требования, которые убирает это изменение. Копия «Атомарность и согласованность изменений дневного выбора» совпадает с итоговым текстом «Атомарность и согласованность операций дневного выбора», кроме частей о замене пути.
+    - Список пересечений из `design.md`, D12, пересчитан по каноническим спецификациям после задачи 4.1: сравнено каждое требование, которое это изменение помечает `MODIFIED` или `REMOVED` и которое меняло `add-relations-in-batches` или `open-full-intention-pages-from-pickers`.
+    - Каждое такое `MODIFIED` сохраняет всё, что внесли эти изменения, кроме частей, которые это изменение убирает намеренно: замены пути, открытия созданного дневного выбора и страницы подробного просмотра. «Панель на обычных страницах независимо от истории» отличается от канона только подробным просмотром дневного выбора, который открывается листом поверх страницы, и отсутствием изменения дневного выбора с выбором направления и заменой пути. Исключения для поиска участника связи и сценария «Страницы над поиском участника скрывают панель» в дельте нет. `REMOVED` убирают только требования, которые убирает это изменение. Копия «Атомарность и согласованность изменений дневного выбора» совпадает с итоговым текстом «Атомарность и согласованность операций дневного выбора», кроме частей о замене пути.
     - Строгая проверка проходит без сообщений о ненайденных требованиях.
-    - Список D12 соответствует пересчитанному, а утверждения D12 и раздела рисков о том, что требований `add-relations-in-batches` нет в каноне, заменены итогом сверки.
+    - Список D12 соответствует пересчитанному, а утверждения D12 и раздела рисков о том, что требований этих изменений нет в каноне ветки, заменены итогом сверки.
     - Поведение, которое реализуют остальные задачи фазы, не меняется. Если сверка требует его изменить, задача останавливается и называет расхождение: решение принимает человек.
   - **Проверка:**
     - `mise exec --no-deps -- openspec validate redesign-daily-choices --strict`.
