@@ -5,7 +5,7 @@
 **Format version:** 1
 **Result:** Changes needed
 **Coverage status:** Complete
-**Summary:** Фаза 4 выполнена и проверена. Слияние `main` на `52f6cf70` сохранило удаления этого изменения, дельты сверены с каноном, а дата, время, приоритет и описание меняются в панели. Общий блок полей стоит и на подтверждении создания, форма изменения удалена. `mise run check` и `mise run codegen-check` на проверенной голове проходят. Открыты две находки низкой важности: F5 и F6. Остаточный риск AR1 перенесён без изменений.
+**Summary:** Фаза 4 выполнена и проверена. Слияние `main` на `52f6cf70` сохранило удаления этого изменения, дельты сверены с каноном, а дата, время, приоритет и описание меняются в панели. Общий блок полей стоит и на подтверждении создания, форма изменения удалена. `mise run check` и `mise run codegen-check` на проверенной голове проходят. Открыта одна находка низкой важности: F6. Остаточный риск AR1 перенесён без изменений.
 
 ## Review target
 
@@ -72,21 +72,11 @@
 
 | Pass | Status | Evidence or limitation |
 |---|---|---|
-| Independent decision review | Complete | Три свежих изолированных проверяющих получили нейтральные брифы без планирования, истории коммитов и прежнего отчёта. U1 проверен на коммите слияния (`4da9c18bf6c7701a87c7c22ae9fdc6f9485a0389..ff39e59dd44b32c9e4547b22ca3d789b292ac292`, вторая сторона `52f6cf7064f86510db24ebbd7e25a47d83a97300`, плюс `--remerge-diff`) по всем 24 путям: существенных замечаний нет. U3 проверен на `d20553b3c1af1235e10c3ca0aed87897ecfcbb2f..f7d098e2c91f9314ea44462296e24621635d0191` по 10 путям. Группа U2, U4 и U5 на том же диапазоне получила все 57 путей, а после первого раунда — ещё 10 путей U3, от которых зависят её исходы; покрытие полное. Открытое из найденного отражено в F5. |
+| Independent decision review | Complete | Три свежих изолированных проверяющих получили нейтральные брифы без планирования, истории коммитов и прежнего отчёта. U1 проверен на коммите слияния (`4da9c18bf6c7701a87c7c22ae9fdc6f9485a0389..ff39e59dd44b32c9e4547b22ca3d789b292ac292`, вторая сторона `52f6cf7064f86510db24ebbd7e25a47d83a97300`, плюс `--remerge-diff`) по всем 24 путям: существенных замечаний нет. U3 проверен на `d20553b3c1af1235e10c3ca0aed87897ecfcbb2f..f7d098e2c91f9314ea44462296e24621635d0191` по 10 путям. Группа U2, U4 и U5 на том же диапазоне получила все 57 путей, а после первого раунда — ещё 10 путей U3, от которых зависят её исходы; покрытие полное. Открытого из найденного не осталось. |
 | OpenSpec conformance | Complete | На проверенной голове прочитаны proposal, design D2–D5 и D12, plan.md Phase 4, задачи 4.1–4.16 и дельты `daily-choice-management`, `bottom-sheets` и `app-navigation`. Проверки 4.1: `git merge-base --is-ancestor 52f6cf70` проходит, оба `git grep` пусты, `daily_choice_path_replace_page.dart` и `daily_choice_path_replacement_flow_test.dart` отсутствуют. Проверки 4.11 и 4.15 (`git grep`) тоже пусты. Шесть `MODIFIED` из D12 сверены по словам с `openspec/specs`: отличия только в замене пути, открытии созданного выбора и странице подробного просмотра. `mise exec --no-deps -- openspec validate redesign-daily-choices --strict --json` — valid, без сообщений. `mise run check` — exit 0: формат 881 файла без изменений, `flutter analyze` — «No issues found!», 4213 обычных и 18 процессных тестов проходят. `mise run codegen-check` — exit 0, дерево после него чистое. Запуск в `/home/seniorkonung/.paseo/worktrees/1id27gtb/purple-scorpion`, где `HEAD` равен проверенной голове и дерево чистое. |
 | Code quality | Complete | Пять осей `code-review-and-quality` по всем путям U2–U5 и по разрешению конфликтов U1. Контекст: `graph_command_coordinator.dart` (политика `silentSuccess`, `_acceptOperation`), `daily_choice_catalog_view_model.dart` (`DailyChoiceCompletionAwaitingSnapshot`), `drift_personal_graph_repository_daily_choice_reads.dart`, `priority_picker.dart`, `daily_choice_creation_view_model.dart`, `daily_choice_result.dart`, `month_grid_day.dart`, `doable_metrics.dart`, `openspec/specs/app-appearance/spec.md`, `flutter_localizations` (`timeOfDayFormat`). |
 
 ## Findings
-
-### F5 · Low — У `TimeDial` есть параметры, которые не нужны ни одному вызову
-
-- **Evidence:** `lib/src/design_system/components/time_dial.dart:358` объявляет `Widget Function(bool showsFocus) builder`, и `:417` передаёт `showsFocus`. Оба вызова отбрасывают аргумент как `(_) =>` (`:450`, `:505`), а кольцо фокуса рисует сам `_DialButton` (`:414-415`).
-  Публичный `allDayHint` (`:89`, `:103`) идёт в доступное название кнопки «Весь день» отдельно от видимого `allDayLabel` (`:327-328`). Единственный потребитель передаёт в оба одну и ту же строку (`lib/src/daily_choice/presentation/details/daily_choice_time_sheet.dart:47-48`).
-- **Evidence revisions:** ["f7d098e2c91f9314ea44462296e24621635d0191"]
-- **Impact:** Лишний аргумент и лишний обязательный параметр расширяют контракт компонента без вызова, которому они нужны. Каждый следующий потребитель обязан передавать дубликат строки, а читатель ищет различие, которого нет. Это избыточность по правилу `proven-necessity`.
-- **Required outcome:** У `TimeDial` и его частей нет параметров и аргументов, которые не нужны текущему вызову. Доступные названия часов и «Весь день» остаются задаваемыми потребителем.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** ["lib/src/design_system/components/time_dial.dart","lib/src/daily_choice/presentation/details/daily_choice_time_sheet.dart","test/design_system/time_dial_test.dart"]
 
 ### F6 · Low — Тест подтверждения создания проверяет отказ по полю даты, которого система не порождает
 
@@ -136,6 +126,6 @@
 
 **Перенесённое состояние.** В прежнем отчёте активных находок не было. Номера новых находок начинаются с F2, потому что F1 — исходная находка AR1. AR1 сохранён: `list_state.dart`, `day_heading.dart`, порог `_wordMaxScale`, шрифт, типографика и отступы заголовка дня в диапазоне не менялись. В `daily_choice_catalog_body.dart` изменилась только подпись времени группы, поэтому условий повторного открытия нет.
 
-**Исправления этой стадии.** Код, тесты и артефакты планирования не менялись. Проверка фиксирует находки и не добавляет по ним задач. Находки F5 и F6 переходят в последующие стадии решения находок.
+**Исправления этой стадии.** Код, тесты и артефакты планирования не менялись. Проверка фиксирует находки и не добавляет по ним задач. Находка F6 переходит в последующие стадии решения находок.
 
 **Устройство.** Устройство и эмулятор не использовались. Ручная проверка на устройстве остаётся за владельцем продукта по сборке `build/app/outputs/flutter-apk/app-debug.apk`: изменение полей и описания в панели, циферблат в 12-часовом формате, поле описания над клавиатурой.

@@ -1082,3 +1082,16 @@
   - **Зависимости:** 4.6.
   - **Предполагаемые файлы:** меняются `lib/src/design_system/components/tabs.dart`, `lib/src/design_system/components/time_dial.dart`, `test/design_system/tabs_test.dart`, `test/design_system/time_dial_test.dart`.
   - **Размер:** S.
+
+- [ ] 4.20 У `TimeDial` и его частей нет параметров, которые не нужны текущему вызову
+  - **Критерии приёмки:**
+    - Построитель содержимого `_DialButton` в `lib/src/design_system/components/time_dial.dart` больше не принимает `showsFocus`: параметр становится построителем без аргументов или готовым дочерним виджетом. Кольцо фокуса по-прежнему рисует сама кнопка.
+    - Публичного параметра `allDayHint` у `TimeDial` и его внутренних частей нет. Доступное название кнопки «Весь день» берётся из `allDayLabel`. Доступные названия часов по-прежнему задаёт потребитель через `hourLabel`.
+    - Лист времени в `lib/src/daily_choice/presentation/details/daily_choice_time_sheet.dart` больше не передаёт `allDayHint`.
+    - Видимый текст, доступные названия, кольцо фокуса и поведение циферблата не меняются.
+    - Тесты `test/design_system/time_dial_test.dart` меняются только там, где передавали удалённый параметр или ждали его значение как доступное название кнопки «Весь день».
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/time_dial_test.dart test/daily_choice/presentation/details`.
+  - **Зависимости:** 4.6, 4.7, 4.18, 4.19 — обе последние тоже меняют `time_dial.dart` или лист времени, поэтому эта задача выполняется после них.
+  - **Предполагаемые файлы:** меняются `lib/src/design_system/components/time_dial.dart`, `lib/src/daily_choice/presentation/details/daily_choice_time_sheet.dart`, `test/design_system/time_dial_test.dart`.
+  - **Размер:** XS.
