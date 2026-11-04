@@ -899,7 +899,7 @@
 - [x] 4.7 Лист времени задаёт выбору целый час или «Весь день»
   - **Критерии приёмки:**
     - Функция показывает `Sheet.untitled` с `TimeDial` и возвращает `DailyChoiceSchedule`, а при закрытии без выбора — ничего. Доступное название листа называет время дневного выбора.
-    - Формат циферблата следует системной настройке 24-часового времени. Час даёт `DailyChoiceTime` с нулём минут, «Весь день» — `DailyChoiceAllDay`, и выбор закрывает лист. Запрет минут живёт только здесь, домен не сужается.
+    - Формат циферблата следует итоговому формату часов устройства и локали. Час даёт `DailyChoiceTime` с нулём минут, «Весь день» — `DailyChoiceAllDay`, и выбор закрывает лист. Запрет минут живёт только здесь, домен не сужается.
     - Отмечен текущий час или «Весь день». Сохранённое время с минутами не отмечает ничего, а при 12-часовом формате лист открывается на его половине суток.
     - Подпись времени собирает одна функция из `daily_choice_field_labels.dart`: её берут лист, поле «Время» панели и подписи групп каталога.
   - **Проверка:**
@@ -1052,4 +1052,18 @@
   - **Предполагаемые файлы:**
     - меняются `lib/src/daily_choice/presentation/details/daily_choice_details_view_model.dart` с его состоянием операции в `daily_choice_details_state.dart`, `lib/src/daily_choice/presentation/details/daily_choice_sheet.dart`;
     - меняется `test/daily_choice/presentation/details/daily_choice_sheet_test.dart`, а тест модели — если без него ожидание снимка не проверить.
+  - **Размер:** S.
+
+- [ ] 4.18 Циферблат, поле «Время» и подписи часов следуют одному итоговому формату часов устройства и локали
+  - **Критерии приёмки:**
+    - Формат часов дневных выборов определяет одна функция в `lib/src/daily_choice/presentation/details/daily_choice_field_labels.dart`. Она берёт `MaterialLocalizations.of(context).timeOfDayFormat(alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context))` и даёт 12-часовой формат, только если этот формат 12-часовой. Другого места выбора формата часов у дневных выборов нет: будущая собственная настройка формата времени в приложении переопределит только эту функцию.
+    - Лист времени выбирает `TimeDialClock12` или `TimeDialClock24` по этой функции, а не только по `MediaQuery.alwaysUse24HourFormatOf`. Начальная половина суток, подписи половин суток и остальное поведение листа не меняются.
+    - Поле «Время», подписи групп каталога и доступные названия часов циферблата по-прежнему строит `dailyChoiceTimeValue` через `TimeOfDay.format`, поэтому формат циферблата совпадает со всеми показами времени.
+    - Русская локаль при выключенном 24-часовом времени показывает 24-часовой циферблат и «18:00», английская — 12-часовой циферблат и «6:00 PM».
+    - Тест `daily_choice_sheet_test.dart`, который в русской локали при выключенном 24-часовом времени выбирает час на 12-часовом циферблате, переписан под новое поведение. Тест `daily_choice_time_sheet_test.dart` подтверждает для ru и en при выключенном 24-часовом времени, что формат циферблата совпадает с подписями часов.
+    - Подписи резервных копий в `backup_descriptions.dart` уже следуют той же политике и не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/details test/daily_choice/presentation/catalog`.
+  - **Зависимости:** 4.7, 4.9.
+  - **Предполагаемые файлы:** меняются `lib/src/daily_choice/presentation/details/daily_choice_field_labels.dart`, `lib/src/daily_choice/presentation/details/daily_choice_time_sheet.dart`, `test/daily_choice/presentation/details/daily_choice_sheet_test.dart`, `test/daily_choice/presentation/details/daily_choice_time_sheet_test.dart`.
   - **Размер:** S.
