@@ -275,7 +275,7 @@ void main() {
 
     expectButton('Час 18', selected: true);
     expectButton('Час 17', selected: false);
-    expectButton('Без времени', selected: false);
+    expectButton('Весь день', selected: false);
     semantics.dispose();
   });
 
@@ -374,7 +374,6 @@ Widget _dial({
   clock: clock,
   selection: selection,
   allDayLabel: 'Весь день',
-  allDayHint: 'Без времени',
   hourLabel: (hour) => 'Час $hour',
   onPickHour: onPickHour ?? (_) {},
   onAllDay: onAllDay ?? () {},

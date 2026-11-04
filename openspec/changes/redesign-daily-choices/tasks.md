@@ -1083,7 +1083,7 @@
   - **Предполагаемые файлы:** меняются `lib/src/design_system/components/tabs.dart`, `lib/src/design_system/components/time_dial.dart`, `test/design_system/tabs_test.dart`, `test/design_system/time_dial_test.dart`.
   - **Размер:** S.
 
-- [ ] 4.20 У `TimeDial` и его частей нет параметров, которые не нужны текущему вызову
+- [x] 4.20 У `TimeDial` и его частей нет параметров, которые не нужны текущему вызову
   - **Критерии приёмки:**
     - Построитель содержимого `_DialButton` в `lib/src/design_system/components/time_dial.dart` больше не принимает `showsFocus`: параметр становится построителем без аргументов или готовым дочерним виджетом. Кольцо фокуса по-прежнему рисует сама кнопка.
     - Публичного параметра `allDayHint` у `TimeDial` и его внутренних частей нет. Доступное название кнопки «Весь день» берётся из `allDayLabel`. Доступные названия часов по-прежнему задаёт потребитель через `hourLabel`.

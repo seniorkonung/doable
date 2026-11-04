@@ -45,7 +45,6 @@ final class _DailyChoiceTimeSheet extends StatelessWidget {
           DailyChoiceTime() => const TimeDialNothingSelected(),
         },
         allDayLabel: allDayLabel,
-        allDayHint: allDayLabel,
         hourLabel: (hour) => dailyChoiceTimeValue(
           context,
           DailyChoiceTime(hour: hour, minute: 0),

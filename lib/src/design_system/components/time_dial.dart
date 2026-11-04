@@ -86,7 +86,6 @@ final class TimeDial extends StatelessWidget {
     required this.clock,
     required this.selection,
     required this.allDayLabel,
-    required this.allDayHint,
     required this.hourLabel,
     required this.onPickHour,
     required this.onAllDay,
@@ -96,11 +95,8 @@ final class TimeDial extends StatelessWidget {
   final TimeDialClock clock;
   final TimeDialSelection selection;
 
-  /// Видимый текст центральной пилюли.
+  /// Видимый текст центральной пилюли и её доступное название.
   final String allDayLabel;
-
-  /// Доступное название центральной кнопки.
-  final String allDayHint;
 
   /// Доступное название часа от 0 до 23.
   final String Function(int hour) hourLabel;
@@ -114,7 +110,6 @@ final class TimeDial extends StatelessWidget {
       face: _Face.h24,
       selection: selection,
       allDayLabel: allDayLabel,
-      allDayHint: allDayHint,
       hourLabel: hourLabel,
       onPickHour: onPickHour,
       onAllDay: onAllDay,
@@ -123,7 +118,6 @@ final class TimeDial extends StatelessWidget {
       clock: clock12,
       selection: selection,
       allDayLabel: allDayLabel,
-      allDayHint: allDayHint,
       hourLabel: hourLabel,
       onPickHour: onPickHour,
       onAllDay: onAllDay,
@@ -136,7 +130,6 @@ final class _Dial12 extends StatefulWidget {
     required this.clock,
     required this.selection,
     required this.allDayLabel,
-    required this.allDayHint,
     required this.hourLabel,
     required this.onPickHour,
     required this.onAllDay,
@@ -145,7 +138,6 @@ final class _Dial12 extends StatefulWidget {
   final TimeDialClock12 clock;
   final TimeDialSelection selection;
   final String allDayLabel;
-  final String allDayHint;
   final String Function(int hour) hourLabel;
   final ValueChanged<int> onPickHour;
   final VoidCallback onAllDay;
@@ -185,7 +177,6 @@ final class _Dial12State extends State<_Dial12> {
       ),
       selection: widget.selection,
       allDayLabel: widget.allDayLabel,
-      allDayHint: widget.allDayHint,
       hourLabel: widget.hourLabel,
       onPickHour: widget.onPickHour,
       onAllDay: widget.onAllDay,
@@ -249,7 +240,6 @@ final class _Dial extends StatelessWidget {
     required this.face,
     required this.selection,
     required this.allDayLabel,
-    required this.allDayHint,
     required this.hourLabel,
     required this.onPickHour,
     required this.onAllDay,
@@ -260,7 +250,6 @@ final class _Dial extends StatelessWidget {
   final Widget? period;
   final TimeDialSelection selection;
   final String allDayLabel;
-  final String allDayHint;
   final String Function(int hour) hourLabel;
   final ValueChanged<int> onPickHour;
   final VoidCallback onAllDay;
@@ -324,7 +313,6 @@ final class _Dial extends StatelessWidget {
                     Center(
                       child: _AllDayButton(
                         text: allDayLabel,
-                        label: allDayHint,
                         chosen: allDayChosen,
                         maxWidth: face.centerWidth,
                         onTap: onAllDay,
@@ -342,19 +330,19 @@ final class _Dial extends StatelessWidget {
 }
 
 /// Кнопка с областью нажатия не меньше `tap-min` и кольцом фокуса вокруг
-/// содержимого, которое рисует [builder].
+/// содержимого [child].
 final class _DialButton extends StatefulWidget {
   const _DialButton({
     required this.label,
     required this.chosen,
     required this.onTap,
-    required this.builder,
+    required this.child,
   });
 
   final String label;
   final bool chosen;
   final VoidCallback onTap;
-  final Widget Function(bool showsFocus) builder;
+  final Widget child;
 
   @override
   State<_DialButton> createState() => _DialButtonState();
@@ -413,7 +401,7 @@ final class _DialButtonState extends State<_DialButton> {
               foregroundPainter: showsFocus
                   ? _FocusRingPainter(ring: colors.accent, gap: colors.bg)
                   : null,
-              child: widget.builder(showsFocus),
+              child: widget.child,
             ),
           ),
         ),
@@ -446,7 +434,7 @@ final class _HourButton extends StatelessWidget {
         label: label,
         chosen: chosen,
         onTap: onTap,
-        builder: (_) => Ink(
+        child: Ink(
           width: _hourCircle,
           height: _hourCircle,
           decoration: BoxDecoration(
@@ -478,14 +466,12 @@ final class _HourButton extends StatelessWidget {
 final class _AllDayButton extends StatelessWidget {
   const _AllDayButton({
     required this.text,
-    required this.label,
     required this.chosen,
     required this.maxWidth,
     required this.onTap,
   });
 
   final String text;
-  final String label;
   final bool chosen;
 
   /// Свободное место между часами: пилюля не ложится на них.
@@ -498,10 +484,10 @@ final class _AllDayButton extends StatelessWidget {
     final colors = theme.extension<DoableColors>()!;
     final shadows = theme.extension<DoableShadows>()!;
     return _DialButton(
-      label: label,
+      label: text,
       chosen: chosen,
       onTap: onTap,
-      builder: (_) => ConstrainedBox(
+      child: ConstrainedBox(
         constraints: BoxConstraints(
           minHeight: DoableMetrics.controlHeightSm,
           maxWidth: maxWidth,
